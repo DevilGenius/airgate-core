@@ -7,6 +7,10 @@
 *.test
 *.out
 vendor/
+backend/server
+
+# TypeScript
+*.tsbuildinfo
 
 # Frontend
 web/node_modules/
