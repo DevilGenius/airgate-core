@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+/* AirGate 设计变量 */
+:root {
+  --ag-primary: #6366f1;
+  --ag-primary-hover: #4f46e5;
+  --ag-success: #22c55e;
+  --ag-warning: #f59e0b;
+  --ag-danger: #ef4444;
+  --ag-bg: #ffffff;
+  --ag-bg-secondary: #f8fafc;
+  --ag-border: #e2e8f0;
+  --ag-text: #0f172a;
+  --ag-text-secondary: #64748b;
+  --ag-sidebar-width: 240px;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--ag-text);
+  background: var(--ag-bg-secondary);
+}
