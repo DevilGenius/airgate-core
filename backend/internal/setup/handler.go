@@ -2,6 +2,7 @@ package setup
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
@@ -9,8 +10,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RegisterRoutes 注册安装向导路由
+// 安装完成回调
+var onInstallDone func()
+
+// RegisterRoutes 注册安装向导路由（无回调）
 func RegisterRoutes(r *gin.Engine) {
+	RegisterRoutesWithCallback(r, nil)
+}
+
+// RegisterRoutesWithCallback 注册安装向导路由，安装成功后触发回调
+func RegisterRoutesWithCallback(r *gin.Engine, callback func()) {
+	onInstallDone = callback
 	setup := r.Group("/setup")
 	{
 		setup.GET("/status", handleStatus)
@@ -99,4 +109,13 @@ func handleInstall(c *gin.Context) {
 	}
 
 	response.Success(c, nil)
+
+	// 安装成功，触发回调通知主进程切换到正常模式
+	if onInstallDone != nil {
+		go func() {
+			// 延迟一点让响应先发回前端
+			time.Sleep(500 * time.Millisecond)
+			onInstallDone()
+		}()
+	}
 }

@@ -145,6 +145,12 @@ func (uu *UserUpdate) SetNillableTotpSecret(s *string) *UserUpdate {
 	return uu
 }
 
+// ClearTotpSecret clears the value of the "totp_secret" field.
+func (uu *UserUpdate) ClearTotpSecret() *UserUpdate {
+	uu.mutation.ClearTotpSecret()
+	return uu
+}
+
 // SetGroupRates sets the "group_rates" field.
 func (uu *UserUpdate) SetGroupRates(m map[int64]float64) *UserUpdate {
 	uu.mutation.SetGroupRates(m)
@@ -461,6 +467,9 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := uu.mutation.TotpSecret(); ok {
 		_spec.SetField(user.FieldTotpSecret, field.TypeString, value)
+	}
+	if uu.mutation.TotpSecretCleared() {
+		_spec.ClearField(user.FieldTotpSecret, field.TypeString)
 	}
 	if value, ok := uu.mutation.GroupRates(); ok {
 		_spec.SetField(user.FieldGroupRates, field.TypeJSON, value)
@@ -831,6 +840,12 @@ func (uuo *UserUpdateOne) SetNillableTotpSecret(s *string) *UserUpdateOne {
 	return uuo
 }
 
+// ClearTotpSecret clears the value of the "totp_secret" field.
+func (uuo *UserUpdateOne) ClearTotpSecret() *UserUpdateOne {
+	uuo.mutation.ClearTotpSecret()
+	return uuo
+}
+
 // SetGroupRates sets the "group_rates" field.
 func (uuo *UserUpdateOne) SetGroupRates(m map[int64]float64) *UserUpdateOne {
 	uuo.mutation.SetGroupRates(m)
@@ -1177,6 +1192,9 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 	}
 	if value, ok := uuo.mutation.TotpSecret(); ok {
 		_spec.SetField(user.FieldTotpSecret, field.TypeString, value)
+	}
+	if uuo.mutation.TotpSecretCleared() {
+		_spec.ClearField(user.FieldTotpSecret, field.TypeString)
 	}
 	if value, ok := uuo.mutation.GroupRates(); ok {
 		_spec.SetField(user.FieldGroupRates, field.TypeJSON, value)

@@ -55,12 +55,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// 如果启用了 TOTP，验证验证码
-	if u.TotpSecret != "" {
+	if hasTOTP(u) {
 		if req.TOTPCode == "" {
 			response.BadRequest(c, "需要 TOTP 验证码")
 			return
 		}
-		if !auth.ValidateCode(u.TotpSecret, req.TOTPCode) {
+		if !auth.ValidateCode(getTOTPSecret(u), req.TOTPCode) {
 			response.Unauthorized(c, "TOTP 验证码错误")
 			return
 		}
@@ -149,7 +149,7 @@ func (h *AuthHandler) TOTPSetup(c *gin.Context) {
 		response.InternalError(c, "获取用户信息失败")
 		return
 	}
-	if u.TotpSecret != "" {
+	if hasTOTP(u) {
 		response.BadRequest(c, "TOTP 已启用")
 		return
 	}
@@ -194,12 +194,12 @@ func (h *AuthHandler) TOTPVerify(c *gin.Context) {
 		response.InternalError(c, "获取用户信息失败")
 		return
 	}
-	if u.TotpSecret == "" {
+	if !hasTOTP(u) {
 		response.BadRequest(c, "请先设置 TOTP")
 		return
 	}
 
-	if !auth.ValidateCode(u.TotpSecret, req.Code) {
+	if !auth.ValidateCode(getTOTPSecret(u), req.Code) {
 		response.BadRequest(c, "验证码错误")
 		return
 	}
@@ -222,20 +222,20 @@ func (h *AuthHandler) TOTPDisable(c *gin.Context) {
 		response.InternalError(c, "获取用户信息失败")
 		return
 	}
-	if u.TotpSecret == "" {
+	if !hasTOTP(u) {
 		response.BadRequest(c, "TOTP 未启用")
 		return
 	}
 
 	// 验证当前 TOTP 码
-	if !auth.ValidateCode(u.TotpSecret, req.Code) {
+	if !auth.ValidateCode(getTOTPSecret(u), req.Code) {
 		response.BadRequest(c, "验证码错误")
 		return
 	}
 
 	// 清除 TOTP 密钥
 	_, err = h.db.User.UpdateOneID(userID.(int)).
-		SetTotpSecret("").
+		ClearTotpSecret().
 		Save(c.Request.Context())
 	if err != nil {
 		slog.Error("禁用 TOTP 失败", "error", err)
@@ -264,6 +264,19 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	})
 }
 
+// hasTOTP 检查用户是否启用了 TOTP
+func hasTOTP(u *ent.User) bool {
+	return u.TotpSecret != nil && *u.TotpSecret != ""
+}
+
+// getTOTPSecret 获取用户的 TOTP 密钥
+func getTOTPSecret(u *ent.User) string {
+	if u.TotpSecret == nil {
+		return ""
+	}
+	return *u.TotpSecret
+}
+
 // userToResp 将 ent User 转换为 DTO 响应
 func userToResp(u *ent.User) dto.UserResp {
 	return dto.UserResp{
@@ -273,7 +286,7 @@ func userToResp(u *ent.User) dto.UserResp {
 		Balance:        u.Balance,
 		Role:           string(u.Role),
 		MaxConcurrency: u.MaxConcurrency,
-		TOTPEnabled:    u.TotpSecret != "",
+		TOTPEnabled:    hasTOTP(u),
 		GroupRates:     u.GroupRates,
 		Status:         string(u.Status),
 		TimeMixin: dto.TimeMixin{

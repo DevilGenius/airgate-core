@@ -21,7 +21,7 @@ func (User) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Enum("role").Values("admin", "user").Default("user"),
 		field.Int("max_concurrency").Default(5),
-		field.String("totp_secret").Default("").Sensitive(),
+		field.String("totp_secret").Optional().Nillable().Sensitive(),
 		field.JSON("group_rates", map[int64]float64{}).Optional(),
 		field.Enum("status").Values("active", "disabled").Default("active"),
 		field.Time("created_at").Default(timeNow).Immutable(),

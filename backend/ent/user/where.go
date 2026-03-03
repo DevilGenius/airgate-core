@@ -445,6 +445,16 @@ func TotpSecretHasSuffix(v string) predicate.User {
 	return predicate.User(sql.FieldHasSuffix(FieldTotpSecret, v))
 }
 
+// TotpSecretIsNil applies the IsNil predicate on the "totp_secret" field.
+func TotpSecretIsNil() predicate.User {
+	return predicate.User(sql.FieldIsNull(FieldTotpSecret))
+}
+
+// TotpSecretNotNil applies the NotNil predicate on the "totp_secret" field.
+func TotpSecretNotNil() predicate.User {
+	return predicate.User(sql.FieldNotNull(FieldTotpSecret))
+}
+
 // TotpSecretEqualFold applies the EqualFold predicate on the "totp_secret" field.
 func TotpSecretEqualFold(v string) predicate.User {
 	return predicate.User(sql.FieldEqualFold(FieldTotpSecret, v))

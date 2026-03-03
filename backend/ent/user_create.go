@@ -281,10 +281,6 @@ func (uc *UserCreate) defaults() {
 		v := user.DefaultMaxConcurrency
 		uc.mutation.SetMaxConcurrency(v)
 	}
-	if _, ok := uc.mutation.TotpSecret(); !ok {
-		v := user.DefaultTotpSecret
-		uc.mutation.SetTotpSecret(v)
-	}
 	if _, ok := uc.mutation.Status(); !ok {
 		v := user.DefaultStatus
 		uc.mutation.SetStatus(v)
@@ -333,9 +329,6 @@ func (uc *UserCreate) check() error {
 	}
 	if _, ok := uc.mutation.MaxConcurrency(); !ok {
 		return &ValidationError{Name: "max_concurrency", err: errors.New(`ent: missing required field "User.max_concurrency"`)}
-	}
-	if _, ok := uc.mutation.TotpSecret(); !ok {
-		return &ValidationError{Name: "totp_secret", err: errors.New(`ent: missing required field "User.totp_secret"`)}
 	}
 	if _, ok := uc.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "User.status"`)}
@@ -403,7 +396,7 @@ func (uc *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	}
 	if value, ok := uc.mutation.TotpSecret(); ok {
 		_spec.SetField(user.FieldTotpSecret, field.TypeString, value)
-		_node.TotpSecret = value
+		_node.TotpSecret = &value
 	}
 	if value, ok := uc.mutation.GroupRates(); ok {
 		_spec.SetField(user.FieldGroupRates, field.TypeJSON, value)

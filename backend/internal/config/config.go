@@ -3,9 +3,23 @@ package config
 
 import (
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
+
+// DefaultPort 默认服务端口
+const DefaultPort = 9517
+
+// GetPort 获取服务端口（优先环境变量 PORT）
+func GetPort() int {
+	if v := os.Getenv("PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			return p
+		}
+	}
+	return DefaultPort
+}
 
 // Config 应用配置
 type Config struct {
@@ -79,16 +93,17 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 	cfg := &Config{
-		Server: ServerConfig{Port: 8080, Mode: "release"},
+		Server: ServerConfig{Port: DefaultPort, Mode: "release"},
 		JWT:    JWTConfig{ExpireHour: 24},
 	}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
 	// 环境变量覆盖
-	if v := os.Getenv("SERVER_PORT"); v != "" {
-		// 简单解析，实际可用 strconv
-		cfg.Server.Port = 8080
+	if v := os.Getenv("PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			cfg.Server.Port = p
+		}
 	}
 	return cfg, nil
 }

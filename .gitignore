@@ -8,6 +8,7 @@
 *.out
 vendor/
 backend/server
+backend/tmp/
 
 # TypeScript
 *.tsbuildinfo
@@ -25,6 +26,11 @@ web/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime
+backend/.air.toml
+backend/.installed
+backend/config.yaml
 
 # Config
 *.local

@@ -343,10 +343,6 @@ func init() {
 	userDescMaxConcurrency := userFields[5].Descriptor()
 	// user.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	user.DefaultMaxConcurrency = userDescMaxConcurrency.Default.(int)
-	// userDescTotpSecret is the schema descriptor for totp_secret field.
-	userDescTotpSecret := userFields[6].Descriptor()
-	// user.DefaultTotpSecret holds the default value on creation for the totp_secret field.
-	user.DefaultTotpSecret = userDescTotpSecret.Default.(string)
 	// userDescCreatedAt is the schema descriptor for created_at field.
 	userDescCreatedAt := userFields[9].Descriptor()
 	// user.DefaultCreatedAt holds the default value on creation for the created_at field.

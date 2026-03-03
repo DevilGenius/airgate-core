@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -31,7 +32,8 @@ func main() {
 	if setup.NeedsSetup() {
 		slog.Info("系统未安装，启动安装向导...")
 		startSetupServer()
-		return
+		// 安装完成后继续往下执行，启动正常服务
+		slog.Info("安装完成，启动主服务...")
 	}
 
 	// 加载配置
@@ -45,12 +47,15 @@ func main() {
 	startMainServer(cfg)
 }
 
-// startSetupServer 启动安装向导服务器
+// startSetupServer 启动安装向导服务器，安装完成后自动关闭
 func startSetupServer() {
 	r := gin.Default()
 
-	// 注册安装路由
-	setup.RegisterRoutes(r)
+	// 用于通知安装完成
+	done := make(chan struct{})
+	setup.RegisterRoutesWithCallback(r, func() {
+		close(done)
+	})
 
 	// 静态文件服务（前端）
 	r.Static("/assets", "web/dist/assets")
@@ -59,16 +64,23 @@ func startSetupServer() {
 		c.File("web/dist/index.html")
 	})
 
-	port := 8080
-	if v := os.Getenv("PORT"); v != "" {
-		port = 8080 // 简化
-		_ = v
-	}
+	port := config.GetPort()
+	srv := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: r}
+
 	slog.Info("安装向导服务器启动", "port", port)
-	if err := r.Run(fmt.Sprintf(":%d", port)); err != nil {
-		slog.Error("启动失败", "error", err)
-		os.Exit(1)
-	}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("安装向导启动失败", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	// 等待安装完成
+	<-done
+	slog.Info("安装完成，关闭安装向导服务器...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(ctx)
 }
 
 // startMainServer 启动主服务器

@@ -3,13 +3,21 @@ package setup
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
 	"sync"
+	"time"
 
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
+	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DouDOU-start/airgate-core/ent/migrate"
 	"github.com/DouDOU-start/airgate-core/internal/config"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
 
@@ -49,13 +57,16 @@ func TestDBConnection(host string, port int, user, password, dbname, sslmode str
 
 // TestRedisConnection 测试 Redis 连接
 func TestRedisConnection(host string, port int, password string, db int) error {
-	// 简单 TCP 连接测试
-	addr := fmt.Sprintf("%s:%d", host, port)
-	conn, err := sql.Open("postgres", "") // placeholder, 实际用 redis client
-	_ = conn
-	_ = addr
-	// 真正的实现将在 Agent-B1 中完成，这里只是框架
-	return err
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", host, port),
+		Password: password,
+		DB:       db,
+	})
+	defer rdb.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return rdb.Ping(ctx).Err()
 }
 
 // InstallParams 安装参数
@@ -86,29 +97,40 @@ func Install(params InstallParams) error {
 
 	// 2. 连接数据库，运行 Ent 迁移
 	dsn := params.DB.DSN()
-	db, err := sql.Open("postgres", dsn)
+	drv, err := entsql.Open(dialect.Postgres, dsn)
 	if err != nil {
 		return fmt.Errorf("打开数据库失败: %w", err)
 	}
-	defer db.Close()
+	client := ent.NewClient(ent.Driver(drv))
+	defer client.Close()
 
-	// TODO: 使用 Ent client 执行 schema 迁移（Agent-B1 将完善）
+	slog.Info("正在执行数据库迁移...")
+	if err := client.Schema.Create(context.Background(),
+		migrate.WithDropIndex(true),
+		migrate.WithDropColumn(true),
+	); err != nil {
+		return fmt.Errorf("数据库迁移失败: %w", err)
+	}
+	slog.Info("数据库迁移完成")
 
 	// 3. 创建管理员账户
 	hash, err := bcrypt.GenerateFromPassword([]byte(params.Admin.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("密码加密失败: %w", err)
 	}
-	_, err = db.ExecContext(context.Background(),
-		`INSERT INTO users (email, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, 'admin', 'active', NOW(), NOW())`,
-		params.Admin.Email, string(hash))
+	_, err = client.User.Create().
+		SetEmail(params.Admin.Email).
+		SetPasswordHash(string(hash)).
+		SetRole("admin").
+		SetStatus("active").
+		Save(context.Background())
 	if err != nil {
 		return fmt.Errorf("创建管理员失败: %w", err)
 	}
 
 	// 4. 写入配置文件
 	cfg := &config.Config{
-		Server:   config.ServerConfig{Port: 8080, Mode: "release"},
+		Server:   config.ServerConfig{Port: config.GetPort(), Mode: "release"},
 		Database: params.DB,
 		Redis:    params.Redis,
 		JWT:      config.JWTConfig{Secret: generateSecret(), ExpireHour: 24},
@@ -131,11 +153,10 @@ func Install(params InstallParams) error {
 }
 
 func generateSecret() string {
-	// 生成 32 字节随机密钥
 	b := make([]byte, 32)
-	_, _ = os.ReadFile("/dev/urandom") // 简化，Agent-B1 将用 crypto/rand
-	for i := range b {
-		b[i] = "abcdefghijklmnopqrstuvwxyz0123456789"[i%36]
+	if _, err := rand.Read(b); err != nil {
+		// 极端情况下的回退
+		return "airgate-default-secret-change-me"
 	}
-	return string(b)
+	return hex.EncodeToString(b)
 }

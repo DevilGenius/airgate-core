@@ -9705,7 +9705,7 @@ func (m *UserMutation) TotpSecret() (r string, exists bool) {
 // OldTotpSecret returns the old "totp_secret" field's value of the User entity.
 // If the User object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UserMutation) OldTotpSecret(ctx context.Context) (v string, err error) {
+func (m *UserMutation) OldTotpSecret(ctx context.Context) (v *string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldTotpSecret is only allowed on UpdateOne operations")
 	}
@@ -9719,9 +9719,22 @@ func (m *UserMutation) OldTotpSecret(ctx context.Context) (v string, err error) 
 	return oldValue.TotpSecret, nil
 }
 
+// ClearTotpSecret clears the value of the "totp_secret" field.
+func (m *UserMutation) ClearTotpSecret() {
+	m.totp_secret = nil
+	m.clearedFields[user.FieldTotpSecret] = struct{}{}
+}
+
+// TotpSecretCleared returns if the "totp_secret" field was cleared in this mutation.
+func (m *UserMutation) TotpSecretCleared() bool {
+	_, ok := m.clearedFields[user.FieldTotpSecret]
+	return ok
+}
+
 // ResetTotpSecret resets all changes to the "totp_secret" field.
 func (m *UserMutation) ResetTotpSecret() {
 	m.totp_secret = nil
+	delete(m.clearedFields, user.FieldTotpSecret)
 }
 
 // SetGroupRates sets the "group_rates" field.
@@ -10423,6 +10436,9 @@ func (m *UserMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *UserMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(user.FieldTotpSecret) {
+		fields = append(fields, user.FieldTotpSecret)
+	}
 	if m.FieldCleared(user.FieldGroupRates) {
 		fields = append(fields, user.FieldGroupRates)
 	}
@@ -10440,6 +10456,9 @@ func (m *UserMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *UserMutation) ClearField(name string) error {
 	switch name {
+	case user.FieldTotpSecret:
+		m.ClearTotpSecret()
+		return nil
 	case user.FieldGroupRates:
 		m.ClearGroupRates()
 		return nil

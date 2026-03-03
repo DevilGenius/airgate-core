@@ -127,8 +127,6 @@ var (
 	DefaultBalance float64
 	// DefaultMaxConcurrency holds the default value on creation for the "max_concurrency" field.
 	DefaultMaxConcurrency int
-	// DefaultTotpSecret holds the default value on creation for the "totp_secret" field.
-	DefaultTotpSecret string
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.

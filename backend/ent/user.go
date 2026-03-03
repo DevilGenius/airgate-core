@@ -31,7 +31,7 @@ type User struct {
 	// MaxConcurrency holds the value of the "max_concurrency" field.
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	// TotpSecret holds the value of the "totp_secret" field.
-	TotpSecret string `json:"-"`
+	TotpSecret *string `json:"-"`
 	// GroupRates holds the value of the "group_rates" field.
 	GroupRates map[int64]float64 `json:"group_rates,omitempty"`
 	// Status holds the value of the "status" field.
@@ -184,7 +184,8 @@ func (u *User) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field totp_secret", values[i])
 			} else if value.Valid {
-				u.TotpSecret = value.String
+				u.TotpSecret = new(string)
+				*u.TotpSecret = value.String
 			}
 		case user.FieldGroupRates:
 			if value, ok := values[i].(*[]byte); !ok {
