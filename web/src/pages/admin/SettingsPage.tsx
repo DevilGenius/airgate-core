@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../../shared/api/settings';
 import { useToast } from '../../shared/components/Toast';
@@ -6,9 +7,11 @@ import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Input } from '../../shared/components/Input';
 import { Card } from '../../shared/components/Card';
+import { Save, Loader2 } from 'lucide-react';
 import type { SettingResp, SettingItem } from '../../shared/types';
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -38,7 +41,7 @@ export default function SettingsPage() {
   const saveMutation = useMutation({
     mutationFn: (items: SettingItem[]) => settingsApi.update({ settings: items }),
     onSuccess: () => {
-      toast('success', '设置已保存');
+      toast('success', t('settings.save_success'));
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       setHasChanges(false);
     },
@@ -73,14 +76,11 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <PageHeader title="系统设置" />
-        <div className="flex items-center justify-center py-12">
-          <svg className="animate-spin h-6 w-6 text-indigo-600" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <span className="ml-2 text-gray-500">加载中...</span>
+      <div>
+        <PageHeader title={t('settings.title')} description={t('settings.description')} />
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-5 h-5 animate-spin text-[var(--ag-primary)]" />
+          <span className="ml-2 text-sm text-[var(--ag-text-tertiary)]">{t('common.loading')}</span>
         </div>
       </div>
     );
@@ -89,33 +89,45 @@ export default function SettingsPage() {
   const groups = groupSettings(settings ?? []);
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader
-        title="系统设置"
+        title={t('settings.title')}
+        description={t('settings.description')}
         actions={
-          <Button onClick={handleSave} loading={saveMutation.isPending} disabled={!hasChanges}>
-            保存
+          <Button
+            icon={<Save className="w-4 h-4" />}
+            onClick={handleSave}
+            loading={saveMutation.isPending}
+            disabled={!hasChanges}
+          >
+            {t('common.save')}
           </Button>
         }
       />
 
       {Object.keys(groups).length === 0 ? (
-        <div className="text-center py-12 text-gray-500">暂无设置项</div>
+        <div className="text-center py-16 text-[var(--ag-text-tertiary)]">
+          {t('settings.no_settings')}
+        </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {Object.entries(groups).map(([group, items]) => (
             <Card key={group} title={group}>
               <div className="space-y-4">
                 {items.map((setting) => (
                   <div key={setting.key} className="flex items-center gap-4">
-                    <label className="w-48 text-sm font-medium text-gray-700 shrink-0">
+                    <label
+                      className="w-52 shrink-0 text-xs font-medium text-[var(--ag-text-secondary)] uppercase tracking-wider"
+                      style={{ fontFamily: 'var(--ag-font-mono)' }}
+                    >
                       {setting.key}
                     </label>
-                    <Input
-                      value={editedValues[setting.key] ?? setting.value}
-                      onChange={(e) => handleChange(setting.key, e.target.value)}
-                      className="flex-1"
-                    />
+                    <div className="flex-1">
+                      <Input
+                        value={editedValues[setting.key] ?? setting.value}
+                        onChange={(e) => handleChange(setting.key, e.target.value)}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>

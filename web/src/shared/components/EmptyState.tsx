@@ -1,19 +1,29 @@
+import { useTranslation } from 'react-i18next';
+import { Inbox } from 'lucide-react';
+import { type ReactNode } from 'react';
+
 interface EmptyStateProps {
   title?: string;
   description?: string;
-  icon?: string;
+  icon?: ReactNode;
 }
 
 export function EmptyState({
-  title = '暂无数据',
-  description = '当前没有可显示的内容',
-  icon = '📭',
+  title,
+  description,
+  icon,
 }: EmptyStateProps) {
+  const { t } = useTranslation();
+  const displayTitle = title ?? t('common.no_data');
+  const displayDescription = description ?? t('common.no_data_desc');
+
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <span className="text-4xl mb-3">{icon}</span>
-      <p className="text-gray-900 font-medium">{title}</p>
-      <p className="text-sm text-gray-500 mt-1">{description}</p>
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[var(--ag-bg-surface)] mb-4">
+        {icon || <Inbox className="w-5 h-5 text-[var(--ag-text-tertiary)]" />}
+      </div>
+      <p className="text-sm font-medium text-[var(--ag-text-secondary)]">{displayTitle}</p>
+      <p className="text-xs text-[var(--ag-text-tertiary)] mt-1">{displayDescription}</p>
     </div>
   );
 }

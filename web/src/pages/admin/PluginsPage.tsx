@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pluginsApi } from '../../shared/api/plugins';
 import { useToast } from '../../shared/components/Toast';
@@ -9,6 +10,10 @@ import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { Card } from '../../shared/components/Card';
 import { Badge, StatusBadge } from '../../shared/components/Badge';
 import { Textarea } from '../../shared/components/Input';
+import {
+  Power, PowerOff, Settings, Trash2, Download, Loader2,
+  Package, User, Tag,
+} from 'lucide-react';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
 
 // 插件类型 Badge 颜色
@@ -19,6 +24,7 @@ const typeVariant: Record<string, 'info' | 'success' | 'warning'> = {
 };
 
 export default function PluginsPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -45,7 +51,7 @@ export default function PluginsPage() {
   const enableMutation = useMutation({
     mutationFn: (id: number) => pluginsApi.enable(id),
     onSuccess: () => {
-      toast('success', '插件已启用');
+      toast('success', t('plugins.enable_success'));
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
     },
     onError: (err: Error) => toast('error', err.message),
@@ -55,7 +61,7 @@ export default function PluginsPage() {
   const disableMutation = useMutation({
     mutationFn: (id: number) => pluginsApi.disable(id),
     onSuccess: () => {
-      toast('success', '插件已禁用');
+      toast('success', t('plugins.disable_success'));
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
     },
     onError: (err: Error) => toast('error', err.message),
@@ -65,7 +71,7 @@ export default function PluginsPage() {
   const uninstallMutation = useMutation({
     mutationFn: (id: number) => pluginsApi.uninstall(id),
     onSuccess: () => {
-      toast('success', '插件已卸载');
+      toast('success', t('plugins.uninstall_success'));
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
       queryClient.invalidateQueries({ queryKey: ['marketplace'] });
       setUninstallTarget(null);
@@ -77,7 +83,7 @@ export default function PluginsPage() {
   const installMutation = useMutation({
     mutationFn: (name: string) => pluginsApi.install({ name }),
     onSuccess: () => {
-      toast('success', '插件安装成功');
+      toast('success', t('plugins.install_success'));
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
       queryClient.invalidateQueries({ queryKey: ['marketplace'] });
     },
@@ -89,7 +95,7 @@ export default function PluginsPage() {
     mutationFn: ({ id, config }: { id: number; config: Record<string, unknown> }) =>
       pluginsApi.updateConfig(id, { config }),
     onSuccess: () => {
-      toast('success', '配置已保存');
+      toast('success', t('plugins.config_success'));
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
       setConfigTarget(null);
     },
@@ -124,44 +130,65 @@ export default function PluginsPage() {
   }
 
   const installedColumns: Column<PluginResp>[] = [
-    { key: 'name', title: '名称' },
-    { key: 'platform', title: '平台' },
-    { key: 'version', title: '版本' },
+    {
+      key: 'name',
+      title: t('common.name'),
+      render: (row) => <span className="text-[var(--ag-text)] font-medium">{row.name}</span>,
+    },
+    { key: 'platform', title: t('plugins.platform') },
+    {
+      key: 'version',
+      title: t('common.version'),
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>{row.version}</span>
+      ),
+    },
     {
       key: 'type',
-      title: '类型',
+      title: t('common.type'),
       render: (row) => (
         <Badge variant={typeVariant[row.type] || 'default'}>{row.type}</Badge>
       ),
     },
     {
       key: 'status',
-      title: '状态',
+      title: t('common.status'),
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'actions',
-      title: '操作',
+      title: t('common.actions'),
       render: (row) => (
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           <Button
             size="sm"
             variant="ghost"
+            icon={
+              row.status === 'enabled'
+                ? <PowerOff className="w-3.5 h-3.5" />
+                : <Power className="w-3.5 h-3.5" />
+            }
             onClick={() => togglePlugin(row)}
             loading={enableMutation.isPending || disableMutation.isPending}
           >
-            {row.status === 'enabled' ? '禁用' : '启用'}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => openConfig(row)}>
-            配置
+            {row.status === 'enabled' ? t('common.disable') : t('common.enable')}
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="text-red-600"
+            icon={<Settings className="w-3.5 h-3.5" />}
+            onClick={() => openConfig(row)}
+          >
+            {t('plugins.config')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Trash2 className="w-3.5 h-3.5" />}
+            className="text-[var(--ag-danger)]"
             onClick={() => setUninstallTarget(row)}
           >
-            卸载
+            {t('common.uninstall')}
           </Button>
         </div>
       ),
@@ -169,23 +196,26 @@ export default function PluginsPage() {
   ];
 
   const tabs = [
-    { key: 'installed' as const, label: '已安装' },
-    { key: 'marketplace' as const, label: '插件市场' },
+    { key: 'installed' as const, label: t('plugins.installed_tab') },
+    { key: 'marketplace' as const, label: t('plugins.marketplace_tab') },
   ];
 
   return (
-    <div className="p-6">
-      <PageHeader title="插件管理" />
+    <div>
+      <PageHeader
+        title={t('plugins.title')}
+        description={t('plugins.description')}
+      />
 
       {/* Tab 切换 */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="flex gap-1 mb-6 border-b border-[var(--ag-border)]">
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all duration-200 cursor-pointer ${
               activeTab === tab.key
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-[var(--ag-primary)] text-[var(--ag-primary)] shadow-[0_2px_8px_var(--ag-primary-glow)]'
+                : 'border-transparent text-[var(--ag-text-tertiary)] hover:text-[var(--ag-text-secondary)]'
             }`}
             onClick={() => setActiveTab(tab.key)}
           >
@@ -198,7 +228,7 @@ export default function PluginsPage() {
       {activeTab === 'installed' && (
         <Table
           columns={installedColumns}
-          data={(pluginsData?.list ?? [])}
+          data={pluginsData?.list ?? []}
           loading={pluginsLoading}
           rowKey={(row) => row.id as number}
         />
@@ -208,12 +238,9 @@ export default function PluginsPage() {
       {activeTab === 'marketplace' && (
         <div>
           {marketLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <svg className="animate-spin h-6 w-6 text-indigo-600" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span className="ml-2 text-gray-500">加载中...</span>
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-5 h-5 animate-spin text-[var(--ag-primary)]" />
+              <span className="ml-2 text-sm text-[var(--ag-text-tertiary)]">{t('common.loading')}</span>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -226,8 +253,8 @@ export default function PluginsPage() {
                 />
               ))}
               {(marketData?.list ?? []).length === 0 && (
-                <div className="col-span-full text-center py-12 text-gray-500">
-                  暂无可用插件
+                <div className="col-span-full text-center py-16 text-[var(--ag-text-tertiary)]">
+                  {t('plugins.no_plugins')}
                 </div>
               )}
             </div>
@@ -239,25 +266,25 @@ export default function PluginsPage() {
       <Modal
         open={!!configTarget}
         onClose={() => setConfigTarget(null)}
-        title={`配置 - ${configTarget?.name}`}
+        title={`${t('plugins.config_title')} - ${configTarget?.name}`}
         width="600px"
         footer={
           <>
             <Button variant="secondary" onClick={() => setConfigTarget(null)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveConfig} loading={configMutation.isPending}>
-              保存
+              {t('common.save')}
             </Button>
           </>
         }
       >
         <Textarea
-          label="插件配置 (JSON)"
+          label={t('plugins.config_label')}
           value={configJson}
           onChange={(e) => setConfigJson(e.target.value)}
           rows={12}
-          className="font-mono text-sm"
+          style={{ fontFamily: 'var(--ag-font-mono)' }}
           error={configError}
         />
       </Modal>
@@ -267,8 +294,8 @@ export default function PluginsPage() {
         open={!!uninstallTarget}
         onClose={() => setUninstallTarget(null)}
         onConfirm={() => uninstallTarget && uninstallMutation.mutate(uninstallTarget.id)}
-        title="卸载插件"
-        message={`确定要卸载插件「${uninstallTarget?.name}」吗？卸载后相关功能将不可用。`}
+        title={t('plugins.uninstall_title')}
+        message={t('plugins.uninstall_confirm', { name: uninstallTarget?.name })}
         loading={uninstallMutation.isPending}
         danger
       />
@@ -286,26 +313,42 @@ function MarketplaceCard({
   onInstall: () => void;
   installing: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Card>
       <div className="flex flex-col h-full">
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="font-semibold text-gray-900">{plugin.name}</h3>
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Package className="w-4 h-4 text-[var(--ag-primary)]" />
+            <h3 className="font-semibold text-[var(--ag-text)]">{plugin.name}</h3>
+          </div>
           <Badge variant={typeVariant[plugin.type] || 'default'}>{plugin.type}</Badge>
         </div>
-        <p className="text-sm text-gray-500 flex-1 mb-3">
-          {plugin.description || '暂无描述'}
+        <p className="text-sm text-[var(--ag-text-tertiary)] flex-1 mb-4 leading-relaxed">
+          {plugin.description || t('common.no_data_desc')}
         </p>
-        <div className="flex items-center justify-between text-xs text-gray-400">
-          <span>作者: {plugin.author}</span>
-          <span>v{plugin.version}</span>
+        <div className="flex items-center justify-between text-xs text-[var(--ag-text-tertiary)] mb-3">
+          <span className="flex items-center gap-1">
+            <User className="w-3 h-3" />
+            {plugin.author}
+          </span>
+          <span className="flex items-center gap-1" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            <Tag className="w-3 h-3" />
+            v{plugin.version}
+          </span>
         </div>
-        <div className="mt-3 pt-3 border-t border-gray-100">
+        <div className="pt-3 border-t border-[var(--ag-border)]">
           {plugin.installed ? (
-            <Badge variant="success">已安装</Badge>
+            <Badge variant="success">{t('plugins.already_installed')}</Badge>
           ) : (
-            <Button size="sm" onClick={onInstall} loading={installing}>
-              安装
+            <Button
+              size="sm"
+              icon={<Download className="w-3.5 h-3.5" />}
+              onClick={onInstall}
+              loading={installing}
+            >
+              {t('common.install')}
             </Button>
           )}
         </div>

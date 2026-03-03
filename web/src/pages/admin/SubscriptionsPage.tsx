@@ -1,8 +1,17 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Plus,
+  Users,
+  Settings2,
+  Layers,
+  CalendarDays,
+  User,
+} from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
-import { Input } from '../../shared/components/Input';
+import { Input, Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
 import { Modal } from '../../shared/components/Modal';
 import { StatusBadge } from '../../shared/components/Badge';
@@ -22,8 +31,16 @@ import type {
 const PAGE_SIZE = 20;
 
 export default function SubscriptionsPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const STATUS_OPTIONS = [
+    { value: '', label: t('subscriptions.all_status') },
+    { value: 'active', label: t('status.active') },
+    { value: 'expired', label: t('status.expired') },
+    { value: 'suspended', label: t('status.suspended') },
+  ];
 
   // 筛选状态
   const [page, setPage] = useState(1);
@@ -61,7 +78,7 @@ export default function SubscriptionsPage() {
   const assignMutation = useMutation({
     mutationFn: (data: AssignSubscriptionReq) => subscriptionsApi.assign(data),
     onSuccess: () => {
-      toast('success', '订阅分配成功');
+      toast('success', t('subscriptions.assign_success'));
       setShowAssignModal(false);
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
     },
@@ -72,7 +89,7 @@ export default function SubscriptionsPage() {
   const bulkMutation = useMutation({
     mutationFn: (data: BulkAssignReq) => subscriptionsApi.bulkAssign(data),
     onSuccess: () => {
-      toast('success', '批量分配成功');
+      toast('success', t('subscriptions.bulk_success'));
       setShowBulkModal(false);
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
     },
@@ -84,7 +101,7 @@ export default function SubscriptionsPage() {
     mutationFn: ({ id, data }: { id: number; data: AdjustSubscriptionReq }) =>
       subscriptionsApi.adjust(id, data),
     onSuccess: () => {
-      toast('success', '订阅调整成功');
+      toast('success', t('subscriptions.adjust_success'));
       setAdjustingSub(null);
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
     },
@@ -103,43 +120,77 @@ export default function SubscriptionsPage() {
   // 查找用户邮箱
   const getUserEmail = (userId: number) => {
     const user = usersData?.list?.find((u: UserResp) => u.id === userId);
-    return user ? user.email : `用户 #${userId}`;
+    return user ? user.email : `${t('subscriptions.user')} #${userId}`;
   };
 
   // 表格列定义
   const columns: Column<SubscriptionResp>[] = [
-    { key: 'id', title: 'ID', width: '60px' },
+    {
+      key: 'id',
+      title: t('common.id'),
+      width: '60px',
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {row.id}
+        </span>
+      ),
+    },
     {
       key: 'user_id',
-      title: '用户',
-      render: (row) => getUserEmail(row.user_id),
+      title: t('subscriptions.user'),
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          <User className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+          {getUserEmail(row.user_id)}
+        </span>
+      ),
     },
-    { key: 'group_name', title: '分组' },
+    {
+      key: 'group_name',
+      title: t('subscriptions.group'),
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          <Layers className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+          <span style={{ color: 'var(--ag-text)' }} className="font-medium">
+            {row.group_name}
+          </span>
+        </span>
+      ),
+    },
     {
       key: 'effective_at',
-      title: '生效时间',
-      render: (row) => formatDate(row.effective_at),
+      title: t('subscriptions.effective_time'),
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {formatDate(row.effective_at)}
+        </span>
+      ),
     },
     {
       key: 'expires_at',
-      title: '过期时间',
-      render: (row) => formatDate(row.expires_at),
+      title: t('subscriptions.expire_time'),
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {formatDate(row.expires_at)}
+        </span>
+      ),
     },
     {
       key: 'status',
-      title: '状态',
+      title: t('common.status'),
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'actions',
-      title: '操作',
+      title: t('common.actions'),
       render: (row) => (
         <Button
           size="sm"
           variant="ghost"
+          icon={<Settings2 className="w-3.5 h-3.5" />}
           onClick={() => setAdjustingSub(row)}
         >
-          调整
+          {t('subscriptions.adjust')}
         </Button>
       ),
     },
@@ -148,32 +199,38 @@ export default function SubscriptionsPage() {
   return (
     <div>
       <PageHeader
-        title="订阅管理"
+        title={t('subscriptions.title')}
+        description={t('subscriptions.description')}
         actions={
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setShowBulkModal(true)}>
-              批量分配
+            <Button
+              variant="secondary"
+              icon={<Users className="w-4 h-4" />}
+              onClick={() => setShowBulkModal(true)}
+            >
+              {t('subscriptions.bulk_assign')}
             </Button>
-            <Button onClick={() => setShowAssignModal(true)}>分配订阅</Button>
+            <Button
+              icon={<Plus className="w-4 h-4" />}
+              onClick={() => setShowAssignModal(true)}
+            >
+              {t('subscriptions.assign')}
+            </Button>
           </div>
         }
       />
 
       {/* 筛选 */}
-      <div className="flex items-center gap-4 mb-4">
-        <select
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+      <div className="flex items-center gap-3 mb-5">
+        <Select
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
             setPage(1);
           }}
-        >
-          <option value="">全部状态</option>
-          <option value="active">活跃</option>
-          <option value="expired">已过期</option>
-          <option value="suspended">已暂停</option>
-        </select>
+          options={STATUS_OPTIONS}
+          label={t('common.status')}
+        />
       </div>
 
       {/* 表格 */}
@@ -241,6 +298,7 @@ function AssignModal({
   onSubmit: (data: AssignSubscriptionReq) => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<AssignSubscriptionReq>({
     user_id: 0,
     group_id: 0,
@@ -257,65 +315,61 @@ function AssignModal({
     onClose();
   };
 
+  const userOptions = [
+    { value: '0', label: t('subscriptions.select_user') },
+    ...users.map((u) => ({
+      value: String(u.id),
+      label: `${u.email} (${u.username || '-'})`,
+    })),
+  ];
+
+  const groupOptions = [
+    { value: '0', label: t('subscriptions.select_group') },
+    ...groups.map((g) => ({
+      value: String(g.id),
+      label: `${g.name} (${g.platform})`,
+    })),
+  ];
+
   return (
     <Modal
       open={open}
       onClose={handleClose}
-      title="分配订阅"
+      title={t('subscriptions.assign')}
       footer={
         <>
           <Button variant="secondary" onClick={handleClose}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} loading={loading}>
-            分配
+            {t('subscriptions.assign')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">
-            用户 <span className="text-red-500">*</span>
-          </label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.user_id}
-            onChange={(e) =>
-              setForm({ ...form, user_id: Number(e.target.value) })
-            }
-          >
-            <option value={0}>请选择用户</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.email} ({u.username || '未设置'})
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          label={t('subscriptions.user')}
+          required
+          value={String(form.user_id)}
+          onChange={(e) =>
+            setForm({ ...form, user_id: Number(e.target.value) })
+          }
+          options={userOptions}
+        />
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">
-            分组 <span className="text-red-500">*</span>
-          </label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.group_id}
-            onChange={(e) =>
-              setForm({ ...form, group_id: Number(e.target.value) })
-            }
-          >
-            <option value={0}>请选择分组</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name} ({g.platform})
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          label={t('subscriptions.group')}
+          required
+          value={String(form.group_id)}
+          onChange={(e) =>
+            setForm({ ...form, group_id: Number(e.target.value) })
+          }
+          options={groupOptions}
+        />
 
         <Input
-          label="过期时间"
+          label={t('subscriptions.expire_time')}
           type="date"
           required
           value={form.expires_at ? form.expires_at.split('T')[0] : ''}
@@ -327,6 +381,7 @@ function AssignModal({
                 : '',
             })
           }
+          icon={<CalendarDays className="w-4 h-4" />}
         />
       </div>
     </Modal>
@@ -350,6 +405,7 @@ function BulkAssignModal({
   onSubmit: (data: BulkAssignReq) => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [groupId, setGroupId] = useState(0);
   const [expiresAt, setExpiresAt] = useState('');
@@ -378,72 +434,91 @@ function BulkAssignModal({
     onClose();
   };
 
+  const groupOptions = [
+    { value: '0', label: t('subscriptions.select_group') },
+    ...groups.map((g) => ({
+      value: String(g.id),
+      label: `${g.name} (${g.platform})`,
+    })),
+  ];
+
   return (
     <Modal
       open={open}
       onClose={handleClose}
-      title="批量分配订阅"
+      title={t('subscriptions.bulk_assign')}
       width="560px"
       footer={
         <>
           <Button variant="secondary" onClick={handleClose}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} loading={loading}>
-            批量分配 ({selectedUserIds.length} 人)
+            {t('subscriptions.bulk_assign_count', { count: selectedUserIds.length })}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         {/* 用户多选 */}
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">
-            选择用户 <span className="text-red-500">*</span>
+        <div className="space-y-1.5">
+          <label
+            className="block text-xs font-medium uppercase tracking-wider"
+            style={{ color: 'var(--ag-text-secondary)' }}
+          >
+            {t('subscriptions.select_users')} <span style={{ color: 'var(--ag-danger)' }}>*</span>
           </label>
-          <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto p-2 space-y-1">
+          <div
+            className="rounded-[var(--ag-radius-md)] max-h-48 overflow-y-auto p-2 space-y-0.5"
+            style={{
+              border: '1px solid var(--ag-glass-border)',
+              background: 'var(--ag-bg-surface)',
+            }}
+          >
             {users.map((u) => (
               <label
                 key={u.id}
-                className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer"
+                className="flex items-center gap-2.5 px-2 py-1.5 rounded-[var(--ag-radius-sm)] cursor-pointer transition-colors"
+                style={{ color: 'var(--ag-text-secondary)' }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = 'var(--ag-bg-hover)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = 'transparent';
+                }}
               >
                 <input
                   type="checkbox"
                   checked={selectedUserIds.includes(u.id)}
                   onChange={() => toggleUser(u.id)}
-                  className="rounded border-gray-300 text-indigo-600"
+                  className="rounded"
+                  style={{
+                    borderColor: 'var(--ag-glass-border)',
+                    accentColor: 'var(--ag-primary)',
+                  }}
                 />
-                <span className="text-sm text-gray-700">
-                  {u.email} ({u.username || '未设置'})
+                <User className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+                <span className="text-sm">
+                  {u.email} ({u.username || '-'})
                 </span>
               </label>
             ))}
           </div>
-          <p className="text-xs text-gray-500">
-            已选 {selectedUserIds.length} 个用户
+          <p className="text-xs" style={{ fontFamily: 'var(--ag-font-mono)', color: 'var(--ag-text-tertiary)' }}>
+            {t('subscriptions.selected_count', { count: selectedUserIds.length })}
           </p>
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">
-            分组 <span className="text-red-500">*</span>
-          </label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={groupId}
-            onChange={(e) => setGroupId(Number(e.target.value))}
-          >
-            <option value={0}>请选择分组</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name} ({g.platform})
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          label={t('subscriptions.group')}
+          required
+          value={String(groupId)}
+          onChange={(e) => setGroupId(Number(e.target.value))}
+          options={groupOptions}
+        />
 
         <Input
-          label="过期时间"
+          label={t('subscriptions.expire_time')}
           type="date"
           required
           value={expiresAt ? expiresAt.split('T')[0] : ''}
@@ -452,6 +527,7 @@ function BulkAssignModal({
               e.target.value ? `${e.target.value}T23:59:59Z` : '',
             )
           }
+          icon={<CalendarDays className="w-4 h-4" />}
         />
       </div>
     </Modal>
@@ -473,6 +549,7 @@ function AdjustModal({
   onSubmit: (data: AdjustSubscriptionReq) => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<AdjustSubscriptionReq>({
     expires_at: subscription.expires_at,
     status: subscription.status as 'active' | 'suspended',
@@ -482,21 +559,21 @@ function AdjustModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={`调整订阅 - ${subscription.group_name}`}
+      title={t('subscriptions.adjust_title', { name: subscription.group_name })}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button onClick={() => onSubmit(form)} loading={loading}>
-            保存
+            {t('common.save')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         <Input
-          label="过期时间"
+          label={t('subscriptions.expire_time')}
           type="date"
           value={
             form.expires_at ? form.expires_at.split('T')[0] : ''
@@ -509,24 +586,23 @@ function AdjustModal({
                 : undefined,
             })
           }
+          icon={<CalendarDays className="w-4 h-4" />}
         />
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">状态</label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.status}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                status: e.target.value as 'active' | 'suspended',
-              })
-            }
-          >
-            <option value="active">活跃</option>
-            <option value="suspended">暂停</option>
-          </select>
-        </div>
+        <Select
+          label={t('common.status')}
+          value={form.status ?? 'active'}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              status: e.target.value as 'active' | 'suspended',
+            })
+          }
+          options={[
+            { value: 'active', label: t('subscriptions.status_active') },
+            { value: 'suspended', label: t('subscriptions.status_suspended') },
+          ]}
+        />
       </div>
     </Modal>
   );

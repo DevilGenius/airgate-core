@@ -1,8 +1,19 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Key,
+  Copy,
+  AlertTriangle,
+  Shield,
+  Layers,
+} from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
-import { Input } from '../../shared/components/Input';
+import { Input, Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
 import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { StatusBadge } from '../../shared/components/Badge';
@@ -14,6 +25,7 @@ import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq, GroupResp } from '..
 const PAGE_SIZE = 20;
 
 export default function APIKeysPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -40,7 +52,7 @@ export default function APIKeysPage() {
   const createMutation = useMutation({
     mutationFn: (data: CreateAPIKeyReq) => apikeysApi.create(data),
     onSuccess: (resp) => {
-      toast('success', 'API 密钥创建成功');
+      toast('success', t('api_keys.create_success'));
       setShowCreateModal(false);
       // 显示完整密钥
       if (resp.key) {
@@ -56,7 +68,7 @@ export default function APIKeysPage() {
     mutationFn: ({ id, data }: { id: number; data: UpdateAPIKeyReq }) =>
       apikeysApi.update(id, data),
     onSuccess: () => {
-      toast('success', '密钥更新成功');
+      toast('success', t('api_keys.update_success'));
       setEditingKey(null);
       queryClient.invalidateQueries({ queryKey: ['apikeys'] });
     },
@@ -67,7 +79,7 @@ export default function APIKeysPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apikeysApi.delete(id),
     onSuccess: () => {
-      toast('success', '密钥已删除');
+      toast('success', t('api_keys.delete_success'));
       setDeletingKey(null);
       queryClient.invalidateQueries({ queryKey: ['apikeys'] });
     },
@@ -76,68 +88,117 @@ export default function APIKeysPage() {
 
   // 格式化过期时间
   const formatExpiry = (date?: string) => {
-    if (!date) return '永不过期';
+    if (!date) return t('common.never_expire');
     const d = new Date(date);
     return d.toLocaleDateString('zh-CN');
   };
 
   // 表格列定义
   const columns: Column<APIKeyResp>[] = [
-    { key: 'id', title: 'ID', width: '60px' },
-    { key: 'name', title: '名称' },
+    {
+      key: 'id',
+      title: t('common.id'),
+      width: '60px',
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {row.id}
+        </span>
+      ),
+    },
+    {
+      key: 'name',
+      title: t('common.name'),
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          <Key className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+          <span style={{ color: 'var(--ag-text)' }} className="font-medium">
+            {row.name}
+          </span>
+        </span>
+      ),
+    },
     {
       key: 'key_prefix',
-      title: '密钥前缀',
+      title: t('api_keys.key_prefix'),
       render: (row) => (
-        <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+        <code
+          className="text-xs px-2 py-0.5 rounded"
+          style={{
+            fontFamily: 'var(--ag-font-mono)',
+            background: 'var(--ag-bg-surface)',
+            color: 'var(--ag-text-secondary)',
+            border: '1px solid var(--ag-border-subtle)',
+          }}
+        >
           {row.key_prefix}...
         </code>
       ),
     },
     {
       key: 'group_id',
-      title: '分组',
+      title: t('api_keys.group'),
       render: (row) => {
         const group = groupsData?.list?.find(
           (g: GroupResp) => g.id === row.group_id,
         );
-        return group ? group.name : `#${row.group_id}`;
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+            {group ? group.name : `#${row.group_id}`}
+          </span>
+        );
       },
     },
     {
       key: 'quota',
-      title: '配额/已用',
+      title: t('api_keys.quota_used'),
       render: (row) => (
-        <span>
-          ${row.used_quota.toFixed(2)} / {row.quota_usd > 0 ? `$${row.quota_usd.toFixed(2)}` : '无限'}
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          <span style={{ color: 'var(--ag-primary)' }}>
+            ${row.used_quota.toFixed(2)}
+          </span>
+          <span style={{ color: 'var(--ag-text-tertiary)' }}> / </span>
+          <span>
+            {row.quota_usd > 0 ? `$${row.quota_usd.toFixed(2)}` : t('common.unlimited')}
+          </span>
         </span>
       ),
     },
     {
       key: 'expires_at',
-      title: '过期时间',
-      render: (row) => formatExpiry(row.expires_at),
+      title: t('api_keys.expire_time'),
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {formatExpiry(row.expires_at)}
+        </span>
+      ),
     },
     {
       key: 'status',
-      title: '状态',
+      title: t('common.status'),
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'actions',
-      title: '操作',
+      title: t('common.actions'),
       render: (row) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="ghost" onClick={() => setEditingKey(row)}>
-            编辑
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Pencil className="w-3.5 h-3.5" />}
+            onClick={() => setEditingKey(row)}
+          >
+            {t('common.edit')}
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="text-red-600"
+            icon={<Trash2 className="w-3.5 h-3.5" />}
+            style={{ color: 'var(--ag-danger)' }}
             onClick={() => setDeletingKey(row)}
           >
-            删除
+            {t('common.delete')}
           </Button>
         </div>
       ),
@@ -147,9 +208,12 @@ export default function APIKeysPage() {
   return (
     <div>
       <PageHeader
-        title="API 密钥"
+        title={t('api_keys.title')}
+        description={t('api_keys.description')}
         actions={
-          <Button onClick={() => setShowCreateModal(true)}>创建密钥</Button>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
+            {t('api_keys.create')}
+          </Button>
         }
       />
 
@@ -199,8 +263,8 @@ export default function APIKeysPage() {
         open={!!deletingKey}
         onClose={() => setDeletingKey(null)}
         onConfirm={() => deletingKey && deleteMutation.mutate(deletingKey.id)}
-        title="删除密钥"
-        message={`确定要删除密钥「${deletingKey?.name}」吗？此操作不可恢复。`}
+        title={t('api_keys.delete_key')}
+        message={t('api_keys.delete_key_confirm', { name: deletingKey?.name })}
         loading={deleteMutation.isPending}
         danger
       />
@@ -223,74 +287,84 @@ function CreateKeyModal({
   onSubmit: (data: CreateAPIKeyReq) => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<CreateAPIKeyReq>({
     name: '',
     group_id: 0,
     quota_usd: 0,
     expires_at: '',
   });
+  const [ipWhitelist, setIpWhitelist] = useState('');
+  const [ipBlacklist, setIpBlacklist] = useState('');
 
   const handleSubmit = () => {
     if (!form.name || !form.group_id) return;
+    const whitelist = ipWhitelist.trim()
+      ? ipWhitelist.split('\n').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    const blacklist = ipBlacklist.trim()
+      ? ipBlacklist.split('\n').map((s) => s.trim()).filter(Boolean)
+      : undefined;
     onSubmit({
       ...form,
       quota_usd: form.quota_usd || undefined,
       expires_at: form.expires_at || undefined,
+      ip_whitelist: whitelist,
+      ip_blacklist: blacklist,
     });
   };
 
   const handleClose = () => {
     setForm({ name: '', group_id: 0, quota_usd: 0, expires_at: '' });
+    setIpWhitelist('');
+    setIpBlacklist('');
     onClose();
   };
+
+  const groupOptions = [
+    { value: '0', label: t('api_keys.select_group') },
+    ...groups.map((g) => ({ value: String(g.id), label: `${g.name} (${g.platform})` })),
+  ];
 
   return (
     <Modal
       open={open}
       onClose={handleClose}
-      title="创建 API 密钥"
+      title={t('api_keys.create')}
+      width="560px"
       footer={
         <>
           <Button variant="secondary" onClick={handleClose}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} loading={loading}>
-            创建
+            {t('common.create')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         <Input
-          label="名称"
+          label={t('common.name')}
           required
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="给密钥起个名字"
+          placeholder={t('api_keys.name_placeholder')}
+          icon={<Key className="w-4 h-4" />}
         />
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">
-            分组 <span className="text-red-500">*</span>
-          </label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.group_id}
-            onChange={(e) =>
-              setForm({ ...form, group_id: Number(e.target.value) })
-            }
-          >
-            <option value={0}>请选择分组</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name} ({g.platform})
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          label={t('api_keys.group')}
+          required
+          value={String(form.group_id)}
+          onChange={(e) =>
+            setForm({ ...form, group_id: Number(e.target.value) })
+          }
+          options={groupOptions}
+        />
 
         <Input
-          label="配额 (USD)"
+          label={t('api_keys.quota_label')}
           type="number"
           step="0.01"
           min="0"
@@ -298,11 +372,11 @@ function CreateKeyModal({
           onChange={(e) =>
             setForm({ ...form, quota_usd: Number(e.target.value) })
           }
-          hint="设为 0 表示无限制"
+          hint={t('api_keys.quota_hint')}
         />
 
         <Input
-          label="过期时间"
+          label={t('api_keys.expire_time')}
           type="date"
           value={form.expires_at ? form.expires_at.split('T')[0] : ''}
           onChange={(e) =>
@@ -313,8 +387,60 @@ function CreateKeyModal({
                 : '',
             })
           }
-          hint="留空表示永不过期"
+          hint={t('api_keys.expire_hint')}
         />
+
+        {/* IP 白名单 */}
+        <div className="space-y-1.5">
+          <label
+            className="block text-xs font-medium uppercase tracking-wider"
+            style={{ color: 'var(--ag-text-secondary)' }}
+          >
+            {t('api_keys.ip_whitelist')}
+          </label>
+          <textarea
+            className="block w-full rounded-[var(--ag-radius-md)] border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
+            style={{
+              borderColor: 'var(--ag-glass-border)',
+              background: 'var(--ag-bg-surface)',
+              color: 'var(--ag-text)',
+              fontFamily: 'var(--ag-font-mono)',
+            }}
+            placeholder={t('api_keys.ip_placeholder')}
+            value={ipWhitelist}
+            onChange={(e) => setIpWhitelist(e.target.value)}
+            rows={2}
+          />
+          <p className="text-xs" style={{ color: 'var(--ag-text-tertiary)' }}>
+            {t('api_keys.ip_hint')}
+          </p>
+        </div>
+
+        {/* IP 黑名单 */}
+        <div className="space-y-1.5">
+          <label
+            className="block text-xs font-medium uppercase tracking-wider"
+            style={{ color: 'var(--ag-text-secondary)' }}
+          >
+            {t('api_keys.ip_blacklist')}
+          </label>
+          <textarea
+            className="block w-full rounded-[var(--ag-radius-md)] border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
+            style={{
+              borderColor: 'var(--ag-glass-border)',
+              background: 'var(--ag-bg-surface)',
+              color: 'var(--ag-text)',
+              fontFamily: 'var(--ag-font-mono)',
+            }}
+            placeholder={t('api_keys.ip_placeholder')}
+            value={ipBlacklist}
+            onChange={(e) => setIpBlacklist(e.target.value)}
+            rows={2}
+          />
+          <p className="text-xs" style={{ color: 'var(--ag-text-tertiary)' }}>
+            {t('api_keys.ip_hint')}
+          </p>
+        </div>
       </div>
     </Modal>
   );
@@ -331,14 +457,15 @@ function KeyRevealModal({
   keyValue: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(keyValue);
-      toast('success', '已复制到剪贴板');
+      toast('success', t('common.copied'));
     } catch {
-      toast('error', '复制失败，请手动复制');
+      toast('error', t('common.copy_failed'));
     }
   };
 
@@ -346,23 +473,43 @@ function KeyRevealModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="密钥已创建"
+      title={t('api_keys.key_created')}
       footer={
-        <Button onClick={onClose}>我已保存，关闭</Button>
+        <Button onClick={onClose}>{t('api_keys.key_saved_close')}</Button>
       }
     >
       <div className="space-y-4">
-        <div className="rounded-md bg-yellow-50 border border-yellow-200 p-4">
-          <p className="text-sm text-yellow-800 font-medium">
-            请立即复制并妥善保存此密钥，关闭后将无法再次查看完整密钥。
+        <div
+          className="rounded-[var(--ag-radius-md)] p-4 flex items-start gap-3"
+          style={{
+            background: 'var(--ag-warning-subtle)',
+            border: '1px solid var(--ag-warning)',
+          }}
+        >
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--ag-warning)' }} />
+          <p className="text-sm font-medium" style={{ color: 'var(--ag-warning)' }}>
+            {t('api_keys.key_created_warning')}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <code className="flex-1 bg-gray-100 px-3 py-2 rounded text-sm font-mono break-all">
+          <code
+            className="flex-1 px-3 py-2 rounded-[var(--ag-radius-md)] text-sm break-all"
+            style={{
+              fontFamily: 'var(--ag-font-mono)',
+              background: 'var(--ag-bg-surface)',
+              color: 'var(--ag-text)',
+              border: '1px solid var(--ag-glass-border)',
+            }}
+          >
             {keyValue}
           </code>
-          <Button size="sm" variant="secondary" onClick={handleCopy}>
-            复制
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<Copy className="w-3.5 h-3.5" />}
+            onClick={handleCopy}
+          >
+            {t('common.copy')}
           </Button>
         </div>
       </div>
@@ -385,38 +532,61 @@ function EditKeyModal({
   onSubmit: (data: UpdateAPIKeyReq) => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<UpdateAPIKeyReq>({
     name: apiKey.name,
     quota_usd: apiKey.quota_usd,
     expires_at: apiKey.expires_at,
     status: apiKey.status as 'active' | 'disabled',
   });
+  const [ipWhitelist, setIpWhitelist] = useState(
+    apiKey.ip_whitelist?.join('\n') ?? '',
+  );
+  const [ipBlacklist, setIpBlacklist] = useState(
+    apiKey.ip_blacklist?.join('\n') ?? '',
+  );
+
+  const handleSubmit = () => {
+    const whitelist = ipWhitelist.trim()
+      ? ipWhitelist.split('\n').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    const blacklist = ipBlacklist.trim()
+      ? ipBlacklist.split('\n').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    onSubmit({
+      ...form,
+      ip_whitelist: whitelist,
+      ip_blacklist: blacklist,
+    });
+  };
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="编辑密钥"
+      title={t('api_keys.edit')}
+      width="560px"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            取消
+            {t('common.cancel')}
           </Button>
-          <Button onClick={() => onSubmit(form)} loading={loading}>
-            保存
+          <Button onClick={handleSubmit} loading={loading}>
+            {t('common.save')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         <Input
-          label="名称"
+          label={t('common.name')}
           value={form.name ?? ''}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
+          icon={<Key className="w-4 h-4" />}
         />
 
         <Input
-          label="配额 (USD)"
+          label={t('api_keys.quota_label')}
           type="number"
           step="0.01"
           min="0"
@@ -424,11 +594,11 @@ function EditKeyModal({
           onChange={(e) =>
             setForm({ ...form, quota_usd: Number(e.target.value) })
           }
-          hint="设为 0 表示无限制"
+          hint={t('api_keys.quota_hint')}
         />
 
         <Input
-          label="过期时间"
+          label={t('api_keys.expire_time')}
           type="date"
           value={
             form.expires_at ? form.expires_at.split('T')[0] : ''
@@ -441,24 +611,70 @@ function EditKeyModal({
                 : undefined,
             })
           }
-          hint="留空表示永不过期"
+          hint={t('api_keys.expire_hint')}
         />
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">状态</label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.status}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                status: e.target.value as 'active' | 'disabled',
-              })
-            }
+        <Select
+          label={t('common.status')}
+          value={form.status ?? 'active'}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              status: e.target.value as 'active' | 'disabled',
+            })
+          }
+          options={[
+            { value: 'active', label: t('status.active') },
+            { value: 'disabled', label: t('status.disabled') },
+          ]}
+        />
+
+        {/* IP 白名单 */}
+        <div className="space-y-1.5">
+          <label
+            className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider"
+            style={{ color: 'var(--ag-text-secondary)' }}
           >
-            <option value="active">活跃</option>
-            <option value="disabled">已禁用</option>
-          </select>
+            <Shield className="w-3.5 h-3.5" />
+            {t('api_keys.ip_whitelist')}
+          </label>
+          <textarea
+            className="block w-full rounded-[var(--ag-radius-md)] border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
+            style={{
+              borderColor: 'var(--ag-glass-border)',
+              background: 'var(--ag-bg-surface)',
+              color: 'var(--ag-text)',
+              fontFamily: 'var(--ag-font-mono)',
+            }}
+            placeholder={t('api_keys.ip_placeholder')}
+            value={ipWhitelist}
+            onChange={(e) => setIpWhitelist(e.target.value)}
+            rows={2}
+          />
+        </div>
+
+        {/* IP 黑名单 */}
+        <div className="space-y-1.5">
+          <label
+            className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider"
+            style={{ color: 'var(--ag-text-secondary)' }}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            {t('api_keys.ip_blacklist')}
+          </label>
+          <textarea
+            className="block w-full rounded-[var(--ag-radius-md)] border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
+            style={{
+              borderColor: 'var(--ag-glass-border)',
+              background: 'var(--ag-bg-surface)',
+              color: 'var(--ag-text)',
+              fontFamily: 'var(--ag-font-mono)',
+            }}
+            placeholder={t('api_keys.ip_placeholder')}
+            value={ipBlacklist}
+            onChange={(e) => setIpBlacklist(e.target.value)}
+            rows={2}
+          />
         </div>
       </div>
     </Modal>

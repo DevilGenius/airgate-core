@@ -1,13 +1,26 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Zap,
+  Server,
+  Hash,
+  Gauge,
+  Layers,
+  Shield,
+} from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
-import { Input, Textarea } from '../../shared/components/Input';
+import { Input, Textarea, Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
 import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { StatusBadge } from '../../shared/components/Badge';
 import { useToast } from '../../shared/components/Toast';
 import { accountsApi } from '../../shared/api/accounts';
+import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import type {
   AccountResp,
   CreateAccountReq,
@@ -17,12 +30,23 @@ import type {
 
 const PAGE_SIZE = 20;
 
-// 已知平台列表（用于筛选和创建）
-const PLATFORMS = ['openai', 'claude', 'gemini', 'sora'];
-
 export default function AccountsPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { platforms } = usePlatforms();
+
+  const PLATFORM_OPTIONS = [
+    { value: '', label: t('accounts.all_platforms') },
+    ...platforms.map((p) => ({ value: p, label: p })),
+  ];
+
+  const STATUS_OPTIONS = [
+    { value: '', label: t('users.all_status') },
+    { value: 'active', label: t('status.active') },
+    { value: 'error', label: t('status.error') },
+    { value: 'disabled', label: t('status.disabled') },
+  ];
 
   // 筛选状态
   const [page, setPage] = useState(1);
@@ -51,7 +75,7 @@ export default function AccountsPage() {
   const createMutation = useMutation({
     mutationFn: (data: CreateAccountReq) => accountsApi.create(data),
     onSuccess: () => {
-      toast('success', '账号创建成功');
+      toast('success', t('accounts.create_success'));
       setShowCreateModal(false);
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
     },
@@ -63,7 +87,7 @@ export default function AccountsPage() {
     mutationFn: ({ id, data }: { id: number; data: UpdateAccountReq }) =>
       accountsApi.update(id, data),
     onSuccess: () => {
-      toast('success', '账号更新成功');
+      toast('success', t('accounts.update_success'));
       setEditingAccount(null);
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
     },
@@ -74,7 +98,7 @@ export default function AccountsPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => accountsApi.delete(id),
     onSuccess: () => {
-      toast('success', '账号已删除');
+      toast('success', t('accounts.delete_success'));
       setDeletingAccount(null);
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
     },
@@ -86,9 +110,9 @@ export default function AccountsPage() {
     mutationFn: (id: number) => accountsApi.test(id),
     onSuccess: (result) => {
       if (result.success) {
-        toast('success', '连通性测试通过');
+        toast('success', t('accounts.test_success'));
       } else {
-        toast('error', `连通性测试失败：${result.error_msg ?? '未知错误'}`);
+        toast('error', t('accounts.test_failed', { error: result.error_msg ?? '' }));
       }
       setTestingId(null);
     },
@@ -100,58 +124,117 @@ export default function AccountsPage() {
 
   // 表格列定义
   const columns: Column<AccountResp>[] = [
-    { key: 'id', title: 'ID', width: '60px' },
-    { key: 'name', title: '名称' },
-    { key: 'platform', title: '平台' },
+    {
+      key: 'id',
+      title: t('common.id'),
+      width: '60px',
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {row.id}
+        </span>
+      ),
+    },
+    {
+      key: 'name',
+      title: t('common.name'),
+      render: (row) => (
+        <span style={{ color: 'var(--ag-text)' }} className="font-medium">
+          {row.name}
+        </span>
+      ),
+    },
+    {
+      key: 'platform',
+      title: t('accounts.platform'),
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          <Server className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+          {row.platform}
+        </span>
+      ),
+    },
     {
       key: 'status',
-      title: '状态',
+      title: t('common.status'),
       render: (row) => <StatusBadge status={row.status} />,
     },
-    { key: 'priority', title: '优先级', width: '80px' },
-    { key: 'max_concurrency', title: '并发数', width: '80px' },
+    {
+      key: 'priority',
+      title: t('accounts.priority'),
+      width: '80px',
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {row.priority}
+        </span>
+      ),
+    },
+    {
+      key: 'max_concurrency',
+      title: t('accounts.concurrency'),
+      width: '80px',
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {row.max_concurrency}
+        </span>
+      ),
+    },
     {
       key: 'rate_multiplier',
-      title: '倍率',
+      title: t('accounts.rate_multiplier'),
       width: '80px',
-      render: (row) => `${row.rate_multiplier}x`,
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)', color: 'var(--ag-primary)' }}>
+          {row.rate_multiplier}x
+        </span>
+      ),
     },
     {
       key: 'proxy_id',
-      title: '代理',
+      title: t('accounts.proxy'),
       width: '80px',
-      render: (row) => (row.proxy_id ? `#${row.proxy_id}` : '-'),
+      render: (row) =>
+        row.proxy_id ? (
+          <span className="inline-flex items-center gap-1" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            <Shield className="w-3 h-3" style={{ color: 'var(--ag-text-tertiary)' }} />
+            #{row.proxy_id}
+          </span>
+        ) : (
+          <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
+        ),
     },
     {
       key: 'actions',
-      title: '操作',
+      title: t('common.actions'),
       render: (row) => (
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           <Button
             size="sm"
             variant="ghost"
+            icon={<Pencil className="w-3.5 h-3.5" />}
             onClick={() => setEditingAccount(row)}
           >
-            编辑
+            {t('common.edit')}
           </Button>
           <Button
             size="sm"
             variant="ghost"
+            icon={<Zap className="w-3.5 h-3.5" />}
             loading={testingId === row.id && testMutation.isPending}
             onClick={() => {
               setTestingId(row.id);
               testMutation.mutate(row.id);
             }}
           >
-            测试
+            {t('common.test')}
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="text-red-600"
+            icon={<Trash2 className="w-3.5 h-3.5" />}
+            style={{ color: 'var(--ag-danger)' }}
             onClick={() => setDeletingAccount(row)}
           >
-            删除
+            {t('common.delete')}
           </Button>
         </div>
       ),
@@ -161,42 +244,35 @@ export default function AccountsPage() {
   return (
     <div>
       <PageHeader
-        title="账号管理"
+        title={t('accounts.title')}
+        description={t('accounts.description')}
         actions={
-          <Button onClick={() => setShowCreateModal(true)}>添加账号</Button>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
+            {t('accounts.create')}
+          </Button>
         }
       />
 
       {/* 筛选 */}
-      <div className="flex items-center gap-4 mb-4">
-        <select
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+      <div className="flex items-center gap-3 mb-5">
+        <Select
           value={platformFilter}
           onChange={(e) => {
             setPlatformFilter(e.target.value);
             setPage(1);
           }}
-        >
-          <option value="">全部平台</option>
-          {PLATFORMS.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        <select
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+          options={PLATFORM_OPTIONS}
+          label={t('accounts.platform')}
+        />
+        <Select
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
             setPage(1);
           }}
-        >
-          <option value="">全部状态</option>
-          <option value="active">活跃</option>
-          <option value="error">错误</option>
-          <option value="disabled">已禁用</option>
-        </select>
+          options={STATUS_OPTIONS}
+          label={t('common.status')}
+        />
       </div>
 
       {/* 表格 */}
@@ -217,6 +293,7 @@ export default function AccountsPage() {
         onClose={() => setShowCreateModal(false)}
         onSubmit={(data) => createMutation.mutate(data)}
         loading={createMutation.isPending}
+        platforms={platforms}
       />
 
       {/* 编辑弹窗 */}
@@ -237,8 +314,8 @@ export default function AccountsPage() {
         open={!!deletingAccount}
         onClose={() => setDeletingAccount(null)}
         onConfirm={() => deletingAccount && deleteMutation.mutate(deletingAccount.id)}
-        title="删除账号"
-        message={`确定要删除账号「${deletingAccount?.name}」吗？此操作不可恢复。`}
+        title={t('accounts.delete_title')}
+        message={t('accounts.delete_confirm', { name: deletingAccount?.name })}
         loading={deleteMutation.isPending}
         danger
       />
@@ -253,12 +330,15 @@ function CreateAccountModal({
   onClose,
   onSubmit,
   loading,
+  platforms,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: CreateAccountReq) => void;
   loading: boolean;
+  platforms: string[];
 }) {
+  const { t } = useTranslation();
   const [platform, setPlatform] = useState('');
   const [form, setForm] = useState<Omit<CreateAccountReq, 'platform' | 'credentials'>>({
     name: '',
@@ -301,49 +381,51 @@ function CreateAccountModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="添加账号"
+      title={t('accounts.create')}
       width="560px"
       footer={
         <>
           <Button variant="secondary" onClick={handleClose}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} loading={loading} disabled={!platform}>
-            创建
+            {t('common.create')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">
-            平台 <span className="text-red-500">*</span>
-          </label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={platform}
-            onChange={(e) => handlePlatformChange(e.target.value)}
-          >
-            <option value="">请选择平台</option>
-            {PLATFORMS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          label={t('accounts.platform')}
+          required
+          value={platform}
+          onChange={(e) => handlePlatformChange(e.target.value)}
+          options={[
+            { value: '', label: t('accounts.select_platform') },
+            ...platforms.map((p) => ({ value: p, label: p })),
+          ]}
+        />
 
         <Input
-          label="名称"
+          label={t('common.name')}
           required
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
+          icon={<Layers className="w-4 h-4" />}
         />
 
         {/* 动态凭证字段 */}
         {schema?.fields && schema.fields.length > 0 && (
-          <div className="space-y-4 border-t border-gray-200 pt-4">
-            <p className="text-sm font-medium text-gray-700">凭证信息</p>
+          <div
+            className="space-y-4 pt-4"
+            style={{ borderTop: '1px solid var(--ag-border)' }}
+          >
+            <p
+              className="text-xs font-medium uppercase tracking-wider"
+              style={{ color: 'var(--ag-text-secondary)' }}
+            >
+              {t('accounts.credentials')}
+            </p>
             {schema.fields.map((field) => (
               <CredentialFieldInput
                 key={field.key}
@@ -358,23 +440,25 @@ function CreateAccountModal({
         )}
 
         <Input
-          label="优先级"
+          label={t('accounts.priority')}
           type="number"
           value={String(form.priority ?? 0)}
           onChange={(e) =>
             setForm({ ...form, priority: Number(e.target.value) })
           }
+          icon={<Hash className="w-4 h-4" />}
         />
         <Input
-          label="最大并发数"
+          label={t('accounts.concurrency')}
           type="number"
           value={String(form.max_concurrency ?? 5)}
           onChange={(e) =>
             setForm({ ...form, max_concurrency: Number(e.target.value) })
           }
+          icon={<Gauge className="w-4 h-4" />}
         />
         <Input
-          label="费率倍率"
+          label={t('accounts.rate_multiplier')}
           type="number"
           step="0.1"
           value={String(form.rate_multiplier ?? 1)}
@@ -439,6 +523,7 @@ function EditAccountModal({
   onSubmit: (data: UpdateAccountReq) => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<UpdateAccountReq>({
     name: account.name,
     status: account.status === 'error' ? 'active' : (account.status as 'active' | 'disabled'),
@@ -462,34 +547,43 @@ function EditAccountModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="编辑账号"
+      title={t('accounts.edit')}
       width="560px"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button
             onClick={() => onSubmit({ ...form, credentials })}
             loading={loading}
           >
-            保存
+            {t('common.save')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Input label="平台" value={account.platform} disabled />
+        <Input label={t('accounts.platform')} value={account.platform} disabled />
         <Input
-          label="名称"
+          label={t('common.name')}
           value={form.name ?? ''}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
+          icon={<Layers className="w-4 h-4" />}
         />
 
         {/* 凭证编辑 */}
         {schema?.fields && schema.fields.length > 0 && (
-          <div className="space-y-4 border-t border-gray-200 pt-4">
-            <p className="text-sm font-medium text-gray-700">凭证信息</p>
+          <div
+            className="space-y-4 pt-4"
+            style={{ borderTop: '1px solid var(--ag-border)' }}
+          >
+            <p
+              className="text-xs font-medium uppercase tracking-wider"
+              style={{ color: 'var(--ag-text-secondary)' }}
+            >
+              {t('accounts.credentials')}
+            </p>
             {schema.fields.map((field) => (
               <CredentialFieldInput
                 key={field.key}
@@ -503,40 +597,40 @@ function EditAccountModal({
           </div>
         )}
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">状态</label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.status}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                status: e.target.value as 'active' | 'disabled',
-              })
-            }
-          >
-            <option value="active">活跃</option>
-            <option value="disabled">已禁用</option>
-          </select>
-        </div>
+        <Select
+          label={t('common.status')}
+          value={form.status ?? 'active'}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              status: e.target.value as 'active' | 'disabled',
+            })
+          }
+          options={[
+            { value: 'active', label: t('status.active') },
+            { value: 'disabled', label: t('status.disabled') },
+          ]}
+        />
         <Input
-          label="优先级"
+          label={t('accounts.priority')}
           type="number"
           value={String(form.priority ?? 0)}
           onChange={(e) =>
             setForm({ ...form, priority: Number(e.target.value) })
           }
+          icon={<Hash className="w-4 h-4" />}
         />
         <Input
-          label="最大并发数"
+          label={t('accounts.concurrency')}
           type="number"
           value={String(form.max_concurrency ?? 5)}
           onChange={(e) =>
             setForm({ ...form, max_concurrency: Number(e.target.value) })
           }
+          icon={<Gauge className="w-4 h-4" />}
         />
         <Input
-          label="费率倍率"
+          label={t('accounts.rate_multiplier')}
           type="number"
           step="0.1"
           value={String(form.rate_multiplier ?? 1)}
@@ -545,7 +639,7 @@ function EditAccountModal({
           }
         />
         <Input
-          label="代理 ID"
+          label={t('accounts.proxy_id')}
           type="number"
           value={String(form.proxy_id ?? '')}
           onChange={(e) =>
@@ -554,7 +648,8 @@ function EditAccountModal({
               proxy_id: e.target.value ? Number(e.target.value) : undefined,
             })
           }
-          hint="留空表示不使用代理"
+          hint={t('accounts.proxy_hint')}
+          icon={<Shield className="w-4 h-4" />}
         />
       </div>
     </Modal>

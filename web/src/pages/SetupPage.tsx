@@ -1,51 +1,140 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '../shared/components/Button';
-import { Input } from '../shared/components/Input';
+import { Input, Select } from '../shared/components/Input';
 import { Card } from '../shared/components/Card';
 import { setupApi } from '../shared/api/setup';
+import { resetSetupCache } from '../app/router';
+import {
+  Database,
+  Server,
+  UserCog,
+  CheckCircle2,
+  Zap,
+  ArrowLeft,
+  ArrowRight,
+  Play,
+  Plug2,
+  Loader2,
+  RefreshCw,
+  CircleDot,
+  ShieldCheck,
+} from 'lucide-react';
 import type { TestDBReq, TestRedisReq, AdminSetup } from '../shared/types';
+
+// ==================== 步骤配置 ====================
+
+const STEP_KEYS = [
+  { labelKey: 'setup.step_db', icon: Database },
+  { labelKey: 'setup.step_redis', icon: Server },
+  { labelKey: 'setup.step_admin', icon: UserCog },
+  { labelKey: 'setup.step_finish', icon: CheckCircle2 },
+] as const;
 
 // ==================== 步骤指示器 ====================
 
-const STEPS = ['数据库配置', 'Redis 配置', '管理员账户', '完成安装'] as const;
-
 function Stepper({ current }: { current: number }) {
+  const { t } = useTranslation();
+
   return (
-    <div className="flex items-center justify-center mb-8">
-      {STEPS.map((label, index) => (
-        <div key={label} className="flex items-center">
-          {/* 步骤圆圈 */}
-          <div className="flex flex-col items-center">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                index < current
-                  ? 'bg-indigo-600 text-white'
-                  : index === current
-                    ? 'bg-indigo-600 text-white ring-4 ring-indigo-100'
-                    : 'bg-gray-200 text-gray-500'
-              }`}
-            >
-              {index < current ? '✓' : index + 1}
+    <div className="flex items-center justify-center mb-10">
+      {STEP_KEYS.map((step, index) => {
+        const isCompleted = index < current;
+        const isCurrent = index === current;
+        const Icon = step.icon;
+
+        return (
+          <div key={step.labelKey} className="flex items-center">
+            {/* 步骤圆点 */}
+            <div className="flex flex-col items-center">
+              <div
+                className="relative flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300"
+                style={{
+                  background: isCompleted
+                    ? 'var(--ag-primary)'
+                    : isCurrent
+                      ? 'var(--ag-primary)'
+                      : 'var(--ag-bg-surface)',
+                  border: isCompleted || isCurrent
+                    ? '2px solid var(--ag-primary)'
+                    : '2px solid var(--ag-glass-border)',
+                  boxShadow: isCurrent
+                    ? '0 0 20px var(--ag-primary-glow), 0 0 40px var(--ag-primary-glow)'
+                    : 'none',
+                }}
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className="w-5 h-5 text-white" />
+                ) : (
+                  <Icon
+                    className="w-4.5 h-4.5"
+                    style={{
+                      color: isCurrent ? 'white' : 'var(--ag-text-tertiary)',
+                    }}
+                  />
+                )}
+                {/* 当前步骤脉冲动画 */}
+                {isCurrent && (
+                  <div
+                    className="absolute inset-0 rounded-full animate-ping opacity-20"
+                    style={{ background: 'var(--ag-primary)' }}
+                  />
+                )}
+              </div>
+              <span
+                className="text-xs mt-2 whitespace-nowrap font-medium transition-colors"
+                style={{
+                  color: isCompleted || isCurrent
+                    ? 'var(--ag-primary)'
+                    : 'var(--ag-text-tertiary)',
+                }}
+              >
+                {t(step.labelKey)}
+              </span>
             </div>
-            <span
-              className={`text-xs mt-1.5 whitespace-nowrap ${
-                index <= current ? 'text-indigo-600 font-medium' : 'text-gray-400'
-              }`}
-            >
-              {label}
-            </span>
+            {/* 连接线 */}
+            {index < STEP_KEYS.length - 1 && (
+              <div
+                className="w-16 h-[2px] mx-3 mb-6 rounded-full transition-all duration-500"
+                style={{
+                  background: isCompleted
+                    ? 'var(--ag-primary)'
+                    : 'var(--ag-glass-border)',
+                  boxShadow: isCompleted
+                    ? '0 0 6px var(--ag-primary-glow)'
+                    : 'none',
+                }}
+              />
+            )}
           </div>
-          {/* 连接线 */}
-          {index < STEPS.length - 1 && (
-            <div
-              className={`w-16 h-0.5 mx-2 mb-5 ${
-                index < current ? 'bg-indigo-600' : 'bg-gray-200'
-              }`}
-            />
-          )}
-        </div>
-      ))}
+        );
+      })}
+    </div>
+  );
+}
+
+// ==================== 连接测试结果 ====================
+
+function TestResultBanner({ result }: { result: { success: boolean; error_msg?: string } | null }) {
+  const { t } = useTranslation();
+  if (!result) return null;
+
+  return (
+    <div
+      className="flex items-start gap-2.5 rounded-[var(--ag-radius-md)] px-4 py-3 text-sm"
+      style={{
+        background: result.success ? 'var(--ag-success-subtle)' : 'var(--ag-danger-subtle)',
+        color: result.success ? 'var(--ag-success)' : 'var(--ag-danger)',
+        borderLeft: `3px solid ${result.success ? 'var(--ag-success)' : 'var(--ag-danger)'}`,
+      }}
+    >
+      {result.success ? (
+        <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+      ) : (
+        <CircleDot className="w-4 h-4 mt-0.5 shrink-0" />
+      )}
+      <span>{result.success ? t('setup.test_success') : `${t('setup.test_failed')}${result.error_msg}`}</span>
     </div>
   );
 }
@@ -59,6 +148,7 @@ interface DBStepProps {
 }
 
 function DBStep({ data, onChange, onNext }: DBStepProps) {
+  const { t } = useTranslation();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; error_msg?: string } | null>(null);
 
@@ -74,25 +164,34 @@ function DBStep({ data, onChange, onNext }: DBStepProps) {
       const result = await setupApi.testDB(data);
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error_msg: err instanceof Error ? err.message : '连接失败' });
+      setTestResult({ success: false, error_msg: err instanceof Error ? err.message : t('setup.test_failed') });
     } finally {
       setTesting(false);
     }
   };
 
+  const sslOptions = [
+    { value: 'disable', label: 'disable' },
+    { value: 'require', label: 'require' },
+    { value: 'verify-ca', label: 'verify-ca' },
+    { value: 'verify-full', label: 'verify-full' },
+  ];
+
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500 mb-4">配置 PostgreSQL 数据库连接信息</p>
+      <p className="text-sm text-[var(--ag-text-secondary)] mb-2">
+        {t('setup.step_db_desc')}
+      </p>
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="主机地址"
+          label={t('setup.host')}
           value={data.host}
           onChange={(e) => update('host', e.target.value)}
           placeholder="localhost"
           required
         />
         <Input
-          label="端口"
+          label={t('setup.port')}
           type="number"
           value={data.port}
           onChange={(e) => update('port', Number(e.target.value))}
@@ -102,63 +201,54 @@ function DBStep({ data, onChange, onNext }: DBStepProps) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="用户名"
+          label={t('setup.username')}
           value={data.user}
           onChange={(e) => update('user', e.target.value)}
           placeholder="postgres"
           required
         />
         <Input
-          label="密码"
+          label={t('profile.old_password')}
           type="password"
           value={data.password || ''}
           onChange={(e) => update('password', e.target.value)}
-          placeholder="数据库密码"
+          placeholder={t('setup.db_name')}
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="数据库名"
+          label={t('setup.db_name')}
           value={data.dbname}
           onChange={(e) => update('dbname', e.target.value)}
           placeholder="airgate"
           required
         />
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">SSL 模式</label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            value={data.sslmode || 'disable'}
-            onChange={(e) => update('sslmode', e.target.value)}
-          >
-            <option value="disable">disable</option>
-            <option value="require">require</option>
-            <option value="verify-ca">verify-ca</option>
-            <option value="verify-full">verify-full</option>
-          </select>
-        </div>
+        <Select
+          label={t('setup.ssl_mode')}
+          value={data.sslmode || 'disable'}
+          onChange={(e) => update('sslmode', e.target.value)}
+          options={sslOptions}
+        />
       </div>
 
-      {/* 测试结果 */}
-      {testResult && (
-        <div
-          className={`rounded-md p-3 text-sm ${
-            testResult.success
-              ? 'bg-green-50 text-green-700 border border-green-200'
-              : 'bg-red-50 text-red-700 border border-red-200'
-          }`}
-        >
-          {testResult.success ? '连接成功' : `连接失败：${testResult.error_msg}`}
-        </div>
-      )}
+      <TestResultBanner result={testResult} />
 
       {/* 操作按钮 */}
       <div className="flex justify-between pt-4">
-        <Button variant="secondary" onClick={handleTest} loading={testing}>
-          测试连接
+        <Button
+          variant="secondary"
+          onClick={handleTest}
+          loading={testing}
+          icon={<Plug2 className="w-4 h-4" />}
+        >
+          {t('setup.test_connection')}
         </Button>
-        <Button onClick={onNext} disabled={!testResult?.success}>
-          下一步
+        <Button
+          onClick={onNext}
+          disabled={!testResult?.success}
+          icon={<ArrowRight className="w-4 h-4" />}
+        >
+          {t('setup.step_redis')}
         </Button>
       </div>
     </div>
@@ -175,6 +265,7 @@ interface RedisStepProps {
 }
 
 function RedisStep({ data, onChange, onPrev, onNext }: RedisStepProps) {
+  const { t } = useTranslation();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; error_msg?: string } | null>(null);
 
@@ -190,7 +281,7 @@ function RedisStep({ data, onChange, onPrev, onNext }: RedisStepProps) {
       const result = await setupApi.testRedis(data);
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error_msg: err instanceof Error ? err.message : '连接失败' });
+      setTestResult({ success: false, error_msg: err instanceof Error ? err.message : t('setup.test_failed') });
     } finally {
       setTesting(false);
     }
@@ -198,17 +289,19 @@ function RedisStep({ data, onChange, onPrev, onNext }: RedisStepProps) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500 mb-4">配置 Redis 缓存连接信息</p>
+      <p className="text-sm text-[var(--ag-text-secondary)] mb-2">
+        {t('setup.step_redis_desc')}
+      </p>
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="主机地址"
+          label={t('setup.host')}
           value={data.host}
           onChange={(e) => update('host', e.target.value)}
           placeholder="localhost"
           required
         />
         <Input
-          label="端口"
+          label={t('setup.port')}
           type="number"
           value={data.port}
           onChange={(e) => update('port', Number(e.target.value))}
@@ -218,58 +311,63 @@ function RedisStep({ data, onChange, onPrev, onNext }: RedisStepProps) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="密码"
+          label={t('profile.old_password')}
           type="password"
           value={data.password || ''}
           onChange={(e) => update('password', e.target.value)}
-          placeholder="留空表示无密码"
+          placeholder={t('profile.old_password_placeholder')}
         />
         <Input
-          label="数据库编号"
+          label={t('setup.db_number')}
           type="number"
           value={data.db ?? 0}
           onChange={(e) => update('db', Number(e.target.value))}
           placeholder="0"
         />
       </div>
-      <div className="flex items-center gap-2">
+      {/* TLS 开关 */}
+      <label
+        className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--ag-radius-md)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] cursor-pointer transition-colors hover:border-[var(--ag-border-focus)]"
+      >
         <input
           type="checkbox"
-          id="redis-tls"
           checked={data.tls || false}
           onChange={(e) => update('tls', e.target.checked)}
-          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+          className="h-4 w-4 rounded border-[var(--ag-glass-border)] accent-[var(--ag-primary)]"
         />
-        <label htmlFor="redis-tls" className="text-sm text-gray-700">
-          启用 TLS 加密连接
-        </label>
-      </div>
-
-      {/* 测试结果 */}
-      {testResult && (
-        <div
-          className={`rounded-md p-3 text-sm ${
-            testResult.success
-              ? 'bg-green-50 text-green-700 border border-green-200'
-              : 'bg-red-50 text-red-700 border border-red-200'
-          }`}
-        >
-          {testResult.success ? '连接成功' : `连接失败：${testResult.error_msg}`}
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-[var(--ag-text-tertiary)]" />
+          <span className="text-sm text-[var(--ag-text-secondary)]">{t('setup.enable_tls')}</span>
         </div>
-      )}
+      </label>
+
+      <TestResultBanner result={testResult} />
 
       {/* 操作按钮 */}
       <div className="flex justify-between pt-4">
         <div className="flex gap-2">
-          <Button variant="ghost" onClick={onPrev}>
-            上一步
+          <Button
+            variant="ghost"
+            onClick={onPrev}
+            icon={<ArrowLeft className="w-4 h-4" />}
+          >
+            {t('setup.step_db')}
           </Button>
-          <Button variant="secondary" onClick={handleTest} loading={testing}>
-            测试连接
+          <Button
+            variant="secondary"
+            onClick={handleTest}
+            loading={testing}
+            icon={<Plug2 className="w-4 h-4" />}
+          >
+            {t('setup.test_connection')}
           </Button>
         </div>
-        <Button onClick={onNext} disabled={!testResult?.success}>
-          下一步
+        <Button
+          onClick={onNext}
+          disabled={!testResult?.success}
+          icon={<ArrowRight className="w-4 h-4" />}
+        >
+          {t('setup.step_admin')}
         </Button>
       </div>
     </div>
@@ -286,22 +384,24 @@ interface AdminStepProps {
 }
 
 function AdminStep({ data, onChange, onPrev, onNext }: AdminStepProps) {
+  const { t } = useTranslation();
+
   const update = (field: string, value: string) => {
     onChange({ ...data, [field]: value });
   };
 
   // 密码强度检查
-  const getPasswordStrength = (pwd: string): { label: string; color: string } => {
-    if (pwd.length < 6) return { label: '太短', color: 'text-red-500' };
-    if (pwd.length < 8) return { label: '弱', color: 'text-yellow-500' };
+  const getPasswordStrength = (pwd: string): { label: string; color: string; width: string } => {
+    if (pwd.length < 6) return { label: t('setup.password_too_short'), color: 'var(--ag-danger)', width: '20%' };
+    if (pwd.length < 8) return { label: t('setup.strength_weak'), color: 'var(--ag-danger)', width: '35%' };
     const hasUpper = /[A-Z]/.test(pwd);
     const hasLower = /[a-z]/.test(pwd);
     const hasNumber = /\d/.test(pwd);
     const hasSpecial = /[^A-Za-z0-9]/.test(pwd);
     const score = [hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length;
-    if (score >= 3 && pwd.length >= 10) return { label: '强', color: 'text-green-600' };
-    if (score >= 2) return { label: '中等', color: 'text-yellow-500' };
-    return { label: '弱', color: 'text-red-500' };
+    if (score >= 3 && pwd.length >= 10) return { label: t('setup.strength_strong'), color: 'var(--ag-success)', width: '100%' };
+    if (score >= 2) return { label: t('setup.strength_fair'), color: 'var(--ag-warning)', width: '65%' };
+    return { label: t('setup.strength_weak'), color: 'var(--ag-danger)', width: '35%' };
   };
 
   const passwordMismatch = data.confirmPassword && data.password !== data.confirmPassword;
@@ -315,9 +415,11 @@ function AdminStep({ data, onChange, onPrev, onNext }: AdminStepProps) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500 mb-4">创建系统管理员账户</p>
+      <p className="text-sm text-[var(--ag-text-secondary)] mb-2">
+        {t('setup.step_admin_desc')}
+      </p>
       <Input
-        label="管理员邮箱"
+        label={t('setup.admin_email')}
         type="email"
         value={data.email}
         onChange={(e) => update('email', e.target.value)}
@@ -326,35 +428,56 @@ function AdminStep({ data, onChange, onPrev, onNext }: AdminStepProps) {
       />
       <div>
         <Input
-          label="密码"
+          label={t('profile.new_password')}
           type="password"
           value={data.password}
           onChange={(e) => update('password', e.target.value)}
-          placeholder="至少 8 个字符"
+          placeholder={t('setup.password_too_short')}
           required
-          error={passwordTooShort ? '密码至少需要 8 个字符' : undefined}
+          error={passwordTooShort ? t('setup.password_too_short') : undefined}
         />
         {strength && !passwordTooShort && (
-          <p className={`text-xs mt-1 ${strength.color}`}>密码强度：{strength.label}</p>
+          <div className="mt-2 space-y-1">
+            <div
+              className="h-1 rounded-full overflow-hidden"
+              style={{ background: 'var(--ag-bg-surface)' }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: strength.width, background: strength.color }}
+              />
+            </div>
+            <p className="text-xs" style={{ color: strength.color }}>
+              {t('setup.password_strength')}:{strength.label}
+            </p>
+          </div>
         )}
       </div>
       <Input
-        label="确认密码"
+        label={t('profile.confirm_new_password')}
         type="password"
         value={data.confirmPassword}
         onChange={(e) => update('confirmPassword', e.target.value)}
-        placeholder="再次输入密码"
+        placeholder={t('profile.confirm_placeholder')}
         required
-        error={passwordMismatch ? '两次输入的密码不一致' : undefined}
+        error={passwordMismatch ? t('profile.password_mismatch') : undefined}
       />
 
       {/* 操作按钮 */}
       <div className="flex justify-between pt-4">
-        <Button variant="ghost" onClick={onPrev}>
-          上一步
+        <Button
+          variant="ghost"
+          onClick={onPrev}
+          icon={<ArrowLeft className="w-4 h-4" />}
+        >
+          {t('setup.step_redis')}
         </Button>
-        <Button onClick={onNext} disabled={!canProceed}>
-          下一步
+        <Button
+          onClick={onNext}
+          disabled={!canProceed}
+          icon={<ArrowRight className="w-4 h-4" />}
+        >
+          {t('setup.step_finish')}
         </Button>
       </div>
     </div>
@@ -371,6 +494,7 @@ interface FinishStepProps {
 }
 
 function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [installing, setInstalling] = useState(false);
   const [status, setStatus] = useState<'idle' | 'installing' | 'restarting' | 'done' | 'error'>('idle');
@@ -389,20 +513,22 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
         .then((resp) => {
           if (!resp.needs_setup) {
             setStatus('done');
+            resetSetupCache();
             setTimeout(() => navigate({ to: '/login' }), 1500);
           } else if (attempt < maxAttempts) {
             setTimeout(poll, 2000);
           } else {
             setStatus('done');
+            resetSetupCache();
             setTimeout(() => navigate({ to: '/login' }), 1500);
           }
         })
         .catch(() => {
-          // 服务可能还在重启，继续轮询
           if (attempt < maxAttempts) {
             setTimeout(poll, 2000);
           } else {
             setStatus('done');
+            resetSetupCache();
             setTimeout(() => navigate({ to: '/login' }), 1500);
           }
         });
@@ -424,77 +550,154 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
       pollStatus();
     } catch (err) {
       setStatus('error');
-      setErrorMsg(err instanceof Error ? err.message : '安装失败');
+      setErrorMsg(err instanceof Error ? err.message : t('setup.install_failed'));
       setInstalling(false);
     }
   };
 
+  // 配置摘要项
+  const summaryItems = [
+    {
+      icon: Database,
+      title: t('setup.config_summary_db'),
+      details: [
+        { label: t('setup.config_host'), value: `${dbConfig.host}:${dbConfig.port}` },
+        { label: t('setup.config_user'), value: dbConfig.user },
+        { label: t('setup.config_database'), value: dbConfig.dbname },
+        { label: t('setup.config_ssl'), value: dbConfig.sslmode || 'disable' },
+      ],
+    },
+    {
+      icon: Server,
+      title: t('setup.config_summary_redis'),
+      details: [
+        { label: t('setup.config_host'), value: `${redisConfig.host}:${redisConfig.port}` },
+        { label: t('setup.config_database'), value: String(redisConfig.db ?? 0) },
+        { label: t('profile.old_password'), value: redisConfig.password ? '******' : t('common.no') },
+        { label: t('setup.config_tls'), value: redisConfig.tls ? t('common.enable') : t('common.disable') },
+      ],
+    },
+    {
+      icon: UserCog,
+      title: t('setup.config_summary_admin'),
+      details: [
+        { label: t('setup.config_email'), value: adminConfig.email },
+      ],
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-500 mb-4">请确认以下配置信息，然后执行安装</p>
+      <p className="text-sm text-[var(--ag-text-secondary)]">
+        {t('setup.confirm_config')}
+      </p>
 
       {/* 配置摘要 */}
-      <div className="space-y-4">
-        {/* 数据库摘要 */}
-        <div className="rounded-md border border-gray-200 p-4">
-          <h4 className="text-sm font-medium text-gray-900 mb-2">数据库</h4>
-          <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-            <span>主机：{dbConfig.host}:{dbConfig.port}</span>
-            <span>用户：{dbConfig.user}</span>
-            <span>数据库：{dbConfig.dbname}</span>
-            <span>SSL：{dbConfig.sslmode || 'disable'}</span>
-          </div>
-        </div>
-
-        {/* Redis 摘要 */}
-        <div className="rounded-md border border-gray-200 p-4">
-          <h4 className="text-sm font-medium text-gray-900 mb-2">Redis</h4>
-          <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-            <span>主机：{redisConfig.host}:{redisConfig.port}</span>
-            <span>数据库：{redisConfig.db ?? 0}</span>
-            <span>密码：{redisConfig.password ? '******' : '无'}</span>
-            <span>TLS：{redisConfig.tls ? '已启用' : '未启用'}</span>
-          </div>
-        </div>
-
-        {/* 管理员摘要 */}
-        <div className="rounded-md border border-gray-200 p-4">
-          <h4 className="text-sm font-medium text-gray-900 mb-2">管理员</h4>
-          <div className="text-sm text-gray-600">
-            <span>邮箱：{adminConfig.email}</span>
-          </div>
-        </div>
+      <div className="space-y-3">
+        {summaryItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div
+              key={item.title}
+              className="rounded-[var(--ag-radius-md)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] p-4"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Icon className="w-4 h-4 text-[var(--ag-primary)]" />
+                <h4 className="text-sm font-semibold text-[var(--ag-text)]">{item.title}</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                {item.details.map((d) => (
+                  <div key={d.label} className="flex items-center gap-2 text-xs">
+                    <span className="text-[var(--ag-text-tertiary)]">{d.label}:</span>
+                    <span className="text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                      {d.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* 安装状态 */}
       {status === 'installing' && (
-        <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-700">
-          正在安装，请稍候...
+        <div
+          className="flex items-center gap-2.5 rounded-[var(--ag-radius-md)] px-4 py-3 text-sm"
+          style={{
+            background: 'var(--ag-info-subtle)',
+            color: 'var(--ag-info)',
+            borderLeft: '3px solid var(--ag-info)',
+          }}
+        >
+          <Loader2 className="w-4 h-4 animate-spin" />
+          {t('setup.installing')}
         </div>
       )}
       {status === 'restarting' && (
-        <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-700">
-          安装成功！正在等待服务重启...
+        <div
+          className="flex items-center gap-2.5 rounded-[var(--ag-radius-md)] px-4 py-3 text-sm"
+          style={{
+            background: 'var(--ag-warning-subtle)',
+            color: 'var(--ag-warning)',
+            borderLeft: '3px solid var(--ag-warning)',
+          }}
+        >
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          {t('setup.install_waiting')}
         </div>
       )}
       {status === 'done' && (
-        <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700">
-          安装完成！即将跳转到登录页面...
+        <div
+          className="relative overflow-hidden rounded-[var(--ag-radius-md)] px-4 py-3 text-sm"
+          style={{
+            background: 'var(--ag-success-subtle)',
+            color: 'var(--ag-success)',
+            borderLeft: '3px solid var(--ag-success)',
+          }}
+        >
+          {/* 成功发光效果 */}
+          <div
+            className="absolute inset-0 opacity-30 animate-pulse"
+            style={{ background: 'radial-gradient(circle at center, var(--ag-success), transparent 70%)' }}
+          />
+          <div className="relative flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4" />
+            {t('setup.install_complete')}
+          </div>
         </div>
       )}
       {status === 'error' && (
-        <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-          安装失败：{errorMsg}
+        <div
+          className="flex items-start gap-2.5 rounded-[var(--ag-radius-md)] px-4 py-3 text-sm"
+          style={{
+            background: 'var(--ag-danger-subtle)',
+            color: 'var(--ag-danger)',
+            borderLeft: '3px solid var(--ag-danger)',
+          }}
+        >
+          <CircleDot className="w-4 h-4 mt-0.5 shrink-0" />
+          {t('setup.install_failed')}:{errorMsg}
         </div>
       )}
 
       {/* 操作按钮 */}
-      <div className="flex justify-between pt-4">
-        <Button variant="ghost" onClick={onPrev} disabled={installing}>
-          上一步
+      <div className="flex justify-between pt-2">
+        <Button
+          variant="ghost"
+          onClick={onPrev}
+          disabled={installing}
+          icon={<ArrowLeft className="w-4 h-4" />}
+        >
+          {t('setup.step_admin')}
         </Button>
-        <Button onClick={handleInstall} loading={installing} disabled={status === 'done'}>
-          {status === 'idle' || status === 'error' ? '执行安装' : '安装中...'}
+        <Button
+          onClick={handleInstall}
+          loading={installing}
+          disabled={status === 'done'}
+          icon={<Play className="w-4 h-4" />}
+        >
+          {status === 'idle' || status === 'error' ? t('setup.run_install') : t('setup.installing_btn')}
         </Button>
       </div>
     </div>
@@ -504,6 +707,7 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
 // ==================== 安装向导主页面 ====================
 
 export default function SetupPage() {
+  const { t } = useTranslation();
   const [step, setStep] = useState(0);
 
   // 各步骤的表单数据
@@ -531,12 +735,43 @@ export default function SetupPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-xl">
+    <div className="min-h-screen bg-[var(--ag-bg-deep)] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* 背景装饰（与 LoginPage 一致） */}
+      <div className="absolute inset-0">
+        {/* 渐变光晕 */}
+        <div
+          className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-[0.07]"
+          style={{ background: 'radial-gradient(circle, var(--ag-primary), transparent 70%)' }}
+        />
+        <div
+          className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-[0.05]"
+          style={{ background: 'radial-gradient(circle, var(--ag-info), transparent 70%)' }}
+        />
+        {/* 网格纹理 */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `linear-gradient(var(--ag-text) 1px, transparent 1px), linear-gradient(90deg, var(--ag-text) 1px, transparent 1px)`,
+            backgroundSize: '60px 60px',
+          }}
+        />
+      </div>
+
+      <div
+        className="relative w-full max-w-xl"
+        style={{ animation: 'ag-slide-up 0.5s ease-out' }}
+      >
         {/* 标题 */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">AirGate</h1>
-          <p className="text-gray-500 mt-2">系统安装向导</p>
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-[var(--ag-radius-xl)] bg-[var(--ag-primary-subtle)] mb-4 shadow-[var(--ag-shadow-glow)]">
+            <Zap className="w-7 h-7 text-[var(--ag-primary)]" />
+          </div>
+          <h1 className="text-2xl font-bold text-[var(--ag-text)] tracking-tight">
+            AirGate
+          </h1>
+          <p className="text-sm text-[var(--ag-text-tertiary)] mt-1.5 tracking-wide">
+            {t('setup.title')}
+          </p>
         </div>
 
         {/* 步骤指示器 */}
@@ -572,6 +807,11 @@ export default function SetupPage() {
             />
           )}
         </Card>
+
+        {/* 底部文字 */}
+        <p className="text-center text-[10px] text-[var(--ag-text-tertiary)] mt-6 uppercase tracking-widest">
+          Powered by AirGate
+        </p>
       </div>
     </div>
   );

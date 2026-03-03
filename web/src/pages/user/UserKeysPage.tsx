@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { groupsApi } from '../../shared/api/groups';
@@ -6,9 +7,17 @@ import { useToast } from '../../shared/components/Toast';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Table, type Column } from '../../shared/components/Table';
 import { Button } from '../../shared/components/Button';
-import { Input } from '../../shared/components/Input';
+import { Input, Select } from '../../shared/components/Input';
 import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { StatusBadge } from '../../shared/components/Badge';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Key,
+  Copy,
+  AlertTriangle,
+} from 'lucide-react';
 import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq } from '../../shared/types';
 
 interface KeyForm {
@@ -26,6 +35,7 @@ const emptyForm: KeyForm = {
 };
 
 export default function UserKeysPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -54,7 +64,7 @@ export default function UserKeysPage() {
   const createMutation = useMutation({
     mutationFn: (data: CreateAPIKeyReq) => apikeysApi.create(data),
     onSuccess: (result) => {
-      toast('success', '密钥创建成功');
+      toast('success', t('user_keys.create_success'));
       queryClient.invalidateQueries({ queryKey: ['user-keys'] });
       closeModal();
       // 显示完整密钥
@@ -70,7 +80,7 @@ export default function UserKeysPage() {
     mutationFn: ({ id, data }: { id: number; data: UpdateAPIKeyReq }) =>
       apikeysApi.update(id, data),
     onSuccess: () => {
-      toast('success', '密钥已更新');
+      toast('success', t('user_keys.update_success'));
       queryClient.invalidateQueries({ queryKey: ['user-keys'] });
       closeModal();
     },
@@ -81,7 +91,7 @@ export default function UserKeysPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apikeysApi.delete(id),
     onSuccess: () => {
-      toast('success', '密钥已删除');
+      toast('success', t('user_keys.delete_success'));
       queryClient.invalidateQueries({ queryKey: ['user-keys'] });
       setDeleteTarget(null);
     },
@@ -113,11 +123,11 @@ export default function UserKeysPage() {
 
   function handleSubmit() {
     if (!form.name) {
-      toast('error', '请填写密钥名称');
+      toast('error', t('user_keys.name_placeholder'));
       return;
     }
     if (!editingKey && !form.group_id) {
-      toast('error', '请选择分组');
+      toast('error', t('user_keys.select_group'));
       return;
     }
 
@@ -144,65 +154,84 @@ export default function UserKeysPage() {
     (groupsData?.list ?? []).map((g) => [g.id, g.name]),
   );
 
+  // 分组选项
+  const groupOptions = [
+    { value: '', label: t('user_keys.select_group') },
+    ...(groupsData?.list ?? []).map((g) => ({
+      value: String(g.id),
+      label: `${g.name} (${g.platform})`,
+    })),
+  ];
+
   const columns: Column<APIKeyResp>[] = [
-    { key: 'name', title: '名称' },
+    { key: 'name', title: t('common.name') },
     {
       key: 'key_prefix',
-      title: '密钥前缀',
+      title: t('user_keys.title'),
       render: (row) => (
-        <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">
+        <span
+          className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-[var(--ag-radius-sm)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] text-[var(--ag-text-secondary)]"
+          style={{ fontFamily: 'var(--ag-font-mono)' }}
+        >
+          <Key className="w-3 h-3 text-[var(--ag-text-tertiary)]" />
           {row.key_prefix}...
-        </code>
+        </span>
       ),
     },
     {
       key: 'group_id',
-      title: '分组',
+      title: t('user_keys.group'),
       render: (row) => groupMap.get(row.group_id) || `#${row.group_id}`,
     },
     {
       key: 'quota',
-      title: '配额/已用',
+      title: t('user_keys.quota_label'),
       render: (row) => (
-        <span>
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
           {row.quota_usd > 0 ? (
             <>
               ${row.used_quota.toFixed(4)} / ${row.quota_usd.toFixed(4)}
             </>
           ) : (
-            <span className="text-gray-400">无限制</span>
+            <span className="text-[var(--ag-text-tertiary)]">{t('user_keys.quota_unlimited_hint')}</span>
           )}
         </span>
       ),
     },
     {
       key: 'expires_at',
-      title: '过期时间',
+      title: t('user_keys.expire_hint'),
       render: (row) =>
         row.expires_at
           ? new Date(row.expires_at).toLocaleDateString('zh-CN')
-          : '永不过期',
+          : t('user_keys.expire_hint'),
     },
     {
       key: 'status',
-      title: '状态',
+      title: t('common.status'),
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'actions',
-      title: '操作',
+      title: t('common.actions'),
       render: (row) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="ghost" onClick={() => openEdit(row)}>
-            编辑
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => openEdit(row)}
+            icon={<Pencil className="w-3.5 h-3.5" />}
+          >
+            {t('common.edit')}
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="text-red-600"
             onClick={() => setDeleteTarget(row)}
+            icon={<Trash2 className="w-3.5 h-3.5" />}
+            className="text-[var(--ag-danger)] hover:text-[var(--ag-danger)]"
           >
-            删除
+            {t('common.delete')}
           </Button>
         </div>
       ),
@@ -214,13 +243,17 @@ export default function UserKeysPage() {
   return (
     <div className="p-6">
       <PageHeader
-        title="我的密钥"
-        actions={<Button onClick={openCreate}>创建密钥</Button>}
+        title={t('user_keys.title')}
+        actions={
+          <Button onClick={openCreate} icon={<Plus className="w-4 h-4" />}>
+            {t('user_keys.create')}
+          </Button>
+        }
       />
 
       <Table
         columns={columns}
-        data={(data?.list ?? [])}
+        data={data?.list ?? []}
         loading={isLoading}
         rowKey={(row) => row.id as number}
         page={page}
@@ -233,59 +266,49 @@ export default function UserKeysPage() {
       <Modal
         open={modalOpen}
         onClose={closeModal}
-        title={editingKey ? '编辑密钥' : '创建密钥'}
+        title={editingKey ? t('user_keys.edit') : t('user_keys.create')}
         footer={
           <>
             <Button variant="secondary" onClick={closeModal}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSubmit} loading={saving}>
-              {editingKey ? '保存' : '创建'}
+              {editingKey ? t('common.save') : t('common.create')}
             </Button>
           </>
         }
       >
         <div className="space-y-4">
           <Input
-            label="名称"
+            label={t('common.name')}
             required
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="例如：生产环境密钥"
+            placeholder={t('user_keys.name_placeholder')}
           />
           {!editingKey && (
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">
-                分组 <span className="text-red-500 ml-1">*</span>
-              </label>
-              <select
-                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                value={form.group_id}
-                onChange={(e) => setForm({ ...form, group_id: e.target.value })}
-              >
-                <option value="">请选择分组</option>
-                {(groupsData?.list ?? []).map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} ({g.platform})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label={t('user_keys.group')}
+              required
+              value={form.group_id}
+              onChange={(e) => setForm({ ...form, group_id: e.target.value })}
+              options={groupOptions}
+            />
           )}
           <Input
-            label="配额 (USD)"
+            label={t('user_keys.quota_label')}
             type="number"
             value={form.quota_usd}
             onChange={(e) => setForm({ ...form, quota_usd: e.target.value })}
-            placeholder="留空为无限制"
-            hint="设为 0 或留空表示不限配额"
+            placeholder={t('user_keys.quota_unlimited_hint')}
+            hint={t('user_keys.quota_hint')}
           />
           <Input
-            label="过期时间"
+            label={t('user_keys.expire_hint')}
             type="date"
             value={form.expires_at}
             onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-            hint="留空表示永不过期"
+            hint={t('user_keys.expire_hint')}
           />
         </div>
       </Modal>
@@ -294,16 +317,22 @@ export default function UserKeysPage() {
       <Modal
         open={!!createdKey}
         onClose={() => setCreatedKey(null)}
-        title="密钥创建成功"
+        title={t('user_keys.create_success')}
         footer={
-          <Button onClick={() => setCreatedKey(null)}>我已保存，关闭</Button>
+          <Button onClick={() => setCreatedKey(null)}>{t('user_keys.key_created_warning')}</Button>
         }
       >
-        <div className="space-y-3">
-          <p className="text-sm text-red-600 font-medium">
-            请立即复制并保存此密钥，关闭后将无法再次查看完整密钥！
-          </p>
-          <div className="bg-gray-50 rounded-md p-3 break-all font-mono text-sm">
+        <div className="space-y-4">
+          <div className="flex items-start gap-2.5 rounded-[var(--ag-radius-md)] bg-[var(--ag-danger-subtle)] border border-[var(--ag-danger)] border-opacity-20 px-4 py-3">
+            <AlertTriangle className="w-4 h-4 text-[var(--ag-danger)] mt-0.5 shrink-0" />
+            <p className="text-sm text-[var(--ag-danger)] font-medium">
+              {t('user_keys.key_created_warning')}
+            </p>
+          </div>
+          <div
+            className="rounded-[var(--ag-radius-md)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] p-3 break-all text-sm text-[var(--ag-text)]"
+            style={{ fontFamily: 'var(--ag-font-mono)' }}
+          >
             {createdKey}
           </div>
           <Button
@@ -311,10 +340,11 @@ export default function UserKeysPage() {
             size="sm"
             onClick={() => {
               navigator.clipboard.writeText(createdKey || '');
-              toast('success', '已复制到剪贴板');
+              toast('success', t('user_keys.copy_key'));
             }}
+            icon={<Copy className="w-3.5 h-3.5" />}
           >
-            复制密钥
+            {t('user_keys.copy_key')}
           </Button>
         </div>
       </Modal>
@@ -324,8 +354,8 @@ export default function UserKeysPage() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-        title="删除密钥"
-        message={`确定要删除密钥「${deleteTarget?.name}」吗？删除后使用此密钥的请求将立即失效。`}
+        title={t('user_keys.delete_key')}
+        message={t('user_keys.delete_confirm', { name: deleteTarget?.name })}
         loading={deleteMutation.isPending}
         danger
       />

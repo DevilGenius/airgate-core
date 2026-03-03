@@ -5,50 +5,99 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { lazy } from 'react';
+import { Suspense, lazy } from 'react';
 import { AppShell } from './layout/AppShell';
 import { getToken } from '../shared/api/client';
+import { setupApi } from '../shared/api/setup';
+import DashboardPage from '../pages/DashboardPage';
+import UsersPage from '../pages/admin/UsersPage';
+import AccountsPage from '../pages/admin/AccountsPage';
+import GroupsPage from '../pages/admin/GroupsPage';
+import APIKeysPage from '../pages/admin/APIKeysPage';
+import SubscriptionsPage from '../pages/admin/SubscriptionsPage';
+import ProxiesPage from '../pages/admin/ProxiesPage';
+import UsagePage from '../pages/admin/UsagePage';
+import PluginsPage from '../pages/admin/PluginsPage';
+import SettingsPage from '../pages/admin/SettingsPage';
+import ProfilePage from '../pages/user/ProfilePage';
+import UserKeysPage from '../pages/user/UserKeysPage';
 
-// 懒加载页面组件
+// 登录和安装页不常用，保持懒加载
 const SetupPage = lazy(() => import('../pages/SetupPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
-const DashboardPage = lazy(() => import('../pages/DashboardPage'));
-const UsersPage = lazy(() => import('../pages/admin/UsersPage'));
-const AccountsPage = lazy(() => import('../pages/admin/AccountsPage'));
-const GroupsPage = lazy(() => import('../pages/admin/GroupsPage'));
-const APIKeysPage = lazy(() => import('../pages/admin/APIKeysPage'));
-const SubscriptionsPage = lazy(() => import('../pages/admin/SubscriptionsPage'));
-const ProxiesPage = lazy(() => import('../pages/admin/ProxiesPage'));
-const UsagePage = lazy(() => import('../pages/admin/UsagePage'));
-const PluginsPage = lazy(() => import('../pages/admin/PluginsPage'));
-const SettingsPage = lazy(() => import('../pages/admin/SettingsPage'));
-const ProfilePage = lazy(() => import('../pages/user/ProfilePage'));
-const UserKeysPage = lazy(() => import('../pages/user/UserKeysPage'));
+
+// 缓存安装状态，避免每次路由跳转都请求
+let setupChecked = false;
+let needsSetup = false;
+
+async function checkSetup() {
+  if (!setupChecked) {
+    try {
+      const resp = await setupApi.status();
+      needsSetup = resp.needs_setup;
+    } catch {
+      // 请求失败视为未安装
+      needsSetup = true;
+    }
+    setupChecked = true;
+  }
+  return needsSetup;
+}
+
+// 安装完成后调用，重置缓存
+export function resetSetupCache() {
+  setupChecked = false;
+  needsSetup = false;
+}
 
 // 根路由
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
 });
 
-// 安装向导（无需认证）
+// 安装向导（无需认证，懒加载）
 const setupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/setup',
-  component: SetupPage,
+  beforeLoad: async () => {
+    const needs = await checkSetup();
+    if (!needs) {
+      throw redirect({ to: '/login' });
+    }
+  },
+  component: () => (
+    <Suspense>
+      <SetupPage />
+    </Suspense>
+  ),
 });
 
-// 登录页（无需认证）
+// 登录页（无需认证，懒加载）
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  component: LoginPage,
+  beforeLoad: async () => {
+    const needs = await checkSetup();
+    if (needs) {
+      throw redirect({ to: '/setup' });
+    }
+  },
+  component: () => (
+    <Suspense>
+      <LoginPage />
+    </Suspense>
+  ),
 });
 
 // 认证布局（需要登录）
 const authLayout = createRoute({
   getParentRoute: () => rootRoute,
   id: 'auth',
-  beforeLoad: () => {
+  beforeLoad: async () => {
+    const needs = await checkSetup();
+    if (needs) {
+      throw redirect({ to: '/setup' });
+    }
     if (!getToken()) {
       throw redirect({ to: '/login' });
     }

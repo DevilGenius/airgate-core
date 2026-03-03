@@ -1,4 +1,6 @@
 import { type ReactNode, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { X } from 'lucide-react';
 import { Button } from './Button';
 
 interface ModalProps {
@@ -11,45 +13,40 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children, footer, width = '480px' }: ModalProps) {
-  // ESC 键关闭
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handler);
+      document.body.style.overflow = '';
+    };
   }, [open, onClose]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* 遮罩 */}
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-
-      {/* 弹窗内容 */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ animation: 'ag-fade-in 0.15s ease-out' }}>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative bg-white rounded-lg shadow-xl max-h-[90vh] flex flex-col"
-        style={{ width, maxWidth: '90vw' }}
+        className="relative rounded-[var(--ag-radius-xl)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-elevated)] shadow-[var(--ag-shadow-lg)] max-h-[85vh] flex flex-col"
+        style={{ width, maxWidth: '90vw', animation: 'ag-scale-in 0.2s ease-out' }}
       >
-        {/* 标题栏 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ag-border)]">
+          <h3 className="text-base font-semibold text-[var(--ag-text)]">{title}</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+            className="flex items-center justify-center w-8 h-8 rounded-[var(--ag-radius-sm)] text-[var(--ag-text-tertiary)] hover:text-[var(--ag-text)] hover:bg-[var(--ag-bg-hover)] transition-colors"
           >
-            &times;
+            <X className="w-4 h-4" />
           </button>
         </div>
-
-        {/* 内容 */}
-        <div className="px-6 py-4 overflow-y-auto flex-1">{children}</div>
-
-        {/* 底部按钮 */}
+        <div className="px-6 py-5 overflow-y-auto flex-1">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--ag-border)]">
             {footer}
           </div>
         )}
@@ -58,7 +55,6 @@ export function Modal({ open, onClose, title, children, footer, width = '480px' 
   );
 }
 
-// 确认弹窗快捷组件
 interface ConfirmModalProps {
   open: boolean;
   onClose: () => void;
@@ -70,6 +66,8 @@ interface ConfirmModalProps {
 }
 
 export function ConfirmModal({ open, onClose, onConfirm, title, message, loading, danger }: ConfirmModalProps) {
+  const { t } = useTranslation();
+
   return (
     <Modal
       open={open}
@@ -77,14 +75,12 @@ export function ConfirmModal({ open, onClose, onConfirm, title, message, loading
       title={title}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>取消</Button>
-          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>
-            确认
-          </Button>
+          <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>{t('common.confirm')}</Button>
         </>
       }
     >
-      <p className="text-sm text-gray-600">{message}</p>
+      <p className="text-sm text-[var(--ag-text-secondary)]">{message}</p>
     </Modal>
   );
 }

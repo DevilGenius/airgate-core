@@ -1,34 +1,34 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Input } from '../../shared/components/Input';
+import { Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
 import { Modal } from '../../shared/components/Modal';
 import { Badge, StatusBadge } from '../../shared/components/Badge';
 import { useToast } from '../../shared/components/Toast';
 import { usersApi } from '../../shared/api/users';
 import type { UserResp, CreateUserReq, UpdateUserReq, AdjustBalanceReq } from '../../shared/types';
+import { Plus, Search, Pencil, Wallet } from 'lucide-react';
 
-// 默认分页大小
 const PAGE_SIZE = 20;
 
 export default function UsersPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // 搜索和筛选状态
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
 
-  // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserResp | null>(null);
   const [balanceUser, setBalanceUser] = useState<UserResp | null>(null);
 
-  // 查询用户列表
   const { data, isLoading } = useQuery({
     queryKey: ['users', page, keyword, statusFilter, roleFilter],
     queryFn: () =>
@@ -41,76 +41,86 @@ export default function UsersPage() {
       }),
   });
 
-  // 创建用户
   const createMutation = useMutation({
     mutationFn: (data: CreateUserReq) => usersApi.create(data),
     onSuccess: () => {
-      toast('success', '用户创建成功');
+      toast('success', t('users.create_success'));
       setShowCreateModal(false);
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 更新用户
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateUserReq }) =>
-      usersApi.update(id, data),
+    mutationFn: ({ id, data }: { id: number; data: UpdateUserReq }) => usersApi.update(id, data),
     onSuccess: () => {
-      toast('success', '用户更新成功');
+      toast('success', t('users.update_success'));
       setEditingUser(null);
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 调整余额
   const balanceMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: AdjustBalanceReq }) =>
-      usersApi.adjustBalance(id, data),
+    mutationFn: ({ id, data }: { id: number; data: AdjustBalanceReq }) => usersApi.adjustBalance(id, data),
     onSuccess: () => {
-      toast('success', '余额调整成功');
+      toast('success', t('users.balance_success'));
       setBalanceUser(null);
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 表格列定义
   const columns: Column<UserResp>[] = [
-    { key: 'id', title: 'ID', width: '60px' },
-    { key: 'email', title: '邮箱' },
-    { key: 'username', title: '用户名' },
+    {
+      key: 'id',
+      title: t('common.id'),
+      width: '60px',
+      render: (row) => (
+        <span className="text-[var(--ag-text-tertiary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {row.id}
+        </span>
+      ),
+    },
+    {
+      key: 'email',
+      title: t('users.email'),
+      render: (row) => <span className="text-[var(--ag-text)]">{row.email}</span>,
+    },
+    { key: 'username', title: t('users.username') },
     {
       key: 'role',
-      title: '角色',
+      title: t('users.role'),
       render: (row) => (
         <Badge variant={row.role === 'admin' ? 'info' : 'default'}>
-          {row.role === 'admin' ? '管理员' : '用户'}
+          {row.role === 'admin' ? t('users.role_admin') : t('users.role_user')}
         </Badge>
       ),
     },
     {
       key: 'balance',
-      title: '余额',
-      render: (row) => `$${row.balance.toFixed(2)}`,
+      title: t('users.balance'),
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          ${row.balance.toFixed(2)}
+        </span>
+      ),
     },
-    { key: 'max_concurrency', title: '并发数' },
     {
       key: 'status',
-      title: '状态',
+      title: t('common.status'),
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'actions',
-      title: '操作',
+      title: t('common.actions'),
       render: (row) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="ghost" onClick={() => setEditingUser(row)}>
-            编辑
+        <div className="flex gap-1">
+          <Button size="sm" variant="ghost" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => setEditingUser(row)}>
+            {t('common.edit')}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setBalanceUser(row)}>
-            余额
+          <Button size="sm" variant="ghost" icon={<Wallet className="w-3.5 h-3.5" />} onClick={() => setBalanceUser(row)}>
+            {t('users.balance')}
           </Button>
         </div>
       ),
@@ -120,51 +130,48 @@ export default function UsersPage() {
   return (
     <div>
       <PageHeader
-        title="用户管理"
+        title={t('users.title')}
         actions={
-          <Button onClick={() => setShowCreateModal(true)}>创建用户</Button>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
+            {t('users.create')}
+          </Button>
         }
       />
 
-      {/* 搜索和筛选 */}
-      <div className="flex items-center gap-4 mb-4">
+      {/* 筛选栏 */}
+      <div className="flex items-end gap-3 mb-5">
         <div className="w-64">
           <Input
-            placeholder="搜索邮箱或用户名..."
+            placeholder={t('users.search_placeholder')}
             value={keyword}
-            onChange={(e) => {
-              setKeyword(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+            icon={<Search className="w-4 h-4" />}
           />
         </div>
-        <select
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">全部状态</option>
-          <option value="active">活跃</option>
-          <option value="disabled">已禁用</option>
-        </select>
-        <select
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-          value={roleFilter}
-          onChange={(e) => {
-            setRoleFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">全部角色</option>
-          <option value="admin">管理员</option>
-          <option value="user">用户</option>
-        </select>
+        <div className="w-36">
+          <Select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            options={[
+              { value: '', label: t('users.all_status') },
+              { value: 'active', label: t('status.active') },
+              { value: 'disabled', label: t('status.disabled') },
+            ]}
+          />
+        </div>
+        <div className="w-36">
+          <Select
+            value={roleFilter}
+            onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
+            options={[
+              { value: '', label: t('users.all_roles') },
+              { value: 'admin', label: t('users.role_admin') },
+              { value: 'user', label: t('users.role_user') },
+            ]}
+          />
+        </div>
       </div>
 
-      {/* 表格 */}
       <Table<UserResp>
         columns={columns}
         data={data?.list ?? []}
@@ -176,7 +183,6 @@ export default function UsersPage() {
         onPageChange={setPage}
       />
 
-      {/* 创建用户弹窗 */}
       <CreateUserModal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
@@ -184,28 +190,22 @@ export default function UsersPage() {
         loading={createMutation.isPending}
       />
 
-      {/* 编辑用户弹窗 */}
       {editingUser && (
         <EditUserModal
           open
           user={editingUser}
           onClose={() => setEditingUser(null)}
-          onSubmit={(data) =>
-            updateMutation.mutate({ id: editingUser.id, data })
-          }
+          onSubmit={(data) => updateMutation.mutate({ id: editingUser.id, data })}
           loading={updateMutation.isPending}
         />
       )}
 
-      {/* 余额调整弹窗 */}
       {balanceUser && (
         <BalanceModal
           open
           user={balanceUser}
           onClose={() => setBalanceUser(null)}
-          onSubmit={(data) =>
-            balanceMutation.mutate({ id: balanceUser.id, data })
-          }
+          onSubmit={(data) => balanceMutation.mutate({ id: balanceUser.id, data })}
           loading={balanceMutation.isPending}
         />
       )}
@@ -213,25 +213,16 @@ export default function UsersPage() {
   );
 }
 
-// ==================== 创建用户弹窗 ====================
+/* ==================== 创建用户弹窗 ==================== */
 
 function CreateUserModal({
-  open,
-  onClose,
-  onSubmit,
-  loading,
+  open, onClose, onSubmit, loading,
 }: {
-  open: boolean;
-  onClose: () => void;
-  onSubmit: (data: CreateUserReq) => void;
-  loading: boolean;
+  open: boolean; onClose: () => void; onSubmit: (data: CreateUserReq) => void; loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<CreateUserReq>({
-    email: '',
-    password: '',
-    username: '',
-    role: 'user',
-    max_concurrency: 5,
+    email: '', password: '', username: '', role: 'user', max_concurrency: 5,
   });
 
   const handleSubmit = () => {
@@ -239,7 +230,6 @@ function CreateUserModal({
     onSubmit(form);
   };
 
-  // 重置表单
   const handleClose = () => {
     setForm({ email: '', password: '', username: '', role: 'user', max_concurrency: 5 });
     onClose();
@@ -249,79 +239,43 @@ function CreateUserModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="创建用户"
+      title={t('users.create')}
       footer={
         <>
-          <Button variant="secondary" onClick={handleClose}>
-            取消
-          </Button>
-          <Button onClick={handleSubmit} loading={loading}>
-            创建
-          </Button>
+          <Button variant="secondary" onClick={handleClose}>{t('common.cancel')}</Button>
+          <Button onClick={handleSubmit} loading={loading}>{t('common.create')}</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Input
-          label="邮箱"
-          type="email"
-          required
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
+        <Input label={t('users.email')} type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <Input label={t('users.password')} type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <Input label={t('users.username')} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+        <Select
+          label={t('users.role')}
+          value={form.role}
+          onChange={(e) => setForm({ ...form, role: e.target.value as 'admin' | 'user' })}
+          options={[{ value: 'user', label: t('users.role_user') }, { value: 'admin', label: t('users.role_admin') }]}
         />
         <Input
-          label="密码"
-          type="password"
-          required
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-        />
-        <Input
-          label="用户名"
-          value={form.username}
-          onChange={(e) => setForm({ ...form, username: e.target.value })}
-        />
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">角色</label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.role}
-            onChange={(e) =>
-              setForm({ ...form, role: e.target.value as 'admin' | 'user' })
-            }
-          >
-            <option value="user">用户</option>
-            <option value="admin">管理员</option>
-          </select>
-        </div>
-        <Input
-          label="最大并发数"
+          label={t('users.max_concurrency')}
           type="number"
           value={String(form.max_concurrency ?? 5)}
-          onChange={(e) =>
-            setForm({ ...form, max_concurrency: Number(e.target.value) })
-          }
+          onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
         />
       </div>
     </Modal>
   );
 }
 
-// ==================== 编辑用户弹窗 ====================
+/* ==================== 编辑用户弹窗 ==================== */
 
 function EditUserModal({
-  open,
-  user,
-  onClose,
-  onSubmit,
-  loading,
+  open, user, onClose, onSubmit, loading,
 }: {
-  open: boolean;
-  user: UserResp;
-  onClose: () => void;
-  onSubmit: (data: UpdateUserReq) => void;
-  loading: boolean;
+  open: boolean; user: UserResp; onClose: () => void; onSubmit: (data: UpdateUserReq) => void; loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<UpdateUserReq>({
     username: user.username,
     role: user.role,
@@ -333,134 +287,87 @@ function EditUserModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="编辑用户"
+      title={t('users.edit')}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={() => onSubmit(form)} loading={loading}>
-            保存
-          </Button>
+          <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button onClick={() => onSubmit(form)} loading={loading}>{t('common.save')}</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Input label="邮箱" value={user.email} disabled />
-        <Input
-          label="用户名"
-          value={form.username ?? ''}
-          onChange={(e) => setForm({ ...form, username: e.target.value })}
+        <Input label={t('users.email')} value={user.email} disabled />
+        <Input label={t('users.username')} value={form.username ?? ''} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+        <Select
+          label={t('users.role')}
+          value={form.role ?? 'user'}
+          onChange={(e) => setForm({ ...form, role: e.target.value as 'admin' | 'user' })}
+          options={[{ value: 'user', label: t('users.role_user') }, { value: 'admin', label: t('users.role_admin') }]}
         />
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">角色</label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.role}
-            onChange={(e) =>
-              setForm({ ...form, role: e.target.value as 'admin' | 'user' })
-            }
-          >
-            <option value="user">用户</option>
-            <option value="admin">管理员</option>
-          </select>
-        </div>
         <Input
-          label="最大并发数"
+          label={t('users.max_concurrency')}
           type="number"
           value={String(form.max_concurrency ?? 5)}
-          onChange={(e) =>
-            setForm({ ...form, max_concurrency: Number(e.target.value) })
-          }
+          onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
         />
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">状态</label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.status}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                status: e.target.value as 'active' | 'disabled',
-              })
-            }
-          >
-            <option value="active">活跃</option>
-            <option value="disabled">已禁用</option>
-          </select>
-        </div>
+        <Select
+          label={t('common.status')}
+          value={form.status ?? 'active'}
+          onChange={(e) => setForm({ ...form, status: e.target.value as 'active' | 'disabled' })}
+          options={[{ value: 'active', label: t('status.active') }, { value: 'disabled', label: t('status.disabled') }]}
+        />
       </div>
     </Modal>
   );
 }
 
-// ==================== 余额调整弹窗 ====================
+/* ==================== 余额调整弹窗 ==================== */
 
 function BalanceModal({
-  open,
-  user,
-  onClose,
-  onSubmit,
-  loading,
+  open, user, onClose, onSubmit, loading,
 }: {
-  open: boolean;
-  user: UserResp;
-  onClose: () => void;
-  onSubmit: (data: AdjustBalanceReq) => void;
-  loading: boolean;
+  open: boolean; user: UserResp; onClose: () => void; onSubmit: (data: AdjustBalanceReq) => void; loading: boolean;
 }) {
-  const [form, setForm] = useState<AdjustBalanceReq>({
-    action: 'add',
-    amount: 0,
-  });
+  const { t } = useTranslation();
+  const [form, setForm] = useState<AdjustBalanceReq>({ action: 'add', amount: 0 });
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={`余额调整 - ${user.email}`}
+      title={t('users.adjust_balance', { email: user.email })}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={() => onSubmit(form)} loading={loading}>
-            确认
-          </Button>
+          <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button onClick={() => onSubmit(form)} loading={loading}>{t('common.confirm')}</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
-          当前余额：<span className="font-semibold">${user.balance.toFixed(2)}</span>
-        </p>
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">操作类型</label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.action}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                action: e.target.value as 'set' | 'add' | 'subtract',
-              })
-            }
-          >
-            <option value="add">增加</option>
-            <option value="subtract">减少</option>
-            <option value="set">设为</option>
-          </select>
+        <div className="rounded-[var(--ag-radius-md)] bg-[var(--ag-bg-surface)] border border-[var(--ag-glass-border)] px-4 py-3">
+          <p className="text-xs text-[var(--ag-text-tertiary)] uppercase tracking-wider">{t('users.current_balance')}</p>
+          <p className="text-lg font-bold mt-1" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            ${user.balance.toFixed(2)}
+          </p>
         </div>
+        <Select
+          label={t('users.action_type')}
+          value={form.action}
+          onChange={(e) => setForm({ ...form, action: e.target.value as 'set' | 'add' | 'subtract' })}
+          options={[
+            { value: 'add', label: t('users.action_add') },
+            { value: 'subtract', label: t('users.action_subtract') },
+            { value: 'set', label: t('users.action_set') },
+          ]}
+        />
         <Input
-          label="金额"
+          label={t('users.amount')}
           type="number"
           required
           min="0"
           step="0.01"
           value={String(form.amount)}
-          onChange={(e) =>
-            setForm({ ...form, amount: Number(e.target.value) })
-          }
+          onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
         />
       </div>
     </Modal>

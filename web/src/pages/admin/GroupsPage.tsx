@@ -1,21 +1,37 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Plus,
+  Pencil,
+  Layers,
+  Server,
+  ArrowUpDown,
+  Lock,
+} from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
-import { Input, Textarea } from '../../shared/components/Input';
+import { Input, Textarea, Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
 import { Modal } from '../../shared/components/Modal';
 import { Badge } from '../../shared/components/Badge';
 import { useToast } from '../../shared/components/Toast';
 import { groupsApi } from '../../shared/api/groups';
+import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
 
 const PAGE_SIZE = 20;
-const PLATFORMS = ['openai', 'claude', 'gemini', 'sora'];
 
 export default function GroupsPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { platforms } = usePlatforms();
+
+  const PLATFORM_OPTIONS = [
+    { value: '', label: t('groups.all_platforms') },
+    ...platforms.map((p) => ({ value: p, label: p })),
+  ];
 
   // 筛选状态
   const [page, setPage] = useState(1);
@@ -40,7 +56,7 @@ export default function GroupsPage() {
   const createMutation = useMutation({
     mutationFn: (data: CreateGroupReq) => groupsApi.create(data),
     onSuccess: () => {
-      toast('success', '分组创建成功');
+      toast('success', t('groups.create_success'));
       setShowCreateModal(false);
       queryClient.invalidateQueries({ queryKey: ['groups'] });
     },
@@ -52,7 +68,7 @@ export default function GroupsPage() {
     mutationFn: ({ id, data }: { id: number; data: UpdateGroupReq }) =>
       groupsApi.update(id, data),
     onSuccess: () => {
-      toast('success', '分组更新成功');
+      toast('success', t('groups.update_success'));
       setEditingGroup(null);
       queryClient.invalidateQueries({ queryKey: ['groups'] });
     },
@@ -61,37 +77,93 @@ export default function GroupsPage() {
 
   // 表格列定义
   const columns: Column<GroupResp>[] = [
-    { key: 'id', title: 'ID', width: '60px' },
-    { key: 'name', title: '名称' },
-    { key: 'platform', title: '平台' },
+    {
+      key: 'id',
+      title: t('common.id'),
+      width: '60px',
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {row.id}
+        </span>
+      ),
+    },
+    {
+      key: 'name',
+      title: t('common.name'),
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          <Layers className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+          <span style={{ color: 'var(--ag-text)' }} className="font-medium">
+            {row.name}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'platform',
+      title: t('groups.platform'),
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          <Server className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+          {row.platform}
+        </span>
+      ),
+    },
     {
       key: 'subscription_type',
-      title: '订阅类型',
+      title: t('groups.subscription_type'),
       render: (row) => (
         <Badge variant={row.subscription_type === 'subscription' ? 'info' : 'default'}>
-          {row.subscription_type === 'subscription' ? '订阅制' : '标准'}
+          {row.subscription_type === 'subscription' ? t('groups.type_subscription') : t('groups.type_standard')}
         </Badge>
       ),
     },
     {
       key: 'rate_multiplier',
-      title: '倍率',
+      title: t('groups.rate_multiplier'),
       width: '80px',
-      render: (row) => `${row.rate_multiplier}x`,
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)', color: 'var(--ag-primary)' }}>
+          {row.rate_multiplier}x
+        </span>
+      ),
     },
     {
       key: 'is_exclusive',
-      title: '专属',
+      title: t('groups.exclusive'),
       width: '80px',
-      render: (row) => (row.is_exclusive ? '是' : '否'),
+      render: (row) =>
+        row.is_exclusive ? (
+          <span className="inline-flex items-center gap-1" style={{ color: 'var(--ag-warning)' }}>
+            <Lock className="w-3.5 h-3.5" />
+            {t('common.yes')}
+          </span>
+        ) : (
+          <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('common.no')}</span>
+        ),
     },
-    { key: 'sort_weight', title: '排序权重', width: '100px' },
+    {
+      key: 'sort_weight',
+      title: t('groups.sort_weight'),
+      width: '100px',
+      render: (row) => (
+        <span className="inline-flex items-center gap-1" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          <ArrowUpDown className="w-3 h-3" style={{ color: 'var(--ag-text-tertiary)' }} />
+          {row.sort_weight}
+        </span>
+      ),
+    },
     {
       key: 'actions',
-      title: '操作',
+      title: t('common.actions'),
       render: (row) => (
-        <Button size="sm" variant="ghost" onClick={() => setEditingGroup(row)}>
-          编辑
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<Pencil className="w-3.5 h-3.5" />}
+          onClick={() => setEditingGroup(row)}
+        >
+          {t('common.edit')}
         </Button>
       ),
     },
@@ -100,29 +172,26 @@ export default function GroupsPage() {
   return (
     <div>
       <PageHeader
-        title="分组管理"
+        title={t('groups.title')}
+        description={t('groups.description')}
         actions={
-          <Button onClick={() => setShowCreateModal(true)}>创建分组</Button>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
+            {t('groups.create')}
+          </Button>
         }
       />
 
       {/* 筛选 */}
-      <div className="flex items-center gap-4 mb-4">
-        <select
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+      <div className="flex items-center gap-3 mb-5">
+        <Select
           value={platformFilter}
           onChange={(e) => {
             setPlatformFilter(e.target.value);
             setPage(1);
           }}
-        >
-          <option value="">全部平台</option>
-          {PLATFORMS.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
+          options={PLATFORM_OPTIONS}
+          label={t('groups.platform')}
+        />
       </div>
 
       {/* 表格 */}
@@ -140,23 +209,25 @@ export default function GroupsPage() {
       {/* 创建弹窗 */}
       <GroupFormModal
         open={showCreateModal}
-        title="创建分组"
+        title={t('groups.create')}
         onClose={() => setShowCreateModal(false)}
         onSubmit={(data) => createMutation.mutate(data as CreateGroupReq)}
         loading={createMutation.isPending}
+        platforms={platforms}
       />
 
       {/* 编辑弹窗 */}
       {editingGroup && (
         <GroupFormModal
           open
-          title="编辑分组"
+          title={t('groups.edit')}
           group={editingGroup}
           onClose={() => setEditingGroup(null)}
           onSubmit={(data) =>
             updateMutation.mutate({ id: editingGroup.id, data })
           }
           loading={updateMutation.isPending}
+          platforms={platforms}
         />
       )}
     </div>
@@ -172,6 +243,7 @@ function GroupFormModal({
   onClose,
   onSubmit,
   loading,
+  platforms,
 }: {
   open: boolean;
   title: string;
@@ -179,7 +251,9 @@ function GroupFormModal({
   onClose: () => void;
   onSubmit: (data: CreateGroupReq | UpdateGroupReq) => void;
   loading: boolean;
+  platforms: string[];
 }) {
+  const { t } = useTranslation();
   const isEdit = !!group;
 
   const [form, setForm] = useState({
@@ -215,7 +289,7 @@ function GroupFormModal({
       }
       setJsonError('');
     } catch {
-      setJsonError('JSON 格式错误，请检查');
+      setJsonError(t('groups.json_error'));
       return;
     }
 
@@ -241,46 +315,40 @@ function GroupFormModal({
       footer={
         <>
           <Button variant="secondary" onClick={handleClose}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} loading={loading}>
-            {isEdit ? '保存' : '创建'}
+            {isEdit ? t('common.save') : t('common.create')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         <Input
-          label="名称"
+          label={t('common.name')}
           required
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
+          icon={<Layers className="w-4 h-4" />}
         />
 
         {isEdit ? (
-          <Input label="平台" value={form.platform} disabled />
+          <Input label={t('groups.platform')} value={form.platform} disabled />
         ) : (
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
-              平台 <span className="text-red-500">*</span>
-            </label>
-            <select
-              className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={form.platform}
-              onChange={(e) => setForm({ ...form, platform: e.target.value })}
-            >
-              <option value="">请选择平台</option>
-              {PLATFORMS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label={t('groups.platform')}
+            required
+            value={form.platform}
+            onChange={(e) => setForm({ ...form, platform: e.target.value })}
+            options={[
+              { value: '', label: t('groups.select_platform') },
+              ...platforms.map((p) => ({ value: p, label: p })),
+            ]}
+          />
         )}
 
         <Input
-          label="费率倍率"
+          label={t('groups.rate_multiplier')}
           type="number"
           step="0.1"
           value={String(form.rate_multiplier)}
@@ -289,7 +357,7 @@ function GroupFormModal({
           }
         />
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <input
             type="checkbox"
             id="is_exclusive"
@@ -297,43 +365,50 @@ function GroupFormModal({
             onChange={(e) =>
               setForm({ ...form, is_exclusive: e.target.checked })
             }
-            className="rounded border-gray-300 text-indigo-600"
+            className="rounded"
+            style={{
+              borderColor: 'var(--ag-glass-border)',
+              accentColor: 'var(--ag-primary)',
+            }}
           />
-          <label htmlFor="is_exclusive" className="text-sm text-gray-700">
-            专属分组（需要订阅才能使用）
+          <label
+            htmlFor="is_exclusive"
+            className="text-sm"
+            style={{ color: 'var(--ag-text-secondary)' }}
+          >
+            {t('groups.exclusive_hint')}
           </label>
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">订阅类型</label>
-          <select
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={form.subscription_type}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                subscription_type: e.target.value as 'standard' | 'subscription',
-              })
-            }
-          >
-            <option value="standard">标准</option>
-            <option value="subscription">订阅制</option>
-          </select>
-        </div>
+        <Select
+          label={t('groups.subscription_type')}
+          value={form.subscription_type}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              subscription_type: e.target.value as 'standard' | 'subscription',
+            })
+          }
+          options={[
+            { value: 'standard', label: t('groups.type_standard') },
+            { value: 'subscription', label: t('groups.type_subscription') },
+          ]}
+        />
 
         <Input
-          label="排序权重"
+          label={t('groups.sort_weight')}
           type="number"
           value={String(form.sort_weight)}
           onChange={(e) =>
             setForm({ ...form, sort_weight: Number(e.target.value) })
           }
-          hint="数值越大排序越靠前"
+          hint={t('groups.sort_weight_hint')}
+          icon={<ArrowUpDown className="w-4 h-4" />}
         />
 
         {/* 模型路由 JSON */}
         <Textarea
-          label="模型路由 (JSON)"
+          label={t('groups.model_routing')}
           value={modelRoutingJson}
           rows={4}
           placeholder='{"gpt-4": [1, 2], "gpt-3.5-turbo": [3]}'
@@ -342,7 +417,7 @@ function GroupFormModal({
 
         {/* 配额 JSON */}
         <Textarea
-          label="配额限制 (JSON)"
+          label={t('groups.quotas')}
           value={quotasJson}
           rows={4}
           placeholder='{"daily": 100, "monthly": 3000}'

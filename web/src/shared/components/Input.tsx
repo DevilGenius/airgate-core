@@ -1,32 +1,46 @@
-import { type InputHTMLAttributes, forwardRef } from 'react';
+import { type InputHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes, forwardRef, type ReactNode } from 'react';
+
+/* ==================== 共享样式 ==================== */
+
+const inputBase =
+  'block w-full rounded-[var(--ag-radius-md)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] px-3 py-2 text-sm text-[var(--ag-text)] placeholder-[var(--ag-text-tertiary)] transition-all duration-200 focus:outline-none focus:border-[var(--ag-border-focus)] focus:shadow-[0_0_0_3px_var(--ag-primary-subtle)] disabled:opacity-40 disabled:cursor-not-allowed';
+
+const inputError =
+  'border-[var(--ag-danger)] focus:border-[var(--ag-danger)] focus:shadow-[0_0_0_3px_var(--ag-danger-subtle)]';
+
+/* ==================== Input ==================== */
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   hint?: string;
+  icon?: ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, className = '', ...props }, ref) => {
+  ({ label, error, hint, icon, className = '', ...props }, ref) => {
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {label && (
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-xs font-medium text-[var(--ag-text-secondary)] uppercase tracking-wider">
             {label}
-            {props.required && <span className="text-red-500 ml-1">*</span>}
+            {props.required && <span className="text-[var(--ag-danger)] ml-0.5">*</span>}
           </label>
         )}
-        <input
-          ref={ref}
-          className={`block w-full rounded-md border px-3 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-            error
-              ? 'border-red-300 text-red-900 placeholder-red-300'
-              : 'border-gray-300 text-gray-900 placeholder-gray-400'
-          } ${className}`}
-          {...props}
-        />
-        {error && <p className="text-xs text-red-600">{error}</p>}
-        {hint && !error && <p className="text-xs text-gray-500">{hint}</p>}
+        <div className="relative">
+          {icon && (
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ag-text-tertiary)]">
+              {icon}
+            </div>
+          )}
+          <input
+            ref={ref}
+            className={`${inputBase} ${error ? inputError : ''} ${icon ? 'pl-10' : ''} ${className}`}
+            {...props}
+          />
+        </div>
+        {error && <p className="text-xs text-[var(--ag-danger)]">{error}</p>}
+        {hint && !error && <p className="text-xs text-[var(--ag-text-tertiary)]">{hint}</p>}
       </div>
     );
   },
@@ -34,28 +48,59 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
 Input.displayName = 'Input';
 
-// Textarea 变体
-interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+/* ==================== Textarea ==================== */
+
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
 }
 
 export function Textarea({ label, error, className = '', ...props }: TextareaProps) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       {label && (
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-xs font-medium text-[var(--ag-text-secondary)] uppercase tracking-wider">
           {label}
-          {props.required && <span className="text-red-500 ml-1">*</span>}
+          {props.required && <span className="text-[var(--ag-danger)] ml-0.5">*</span>}
         </label>
       )}
       <textarea
-        className={`block w-full rounded-md border px-3 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-          error ? 'border-red-300' : 'border-gray-300'
-        } ${className}`}
+        className={`${inputBase} min-h-[80px] resize-y ${error ? inputError : ''} ${className}`}
         {...props}
       />
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-[var(--ag-danger)]">{error}</p>}
+    </div>
+  );
+}
+
+/* ==================== Select ==================== */
+
+interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+  label?: string;
+  error?: string;
+  options: Array<{ value: string; label: string }>;
+}
+
+export function Select({ label, error, options, className = '', ...props }: SelectProps) {
+  return (
+    <div className="space-y-1.5">
+      {label && (
+        <label className="block text-xs font-medium text-[var(--ag-text-secondary)] uppercase tracking-wider">
+          {label}
+          {props.required && <span className="text-[var(--ag-danger)] ml-0.5">*</span>}
+        </label>
+      )}
+      <select
+        className={`${inputBase} cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238892a8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22/%3E%3C/svg%3E')] bg-no-repeat bg-[right_12px_center] pr-10 ${error ? inputError : ''} ${className}`}
+        {...props}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      {error && <p className="text-xs text-[var(--ag-danger)]">{error}</p>}
     </div>
   );
 }

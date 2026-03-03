@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Button } from './Button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 
 export interface Column<T> {
@@ -14,7 +14,6 @@ interface TableProps<T> {
   data: T[];
   loading?: boolean;
   rowKey?: (row: T) => string | number;
-  // 分页
   page?: number;
   pageSize?: number;
   total?: number;
@@ -36,77 +35,129 @@ export function Table<T extends Record<string, any>>({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <svg className="animate-spin h-6 w-6 text-indigo-600" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-        <span className="ml-2 text-gray-500">加载中...</span>
+      <div className="rounded-[var(--ag-radius-lg)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-elevated)] overflow-hidden">
+        {/* 表头骨架 */}
+        <div className="flex gap-4 px-4 py-3 border-b border-[var(--ag-border)] bg-[var(--ag-bg-surface)]">
+          {columns.map((col) => (
+            <div key={col.key} className="h-4 ag-shimmer rounded w-20" style={{ flex: col.width ? `0 0 ${col.width}` : '1' }} />
+          ))}
+        </div>
+        {/* 行骨架 */}
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex gap-4 px-4 py-3.5 border-b border-[var(--ag-border-subtle)]">
+            {columns.map((col) => (
+              <div key={col.key} className="h-4 ag-shimmer rounded w-24" style={{ flex: col.width ? `0 0 ${col.width}` : '1', animationDelay: `${i * 100}ms` }} />
+            ))}
+          </div>
+        ))}
       </div>
     );
   }
 
   if (data.length === 0) {
-    return <EmptyState />;
+    return (
+      <div className="rounded-[var(--ag-radius-lg)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-elevated)]">
+        <EmptyState />
+      </div>
+    );
   }
 
   return (
-    <div>
-      <div className="overflow-x-auto border border-gray-200 rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              {columns.map((col) => (
-                <th
-                  key={col.key}
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  style={{ width: col.width }}
-                >
-                  {col.title}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {data.map((row, i) => (
-              <tr key={rowKey ? rowKey(row) : i} className="hover:bg-gray-50">
+    <div className="space-y-4">
+      <div className="rounded-[var(--ag-radius-lg)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-elevated)] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[var(--ag-border)] bg-[var(--ag-bg-surface)]">
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                    {col.render ? col.render(row) : String(row[col.key] ?? '')}
-                  </td>
+                  <th
+                    key={col.key}
+                    className="px-4 py-3 text-left text-[10px] font-semibold text-[var(--ag-text-tertiary)] uppercase tracking-widest"
+                    style={{ width: col.width }}
+                  >
+                    {col.title}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.map((row, i) => (
+                <tr
+                  key={rowKey ? rowKey(row) : i}
+                  className="border-b border-[var(--ag-border-subtle)] last:border-0 transition-colors hover:bg-[var(--ag-bg-hover)]"
+                >
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      className="px-4 py-3 text-sm text-[var(--ag-text-secondary)] whitespace-nowrap"
+                    >
+                      {col.render ? col.render(row) : String(row[col.key] ?? '')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* 分页 */}
       {totalPages > 1 && onPageChange && (
-        <div className="flex items-center justify-between mt-4">
-          <span className="text-sm text-gray-500">
-            共 {total} 条，第 {page}/{totalPages} 页
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[var(--ag-text-tertiary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            共 {total} 条 · 第 {page}/{totalPages} 页
           </span>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
+          <div className="flex items-center gap-1">
+            <button
+              className="flex items-center justify-center w-8 h-8 rounded-[var(--ag-radius-sm)] text-[var(--ag-text-secondary)] hover:bg-[var(--ag-bg-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
             >
-              上一页
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            {/* 页码按钮 */}
+            {generatePageNumbers(page, totalPages).map((p, i) =>
+              p === '...' ? (
+                <span key={`ellipsis-${i}`} className="w-8 text-center text-[var(--ag-text-tertiary)] text-xs">
+                  ···
+                </span>
+              ) : (
+                <button
+                  key={p}
+                  className={`flex items-center justify-center w-8 h-8 rounded-[var(--ag-radius-sm)] text-xs font-medium transition-all ${
+                    p === page
+                      ? 'bg-[var(--ag-primary)] text-white shadow-[0_0_8px_var(--ag-primary-glow)]'
+                      : 'text-[var(--ag-text-secondary)] hover:bg-[var(--ag-bg-hover)]'
+                  }`}
+                  onClick={() => onPageChange(p as number)}
+                >
+                  {p}
+                </button>
+              ),
+            )}
+            <button
+              className="flex items-center justify-center w-8 h-8 rounded-[var(--ag-radius-sm)] text-[var(--ag-text-secondary)] hover:bg-[var(--ag-bg-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               disabled={page >= totalPages}
               onClick={() => onPageChange(page + 1)}
             >
-              下一页
-            </Button>
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
     </div>
   );
+}
+
+/** 生成分页页码 */
+function generatePageNumbers(current: number, total: number): (number | string)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | string)[] = [1];
+  if (current > 3) pages.push('...');
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+    pages.push(i);
+  }
+  if (current < total - 2) pages.push('...');
+  pages.push(total);
+  return pages;
 }

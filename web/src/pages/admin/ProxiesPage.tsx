@@ -1,13 +1,15 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { proxiesApi } from '../../shared/api/proxies';
 import { useToast } from '../../shared/components/Toast';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Table, type Column } from '../../shared/components/Table';
 import { Button } from '../../shared/components/Button';
-import { Input } from '../../shared/components/Input';
+import { Input, Select } from '../../shared/components/Input';
 import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { Badge, StatusBadge } from '../../shared/components/Badge';
+import { Plus, Pencil, Trash2, Zap } from 'lucide-react';
 import type { ProxyResp, CreateProxyReq, UpdateProxyReq } from '../../shared/types';
 
 // 代理表单数据
@@ -30,6 +32,7 @@ const emptyForm: ProxyForm = {
 };
 
 export default function ProxiesPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -50,7 +53,7 @@ export default function ProxiesPage() {
   const createMutation = useMutation({
     mutationFn: (data: CreateProxyReq) => proxiesApi.create(data),
     onSuccess: () => {
-      toast('success', '代理创建成功');
+      toast('success', t('proxies.create_success'));
       queryClient.invalidateQueries({ queryKey: ['proxies'] });
       closeModal();
     },
@@ -62,7 +65,7 @@ export default function ProxiesPage() {
     mutationFn: ({ id, data }: { id: number; data: UpdateProxyReq }) =>
       proxiesApi.update(id, data),
     onSuccess: () => {
-      toast('success', '代理更新成功');
+      toast('success', t('proxies.update_success'));
       queryClient.invalidateQueries({ queryKey: ['proxies'] });
       closeModal();
     },
@@ -73,7 +76,7 @@ export default function ProxiesPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => proxiesApi.delete(id),
     onSuccess: () => {
-      toast('success', '代理已删除');
+      toast('success', t('proxies.delete_success'));
       queryClient.invalidateQueries({ queryKey: ['proxies'] });
       setDeleteTarget(null);
     },
@@ -85,9 +88,9 @@ export default function ProxiesPage() {
     mutationFn: (id: number) => proxiesApi.test(id),
     onSuccess: (result) => {
       if (result.success) {
-        toast('success', `连通性测试成功，延迟: ${result.latency_ms}ms`);
+        toast('success', t('proxies.test_success', { latency: result.latency_ms }));
       } else {
-        toast('error', `连通性测试失败: ${result.error_msg || '未知错误'}`);
+        toast('error', t('proxies.test_failed', { error: result.error_msg || '' }));
       }
       setTestingId(null);
     },
@@ -128,7 +131,7 @@ export default function ProxiesPage() {
   // 提交表单
   function handleSubmit() {
     if (!form.name || !form.address || !form.port) {
-      toast('error', '请填写必填项');
+      toast('error', t('common.fill_required'));
       return;
     }
 
@@ -155,51 +158,83 @@ export default function ProxiesPage() {
   }
 
   const columns: Column<ProxyResp>[] = [
-    { key: 'id', title: 'ID', width: '60px' },
-    { key: 'name', title: '名称' },
+    {
+      key: 'id',
+      title: t('common.id'),
+      width: '60px',
+      render: (row) => (
+        <span className="text-[var(--ag-text-tertiary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {row.id}
+        </span>
+      ),
+    },
+    {
+      key: 'name',
+      title: t('common.name'),
+      render: (row) => <span className="text-[var(--ag-text)]">{row.name}</span>,
+    },
     {
       key: 'protocol',
-      title: '协议',
+      title: t('proxies.protocol'),
       render: (row) => (
         <Badge variant={row.protocol === 'http' ? 'info' : 'warning'}>
-          {row.protocol}
+          {row.protocol.toUpperCase()}
         </Badge>
       ),
     },
     {
       key: 'endpoint',
-      title: '地址',
-      render: (row) => `${row.address}:${row.port}`,
+      title: t('proxies.address'),
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          {row.address}:{row.port}
+        </span>
+      ),
     },
-    { key: 'username', title: '用户名', render: (row) => row.username || '-' },
+    {
+      key: 'username',
+      title: t('proxies.username'),
+      render: (row) => (
+        <span className="text-[var(--ag-text-secondary)]">
+          {row.username || '-'}
+        </span>
+      ),
+    },
     {
       key: 'status',
-      title: '状态',
+      title: t('common.status'),
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'actions',
-      title: '操作',
+      title: t('common.actions'),
       render: (row) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="ghost" onClick={() => openEdit(row)}>
-            编辑
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Pencil className="w-3.5 h-3.5" />}
+            onClick={() => openEdit(row)}
+          >
+            {t('common.edit')}
           </Button>
           <Button
             size="sm"
             variant="ghost"
+            icon={<Zap className="w-3.5 h-3.5" />}
             loading={testingId === row.id}
             onClick={() => handleTest(row.id)}
           >
-            测试
+            {t('common.test')}
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="text-red-600"
+            icon={<Trash2 className="w-3.5 h-3.5" />}
+            className="text-[var(--ag-danger)]"
             onClick={() => setDeleteTarget(row)}
           >
-            删除
+            {t('common.delete')}
           </Button>
         </div>
       ),
@@ -209,15 +244,20 @@ export default function ProxiesPage() {
   const saving = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader
-        title="代理池"
-        actions={<Button onClick={openCreate}>添加代理</Button>}
+        title={t('proxies.title')}
+        description={t('proxies.description')}
+        actions={
+          <Button icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
+            {t('proxies.create')}
+          </Button>
+        }
       />
 
       <Table
         columns={columns}
-        data={(data?.list ?? [])}
+        data={data?.list ?? []}
         loading={isLoading}
         rowKey={(row) => row.id as number}
         page={page}
@@ -230,71 +270,67 @@ export default function ProxiesPage() {
       <Modal
         open={modalOpen}
         onClose={closeModal}
-        title={editingProxy ? '编辑代理' : '添加代理'}
+        title={editingProxy ? t('proxies.edit') : t('proxies.create')}
         footer={
           <>
             <Button variant="secondary" onClick={closeModal}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSubmit} loading={saving}>
-              {editingProxy ? '保存' : '创建'}
+              {editingProxy ? t('common.save') : t('common.create')}
             </Button>
           </>
         }
       >
         <div className="space-y-4">
           <Input
-            label="名称"
+            label={t('common.name')}
             required
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="例如：美国代理-1"
+            placeholder={t('proxies.name_placeholder')}
           />
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
-              协议 <span className="text-red-500 ml-1">*</span>
-            </label>
-            <select
-              className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              value={form.protocol}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  protocol: e.target.value as 'http' | 'socks5',
-                })
-              }
-            >
-              <option value="http">HTTP</option>
-              <option value="socks5">SOCKS5</option>
-            </select>
-          </div>
+          <Select
+            label={t('proxies.protocol')}
+            required
+            value={form.protocol}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                protocol: e.target.value as 'http' | 'socks5',
+              })
+            }
+            options={[
+              { value: 'http', label: 'HTTP' },
+              { value: 'socks5', label: 'SOCKS5' },
+            ]}
+          />
           <Input
-            label="地址"
+            label={t('proxies.address')}
             required
             value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })}
-            placeholder="例如：proxy.example.com"
+            placeholder={t('proxies.address_placeholder')}
           />
           <Input
-            label="端口"
+            label={t('proxies.port')}
             required
             type="number"
             value={form.port}
             onChange={(e) => setForm({ ...form, port: e.target.value })}
-            placeholder="例如：1080"
+            placeholder={t('proxies.port_placeholder')}
           />
           <Input
-            label="用户名"
+            label={t('proxies.username')}
             value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
-            placeholder="可选"
           />
           <Input
-            label="密码"
+            label={t('proxies.password_label')}
             type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder={editingProxy ? '留空则不修改' : '可选'}
+            placeholder={editingProxy ? t('proxies.password_hint') : ''}
           />
         </div>
       </Modal>
@@ -304,8 +340,8 @@ export default function ProxiesPage() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-        title="删除代理"
-        message={`确定要删除代理「${deleteTarget?.name}」吗？使用此代理的账号将受到影响。`}
+        title={t('proxies.delete_proxy')}
+        message={t('proxies.delete_confirm', { name: deleteTarget?.name })}
         loading={deleteMutation.isPending}
         danger
       />
