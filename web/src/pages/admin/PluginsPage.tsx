@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pluginsApi } from '../../shared/api/plugins';
@@ -9,10 +9,10 @@ import { Button } from '../../shared/components/Button';
 import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { Card } from '../../shared/components/Card';
 import { Badge, StatusBadge } from '../../shared/components/Badge';
-import { Textarea } from '../../shared/components/Input';
+import { Input, Textarea } from '../../shared/components/Input';
 import {
   Power, PowerOff, Settings, Trash2, Download, Loader2,
-  Package, User, Tag,
+  Package, User, Tag, Plus, Upload, Github,
 } from 'lucide-react';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
 
@@ -33,6 +33,7 @@ export default function PluginsPage() {
   const [configJson, setConfigJson] = useState('');
   const [configError, setConfigError] = useState('');
   const [uninstallTarget, setUninstallTarget] = useState<PluginResp | null>(null);
+  const [installOpen, setInstallOpen] = useState(false);
 
   // 已安装插件列表
   const { data: pluginsData, isLoading: pluginsLoading } = useQuery({
@@ -79,7 +80,7 @@ export default function PluginsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 安装插件
+  // 安装插件（从市场）
   const installMutation = useMutation({
     mutationFn: (name: string) => pluginsApi.install({ name }),
     onSuccess: () => {
@@ -205,6 +206,14 @@ export default function PluginsPage() {
       <PageHeader
         title={t('plugins.title')}
         description={t('plugins.description')}
+        actions={
+          <Button
+            icon={<Plus className="w-4 h-4" />}
+            onClick={() => setInstallOpen(true)}
+          >
+            {t('plugins.install_plugin')}
+          </Button>
+        }
       />
 
       {/* Tab 切换 */}
@@ -262,6 +271,17 @@ export default function PluginsPage() {
         </div>
       )}
 
+      {/* 安装插件弹窗 */}
+      <InstallPluginModal
+        open={installOpen}
+        onClose={() => setInstallOpen(false)}
+        onInstalled={() => {
+          queryClient.invalidateQueries({ queryKey: ['plugins'] });
+          queryClient.invalidateQueries({ queryKey: ['marketplace'] });
+          setInstallOpen(false);
+        }}
+      />
+
       {/* 配置弹窗 */}
       <Modal
         open={!!configTarget}
@@ -300,6 +320,183 @@ export default function PluginsPage() {
         danger
       />
     </div>
+  );
+}
+
+// 安装插件弹窗
+function InstallPluginModal({
+  open,
+  onClose,
+  onInstalled,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onInstalled: () => void;
+}) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [installTab, setInstallTab] = useState<'upload' | 'github'>('upload');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [pluginName, setPluginName] = useState('');
+  const [githubRepo, setGithubRepo] = useState('');
+
+  // 上传安装
+  const uploadMutation = useMutation({
+    mutationFn: () => pluginsApi.upload(selectedFile!, pluginName || undefined),
+    onSuccess: () => {
+      toast('success', t('plugins.upload_success'));
+      resetForm();
+      onInstalled();
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  // GitHub 安装
+  const githubMutation = useMutation({
+    mutationFn: () => pluginsApi.installGithub(githubRepo),
+    onSuccess: () => {
+      toast('success', t('plugins.github_success'));
+      resetForm();
+      onInstalled();
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  function resetForm() {
+    setSelectedFile(null);
+    setPluginName('');
+    setGithubRepo('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function handleClose() {
+    resetForm();
+    onClose();
+  }
+
+  const installing = uploadMutation.isPending || githubMutation.isPending;
+
+  const installTabs = [
+    { key: 'upload' as const, label: t('plugins.upload_tab'), icon: <Upload className="w-3.5 h-3.5" /> },
+    { key: 'github' as const, label: t('plugins.github_tab'), icon: <Github className="w-3.5 h-3.5" /> },
+  ];
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title={t('plugins.install_plugin')}
+      width="520px"
+      footer={
+        <>
+          <Button variant="secondary" onClick={handleClose} disabled={installing}>
+            {t('common.cancel')}
+          </Button>
+          {installTab === 'upload' ? (
+            <Button
+              onClick={() => uploadMutation.mutate()}
+              loading={uploadMutation.isPending}
+              disabled={!selectedFile}
+            >
+              {t('common.install')}
+            </Button>
+          ) : (
+            <Button
+              onClick={() => githubMutation.mutate()}
+              loading={githubMutation.isPending}
+              disabled={!githubRepo.trim()}
+            >
+              {t('common.install')}
+            </Button>
+          )}
+        </>
+      }
+    >
+      {/* 安装方式切换 */}
+      <div className="flex gap-2 mb-5">
+        {installTabs.map((tab) => (
+          <button
+            key={tab.key}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--ag-radius-md)] text-xs font-medium transition-all cursor-pointer ${
+              installTab === tab.key
+                ? 'bg-[var(--ag-primary)] text-white'
+                : 'bg-[var(--ag-bg-surface)] text-[var(--ag-text-secondary)] hover:bg-[var(--ag-bg-muted)]'
+            }`}
+            onClick={() => setInstallTab(tab.key)}
+            disabled={installing}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 上传安装 */}
+      {installTab === 'upload' && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-[var(--ag-text-secondary)] uppercase tracking-wider mb-1.5">
+              {t('plugins.plugin_file')} <span className="text-[var(--ag-danger)]">*</span>
+            </label>
+            <div
+              className={`border-2 border-dashed rounded-[var(--ag-radius-md)] p-6 text-center cursor-pointer transition-colors ${
+                selectedFile
+                  ? 'border-[var(--ag-primary)] bg-[var(--ag-primary-subtle)]'
+                  : 'border-[var(--ag-glass-border)] hover:border-[var(--ag-border-focus)]'
+              }`}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+              />
+              {selectedFile ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Package className="w-5 h-5 text-[var(--ag-primary)]" />
+                  <span className="text-sm text-[var(--ag-text)]">{selectedFile.name}</span>
+                  <span className="text-xs text-[var(--ag-text-tertiary)]">
+                    ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  <Upload className="w-8 h-8 mx-auto mb-2 text-[var(--ag-text-tertiary)]" />
+                  <p className="text-sm text-[var(--ag-text-tertiary)]">
+                    {t('plugins.upload_hint')}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          <Input
+            label={t('plugins.plugin_name')}
+            value={pluginName}
+            onChange={(e) => setPluginName(e.target.value)}
+            placeholder={t('plugins.plugin_name_hint')}
+          />
+        </div>
+      )}
+
+      {/* GitHub 安装 */}
+      {installTab === 'github' && (
+        <div className="space-y-4">
+          <Input
+            label={t('plugins.github_repo')}
+            value={githubRepo}
+            onChange={(e) => setGithubRepo(e.target.value)}
+            placeholder={t('plugins.github_repo_placeholder')}
+            required
+          />
+          <p className="text-xs text-[var(--ag-text-tertiary)]">
+            {t('plugins.github_hint')}
+          </p>
+        </div>
+      )}
+    </Modal>
   );
 }
 

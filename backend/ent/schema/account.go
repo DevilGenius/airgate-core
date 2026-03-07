@@ -15,6 +15,7 @@ func (Account) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
 		field.String("platform").NotEmpty(),
+		field.String("type").Default("").Optional(), // 账号类型，由插件定义（如 "apikey", "oauth"）
 		field.JSON("credentials", map[string]string{}).Default(map[string]string{}),
 		field.Enum("status").Values("active", "error", "disabled").Default("active"),
 		field.Int("priority").Default(0),

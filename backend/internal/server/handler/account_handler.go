@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"strconv"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/account"
+	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 	"github.com/gin-gonic/gin"
@@ -13,12 +15,13 @@ import (
 
 // AccountHandler 上游账号管理 Handler
 type AccountHandler struct {
-	db *ent.Client
+	db        *ent.Client
+	pluginMgr *plugin.Manager
 }
 
 // NewAccountHandler 创建 AccountHandler
-func NewAccountHandler(db *ent.Client) *AccountHandler {
-	return &AccountHandler{db: db}
+func NewAccountHandler(db *ent.Client, pluginMgr *plugin.Manager) *AccountHandler {
+	return &AccountHandler{db: db, pluginMgr: pluginMgr}
 }
 
 // ListAccounts 查询账号列表（支持分页、平台/状态筛选）
@@ -87,6 +90,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 	builder := h.db.Account.Create().
 		SetName(req.Name).
 		SetPlatform(req.Platform).
+		SetType(req.Type).
 		SetCredentials(req.Credentials).
 		SetPriority(req.Priority).
 		SetMaxConcurrency(req.MaxConcurrency).
@@ -146,6 +150,9 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 
 	if req.Name != nil {
 		builder = builder.SetName(*req.Name)
+	}
+	if req.Type != nil {
+		builder = builder.SetType(*req.Type)
 	}
 	if req.Credentials != nil {
 		builder = builder.SetCredentials(req.Credentials)
@@ -227,7 +234,7 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// TestAccount 测试账号连通性（简单占位实现，详细逻辑由 Agent-B3 完善）
+// TestAccount 测试账号连通性
 func (h *AccountHandler) TestAccount(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -235,22 +242,45 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 		return
 	}
 
-	// 检查账号是否存在
-	exists, err := h.db.Account.Query().Where(account.IDEQ(id)).Exist(c.Request.Context())
+	// 查询账号
+	a, err := h.db.Account.Get(c.Request.Context(), id)
 	if err != nil {
-		slog.Error("检查账号是否存在失败", "error", err)
+		if ent.IsNotFound(err) {
+			response.NotFound(c, "账号不存在")
+			return
+		}
+		slog.Error("查询账号失败", "error", err)
 		response.InternalError(c, "测试失败")
 		return
 	}
-	if !exists {
-		response.NotFound(c, "账号不存在")
+
+	// 查找对应平台的插件
+	inst := h.pluginMgr.GetPluginByPlatform(a.Platform)
+	if inst == nil {
+		response.Success(c, map[string]interface{}{
+			"success": false,
+			"message": "未找到平台 " + a.Platform + " 对应的插件，请先安装并启用插件",
+		})
 		return
 	}
 
-	// TODO: 通过插件实际测试账号连通性，此处返回占位响应
+	// 调用插件的 ValidateCredentials
+	creds := make(map[string]string, len(a.Credentials))
+	for k, v := range a.Credentials {
+		creds[k] = fmt.Sprintf("%v", v)
+	}
+
+	if err := inst.Gateway.ValidateCredentials(c.Request.Context(), creds); err != nil {
+		response.Success(c, map[string]interface{}{
+			"success": false,
+			"message": "凭证验证失败: " + err.Error(),
+		})
+		return
+	}
+
 	response.Success(c, map[string]interface{}{
-		"success":  true,
-		"message":  "测试功能待完善",
+		"success": true,
+		"message": "凭证验证通过",
 	})
 }
 
@@ -258,8 +288,46 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 func (h *AccountHandler) GetCredentialsSchema(c *gin.Context) {
 	platform := c.Param("platform")
 
-	// 根据平台返回对应的凭证字段定义
-	// TODO: 从插件注册表动态获取，此处提供常见平台的静态定义
+	// 优先从插件缓存获取动态 schema
+	if fields := h.pluginMgr.GetCredentialFields(platform); len(fields) > 0 {
+		respFields := make([]dto.CredentialFieldResp, len(fields))
+		for i, f := range fields {
+			respFields[i] = dto.CredentialFieldResp{
+				Key:         f.Key,
+				Label:       f.Label,
+				Type:        f.Type,
+				Required:    f.Required,
+				Placeholder: f.Placeholder,
+			}
+		}
+		resp := dto.CredentialSchemaResp{Fields: respFields}
+
+		// 附带账号类型信息
+		if accountTypes := h.pluginMgr.GetAccountTypes(platform); len(accountTypes) > 0 {
+			for _, at := range accountTypes {
+				atResp := dto.AccountTypeResp{
+					Key:         at.Key,
+					Label:       at.Label,
+					Description: at.Description,
+				}
+				for _, f := range at.Fields {
+					atResp.Fields = append(atResp.Fields, dto.CredentialFieldResp{
+						Key:         f.Key,
+						Label:       f.Label,
+						Type:        f.Type,
+						Required:    f.Required,
+						Placeholder: f.Placeholder,
+					})
+				}
+				resp.AccountTypes = append(resp.AccountTypes, atResp)
+			}
+		}
+
+		response.Success(c, resp)
+		return
+	}
+
+	// fallback: 静态定义
 	schemas := map[string]dto.CredentialSchemaResp{
 		"openai": {
 			Fields: []dto.CredentialFieldResp{
@@ -282,7 +350,6 @@ func (h *AccountHandler) GetCredentialsSchema(c *gin.Context) {
 
 	schema, ok := schemas[platform]
 	if !ok {
-		// 未知平台返回通用 schema
 		schema = dto.CredentialSchemaResp{
 			Fields: []dto.CredentialFieldResp{
 				{Key: "api_key", Label: "API Key", Type: "password", Required: true, Placeholder: ""},
@@ -300,6 +367,7 @@ func toAccountResp(a *ent.Account) dto.AccountResp {
 		ID:             int64(a.ID),
 		Name:           a.Name,
 		Platform:       a.Platform,
+		Type:           a.Type,
 		Credentials:    a.Credentials,
 		Status:         string(a.Status),
 		Priority:       a.Priority,

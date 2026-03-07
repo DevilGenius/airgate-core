@@ -35,6 +35,20 @@ func (ac *AccountCreate) SetPlatform(s string) *AccountCreate {
 	return ac
 }
 
+// SetType sets the "type" field.
+func (ac *AccountCreate) SetType(s string) *AccountCreate {
+	ac.mutation.SetType(s)
+	return ac
+}
+
+// SetNillableType sets the "type" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableType(s *string) *AccountCreate {
+	if s != nil {
+		ac.SetType(*s)
+	}
+	return ac
+}
+
 // SetCredentials sets the "credentials" field.
 func (ac *AccountCreate) SetCredentials(m map[string]string) *AccountCreate {
 	ac.mutation.SetCredentials(m)
@@ -237,6 +251,10 @@ func (ac *AccountCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (ac *AccountCreate) defaults() {
+	if _, ok := ac.mutation.GetType(); !ok {
+		v := account.DefaultType
+		ac.mutation.SetType(v)
+	}
 	if _, ok := ac.mutation.Credentials(); !ok {
 		v := account.DefaultCredentials
 		ac.mutation.SetCredentials(v)
@@ -351,6 +369,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.Platform(); ok {
 		_spec.SetField(account.FieldPlatform, field.TypeString, value)
 		_node.Platform = value
+	}
+	if value, ok := ac.mutation.GetType(); ok {
+		_spec.SetField(account.FieldType, field.TypeString, value)
+		_node.Type = value
 	}
 	if value, ok := ac.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)

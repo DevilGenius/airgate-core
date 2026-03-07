@@ -59,6 +59,26 @@ func (au *AccountUpdate) SetNillablePlatform(s *string) *AccountUpdate {
 	return au
 }
 
+// SetType sets the "type" field.
+func (au *AccountUpdate) SetType(s string) *AccountUpdate {
+	au.mutation.SetType(s)
+	return au
+}
+
+// SetNillableType sets the "type" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableType(s *string) *AccountUpdate {
+	if s != nil {
+		au.SetType(*s)
+	}
+	return au
+}
+
+// ClearType clears the value of the "type" field.
+func (au *AccountUpdate) ClearType() *AccountUpdate {
+	au.mutation.ClearType()
+	return au
+}
+
 // SetCredentials sets the "credentials" field.
 func (au *AccountUpdate) SetCredentials(m map[string]string) *AccountUpdate {
 	au.mutation.SetCredentials(m)
@@ -358,6 +378,12 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := au.mutation.Platform(); ok {
 		_spec.SetField(account.FieldPlatform, field.TypeString, value)
 	}
+	if value, ok := au.mutation.GetType(); ok {
+		_spec.SetField(account.FieldType, field.TypeString, value)
+	}
+	if au.mutation.TypeCleared() {
+		_spec.ClearField(account.FieldType, field.TypeString)
+	}
 	if value, ok := au.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
 	}
@@ -558,6 +584,26 @@ func (auo *AccountUpdateOne) SetNillablePlatform(s *string) *AccountUpdateOne {
 	if s != nil {
 		auo.SetPlatform(*s)
 	}
+	return auo
+}
+
+// SetType sets the "type" field.
+func (auo *AccountUpdateOne) SetType(s string) *AccountUpdateOne {
+	auo.mutation.SetType(s)
+	return auo
+}
+
+// SetNillableType sets the "type" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableType(s *string) *AccountUpdateOne {
+	if s != nil {
+		auo.SetType(*s)
+	}
+	return auo
+}
+
+// ClearType clears the value of the "type" field.
+func (auo *AccountUpdateOne) ClearType() *AccountUpdateOne {
+	auo.mutation.ClearType()
 	return auo
 }
 
@@ -889,6 +935,12 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if value, ok := auo.mutation.Platform(); ok {
 		_spec.SetField(account.FieldPlatform, field.TypeString, value)
+	}
+	if value, ok := auo.mutation.GetType(); ok {
+		_spec.SetField(account.FieldType, field.TypeString, value)
+	}
+	if auo.mutation.TypeCleared() {
+		_spec.ClearField(account.FieldType, field.TypeString)
 	}
 	if value, ok := auo.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)

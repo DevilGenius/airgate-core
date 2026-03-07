@@ -2,6 +2,16 @@ package plugin
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 )
@@ -13,19 +23,33 @@ type MarketplacePlugin struct {
 	Description string `json:"description"`
 	Author      string `json:"author"`
 	Type        string `json:"type"` // gateway / payment / extension
+	DownloadURL string `json:"download_url,omitempty"`
+	SHA256      string `json:"sha256,omitempty"`
+}
+
+// RegistryJSON 插件源注册表结构
+type RegistryJSON struct {
+	Version string              `json:"version"`
+	Plugins []MarketplacePlugin `json:"plugins"`
 }
 
 // Marketplace 插件市场
 type Marketplace struct {
-	db *ent.Client
+	db        *ent.Client
+	pluginDir string
+	mu        sync.RWMutex
+	cache     []MarketplacePlugin // 缓存的插件列表
 }
 
 // NewMarketplace 创建插件市场
-func NewMarketplace(db *ent.Client) *Marketplace {
-	return &Marketplace{db: db}
+func NewMarketplace(db *ent.Client, pluginDir string) *Marketplace {
+	return &Marketplace{
+		db:        db,
+		pluginDir: pluginDir,
+	}
 }
 
-// officialPlugins 官方插件列表
+// officialPlugins 官方插件列表（作为无源时的 fallback）
 var officialPlugins = []MarketplacePlugin{
 	{
 		Name:        "gateway-openai",
@@ -71,8 +95,102 @@ var officialPlugins = []MarketplacePlugin{
 	},
 }
 
-// ListAvailable 列出可用插件（占位实现，返回官方插件列表）
-// 后续从插件源 URL 动态获取
+// ListAvailable 列出可用插件
 func (m *Marketplace) ListAvailable(ctx context.Context) ([]MarketplacePlugin, error) {
+	m.mu.RLock()
+	cached := m.cache
+	m.mu.RUnlock()
+
+	if len(cached) > 0 {
+		return cached, nil
+	}
+
+	// 无缓存时返回官方列表
 	return officialPlugins, nil
+}
+
+// SyncFromURL 从指定 URL 同步插件列表
+func (m *Marketplace) SyncFromURL(ctx context.Context, registryURL string) error {
+	resp, err := http.Get(registryURL)
+	if err != nil {
+		return fmt.Errorf("请求插件源失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("插件源返回状态码 %d", resp.StatusCode)
+	}
+
+	var registry RegistryJSON
+	if err := json.NewDecoder(resp.Body).Decode(&registry); err != nil {
+		return fmt.Errorf("解析插件源数据失败: %w", err)
+	}
+
+	m.mu.Lock()
+	m.cache = registry.Plugins
+	m.mu.Unlock()
+
+	slog.Info("插件源同步完成", "url", registryURL, "count", len(registry.Plugins))
+	return nil
+}
+
+// Download 下载插件二进制到本地
+func (m *Marketplace) Download(ctx context.Context, pluginName, version, downloadURL, expectedSHA256 string) (string, error) {
+	// 创建目标目录
+	targetDir := filepath.Join(m.pluginDir, pluginName)
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return "", fmt.Errorf("创建插件目录失败: %w", err)
+	}
+
+	// 下载文件
+	resp, err := http.Get(downloadURL)
+	if err != nil {
+		return "", fmt.Errorf("下载插件失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("下载返回状态码 %d", resp.StatusCode)
+	}
+
+	// 写入临时文件
+	tmpFile := filepath.Join(targetDir, pluginName+".tmp")
+	f, err := os.Create(tmpFile)
+	if err != nil {
+		return "", fmt.Errorf("创建临时文件失败: %w", err)
+	}
+
+	hasher := sha256.New()
+	writer := io.MultiWriter(f, hasher)
+
+	if _, err := io.Copy(writer, resp.Body); err != nil {
+		f.Close()
+		os.Remove(tmpFile)
+		return "", fmt.Errorf("写入文件失败: %w", err)
+	}
+	f.Close()
+
+	// SHA256 校验
+	if expectedSHA256 != "" {
+		actualHash := hex.EncodeToString(hasher.Sum(nil))
+		if actualHash != expectedSHA256 {
+			os.Remove(tmpFile)
+			return "", fmt.Errorf("SHA256 校验失败: 期望 %s，实际 %s", expectedSHA256, actualHash)
+		}
+	}
+
+	// 重命名为最终文件
+	finalPath := filepath.Join(targetDir, pluginName)
+	if err := os.Rename(tmpFile, finalPath); err != nil {
+		os.Remove(tmpFile)
+		return "", fmt.Errorf("移动文件失败: %w", err)
+	}
+
+	// 设置可执行权限
+	if err := os.Chmod(finalPath, 0755); err != nil {
+		return "", fmt.Errorf("设置执行权限失败: %w", err)
+	}
+
+	slog.Info("插件下载完成", "name", pluginName, "version", version, "path", finalPath)
+	return finalPath, nil
 }

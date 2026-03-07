@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/server/handler"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
@@ -21,7 +20,7 @@ func (s *Server) registerRoutes() {
 	// 初始化所有 Handler
 	authHandler := handler.NewAuthHandler(s.db, s.jwtMgr)
 	userHandler := handler.NewUserHandler(s.db)
-	accountHandler := handler.NewAccountHandler(s.db)
+	accountHandler := handler.NewAccountHandler(s.db, s.pluginMgr)
 	groupHandler := handler.NewGroupHandler(s.db)
 	apikeyHandler := handler.NewAPIKeyHandler(s.db)
 	subscriptionHandler := handler.NewSubscriptionHandler(s.db)
@@ -30,10 +29,16 @@ func (s *Server) registerRoutes() {
 	settingsHandler := handler.NewSettingsHandler(s.db)
 	dashboardHandler := handler.NewDashboardHandler(s.db)
 
-	// 插件相关
-	pluginMgr := plugin.NewManager(s.db, "plugins")
-	pluginMarketplace := plugin.NewMarketplace(s.db)
-	pluginHandler := handler.NewPluginHandler(s.db, pluginMgr, pluginMarketplace)
+	// 插件 Handler（使用 server 持有的组件）
+	pluginHandler := handler.NewPluginHandler(s.db, s.pluginMgr, s.marketplace)
+
+	// === 插件 API 路由（API Key 认证，catch-all） ===
+	// 必须在管理 API 路由之前注册，使用独立的路由组
+	pluginAPI := r.Group("/v1")
+	pluginAPI.Use(middleware.APIKeyAuth(s.db))
+	{
+		pluginAPI.Any("/*path", s.dynamicRouter.Handle)
+	}
 
 	// API v1 路由组
 	v1 := r.Group("/api/v1")
@@ -127,10 +132,16 @@ func (s *Server) registerRoutes() {
 		// 插件管理
 		adminGroup.GET("/plugins", pluginHandler.ListPlugins)
 		adminGroup.POST("/plugins/install", pluginHandler.InstallPlugin)
+		adminGroup.POST("/plugins/upload", pluginHandler.UploadPlugin)
+		adminGroup.POST("/plugins/install-github", pluginHandler.InstallFromGithub)
 		adminGroup.POST("/plugins/:id/uninstall", pluginHandler.UninstallPlugin)
 		adminGroup.POST("/plugins/:id/enable", pluginHandler.EnablePlugin)
 		adminGroup.POST("/plugins/:id/disable", pluginHandler.DisablePlugin)
 		adminGroup.PUT("/plugins/:id/config", pluginHandler.UpdateConfig)
+		adminGroup.GET("/plugins/:id/status", pluginHandler.PluginStatus)
+
+		// 插件市场
+		adminGroup.GET("/marketplace/plugins", pluginHandler.ListMarketplace)
 
 		// 系统设置
 		adminGroup.GET("/settings", settingsHandler.GetSettings)
@@ -139,6 +150,9 @@ func (s *Server) registerRoutes() {
 		// 仪表盘（管理员）
 		adminGroup.GET("/dashboard/stats", dashboardHandler.Stats)
 	}
+
+	// 插件前端静态资源（/plugins/{pluginName}/assets/index.js）
+	r.Static("/plugins", "data/plugins")
 
 	// 静态文件服务（前端）
 	r.Static("/assets", "web/dist/assets")

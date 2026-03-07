@@ -23,6 +23,8 @@ type Account struct {
 	Name string `json:"name,omitempty"`
 	// Platform holds the value of the "platform" field.
 	Platform string `json:"platform,omitempty"`
+	// Type holds the value of the "type" field.
+	Type string `json:"type,omitempty"`
 	// Credentials holds the value of the "credentials" field.
 	Credentials map[string]string `json:"credentials,omitempty"`
 	// Status holds the value of the "status" field.
@@ -101,7 +103,7 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case account.FieldID, account.FieldPriority, account.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
-		case account.FieldName, account.FieldPlatform, account.FieldStatus, account.FieldErrorMsg:
+		case account.FieldName, account.FieldPlatform, account.FieldType, account.FieldStatus, account.FieldErrorMsg:
 			values[i] = new(sql.NullString)
 		case account.FieldLastUsedAt, account.FieldCreatedAt, account.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -139,6 +141,12 @@ func (a *Account) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field platform", values[i])
 			} else if value.Valid {
 				a.Platform = value.String
+			}
+		case account.FieldType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field type", values[i])
+			} else if value.Valid {
+				a.Type = value.String
 			}
 		case account.FieldCredentials:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -260,6 +268,9 @@ func (a *Account) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("platform=")
 	builder.WriteString(a.Platform)
+	builder.WriteString(", ")
+	builder.WriteString("type=")
+	builder.WriteString(a.Type)
 	builder.WriteString(", ")
 	builder.WriteString("credentials=")
 	builder.WriteString(fmt.Sprintf("%v", a.Credentials))

@@ -1,7 +1,9 @@
 import { type ReactNode, useState } from 'react';
 import { Link, useMatchRoute } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../providers/AuthProvider';
+import { pluginsApi } from '../../shared/api/plugins';
 import {
   LayoutDashboard,
   Users,
@@ -51,6 +53,36 @@ const userMenuItems: MenuItem[] = [
   { path: '/keys', labelKey: 'nav.my_keys', icon: <Key className="w-[18px] h-[18px]" /> },
 ];
 
+/**
+ * 从已启用插件中提取前端页面菜单项
+ */
+function usePluginMenuItems(): MenuItem[] {
+  const { data } = useQuery({
+    queryKey: ['plugins-menu'],
+    queryFn: () => pluginsApi.list(),
+    staleTime: 60_000,
+  });
+
+  if (!data?.list) return [];
+
+  const items: MenuItem[] = [];
+  let first = true;
+  for (const p of data.list) {
+    if (p.status !== 'enabled' || !p.frontend_pages?.length) continue;
+    for (const page of p.frontend_pages) {
+      items.push({
+        path: `/plugins/${p.name}${page.path}`,
+        labelKey: page.title,
+        icon: <Puzzle className="w-[18px] h-[18px]" />,
+        // 第一个插件菜单项带分区标题
+        ...(first ? { sectionKey: 'nav.plugins' } : {}),
+      });
+      first = false;
+    }
+  }
+  return items;
+}
+
 export function AppShell({ children }: AppShellProps) {
   const { user, logout } = useAuth();
   const { t, i18n } = useTranslation();
@@ -58,7 +90,10 @@ export function AppShell({ children }: AppShellProps) {
   const matchRoute = useMatchRoute();
 
   const isAdmin = user?.role === 'admin';
-  const menuItems = isAdmin ? [...adminMenuItems, ...userMenuItems] : userMenuItems;
+  const pluginMenuItems = usePluginMenuItems();
+  const menuItems = isAdmin
+    ? [...adminMenuItems, ...pluginMenuItems, ...userMenuItems]
+    : [...userMenuItems, ...pluginMenuItems];
 
   // 按 section 分组
   const sections: Array<{ titleKey?: string; items: MenuItem[] }> = [];
@@ -146,12 +181,12 @@ export function AppShell({ children }: AppShellProps) {
                       )}
                       <span className="flex-shrink-0">{item.icon}</span>
                       {!collapsed && (
-                        <span className="text-[13px] font-medium truncate">{t(item.labelKey)}</span>
+                        <span className="text-[13px] font-medium truncate">{t(item.labelKey, { defaultValue: item.labelKey })}</span>
                       )}
                       {/* 折叠时的 tooltip */}
                       {collapsed && (
                         <div className="absolute left-full ml-2 px-2.5 py-1.5 rounded-[var(--ag-radius-sm)] bg-[var(--ag-bg-surface)] border border-[var(--ag-glass-border)] shadow-[var(--ag-shadow-md)] text-xs text-[var(--ag-text)] whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                          {t(item.labelKey)}
+                          {t(item.labelKey, { defaultValue: item.labelKey })}
                         </div>
                       )}
                     </Link>

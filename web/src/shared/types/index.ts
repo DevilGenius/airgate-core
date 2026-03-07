@@ -105,6 +105,7 @@ export interface AccountResp {
   id: number;
   name: string;
   platform: string;
+  type: string;
   credentials: Record<string, string>;
   status: 'active' | 'error' | 'disabled';
   priority: number;
@@ -121,6 +122,7 @@ export interface AccountResp {
 export interface CreateAccountReq {
   name: string;
   platform: string;
+  type?: string;
   credentials: Record<string, string>;
   priority?: number;
   max_concurrency?: number;
@@ -131,6 +133,7 @@ export interface CreateAccountReq {
 
 export interface UpdateAccountReq {
   name?: string;
+  type?: string;
   credentials?: Record<string, string>;
   status?: 'active' | 'disabled';
   priority?: number;
@@ -148,8 +151,16 @@ export interface CredentialField {
   placeholder: string;
 }
 
+export interface AccountTypeResp {
+  key: string;
+  label: string;
+  description: string;
+  fields: CredentialField[];
+}
+
 export interface CredentialSchemaResp {
   fields: CredentialField[];
+  account_types?: AccountTypeResp[];
 }
 
 // ==================== Group ====================
@@ -400,6 +411,18 @@ export interface PluginResp {
   status: 'installed' | 'enabled' | 'disabled';
   config?: Record<string, unknown>;
   binary_path?: string;
+  account_types?: Array<{
+    key: string;
+    label: string;
+    description?: string;
+  }>;
+  frontend_pages?: Array<{
+    path: string;
+    title: string;
+    icon?: string;
+    description?: string;
+  }>;
+  has_web_assets?: boolean;
   created_at: string;
   updated_at: string;
 }

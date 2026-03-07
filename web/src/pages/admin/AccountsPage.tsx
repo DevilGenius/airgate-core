@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -21,12 +21,42 @@ import { StatusBadge } from '../../shared/components/Badge';
 import { useToast } from '../../shared/components/Toast';
 import { accountsApi } from '../../shared/api/accounts';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
+import { loadPluginFrontend, type AccountFormProps } from '../../app/plugin-loader';
 import type {
   AccountResp,
   CreateAccountReq,
   UpdateAccountReq,
   CredentialField,
 } from '../../shared/types';
+
+/** 根据平台加载插件前端 accountForm 组件（带缓存） */
+const pluginFormCache = new Map<string, ComponentType<AccountFormProps> | null>();
+function usePluginAccountForm(platform: string) {
+  const [Form, setForm] = useState<ComponentType<AccountFormProps> | null>(null);
+  const loadedRef = useRef('');
+
+  useEffect(() => {
+    if (!platform) {
+      setForm(null);
+      loadedRef.current = '';
+      return;
+    }
+    const pluginId = `gateway-${platform}`;
+    if (pluginFormCache.has(pluginId)) {
+      setForm(pluginFormCache.get(pluginId) ?? null);
+      return;
+    }
+    if (loadedRef.current === pluginId) return;
+    loadedRef.current = pluginId;
+    loadPluginFrontend(pluginId).then((mod) => {
+      const form = mod?.accountForm ?? null;
+      pluginFormCache.set(pluginId, form);
+      setForm(form);
+    });
+  }, [platform]);
+
+  return Form;
+}
 
 const PAGE_SIZE = 20;
 
@@ -340,7 +370,8 @@ function CreateAccountModal({
 }) {
   const { t } = useTranslation();
   const [platform, setPlatform] = useState('');
-  const [form, setForm] = useState<Omit<CreateAccountReq, 'platform' | 'credentials'>>({
+  const [accountType, setAccountType] = useState('');
+  const [form, setForm] = useState<Omit<CreateAccountReq, 'platform' | 'credentials' | 'type'>>({
     name: '',
     priority: 0,
     max_concurrency: 5,
@@ -355,10 +386,14 @@ function CreateAccountModal({
     enabled: !!platform,
   });
 
-  // 平台变化时重置凭证
+  // 加载插件自定义表单组件
+  const PluginAccountForm = usePluginAccountForm(platform);
+
+  // 平台变化时重置凭证和账号类型
   const handlePlatformChange = (newPlatform: string) => {
     setPlatform(newPlatform);
     setCredentials({});
+    setAccountType('');
   };
 
   const handleSubmit = () => {
@@ -366,12 +401,14 @@ function CreateAccountModal({
     onSubmit({
       ...form,
       platform,
+      type: accountType || undefined,
       credentials,
     });
   };
 
   const handleClose = () => {
     setPlatform('');
+    setAccountType('');
     setForm({ name: '', priority: 0, max_concurrency: 5, rate_multiplier: 1 });
     setCredentials({});
     onClose();
@@ -414,8 +451,21 @@ function CreateAccountModal({
           icon={<Layers className="w-4 h-4" />}
         />
 
-        {/* 动态凭证字段 */}
-        {schema?.fields && schema.fields.length > 0 && (
+        {/* 凭证区域：插件自定义表单 or 默认 schema 驱动 */}
+        {PluginAccountForm ? (
+          <div
+            className="pt-4"
+            style={{ borderTop: '1px solid var(--ag-border)' }}
+          >
+            <PluginAccountForm
+              credentials={credentials}
+              onChange={setCredentials}
+              mode="create"
+              accountType={accountType}
+              onAccountTypeChange={setAccountType}
+            />
+          </div>
+        ) : schema?.fields && schema.fields.length > 0 ? (
           <div
             className="space-y-4 pt-4"
             style={{ borderTop: '1px solid var(--ag-border)' }}
@@ -437,7 +487,7 @@ function CreateAccountModal({
               />
             ))}
           </div>
-        )}
+        ) : null}
 
         <Input
           label={t('accounts.priority')}
@@ -524,8 +574,10 @@ function EditAccountModal({
   loading: boolean;
 }) {
   const { t } = useTranslation();
+  const [accountType, setAccountType] = useState(account.type || '');
   const [form, setForm] = useState<UpdateAccountReq>({
     name: account.name,
+    type: account.type || undefined,
     status: account.status === 'error' ? 'active' : (account.status as 'active' | 'disabled'),
     priority: account.priority,
     max_concurrency: account.max_concurrency,
@@ -539,9 +591,17 @@ function EditAccountModal({
     queryFn: () => accountsApi.credentialsSchema(account.platform),
   });
 
+  // 加载插件自定义表单组件
+  const PluginAccountForm = usePluginAccountForm(account.platform);
+
   const [credentials, setCredentials] = useState<Record<string, string>>(
     account.credentials,
   );
+
+  const handleAccountTypeChange = (type: string) => {
+    setAccountType(type);
+    setForm({ ...form, type: type || undefined });
+  };
 
   return (
     <Modal
@@ -555,7 +615,7 @@ function EditAccountModal({
             {t('common.cancel')}
           </Button>
           <Button
-            onClick={() => onSubmit({ ...form, credentials })}
+            onClick={() => onSubmit({ ...form, type: accountType || undefined, credentials })}
             loading={loading}
           >
             {t('common.save')}
@@ -572,8 +632,21 @@ function EditAccountModal({
           icon={<Layers className="w-4 h-4" />}
         />
 
-        {/* 凭证编辑 */}
-        {schema?.fields && schema.fields.length > 0 && (
+        {/* 凭证编辑：插件自定义表单 or 默认 schema 驱动 */}
+        {PluginAccountForm ? (
+          <div
+            className="pt-4"
+            style={{ borderTop: '1px solid var(--ag-border)' }}
+          >
+            <PluginAccountForm
+              credentials={credentials}
+              onChange={setCredentials}
+              mode="edit"
+              accountType={accountType}
+              onAccountTypeChange={handleAccountTypeChange}
+            />
+          </div>
+        ) : schema?.fields && schema.fields.length > 0 ? (
           <div
             className="space-y-4 pt-4"
             style={{ borderTop: '1px solid var(--ag-border)' }}
@@ -595,7 +668,7 @@ function EditAccountModal({
               />
             ))}
           </div>
-        )}
+        ) : null}
 
         <Select
           label={t('common.status')}

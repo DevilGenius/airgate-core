@@ -134,7 +134,7 @@ function TestResultBanner({ result }: { result: { success: boolean; error_msg?: 
       ) : (
         <CircleDot className="w-4 h-4 mt-0.5 shrink-0" />
       )}
-      <span>{result.success ? t('setup.test_success') : `${t('setup.test_failed')}${result.error_msg}`}</span>
+      <span>{result.success ? t('setup.test_success') : t('setup.test_failed', { error: result.error_msg || '' })}</span>
     </div>
   );
 }
@@ -164,7 +164,7 @@ function DBStep({ data, onChange, onNext }: DBStepProps) {
       const result = await setupApi.testDB(data);
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error_msg: err instanceof Error ? err.message : t('setup.test_failed') });
+      setTestResult({ success: false, error_msg: err instanceof Error ? err.message : String(err) });
     } finally {
       setTesting(false);
     }
@@ -281,7 +281,7 @@ function RedisStep({ data, onChange, onPrev, onNext }: RedisStepProps) {
       const result = await setupApi.testRedis(data);
       setTestResult(result);
     } catch (err) {
-      setTestResult({ success: false, error_msg: err instanceof Error ? err.message : t('setup.test_failed') });
+      setTestResult({ success: false, error_msg: err instanceof Error ? err.message : String(err) });
     } finally {
       setTesting(false);
     }

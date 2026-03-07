@@ -1,12 +1,24 @@
 import type { ComponentType } from 'react';
 
 /**
+ * 插件账号表单组件 Props
+ */
+export interface AccountFormProps {
+  credentials: Record<string, string>;
+  onChange: (credentials: Record<string, string>) => void;
+  mode: 'create' | 'edit';
+  accountType?: string;
+  onAccountTypeChange?: (type: string) => void;
+}
+
+/**
  * 插件前端模块接口
- * 每个插件可选地暴露路由和菜单项，由核心 Shell 动态注入。
+ * 每个插件可选地暴露路由、菜单项和自定义账号表单组件，由核心 Shell 动态注入。
  */
 export interface PluginFrontendModule {
   routes?: Array<{ path: string; component: ComponentType }>;
   menuItems?: Array<{ path: string; title: string; icon: string }>;
+  accountForm?: ComponentType<AccountFormProps>;
 }
 
 /**

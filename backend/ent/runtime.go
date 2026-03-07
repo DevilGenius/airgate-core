@@ -61,32 +61,36 @@ func init() {
 	accountDescPlatform := accountFields[1].Descriptor()
 	// account.PlatformValidator is a validator for the "platform" field. It is called by the builders before save.
 	account.PlatformValidator = accountDescPlatform.Validators[0].(func(string) error)
+	// accountDescType is the schema descriptor for type field.
+	accountDescType := accountFields[2].Descriptor()
+	// account.DefaultType holds the default value on creation for the type field.
+	account.DefaultType = accountDescType.Default.(string)
 	// accountDescCredentials is the schema descriptor for credentials field.
-	accountDescCredentials := accountFields[2].Descriptor()
+	accountDescCredentials := accountFields[3].Descriptor()
 	// account.DefaultCredentials holds the default value on creation for the credentials field.
 	account.DefaultCredentials = accountDescCredentials.Default.(map[string]string)
 	// accountDescPriority is the schema descriptor for priority field.
-	accountDescPriority := accountFields[4].Descriptor()
+	accountDescPriority := accountFields[5].Descriptor()
 	// account.DefaultPriority holds the default value on creation for the priority field.
 	account.DefaultPriority = accountDescPriority.Default.(int)
 	// accountDescMaxConcurrency is the schema descriptor for max_concurrency field.
-	accountDescMaxConcurrency := accountFields[5].Descriptor()
+	accountDescMaxConcurrency := accountFields[6].Descriptor()
 	// account.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	account.DefaultMaxConcurrency = accountDescMaxConcurrency.Default.(int)
 	// accountDescRateMultiplier is the schema descriptor for rate_multiplier field.
-	accountDescRateMultiplier := accountFields[6].Descriptor()
+	accountDescRateMultiplier := accountFields[7].Descriptor()
 	// account.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	account.DefaultRateMultiplier = accountDescRateMultiplier.Default.(float64)
 	// accountDescErrorMsg is the schema descriptor for error_msg field.
-	accountDescErrorMsg := accountFields[7].Descriptor()
+	accountDescErrorMsg := accountFields[8].Descriptor()
 	// account.DefaultErrorMsg holds the default value on creation for the error_msg field.
 	account.DefaultErrorMsg = accountDescErrorMsg.Default.(string)
 	// accountDescCreatedAt is the schema descriptor for created_at field.
-	accountDescCreatedAt := accountFields[9].Descriptor()
+	accountDescCreatedAt := accountFields[10].Descriptor()
 	// account.DefaultCreatedAt holds the default value on creation for the created_at field.
 	account.DefaultCreatedAt = accountDescCreatedAt.Default.(func() time.Time)
 	// accountDescUpdatedAt is the schema descriptor for updated_at field.
-	accountDescUpdatedAt := accountFields[10].Descriptor()
+	accountDescUpdatedAt := accountFields[11].Descriptor()
 	// account.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	account.DefaultUpdatedAt = accountDescUpdatedAt.Default.(func() time.Time)
 	// account.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

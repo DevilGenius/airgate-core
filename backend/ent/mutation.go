@@ -1241,6 +1241,7 @@ type AccountMutation struct {
 	id                 *int
 	name               *string
 	platform           *string
+	_type              *string
 	credentials        *map[string]string
 	status             *account.Status
 	priority           *int
@@ -1435,6 +1436,55 @@ func (m *AccountMutation) OldPlatform(ctx context.Context) (v string, err error)
 // ResetPlatform resets all changes to the "platform" field.
 func (m *AccountMutation) ResetPlatform() {
 	m.platform = nil
+}
+
+// SetType sets the "type" field.
+func (m *AccountMutation) SetType(s string) {
+	m._type = &s
+}
+
+// GetType returns the value of the "type" field in the mutation.
+func (m *AccountMutation) GetType() (r string, exists bool) {
+	v := m._type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldType returns the old "type" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldType: %w", err)
+	}
+	return oldValue.Type, nil
+}
+
+// ClearType clears the value of the "type" field.
+func (m *AccountMutation) ClearType() {
+	m._type = nil
+	m.clearedFields[account.FieldType] = struct{}{}
+}
+
+// TypeCleared returns if the "type" field was cleared in this mutation.
+func (m *AccountMutation) TypeCleared() bool {
+	_, ok := m.clearedFields[account.FieldType]
+	return ok
+}
+
+// ResetType resets all changes to the "type" field.
+func (m *AccountMutation) ResetType() {
+	m._type = nil
+	delete(m.clearedFields, account.FieldType)
 }
 
 // SetCredentials sets the "credentials" field.
@@ -2015,12 +2065,15 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.name != nil {
 		fields = append(fields, account.FieldName)
 	}
 	if m.platform != nil {
 		fields = append(fields, account.FieldPlatform)
+	}
+	if m._type != nil {
+		fields = append(fields, account.FieldType)
 	}
 	if m.credentials != nil {
 		fields = append(fields, account.FieldCredentials)
@@ -2061,6 +2114,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case account.FieldPlatform:
 		return m.Platform()
+	case account.FieldType:
+		return m.GetType()
 	case account.FieldCredentials:
 		return m.Credentials()
 	case account.FieldStatus:
@@ -2092,6 +2147,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldName(ctx)
 	case account.FieldPlatform:
 		return m.OldPlatform(ctx)
+	case account.FieldType:
+		return m.OldType(ctx)
 	case account.FieldCredentials:
 		return m.OldCredentials(ctx)
 	case account.FieldStatus:
@@ -2132,6 +2189,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPlatform(v)
+		return nil
+	case account.FieldType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetType(v)
 		return nil
 	case account.FieldCredentials:
 		v, ok := value.(map[string]string)
@@ -2265,6 +2329,9 @@ func (m *AccountMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *AccountMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(account.FieldType) {
+		fields = append(fields, account.FieldType)
+	}
 	if m.FieldCleared(account.FieldLastUsedAt) {
 		fields = append(fields, account.FieldLastUsedAt)
 	}
@@ -2282,6 +2349,9 @@ func (m *AccountMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *AccountMutation) ClearField(name string) error {
 	switch name {
+	case account.FieldType:
+		m.ClearType()
+		return nil
 	case account.FieldLastUsedAt:
 		m.ClearLastUsedAt()
 		return nil
@@ -2298,6 +2368,9 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldPlatform:
 		m.ResetPlatform()
+		return nil
+	case account.FieldType:
+		m.ResetType()
 		return nil
 	case account.FieldCredentials:
 		m.ResetCredentials()

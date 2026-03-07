@@ -19,6 +19,8 @@ const (
 	FieldName = "name"
 	// FieldPlatform holds the string denoting the platform field in the database.
 	FieldPlatform = "platform"
+	// FieldType holds the string denoting the type field in the database.
+	FieldType = "type"
 	// FieldCredentials holds the string denoting the credentials field in the database.
 	FieldCredentials = "credentials"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -71,6 +73,7 @@ var Columns = []string{
 	FieldID,
 	FieldName,
 	FieldPlatform,
+	FieldType,
 	FieldCredentials,
 	FieldStatus,
 	FieldPriority,
@@ -114,6 +117,8 @@ var (
 	NameValidator func(string) error
 	// PlatformValidator is a validator for the "platform" field. It is called by the builders before save.
 	PlatformValidator func(string) error
+	// DefaultType holds the default value on creation for the "type" field.
+	DefaultType string
 	// DefaultCredentials holds the default value on creation for the "credentials" field.
 	DefaultCredentials map[string]string
 	// DefaultPriority holds the default value on creation for the "priority" field.
@@ -175,6 +180,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByPlatform orders the results by the platform field.
 func ByPlatform(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPlatform, opts...).ToFunc()
+}
+
+// ByType orders the results by the type field.
+func ByType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldType, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

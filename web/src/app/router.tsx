@@ -25,6 +25,7 @@ import UserKeysPage from '../pages/user/UserKeysPage';
 // 登录和安装页不常用，保持懒加载
 const SetupPage = lazy(() => import('../pages/SetupPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
+const PluginPage = lazy(() => import('../pages/PluginPage'));
 
 // 缓存安装状态，避免每次路由跳转都请求
 let setupChecked = false;
@@ -127,6 +128,17 @@ const adminSettingsRoute = createRoute({ getParentRoute: () => authLayout, path:
 const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/profile', component: ProfilePage });
 const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: UserKeysPage });
 
+// 插件页面路由（catch-all）
+const pluginRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/plugins/$pluginName/$',
+  component: () => (
+    <Suspense>
+      <PluginPage />
+    </Suspense>
+  ),
+});
+
 // 路由树
 const routeTree = rootRoute.addChildren([
   setupRoute,
@@ -144,6 +156,7 @@ const routeTree = rootRoute.addChildren([
     adminSettingsRoute,
     profileRoute,
     userKeysRoute,
+    pluginRoute,
   ]),
 ]);
 

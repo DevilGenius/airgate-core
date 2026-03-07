@@ -1,4 +1,4 @@
-import { get, post, put } from './client';
+import { get, post, put, upload } from './client';
 import type {
   PluginResp, PluginConfigReq, InstallPluginReq,
   MarketplacePluginResp, PageReq, PagedData,
@@ -15,4 +15,14 @@ export const pluginsApi = {
     put<void>(`/api/v1/admin/plugins/${id}/config`, data),
   marketplace: (params?: PageReq) =>
     get<PagedData<MarketplacePluginResp>>('/api/v1/admin/plugins/marketplace', params),
+  // 上传安装插件
+  upload: (file: File, name?: string) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (name) fd.append('name', name);
+    return upload<void>('/api/v1/admin/plugins/upload', fd);
+  },
+  // 从 GitHub Release 安装
+  installGithub: (repo: string) =>
+    post<void>('/api/v1/admin/plugins/install-github', { repo }),
 };

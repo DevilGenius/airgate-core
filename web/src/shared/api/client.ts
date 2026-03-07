@@ -48,13 +48,23 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  const res = await fetch(url.toString(), {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new ApiError(-1, '无法连接到服务器，请检查网络或服务是否正常', 0);
+  }
 
-  const json: ApiResponse<T> = await res.json();
+  let json: ApiResponse<T>;
+  try {
+    json = await res.json();
+  } catch {
+    throw new ApiError(-1, `服务端响应异常 (HTTP ${res.status})`, res.status);
+  }
 
   if (json.code !== 0) {
     // Token 过期，尝试刷新
@@ -95,4 +105,43 @@ export function put<T>(path: string, body?: unknown): Promise<T> {
 
 export function del<T>(path: string): Promise<T> {
   return request<T>('DELETE', path);
+}
+
+// 文件上传（multipart/form-data）
+export async function upload<T>(path: string, formData: FormData): Promise<T> {
+  const url = new URL(`${BASE_URL}${path}`, window.location.origin);
+
+  const headers: Record<string, string> = {};
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  // 不设 Content-Type，让浏览器自动设置 boundary
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+  } catch {
+    throw new ApiError(-1, '无法连接到服务器，请检查网络或服务是否正常', 0);
+  }
+
+  let json: ApiResponse<T>;
+  try {
+    json = await res.json();
+  } catch {
+    throw new ApiError(-1, `服务端响应异常 (HTTP ${res.status})`, res.status);
+  }
+
+  if (json.code !== 0) {
+    if (res.status === 401 && accessToken) {
+      setToken(null);
+      window.location.href = '/login';
+    }
+    throw new ApiError(json.code, json.message, res.status);
+  }
+
+  return json.data;
 }

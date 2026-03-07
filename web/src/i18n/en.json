@@ -310,7 +310,19 @@
     "install_success": "Plugin installed successfully",
     "config_success": "Configuration saved",
     "config": "Config",
-    "already_installed": "Installed"
+    "already_installed": "Installed",
+    "install_plugin": "Install Plugin",
+    "upload_tab": "Upload",
+    "github_tab": "GitHub",
+    "plugin_file": "Plugin File",
+    "upload_hint": "Click to select a plugin binary file",
+    "plugin_name": "Plugin Name",
+    "plugin_name_hint": "Leave empty to use filename",
+    "github_repo": "Repository",
+    "github_repo_placeholder": "owner/repo",
+    "github_hint": "Download pre-built binary from GitHub Release for the current platform",
+    "upload_success": "Plugin uploaded and installed",
+    "github_success": "Plugin installed from GitHub"
   },
 
   "settings": {

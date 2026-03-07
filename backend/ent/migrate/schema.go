@@ -49,6 +49,7 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString},
 		{Name: "platform", Type: field.TypeString},
+		{Name: "type", Type: field.TypeString, Nullable: true, Default: ""},
 		{Name: "credentials", Type: field.TypeJSON},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "error", "disabled"}, Default: "active"},
 		{Name: "priority", Type: field.TypeInt, Default: 0},
@@ -68,7 +69,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[12]},
+				Columns:    []*schema.Column{AccountsColumns[13]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

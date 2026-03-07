@@ -35,3 +35,4 @@ backend/config.yaml
 # Config
 *.local
 .env
+backend/data/

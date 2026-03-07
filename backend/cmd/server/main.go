@@ -105,6 +105,9 @@ func startMainServer(cfg *config.Config) {
 	// 创建并启动 HTTP 服务器
 	srv := server.NewServer(cfg, db, rdb)
 
+	// 启动插件系统（非阻塞，失败不影响核心服务）
+	srv.StartPlugins(context.Background())
+
 	// 优雅关闭
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

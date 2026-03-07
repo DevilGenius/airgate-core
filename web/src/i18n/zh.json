@@ -310,7 +310,19 @@
     "install_success": "插件安装成功",
     "config_success": "配置已保存",
     "config": "配置",
-    "already_installed": "已安装"
+    "already_installed": "已安装",
+    "install_plugin": "安装插件",
+    "upload_tab": "上传安装",
+    "github_tab": "GitHub 安装",
+    "plugin_file": "插件文件",
+    "upload_hint": "点击选择插件二进制文件",
+    "plugin_name": "插件名称",
+    "plugin_name_hint": "留空则使用文件名",
+    "github_repo": "仓库地址",
+    "github_repo_placeholder": "owner/repo",
+    "github_hint": "从 GitHub Release 下载适配当前系统的预编译二进制文件",
+    "upload_success": "插件上传安装成功",
+    "github_success": "插件从 GitHub 安装成功"
   },
 
   "settings": {
