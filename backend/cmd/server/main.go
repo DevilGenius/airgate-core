@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DouDOU-start/airgate-core/ent/migrate"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/i18n"
 	"github.com/DouDOU-start/airgate-core/internal/server"
@@ -93,6 +94,12 @@ func startMainServer(cfg *config.Config) {
 	}
 	db := ent.NewClient(ent.Driver(drv))
 	defer db.Close()
+
+	// 启动时执行非破坏性迁移，补齐缺失表和字段，避免升级后因 schema 落后导致接口报错。
+	if err := db.Schema.Create(context.Background(), migrate.WithDropIndex(false), migrate.WithDropColumn(false)); err != nil {
+		slog.Error("执行数据库迁移失败", "error", err)
+		os.Exit(1)
+	}
 
 	// 初始化 Redis
 	rdb := redis.NewClient(&redis.Options{

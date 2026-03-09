@@ -322,7 +322,10 @@
     "github_repo_placeholder": "owner/repo",
     "github_hint": "Download pre-built binary from GitHub Release for the current platform",
     "upload_success": "Plugin uploaded and installed",
-    "github_success": "Plugin installed from GitHub"
+    "github_success": "Plugin installed from GitHub",
+    "reload": "Reload",
+    "reload_success": "Plugin reloaded successfully",
+    "dev_badge": "Dev"
   },
 
   "settings": {

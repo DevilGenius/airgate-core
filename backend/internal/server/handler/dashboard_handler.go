@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	entplugin "github.com/DouDOU-start/airgate-core/ent/plugin"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
+	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 	"github.com/gin-gonic/gin"
@@ -14,12 +14,13 @@ import (
 
 // DashboardHandler 仪表盘 Handler
 type DashboardHandler struct {
-	db *ent.Client
+	db      *ent.Client
+	plugins *plugin.Manager
 }
 
 // NewDashboardHandler 创建 DashboardHandler
-func NewDashboardHandler(db *ent.Client) *DashboardHandler {
-	return &DashboardHandler{db: db}
+func NewDashboardHandler(db *ent.Client, plugins *plugin.Manager) *DashboardHandler {
+	return &DashboardHandler{db: db, plugins: plugins}
 }
 
 // Stats 返回仪表盘统计数据
@@ -51,13 +52,7 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 		totalAPIKeys = 0
 	}
 
-	activePlugins, err := h.db.Plugin.Query().
-		Where(entplugin.StatusEQ(entplugin.StatusEnabled)).
-		Count(ctx)
-	if err != nil {
-		slog.Error("查询活跃插件数失败", "error", err)
-		activePlugins = 0
-	}
+	activePlugins := h.plugins.RunningCount()
 
 	// 今日统计：按今天的日期筛选使用日志
 	todayStart := time.Now().Truncate(24 * time.Hour)

@@ -20,8 +20,13 @@ import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { StatusBadge } from '../../shared/components/Badge';
 import { useToast } from '../../shared/components/Toast';
 import { accountsApi } from '../../shared/api/accounts';
+import { pluginsApi } from '../../shared/api/plugins';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import { loadPluginFrontend, type AccountFormProps } from '../../app/plugin-loader';
+import {
+  loadPluginFrontend,
+  type AccountFormProps,
+  type PluginOAuthBridge,
+} from '../../app/plugin-loader';
 import type {
   AccountResp,
   CreateAccountReq,
@@ -29,33 +34,95 @@ import type {
   CredentialField,
 } from '../../shared/types';
 
-/** 根据平台加载插件前端 accountForm 组件（带缓存） */
+/** 平台 → 插件名称映射缓存 */
+let platformPluginMap: Map<string, string> | null = null;
+
+async function getPlatformPluginMap(): Promise<Map<string, string>> {
+  if (platformPluginMap) return platformPluginMap;
+  const resp = await pluginsApi.list({ page: 1, page_size: 100 });
+  const map = new Map<string, string>();
+  for (const p of resp.list) {
+    if (p.platform) map.set(p.platform, p.name);
+  }
+  platformPluginMap = map;
+  return map;
+}
+
+function detectCredentialAccountType(credentials: Record<string, string>): string {
+  if (credentials.provider === 'sub2api') return 'sub2api';
+  if (credentials.api_key) return 'apikey';
+  if (credentials.access_token) return 'oauth';
+  return '';
+}
+
 const pluginFormCache = new Map<string, ComponentType<AccountFormProps> | null>();
 function usePluginAccountForm(platform: string) {
   const [Form, setForm] = useState<ComponentType<AccountFormProps> | null>(null);
+  const [pluginId, setPluginId] = useState('');
   const loadedRef = useRef('');
 
   useEffect(() => {
     if (!platform) {
       setForm(null);
+      setPluginId('');
       loadedRef.current = '';
       return;
     }
-    const pluginId = `gateway-${platform}`;
-    if (pluginFormCache.has(pluginId)) {
-      setForm(pluginFormCache.get(pluginId) ?? null);
-      return;
-    }
-    if (loadedRef.current === pluginId) return;
-    loadedRef.current = pluginId;
-    loadPluginFrontend(pluginId).then((mod) => {
-      const form = mod?.accountForm ?? null;
-      pluginFormCache.set(pluginId, form);
-      setForm(form);
+    if (loadedRef.current === platform) return;
+    loadedRef.current = platform;
+    let cancelled = false;
+
+    getPlatformPluginMap().then((map) => {
+      const resolvedPluginId = map.get(platform) ?? '';
+      if (cancelled) return;
+
+      setPluginId(resolvedPluginId);
+
+      if (!resolvedPluginId) {
+        setForm(null);
+        return;
+      }
+      if (pluginFormCache.has(resolvedPluginId)) {
+        const cachedForm = pluginFormCache.get(resolvedPluginId) ?? null;
+        setForm(() => cachedForm);
+        return;
+      }
+      loadPluginFrontend(resolvedPluginId).then((mod) => {
+        if (cancelled) return;
+        const form = mod?.accountForm ?? null;
+        pluginFormCache.set(resolvedPluginId, form);
+        setForm(() => form);
+      });
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [platform]);
 
-  return Form;
+  return { Form, pluginId };
+}
+
+function createPluginOAuthBridge(pluginId: string): PluginOAuthBridge | undefined {
+  if (!pluginId) return undefined;
+
+  return {
+    start: async () => {
+      const result = await pluginsApi.oauthStart(pluginId);
+      return {
+        authorizeURL: result.authorize_url,
+        state: result.state,
+      };
+    },
+    exchange: async (callbackURL: string) => {
+      const result = await pluginsApi.oauthExchange(pluginId, callbackURL);
+      return {
+        accountType: result.account_type,
+        accountName: result.account_name,
+        credentials: result.credentials,
+      };
+    },
+  };
 }
 
 const PAGE_SIZE = 20;
@@ -387,7 +454,8 @@ function CreateAccountModal({
   });
 
   // 加载插件自定义表单组件
-  const PluginAccountForm = usePluginAccountForm(platform);
+  const { Form: PluginAccountForm, pluginId } = usePluginAccountForm(platform);
+  const pluginOAuth = createPluginOAuthBridge(pluginId);
 
   // 平台变化时重置凭证和账号类型
   const handlePlatformChange = (newPlatform: string) => {
@@ -463,6 +531,10 @@ function CreateAccountModal({
               mode="create"
               accountType={accountType}
               onAccountTypeChange={setAccountType}
+              onSuggestedName={(name) =>
+                setForm((prev) => (prev.name ? prev : { ...prev, name }))
+              }
+              oauth={pluginOAuth}
             />
           </div>
         ) : schema?.fields && schema.fields.length > 0 ? (
@@ -574,10 +646,11 @@ function EditAccountModal({
   loading: boolean;
 }) {
   const { t } = useTranslation();
-  const [accountType, setAccountType] = useState(account.type || '');
+  const initialAccountType = account.type || detectCredentialAccountType(account.credentials);
+  const [accountType, setAccountType] = useState(initialAccountType);
   const [form, setForm] = useState<UpdateAccountReq>({
     name: account.name,
-    type: account.type || undefined,
+    type: initialAccountType || undefined,
     status: account.status === 'error' ? 'active' : (account.status as 'active' | 'disabled'),
     priority: account.priority,
     max_concurrency: account.max_concurrency,
@@ -592,7 +665,8 @@ function EditAccountModal({
   });
 
   // 加载插件自定义表单组件
-  const PluginAccountForm = usePluginAccountForm(account.platform);
+  const { Form: PluginAccountForm, pluginId } = usePluginAccountForm(account.platform);
+  const pluginOAuth = createPluginOAuthBridge(pluginId);
 
   const [credentials, setCredentials] = useState<Record<string, string>>(
     account.credentials,
@@ -644,6 +718,7 @@ function EditAccountModal({
               mode="edit"
               accountType={accountType}
               onAccountTypeChange={handleAccountTypeChange}
+              oauth={pluginOAuth}
             />
           </div>
         ) : schema?.fields && schema.fields.length > 0 ? (

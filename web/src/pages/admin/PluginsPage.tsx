@@ -8,10 +8,10 @@ import { Table, type Column } from '../../shared/components/Table';
 import { Button } from '../../shared/components/Button';
 import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { Card } from '../../shared/components/Card';
-import { Badge, StatusBadge } from '../../shared/components/Badge';
-import { Input, Textarea } from '../../shared/components/Input';
+import { Badge } from '../../shared/components/Badge';
+import { Input } from '../../shared/components/Input';
 import {
-  Power, PowerOff, Settings, Trash2, Download, Loader2,
+  Trash2, Download, Loader2, RefreshCw,
   Package, User, Tag, Plus, Upload, Github,
 } from 'lucide-react';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
@@ -29,9 +29,6 @@ export default function PluginsPage() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<'installed' | 'marketplace'>('installed');
-  const [configTarget, setConfigTarget] = useState<PluginResp | null>(null);
-  const [configJson, setConfigJson] = useState('');
-  const [configError, setConfigError] = useState('');
   const [uninstallTarget, setUninstallTarget] = useState<PluginResp | null>(null);
   const [installOpen, setInstallOpen] = useState(false);
 
@@ -48,29 +45,9 @@ export default function PluginsPage() {
     enabled: activeTab === 'marketplace',
   });
 
-  // 启用插件
-  const enableMutation = useMutation({
-    mutationFn: (id: number) => pluginsApi.enable(id),
-    onSuccess: () => {
-      toast('success', t('plugins.enable_success'));
-      queryClient.invalidateQueries({ queryKey: ['plugins'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
-  });
-
-  // 禁用插件
-  const disableMutation = useMutation({
-    mutationFn: (id: number) => pluginsApi.disable(id),
-    onSuccess: () => {
-      toast('success', t('plugins.disable_success'));
-      queryClient.invalidateQueries({ queryKey: ['plugins'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
-  });
-
   // 卸载插件
   const uninstallMutation = useMutation({
-    mutationFn: (id: number) => pluginsApi.uninstall(id),
+    mutationFn: (name: string) => pluginsApi.uninstall(name),
     onSuccess: () => {
       toast('success', t('plugins.uninstall_success'));
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
@@ -80,55 +57,15 @@ export default function PluginsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 安装插件（从市场）
-  const installMutation = useMutation({
-    mutationFn: (name: string) => pluginsApi.install({ name }),
+  // 热加载插件
+  const reloadMutation = useMutation({
+    mutationFn: (name: string) => pluginsApi.reload(name),
     onSuccess: () => {
-      toast('success', t('plugins.install_success'));
+      toast('success', t('plugins.reload_success'));
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
-      queryClient.invalidateQueries({ queryKey: ['marketplace'] });
     },
     onError: (err: Error) => toast('error', err.message),
   });
-
-  // 更新配置
-  const configMutation = useMutation({
-    mutationFn: ({ id, config }: { id: number; config: Record<string, unknown> }) =>
-      pluginsApi.updateConfig(id, { config }),
-    onSuccess: () => {
-      toast('success', t('plugins.config_success'));
-      queryClient.invalidateQueries({ queryKey: ['plugins'] });
-      setConfigTarget(null);
-    },
-    onError: (err: Error) => toast('error', err.message),
-  });
-
-  // 打开配置弹窗
-  function openConfig(plugin: PluginResp) {
-    setConfigTarget(plugin);
-    setConfigJson(JSON.stringify(plugin.config || {}, null, 2));
-    setConfigError('');
-  }
-
-  // 保存配置
-  function handleSaveConfig() {
-    try {
-      const parsed = JSON.parse(configJson);
-      setConfigError('');
-      configMutation.mutate({ id: configTarget!.id, config: parsed });
-    } catch {
-      setConfigError('JSON 格式不正确');
-    }
-  }
-
-  // 切换启用/禁用
-  function togglePlugin(plugin: PluginResp) {
-    if (plugin.status === 'enabled') {
-      disableMutation.mutate(plugin.id);
-    } else {
-      enableMutation.mutate(plugin.id);
-    }
-  }
 
   const installedColumns: Column<PluginResp>[] = [
     {
@@ -136,52 +73,32 @@ export default function PluginsPage() {
       title: t('common.name'),
       render: (row) => <span className="text-[var(--ag-text)] font-medium">{row.name}</span>,
     },
-    { key: 'platform', title: t('plugins.platform') },
     {
-      key: 'version',
-      title: t('common.version'),
+      key: 'platform',
+      title: t('plugins.platform'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>{row.version}</span>
+        <div className="flex items-center gap-2">
+          <span>{row.platform}</span>
+          {row.is_dev && <Badge variant="warning">{t('plugins.dev_badge')}</Badge>}
+        </div>
       ),
-    },
-    {
-      key: 'type',
-      title: t('common.type'),
-      render: (row) => (
-        <Badge variant={typeVariant[row.type] || 'default'}>{row.type}</Badge>
-      ),
-    },
-    {
-      key: 'status',
-      title: t('common.status'),
-      render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'actions',
       title: t('common.actions'),
       render: (row) => (
         <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={
-              row.status === 'enabled'
-                ? <PowerOff className="w-3.5 h-3.5" />
-                : <Power className="w-3.5 h-3.5" />
-            }
-            onClick={() => togglePlugin(row)}
-            loading={enableMutation.isPending || disableMutation.isPending}
-          >
-            {row.status === 'enabled' ? t('common.disable') : t('common.enable')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Settings className="w-3.5 h-3.5" />}
-            onClick={() => openConfig(row)}
-          >
-            {t('plugins.config')}
-          </Button>
+          {row.is_dev && (
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<RefreshCw className={`w-3.5 h-3.5 ${reloadMutation.isPending ? 'animate-spin' : ''}`} />}
+              onClick={() => reloadMutation.mutate(row.name)}
+              disabled={reloadMutation.isPending}
+            >
+              {t('plugins.reload')}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -239,7 +156,7 @@ export default function PluginsPage() {
           columns={installedColumns}
           data={pluginsData?.list ?? []}
           loading={pluginsLoading}
-          rowKey={(row) => row.id as number}
+          rowKey={(row) => row.name}
         />
       )}
 
@@ -257,8 +174,6 @@ export default function PluginsPage() {
                 <MarketplaceCard
                   key={plugin.name}
                   plugin={plugin}
-                  onInstall={() => installMutation.mutate(plugin.name)}
-                  installing={installMutation.isPending}
                 />
               ))}
               {(marketData?.list ?? []).length === 0 && (
@@ -282,38 +197,11 @@ export default function PluginsPage() {
         }}
       />
 
-      {/* 配置弹窗 */}
-      <Modal
-        open={!!configTarget}
-        onClose={() => setConfigTarget(null)}
-        title={`${t('plugins.config_title')} - ${configTarget?.name}`}
-        width="600px"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setConfigTarget(null)}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleSaveConfig} loading={configMutation.isPending}>
-              {t('common.save')}
-            </Button>
-          </>
-        }
-      >
-        <Textarea
-          label={t('plugins.config_label')}
-          value={configJson}
-          onChange={(e) => setConfigJson(e.target.value)}
-          rows={12}
-          style={{ fontFamily: 'var(--ag-font-mono)' }}
-          error={configError}
-        />
-      </Modal>
-
       {/* 卸载确认 */}
       <ConfirmModal
         open={!!uninstallTarget}
         onClose={() => setUninstallTarget(null)}
-        onConfirm={() => uninstallTarget && uninstallMutation.mutate(uninstallTarget.id)}
+        onConfirm={() => uninstallTarget && uninstallMutation.mutate(uninstallTarget.name)}
         title={t('plugins.uninstall_title')}
         message={t('plugins.uninstall_confirm', { name: uninstallTarget?.name })}
         loading={uninstallMutation.isPending}
@@ -503,12 +391,8 @@ function InstallPluginModal({
 // 插件市场卡片组件
 function MarketplaceCard({
   plugin,
-  onInstall,
-  installing,
 }: {
   plugin: MarketplacePluginResp;
-  onInstall: () => void;
-  installing: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -542,8 +426,7 @@ function MarketplaceCard({
             <Button
               size="sm"
               icon={<Download className="w-3.5 h-3.5" />}
-              onClick={onInstall}
-              loading={installing}
+              disabled
             >
               {t('common.install')}
             </Button>

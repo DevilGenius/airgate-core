@@ -2,101 +2,59 @@
 package handler
 
 import (
+	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entplugin "github.com/DouDOU-start/airgate-core/ent/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	sdk "github.com/DouDOU-start/airgate-sdk"
 	"github.com/gin-gonic/gin"
 )
 
 // PluginHandler 插件管理 API
 type PluginHandler struct {
-	db          *ent.Client
 	manager     *plugin.Manager
 	marketplace *plugin.Marketplace
 }
 
 // NewPluginHandler 创建插件管理 Handler
-func NewPluginHandler(db *ent.Client, manager *plugin.Manager, marketplace *plugin.Marketplace) *PluginHandler {
+func NewPluginHandler(manager *plugin.Manager, marketplace *plugin.Marketplace) *PluginHandler {
 	return &PluginHandler{
-		db:          db,
 		manager:     manager,
 		marketplace: marketplace,
 	}
 }
 
-// ListPlugins 获取已安装的插件列表
+// ListPlugins 获取已加载的插件列表
 // GET /api/v1/admin/plugins
 func (h *PluginHandler) ListPlugins(c *gin.Context) {
-	plugins, err := h.db.Plugin.Query().
-		Order(entplugin.ByCreatedAt()).
-		All(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, "查询插件列表失败")
-		return
-	}
-
-	// 从 Manager 获取运行时元信息，建立 name → meta 的映射
 	allMeta := h.manager.GetAllPluginMeta()
-	metaMap := make(map[string]plugin.PluginMeta, len(allMeta))
-	for _, m := range allMeta {
-		metaMap[m.Name] = m
-	}
 
-	list := make([]dto.PluginResp, 0, len(plugins))
-	for _, p := range plugins {
+	list := make([]dto.PluginResp, 0, len(allMeta))
+	for _, m := range allMeta {
 		resp := dto.PluginResp{
-			ID:       int64(p.ID),
-			Name:     p.Name,
-			Platform: p.Platform,
-			Version:  p.Version,
-			Type:     string(p.Type),
-			Status:   string(p.Status),
-			Config:   p.Config,
-			TimeMixin: dto.TimeMixin{
-				CreatedAt: p.CreatedAt,
-				UpdatedAt: p.UpdatedAt,
-			},
+			Name:     m.Name,
+			Platform: m.Platform,
 		}
-		// 填充运行时元信息
-		if m, ok := metaMap[p.Name]; ok {
-			for _, at := range m.AccountTypes {
-				resp.AccountTypes = append(resp.AccountTypes, dto.AccountTypeResp{
-					Key: at.Key, Label: at.Label, Description: at.Description,
-				})
-			}
-			for _, fp := range m.FrontendPages {
-				resp.FrontendPages = append(resp.FrontendPages, dto.FrontendPageResp{
-					Path: fp.Path, Title: fp.Title, Icon: fp.Icon, Description: fp.Description,
-				})
-			}
-			resp.HasWebAssets = m.HasWebAssets
+		for _, at := range m.AccountTypes {
+			resp.AccountTypes = append(resp.AccountTypes, dto.AccountTypeResp{
+				Key: at.Key, Label: at.Label, Description: at.Description,
+			})
 		}
+		for _, fp := range m.FrontendPages {
+			resp.FrontendPages = append(resp.FrontendPages, dto.FrontendPageResp{
+				Path: fp.Path, Title: fp.Title, Icon: fp.Icon, Description: fp.Description,
+			})
+		}
+		resp.HasWebAssets = m.HasWebAssets
+		resp.IsDev = m.IsDev
 		list = append(list, resp)
 	}
 
 	response.Success(c, response.PagedData(list, int64(len(list)), 1, len(list)))
-}
-
-// InstallPlugin 安装插件
-// POST /api/v1/admin/plugins/install
-func (h *PluginHandler) InstallPlugin(c *gin.Context) {
-	var req dto.InstallPluginReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "请求参数无效")
-		return
-	}
-
-	if err := h.manager.Install(c.Request.Context(), req.Name, req.Source, req.Version); err != nil {
-		response.InternalError(c, "安装插件失败: "+err.Error())
-		return
-	}
-
-	response.Success(c, nil)
 }
 
 // UploadPlugin 上传安装插件
@@ -108,7 +66,6 @@ func (h *PluginHandler) UploadPlugin(c *gin.Context) {
 		return
 	}
 
-	// 读取文件内容
 	f, err := file.Open()
 	if err != nil {
 		response.InternalError(c, "读取上传文件失败")
@@ -122,7 +79,6 @@ func (h *PluginHandler) UploadPlugin(c *gin.Context) {
 		return
 	}
 
-	// 插件名：优先使用表单字段，否则用文件名
 	name := c.PostForm("name")
 	if name == "" {
 		name = strings.TrimSuffix(file.Filename, ".exe")
@@ -154,101 +110,111 @@ func (h *PluginHandler) InstallFromGithub(c *gin.Context) {
 }
 
 // UninstallPlugin 卸载插件
-// POST /api/v1/admin/plugins/:id/uninstall
+// POST /api/v1/admin/plugins/:name/uninstall
 func (h *PluginHandler) UninstallPlugin(c *gin.Context) {
-	var param dto.IDParam
-	if err := c.ShouldBindUri(&param); err != nil {
-		response.BadRequest(c, "插件 ID 无效")
+	name := c.Param("name")
+	if name == "" {
+		response.BadRequest(c, "插件名称无效")
 		return
 	}
 
-	if err := h.manager.Uninstall(c.Request.Context(), int(param.ID)); err != nil {
-		response.InternalError(c, "卸载插件失败")
-		return
-	}
-
-	response.Success(c, nil)
-}
-
-// EnablePlugin 启用插件
-// POST /api/v1/admin/plugins/:id/enable
-func (h *PluginHandler) EnablePlugin(c *gin.Context) {
-	var param dto.IDParam
-	if err := c.ShouldBindUri(&param); err != nil {
-		response.BadRequest(c, "插件 ID 无效")
-		return
-	}
-
-	if err := h.manager.Enable(c.Request.Context(), int(param.ID)); err != nil {
-		response.InternalError(c, "启用插件失败: "+err.Error())
+	if err := h.manager.Uninstall(c.Request.Context(), name); err != nil {
+		response.InternalError(c, "卸载插件失败: "+err.Error())
 		return
 	}
 
 	response.Success(c, nil)
 }
 
-// DisablePlugin 停用插件
-// POST /api/v1/admin/plugins/:id/disable
-func (h *PluginHandler) DisablePlugin(c *gin.Context) {
-	var param dto.IDParam
-	if err := c.ShouldBindUri(&param); err != nil {
-		response.BadRequest(c, "插件 ID 无效")
+// ReloadPlugin 热加载开发模式插件
+// POST /api/v1/admin/plugins/:name/reload
+func (h *PluginHandler) ReloadPlugin(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		response.BadRequest(c, "插件名称无效")
 		return
 	}
 
-	if err := h.manager.Disable(c.Request.Context(), int(param.ID)); err != nil {
-		response.InternalError(c, "停用插件失败: "+err.Error())
+	if !h.manager.IsDev(name) {
+		response.BadRequest(c, "仅开发模式插件支持热加载")
+		return
+	}
+
+	if err := h.manager.ReloadDev(c.Request.Context(), name); err != nil {
+		response.InternalError(c, "热加载插件失败: "+err.Error())
 		return
 	}
 
 	response.Success(c, nil)
 }
 
-// UpdateConfig 更新插件配置
-// PUT /api/v1/admin/plugins/:id/config
-func (h *PluginHandler) UpdateConfig(c *gin.Context) {
-	var param dto.IDParam
-	if err := c.ShouldBindUri(&param); err != nil {
-		response.BadRequest(c, "插件 ID 无效")
+// StartOAuth 发起插件 OAuth 授权
+// POST /api/v1/admin/plugins/:name/oauth/start
+func (h *PluginHandler) StartOAuth(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		response.BadRequest(c, "插件名称无效")
 		return
 	}
 
-	var req dto.PluginConfigReq
+	inst := h.manager.GetInstance(name)
+	if inst == nil || inst.Gateway == nil {
+		response.NotFound(c, "插件未运行或不存在")
+		return
+	}
+
+	result, err := inst.Gateway.StartOAuth(c.Request.Context(), &sdk.OAuthStartRequest{})
+	if err != nil {
+		response.InternalError(c, "发起 OAuth 授权失败: "+err.Error())
+		return
+	}
+
+	response.Success(c, dto.PluginOAuthStartResp{
+		AuthorizeURL: result.AuthorizeURL,
+		State:        result.State,
+	})
+}
+
+// ExchangeOAuth 使用回调 URL 完成插件 OAuth token 交换
+// POST /api/v1/admin/plugins/:name/oauth/exchange
+func (h *PluginHandler) ExchangeOAuth(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		response.BadRequest(c, "插件名称无效")
+		return
+	}
+
+	inst := h.manager.GetInstance(name)
+	if inst == nil || inst.Gateway == nil {
+		response.NotFound(c, "插件未运行或不存在")
+		return
+	}
+
+	var req dto.PluginOAuthExchangeReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "请求参数无效")
 		return
 	}
 
-	if err := h.manager.UpdateConfig(c.Request.Context(), int(param.ID), req.Config); err != nil {
-		response.InternalError(c, "更新配置失败")
-		return
-	}
-
-	response.Success(c, nil)
-}
-
-// PluginStatus 获取插件运行状态
-// GET /api/v1/admin/plugins/:id/status
-func (h *PluginHandler) PluginStatus(c *gin.Context) {
-	var param dto.IDParam
-	if err := c.ShouldBindUri(&param); err != nil {
-		response.BadRequest(c, "插件 ID 无效")
-		return
-	}
-
-	p, err := h.db.Plugin.Get(c.Request.Context(), int(param.ID))
+	code, state, err := parseOAuthCallbackURL(req.CallbackURL)
 	if err != nil {
-		response.NotFound(c, "插件不存在")
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	running := h.manager.IsRunning(int(param.ID))
+	result, err := inst.Gateway.HandleOAuthCallback(c.Request.Context(), &sdk.OAuthCallbackRequest{
+		Code:  code,
+		State: state,
+	})
+	if err != nil {
+		response.InternalError(c, "OAuth 回调交换失败: "+err.Error())
+		return
+	}
 
-	response.Success(c, map[string]interface{}{
-		"id":      p.ID,
-		"name":    p.Name,
-		"status":  string(p.Status),
-		"running": running,
+	response.Success(c, dto.PluginOAuthExchangeResp{
+		AccountType: result.AccountType,
+		AccountName: result.AccountName,
+		Credentials: result.Credentials,
 	})
 }
 
@@ -273,4 +239,24 @@ func (h *PluginHandler) ListMarketplace(c *gin.Context) {
 	}
 
 	response.Success(c, response.PagedData(list, int64(len(list)), 1, len(list)))
+}
+
+func parseOAuthCallbackURL(raw string) (code, state string, err error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", "", fmt.Errorf("请粘贴完整的回调 URL")
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", "", fmt.Errorf("回调 URL 格式无效")
+	}
+
+	code = strings.TrimSpace(parsed.Query().Get("code"))
+	state = strings.TrimSpace(parsed.Query().Get("state"))
+	if code == "" || state == "" {
+		return "", "", fmt.Errorf("回调 URL 中缺少 code 或 state 参数")
+	}
+
+	return code, state, nil
 }

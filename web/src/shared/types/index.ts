@@ -163,6 +163,17 @@ export interface CredentialSchemaResp {
   account_types?: AccountTypeResp[];
 }
 
+export interface PluginOAuthStartResp {
+  authorize_url: string;
+  state: string;
+}
+
+export interface PluginOAuthExchangeResp {
+  account_type: string;
+  account_name: string;
+  credentials: Record<string, string>;
+}
+
 // ==================== Group ====================
 
 export interface GroupResp {
@@ -403,14 +414,8 @@ export interface TestProxyResp {
 // ==================== Plugin ====================
 
 export interface PluginResp {
-  id: number;
   name: string;
   platform: string;
-  version: string;
-  type: 'gateway' | 'payment' | 'extension';
-  status: 'installed' | 'enabled' | 'disabled';
-  config?: Record<string, unknown>;
-  binary_path?: string;
   account_types?: Array<{
     key: string;
     label: string;
@@ -423,18 +428,7 @@ export interface PluginResp {
     description?: string;
   }>;
   has_web_assets?: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PluginConfigReq {
-  config: Record<string, unknown>;
-}
-
-export interface InstallPluginReq {
-  name: string;
-  source?: string;
-  version?: string;
+  is_dev?: boolean;
 }
 
 export interface MarketplacePluginResp {

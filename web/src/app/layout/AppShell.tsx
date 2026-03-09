@@ -68,7 +68,7 @@ function usePluginMenuItems(): MenuItem[] {
   const items: MenuItem[] = [];
   let first = true;
   for (const p of data.list) {
-    if (p.status !== 'enabled' || !p.frontend_pages?.length) continue;
+    if (!p.frontend_pages?.length) continue;
     for (const page of p.frontend_pages) {
       items.push({
         path: `/plugins/${p.name}${page.path}`,

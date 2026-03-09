@@ -12,8 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-
-	"github.com/DouDOU-start/airgate-core/ent"
 )
 
 // MarketplacePlugin 市场插件条目
@@ -35,16 +33,14 @@ type RegistryJSON struct {
 
 // Marketplace 插件市场
 type Marketplace struct {
-	db        *ent.Client
 	pluginDir string
 	mu        sync.RWMutex
 	cache     []MarketplacePlugin // 缓存的插件列表
 }
 
 // NewMarketplace 创建插件市场
-func NewMarketplace(db *ent.Client, pluginDir string) *Marketplace {
+func NewMarketplace(pluginDir string) *Marketplace {
 	return &Marketplace{
-		db:        db,
 		pluginDir: pluginDir,
 	}
 }

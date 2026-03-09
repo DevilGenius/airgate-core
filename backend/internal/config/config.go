@@ -27,6 +27,19 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Redis    RedisConfig    `yaml:"redis"`
 	JWT      JWTConfig      `yaml:"jwt"`
+	Plugins  PluginsConfig  `yaml:"plugins"`
+}
+
+// PluginsConfig 插件配置
+type PluginsConfig struct {
+	Dir string      `yaml:"dir"` // 插件二进制目录，默认 data/plugins
+	Dev []DevPlugin `yaml:"dev"` // 开发模式：直接从源码加载的插件
+}
+
+// DevPlugin 开发模式插件
+type DevPlugin struct {
+	Name string `yaml:"name"` // 插件名称
+	Path string `yaml:"path"` // 源码目录路径（用 go run 启动）
 }
 
 // ServerConfig HTTP 服务器配置

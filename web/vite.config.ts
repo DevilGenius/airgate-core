@@ -17,6 +17,8 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': 'http://localhost:9517',
+      '/v1': 'http://localhost:9517',
+      '/plugins': 'http://localhost:9517',
       '/setup/status': 'http://localhost:9517',
       '/setup/test-db': 'http://localhost:9517',
       '/setup/test-redis': 'http://localhost:9517',

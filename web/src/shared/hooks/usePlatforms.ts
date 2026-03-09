@@ -10,10 +10,10 @@ export function usePlatforms() {
     queryKey: ['installed-platforms'],
     queryFn: async () => {
       const resp = await pluginsApi.list({ page: 1, page_size: 100 });
-      // 只取 gateway 类型且已启用的插件平台
+      // 所有运行中的插件平台
       const platforms = resp.list
-        .filter((p) => p.type === 'gateway' && p.status === 'enabled')
-        .map((p) => p.platform);
+        .map((p) => p.platform)
+        .filter(Boolean);
       // 去重
       return [...new Set(platforms)];
     },

@@ -27,10 +27,10 @@ func (s *Server) registerRoutes() {
 	usageHandler := handler.NewUsageHandler(s.db)
 	proxyHandler := handler.NewProxyHandler(s.db)
 	settingsHandler := handler.NewSettingsHandler(s.db)
-	dashboardHandler := handler.NewDashboardHandler(s.db)
+	dashboardHandler := handler.NewDashboardHandler(s.db, s.pluginMgr)
 
 	// 插件 Handler（使用 server 持有的组件）
-	pluginHandler := handler.NewPluginHandler(s.db, s.pluginMgr, s.marketplace)
+	pluginHandler := handler.NewPluginHandler(s.pluginMgr, s.marketplace)
 
 	// === 插件 API 路由（API Key 认证，catch-all） ===
 	// 必须在管理 API 路由之前注册，使用独立的路由组
@@ -131,14 +131,12 @@ func (s *Server) registerRoutes() {
 
 		// 插件管理
 		adminGroup.GET("/plugins", pluginHandler.ListPlugins)
-		adminGroup.POST("/plugins/install", pluginHandler.InstallPlugin)
 		adminGroup.POST("/plugins/upload", pluginHandler.UploadPlugin)
 		adminGroup.POST("/plugins/install-github", pluginHandler.InstallFromGithub)
-		adminGroup.POST("/plugins/:id/uninstall", pluginHandler.UninstallPlugin)
-		adminGroup.POST("/plugins/:id/enable", pluginHandler.EnablePlugin)
-		adminGroup.POST("/plugins/:id/disable", pluginHandler.DisablePlugin)
-		adminGroup.PUT("/plugins/:id/config", pluginHandler.UpdateConfig)
-		adminGroup.GET("/plugins/:id/status", pluginHandler.PluginStatus)
+		adminGroup.POST("/plugins/:name/uninstall", pluginHandler.UninstallPlugin)
+		adminGroup.POST("/plugins/:name/reload", pluginHandler.ReloadPlugin)
+		adminGroup.POST("/plugins/:name/oauth/start", pluginHandler.StartOAuth)
+		adminGroup.POST("/plugins/:name/oauth/exchange", pluginHandler.ExchangeOAuth)
 
 		// 插件市场
 		adminGroup.GET("/marketplace/plugins", pluginHandler.ListMarketplace)
@@ -152,7 +150,11 @@ func (s *Server) registerRoutes() {
 	}
 
 	// 插件前端静态资源（/plugins/{pluginName}/assets/index.js）
-	r.Static("/plugins", "data/plugins")
+	pluginDir := s.cfg.Plugins.Dir
+	if pluginDir == "" {
+		pluginDir = "data/plugins"
+	}
+	r.Static("/plugins", pluginDir)
 
 	// 静态文件服务（前端）
 	r.Static("/assets", "web/dist/assets")

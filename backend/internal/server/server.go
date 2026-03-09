@@ -59,9 +59,13 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	recorder := billing.NewRecorder(db, 0)
 
 	// 插件系统组件
-	pluginMgr := plugin.NewManager(db, "data/plugins", priceMgr)
+	pluginDir := cfg.Plugins.Dir
+	if pluginDir == "" {
+		pluginDir = "data/plugins"
+	}
+	pluginMgr := plugin.NewManager(pluginDir)
 	forwarder := plugin.NewForwarder(pluginMgr, db, sched, concurrency, limiter, calculator, priceMgr, recorder)
-	marketplace := plugin.NewMarketplace(db, "data/plugins")
+	marketplace := plugin.NewMarketplace(pluginDir)
 	dynamicRouter := NewDynamicRouter(forwarder)
 
 	s := &Server{
@@ -104,9 +108,16 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	// 启动使用量异步记录器
 	s.recorder.Start()
 
-	// 加载所有已启用的插件
+	// 加载已编译的插件
 	if err := s.pluginMgr.LoadAll(ctx); err != nil {
 		slog.Error("加载插件失败（不影响核心服务）", "error", err)
+	}
+
+	// 加载开发模式插件（go run 源码）
+	for _, dev := range s.cfg.Plugins.Dev {
+		if err := s.pluginMgr.LoadDev(ctx, dev.Name, dev.Path); err != nil {
+			slog.Error("加载开发插件失败", "name", dev.Name, "path", dev.Path, "error", err)
+		}
 	}
 }
 
