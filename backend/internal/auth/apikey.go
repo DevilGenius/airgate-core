@@ -27,6 +27,10 @@ type APIKeyInfo struct {
 	GroupID   int
 	QuotaUSD  float64
 	UsedQuota float64
+
+	// 预加载字段，避免 forwarder 重复查询
+	UserBalance         float64 // 用户余额
+	GroupRateMultiplier float64 // 分组倍率
 }
 
 // GenerateAPIKey 生成 API Key 和对应的哈希值
@@ -91,5 +95,8 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		GroupID:   g.ID,
 		QuotaUSD:  ak.QuotaUsd,
 		UsedQuota: ak.UsedQuota,
+
+		UserBalance:         u.Balance,
+		GroupRateMultiplier: g.RateMultiplier,
 	}, nil
 }

@@ -20,6 +20,8 @@ import (
 	sdk "github.com/DouDOU-start/airgate-sdk"
 	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
 	"github.com/DouDOU-start/airgate-sdk/shared"
+
+	"github.com/DouDOU-start/airgate-core/internal/billing"
 )
 
 // PluginInstance 运行中的插件实例
@@ -40,8 +42,9 @@ type PluginInstance struct {
 // Manager 插件管理器
 // 负责插件的安装、卸载、启停、进程管理和 gRPC 通信
 type Manager struct {
-	pluginDir string // 插件二进制目录
-	logLevel  string // 日志级别，传给插件子进程
+	pluginDir string                // 插件二进制目录
+	logLevel  string                // 日志级别，传给插件子进程
+	priceMgr  *billing.PriceManager // 价格管理器，插件启动时自动同步模型价格
 
 	mu        sync.RWMutex
 	instances map[string]*PluginInstance // pluginName → 运行实例
@@ -57,10 +60,11 @@ type Manager struct {
 }
 
 // NewManager 创建插件管理器
-func NewManager(pluginDir, logLevel string) *Manager {
+func NewManager(pluginDir, logLevel string, priceMgr *billing.PriceManager) *Manager {
 	return &Manager{
 		pluginDir:         pluginDir,
 		logLevel:          logLevel,
+		priceMgr:          priceMgr,
 		instances:         make(map[string]*PluginInstance),
 		aliases:           make(map[string]string),
 		devPaths:          make(map[string]string),
@@ -271,6 +275,17 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		Type:        pluginType,
 		Client:      client,
 		Gateway:     gateway,
+	}
+
+	// 同步模型价格到 PriceManager（插件声明的价格为每百万 token，转换为每 token）
+	if m.priceMgr != nil {
+		for _, model := range models {
+			m.priceMgr.SetPrice(platform, model.ID, billing.ModelPrice{
+				InputPerToken:  model.InputPrice / 1_000_000,
+				OutputPerToken: model.OutputPrice / 1_000_000,
+				CachePerToken:  model.CachePrice / 1_000_000,
+			})
+		}
 	}
 
 	m.mu.Lock()

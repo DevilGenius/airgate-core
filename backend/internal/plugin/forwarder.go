@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/ratelimit"
@@ -24,7 +23,6 @@ import (
 // 完整流程：认证 → 限流 → 余额预检 → 调度 → 并发控制 → 转发 → 计费 → 记录
 type Forwarder struct {
 	manager     *Manager
-	db          *ent.Client
 	scheduler   *scheduler.Scheduler
 	concurrency *scheduler.ConcurrencyManager
 	limiter     *ratelimit.Limiter
@@ -36,7 +34,6 @@ type Forwarder struct {
 // NewForwarder 创建转发器
 func NewForwarder(
 	manager *Manager,
-	db *ent.Client,
 	sched *scheduler.Scheduler,
 	concurrency *scheduler.ConcurrencyManager,
 	limiter *ratelimit.Limiter,
@@ -46,7 +43,6 @@ func NewForwarder(
 ) *Forwarder {
 	return &Forwarder{
 		manager:     manager,
-		db:          db,
 		scheduler:   sched,
 		concurrency: concurrency,
 		limiter:     limiter,
@@ -95,13 +91,8 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		return
 	}
 
-	// 6. 余额预检（balance > 0）
-	user, err := f.db.User.Get(c.Request.Context(), keyInfo.UserID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询用户失败"})
-		return
-	}
-	if user.Balance <= 0 {
+	// 6. 余额预检（使用认证时预加载的余额，无需额外 DB 查询）
+	if keyInfo.UserBalance <= 0 {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "余额不足"})
 		return
 	}
@@ -134,9 +125,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	defer f.concurrency.ReleaseSlot(c.Request.Context(), account.ID, requestID)
 
 	// 9. 构造 ForwardRequest 并调用插件
-	// 获取代理 URL（如果有关联代理）
+	// 获取代理 URL（使用调度时预加载的边关系，无需额外 DB 查询）
 	proxyURL := ""
-	if proxy, err := account.QueryProxy().Only(c.Request.Context()); err == nil && proxy != nil {
+	if proxy, err := account.Edges.ProxyOrErr(); err == nil && proxy != nil {
 		if proxy.Username != "" {
 			proxyURL = fmt.Sprintf("%s://%s:%s@%s:%d", proxy.Protocol, proxy.Username, proxy.Password, proxy.Address, proxy.Port)
 		} else {
@@ -161,7 +152,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		Stream:  stream,
 	}
 
-	// 流式请求需要设置 Writer
+	// 流式请求：设置 SSE 响应头并传入 Writer，插件直接写入 SSE 数据
 	if stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -189,11 +180,10 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		actualModel = model
 	}
 
-	// 获取分组倍率
-	group, _ := f.db.Group.Get(c.Request.Context(), keyInfo.GroupID)
-	groupRate := 1.0
-	if group != nil {
-		groupRate = group.RateMultiplier
+	// 分组倍率（使用认证时预加载的数据，无需额外 DB 查询）
+	groupRate := keyInfo.GroupRateMultiplier
+	if groupRate <= 0 {
+		groupRate = 1.0
 	}
 
 	price, _ := f.priceMgr.GetPrice(inst.Platform, actualModel)
@@ -208,19 +198,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		UserRateMultiplier:    1.0,
 	}, price)
 
-	// 12. 扣减余额
-	if calcResult.ActualCost > 0 {
-		_ = f.db.User.UpdateOneID(keyInfo.UserID).
-			AddBalance(-calcResult.ActualCost).
-			Exec(c.Request.Context())
-
-		// 更新 API Key 使用量
-		_ = f.db.APIKey.UpdateOneID(keyInfo.KeyID).
-			AddUsedQuota(calcResult.ActualCost).
-			Exec(c.Request.Context())
-	}
-
-	// 13. 异步记录使用量
+	// 12. 异步记录使用量并扣费（由 Recorder 统一处理）
 	f.recorder.Record(billing.UsageRecord{
 		UserID:                keyInfo.UserID,
 		APIKeyID:              keyInfo.KeyID,
@@ -244,13 +222,17 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		IPAddress:             c.ClientIP(),
 	})
 
-	// 14. 非流式响应已由插件 gRPC 返回，这里无需再写入
-	// 流式响应已在 ForwardStream 中直接写入 Writer
-	if !stream && result.StatusCode > 0 {
-		// 非流式：gRPC Forward 已返回 body，但当前 SDK 设计中
-		// 非流式响应通过 gRPC 一次性返回，响应体也已写入
-		// 此处只需确保状态码正确
-		c.Status(result.StatusCode)
+	// 14. 写入响应
+	// 流式响应已通过 Writer 直接写入客户端
+	// 非流式响应通过 ForwardResult.Body 返回，需要由 Core 写入
+	if !stream && result.Body != nil {
+		for k, vals := range result.Headers {
+			for _, v := range vals {
+				c.Writer.Header().Set(k, v)
+			}
+		}
+		c.Writer.WriteHeader(result.StatusCode)
+		_, _ = c.Writer.Write(result.Body)
 	}
 }
 

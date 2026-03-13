@@ -94,12 +94,13 @@ func (s *Scheduler) routeAccounts(ctx context.Context, platform, model string, g
 		return nil, fmt.Errorf("%w: %v", ErrGroupNotFound, err)
 	}
 
-	// 查询分组关联的所有 active 账户
+	// 查询分组关联的所有 active 账户（预加载代理信息，避免 forwarder 额外查询）
 	accounts, err := grp.QueryAccounts().
 		Where(
 			account.PlatformEQ(platform),
 			account.StatusEQ(account.StatusActive),
 		).
+		WithProxy().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("查询分组账户失败: %w", err)
