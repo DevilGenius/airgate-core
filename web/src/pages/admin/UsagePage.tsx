@@ -66,7 +66,7 @@ export default function UsagePage() {
       key: 'created_at',
       title: t('usage.time'),
       render: (row) => (
-        <span className="text-[var(--ag-text-secondary)]">
+        <span className="text-text-secondary">
           {new Date(row.created_at).toLocaleString('zh-CN')}
         </span>
       ),
@@ -75,7 +75,7 @@ export default function UsagePage() {
       key: 'user_id',
       title: t('usage.user_id'),
       render: (row) => (
-        <span className="text-[var(--ag-text-tertiary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="text-text-tertiary font-mono">
           #{row.user_id}
         </span>
       ),
@@ -83,13 +83,13 @@ export default function UsagePage() {
     {
       key: 'model',
       title: t('usage.model'),
-      render: (row) => <span className="text-[var(--ag-text)]">{row.model}</span>,
+      render: (row) => <span className="text-text">{row.model}</span>,
     },
     {
       key: 'input_tokens',
       title: t('usage.input_tokens'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {row.input_tokens.toLocaleString()}
         </span>
       ),
@@ -98,7 +98,7 @@ export default function UsagePage() {
       key: 'output_tokens',
       title: t('usage.output_tokens'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {row.output_tokens.toLocaleString()}
         </span>
       ),
@@ -107,7 +107,7 @@ export default function UsagePage() {
       key: 'total_cost',
       title: t('usage.total_cost'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           ${row.total_cost.toFixed(6)}
         </span>
       ),
@@ -116,7 +116,7 @@ export default function UsagePage() {
       key: 'actual_cost',
       title: t('usage.actual_cost'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           ${row.actual_cost.toFixed(6)}
         </span>
       ),
@@ -134,7 +134,7 @@ export default function UsagePage() {
       key: 'duration_ms',
       title: t('usage.duration'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {row.duration_ms}ms
         </span>
       ),
@@ -228,17 +228,17 @@ export default function UsagePage() {
           {/* 分组统计切换 */}
           <Card>
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-xs text-[var(--ag-text-tertiary)] uppercase tracking-wider">
+              <span className="text-xs text-text-tertiary uppercase tracking-wider">
                 {t('usage.group_stats')}
               </span>
               <div className="flex gap-1 ml-2">
                 {Object.entries(groupByKeys).map(([key, i18nKey]) => (
                   <button
                     key={key}
-                    className={`px-3 py-1.5 text-xs rounded-[var(--ag-radius-md)] font-medium transition-all duration-200 cursor-pointer ${
+                    className={`px-3 py-1.5 text-xs rounded-md font-medium transition-all duration-200 cursor-pointer ${
                       statsGroupBy === key
-                        ? 'bg-[var(--ag-primary-subtle)] text-[var(--ag-primary)] shadow-[0_0_8px_var(--ag-primary-glow)]'
-                        : 'text-[var(--ag-text-secondary)] hover:bg-[var(--ag-bg-hover)] hover:text-[var(--ag-text)]'
+                        ? 'bg-primary-subtle text-primary shadow-[0_0_8px_var(--ag-primary-glow)]'
+                        : 'text-text-secondary hover:bg-bg-hover hover:text-text'
                     }`}
                     onClick={() => setStatsGroupBy(key)}
                   >
@@ -252,19 +252,19 @@ export default function UsagePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[var(--ag-border)]">
-                    <th className="text-left py-2.5 pr-4 text-[10px] font-semibold text-[var(--ag-text-tertiary)] uppercase tracking-widest">
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2.5 pr-4 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest">
                       {t(groupByHeaderKeys[statsGroupBy] ?? 'usage.model')}
                     </th>
-                    <th className="text-left py-2.5 pr-4 text-[10px] font-semibold text-[var(--ag-text-tertiary)] uppercase tracking-widest">
+                    <th className="text-left py-2.5 pr-4 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest">
                       {t('usage.requests')}
                     </th>
                     {statsGroupBy === 'model' && (
-                      <th className="text-left py-2.5 pr-4 text-[10px] font-semibold text-[var(--ag-text-tertiary)] uppercase tracking-widest">
+                      <th className="text-left py-2.5 pr-4 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest">
                         {t('usage.tokens')}
                       </th>
                     )}
-                    <th className="text-left py-2.5 text-[10px] font-semibold text-[var(--ag-text-tertiary)] uppercase tracking-widest">
+                    <th className="text-left py-2.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest">
                       {t('usage.cost')}
                     </th>
                   </tr>
@@ -273,15 +273,15 @@ export default function UsagePage() {
                   {/* 按模型 */}
                   {statsGroupBy === 'model' &&
                     stats.by_model?.map((s) => (
-                      <tr key={s.model} className="border-b border-[var(--ag-border-subtle)] last:border-0 transition-colors hover:bg-[var(--ag-bg-hover)]">
-                        <td className="py-2.5 pr-4 font-medium text-[var(--ag-text)]">{s.model}</td>
-                        <td className="py-2.5 pr-4 text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                      <tr key={s.model} className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover">
+                        <td className="py-2.5 pr-4 font-medium text-text">{s.model}</td>
+                        <td className="py-2.5 pr-4 text-text-secondary font-mono">
                           {s.requests.toLocaleString()}
                         </td>
-                        <td className="py-2.5 pr-4 text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                        <td className="py-2.5 pr-4 text-text-secondary font-mono">
                           {s.tokens.toLocaleString()}
                         </td>
-                        <td className="py-2.5 text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                        <td className="py-2.5 text-text-secondary font-mono">
                           ${s.total_cost.toFixed(4)}
                         </td>
                       </tr>
@@ -290,12 +290,12 @@ export default function UsagePage() {
                   {/* 按用户 */}
                   {statsGroupBy === 'user' &&
                     stats.by_user?.map((s) => (
-                      <tr key={s.user_id} className="border-b border-[var(--ag-border-subtle)] last:border-0 transition-colors hover:bg-[var(--ag-bg-hover)]">
-                        <td className="py-2.5 pr-4 font-medium text-[var(--ag-text)]">{s.email}</td>
-                        <td className="py-2.5 pr-4 text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                      <tr key={s.user_id} className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover">
+                        <td className="py-2.5 pr-4 font-medium text-text">{s.email}</td>
+                        <td className="py-2.5 pr-4 text-text-secondary font-mono">
                           {s.requests.toLocaleString()}
                         </td>
-                        <td className="py-2.5 text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                        <td className="py-2.5 text-text-secondary font-mono">
                           ${s.total_cost.toFixed(4)}
                         </td>
                       </tr>
@@ -304,12 +304,12 @@ export default function UsagePage() {
                   {/* 按账号 */}
                   {statsGroupBy === 'account' &&
                     stats.by_account?.map((s) => (
-                      <tr key={s.account_id} className="border-b border-[var(--ag-border-subtle)] last:border-0 transition-colors hover:bg-[var(--ag-bg-hover)]">
-                        <td className="py-2.5 pr-4 font-medium text-[var(--ag-text)]">{s.name}</td>
-                        <td className="py-2.5 pr-4 text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                      <tr key={s.account_id} className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover">
+                        <td className="py-2.5 pr-4 font-medium text-text">{s.name}</td>
+                        <td className="py-2.5 pr-4 text-text-secondary font-mono">
                           {s.requests.toLocaleString()}
                         </td>
-                        <td className="py-2.5 text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                        <td className="py-2.5 text-text-secondary font-mono">
                           ${s.total_cost.toFixed(4)}
                         </td>
                       </tr>
@@ -318,12 +318,12 @@ export default function UsagePage() {
                   {/* 按分组 */}
                   {statsGroupBy === 'group' &&
                     stats.by_group?.map((s) => (
-                      <tr key={s.group_id} className="border-b border-[var(--ag-border-subtle)] last:border-0 transition-colors hover:bg-[var(--ag-bg-hover)]">
-                        <td className="py-2.5 pr-4 font-medium text-[var(--ag-text)]">{s.name}</td>
-                        <td className="py-2.5 pr-4 text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                      <tr key={s.group_id} className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover">
+                        <td className="py-2.5 pr-4 font-medium text-text">{s.name}</td>
+                        <td className="py-2.5 pr-4 text-text-secondary font-mono">
                           {s.requests.toLocaleString()}
                         </td>
-                        <td className="py-2.5 text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                        <td className="py-2.5 text-text-secondary font-mono">
                           ${s.total_cost.toFixed(4)}
                         </td>
                       </tr>

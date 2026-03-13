@@ -153,6 +153,13 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/dashboard/stats", dashboardHandler.Stats)
 	}
 
+	// === Extension 插件 API 路由（JWT 认证） ===
+	extGroup := r.Group("/api/v1/ext")
+	extGroup.Use(middleware.JWTAuth(s.jwtMgr))
+	{
+		extGroup.Any("/:pluginName/*path", s.extensionProxy.Handle)
+	}
+
 	// 插件前端静态资源（/plugins/{pluginName}/assets/index.js）
 	pluginDir := s.cfg.Plugins.Dir
 	if pluginDir == "" {

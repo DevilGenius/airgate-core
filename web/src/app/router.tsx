@@ -73,7 +73,7 @@ const setupRoute = createRoute({
     }
   },
   component: () => (
-    <Suspense>
+    <Suspense fallback={null}>
       <SetupPage />
     </Suspense>
   ),
@@ -90,7 +90,7 @@ const loginRoute = createRoute({
     }
   },
   component: () => (
-    <Suspense>
+    <Suspense fallback={null}>
       <LoginPage />
     </Suspense>
   ),
@@ -152,7 +152,7 @@ const pluginRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/plugins/$pluginName/$',
   component: () => (
-    <Suspense>
+    <Suspense fallback={null}>
       <PluginPage />
     </Suspense>
   ),

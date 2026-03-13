@@ -46,44 +46,32 @@ function Stepper({ current }: { current: number }) {
 
         return (
           <div key={step.labelKey} className="flex items-center">
-            {/* 步骤圆点 */}
             <div className="flex flex-col items-center">
               <div
-                className="relative flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300"
+                className="relative flex items-center justify-center w-9 h-9 rounded-full transition-all duration-300"
                 style={{
-                  background: isCompleted
+                  background: isCompleted || isCurrent
                     ? 'var(--ag-primary)'
-                    : isCurrent
-                      ? 'var(--ag-primary)'
-                      : 'var(--ag-bg-surface)',
+                    : 'var(--ag-bg-surface)',
                   border: isCompleted || isCurrent
-                    ? '2px solid var(--ag-primary)'
-                    : '2px solid var(--ag-glass-border)',
+                    ? '1.5px solid var(--ag-primary)'
+                    : '1.5px solid var(--ag-glass-border)',
                   boxShadow: isCurrent
-                    ? '0 0 20px var(--ag-primary-glow), 0 0 40px var(--ag-primary-glow)'
+                    ? '0 0 16px var(--ag-primary-glow)'
                     : 'none',
                 }}
               >
                 {isCompleted ? (
-                  <CheckCircle2 className="w-5 h-5 text-white" />
+                  <CheckCircle2 className="w-4 h-4 text-text-inverse" />
                 ) : (
                   <Icon
-                    className="w-4.5 h-4.5"
-                    style={{
-                      color: isCurrent ? 'white' : 'var(--ag-text-tertiary)',
-                    }}
-                  />
-                )}
-                {/* 当前步骤脉冲动画 */}
-                {isCurrent && (
-                  <div
-                    className="absolute inset-0 rounded-full animate-ping opacity-20"
-                    style={{ background: 'var(--ag-primary)' }}
+                    className="w-4 h-4"
+                    style={{ color: isCurrent ? 'var(--ag-text-inverse)' : 'var(--ag-text-tertiary)' }}
                   />
                 )}
               </div>
               <span
-                className="text-xs mt-2 whitespace-nowrap font-medium transition-colors"
+                className="text-[10px] mt-1.5 whitespace-nowrap font-medium font-mono uppercase tracking-wider transition-colors"
                 style={{
                   color: isCompleted || isCurrent
                     ? 'var(--ag-primary)'
@@ -93,16 +81,15 @@ function Stepper({ current }: { current: number }) {
                 {t(step.labelKey)}
               </span>
             </div>
-            {/* 连接线 */}
             {index < STEP_KEYS.length - 1 && (
               <div
-                className="w-16 h-[2px] mx-3 mb-6 rounded-full transition-all duration-500"
+                className="w-12 h-px mx-2.5 mb-5 rounded-full transition-all duration-500"
                 style={{
                   background: isCompleted
                     ? 'var(--ag-primary)'
                     : 'var(--ag-glass-border)',
                   boxShadow: isCompleted
-                    ? '0 0 6px var(--ag-primary-glow)'
+                    ? '0 0 4px var(--ag-primary-glow)'
                     : 'none',
                 }}
               />
@@ -118,11 +105,11 @@ function Stepper({ current }: { current: number }) {
 
 function TestResultBanner({ result }: { result: { success: boolean; error_msg?: string } | null }) {
   const { t } = useTranslation();
-  if (!result) return null;
+  if (!result) return <div />;
 
   return (
     <div
-      className="flex items-start gap-2.5 rounded-[var(--ag-radius-md)] px-4 py-3 text-sm"
+      className="flex items-start gap-2.5 rounded-md px-4 py-3 text-sm"
       style={{
         background: result.success ? 'var(--ag-success-subtle)' : 'var(--ag-danger-subtle)',
         color: result.success ? 'var(--ag-success)' : 'var(--ag-danger)',
@@ -179,7 +166,7 @@ function DBStep({ data, onChange, onNext }: DBStepProps) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-[var(--ag-text-secondary)] mb-2">
+      <p className="text-sm text-text-secondary mb-2">
         {t('setup.step_db_desc')}
       </p>
       <div className="grid grid-cols-2 gap-4">
@@ -289,7 +276,7 @@ function RedisStep({ data, onChange, onPrev, onNext }: RedisStepProps) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-[var(--ag-text-secondary)] mb-2">
+      <p className="text-sm text-text-secondary mb-2">
         {t('setup.step_redis_desc')}
       </p>
       <div className="grid grid-cols-2 gap-4">
@@ -327,17 +314,17 @@ function RedisStep({ data, onChange, onPrev, onNext }: RedisStepProps) {
       </div>
       {/* TLS 开关 */}
       <label
-        className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--ag-radius-md)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] cursor-pointer transition-colors hover:border-[var(--ag-border-focus)]"
+        className="flex items-center gap-3 px-3 py-2.5 rounded-md border border-glass-border bg-surface cursor-pointer transition-colors hover:border-border-focus"
       >
         <input
           type="checkbox"
           checked={data.tls || false}
           onChange={(e) => update('tls', e.target.checked)}
-          className="h-4 w-4 rounded border-[var(--ag-glass-border)] accent-[var(--ag-primary)]"
+          className="h-4 w-4 rounded border-glass-border accent-[var(--ag-primary)]"
         />
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-[var(--ag-text-tertiary)]" />
-          <span className="text-sm text-[var(--ag-text-secondary)]">{t('setup.enable_tls')}</span>
+          <ShieldCheck className="w-4 h-4 text-text-tertiary" />
+          <span className="text-sm text-text-secondary">{t('setup.enable_tls')}</span>
         </div>
       </label>
 
@@ -415,7 +402,7 @@ function AdminStep({ data, onChange, onPrev, onNext }: AdminStepProps) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-[var(--ag-text-secondary)] mb-2">
+      <p className="text-sm text-text-secondary mb-2">
         {t('setup.step_admin_desc')}
       </p>
       <Input
@@ -588,7 +575,7 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-[var(--ag-text-secondary)]">
+      <p className="text-sm text-text-secondary">
         {t('setup.confirm_config')}
       </p>
 
@@ -599,17 +586,17 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
           return (
             <div
               key={item.title}
-              className="rounded-[var(--ag-radius-md)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] p-4"
+              className="rounded-md border border-glass-border bg-surface p-4"
             >
               <div className="flex items-center gap-2 mb-3">
-                <Icon className="w-4 h-4 text-[var(--ag-primary)]" />
-                <h4 className="text-sm font-semibold text-[var(--ag-text)]">{item.title}</h4>
+                <Icon className="w-4 h-4 text-primary" />
+                <h4 className="text-sm font-semibold text-text">{item.title}</h4>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                 {item.details.map((d) => (
                   <div key={d.label} className="flex items-center gap-2 text-xs">
-                    <span className="text-[var(--ag-text-tertiary)]">{d.label}:</span>
-                    <span className="text-[var(--ag-text-secondary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                    <span className="text-text-tertiary">{d.label}:</span>
+                    <span className="text-text-secondary font-mono">
                       {d.value}
                     </span>
                   </div>
@@ -623,7 +610,7 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
       {/* 安装状态 */}
       {status === 'installing' && (
         <div
-          className="flex items-center gap-2.5 rounded-[var(--ag-radius-md)] px-4 py-3 text-sm"
+          className="flex items-center gap-2.5 rounded-md px-4 py-3 text-sm"
           style={{
             background: 'var(--ag-info-subtle)',
             color: 'var(--ag-info)',
@@ -636,7 +623,7 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
       )}
       {status === 'restarting' && (
         <div
-          className="flex items-center gap-2.5 rounded-[var(--ag-radius-md)] px-4 py-3 text-sm"
+          className="flex items-center gap-2.5 rounded-md px-4 py-3 text-sm"
           style={{
             background: 'var(--ag-warning-subtle)',
             color: 'var(--ag-warning)',
@@ -649,7 +636,7 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
       )}
       {status === 'done' && (
         <div
-          className="relative overflow-hidden rounded-[var(--ag-radius-md)] px-4 py-3 text-sm"
+          className="relative overflow-hidden rounded-md px-4 py-3 text-sm"
           style={{
             background: 'var(--ag-success-subtle)',
             color: 'var(--ag-success)',
@@ -669,7 +656,7 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
       )}
       {status === 'error' && (
         <div
-          className="flex items-start gap-2.5 rounded-[var(--ag-radius-md)] px-4 py-3 text-sm"
+          className="flex items-start gap-2.5 rounded-md px-4 py-3 text-sm"
           style={{
             background: 'var(--ag-danger-subtle)',
             color: 'var(--ag-danger)',
@@ -735,41 +722,43 @@ export default function SetupPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[var(--ag-bg-deep)] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* 背景装饰（与 LoginPage 一致） */}
-      <div className="absolute inset-0">
-        {/* 渐变光晕 */}
+    <div className="min-h-screen bg-bg-deep flex items-center justify-center p-4 relative overflow-hidden">
+      {/* 背景 */}
+      <div className="absolute inset-0 pointer-events-none">
         <div
-          className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-[0.07]"
-          style={{ background: 'radial-gradient(circle, var(--ag-primary), transparent 70%)' }}
-        />
-        <div
-          className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-[0.05]"
-          style={{ background: 'radial-gradient(circle, var(--ag-info), transparent 70%)' }}
-        />
-        {/* 网格纹理 */}
-        <div
-          className="absolute inset-0 opacity-[0.03]"
+          className="absolute inset-0 opacity-[0.04]"
           style={{
-            backgroundImage: `linear-gradient(var(--ag-text) 1px, transparent 1px), linear-gradient(90deg, var(--ag-text) 1px, transparent 1px)`,
-            backgroundSize: '60px 60px',
+            backgroundImage: `linear-gradient(var(--ag-text-tertiary) 1px, transparent 1px), linear-gradient(90deg, var(--ag-text-tertiary) 1px, transparent 1px)`,
+            backgroundSize: '64px 64px',
           }}
+        />
+        <div
+          className="absolute -top-[30%] -left-[15%] w-[700px] h-[700px] rounded-full opacity-[0.06]"
+          style={{ background: 'radial-gradient(circle, var(--ag-primary), transparent 65%)' }}
+        />
+        <div
+          className="absolute -bottom-[25%] -right-[10%] w-[500px] h-[500px] rounded-full opacity-[0.04]"
+          style={{ background: 'radial-gradient(circle, var(--ag-info), transparent 65%)' }}
+        />
+        <div
+          className="absolute top-0 left-0 right-0 h-px"
+          style={{ background: 'linear-gradient(90deg, transparent, var(--ag-primary-glow), transparent)' }}
         />
       </div>
 
       <div
         className="relative w-full max-w-xl"
-        style={{ animation: 'ag-slide-up 0.5s ease-out' }}
+        style={{ animation: 'ag-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
         {/* 标题 */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-[var(--ag-radius-xl)] bg-[var(--ag-primary-subtle)] mb-4 shadow-[var(--ag-shadow-glow)]">
-            <Zap className="w-7 h-7 text-[var(--ag-primary)]" />
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-subtle mb-4 shadow-glow">
+            <Zap className="w-6 h-6 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-[var(--ag-text)] tracking-tight">
+          <h1 className="text-xl font-semibold text-text tracking-tight">
             AirGate
           </h1>
-          <p className="text-sm text-[var(--ag-text-tertiary)] mt-1.5 tracking-wide">
+          <p className="text-xs text-text-tertiary mt-1.5 tracking-wide font-mono uppercase">
             {t('setup.title')}
           </p>
         </div>
@@ -808,8 +797,8 @@ export default function SetupPage() {
           )}
         </Card>
 
-        {/* 底部文字 */}
-        <p className="text-center text-[10px] text-[var(--ag-text-tertiary)] mt-6 uppercase tracking-widest">
+        {/* 底部 */}
+        <p className="text-center text-[10px] text-text-tertiary mt-8 font-mono uppercase tracking-[0.15em]">
           Powered by AirGate
         </p>
       </div>

@@ -163,7 +163,7 @@ export default function ProxiesPage() {
       title: t('common.id'),
       width: '60px',
       render: (row) => (
-        <span className="text-[var(--ag-text-tertiary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="text-text-tertiary font-mono">
           {row.id}
         </span>
       ),
@@ -171,7 +171,7 @@ export default function ProxiesPage() {
     {
       key: 'name',
       title: t('common.name'),
-      render: (row) => <span className="text-[var(--ag-text)]">{row.name}</span>,
+      render: (row) => <span className="text-text">{row.name}</span>,
     },
     {
       key: 'protocol',
@@ -186,7 +186,7 @@ export default function ProxiesPage() {
       key: 'endpoint',
       title: t('proxies.address'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {row.address}:{row.port}
         </span>
       ),
@@ -195,7 +195,7 @@ export default function ProxiesPage() {
       key: 'username',
       title: t('proxies.username'),
       render: (row) => (
-        <span className="text-[var(--ag-text-secondary)]">
+        <span className="text-text-secondary">
           {row.username || '-'}
         </span>
       ),
@@ -231,7 +231,7 @@ export default function ProxiesPage() {
             size="sm"
             variant="ghost"
             icon={<Trash2 className="w-3.5 h-3.5" />}
-            className="text-[var(--ag-danger)]"
+            className="text-danger"
             onClick={() => setDeleteTarget(row)}
           >
             {t('common.delete')}

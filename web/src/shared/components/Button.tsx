@@ -10,15 +10,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<string, string> = {
   primary:
-    'bg-[var(--ag-primary)] text-white hover:bg-[var(--ag-primary-hover)] shadow-[0_0_12px_var(--ag-primary-glow)] hover:shadow-[0_0_20px_var(--ag-primary-glow)]',
+    'bg-primary text-text-inverse hover:bg-primary-hover shadow-[0_0_16px_var(--ag-primary-glow)] hover:shadow-[0_0_24px_var(--ag-primary-glow)]',
   secondary:
-    'bg-[var(--ag-bg-surface)] text-[var(--ag-text)] border border-[var(--ag-glass-border)] hover:bg-[var(--ag-bg-hover)] hover:border-[var(--ag-border-focus)]',
+    'bg-surface text-text border border-glass-border hover:bg-bg-hover hover:border-border',
   danger:
-    'bg-[var(--ag-danger)] text-white hover:brightness-110 shadow-[0_0_12px_var(--ag-danger-subtle)]',
+    'bg-danger text-white hover:brightness-110',
   ghost:
-    'text-[var(--ag-text-secondary)] hover:text-[var(--ag-text)] hover:bg-[var(--ag-bg-hover)]',
+    'text-text-tertiary hover:text-text hover:bg-bg-hover',
   outline:
-    'border border-[var(--ag-primary)] text-[var(--ag-primary)] bg-transparent hover:bg-[var(--ag-primary-subtle)]',
+    'border border-primary/40 text-primary bg-transparent hover:bg-primary-subtle hover:border-primary/60',
 };
 
 const sizeStyles: Record<string, string> = {
@@ -39,16 +39,16 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-[var(--ag-radius-md)] font-medium transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >
-      {loading ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : icon ? (
-        <span className="flex-shrink-0">{icon}</span>
-      ) : null}
-      {children}
+      {(loading || icon) && (
+        <span className="flex-shrink-0">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
+        </span>
+      )}
+      {children && <span>{children}</span>}
     </button>
   );
 }

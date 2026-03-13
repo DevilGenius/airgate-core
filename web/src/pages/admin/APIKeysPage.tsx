@@ -100,7 +100,7 @@ export default function APIKeysPage() {
       title: t('common.id'),
       width: '60px',
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {row.id}
         </span>
       ),
@@ -153,7 +153,7 @@ export default function APIKeysPage() {
       key: 'quota',
       title: t('api_keys.quota_used'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           <span style={{ color: 'var(--ag-primary)' }}>
             ${row.used_quota.toFixed(2)}
           </span>
@@ -168,7 +168,7 @@ export default function APIKeysPage() {
       key: 'expires_at',
       title: t('api_keys.expire_time'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {formatExpiry(row.expires_at)}
         </span>
       ),
@@ -399,7 +399,7 @@ function CreateKeyModal({
             {t('api_keys.ip_whitelist')}
           </label>
           <textarea
-            className="block w-full rounded-[var(--ag-radius-md)] border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
+            className="block w-full rounded-md border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
             style={{
               borderColor: 'var(--ag-glass-border)',
               background: 'var(--ag-bg-surface)',
@@ -425,7 +425,7 @@ function CreateKeyModal({
             {t('api_keys.ip_blacklist')}
           </label>
           <textarea
-            className="block w-full rounded-[var(--ag-radius-md)] border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
+            className="block w-full rounded-md border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
             style={{
               borderColor: 'var(--ag-glass-border)',
               background: 'var(--ag-bg-surface)',
@@ -480,7 +480,7 @@ function KeyRevealModal({
     >
       <div className="space-y-4">
         <div
-          className="rounded-[var(--ag-radius-md)] p-4 flex items-start gap-3"
+          className="rounded-md p-4 flex items-start gap-3"
           style={{
             background: 'var(--ag-warning-subtle)',
             border: '1px solid var(--ag-warning)',
@@ -493,7 +493,7 @@ function KeyRevealModal({
         </div>
         <div className="flex items-center gap-2">
           <code
-            className="flex-1 px-3 py-2 rounded-[var(--ag-radius-md)] text-sm break-all"
+            className="flex-1 px-3 py-2 rounded-md text-sm break-all"
             style={{
               fontFamily: 'var(--ag-font-mono)',
               background: 'var(--ag-bg-surface)',
@@ -639,7 +639,7 @@ function EditKeyModal({
             {t('api_keys.ip_whitelist')}
           </label>
           <textarea
-            className="block w-full rounded-[var(--ag-radius-md)] border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
+            className="block w-full rounded-md border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
             style={{
               borderColor: 'var(--ag-glass-border)',
               background: 'var(--ag-bg-surface)',
@@ -663,7 +663,7 @@ function EditKeyModal({
             {t('api_keys.ip_blacklist')}
           </label>
           <textarea
-            className="block w-full rounded-[var(--ag-radius-md)] border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
+            className="block w-full rounded-md border px-3 py-2 text-sm transition-all duration-200 focus:outline-none min-h-[60px] resize-y"
             style={{
               borderColor: 'var(--ag-glass-border)',
               background: 'var(--ag-bg-surface)',

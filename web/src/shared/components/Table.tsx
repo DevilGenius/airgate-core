@@ -35,16 +35,16 @@ export function Table<T extends Record<string, any>>({
 
   if (loading) {
     return (
-      <div className="rounded-[var(--ag-radius-lg)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-elevated)] overflow-hidden">
+      <div className="rounded-lg border border-glass-border bg-bg-elevated overflow-hidden">
         {/* 表头骨架 */}
-        <div className="flex gap-4 px-4 py-3 border-b border-[var(--ag-border)] bg-[var(--ag-bg-surface)]">
+        <div className="flex gap-4 px-4 py-3 border-b border-border bg-surface">
           {columns.map((col) => (
             <div key={col.key} className="h-4 ag-shimmer rounded w-20" style={{ flex: col.width ? `0 0 ${col.width}` : '1' }} />
           ))}
         </div>
         {/* 行骨架 */}
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="flex gap-4 px-4 py-3.5 border-b border-[var(--ag-border-subtle)]">
+          <div key={i} className="flex gap-4 px-4 py-3.5 border-b border-border-subtle">
             {columns.map((col) => (
               <div key={col.key} className="h-4 ag-shimmer rounded w-24" style={{ flex: col.width ? `0 0 ${col.width}` : '1', animationDelay: `${i * 100}ms` }} />
             ))}
@@ -56,7 +56,7 @@ export function Table<T extends Record<string, any>>({
 
   if (data.length === 0) {
     return (
-      <div className="rounded-[var(--ag-radius-lg)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-elevated)]">
+      <div className="rounded-lg border border-glass-border bg-bg-elevated">
         <EmptyState />
       </div>
     );
@@ -64,15 +64,15 @@ export function Table<T extends Record<string, any>>({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[var(--ag-radius-lg)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-elevated)] overflow-hidden">
+      <div className="rounded-lg border border-glass-border bg-bg-elevated overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[var(--ag-border)] bg-[var(--ag-bg-surface)]">
+              <tr className="border-b border-border bg-surface">
                 {columns.map((col) => (
                   <th
                     key={col.key}
-                    className="px-4 py-3 text-left text-[10px] font-semibold text-[var(--ag-text-tertiary)] uppercase tracking-widest"
+                    className="px-4 py-3 text-left text-[10px] font-semibold text-text-tertiary uppercase tracking-widest"
                     style={{ width: col.width }}
                   >
                     {col.title}
@@ -84,12 +84,12 @@ export function Table<T extends Record<string, any>>({
               {data.map((row, i) => (
                 <tr
                   key={rowKey ? rowKey(row) : i}
-                  className="border-b border-[var(--ag-border-subtle)] last:border-0 transition-colors hover:bg-[var(--ag-bg-hover)]"
+                  className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover"
                 >
                   {columns.map((col) => (
                     <td
                       key={col.key}
-                      className="px-4 py-3 text-sm text-[var(--ag-text-secondary)] whitespace-nowrap"
+                      className="px-4 py-3 text-sm text-text-secondary whitespace-nowrap"
                     >
                       {col.render ? col.render(row) : String(row[col.key] ?? '')}
                     </td>
@@ -104,12 +104,12 @@ export function Table<T extends Record<string, any>>({
       {/* 分页 */}
       {totalPages > 1 && onPageChange && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[var(--ag-text-tertiary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          <span className="text-xs text-text-tertiary font-mono">
             共 {total} 条 · 第 {page}/{totalPages} 页
           </span>
           <div className="flex items-center gap-1">
             <button
-              className="flex items-center justify-center w-8 h-8 rounded-[var(--ag-radius-sm)] text-[var(--ag-text-secondary)] hover:bg-[var(--ag-bg-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center justify-center w-8 h-8 rounded-sm text-text-secondary hover:bg-bg-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
             >
@@ -118,16 +118,16 @@ export function Table<T extends Record<string, any>>({
             {/* 页码按钮 */}
             {generatePageNumbers(page, totalPages).map((p, i) =>
               p === '...' ? (
-                <span key={`ellipsis-${i}`} className="w-8 text-center text-[var(--ag-text-tertiary)] text-xs">
+                <span key={`ellipsis-${i}`} className="w-8 text-center text-text-tertiary text-xs">
                   ···
                 </span>
               ) : (
                 <button
                   key={p}
-                  className={`flex items-center justify-center w-8 h-8 rounded-[var(--ag-radius-sm)] text-xs font-medium transition-all ${
+                  className={`flex items-center justify-center w-8 h-8 rounded-sm text-xs font-medium transition-all ${
                     p === page
-                      ? 'bg-[var(--ag-primary)] text-white shadow-[0_0_8px_var(--ag-primary-glow)]'
-                      : 'text-[var(--ag-text-secondary)] hover:bg-[var(--ag-bg-hover)]'
+                      ? 'bg-primary text-text-inverse shadow-[0_0_12px_var(--ag-primary-glow)]'
+                      : 'text-text-secondary hover:bg-bg-hover'
                   }`}
                   onClick={() => onPageChange(p as number)}
                 >
@@ -136,7 +136,7 @@ export function Table<T extends Record<string, any>>({
               ),
             )}
             <button
-              className="flex items-center justify-center w-8 h-8 rounded-[var(--ag-radius-sm)] text-[var(--ag-text-secondary)] hover:bg-[var(--ag-bg-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center justify-center w-8 h-8 rounded-sm text-text-secondary hover:bg-bg-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               disabled={page >= totalPages}
               onClick={() => onPageChange(page + 1)}
             >

@@ -30,10 +30,11 @@ type Server struct {
 	srv     *http.Server
 
 	// 插件系统组件
-	pluginMgr     *plugin.Manager
-	forwarder     *plugin.Forwarder
-	marketplace   *plugin.Marketplace
-	dynamicRouter *DynamicRouter
+	pluginMgr      *plugin.Manager
+	forwarder      *plugin.Forwarder
+	marketplace    *plugin.Marketplace
+	dynamicRouter  *DynamicRouter
+	extensionProxy *plugin.ExtensionProxy
 
 	// 核心服务组件
 	scheduler   *scheduler.Scheduler
@@ -68,18 +69,20 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	forwarder := plugin.NewForwarder(pluginMgr, db, sched, concurrency, limiter, calculator, priceMgr, recorder)
 	marketplace := plugin.NewMarketplace(pluginDir)
 	dynamicRouter := NewDynamicRouter(forwarder)
+	extensionProxy := plugin.NewExtensionProxy(pluginMgr)
 
 	s := &Server{
-		cfg:           cfg,
-		db:            db,
-		rdb:           rdb,
-		jwtMgr:        jwtMgr,
-		limiter:       limiter,
-		engine:        gin.Default(),
-		pluginMgr:     pluginMgr,
-		forwarder:     forwarder,
-		marketplace:   marketplace,
-		dynamicRouter: dynamicRouter,
+		cfg:            cfg,
+		db:             db,
+		rdb:            rdb,
+		jwtMgr:         jwtMgr,
+		limiter:        limiter,
+		engine:         gin.Default(),
+		pluginMgr:      pluginMgr,
+		forwarder:      forwarder,
+		marketplace:    marketplace,
+		dynamicRouter:  dynamicRouter,
+		extensionProxy: extensionProxy,
 		scheduler:     sched,
 		concurrency:   concurrency,
 		priceMgr:      priceMgr,

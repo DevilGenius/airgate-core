@@ -133,15 +133,15 @@ export default function ProfilePage() {
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 w-28 shrink-0">
-              <Mail className="w-4 h-4 text-[var(--ag-text-tertiary)]" />
-              <span className="text-xs font-medium text-[var(--ag-text-secondary)]">{t('profile.email')}</span>
+              <Mail className="w-4 h-4 text-text-tertiary" />
+              <span className="text-xs font-medium text-text-secondary">{t('profile.email')}</span>
             </div>
-            <span className="text-sm text-[var(--ag-text)]">{user.email}</span>
+            <span className="text-sm text-text">{user.email}</span>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 w-28 shrink-0">
-              <Shield className="w-4 h-4 text-[var(--ag-text-tertiary)]" />
-              <span className="text-xs font-medium text-[var(--ag-text-secondary)]">{t('profile.role')}</span>
+              <Shield className="w-4 h-4 text-text-tertiary" />
+              <span className="text-xs font-medium text-text-secondary">{t('profile.role')}</span>
             </div>
             <Badge variant={user.role === 'admin' ? 'info' : 'default'}>
               {user.role === 'admin' ? t('nav.admin') : t('nav.user')}
@@ -149,19 +149,19 @@ export default function ProfilePage() {
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 w-28 shrink-0">
-              <Wallet className="w-4 h-4 text-[var(--ag-text-tertiary)]" />
-              <span className="text-xs font-medium text-[var(--ag-text-secondary)]">{t('profile.balance')}</span>
+              <Wallet className="w-4 h-4 text-text-tertiary" />
+              <span className="text-xs font-medium text-text-secondary">{t('profile.balance')}</span>
             </div>
-            <span className="text-sm text-[var(--ag-text)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            <span className="text-sm text-text font-mono">
               ${user.balance.toFixed(4)}
             </span>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 w-28 shrink-0">
-              <Layers className="w-4 h-4 text-[var(--ag-text-tertiary)]" />
-              <span className="text-xs font-medium text-[var(--ag-text-secondary)]">{t('profile.concurrency')}</span>
+              <Layers className="w-4 h-4 text-text-tertiary" />
+              <span className="text-xs font-medium text-text-secondary">{t('profile.concurrency')}</span>
             </div>
-            <span className="text-sm text-[var(--ag-text)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            <span className="text-sm text-text font-mono">
               {user.max_concurrency}
             </span>
           </div>
@@ -243,7 +243,7 @@ export default function ProfilePage() {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <Badge variant="success">{t('profile.totp_enabled')}</Badge>
-              <span className="text-sm text-[var(--ag-text-secondary)]">
+              <span className="text-sm text-text-secondary">
                 {t('profile.totp_enabled_desc')}
               </span>
             </div>
@@ -273,7 +273,7 @@ export default function ProfilePage() {
           <div className="space-y-4">
             {totpStep === 'idle' && (
               <div>
-                <p className="text-sm text-[var(--ag-text-secondary)] mb-4">
+                <p className="text-sm text-text-secondary mb-4">
                   {t('profile.totp_enable_desc')}
                 </p>
                 <Button
@@ -288,15 +288,14 @@ export default function ProfilePage() {
 
             {totpStep === 'verify' && (
               <div className="space-y-4">
-                <p className="text-sm text-[var(--ag-text-secondary)]">
+                <p className="text-sm text-text-secondary">
                   {t('profile.totp_scan_uri')}
                 </p>
                 <div
-                  className="rounded-[var(--ag-radius-md)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] p-3 break-all text-sm text-[var(--ag-text-secondary)]"
-                  style={{ fontFamily: 'var(--ag-font-mono)' }}
+                  className="rounded-md border border-glass-border bg-surface p-3 break-all text-sm text-text-secondary font-mono"
                 >
                   <div className="flex items-start gap-2">
-                    <Smartphone className="w-4 h-4 text-[var(--ag-primary)] mt-0.5 shrink-0" />
+                    <Smartphone className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                     <span>{totpUri}</span>
                   </div>
                 </div>

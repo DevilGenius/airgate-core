@@ -73,11 +73,11 @@ export default function PluginsPage() {
       title: t('common.name'),
       render: (row) => (
         <div className="min-w-0">
-          <div className="text-[var(--ag-text)] font-medium">
+          <div className="text-text font-medium">
             {row.display_name || row.name}
           </div>
           {row.display_name && row.display_name !== row.name && (
-            <div className="text-xs text-[var(--ag-text-tertiary)] font-mono mt-0.5">
+            <div className="text-xs text-text-tertiary font-mono mt-0.5">
               {row.name}
             </div>
           )}
@@ -95,7 +95,7 @@ export default function PluginsPage() {
             </Badge>
           </div>
           {row.version && (
-            <span className="text-xs text-[var(--ag-text-tertiary)]">
+            <span className="text-xs text-text-tertiary">
               {t('common.version')}: {row.version}
             </span>
           )}
@@ -132,7 +132,7 @@ export default function PluginsPage() {
             size="sm"
             variant="ghost"
             icon={<Trash2 className="w-3.5 h-3.5" />}
-            className="text-[var(--ag-danger)]"
+            className="text-danger"
             onClick={() => setUninstallTarget(row)}
           >
             {t('common.uninstall')}
@@ -163,14 +163,14 @@ export default function PluginsPage() {
       />
 
       {/* Tab 切换 */}
-      <div className="flex gap-1 mb-6 border-b border-[var(--ag-border)]">
+      <div className="flex gap-1 mb-6 border-b border-border">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all duration-200 cursor-pointer ${
               activeTab === tab.key
-                ? 'border-[var(--ag-primary)] text-[var(--ag-primary)] shadow-[0_2px_8px_var(--ag-primary-glow)]'
-                : 'border-transparent text-[var(--ag-text-tertiary)] hover:text-[var(--ag-text-secondary)]'
+                ? 'border-primary text-primary shadow-[0_2px_8px_var(--ag-primary-glow)]'
+                : 'border-transparent text-text-tertiary hover:text-text-secondary'
             }`}
             onClick={() => setActiveTab(tab.key)}
           >
@@ -194,8 +194,8 @@ export default function PluginsPage() {
         <div>
           {marketLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-5 h-5 animate-spin text-[var(--ag-primary)]" />
-              <span className="ml-2 text-sm text-[var(--ag-text-tertiary)]">{t('common.loading')}</span>
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <span className="ml-2 text-sm text-text-tertiary">{t('common.loading')}</span>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -206,7 +206,7 @@ export default function PluginsPage() {
                 />
               ))}
               {(marketData?.list ?? []).length === 0 && (
-                <div className="col-span-full text-center py-16 text-[var(--ag-text-tertiary)]">
+                <div className="col-span-full text-center py-16 text-text-tertiary">
                   {t('plugins.no_plugins')}
                 </div>
               )}
@@ -336,10 +336,10 @@ function InstallPluginModal({
         {installTabs.map((tab) => (
           <button
             key={tab.key}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--ag-radius-md)] text-xs font-medium transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
               installTab === tab.key
-                ? 'bg-[var(--ag-primary)] text-white'
-                : 'bg-[var(--ag-bg-surface)] text-[var(--ag-text-secondary)] hover:bg-[var(--ag-bg-muted)]'
+                ? 'bg-primary text-white'
+                : 'bg-surface text-text-secondary hover:bg-[var(--ag-bg-muted)]'
             }`}
             onClick={() => setInstallTab(tab.key)}
             disabled={installing}
@@ -354,14 +354,14 @@ function InstallPluginModal({
       {installTab === 'upload' && (
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-[var(--ag-text-secondary)] uppercase tracking-wider mb-1.5">
-              {t('plugins.plugin_file')} <span className="text-[var(--ag-danger)]">*</span>
+            <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider mb-1.5">
+              {t('plugins.plugin_file')} <span className="text-danger">*</span>
             </label>
             <div
-              className={`border-2 border-dashed rounded-[var(--ag-radius-md)] p-6 text-center cursor-pointer transition-colors ${
+              className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
                 selectedFile
-                  ? 'border-[var(--ag-primary)] bg-[var(--ag-primary-subtle)]'
-                  : 'border-[var(--ag-glass-border)] hover:border-[var(--ag-border-focus)]'
+                  ? 'border-primary bg-primary-subtle'
+                  : 'border-glass-border hover:border-border-focus'
               }`}
               onClick={() => fileInputRef.current?.click()}
             >
@@ -373,16 +373,16 @@ function InstallPluginModal({
               />
               {selectedFile ? (
                 <div className="flex items-center justify-center gap-2">
-                  <Package className="w-5 h-5 text-[var(--ag-primary)]" />
-                  <span className="text-sm text-[var(--ag-text)]">{selectedFile.name}</span>
-                  <span className="text-xs text-[var(--ag-text-tertiary)]">
+                  <Package className="w-5 h-5 text-primary" />
+                  <span className="text-sm text-text">{selectedFile.name}</span>
+                  <span className="text-xs text-text-tertiary">
                     ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
                   </span>
                 </div>
               ) : (
                 <div>
-                  <Upload className="w-8 h-8 mx-auto mb-2 text-[var(--ag-text-tertiary)]" />
-                  <p className="text-sm text-[var(--ag-text-tertiary)]">
+                  <Upload className="w-8 h-8 mx-auto mb-2 text-text-tertiary" />
+                  <p className="text-sm text-text-tertiary">
                     {t('plugins.upload_hint')}
                   </p>
                 </div>
@@ -408,7 +408,7 @@ function InstallPluginModal({
             placeholder={t('plugins.github_repo_placeholder')}
             required
           />
-          <p className="text-xs text-[var(--ag-text-tertiary)]">
+          <p className="text-xs text-text-tertiary">
             {t('plugins.github_hint')}
           </p>
         </div>
@@ -430,25 +430,25 @@ function MarketplaceCard({
       <div className="flex flex-col h-full">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Package className="w-4 h-4 text-[var(--ag-primary)]" />
-            <h3 className="font-semibold text-[var(--ag-text)]">{plugin.name}</h3>
+            <Package className="w-4 h-4 text-primary" />
+            <h3 className="font-semibold text-text">{plugin.name}</h3>
           </div>
           <Badge variant={typeVariant[plugin.type] || 'default'}>{plugin.type}</Badge>
         </div>
-        <p className="text-sm text-[var(--ag-text-tertiary)] flex-1 mb-4 leading-relaxed">
+        <p className="text-sm text-text-tertiary flex-1 mb-4 leading-relaxed">
           {plugin.description || t('common.no_data_desc')}
         </p>
-        <div className="flex items-center justify-between text-xs text-[var(--ag-text-tertiary)] mb-3">
+        <div className="flex items-center justify-between text-xs text-text-tertiary mb-3">
           <span className="flex items-center gap-1">
             <User className="w-3 h-3" />
             {plugin.author}
           </span>
-          <span className="flex items-center gap-1" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+          <span className="flex items-center gap-1 font-mono">
             <Tag className="w-3 h-3" />
             v{plugin.version}
           </span>
         </div>
-        <div className="pt-3 border-t border-[var(--ag-border)]">
+        <div className="pt-3 border-t border-border">
           {plugin.installed ? (
             <Badge variant="success">{t('plugins.already_installed')}</Badge>
           ) : (

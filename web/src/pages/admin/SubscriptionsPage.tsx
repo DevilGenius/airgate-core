@@ -130,7 +130,7 @@ export default function SubscriptionsPage() {
       title: t('common.id'),
       width: '60px',
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {row.id}
         </span>
       ),
@@ -161,7 +161,7 @@ export default function SubscriptionsPage() {
       key: 'effective_at',
       title: t('subscriptions.effective_time'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {formatDate(row.effective_at)}
         </span>
       ),
@@ -170,7 +170,7 @@ export default function SubscriptionsPage() {
       key: 'expires_at',
       title: t('subscriptions.expire_time'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {formatDate(row.expires_at)}
         </span>
       ),
@@ -469,7 +469,7 @@ function BulkAssignModal({
             {t('subscriptions.select_users')} <span style={{ color: 'var(--ag-danger)' }}>*</span>
           </label>
           <div
-            className="rounded-[var(--ag-radius-md)] max-h-48 overflow-y-auto p-2 space-y-0.5"
+            className="rounded-md max-h-48 overflow-y-auto p-2 space-y-0.5"
             style={{
               border: '1px solid var(--ag-glass-border)',
               background: 'var(--ag-bg-surface)',
@@ -478,7 +478,7 @@ function BulkAssignModal({
             {users.map((u) => (
               <label
                 key={u.id}
-                className="flex items-center gap-2.5 px-2 py-1.5 rounded-[var(--ag-radius-sm)] cursor-pointer transition-colors"
+                className="flex items-center gap-2.5 px-2 py-1.5 rounded-sm cursor-pointer transition-colors"
                 style={{ color: 'var(--ag-text-secondary)' }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLElement).style.background = 'var(--ag-bg-hover)';
@@ -504,7 +504,7 @@ function BulkAssignModal({
               </label>
             ))}
           </div>
-          <p className="text-xs" style={{ fontFamily: 'var(--ag-font-mono)', color: 'var(--ag-text-tertiary)' }}>
+          <p className="text-xs font-mono" style={{ color: 'var(--ag-text-tertiary)' }}>
             {t('subscriptions.selected_count', { count: selectedUserIds.length })}
           </p>
         </div>

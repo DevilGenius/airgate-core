@@ -82,7 +82,7 @@ export default function GroupsPage() {
       title: t('common.id'),
       width: '60px',
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {row.id}
         </span>
       ),
@@ -123,7 +123,7 @@ export default function GroupsPage() {
       title: t('groups.rate_multiplier'),
       width: '80px',
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)', color: 'var(--ag-primary)' }}>
+        <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
           {row.rate_multiplier}x
         </span>
       ),
@@ -147,7 +147,7 @@ export default function GroupsPage() {
       title: t('groups.sort_weight'),
       width: '100px',
       render: (row) => (
-        <span className="inline-flex items-center gap-1" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="inline-flex items-center gap-1 font-mono">
           <ArrowUpDown className="w-3 h-3" style={{ color: 'var(--ag-text-tertiary)' }} />
           {row.sort_weight}
         </span>

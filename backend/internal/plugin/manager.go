@@ -31,9 +31,10 @@ type PluginInstance struct {
 	Version     string
 	Author      string
 	Platform    string
-	Type        string // "gateway", "payment", "extension"
+	Type        string // "gateway", "extension"
 	Client      *goplugin.Client
 	Gateway     *sdkgrpc.GatewayGRPCClient
+	Extension   *sdkgrpc.ExtensionGRPCClient
 }
 
 // Manager 插件管理器
@@ -169,12 +170,14 @@ func (m *Manager) IsDev(name string) bool {
 }
 
 // startPlugin 启动插件子进程并建立 gRPC 连接
+// 支持 gateway 和 extension 两种插件类型：先尝试 gateway，失败则尝试 extension
 func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string) (string, error) {
 	// 创建 go-plugin 客户端（SyncStdout/Stderr 转发子进程日志到主进程）
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: shared.Handshake,
 		Plugins: goplugin.PluginSet{
-			shared.PluginKeyGateway: &sdkgrpc.GatewayGRPCPlugin{},
+			shared.PluginKeyGateway:   &sdkgrpc.GatewayGRPCPlugin{},
+			shared.PluginKeyExtension: &sdkgrpc.ExtensionGRPCPlugin{},
 		},
 		Cmd:              cmd,
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
@@ -189,19 +192,42 @@ func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *ex
 		return "", fmt.Errorf("连接插件进程失败: %w", err)
 	}
 
-	// 获取网关插件接口
+	// 先通过 PluginService.GetInfo() 获取插件类型，再 Dispense 对应接口
+	// 注意：go-plugin 的 Dispense 总是成功（只创建 stub），不能靠它区分类型
 	raw, err := rpcClient.Dispense(shared.PluginKeyGateway)
 	if err != nil {
 		client.Kill()
 		return "", fmt.Errorf("获取插件接口失败: %w", err)
 	}
-
-	gateway, ok := raw.(*sdkgrpc.GatewayGRPCClient)
+	probe, ok := raw.(*sdkgrpc.GatewayGRPCClient)
 	if !ok {
 		client.Kill()
 		return "", fmt.Errorf("插件类型断言失败")
 	}
 
+	// 通过 Info().Type 判断真实插件类型
+	info := probe.Info()
+	if info.Type == sdk.PluginTypeExtension {
+		// 是 extension 插件，用 extension 接口重新 Dispense
+		extRaw, err := rpcClient.Dispense(shared.PluginKeyExtension)
+		if err != nil {
+			client.Kill()
+			return "", fmt.Errorf("获取 extension 插件接口失败: %w", err)
+		}
+		ext, ok := extRaw.(*sdkgrpc.ExtensionGRPCClient)
+		if !ok {
+			client.Kill()
+			return "", fmt.Errorf("extension 插件类型断言失败")
+		}
+		return m.startExtensionPlugin(ctx, client, ext, requestedName, binaryDir)
+	}
+
+	// 默认作为 gateway 插件处理
+	return m.startGatewayPlugin(ctx, client, probe, requestedName, binaryDir)
+}
+
+// startGatewayPlugin 初始化并启动 gateway 类型插件
+func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Client, gateway *sdkgrpc.GatewayGRPCClient, requestedName, binaryDir string) (string, error) {
 	info := gateway.Info()
 	canonicalName := canonicalPluginName(info, requestedName)
 	if canonicalName == "" {
@@ -264,23 +290,98 @@ func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *ex
 	m.mu.Unlock()
 
 	// 提取前端静态资源
-	assets, err := gateway.GetWebAssets()
-	if err != nil {
-		slog.Warn("获取插件前端资源失败", "plugin", canonicalName, "error", err)
-	} else if len(assets) > 0 {
-		assetsDir := filepath.Join(m.pluginDir, canonicalName, "assets")
-		if err := extractWebAssets(assetsDir, assets); err != nil {
-			slog.Warn("写入插件前端资源失败", "plugin", canonicalName, "error", err)
-		} else {
-			slog.Info("已提取插件前端资源", "plugin", canonicalName, "files", len(assets))
-		}
-	}
+	m.extractPluginWebAssets(canonicalName, gateway)
 
 	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
 		slog.Info("插件名称已统一到 Info().ID", "requested_name", requestedName, "canonical_name", canonicalName)
 	}
 
 	return canonicalName, nil
+}
+
+// startExtensionPlugin 初始化并启动 extension 类型插件
+func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Client, ext *sdkgrpc.ExtensionGRPCClient, requestedName, binaryDir string) (string, error) {
+	info := ext.Info()
+	canonicalName := canonicalPluginName(info, requestedName)
+	if canonicalName == "" {
+		client.Kill()
+		return "", fmt.Errorf("插件未提供有效的 ID/name")
+	}
+
+	// 初始化插件
+	pluginCtx := newCorePluginContext(nil, canonicalName)
+	if err := ext.Init(pluginCtx); err != nil {
+		client.Kill()
+		return "", fmt.Errorf("初始化 extension 插件失败: %w", err)
+	}
+
+	// 启动插件
+	if err := ext.Start(ctx); err != nil {
+		client.Kill()
+		return "", fmt.Errorf("启动 extension 插件失败: %w", err)
+	}
+
+	// 执行数据库迁移
+	if err := ext.Migrate(); err != nil {
+		slog.Warn("extension 插件迁移失败", "plugin", canonicalName, "error", err)
+	}
+
+	pluginType := string(info.Type)
+	if pluginType == "" {
+		pluginType = "extension"
+	}
+
+	instance := &PluginInstance{
+		Name:        canonicalName,
+		SourceName:  normalizePluginName(requestedName),
+		BinaryDir:   normalizePluginName(binaryDir),
+		DisplayName: info.Name,
+		Version:     info.Version,
+		Author:      info.Author,
+		Type:        pluginType,
+		Client:      client,
+		Extension:   ext,
+	}
+
+	m.mu.Lock()
+	m.instances[canonicalName] = instance
+	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
+	if len(info.FrontendPages) > 0 {
+		m.frontendPageCache[canonicalName] = info.FrontendPages
+	}
+	m.mu.Unlock()
+
+	// 提取前端静态资源
+	m.extractPluginWebAssets(canonicalName, ext)
+
+	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
+		slog.Info("插件名称已统一到 Info().ID", "requested_name", requestedName, "canonical_name", canonicalName)
+	}
+
+	return canonicalName, nil
+}
+
+// webAssetsProvider 获取前端资源的接口（gateway 和 extension 都实现了）
+type webAssetsProvider interface {
+	GetWebAssets() (map[string][]byte, error)
+}
+
+// extractPluginWebAssets 提取插件的前端静态资源到磁盘
+func (m *Manager) extractPluginWebAssets(pluginName string, provider webAssetsProvider) {
+	assets, err := provider.GetWebAssets()
+	if err != nil {
+		slog.Warn("获取插件前端资源失败", "plugin", pluginName, "error", err)
+		return
+	}
+	if len(assets) == 0 {
+		return
+	}
+	assetsDir := filepath.Join(m.pluginDir, pluginName, "assets")
+	if err := extractWebAssets(assetsDir, assets); err != nil {
+		slog.Warn("写入插件前端资源失败", "plugin", pluginName, "error", err)
+	} else {
+		slog.Info("已提取插件前端资源", "plugin", pluginName, "files", len(assets))
+	}
 }
 
 // stopPlugin 停止插件进程
@@ -303,6 +404,9 @@ func (m *Manager) stopPlugin(name string) {
 
 	if inst.Gateway != nil {
 		_ = inst.Gateway.Stop(context.Background())
+	}
+	if inst.Extension != nil {
+		_ = inst.Extension.Stop(context.Background())
 	}
 	if inst.Client != nil {
 		inst.Client.Kill()
@@ -404,7 +508,8 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: shared.Handshake,
 		Plugins: goplugin.PluginSet{
-			shared.PluginKeyGateway: &sdkgrpc.GatewayGRPCPlugin{},
+			shared.PluginKeyGateway:   &sdkgrpc.GatewayGRPCPlugin{},
+			shared.PluginKeyExtension: &sdkgrpc.ExtensionGRPCPlugin{},
 		},
 		Cmd:              exec.Command(tmpBinary),
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
@@ -416,21 +521,29 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 		return "", fmt.Errorf("连接探测进程失败: %w", err)
 	}
 
-	raw, err := rpcClient.Dispense(shared.PluginKeyGateway)
-	if err != nil {
-		return "", fmt.Errorf("获取探测接口失败: %w", err)
+	// 先尝试 gateway
+	if raw, err := rpcClient.Dispense(shared.PluginKeyGateway); err == nil {
+		if gateway, ok := raw.(*sdkgrpc.GatewayGRPCClient); ok {
+			if info := gateway.Info(); info.ID != "" {
+				return info.ID, nil
+			}
+			return fallbackName, nil
+		}
 	}
 
-	gateway, ok := raw.(*sdkgrpc.GatewayGRPCClient)
+	// 再尝试 extension
+	raw, err := rpcClient.Dispense(shared.PluginKeyExtension)
+	if err != nil {
+		return "", fmt.Errorf("获取探测接口失败（gateway 和 extension 均不匹配）: %w", err)
+	}
+	ext, ok := raw.(*sdkgrpc.ExtensionGRPCClient)
 	if !ok {
 		return "", fmt.Errorf("探测类型断言失败")
 	}
-
-	info := gateway.Info()
-	if info.ID == "" {
-		return fallbackName, nil
+	if info := ext.Info(); info.ID != "" {
+		return info.ID, nil
 	}
-	return info.ID, nil
+	return fallbackName, nil
 }
 
 // InstallFromGithub 从 GitHub Release 下载并安装插件
@@ -534,6 +647,17 @@ func parseGithubRepo(repo string) (owner, name string, err error) {
 		return "", "", fmt.Errorf("无效的仓库格式，请使用 owner/repo 格式")
 	}
 	return segments[0], segments[1], nil
+}
+
+// GetExtensionByName 根据插件名查找 extension 类型插件
+func (m *Manager) GetExtensionByName(name string) *sdkgrpc.ExtensionGRPCClient {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	inst := m.instances[m.resolveNameLocked(name)]
+	if inst == nil {
+		return nil
+	}
+	return inst.Extension
 }
 
 // GetPluginByPlatform 根据平台查找运行中的插件实例

@@ -32,10 +32,10 @@ const statConfigs = [
   { key: 'total_accounts', titleKey: 'dashboard.total_accounts', icon: KeyRound, color: 'var(--ag-info)' },
   { key: 'total_groups', titleKey: 'dashboard.total_groups', icon: FolderTree, color: 'var(--ag-success)' },
   { key: 'total_api_keys', titleKey: 'dashboard.total_api_keys', icon: Key, color: 'var(--ag-warning)' },
-  { key: 'total_requests', titleKey: 'dashboard.today_requests', icon: Activity, color: '#06b6d4' },
-  { key: 'total_tokens', titleKey: 'dashboard.today_tokens', icon: Coins, color: '#8b5cf6' },
+  { key: 'total_requests', titleKey: 'dashboard.today_requests', icon: Activity, color: 'var(--ag-primary)' },
+  { key: 'total_tokens', titleKey: 'dashboard.today_tokens', icon: Coins, color: 'var(--ag-info)' },
   { key: 'total_revenue', titleKey: 'dashboard.today_revenue', icon: DollarSign, color: 'var(--ag-success)', isCurrency: true },
-  { key: 'active_plugins', titleKey: 'dashboard.active_plugins', icon: Puzzle, color: '#ec4899' },
+  { key: 'active_plugins', titleKey: 'dashboard.active_plugins', icon: Puzzle, color: 'var(--ag-warning)' },
 ] as const;
 
 export default function DashboardPage() {
@@ -56,7 +56,7 @@ export default function DashboardPage() {
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="rounded-[var(--ag-radius-lg)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-elevated)] p-5"
+              className="rounded-lg border border-glass-border bg-bg-elevated p-5"
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <div className="space-y-3">
@@ -70,7 +70,7 @@ export default function DashboardPage() {
 
       {/* 错误 */}
       {error && (
-        <div className="rounded-[var(--ag-radius-md)] bg-[var(--ag-danger-subtle)] border border-[var(--ag-danger)] border-opacity-20 px-4 py-3 text-sm text-[var(--ag-danger)]">
+        <div className="rounded-md bg-danger-subtle border border-danger border-opacity-20 px-4 py-3 text-sm text-danger">
           {t('dashboard.load_failed', { error: error instanceof Error ? error.message : t('common.unknown_error') })}
         </div>
       )}

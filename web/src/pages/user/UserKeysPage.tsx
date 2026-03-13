@@ -170,10 +170,9 @@ export default function UserKeysPage() {
       title: t('user_keys.title'),
       render: (row) => (
         <span
-          className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-[var(--ag-radius-sm)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] text-[var(--ag-text-secondary)]"
-          style={{ fontFamily: 'var(--ag-font-mono)' }}
+          className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono"
         >
-          <Key className="w-3 h-3 text-[var(--ag-text-tertiary)]" />
+          <Key className="w-3 h-3 text-text-tertiary" />
           {row.key_prefix}...
         </span>
       ),
@@ -187,13 +186,13 @@ export default function UserKeysPage() {
       key: 'quota',
       title: t('user_keys.quota_label'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           {row.quota_usd > 0 ? (
             <>
               ${row.used_quota.toFixed(4)} / ${row.quota_usd.toFixed(4)}
             </>
           ) : (
-            <span className="text-[var(--ag-text-tertiary)]">{t('user_keys.quota_unlimited_hint')}</span>
+            <span className="text-text-tertiary">{t('user_keys.quota_unlimited_hint')}</span>
           )}
         </span>
       ),
@@ -229,7 +228,7 @@ export default function UserKeysPage() {
             variant="ghost"
             onClick={() => setDeleteTarget(row)}
             icon={<Trash2 className="w-3.5 h-3.5" />}
-            className="text-[var(--ag-danger)] hover:text-[var(--ag-danger)]"
+            className="text-danger hover:text-danger"
           >
             {t('common.delete')}
           </Button>
@@ -323,15 +322,14 @@ export default function UserKeysPage() {
         }
       >
         <div className="space-y-4">
-          <div className="flex items-start gap-2.5 rounded-[var(--ag-radius-md)] bg-[var(--ag-danger-subtle)] border border-[var(--ag-danger)] border-opacity-20 px-4 py-3">
-            <AlertTriangle className="w-4 h-4 text-[var(--ag-danger)] mt-0.5 shrink-0" />
-            <p className="text-sm text-[var(--ag-danger)] font-medium">
+          <div className="flex items-start gap-2.5 rounded-md bg-danger-subtle border border-danger border-opacity-20 px-4 py-3">
+            <AlertTriangle className="w-4 h-4 text-danger mt-0.5 shrink-0" />
+            <p className="text-sm text-danger font-medium">
               {t('user_keys.key_created_warning')}
             </p>
           </div>
           <div
-            className="rounded-[var(--ag-radius-md)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] p-3 break-all text-sm text-[var(--ag-text)]"
-            style={{ fontFamily: 'var(--ag-font-mono)' }}
+            className="rounded-md border border-glass-border bg-surface p-3 break-all text-sm text-text font-mono"
           >
             {createdKey}
           </div>

@@ -87,7 +87,7 @@ function LoginForm() {
         />
       )}
       {error && (
-        <div className="rounded-[var(--ag-radius-md)] bg-[var(--ag-danger-subtle)] border border-[var(--ag-danger)] border-opacity-20 px-4 py-3 text-sm text-[var(--ag-danger)]">
+        <div className="rounded-md bg-danger-subtle border border-danger/20 px-4 py-3 text-sm text-danger">
           {error}
         </div>
       )}
@@ -179,7 +179,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         error={passwordMismatch ? t('auth.password_mismatch') : undefined}
       />
       {error && (
-        <div className="rounded-[var(--ag-radius-md)] bg-[var(--ag-danger-subtle)] border border-[var(--ag-danger)] border-opacity-20 px-4 py-3 text-sm text-[var(--ag-danger)]">
+        <div className="rounded-md bg-danger-subtle border border-danger/20 px-4 py-3 text-sm text-danger">
           {error}
         </div>
       )}
@@ -203,50 +203,59 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--ag-bg-deep)] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* 背景装饰 */}
-      <div className="absolute inset-0">
-        {/* 渐变光晕 */}
-        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-[0.07]"
-          style={{ background: 'radial-gradient(circle, var(--ag-primary), transparent 70%)' }}
-        />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-[0.05]"
-          style={{ background: 'radial-gradient(circle, var(--ag-info), transparent 70%)' }}
-        />
-        {/* 网格纹理 */}
-        <div className="absolute inset-0 opacity-[0.03]"
+    <div className="min-h-screen bg-bg-deep flex items-center justify-center p-4 relative overflow-hidden">
+      {/* 背景 — 微弱网格 + 双光晕 */}
+      <div className="absolute inset-0 pointer-events-none">
+        {/* 网格 */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
           style={{
-            backgroundImage: `linear-gradient(var(--ag-text) 1px, transparent 1px), linear-gradient(90deg, var(--ag-text) 1px, transparent 1px)`,
-            backgroundSize: '60px 60px',
+            backgroundImage: `linear-gradient(var(--ag-text-tertiary) 1px, transparent 1px), linear-gradient(90deg, var(--ag-text-tertiary) 1px, transparent 1px)`,
+            backgroundSize: '64px 64px',
           }}
+        />
+        {/* 主色光晕 — 左上 */}
+        <div
+          className="absolute -top-[30%] -left-[15%] w-[700px] h-[700px] rounded-full opacity-[0.06]"
+          style={{ background: 'radial-gradient(circle, var(--ag-primary), transparent 65%)' }}
+        />
+        {/* 紫色光晕 — 右下 */}
+        <div
+          className="absolute -bottom-[25%] -right-[10%] w-[500px] h-[500px] rounded-full opacity-[0.04]"
+          style={{ background: 'radial-gradient(circle, var(--ag-info), transparent 65%)' }}
+        />
+        {/* 顶部渐变线 */}
+        <div
+          className="absolute top-0 left-0 right-0 h-px"
+          style={{ background: 'linear-gradient(90deg, transparent, var(--ag-primary-glow), transparent)' }}
         />
       </div>
 
-      <div className="relative w-full max-w-[420px]" style={{ animation: 'ag-slide-up 0.5s ease-out' }}>
+      <div className="relative w-full max-w-[400px]" style={{ animation: 'ag-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)' }}>
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-[var(--ag-radius-xl)] bg-[var(--ag-primary-subtle)] mb-4 shadow-[var(--ag-shadow-glow)]">
-            <Zap className="w-7 h-7 text-[var(--ag-primary)]" />
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-subtle mb-4 shadow-glow">
+            <Zap className="w-6 h-6 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-[var(--ag-text)] tracking-tight">
+          <h1 className="text-xl font-semibold text-text tracking-tight">
             {t('app_name')}
           </h1>
-          <p className="text-sm text-[var(--ag-text-tertiary)] mt-1.5 tracking-wide">
+          <p className="text-xs text-text-tertiary mt-1.5 tracking-wide font-mono uppercase">
             {t('app_subtitle')}
           </p>
         </div>
 
         {/* 表单卡片 */}
-        <div className="rounded-[var(--ag-radius-xl)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-elevated)] shadow-[var(--ag-shadow-lg)] overflow-hidden">
+        <div className="rounded-lg border border-glass-border bg-bg-elevated/80 shadow-lg backdrop-blur-sm overflow-hidden">
           {/* Tab 切换 */}
-          <div className="flex border-b border-[var(--ag-border)]">
+          <div className="flex border-b border-border">
             {(['login', 'register'] as const).map((tab) => (
               <button
                 key={tab}
-                className={`flex-1 py-3.5 text-sm font-medium text-center transition-all relative ${
+                className={`flex-1 py-3 text-xs font-medium text-center transition-all relative uppercase tracking-wider ${
                   activeTab === tab
-                    ? 'text-[var(--ag-primary)]'
-                    : 'text-[var(--ag-text-tertiary)] hover:text-[var(--ag-text-secondary)]'
+                    ? 'text-primary'
+                    : 'text-text-tertiary hover:text-text-secondary'
                 }`}
                 onClick={() => {
                   setActiveTab(tab);
@@ -255,16 +264,15 @@ export default function LoginPage() {
               >
                 {tab === 'login' ? t('common.login') : t('common.register')}
                 {activeTab === tab && (
-                  <div className="absolute bottom-0 left-1/4 right-1/4 h-[2px] bg-[var(--ag-primary)] rounded-full" />
+                  <div className="absolute bottom-0 left-1/4 right-1/4 h-[1.5px] bg-primary rounded-full" />
                 )}
               </button>
             ))}
           </div>
 
           <div className="p-6">
-            {/* 注册成功提示 */}
             {registerSuccess && activeTab === 'login' && (
-              <div className="rounded-[var(--ag-radius-md)] bg-[var(--ag-success-subtle)] border border-[var(--ag-success)] border-opacity-20 px-4 py-3 text-sm text-[var(--ag-success)] mb-5">
+              <div className="rounded-md bg-success-subtle border border-success/20 px-4 py-3 text-sm text-success mb-5">
                 {t('auth.register_success')}
               </div>
             )}
@@ -277,8 +285,8 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* 底部文字 */}
-        <p className="text-center text-[10px] text-[var(--ag-text-tertiary)] mt-6 uppercase tracking-widest">
+        {/* 底部 */}
+        <p className="text-center text-[10px] text-text-tertiary mt-8 font-mono uppercase tracking-[0.15em]">
           Powered by AirGate
         </p>
       </div>

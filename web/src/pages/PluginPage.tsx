@@ -23,7 +23,7 @@ export default function PluginPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-[var(--ag-text-secondary)]">加载插件页面...</div>
+        <div className="text-text-secondary">加载插件页面...</div>
       </div>
     );
   }
@@ -31,7 +31,7 @@ export default function PluginPage() {
   if (!mod?.routes?.length) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-[var(--ag-text-secondary)]">插件未提供页面</div>
+        <div className="text-text-secondary">插件未提供页面</div>
       </div>
     );
   }
@@ -43,7 +43,7 @@ export default function PluginPage() {
   if (!matched) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-[var(--ag-text-secondary)]">页面未找到</div>
+        <div className="text-text-secondary">页面未找到</div>
       </div>
     );
   }

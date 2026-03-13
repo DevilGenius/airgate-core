@@ -77,7 +77,7 @@ export default function UsersPage() {
       title: t('common.id'),
       width: '60px',
       render: (row) => (
-        <span className="text-[var(--ag-text-tertiary)]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="text-text-tertiary font-mono">
           {row.id}
         </span>
       ),
@@ -85,7 +85,7 @@ export default function UsersPage() {
     {
       key: 'email',
       title: t('users.email'),
-      render: (row) => <span className="text-[var(--ag-text)]">{row.email}</span>,
+      render: (row) => <span className="text-text">{row.email}</span>,
     },
     { key: 'username', title: t('users.username') },
     {
@@ -101,7 +101,7 @@ export default function UsersPage() {
       key: 'balance',
       title: t('users.balance'),
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <span className="font-mono">
           ${row.balance.toFixed(2)}
         </span>
       ),
@@ -344,9 +344,9 @@ function BalanceModal({
       }
     >
       <div className="space-y-4">
-        <div className="rounded-[var(--ag-radius-md)] bg-[var(--ag-bg-surface)] border border-[var(--ag-glass-border)] px-4 py-3">
-          <p className="text-xs text-[var(--ag-text-tertiary)] uppercase tracking-wider">{t('users.current_balance')}</p>
-          <p className="text-lg font-bold mt-1" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+        <div className="rounded-md bg-surface border border-glass-border px-4 py-3">
+          <p className="text-xs text-text-tertiary uppercase tracking-wider">{t('users.current_balance')}</p>
+          <p className="text-lg font-bold mt-1 font-mono">
             ${user.balance.toFixed(2)}
           </p>
         </div>

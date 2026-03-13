@@ -30,23 +30,23 @@ export function Modal({ open, onClose, title, children, footer, width = '480px' 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ animation: 'ag-fade-in 0.15s ease-out' }}>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/70" onClick={onClose} />
       <div
-        className="relative rounded-[var(--ag-radius-xl)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-elevated)] shadow-[var(--ag-shadow-lg)] max-h-[85vh] flex flex-col"
-        style={{ width, maxWidth: '90vw', animation: 'ag-scale-in 0.2s ease-out' }}
+        className="relative rounded-lg border border-glass-border bg-bg-elevated shadow-lg max-h-[85vh] flex flex-col"
+        style={{ width, maxWidth: '90vw', animation: 'ag-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ag-border)]">
-          <h3 className="text-base font-semibold text-[var(--ag-text)]">{title}</h3>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-text">{title}</h3>
           <button
             onClick={onClose}
-            className="flex items-center justify-center w-8 h-8 rounded-[var(--ag-radius-sm)] text-[var(--ag-text-tertiary)] hover:text-[var(--ag-text)] hover:bg-[var(--ag-bg-hover)] transition-colors"
+            className="flex items-center justify-center w-7 h-7 rounded-md text-text-tertiary hover:text-text hover:bg-bg-hover transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="px-6 py-5 overflow-y-auto flex-1">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--ag-border)]">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
             {footer}
           </div>
         )}
@@ -80,7 +80,7 @@ export function ConfirmModal({ open, onClose, onConfirm, title, message, loading
         </>
       }
     >
-      <p className="text-sm text-[var(--ag-text-secondary)]">{message}</p>
+      <p className="text-sm text-text-secondary">{message}</p>
     </Modal>
   );
 }

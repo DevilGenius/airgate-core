@@ -79,8 +79,8 @@ export default function SettingsPage() {
       <div>
         <PageHeader title={t('settings.title')} description={t('settings.description')} />
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-5 h-5 animate-spin text-[var(--ag-primary)]" />
-          <span className="ml-2 text-sm text-[var(--ag-text-tertiary)]">{t('common.loading')}</span>
+          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+          <span className="ml-2 text-sm text-text-tertiary">{t('common.loading')}</span>
         </div>
       </div>
     );
@@ -106,7 +106,7 @@ export default function SettingsPage() {
       />
 
       {Object.keys(groups).length === 0 ? (
-        <div className="text-center py-16 text-[var(--ag-text-tertiary)]">
+        <div className="text-center py-16 text-text-tertiary">
           {t('settings.no_settings')}
         </div>
       ) : (
@@ -117,8 +117,7 @@ export default function SettingsPage() {
                 {items.map((setting) => (
                   <div key={setting.key} className="flex items-center gap-4">
                     <label
-                      className="w-52 shrink-0 text-xs font-medium text-[var(--ag-text-secondary)] uppercase tracking-wider"
-                      style={{ fontFamily: 'var(--ag-font-mono)' }}
+                      className="w-52 shrink-0 text-xs font-medium text-text-secondary uppercase tracking-wider font-mono"
                     >
                       {setting.key}
                     </label>

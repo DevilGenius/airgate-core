@@ -6,11 +6,11 @@ interface BadgeProps {
 }
 
 const variantStyles: Record<string, string> = {
-  default: 'bg-[var(--ag-bg-hover)] text-[var(--ag-text-secondary)] border-[var(--ag-glass-border)]',
-  success: 'bg-[var(--ag-success-subtle)] text-[var(--ag-success)] border-[var(--ag-success-subtle)]',
-  warning: 'bg-[var(--ag-warning-subtle)] text-[var(--ag-warning)] border-[var(--ag-warning-subtle)]',
-  danger: 'bg-[var(--ag-danger-subtle)] text-[var(--ag-danger)] border-[var(--ag-danger-subtle)]',
-  info: 'bg-[var(--ag-info-subtle)] text-[var(--ag-info)] border-[var(--ag-info-subtle)]',
+  default: 'bg-bg-hover text-text-secondary border-glass-border',
+  success: 'bg-success-subtle text-success border-success-subtle',
+  warning: 'bg-warning-subtle text-warning border-warning-subtle',
+  danger: 'bg-danger-subtle text-danger border-danger-subtle',
+  info: 'bg-info-subtle text-info border-info-subtle',
 };
 
 export function Badge({ children, variant = 'default' }: BadgeProps) {
