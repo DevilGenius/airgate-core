@@ -181,6 +181,15 @@
     "subscription_expired": "已过期",
     "capacity": "容量",
     "scheduling": "调度",
+    "groups": "所属分组",
+    "last_used": "最近使用",
+    "just_now": "刚刚",
+    "minutes_ago": "{{n}} 分钟前",
+    "hours_ago": "{{n}} 小时前",
+    "days_ago": "{{n}} 天前",
+    "platform_type": "平台/类型",
+    "expires_at": "过期时间",
+    "no_proxy": "不使用代理",
     "usage_window": "用量窗口"
   },
 

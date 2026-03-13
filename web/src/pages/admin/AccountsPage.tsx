@@ -20,6 +20,8 @@ import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { StatusBadge } from '../../shared/components/Badge';
 import { useToast } from '../../shared/components/Toast';
 import { accountsApi } from '../../shared/api/accounts';
+import { groupsApi } from '../../shared/api/groups';
+import { proxiesApi } from '../../shared/api/proxies';
 import { pluginsApi } from '../../shared/api/plugins';
 import { AccountTestModal } from './AccountTestModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
@@ -213,6 +215,15 @@ export default function AccountsPage() {
       }),
   });
 
+  // 查询分组列表（用于表格中 ID→名称映射）
+  const { data: allGroupsData } = useQuery({
+    queryKey: ['groups-all'],
+    queryFn: () => groupsApi.list({ page: 1, page_size: 100 }),
+  });
+  const groupMap = new Map(
+    (allGroupsData?.list ?? []).map((g) => [g.id, g.name]),
+  );
+
   // 查询用量窗口
   const { data: usageData } = useQuery({
     queryKey: ['account-usage', platformFilter],
@@ -284,41 +295,18 @@ export default function AccountsPage() {
     },
     {
       key: 'platform',
-      title: t('accounts.platform'),
-      render: (row) => {
-        const planType = row.credentials?.plan_type;
-        const subUntil = row.credentials?.subscription_active_until;
-        const isExpired = subUntil ? new Date(subUntil) < new Date() : false;
-
-        return (
-          <div className="flex flex-col gap-0.5">
-            <span className="inline-flex items-center gap-1.5">
-              <Server className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-              <span>{row.platform.toUpperCase()}</span>
-              {row.type && (
-                <span className="text-[10px] px-1 py-0 rounded" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
-                  {row.type}
-                </span>
-              )}
+      title: t('accounts.platform_type'),
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          <Server className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+          <span>{row.platform}</span>
+          {row.type && (
+            <span className="text-[10px] px-1 py-0 rounded" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
+              {row.type}
             </span>
-            {planType && (
-              <span className="inline-flex items-center gap-1 text-[11px]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
-                <span className="px-1 py-0 rounded text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
-                  {planType.charAt(0).toUpperCase() + planType.slice(1)}
-                </span>
-                {subUntil && (
-                  <span style={{ color: isExpired ? 'var(--ag-danger)' : 'var(--ag-text-tertiary)', fontSize: 10 }}>
-                    {isExpired
-                      ? t('accounts.subscription_expired')
-                      : new Date(subUntil).toLocaleDateString()
-                    }
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
-        );
-      },
+          )}
+        </span>
+      ),
     },
     {
       key: 'capacity',
@@ -389,6 +377,28 @@ export default function AccountsPage() {
           <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
         ),
     },
+    {
+      key: 'groups',
+      title: t('accounts.groups'),
+      render: (row) => {
+        if (!row.group_ids || row.group_ids.length === 0) {
+          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+        }
+        return (
+          <div className="flex flex-wrap gap-1">
+            {row.group_ids.map((gid) => (
+              <span
+                key={gid}
+                className="text-[10px] px-1.5 py-0 rounded"
+                style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}
+              >
+                {groupMap.get(gid) ?? `#${gid}`}
+              </span>
+            ))}
+          </div>
+        );
+      },
+    },
     // 用量窗口
     ...(usageData?.accounts && Object.keys(usageData.accounts).length > 0 ? [{
       key: 'usage_window',
@@ -452,6 +462,51 @@ export default function AccountsPage() {
         );
       },
     } as Column<AccountResp>] : []),
+    {
+      key: 'last_used_at',
+      title: t('accounts.last_used'),
+      width: '120px',
+      render: (row) => {
+        if (!row.last_used_at) {
+          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+        }
+        const diff = Date.now() - new Date(row.last_used_at).getTime();
+        const seconds = Math.floor(diff / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+        let relative: string;
+        if (seconds < 60) relative = t('accounts.just_now');
+        else if (minutes < 60) relative = t('accounts.minutes_ago', { n: minutes });
+        else if (hours < 24) relative = t('accounts.hours_ago', { n: hours });
+        else relative = t('accounts.days_ago', { n: days });
+        return (
+          <span className="text-xs" style={{ color: 'var(--ag-text-secondary)' }} title={new Date(row.last_used_at).toLocaleString()}>
+            {relative}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'expires_at',
+      title: t('accounts.expires_at'),
+      width: '120px',
+      render: (row) => {
+        const subUntil = row.credentials?.subscription_active_until;
+        if (!subUntil) {
+          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+        }
+        const isExpired = new Date(subUntil) < new Date();
+        return (
+          <span
+            className="text-xs"
+            style={{ color: isExpired ? 'var(--ag-danger)' : 'var(--ag-text-secondary)' }}
+          >
+            {isExpired ? t('accounts.subscription_expired') : new Date(subUntil).toLocaleDateString()}
+          </span>
+        );
+      },
+    },
     {
       key: 'actions',
       title: t('common.actions'),
@@ -601,12 +656,19 @@ function CreateAccountModal({
     rate_multiplier: 1,
   });
   const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [groupIds, setGroupIds] = useState<number[]>([]);
 
   // 根据平台获取凭证字段定义
   const { data: schema } = useQuery({
     queryKey: ['credentials-schema', platform],
     queryFn: () => accountsApi.credentialsSchema(platform),
     enabled: !!platform,
+  });
+
+  // 查询分组列表
+  const { data: groupsData } = useQuery({
+    queryKey: ['groups-all'],
+    queryFn: () => groupsApi.list({ page: 1, page_size: 100 }),
   });
 
   // 加载插件自定义表单组件
@@ -639,6 +701,7 @@ function CreateAccountModal({
       platform,
       type: accountType || undefined,
       credentials,
+      group_ids: groupIds,
     });
   };
 
@@ -647,6 +710,7 @@ function CreateAccountModal({
     setAccountType('');
     setForm({ name: '', priority: 0, max_concurrency: 5, rate_multiplier: 1 });
     setCredentials({});
+    setGroupIds([]);
     onClose();
   };
 
@@ -742,8 +806,74 @@ function CreateAccountModal({
             setForm({ ...form, rate_multiplier: Number(e.target.value) })
           }
         />
+
+        {/* 分组选择 */}
+        <GroupCheckboxList
+          groups={groupsData?.list ?? []}
+          selectedIds={groupIds}
+          onChange={setGroupIds}
+        />
       </div>
     </Modal>
+  );
+}
+
+// ==================== 分组多选 ====================
+
+function GroupCheckboxList({
+  groups,
+  selectedIds,
+  onChange,
+}: {
+  groups: { id: number; name: string; platform: string }[];
+  selectedIds: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  const { t } = useTranslation();
+
+  if (groups.length === 0) return null;
+
+  const toggle = (id: number) => {
+    onChange(
+      selectedIds.includes(id)
+        ? selectedIds.filter((v) => v !== id)
+        : [...selectedIds, id],
+    );
+  };
+
+  return (
+    <div>
+      <label
+        className="block text-xs font-medium mb-1.5"
+        style={{ color: 'var(--ag-text-secondary)' }}
+      >
+        {t('accounts.groups')}
+      </label>
+      <div
+        className="flex flex-wrap gap-2 p-3 rounded-lg border max-h-32 overflow-y-auto"
+        style={{ borderColor: 'var(--ag-glass-border)', background: 'var(--ag-bg-surface)' }}
+      >
+        {groups.map((g) => (
+          <label
+            key={g.id}
+            className="inline-flex items-center gap-1.5 cursor-pointer text-xs"
+            style={{ color: 'var(--ag-text)' }}
+          >
+            <input
+              type="checkbox"
+              checked={selectedIds.includes(g.id)}
+              onChange={() => toggle(g.id)}
+              className="rounded"
+              style={{ accentColor: 'var(--ag-primary)' }}
+            />
+            <span>{g.name}</span>
+            <span className="text-[10px]" style={{ color: 'var(--ag-text-tertiary)' }}>
+              {g.platform}
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -888,6 +1018,19 @@ function EditAccountModal({
   const [credentials, setCredentials] = useState<Record<string, string>>(
     account.credentials,
   );
+  const [groupIds, setGroupIds] = useState<number[]>(account.group_ids ?? []);
+
+  // 查询分组列表
+  const { data: groupsData } = useQuery({
+    queryKey: ['groups-all'],
+    queryFn: () => groupsApi.list({ page: 1, page_size: 100 }),
+  });
+
+  // 查询代理列表
+  const { data: proxiesData } = useQuery({
+    queryKey: ['proxies-all'],
+    queryFn: () => proxiesApi.list({ page: 1, page_size: 100 }),
+  });
 
   useEffect(() => {
     const selectedType = getSchemaSelectedAccountType(schema, accountType);
@@ -919,7 +1062,7 @@ function EditAccountModal({
             {t('common.cancel')}
           </Button>
           <Button
-            onClick={() => onSubmit({ ...form, type: accountType || undefined, credentials })}
+            onClick={() => onSubmit({ ...form, type: accountType || undefined, credentials, group_ids: groupIds })}
             loading={loading}
           >
             {t('common.save')}
@@ -1002,9 +1145,8 @@ function EditAccountModal({
             setForm({ ...form, rate_multiplier: Number(e.target.value) })
           }
         />
-        <Input
-          label={t('accounts.proxy_id')}
-          type="number"
+        <Select
+          label={t('accounts.proxy')}
           value={String(form.proxy_id ?? '')}
           onChange={(e) =>
             setForm({
@@ -1012,8 +1154,20 @@ function EditAccountModal({
               proxy_id: e.target.value ? Number(e.target.value) : undefined,
             })
           }
-          hint={t('accounts.proxy_hint')}
-          icon={<Shield className="w-4 h-4" />}
+          options={[
+            { value: '', label: t('accounts.no_proxy') },
+            ...(proxiesData?.list ?? []).map((p) => ({
+              value: String(p.id),
+              label: `${p.name} (${p.protocol}://${p.address}:${p.port})`,
+            })),
+          ]}
+        />
+
+        {/* 分组选择 */}
+        <GroupCheckboxList
+          groups={groupsData?.list ?? []}
+          selectedIds={groupIds}
+          onChange={setGroupIds}
         />
       </div>
     </Modal>

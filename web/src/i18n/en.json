@@ -181,6 +181,15 @@
     "subscription_expired": "Expired",
     "capacity": "Capacity",
     "scheduling": "Scheduling",
+    "groups": "Groups",
+    "last_used": "Last Used",
+    "just_now": "Just now",
+    "minutes_ago": "{{n}}m ago",
+    "hours_ago": "{{n}}h ago",
+    "days_ago": "{{n}}d ago",
+    "platform_type": "Platform/Type",
+    "expires_at": "Expires",
+    "no_proxy": "No Proxy",
     "usage_window": "Usage Window"
   },
 
