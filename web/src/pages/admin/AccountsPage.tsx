@@ -883,10 +883,12 @@ function CredentialFieldInput({
   field,
   value,
   onChange,
+  disabled,
 }: {
   field: CredentialField;
   value: string;
   onChange: (val: string) => void;
+  disabled?: boolean;
 }) {
   if (field.type === 'textarea') {
     return (
@@ -897,6 +899,7 @@ function CredentialFieldInput({
         value={value}
         rows={3}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
       />
     );
   }
@@ -910,6 +913,7 @@ function CredentialFieldInput({
       placeholder={field.placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
     />
   );
 }
@@ -920,12 +924,14 @@ function SchemaCredentialsForm({
   onAccountTypeChange,
   credentials,
   onCredentialsChange,
+  mode = 'create',
 }: {
   schema: CredentialSchemaResp;
   accountType: string;
   onAccountTypeChange: (type: string) => void;
   credentials: Record<string, string>;
   onCredentialsChange: (credentials: Record<string, string>) => void;
+  mode?: 'create' | 'edit';
 }) {
   const { t } = useTranslation();
   const accountTypes = getSchemaAccountTypes(schema);
@@ -954,8 +960,9 @@ function SchemaCredentialsForm({
               value: item.key,
               label: item.label,
             }))}
+            disabled={mode === 'edit'}
           />
-          {selectedType?.description && (
+          {selectedType?.description && mode === 'create' && (
             <p className="text-xs text-text-tertiary -mt-2">
               {selectedType.description}
             </p>
@@ -963,16 +970,22 @@ function SchemaCredentialsForm({
         </>
       )}
 
-      {visibleFields.map((field) => (
-        <CredentialFieldInput
-          key={field.key}
-          field={field}
-          value={credentials[field.key] ?? ''}
-          onChange={(val) =>
-            onCredentialsChange({ ...credentials, [field.key]: val })
-          }
-        />
-      ))}
+      {visibleFields.map((field) => {
+        // 编辑模式下，只有标记为 editable 或 required 的字段可编辑
+        // 敏感字段（password 类型）在编辑模式下如果不是 required 则只读
+        const isReadonlyInEdit = mode === 'edit' && field.type === 'password' && !field.required;
+        return (
+          <CredentialFieldInput
+            key={field.key}
+            field={field}
+            value={credentials[field.key] ?? ''}
+            onChange={(val) =>
+              onCredentialsChange({ ...credentials, [field.key]: val })
+            }
+            disabled={isReadonlyInEdit}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -1101,6 +1114,7 @@ function EditAccountModal({
             onAccountTypeChange={handleSchemaAccountTypeChange}
             credentials={credentials}
             onCredentialsChange={setCredentials}
+            mode="edit"
           />
         ) : null}
 
