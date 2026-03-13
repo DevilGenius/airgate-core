@@ -88,7 +88,11 @@ export default function ProxiesPage() {
     mutationFn: (id: number) => proxiesApi.test(id),
     onSuccess: (result) => {
       if (result.success) {
-        toast('success', t('proxies.test_success', { latency: result.latency_ms }));
+        const location = [result.country, result.city].filter(Boolean).join(' · ');
+        const parts = [`${result.latency_ms}ms`];
+        if (result.ip_address) parts.push(result.ip_address);
+        if (location) parts.push(location);
+        toast('success', t('proxies.test_success', { detail: parts.join('  |  ') }));
       } else {
         toast('error', t('proxies.test_failed', { error: result.error_msg || '' }));
       }

@@ -150,6 +150,7 @@ export interface CredentialField {
   type: 'text' | 'password' | 'textarea' | 'select';
   required: boolean;
   placeholder: string;
+  edit_disabled?: boolean;
 }
 
 export interface AccountTypeResp {
@@ -231,6 +232,7 @@ export interface CreateAPIKeyReq {
 
 export interface UpdateAPIKeyReq {
   name?: string;
+  group_id?: number;
   ip_whitelist?: string[];
   ip_blacklist?: string[];
   quota_usd?: number;
@@ -399,6 +401,10 @@ export interface TestProxyResp {
   success: boolean;
   latency_ms: number;
   error_msg?: string;
+  ip_address?: string;
+  country?: string;
+  country_code?: string;
+  city?: string;
 }
 
 // ==================== Plugin ====================

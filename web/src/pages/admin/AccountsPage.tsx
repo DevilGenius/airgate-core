@@ -950,7 +950,7 @@ function SchemaCredentialsForm({
         {t('accounts.credentials')}
       </p>
 
-      {accountTypes.length > 0 && (
+      {accountTypes.length > 0 && mode === 'create' && (
         <>
           <Select
             label={t('common.type')}
@@ -960,9 +960,8 @@ function SchemaCredentialsForm({
               value: item.key,
               label: item.label,
             }))}
-            disabled={mode === 'edit'}
           />
-          {selectedType?.description && mode === 'create' && (
+          {selectedType?.description && (
             <p className="text-xs text-text-tertiary -mt-2">
               {selectedType.description}
             </p>
@@ -970,11 +969,9 @@ function SchemaCredentialsForm({
         </>
       )}
 
-      {visibleFields.map((field) => {
-        // 编辑模式下，只有标记为 editable 或 required 的字段可编辑
-        // 敏感字段（password 类型）在编辑模式下如果不是 required 则只读
-        const isReadonlyInEdit = mode === 'edit' && field.type === 'password' && !field.required;
-        return (
+      {visibleFields
+        .filter((field) => !(mode === 'edit' && field.edit_disabled))
+        .map((field) => (
           <CredentialFieldInput
             key={field.key}
             field={field}
@@ -982,10 +979,8 @@ function SchemaCredentialsForm({
             onChange={(val) =>
               onCredentialsChange({ ...credentials, [field.key]: val })
             }
-            disabled={isReadonlyInEdit}
           />
-        );
-      })}
+        ))}
     </div>
   );
 }

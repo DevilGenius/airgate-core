@@ -61,9 +61,10 @@ type AccountTypeResp struct {
 
 // CredentialFieldResp 凭证字段定义
 type CredentialFieldResp struct {
-	Key         string `json:"key"`
-	Label       string `json:"label"`
-	Type        string `json:"type"` // text / password / textarea / select
-	Required    bool   `json:"required"`
-	Placeholder string `json:"placeholder"`
+	Key          string `json:"key"`
+	Label        string `json:"label"`
+	Type         string `json:"type"` // text / password / textarea / select
+	Required     bool   `json:"required"`
+	Placeholder  string `json:"placeholder"`
+	EditDisabled bool   `json:"edit_disabled,omitempty"` // 编辑模式下隐藏该字段
 }

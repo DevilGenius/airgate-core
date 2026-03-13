@@ -35,7 +35,11 @@ type UpdateProxyReq struct {
 
 // TestProxyResp 测试代理响应
 type TestProxyResp struct {
-	Success  bool   `json:"success"`
-	Latency  int64  `json:"latency_ms"`
-	ErrorMsg string `json:"error_msg,omitempty"`
+	Success     bool   `json:"success"`
+	Latency     int64  `json:"latency_ms"`
+	ErrorMsg    string `json:"error_msg,omitempty"`
+	IPAddress   string `json:"ip_address,omitempty"`
+	Country     string `json:"country,omitempty"`
+	CountryCode string `json:"country_code,omitempty"`
+	City        string `json:"city,omitempty"`
 }

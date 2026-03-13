@@ -542,11 +542,12 @@ func (h *AccountHandler) GetCredentialsSchema(c *gin.Context) {
 			}
 			for _, f := range at.Fields {
 				fieldResp := dto.CredentialFieldResp{
-					Key:         f.Key,
-					Label:       f.Label,
-					Type:        f.Type,
-					Required:    f.Required,
-					Placeholder: f.Placeholder,
+					Key:          f.Key,
+					Label:        f.Label,
+					Type:         f.Type,
+					Required:     f.Required,
+					Placeholder:  f.Placeholder,
+					EditDisabled: f.EditDisabled,
 				}
 				atResp.Fields = append(atResp.Fields, fieldResp)
 			}
@@ -567,11 +568,12 @@ func (h *AccountHandler) GetCredentialsSchema(c *gin.Context) {
 		respFields := make([]dto.CredentialFieldResp, len(fields))
 		for i, f := range fields {
 			respFields[i] = dto.CredentialFieldResp{
-				Key:         f.Key,
-				Label:       f.Label,
-				Type:        f.Type,
-				Required:    f.Required,
-				Placeholder: f.Placeholder,
+				Key:          f.Key,
+				Label:        f.Label,
+				Type:         f.Type,
+				Required:     f.Required,
+				Placeholder:  f.Placeholder,
+				EditDisabled: f.EditDisabled,
 			}
 		}
 
