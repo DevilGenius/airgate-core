@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useState, useRef, useEffect } from 'react';
 import { Link, useMatchRoute } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -24,6 +24,7 @@ import {
   Languages,
   Sun,
   Moon,
+  ChevronDown,
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -38,21 +39,20 @@ interface MenuItem {
 }
 
 const adminMenuItems: MenuItem[] = [
-  { path: '/', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, sectionKey: 'nav.overview' },
-  { path: '/admin/users', labelKey: 'nav.users', icon: <Users className="w-[18px] h-[18px]" />, sectionKey: 'nav.management' },
-  { path: '/admin/accounts', labelKey: 'nav.accounts', icon: <KeyRound className="w-[18px] h-[18px]" /> },
-  { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="w-[18px] h-[18px]" /> },
-  { path: '/admin/api-keys', labelKey: 'nav.api_keys', icon: <Key className="w-[18px] h-[18px]" /> },
-  { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="w-[18px] h-[18px]" /> },
-  { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="w-[18px] h-[18px]" /> },
-  { path: '/admin/usage', labelKey: 'nav.usage', icon: <BarChart3 className="w-[18px] h-[18px]" /> },
-  { path: '/admin/plugins', labelKey: 'nav.plugins', icon: <Puzzle className="w-[18px] h-[18px]" />, sectionKey: 'nav.system' },
-  { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="w-[18px] h-[18px]" /> },
+  { path: '/', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+  { path: '/admin/users', labelKey: 'nav.users', icon: <Users className="w-5 h-5" /> },
+  { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="w-5 h-5" /> },
+  { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="w-5 h-5" /> },
+  { path: '/admin/accounts', labelKey: 'nav.accounts', icon: <KeyRound className="w-5 h-5" /> },
+  { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="w-5 h-5" /> },
+  { path: '/admin/usage', labelKey: 'nav.usage', icon: <BarChart3 className="w-5 h-5" /> },
+  { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="w-5 h-5" /> },
 ];
 
 const userMenuItems: MenuItem[] = [
-  { path: '/profile', labelKey: 'nav.profile', icon: <User className="w-[18px] h-[18px]" />, sectionKey: 'nav.personal' },
-  { path: '/keys', labelKey: 'nav.my_keys', icon: <Key className="w-[18px] h-[18px]" /> },
+  { path: '/keys', labelKey: 'nav.my_keys', icon: <Key className="w-5 h-5" />, sectionKey: 'nav.personal' },
+  { path: '/usage', labelKey: 'nav.usage', icon: <BarChart3 className="w-5 h-5" /> },
+  { path: '/profile', labelKey: 'nav.profile', icon: <User className="w-5 h-5" /> },
 ];
 
 function usePluginMenuItems(): MenuItem[] {
@@ -72,7 +72,7 @@ function usePluginMenuItems(): MenuItem[] {
       items.push({
         path: `/plugins/${p.name}${page.path}`,
         labelKey: page.title,
-        icon: <Puzzle className="w-[18px] h-[18px]" />,
+        icon: <Puzzle className="w-5 h-5" />,
         ...(first ? { sectionKey: 'nav.plugins' } : {}),
       });
       first = false;
@@ -86,7 +86,20 @@ export function AppShell({ children }: AppShellProps) {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const matchRoute = useMatchRoute();
+
+  // 点击外部关闭下拉菜单
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const isAdmin = user?.role === 'admin';
   const pluginMenuItems = usePluginMenuItems();
@@ -129,18 +142,18 @@ export function AppShell({ children }: AppShellProps) {
         />
 
         {/* Logo 区 */}
-        <div className="flex items-center h-14 px-4 border-b border-border">
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary-subtle flex-shrink-0">
-              <Zap className="w-4 h-4 text-primary" />
+        <div className="flex items-center h-16 px-4 border-b border-border">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary-subtle flex-shrink-0">
+              <Zap className="w-[18px] h-[18px] text-primary" />
             </div>
             {!collapsed && (
               <div className="overflow-hidden">
-                <h1 className="text-sm font-semibold text-text tracking-tight whitespace-nowrap">
+                <h1 className="text-[15px] font-semibold text-text tracking-tight whitespace-nowrap">
                   AirGate
                 </h1>
-                <p className="text-[9px] text-text-tertiary font-mono tracking-[0.1em] uppercase">
-                  Control Panel
+                <p className="text-[10px] text-text-tertiary font-mono tracking-[0.08em]">
+                  v0.1.0
                 </p>
               </div>
             )}
@@ -148,18 +161,18 @@ export function AppShell({ children }: AppShellProps) {
         </div>
 
         {/* 导航菜单 */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
           {sections.map((section, si) => (
             <div key={si}>
               {section.titleKey && !collapsed && (
-                <p className="text-[10px] font-medium text-text-tertiary uppercase tracking-[0.1em] px-2.5 mb-1.5">
+                <p className="text-[10px] font-medium text-text-tertiary uppercase tracking-[0.1em] px-3 mb-2">
                   {t(section.titleKey)}
                 </p>
               )}
               {collapsed && si > 0 && (
-                <div className="h-px mx-3 mb-2 bg-border" />
+                <div className="h-px mx-3 mb-3 bg-border" />
               )}
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 {section.items.map((item) => {
                   const isActive = !!matchRoute({ to: item.path, fuzzy: item.path !== '/' });
                   const isExactDashboard = item.path === '/' && !!matchRoute({ to: '/' });
@@ -169,8 +182,8 @@ export function AppShell({ children }: AppShellProps) {
                     <Link
                       key={item.path}
                       to={item.path}
-                      className={`group flex items-center gap-2.5 rounded-md transition-all duration-150 relative ${
-                        collapsed ? 'justify-center px-0 py-2.5 mx-1' : 'px-2.5 py-[7px]'
+                      className={`group flex items-center gap-3 rounded-lg transition-all duration-200 relative ${
+                        collapsed ? 'justify-center px-0 py-2.5 mx-1' : 'px-3 py-2.5'
                       } ${
                         active
                           ? 'bg-primary-subtle text-primary'
@@ -178,14 +191,14 @@ export function AppShell({ children }: AppShellProps) {
                       }`}
                     >
                       {active && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-3.5 rounded-r-full bg-primary" />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary" />
                       )}
                       <span className="flex-shrink-0">{item.icon}</span>
                       {!collapsed && (
-                        <span className="text-[13px] font-medium truncate">{t(item.labelKey, { defaultValue: item.labelKey })}</span>
+                        <span className="text-sm font-medium truncate">{t(item.labelKey, { defaultValue: item.labelKey })}</span>
                       )}
                       {collapsed && (
-                        <div className="absolute left-full ml-2 px-2.5 py-1.5 rounded-md bg-bg-elevated border border-glass-border shadow-md text-xs text-text whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                        <div className="absolute left-full ml-2 px-3 py-1.5 rounded-lg bg-bg-elevated border border-glass-border shadow-md text-xs text-text whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                           {t(item.labelKey, { defaultValue: item.labelKey })}
                         </div>
                       )}
@@ -197,73 +210,99 @@ export function AppShell({ children }: AppShellProps) {
           ))}
         </nav>
 
-        {/* 底部 */}
-        <div className="border-t border-border p-2.5 space-y-1.5">
-          {/* 用户信息 */}
-          <div className={`flex items-center gap-2.5 rounded-md p-2 ${collapsed ? 'justify-center' : ''}`}>
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-subtle flex-shrink-0 text-[10px] font-bold text-primary">
-              {user?.email?.charAt(0).toUpperCase() || 'U'}
-            </div>
-            {!collapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-text truncate">
-                  {user?.username || user?.email}
-                </p>
-                <p className="text-[10px] text-text-tertiary truncate font-mono">
-                  {user?.role === 'admin' ? t('nav.admin') : t('nav.user')}
-                </p>
-              </div>
+        {/* 底部折叠按钮 */}
+        <div className="border-t border-border p-3">
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="flex items-center justify-center w-full h-8 rounded-lg text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            {collapsed ? (
+              <PanelLeft className="w-4 h-4" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4" />
             )}
-            {!collapsed && (
-              <button
-                onClick={logout}
-                className="flex items-center justify-center w-7 h-7 rounded-md text-text-tertiary hover:text-danger hover:bg-danger-subtle transition-all"
-                title={t('common.logout')}
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* 工具按钮 */}
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={toggleLanguage}
-              className="flex items-center justify-center flex-1 h-7 rounded-md text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors gap-1.5"
-              title={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
-            >
-              <Languages className="w-3.5 h-3.5" />
-              {!collapsed && (
-                <span className="text-[10px] font-mono uppercase">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
-              )}
-            </button>
-            <button
-              onClick={toggleTheme}
-              className="flex items-center justify-center flex-1 h-7 rounded-md text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
-              title={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
-            >
-              {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            </button>
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="flex items-center justify-center flex-1 h-7 rounded-md text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
-            >
-              {collapsed ? (
-                <PanelLeft className="w-3.5 h-3.5" />
-              ) : (
-                <PanelLeftClose className="w-3.5 h-3.5" />
-              )}
-            </button>
-          </div>
+          </button>
         </div>
       </aside>
 
-      {/* 主内容 */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-6 max-w-[1400px] mx-auto">
-          {children}
-        </div>
-      </main>
+      {/* 右侧区域 */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* 顶栏 */}
+        <header className="flex items-center justify-end h-16 px-6 border-b border-border bg-bg/80 backdrop-blur-xl flex-shrink-0">
+          <div className="flex items-center gap-1.5">
+            {/* 语言切换 */}
+            <button
+              onClick={toggleLanguage}
+              className="flex items-center justify-center h-9 px-3 rounded-xl text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors gap-2"
+              title={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
+            >
+              <Languages className="w-4 h-4" />
+              <span className="text-xs font-medium">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
+            </button>
+
+            {/* 主题切换 */}
+            <button
+              onClick={toggleTheme}
+              className="flex items-center justify-center w-9 h-9 rounded-xl text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+              title={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            {/* 分隔线 */}
+            <div className="w-px h-6 bg-border mx-2" />
+
+            {/* 用户下拉菜单 */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-2.5 rounded-xl p-1.5 transition-colors hover:bg-bg-hover"
+              >
+                <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary-subtle flex-shrink-0 text-xs font-bold text-primary">
+                  {user?.email?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div className="text-left hidden md:block">
+                  <div className="text-sm font-medium text-text leading-tight">
+                    {user?.username || user?.email}
+                  </div>
+                  <div className="text-[11px] text-text-tertiary leading-tight capitalize">
+                    {user?.role === 'admin' ? t('nav.admin') : t('nav.user')}
+                  </div>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-text-tertiary transition-transform duration-200 hidden md:block ${dropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* 下拉菜单 */}
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 rounded-xl bg-bg-elevated border border-glass-border shadow-lg z-50 overflow-hidden animate-[ag-slide-down_0.15s_ease-out]">
+                  {/* 用户信息 */}
+                  <div className="px-4 py-3 border-b border-border">
+                    <div className="text-sm font-medium text-text">{user?.username || user?.email}</div>
+                    <div className="text-xs text-text-tertiary mt-0.5">{user?.email}</div>
+                  </div>
+                  {/* 退出登录 */}
+                  <div className="p-1.5">
+                    <button
+                      onClick={() => { setDropdownOpen(false); logout(); }}
+                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-danger hover:bg-danger-subtle transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      {t('common.logout')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* 主内容 */}
+        <main className="flex-1 overflow-auto">
+          <div className="p-6 max-w-[1400px] mx-auto">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

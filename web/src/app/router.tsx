@@ -23,6 +23,7 @@ import PluginsPage from '../pages/admin/PluginsPage';
 import SettingsPage from '../pages/admin/SettingsPage';
 import ProfilePage from '../pages/user/ProfilePage';
 import UserKeysPage from '../pages/user/UserKeysPage';
+import UserUsagePage from '../pages/user/UserUsagePage';
 
 // 登录和安装页不常用，保持懒加载
 const SetupPage = lazy(() => import('../pages/SetupPage'));
@@ -146,6 +147,7 @@ const adminSettingsRoute = createRoute({ getParentRoute: () => adminLayout, path
 // 用户路由
 const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/profile', component: ProfilePage });
 const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: UserKeysPage });
+const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/usage', component: UserUsagePage });
 
 // 插件页面路由（catch-all）
 const pluginRoute = createRoute({
@@ -177,6 +179,7 @@ const routeTree = rootRoute.addChildren([
     ]),
     profileRoute,
     userKeysRoute,
+    userUsageRoute,
     pluginRoute,
   ]),
 ]);
