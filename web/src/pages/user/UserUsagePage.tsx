@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { usageApi } from '../../shared/api/usage';
-import { PageHeader } from '../../shared/components/PageHeader';
 import { Table, type Column } from '../../shared/components/Table';
 import { Input } from '../../shared/components/Input';
+import { DatePicker } from '../../shared/components/DatePicker';
 import { StatCard } from '../../shared/components/Card';
 import { Badge } from '../../shared/components/Badge';
 import { Activity, Hash, DollarSign, Coins, Search } from 'lucide-react';
@@ -101,27 +101,20 @@ export default function UserUsagePage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('usage.title')}
-        description={t('usage.description')}
-      />
-
       {/* 筛选栏 */}
       <div className="flex items-end gap-3 mb-5 flex-wrap">
         <div className="w-44">
-          <Input
+          <DatePicker
             label={t('usage.start_date')}
-            type="date"
             value={filters.start_date || ''}
-            onChange={(e) => updateFilter('start_date', e.target.value)}
+            onChange={(v) => updateFilter('start_date', v)}
           />
         </div>
         <div className="w-44">
-          <Input
+          <DatePicker
             label={t('usage.end_date')}
-            type="date"
             value={filters.end_date || ''}
-            onChange={(e) => updateFilter('end_date', e.target.value)}
+            onChange={(v) => updateFilter('end_date', v)}
           />
         </div>
         <div className="w-40">

@@ -3,6 +3,12 @@
   "app_subtitle": "API 网关管理平台",
   "powered_by": "Powered by AirGate",
 
+  "datepicker": {
+    "placeholder": "选择日期",
+    "clear": "清除",
+    "today": "今天"
+  },
+
   "common": {
     "login": "登录",
     "register": "注册",
@@ -155,6 +161,7 @@
 
   "users": {
     "title": "用户管理",
+    "description": "管理系统用户、角色与余额",
     "create": "创建用户",
     "edit": "编辑用户",
     "search_placeholder": "搜索邮箱或用户名...",
@@ -486,6 +493,7 @@
 
   "profile": {
     "title": "个人资料",
+    "description": "查看和编辑个人信息",
     "basic_info": "基本信息",
     "email": "邮箱",
     "role": "角色",
@@ -524,6 +532,7 @@
 
   "user_keys": {
     "title": "API 密钥",
+    "description": "管理个人 API 访问密钥",
     "create": "创建密钥",
     "edit": "编辑密钥",
     "name_placeholder": "例如：生产环境密钥",
@@ -541,7 +550,23 @@
     "delete_confirm": "确定要删除密钥「{{name}}」吗？删除后使用此密钥的请求将立即失效。",
     "create_success": "密钥创建成功",
     "update_success": "密钥已更新",
-    "delete_success": "密钥已删除"
+    "delete_success": "密钥已删除",
+    "disable": "禁用",
+    "enable": "启用",
+    "disable_success": "密钥已禁用",
+    "enable_success": "密钥已启用",
+    "use_key": "使用配置",
+    "use_key_title": "使用 API 密钥",
+    "use_key_desc": "将以下环境变量添加到你的终端配置中，即可开始使用。",
+    "copy": "复制",
+    "copied": "已复制",
+    "reveal_failed": "无法获取密钥原文",
+    "import_ccs": "导入 CCS",
+    "ccs_select_client": "选择客户端",
+    "ccs_select_desc": "选择要导入到 CC-Switch 的客户端类型。",
+    "ccs_claude_desc": "Anthropic Claude Code 编码助手",
+    "ccs_codex_desc": "OpenAI Codex CLI 编码助手",
+    "ccs_not_installed": "未检测到 CC-Switch，请先安装 CC-Switch 客户端。"
   },
 
   "setup": {

@@ -5,7 +5,6 @@ import { useAuth } from '../../app/providers/AuthProvider';
 import { usersApi } from '../../shared/api/users';
 import { authApi } from '../../shared/api/auth';
 import { useToast } from '../../shared/components/Toast';
-import { PageHeader } from '../../shared/components/PageHeader';
 import { Card } from '../../shared/components/Card';
 import { Button } from '../../shared/components/Button';
 import { Input } from '../../shared/components/Input';
@@ -126,8 +125,6 @@ export default function ProfilePage() {
 
   return (
     <div className="p-6 max-w-3xl">
-      <PageHeader title={t('profile.title')} />
-
       {/* 用户信息 */}
       <Card title={t('profile.basic_info')} className="mb-6">
         <div className="space-y-4">

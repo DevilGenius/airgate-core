@@ -9,7 +9,6 @@ import {
   Key, Monitor, Activity, Users,
   Coins, Database, Zap, Clock,
 } from 'lucide-react';
-import { PageHeader } from '../shared/components/PageHeader';
 import { Card } from '../shared/components/Card';
 import { dashboardApi } from '../shared/api/dashboard';
 import type { DashboardStatsResp, DashboardTrendResp, DashboardTrendReq } from '../shared/types';
@@ -68,8 +67,6 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <PageHeader title={t('dashboard.title')} description={t('dashboard.description')} />
-
       {/* 错误提示 */}
       {statsError && (
         <div className="rounded-md bg-danger-subtle border border-danger border-opacity-20 px-4 py-3 text-sm text-danger mb-4">

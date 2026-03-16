@@ -77,7 +77,6 @@ export default function SettingsPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title={t('settings.title')} description={t('settings.description')} />
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-5 h-5 animate-spin text-primary" />
           <span className="ml-2 text-sm text-text-tertiary">{t('common.loading')}</span>

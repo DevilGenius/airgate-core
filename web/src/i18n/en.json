@@ -3,6 +3,12 @@
   "app_subtitle": "API Gateway Management",
   "powered_by": "Powered by AirGate",
 
+  "datepicker": {
+    "placeholder": "Select date",
+    "clear": "Clear",
+    "today": "Today"
+  },
+
   "common": {
     "login": "Login",
     "register": "Register",
@@ -155,6 +161,7 @@
 
   "users": {
     "title": "Users",
+    "description": "Manage system users, roles and balances",
     "create": "Create User",
     "edit": "Edit User",
     "search_placeholder": "Search email or username...",
@@ -486,6 +493,7 @@
 
   "profile": {
     "title": "Profile",
+    "description": "View and edit your personal information",
     "basic_info": "Basic Info",
     "email": "Email",
     "role": "Role",
@@ -524,6 +532,7 @@
 
   "user_keys": {
     "title": "API Keys",
+    "description": "Manage your personal API access keys",
     "create": "Create Key",
     "edit": "Edit Key",
     "name_placeholder": "e.g. Production Key",
@@ -541,7 +550,23 @@
     "delete_confirm": "Are you sure you want to delete key \"{{name}}\"? Requests using this key will immediately fail.",
     "create_success": "Key created successfully",
     "update_success": "Key updated",
-    "delete_success": "Key deleted"
+    "delete_success": "Key deleted",
+    "disable": "Disable",
+    "enable": "Enable",
+    "disable_success": "Key disabled",
+    "enable_success": "Key enabled",
+    "use_key": "Use Key",
+    "use_key_title": "Use API Key",
+    "use_key_desc": "Add the following environment variables to your terminal configuration to get started.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "reveal_failed": "Failed to retrieve key",
+    "import_ccs": "Import CCS",
+    "ccs_select_client": "Select Client",
+    "ccs_select_desc": "Choose the client type to import into CC-Switch.",
+    "ccs_claude_desc": "Anthropic Claude Code coding assistant",
+    "ccs_codex_desc": "OpenAI Codex CLI coding assistant",
+    "ccs_not_installed": "CC-Switch not detected. Please install the CC-Switch client first."
   },
 
   "setup": {

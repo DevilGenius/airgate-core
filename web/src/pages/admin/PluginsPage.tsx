@@ -72,7 +72,7 @@ export default function PluginsPage() {
       key: 'name',
       title: t('common.name'),
       render: (row) => (
-        <div className="min-w-0">
+        <div className="min-w-0 inline-block text-center">
           <div className="text-text font-medium">
             {row.display_name || row.name}
           </div>
@@ -106,7 +106,7 @@ export default function PluginsPage() {
       key: 'platform',
       title: t('plugins.platform'),
       render: (row) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           <span>{row.platform}</span>
           {row.is_dev && <Badge variant="warning">{t('plugins.dev_badge')}</Badge>}
         </div>
@@ -116,7 +116,7 @@ export default function PluginsPage() {
       key: 'actions',
       title: t('common.actions'),
       render: (row) => (
-        <div className="flex gap-1">
+        <div className="flex gap-1 justify-center">
           {row.is_dev && (
             <Button
               size="sm"

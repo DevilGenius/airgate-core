@@ -1,5 +1,5 @@
 import { type ReactNode, useState, useRef, useEffect } from 'react';
-import { Link, useMatchRoute } from '@tanstack/react-router';
+import { Link, useMatchRoute, useLocation } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../providers/AuthProvider';
@@ -26,6 +26,7 @@ import {
   Sun,
   Moon,
   ChevronDown,
+  Github,
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -35,26 +36,27 @@ interface AppShellProps {
 interface MenuItem {
   path: string;
   labelKey: string;
+  descriptionKey?: string;
   icon: ReactNode;
   sectionKey?: string;
 }
 
 const adminMenuItems: MenuItem[] = [
-  { path: '/', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { path: '/admin/users', labelKey: 'nav.users', icon: <Users className="w-5 h-5" /> },
-  { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="w-5 h-5" /> },
-  { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="w-5 h-5" /> },
-  { path: '/admin/accounts', labelKey: 'nav.accounts', icon: <KeyRound className="w-5 h-5" /> },
-  { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="w-5 h-5" /> },
-  { path: '/admin/usage', labelKey: 'nav.usage', icon: <BarChart3 className="w-5 h-5" /> },
-  { path: '/admin/plugins', labelKey: 'nav.plugins', icon: <Puzzle className="w-5 h-5" /> },
-  { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="w-5 h-5" /> },
+  { path: '/', labelKey: 'nav.dashboard', descriptionKey: 'dashboard.description', icon: <LayoutDashboard className="w-5 h-5" /> },
+  { path: '/admin/users', labelKey: 'nav.users', descriptionKey: 'users.description', icon: <Users className="w-5 h-5" /> },
+  { path: '/admin/groups', labelKey: 'nav.groups', descriptionKey: 'groups.description', icon: <FolderTree className="w-5 h-5" /> },
+  { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', descriptionKey: 'subscriptions.description', icon: <CreditCard className="w-5 h-5" /> },
+  { path: '/admin/accounts', labelKey: 'nav.accounts', descriptionKey: 'accounts.description', icon: <KeyRound className="w-5 h-5" /> },
+  { path: '/admin/proxies', labelKey: 'nav.proxies', descriptionKey: 'proxies.description', icon: <Globe className="w-5 h-5" /> },
+  { path: '/admin/usage', labelKey: 'nav.usage', descriptionKey: 'usage.description', icon: <BarChart3 className="w-5 h-5" /> },
+  { path: '/admin/plugins', labelKey: 'nav.plugins', descriptionKey: 'plugins.description', icon: <Puzzle className="w-5 h-5" /> },
+  { path: '/admin/settings', labelKey: 'nav.settings', descriptionKey: 'settings.description', icon: <Settings className="w-5 h-5" /> },
 ];
 
 const userMenuItems: MenuItem[] = [
-  { path: '/keys', labelKey: 'nav.my_keys', icon: <Key className="w-5 h-5" />, sectionKey: 'nav.personal' },
-  { path: '/usage', labelKey: 'nav.usage', icon: <BarChart3 className="w-5 h-5" /> },
-  { path: '/profile', labelKey: 'nav.profile', icon: <User className="w-5 h-5" /> },
+  { path: '/keys', labelKey: 'nav.my_keys', descriptionKey: 'user_keys.description', icon: <Key className="w-5 h-5" />, sectionKey: 'nav.personal' },
+  { path: '/usage', labelKey: 'nav.usage', descriptionKey: 'usage.description', icon: <BarChart3 className="w-5 h-5" /> },
+  { path: '/profile', labelKey: 'nav.profile', descriptionKey: 'profile.description', icon: <User className="w-5 h-5" /> },
 ];
 
 /** 已预加载过图标的插件集合，避免重复加载 */
@@ -118,11 +120,20 @@ export function AppShell({ children }: AppShellProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const location = useLocation();
   const isAdmin = user?.role === 'admin';
   const pluginMenuItems = usePluginMenuItems();
   const menuItems = isAdmin
     ? [...adminMenuItems, ...pluginMenuItems, ...userMenuItems]
     : [...userMenuItems, ...pluginMenuItems];
+
+  // 根据当前路由匹配页面标题
+  const currentMenuItem = menuItems.find((item) => {
+    if (item.path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(item.path);
+  });
+  const pageTitle = currentMenuItem ? t(currentMenuItem.labelKey, { defaultValue: currentMenuItem.labelKey }) : '';
+  const pageDescription = currentMenuItem?.descriptionKey ? t(currentMenuItem.descriptionKey, { defaultValue: '' }) : '';
 
   const sections: Array<{ titleKey?: string; items: MenuItem[] }> = [];
   let currentSection: { titleKey?: string; items: MenuItem[] } | null = null;
@@ -245,7 +256,14 @@ export function AppShell({ children }: AppShellProps) {
       {/* 右侧区域 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 顶栏 */}
-        <header className="flex items-center justify-end h-16 px-6 border-b border-border bg-bg/80 backdrop-blur-xl flex-shrink-0">
+        <header className="flex items-center justify-between h-16 px-6 border-b border-border bg-bg/80 backdrop-blur-xl flex-shrink-0">
+          {/* 页面标题 */}
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-text tracking-tight">{pageTitle}</h2>
+            {pageDescription && (
+              <p className="text-xs text-text-tertiary mt-0.5 truncate">{pageDescription}</p>
+            )}
+          </div>
           <div className="flex items-center gap-1.5">
             {/* 语言切换 */}
             <button
@@ -265,6 +283,17 @@ export function AppShell({ children }: AppShellProps) {
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
+
+            {/* GitHub */}
+            <a
+              href="https://github.com/DouDOU-start/airgate-core"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-9 h-9 rounded-xl text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+              title="GitHub"
+            >
+              <Github className="w-4 h-4" />
+            </a>
 
             {/* 分隔线 */}
             <div className="w-px h-6 bg-border mx-2" />
