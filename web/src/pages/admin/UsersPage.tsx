@@ -39,7 +39,6 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserResp | null>(null);
@@ -53,14 +52,13 @@ export default function UsersPage() {
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['users', page, keyword, statusFilter, roleFilter],
+    queryKey: ['users', page, keyword, statusFilter],
     queryFn: () =>
       usersApi.list({
         page,
         page_size: PAGE_SIZE,
         keyword: keyword || undefined,
         status: statusFilter || undefined,
-        role: roleFilter || undefined,
       }),
   });
 
