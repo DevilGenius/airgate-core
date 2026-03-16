@@ -63,6 +63,7 @@ export interface UserResp {
   max_concurrency: number;
   totp_enabled: boolean;
   group_rates?: Record<number, number>;
+  allowed_group_ids?: number[];
   status: string;
   created_at: string;
   updated_at: string;
@@ -88,15 +89,28 @@ export interface CreateUserReq {
 
 export interface UpdateUserReq {
   username?: string;
+  password?: string;
   role?: 'admin' | 'user';
   max_concurrency?: number;
   group_rates?: Record<number, number>;
+  allowed_group_ids?: number[];
   status?: 'active' | 'disabled';
 }
 
 export interface AdjustBalanceReq {
   action: 'set' | 'add' | 'subtract';
   amount: number;
+  remark?: string;
+}
+
+export interface BalanceLogResp {
+  id: number;
+  action: string;
+  amount: number;
+  before_balance: number;
+  after_balance: number;
+  remark: string;
+  created_at: string;
 }
 
 // ==================== Account ====================
@@ -460,14 +474,73 @@ export interface SettingItem {
 // ==================== Dashboard ====================
 
 export interface DashboardStatsResp {
-  total_users: number;
-  total_accounts: number;
-  total_groups: number;
   total_api_keys: number;
-  total_requests: number;
-  total_tokens: number;
-  total_revenue: number;
-  active_plugins: number;
+  enabled_api_keys: number;
+  total_accounts: number;
+  enabled_accounts: number;
+  error_accounts: number;
+  today_requests: number;
+  alltime_requests: number;
+  total_users: number;
+  new_users_today: number;
+  today_tokens: number;
+  today_cost: number;
+  alltime_tokens: number;
+  alltime_cost: number;
+  rpm: number;
+  tpm: number;
+  avg_duration_ms: number;
+  active_users: number;
+}
+
+export interface DashboardTrendReq {
+  range: 'today' | '7d' | '30d' | '90d' | 'custom';
+  granularity: 'hour' | 'day';
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface DashboardTrendResp {
+  model_distribution: DashboardModelStats[];
+  user_ranking: DashboardUserRanking[];
+  token_trend: DashboardTimeBucket[];
+  top_users: DashboardUserTrend[];
+}
+
+export interface DashboardModelStats {
+  model: string;
+  requests: number;
+  tokens: number;
+  actual_cost: number;
+  standard_cost: number;
+}
+
+export interface DashboardUserRanking {
+  user_id: number;
+  email: string;
+  requests: number;
+  tokens: number;
+  actual_cost: number;
+  standard_cost: number;
+}
+
+export interface DashboardTimeBucket {
+  time: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation: number;
+  cache_read: number;
+}
+
+export interface DashboardUserTrend {
+  user_id: number;
+  email: string;
+  trend: DashboardUserTrendPoint[];
+}
+
+export interface DashboardUserTrendPoint {
+  time: string;
+  tokens: number;
 }
 
 // ==================== Setup ====================

@@ -1,9 +1,12 @@
-import { get, put, post } from './client';
+import { get, put, post, del, patch } from './client';
 import type {
   UserResp, UpdateProfileReq, ChangePasswordReq,
   CreateUserReq, UpdateUserReq, AdjustBalanceReq,
-  PageReq, PagedData,
+  BalanceLogResp, PageReq, PagedData,
 } from '../types';
+
+// APIKeyResp 从 types 中已有定义，这里直接引用
+import type { APIKeyResp } from '../types';
 
 export const usersApi = {
   // 用户接口
@@ -16,6 +19,12 @@ export const usersApi = {
     get<PagedData<UserResp>>('/api/v1/admin/users', params),
   create: (data: CreateUserReq) => post<UserResp>('/api/v1/admin/users', data),
   update: (id: number, data: UpdateUserReq) => put<void>(`/api/v1/admin/users/${id}`, data),
+  delete: (id: number) => del<void>(`/api/v1/admin/users/${id}`),
+  toggleStatus: (id: number) => patch<{ id: number; status: string }>(`/api/v1/admin/users/${id}/toggle`),
   adjustBalance: (id: number, data: AdjustBalanceReq) =>
     post<void>(`/api/v1/admin/users/${id}/balance`, data),
+  balanceHistory: (id: number, params: PageReq) =>
+    get<PagedData<BalanceLogResp>>(`/api/v1/admin/users/${id}/balance-history`, params),
+  apiKeys: (id: number, params: PageReq) =>
+    get<PagedData<APIKeyResp>>(`/api/v1/admin/users/${id}/api-keys`, params),
 };

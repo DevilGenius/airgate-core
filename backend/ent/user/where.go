@@ -690,6 +690,29 @@ func HasAllowedGroupsWith(preds ...predicate.Group) predicate.User {
 	})
 }
 
+// HasBalanceLogs applies the HasEdge predicate on the "balance_logs" edge.
+func HasBalanceLogs() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, BalanceLogsTable, BalanceLogsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasBalanceLogsWith applies the HasEdge predicate on the "balance_logs" edge with a given conditions (other predicates).
+func HasBalanceLogsWith(preds ...predicate.BalanceLog) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newBalanceLogsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.User) predicate.User {
 	return predicate.User(sql.AndPredicates(predicates...))

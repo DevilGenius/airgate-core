@@ -78,6 +78,7 @@ func (s *Server) registerRoutes() {
 
 		// 仪表盘
 		userGroup.GET("/dashboard/stats", dashboardHandler.Stats)
+		userGroup.GET("/dashboard/trend", dashboardHandler.Trend)
 	}
 
 	// === 管理员路由（需要 JWT + AdminOnly） ===
@@ -88,7 +89,11 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/users", userHandler.ListUsers)
 		adminGroup.POST("/users", userHandler.CreateUser)
 		adminGroup.PUT("/users/:id", userHandler.UpdateUser)
+		adminGroup.DELETE("/users/:id", userHandler.DeleteUser)
+		adminGroup.PATCH("/users/:id/toggle", userHandler.ToggleUserStatus)
 		adminGroup.POST("/users/:id/balance", userHandler.AdjustBalance)
+		adminGroup.GET("/users/:id/balance-history", userHandler.GetUserBalanceHistory)
+		adminGroup.GET("/users/:id/api-keys", userHandler.AdminListUserKeys)
 
 		// 账号管理
 		adminGroup.GET("/accounts", accountHandler.ListAccounts)
@@ -146,6 +151,7 @@ func (s *Server) registerRoutes() {
 
 		// 仪表盘（管理员）
 		adminGroup.GET("/dashboard/stats", dashboardHandler.Stats)
+		adminGroup.GET("/dashboard/trend", dashboardHandler.Trend)
 	}
 
 	// === Extension 插件 API 路由（JWT 认证 + 管理员权限） ===

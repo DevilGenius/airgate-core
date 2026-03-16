@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/order"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
@@ -258,6 +259,21 @@ func (uu *UserUpdate) AddAllowedGroups(g ...*Group) *UserUpdate {
 	return uu.AddAllowedGroupIDs(ids...)
 }
 
+// AddBalanceLogIDs adds the "balance_logs" edge to the BalanceLog entity by IDs.
+func (uu *UserUpdate) AddBalanceLogIDs(ids ...int) *UserUpdate {
+	uu.mutation.AddBalanceLogIDs(ids...)
+	return uu
+}
+
+// AddBalanceLogs adds the "balance_logs" edges to the BalanceLog entity.
+func (uu *UserUpdate) AddBalanceLogs(b ...*BalanceLog) *UserUpdate {
+	ids := make([]int, len(b))
+	for i := range b {
+		ids[i] = b[i].ID
+	}
+	return uu.AddBalanceLogIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (uu *UserUpdate) Mutation() *UserMutation {
 	return uu.mutation
@@ -366,6 +382,27 @@ func (uu *UserUpdate) RemoveAllowedGroups(g ...*Group) *UserUpdate {
 		ids[i] = g[i].ID
 	}
 	return uu.RemoveAllowedGroupIDs(ids...)
+}
+
+// ClearBalanceLogs clears all "balance_logs" edges to the BalanceLog entity.
+func (uu *UserUpdate) ClearBalanceLogs() *UserUpdate {
+	uu.mutation.ClearBalanceLogs()
+	return uu
+}
+
+// RemoveBalanceLogIDs removes the "balance_logs" edge to BalanceLog entities by IDs.
+func (uu *UserUpdate) RemoveBalanceLogIDs(ids ...int) *UserUpdate {
+	uu.mutation.RemoveBalanceLogIDs(ids...)
+	return uu
+}
+
+// RemoveBalanceLogs removes "balance_logs" edges to BalanceLog entities.
+func (uu *UserUpdate) RemoveBalanceLogs(b ...*BalanceLog) *UserUpdate {
+	ids := make([]int, len(b))
+	for i := range b {
+		ids[i] = b[i].ID
+	}
+	return uu.RemoveBalanceLogIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -708,6 +745,51 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if uu.mutation.BalanceLogsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BalanceLogsTable,
+			Columns: []string{user.BalanceLogsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(balancelog.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uu.mutation.RemovedBalanceLogsIDs(); len(nodes) > 0 && !uu.mutation.BalanceLogsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BalanceLogsTable,
+			Columns: []string{user.BalanceLogsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(balancelog.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uu.mutation.BalanceLogsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BalanceLogsTable,
+			Columns: []string{user.BalanceLogsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(balancelog.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, uu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{user.Label}
@@ -953,6 +1035,21 @@ func (uuo *UserUpdateOne) AddAllowedGroups(g ...*Group) *UserUpdateOne {
 	return uuo.AddAllowedGroupIDs(ids...)
 }
 
+// AddBalanceLogIDs adds the "balance_logs" edge to the BalanceLog entity by IDs.
+func (uuo *UserUpdateOne) AddBalanceLogIDs(ids ...int) *UserUpdateOne {
+	uuo.mutation.AddBalanceLogIDs(ids...)
+	return uuo
+}
+
+// AddBalanceLogs adds the "balance_logs" edges to the BalanceLog entity.
+func (uuo *UserUpdateOne) AddBalanceLogs(b ...*BalanceLog) *UserUpdateOne {
+	ids := make([]int, len(b))
+	for i := range b {
+		ids[i] = b[i].ID
+	}
+	return uuo.AddBalanceLogIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (uuo *UserUpdateOne) Mutation() *UserMutation {
 	return uuo.mutation
@@ -1061,6 +1158,27 @@ func (uuo *UserUpdateOne) RemoveAllowedGroups(g ...*Group) *UserUpdateOne {
 		ids[i] = g[i].ID
 	}
 	return uuo.RemoveAllowedGroupIDs(ids...)
+}
+
+// ClearBalanceLogs clears all "balance_logs" edges to the BalanceLog entity.
+func (uuo *UserUpdateOne) ClearBalanceLogs() *UserUpdateOne {
+	uuo.mutation.ClearBalanceLogs()
+	return uuo
+}
+
+// RemoveBalanceLogIDs removes the "balance_logs" edge to BalanceLog entities by IDs.
+func (uuo *UserUpdateOne) RemoveBalanceLogIDs(ids ...int) *UserUpdateOne {
+	uuo.mutation.RemoveBalanceLogIDs(ids...)
+	return uuo
+}
+
+// RemoveBalanceLogs removes "balance_logs" edges to BalanceLog entities.
+func (uuo *UserUpdateOne) RemoveBalanceLogs(b ...*BalanceLog) *UserUpdateOne {
+	ids := make([]int, len(b))
+	for i := range b {
+		ids[i] = b[i].ID
+	}
+	return uuo.RemoveBalanceLogIDs(ids...)
 }
 
 // Where appends a list predicates to the UserUpdate builder.
@@ -1426,6 +1544,51 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if uuo.mutation.BalanceLogsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BalanceLogsTable,
+			Columns: []string{user.BalanceLogsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(balancelog.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uuo.mutation.RemovedBalanceLogsIDs(); len(nodes) > 0 && !uuo.mutation.BalanceLogsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BalanceLogsTable,
+			Columns: []string{user.BalanceLogsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(balancelog.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uuo.mutation.BalanceLogsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BalanceLogsTable,
+			Columns: []string{user.BalanceLogsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(balancelog.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

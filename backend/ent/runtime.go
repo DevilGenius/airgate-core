@@ -7,6 +7,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/order"
 	"github.com/DouDOU-start/airgate-core/ent/plugin"
@@ -111,6 +112,16 @@ func init() {
 	account.DefaultUpdatedAt = accountDescUpdatedAt.Default.(func() time.Time)
 	// account.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	account.UpdateDefaultUpdatedAt = accountDescUpdatedAt.UpdateDefault.(func() time.Time)
+	balancelogFields := schema.BalanceLog{}.Fields()
+	_ = balancelogFields
+	// balancelogDescRemark is the schema descriptor for remark field.
+	balancelogDescRemark := balancelogFields[4].Descriptor()
+	// balancelog.DefaultRemark holds the default value on creation for the remark field.
+	balancelog.DefaultRemark = balancelogDescRemark.Default.(string)
+	// balancelogDescCreatedAt is the schema descriptor for created_at field.
+	balancelogDescCreatedAt := balancelogFields[5].Descriptor()
+	// balancelog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	balancelog.DefaultCreatedAt = balancelogDescCreatedAt.Default.(func() time.Time)
 	groupFields := schema.Group{}.Fields()
 	_ = groupFields
 	// groupDescName is the schema descriptor for name field.

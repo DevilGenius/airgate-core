@@ -213,11 +213,11 @@ export default function UserKeysPage() {
     },
     {
       key: 'expires_at',
-      title: t('user_keys.expire_hint'),
+      title: t('user_keys.expires_at'),
       render: (row) =>
         row.expires_at
           ? new Date(row.expires_at).toLocaleDateString('zh-CN')
-          : t('user_keys.expire_hint'),
+          : t('user_keys.never_expire'),
     },
     {
       key: 'status',
@@ -228,7 +228,7 @@ export default function UserKeysPage() {
       key: 'actions',
       title: t('common.actions'),
       render: (row) => (
-        <div className="flex gap-1">
+        <div className="flex gap-1 justify-center">
           <Button
             size="sm"
             variant="ghost"
@@ -324,7 +324,7 @@ export default function UserKeysPage() {
             hint={t('user_keys.quota_hint')}
           />
           <Input
-            label={t('user_keys.expire_hint')}
+            label={t('user_keys.expires_at')}
             type="date"
             value={form.expires_at}
             onChange={(e) => setForm({ ...form, expires_at: e.target.value })}

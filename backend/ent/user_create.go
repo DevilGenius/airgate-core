@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/order"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -228,6 +229,21 @@ func (uc *UserCreate) AddAllowedGroups(g ...*Group) *UserCreate {
 		ids[i] = g[i].ID
 	}
 	return uc.AddAllowedGroupIDs(ids...)
+}
+
+// AddBalanceLogIDs adds the "balance_logs" edge to the BalanceLog entity by IDs.
+func (uc *UserCreate) AddBalanceLogIDs(ids ...int) *UserCreate {
+	uc.mutation.AddBalanceLogIDs(ids...)
+	return uc
+}
+
+// AddBalanceLogs adds the "balance_logs" edges to the BalanceLog entity.
+func (uc *UserCreate) AddBalanceLogs(b ...*BalanceLog) *UserCreate {
+	ids := make([]int, len(b))
+	for i := range b {
+		ids[i] = b[i].ID
+	}
+	return uc.AddBalanceLogIDs(ids...)
 }
 
 // Mutation returns the UserMutation object of the builder.
@@ -487,6 +503,22 @@ func (uc *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := uc.mutation.BalanceLogsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BalanceLogsTable,
+			Columns: []string{user.BalanceLogsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(balancelog.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

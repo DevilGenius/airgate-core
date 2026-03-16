@@ -37,5 +37,6 @@ func (User) Edges() []ent.Edge {
 		edge.To("usage_logs", UsageLog.Type),
 		// 用户可访问的专属分组（多对多）
 		edge.To("allowed_groups", Group.Type),
+		edge.To("balance_logs", BalanceLog.Type),
 	}
 }

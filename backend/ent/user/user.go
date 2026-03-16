@@ -47,6 +47,8 @@ const (
 	EdgeUsageLogs = "usage_logs"
 	// EdgeAllowedGroups holds the string denoting the allowed_groups edge name in mutations.
 	EdgeAllowedGroups = "allowed_groups"
+	// EdgeBalanceLogs holds the string denoting the balance_logs edge name in mutations.
+	EdgeBalanceLogs = "balance_logs"
 	// Table holds the table name of the user in the database.
 	Table = "users"
 	// APIKeysTable is the table that holds the api_keys relation/edge.
@@ -82,6 +84,13 @@ const (
 	// AllowedGroupsInverseTable is the table name for the Group entity.
 	// It exists in this package in order to avoid circular dependency with the "group" package.
 	AllowedGroupsInverseTable = "groups"
+	// BalanceLogsTable is the table that holds the balance_logs relation/edge.
+	BalanceLogsTable = "balance_logs"
+	// BalanceLogsInverseTable is the table name for the BalanceLog entity.
+	// It exists in this package in order to avoid circular dependency with the "balancelog" package.
+	BalanceLogsInverseTable = "balance_logs"
+	// BalanceLogsColumn is the table column denoting the balance_logs relation/edge.
+	BalanceLogsColumn = "user_balance_logs"
 )
 
 // Columns holds all SQL columns for user fields.
@@ -314,6 +323,20 @@ func ByAllowedGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newAllowedGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByBalanceLogsCount orders the results by balance_logs count.
+func ByBalanceLogsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newBalanceLogsStep(), opts...)
+	}
+}
+
+// ByBalanceLogs orders the results by balance_logs terms.
+func ByBalanceLogs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newBalanceLogsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newAPIKeysStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -347,5 +370,12 @@ func newAllowedGroupsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(AllowedGroupsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2M, false, AllowedGroupsTable, AllowedGroupsPrimaryKey...),
+	)
+}
+func newBalanceLogsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(BalanceLogsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, BalanceLogsTable, BalanceLogsColumn),
 	)
 }

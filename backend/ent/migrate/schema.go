@@ -76,6 +76,31 @@ var (
 			},
 		},
 	}
+	// BalanceLogsColumns holds the columns for the "balance_logs" table.
+	BalanceLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "action", Type: field.TypeEnum, Enums: []string{"add", "subtract", "set"}},
+		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "before_balance", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "after_balance", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "remark", Type: field.TypeString, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "user_balance_logs", Type: field.TypeInt},
+	}
+	// BalanceLogsTable holds the schema information for the "balance_logs" table.
+	BalanceLogsTable = &schema.Table{
+		Name:       "balance_logs",
+		Columns:    BalanceLogsColumns,
+		PrimaryKey: []*schema.Column{BalanceLogsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "balance_logs_users_balance_logs",
+				Columns:    []*schema.Column{BalanceLogsColumns[7]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+	}
 	// GroupsColumns holds the columns for the "groups" table.
 	GroupsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -356,6 +381,7 @@ var (
 	Tables = []*schema.Table{
 		APIKeysTable,
 		AccountsTable,
+		BalanceLogsTable,
 		GroupsTable,
 		OrdersTable,
 		PluginsTable,
@@ -374,6 +400,7 @@ func init() {
 	APIKeysTable.ForeignKeys[0].RefTable = GroupsTable
 	APIKeysTable.ForeignKeys[1].RefTable = UsersTable
 	AccountsTable.ForeignKeys[0].RefTable = ProxiesTable
+	BalanceLogsTable.ForeignKeys[0].RefTable = UsersTable
 	OrdersTable.ForeignKeys[0].RefTable = UsersTable
 	UsageLogsTable.ForeignKeys[0].RefTable = APIKeysTable
 	UsageLogsTable.ForeignKeys[1].RefTable = AccountsTable

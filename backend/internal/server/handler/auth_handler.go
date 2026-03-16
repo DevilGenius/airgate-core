@@ -280,7 +280,7 @@ func getTOTPSecret(u *ent.User) string {
 
 // userToResp 将 ent User 转换为 DTO 响应
 func userToResp(u *ent.User) dto.UserResp {
-	return dto.UserResp{
+	resp := dto.UserResp{
 		ID:             int64(u.ID),
 		Email:          u.Email,
 		Username:       u.Username,
@@ -295,4 +295,13 @@ func userToResp(u *ent.User) dto.UserResp {
 			UpdatedAt: u.UpdatedAt,
 		},
 	}
+	// 如果 edge 已加载，填充 allowed_group_ids
+	if groups := u.Edges.AllowedGroups; groups != nil {
+		ids := make([]int64, 0, len(groups))
+		for _, g := range groups {
+			ids = append(ids, int64(g.ID))
+		}
+		resp.AllowedGroupIDs = ids
+	}
+	return resp
 }

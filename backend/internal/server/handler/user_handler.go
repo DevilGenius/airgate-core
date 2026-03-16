@@ -4,11 +4,14 @@ package handler
 import (
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
@@ -154,8 +157,9 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 		return
 	}
 
-	// 分页查询
+	// 分页查询（加载 allowed_groups）
 	users, err := query.
+		WithAllowedGroups().
 		Offset((page.Page - 1) * page.PageSize).
 		Limit(page.PageSize).
 		Order(ent.Desc(user.FieldCreatedAt)).
@@ -244,6 +248,15 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	if req.Username != nil {
 		builder = builder.SetUsername(*req.Username)
 	}
+	if req.Password != nil {
+		hash, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			slog.Error("生成密码哈希失败", "error", err)
+			response.InternalError(c, "密码修改失败")
+			return
+		}
+		builder = builder.SetPasswordHash(string(hash))
+	}
 	if req.Role != nil {
 		builder = builder.SetRole(user.Role(*req.Role))
 	}
@@ -252,6 +265,17 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	}
 	if req.GroupRates != nil {
 		builder = builder.SetGroupRates(req.GroupRates)
+	}
+	if req.AllowedGroupIDs != nil {
+		builder = builder.ClearAllowedGroups()
+		ids := *req.AllowedGroupIDs
+		if len(ids) > 0 {
+			intIDs := make([]int, len(ids))
+			for i, v := range ids {
+				intIDs[i] = int(v)
+			}
+			builder = builder.AddAllowedGroupIDs(intIDs...)
+		}
 	}
 	if req.Status != nil {
 		builder = builder.SetStatus(user.Status(*req.Status))
@@ -268,6 +292,8 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
+	// 重新加载 allowed_groups 以返回完整数据
+	u, _ = h.db.User.Query().Where(user.IDEQ(u.ID)).WithAllowedGroups().Only(c.Request.Context())
 	response.Success(c, userToResp(u))
 }
 
@@ -285,32 +311,232 @@ func (h *UserHandler) AdjustBalance(c *gin.Context) {
 		return
 	}
 
-	builder := h.db.User.UpdateOneID(id)
+	ctx := c.Request.Context()
 
+	// 先获取当前余额
+	u, err := h.db.User.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			response.NotFound(c, "用户不存在")
+			return
+		}
+		slog.Error("查询用户失败", "error", err)
+		response.InternalError(c, "调整余额失败")
+		return
+	}
+	beforeBalance := u.Balance
+
+	builder := h.db.User.UpdateOneID(id)
 	switch req.Action {
 	case "set":
 		builder = builder.SetBalance(req.Amount)
 	case "add":
 		builder = builder.AddBalance(req.Amount)
 	case "subtract":
+		if beforeBalance < req.Amount {
+			response.BadRequest(c, "余额不足")
+			return
+		}
 		builder = builder.AddBalance(-req.Amount)
 	default:
 		response.BadRequest(c, "无效的操作类型")
 		return
 	}
 
-	u, err := builder.Save(c.Request.Context())
+	u, err = builder.Save(ctx)
 	if err != nil {
-		if ent.IsNotFound(err) {
-			response.NotFound(c, "用户不存在")
-			return
-		}
 		slog.Error("调整余额失败", "error", err)
 		response.InternalError(c, "调整余额失败")
 		return
 	}
 
+	// 记录余额变更日志
+	if _, err := h.db.BalanceLog.Create().
+		SetAction(balancelog.Action(req.Action)).
+		SetAmount(req.Amount).
+		SetBeforeBalance(beforeBalance).
+		SetAfterBalance(u.Balance).
+		SetRemark(req.Remark).
+		SetUserID(id).
+		Save(ctx); err != nil {
+		slog.Error("记录余额日志失败", "error", err)
+	}
+
 	response.Success(c, userToResp(u))
+}
+
+// DeleteUser 管理员删除用户
+func (h *UserHandler) DeleteUser(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的用户 ID")
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// 查询目标用户
+	u, err := h.db.User.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			response.NotFound(c, "用户不存在")
+			return
+		}
+		slog.Error("查询用户失败", "error", err)
+		response.InternalError(c, "删除失败")
+		return
+	}
+
+	// 禁止删除管理员
+	if u.Role == user.RoleAdmin {
+		response.BadRequest(c, "不能删除管理员用户")
+		return
+	}
+
+	if err := h.db.User.DeleteOneID(id).Exec(ctx); err != nil {
+		slog.Error("删除用户失败", "error", err)
+		response.InternalError(c, "删除失败")
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+// ToggleUserStatus 切换用户状态 (active ↔ disabled)
+func (h *UserHandler) ToggleUserStatus(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的用户 ID")
+		return
+	}
+
+	ctx := c.Request.Context()
+	u, err := h.db.User.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			response.NotFound(c, "用户不存在")
+			return
+		}
+		slog.Error("查询用户失败", "error", err)
+		response.InternalError(c, "操作失败")
+		return
+	}
+
+	newStatus := user.StatusDisabled
+	if u.Status == user.StatusDisabled {
+		newStatus = user.StatusActive
+	}
+
+	u, err = h.db.User.UpdateOneID(id).SetStatus(newStatus).Save(ctx)
+	if err != nil {
+		slog.Error("切换用户状态失败", "error", err)
+		response.InternalError(c, "操作失败")
+		return
+	}
+
+	response.Success(c, map[string]interface{}{
+		"id":     u.ID,
+		"status": string(u.Status),
+	})
+}
+
+// GetUserBalanceHistory 查询用户余额变更历史
+func (h *UserHandler) GetUserBalanceHistory(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的用户 ID")
+		return
+	}
+
+	var page dto.PageReq
+	if err := c.ShouldBindQuery(&page); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	query := h.db.BalanceLog.Query().
+		Where(balancelog.HasUserWith(user.IDEQ(id)))
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		slog.Error("查询余额日志总数失败", "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	logs, err := query.
+		Offset((page.Page - 1) * page.PageSize).
+		Limit(page.PageSize).
+		Order(ent.Desc(balancelog.FieldCreatedAt)).
+		All(ctx)
+	if err != nil {
+		slog.Error("查询余额日志失败", "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	list := make([]dto.BalanceLogResp, 0, len(logs))
+	for _, l := range logs {
+		list = append(list, dto.BalanceLogResp{
+			ID:            int64(l.ID),
+			Action:        string(l.Action),
+			Amount:        l.Amount,
+			BeforeBalance: l.BeforeBalance,
+			AfterBalance:  l.AfterBalance,
+			Remark:        l.Remark,
+			CreatedAt:     l.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	response.Success(c, response.PagedData(list, int64(total), page.Page, page.PageSize))
+}
+
+// AdminListUserKeys 管理员查询指定用户的 API 密钥列表
+func (h *UserHandler) AdminListUserKeys(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的用户 ID")
+		return
+	}
+
+	var page dto.PageReq
+	if err := c.ShouldBindQuery(&page); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	query := h.db.APIKey.Query().
+		Where(apikey.HasUserWith(user.IDEQ(id))).
+		WithGroup()
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		slog.Error("查询用户密钥总数失败", "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	keys, err := query.
+		Offset((page.Page - 1) * page.PageSize).
+		Limit(page.PageSize).
+		Order(ent.Desc(apikey.FieldCreatedAt)).
+		All(ctx)
+	if err != nil {
+		slog.Error("查询用户密钥失败", "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	list := make([]dto.APIKeyResp, 0, len(keys))
+	for _, k := range keys {
+		resp := toAPIKeyResp(k, "")
+		resp.UserID = int64(id)
+		list = append(list, resp)
+	}
+
+	response.Success(c, response.PagedData(list, int64(total), page.Page, page.PageSize))
 }
 
 // toUserResp 在 auth_handler.go 中定义为 userToResp，此处复用

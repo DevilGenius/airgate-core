@@ -694,13 +694,11 @@ export default function AccountsPage() {
           value={platformFilter}
           onChange={(e) => { setPlatformFilter(e.target.value); setPage(1); }}
           options={PLATFORM_OPTIONS}
-          label={t('accounts.platform')}
         />
         <Select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           options={STATUS_OPTIONS}
-          label={t('common.status')}
         />
         <Select
           value={groupFilter}
@@ -709,7 +707,6 @@ export default function AccountsPage() {
             { value: '', label: t('accounts.all_groups') },
             ...(allGroupsData?.list ?? []).map((g) => ({ value: String(g.id), label: g.name })),
           ]}
-          label={t('accounts.groups')}
         />
         <Select
           value={proxyFilter}
@@ -718,7 +715,6 @@ export default function AccountsPage() {
             { value: '', label: t('accounts.all_proxies') },
             ...(allProxiesData?.list ?? []).map((p) => ({ value: String(p.id), label: p.name })),
           ]}
-          label={t('accounts.proxy')}
         />
 
         {/* 刷新 & 自动刷新 */}
