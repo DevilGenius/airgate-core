@@ -20,6 +20,10 @@ jwt:
   secret: ""                     # 必须修改！或设置环境变量 JWT_SECRET
   expire_hour: 24
 
+security:
+  api_key_secret: ""             # 可选，API Key 加密密钥（hex 编码，≥64 字符）
+                                 # 未配置时使用内置默认值；或设置环境变量 API_KEY_SECRET
+
 plugins:
   dir: data/plugins
   dev: []

@@ -2,6 +2,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"os"
 	"strconv"
 
@@ -27,6 +28,7 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Redis    RedisConfig    `yaml:"redis"`
 	JWT      JWTConfig      `yaml:"jwt"`
+	Security SecurityConfig `yaml:"security"`
 	Log      LogConfig      `yaml:"log"`
 	Plugins  PluginsConfig  `yaml:"plugins"`
 }
@@ -79,6 +81,28 @@ type RedisConfig struct {
 type JWTConfig struct {
 	Secret     string `yaml:"secret"`
 	ExpireHour int    `yaml:"expire_hour"`
+}
+
+// defaultAPIKeySecret 内置默认 API Key 加密密钥（hex 编码 32 字节）
+// 用户未配置或配置格式不合规时自动使用此值
+const defaultAPIKeySecret = "6a8f3d2e1b9c4f7a0e5d2c8b3a1f6e9d4c7b2a5e8f1d3c6b9a2e5f8d1c4b7a0e"
+
+// APIKeySecret 返回实际使用的 API Key 加密密钥：
+// 优先使用配置值（需为合法 hex 且 ≥64 字符），否则使用内置默认值
+func (c *Config) APIKeySecret() string {
+	s := c.Security.APIKeySecret
+	if len(s) >= 64 {
+		// 简单校验：尝试 hex 解码前 64 字符
+		if b, err := hex.DecodeString(s[:64]); err == nil && len(b) == 32 {
+			return s
+		}
+	}
+	return defaultAPIKeySecret
+}
+
+// SecurityConfig 安全相关配置
+type SecurityConfig struct {
+	APIKeySecret string `yaml:"api_key_secret"` // API Key 加密密钥（hex 编码，≥64 字符）
 }
 
 // DSN 返回 PostgreSQL 连接字符串
@@ -140,6 +164,9 @@ func applyEnvOverrides(cfg *Config) {
 	// 日志
 	envStr("LOG_LEVEL", &cfg.Log.Level)
 	envStr("LOG_FORMAT", &cfg.Log.Format)
+
+	// 安全
+	envStr("API_KEY_SECRET", &cfg.Security.APIKeySecret)
 
 	// 插件
 	envStr("PLUGINS_DIR", &cfg.Plugins.Dir)

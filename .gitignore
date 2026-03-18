@@ -30,6 +30,7 @@ Thumbs.db
 
 # Runtime
 backend/config.yaml
+backend/config.docker.yaml
 
 # Config
 *.local

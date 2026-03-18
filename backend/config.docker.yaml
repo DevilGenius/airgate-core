@@ -22,6 +22,9 @@ jwt:
   secret: airgate-docker-secret-change-me
   expire_hour: 24
 
+security:
+  api_key_secret: ""             # 留空使用内置默认密钥；或填入 hex 编码的 64 字符密钥
+
 log:
   level: info
   format: text
