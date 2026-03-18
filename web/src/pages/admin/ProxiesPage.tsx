@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { proxiesApi } from '../../shared/api/proxies';
 import { useToast } from '../../shared/components/Toast';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Table, type Column } from '../../shared/components/Table';
 import { Button } from '../../shared/components/Button';
@@ -36,7 +37,7 @@ export default function ProxiesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } = usePagination(20);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProxy, setEditingProxy] = useState<ProxyResp | null>(null);
   const [form, setForm] = useState<ProxyForm>(emptyForm);
@@ -45,8 +46,8 @@ export default function ProxiesPage() {
 
   // 查询代理列表
   const { data, isLoading } = useQuery({
-    queryKey: ['proxies', page],
-    queryFn: () => proxiesApi.list({ page, page_size: 20 }),
+    queryKey: ['proxies', page, pageSize],
+    queryFn: () => proxiesApi.list({ page, page_size: pageSize }),
   });
 
   // 创建代理
@@ -265,9 +266,10 @@ export default function ProxiesPage() {
         loading={isLoading}
         rowKey={(row) => row.id as number}
         page={page}
-        pageSize={20}
+        pageSize={pageSize}
         total={data?.total ?? 0}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
 
       {/* 创建/编辑弹窗 */}

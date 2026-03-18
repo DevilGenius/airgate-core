@@ -21,6 +21,7 @@ import { StatusBadge } from '../../shared/components/Badge';
 import { useToast } from '../../shared/components/Toast';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { groupsApi } from '../../shared/api/groups';
+import { usePagination } from '../../shared/hooks/usePagination';
 import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq, GroupResp } from '../../shared/types';
 
 const PAGE_SIZE = 20;
@@ -31,7 +32,7 @@ export default function APIKeysPage() {
   const queryClient = useQueryClient();
 
   // 状态
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } = usePagination(PAGE_SIZE);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
   const [deletingKey, setDeletingKey] = useState<APIKeyResp | null>(null);
@@ -40,8 +41,8 @@ export default function APIKeysPage() {
 
   // 查询密钥列表
   const { data, isLoading } = useQuery({
-    queryKey: ['apikeys', page],
-    queryFn: () => apikeysApi.list({ page, page_size: PAGE_SIZE }),
+    queryKey: ['apikeys', page, pageSize],
+    queryFn: () => apikeysApi.list({ page, page_size: pageSize }),
   });
 
   // 查询分组列表（用于创建密钥时选择分组）
@@ -246,9 +247,10 @@ export default function APIKeysPage() {
         loading={isLoading}
         rowKey={(row) => row.id}
         page={page}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         total={data?.total ?? 0}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
 
       {/* 创建弹窗 */}

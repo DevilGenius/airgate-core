@@ -15,7 +15,6 @@ import DashboardPage from '../pages/DashboardPage';
 import UsersPage from '../pages/admin/UsersPage';
 import AccountsPage from '../pages/admin/AccountsPage';
 import GroupsPage from '../pages/admin/GroupsPage';
-import APIKeysPage from '../pages/admin/APIKeysPage';
 import SubscriptionsPage from '../pages/admin/SubscriptionsPage';
 import ProxiesPage from '../pages/admin/ProxiesPage';
 import UsagePage from '../pages/admin/UsagePage';
@@ -137,7 +136,6 @@ const adminLayout = createRoute({
 const adminUsersRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/users', component: UsersPage });
 const adminAccountsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/accounts', component: AccountsPage });
 const adminGroupsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/groups', component: GroupsPage });
-const adminAPIKeysRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/api-keys', component: APIKeysPage });
 const adminSubscriptionsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/subscriptions', component: SubscriptionsPage });
 const adminProxiesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/proxies', component: ProxiesPage });
 const adminUsageRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/usage', component: UsagePage });
@@ -170,7 +168,6 @@ const routeTree = rootRoute.addChildren([
       adminUsersRoute,
       adminAccountsRoute,
       adminGroupsRoute,
-      adminAPIKeysRoute,
       adminSubscriptionsRoute,
       adminProxiesRoute,
       adminUsageRoute,

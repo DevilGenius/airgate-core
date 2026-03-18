@@ -13,21 +13,31 @@ export default defineConfig({
     {
       name: 'api-key-proxy',
       configureServer(server) {
-        // 携带 Bearer token 的请求一律代理到后端（API Key 调用）
+        // 携带 Bearer token 的请求一律代理到后端（API Key 调用），支持 SSE 流式
         server.middlewares.use((req, res, next) => {
           const auth = req.headers.authorization;
           if (auth && auth.startsWith('Bearer ')) {
+            const headers = { ...req.headers, host: backendUrl.host };
             const proxyReq = http.request(
               {
                 hostname: backendUrl.hostname,
                 port: backendUrl.port,
                 path: req.url,
                 method: req.method,
-                headers: req.headers,
+                headers,
               },
               (proxyRes) => {
+                // 流式响应：禁用压缩，逐块转发
                 res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
-                proxyRes.pipe(res);
+                proxyRes.on('data', (chunk) => {
+                  res.write(chunk);
+                  // 强制刷新，确保 SSE 数据立即发送
+                  if (typeof (res as NodeJS.WritableStream & { flush?: () => void }).flush === 'function') {
+                    (res as NodeJS.WritableStream & { flush?: () => void }).flush!();
+                  }
+                });
+                proxyRes.on('end', () => res.end());
+                proxyRes.on('error', () => res.end());
               },
             );
             proxyReq.on('error', () => {
@@ -65,6 +75,12 @@ export default defineConfig({
       '/setup/test-db': BACKEND,
       '/setup/test-redis': BACKEND,
       '/setup/install': BACKEND,
+      // OpenAI 兼容接口（含 WebSocket）
+      '/v1': { target: BACKEND, ws: true },
+      '/responses': { target: BACKEND, ws: true },
+      '/chat': { target: BACKEND, ws: true },
+      '/messages': { target: BACKEND, ws: true },
+      '/models': { target: BACKEND, ws: true },
     },
   },
 });

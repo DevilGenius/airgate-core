@@ -18,6 +18,7 @@ import { useToast } from '../../shared/components/Toast';
 import { PlatformIcon } from '../../shared/components/PlatformIcon';
 import { groupsApi } from '../../shared/api/groups';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
+import { usePagination } from '../../shared/hooks/usePagination';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
 
 const PAGE_SIZE = 20;
@@ -34,7 +35,7 @@ export default function GroupsPage() {
   ];
 
   // 筛选状态
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } = usePagination(PAGE_SIZE);
   const [platformFilter, setPlatformFilter] = useState('');
 
   // 弹窗状态
@@ -43,11 +44,11 @@ export default function GroupsPage() {
 
   // 查询分组列表
   const { data, isLoading } = useQuery({
-    queryKey: ['groups', page, platformFilter],
+    queryKey: ['groups', page, pageSize, platformFilter],
     queryFn: () =>
       groupsApi.list({
         page,
-        page_size: PAGE_SIZE,
+        page_size: pageSize,
         platform: platformFilter || undefined,
       }),
   });
@@ -201,9 +202,10 @@ export default function GroupsPage() {
         loading={isLoading}
         rowKey={(row) => row.id}
         page={page}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         total={data?.total ?? 0}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
 
       {/* 创建弹窗 */}

@@ -11,6 +11,7 @@ import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { Badge, StatusBadge } from '../../shared/components/Badge';
 import { useToast } from '../../shared/components/Toast';
 import { usersApi } from '../../shared/api/users';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { groupsApi } from '../../shared/api/groups';
 import type { UserResp, CreateUserReq, UpdateUserReq, AdjustBalanceReq, BalanceLogResp, APIKeyResp, GroupResp } from '../../shared/types';
 import {
@@ -36,7 +37,7 @@ export default function UsersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } = usePagination(PAGE_SIZE);
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -52,11 +53,11 @@ export default function UsersPage() {
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['users', page, keyword, statusFilter],
+    queryKey: ['users', page, pageSize, keyword, statusFilter],
     queryFn: () =>
       usersApi.list({
         page,
-        page_size: PAGE_SIZE,
+        page_size: pageSize,
         keyword: keyword || undefined,
         status: statusFilter || undefined,
       }),
@@ -126,6 +127,12 @@ export default function UsersPage() {
 
   const columns: Column<UserResp>[] = [
     {
+      key: 'id',
+      title: 'ID',
+      width: '60px',
+      render: (row) => <span className="text-text-tertiary font-mono">{row.id}</span>,
+    },
+    {
       key: 'email',
       title: t('users.email'),
       render: (row) => (
@@ -139,12 +146,6 @@ export default function UsersPage() {
           <span className="text-text truncate">{row.email}</span>
         </div>
       ),
-    },
-    {
-      key: 'id',
-      title: 'ID',
-      width: '60px',
-      render: (row) => <span className="text-text-tertiary font-mono">{row.id}</span>,
     },
     {
       key: 'username',
@@ -278,9 +279,10 @@ export default function UsersPage() {
         loading={isLoading}
         rowKey={(row) => row.id}
         page={page}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         total={data?.total ?? 0}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
 
       {/* 更多操作下拉菜单 (Portal) */}
@@ -738,6 +740,7 @@ function UserApiKeysModal({
           pageSize={10}
           total={data?.total ?? 0}
           onPageChange={setPage}
+          autoHeight
         />
       )}
     </Modal>
@@ -840,6 +843,7 @@ function UserBalanceHistoryModal({
           pageSize={10}
           total={data?.total ?? 0}
           onPageChange={setPage}
+          autoHeight
         />
       )}
     </Modal>

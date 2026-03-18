@@ -42,7 +42,6 @@ const adminMenuItems: MenuItem[] = [
   { path: '/admin/users', labelKey: 'nav.users', icon: <Users className="w-[18px] h-[18px]" />, sectionKey: 'nav.management' },
   { path: '/admin/accounts', labelKey: 'nav.accounts', icon: <KeyRound className="w-[18px] h-[18px]" /> },
   { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="w-[18px] h-[18px]" /> },
-  { path: '/admin/api-keys', labelKey: 'nav.api_keys', icon: <Key className="w-[18px] h-[18px]" /> },
   { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="w-[18px] h-[18px]" /> },
   { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="w-[18px] h-[18px]" /> },
   { path: '/admin/usage', labelKey: 'nav.usage', icon: <BarChart3 className="w-[18px] h-[18px]" /> },

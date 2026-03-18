@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -78,6 +79,11 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	requestPath := c.Param("path")
 	if requestPath == "" {
 		requestPath = c.Request.URL.Path
+	}
+
+	// Responses API 本身就是流式协议，强制设为流式
+	if strings.HasSuffix(requestPath, "/responses") {
+		stream = true
 	}
 	inst := f.manager.MatchPluginByPathPrefix(requestPath)
 	if inst == nil {
@@ -157,6 +163,8 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		c.Writer.Header().Set("Cache-Control", "no-cache")
 		c.Writer.Header().Set("Connection", "keep-alive")
+		c.Writer.Header().Set("X-Accel-Buffering", "no")
+		c.Writer.WriteHeader(http.StatusOK)
 		fwdReq.Writer = c.Writer
 	}
 

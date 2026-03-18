@@ -1,7 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apikeysApi } from '../../shared/api/apikeys';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { groupsApi } from '../../shared/api/groups';
 import { useToast } from '../../shared/components/Toast';
 import { PageHeader } from '../../shared/components/PageHeader';
@@ -23,6 +25,7 @@ import {
   CheckCircle,
   Terminal,
   Upload,
+  MoreHorizontal,
 } from 'lucide-react';
 import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq, GroupResp } from '../../shared/types';
 
@@ -45,7 +48,7 @@ export default function UserKeysPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } = usePagination(20);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
   const [form, setForm] = useState<KeyForm>(emptyForm);
@@ -65,10 +68,26 @@ export default function UserKeysPage() {
   const [ccsTarget, setCcsTarget] = useState<APIKeyResp | null>(null);
   const [ccsKeyValue, setCcsKeyValue] = useState<string | null>(null);
 
+  // 更多菜单
+  const [moreMenu, setMoreMenu] = useState<{ id: number; top: number; left: number } | null>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  // 点击外部关闭更多菜单
+  useEffect(() => {
+    if (!moreMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [moreMenu]);
+
   // 密钥列表
   const { data, isLoading } = useQuery({
-    queryKey: ['user-keys', page],
-    queryFn: () => apikeysApi.list({ page, page_size: 20 }),
+    queryKey: ['user-keys', page, pageSize],
+    queryFn: () => apikeysApi.list({ page, page_size: pageSize }),
   });
 
   // 分组列表（用于选择）
@@ -275,7 +294,7 @@ export default function UserKeysPage() {
             files: [
               {
                 path: '~/.codex/config.toml',
-                content: `model = "o4-mini"\n\n[api]\napi_key_env = "OPENAI_API_KEY"\nbase_url = "${baseUrl}/v1"`,
+                content: `model = "gpt-5.4"\n\n[api]\napi_key_env = "OPENAI_API_KEY"\nbase_url = "${baseUrl}"`,
               },
               {
                 path: '~/.bashrc 或 ~/.zshrc',
@@ -288,7 +307,7 @@ export default function UserKeysPage() {
             files: [
               {
                 path: '%USERPROFILE%\\.codex\\config.toml',
-                content: `model = "o4-mini"\n\n[api]\napi_key_env = "OPENAI_API_KEY"\nbase_url = "${baseUrl}/v1"`,
+                content: `model = "gpt-5.4"\n\n[api]\napi_key_env = "OPENAI_API_KEY"\nbase_url = "${baseUrl}"`,
               },
               {
                 path: 'CMD',
@@ -301,7 +320,7 @@ export default function UserKeysPage() {
             files: [
               {
                 path: '$HOME\\.codex\\config.toml',
-                content: `model = "o4-mini"\n\n[api]\napi_key_env = "OPENAI_API_KEY"\nbase_url = "${baseUrl}/v1"`,
+                content: `model = "gpt-5.4"\n\n[api]\napi_key_env = "OPENAI_API_KEY"\nbase_url = "${baseUrl}"`,
               },
               {
                 path: 'PowerShell',
@@ -480,75 +499,41 @@ export default function UserKeysPage() {
     {
       key: 'actions',
       title: t('common.actions'),
+      width: '120px',
       render: (row) => (
-        <div className="flex gap-1 justify-center flex-wrap">
-          <Button
-            size="sm"
-            variant="ghost"
+        <div className="flex items-center justify-center gap-0.5">
+          <button
+            className="p-1.5 rounded hover:bg-bg-hover transition-colors cursor-pointer"
+            style={{ color: 'var(--ag-text-secondary)' }}
+            title={t('api_keys.reveal')}
             onClick={() => revealMutation.mutate(row.id)}
-            icon={<Eye className="w-3.5 h-3.5" />}
-            loading={revealMutation.isPending}
           >
-            {t('api_keys.reveal')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+          <button
+            className="p-1.5 rounded hover:bg-bg-hover transition-colors cursor-pointer"
+            style={{ color: 'var(--ag-text-secondary)' }}
+            title={t('user_keys.use_key')}
             onClick={() => openUseKeyModal(row)}
-            icon={<Terminal className="w-3.5 h-3.5" />}
           >
-            {t('user_keys.use_key')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => openCcsModal(row)}
-            icon={<Upload className="w-3.5 h-3.5" />}
+            <Terminal className="w-3.5 h-3.5" />
+          </button>
+          <button
+            className="p-1.5 rounded hover:bg-bg-hover transition-colors cursor-pointer"
+            style={{ color: 'var(--ag-text-secondary)' }}
+            title={t('common.more')}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (moreMenu?.id === row.id) {
+                setMoreMenu(null);
+              } else {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setMoreMenu({ id: row.id, top: rect.bottom + 4, left: rect.right });
+              }
+            }}
           >
-            {t('user_keys.import_ccs')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() =>
-              toggleStatusMutation.mutate({
-                id: row.id,
-                status: row.status === 'active' ? 'disabled' : 'active',
-              })
-            }
-            icon={
-              row.status === 'active' ? (
-                <Ban className="w-3.5 h-3.5" />
-              ) : (
-                <CheckCircle className="w-3.5 h-3.5" />
-              )
-            }
-            className={
-              row.status === 'active'
-                ? 'text-warning hover:text-warning'
-                : 'text-success hover:text-success'
-            }
-            loading={toggleStatusMutation.isPending}
-          >
-            {row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => openEdit(row)}
-            icon={<Pencil className="w-3.5 h-3.5" />}
-          >
-            {t('common.edit')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setDeleteTarget(row)}
-            icon={<Trash2 className="w-3.5 h-3.5" />}
-            className="text-danger hover:text-danger"
-          >
-            {t('common.delete')}
-          </Button>
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </button>
         </div>
       ),
     },
@@ -577,10 +562,75 @@ export default function UserKeysPage() {
         loading={isLoading}
         rowKey={(row) => row.id as number}
         page={page}
-        pageSize={20}
+        pageSize={pageSize}
         total={data?.total ?? 0}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
+
+      {/* 更多操作下拉菜单 */}
+      {moreMenu && createPortal(
+        <div
+          ref={moreMenuRef}
+          className="fixed py-1 rounded-lg shadow-lg min-w-[140px]"
+          style={{
+            top: moreMenu.top,
+            left: moreMenu.left,
+            transform: 'translateX(-100%)',
+            zIndex: 9999,
+            background: 'var(--ag-bg-elevated)',
+            border: '1px solid var(--ag-glass-border)',
+          }}
+        >
+          {(() => {
+            const row = data?.list?.find((k) => k.id === moreMenu.id);
+            if (!row) return null;
+            return (
+              <>
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left cursor-pointer"
+                  style={{ color: 'var(--ag-text-secondary)' }}
+                  onClick={() => { openCcsModal(row); setMoreMenu(null); }}
+                >
+                  <Upload className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+                  {t('user_keys.import_ccs')}
+                </button>
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left cursor-pointer"
+                  style={{ color: row.status === 'active' ? 'var(--ag-warning)' : 'var(--ag-success)' }}
+                  onClick={() => {
+                    toggleStatusMutation.mutate({ id: row.id, status: row.status === 'active' ? 'disabled' : 'active' });
+                    setMoreMenu(null);
+                  }}
+                >
+                  {row.status === 'active'
+                    ? <Ban className="w-3.5 h-3.5" />
+                    : <CheckCircle className="w-3.5 h-3.5" />}
+                  {row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
+                </button>
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left cursor-pointer"
+                  style={{ color: 'var(--ag-text-secondary)' }}
+                  onClick={() => { openEdit(row); setMoreMenu(null); }}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  {t('common.edit')}
+                </button>
+                <div className="my-1 border-t" style={{ borderColor: 'var(--ag-border-subtle)' }} />
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left cursor-pointer"
+                  style={{ color: 'var(--ag-danger)' }}
+                  onClick={() => { setDeleteTarget(row); setMoreMenu(null); }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {t('common.delete')}
+                </button>
+              </>
+            );
+          })()}
+        </div>,
+        document.body,
+      )}
 
       {/* 创建/编辑弹窗 */}
       <Modal

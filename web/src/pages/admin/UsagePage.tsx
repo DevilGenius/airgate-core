@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { usageApi } from '../../shared/api/usage';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { Table, type Column } from '../../shared/components/Table';
 import { Input } from '../../shared/components/Input';
 import { DatePicker } from '../../shared/components/DatePicker';
@@ -20,14 +21,14 @@ const groupByKeys: Record<string, string> = {
 
 export default function UsagePage() {
   const { t } = useTranslation();
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } = usePagination(20);
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
 
   // 构建查询参数
   const queryParams: UsageQuery = {
     page,
-    page_size: 20,
+    page_size: pageSize,
     ...filters,
   };
 
@@ -296,9 +297,10 @@ export default function UsagePage() {
         loading={isLoading}
         rowKey={(row) => row.id as number}
         page={page}
-        pageSize={20}
+        pageSize={pageSize}
         total={data?.total ?? 0}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
     </div>
   );

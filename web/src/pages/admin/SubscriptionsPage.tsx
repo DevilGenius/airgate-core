@@ -19,6 +19,7 @@ import { useToast } from '../../shared/components/Toast';
 import { subscriptionsApi } from '../../shared/api/subscriptions';
 import { groupsApi } from '../../shared/api/groups';
 import { usersApi } from '../../shared/api/users';
+import { usePagination } from '../../shared/hooks/usePagination';
 import type {
   SubscriptionResp,
   AssignSubscriptionReq,
@@ -43,7 +44,7 @@ export default function SubscriptionsPage() {
   ];
 
   // 筛选状态
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } = usePagination(PAGE_SIZE);
   const [statusFilter, setStatusFilter] = useState('');
 
   // 弹窗状态
@@ -53,11 +54,11 @@ export default function SubscriptionsPage() {
 
   // 查询订阅列表
   const { data, isLoading } = useQuery({
-    queryKey: ['subscriptions', page, statusFilter],
+    queryKey: ['subscriptions', page, pageSize, statusFilter],
     queryFn: () =>
       subscriptionsApi.adminList({
         page,
-        page_size: PAGE_SIZE,
+        page_size: pageSize,
         status: statusFilter || undefined,
       }),
   });
@@ -240,9 +241,10 @@ export default function SubscriptionsPage() {
         loading={isLoading}
         rowKey={(row) => row.id}
         page={page}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         total={data?.total ?? 0}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
 
       {/* 分配订阅弹窗 */}
