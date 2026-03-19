@@ -92,10 +92,24 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	if strings.HasSuffix(requestPath, "/responses") {
 		stream = true
 	}
-	inst := f.manager.MatchPluginByPathPrefix(requestPath)
-	if inst == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "未找到匹配的插件"})
-		return
+	var inst *PluginInstance
+	if keyInfo.GroupPlatform != "" {
+		inst = f.manager.MatchPluginByPlatformAndPath(keyInfo.GroupPlatform, requestPath)
+		if inst == nil {
+			slog.Warn("分组平台未找到可处理请求的插件",
+				"group_id", keyInfo.GroupID,
+				"platform", keyInfo.GroupPlatform,
+				"path", requestPath,
+			)
+			c.JSON(http.StatusNotFound, gin.H{"error": "当前 API Key 绑定的平台不支持该 API 路径"})
+			return
+		}
+	} else {
+		inst = f.manager.MatchPluginByPathPrefix(requestPath)
+		if inst == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "未找到匹配的插件"})
+			return
+		}
 	}
 
 	// 5. 限流检查
