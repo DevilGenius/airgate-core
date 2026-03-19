@@ -8,6 +8,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 )
@@ -58,6 +59,64 @@ func (h *GroupHandler) ListGroups(c *gin.Context) {
 		All(c.Request.Context())
 	if err != nil {
 		slog.Error("查询分组列表失败", "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	list := make([]dto.GroupResp, 0, len(groups))
+	for _, g := range groups {
+		list = append(list, toGroupResp(g))
+	}
+
+	response.Success(c, response.PagedData(list, int64(total), page.Page, page.PageSize))
+}
+
+// ListAvailableGroups 查询当前用户可用分组列表
+func (h *GroupHandler) ListAvailableGroups(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	uid, ok := userID.(int)
+	if !ok {
+		response.Unauthorized(c, "用户未认证")
+		return
+	}
+
+	var page dto.PageReq
+	if err := c.ShouldBindQuery(&page); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	query := h.db.Group.Query().Where(
+		group.Or(
+			group.IsExclusiveEQ(false),
+			group.And(
+				group.IsExclusiveEQ(true),
+				group.HasAllowedUsersWith(user.IDEQ(uid)),
+			),
+		),
+	)
+
+	if page.Keyword != "" {
+		query = query.Where(group.NameContains(page.Keyword))
+	}
+	if platform := c.Query("platform"); platform != "" {
+		query = query.Where(group.PlatformEQ(platform))
+	}
+
+	total, err := query.Count(c.Request.Context())
+	if err != nil {
+		slog.Error("查询用户可用分组总数失败", "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	groups, err := query.
+		Offset((page.Page-1)*page.PageSize).
+		Limit(page.PageSize).
+		Order(ent.Desc(group.FieldSortWeight), ent.Desc(group.FieldCreatedAt)).
+		All(c.Request.Context())
+	if err != nil {
+		slog.Error("查询用户可用分组列表失败", "error", err)
 		response.InternalError(c, "查询失败")
 		return
 	}

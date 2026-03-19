@@ -13,6 +13,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
@@ -94,6 +95,15 @@ func (h *APIKeyHandler) CreateKey(c *gin.Context) {
 	var req dto.CreateAPIKeyReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BindError(c, err)
+		return
+	}
+
+	if ok, err := h.canUserUseGroup(c, uid, int(req.GroupID)); err != nil {
+		slog.Error("校验用户分组权限失败", "error", err, "user_id", uid, "group_id", req.GroupID)
+		response.InternalError(c, "创建失败")
+		return
+	} else if !ok {
+		response.Forbidden(c, "无权使用该分组")
 		return
 	}
 
@@ -202,6 +212,16 @@ func (h *APIKeyHandler) UpdateKey(c *gin.Context) {
 		builder = builder.SetName(*req.Name)
 	}
 	if req.GroupID != nil {
+		ok, err := h.canUserUseGroup(c, uid, int(*req.GroupID))
+		if err != nil {
+			slog.Error("校验用户分组权限失败", "error", err, "user_id", uid, "group_id", *req.GroupID)
+			response.InternalError(c, "更新失败")
+			return
+		}
+		if !ok {
+			response.Forbidden(c, "无权使用该分组")
+			return
+		}
 		builder = builder.SetGroupID(int(*req.GroupID))
 	}
 	if req.IPWhitelist != nil {
@@ -351,6 +371,36 @@ func (h *APIKeyHandler) AdminUpdateKey(c *gin.Context) {
 	}
 
 	response.Success(c, toAPIKeyResp(updated, ""))
+}
+
+func (h *APIKeyHandler) canUserUseGroup(c *gin.Context, uid, groupID int) (bool, error) {
+	exists, err := h.db.Group.Query().
+		Where(group.IDEQ(groupID)).
+		Exist(c.Request.Context())
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		response.NotFound(c, "分组不存在")
+		return false, nil
+	}
+
+	allowed, err := h.db.Group.Query().
+		Where(
+			group.IDEQ(groupID),
+			group.Or(
+				group.IsExclusiveEQ(false),
+				group.And(
+					group.IsExclusiveEQ(true),
+					group.HasAllowedUsersWith(user.IDEQ(uid)),
+				),
+			),
+		).
+		Exist(c.Request.Context())
+	if err != nil {
+		return false, err
+	}
+	return allowed, nil
 }
 
 // RevealKey 查看 API 密钥原文

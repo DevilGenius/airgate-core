@@ -93,7 +93,7 @@ export default function UserKeysPage() {
   // 分组列表（用于选择）
   const { data: groupsData } = useQuery({
     queryKey: ['groups-for-keys'],
-    queryFn: () => groupsApi.list({ page: 1, page_size: 100 }),
+    queryFn: () => groupsApi.listAvailable({ page: 1, page_size: 100 }),
   });
 
   // 创建密钥
@@ -162,6 +162,10 @@ export default function UserKeysPage() {
   });
 
   function openCreate() {
+    if (!hasAvailableGroups) {
+      toast('error', t('user_keys.no_groups_available'));
+      return;
+    }
     setEditingKey(null);
     setForm(emptyForm);
     setModalOpen(true);
@@ -221,9 +225,16 @@ export default function UserKeysPage() {
   const groupMap = new Map<number, GroupResp>(groupList.map((g) => [g.id, g]));
   const getGroupPlatform = (groupId: number) => groupMap.get(groupId)?.platform || '';
 
+  const hasAvailableGroups = groupList.length > 0;
+
   // 分组选项
   const groupOptions = [
-    { value: '', label: t('user_keys.select_group') },
+    {
+      value: '',
+      label: hasAvailableGroups
+        ? t('user_keys.select_group')
+        : t('user_keys.no_groups_available'),
+    },
     ...groupList.map((g) => ({
       value: String(g.id),
       label: `${g.name} (${g.platform})`,
@@ -550,8 +561,13 @@ export default function UserKeysPage() {
       <PageHeader
         title={t('user_keys.title')}
         actions={
-          <Button onClick={openCreate} icon={<Plus className="w-4 h-4" />}>
-            {t('user_keys.create')}
+          <Button
+            onClick={openCreate}
+            icon={<Plus className="w-4 h-4" />}
+            disabled={!hasAvailableGroups}
+            title={!hasAvailableGroups ? t('user_keys.no_groups_available') : undefined}
+          >
+            {hasAvailableGroups ? t('user_keys.create') : t('user_keys.create_disabled_no_groups')}
           </Button>
         }
       />

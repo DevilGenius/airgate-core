@@ -559,6 +559,8 @@
     "name_placeholder": "例如：生产环境密钥",
     "group": "分组",
     "select_group": "请选择分组",
+    "no_groups_available": "当前没有可用分组，请联系管理员分配分组后再创建密钥。",
+    "create_disabled_no_groups": "暂无可用分组",
     "quota_label": "配额 (USD)",
     "quota_hint": "设为 0 或留空表示不限配额",
     "quota_unlimited_hint": "留空为无限制",

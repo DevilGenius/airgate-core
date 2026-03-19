@@ -70,6 +70,9 @@ func (s *Server) registerRoutes() {
 		userGroup.DELETE("/api-keys/:id", apikeyHandler.DeleteKey)
 		userGroup.GET("/api-keys/:id/reveal", apikeyHandler.RevealKey)
 
+		// 分组
+		userGroup.GET("/groups", groupHandler.ListAvailableGroups)
+
 		// 订阅
 		userGroup.GET("/subscriptions", subscriptionHandler.UserSubscriptions)
 		userGroup.GET("/subscriptions/active", subscriptionHandler.ActiveSubscriptions)

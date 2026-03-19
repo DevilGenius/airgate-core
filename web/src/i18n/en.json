@@ -559,6 +559,8 @@
     "name_placeholder": "e.g. Production Key",
     "group": "Group",
     "select_group": "Select group",
+    "no_groups_available": "No available groups yet. Please contact an administrator to assign a group before creating a key.",
+    "create_disabled_no_groups": "No groups available",
     "quota_label": "Quota (USD)",
     "quota_hint": "Set to 0 or leave empty for unlimited",
     "quota_unlimited_hint": "Leave empty for unlimited",
