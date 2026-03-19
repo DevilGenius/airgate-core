@@ -1,7 +1,7 @@
 # ============================================================
 # AirGate Core — 多阶段构建
 # 构建上下文必须为上级目录（包含 airgate-sdk）:
-#   docker build -f airgate-core/Dockerfile -t airgate-core ..
+#   docker build -f airgate-core/deploy/Dockerfile -t airgate-core ..
 # ============================================================
 
 # ---- 阶段 1: 构建前端 ----
@@ -42,7 +42,7 @@ WORKDIR /app
 
 COPY --from=backend /server ./server
 COPY --from=frontend /build/airgate-core/web/dist ./frontend
-COPY airgate-core/backend/config.docker.yaml ./config.yaml
+COPY airgate-core/deploy/config.docker.yaml ./config.yaml
 COPY airgate-core/backend/locales ./locales
 
 RUN mkdir -p data/plugins

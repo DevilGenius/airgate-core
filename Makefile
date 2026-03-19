@@ -104,19 +104,19 @@ install: setup-hooks ## 安装全部依赖（含 SDK 前端构建）
 # ===================== Docker =====================
 
 docker-build: ## 构建 Docker 镜像（使用缓存）
-	@docker build -f Dockerfile -t airgate-core:latest ..
+	@docker build -f deploy/Dockerfile -t airgate-core:latest ..
 
 docker-rebuild: ## 构建 Docker 镜像（无缓存，强制全量重建）
-	@docker build -f Dockerfile -t airgate-core:latest --no-cache ..
+	@docker build -f deploy/Dockerfile -t airgate-core:latest --no-cache ..
 
 docker-up: ## 启动生产环境（后台运行）
-	@docker compose up -d
+	@docker compose -f deploy/docker-compose.yml up -d
 
 docker-down: ## 停止生产环境
-	@docker compose down
+	@docker compose -f deploy/docker-compose.yml down
 
 docker-dev: ## 启动开发环境（源码编译模式）
-	@docker compose -f docker-compose.dev.yml up
+	@docker compose -f deploy/docker-compose.dev.yml up
 
 # ===================== 清理 =====================
 

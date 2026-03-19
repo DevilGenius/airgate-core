@@ -1,5 +1,5 @@
 # 开发环境编排 — 源码挂载 + 实时编译
-# 使用方式: docker compose -f docker-compose.dev.yml up
+# 使用方式: docker compose -f deploy/docker-compose.dev.yml up
 services:
   postgres:
     image: postgres:16
@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: airgate
       POSTGRES_DB: airgate
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ../data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airgate -d airgate"]
       interval: 5s
@@ -20,7 +20,7 @@ services:
     image: redis:7
     restart: unless-stopped
     volumes:
-      - redis_data:/data
+      - ../data/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -33,8 +33,8 @@ services:
     environment:
       npm_config_cache: /root/.npm
     volumes:
-      - ..:/workspace
-      - npm_cache:/root/.npm
+      - ../..:/workspace
+      - ../data/npm_cache:/root/.npm
     command:
       - bash
       - -lc
@@ -52,9 +52,9 @@ services:
       frontend-builder:
         condition: service_completed_successfully
     volumes:
-      - ..:/workspace
-      - go_pkg_mod:/go/pkg/mod
-      - go_build_cache:/root/.cache/go-build
+      - ../..:/workspace
+      - ../data/go_pkg_mod:/go/pkg/mod
+      - ../data/go_build_cache:/root/.cache/go-build
     command:
       - bash
       - -lc
@@ -82,10 +82,10 @@ services:
       CONFIG_PATH: /workspace/airgate-core/backend/config.docker.yaml
       PLUGINS_DIR: /workspace/airgate-core/backend/data/plugins
     volumes:
-      - ..:/workspace
-      - go_pkg_mod:/go/pkg/mod
-      - go_build_cache:/root/.cache/go-build
-      - plugins_data:/workspace/airgate-core/backend/data/plugins
+      - ../..:/workspace
+      - ../data/go_pkg_mod:/go/pkg/mod
+      - ../data/go_build_cache:/root/.cache/go-build
+      - ../data/plugins:/workspace/airgate-core/backend/data/plugins
     ports:
       - "9517:9517"
     command:
@@ -97,11 +97,3 @@ services:
         cp /workspace/airgate-openai/bin/gateway-openai /workspace/airgate-core/backend/data/plugins/gateway-openai/gateway-openai;
         chmod +x /workspace/airgate-core/backend/data/plugins/gateway-openai/gateway-openai;
         /usr/local/go/bin/go run -buildvcs=false ./cmd/server
-
-volumes:
-  postgres_data:
-  redis_data:
-  npm_cache:
-  go_pkg_mod:
-  go_build_cache:
-  plugins_data:

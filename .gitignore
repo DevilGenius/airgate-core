@@ -36,3 +36,4 @@ backend/config.docker.yaml
 *.local
 .env
 backend/data/
+data/
