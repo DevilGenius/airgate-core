@@ -234,6 +234,8 @@ export interface APIKeyResp {
   ip_blacklist?: string[];
   quota_usd: number;
   used_quota: number;
+  today_cost: number;
+  thirty_day_cost: number;
   expires_at?: string;
   status: string;
   created_at: string;

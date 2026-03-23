@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -73,10 +74,19 @@ func (h *APIKeyHandler) ListKeys(c *gin.Context) {
 		return
 	}
 
+	// 批量查询 API Key 用量（今日 + 近30天）
+	keyIDs := make([]int, len(keys))
+	for i, k := range keys {
+		keyIDs[i] = k.ID
+	}
+	todayCostMap, thirtyDayCostMap := h.batchKeyUsage(c.Request.Context(), keyIDs)
+
 	list := make([]dto.APIKeyResp, 0, len(keys))
 	for _, k := range keys {
 		resp := toAPIKeyResp(k, "")
 		resp.UserID = int64(uid)
+		resp.TodayCost = todayCostMap[k.ID]
+		resp.ThirtyDayCost = thirtyDayCostMap[k.ID]
 		list = append(list, resp)
 	}
 
@@ -423,6 +433,60 @@ func (h *APIKeyHandler) RevealKey(c *gin.Context) {
 	resp := toAPIKeyResp(k, plainKey)
 	resp.UserID = int64(uid)
 	response.Success(c, resp)
+}
+
+// batchKeyUsage 批量查询 API Key 的今日和近30天用量
+func (h *APIKeyHandler) batchKeyUsage(ctx context.Context, keyIDs []int) (todayMap, thirtyDayMap map[int]float64) {
+	todayMap = make(map[int]float64, len(keyIDs))
+	thirtyDayMap = make(map[int]float64, len(keyIDs))
+	if len(keyIDs) == 0 {
+		return
+	}
+
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	thirtyDaysAgo := now.AddDate(0, 0, -30)
+
+	type costRow struct {
+		APIKeyID int     `json:"api_key_usage_logs"`
+		Cost     float64 `json:"cost"`
+	}
+
+	// 今日用量
+	var todayRows []costRow
+	err := h.db.UsageLog.Query().
+		Where(
+			entusagelog.HasAPIKeyWith(apikey.IDIn(keyIDs...)),
+			entusagelog.CreatedAtGTE(todayStart),
+		).
+		GroupBy(entusagelog.ForeignKeys[0]).
+		Aggregate(ent.As(ent.Sum(entusagelog.FieldActualCost), "cost")).
+		Scan(ctx, &todayRows)
+	if err != nil {
+		slog.Error("查询 API Key 今日用量失败", "error", err)
+	}
+	for _, r := range todayRows {
+		todayMap[r.APIKeyID] = r.Cost
+	}
+
+	// 近30天用量
+	var thirtyDayRows []costRow
+	err = h.db.UsageLog.Query().
+		Where(
+			entusagelog.HasAPIKeyWith(apikey.IDIn(keyIDs...)),
+			entusagelog.CreatedAtGTE(thirtyDaysAgo),
+		).
+		GroupBy(entusagelog.ForeignKeys[0]).
+		Aggregate(ent.As(ent.Sum(entusagelog.FieldActualCost), "cost")).
+		Scan(ctx, &thirtyDayRows)
+	if err != nil {
+		slog.Error("查询 API Key 近30天用量失败", "error", err)
+	}
+	for _, r := range thirtyDayRows {
+		thirtyDayMap[r.APIKeyID] = r.Cost
+	}
+
+	return
 }
 
 // generateAPIKey 生成 sk- 前缀的随机 API 密钥

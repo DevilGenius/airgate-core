@@ -2,18 +2,20 @@ package dto
 
 // APIKeyResp API 密钥响应
 type APIKeyResp struct {
-	ID          int64    `json:"id"`
-	Name        string   `json:"name"`
-	Key         string   `json:"key,omitempty"` // 仅创建时返回完整密钥
-	KeyPrefix   string   `json:"key_prefix"`    // sk-xxxx... 前缀展示
-	UserID      int64    `json:"user_id"`
-	GroupID     *int64   `json:"group_id"`
-	IPWhitelist []string `json:"ip_whitelist,omitempty"`
-	IPBlacklist []string `json:"ip_blacklist,omitempty"`
-	QuotaUSD    float64  `json:"quota_usd"`
-	UsedQuota   float64  `json:"used_quota"`
-	ExpiresAt   *string  `json:"expires_at,omitempty"`
-	Status      string   `json:"status"`
+	ID            int64    `json:"id"`
+	Name          string   `json:"name"`
+	Key           string   `json:"key,omitempty"` // 仅创建时返回完整密钥
+	KeyPrefix     string   `json:"key_prefix"`    // sk-xxxx... 前缀展示
+	UserID        int64    `json:"user_id"`
+	GroupID       *int64   `json:"group_id"`
+	IPWhitelist   []string `json:"ip_whitelist,omitempty"`
+	IPBlacklist   []string `json:"ip_blacklist,omitempty"`
+	QuotaUSD      float64  `json:"quota_usd"`
+	UsedQuota     float64  `json:"used_quota"`
+	TodayCost     float64  `json:"today_cost"`
+	ThirtyDayCost float64  `json:"thirty_day_cost"`
+	ExpiresAt     *string  `json:"expires_at,omitempty"`
+	Status        string   `json:"status"`
 	TimeMixin
 }
 

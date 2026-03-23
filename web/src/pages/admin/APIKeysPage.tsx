@@ -179,6 +179,22 @@ export default function APIKeysPage() {
       ),
     },
     {
+      key: 'usage',
+      title: t('api_keys.usage'),
+      render: (row) => (
+        <div className="font-mono text-xs space-y-0.5">
+          <div>
+            <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('api_keys.today')}: </span>
+            <span style={{ color: 'var(--ag-primary)' }}>${row.today_cost.toFixed(4)}</span>
+          </div>
+          <div>
+            <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('api_keys.thirty_days')}: </span>
+            <span style={{ color: 'var(--ag-text)' }}>${row.thirty_day_cost.toFixed(4)}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
       key: 'expires_at',
       title: t('api_keys.expire_time'),
       render: (row) => (

@@ -384,7 +384,10 @@
     "update_success": "密钥更新成功",
     "delete_success": "密钥已删除",
     "reveal": "查看密钥",
-    "group_unbound": "未绑定分组"
+    "group_unbound": "未绑定分组",
+    "usage": "用量",
+    "today": "今日",
+    "thirty_days": "近30天"
   },
 
   "subscriptions": {

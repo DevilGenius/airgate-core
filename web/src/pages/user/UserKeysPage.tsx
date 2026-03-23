@@ -479,6 +479,22 @@ export default function UserKeysPage() {
       ),
     },
     {
+      key: 'usage',
+      title: t('api_keys.usage'),
+      render: (row) => (
+        <div className="font-mono text-xs space-y-0.5">
+          <div>
+            <span className="text-text-tertiary">{t('api_keys.today')}: </span>
+            <span style={{ color: 'var(--ag-primary)' }}>${row.today_cost.toFixed(4)}</span>
+          </div>
+          <div>
+            <span className="text-text-tertiary">{t('api_keys.thirty_days')}: </span>
+            <span>${row.thirty_day_cost.toFixed(4)}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
       key: 'expires_at',
       title: t('user_keys.expires_at'),
       render: (row) =>

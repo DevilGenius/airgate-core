@@ -384,7 +384,10 @@
     "update_success": "Key updated successfully",
     "delete_success": "Key deleted",
     "reveal": "Reveal Key",
-    "group_unbound": "Unbound Group"
+    "group_unbound": "Unbound Group",
+    "usage": "Usage",
+    "today": "Today",
+    "thirty_days": "30 Days"
   },
 
   "subscriptions": {
