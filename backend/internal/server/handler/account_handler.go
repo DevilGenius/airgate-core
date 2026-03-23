@@ -543,10 +543,22 @@ func (h *AccountHandler) GetAccountUsage(c *gin.Context) {
 
 		var result struct {
 			Accounts map[string]any `json:"accounts"`
+			Errors   []struct {
+				ID      int    `json:"id"`
+				Message string `json:"message"`
+			} `json:"errors"`
 		}
 		if json.Unmarshal(respBody, &result) == nil {
 			for k, v := range result.Accounts {
 				merged[k] = v
+			}
+			// 插件探测到的凭证错误，立即标记账号为 error
+			for _, e := range result.Errors {
+				slog.Warn("探测发现账号凭证错误，标记为 error", "account_id", e.ID, "message", e.Message)
+				_ = h.db.Account.UpdateOneID(e.ID).
+					SetStatus(account.StatusError).
+					SetErrorMsg(e.Message).
+					Exec(c.Request.Context())
 			}
 		}
 	}
