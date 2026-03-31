@@ -61,6 +61,7 @@ lint: ## 代码检查（需要安装 golangci-lint）
 	fi
 	@cd $(BACKEND_DIR) && golangci-lint run ./...
 	@cd $(WEB_DIR) && npx tsc -b --noEmit
+	@cd $(WEB_DIR) && npm run lint
 	@echo "代码检查通过"
 
 fmt: ## 格式化代码
@@ -79,9 +80,22 @@ test: ## 运行测试
 
 # ===================== CI =====================
 
-ci: lint test build-backend ## 本地运行与 CI 完全一致的检查
+ci: lint test vet verify-ent build-backend ## 本地运行与 CI 完全一致的检查
 
-pre-commit: lint build-backend ## pre-commit hook 调用（跳过耗时的测试）
+pre-commit: lint vet build-backend ## pre-commit hook 调用（跳过耗时的测试）
+
+vet: ## 静态分析
+	@cd $(BACKEND_DIR) && $(GO) vet ./...
+
+verify-ent: ## 验证 Ent 生成代码是否最新
+	@cd $(BACKEND_DIR) && GOWORK=off go run entgo.io/ent/cmd/ent generate ./ent/schema
+	@cd $(BACKEND_DIR) && \
+	if ! git diff --quiet ent/; then \
+		echo "❌ Ent 生成代码不一致，请运行: make ent"; \
+		git diff --stat ent/; \
+		exit 1; \
+	fi
+	@echo "Ent 生成代码一致"
 
 setup-hooks: ## 安装 Git pre-commit hook
 	@echo '#!/bin/sh' > .git/hooks/pre-commit

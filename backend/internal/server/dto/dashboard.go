@@ -13,7 +13,7 @@ type DashboardStatsResp struct {
 
 	// 请求
 	TodayRequests   int64 `json:"today_requests"`
-	AllTimeRequests int64 `json:"alltime_requests"`
+	AllTimeRequests int64 `json:"alltime_requests"` //nolint:misspell
 
 	// 用户
 	TotalUsers    int64 `json:"total_users"`
@@ -24,8 +24,8 @@ type DashboardStatsResp struct {
 	TodayCost   float64 `json:"today_cost"`
 
 	// 总 Token
-	AllTimeTokens int64   `json:"alltime_tokens"`
-	AllTimeCost   float64 `json:"alltime_cost"`
+	AllTimeTokens int64   `json:"alltime_tokens"` //nolint:misspell
+	AllTimeCost   float64 `json:"alltime_cost"`   //nolint:misspell
 
 	// 性能指标
 	RPM           float64 `json:"rpm"`
