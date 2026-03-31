@@ -235,13 +235,13 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	//   - "expired"/"disabled" (401/403)：计入失败（账号凭证问题）
 	//   - 5xx / 网络错误：计入失败
 	//   - 正常 2xx：成功
-	accountStatus := ""
+	var accountStatus sdk.AccountStatus
 	if result != nil {
 		accountStatus = result.AccountStatus
 	}
 	isSuccess := err == nil && result != nil && result.StatusCode >= 200 && result.StatusCode < 400
-	isRateLimited := accountStatus == "rate_limited"
-	isAccountError := accountStatus == "expired" || accountStatus == "disabled"
+	isRateLimited := accountStatus == sdk.AccountStatusRateLimited
+	isAccountError := accountStatus == sdk.AccountStatusExpired || accountStatus == sdk.AccountStatusDisabled
 
 	switch {
 	case isSuccess:
@@ -348,6 +348,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		ServiceTier:           result.ServiceTier,
 		Stream:                stream,
 		DurationMs:            duration.Milliseconds(),
+		FirstTokenMs:          result.FirstTokenMs,
 		UserAgent:             c.Request.UserAgent(),
 		IPAddress:             c.ClientIP(),
 	})
