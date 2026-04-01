@@ -624,7 +624,7 @@ export default function UsagePage() {
     },
     {
       key: 'first_token_ms',
-      title: 'TTFT',
+      title: t('usage.first_token'),
       render: (row) => (
         <span className="font-mono text-xs text-text-secondary">
           {row.first_token_ms > 0 ? (row.first_token_ms >= 1000 ? `${(row.first_token_ms / 1000).toFixed(2)}s` : `${row.first_token_ms}ms`) : '-'}

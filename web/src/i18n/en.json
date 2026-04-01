@@ -494,6 +494,7 @@
     "user_charged": "User Charged",
     "account_billed": "Account Billed",
     "cost_detail": "Cost Detail",
+    "first_token": "TTFT",
     "stream": "Stream",
     "duration": "Duration",
     "requests": "Requests",

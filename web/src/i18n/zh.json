@@ -494,6 +494,7 @@
     "user_charged": "用户扣费",
     "account_billed": "账号计费",
     "cost_detail": "成本明细",
+    "first_token": "首 Token",
     "stream": "流式",
     "duration": "耗时",
     "requests": "请求数",
