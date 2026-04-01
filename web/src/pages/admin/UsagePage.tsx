@@ -623,19 +623,22 @@ export default function UsagePage() {
       ),
     },
     {
+      key: 'first_token_ms',
+      title: 'TTFT',
+      render: (row) => (
+        <span className="font-mono text-xs text-text-secondary">
+          {row.first_token_ms > 0 ? (row.first_token_ms >= 1000 ? `${(row.first_token_ms / 1000).toFixed(2)}s` : `${row.first_token_ms}ms`) : '-'}
+        </span>
+      ),
+    },
+    {
       key: 'duration_ms',
       title: t('usage.duration'),
-      render: (row) => {
-        const fmt = (ms: number) => ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${ms}ms`;
-        return (
-          <div className="font-mono text-xs">
-            <div className="text-text">{fmt(row.duration_ms)}</div>
-            {row.first_token_ms > 0 && (
-              <div className="text-text-tertiary">{fmt(row.first_token_ms)}</div>
-            )}
-          </div>
-        );
-      },
+      render: (row) => (
+        <span className="font-mono text-xs">
+          {row.duration_ms >= 1000 ? `${(row.duration_ms / 1000).toFixed(2)}s` : `${row.duration_ms}ms`}
+        </span>
+      ),
     },
   ];
 
