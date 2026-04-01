@@ -55,7 +55,8 @@
     "copied": "已复制到剪贴板",
     "copy_failed": "复制失败，请手动复制",
     "fill_required": "请填写必填项",
-    "more": "更多"
+    "more": "更多",
+    "user": "用户"
   },
 
   "status": {

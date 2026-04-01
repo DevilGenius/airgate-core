@@ -55,7 +55,8 @@
     "copied": "Copied to clipboard",
     "copy_failed": "Copy failed, please copy manually",
     "fill_required": "Please fill in required fields",
-    "more": "More"
+    "more": "More",
+    "user": "User"
   },
 
   "status": {

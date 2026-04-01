@@ -56,6 +56,7 @@ export default function UserUsagePage() {
     {
       key: 'created_at',
       title: t('usage.time'),
+      width: '168px',
       render: (row) => (
         <span className="text-text-secondary">
           {new Date(row.created_at).toLocaleString('zh-CN')}
@@ -65,11 +66,17 @@ export default function UserUsagePage() {
     {
       key: 'model',
       title: t('usage.model'),
-      render: (row) => <span className="text-text">{row.model}</span>,
+      width: '220px',
+      render: (row) => (
+        <span className="block max-w-full truncate text-text" title={row.model}>
+          {row.model}
+        </span>
+      ),
     },
     {
       key: 'input_tokens',
       title: t('usage.input_tokens'),
+      width: '120px',
       render: (row) => (
         <span className="font-mono">{row.input_tokens.toLocaleString()}</span>
       ),
@@ -77,6 +84,7 @@ export default function UserUsagePage() {
     {
       key: 'output_tokens',
       title: t('usage.output_tokens'),
+      width: '120px',
       render: (row) => (
         <span className="font-mono">{row.output_tokens.toLocaleString()}</span>
       ),
@@ -84,6 +92,7 @@ export default function UserUsagePage() {
     {
       key: 'cached_input_tokens',
       title: t('usage.cached_input_tokens'),
+      width: '132px',
       render: (row) => (
         <span className="font-mono text-text-secondary">
           {row.cached_input_tokens > 0 ? row.cached_input_tokens.toLocaleString() : '-'}
@@ -93,6 +102,7 @@ export default function UserUsagePage() {
     {
       key: 'total_cost',
       title: t('usage.total_cost'),
+      width: '124px',
       render: (row) => (
         <span className="font-mono">${row.total_cost.toFixed(6)}</span>
       ),
@@ -100,6 +110,7 @@ export default function UserUsagePage() {
     {
       key: 'actual_cost',
       title: t('usage.actual_cost'),
+      width: '124px',
       render: (row) => (
         <span className="font-mono">${row.actual_cost.toFixed(6)}</span>
       ),
@@ -107,6 +118,7 @@ export default function UserUsagePage() {
     {
       key: 'stream',
       title: t('usage.stream'),
+      width: '84px',
       render: (row) => (
         <Badge variant={row.stream ? 'info' : 'default'}>
           {row.stream ? t('common.yes') : t('common.no')}
@@ -116,6 +128,7 @@ export default function UserUsagePage() {
     {
       key: 'duration_ms',
       title: t('usage.duration'),
+      width: '96px',
       render: (row) => (
         <span className="font-mono">{row.duration_ms}ms</span>
       ),
@@ -200,6 +213,7 @@ export default function UserUsagePage() {
         total={total}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
+        separateHeader
       />
     </div>
   );

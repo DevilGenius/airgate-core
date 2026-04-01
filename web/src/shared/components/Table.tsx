@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { useMemo, type ReactNode, type CSSProperties } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 
@@ -22,6 +22,8 @@ export interface TableProps<T> {
   pageSizeOptions?: number[];
   onPageSizeChange?: (size: number) => void;
   autoHeight?: boolean;
+  /** @deprecated No longer needed – kept for backward compatibility */
+  separateHeader?: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,16 +42,38 @@ export function Table<T extends Record<string, any>>({
 }: TableProps<T>) {
   const totalPages = Math.ceil(total / pageSize);
 
+  // Compute sticky styles for fixed columns
+  const fixedStyles = useMemo(() => {
+    const styles: Record<string, CSSProperties> = {};
+    let leftOffset = 0;
+    for (const col of columns) {
+      if (col.fixed === 'left') {
+        styles[col.key] = { position: 'sticky', left: leftOffset, zIndex: 1, backgroundColor: 'var(--ag-bg-elevated)' };
+        leftOffset += parseInt(col.width || '0', 10);
+      }
+    }
+    let rightOffset = 0;
+    for (let i = columns.length - 1; i >= 0; i--) {
+      const col = columns[i]!;
+      if (col.fixed === 'right') {
+        styles[col.key] = { position: 'sticky', right: rightOffset, zIndex: 1, backgroundColor: 'var(--ag-bg-elevated)' };
+        rightOffset += parseInt(col.width || '0', 10);
+      }
+    }
+    return styles;
+  }, [columns]);
+
+  const thClass = 'px-4 py-3 text-center text-[10px] font-semibold text-text-tertiary uppercase tracking-widest whitespace-nowrap bg-bg-elevated';
+  const tdClass = 'px-4 py-3 text-sm text-text-secondary whitespace-nowrap align-middle';
+
   if (loading) {
     return (
       <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-hidden">
-        {/* 表头骨架 */}
         <div className="flex gap-4 px-4 py-3 border-b border-border bg-black/[0.03]">
           {columns.map((col) => (
             <div key={col.key} className="h-4 ag-shimmer rounded w-20" style={{ flex: col.width ? `0 0 ${col.width}` : '1' }} />
           ))}
         </div>
-        {/* 行骨架 */}
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex gap-4 px-4 py-3.5 border-b border-border-subtle">
             {columns.map((col) => (
@@ -69,7 +93,29 @@ export function Table<T extends Record<string, any>>({
     );
   }
 
-  const tableBody = (
+  const colGroup = (
+    <colgroup>
+      {columns.map((col) => <col key={col.key} style={{ width: col.width }} />)}
+    </colgroup>
+  );
+
+  const thead = (
+    <thead className="sticky top-0 z-10 bg-bg-elevated" style={{ boxShadow: '0 1px 0 var(--ag-border)' }}>
+      <tr>
+        {columns.map((col) => (
+          <th
+            key={col.key}
+            className={thClass}
+            style={fixedStyles[col.key] ? { ...fixedStyles[col.key], zIndex: 12 } : undefined}
+          >
+            {col.title}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+
+  const tbody = (
     <tbody>
       {data.map((row, i) => (
         <tr
@@ -77,10 +123,7 @@ export function Table<T extends Record<string, any>>({
           className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover"
         >
           {columns.map((col) => (
-            <td
-              key={col.key}
-              className="px-4 py-3 text-sm text-text-secondary whitespace-nowrap"
-            >
+            <td key={col.key} className={tdClass} style={fixedStyles[col.key]}>
               <div className="flex items-center justify-center">
                 {col.render ? col.render(row) : String(row[col.key] ?? '')}
               </div>
@@ -89,14 +132,6 @@ export function Table<T extends Record<string, any>>({
         </tr>
       ))}
     </tbody>
-  );
-
-  const colGroup = (
-    <colgroup>
-      {columns.map((col) => (
-        <col key={col.key} style={{ width: col.width }} />
-      ))}
-    </colgroup>
   );
 
   return (
@@ -110,34 +145,24 @@ export function Table<T extends Record<string, any>>({
                 {columns.map((col) => (
                   <th
                     key={col.key}
-                    className="px-4 py-3 text-center text-[10px] font-semibold text-text-tertiary uppercase tracking-widest"
+                    className={thClass}
+                    style={fixedStyles[col.key] ? { ...fixedStyles[col.key], zIndex: 2 } : undefined}
                   >
                     {col.title}
                   </th>
                 ))}
               </tr>
             </thead>
-            {tableBody}
+            {tbody}
           </table>
         </div>
       ) : (
         <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-hidden" style={{ height: '494px' }}>
-          <div className="overflow-auto h-full">
+          <div className="h-full overflow-auto">
             <table className="w-full min-w-max">
               {colGroup}
-              <thead className="sticky top-0 z-10 bg-bg-elevated" style={{ boxShadow: '0 1px 0 var(--ag-border)' }}>
-                <tr>
-                  {columns.map((col) => (
-                    <th
-                      key={col.key}
-                      className="px-4 py-3 text-center text-[10px] font-semibold text-text-tertiary uppercase tracking-widest bg-bg-elevated"
-                    >
-                      {col.title}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              {tableBody}
+              {thead}
+              {tbody}
             </table>
           </div>
         </div>

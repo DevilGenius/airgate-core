@@ -437,8 +437,20 @@ export default function UsagePage() {
 
   const columns: Column<UsageLogResp>[] = [
     {
+      key: 'user_id',
+      title: t('common.user'),
+      width: '180px',
+      fixed: 'left',
+      render: (row) => (
+        <span className="block max-w-full truncate text-text-tertiary font-mono" title={row.user_email || `#${row.user_id}`}>
+          {row.user_email || `#${row.user_id}`}
+        </span>
+      ),
+    },
+    {
       key: 'created_at',
       title: t('usage.time'),
+      width: '168px',
       render: (row) => (
         <span className="text-text-secondary">
           {new Date(row.created_at).toLocaleString('zh-CN')}
@@ -446,32 +458,27 @@ export default function UsagePage() {
       ),
     },
     {
-      key: 'user_id',
-      title: t('usage.user_id'),
-      render: (row) => (
-        <span className="text-text-tertiary font-mono">
-          {row.user_email || `#${row.user_id}`}
-        </span>
-      ),
-    },
-    {
       key: 'model',
       title: t('usage.model'),
+      width: '220px',
       render: (row) => (
-        <span className="text-text">{row.model}</span>
+        <span className="block max-w-full truncate text-text" title={row.model}>
+          {row.model}
+        </span>
       ),
     },
     {
       key: 'api_key',
       title: 'API Key',
+      width: '160px',
       render: (row) => {
         if (row.api_key_deleted) {
-          return <span className="text-text-tertiary text-xs">{t('usage.api_key_deleted')}</span>;
+          return <span className="block max-w-full truncate text-text-tertiary text-xs">{t('usage.api_key_deleted')}</span>;
         }
         const hint = row.api_key_hint || `#${row.api_key_id}`;
         const name = row.api_key_name || hint;
         return (
-          <span className="text-text-secondary font-mono text-xs cursor-default" title={hint}>
+          <span className="block max-w-full truncate text-text-secondary font-mono text-xs cursor-default" title={hint}>
             {name}
           </span>
         );
@@ -480,10 +487,11 @@ export default function UsagePage() {
     {
       key: 'account_name',
       title: t('usage.account'),
+      width: '160px',
       render: (row) => {
         const label = row.account_name || `#${row.account_id}`;
         return (
-          <span className="text-text-tertiary font-mono truncate max-w-[160px] inline-block" title={label}>
+          <span className="block max-w-full truncate text-text-tertiary font-mono" title={label}>
             {label}
           </span>
         );
@@ -492,6 +500,7 @@ export default function UsagePage() {
     {
       key: 'tokens',
       title: 'TOKEN',
+      width: '160px',
       render: (row) => {
         const total = row.input_tokens + row.output_tokens + row.cached_input_tokens;
         return (
@@ -538,6 +547,7 @@ export default function UsagePage() {
     {
       key: 'cost',
       title: t('usage.cost'),
+      width: '140px',
       render: (row) => {
         return (
           <HoverCard
@@ -616,6 +626,7 @@ export default function UsagePage() {
     {
       key: 'stream',
       title: t('usage.stream'),
+      width: '84px',
       render: (row) => (
         <Badge variant={row.stream ? 'info' : 'default'}>
           {row.stream ? t('common.yes') : t('common.no')}
@@ -625,6 +636,7 @@ export default function UsagePage() {
     {
       key: 'first_token_ms',
       title: t('usage.first_token'),
+      width: '96px',
       render: (row) => (
         <span className="font-mono text-xs text-text-secondary">
           {row.first_token_ms > 0 ? (row.first_token_ms >= 1000 ? `${(row.first_token_ms / 1000).toFixed(2)}s` : `${row.first_token_ms}ms`) : '-'}
@@ -634,6 +646,7 @@ export default function UsagePage() {
     {
       key: 'duration_ms',
       title: t('usage.duration'),
+      width: '96px',
       render: (row) => (
         <span className="font-mono text-xs">
           {row.duration_ms >= 1000 ? `${(row.duration_ms / 1000).toFixed(2)}s` : `${row.duration_ms}ms`}
@@ -822,6 +835,7 @@ export default function UsagePage() {
         total={data?.total ?? 0}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
+        separateHeader
       />
     </div>
   );
