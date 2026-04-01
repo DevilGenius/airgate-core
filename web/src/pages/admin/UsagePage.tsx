@@ -538,14 +538,82 @@ export default function UsagePage() {
     {
       key: 'cost',
       title: t('usage.cost'),
-      render: (row) => (
-        <div className="font-mono text-xs text-right">
-          <div className="text-text">${row.total_cost.toFixed(6)}</div>
-          {row.actual_cost !== row.total_cost && (
-            <div className="text-text-tertiary">A ${row.actual_cost.toFixed(6)}</div>
-          )}
-        </div>
-      ),
+      render: (row) => {
+        const inputPrice = row.input_tokens > 0 ? (row.input_cost / row.input_tokens * 1_000_000) : 0;
+        const outputPrice = row.output_tokens > 0 ? (row.output_cost / row.output_tokens * 1_000_000) : 0;
+        return (
+          <HoverCard
+            content={
+              <>
+                <div className="text-xs font-semibold text-text mb-2">{t('usage.cost_detail')}</div>
+                <div className="space-y-1 text-xs font-mono">
+                  <div className="flex justify-between gap-6">
+                    <span className="text-text-tertiary">{t('usage.input_cost')}</span>
+                    <span className="text-text-secondary">${row.input_cost.toFixed(6)}</span>
+                  </div>
+                  <div className="flex justify-between gap-6">
+                    <span className="text-text-tertiary">{t('usage.output_cost')}</span>
+                    <span className="text-text-secondary">${row.output_cost.toFixed(6)}</span>
+                  </div>
+                  {inputPrice > 0 && (
+                    <div className="flex justify-between gap-6">
+                      <span className="text-text-tertiary">{t('usage.input_unit_price')}</span>
+                      <span className="text-text-secondary">${inputPrice.toFixed(4)} / 1M Token</span>
+                    </div>
+                  )}
+                  {outputPrice > 0 && (
+                    <div className="flex justify-between gap-6">
+                      <span className="text-text-tertiary">{t('usage.output_unit_price')}</span>
+                      <span className="text-text-secondary">${outputPrice.toFixed(4)} / 1M Token</span>
+                    </div>
+                  )}
+                  {row.cached_input_cost > 0 && (
+                    <div className="flex justify-between gap-6">
+                      <span className="text-text-tertiary">{t('usage.cached_input_cost')}</span>
+                      <span className="text-text-secondary">${row.cached_input_cost.toFixed(6)}</span>
+                    </div>
+                  )}
+                  <div className="my-1 border-t border-glass-border" />
+                  {row.service_tier && (
+                    <div className="flex justify-between gap-6">
+                      <span className="text-text-tertiary">{t('usage.service_tier')}</span>
+                      <span className="text-text-secondary capitalize">{row.service_tier}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-6">
+                    <span className="text-text-tertiary">{t('usage.rate_multiplier')}</span>
+                    <span className="text-text-secondary">{row.rate_multiplier.toFixed(2)}x</span>
+                  </div>
+                  <div className="flex justify-between gap-6">
+                    <span className="text-text-tertiary">{t('usage.account_rate_multiplier')}</span>
+                    <span className="text-text-secondary">{row.account_rate_multiplier.toFixed(2)}x</span>
+                  </div>
+                  <div className="my-1 border-t border-glass-border" />
+                  <div className="flex justify-between gap-6">
+                    <span className="text-text-tertiary">{t('usage.original_cost')}</span>
+                    <span className="text-text-secondary">${row.total_cost.toFixed(6)}</span>
+                  </div>
+                  <div className="flex justify-between gap-6">
+                    <span className="text-text-tertiary">{t('usage.user_charged')}</span>
+                    <span className="text-text-secondary">${row.actual_cost.toFixed(6)}</span>
+                  </div>
+                  <div className="flex justify-between gap-6">
+                    <span className="text-text-tertiary">{t('usage.account_billed')}</span>
+                    <span className="text-primary font-semibold">${row.total_cost.toFixed(6)}</span>
+                  </div>
+                </div>
+              </>
+            }
+          >
+            <div className="font-mono text-xs text-right">
+              <div className="text-text">${row.actual_cost.toFixed(6)}</div>
+              {row.actual_cost !== row.total_cost && (
+                <div className="text-text-tertiary">A ${row.total_cost.toFixed(6)}</div>
+              )}
+            </div>
+          </HoverCard>
+        );
+      },
     },
     {
       key: 'stream',
