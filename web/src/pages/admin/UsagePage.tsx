@@ -456,21 +456,23 @@ export default function UsagePage() {
     {
       key: 'model',
       title: t('usage.model'),
+      render: (row) => (
+        <span className="text-text">{row.model}</span>
+      ),
+    },
+    {
+      key: 'api_key',
+      title: 'API Key',
       render: (row) => {
-        const keyParts: string[] = [];
         if (row.api_key_deleted) {
-          keyParts.push(t('usage.api_key_deleted'));
-        } else {
-          if (row.api_key_hint) keyParts.push(row.api_key_hint);
-          if (row.api_key_name) keyParts.push(row.api_key_name);
-          if (keyParts.length === 0) keyParts.push(`API Key #${row.api_key_id}`);
+          return <span className="text-text-tertiary text-xs">{t('usage.api_key_deleted')}</span>;
         }
+        const hint = row.api_key_hint || `#${row.api_key_id}`;
+        const name = row.api_key_name;
         return (
-          <div>
-            <div className="text-text">{row.model}</div>
-            <div className="text-xs text-text-tertiary font-mono truncate max-w-[200px]" title={keyParts.join(' · ')}>
-              {keyParts.join(' · ')}
-            </div>
+          <div className="max-w-[180px]">
+            <div className="text-text-secondary font-mono text-xs">{hint}</div>
+            {name && <div className="text-[11px] text-text-tertiary truncate" title={name}>{name}</div>}
           </div>
         );
       },
