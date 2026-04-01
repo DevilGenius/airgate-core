@@ -191,15 +191,15 @@ function DBStep({ data, onChange, onNext }: DBStepProps) {
           label={t('setup.username')}
           value={data.user}
           onChange={(e) => update('user', e.target.value)}
-          placeholder="postgres"
+          placeholder="airgate"
           required
         />
         <Input
-          label={t('profile.old_password')}
+          label={t('setup.password')}
           type="password"
           value={data.password || ''}
           onChange={(e) => update('password', e.target.value)}
-          placeholder={t('setup.db_name')}
+          placeholder={t('setup.password')}
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -298,11 +298,11 @@ function RedisStep({ data, onChange, onPrev, onNext }: RedisStepProps) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label={t('profile.old_password')}
+          label={t('setup.password')}
           type="password"
           value={data.password || ''}
           onChange={(e) => update('password', e.target.value)}
-          placeholder={t('profile.old_password_placeholder')}
+          placeholder={t('setup.password')}
         />
         <Input
           label={t('setup.db_number')}
@@ -560,8 +560,7 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
       details: [
         { label: t('setup.config_host'), value: `${redisConfig.host}:${redisConfig.port}` },
         { label: t('setup.config_database'), value: String(redisConfig.db ?? 0) },
-        { label: t('profile.old_password'), value: redisConfig.password ? '******' : t('common.no') },
-        { label: t('setup.config_tls'), value: redisConfig.tls ? t('common.enable') : t('common.disable') },
+{ label: t('setup.config_tls'), value: redisConfig.tls ? t('common.enable') : t('common.disable') },
       ],
     },
     {
@@ -701,8 +700,8 @@ export default function SetupPage() {
   const [dbConfig, setDBConfig] = useState<TestDBReq>({
     host: 'localhost',
     port: 5432,
-    user: 'postgres',
-    password: '',
+    user: 'airgate',
+    password: 'airgate',
     dbname: 'airgate',
     sslmode: 'disable',
   });

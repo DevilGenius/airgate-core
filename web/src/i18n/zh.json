@@ -637,6 +637,7 @@
     "port": "端口",
     "username": "用户名",
     "db_name": "数据库名",
+    "password": "密码",
     "ssl_mode": "SSL 模式",
     "db_number": "数据库编号",
     "enable_tls": "启用 TLS 加密连接",

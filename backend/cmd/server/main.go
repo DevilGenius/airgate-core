@@ -30,7 +30,7 @@ import (
 func main() {
 	// 默认初始化日志（配置加载前先用默认值）
 	sdk.InitLogger("core", "info", "text")
-	slog.Info("AirGate Core 启动中...")
+	slog.Info("AirGate Core 启动中...", "sdk_version", sdk.SDKVersion)
 
 	// 加载国际化
 	_ = i18n.Load("locales")

@@ -637,6 +637,7 @@
     "port": "Port",
     "username": "Username",
     "db_name": "Database Name",
+    "password": "Password",
     "ssl_mode": "SSL Mode",
     "db_number": "Database Number",
     "enable_tls": "Enable TLS encryption",
