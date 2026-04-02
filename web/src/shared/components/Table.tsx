@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode, type CSSProperties } from 'react';
+import { useMemo, useRef, useCallback, type ReactNode, type CSSProperties } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 
@@ -41,6 +41,15 @@ export function Table<T extends Record<string, any>>({
   autoHeight = false,
 }: TableProps<T>) {
   const totalPages = Math.ceil(total / pageSize);
+
+  // Sync horizontal scroll between fixed header and scrollable body
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const handleBodyScroll = useCallback(() => {
+    if (bodyRef.current && headerRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  }, []);
 
   // Compute sticky styles for fixed columns
   const fixedStyles = useMemo(() => {
@@ -99,14 +108,14 @@ export function Table<T extends Record<string, any>>({
     </colgroup>
   );
 
-  const thead = (
-    <thead className="sticky top-0 z-10 bg-bg-elevated" style={{ boxShadow: '0 1px 0 var(--ag-border)' }}>
+  const theadRow = (
+    <thead className="bg-bg-elevated" style={{ boxShadow: '0 1px 0 var(--ag-border)' }}>
       <tr>
         {columns.map((col) => (
           <th
             key={col.key}
             className={thClass}
-            style={fixedStyles[col.key] ? { ...fixedStyles[col.key], zIndex: 12 } : undefined}
+            style={fixedStyles[col.key] ? { ...fixedStyles[col.key], zIndex: 2 } : undefined}
           >
             {col.title}
           </th>
@@ -140,28 +149,23 @@ export function Table<T extends Record<string, any>>({
         <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-x-auto">
           <table className="w-full min-w-max">
             {colGroup}
-            <thead className="border-b border-border bg-black/[0.03]">
-              <tr>
-                {columns.map((col) => (
-                  <th
-                    key={col.key}
-                    className={thClass}
-                    style={fixedStyles[col.key] ? { ...fixedStyles[col.key], zIndex: 2 } : undefined}
-                  >
-                    {col.title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
+            {theadRow}
             {tbody}
           </table>
         </div>
       ) : (
-        <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-hidden" style={{ height: '494px' }}>
-          <div className="h-full overflow-auto">
+        <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-hidden flex flex-col" style={{ height: '494px' }}>
+          {/* 固定表头 —— 不参与垂直滚动 */}
+          <div ref={headerRef} className="shrink-0 overflow-hidden">
             <table className="w-full min-w-max">
               {colGroup}
-              {thead}
+              {theadRow}
+            </table>
+          </div>
+          {/* 数据体 —— 独立滚动，滚动条只出现在此区域 */}
+          <div ref={bodyRef} className="flex-1 overflow-auto" onScroll={handleBodyScroll}>
+            <table className="w-full min-w-max">
+              {colGroup}
               {tbody}
             </table>
           </div>

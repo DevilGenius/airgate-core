@@ -228,19 +228,19 @@ func (h *UsageHandler) AdminUsageStats(c *gin.Context) {
 
 	// 使用 Ent 聚合查询获取总计
 	var results []struct {
-		InputTokens       int64   `json:"sum_input_tokens"`
-		OutputTokens      int64   `json:"sum_output_tokens"`
-		CachedInputTokens int64   `json:"sum_cached_input_tokens"`
-		TotalCost         float64 `json:"sum_total_cost"`
-		TotalActualCost   float64 `json:"sum_actual_cost"`
+		InputTokens       int64   `json:"input_tokens"`
+		OutputTokens      int64   `json:"output_tokens"`
+		CachedInputTokens int64   `json:"cached_input_tokens"`
+		TotalCost         float64 `json:"total_cost"`
+		TotalActualCost   float64 `json:"actual_cost"`
 	}
 	err = baseQuery.Clone().
 		Aggregate(
-			ent.Sum(usagelog.FieldInputTokens),
-			ent.Sum(usagelog.FieldOutputTokens),
-			ent.Sum(usagelog.FieldCachedInputTokens),
-			ent.Sum(usagelog.FieldTotalCost),
-			ent.Sum(usagelog.FieldActualCost),
+			ent.As(ent.Sum(usagelog.FieldInputTokens), "input_tokens"),
+			ent.As(ent.Sum(usagelog.FieldOutputTokens), "output_tokens"),
+			ent.As(ent.Sum(usagelog.FieldCachedInputTokens), "cached_input_tokens"),
+			ent.As(ent.Sum(usagelog.FieldTotalCost), "total_cost"),
+			ent.As(ent.Sum(usagelog.FieldActualCost), "actual_cost"),
 		).
 		Scan(ctx, &results)
 

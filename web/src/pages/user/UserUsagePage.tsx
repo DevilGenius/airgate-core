@@ -3,22 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { usageApi } from '../../shared/api/usage';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { Table, type Column } from '../../shared/components/Table';
+import { Table } from '../../shared/components/Table';
 import { Input, Select } from '../../shared/components/Input';
 import { DatePicker } from '../../shared/components/DatePicker';
 import { StatCard } from '../../shared/components/Card';
-import { Badge } from '../../shared/components/Badge';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { Activity, Hash, DollarSign, Coins, Search } from 'lucide-react';
-import type { UsageLogResp, UsageQuery } from '../../shared/types';
-
-/** 大数字友好显示：33518599 → "33.52M"，1234 → "1,234" */
-function formatLargeNumber(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
+import { useUsageColumns, fmtNum } from '../../shared/columns/usageColumns';
+import type { UsageQuery } from '../../shared/types';
 
 export default function UserUsagePage() {
   const { t } = useTranslation();
@@ -52,88 +44,7 @@ export default function UserUsagePage() {
   const list = data?.list ?? [];
   const total = data?.total ?? 0;
 
-  const columns: Column<UsageLogResp>[] = [
-    {
-      key: 'created_at',
-      title: t('usage.time'),
-      width: '168px',
-      render: (row) => (
-        <span className="text-text-secondary">
-          {new Date(row.created_at).toLocaleString('zh-CN')}
-        </span>
-      ),
-    },
-    {
-      key: 'model',
-      title: t('usage.model'),
-      width: '220px',
-      render: (row) => (
-        <span className="block max-w-full truncate text-text" title={row.model}>
-          {row.model}
-        </span>
-      ),
-    },
-    {
-      key: 'input_tokens',
-      title: t('usage.input_tokens'),
-      width: '120px',
-      render: (row) => (
-        <span className="font-mono">{row.input_tokens.toLocaleString()}</span>
-      ),
-    },
-    {
-      key: 'output_tokens',
-      title: t('usage.output_tokens'),
-      width: '120px',
-      render: (row) => (
-        <span className="font-mono">{row.output_tokens.toLocaleString()}</span>
-      ),
-    },
-    {
-      key: 'cached_input_tokens',
-      title: t('usage.cached_input_tokens'),
-      width: '132px',
-      render: (row) => (
-        <span className="font-mono text-text-secondary">
-          {row.cached_input_tokens > 0 ? row.cached_input_tokens.toLocaleString() : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'total_cost',
-      title: t('usage.total_cost'),
-      width: '124px',
-      render: (row) => (
-        <span className="font-mono">${row.total_cost.toFixed(6)}</span>
-      ),
-    },
-    {
-      key: 'actual_cost',
-      title: t('usage.actual_cost'),
-      width: '124px',
-      render: (row) => (
-        <span className="font-mono">${row.actual_cost.toFixed(6)}</span>
-      ),
-    },
-    {
-      key: 'stream',
-      title: t('usage.stream'),
-      width: '84px',
-      render: (row) => (
-        <Badge variant={row.stream ? 'info' : 'default'}>
-          {row.stream ? t('common.yes') : t('common.no')}
-        </Badge>
-      ),
-    },
-    {
-      key: 'duration_ms',
-      title: t('usage.duration'),
-      width: '96px',
-      render: (row) => (
-        <span className="font-mono">{row.duration_ms}ms</span>
-      ),
-    },
-  ];
+  const columns = useUsageColumns();
 
   return (
     <div>
@@ -184,7 +95,7 @@ export default function UserUsagePage() {
         />
         <StatCard
           title={t('usage.total_tokens')}
-          value={formatLargeNumber(stats?.total_tokens ?? 0)}
+          value={fmtNum(stats?.total_tokens ?? 0)}
           icon={<Hash className="w-5 h-5" />}
           accentColor="var(--ag-info)"
         />
