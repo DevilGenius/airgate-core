@@ -6,16 +6,11 @@ interface PageHeaderProps {
   actions?: ReactNode;
 }
 
-export function PageHeader({ title, description, actions }: PageHeaderProps) {
+export function PageHeader({ actions }: PageHeaderProps) {
+  if (!actions) return null;
   return (
-    <div className="flex items-center justify-between mb-8">
-      <div>
-        <h1 className="text-lg font-semibold text-text tracking-tight">{title}</h1>
-        {description && (
-          <p className="text-xs text-text-tertiary mt-0.5">{description}</p>
-        )}
-      </div>
-      {actions && <div className="flex items-center gap-3">{actions}</div>}
+    <div className="flex items-center justify-end mb-6">
+      <div className="flex items-center gap-3">{actions}</div>
     </div>
   );
 }

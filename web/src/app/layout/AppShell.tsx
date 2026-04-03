@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Link, useMatchRoute } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -121,6 +121,16 @@ export function AppShell({ children }: AppShellProps) {
     localStorage.setItem('lang', nextLang);
   };
 
+  // 根据当前路由设置浏览器标签标题
+  const activeItem = menuItems.find((item) => {
+    if (item.path === '/') return !!matchRoute({ to: '/' });
+    return !!matchRoute({ to: item.path, fuzzy: true });
+  });
+  const pageTitle = activeItem ? t(activeItem.labelKey, { defaultValue: activeItem.labelKey }) : '';
+  useEffect(() => {
+    document.title = pageTitle ? `${pageTitle} - AirGate` : 'AirGate';
+  }, [pageTitle]);
+
   return (
     <div className="flex h-screen">
       {/* 侧边栏 */}
@@ -216,7 +226,8 @@ export function AppShell({ children }: AppShellProps) {
       {/* 主内容 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 顶栏 */}
-        <header className="flex items-center justify-end h-14 px-6 border-b border-border bg-bg shrink-0">
+        <header className="flex items-center justify-between h-14 px-6 border-b border-border bg-bg shrink-0">
+          <h2 className="text-sm font-semibold text-text">{pageTitle}</h2>
           <div className="flex items-center gap-1.5">
             {/* 语言切换 */}
             <button
