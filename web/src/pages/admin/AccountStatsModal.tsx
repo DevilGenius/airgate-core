@@ -15,11 +15,9 @@ import { PlatformIcon } from '../../shared/components/PlatformIcon';
 import { DatePicker } from '../../shared/components/DatePicker';
 import { accountsApi, type AccountStatsResp } from '../../shared/api/accounts';
 
-// 饼图颜色
-const PIE_COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1',
-];
+import { decorativePalette } from '@airgate/theme';
+
+const PIE_COLORS = decorativePalette.slice(0, 10);
 
 // 预设时间范围
 type RangePreset = '7d' | '30d' | '90d' | 'custom';

@@ -3,10 +3,11 @@
 # 变量
 BACKEND_DIR := backend
 WEB_DIR := web
+SDK_FRONTEND := ../airgate-sdk/frontend
 BINARY := $(BACKEND_DIR)/server
 GO := GOTOOLCHAIN=local go
 
-.PHONY: help dev dev-backend dev-frontend build build-backend build-frontend \
+.PHONY: help dev dev-backend dev-frontend dev-sdk build build-backend build-frontend \
         ent lint fmt test clean install ci pre-commit setup-hooks \
         docker-build docker-rebuild docker-up docker-down docker-restart docker-dev
 
@@ -15,11 +16,15 @@ help: ## 显示帮助信息
 
 # ===================== 开发 =====================
 
-dev: ## 同时启动前后端开发服务器
+dev: ## 同时启动 SDK watch + 前后端开发服务器
 	@echo "启动开发环境..."
+	@$(MAKE) dev-sdk &
 	@$(MAKE) dev-backend &
 	@$(MAKE) dev-frontend
 	@wait
+
+dev-sdk: ## 启动 SDK 主题 watch 模式（修改 token 自动编译）
+	@cd $(SDK_FRONTEND) && npm run dev
 
 dev-backend: ## 启动后端（带热重载，需要 air）
 	@cd $(BACKEND_DIR) && \
@@ -104,8 +109,6 @@ setup-hooks: ## 安装 Git pre-commit hook
 	@echo "pre-commit hook 已安装"
 
 # ===================== 依赖安装 =====================
-
-SDK_FRONTEND := ../airgate-sdk/frontend
 
 install: setup-hooks ## 安装全部依赖（含 SDK 前端构建）
 	@cd $(SDK_FRONTEND) && npm install && npm run build && echo "SDK 前端构建完成"

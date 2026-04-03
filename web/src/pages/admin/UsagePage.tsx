@@ -18,11 +18,9 @@ import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
 import { useUsageColumns, fmtNum, fmtCost } from '../../shared/columns/usageColumns';
 import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 
-// 饼图颜色
-const PIE_COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1',
-];
+import { decorativePalette } from '@airgate/theme';
+
+const PIE_COLORS = decorativePalette.slice(0, 10);
 
 /** 格式化时间标签 */
 function fmtTime(timeStr: string): string {

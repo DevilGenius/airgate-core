@@ -16,18 +16,11 @@ import { queryKeys } from '../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../shared/constants';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
-// 饼图颜色
-const PIE_COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1',
-];
+import { decorativePalette } from '@airgate/theme';
 
-// 用户趋势线颜色
-const USER_COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1',
-  '#14b8a6', '#a855f7',
-];
+// 饼图 & 用户趋势线颜色（引用 SDK 装饰色）
+const PIE_COLORS = decorativePalette.slice(0, 10);
+const USER_COLORS = [...decorativePalette];
 
 type RangePreset = 'today' | '7d' | '30d' | '90d';
 type Granularity = 'hour' | 'day';

@@ -52,6 +52,10 @@ export default defineConfig({
       },
     },
   ],
+  optimizeDeps: {
+    // SDK 是 file: 链接，不预打包，确保改 token 后立即生效
+    exclude: ['@airgate/theme'],
+  },
   build: {
     rollupOptions: {
       output: {
