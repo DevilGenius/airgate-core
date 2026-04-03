@@ -65,11 +65,13 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResul
 	}
 
 	user, err := s.repo.Create(ctx, CreateUserInput{
-		Email:        input.Email,
-		PasswordHash: string(hash),
-		Username:     input.Username,
-		Role:         "user",
-		Status:       "active",
+		Email:          input.Email,
+		PasswordHash:   string(hash),
+		Username:       input.Username,
+		Role:           "user",
+		Status:         "active",
+		Balance:        input.Balance,
+		MaxConcurrency: input.MaxConcurrency,
 	})
 	if err != nil {
 		return LoginResult{}, err
@@ -84,6 +86,11 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResul
 		Token: token,
 		User:  user,
 	}, nil
+}
+
+// EmailExists 检查邮箱是否已注册。
+func (s *Service) EmailExists(ctx context.Context, email string) (bool, error) {
+	return s.repo.EmailExists(ctx, email)
 }
 
 // RefreshToken 刷新 JWT。

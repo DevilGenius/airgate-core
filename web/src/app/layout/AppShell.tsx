@@ -6,6 +6,7 @@ import { useAuth } from '../providers/AuthProvider';
 import { pluginsApi } from '../../shared/api/plugins';
 import { queryKeys } from '../../shared/queryKeys';
 import { useTheme } from '../providers/ThemeProvider';
+import { useSiteSettings } from '../providers/SiteSettingsProvider';
 import { useIsMobile } from '../../shared/hooks/useMediaQuery';
 import {
   LayoutDashboard,
@@ -28,6 +29,8 @@ import {
   Moon,
   Menu,
   ShieldCheck,
+  BookOpen,
+  MessageCircle,
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -60,11 +63,12 @@ const userMenuItems: MenuItem[] = [
   { path: '/usage', labelKey: 'nav.my_usage', icon: <BarChart3 className="w-[18px] h-[18px]" /> },
 ];
 
-function usePluginMenuItems(): MenuItem[] {
+function usePluginMenuItems(isAdmin: boolean): MenuItem[] {
   const { data } = useQuery({
     queryKey: queryKeys.pluginsMenu(),
     queryFn: () => pluginsApi.list(),
     staleTime: 60_000,
+    enabled: isAdmin,
   });
 
   if (!data?.list) return [];
@@ -90,6 +94,7 @@ export function AppShell({ children }: AppShellProps) {
   const { user, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
+  const site = useSiteSettings();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -110,7 +115,7 @@ export function AppShell({ children }: AppShellProps) {
   }, [mobileOpen]);
 
   const isAdmin = user?.role === 'admin';
-  const pluginMenuItems = usePluginMenuItems();
+  const pluginMenuItems = usePluginMenuItems(isAdmin);
   const adminUserItems = userMenuItems
     .filter((item) => item.path !== '/')
     .map((item, i) => (i === 0 ? { ...item, sectionKey: 'nav.personal' } : item));
@@ -145,8 +150,8 @@ export function AppShell({ children }: AppShellProps) {
   });
   const pageTitle = activeItem ? t(activeItem.labelKey, { defaultValue: activeItem.labelKey }) : '';
   useEffect(() => {
-    document.title = 'AirGate';
-  }, []);
+    document.title = site.site_name || 'AirGate';
+  }, [site.site_name]);
 
   // On mobile, sidebar is always expanded inside the drawer
   const sidebarCollapsed = isMobile ? false : collapsed;
@@ -156,16 +161,20 @@ export function AppShell({ children }: AppShellProps) {
       {/* Logo */}
       <div className="flex items-center h-16 px-4 border-b border-border">
         <div className="flex items-center gap-2.5 overflow-hidden">
-          <div className="flex items-center justify-center w-8 h-8 rounded-[10px] bg-primary-subtle flex-shrink-0">
-            <Zap className="w-4 h-4 text-primary" />
-          </div>
+          {site.site_logo ? (
+            <img src={site.site_logo} alt="" className="w-8 h-8 rounded-sm flex-shrink-0 object-cover" />
+          ) : (
+            <div className="flex items-center justify-center w-8 h-8 rounded-[10px] bg-primary-subtle flex-shrink-0">
+              <Zap className="w-4 h-4 text-primary" />
+            </div>
+          )}
           {!sidebarCollapsed && (
             <div className="overflow-hidden">
               <h1 className="text-sm font-semibold text-text tracking-tight whitespace-nowrap">
-                AirGate
+                {site.site_name || 'AirGate'}
               </h1>
               <p className="text-[9px] text-text-tertiary font-mono tracking-[0.1em] uppercase">
-                Control Panel
+                {site.site_subtitle || 'Control Panel'}
               </p>
             </div>
           )}
@@ -222,9 +231,9 @@ export function AppShell({ children }: AppShellProps) {
         ))}
       </nav>
 
-      {/* Collapse toggle (desktop only) */}
-      {!isMobile && (
-        <div className="border-t border-border p-2.5">
+      {/* Links + Collapse toggle */}
+      <div className="border-t border-border p-2.5 space-y-1">
+        {!isMobile && (
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="flex items-center justify-center w-full h-7 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
@@ -235,8 +244,8 @@ export function AppShell({ children }: AppShellProps) {
               <PanelLeftClose className="w-3.5 h-3.5" />
             )}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 
@@ -284,6 +293,25 @@ export function AppShell({ children }: AppShellProps) {
             <h2 className="text-sm font-semibold text-text">{pageTitle}</h2>
           </div>
           <div className="flex items-center gap-1.5">
+            {/* Docs */}
+            {site.doc_url && (
+              <a
+                href={site.doc_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+                title={t('nav.docs')}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+              </a>
+            )}
+            {/* Contact */}
+            {site.contact_info && (
+              <div className="flex items-center gap-1.5 text-text-tertiary hidden sm:flex">
+                <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-xs">{site.contact_info}</span>
+              </div>
+            )}
             {/* Language toggle */}
             <button
               onClick={toggleLanguage}
@@ -305,17 +333,18 @@ export function AppShell({ children }: AppShellProps) {
             <div className="w-px h-5 bg-border mx-1.5" />
 
             {/* User info */}
-            <div className="flex items-center gap-2.5 pl-1">
-              <span className="text-xs font-medium text-text hidden sm:inline">
-                {user?.username || user?.email}
-              </span>
+            <div className="flex items-center gap-2 pl-1">
+              <div className="hidden sm:block text-center">
+                <p className="text-xs font-medium text-text leading-tight">{user?.username || user?.email?.split('@')[0]}</p>
+                <p className="text-[10px] text-text-tertiary leading-tight">{user?.email}</p>
+              </div>
               {isAdmin ? (
-                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-subtle text-primary" title={t('nav.admin')}>
-                  <ShieldCheck className="w-4 h-4" />
+                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-subtle text-primary shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5" />
                 </div>
               ) : (
-                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-subtle text-[10px] font-bold text-primary">
-                  {user?.email?.charAt(0).toUpperCase() || 'U'}
+                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-subtle text-[11px] font-bold text-primary shrink-0">
+                  {(user?.username || user?.email || 'U').charAt(0).toUpperCase()}
                 </div>
               )}
               <button

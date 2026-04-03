@@ -58,6 +58,11 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult,
 	}, nil
 }
 
+// StatsByModel 按模型分组统计。
+func (s *Service) StatsByModel(ctx context.Context, filter StatsFilter) ([]ModelStats, error) {
+	return s.repo.StatsByModel(ctx, filter)
+}
+
 // AdminStats 查询管理员聚合统计。
 func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy string) (StatsResult, error) {
 	summary, err := s.repo.SummaryAdmin(ctx, filter)

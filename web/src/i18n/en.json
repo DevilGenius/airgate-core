@@ -95,7 +95,9 @@
     "my_keys": "API Keys",
     "my_usage": "Usage",
     "admin": "Admin",
-    "user": "User"
+    "user": "User",
+    "docs": "Docs",
+    "contact": "Contact"
   },
 
   "auth": {
@@ -112,7 +114,25 @@
     "register_failed": "Registration failed, please try again later",
     "register_success": "Registration successful! Please login with your email and password.",
     "password_mismatch": "Passwords do not match",
-    "password_too_short": "Password must be at least 8 characters"
+    "password_too_short": "Password must be at least 8 characters",
+    "welcome_title": "AI API Gateway",
+    "welcome_desc": "Manage multi-platform AI model APIs with unified access, load balancing, and usage tracking.",
+    "feature_1": "Multi-platform",
+    "feature_2": "Load Balancing",
+    "feature_3": "Usage Tracking",
+    "sign_in_title": "Welcome back",
+    "sign_in_subtitle": "Sign in to your account to continue",
+    "sign_up_title": "Create account",
+    "sign_up_subtitle": "Sign up to get started",
+    "verify_code": "Verification Code",
+    "verify_code_placeholder": "6-digit code",
+    "send_code": "Send Code",
+    "resend_code": "Resend",
+    "send_code_failed": "Failed to send verification code",
+    "email_required": "Please enter your email",
+    "code_required": "Please enter the verification code",
+    "next_step": "Next",
+    "change_email": "Change"
   },
 
   "dashboard": {
@@ -172,16 +192,12 @@
 
   "user_overview": {
     "title": "My Overview",
-    "description": "View your account status, usage, API keys, and subscriptions",
+    "description": "View your account status and usage",
     "balance": "Balance",
     "max_concurrency": "Max Concurrency",
-    "active_subscriptions": "Active Subscriptions",
     "recent_usage": "Recent Usage",
-    "my_keys": "My API Keys",
-    "enabled_keys": "{{count}} enabled",
-    "recent_usage_empty": "No usage records yet",
-    "subscriptions_empty": "No active subscriptions",
-    "keys_empty": "No API keys yet"
+    "today": "Today",
+    "cumulative": "Cumulative"
   },
 
   "users": {
@@ -510,6 +526,9 @@
     "cost_detail": "Cost Detail",
     "first_token": "TTFT",
     "stream": "Stream",
+    "type": "Type",
+    "type_sync": "Sync",
+    "type_stream": "Stream",
     "duration": "Duration",
     "requests": "Requests",
     "tokens": "Tokens",
@@ -567,7 +586,57 @@
     "title": "Settings",
     "description": "Manage global system configuration",
     "no_settings": "No settings available",
-    "save_success": "Settings saved"
+    "save_success": "Settings saved",
+
+    "tab_site": "Site Branding",
+    "tab_registration": "Registration",
+    "tab_defaults": "User Defaults",
+    "tab_smtp": "Email (SMTP)",
+
+    "site_branding": "Site Branding",
+    "site_name": "Site Name",
+    "site_name_hint": "Displayed in browser title bar and sidebar logo",
+    "site_subtitle": "Subtitle",
+    "site_logo": "Site Logo",
+    "site_logo_hint": "Upload an image or enter a URL, leave empty for default icon",
+    "upload_logo": "Upload",
+    "change_logo": "Change",
+    "logo_too_large": "Image must be under 512KB",
+    "api_base_url": "API Base URL",
+    "api_base_url_hint": "API endpoint URL shown to users for key usage instructions",
+    "frontend_url": "Frontend URL",
+    "contact_info": "Contact Info",
+    "doc_url": "Documentation URL",
+    "home_content": "Home Page Content",
+    "home_content_hint": "Supports HTML, leave empty to hide",
+
+    "registration_auth": "Registration & Authentication",
+    "registration_enabled": "Open Registration",
+    "registration_enabled_desc": "When disabled, only admins can create new users",
+    "email_verify_enabled": "Email Verification",
+    "email_verify_enabled_desc": "Require email verification on registration (SMTP must be configured)",
+    "email_verify_no_smtp": "Please configure SMTP in \"Email\" tab first",
+    "email_suffix_whitelist": "Email Suffix Whitelist",
+    "email_suffix_whitelist_hint": "One suffix per line (e.g. gmail.com), leave empty for no restriction",
+
+    "new_user_defaults": "New User Defaults",
+    "default_balance": "Default Balance",
+    "default_balance_hint": "Initial balance for newly registered users (USD)",
+    "default_concurrency": "Default Concurrency",
+    "default_concurrency_hint": "Default max concurrent requests for new users",
+
+    "smtp_config": "SMTP Mail Server",
+    "smtp_host": "Server Host",
+    "smtp_port": "Port",
+    "smtp_username": "Username",
+    "smtp_password": "Password",
+    "smtp_from_email": "From Email",
+    "smtp_from_name": "From Name",
+    "smtp_use_tls": "Use TLS",
+    "smtp_use_tls_desc": "Connect to SMTP server with TLS encryption (usually port 465)",
+    "smtp_test": "Send Test Email",
+    "smtp_test_prompt": "Enter the email address to receive the test email:",
+    "smtp_test_success": "Test email sent, please check your inbox"
   },
 
   "profile": {

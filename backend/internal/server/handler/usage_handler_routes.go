@@ -72,12 +72,32 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.UsageStatsResp{
+	// 查询模型分布
+	uid64 := int64(userID)
+	modelStats, _ := h.service.StatsByModel(c.Request.Context(), appusage.StatsFilter{
+		UserID:    &uid64,
+		Platform:  query.Platform,
+		Model:     query.Model,
+		StartDate: query.StartDate,
+		EndDate:   query.EndDate,
+	})
+
+	resp := dto.UsageStatsResp{
 		TotalRequests:   summary.TotalRequests,
 		TotalTokens:     summary.TotalTokens,
 		TotalCost:       summary.TotalCost,
 		TotalActualCost: summary.TotalActualCost,
-	})
+	}
+	for _, m := range modelStats {
+		resp.ByModel = append(resp.ByModel, dto.ModelStats{
+			Model:      m.Model,
+			Requests:   m.Requests,
+			Tokens:     m.Tokens,
+			TotalCost:  m.TotalCost,
+			ActualCost: m.ActualCost,
+		})
+	}
+	response.Success(c, resp)
 }
 
 // AdminUsage 管理员查看全局使用记录。

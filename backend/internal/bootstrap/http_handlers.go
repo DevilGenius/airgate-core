@@ -15,6 +15,7 @@ import (
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/config"
+	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
@@ -52,6 +53,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	apiKeyService := appapikey.NewService(apiKeyStore, dep.Config.APIKeySecret())
 	authStore := store.NewAuthStore(dep.DB)
 	authService := appauth.NewService(authStore, dep.JWTMgr)
+	verifyCodeStore := mailer.NewVerifyCodeStore()
 	accountStore := store.NewAccountStore(dep.DB)
 	accountService := appaccount.NewService(accountStore, dep.PluginMgr, dep.Concurrency)
 	groupStore := store.NewGroupStore(dep.DB)
@@ -71,7 +73,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	usageService := appusage.NewService(usageStore)
 
 	return &HTTPHandlers{
-		Auth:         handler.NewAuthHandler(authService),
+		Auth:         handler.NewAuthHandler(authService, settingsService, verifyCodeStore),
 		User:         handler.NewUserHandler(userService),
 		Account:      handler.NewAccountHandler(accountService),
 		Group:        handler.NewGroupHandler(groupService),

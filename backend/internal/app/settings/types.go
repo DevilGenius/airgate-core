@@ -13,6 +13,7 @@ type Setting struct {
 type ItemInput struct {
 	Key   string
 	Value string
+	Group string
 }
 
 // Repository 定义设置域持久化接口。

@@ -174,12 +174,12 @@ export function useUsageColumns(): Column<UsageLogResp>[] {
     },
     {
       key: 'stream',
-      title: t('usage.stream'),
+      title: t('usage.type'),
       width: '84px',
       hideOnMobile: true,
       render: (row) => (
         <Badge variant={row.stream ? 'info' : 'default'}>
-          {row.stream ? t('common.yes') : t('common.no')}
+          {row.stream ? t('usage.type_stream') : t('usage.type_sync')}
         </Badge>
       ),
     },

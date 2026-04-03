@@ -39,6 +39,7 @@ export interface RegisterReq {
   email: string;
   password: string;
   username?: string;
+  verify_code?: string;
 }
 
 export interface RefreshResp {
@@ -488,6 +489,17 @@ export interface UpdateSettingsReq {
 export interface SettingItem {
   key: string;
   value: string;
+  group?: string;
+}
+
+export interface TestSMTPReq {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  use_tls: boolean;
+  from: string;
+  to: string;
 }
 
 // ==================== Dashboard ====================

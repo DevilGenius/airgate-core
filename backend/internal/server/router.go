@@ -23,12 +23,16 @@ func (s *Server) registerRoutes() {
 	// API v1 路由组
 	v1 := r.Group("/api/v1")
 
+	// === 公共路由（无需认证） ===
+	v1.GET("/settings/public", handlers.Settings.GetPublicSettings)
+
 	// === 认证路由（无需 JWT，带限流保护） ===
 	authGroup := v1.Group("/auth")
 	authGroup.Use(middleware.RateLimit(s.limiter))
 	{
 		authGroup.POST("/login", handlers.Auth.Login)
 		authGroup.POST("/register", handlers.Auth.Register)
+		authGroup.POST("/send-verify-code", handlers.Auth.SendVerifyCode)
 	}
 
 	// === 用户路由（需要 JWT 认证） ===
@@ -133,6 +137,8 @@ func (s *Server) registerRoutes() {
 		// 系统设置
 		adminGroup.GET("/settings", handlers.Settings.GetSettings)
 		adminGroup.PUT("/settings", handlers.Settings.UpdateSettings)
+		adminGroup.POST("/settings/test-smtp", handlers.Settings.TestSMTP)
+		adminGroup.POST("/settings/upload", handlers.Settings.UploadFile)
 
 		// 仪表盘（管理员）
 		adminGroup.GET("/dashboard/stats", handlers.Dashboard.Stats)
@@ -145,6 +151,9 @@ func (s *Server) registerRoutes() {
 	{
 		extGroup.Any("/:pluginName/*path", s.extensionProxy.Handle)
 	}
+
+	// 上传文件静态服务
+	r.Static("/uploads", "data/uploads")
 
 	// 插件前端静态资源（/plugins/{pluginName}/assets/index.js）
 	pluginDir := s.cfg.Plugins.Dir

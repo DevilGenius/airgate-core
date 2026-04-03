@@ -4,6 +4,7 @@ import { AlertTriangle, Copy } from 'lucide-react';
 import { Modal } from '../../../shared/components/Modal';
 import { Button } from '../../../shared/components/Button';
 import { useToast } from '../../../shared/components/Toast';
+import { useSiteSettings } from '../../../app/providers/SiteSettingsProvider';
 import { apikeysApi } from '../../../shared/api/apikeys';
 import type { APIKeyResp, GroupResp } from '../../../shared/types';
 
@@ -195,7 +196,8 @@ export function UseKeyModal({
 }) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const baseUrl = window.location.origin;
+  const site = useSiteSettings();
+  const baseUrl = site.api_base_url || window.location.origin;
 
   return (
     <Modal

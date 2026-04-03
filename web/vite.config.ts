@@ -76,6 +76,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': BACKEND,
+      '/uploads': BACKEND,
       '/plugins': BACKEND,
       '/setup/status': BACKEND,
       '/setup/test-db': BACKEND,

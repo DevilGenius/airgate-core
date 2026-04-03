@@ -95,7 +95,9 @@
     "my_keys": "API 密钥",
     "my_usage": "使用记录",
     "admin": "管理员",
-    "user": "用户"
+    "user": "用户",
+    "docs": "文档",
+    "contact": "联系我们"
   },
 
   "auth": {
@@ -112,7 +114,25 @@
     "register_failed": "注册失败，请稍后重试",
     "register_success": "注册成功！请使用邮箱和密码登录。",
     "password_mismatch": "两次输入的密码不一致",
-    "password_too_short": "密码至少需要 8 个字符"
+    "password_too_short": "密码至少需要 8 个字符",
+    "welcome_title": "智能 AI API 网关",
+    "welcome_desc": "统一管理多平台 AI 模型接口，安全高效地分发和监控 API 调用。",
+    "feature_1": "多平台",
+    "feature_2": "负载均衡",
+    "feature_3": "用量追踪",
+    "sign_in_title": "欢迎回来",
+    "sign_in_subtitle": "登录您的账户以继续",
+    "sign_up_title": "创建账户",
+    "sign_up_subtitle": "注册以开始使用",
+    "verify_code": "验证码",
+    "verify_code_placeholder": "6 位验证码",
+    "send_code": "发送验证码",
+    "resend_code": "重新发送",
+    "send_code_failed": "发送验证码失败",
+    "email_required": "请输入邮箱地址",
+    "code_required": "请输入验证码",
+    "next_step": "下一步",
+    "change_email": "更换"
   },
 
   "dashboard": {
@@ -172,16 +192,12 @@
 
   "user_overview": {
     "title": "个人概览",
-    "description": "查看你的账户状态、使用情况、密钥与订阅信息",
+    "description": "查看你的账户状态和使用情况",
     "balance": "账户余额",
     "max_concurrency": "最大并发",
-    "active_subscriptions": "活跃订阅",
     "recent_usage": "最近使用记录",
-    "my_keys": "我的密钥",
-    "enabled_keys": "{{count}} 个启用中",
-    "recent_usage_empty": "暂无使用记录",
-    "subscriptions_empty": "暂无活跃订阅",
-    "keys_empty": "暂无 API 密钥"
+    "today": "今日统计",
+    "cumulative": "累计统计"
   },
 
   "users": {
@@ -510,6 +526,9 @@
     "cost_detail": "成本明细",
     "first_token": "首 Token",
     "stream": "流式",
+    "type": "类型",
+    "type_sync": "同步",
+    "type_stream": "流式",
     "duration": "耗时",
     "requests": "请求数",
     "tokens": "Token",
@@ -567,7 +586,57 @@
     "title": "系统设置",
     "description": "管理系统全局配置项",
     "no_settings": "暂无设置项",
-    "save_success": "设置已保存"
+    "save_success": "设置已保存",
+
+    "tab_site": "站点品牌",
+    "tab_registration": "注册认证",
+    "tab_defaults": "新用户默认值",
+    "tab_smtp": "邮件配置",
+
+    "site_branding": "站点品牌信息",
+    "site_name": "站点名称",
+    "site_name_hint": "显示在浏览器标题栏和侧边栏 Logo 旁",
+    "site_subtitle": "站点副标题",
+    "site_logo": "站点 Logo",
+    "site_logo_hint": "上传图片或输入 URL，留空使用默认图标",
+    "upload_logo": "上传图片",
+    "change_logo": "更换图片",
+    "logo_too_large": "图片大小不能超过 512KB",
+    "api_base_url": "API 基础地址",
+    "api_base_url_hint": "展示给用户的 API 接口地址，用于密钥使用说明",
+    "frontend_url": "前端地址",
+    "contact_info": "联系方式",
+    "doc_url": "文档链接",
+    "home_content": "首页自定义内容",
+    "home_content_hint": "支持 HTML，留空则不显示",
+
+    "registration_auth": "注册与认证",
+    "registration_enabled": "开放注册",
+    "registration_enabled_desc": "关闭后新用户无法自行注册，只能由管理员创建",
+    "email_verify_enabled": "邮箱验证",
+    "email_verify_enabled_desc": "注册时要求验证邮箱，需先配置 SMTP",
+    "email_verify_no_smtp": "请先在「邮件配置」中配置 SMTP 后才能开启",
+    "email_suffix_whitelist": "注册邮箱后缀白名单",
+    "email_suffix_whitelist_hint": "每行一个后缀（如 gmail.com），留空不限制",
+
+    "new_user_defaults": "新用户默认值",
+    "default_balance": "默认余额",
+    "default_balance_hint": "新注册用户的初始余额（美元）",
+    "default_concurrency": "默认并发数",
+    "default_concurrency_hint": "新注册用户的默认最大并发请求数",
+
+    "smtp_config": "SMTP 邮件服务器",
+    "smtp_host": "服务器地址",
+    "smtp_port": "端口",
+    "smtp_username": "用户名",
+    "smtp_password": "密码",
+    "smtp_from_email": "发件人邮箱",
+    "smtp_from_name": "发件人名称",
+    "smtp_use_tls": "使用 TLS",
+    "smtp_use_tls_desc": "通过 TLS 加密连接 SMTP 服务器（端口通常为 465）",
+    "smtp_test": "发送测试邮件",
+    "smtp_test_prompt": "请输入接收测试邮件的邮箱地址：",
+    "smtp_test_success": "测试邮件已发送，请检查收件箱"
   },
 
   "profile": {

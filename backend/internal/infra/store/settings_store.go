@@ -57,10 +57,13 @@ func (s *SettingsStore) UpsertMany(ctx context.Context, items []appsettings.Item
 			Only(ctx)
 		if err != nil {
 			if ent.IsNotFound(err) {
-				if _, err := tx.Setting.Create().
+				creator := tx.Setting.Create().
 					SetKey(item.Key).
-					SetValue(item.Value).
-					Save(ctx); err != nil {
+					SetValue(item.Value)
+				if item.Group != "" {
+					creator = creator.SetGroup(item.Group)
+				}
+				if _, err := creator.Save(ctx); err != nil {
 					return err
 				}
 				continue
@@ -68,9 +71,11 @@ func (s *SettingsStore) UpsertMany(ctx context.Context, items []appsettings.Item
 			return err
 		}
 
-		if _, err := existing.Update().
-			SetValue(item.Value).
-			Save(ctx); err != nil {
+		updater := existing.Update().SetValue(item.Value)
+		if item.Group != "" {
+			updater = updater.SetGroup(item.Group)
+		}
+		if _, err := updater.Save(ctx); err != nil {
 			return err
 		}
 	}

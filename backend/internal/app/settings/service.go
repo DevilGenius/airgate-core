@@ -24,6 +24,7 @@ func (s *Service) Update(ctx context.Context, items []ItemInput) error {
 		cloned = append(cloned, ItemInput{
 			Key:   item.Key,
 			Value: item.Value,
+			Group: item.Group,
 		})
 	}
 	return s.repo.UpsertMany(ctx, cloned)

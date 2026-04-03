@@ -14,9 +14,15 @@ type LoginResp struct {
 
 // RegisterReq 注册请求
 type RegisterReq struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
-	Username string `json:"username"`
+	Email      string `json:"email" binding:"required,email"`
+	Password   string `json:"password" binding:"required,min=6"`
+	Username   string `json:"username"`
+	VerifyCode string `json:"verify_code"`
+}
+
+// SendVerifyCodeReq 发送验证码请求
+type SendVerifyCodeReq struct {
+	Email string `json:"email" binding:"required,email"`
 }
 
 // RefreshResp Token 刷新响应

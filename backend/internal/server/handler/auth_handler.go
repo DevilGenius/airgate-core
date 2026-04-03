@@ -8,17 +8,25 @@ import (
 	"github.com/gin-gonic/gin"
 
 	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
+	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
+	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 )
 
 // AuthHandler 认证相关 Handler。
 type AuthHandler struct {
-	service *appauth.Service
+	service         *appauth.Service
+	settingsService *appsettings.Service
+	codeStore       *mailer.VerifyCodeStore
 }
 
 // NewAuthHandler 创建认证 Handler。
-func NewAuthHandler(service *appauth.Service) *AuthHandler {
-	return &AuthHandler{service: service}
+func NewAuthHandler(service *appauth.Service, settingsService *appsettings.Service, codeStore *mailer.VerifyCodeStore) *AuthHandler {
+	return &AuthHandler{
+		service:         service,
+		settingsService: settingsService,
+		codeStore:       codeStore,
+	}
 }
 
 func (h *AuthHandler) handleLoginError(err error) (int, string, bool) {

@@ -29,9 +29,11 @@ type LoginInput struct {
 
 // RegisterInput 注册输入。
 type RegisterInput struct {
-	Email    string
-	Password string
-	Username string
+	Email          string
+	Password       string
+	Username       string
+	Balance        float64
+	MaxConcurrency int
 }
 
 // AuthIdentity 表示当前登录身份。
@@ -49,11 +51,13 @@ type LoginResult struct {
 
 // CreateUserInput 创建用户输入。
 type CreateUserInput struct {
-	Email        string
-	PasswordHash string
-	Username     string
-	Role         string
-	Status       string
+	Email          string
+	PasswordHash   string
+	Username       string
+	Role           string
+	Status         string
+	Balance        float64
+	MaxConcurrency int
 }
 
 // Repository 认证域仓储接口。
