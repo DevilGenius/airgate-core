@@ -607,6 +607,7 @@
     "upload_logo": "Upload",
     "change_logo": "Change",
     "logo_too_large": "Image must be under 512KB",
+    "restore_default_logo": "Restore default",
     "api_base_url": "API Base URL",
     "api_base_url_hint": "API endpoint URL shown to users for key usage instructions",
     "frontend_url": "Frontend URL",

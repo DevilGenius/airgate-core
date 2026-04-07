@@ -5,11 +5,11 @@ import { Button } from '../shared/components/Button';
 import { Input } from '../shared/components/Input';
 import { Alert } from '../shared/components/Alert';
 import { useAuth } from '../app/providers/AuthProvider';
-import { useSiteSettings } from '../app/providers/SiteSettingsProvider';
+import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { ApiError } from '../shared/api/client';
-import { Mail, Lock, User, Zap, ArrowRight, Sun, Moon, ShieldCheck, Key } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key } from 'lucide-react';
 
 type TabKey = 'login' | 'register' | 'apikey';
 
@@ -379,15 +379,7 @@ export default function LoginPage() {
         {/* 内容 */}
         <div className={`relative z-10 px-12 max-w-md ${theme === 'dark' ? 'text-text' : 'text-white'}`}>
           <div className="flex items-center gap-3 mb-8">
-            {site.site_logo ? (
-              <img src={site.site_logo} alt="" className={`w-10 h-10 rounded-sm object-cover ${theme === 'dark' ? '' : 'brightness-0 invert'}`} />
-            ) : (
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl"
-                style={{ background: theme === 'dark' ? 'var(--ag-primary-subtle)' : 'rgba(255,255,255,0.15)' }}
-              >
-                <Zap className="w-5 h-5" style={{ color: theme === 'dark' ? 'var(--ag-primary)' : 'white' }} />
-              </div>
-            )}
+            <img src={site.site_logo || defaultLogoUrl} alt="" className={`w-10 h-10 rounded-sm object-cover ${theme === 'dark' ? '' : (!site.site_logo ? '' : 'brightness-0 invert')}`} />
             <span className="text-xl font-bold tracking-tight">{site.site_name || 'AirGate'}</span>
           </div>
           <h2 className="text-3xl font-bold leading-snug mb-4">
@@ -437,13 +429,7 @@ export default function LoginPage() {
         <div className="relative w-full max-w-[420px]" style={{ animation: 'ag-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)' }}>
           {/* 移动端 Logo */}
           <div className="text-center mb-8 lg:hidden">
-            {site.site_logo ? (
-              <img src={site.site_logo} alt="" className="w-11 h-11 rounded-sm mb-3 mx-auto object-cover" />
-            ) : (
-              <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-primary-subtle mb-3">
-                <Zap className="w-5 h-5 text-primary" />
-              </div>
-            )}
+            <img src={site.site_logo || defaultLogoUrl} alt="" className="w-11 h-11 rounded-sm mb-3 mx-auto object-cover" />
             <h1 className="text-lg font-bold text-text tracking-tight">
               {site.site_name || t('app_name')}
             </h1>

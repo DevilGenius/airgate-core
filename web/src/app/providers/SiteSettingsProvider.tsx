@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { settingsApi } from '../../shared/api/settings';
+import defaultLogoUrl from '../../assets/logo.svg';
+
+export { defaultLogoUrl };
 
 interface SiteSettings {
   site_name: string;
@@ -46,16 +49,16 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     email_verify_enabled: data?.email_verify_enabled === 'true',
   };
 
-  // 动态设置 favicon
+  // 动态设置 favicon（优先自定义 logo，否则使用默认 logo）
   useEffect(() => {
-    if (!value.site_logo) return;
+    const logoHref = value.site_logo || defaultLogoUrl;
     let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (!link) {
       link = document.createElement('link');
       link.rel = 'icon';
       document.head.appendChild(link);
     }
-    link.href = value.site_logo;
+    link.href = logoHref;
   }, [value.site_logo]);
 
   return (

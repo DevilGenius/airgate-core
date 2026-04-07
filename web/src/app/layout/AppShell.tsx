@@ -6,7 +6,7 @@ import { useAuth } from '../providers/AuthProvider';
 import { pluginsApi } from '../../shared/api/plugins';
 import { queryKeys } from '../../shared/queryKeys';
 import { useTheme } from '../providers/ThemeProvider';
-import { useSiteSettings } from '../providers/SiteSettingsProvider';
+import { useSiteSettings, defaultLogoUrl } from '../providers/SiteSettingsProvider';
 import { useIsMobile } from '../../shared/hooks/useMediaQuery';
 import {
   LayoutDashboard,
@@ -23,7 +23,6 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeft,
-  Zap,
   Languages,
   Sun,
   Moon,
@@ -170,13 +169,7 @@ export function AppShell({ children }: AppShellProps) {
       {/* Logo */}
       <div className="flex items-center h-16 px-4 border-b border-border">
         <div className="flex items-center gap-2.5 overflow-hidden">
-          {site.site_logo ? (
-            <img src={site.site_logo} alt="" className="w-8 h-8 rounded-sm flex-shrink-0 object-cover" />
-          ) : (
-            <div className="flex items-center justify-center w-8 h-8 rounded-[10px] bg-primary-subtle flex-shrink-0">
-              <Zap className="w-4 h-4 text-primary" />
-            </div>
-          )}
+          <img src={site.site_logo || defaultLogoUrl} alt="" className="w-8 h-8 rounded-sm flex-shrink-0 object-cover" />
           {!sidebarCollapsed && (
             <div className="overflow-hidden">
               <h1 className="text-sm font-semibold text-text tracking-tight whitespace-nowrap">

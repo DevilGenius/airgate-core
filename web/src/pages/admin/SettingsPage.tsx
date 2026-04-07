@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../../shared/api/settings';
+import { defaultLogoUrl } from '../../app/providers/SiteSettingsProvider';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { Button } from '../../shared/components/Button';
@@ -552,9 +553,9 @@ function LogoUpload({ value, onChange }: { value: string; onChange: (url: string
 
   return (
     <div className="flex items-center gap-3">
-      {value ? (
-        <div className="relative group">
-          <img src={value} alt="Logo" className="w-14 h-14 rounded-sm object-cover" />
+      <div className="relative group">
+        <img src={value || defaultLogoUrl} alt="Logo" className="w-14 h-14 rounded-sm object-cover" />
+        {value && (
           <button
             type="button"
             onClick={() => onChange('')}
@@ -562,19 +563,27 @@ function LogoUpload({ value, onChange }: { value: string; onChange: (url: string
           >
             <X className="w-3 h-3" />
           </button>
-        </div>
-      ) : (
-        <div className="w-14 h-14 rounded-xl border-2 border-dashed border-glass-border flex items-center justify-center text-text-tertiary">
-          <Upload className="w-5 h-5" />
-        </div>
-      )}
-      <label className="cursor-pointer">
-        <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/x-icon,image/webp" onChange={handleFile} className="hidden" />
-        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-glass-border hover:bg-bg-hover transition-colors">
-          <Upload className="w-3.5 h-3.5" />
-          {value ? t('settings.change_logo') : t('settings.upload_logo')}
-        </span>
-      </label>
+        )}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="cursor-pointer">
+          <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/x-icon,image/webp" onChange={handleFile} className="hidden" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-glass-border hover:bg-bg-hover transition-colors">
+            <Upload className="w-3.5 h-3.5" />
+            {value ? t('settings.change_logo') : t('settings.upload_logo')}
+          </span>
+        </label>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            {t('settings.restore_default_logo')}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
