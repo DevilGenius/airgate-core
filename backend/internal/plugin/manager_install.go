@@ -17,7 +17,6 @@ import (
 
 	sdk "github.com/DouDOU-start/airgate-sdk"
 	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
-	"github.com/DouDOU-start/airgate-sdk/shared"
 )
 
 // Uninstall 卸载插件。
@@ -91,10 +90,10 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 	}
 
 	client := goplugin.NewClient(&goplugin.ClientConfig{
-		HandshakeConfig: shared.Handshake,
+		HandshakeConfig: sdkgrpc.Handshake,
 		Plugins: goplugin.PluginSet{
-			shared.PluginKeyGateway:   &sdkgrpc.GatewayGRPCPlugin{},
-			shared.PluginKeyExtension: &sdkgrpc.ExtensionGRPCPlugin{},
+			sdkgrpc.PluginKeyGateway:   &sdkgrpc.GatewayGRPCPlugin{},
+			sdkgrpc.PluginKeyExtension: &sdkgrpc.ExtensionGRPCPlugin{},
 		},
 		Cmd:              exec.Command(tmpBinary),
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
@@ -106,7 +105,7 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 		return "", fmt.Errorf("连接探测进程失败: %w", err)
 	}
 
-	raw, err := rpcClient.Dispense(shared.PluginKeyGateway)
+	raw, err := rpcClient.Dispense(sdkgrpc.PluginKeyGateway)
 	if err != nil {
 		return "", fmt.Errorf("获取探测接口失败: %w", err)
 	}
@@ -117,7 +116,7 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 
 	info := probe.Info()
 	if info.Type == sdk.PluginTypeExtension {
-		extRaw, err := rpcClient.Dispense(shared.PluginKeyExtension)
+		extRaw, err := rpcClient.Dispense(sdkgrpc.PluginKeyExtension)
 		if err != nil {
 			return "", fmt.Errorf("获取 extension 探测接口失败: %w", err)
 		}

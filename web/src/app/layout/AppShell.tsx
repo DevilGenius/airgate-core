@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   BookOpen,
   MessageCircle,
+  Github,
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -301,6 +302,16 @@ export function AppShell({ children }: AppShellProps) {
             <h2 className="text-sm font-semibold text-text">{pageTitle}</h2>
           </div>
           <div className="flex items-center gap-1.5">
+            {/* GitHub */}
+            <a
+              href="https://github.com/DouDOU-start/airgate-core"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+              title="GitHub"
+            >
+              <Github className="w-3.5 h-3.5" />
+            </a>
             {/* Docs */}
             {site.doc_url && (
               <a
