@@ -46,18 +46,19 @@ type AccountCapacity struct {
 
 // Group 描述分组领域对象。
 type Group struct {
-	ID               int
-	Name             string
-	Platform         string
-	RateMultiplier   float64
-	IsExclusive      bool
-	SubscriptionType string
-	Quotas           map[string]any
-	ModelRouting     map[string][]int64
-	ServiceTier      string
-	SortWeight       int
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                int
+	Name              string
+	Platform          string
+	RateMultiplier    float64
+	IsExclusive       bool
+	SubscriptionType  string
+	Quotas            map[string]any
+	ModelRouting      map[string][]int64
+	ServiceTier       string
+	ForceInstructions string
+	SortWeight        int
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 // ListFilter 描述管理员分组列表查询条件。
@@ -88,27 +89,29 @@ type ListResult struct {
 
 // CreateInput 描述创建分组输入。
 type CreateInput struct {
-	Name             string
-	Platform         string
-	RateMultiplier   float64
-	IsExclusive      bool
-	SubscriptionType string
-	Quotas           map[string]any
-	ModelRouting     map[string][]int64
-	ServiceTier      string
-	SortWeight       int
+	Name              string
+	Platform          string
+	RateMultiplier    float64
+	IsExclusive       bool
+	SubscriptionType  string
+	Quotas            map[string]any
+	ModelRouting      map[string][]int64
+	ServiceTier       string
+	ForceInstructions string
+	SortWeight        int
 }
 
 // UpdateInput 描述更新分组输入。
 type UpdateInput struct {
-	Name             *string
-	RateMultiplier   *float64
-	IsExclusive      *bool
-	SubscriptionType *string
-	Quotas           map[string]any
-	ModelRouting     map[string][]int64
-	ServiceTier      *string
-	SortWeight       *int
+	Name              *string
+	RateMultiplier    *float64
+	IsExclusive       *bool
+	SubscriptionType  *string
+	Quotas            map[string]any
+	ModelRouting      map[string][]int64
+	ServiceTier       *string
+	ForceInstructions *string
+	SortWeight        *int
 }
 
 func normalizePage(page, pageSize int) (int, int) {

@@ -3511,6 +3511,7 @@ type GroupMutation struct {
 	quotas               *map[string]interface{}
 	model_routing        *map[string][]int64
 	service_tier         *string
+	force_instructions   *string
 	sort_weight          *int
 	addsort_weight       *int
 	created_at           *time.Time
@@ -3968,6 +3969,42 @@ func (m *GroupMutation) ResetServiceTier() {
 	m.service_tier = nil
 }
 
+// SetForceInstructions sets the "force_instructions" field.
+func (m *GroupMutation) SetForceInstructions(s string) {
+	m.force_instructions = &s
+}
+
+// ForceInstructions returns the value of the "force_instructions" field in the mutation.
+func (m *GroupMutation) ForceInstructions() (r string, exists bool) {
+	v := m.force_instructions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldForceInstructions returns the old "force_instructions" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldForceInstructions(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldForceInstructions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldForceInstructions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldForceInstructions: %w", err)
+	}
+	return oldValue.ForceInstructions, nil
+}
+
+// ResetForceInstructions resets all changes to the "force_instructions" field.
+func (m *GroupMutation) ResetForceInstructions() {
+	m.force_instructions = nil
+}
+
 // SetSortWeight sets the "sort_weight" field.
 func (m *GroupMutation) SetSortWeight(i int) {
 	m.sort_weight = &i
@@ -4400,7 +4437,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.name != nil {
 		fields = append(fields, group.FieldName)
 	}
@@ -4424,6 +4461,9 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.service_tier != nil {
 		fields = append(fields, group.FieldServiceTier)
+	}
+	if m.force_instructions != nil {
+		fields = append(fields, group.FieldForceInstructions)
 	}
 	if m.sort_weight != nil {
 		fields = append(fields, group.FieldSortWeight)
@@ -4458,6 +4498,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.ModelRouting()
 	case group.FieldServiceTier:
 		return m.ServiceTier()
+	case group.FieldForceInstructions:
+		return m.ForceInstructions()
 	case group.FieldSortWeight:
 		return m.SortWeight()
 	case group.FieldCreatedAt:
@@ -4489,6 +4531,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldModelRouting(ctx)
 	case group.FieldServiceTier:
 		return m.OldServiceTier(ctx)
+	case group.FieldForceInstructions:
+		return m.OldForceInstructions(ctx)
 	case group.FieldSortWeight:
 		return m.OldSortWeight(ctx)
 	case group.FieldCreatedAt:
@@ -4559,6 +4603,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetServiceTier(v)
+		return nil
+	case group.FieldForceInstructions:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetForceInstructions(v)
 		return nil
 	case group.FieldSortWeight:
 		v, ok := value.(int)
@@ -4695,6 +4746,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldServiceTier:
 		m.ResetServiceTier()
+		return nil
+	case group.FieldForceInstructions:
+		m.ResetForceInstructions()
 		return nil
 	case group.FieldSortWeight:
 		m.ResetSortWeight()

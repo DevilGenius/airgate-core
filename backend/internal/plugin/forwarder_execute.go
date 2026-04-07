@@ -117,6 +117,9 @@ func buildForwardHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Head
 	if keyInfo.GroupServiceTier != "" {
 		headers.Set("X-Airgate-Service-Tier", keyInfo.GroupServiceTier)
 	}
+	if keyInfo.GroupForceInstructions != "" {
+		headers.Set("X-Airgate-Force-Instructions", keyInfo.GroupForceInstructions)
+	}
 	return headers
 }
 

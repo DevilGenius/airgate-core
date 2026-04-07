@@ -31,6 +31,8 @@ const (
 	FieldModelRouting = "model_routing"
 	// FieldServiceTier holds the string denoting the service_tier field in the database.
 	FieldServiceTier = "service_tier"
+	// FieldForceInstructions holds the string denoting the force_instructions field in the database.
+	FieldForceInstructions = "force_instructions"
 	// FieldSortWeight holds the string denoting the sort_weight field in the database.
 	FieldSortWeight = "sort_weight"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -93,6 +95,7 @@ var Columns = []string{
 	FieldQuotas,
 	FieldModelRouting,
 	FieldServiceTier,
+	FieldForceInstructions,
 	FieldSortWeight,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -128,6 +131,8 @@ var (
 	DefaultIsExclusive bool
 	// DefaultServiceTier holds the default value on creation for the "service_tier" field.
 	DefaultServiceTier string
+	// DefaultForceInstructions holds the default value on creation for the "force_instructions" field.
+	DefaultForceInstructions string
 	// DefaultSortWeight holds the default value on creation for the "sort_weight" field.
 	DefaultSortWeight int
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -200,6 +205,11 @@ func BySubscriptionType(opts ...sql.OrderTermOption) OrderOption {
 // ByServiceTier orders the results by the service_tier field.
 func ByServiceTier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldServiceTier, opts...).ToFunc()
+}
+
+// ByForceInstructions orders the results by the force_instructions field.
+func ByForceInstructions(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldForceInstructions, opts...).ToFunc()
 }
 
 // BySortWeight orders the results by the sort_weight field.

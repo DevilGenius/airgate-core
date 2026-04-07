@@ -51,6 +51,7 @@ export function GroupFormModal({
     is_exclusive: group?.is_exclusive ?? false,
     subscription_type: group?.subscription_type ?? 'standard' as const,
     sort_weight: group?.sort_weight ?? 0,
+    force_instructions: group?.force_instructions ?? '',
   });
 
   const [quotas, setQuotas] = useState(
@@ -64,6 +65,7 @@ export function GroupFormModal({
       ...form,
       subscription_type: form.subscription_type as 'standard' | 'subscription',
       quotas: form.subscription_type === 'subscription' ? buildQuotas(quotas) : undefined,
+      force_instructions: form.force_instructions || undefined,
     });
   };
 
@@ -166,6 +168,47 @@ export function GroupFormModal({
           hint={t('groups.sort_weight_hint')}
           icon={<ArrowUpDown className="w-4 h-4" />}
         />
+
+        {/* 强制 Instructions */}
+        <div>
+          <label className="block text-xs font-medium uppercase tracking-wider mb-1.5" style={{ color: 'var(--ag-text-secondary)' }}>
+            {t('groups.force_instructions', 'Force Instructions')}
+          </label>
+          <p className="text-[11px] mb-2" style={{ color: 'var(--ag-text-tertiary)' }}>
+            {t('groups.force_instructions_hint', '留空则不覆盖。可填预设名 (default / simple / nsfw) 或自定义内容')}
+          </p>
+          <div className="flex gap-2 mb-2">
+            {['', 'default', 'simple', 'nsfw'].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setForm({ ...form, force_instructions: preset })}
+                className="px-2.5 py-1 text-xs rounded-md border transition-colors"
+                style={{
+                  borderColor: form.force_instructions === preset ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
+                  backgroundColor: form.force_instructions === preset ? 'var(--ag-primary-alpha)' : 'transparent',
+                  color: form.force_instructions === preset ? 'var(--ag-primary)' : 'var(--ag-text-secondary)',
+                }}
+              >
+                {preset || t('groups.instructions_none', '不覆盖')}
+              </button>
+            ))}
+          </div>
+          {form.force_instructions && !['default', 'simple', 'nsfw'].includes(form.force_instructions) && (
+            <textarea
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              style={{
+                borderColor: 'var(--ag-glass-border)',
+                backgroundColor: 'var(--ag-glass-bg)',
+                color: 'var(--ag-text-primary)',
+              }}
+              rows={4}
+              value={form.force_instructions}
+              onChange={(e) => setForm({ ...form, force_instructions: e.target.value })}
+              placeholder={t('groups.instructions_custom_placeholder', '输入自定义 instructions 内容...')}
+            />
+          )}
+        </div>
 
         {/* 配额限制 -- 仅订阅制显示 */}
         {form.subscription_type === 'subscription' && (

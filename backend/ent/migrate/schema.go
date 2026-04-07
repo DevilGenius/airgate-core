@@ -114,6 +114,7 @@ var (
 		{Name: "quotas", Type: field.TypeJSON, Nullable: true},
 		{Name: "model_routing", Type: field.TypeJSON, Nullable: true},
 		{Name: "service_tier", Type: field.TypeString, Default: ""},
+		{Name: "force_instructions", Type: field.TypeString, Default: ""},
 		{Name: "sort_weight", Type: field.TypeInt, Default: 0},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -220,7 +221,7 @@ var (
 		{Name: "ip_address", Type: field.TypeString, Default: ""},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "api_key_usage_logs", Type: field.TypeInt, Nullable: true},
-		{Name: "account_usage_logs", Type: field.TypeInt},
+		{Name: "account_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "group_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "user_usage_logs", Type: field.TypeInt},
 	}
@@ -240,7 +241,7 @@ var (
 				Symbol:     "usage_logs_accounts_usage_logs",
 				Columns:    []*schema.Column{UsageLogsColumns[25]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_groups_usage_logs",

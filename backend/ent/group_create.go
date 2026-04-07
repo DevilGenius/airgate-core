@@ -105,6 +105,20 @@ func (gc *GroupCreate) SetNillableServiceTier(s *string) *GroupCreate {
 	return gc
 }
 
+// SetForceInstructions sets the "force_instructions" field.
+func (gc *GroupCreate) SetForceInstructions(s string) *GroupCreate {
+	gc.mutation.SetForceInstructions(s)
+	return gc
+}
+
+// SetNillableForceInstructions sets the "force_instructions" field if the given value is not nil.
+func (gc *GroupCreate) SetNillableForceInstructions(s *string) *GroupCreate {
+	if s != nil {
+		gc.SetForceInstructions(*s)
+	}
+	return gc
+}
+
 // SetSortWeight sets the "sort_weight" field.
 func (gc *GroupCreate) SetSortWeight(i int) *GroupCreate {
 	gc.mutation.SetSortWeight(i)
@@ -273,6 +287,10 @@ func (gc *GroupCreate) defaults() {
 		v := group.DefaultServiceTier
 		gc.mutation.SetServiceTier(v)
 	}
+	if _, ok := gc.mutation.ForceInstructions(); !ok {
+		v := group.DefaultForceInstructions
+		gc.mutation.SetForceInstructions(v)
+	}
 	if _, ok := gc.mutation.SortWeight(); !ok {
 		v := group.DefaultSortWeight
 		gc.mutation.SetSortWeight(v)
@@ -321,6 +339,9 @@ func (gc *GroupCreate) check() error {
 	}
 	if _, ok := gc.mutation.ServiceTier(); !ok {
 		return &ValidationError{Name: "service_tier", err: errors.New(`ent: missing required field "Group.service_tier"`)}
+	}
+	if _, ok := gc.mutation.ForceInstructions(); !ok {
+		return &ValidationError{Name: "force_instructions", err: errors.New(`ent: missing required field "Group.force_instructions"`)}
 	}
 	if _, ok := gc.mutation.SortWeight(); !ok {
 		return &ValidationError{Name: "sort_weight", err: errors.New(`ent: missing required field "Group.sort_weight"`)}
@@ -388,6 +409,10 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := gc.mutation.ServiceTier(); ok {
 		_spec.SetField(group.FieldServiceTier, field.TypeString, value)
 		_node.ServiceTier = value
+	}
+	if value, ok := gc.mutation.ForceInstructions(); ok {
+		_spec.SetField(group.FieldForceInstructions, field.TypeString, value)
+		_node.ForceInstructions = value
 	}
 	if value, ok := gc.mutation.SortWeight(); ok {
 		_spec.SetField(group.FieldSortWeight, field.TypeInt, value)

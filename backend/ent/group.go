@@ -34,6 +34,8 @@ type Group struct {
 	ModelRouting map[string][]int64 `json:"model_routing,omitempty"`
 	// ServiceTier holds the value of the "service_tier" field.
 	ServiceTier string `json:"service_tier,omitempty"`
+	// ForceInstructions holds the value of the "force_instructions" field.
+	ForceInstructions string `json:"force_instructions,omitempty"`
 	// SortWeight holds the value of the "sort_weight" field.
 	SortWeight int `json:"sort_weight,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -121,7 +123,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case group.FieldID, group.FieldSortWeight:
 			values[i] = new(sql.NullInt64)
-		case group.FieldName, group.FieldPlatform, group.FieldSubscriptionType, group.FieldServiceTier:
+		case group.FieldName, group.FieldPlatform, group.FieldSubscriptionType, group.FieldServiceTier, group.FieldForceInstructions:
 			values[i] = new(sql.NullString)
 		case group.FieldCreatedAt, group.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -197,6 +199,12 @@ func (gr *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field service_tier", values[i])
 			} else if value.Valid {
 				gr.ServiceTier = value.String
+			}
+		case group.FieldForceInstructions:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field force_instructions", values[i])
+			} else if value.Valid {
+				gr.ForceInstructions = value.String
 			}
 		case group.FieldSortWeight:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -300,6 +308,9 @@ func (gr *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("service_tier=")
 	builder.WriteString(gr.ServiceTier)
+	builder.WriteString(", ")
+	builder.WriteString("force_instructions=")
+	builder.WriteString(gr.ForceInstructions)
 	builder.WriteString(", ")
 	builder.WriteString("sort_weight=")
 	builder.WriteString(fmt.Sprintf("%v", gr.SortWeight))

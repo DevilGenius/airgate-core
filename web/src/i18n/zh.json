@@ -406,7 +406,11 @@
     "capacity": "容量",
     "usage": "用量",
     "today_cost": "今日",
-    "total_cost": "累计"
+    "total_cost": "累计",
+    "force_instructions": "强制 Instructions",
+    "force_instructions_hint": "留空则不覆盖。可选预设 (default / simple / nsfw) 或自定义内容",
+    "instructions_none": "不覆盖",
+    "instructions_custom_placeholder": "输入自定义 instructions 内容..."
   },
 
   "api_keys": {

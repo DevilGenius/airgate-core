@@ -196,6 +196,7 @@ export interface GroupResp {
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
   service_tier?: 'fast' | 'flex';
+  force_instructions?: string;
   sort_weight: number;
   account_active: number;
   account_error: number;
@@ -218,6 +219,7 @@ export interface CreateGroupReq {
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
   service_tier?: 'fast' | 'flex';
+  force_instructions?: string;
   sort_weight?: number;
 }
 
@@ -229,6 +231,7 @@ export interface UpdateGroupReq {
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
   service_tier?: 'fast' | 'flex';
+  force_instructions?: string;
   sort_weight?: number;
 }
 

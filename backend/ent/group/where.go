@@ -80,6 +80,11 @@ func ServiceTier(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldServiceTier, v))
 }
 
+// ForceInstructions applies equality check predicate on the "force_instructions" field. It's identical to ForceInstructionsEQ.
+func ForceInstructions(v string) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldForceInstructions, v))
+}
+
 // SortWeight applies equality check predicate on the "sort_weight" field. It's identical to SortWeightEQ.
 func SortWeight(v int) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldSortWeight, v))
@@ -378,6 +383,71 @@ func ServiceTierEqualFold(v string) predicate.Group {
 // ServiceTierContainsFold applies the ContainsFold predicate on the "service_tier" field.
 func ServiceTierContainsFold(v string) predicate.Group {
 	return predicate.Group(sql.FieldContainsFold(FieldServiceTier, v))
+}
+
+// ForceInstructionsEQ applies the EQ predicate on the "force_instructions" field.
+func ForceInstructionsEQ(v string) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldForceInstructions, v))
+}
+
+// ForceInstructionsNEQ applies the NEQ predicate on the "force_instructions" field.
+func ForceInstructionsNEQ(v string) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldForceInstructions, v))
+}
+
+// ForceInstructionsIn applies the In predicate on the "force_instructions" field.
+func ForceInstructionsIn(vs ...string) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldForceInstructions, vs...))
+}
+
+// ForceInstructionsNotIn applies the NotIn predicate on the "force_instructions" field.
+func ForceInstructionsNotIn(vs ...string) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldForceInstructions, vs...))
+}
+
+// ForceInstructionsGT applies the GT predicate on the "force_instructions" field.
+func ForceInstructionsGT(v string) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldForceInstructions, v))
+}
+
+// ForceInstructionsGTE applies the GTE predicate on the "force_instructions" field.
+func ForceInstructionsGTE(v string) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldForceInstructions, v))
+}
+
+// ForceInstructionsLT applies the LT predicate on the "force_instructions" field.
+func ForceInstructionsLT(v string) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldForceInstructions, v))
+}
+
+// ForceInstructionsLTE applies the LTE predicate on the "force_instructions" field.
+func ForceInstructionsLTE(v string) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldForceInstructions, v))
+}
+
+// ForceInstructionsContains applies the Contains predicate on the "force_instructions" field.
+func ForceInstructionsContains(v string) predicate.Group {
+	return predicate.Group(sql.FieldContains(FieldForceInstructions, v))
+}
+
+// ForceInstructionsHasPrefix applies the HasPrefix predicate on the "force_instructions" field.
+func ForceInstructionsHasPrefix(v string) predicate.Group {
+	return predicate.Group(sql.FieldHasPrefix(FieldForceInstructions, v))
+}
+
+// ForceInstructionsHasSuffix applies the HasSuffix predicate on the "force_instructions" field.
+func ForceInstructionsHasSuffix(v string) predicate.Group {
+	return predicate.Group(sql.FieldHasSuffix(FieldForceInstructions, v))
+}
+
+// ForceInstructionsEqualFold applies the EqualFold predicate on the "force_instructions" field.
+func ForceInstructionsEqualFold(v string) predicate.Group {
+	return predicate.Group(sql.FieldEqualFold(FieldForceInstructions, v))
+}
+
+// ForceInstructionsContainsFold applies the ContainsFold predicate on the "force_instructions" field.
+func ForceInstructionsContainsFold(v string) predicate.Group {
+	return predicate.Group(sql.FieldContainsFold(FieldForceInstructions, v))
 }
 
 // SortWeightEQ applies the EQ predicate on the "sort_weight" field.

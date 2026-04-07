@@ -148,6 +148,20 @@ func (gu *GroupUpdate) SetNillableServiceTier(s *string) *GroupUpdate {
 	return gu
 }
 
+// SetForceInstructions sets the "force_instructions" field.
+func (gu *GroupUpdate) SetForceInstructions(s string) *GroupUpdate {
+	gu.mutation.SetForceInstructions(s)
+	return gu
+}
+
+// SetNillableForceInstructions sets the "force_instructions" field if the given value is not nil.
+func (gu *GroupUpdate) SetNillableForceInstructions(s *string) *GroupUpdate {
+	if s != nil {
+		gu.SetForceInstructions(*s)
+	}
+	return gu
+}
+
 // SetSortWeight sets the "sort_weight" field.
 func (gu *GroupUpdate) SetSortWeight(i int) *GroupUpdate {
 	gu.mutation.ResetSortWeight()
@@ -460,6 +474,9 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := gu.mutation.ServiceTier(); ok {
 		_spec.SetField(group.FieldServiceTier, field.TypeString, value)
+	}
+	if value, ok := gu.mutation.ForceInstructions(); ok {
+		_spec.SetField(group.FieldForceInstructions, field.TypeString, value)
 	}
 	if value, ok := gu.mutation.SortWeight(); ok {
 		_spec.SetField(group.FieldSortWeight, field.TypeInt, value)
@@ -830,6 +847,20 @@ func (guo *GroupUpdateOne) SetNillableServiceTier(s *string) *GroupUpdateOne {
 	return guo
 }
 
+// SetForceInstructions sets the "force_instructions" field.
+func (guo *GroupUpdateOne) SetForceInstructions(s string) *GroupUpdateOne {
+	guo.mutation.SetForceInstructions(s)
+	return guo
+}
+
+// SetNillableForceInstructions sets the "force_instructions" field if the given value is not nil.
+func (guo *GroupUpdateOne) SetNillableForceInstructions(s *string) *GroupUpdateOne {
+	if s != nil {
+		guo.SetForceInstructions(*s)
+	}
+	return guo
+}
+
 // SetSortWeight sets the "sort_weight" field.
 func (guo *GroupUpdateOne) SetSortWeight(i int) *GroupUpdateOne {
 	guo.mutation.ResetSortWeight()
@@ -1172,6 +1203,9 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	}
 	if value, ok := guo.mutation.ServiceTier(); ok {
 		_spec.SetField(group.FieldServiceTier, field.TypeString, value)
+	}
+	if value, ok := guo.mutation.ForceInstructions(); ok {
+		_spec.SetField(group.FieldForceInstructions, field.TypeString, value)
 	}
 	if value, ok := guo.mutation.SortWeight(); ok {
 		_spec.SetField(group.FieldSortWeight, field.TypeInt, value)

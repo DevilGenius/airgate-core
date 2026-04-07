@@ -96,6 +96,7 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 		SetIsExclusive(input.IsExclusive).
 		SetSubscriptionType(entgroup.SubscriptionType(input.SubscriptionType)).
 		SetServiceTier(input.ServiceTier).
+		SetForceInstructions(input.ForceInstructions).
 		SetSortWeight(input.SortWeight)
 
 	if input.Quotas != nil {
@@ -137,6 +138,9 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.ServiceTier != nil {
 		builder = builder.SetServiceTier(*input.ServiceTier)
+	}
+	if input.ForceInstructions != nil {
+		builder = builder.SetForceInstructions(*input.ForceInstructions)
 	}
 	if input.SortWeight != nil {
 		builder = builder.SetSortWeight(*input.SortWeight)
@@ -320,18 +324,19 @@ func mapGroups(items []*ent.Group) []appgroup.Group {
 
 func mapGroup(item *ent.Group) appgroup.Group {
 	return appgroup.Group{
-		ID:               item.ID,
-		Name:             item.Name,
-		Platform:         item.Platform,
-		RateMultiplier:   item.RateMultiplier,
-		IsExclusive:      item.IsExclusive,
-		SubscriptionType: string(item.SubscriptionType),
-		Quotas:           appgroupCloneQuotas(item.Quotas),
-		ModelRouting:     appgroupCloneModelRouting(item.ModelRouting),
-		ServiceTier:      item.ServiceTier,
-		SortWeight:       item.SortWeight,
-		CreatedAt:        item.CreatedAt,
-		UpdatedAt:        item.UpdatedAt,
+		ID:                item.ID,
+		Name:              item.Name,
+		Platform:          item.Platform,
+		RateMultiplier:    item.RateMultiplier,
+		IsExclusive:       item.IsExclusive,
+		SubscriptionType:  string(item.SubscriptionType),
+		Quotas:            appgroupCloneQuotas(item.Quotas),
+		ModelRouting:      appgroupCloneModelRouting(item.ModelRouting),
+		ServiceTier:       item.ServiceTier,
+		ForceInstructions: item.ForceInstructions,
+		SortWeight:        item.SortWeight,
+		CreatedAt:         item.CreatedAt,
+		UpdatedAt:         item.UpdatedAt,
 	}
 }
 
