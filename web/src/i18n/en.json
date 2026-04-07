@@ -3,6 +3,28 @@
   "app_subtitle": "API Gateway Management",
   "powered_by": "Powered by AirGate",
 
+  "home": {
+    "badge": "Unified AI API Gateway",
+    "subtitle": "Secure and efficient AI API aggregation and management platform",
+    "login": "Login",
+    "get_started": "Get Started",
+    "go_dashboard": "Dashboard",
+    "view_docs": "Documentation",
+    "docs": "Docs",
+    "feature_gateway": "Unified Gateway",
+    "feature_gateway_desc": "Single entry point for multiple AI platforms with unified API format and seamless provider switching.",
+    "feature_security": "Security",
+    "feature_security_desc": "API key management, IP whitelisting/blacklisting, and quota limits for comprehensive API security.",
+    "feature_plugins": "Plugin System",
+    "feature_plugins_desc": "Flexible plugin architecture supporting custom protocol translation, model routing, and business logic.",
+    "feature_analytics": "Usage Analytics",
+    "feature_analytics_desc": "Real-time monitoring of requests, token usage, and costs with multi-dimensional data analysis.",
+    "feature_keys": "Key Management",
+    "feature_keys_desc": "Multi-key group management with customizable quotas, expiration, and fine-grained access control.",
+    "feature_multi_platform": "Multi-Platform",
+    "feature_multi_platform_desc": "Built-in support for OpenAI, Anthropic, and other major platforms, ready to use out of the box."
+  },
+
   "datepicker": {
     "placeholder": "Select date",
     "clear": "Clear",

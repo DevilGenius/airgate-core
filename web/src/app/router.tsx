@@ -26,10 +26,11 @@ import ProfilePage from '../pages/user/ProfilePage';
 import UserKeysPage from '../pages/user/UserKeysPage';
 import UserUsagePage from '../pages/user/UserUsagePage';
 
-// 登录和安装页不常用，保持懒加载
+// 登录、安装、首页不常用，保持懒加载
 const SetupPage = lazy(() => import('../pages/SetupPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
 const PluginPage = lazy(() => import('../pages/PluginPage'));
+const PublicHomePage = lazy(() => import('../pages/HomePage'));
 
 // 缓存安装状态，避免每次路由跳转都请求
 let setupChecked = false;
@@ -81,6 +82,23 @@ const setupRoute = createRoute({
   ),
 });
 
+// 公共首页（无需认证，懒加载）
+const homeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/home',
+  beforeLoad: async () => {
+    const needs = await checkSetup();
+    if (needs) {
+      throw redirect({ to: '/setup' });
+    }
+  },
+  component: () => (
+    <Suspense fallback={null}>
+      <PublicHomePage />
+    </Suspense>
+  ),
+});
+
 // 登录页（无需认证，懒加载）
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -108,7 +126,7 @@ const authLayout = createRoute({
       throw redirect({ to: '/setup' });
     }
     if (!getToken()) {
-      throw redirect({ to: '/login' });
+      throw redirect({ to: '/home' });
     }
   },
   component: () => (
@@ -169,6 +187,7 @@ const pluginRoute = createRoute({
 // 路由树
 const routeTree = rootRoute.addChildren([
   setupRoute,
+  homeRoute,
   loginRoute,
   authLayout.addChildren([
     dashboardRoute,

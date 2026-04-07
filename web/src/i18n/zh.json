@@ -3,6 +3,28 @@
   "app_subtitle": "API 网关管理平台",
   "powered_by": "Powered by AirGate",
 
+  "home": {
+    "badge": "AI API 统一网关",
+    "subtitle": "安全、高效的 AI API 聚合与管理平台",
+    "login": "登录",
+    "get_started": "开始使用",
+    "go_dashboard": "进入控制台",
+    "view_docs": "查看文档",
+    "docs": "文档",
+    "feature_gateway": "统一网关",
+    "feature_gateway_desc": "一个入口对接多家 AI 平台，统一 API 格式，无缝切换模型供应商。",
+    "feature_security": "安全认证",
+    "feature_security_desc": "API Key 管理、IP 黑白名单、配额限制，全方位保障 API 调用安全。",
+    "feature_plugins": "插件扩展",
+    "feature_plugins_desc": "灵活的插件架构，支持自定义协议翻译、模型路由和业务逻辑扩展。",
+    "feature_analytics": "用量分析",
+    "feature_analytics_desc": "实时监控请求量、Token 用量和费用，多维度数据分析一目了然。",
+    "feature_keys": "密钥管理",
+    "feature_keys_desc": "多密钥分组管理，按需设置配额与过期时间，精细化权限控制。",
+    "feature_multi_platform": "多平台支持",
+    "feature_multi_platform_desc": "内置 OpenAI、Anthropic 等主流平台支持，开箱即用。"
+  },
+
   "datepicker": {
     "placeholder": "选择日期",
     "clear": "清除",
