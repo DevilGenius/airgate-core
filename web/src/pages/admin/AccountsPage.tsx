@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   Plus,
   Pencil,
@@ -13,7 +13,10 @@ import {
   RefreshCw,
   ChevronDown,
   Search,
+  Download,
+  Upload,
 } from 'lucide-react';
+import { useToast } from '../../shared/components/Toast';
 import { Button } from '../../shared/components/Button';
 import { Input, Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
@@ -35,12 +38,15 @@ import type {
   AccountResp,
   CreateAccountReq,
   UpdateAccountReq,
+  AccountExportFile,
+  AccountExportItem,
 } from '../../shared/types';
 
 export default function AccountsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { platforms, platformName } = usePlatforms();
+  const { toast } = useToast();
 
   const PLATFORM_OPTIONS = [
     { value: '', label: t('accounts.all_platforms') },
@@ -146,6 +152,72 @@ export default function AccountsPage() {
     queryKey: queryKeys.accounts(),
     onSuccess: () => setShowCreateModal(false),
   });
+
+  // 导出账号（按当前筛选条件）
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const exportMutation = useMutation({
+    mutationFn: () =>
+      accountsApi.export({
+        keyword: keyword || undefined,
+        platform: platformFilter || undefined,
+        status: statusFilter || undefined,
+        group_id: groupFilter ? Number(groupFilter) : undefined,
+        proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
+      }),
+    onSuccess: (file: AccountExportFile) => {
+      // 触发浏览器下载
+      const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+      a.href = url;
+      a.download = `airgate-accounts-${ts}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast('success', t('accounts.export_success', { count: file.count }));
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  // 导入账号
+  const importMutation = useMutation({
+    mutationFn: (accounts: AccountExportItem[]) => accountsApi.import(accounts),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      if (res.failed > 0) {
+        toast('warning', t('accounts.import_partial', { imported: res.imported, failed: res.failed }));
+      } else {
+        toast('success', t('accounts.import_success', { count: res.imported }));
+      }
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // 重置 input，允许重复选择同一文件
+    if (importInputRef.current) importInputRef.current.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        const accounts: AccountExportItem[] = Array.isArray(parsed) ? parsed : parsed.accounts;
+        if (!Array.isArray(accounts) || accounts.length === 0) {
+          toast('error', t('accounts.import_invalid'));
+          return;
+        }
+        importMutation.mutate(accounts);
+      } catch {
+        toast('error', t('accounts.import_invalid'));
+      }
+    };
+    reader.onerror = () => toast('error', t('accounts.import_invalid'));
+    reader.readAsText(file);
+  }
 
   // 更新账号
   const updateMutation = useCrudMutation({
@@ -590,11 +662,37 @@ export default function AccountsPage() {
               </div>
             )}
           </div>
+          <Button
+            variant="secondary"
+            icon={<Upload className="w-4 h-4" />}
+            onClick={() => importInputRef.current?.click()}
+            loading={importMutation.isPending}
+            title={t('accounts.import')}
+          >
+            {t('accounts.import')}
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<Download className="w-4 h-4" />}
+            onClick={() => exportMutation.mutate()}
+            loading={exportMutation.isPending}
+            title={t('accounts.export')}
+          >
+            {t('accounts.export')}
+          </Button>
           <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
             {t('accounts.create')}
           </Button>
         </div>
       </div>
+      {/* 隐藏的文件选择器（供导入按钮触发） */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={handleImportFile}
+      />
 
       {/* 表格 */}
       <Table<AccountResp>

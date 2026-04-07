@@ -37,6 +37,24 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 	return resp
 }
 
+func toAccountExportItem(account appaccount.Account) dto.AccountExportItem {
+	item := dto.AccountExportItem{
+		Name:           account.Name,
+		Platform:       account.Platform,
+		Type:           account.Type,
+		Credentials:    account.Credentials,
+		Priority:       account.Priority,
+		MaxConcurrency: account.MaxConcurrency,
+		RateMultiplier: account.RateMultiplier,
+		GroupIDs:       account.GroupIDs,
+	}
+	if account.Proxy != nil {
+		proxyID := int64(account.Proxy.ID)
+		item.ProxyID = &proxyID
+	}
+	return item
+}
+
 func toCredentialSchemaResp(schema appaccount.CredentialSchema) dto.CredentialSchemaResp {
 	resp := dto.CredentialSchemaResp{
 		Fields:       make([]dto.CredentialFieldResp, 0, len(schema.Fields)),

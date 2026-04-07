@@ -217,9 +217,24 @@ type LoadOptions struct {
 	WithProxy  bool
 }
 
+// ImportSummary 批量导入结果。
+type ImportSummary struct {
+	Imported int               `json:"imported"`
+	Failed   int               `json:"failed"`
+	Errors   []ImportItemError `json:"errors,omitempty"`
+}
+
+// ImportItemError 单条导入失败信息。
+type ImportItemError struct {
+	Index   int    `json:"index"`
+	Name    string `json:"name"`
+	Message string `json:"message"`
+}
+
 // Repository 账号领域的持久化接口。
 type Repository interface {
 	List(context.Context, ListFilter) ([]Account, int64, error)
+	ListAll(context.Context, ListFilter) ([]Account, error)
 	Create(context.Context, CreateInput) (Account, error)
 	Update(context.Context, int, UpdateInput) (Account, error)
 	Delete(context.Context, int) error

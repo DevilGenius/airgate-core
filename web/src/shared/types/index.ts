@@ -163,6 +163,34 @@ export interface UpdateAccountReq {
   group_ids?: number[];
 }
 
+// 导出文件中的单条账号（精简字段，可被 import 还原）
+export interface AccountExportItem {
+  name: string;
+  platform: string;
+  type?: string;
+  credentials: Record<string, string>;
+  priority: number;
+  max_concurrency: number;
+  rate_multiplier: number;
+  group_ids?: number[];
+  proxy_id?: number;
+}
+
+// 导出文件结构
+export interface AccountExportFile {
+  version: number;
+  exported_at: string;
+  count: number;
+  accounts: AccountExportItem[];
+}
+
+// 导入响应
+export interface ImportAccountsResp {
+  imported: number;
+  failed: number;
+  errors?: { index: number; name: string; message: string }[];
+}
+
 export interface CredentialField {
   key: string;
   label: string;

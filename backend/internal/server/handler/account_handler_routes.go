@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -42,6 +43,78 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 	}
 
 	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
+}
+
+// ExportAccounts 按当前筛选条件导出账号（返回 JSON 数据，前端落盘为文件）。
+func (h *AccountHandler) ExportAccounts(c *gin.Context) {
+	accounts, err := h.service.ExportAll(c.Request.Context(), appaccount.ListFilter{
+		Keyword:  c.Query("keyword"),
+		Platform: c.Query("platform"),
+		Status:   c.Query("status"),
+		GroupID:  parseOptionalInt(c.Query("group_id")),
+		ProxyID:  parseOptionalInt(c.Query("proxy_id")),
+	})
+	if err != nil {
+		httpCode, message := h.handleError("导出账号失败", "导出失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	items := make([]dto.AccountExportItem, 0, len(accounts))
+	for _, account := range accounts {
+		items = append(items, toAccountExportItem(account))
+	}
+
+	response.Success(c, dto.AccountExportFile{
+		Version:    1,
+		ExportedAt: time.Now().UTC().Format(time.RFC3339),
+		Count:      len(items),
+		Accounts:   items,
+	})
+}
+
+// ImportAccounts 批量导入账号。
+func (h *AccountHandler) ImportAccounts(c *gin.Context) {
+	var req dto.ImportAccountsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	if len(req.Accounts) == 0 {
+		response.BadRequest(c, "导入文件中没有账号数据")
+		return
+	}
+
+	inputs := make([]appaccount.CreateInput, 0, len(req.Accounts))
+	for _, item := range req.Accounts {
+		inputs = append(inputs, appaccount.CreateInput{
+			Name:           item.Name,
+			Platform:       item.Platform,
+			Type:           item.Type,
+			Credentials:    item.Credentials,
+			Priority:       item.Priority,
+			MaxConcurrency: item.MaxConcurrency,
+			RateMultiplier: item.RateMultiplier,
+			GroupIDs:       item.GroupIDs,
+			ProxyID:        item.ProxyID,
+		})
+	}
+
+	summary := h.service.Import(c.Request.Context(), inputs)
+
+	resp := dto.ImportAccountsResp{
+		Imported: summary.Imported,
+		Failed:   summary.Failed,
+	}
+	for _, e := range summary.Errors {
+		resp.Errors = append(resp.Errors, dto.ImportItemErrorResp{
+			Index:   e.Index,
+			Name:    e.Name,
+			Message: e.Message,
+		})
+	}
+	response.Success(c, resp)
 }
 
 // CreateAccount 创建账号。

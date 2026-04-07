@@ -77,6 +77,29 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 	return s.repo.Create(ctx, input)
 }
 
+// ExportAll 查询符合筛选条件的全部账号（用于导出，不分页、不带并发计数）。
+func (s *Service) ExportAll(ctx context.Context, filter ListFilter) ([]Account, error) {
+	return s.repo.ListAll(ctx, filter)
+}
+
+// Import 批量导入账号，逐条创建并收集失败信息（不使用事务，允许部分成功）。
+func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary {
+	summary := ImportSummary{}
+	for index, input := range items {
+		if _, err := s.repo.Create(ctx, input); err != nil {
+			summary.Failed++
+			summary.Errors = append(summary.Errors, ImportItemError{
+				Index:   index,
+				Name:    input.Name,
+				Message: err.Error(),
+			})
+			continue
+		}
+		summary.Imported++
+	}
+	return summary
+}
+
 // Update 更新账号。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Account, error) {
 	return s.repo.Update(ctx, id, input)

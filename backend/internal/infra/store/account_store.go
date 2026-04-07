@@ -62,6 +62,38 @@ func (s *AccountStore) List(ctx context.Context, filter appaccount.ListFilter) (
 	return mapAccounts(accounts), int64(total), nil
 }
 
+// ListAll 查询符合筛选条件的全部账号（不分页，用于导出）。
+func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter) ([]appaccount.Account, error) {
+	query := s.db.Account.Query()
+
+	if filter.Keyword != "" {
+		query = query.Where(entaccount.NameContains(filter.Keyword))
+	}
+	if filter.Platform != "" {
+		query = query.Where(entaccount.PlatformEQ(filter.Platform))
+	}
+	if filter.Status != "" {
+		query = query.Where(entaccount.StatusEQ(entaccount.Status(filter.Status)))
+	}
+	if filter.GroupID != nil {
+		query = query.Where(entaccount.HasGroupsWith(entgroup.ID(*filter.GroupID)))
+	}
+	if filter.ProxyID != nil {
+		query = query.Where(entaccount.HasProxyWith(entproxy.IDEQ(*filter.ProxyID)))
+	}
+
+	accounts, err := query.
+		WithGroups().
+		WithProxy().
+		Order(ent.Desc(entaccount.FieldCreatedAt)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapAccounts(accounts), nil
+}
+
 // Create 创建账号。
 func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput) (appaccount.Account, error) {
 	builder := s.db.Account.Create().

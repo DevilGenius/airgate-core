@@ -45,6 +45,46 @@ type UpdateAccountReq struct {
 	GroupIDs       []int64           `json:"group_ids"`
 }
 
+// AccountExportItem 导出文件中的单条账号（精简字段，可被导入还原）
+type AccountExportItem struct {
+	Name           string            `json:"name"`
+	Platform       string            `json:"platform"`
+	Type           string            `json:"type,omitempty"`
+	Credentials    map[string]string `json:"credentials"`
+	Priority       int               `json:"priority"`
+	MaxConcurrency int               `json:"max_concurrency"`
+	RateMultiplier float64           `json:"rate_multiplier"`
+	GroupIDs       []int64           `json:"group_ids,omitempty"`
+	ProxyID        *int64            `json:"proxy_id,omitempty"`
+}
+
+// AccountExportFile 导出文件结构
+type AccountExportFile struct {
+	Version    int                 `json:"version"`
+	ExportedAt string              `json:"exported_at"`
+	Count      int                 `json:"count"`
+	Accounts   []AccountExportItem `json:"accounts"`
+}
+
+// ImportAccountsReq 批量导入请求
+type ImportAccountsReq struct {
+	Accounts []AccountExportItem `json:"accounts" binding:"required"`
+}
+
+// ImportItemErrorResp 导入失败项响应
+type ImportItemErrorResp struct {
+	Index   int    `json:"index"`
+	Name    string `json:"name"`
+	Message string `json:"message"`
+}
+
+// ImportAccountsResp 导入结果响应
+type ImportAccountsResp struct {
+	Imported int                   `json:"imported"`
+	Failed   int                   `json:"failed"`
+	Errors   []ImportItemErrorResp `json:"errors,omitempty"`
+}
+
 // CredentialSchemaResp 凭证字段 schema 响应
 type CredentialSchemaResp struct {
 	Fields       []CredentialFieldResp `json:"fields"`
