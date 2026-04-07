@@ -4,7 +4,7 @@ import { Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Modal } from '../../../shared/components/Modal';
 import { Button } from '../../../shared/components/Button';
 import { Input } from '../../../shared/components/Input';
-import { useToast } from '../../../shared/components/Toast';
+import { useClipboard } from '../../../shared/hooks/useClipboard';
 import type { CreateUserReq } from '../../../shared/types';
 
 interface CreateUserModalProps {
@@ -20,7 +20,7 @@ const defaultForm: CreateUserReq = {
 
 export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUserModalProps) {
   const { t } = useTranslation();
-  const { toast } = useToast();
+  const copy = useClipboard();
   const [form, setForm] = useState<CreateUserReq>(defaultForm);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -30,10 +30,7 @@ export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUser
     crypto.getRandomValues(arr);
     const pwd = Array.from(arr, (b) => chars[b % chars.length]).join('');
     setForm({ ...form, password: pwd });
-    navigator.clipboard.writeText(pwd).then(
-      () => toast('success', t('common.copied')),
-      () => { /* ignore */ },
-    );
+    copy(pwd);
   };
 
   const handleSubmit = () => {

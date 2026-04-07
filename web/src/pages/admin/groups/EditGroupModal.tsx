@@ -185,8 +185,9 @@ export function GroupFormModal({
                 key={preset}
                 type="button"
                 onClick={() => setForm({ ...form, force_instructions: preset })}
-                className="px-2.5 py-1 text-xs rounded-md border transition-colors"
+                className="px-2.5 py-1 text-xs rounded-md transition-colors"
                 style={{
+                  borderWidth: '1px', borderStyle: 'solid',
                   borderColor: form.force_instructions === preset ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
                   backgroundColor: form.force_instructions === preset ? 'var(--ag-primary-alpha)' : 'transparent',
                   color: form.force_instructions === preset ? 'var(--ag-primary)' : 'var(--ag-text-secondary)',
@@ -198,8 +199,9 @@ export function GroupFormModal({
           </div>
           {form.force_instructions && !instructionPresets(form.platform).includes(form.force_instructions) && (
             <textarea
-              className="w-full rounded-lg border px-3 py-2 text-sm"
+              className="w-full rounded-lg px-3 py-2 text-sm"
               style={{
+                borderWidth: '1px', borderStyle: 'solid',
                 borderColor: 'var(--ag-glass-border)',
                 backgroundColor: 'var(--ag-glass-bg)',
                 color: 'var(--ag-text-primary)',

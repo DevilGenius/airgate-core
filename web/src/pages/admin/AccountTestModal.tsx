@@ -7,6 +7,7 @@ import { Select } from '../../shared/components/Input';
 import { Badge } from '../../shared/components/Badge';
 import { accountsApi } from '../../shared/api/accounts';
 import { getToken } from '../../shared/api/client';
+import { useClipboard } from '../../shared/hooks/useClipboard';
 import type { AccountResp, ModelInfo } from '../../shared/types';
 
 type TestStatus = 'idle' | 'connecting' | 'streaming' | 'success' | 'error';
@@ -190,12 +191,12 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
     onClose();
   };
 
-  const handleCopy = () => {
+  const clipboardCopy = useClipboard();
+  const handleCopy = async () => {
     const text = outputLines.map((l) => l.text).join('\n') + (streamingContent ? '\n' + streamingContent : '');
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    await clipboardCopy(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   if (!account) return null;

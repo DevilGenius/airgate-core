@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Copy } from 'lucide-react';
 import { Modal } from '../../../shared/components/Modal';
 import { Button } from '../../../shared/components/Button';
-import { useToast } from '../../../shared/components/Toast';
+import { useClipboard } from '../../../shared/hooks/useClipboard';
 
 export function CreateKeyModal({
   open,
@@ -14,7 +14,7 @@ export function CreateKeyModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const { toast } = useToast();
+  const copy = useClipboard();
 
   return (
     <Modal
@@ -40,10 +40,7 @@ export function CreateKeyModal({
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => {
-            navigator.clipboard.writeText(createdKey || '');
-            toast('success', t('user_keys.copy_key'));
-          }}
+          onClick={() => copy(createdKey || '', t('user_keys.copy_key'))}
           icon={<Copy className="w-3.5 h-3.5" />}
         >
           {t('user_keys.copy_key')}

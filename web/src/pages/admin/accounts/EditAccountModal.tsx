@@ -82,6 +82,7 @@ export function EditAccountModal({
     });
   }, [schema, accountType]);
   const [groupIds, setGroupIds] = useState<number[]>(account.group_ids ?? []);
+  const [step, setStep] = useState(1);
 
   // 查询分组列表
   const { data: groupsData } = useQuery({
@@ -117,130 +118,148 @@ export function EditAccountModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={t('accounts.edit')}
+      title={`${t('accounts.edit')} (${step}/2)`}
       width="560px"
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button
-            onClick={() => {
-              // 提交时：仅将未修改的密码字段回填原值，允许普通字段被清空
-              const merged = { ...credentials };
-              const passwordKeys = new Set(
-                getSchemaVisibleFields(schema, accountType)
-                  .filter((field) => field.type === 'password')
-                  .map((field) => field.key),
-              );
-              for (const [k, v] of Object.entries(origCredentials.current)) {
-                if (passwordKeys.has(k) && merged[k] === '' && v) merged[k] = v;
-              }
-              onSubmit({ ...form, type: accountType || undefined, credentials: merged, group_ids: groupIds });
-            }}
-            loading={loading}
-          >
-            {t('common.save')}
-          </Button>
-        </>
+        <div className="flex justify-between w-full">
+          <div>
+            {step > 1 && (
+              <Button variant="secondary" onClick={() => setStep(1)}>
+                {t('common.back', '上一步')}
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+            {step === 1 ? (
+              <Button onClick={() => setStep(2)}>
+                {t('common.next', '下一步')}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  const merged = { ...credentials };
+                  const passwordKeys = new Set(
+                    getSchemaVisibleFields(schema, accountType)
+                      .filter((field) => field.type === 'password')
+                      .map((field) => field.key),
+                  );
+                  for (const [k, v] of Object.entries(origCredentials.current)) {
+                    if (passwordKeys.has(k) && merged[k] === '' && v) merged[k] = v;
+                  }
+                  onSubmit({ ...form, type: accountType || undefined, credentials: merged, group_ids: groupIds });
+                }}
+                loading={loading}
+              >
+                {t('common.save')}
+              </Button>
+            )}
+          </div>
+        </div>
       }
     >
-      <div className="space-y-4">
-        <Input label={t('accounts.platform')} value={pName(account.platform)} disabled />
-        <Input
-          label={t('common.name')}
-          value={form.name ?? ''}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          icon={<Layers className="w-4 h-4" />}
-        />
-
-        {/* 凭证编辑：插件自定义表单 or 默认 schema 驱动 */}
-        {PluginAccountForm ? (
-          <div
-            className="ag-plugin-scope pt-4"
-            style={{ borderTop: '1px solid var(--ag-border)' }}
-          >
-            <PluginAccountForm
-              credentials={credentials}
-              onChange={setCredentials}
-              mode="edit"
-              accountType={accountType}
-              onAccountTypeChange={handleAccountTypeChange}
-              oauth={pluginOAuth}
-            />
-          </div>
-        ) : schema && getSchemaVisibleFields(schema, accountType).length > 0 ? (
-          <SchemaCredentialsForm
-            schema={schema}
-            accountType={accountType}
-            onAccountTypeChange={handleSchemaAccountTypeChange}
-            credentials={credentials}
-            onCredentialsChange={setCredentials}
-            mode="edit"
+      {step === 1 ? (
+        <div className="space-y-4">
+          <Input label={t('accounts.platform')} value={pName(account.platform)} disabled />
+          <Input
+            label={t('common.name')}
+            value={form.name ?? ''}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            icon={<Layers className="w-4 h-4" />}
           />
-        ) : null}
 
-        <Switch
-          label={t('accounts.enable_dispatch')}
-          checked={form.status !== 'disabled'}
-          onChange={(on) => setForm({ ...form, status: on ? 'active' : 'disabled' })}
-        />
-        <Input
-          label={t('accounts.priority_hint')}
-          type="number"
-          min={0}
-          max={999}
-          step={1}
-          value={String(form.priority ?? 50)}
-          onChange={(e) => {
-            const v = Math.round(Number(e.target.value));
-            setForm({ ...form, priority: Math.max(0, Math.min(999, v)) });
-          }}
-          icon={<Hash className="w-4 h-4" />}
-        />
-        <Input
-          label={t('accounts.concurrency')}
-          type="number"
-          value={String(form.max_concurrency ?? 5)}
-          onChange={(e) =>
-            setForm({ ...form, max_concurrency: Number(e.target.value) })
-          }
-          icon={<Gauge className="w-4 h-4" />}
-        />
-        <Input
-          label={t('accounts.rate_multiplier')}
-          type="number"
-          step="0.1"
-          value={String(form.rate_multiplier ?? 1)}
-          onChange={(e) =>
-            setForm({ ...form, rate_multiplier: Number(e.target.value) })
-          }
-        />
-        <Select
-          label={t('accounts.proxy')}
-          value={form.proxy_id == null ? '' : String(form.proxy_id)}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              proxy_id: e.target.value ? Number(e.target.value) : null,
-            })
-          }
-          options={[
-            { value: '', label: t('accounts.no_proxy') },
-            ...(proxiesData?.list ?? []).map((p) => ({
-              value: String(p.id),
-              label: `${p.name} (${p.protocol}://${p.address}:${p.port})`,
-            })),
-          ]}
-        />
+          {/* 凭证编辑：插件自定义表单 or 默认 schema 驱动 */}
+          {PluginAccountForm ? (
+            <div
+              className="ag-plugin-scope pt-4"
+              style={{ borderTop: '1px solid var(--ag-border)' }}
+            >
+              <PluginAccountForm
+                credentials={credentials}
+                onChange={setCredentials}
+                mode="edit"
+                accountType={accountType}
+                onAccountTypeChange={handleAccountTypeChange}
+                oauth={pluginOAuth}
+              />
+            </div>
+          ) : schema && getSchemaVisibleFields(schema, accountType).length > 0 ? (
+            <SchemaCredentialsForm
+              schema={schema}
+              accountType={accountType}
+              onAccountTypeChange={handleSchemaAccountTypeChange}
+              credentials={credentials}
+              onCredentialsChange={setCredentials}
+              mode="edit"
+            />
+          ) : null}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <Switch
+            label={t('accounts.enable_dispatch')}
+            checked={form.status !== 'disabled'}
+            onChange={(on) => setForm({ ...form, status: on ? 'active' : 'disabled' })}
+          />
+          <Input
+            label={t('accounts.priority_hint')}
+            type="number"
+            min={0}
+            max={999}
+            step={1}
+            value={String(form.priority ?? 50)}
+            onChange={(e) => {
+              const v = Math.round(Number(e.target.value));
+              setForm({ ...form, priority: Math.max(0, Math.min(999, v)) });
+            }}
+            icon={<Hash className="w-4 h-4" />}
+          />
 
-        {/* 分组选择 */}
-        <GroupCheckboxList
-          groups={groupsData?.list ?? []}
-          selectedIds={groupIds}
-          onChange={setGroupIds}
-        />
-      </div>
+          <GroupCheckboxList
+            groups={groupsData?.list ?? []}
+            selectedIds={groupIds}
+            onChange={setGroupIds}
+          />
+
+          <Input
+            label={t('accounts.concurrency')}
+            type="number"
+            value={String(form.max_concurrency ?? 5)}
+            onChange={(e) =>
+              setForm({ ...form, max_concurrency: Number(e.target.value) })
+            }
+            icon={<Gauge className="w-4 h-4" />}
+          />
+          <Input
+            label={t('accounts.rate_multiplier')}
+            type="number"
+            step="0.1"
+            value={String(form.rate_multiplier ?? 1)}
+            onChange={(e) =>
+              setForm({ ...form, rate_multiplier: Number(e.target.value) })
+            }
+          />
+          <Select
+            label={t('accounts.proxy')}
+            value={form.proxy_id == null ? '' : String(form.proxy_id)}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                proxy_id: e.target.value ? Number(e.target.value) : null,
+              })
+            }
+            options={[
+              { value: '', label: t('accounts.no_proxy') },
+              ...(proxiesData?.list ?? []).map((p) => ({
+                value: String(p.id),
+                label: `${p.name} (${p.protocol}://${p.address}:${p.port})`,
+              })),
+            ]}
+          />
+        </div>
+      )}
     </Modal>
   );
 }

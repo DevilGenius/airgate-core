@@ -88,10 +88,10 @@ function ErrorPopover({ anchor, content, onClose }: { anchor: DOMRect; content: 
       style={{ top, left, width: popoverWidth }}
     >
       <div
-        className="rounded-lg border shadow-lg overflow-hidden"
+        className="rounded-lg shadow-lg overflow-hidden"
         style={{
           background: 'var(--ag-bg-card)',
-          borderColor: 'var(--ag-danger)',
+          borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-danger)',
           boxShadow: '0 4px 24px rgba(0,0,0,0.25), 0 0 12px var(--ag-danger-glow, rgba(239,68,68,0.15))',
         }}
       >

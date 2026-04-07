@@ -68,8 +68,8 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
                     style={{ color: 'var(--ag-text-secondary)' }}
                   >
                     <span
-                      className="flex items-center justify-center w-4 h-4 rounded border flex-shrink-0"
-                      style={{ borderColor: 'var(--ag-glass-border)', background: 'var(--ag-primary)', opacity: 0.5 }}
+                      className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0"
+                      style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-glass-border)', background: 'var(--ag-primary)', opacity: 0.5 }}
                     >
                       <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none"><path d="M2.5 6l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </span>
@@ -101,8 +101,10 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
                     style={{ color: 'var(--ag-text)' }}
                   >
                     <span
-                      className="flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 transition-colors"
+                      className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0 transition-colors"
                       style={{
+                        borderWidth: '1px',
+                        borderStyle: 'solid',
                         borderColor: selectedIds.includes(g.id) ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
                         background: selectedIds.includes(g.id) ? 'var(--ag-primary)' : 'transparent',
                       }}

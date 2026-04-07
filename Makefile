@@ -4,10 +4,13 @@
 BACKEND_DIR := backend
 WEB_DIR := web
 SDK_FRONTEND := ../airgate-sdk/frontend
+OPENAI_PLUGIN := ../airgate-openai/web
+PLUGIN_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-openai/assets
 BINARY := $(BACKEND_DIR)/server
 GO := GOTOOLCHAIN=local go
 
-.PHONY: help dev dev-backend dev-frontend dev-sdk build build-backend build-frontend \
+.PHONY: help dev dev-backend dev-frontend dev-sdk dev-plugins build build-backend build-frontend \
+        build-plugins sync-plugins \
         ent lint fmt test clean install ci pre-commit setup-hooks \
         docker-build docker-rebuild docker-up docker-down docker-restart docker-dev
 
@@ -16,15 +19,21 @@ help: ## 显示帮助信息
 
 # ===================== 开发 =====================
 
-dev: ## 同时启动 SDK watch + 前后端开发服务器
+dev: ## 同时启动 SDK watch + 插件 watch + 前后端开发服务器
 	@echo "启动开发环境..."
+	@$(MAKE) sync-plugins
 	@$(MAKE) dev-sdk &
+	@$(MAKE) dev-plugins &
 	@$(MAKE) dev-backend &
 	@$(MAKE) dev-frontend
 	@wait
 
 dev-sdk: ## 启动 SDK 主题 watch 模式（修改 token 自动编译）
 	@cd $(SDK_FRONTEND) && npm run dev
+
+dev-plugins: ## 启动插件前端 watch 模式（修改后自动构建并同步到 core）
+	@echo "启动插件前端 watch → $(PLUGIN_ASSETS)/"
+	@cd $(OPENAI_PLUGIN) && npx vite build --watch --outDir ../../airgate-core/$(PLUGIN_ASSETS) 2>&1 | grep -v 'not inside project root'
 
 dev-backend: ## 启动后端（带热重载，需要 air）
 	@cd $(BACKEND_DIR) && \
@@ -41,7 +50,7 @@ dev-frontend: ## 启动前端开发服务器
 
 # ===================== 构建 =====================
 
-build: build-backend build-frontend ## 构建前后端
+build: build-backend build-frontend build-plugins ## 构建前后端及插件
 
 build-backend: ## 编译后端二进制
 	@cd $(BACKEND_DIR) && $(GO) build -o server ./cmd/server
@@ -50,6 +59,16 @@ build-backend: ## 编译后端二进制
 build-frontend: ## 构建前端产物
 	@cd $(WEB_DIR) && npm run build
 	@echo "前端构建完成: $(WEB_DIR)/dist/"
+
+build-plugins: sync-plugins ## 构建插件前端并同步到 core
+	@echo "插件前端构建完成"
+
+sync-plugins: ## 构建 openai 插件前端并同步到 data/plugins/
+	@echo "构建并同步 openai 插件前端..."
+	@cd $(OPENAI_PLUGIN) && npm run build
+	@mkdir -p $(PLUGIN_ASSETS)
+	@cp $(OPENAI_PLUGIN)/dist/index.js $(PLUGIN_ASSETS)/index.js
+	@echo "openai 插件前端已同步到 $(PLUGIN_ASSETS)/"
 
 # ===================== 代码生成 =====================
 

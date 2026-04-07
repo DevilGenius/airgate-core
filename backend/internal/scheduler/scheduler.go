@@ -59,7 +59,8 @@ func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 
 // SelectAccount 选择一个可用账户
 // 完整调度流程：模型路由 → 粘性会话 → 负载均衡
-func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, userID, groupID int, sessionID string) (*ent.Account, error) {
+// excludeIDs 为 failover 时需要排除的已尝试账户 ID
+func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, userID, groupID int, sessionID string, excludeIDs ...int) (*ent.Account, error) {
 	// 第一层：模型路由，获取候选账户列表
 	candidates, err := s.routeAccounts(ctx, platform, model, groupID)
 	if err != nil {
@@ -67,6 +68,24 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 	}
 	if len(candidates) == 0 {
 		return nil, ErrNoAvailableAccount
+	}
+
+	// 排除已尝试的账户（failover 场景）
+	if len(excludeIDs) > 0 {
+		excludeSet := make(map[int]bool, len(excludeIDs))
+		for _, id := range excludeIDs {
+			excludeSet[id] = true
+		}
+		filtered := candidates[:0]
+		for _, acc := range candidates {
+			if !excludeSet[acc.ID] {
+				filtered = append(filtered, acc)
+			}
+		}
+		candidates = filtered
+		if len(candidates) == 0 {
+			return nil, ErrNoAvailableAccount
+		}
 	}
 
 	// 第二层：调度约束过滤（窗口费用、RPM、会话数）
@@ -375,8 +394,13 @@ func (s *Scheduler) RegisterSession(ctx context.Context, accountID int, sessionI
 }
 
 // AcquireMessageLock 获取消息锁（真实用户消息串行化）
+// 锁 TTL 可通过 extra["msg_lock_ttl_seconds"] 配置，默认 360 秒（6 分钟）
 func (s *Scheduler) AcquireMessageLock(ctx context.Context, accountID int, requestID string, extra map[string]interface{}) (bool, error) {
-	return s.msgQueue.WaitAcquire(ctx, accountID, requestID, defaultLockTTL, 30*time.Second)
+	lockTTL := defaultLockTTL
+	if ttlSec := ExtraInt(extra, "msg_lock_ttl_seconds"); ttlSec > 0 {
+		lockTTL = time.Duration(ttlSec) * time.Second
+	}
+	return s.msgQueue.WaitAcquire(ctx, accountID, requestID, lockTTL, 30*time.Second)
 }
 
 // ReleaseMessageLock 释放消息锁
@@ -405,28 +429,40 @@ func (s *Scheduler) AddWindowCost(ctx context.Context, accountID int, cost float
 	s.windowCost.AddCost(ctx, accountID, cost)
 }
 
+// dbTimeout 为后台 DB 操作的超时时间，防止 DB 卡住导致 goroutine 泄漏
+const dbTimeout = 10 * time.Second
+
 // ReportAccountError 立即标记账号为 error（用于 401/403 等确定性凭证错误）
 func (s *Scheduler) ReportAccountError(accountID int, reason string) {
 	slog.Error("账户凭证错误，立即标记为 error", "account_id", accountID, "reason", reason)
-	_ = s.db.Account.UpdateOneID(accountID).
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+	if err := s.db.Account.UpdateOneID(accountID).
 		SetStatus(account.StatusError).
 		SetErrorMsg(reason).
-		Exec(context.Background())
+		Exec(ctx); err != nil {
+		slog.Error("标记账户 error 失败", "account_id", accountID, "error", err)
+	}
 	s.failCounts.Delete(accountID)
 }
 
 // ReportResult 上报调度结果，用于动态调整
 // reason 为失败时的错误原因（可选），记录到账号 error_msg 便于排查
 func (s *Scheduler) ReportResult(accountID int, success bool, latency time.Duration, reason ...string) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
 	if success {
 		// 成功时清零失败计数
 		s.failCounts.Delete(accountID)
 
 		// 更新 last_used_at
 		now := time.Now()
-		_ = s.db.Account.UpdateOneID(accountID).
+		if err := s.db.Account.UpdateOneID(accountID).
 			SetLastUsedAt(now).
-			Exec(context.Background())
+			Exec(ctx); err != nil {
+			slog.Debug("更新 last_used_at 失败", "account_id", accountID, "error", err)
+		}
 		return
 	}
 
@@ -451,10 +487,12 @@ func (s *Scheduler) ReportResult(accountID int, success bool, latency time.Durat
 		if len(reason) > 0 && reason[0] != "" {
 			errMsg = reason[0]
 		}
-		_ = s.db.Account.UpdateOneID(accountID).
+		if err := s.db.Account.UpdateOneID(accountID).
 			SetStatus(account.StatusError).
 			SetErrorMsg(errMsg).
-			Exec(context.Background())
+			Exec(ctx); err != nil {
+			slog.Error("标记账户 error 失败", "account_id", accountID, "error", err)
+		}
 		s.failCounts.Delete(accountID)
 	}
 }

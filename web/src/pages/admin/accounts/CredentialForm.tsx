@@ -172,8 +172,8 @@ export function GroupCheckboxList({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center justify-between w-full px-3 py-2 rounded-lg border text-sm text-left transition-colors"
-        style={{ borderColor: 'var(--ag-glass-border)', background: 'var(--ag-bg-surface)', color: 'var(--ag-text)' }}
+        className="flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm text-left transition-colors"
+        style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-glass-border)', background: 'var(--ag-bg-surface)', color: 'var(--ag-text)' }}
       >
         <span className="truncate" style={selectedGroups.length === 0 ? { color: 'var(--ag-text-tertiary)' } : undefined}>
           {selectedGroups.length === 0
@@ -184,8 +184,8 @@ export function GroupCheckboxList({
       </button>
       {open && (
         <div
-          className="absolute z-50 mt-1 w-full rounded-lg border shadow-lg max-h-48 overflow-y-auto py-1"
-          style={{ borderColor: 'var(--ag-glass-border)', background: 'var(--ag-bg-elevated)' }}
+          className="absolute z-50 mt-1 w-full rounded-lg shadow-lg max-h-48 overflow-y-auto py-1"
+          style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-glass-border)', background: 'var(--ag-bg-elevated)' }}
         >
           {groups.map((g) => (
             <button
@@ -196,8 +196,10 @@ export function GroupCheckboxList({
               style={{ color: 'var(--ag-text)' }}
             >
               <span
-                className="flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 transition-colors"
+                className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0 transition-colors"
                 style={{
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
                   borderColor: selectedIds.includes(g.id) ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
                   background: selectedIds.includes(g.id) ? 'var(--ag-primary)' : 'transparent',
                 }}

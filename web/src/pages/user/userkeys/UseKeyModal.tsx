@@ -4,6 +4,7 @@ import { AlertTriangle, Copy } from 'lucide-react';
 import { Modal } from '../../../shared/components/Modal';
 import { Button } from '../../../shared/components/Button';
 import { useToast } from '../../../shared/components/Toast';
+import { useClipboard } from '../../../shared/hooks/useClipboard';
 import { useSiteSettings } from '../../../app/providers/SiteSettingsProvider';
 import { apikeysApi } from '../../../shared/api/apikeys';
 import type { APIKeyResp, GroupResp } from '../../../shared/types';
@@ -195,7 +196,7 @@ export function UseKeyModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const { toast } = useToast();
+  const copy = useClipboard();
   const site = useSiteSettings();
   const baseUrl = site.api_base_url || window.location.origin;
 
@@ -292,10 +293,7 @@ export function UseKeyModal({
                     <div className="flex items-center justify-between px-3 py-1.5 bg-bg-hover border-b border-glass-border">
                       <span className="text-xs text-text-tertiary font-mono">{file.path}</span>
                       <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(file.content);
-                          toast('success', t('user_keys.copied'));
-                        }}
+                        onClick={() => copy(file.content, t('user_keys.copied'))}
                         className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-bg-elevated text-text-secondary transition-colors"
                       >
                         <Copy className="w-3 h-3" />

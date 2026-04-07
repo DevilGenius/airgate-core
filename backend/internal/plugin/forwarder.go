@@ -131,19 +131,14 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		return
 	}
 
-	// 记录已尝试过的账户，failover 时排除
-	triedAccountIDs := make(map[int]bool)
+	// 记录已尝试过的账户 ID，传给调度器做排除
+	var excludeIDs []int
 
 	for attempt := 0; attempt < maxFailoverAttempts; attempt++ {
-		if !f.selectForwardAccount(c, state) {
+		if !f.selectForwardAccount(c, state, excludeIDs...) {
 			return
 		}
-
-		// 如果此账户已尝试过，跳过（防止重复选中同一账户）
-		if triedAccountIDs[state.account.ID] {
-			break
-		}
-		triedAccountIDs[state.account.ID] = true
+		excludeIDs = append(excludeIDs, state.account.ID)
 
 		cleanup, ok := f.prepareForwardExecution(c, state)
 		if !ok {

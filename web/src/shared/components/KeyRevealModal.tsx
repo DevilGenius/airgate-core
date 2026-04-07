@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Copy } from 'lucide-react';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import { useToast } from './Toast';
+import { useClipboard } from '../hooks/useClipboard';
 
 interface KeyRevealModalProps {
   open: boolean;
@@ -22,16 +22,9 @@ export function KeyRevealModal({
   onClose,
 }: KeyRevealModalProps) {
   const { t } = useTranslation();
-  const { toast } = useToast();
+  const copy = useClipboard();
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(keyValue);
-      toast('success', t('common.copied'));
-    } catch {
-      toast('error', t('common.copy_failed'));
-    }
-  };
+  const handleCopy = () => copy(keyValue);
 
   return (
     <Modal

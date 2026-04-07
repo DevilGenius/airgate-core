@@ -573,8 +573,8 @@ export default function AccountsPage() {
             </button>
             {showRefreshMenu && (
               <div
-                className="absolute right-0 mt-1 w-40 rounded-lg border shadow-lg py-1 z-50"
-                style={{ background: 'var(--ag-bg-elevated)', borderColor: 'var(--ag-glass-border)' }}
+                className="absolute right-0 mt-1 w-40 rounded-lg shadow-lg py-1 z-50"
+                style={{ background: 'var(--ag-bg-elevated)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-glass-border)' }}
               >
                 {AUTO_REFRESH_OPTIONS.map((sec) => (
                   <button

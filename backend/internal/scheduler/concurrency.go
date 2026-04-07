@@ -12,8 +12,8 @@ import (
 var ErrConcurrencyLimit = errors.New("并发槽位已满")
 
 const (
-	// slotTTL 单个请求槽位的过期时间，防止异常未释放
-	slotTTL = 5 * time.Minute
+	// defaultSlotTTL 单个请求槽位的默认过期时间，防止异常未释放
+	defaultSlotTTL = 5 * time.Minute
 )
 
 // ConcurrencyManager 分布式并发槽位管理
@@ -34,9 +34,13 @@ func concurrencyKey(accountID int) string {
 
 // AcquireSlot 获取并发槽位
 // 检查当前 SET 大小 < maxConcurrency，若未满则 SADD
-func (cm *ConcurrencyManager) AcquireSlot(ctx context.Context, accountID int, requestID string, maxConcurrency int) error {
+// slotTTL 为槽位过期时间，<= 0 时使用默认值（5 分钟）
+func (cm *ConcurrencyManager) AcquireSlot(ctx context.Context, accountID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
 	if cm.rdb == nil {
 		return nil // Redis 不可用时放行
+	}
+	if slotTTL <= 0 {
+		slotTTL = defaultSlotTTL
 	}
 
 	key := concurrencyKey(accountID)

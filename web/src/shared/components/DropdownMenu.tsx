@@ -33,7 +33,7 @@ export const DropdownMenu = forwardRef<HTMLDivElement, DropdownMenuProps>(
         {items.map((item, idx) => (
           <div key={idx}>
             {item.divider && (
-              <div className="my-1 border-t" style={{ borderColor: 'var(--ag-border-subtle)' }} />
+              <div className="my-1" style={{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: 'var(--ag-border-subtle)' }} />
             )}
             <button
               className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-lg hover:bg-bg-hover transition-colors text-left cursor-pointer"

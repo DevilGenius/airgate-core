@@ -256,9 +256,8 @@ export function Select({
           onClick={() => !disabled && setOpen((o) => !o)}
           onKeyDown={handleKeyDown}
           className={`${inputBase} cursor-pointer pr-10 text-left ${error ? inputError : ''} ${
-            open ? 'shadow-[0_0_0_2px_var(--ag-primary-subtle)]' : ''
+            open ? 'border-border-focus shadow-[0_0_0_2px_var(--ag-primary-subtle)]' : ''
           } ${!selectedOption ? 'text-text-tertiary' : ''} ${className}`}
-          style={open ? { borderColor: 'var(--ag-border-focus)' } : undefined}
         >
           {displayLabel || '\u00A0'}
         </button>

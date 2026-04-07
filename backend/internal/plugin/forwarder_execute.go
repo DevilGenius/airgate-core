@@ -35,7 +35,7 @@ func (f *Forwarder) ensureForwardAllowed(c *gin.Context, state *forwardState) bo
 	return true
 }
 
-func (f *Forwarder) selectForwardAccount(c *gin.Context, state *forwardState) bool {
+func (f *Forwarder) selectForwardAccount(c *gin.Context, state *forwardState, excludeIDs ...int) bool {
 	account, err := f.scheduler.SelectAccount(
 		c.Request.Context(),
 		state.plugin.Platform,
@@ -43,6 +43,7 @@ func (f *Forwarder) selectForwardAccount(c *gin.Context, state *forwardState) bo
 		state.keyInfo.UserID,
 		state.keyInfo.GroupID,
 		state.sessionID,
+		excludeIDs...,
 	)
 	if err != nil {
 		slog.Warn("账户调度失败", "platform", state.plugin.Platform, "model", state.model, "error", err)
@@ -81,7 +82,10 @@ func (f *Forwarder) prepareForwardExecution(c *gin.Context, state *forwardState)
 		maxConc = 5
 	}
 
-	if err := f.concurrency.AcquireSlot(ctx, state.account.ID, state.requestID, maxConc); err != nil {
+	// 槽位 TTL 可通过 extra["slot_ttl_seconds"] 配置，默认 300 秒（5 分钟）
+	slotTTL := time.Duration(scheduler.ExtraInt(state.account.Extra, "slot_ttl_seconds")) * time.Second
+
+	if err := f.concurrency.AcquireSlot(ctx, state.account.ID, state.requestID, maxConc, slotTTL); err != nil {
 		releaseMessageLock()
 		f.scheduler.DecrementRPM(ctx, state.account.ID)
 		openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "concurrency_limit", "并发已满，请稍后重试")

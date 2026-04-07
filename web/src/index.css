@@ -327,6 +327,17 @@ body {
   animation: ag-breathe 4s ease-in-out infinite;
 }
 
+/* ── 隐藏数字输入框的原生加减按钮 ── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 /* ── 原生 select/option 主题适配 ── */
 select option {
   background: var(--ag-bg-elevated);
