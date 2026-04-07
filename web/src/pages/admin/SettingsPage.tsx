@@ -2,16 +2,21 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../../shared/api/settings';
+import { adminApiKeyApi, type AdminAPIKeyResp } from '../../shared/api/adminApiKey';
 import { defaultLogoUrl } from '../../app/providers/SiteSettingsProvider';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { useClipboard } from '../../shared/hooks/useClipboard';
 import { queryKeys } from '../../shared/queryKeys';
 import { Button } from '../../shared/components/Button';
 import { Input, Textarea } from '../../shared/components/Input';
 import { Switch } from '../../shared/components/Switch';
 import { Card } from '../../shared/components/Card';
+import { Modal, ConfirmModal } from '../../shared/components/Modal';
+import { Alert } from '../../shared/components/Alert';
 import { useToast } from '../../shared/components/Toast';
 import {
   Save, Loader2, Globe, UserPlus, Gift, Mail, Send, Upload, X, Eye, RotateCcw,
+  ShieldCheck, Copy, Trash2, KeyRound,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
 
@@ -77,23 +82,25 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'registration' | 'defaults' | 'smtp';
+type TabKey = 'site' | 'security' | 'registration' | 'defaults' | 'smtp';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
+  { key: 'security', labelKey: 'settings.tab_security', icon: ShieldCheck },
   { key: 'registration', labelKey: 'settings.tab_registration', icon: UserPlus },
   { key: 'defaults', labelKey: 'settings.tab_defaults', icon: Gift },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
 ];
 
-const TAB_GROUP: Record<TabKey, string> = {
+// security tab 不走通用 settings save 流程，单独通过 admin-api-key 接口管理
+const TAB_GROUP: Record<Exclude<TabKey, 'security'>, string> = {
   site: 'site',
   registration: 'registration',
   defaults: 'defaults',
   smtp: 'smtp',
 };
 
-const TAB_KEYS: Record<TabKey, readonly string[]> = {
+const TAB_KEYS: Record<Exclude<TabKey, 'security'>, readonly string[]> = {
   site: SITE_KEYS,
   registration: REG_KEYS,
   defaults: DEFAULT_KEYS,
@@ -162,6 +169,7 @@ export default function SettingsPage() {
   }
 
   function handleSave() {
+    if (activeTab === 'security') return;
     const group = TAB_GROUP[activeTab];
     const keys = TAB_KEYS[activeTab];
     const items: SettingItem[] = keys.map((key) => ({
@@ -245,6 +253,8 @@ export default function SettingsPage() {
             </div>
           </Card>
         )}
+
+        {activeTab === 'security' && <SecurityPanel />}
 
         {activeTab === 'registration' && (
           <Card title={t('settings.registration_auth')}>
@@ -410,18 +420,198 @@ export default function SettingsPage() {
         </>)}
       </div>
 
-      {/* Save button */}
-      <div className="flex justify-end mt-6">
-        <Button
-          icon={<Save className="w-4 h-4" />}
-          onClick={handleSave}
-          loading={saveMutation.isPending}
-          disabled={!hasChanges}
-        >
-          {t('common.save')}
-        </Button>
-      </div>
+      {/* Save button (security tab manages its own actions) */}
+      {activeTab !== 'security' && (
+        <div className="flex justify-end mt-6">
+          <Button
+            icon={<Save className="w-4 h-4" />}
+            onClick={handleSave}
+            loading={saveMutation.isPending}
+            disabled={!hasChanges}
+          >
+            {t('common.save')}
+          </Button>
+        </div>
+      )}
     </div>
+  );
+}
+
+// ==================== Security Panel ====================
+
+function SecurityPanel() {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const copy = useClipboard();
+
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [plainKey, setPlainKey] = useState('');
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.adminApiKey(),
+    queryFn: () => adminApiKeyApi.get(),
+  });
+
+  const hasKey = !!data?.hint;
+
+  const generateMutation = useMutation({
+    mutationFn: () => adminApiKeyApi.generate(),
+    onSuccess: (resp: AdminAPIKeyResp) => {
+      queryClient.setQueryData(queryKeys.adminApiKey(), { hint: resp.hint });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminApiKey() });
+      setPlainKey(resp.key ?? '');
+      setShowKeyModal(true);
+      setConfirmRegen(false);
+      toast(
+        'success',
+        hasKey
+          ? t('settings.security_admin_key_regenerated')
+          : t('settings.security_admin_key_generated'),
+      );
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => adminApiKeyApi.remove(),
+    onSuccess: () => {
+      queryClient.setQueryData(queryKeys.adminApiKey(), null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminApiKey() });
+      setConfirmDelete(false);
+      toast('success', t('settings.security_admin_key_deleted'));
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  return (
+    <Card title={t('settings.security_admin_key')}>
+      <p className="text-[12px] text-text-tertiary -mt-1 mb-4">
+        {t('settings.security_admin_key_desc')}
+      </p>
+
+      <div className="mb-4">
+        <Alert variant="warning">{t('settings.security_admin_key_warning')}</Alert>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center py-4 text-text-tertiary text-sm">
+          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+          {t('common.loading')}
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] text-text-tertiary mb-1.5">
+              {t('settings.security_admin_key_current')}
+            </div>
+            {hasKey ? (
+              <code className="inline-block px-2.5 py-1.5 rounded-md bg-surface border border-glass-border text-[13px] font-mono text-text break-all">
+                {data!.hint}
+              </code>
+            ) : (
+              <span className="text-[13px] text-text-tertiary">
+                {t('settings.security_admin_key_none')}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {hasKey ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<RotateCcw className="w-3.5 h-3.5" />}
+                  onClick={() => setConfirmRegen(true)}
+                  loading={generateMutation.isPending}
+                >
+                  {t('settings.security_admin_key_regenerate')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  icon={<Trash2 className="w-3.5 h-3.5" />}
+                  onClick={() => setConfirmDelete(true)}
+                  loading={deleteMutation.isPending}
+                >
+                  {t('settings.security_admin_key_delete')}
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                icon={<KeyRound className="w-3.5 h-3.5" />}
+                onClick={() => generateMutation.mutate()}
+                loading={generateMutation.isPending}
+              >
+                {t('settings.security_admin_key_generate')}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 一次性显示明文密钥 */}
+      <Modal
+        open={showKeyModal}
+        onClose={() => {
+          setShowKeyModal(false);
+          setPlainKey('');
+        }}
+        title={t('settings.security_admin_key_show_title')}
+        width="520px"
+        footer={
+          <Button
+            onClick={() => {
+              setShowKeyModal(false);
+              setPlainKey('');
+            }}
+          >
+            {t('common.confirm')}
+          </Button>
+        }
+      >
+        <div className="space-y-3">
+          <Alert variant="warning">{t('settings.security_admin_key_show_hint')}</Alert>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 min-w-0 px-3 py-2 rounded-md bg-surface border border-glass-border text-[13px] font-mono text-text break-all">
+              {plainKey}
+            </code>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Copy className="w-3.5 h-3.5" />}
+              onClick={() => copy(plainKey)}
+            >
+              {t('settings.security_admin_key_copy')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmModal
+        open={confirmRegen}
+        onClose={() => setConfirmRegen(false)}
+        onConfirm={() => generateMutation.mutate()}
+        title={t('settings.security_admin_key_regenerate_confirm_title')}
+        message={t('settings.security_admin_key_regenerate_confirm_msg')}
+        loading={generateMutation.isPending}
+        danger
+      />
+
+      <ConfirmModal
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        title={t('settings.security_admin_key_delete_confirm_title')}
+        message={t('settings.security_admin_key_delete_confirm_msg')}
+        loading={deleteMutation.isPending}
+        danger
+      />
+    </Card>
   );
 }
 
