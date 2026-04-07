@@ -58,7 +58,12 @@ func (f *Forwarder) prepareForwardExecution(c *gin.Context, state *forwardState)
 	ctx := c.Request.Context()
 	state.requestID = uuid.New().String()
 
-	f.scheduler.IncrementRPM(ctx, state.account.ID)
+	// 原子检查 RPM 限制并递增，防止并发请求超过 max_rpm
+	maxRPM := scheduler.ExtraInt(state.account.Extra, "max_rpm")
+	if !f.scheduler.TryIncrementRPM(ctx, state.account.ID, maxRPM) {
+		openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "rpm_limit", "账户 RPM 已达上限，请稍后重试")
+		return nil, false
+	}
 
 	releaseMessageLock := func() {}
 	if scheduler.IsRealUserMessage(state.body) {

@@ -83,6 +83,47 @@ func (r *RPMCounter) DecrementRPM(ctx context.Context, accountID int) {
 	decrementRPMScript.Run(ctx, r.rdb, []string{key})
 }
 
+// tryIncrementScript 原子检查 RPM 限制并递增
+// ARGV[1] = maxRPM
+// 返回: -1 = 已达上限（拒绝），>= 0 = 递增后的值（允许）
+var tryIncrementScript = redis.NewScript(`
+	local key = KEYS[1]
+	local maxRPM = tonumber(ARGV[1])
+	local current = tonumber(redis.call('GET', key) or '0')
+	if current >= maxRPM then
+		return -1
+	end
+	local newVal = redis.call('INCR', key)
+	if redis.call('TTL', key) < 0 then
+		redis.call('EXPIRE', key, 120)
+	end
+	return newVal
+`)
+
+// TryIncrementRPM 原子检查 RPM 限制并递增
+// 如果当前 RPM 已达 maxRPM，返回 false 不递增；否则递增并返回 true
+// maxRPM <= 0 表示不限制，直接递增
+func (r *RPMCounter) TryIncrementRPM(ctx context.Context, accountID int, maxRPM int) (bool, error) {
+	if r.rdb == nil {
+		return true, nil
+	}
+
+	// 不限制时直接递增
+	if maxRPM <= 0 {
+		_, err := r.IncrementRPM(ctx, accountID)
+		return true, err
+	}
+
+	key := r.getMinuteKey(ctx, accountID)
+	result, err := tryIncrementScript.Run(ctx, r.rdb, []string{key}, maxRPM).Int()
+	if err != nil {
+		// fail-open：Redis 不可用时允许通过并尝试普通递增
+		_, _ = r.IncrementRPM(ctx, accountID)
+		return true, nil
+	}
+	return result >= 0, nil
+}
+
 // GetSchedulability 根据 RPM 使用率返回调度状态
 // maxRPM <= 0 表示不限制
 func (r *RPMCounter) GetSchedulability(ctx context.Context, accountID int, maxRPM int) Schedulability {

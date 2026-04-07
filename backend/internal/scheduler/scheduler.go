@@ -33,6 +33,7 @@ type Scheduler struct {
 	rpm        *RPMCounter
 	session    *SessionManager
 	msgQueue   *MessageQueue
+	overload   *OverloadManager
 
 	// 连续失败计数器（accountID → 连续失败次数）
 	failCounts sync.Map
@@ -51,6 +52,7 @@ func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 		rpm:          rpm,
 		session:      NewSessionManager(rdb),
 		msgQueue:     NewMessageQueue(rdb, rpm),
+		overload:     NewOverloadManager(rdb),
 		maxFailCount: 3,
 	}
 }
@@ -264,9 +266,14 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 	return items[0].acc
 }
 
-// checkSchedulability 综合检查账户调度约束（窗口费用、RPM、会话数）
+// checkSchedulability 综合检查账户调度约束（限流冷却、窗口费用、RPM、会话数）
 // 返回最严格的约束状态
 func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account) Schedulability {
+	// 限流冷却检查（429 后的临时不可调度，优先判断）
+	if sched := s.overload.GetSchedulability(ctx, acc.ID); sched == NotSchedulable {
+		return NotSchedulable
+	}
+
 	worst := Normal
 
 	// 窗口费用检查
@@ -314,9 +321,26 @@ func (s *Scheduler) IncrementRPM(ctx context.Context, accountID int) {
 	}
 }
 
+// TryIncrementRPM 原子检查 RPM 限制并递增
+// 如果已达上限返回 false（未递增），否则递增后返回 true
+func (s *Scheduler) TryIncrementRPM(ctx context.Context, accountID int, maxRPM int) bool {
+	allowed, err := s.rpm.TryIncrementRPM(ctx, accountID, maxRPM)
+	if err != nil {
+		slog.Debug("原子递增 RPM 失败", "account_id", accountID, "error", err)
+		return true // fail-open
+	}
+	return allowed
+}
+
 // DecrementRPM 回退 RPM 计数（请求未实际消耗上游配额时调用）
 func (s *Scheduler) DecrementRPM(ctx context.Context, accountID int) {
 	s.rpm.DecrementRPM(ctx, accountID)
+}
+
+// MarkOverloaded 标记账户为临时限流状态（收到 429 后调用）
+// retryAfter 为上游建议的等待时间
+func (s *Scheduler) MarkOverloaded(ctx context.Context, accountID int, retryAfter time.Duration) {
+	s.overload.MarkOverloaded(ctx, accountID, retryAfter)
 }
 
 // RefreshSession 刷新账户会话时间戳（转发成功后调用）

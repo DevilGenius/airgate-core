@@ -74,7 +74,8 @@ func (f *Forwarder) reportForwardExecution(ctx context.Context, state *forwardSt
 		f.scheduler.RefreshSession(ctx, state.account.ID, state.sessionID, state.account.Extra)
 	case isRateLimited:
 		f.scheduler.DecrementRPM(ctx, state.account.ID)
-		slog.Warn("上游限流", "account_id", state.account.ID, "retry_after", execution.result.RetryAfter)
+		f.scheduler.MarkOverloaded(ctx, state.account.ID, execution.result.RetryAfter)
+		slog.Warn("上游限流，临时暂停调度", "account_id", state.account.ID, "retry_after", execution.result.RetryAfter)
 	case isAccountError:
 		f.scheduler.DecrementRPM(ctx, state.account.ID)
 		f.scheduler.ReportAccountError(state.account.ID, resolveAccountErrorReason(execution))

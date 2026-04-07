@@ -2,6 +2,7 @@ package billing
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -155,11 +156,22 @@ func (r *Recorder) flush(ctx context.Context, batch []UsageRecord) {
 	}
 }
 
-// batchInsert 批量写入使用记录并异步扣费
+// batchInsert 在同一事务中批量写入使用记录并扣费
+// 保证 UsageLog 插入与余额扣减的原子性，避免记录成功但扣费失败
 func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
+	tx, err := r.db.Tx(ctx)
+	if err != nil {
+		return fmt.Errorf("开启事务失败: %w", err)
+	}
+	defer func() {
+		// 若事务未提交则回滚（Commit 后 Rollback 是 no-op）
+		_ = tx.Rollback()
+	}()
+
+	// 1. 批量写入 UsageLog
 	builders := make([]*ent.UsageLogCreate, 0, len(batch))
 	for _, rec := range batch {
-		b := r.db.UsageLog.Create().
+		b := tx.UsageLog.Create().
 			SetPlatform(rec.Platform).
 			SetModel(rec.Model).
 			SetInputTokens(rec.InputTokens).
@@ -189,17 +201,11 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 		builders = append(builders, b)
 	}
 
-	if _, err := r.db.UsageLog.CreateBulk(builders...).Save(ctx); err != nil {
-		return err
+	if _, err := tx.UsageLog.CreateBulk(builders...).Save(ctx); err != nil {
+		return fmt.Errorf("批量插入 UsageLog 失败: %w", err)
 	}
 
-	// 异步扣费：按 UserID / APIKeyID 聚合后批量扣减
-	r.deductBatch(ctx, batch)
-	return nil
-}
-
-// deductBatch 按用户和 API Key 聚合扣费，减少 DB 写入次数
-func (r *Recorder) deductBatch(ctx context.Context, batch []UsageRecord) {
+	// 2. 在同一事务中扣费：按 UserID / APIKeyID 聚合后批量扣减
 	userCosts := make(map[int]float64)
 	keyCosts := make(map[int]float64)
 
@@ -211,18 +217,24 @@ func (r *Recorder) deductBatch(ctx context.Context, batch []UsageRecord) {
 	}
 
 	for userID, cost := range userCosts {
-		if err := r.db.User.UpdateOneID(userID).
+		if err := tx.User.UpdateOneID(userID).
 			AddBalance(-cost).
 			Exec(ctx); err != nil {
-			slog.Error("异步扣减用户余额失败", "user_id", userID, "cost", cost, "error", err)
+			return fmt.Errorf("扣减用户余额失败 user_id=%d cost=%.8f: %w", userID, cost, err)
 		}
 	}
 
 	for keyID, cost := range keyCosts {
-		if err := r.db.APIKey.UpdateOneID(keyID).
+		if err := tx.APIKey.UpdateOneID(keyID).
 			AddUsedQuota(cost).
 			Exec(ctx); err != nil {
-			slog.Error("异步更新 API Key 用量失败", "key_id", keyID, "cost", cost, "error", err)
+			return fmt.Errorf("更新 API Key 用量失败 key_id=%d cost=%.8f: %w", keyID, cost, err)
 		}
 	}
+
+	// 3. 提交事务
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("提交事务失败: %w", err)
+	}
+	return nil
 }
