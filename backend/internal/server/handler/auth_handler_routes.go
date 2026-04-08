@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -94,9 +95,27 @@ func (h *AuthHandler) LoginByAPIKey(c *gin.Context) {
 		return
 	}
 
+	// 填充 API Key 维度的字段（额度 / 已用 / 到期时间），与 GetMe 行为对齐，
+	// 否则前端首屏拿不到 quota，会先显示"无限"再因 /me 刷新而跳变。
+	userResp := userToResp(user)
+	userResp.APIKeyID = int64(info.KeyID)
+	userResp.APIKeyName = info.KeyName
+	if keyInfo, err := h.userService.GetAPIKeyInfo(c.Request.Context(), info.KeyID); err == nil {
+		userResp.APIKeyQuotaUSD = keyInfo.QuotaUSD
+		userResp.APIKeyUsedQuota = keyInfo.UsedQuota
+		if keyInfo.SellRate > 0 {
+			userResp.APIKeyRate = keyInfo.SellRate
+		} else {
+			userResp.APIKeyRate = keyInfo.GroupRate
+		}
+		if keyInfo.ExpiresAt != nil {
+			userResp.APIKeyExpiresAt = keyInfo.ExpiresAt.Format(time.RFC3339)
+		}
+	}
+
 	response.Success(c, dto.LoginResp{
 		Token:      token,
-		User:       userToResp(user),
+		User:       userResp,
 		APIKeyID:   int64(info.KeyID),
 		APIKeyName: info.KeyName,
 	})

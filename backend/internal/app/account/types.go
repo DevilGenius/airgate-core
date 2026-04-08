@@ -42,8 +42,9 @@ type UsageLog struct {
 	Model        string
 	InputTokens  int64
 	OutputTokens int64
-	TotalCost    float64
-	ActualCost   float64
+	TotalCost    float64 // 原始上游定价（base, 不含任何倍率）
+	AccountCost  float64 // 账号实际成本 = total × account_rate（"账号计费"统计的真值）
+	ActualCost   float64 // 用户扣费 = total × billing_rate
 	DurationMs   int64
 	CreatedAt    time.Time
 }
@@ -145,20 +146,27 @@ type StatsQuery struct {
 }
 
 // PeriodStats 期间汇总。
+//
+// 三个 cost 字段语义：
+//   - TotalCost   = SUM(usage_log.total_cost)   原始上游定价
+//   - AccountCost = SUM(usage_log.account_cost) 账号实际成本 = total × account_rate（"账号计费"）
+//   - ActualCost  = SUM(usage_log.actual_cost)  用户扣费     = total × billing_rate
 type PeriodStats struct {
 	Count        int     `json:"count"`
 	InputTokens  int64   `json:"input_tokens"`
 	OutputTokens int64   `json:"output_tokens"`
 	TotalCost    float64 `json:"total_cost"`
+	AccountCost  float64 `json:"account_cost"`
 	ActualCost   float64 `json:"actual_cost"`
 }
 
 // DailyStats 每日统计。
 type DailyStats struct {
-	Date       string  `json:"date"`
-	Count      int     `json:"count"`
-	TotalCost  float64 `json:"total_cost"`
-	ActualCost float64 `json:"actual_cost"`
+	Date        string  `json:"date"`
+	Count       int     `json:"count"`
+	TotalCost   float64 `json:"total_cost"`
+	AccountCost float64 `json:"account_cost"`
+	ActualCost  float64 `json:"actual_cost"`
 }
 
 // ModelStats 模型分布统计。
@@ -168,15 +176,17 @@ type ModelStats struct {
 	InputTokens  int64   `json:"input_tokens"`
 	OutputTokens int64   `json:"output_tokens"`
 	TotalCost    float64 `json:"total_cost"`
+	AccountCost  float64 `json:"account_cost"`
 	ActualCost   float64 `json:"actual_cost"`
 }
 
 // PeakDay 峰值日期统计。
 type PeakDay struct {
-	Date       string  `json:"date"`
-	Count      int     `json:"count"`
-	TotalCost  float64 `json:"total_cost"`
-	ActualCost float64 `json:"actual_cost"`
+	Date        string  `json:"date"`
+	Count       int     `json:"count"`
+	TotalCost   float64 `json:"total_cost"`
+	AccountCost float64 `json:"account_cost"`
+	ActualCost  float64 `json:"actual_cost"`
 }
 
 // StatsResult 账号统计结果。

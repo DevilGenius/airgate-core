@@ -21,6 +21,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
     name: '',
     group_id: 0,
     quota_usd: 0,
+    sell_rate: 0,
     expires_at: '',
   });
   const [ipWhitelist, setIpWhitelist] = useState('');
@@ -31,6 +32,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
     onSubmit({
       ...form,
       quota_usd: form.quota_usd || undefined,
+      sell_rate: form.sell_rate || undefined,
       expires_at: form.expires_at || undefined,
       ip_whitelist: parseIpList(ipWhitelist),
       ip_blacklist: parseIpList(ipBlacklist),
@@ -38,7 +40,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
   };
 
   const handleClose = () => {
-    setForm({ name: '', group_id: 0, quota_usd: 0, expires_at: '' });
+    setForm({ name: '', group_id: 0, quota_usd: 0, sell_rate: 0, expires_at: '' });
     setIpWhitelist('');
     setIpBlacklist('');
     onClose();
@@ -46,7 +48,10 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
 
   const groupOptions = [
     { value: '0', label: t('api_keys.select_group') },
-    ...groups.map((g) => ({ value: String(g.id), label: `${g.name} (${g.platform})` })),
+    ...groups.map((g) => ({
+      value: String(g.id),
+      label: `${g.name} (${g.platform}) · ${g.rate_multiplier}x`,
+    })),
   ];
 
   return (
@@ -92,6 +97,19 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
           value={String(form.quota_usd ?? 0)}
           onChange={(e) => setForm({ ...form, quota_usd: Number(e.target.value) })}
           hint={t('api_keys.quota_hint')}
+        />
+
+        <Input
+          label={t('api_keys.sell_rate_label', '销售倍率')}
+          type="number"
+          step="0.01"
+          min="0"
+          value={String(form.sell_rate ?? 0)}
+          onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
+          hint={t(
+            'api_keys.sell_rate_hint',
+            '对客户的售价倍率（如 0.6 表示按基础成本的 0.6 倍计费）。留空或 0 表示按平台原价，不启用 markup。可随时调整。',
+          )}
         />
 
         <Input

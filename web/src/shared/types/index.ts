@@ -70,6 +70,7 @@ export interface UserResp {
   api_key_quota_usd?: number;
   api_key_used_quota?: number;
   api_key_expires_at?: string;
+  api_key_rate?: number;
   created_at: string;
   updated_at: string;
 }
@@ -278,7 +279,12 @@ export interface APIKeyResp {
   ip_whitelist?: string[];
   ip_blacklist?: string[];
   quota_usd: number;
+  /** 账面已用（含 sell_rate markup）。end customer 通过 key 看到的就是这个数字 */
   used_quota: number;
+  /** 真实成本已用（reseller 用于成本核算/利润计算，end customer 不可见） */
+  used_quota_actual: number;
+  /** 销售倍率：>0 启用 reseller markup，0 表示按平台原价计费 */
+  sell_rate: number;
   today_cost: number;
   thirty_day_cost: number;
   expires_at?: string;
@@ -293,6 +299,8 @@ export interface CreateAPIKeyReq {
   ip_whitelist?: string[];
   ip_blacklist?: string[];
   quota_usd?: number;
+  /** 销售倍率：>0 启用 reseller markup（对客户的售价倍率）。可空，默认 0 */
+  sell_rate?: number;
   expires_at?: string;
 }
 
@@ -302,6 +310,8 @@ export interface UpdateAPIKeyReq {
   ip_whitelist?: string[];
   ip_blacklist?: string[];
   quota_usd?: number;
+  /** 销售倍率可随时动态调整，不影响历史 used_quota 累加值 */
+  sell_rate?: number;
   expires_at?: string;
   status?: 'active' | 'disabled';
 }
@@ -364,8 +374,16 @@ export interface UsageLogResp {
   output_cost: number;
   cached_input_cost: number;
   total_cost: number;
+  /** 平台真实成本/用户扣费 = total × billing_rate */
   actual_cost: number;
+  /** 客户账面消耗（含 sell_rate markup）；reseller 计算 actual_cost 与之差额即利润 */
+  billed_cost: number;
+  /** 账号实际成本 = total × account_rate；用于"账号计费"统计 */
+  account_cost: number;
   rate_multiplier: number;
+  /** 快照：本次请求生效的 sell_rate；0 表示该 key 当时未启用 markup */
+  sell_rate: number;
+  /** 快照：本次请求生效的 account_rate */
   account_rate_multiplier: number;
   service_tier?: string;
   stream: boolean;
@@ -373,6 +391,29 @@ export interface UsageLogResp {
   first_token_ms: number;
   user_agent?: string;
   ip_address?: string;
+  created_at: string;
+}
+
+/**
+ * CustomerUsageLogResp end customer 视角的精简响应。
+ *
+ * 当请求来自 API Key 登录拿到的 scoped JWT 时，后端返回此结构，
+ * 不暴露 actual_cost / total_cost / 单价 / rate_multiplier 等会泄漏 reseller 毛利的字段。
+ */
+export interface CustomerUsageLogResp {
+  id: number;
+  api_key_id: number;
+  platform: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cached_input_tokens: number;
+  /** 客户视角："本次消耗 = X 美元" */
+  cost: number;
+  service_tier?: string;
+  stream: boolean;
+  duration_ms: number;
+  first_token_ms: number;
   created_at: string;
 }
 
@@ -392,6 +433,8 @@ export interface UsageStatsResp {
   total_tokens: number;
   total_cost: number;
   total_actual_cost: number;
+  /** Reseller scope 才会下发；admin scope omit */
+  total_billed_cost?: number;
   by_model?: ModelStats[];
   by_user?: UserStats[];
   by_account?: AccountStats[];
@@ -404,6 +447,7 @@ export interface ModelStats {
   tokens: number;
   total_cost: number;
   actual_cost: number;
+  billed_cost?: number;
 }
 
 export interface UserStats {
@@ -413,6 +457,7 @@ export interface UserStats {
   tokens: number;
   total_cost: number;
   actual_cost: number;
+  billed_cost?: number;
 }
 
 export interface AccountStats {
@@ -422,6 +467,7 @@ export interface AccountStats {
   tokens: number;
   total_cost: number;
   actual_cost: number;
+  billed_cost?: number;
 }
 
 export interface GroupStats {
@@ -431,6 +477,7 @@ export interface GroupStats {
   tokens: number;
   total_cost: number;
   actual_cost: number;
+  billed_cost?: number;
 }
 
 export interface UsageTrendBucket {
@@ -441,6 +488,7 @@ export interface UsageTrendBucket {
   cache_read: number;
   actual_cost: number;
   standard_cost: number;
+  billed_cost?: number;
 }
 
 // ==================== Proxy ====================

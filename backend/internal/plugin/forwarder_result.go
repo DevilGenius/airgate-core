@@ -115,21 +115,26 @@ func (f *Forwarder) recordForwardUsage(c *gin.Context, state *forwardState, exec
 		actualModel = state.model
 	}
 
-	groupRate := state.keyInfo.GroupRateMultiplier
-	if groupRate <= 0 {
-		groupRate = 1.0
-	}
+	// 三条独立倍率管道：
+	//   - billingRate: 平台对 reseller 的计费倍率（group/user 优先级链）
+	//   - sellRate:    reseller 对客户的销售倍率（独立 markup 管道）
+	//   - accountRate: 账号自身的真实成本系数（独立"账号计费"统计管道）
+	billingRate := billing.ResolveBillingRate(state.keyInfo)
+	sellRate := state.keyInfo.SellRate
+	accountRate := state.account.RateMultiplier
 
 	calcResult := f.calculator.Calculate(billing.CalculateInput{
-		InputCost:             result.InputCost,
-		OutputCost:            result.OutputCost,
-		CachedInputCost:       result.CachedInputCost,
-		GroupRateMultiplier:   groupRate,
-		AccountRateMultiplier: state.account.RateMultiplier,
-		UserRateMultiplier:    1.0,
+		InputCost:       result.InputCost,
+		OutputCost:      result.OutputCost,
+		CachedInputCost: result.CachedInputCost,
+		BillingRate:     billingRate,
+		SellRate:        sellRate,
+		AccountRate:     accountRate,
 	})
 
-	f.scheduler.AddWindowCost(c.Request.Context(), state.account.ID, calcResult.ActualCost)
+	// scheduler 的 window cost 沿用 account_cost（= total × account_rate），
+	// 用于追踪上游账号自身的窗口消耗，做 RPM/容量限流。与用户账单完全解耦。
+	f.scheduler.AddWindowCost(c.Request.Context(), state.account.ID, calcResult.AccountCost)
 
 	f.recorder.Record(billing.UsageRecord{
 		UserID:                state.keyInfo.UserID,
@@ -150,7 +155,10 @@ func (f *Forwarder) recordForwardUsage(c *gin.Context, state *forwardState, exec
 		CachedInputCost:       calcResult.CachedInputCost,
 		TotalCost:             calcResult.TotalCost,
 		ActualCost:            calcResult.ActualCost,
+		BilledCost:            calcResult.BilledCost,
+		AccountCost:           calcResult.AccountCost,
 		RateMultiplier:        calcResult.RateMultiplier,
+		SellRate:              calcResult.SellRate,
 		AccountRateMultiplier: calcResult.AccountRateMultiplier,
 		ServiceTier:           result.ServiceTier,
 		Stream:                state.stream,

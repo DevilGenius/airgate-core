@@ -14,16 +14,21 @@ type ListFilter struct {
 	Model     string
 	StartDate string
 	EndDate   string
+	// ScopedToKey 标记当前查询是被某个 API Key（end customer）发起的。
+	// handler 必须根据 CtxKeyAPIKeyID 强制设置 APIKeyID 并打开此标志，
+	// 后续 mapper 据此切换到 CustomerUsageLogResp，避免泄漏平台真实成本。
+	ScopedToKey bool
 }
 
 // StatsFilter 聚合统计筛选。
 type StatsFilter struct {
-	UserID    *int64
-	APIKeyID  *int64
-	Platform  string
-	Model     string
-	StartDate string
-	EndDate   string
+	UserID      *int64
+	APIKeyID    *int64
+	Platform    string
+	Model       string
+	StartDate   string
+	EndDate     string
+	ScopedToKey bool // 与 ListFilter.ScopedToKey 同义
 }
 
 // TrendFilter 趋势统计筛选。
@@ -58,9 +63,12 @@ type LogRecord struct {
 	OutputCost            float64
 	CachedInputCost       float64
 	TotalCost             float64
-	ActualCost            float64
-	RateMultiplier        float64
-	AccountRateMultiplier float64
+	ActualCost            float64 // 平台真实成本（用户扣费）
+	BilledCost            float64 // 客户账面消耗（reseller 销售管道）
+	AccountCost           float64 // 账号实际成本（账号管理统计专用）
+	RateMultiplier        float64 // 快照：本次生效的平台计费倍率
+	SellRate              float64 // 快照：本次生效的销售倍率（0 表示未启用 markup）
+	AccountRateMultiplier float64 // 快照：本次生效的 account_rate
 	ServiceTier           string
 	Stream                bool
 	DurationMs            int64
@@ -79,11 +87,14 @@ type ListResult struct {
 }
 
 // Summary 汇总统计。
+// BilledCost 仅在 reseller / customer scope 的查询里被前端使用；
+// admin 视图通过 mapper 不暴露此字段。
 type Summary struct {
 	TotalRequests   int64
 	TotalTokens     int64
 	TotalCost       float64
 	TotalActualCost float64
+	TotalBilledCost float64
 }
 
 // ModelStats 按模型统计。
@@ -93,6 +104,7 @@ type ModelStats struct {
 	Tokens     int64  `json:"tokens"`
 	TotalCost  float64
 	ActualCost float64
+	BilledCost float64
 }
 
 // UserStats 按用户统计。
@@ -103,6 +115,7 @@ type UserStats struct {
 	Tokens     int64  `json:"tokens"`
 	TotalCost  float64
 	ActualCost float64
+	BilledCost float64
 }
 
 // AccountStats 按账号统计。
@@ -113,6 +126,7 @@ type AccountStats struct {
 	Tokens     int64  `json:"tokens"`
 	TotalCost  float64
 	ActualCost float64
+	BilledCost float64
 }
 
 // GroupStats 按分组统计。
@@ -123,6 +137,7 @@ type GroupStats struct {
 	Tokens     int64  `json:"tokens"`
 	TotalCost  float64
 	ActualCost float64
+	BilledCost float64
 }
 
 // StatsResult 管理员统计结果。
@@ -142,6 +157,7 @@ type TrendEntry struct {
 	CachedInputTokens int64
 	ActualCost        float64
 	StandardCost      float64
+	BilledCost        float64
 }
 
 // TrendBucket 趋势时间桶。
@@ -153,6 +169,7 @@ type TrendBucket struct {
 	CacheRead     int64   `json:"cache_read"`
 	ActualCost    float64 `json:"actual_cost"`
 	StandardCost  float64 `json:"standard_cost"`
+	BilledCost    float64 `json:"billed_cost,omitempty"`
 }
 
 // Repository 使用记录仓储接口。

@@ -172,6 +172,48 @@ func (aku *APIKeyUpdate) AddUsedQuota(f float64) *APIKeyUpdate {
 	return aku
 }
 
+// SetUsedQuotaActual sets the "used_quota_actual" field.
+func (aku *APIKeyUpdate) SetUsedQuotaActual(f float64) *APIKeyUpdate {
+	aku.mutation.ResetUsedQuotaActual()
+	aku.mutation.SetUsedQuotaActual(f)
+	return aku
+}
+
+// SetNillableUsedQuotaActual sets the "used_quota_actual" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableUsedQuotaActual(f *float64) *APIKeyUpdate {
+	if f != nil {
+		aku.SetUsedQuotaActual(*f)
+	}
+	return aku
+}
+
+// AddUsedQuotaActual adds f to the "used_quota_actual" field.
+func (aku *APIKeyUpdate) AddUsedQuotaActual(f float64) *APIKeyUpdate {
+	aku.mutation.AddUsedQuotaActual(f)
+	return aku
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (aku *APIKeyUpdate) SetSellRate(f float64) *APIKeyUpdate {
+	aku.mutation.ResetSellRate()
+	aku.mutation.SetSellRate(f)
+	return aku
+}
+
+// SetNillableSellRate sets the "sell_rate" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableSellRate(f *float64) *APIKeyUpdate {
+	if f != nil {
+		aku.SetSellRate(*f)
+	}
+	return aku
+}
+
+// AddSellRate adds f to the "sell_rate" field.
+func (aku *APIKeyUpdate) AddSellRate(f float64) *APIKeyUpdate {
+	aku.mutation.AddSellRate(f)
+	return aku
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (aku *APIKeyUpdate) SetExpiresAt(t time.Time) *APIKeyUpdate {
 	aku.mutation.SetExpiresAt(t)
@@ -343,6 +385,11 @@ func (aku *APIKeyUpdate) check() error {
 			return &ValidationError{Name: "key_hash", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_hash": %w`, err)}
 		}
 	}
+	if v, ok := aku.mutation.SellRate(); ok {
+		if err := apikey.SellRateValidator(v); err != nil {
+			return &ValidationError{Name: "sell_rate", err: fmt.Errorf(`ent: validator failed for field "APIKey.sell_rate": %w`, err)}
+		}
+	}
 	if v, ok := aku.mutation.Status(); ok {
 		if err := apikey.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "APIKey.status": %w`, err)}
@@ -414,6 +461,18 @@ func (aku *APIKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := aku.mutation.AddedUsedQuota(); ok {
 		_spec.AddField(apikey.FieldUsedQuota, field.TypeFloat64, value)
+	}
+	if value, ok := aku.mutation.UsedQuotaActual(); ok {
+		_spec.SetField(apikey.FieldUsedQuotaActual, field.TypeFloat64, value)
+	}
+	if value, ok := aku.mutation.AddedUsedQuotaActual(); ok {
+		_spec.AddField(apikey.FieldUsedQuotaActual, field.TypeFloat64, value)
+	}
+	if value, ok := aku.mutation.SellRate(); ok {
+		_spec.SetField(apikey.FieldSellRate, field.TypeFloat64, value)
+	}
+	if value, ok := aku.mutation.AddedSellRate(); ok {
+		_spec.AddField(apikey.FieldSellRate, field.TypeFloat64, value)
 	}
 	if value, ok := aku.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)
@@ -690,6 +749,48 @@ func (akuo *APIKeyUpdateOne) AddUsedQuota(f float64) *APIKeyUpdateOne {
 	return akuo
 }
 
+// SetUsedQuotaActual sets the "used_quota_actual" field.
+func (akuo *APIKeyUpdateOne) SetUsedQuotaActual(f float64) *APIKeyUpdateOne {
+	akuo.mutation.ResetUsedQuotaActual()
+	akuo.mutation.SetUsedQuotaActual(f)
+	return akuo
+}
+
+// SetNillableUsedQuotaActual sets the "used_quota_actual" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableUsedQuotaActual(f *float64) *APIKeyUpdateOne {
+	if f != nil {
+		akuo.SetUsedQuotaActual(*f)
+	}
+	return akuo
+}
+
+// AddUsedQuotaActual adds f to the "used_quota_actual" field.
+func (akuo *APIKeyUpdateOne) AddUsedQuotaActual(f float64) *APIKeyUpdateOne {
+	akuo.mutation.AddUsedQuotaActual(f)
+	return akuo
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (akuo *APIKeyUpdateOne) SetSellRate(f float64) *APIKeyUpdateOne {
+	akuo.mutation.ResetSellRate()
+	akuo.mutation.SetSellRate(f)
+	return akuo
+}
+
+// SetNillableSellRate sets the "sell_rate" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableSellRate(f *float64) *APIKeyUpdateOne {
+	if f != nil {
+		akuo.SetSellRate(*f)
+	}
+	return akuo
+}
+
+// AddSellRate adds f to the "sell_rate" field.
+func (akuo *APIKeyUpdateOne) AddSellRate(f float64) *APIKeyUpdateOne {
+	akuo.mutation.AddSellRate(f)
+	return akuo
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (akuo *APIKeyUpdateOne) SetExpiresAt(t time.Time) *APIKeyUpdateOne {
 	akuo.mutation.SetExpiresAt(t)
@@ -874,6 +975,11 @@ func (akuo *APIKeyUpdateOne) check() error {
 			return &ValidationError{Name: "key_hash", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_hash": %w`, err)}
 		}
 	}
+	if v, ok := akuo.mutation.SellRate(); ok {
+		if err := apikey.SellRateValidator(v); err != nil {
+			return &ValidationError{Name: "sell_rate", err: fmt.Errorf(`ent: validator failed for field "APIKey.sell_rate": %w`, err)}
+		}
+	}
 	if v, ok := akuo.mutation.Status(); ok {
 		if err := apikey.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "APIKey.status": %w`, err)}
@@ -962,6 +1068,18 @@ func (akuo *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err er
 	}
 	if value, ok := akuo.mutation.AddedUsedQuota(); ok {
 		_spec.AddField(apikey.FieldUsedQuota, field.TypeFloat64, value)
+	}
+	if value, ok := akuo.mutation.UsedQuotaActual(); ok {
+		_spec.SetField(apikey.FieldUsedQuotaActual, field.TypeFloat64, value)
+	}
+	if value, ok := akuo.mutation.AddedUsedQuotaActual(); ok {
+		_spec.AddField(apikey.FieldUsedQuotaActual, field.TypeFloat64, value)
+	}
+	if value, ok := akuo.mutation.SellRate(); ok {
+		_spec.SetField(apikey.FieldSellRate, field.TypeFloat64, value)
+	}
+	if value, ok := akuo.mutation.AddedSellRate(); ok {
+		_spec.AddField(apikey.FieldSellRate, field.TypeFloat64, value)
 	}
 	if value, ok := akuo.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)

@@ -34,8 +34,12 @@ type APIKey struct {
 	IPBlacklist []string `json:"ip_blacklist,omitempty"`
 	// QuotaUsd holds the value of the "quota_usd" field.
 	QuotaUsd float64 `json:"quota_usd,omitempty"`
-	// UsedQuota holds the value of the "used_quota" field.
+	// 账面已用：累加 billed_cost（含 sell_rate markup）。end customer 看到的就是这个数字。
 	UsedQuota float64 `json:"used_quota,omitempty"`
+	// 真实成本已用：累加 actual_cost。reseller 用于成本核算/利润计算，end customer 不可见。
+	UsedQuotaActual float64 `json:"used_quota_actual,omitempty"`
+	// 销售倍率：>0 时启用 reseller markup, billed_cost = base_cost × sell_rate；=0 表示不加价，billed_cost = actual_cost
+	SellRate float64 `json:"sell_rate,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// Status holds the value of the "status" field.
@@ -103,7 +107,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
 			values[i] = new([]byte)
-		case apikey.FieldQuotaUsd, apikey.FieldUsedQuota:
+		case apikey.FieldQuotaUsd, apikey.FieldUsedQuota, apikey.FieldUsedQuotaActual, apikey.FieldSellRate:
 			values[i] = new(sql.NullFloat64)
 		case apikey.FieldID:
 			values[i] = new(sql.NullInt64)
@@ -187,6 +191,18 @@ func (ak *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field used_quota", values[i])
 			} else if value.Valid {
 				ak.UsedQuota = value.Float64
+			}
+		case apikey.FieldUsedQuotaActual:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field used_quota_actual", values[i])
+			} else if value.Valid {
+				ak.UsedQuotaActual = value.Float64
+			}
+		case apikey.FieldSellRate:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field sell_rate", values[i])
+			} else if value.Valid {
+				ak.SellRate = value.Float64
 			}
 		case apikey.FieldExpiresAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -299,6 +315,12 @@ func (ak *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("used_quota=")
 	builder.WriteString(fmt.Sprintf("%v", ak.UsedQuota))
+	builder.WriteString(", ")
+	builder.WriteString("used_quota_actual=")
+	builder.WriteString(fmt.Sprintf("%v", ak.UsedQuotaActual))
+	builder.WriteString(", ")
+	builder.WriteString("sell_rate=")
+	builder.WriteString(fmt.Sprintf("%v", ak.SellRate))
 	builder.WriteString(", ")
 	if v := ak.ExpiresAt; v != nil {
 		builder.WriteString("expires_at=")

@@ -126,8 +126,10 @@ function StatsContent({ data }: { data: AccountStatsResp }) {
   const range = data.range;
 
   // 计算活跃天数和日均
+  // 注意：所有"账号计费"相关数字都用 account_cost（base × account_rate），
+  // 而不是 total_cost（base 原价）。这样 reseller 配置 account_rate 才能真正反映"我用这个账号的实际花费"。
   const activeDays = data.active_days || 1;
-  const dailyAvgCost = range.total_cost / activeDays;
+  const dailyAvgCost = range.account_cost / activeDays;
   const dailyAvgRequests = range.count / activeDays;
 
   // Token 总量
@@ -159,7 +161,7 @@ function StatsContent({ data }: { data: AccountStatsResp }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MiniStatCard
           label={t('accounts.stats_range_cost')}
-          value={fmtCost(range.total_cost, 2)}
+          value={fmtCost(range.account_cost, 2)}
           sub={`${t('accounts.stats_actual')}: ${fmtCost(range.actual_cost, 2)}`}
           icon={<DollarSign className="w-4 h-4" />}
           color="var(--ag-warning)"
@@ -191,7 +193,7 @@ function StatsContent({ data }: { data: AccountStatsResp }) {
       <div className="grid grid-cols-3 gap-3">
         {/* 今日概览 */}
         <InfoCard title={t('accounts.stats_today')} icon={<Clock className="w-4 h-4" />} color="var(--ag-info)">
-          <InfoRow label={t('accounts.stats_cost')} value={fmtCost(data.today.total_cost)} />
+          <InfoRow label={t('accounts.stats_cost')} value={fmtCost(data.today.account_cost)} />
           <InfoRow label={t('accounts.stats_actual_cost')} value={fmtCost(data.today.actual_cost)} />
           <InfoRow label={t('accounts.stats_requests')} value={data.today.count.toLocaleString()} />
           <InfoRow label="Token" value={fmtNum(data.today.input_tokens + data.today.output_tokens)} />
@@ -200,7 +202,7 @@ function StatsContent({ data }: { data: AccountStatsResp }) {
         {/* 最高费用日 */}
         <InfoCard title={t('accounts.stats_peak_cost_day')} icon={<DollarSign className="w-4 h-4" />} color="var(--ag-warning)">
           <InfoRow label={t('accounts.stats_date')} value={data.peak_cost_day.date ? fmtDate(data.peak_cost_day.date) : '-'} />
-          <InfoRow label={t('accounts.stats_cost')} value={fmtCost(data.peak_cost_day.total_cost)} highlight />
+          <InfoRow label={t('accounts.stats_cost')} value={fmtCost(data.peak_cost_day.account_cost)} highlight />
           <InfoRow label={t('accounts.stats_actual_cost')} value={fmtCost(data.peak_cost_day.actual_cost)} />
           <InfoRow label={t('accounts.stats_requests')} value={fmtNum(data.peak_cost_day.count)} />
         </InfoCard>
@@ -209,7 +211,7 @@ function StatsContent({ data }: { data: AccountStatsResp }) {
         <InfoCard title={t('accounts.stats_peak_request_day')} icon={<Activity className="w-4 h-4" />} color="var(--ag-success)">
           <InfoRow label={t('accounts.stats_date')} value={data.peak_request_day.date ? fmtDate(data.peak_request_day.date) : '-'} />
           <InfoRow label={t('accounts.stats_requests')} value={fmtNum(data.peak_request_day.count)} highlight />
-          <InfoRow label={t('accounts.stats_cost')} value={fmtCost(data.peak_request_day.total_cost)} />
+          <InfoRow label={t('accounts.stats_cost')} value={fmtCost(data.peak_request_day.account_cost)} />
           <InfoRow label={t('accounts.stats_actual_cost')} value={fmtCost(data.peak_request_day.actual_cost)} />
         </InfoCard>
       </div>
@@ -232,7 +234,7 @@ function StatsContent({ data }: { data: AccountStatsResp }) {
         <InfoCard title={t('accounts.stats_recent')} icon={<Calendar className="w-4 h-4" />} color="var(--ag-info)">
           <InfoRow label={t('accounts.stats_today_requests')} value={data.today.count.toLocaleString()} />
           <InfoRow label={t('accounts.stats_today_tokens')} value={fmtNum(data.today.input_tokens + data.today.output_tokens)} />
-          <InfoRow label={t('accounts.stats_today_cost')} value={fmtCost(data.today.total_cost)} />
+          <InfoRow label={t('accounts.stats_today_cost')} value={fmtCost(data.today.account_cost)} />
         </InfoCard>
       </div>
 
@@ -302,7 +304,8 @@ function TrendChart({ data }: { data: AccountStatsResp }) {
   const chartData = useMemo(() =>
     (data.daily_trend ?? []).map((d) => ({
       date: fmtDate(d.date),
-      totalCost: Number(d.total_cost.toFixed(4)),
+      // 趋势图的"账号计费"线读 account_cost（含 account_rate），匹配卡片数字
+      totalCost: Number(d.account_cost.toFixed(4)),
       actualCost: Number(d.actual_cost.toFixed(4)),
       count: d.count,
     })),

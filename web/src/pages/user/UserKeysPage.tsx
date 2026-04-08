@@ -138,6 +138,7 @@ export default function UserKeysPage() {
       name: key.name,
       group_id: key.group_id == null ? '' : String(key.group_id),
       quota_usd: key.quota_usd ? String(key.quota_usd) : '',
+      sell_rate: key.sell_rate ? String(key.sell_rate) : '',
       expires_at: key.expires_at ? key.expires_at.slice(0, 10) : '',
     });
     setModalOpen(true);
@@ -167,6 +168,7 @@ export default function UserKeysPage() {
         name: form.name,
         group_id: form.group_id ? Number(form.group_id) : undefined,
         quota_usd: form.quota_usd ? Number(form.quota_usd) : undefined,
+        sell_rate: form.sell_rate ? Number(form.sell_rate) : 0,
         expires_at: expiresAt,
       };
       updateMutation.mutate({ id: editingKey.id, data: payload });
@@ -175,6 +177,7 @@ export default function UserKeysPage() {
         name: form.name,
         group_id: Number(form.group_id),
         quota_usd: form.quota_usd ? Number(form.quota_usd) : undefined,
+        sell_rate: form.sell_rate ? Number(form.sell_rate) : undefined,
         expires_at: expiresAt,
       };
       createMutation.mutate(payload);
@@ -197,7 +200,7 @@ export default function UserKeysPage() {
     },
     ...groupList.map((g) => ({
       value: String(g.id),
-      label: `${g.name} (${g.platform})`,
+      label: `${g.name} (${g.platform}) · ${g.rate_multiplier}x`,
     })),
   ];
 
@@ -242,7 +245,27 @@ export default function UserKeysPage() {
     {
       key: 'group_id',
       title: t('user_keys.group'),
-      render: (row) => row.group_id == null ? t('user_keys.group_unbound') : groupMap.get(row.group_id)?.name || `#${row.group_id}`,
+      render: (row) => {
+        if (row.group_id == null) return t('user_keys.group_unbound');
+        const group = groupMap.get(row.group_id);
+        const name = group?.name || `#${row.group_id}`;
+        const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
+        return (
+          <div className="space-y-0.5">
+            <div>{name}</div>
+            {group && (
+              <div className="font-mono text-xs text-text-tertiary">
+                {t('user_keys.group_rate_short', '分组倍率')}: {group.rate_multiplier.toFixed(2)}
+              </div>
+            )}
+            {hasSellRate && (
+              <div className="font-mono text-xs text-text-tertiary">
+                {t('user_keys.sell_rate_short', '销售倍率')}: {row.sell_rate!.toFixed(2)}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'quota',
@@ -258,6 +281,36 @@ export default function UserKeysPage() {
           )}
         </span>
       ),
+    },
+    {
+      key: 'markup',
+      title: t('user_keys.markup_title', '销售/成本'),
+      hideOnMobile: true,
+      render: (row) => {
+        // sell_rate=0 时账面 == 真实成本，没必要展示 markup
+        if (!row.sell_rate || row.sell_rate <= 0) {
+          return <span className="text-text-tertiary text-xs">—</span>;
+        }
+        const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
+        return (
+          <div className="font-mono text-xs space-y-0.5">
+            <div>
+              <span className="text-text-tertiary">{t('user_keys.sell_rate_short', '倍率')}: </span>
+              <span>{row.sell_rate.toFixed(2)}</span>
+            </div>
+            <div>
+              <span className="text-text-tertiary">{t('user_keys.cost_actual', '成本')}: </span>
+              <span>${(row.used_quota_actual || 0).toFixed(4)}</span>
+            </div>
+            <div>
+              <span className="text-text-tertiary">{t('user_keys.profit', '利润')}: </span>
+              <span style={{ color: profit > 0 ? 'var(--ag-success)' : undefined }}>
+                ${profit.toFixed(4)}
+              </span>
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: 'usage',

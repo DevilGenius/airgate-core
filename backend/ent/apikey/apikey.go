@@ -31,6 +31,10 @@ const (
 	FieldQuotaUsd = "quota_usd"
 	// FieldUsedQuota holds the string denoting the used_quota field in the database.
 	FieldUsedQuota = "used_quota"
+	// FieldUsedQuotaActual holds the string denoting the used_quota_actual field in the database.
+	FieldUsedQuotaActual = "used_quota_actual"
+	// FieldSellRate holds the string denoting the sell_rate field in the database.
+	FieldSellRate = "sell_rate"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -81,6 +85,8 @@ var Columns = []string{
 	FieldIPBlacklist,
 	FieldQuotaUsd,
 	FieldUsedQuota,
+	FieldUsedQuotaActual,
+	FieldSellRate,
 	FieldExpiresAt,
 	FieldStatus,
 	FieldCreatedAt,
@@ -120,6 +126,12 @@ var (
 	DefaultQuotaUsd float64
 	// DefaultUsedQuota holds the default value on creation for the "used_quota" field.
 	DefaultUsedQuota float64
+	// DefaultUsedQuotaActual holds the default value on creation for the "used_quota_actual" field.
+	DefaultUsedQuotaActual float64
+	// DefaultSellRate holds the default value on creation for the "sell_rate" field.
+	DefaultSellRate float64
+	// SellRateValidator is a validator for the "sell_rate" field. It is called by the builders before save.
+	SellRateValidator func(float64) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -190,6 +202,16 @@ func ByQuotaUsd(opts ...sql.OrderTermOption) OrderOption {
 // ByUsedQuota orders the results by the used_quota field.
 func ByUsedQuota(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUsedQuota, opts...).ToFunc()
+}
+
+// ByUsedQuotaActual orders the results by the used_quota_actual field.
+func ByUsedQuotaActual(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUsedQuotaActual, opts...).ToFunc()
+}
+
+// BySellRate orders the results by the sell_rate field.
+func BySellRate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSellRate, opts...).ToFunc()
 }
 
 // ByExpiresAt orders the results by the expires_at field.

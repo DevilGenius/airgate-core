@@ -47,11 +47,17 @@ type UsageLog struct {
 	CachedInputCost float64 `json:"cached_input_cost,omitempty"`
 	// TotalCost holds the value of the "total_cost" field.
 	TotalCost float64 `json:"total_cost,omitempty"`
-	// ActualCost holds the value of the "actual_cost" field.
+	// 平台对 reseller 的真实扣费 = total × billing_rate（group/user）
 	ActualCost float64 `json:"actual_cost,omitempty"`
-	// RateMultiplier holds the value of the "rate_multiplier" field.
+	// 账面消耗：reseller 对最终客户的计费金额。sell_rate=0 时等于 actual_cost。永远不参与平台账户/统计。
+	BilledCost float64 `json:"billed_cost,omitempty"`
+	// 账号实际成本 = total × account_rate。用于账号管理后台的'账号计费'统计；与用户计费完全独立。
+	AccountCost float64 `json:"account_cost,omitempty"`
+	// 快照：本次请求生效的平台计费倍率（ResolveBillingRate 结果）
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
-	// AccountRateMultiplier holds the value of the "account_rate_multiplier" field.
+	// 快照：本次请求生效的 sell_rate；0 表示该 key 当时未启用 markup
+	SellRate float64 `json:"sell_rate,omitempty"`
+	// 快照：本次请求生效的 account_rate
 	AccountRateMultiplier float64 `json:"account_rate_multiplier,omitempty"`
 	// ServiceTier holds the value of the "service_tier" field.
 	ServiceTier string `json:"service_tier,omitempty"`
@@ -143,7 +149,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case usagelog.FieldStream:
 			values[i] = new(sql.NullBool)
-		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldAccountRateMultiplier:
+		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldBilledCost, usagelog.FieldAccountCost, usagelog.FieldRateMultiplier, usagelog.FieldSellRate, usagelog.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
 		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs:
 			values[i] = new(sql.NullInt64)
@@ -264,11 +270,29 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.ActualCost = value.Float64
 			}
+		case usagelog.FieldBilledCost:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field billed_cost", values[i])
+			} else if value.Valid {
+				ul.BilledCost = value.Float64
+			}
+		case usagelog.FieldAccountCost:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field account_cost", values[i])
+			} else if value.Valid {
+				ul.AccountCost = value.Float64
+			}
 		case usagelog.FieldRateMultiplier:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
 				return fmt.Errorf("unexpected type %T for field rate_multiplier", values[i])
 			} else if value.Valid {
 				ul.RateMultiplier = value.Float64
+			}
+		case usagelog.FieldSellRate:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field sell_rate", values[i])
+			} else if value.Valid {
+				ul.SellRate = value.Float64
 			}
 		case usagelog.FieldAccountRateMultiplier:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
@@ -444,8 +468,17 @@ func (ul *UsageLog) String() string {
 	builder.WriteString("actual_cost=")
 	builder.WriteString(fmt.Sprintf("%v", ul.ActualCost))
 	builder.WriteString(", ")
+	builder.WriteString("billed_cost=")
+	builder.WriteString(fmt.Sprintf("%v", ul.BilledCost))
+	builder.WriteString(", ")
+	builder.WriteString("account_cost=")
+	builder.WriteString(fmt.Sprintf("%v", ul.AccountCost))
+	builder.WriteString(", ")
 	builder.WriteString("rate_multiplier=")
 	builder.WriteString(fmt.Sprintf("%v", ul.RateMultiplier))
+	builder.WriteString(", ")
+	builder.WriteString("sell_rate=")
+	builder.WriteString(fmt.Sprintf("%v", ul.SellRate))
 	builder.WriteString(", ")
 	builder.WriteString("account_rate_multiplier=")
 	builder.WriteString(fmt.Sprintf("%v", ul.AccountRateMultiplier))

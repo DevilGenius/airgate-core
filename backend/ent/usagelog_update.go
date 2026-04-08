@@ -311,6 +311,48 @@ func (ulu *UsageLogUpdate) AddActualCost(f float64) *UsageLogUpdate {
 	return ulu
 }
 
+// SetBilledCost sets the "billed_cost" field.
+func (ulu *UsageLogUpdate) SetBilledCost(f float64) *UsageLogUpdate {
+	ulu.mutation.ResetBilledCost()
+	ulu.mutation.SetBilledCost(f)
+	return ulu
+}
+
+// SetNillableBilledCost sets the "billed_cost" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableBilledCost(f *float64) *UsageLogUpdate {
+	if f != nil {
+		ulu.SetBilledCost(*f)
+	}
+	return ulu
+}
+
+// AddBilledCost adds f to the "billed_cost" field.
+func (ulu *UsageLogUpdate) AddBilledCost(f float64) *UsageLogUpdate {
+	ulu.mutation.AddBilledCost(f)
+	return ulu
+}
+
+// SetAccountCost sets the "account_cost" field.
+func (ulu *UsageLogUpdate) SetAccountCost(f float64) *UsageLogUpdate {
+	ulu.mutation.ResetAccountCost()
+	ulu.mutation.SetAccountCost(f)
+	return ulu
+}
+
+// SetNillableAccountCost sets the "account_cost" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableAccountCost(f *float64) *UsageLogUpdate {
+	if f != nil {
+		ulu.SetAccountCost(*f)
+	}
+	return ulu
+}
+
+// AddAccountCost adds f to the "account_cost" field.
+func (ulu *UsageLogUpdate) AddAccountCost(f float64) *UsageLogUpdate {
+	ulu.mutation.AddAccountCost(f)
+	return ulu
+}
+
 // SetRateMultiplier sets the "rate_multiplier" field.
 func (ulu *UsageLogUpdate) SetRateMultiplier(f float64) *UsageLogUpdate {
 	ulu.mutation.ResetRateMultiplier()
@@ -329,6 +371,27 @@ func (ulu *UsageLogUpdate) SetNillableRateMultiplier(f *float64) *UsageLogUpdate
 // AddRateMultiplier adds f to the "rate_multiplier" field.
 func (ulu *UsageLogUpdate) AddRateMultiplier(f float64) *UsageLogUpdate {
 	ulu.mutation.AddRateMultiplier(f)
+	return ulu
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (ulu *UsageLogUpdate) SetSellRate(f float64) *UsageLogUpdate {
+	ulu.mutation.ResetSellRate()
+	ulu.mutation.SetSellRate(f)
+	return ulu
+}
+
+// SetNillableSellRate sets the "sell_rate" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableSellRate(f *float64) *UsageLogUpdate {
+	if f != nil {
+		ulu.SetSellRate(*f)
+	}
+	return ulu
+}
+
+// AddSellRate adds f to the "sell_rate" field.
+func (ulu *UsageLogUpdate) AddSellRate(f float64) *UsageLogUpdate {
+	ulu.mutation.AddSellRate(f)
 	return ulu
 }
 
@@ -683,11 +746,29 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.AddedActualCost(); ok {
 		_spec.AddField(usagelog.FieldActualCost, field.TypeFloat64, value)
 	}
+	if value, ok := ulu.mutation.BilledCost(); ok {
+		_spec.SetField(usagelog.FieldBilledCost, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AddedBilledCost(); ok {
+		_spec.AddField(usagelog.FieldBilledCost, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AccountCost(); ok {
+		_spec.SetField(usagelog.FieldAccountCost, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AddedAccountCost(); ok {
+		_spec.AddField(usagelog.FieldAccountCost, field.TypeFloat64, value)
+	}
 	if value, ok := ulu.mutation.RateMultiplier(); ok {
 		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
 	}
 	if value, ok := ulu.mutation.AddedRateMultiplier(); ok {
 		_spec.AddField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.SellRate(); ok {
+		_spec.SetField(usagelog.FieldSellRate, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AddedSellRate(); ok {
+		_spec.AddField(usagelog.FieldSellRate, field.TypeFloat64, value)
 	}
 	if value, ok := ulu.mutation.AccountRateMultiplier(); ok {
 		_spec.SetField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64, value)
@@ -1135,6 +1216,48 @@ func (uluo *UsageLogUpdateOne) AddActualCost(f float64) *UsageLogUpdateOne {
 	return uluo
 }
 
+// SetBilledCost sets the "billed_cost" field.
+func (uluo *UsageLogUpdateOne) SetBilledCost(f float64) *UsageLogUpdateOne {
+	uluo.mutation.ResetBilledCost()
+	uluo.mutation.SetBilledCost(f)
+	return uluo
+}
+
+// SetNillableBilledCost sets the "billed_cost" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableBilledCost(f *float64) *UsageLogUpdateOne {
+	if f != nil {
+		uluo.SetBilledCost(*f)
+	}
+	return uluo
+}
+
+// AddBilledCost adds f to the "billed_cost" field.
+func (uluo *UsageLogUpdateOne) AddBilledCost(f float64) *UsageLogUpdateOne {
+	uluo.mutation.AddBilledCost(f)
+	return uluo
+}
+
+// SetAccountCost sets the "account_cost" field.
+func (uluo *UsageLogUpdateOne) SetAccountCost(f float64) *UsageLogUpdateOne {
+	uluo.mutation.ResetAccountCost()
+	uluo.mutation.SetAccountCost(f)
+	return uluo
+}
+
+// SetNillableAccountCost sets the "account_cost" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableAccountCost(f *float64) *UsageLogUpdateOne {
+	if f != nil {
+		uluo.SetAccountCost(*f)
+	}
+	return uluo
+}
+
+// AddAccountCost adds f to the "account_cost" field.
+func (uluo *UsageLogUpdateOne) AddAccountCost(f float64) *UsageLogUpdateOne {
+	uluo.mutation.AddAccountCost(f)
+	return uluo
+}
+
 // SetRateMultiplier sets the "rate_multiplier" field.
 func (uluo *UsageLogUpdateOne) SetRateMultiplier(f float64) *UsageLogUpdateOne {
 	uluo.mutation.ResetRateMultiplier()
@@ -1153,6 +1276,27 @@ func (uluo *UsageLogUpdateOne) SetNillableRateMultiplier(f *float64) *UsageLogUp
 // AddRateMultiplier adds f to the "rate_multiplier" field.
 func (uluo *UsageLogUpdateOne) AddRateMultiplier(f float64) *UsageLogUpdateOne {
 	uluo.mutation.AddRateMultiplier(f)
+	return uluo
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (uluo *UsageLogUpdateOne) SetSellRate(f float64) *UsageLogUpdateOne {
+	uluo.mutation.ResetSellRate()
+	uluo.mutation.SetSellRate(f)
+	return uluo
+}
+
+// SetNillableSellRate sets the "sell_rate" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableSellRate(f *float64) *UsageLogUpdateOne {
+	if f != nil {
+		uluo.SetSellRate(*f)
+	}
+	return uluo
+}
+
+// AddSellRate adds f to the "sell_rate" field.
+func (uluo *UsageLogUpdateOne) AddSellRate(f float64) *UsageLogUpdateOne {
+	uluo.mutation.AddSellRate(f)
 	return uluo
 }
 
@@ -1537,11 +1681,29 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	if value, ok := uluo.mutation.AddedActualCost(); ok {
 		_spec.AddField(usagelog.FieldActualCost, field.TypeFloat64, value)
 	}
+	if value, ok := uluo.mutation.BilledCost(); ok {
+		_spec.SetField(usagelog.FieldBilledCost, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AddedBilledCost(); ok {
+		_spec.AddField(usagelog.FieldBilledCost, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AccountCost(); ok {
+		_spec.SetField(usagelog.FieldAccountCost, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AddedAccountCost(); ok {
+		_spec.AddField(usagelog.FieldAccountCost, field.TypeFloat64, value)
+	}
 	if value, ok := uluo.mutation.RateMultiplier(); ok {
 		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
 	}
 	if value, ok := uluo.mutation.AddedRateMultiplier(); ok {
 		_spec.AddField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.SellRate(); ok {
+		_spec.SetField(usagelog.FieldSellRate, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AddedSellRate(); ok {
+		_spec.AddField(usagelog.FieldSellRate, field.TypeFloat64, value)
 	}
 	if value, ok := uluo.mutation.AccountRateMultiplier(); ok {
 		_spec.SetField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64, value)

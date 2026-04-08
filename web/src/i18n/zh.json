@@ -160,7 +160,8 @@
     "apikey_quota": "额度",
     "apikey_unlimited": "不限",
     "apikey_expires": "到期时间",
-    "apikey_never": "永不过期"
+    "apikey_never": "永不过期",
+    "apikey_rate": "倍率"
   },
 
   "dashboard": {
@@ -774,6 +775,8 @@
     "use_key_desc": "将以下环境变量添加到你的终端配置中，即可开始使用。",
     "group_unbound": "未绑定分组",
     "group_unbound_hint": "该 API 密钥当前未绑定分组，暂时无法生成使用配置。请联系管理员重新绑定分组后再试。",
+    "group_rate_short": "分组倍率",
+    "sell_rate_short": "销售倍率",
     "copy": "复制",
     "copied": "已复制",
     "reveal_failed": "无法获取密钥原文",

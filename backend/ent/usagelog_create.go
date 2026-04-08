@@ -204,6 +204,34 @@ func (ulc *UsageLogCreate) SetNillableActualCost(f *float64) *UsageLogCreate {
 	return ulc
 }
 
+// SetBilledCost sets the "billed_cost" field.
+func (ulc *UsageLogCreate) SetBilledCost(f float64) *UsageLogCreate {
+	ulc.mutation.SetBilledCost(f)
+	return ulc
+}
+
+// SetNillableBilledCost sets the "billed_cost" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableBilledCost(f *float64) *UsageLogCreate {
+	if f != nil {
+		ulc.SetBilledCost(*f)
+	}
+	return ulc
+}
+
+// SetAccountCost sets the "account_cost" field.
+func (ulc *UsageLogCreate) SetAccountCost(f float64) *UsageLogCreate {
+	ulc.mutation.SetAccountCost(f)
+	return ulc
+}
+
+// SetNillableAccountCost sets the "account_cost" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableAccountCost(f *float64) *UsageLogCreate {
+	if f != nil {
+		ulc.SetAccountCost(*f)
+	}
+	return ulc
+}
+
 // SetRateMultiplier sets the "rate_multiplier" field.
 func (ulc *UsageLogCreate) SetRateMultiplier(f float64) *UsageLogCreate {
 	ulc.mutation.SetRateMultiplier(f)
@@ -214,6 +242,20 @@ func (ulc *UsageLogCreate) SetRateMultiplier(f float64) *UsageLogCreate {
 func (ulc *UsageLogCreate) SetNillableRateMultiplier(f *float64) *UsageLogCreate {
 	if f != nil {
 		ulc.SetRateMultiplier(*f)
+	}
+	return ulc
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (ulc *UsageLogCreate) SetSellRate(f float64) *UsageLogCreate {
+	ulc.mutation.SetSellRate(f)
+	return ulc
+}
+
+// SetNillableSellRate sets the "sell_rate" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableSellRate(f *float64) *UsageLogCreate {
+	if f != nil {
+		ulc.SetSellRate(*f)
 	}
 	return ulc
 }
@@ -481,9 +523,21 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultActualCost
 		ulc.mutation.SetActualCost(v)
 	}
+	if _, ok := ulc.mutation.BilledCost(); !ok {
+		v := usagelog.DefaultBilledCost
+		ulc.mutation.SetBilledCost(v)
+	}
+	if _, ok := ulc.mutation.AccountCost(); !ok {
+		v := usagelog.DefaultAccountCost
+		ulc.mutation.SetAccountCost(v)
+	}
 	if _, ok := ulc.mutation.RateMultiplier(); !ok {
 		v := usagelog.DefaultRateMultiplier
 		ulc.mutation.SetRateMultiplier(v)
+	}
+	if _, ok := ulc.mutation.SellRate(); !ok {
+		v := usagelog.DefaultSellRate
+		ulc.mutation.SetSellRate(v)
 	}
 	if _, ok := ulc.mutation.AccountRateMultiplier(); !ok {
 		v := usagelog.DefaultAccountRateMultiplier
@@ -573,8 +627,17 @@ func (ulc *UsageLogCreate) check() error {
 	if _, ok := ulc.mutation.ActualCost(); !ok {
 		return &ValidationError{Name: "actual_cost", err: errors.New(`ent: missing required field "UsageLog.actual_cost"`)}
 	}
+	if _, ok := ulc.mutation.BilledCost(); !ok {
+		return &ValidationError{Name: "billed_cost", err: errors.New(`ent: missing required field "UsageLog.billed_cost"`)}
+	}
+	if _, ok := ulc.mutation.AccountCost(); !ok {
+		return &ValidationError{Name: "account_cost", err: errors.New(`ent: missing required field "UsageLog.account_cost"`)}
+	}
 	if _, ok := ulc.mutation.RateMultiplier(); !ok {
 		return &ValidationError{Name: "rate_multiplier", err: errors.New(`ent: missing required field "UsageLog.rate_multiplier"`)}
+	}
+	if _, ok := ulc.mutation.SellRate(); !ok {
+		return &ValidationError{Name: "sell_rate", err: errors.New(`ent: missing required field "UsageLog.sell_rate"`)}
 	}
 	if _, ok := ulc.mutation.AccountRateMultiplier(); !ok {
 		return &ValidationError{Name: "account_rate_multiplier", err: errors.New(`ent: missing required field "UsageLog.account_rate_multiplier"`)}
@@ -685,9 +748,21 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldActualCost, field.TypeFloat64, value)
 		_node.ActualCost = value
 	}
+	if value, ok := ulc.mutation.BilledCost(); ok {
+		_spec.SetField(usagelog.FieldBilledCost, field.TypeFloat64, value)
+		_node.BilledCost = value
+	}
+	if value, ok := ulc.mutation.AccountCost(); ok {
+		_spec.SetField(usagelog.FieldAccountCost, field.TypeFloat64, value)
+		_node.AccountCost = value
+	}
 	if value, ok := ulc.mutation.RateMultiplier(); ok {
 		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
 		_node.RateMultiplier = value
+	}
+	if value, ok := ulc.mutation.SellRate(); ok {
+		_spec.SetField(usagelog.FieldSellRate, field.TypeFloat64, value)
+		_node.SellRate = value
 	}
 	if value, ok := ulc.mutation.AccountRateMultiplier(); ok {
 		_spec.SetField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64, value)

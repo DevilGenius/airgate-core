@@ -35,6 +35,11 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 				resp.APIKeyName = info.Name
 				resp.APIKeyQuotaUSD = info.QuotaUSD
 				resp.APIKeyUsedQuota = info.UsedQuota
+				if info.SellRate > 0 {
+					resp.APIKeyRate = info.SellRate
+				} else {
+					resp.APIKeyRate = info.GroupRate
+				}
 				if info.ExpiresAt != nil {
 					resp.APIKeyExpiresAt = info.ExpiresAt.Format(time.RFC3339)
 				}

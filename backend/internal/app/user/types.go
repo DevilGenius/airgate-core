@@ -102,6 +102,10 @@ type APIKeyBrief struct {
 	QuotaUSD  float64
 	UsedQuota float64
 	ExpiresAt *time.Time
+	// SellRate 当前 Key 自身的销售倍率（>0 表示启用 markup，否则按分组倍率结算）
+	SellRate float64
+	// GroupRate 所属分组的费率倍率（未绑定分组时为 0）
+	GroupRate float64
 }
 
 type APIKey struct {

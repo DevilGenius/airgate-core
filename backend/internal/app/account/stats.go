@@ -83,6 +83,7 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 		result.Range.InputTokens += log.InputTokens
 		result.Range.OutputTokens += log.OutputTokens
 		result.Range.TotalCost += log.TotalCost
+		result.Range.AccountCost += log.AccountCost
 		result.Range.ActualCost += log.ActualCost
 		totalDurationMs += log.DurationMs
 
@@ -91,19 +92,22 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 			result.Today.InputTokens += log.InputTokens
 			result.Today.OutputTokens += log.OutputTokens
 			result.Today.TotalCost += log.TotalCost
+			result.Today.AccountCost += log.AccountCost
 			result.Today.ActualCost += log.ActualCost
 		}
 
 		if stats, ok := dailyMap[dateKey]; ok {
 			stats.Count++
 			stats.TotalCost += log.TotalCost
+			stats.AccountCost += log.AccountCost
 			stats.ActualCost += log.ActualCost
 		} else {
 			dailyMap[dateKey] = &DailyStats{
-				Date:       dateKey,
-				Count:      1,
-				TotalCost:  log.TotalCost,
-				ActualCost: log.ActualCost,
+				Date:        dateKey,
+				Count:       1,
+				TotalCost:   log.TotalCost,
+				AccountCost: log.AccountCost,
+				ActualCost:  log.ActualCost,
 			}
 		}
 
@@ -112,6 +116,7 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 			stats.InputTokens += log.InputTokens
 			stats.OutputTokens += log.OutputTokens
 			stats.TotalCost += log.TotalCost
+			stats.AccountCost += log.AccountCost
 			stats.ActualCost += log.ActualCost
 		} else {
 			modelMap[log.Model] = &ModelStats{
@@ -120,6 +125,7 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 				InputTokens:  log.InputTokens,
 				OutputTokens: log.OutputTokens,
 				TotalCost:    log.TotalCost,
+				AccountCost:  log.AccountCost,
 				ActualCost:   log.ActualCost,
 			}
 		}
@@ -152,20 +158,24 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 	}
 
 	for _, daily := range dailyMap {
-		if daily.TotalCost > result.PeakCostDay.TotalCost {
+		// "最高费用日" 用 AccountCost（账号实际成本）做比较，
+		// 这才是用户期望的"哪天这个账号花得最多"。
+		if daily.AccountCost > result.PeakCostDay.AccountCost {
 			result.PeakCostDay = PeakDay{
-				Date:       daily.Date,
-				Count:      daily.Count,
-				TotalCost:  daily.TotalCost,
-				ActualCost: daily.ActualCost,
+				Date:        daily.Date,
+				Count:       daily.Count,
+				TotalCost:   daily.TotalCost,
+				AccountCost: daily.AccountCost,
+				ActualCost:  daily.ActualCost,
 			}
 		}
 		if daily.Count > result.PeakRequestDay.Count {
 			result.PeakRequestDay = PeakDay{
-				Date:       daily.Date,
-				Count:      daily.Count,
-				TotalCost:  daily.TotalCost,
-				ActualCost: daily.ActualCost,
+				Date:        daily.Date,
+				Count:       daily.Count,
+				TotalCost:   daily.TotalCost,
+				AccountCost: daily.AccountCost,
+				ActualCost:  daily.ActualCost,
 			}
 		}
 	}

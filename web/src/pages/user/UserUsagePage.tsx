@@ -10,7 +10,7 @@ import { DatePicker } from '../../shared/components/DatePicker';
 import { StatCard } from '../../shared/components/Card';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useAuth } from '../../app/providers/AuthProvider';
-import { Activity, Hash, DollarSign, Coins, Search, RefreshCw, Key, Clock, Gauge } from 'lucide-react';
+import { Activity, Hash, DollarSign, Coins, Search, RefreshCw, Key, Clock, Gauge, Percent } from 'lucide-react';
 import { useUsageColumns, fmtNum } from '../../shared/columns/usageColumns';
 import type { UsageQuery } from '../../shared/types';
 
@@ -23,6 +23,10 @@ function APIKeyInfoBar() {
   const used = user.api_key_used_quota ?? 0;
   const expiresAt = user.api_key_expires_at;
   const pct = quota > 0 ? Math.min((used / quota) * 100, 100) : 0;
+
+  // 后端已经把"销售倍率优先、否则分组倍率"折算成单一字段 api_key_rate，
+  // 前端拿不到原始来源，避免通过 DevTools 推断 reseller 定价模型。
+  const effectiveRate = user.api_key_rate ?? 0;
 
   // 到期时间格式化
   let expiresLabel = '';
@@ -82,6 +86,14 @@ function APIKeyInfoBar() {
         <div className="flex items-center gap-2 text-text-tertiary">
           <Clock className="w-3.5 h-3.5" />
           <span>{t('auth.apikey_expires')}: {t('auth.apikey_never')}</span>
+        </div>
+      )}
+
+      {effectiveRate > 0 && (
+        <div className="flex items-center gap-2">
+          <Percent className="w-3.5 h-3.5 text-text-tertiary" />
+          <span className="text-text-tertiary">{t('auth.apikey_rate', '倍率')}:</span>
+          <span className="text-text-secondary font-mono">{effectiveRate.toFixed(2)}x</span>
         </div>
       )}
     </div>

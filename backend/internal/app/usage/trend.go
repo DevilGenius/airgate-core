@@ -45,6 +45,7 @@ func BuildTrendBuckets(entries []TrendEntry, granularity string) []TrendBucket {
 		bucket.CacheRead += entry.CachedInputTokens
 		bucket.ActualCost += entry.ActualCost
 		bucket.StandardCost += entry.StandardCost
+		bucket.BilledCost += entry.BilledCost
 	}
 
 	result := make([]TrendBucket, 0, len(bucketMap))

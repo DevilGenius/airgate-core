@@ -7,24 +7,26 @@ import (
 
 // Key API Key 领域对象。
 type Key struct {
-	ID            int
-	Name          string
-	KeyHint       string
-	KeyHash       string
-	KeyEncrypted  string
-	PlainKey      string
-	UserID        int
-	GroupID       *int
-	IPWhitelist   []string
-	IPBlacklist   []string
-	QuotaUSD      float64
-	UsedQuota     float64
-	TodayCost     float64
-	ThirtyDayCost float64
-	Status        string
-	ExpiresAt     *time.Time
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID              int
+	Name            string
+	KeyHint         string
+	KeyHash         string
+	KeyEncrypted    string
+	PlainKey        string
+	UserID          int
+	GroupID         *int
+	IPWhitelist     []string
+	IPBlacklist     []string
+	QuotaUSD        float64
+	UsedQuota       float64 // 账面已用（含 sell_rate markup）
+	UsedQuotaActual float64 // 真实成本已用（聚合 sum(usage_log.actual_cost)，仅在 fetch 时填充）
+	SellRate        float64 // 销售倍率，0 表示未启用
+	TodayCost       float64
+	ThirtyDayCost   float64
+	Status          string
+	ExpiresAt       *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // ListFilter API Key 列表查询参数。
@@ -49,6 +51,7 @@ type CreateInput struct {
 	IPWhitelist []string
 	IPBlacklist []string
 	QuotaUSD    float64
+	SellRate    float64
 	ExpiresAt   *string
 }
 
@@ -61,6 +64,7 @@ type UpdateInput struct {
 	IPBlacklist    []string
 	HasIPBlacklist bool
 	QuotaUSD       *float64
+	SellRate       *float64
 	ExpiresAt      *string
 	Status         *string
 }
@@ -84,6 +88,7 @@ type Mutation struct {
 	IPBlacklist    []string
 	HasIPBlacklist bool
 	QuotaUSD       *float64
+	SellRate       *float64
 	ExpiresAt      *time.Time
 	HasExpiresAt   bool
 	Status         *string

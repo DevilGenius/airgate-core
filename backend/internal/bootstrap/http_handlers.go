@@ -84,7 +84,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	usageService := appusage.NewService(usageStore)
 
 	return &HTTPHandlers{
-		Auth:         handler.NewAuthHandler(authService, settingsService, verifyCodeStore, dep.DB, dep.JWTMgr),
+		Auth:         handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
 		User:         handler.NewUserHandler(userService),
 		Account:      handler.NewAccountHandler(accountService),
 		Group:        handler.NewGroupHandler(groupService),

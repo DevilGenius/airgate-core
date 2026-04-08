@@ -39,6 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = (token: string, userData: UserResp) => {
     setToken(token);
     setUser(userData);
+    // 登录响应可能不包含全部用户字段（例如 API Key 登录时缺少 quota / expires_at），
+    // 异步用 /me 拉一次完整数据补齐，避免首屏额度等信息显示不准。
+    usersApi.me().then(setUser).catch(() => {});
   };
 
   const logout = () => {

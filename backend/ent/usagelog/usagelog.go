@@ -42,8 +42,14 @@ const (
 	FieldTotalCost = "total_cost"
 	// FieldActualCost holds the string denoting the actual_cost field in the database.
 	FieldActualCost = "actual_cost"
+	// FieldBilledCost holds the string denoting the billed_cost field in the database.
+	FieldBilledCost = "billed_cost"
+	// FieldAccountCost holds the string denoting the account_cost field in the database.
+	FieldAccountCost = "account_cost"
 	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
 	FieldRateMultiplier = "rate_multiplier"
+	// FieldSellRate holds the string denoting the sell_rate field in the database.
+	FieldSellRate = "sell_rate"
 	// FieldAccountRateMultiplier holds the string denoting the account_rate_multiplier field in the database.
 	FieldAccountRateMultiplier = "account_rate_multiplier"
 	// FieldServiceTier holds the string denoting the service_tier field in the database.
@@ -117,7 +123,10 @@ var Columns = []string{
 	FieldCachedInputCost,
 	FieldTotalCost,
 	FieldActualCost,
+	FieldBilledCost,
+	FieldAccountCost,
 	FieldRateMultiplier,
+	FieldSellRate,
 	FieldAccountRateMultiplier,
 	FieldServiceTier,
 	FieldStream,
@@ -181,8 +190,14 @@ var (
 	DefaultTotalCost float64
 	// DefaultActualCost holds the default value on creation for the "actual_cost" field.
 	DefaultActualCost float64
+	// DefaultBilledCost holds the default value on creation for the "billed_cost" field.
+	DefaultBilledCost float64
+	// DefaultAccountCost holds the default value on creation for the "account_cost" field.
+	DefaultAccountCost float64
 	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
 	DefaultRateMultiplier float64
+	// DefaultSellRate holds the default value on creation for the "sell_rate" field.
+	DefaultSellRate float64
 	// DefaultAccountRateMultiplier holds the default value on creation for the "account_rate_multiplier" field.
 	DefaultAccountRateMultiplier float64
 	// DefaultServiceTier holds the default value on creation for the "service_tier" field.
@@ -279,9 +294,24 @@ func ByActualCost(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldActualCost, opts...).ToFunc()
 }
 
+// ByBilledCost orders the results by the billed_cost field.
+func ByBilledCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBilledCost, opts...).ToFunc()
+}
+
+// ByAccountCost orders the results by the account_cost field.
+func ByAccountCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAccountCost, opts...).ToFunc()
+}
+
 // ByRateMultiplier orders the results by the rate_multiplier field.
 func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
+}
+
+// BySellRate orders the results by the sell_rate field.
+func BySellRate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSellRate, opts...).ToFunc()
 }
 
 // ByAccountRateMultiplier orders the results by the account_rate_multiplier field.

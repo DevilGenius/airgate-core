@@ -36,9 +36,12 @@ type UsageRecord struct {
 	OutputCost            float64
 	CachedInputCost       float64
 	TotalCost             float64
-	ActualCost            float64
-	RateMultiplier        float64
-	AccountRateMultiplier float64
+	ActualCost            float64 // 平台真实成本（扣 reseller 余额）
+	BilledCost            float64 // 客户账面消耗（累加到 APIKey.used_quota）
+	AccountCost           float64 // 账号实际成本（仅服务"账号计费"统计）
+	RateMultiplier        float64 // 快照：本次生效的平台计费倍率
+	SellRate              float64 // 快照：本次生效的销售倍率（0 表示未启用 markup）
+	AccountRateMultiplier float64 // 快照：本次生效的 account_rate
 	ServiceTier           string
 	Stream                bool
 	DurationMs            int64
@@ -168,7 +171,7 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 		_ = tx.Rollback()
 	}()
 
-	// 1. 批量写入 UsageLog
+	// 1. 批量写入 UsageLog（同时记录 actual_cost 和 billed_cost 双轨数据）
 	builders := make([]*ent.UsageLogCreate, 0, len(batch))
 	for _, rec := range batch {
 		b := tx.UsageLog.Create().
@@ -186,7 +189,10 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 			SetCachedInputCost(rec.CachedInputCost).
 			SetTotalCost(rec.TotalCost).
 			SetActualCost(rec.ActualCost).
+			SetBilledCost(rec.BilledCost).
+			SetAccountCost(rec.AccountCost).
 			SetRateMultiplier(rec.RateMultiplier).
+			SetSellRate(rec.SellRate).
 			SetAccountRateMultiplier(rec.AccountRateMultiplier).
 			SetServiceTier(rec.ServiceTier).
 			SetStream(rec.Stream).
@@ -205,18 +211,26 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 		return fmt.Errorf("批量插入 UsageLog 失败: %w", err)
 	}
 
-	// 2. 在同一事务中扣费：按 UserID / APIKeyID 聚合后批量扣减
-	userCosts := make(map[int]float64)
-	keyCosts := make(map[int]float64)
+	// 2. 在同一事务中扣费 —— 三个独立累加器：
+	//    - User.balance：按 actual_cost 扣减（平台真实成本，永远不受 sell_rate 影响）
+	//    - APIKey.used_quota：按 billed_cost 累加（客户账面值，对 end customer 可见）
+	//    - APIKey.used_quota_actual：按 actual_cost 累加（reseller 成本核算用，end customer 不可见）
+	//    sell_rate=0 时 billed_cost==actual_cost，used_quota 与 used_quota_actual 相等，行为完全等价于改造前。
+	userActualCosts := make(map[int]float64)
+	keyBilledCosts := make(map[int]float64)
+	keyActualCosts := make(map[int]float64)
 
 	for _, rec := range batch {
 		if rec.ActualCost > 0 {
-			userCosts[rec.UserID] += rec.ActualCost
-			keyCosts[rec.APIKeyID] += rec.ActualCost
+			userActualCosts[rec.UserID] += rec.ActualCost
+			keyActualCosts[rec.APIKeyID] += rec.ActualCost
+		}
+		if rec.BilledCost > 0 {
+			keyBilledCosts[rec.APIKeyID] += rec.BilledCost
 		}
 	}
 
-	for userID, cost := range userCosts {
+	for userID, cost := range userActualCosts {
 		if err := tx.User.UpdateOneID(userID).
 			AddBalance(-cost).
 			Exec(ctx); err != nil {
@@ -224,11 +238,24 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 		}
 	}
 
-	for keyID, cost := range keyCosts {
-		if err := tx.APIKey.UpdateOneID(keyID).
-			AddUsedQuota(cost).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("更新 API Key 用量失败 key_id=%d cost=%.8f: %w", keyID, cost, err)
+	// APIKey 双累加器：billed 和 actual 都更新（key 集合相同，合并一次 update 调用）
+	keyIDs := make(map[int]struct{}, len(keyBilledCosts))
+	for k := range keyBilledCosts {
+		keyIDs[k] = struct{}{}
+	}
+	for k := range keyActualCosts {
+		keyIDs[k] = struct{}{}
+	}
+	for keyID := range keyIDs {
+		update := tx.APIKey.UpdateOneID(keyID)
+		if billed := keyBilledCosts[keyID]; billed > 0 {
+			update = update.AddUsedQuota(billed)
+		}
+		if actual := keyActualCosts[keyID]; actual > 0 {
+			update = update.AddUsedQuotaActual(actual)
+		}
+		if err := update.Exec(ctx); err != nil {
+			return fmt.Errorf("更新 API Key 用量失败 key_id=%d: %w", keyID, err)
 		}
 	}
 

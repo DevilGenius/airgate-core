@@ -65,6 +65,17 @@ export function EditKeyModal({
           placeholder={t('user_keys.quota_unlimited_hint')}
           hint={t('user_keys.quota_hint')}
         />
+        <Input
+          label={t('user_keys.sell_rate_label', '销售倍率（对外售价）')}
+          type="number"
+          value={form.sell_rate}
+          onChange={(e) => setForm({ ...form, sell_rate: e.target.value })}
+          placeholder="0"
+          hint={t(
+            'user_keys.sell_rate_hint',
+            '对客户的售价倍率（如 0.6 表示按基础成本的 0.6 倍计费）。留空或 0 表示按平台原价，不启用 markup。可随时调整。',
+          )}
+        />
         <DatePicker
           label={t('user_keys.expires_at')}
           value={form.expires_at}

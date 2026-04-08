@@ -23,26 +23,39 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		return
 	}
 
-	// API Key 登录场景：强制只查该 Key 的记录
+	// API Key 登录场景：强制只查该 Key 的记录，并打开 ScopedToKey 标志
 	apiKeyFilter := query.APIKeyID
+	scoped := false
 	if scopedKey := scopedAPIKeyID(c); scopedKey > 0 {
 		apiKeyFilter = &scopedKey
+		scoped = true
 	}
 
 	result, err := h.service.ListUser(c.Request.Context(), int64(userID), appusage.ListFilter{
-		Page:      query.Page,
-		PageSize:  query.PageSize,
-		APIKeyID:  apiKeyFilter,
-		AccountID: query.AccountID,
-		GroupID:   query.GroupID,
-		Platform:  query.Platform,
-		Model:     query.Model,
-		StartDate: query.StartDate,
-		EndDate:   query.EndDate,
+		Page:        query.Page,
+		PageSize:    query.PageSize,
+		APIKeyID:    apiKeyFilter,
+		AccountID:   query.AccountID,
+		GroupID:     query.GroupID,
+		Platform:    query.Platform,
+		Model:       query.Model,
+		StartDate:   query.StartDate,
+		EndDate:     query.EndDate,
+		ScopedToKey: scoped,
 	})
 	if err != nil {
 		handleUsageError("查询用户使用记录失败", err)
 		response.InternalError(c, "查询失败")
+		return
+	}
+
+	// 根据 scope 切换响应 DTO：end customer 走 CustomerUsageLogResp 剥离平台真实成本
+	if scoped {
+		list := make([]dto.CustomerUsageLogResp, 0, len(result.List))
+		for _, item := range result.List {
+			list = append(list, toCustomerUsageLogResp(item))
+		}
+		response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
 		return
 	}
 
@@ -69,16 +82,19 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 
 	// API Key 登录场景：限定统计范围
 	var scopedKey *int64
+	scoped := false
 	if sk := scopedAPIKeyID(c); sk > 0 {
 		scopedKey = &sk
+		scoped = true
 	}
 
 	summary, err := h.service.UserStats(c.Request.Context(), int64(userID), appusage.StatsFilter{
-		APIKeyID:  scopedKey,
-		Platform:  query.Platform,
-		Model:     query.Model,
-		StartDate: query.StartDate,
-		EndDate:   query.EndDate,
+		APIKeyID:    scopedKey,
+		Platform:    query.Platform,
+		Model:       query.Model,
+		StartDate:   query.StartDate,
+		EndDate:     query.EndDate,
+		ScopedToKey: scoped,
 	})
 	if err != nil {
 		handleUsageError("统计用户使用记录失败", err)
@@ -89,19 +105,41 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 	// 查询模型分布
 	uid64 := int64(userID)
 	modelStats, _ := h.service.StatsByModel(c.Request.Context(), appusage.StatsFilter{
-		UserID:    &uid64,
-		APIKeyID:  scopedKey,
-		Platform:  query.Platform,
-		Model:     query.Model,
-		StartDate: query.StartDate,
-		EndDate:   query.EndDate,
+		UserID:      &uid64,
+		APIKeyID:    scopedKey,
+		Platform:    query.Platform,
+		Model:       query.Model,
+		StartDate:   query.StartDate,
+		EndDate:     query.EndDate,
+		ScopedToKey: scoped,
 	})
 
+	// End customer scope：只暴露 billed_cost，剥离 actual_cost / total_cost
+	if scoped {
+		resp := dto.UsageStatsResp{
+			TotalRequests:   summary.TotalRequests,
+			TotalTokens:     summary.TotalTokens,
+			TotalBilledCost: summary.TotalBilledCost,
+		}
+		for _, m := range modelStats {
+			resp.ByModel = append(resp.ByModel, dto.ModelStats{
+				Model:      m.Model,
+				Requests:   m.Requests,
+				Tokens:     m.Tokens,
+				BilledCost: m.BilledCost,
+			})
+		}
+		response.Success(c, resp)
+		return
+	}
+
+	// Reseller scope：完整字段（actual + billed），前端按需展示
 	resp := dto.UsageStatsResp{
 		TotalRequests:   summary.TotalRequests,
 		TotalTokens:     summary.TotalTokens,
 		TotalCost:       summary.TotalCost,
 		TotalActualCost: summary.TotalActualCost,
+		TotalBilledCost: summary.TotalBilledCost,
 	}
 	for _, m := range modelStats {
 		resp.ByModel = append(resp.ByModel, dto.ModelStats{
@@ -110,6 +148,7 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 			Tokens:     m.Tokens,
 			TotalCost:  m.TotalCost,
 			ActualCost: m.ActualCost,
+			BilledCost: m.BilledCost,
 		})
 	}
 	response.Success(c, resp)
@@ -134,24 +173,45 @@ func (h *UsageHandler) UserUsageTrend(c *gin.Context) {
 
 	// API Key 登录场景：限定趋势范围
 	var scopedKeyTrend *int64
+	scoped := false
 	if sk := scopedAPIKeyID(c); sk > 0 {
 		scopedKeyTrend = &sk
+		scoped = true
 	}
 
 	result, err := h.service.AdminTrend(c.Request.Context(), appusage.TrendFilter{
 		StatsFilter: appusage.StatsFilter{
-			UserID:    &uid64,
-			APIKeyID:  scopedKeyTrend,
-			Platform:  query.Platform,
-			Model:     query.Model,
-			StartDate: query.StartDate,
-			EndDate:   query.EndDate,
+			UserID:      &uid64,
+			APIKeyID:    scopedKeyTrend,
+			Platform:    query.Platform,
+			Model:       query.Model,
+			StartDate:   query.StartDate,
+			EndDate:     query.EndDate,
+			ScopedToKey: scoped,
 		},
 		Granularity: granularity,
 	})
 	if err != nil {
 		handleUsageError("查询用户趋势失败", err)
 		response.InternalError(c, "查询失败")
+		return
+	}
+
+	// End customer scope：剥离 actual_cost / standard_cost，只剩 billed_cost
+	if scoped {
+		buckets := make([]dto.UsageTrendBucket, 0, len(result))
+		for _, item := range result {
+			buckets = append(buckets, dto.UsageTrendBucket{
+				Time:          item.Time,
+				InputTokens:   item.InputTokens,
+				OutputTokens:  item.OutputTokens,
+				CacheCreation: item.CacheCreation,
+				CacheRead:     item.CacheRead,
+				BilledCost:    item.BilledCost,
+				// 不暴露 ActualCost / StandardCost
+			})
+		}
+		response.Success(c, buckets)
 		return
 	}
 

@@ -33,11 +33,28 @@ type APIKeyInfo struct {
 	QuotaUSD      float64
 	UsedQuota     float64
 
+	// SellRate Reseller 设置的销售倍率（>0 时启用 markup，独立于平台计费）
+	SellRate float64
+
 	// 预加载字段，避免 forwarder 重复查询
-	UserBalance            float64 // 用户余额
-	GroupRateMultiplier    float64 // 分组倍率
-	GroupServiceTier       string  // 分组 service tier
-	GroupForceInstructions string  // 分组强制 instructions
+	UserBalance            float64           // 用户余额
+	UserGroupRates         map[int64]float64 // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
+	GroupRateMultiplier    float64           // 分组倍率
+	GroupServiceTier       string            // 分组 service tier
+	GroupForceInstructions string            // 分组强制 instructions
+}
+
+// UserGroupRate 返回当前 key 所属分组在 user.group_rates 中的倍率（若存在）。
+// 用于 ResolveBillingRate 的优先级链：用户级专属 > 分组档位。
+func (i *APIKeyInfo) UserGroupRate() (float64, bool) {
+	if i == nil || i.UserGroupRates == nil {
+		return 0, false
+	}
+	r, ok := i.UserGroupRates[int64(i.GroupID)]
+	if !ok || r <= 0 {
+		return 0, false
+	}
+	return r, true
 }
 
 // GenerateAPIKey 生成 API Key 和对应的哈希值
@@ -160,8 +177,10 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		GroupPlatform: g.Platform,
 		QuotaUSD:      ak.QuotaUsd,
 		UsedQuota:     ak.UsedQuota,
+		SellRate:      ak.SellRate,
 
 		UserBalance:            u.Balance,
+		UserGroupRates:         u.GroupRates,
 		GroupRateMultiplier:    g.RateMultiplier,
 		GroupServiceTier:       g.ServiceTier,
 		GroupForceInstructions: g.ForceInstructions,

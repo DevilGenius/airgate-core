@@ -103,6 +103,34 @@ func (akc *APIKeyCreate) SetNillableUsedQuota(f *float64) *APIKeyCreate {
 	return akc
 }
 
+// SetUsedQuotaActual sets the "used_quota_actual" field.
+func (akc *APIKeyCreate) SetUsedQuotaActual(f float64) *APIKeyCreate {
+	akc.mutation.SetUsedQuotaActual(f)
+	return akc
+}
+
+// SetNillableUsedQuotaActual sets the "used_quota_actual" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableUsedQuotaActual(f *float64) *APIKeyCreate {
+	if f != nil {
+		akc.SetUsedQuotaActual(*f)
+	}
+	return akc
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (akc *APIKeyCreate) SetSellRate(f float64) *APIKeyCreate {
+	akc.mutation.SetSellRate(f)
+	return akc
+}
+
+// SetNillableSellRate sets the "sell_rate" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableSellRate(f *float64) *APIKeyCreate {
+	if f != nil {
+		akc.SetSellRate(*f)
+	}
+	return akc
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (akc *APIKeyCreate) SetExpiresAt(t time.Time) *APIKeyCreate {
 	akc.mutation.SetExpiresAt(t)
@@ -251,6 +279,14 @@ func (akc *APIKeyCreate) defaults() {
 		v := apikey.DefaultUsedQuota
 		akc.mutation.SetUsedQuota(v)
 	}
+	if _, ok := akc.mutation.UsedQuotaActual(); !ok {
+		v := apikey.DefaultUsedQuotaActual
+		akc.mutation.SetUsedQuotaActual(v)
+	}
+	if _, ok := akc.mutation.SellRate(); !ok {
+		v := apikey.DefaultSellRate
+		akc.mutation.SetSellRate(v)
+	}
 	if _, ok := akc.mutation.Status(); !ok {
 		v := apikey.DefaultStatus
 		akc.mutation.SetStatus(v)
@@ -291,6 +327,17 @@ func (akc *APIKeyCreate) check() error {
 	}
 	if _, ok := akc.mutation.UsedQuota(); !ok {
 		return &ValidationError{Name: "used_quota", err: errors.New(`ent: missing required field "APIKey.used_quota"`)}
+	}
+	if _, ok := akc.mutation.UsedQuotaActual(); !ok {
+		return &ValidationError{Name: "used_quota_actual", err: errors.New(`ent: missing required field "APIKey.used_quota_actual"`)}
+	}
+	if _, ok := akc.mutation.SellRate(); !ok {
+		return &ValidationError{Name: "sell_rate", err: errors.New(`ent: missing required field "APIKey.sell_rate"`)}
+	}
+	if v, ok := akc.mutation.SellRate(); ok {
+		if err := apikey.SellRateValidator(v); err != nil {
+			return &ValidationError{Name: "sell_rate", err: fmt.Errorf(`ent: validator failed for field "APIKey.sell_rate": %w`, err)}
+		}
 	}
 	if _, ok := akc.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "APIKey.status"`)}
@@ -366,6 +413,14 @@ func (akc *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := akc.mutation.UsedQuota(); ok {
 		_spec.SetField(apikey.FieldUsedQuota, field.TypeFloat64, value)
 		_node.UsedQuota = value
+	}
+	if value, ok := akc.mutation.UsedQuotaActual(); ok {
+		_spec.SetField(apikey.FieldUsedQuotaActual, field.TypeFloat64, value)
+		_node.UsedQuotaActual = value
+	}
+	if value, ok := akc.mutation.SellRate(); ok {
+		_spec.SetField(apikey.FieldSellRate, field.TypeFloat64, value)
+		_node.SellRate = value
 	}
 	if value, ok := akc.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)

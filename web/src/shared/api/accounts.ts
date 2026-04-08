@@ -38,11 +38,18 @@ export const accountsApi = {
     get<AccountStatsResp>(`/api/v1/admin/accounts/${id}/stats`, params),
 };
 
+/**
+ * 三个 cost 字段语义：
+ *   - total_cost   原始上游定价（base，不含任何倍率）
+ *   - account_cost 账号实际成本 = total × account_rate（"账号计费"统计）
+ *   - actual_cost  用户扣费     = total × billing_rate
+ */
 export interface AccountPeriodStats {
   count: number;
   input_tokens: number;
   output_tokens: number;
   total_cost: number;
+  account_cost: number;
   actual_cost: number;
 }
 
@@ -50,6 +57,7 @@ export interface AccountDailyStats {
   date: string;
   count: number;
   total_cost: number;
+  account_cost: number;
   actual_cost: number;
 }
 
@@ -59,6 +67,7 @@ export interface AccountModelStats {
   input_tokens: number;
   output_tokens: number;
   total_cost: number;
+  account_cost: number;
   actual_cost: number;
 }
 
@@ -66,6 +75,7 @@ export interface AccountPeakDay {
   date: string;
   count: number;
   total_cost: number;
+  account_cost: number;
   actual_cost: number;
 }
 

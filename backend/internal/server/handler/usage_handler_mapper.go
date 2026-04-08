@@ -5,6 +5,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 )
 
+// toUsageLogResp 转换为 reseller / admin 视角的完整响应（包含 actual_cost、billed_cost 等所有字段）。
 func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 	return dto.UsageLogResp{
 		ID:                    record.ID,
@@ -31,7 +32,10 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		CachedInputCost:       record.CachedInputCost,
 		TotalCost:             record.TotalCost,
 		ActualCost:            record.ActualCost,
+		BilledCost:            record.BilledCost,
+		AccountCost:           record.AccountCost,
 		RateMultiplier:        record.RateMultiplier,
+		SellRate:              record.SellRate,
 		AccountRateMultiplier: record.AccountRateMultiplier,
 		ServiceTier:           record.ServiceTier,
 		Stream:                record.Stream,
@@ -43,12 +47,34 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 	}
 }
 
+// toCustomerUsageLogResp 转换为 end customer 视角的精简响应（仅 billed_cost，剥离所有平台真实成本字段）。
+//
+// 当请求来自 API Key 登录拿到的 scoped JWT 时使用，避免泄漏 reseller 与平台之间的差价。
+func toCustomerUsageLogResp(record appusage.LogRecord) dto.CustomerUsageLogResp {
+	return dto.CustomerUsageLogResp{
+		ID:                record.ID,
+		APIKeyID:          record.APIKeyID,
+		Platform:          record.Platform,
+		Model:             record.Model,
+		InputTokens:       record.InputTokens,
+		OutputTokens:      record.OutputTokens,
+		CachedInputTokens: record.CachedInputTokens,
+		BilledCost:        record.BilledCost,
+		ServiceTier:       record.ServiceTier,
+		Stream:            record.Stream,
+		DurationMs:        record.DurationMs,
+		FirstTokenMs:      record.FirstTokenMs,
+		CreatedAt:         record.CreatedAt,
+	}
+}
+
 func toUsageStatsResp(result appusage.StatsResult) dto.UsageStatsResp {
 	resp := dto.UsageStatsResp{
 		TotalRequests:   result.TotalRequests,
 		TotalTokens:     result.TotalTokens,
 		TotalCost:       result.TotalCost,
 		TotalActualCost: result.TotalActualCost,
+		TotalBilledCost: result.TotalBilledCost,
 	}
 	for _, item := range result.ByModel {
 		resp.ByModel = append(resp.ByModel, dto.ModelStats{
@@ -57,6 +83,7 @@ func toUsageStatsResp(result appusage.StatsResult) dto.UsageStatsResp {
 			Tokens:     item.Tokens,
 			TotalCost:  item.TotalCost,
 			ActualCost: item.ActualCost,
+			BilledCost: item.BilledCost,
 		})
 	}
 	for _, item := range result.ByUser {
@@ -67,6 +94,7 @@ func toUsageStatsResp(result appusage.StatsResult) dto.UsageStatsResp {
 			Tokens:     item.Tokens,
 			TotalCost:  item.TotalCost,
 			ActualCost: item.ActualCost,
+			BilledCost: item.BilledCost,
 		})
 	}
 	for _, item := range result.ByAccount {
@@ -77,6 +105,7 @@ func toUsageStatsResp(result appusage.StatsResult) dto.UsageStatsResp {
 			Tokens:     item.Tokens,
 			TotalCost:  item.TotalCost,
 			ActualCost: item.ActualCost,
+			BilledCost: item.BilledCost,
 		})
 	}
 	for _, item := range result.ByGroup {
@@ -87,6 +116,7 @@ func toUsageStatsResp(result appusage.StatsResult) dto.UsageStatsResp {
 			Tokens:     item.Tokens,
 			TotalCost:  item.TotalCost,
 			ActualCost: item.ActualCost,
+			BilledCost: item.BilledCost,
 		})
 	}
 	return resp

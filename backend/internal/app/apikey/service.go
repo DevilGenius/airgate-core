@@ -87,6 +87,7 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 		IPBlacklist:    cloneStringSlice(input.IPBlacklist),
 		HasIPBlacklist: input.IPBlacklist != nil,
 		QuotaUSD:       &input.QuotaUSD,
+		SellRate:       &input.SellRate,
 		ExpiresAt:      expiresAt,
 		HasExpiresAt:   hasExpiresAt,
 	})
@@ -151,6 +152,7 @@ func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInp
 		IPBlacklist:    cloneStringSlice(input.IPBlacklist),
 		HasIPBlacklist: input.HasIPBlacklist,
 		QuotaUSD:       input.QuotaUSD,
+		SellRate:       input.SellRate,
 		ExpiresAt:      expiresAt,
 		HasExpiresAt:   hasExpiresAt,
 		Status:         input.Status,

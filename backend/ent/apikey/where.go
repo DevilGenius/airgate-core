@@ -85,6 +85,16 @@ func UsedQuota(v float64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldUsedQuota, v))
 }
 
+// UsedQuotaActual applies equality check predicate on the "used_quota_actual" field. It's identical to UsedQuotaActualEQ.
+func UsedQuotaActual(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldUsedQuotaActual, v))
+}
+
+// SellRate applies equality check predicate on the "sell_rate" field. It's identical to SellRateEQ.
+func SellRate(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldSellRate, v))
+}
+
 // ExpiresAt applies equality check predicate on the "expires_at" field. It's identical to ExpiresAtEQ.
 func ExpiresAt(v time.Time) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldExpiresAt, v))
@@ -468,6 +478,86 @@ func UsedQuotaLT(v float64) predicate.APIKey {
 // UsedQuotaLTE applies the LTE predicate on the "used_quota" field.
 func UsedQuotaLTE(v float64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldLTE(FieldUsedQuota, v))
+}
+
+// UsedQuotaActualEQ applies the EQ predicate on the "used_quota_actual" field.
+func UsedQuotaActualEQ(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldUsedQuotaActual, v))
+}
+
+// UsedQuotaActualNEQ applies the NEQ predicate on the "used_quota_actual" field.
+func UsedQuotaActualNEQ(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldUsedQuotaActual, v))
+}
+
+// UsedQuotaActualIn applies the In predicate on the "used_quota_actual" field.
+func UsedQuotaActualIn(vs ...float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldUsedQuotaActual, vs...))
+}
+
+// UsedQuotaActualNotIn applies the NotIn predicate on the "used_quota_actual" field.
+func UsedQuotaActualNotIn(vs ...float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldUsedQuotaActual, vs...))
+}
+
+// UsedQuotaActualGT applies the GT predicate on the "used_quota_actual" field.
+func UsedQuotaActualGT(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldUsedQuotaActual, v))
+}
+
+// UsedQuotaActualGTE applies the GTE predicate on the "used_quota_actual" field.
+func UsedQuotaActualGTE(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldUsedQuotaActual, v))
+}
+
+// UsedQuotaActualLT applies the LT predicate on the "used_quota_actual" field.
+func UsedQuotaActualLT(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldUsedQuotaActual, v))
+}
+
+// UsedQuotaActualLTE applies the LTE predicate on the "used_quota_actual" field.
+func UsedQuotaActualLTE(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldUsedQuotaActual, v))
+}
+
+// SellRateEQ applies the EQ predicate on the "sell_rate" field.
+func SellRateEQ(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldSellRate, v))
+}
+
+// SellRateNEQ applies the NEQ predicate on the "sell_rate" field.
+func SellRateNEQ(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldSellRate, v))
+}
+
+// SellRateIn applies the In predicate on the "sell_rate" field.
+func SellRateIn(vs ...float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldSellRate, vs...))
+}
+
+// SellRateNotIn applies the NotIn predicate on the "sell_rate" field.
+func SellRateNotIn(vs ...float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldSellRate, vs...))
+}
+
+// SellRateGT applies the GT predicate on the "sell_rate" field.
+func SellRateGT(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldSellRate, v))
+}
+
+// SellRateGTE applies the GTE predicate on the "sell_rate" field.
+func SellRateGTE(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldSellRate, v))
+}
+
+// SellRateLT applies the LT predicate on the "sell_rate" field.
+func SellRateLT(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldSellRate, v))
+}
+
+// SellRateLTE applies the LTE predicate on the "sell_rate" field.
+func SellRateLTE(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldSellRate, v))
 }
 
 // ExpiresAtEQ applies the EQ predicate on the "expires_at" field.

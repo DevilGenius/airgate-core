@@ -160,7 +160,8 @@
     "apikey_quota": "Quota",
     "apikey_unlimited": "Unlimited",
     "apikey_expires": "Expires",
-    "apikey_never": "Never"
+    "apikey_never": "Never",
+    "apikey_rate": "Rate"
   },
 
   "dashboard": {
@@ -770,6 +771,8 @@
     "use_key_desc": "Add the following environment variables to your terminal configuration to get started.",
     "group_unbound": "Unbound Group",
     "group_unbound_hint": "This API key is currently not bound to any group, so usage configuration cannot be generated. Please ask an administrator to bind it to a group first.",
+    "group_rate_short": "Group Rate",
+    "sell_rate_short": "Sell Rate",
     "copy": "Copy",
     "copied": "Copied",
     "reveal_failed": "Failed to retrieve key",

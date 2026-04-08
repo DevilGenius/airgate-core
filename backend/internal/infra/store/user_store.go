@@ -197,18 +197,26 @@ func (s *UserStore) GetAPIKeyName(ctx context.Context, keyID int) (string, error
 	return ak.Name, nil
 }
 
-// GetAPIKeyInfo 获取 API Key 基本信息（名称、额度、到期时间）。
+// GetAPIKeyInfo 获取 API Key 基本信息（名称、额度、到期时间、销售/分组倍率）。
 func (s *UserStore) GetAPIKeyInfo(ctx context.Context, keyID int) (appuser.APIKeyBrief, error) {
-	ak, err := s.db.APIKey.Get(ctx, keyID)
+	ak, err := s.db.APIKey.Query().
+		Where(entapikey.IDEQ(keyID)).
+		WithGroup().
+		Only(ctx)
 	if err != nil {
 		return appuser.APIKeyBrief{}, err
 	}
-	return appuser.APIKeyBrief{
+	brief := appuser.APIKeyBrief{
 		Name:      ak.Name,
 		QuotaUSD:  ak.QuotaUsd,
 		UsedQuota: ak.UsedQuota,
 		ExpiresAt: ak.ExpiresAt,
-	}, nil
+		SellRate:  ak.SellRate,
+	}
+	if g, _ := ak.Edges.GroupOrErr(); g != nil {
+		brief.GroupRate = g.RateMultiplier
+	}
+	return brief, nil
 }
 
 // ListAPIKeys 查询指定用户的 API Key 列表。

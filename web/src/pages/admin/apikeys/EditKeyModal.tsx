@@ -22,6 +22,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
   const [form, setForm] = useState<UpdateAPIKeyReq>({
     name: apiKey.name,
     quota_usd: apiKey.quota_usd,
+    sell_rate: apiKey.sell_rate,
     expires_at: apiKey.expires_at,
     status: apiKey.status as 'active' | 'disabled',
   });
@@ -41,7 +42,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     { value: '0', label: t('api_keys.group_unbound') },
     ...groups.map((g) => ({
       value: String(g.id),
-      label: `${g.name} (${g.platform})`,
+      label: `${g.name} (${g.platform}) · ${g.rate_multiplier}x`,
     })),
   ];
 
@@ -85,6 +86,19 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
           value={String(form.quota_usd ?? 0)}
           onChange={(e) => setForm({ ...form, quota_usd: Number(e.target.value) })}
           hint={t('api_keys.quota_hint')}
+        />
+
+        <Input
+          label={t('api_keys.sell_rate_label', '销售倍率')}
+          type="number"
+          step="0.01"
+          min="0"
+          value={String(form.sell_rate ?? 0)}
+          onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
+          hint={t(
+            'api_keys.sell_rate_hint',
+            '对客户的售价倍率（如 0.6 表示按基础成本的 0.6 倍计费）。留空或 0 表示按平台原价，不启用 markup。可随时调整。',
+          )}
         />
 
         <Input

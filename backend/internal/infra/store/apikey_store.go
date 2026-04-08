@@ -222,6 +222,9 @@ func applyAPIKeyMutationCreate(builder *ent.APIKeyCreate, mutation appapikey.Mut
 	if mutation.QuotaUSD != nil {
 		builder.SetQuotaUsd(*mutation.QuotaUSD)
 	}
+	if mutation.SellRate != nil {
+		builder.SetSellRate(*mutation.SellRate)
+	}
 	if mutation.HasExpiresAt && mutation.ExpiresAt != nil {
 		builder.SetExpiresAt(*mutation.ExpiresAt)
 	}
@@ -246,6 +249,9 @@ func applyAPIKeyMutationUpdate(builder *ent.APIKeyUpdateOne, mutation appapikey.
 	if mutation.QuotaUSD != nil {
 		builder.SetQuotaUsd(*mutation.QuotaUSD)
 	}
+	if mutation.SellRate != nil {
+		builder.SetSellRate(*mutation.SellRate)
+	}
 	if mutation.HasExpiresAt && mutation.ExpiresAt != nil {
 		builder.SetExpiresAt(*mutation.ExpiresAt)
 	}
@@ -256,18 +262,20 @@ func applyAPIKeyMutationUpdate(builder *ent.APIKeyUpdateOne, mutation appapikey.
 
 func mapAPIKey(item *ent.APIKey) appapikey.Key {
 	result := appapikey.Key{
-		ID:           item.ID,
-		Name:         item.Name,
-		KeyHint:      item.KeyHint,
-		KeyHash:      item.KeyHash,
-		KeyEncrypted: item.KeyEncrypted,
-		IPWhitelist:  cloneStringSlice(item.IPWhitelist),
-		IPBlacklist:  cloneStringSlice(item.IPBlacklist),
-		QuotaUSD:     item.QuotaUsd,
-		UsedQuota:    item.UsedQuota,
-		Status:       item.Status.String(),
-		CreatedAt:    item.CreatedAt,
-		UpdatedAt:    item.UpdatedAt,
+		ID:              item.ID,
+		Name:            item.Name,
+		KeyHint:         item.KeyHint,
+		KeyHash:         item.KeyHash,
+		KeyEncrypted:    item.KeyEncrypted,
+		IPWhitelist:     cloneStringSlice(item.IPWhitelist),
+		IPBlacklist:     cloneStringSlice(item.IPBlacklist),
+		QuotaUSD:        item.QuotaUsd,
+		UsedQuota:       item.UsedQuota,
+		UsedQuotaActual: item.UsedQuotaActual,
+		SellRate:        item.SellRate,
+		Status:          item.Status.String(),
+		CreatedAt:       item.CreatedAt,
+		UpdatedAt:       item.UpdatedAt,
 	}
 	if item.ExpiresAt != nil {
 		value := *item.ExpiresAt

@@ -120,8 +120,8 @@ func startMainServer(cfg *config.Config) {
 		os.Exit(1)
 	}
 
-	// 回填历史 API Key 的 key_hint 等启动整理任务
-	bootstrap.RunStartupTasks(db, cfg.APIKeySecret())
+	// 回填历史 API Key 的 key_hint 以及 reseller markup 新列等启动整理任务
+	bootstrap.RunStartupTasks(db, drv, cfg.APIKeySecret())
 
 	// 初始化 Redis
 	rdb := redis.NewClient(&redis.Options{

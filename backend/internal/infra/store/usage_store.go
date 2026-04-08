@@ -121,6 +121,7 @@ func (s *UsageStore) StatsByModel(ctx context.Context, filter appusage.StatsFilt
 		OutputTokens int64   `json:"output_tokens"`
 		TotalCost    float64 `json:"total_cost"`
 		ActualCost   float64 `json:"actual_cost"`
+		BilledCost   float64 `json:"billed_cost"`
 	}
 	err := query.GroupBy(entusagelog.FieldModel).
 		Aggregate(
@@ -129,6 +130,7 @@ func (s *UsageStore) StatsByModel(ctx context.Context, filter appusage.StatsFilt
 			ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_tokens"),
 			ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost"),
 			ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost"),
+			ent.As(ent.Sum(entusagelog.FieldBilledCost), "billed_cost"),
 		).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -143,6 +145,7 @@ func (s *UsageStore) StatsByModel(ctx context.Context, filter appusage.StatsFilt
 			Tokens:     row.InputTokens + row.OutputTokens,
 			TotalCost:  row.TotalCost,
 			ActualCost: row.ActualCost,
+			BilledCost: row.BilledCost,
 		})
 	}
 	sort.Slice(result, func(i, j int) bool {
@@ -169,6 +172,7 @@ func (s *UsageStore) StatsByUser(ctx context.Context, filter appusage.StatsFilte
 		OutputTokens int64   `json:"output_tokens"`
 		TotalCost    float64 `json:"total_cost"`
 		ActualCost   float64 `json:"actual_cost"`
+		BilledCost   float64 `json:"billed_cost"`
 	}
 	err := query.GroupBy("user_usage_logs").
 		Aggregate(
@@ -177,6 +181,7 @@ func (s *UsageStore) StatsByUser(ctx context.Context, filter appusage.StatsFilte
 			ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_tokens"),
 			ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost"),
 			ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost"),
+			ent.As(ent.Sum(entusagelog.FieldBilledCost), "billed_cost"),
 		).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -209,6 +214,7 @@ func (s *UsageStore) StatsByUser(ctx context.Context, filter appusage.StatsFilte
 			Tokens:     row.InputTokens + row.OutputTokens,
 			TotalCost:  row.TotalCost,
 			ActualCost: row.ActualCost,
+			BilledCost: row.BilledCost,
 		})
 	}
 	sort.Slice(result, func(i, j int) bool {
@@ -235,6 +241,7 @@ func (s *UsageStore) StatsByAccount(ctx context.Context, filter appusage.StatsFi
 		OutputTokens int64   `json:"output_tokens"`
 		TotalCost    float64 `json:"total_cost"`
 		ActualCost   float64 `json:"actual_cost"`
+		BilledCost   float64 `json:"billed_cost"`
 	}
 	err := query.GroupBy("account_usage_logs").
 		Aggregate(
@@ -243,6 +250,7 @@ func (s *UsageStore) StatsByAccount(ctx context.Context, filter appusage.StatsFi
 			ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_tokens"),
 			ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost"),
 			ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost"),
+			ent.As(ent.Sum(entusagelog.FieldBilledCost), "billed_cost"),
 		).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -275,6 +283,7 @@ func (s *UsageStore) StatsByAccount(ctx context.Context, filter appusage.StatsFi
 			Tokens:     row.InputTokens + row.OutputTokens,
 			TotalCost:  row.TotalCost,
 			ActualCost: row.ActualCost,
+			BilledCost: row.BilledCost,
 		})
 	}
 	sort.Slice(result, func(i, j int) bool {
@@ -301,6 +310,7 @@ func (s *UsageStore) StatsByGroup(ctx context.Context, filter appusage.StatsFilt
 		OutputTokens int64   `json:"output_tokens"`
 		TotalCost    float64 `json:"total_cost"`
 		ActualCost   float64 `json:"actual_cost"`
+		BilledCost   float64 `json:"billed_cost"`
 	}
 	err := query.GroupBy("group_usage_logs").
 		Aggregate(
@@ -309,6 +319,7 @@ func (s *UsageStore) StatsByGroup(ctx context.Context, filter appusage.StatsFilt
 			ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_tokens"),
 			ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost"),
 			ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost"),
+			ent.As(ent.Sum(entusagelog.FieldBilledCost), "billed_cost"),
 		).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -341,6 +352,7 @@ func (s *UsageStore) StatsByGroup(ctx context.Context, filter appusage.StatsFilt
 			Tokens:     row.InputTokens + row.OutputTokens,
 			TotalCost:  row.TotalCost,
 			ActualCost: row.ActualCost,
+			BilledCost: row.BilledCost,
 		})
 	}
 	sort.Slice(result, func(i, j int) bool {
@@ -369,6 +381,7 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 			entusagelog.FieldOutputTokens,
 			entusagelog.FieldCachedInputTokens,
 			entusagelog.FieldActualCost,
+			entusagelog.FieldBilledCost,
 			entusagelog.FieldTotalCost,
 			entusagelog.FieldCreatedAt,
 		).
@@ -386,6 +399,7 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 			CachedInputTokens: int64(item.CachedInputTokens),
 			ActualCost:        item.ActualCost,
 			StandardCost:      item.TotalCost,
+			BilledCost:        item.BilledCost,
 		})
 	}
 	return result, nil
@@ -402,10 +416,11 @@ func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) 
 		query = query.Where(entusagelog.HasGroupWith(entgroup.IDEQ(int(*filter.GroupID))))
 	}
 	return applyUsageStatsFilter(query, appusage.StatsFilter{
-		Platform:  filter.Platform,
-		Model:     filter.Model,
-		StartDate: filter.StartDate,
-		EndDate:   filter.EndDate,
+		Platform:    filter.Platform,
+		Model:       filter.Model,
+		StartDate:   filter.StartDate,
+		EndDate:     filter.EndDate,
+		ScopedToKey: filter.ScopedToKey,
 	})
 }
 
@@ -444,6 +459,7 @@ func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summar
 		CachedInputTokens int64   `json:"cached_input_tokens"`
 		TotalCost         float64 `json:"total_cost"`
 		ActualCost        float64 `json:"actual_cost"`
+		BilledCost        float64 `json:"billed_cost"`
 	}
 	err = query.Clone().
 		Aggregate(
@@ -452,6 +468,7 @@ func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summar
 			ent.As(ent.Sum(entusagelog.FieldCachedInputTokens), "cached_input_tokens"),
 			ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost"),
 			ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost"),
+			ent.As(ent.Sum(entusagelog.FieldBilledCost), "billed_cost"),
 		).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -463,6 +480,7 @@ func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summar
 		summary.TotalTokens = rows[0].InputTokens + rows[0].OutputTokens + rows[0].CachedInputTokens
 		summary.TotalCost = rows[0].TotalCost
 		summary.TotalActualCost = rows[0].ActualCost
+		summary.TotalBilledCost = rows[0].BilledCost
 	}
 	return summary, nil
 }
@@ -484,7 +502,10 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		CachedInputCost:       item.CachedInputCost,
 		TotalCost:             item.TotalCost,
 		ActualCost:            item.ActualCost,
+		BilledCost:            item.BilledCost,
+		AccountCost:           item.AccountCost,
 		RateMultiplier:        item.RateMultiplier,
+		SellRate:              item.SellRate,
 		AccountRateMultiplier: item.AccountRateMultiplier,
 		ServiceTier:           item.ServiceTier,
 		Stream:                item.Stream,

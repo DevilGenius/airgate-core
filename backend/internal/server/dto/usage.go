@@ -1,6 +1,6 @@
 package dto
 
-// UsageLogResp 使用记录响应
+// UsageLogResp 使用记录响应（reseller / admin scope，包含完整的成本字段）
 type UsageLogResp struct {
 	ID                    int64   `json:"id"`
 	UserID                int64   `json:"user_id"`
@@ -25,9 +25,12 @@ type UsageLogResp struct {
 	OutputCost            float64 `json:"output_cost"`
 	CachedInputCost       float64 `json:"cached_input_cost"`
 	TotalCost             float64 `json:"total_cost"`
-	ActualCost            float64 `json:"actual_cost"`
-	RateMultiplier        float64 `json:"rate_multiplier"`
-	AccountRateMultiplier float64 `json:"account_rate_multiplier"`
+	ActualCost            float64 `json:"actual_cost"`             // 平台真实成本/用户扣费
+	BilledCost            float64 `json:"billed_cost"`             // 客户账面消耗（reseller markup 后的金额）
+	AccountCost           float64 `json:"account_cost"`            // 账号实际成本 = total × account_rate
+	RateMultiplier        float64 `json:"rate_multiplier"`         // 平台计费倍率快照
+	SellRate              float64 `json:"sell_rate"`               // 销售倍率快照
+	AccountRateMultiplier float64 `json:"account_rate_multiplier"` // 账号倍率快照
 	ServiceTier           string  `json:"service_tier,omitempty"`
 	Stream                bool    `json:"stream"`
 	DurationMs            int64   `json:"duration_ms"`
@@ -35,6 +38,26 @@ type UsageLogResp struct {
 	UserAgent             string  `json:"user_agent,omitempty"`
 	IPAddress             string  `json:"ip_address,omitempty"`
 	CreatedAt             string  `json:"created_at"`
+}
+
+// CustomerUsageLogResp 使用记录响应（end customer scope，剥离所有平台真实成本字段）
+//
+// 当请求来自 end customer（通过 API key 登录拿到的 scoped JWT）时返回此结构，
+// 不暴露 actual_cost / total_cost / 单价 / rate_multiplier 等会泄漏 reseller 毛利的字段。
+type CustomerUsageLogResp struct {
+	ID                int64   `json:"id"`
+	APIKeyID          int64   `json:"api_key_id"`
+	Platform          string  `json:"platform"`
+	Model             string  `json:"model"`
+	InputTokens       int     `json:"input_tokens"`
+	OutputTokens      int     `json:"output_tokens"`
+	CachedInputTokens int     `json:"cached_input_tokens"`
+	BilledCost        float64 `json:"cost"` // 客户视角："本次消耗 = X 美元"
+	ServiceTier       string  `json:"service_tier,omitempty"`
+	Stream            bool    `json:"stream"`
+	DurationMs        int64   `json:"duration_ms"`
+	FirstTokenMs      int64   `json:"first_token_ms"`
+	CreatedAt         string  `json:"created_at"`
 }
 
 // UsageQuery 使用记录查询参数
@@ -64,6 +87,7 @@ type UsageStatsResp struct {
 	TotalTokens     int64          `json:"total_tokens"`
 	TotalCost       float64        `json:"total_cost"`
 	TotalActualCost float64        `json:"total_actual_cost"`
+	TotalBilledCost float64        `json:"total_billed_cost,omitempty"` // 仅 reseller scope 暴露
 	ByModel         []ModelStats   `json:"by_model,omitempty"`
 	ByUser          []UserStats    `json:"by_user,omitempty"`
 	ByAccount       []AccountStats `json:"by_account,omitempty"`
@@ -77,6 +101,7 @@ type ModelStats struct {
 	Tokens     int64   `json:"tokens"`
 	TotalCost  float64 `json:"total_cost"`
 	ActualCost float64 `json:"actual_cost"`
+	BilledCost float64 `json:"billed_cost,omitempty"`
 }
 
 // UserStats 按用户统计
@@ -87,6 +112,7 @@ type UserStats struct {
 	Tokens     int64   `json:"tokens"`
 	TotalCost  float64 `json:"total_cost"`
 	ActualCost float64 `json:"actual_cost"`
+	BilledCost float64 `json:"billed_cost,omitempty"`
 }
 
 // AccountStats 按账号统计
@@ -97,6 +123,7 @@ type AccountStats struct {
 	Tokens     int64   `json:"tokens"`
 	TotalCost  float64 `json:"total_cost"`
 	ActualCost float64 `json:"actual_cost"`
+	BilledCost float64 `json:"billed_cost,omitempty"`
 }
 
 // GroupStats 按分组统计
@@ -107,6 +134,7 @@ type GroupStats struct {
 	Tokens     int64   `json:"tokens"`
 	TotalCost  float64 `json:"total_cost"`
 	ActualCost float64 `json:"actual_cost"`
+	BilledCost float64 `json:"billed_cost,omitempty"`
 }
 
 // UsageStatsQuery 统计查询参数
@@ -138,4 +166,5 @@ type UsageTrendBucket struct {
 	CacheRead     int64   `json:"cache_read"`
 	ActualCost    float64 `json:"actual_cost"`
 	StandardCost  float64 `json:"standard_cost"`
+	BilledCost    float64 `json:"billed_cost,omitempty"`
 }

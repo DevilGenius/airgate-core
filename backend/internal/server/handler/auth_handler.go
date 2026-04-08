@@ -10,6 +10,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
+	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
@@ -19,16 +20,18 @@ import (
 type AuthHandler struct {
 	service         *appauth.Service
 	settingsService *appsettings.Service
+	userService     *appuser.Service
 	codeStore       *mailer.VerifyCodeStore
 	db              *ent.Client
 	jwtMgr          *auth.JWTManager
 }
 
 // NewAuthHandler 创建认证 Handler。
-func NewAuthHandler(service *appauth.Service, settingsService *appsettings.Service, codeStore *mailer.VerifyCodeStore, db *ent.Client, jwtMgr *auth.JWTManager) *AuthHandler {
+func NewAuthHandler(service *appauth.Service, settingsService *appsettings.Service, userService *appuser.Service, codeStore *mailer.VerifyCodeStore, db *ent.Client, jwtMgr *auth.JWTManager) *AuthHandler {
 	return &AuthHandler{
 		service:         service,
 		settingsService: settingsService,
+		userService:     userService,
 		codeStore:       codeStore,
 		db:              db,
 		jwtMgr:          jwtMgr,

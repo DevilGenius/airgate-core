@@ -60,6 +60,7 @@ func (h *APIKeyHandler) CreateKey(c *gin.Context) {
 		IPWhitelist: req.IPWhitelist,
 		IPBlacklist: req.IPBlacklist,
 		QuotaUSD:    req.QuotaUSD,
+		SellRate:    req.SellRate,
 		ExpiresAt:   req.ExpiresAt,
 	})
 	if err != nil {
@@ -99,6 +100,7 @@ func (h *APIKeyHandler) UpdateKey(c *gin.Context) {
 		IPBlacklist:    req.IPBlacklist,
 		HasIPBlacklist: req.IPBlacklist != nil,
 		QuotaUSD:       req.QuotaUSD,
+		SellRate:       req.SellRate,
 		ExpiresAt:      req.ExpiresAt,
 		Status:         req.Status,
 	})
@@ -156,6 +158,7 @@ func (h *APIKeyHandler) AdminUpdateKey(c *gin.Context) {
 		IPBlacklist:    req.IPBlacklist,
 		HasIPBlacklist: req.IPBlacklist != nil,
 		QuotaUSD:       req.QuotaUSD,
+		SellRate:       req.SellRate,
 		ExpiresAt:      req.ExpiresAt,
 		Status:         req.Status,
 	})
