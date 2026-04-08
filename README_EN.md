@@ -86,9 +86,31 @@ See [airgate-openai](https://github.com/DouDOU-start/airgate-openai) for a compl
 
 ## 🚀 Deployment
 
-### Method 1: Docker Compose (Recommended)
+### Method 1: One-liner Install (simplest)
 
-For all self-hosted users — **no need to clone the repo**:
+If your host has Docker, a single command downloads everything, generates secrets, starts containers, and waits for health:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/install.sh | bash
+```
+
+[install.sh](deploy/install.sh) will:
+
+1. Verify required tools (docker, docker compose, curl, openssl)
+2. Interactively ask for install dir (default `./airgate`), HTTP port (default 9517), image tag
+3. Create `data/{postgres,redis,plugins,uploads}` under the install dir — all persistent data lives here
+4. Generate `DB_PASSWORD` / `REDIS_PASSWORD` / `JWT_SECRET` via `openssl rand`, write `.env` (mode 600)
+5. `docker compose pull && docker compose up -d`, then poll `/healthz`
+6. Print the access URL and useful follow-up commands
+
+After it finishes, visit `http://<your-host>:9517`. The install wizard will **automatically skip the DB / Redis steps** (env vars are already set) and only ask you to create the admin account. Then go to **Plugin Management → Marketplace** and install plugins on demand.
+
+> Don't trust `curl | bash`? Download first: `curl -fsSL .../install.sh -o install.sh && bash install.sh`.
+> CI usage: `NON_INTERACTIVE=1 AIRGATE_DIR=/srv/airgate bash install.sh`.
+
+### Method 1b: Manual Docker Compose
+
+If you want full control over each step, or you're integrating into ansible / k8s helmfile / similar:
 
 ```bash
 mkdir airgate && cd airgate
@@ -101,14 +123,15 @@ mv .env.example .env
 # Edit three required values: DB_PASSWORD / REDIS_PASSWORD / JWT_SECRET
 vim .env
 
+# Pre-create persistent dirs (avoids docker creating them as root)
+mkdir -p data/postgres data/redis data/plugins data/uploads
+
 # Start
 docker compose up -d
-
-# Tail logs
 docker compose logs -f core
 ```
 
-Once started, visit `http://<your-host>:9517` and follow the wizard to create the admin account.
+Once started, visit `http://<your-host>:9517` and follow the wizard to create the admin account. All data lives under `./data/`, so backup is just `tar czf backup.tgz data .env`.
 
 **Key environment variables** (full list in [.env.example](deploy/.env.example)):
 
@@ -265,6 +288,7 @@ airgate-core/
 │       ├── shared/api/       # API client
 │       └── i18n/             # zh / en strings
 ├── deploy/                   # Docker deployment
+│   ├── install.sh            # One-liner install script (curl | bash)
 │   ├── docker-compose.yml    # Production (pulls ghcr.io image)
 │   ├── docker-compose.dev.yml# Development (source mount)
 │   ├── Dockerfile            # Multi-stage build
@@ -279,10 +303,26 @@ airgate-core/
 ## 🔧 Operations
 
 - **Health check**: `GET /healthz` public endpoint, ready for docker / k8s
-- **Persistence**: Four named volumes — `postgres_data` / `redis_data` / `airgate_plugins` / `airgate_uploads` — survive container recreation
+- **Persistence**: All data lives in `./data/{postgres,redis,plugins,uploads}` (bind mounts). Backup is `tar czf backup.tgz data .env`
 - **Upgrade**: Edit `AIRGATE_IMAGE_TAG` in `.env` → `docker compose pull && docker compose up -d`
 - **DB migrations**: Ent schema changes regenerate code via `make ent`; auto-migrate on startup
 - **Plugin upgrade**: Marketplace → click refresh → uninstall old version → reinstall
+
+> **Migrating existing named-volume deployments**: Older compose files used named volumes `postgres_data` / `redis_data` / `airgate_plugins` / `airgate_uploads`. The new compose uses `./data/*` bind mounts. To migrate:
+> ```bash
+> docker compose down
+> mkdir -p data/postgres data/redis data/plugins data/uploads
+> docker run --rm -v <project>_postgres_data:/from -v $(pwd)/data/postgres:/to alpine cp -a /from/. /to/
+> docker run --rm -v <project>_redis_data:/from    -v $(pwd)/data/redis:/to    alpine cp -a /from/. /to/
+> docker run --rm -v <project>_airgate_plugins:/from -v $(pwd)/data/plugins:/to alpine cp -a /from/. /to/
+> docker run --rm -v <project>_airgate_uploads:/from -v $(pwd)/data/uploads:/to alpine cp -a /from/. /to/
+> # Pull new compose
+> curl -O https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/docker-compose.yml
+> docker compose up -d
+> # After verifying everything works, drop the old named volumes
+> docker volume rm <project>_postgres_data <project>_redis_data <project>_airgate_plugins <project>_airgate_uploads
+> ```
+> `<project>` is the docker compose project prefix (defaults to the current directory name); `docker volume ls` shows the actual names.
 
 ## 🤝 Contributing / Feedback
 

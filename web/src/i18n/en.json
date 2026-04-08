@@ -793,6 +793,8 @@
     "step_admin": "Admin Account",
     "step_admin_desc": "Create system admin account",
     "step_finish": "Complete",
+    "from_env": "ENV",
+    "from_env_hint": "Provided via environment variables; will be used as-is",
     "host": "Host",
     "port": "Port",
     "username": "Username",

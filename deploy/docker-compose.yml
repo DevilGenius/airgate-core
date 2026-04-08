@@ -1,17 +1,24 @@
 # ============================================================
 # AirGate Core 生产部署
 #
-# 用法：
-#   1. 在本目录（或任意空目录）准备 docker-compose.yml + .env：
-#        cp .env.example .env && vim .env   # 至少改 DB_PASSWORD 和 JWT_SECRET
-#   2. 启动：
-#        docker compose up -d
-#   3. 查看日志：
-#        docker compose logs -f core
-#   4. 停止：
-#        docker compose down       # 保留数据卷
-#        docker compose down -v    # 同时清理数据卷（慎用）
+# 推荐用法（一行安装）：
+#   curl -fsSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/install.sh | bash
 #
+# 手动用法：
+#   1. 在本目录（或任意空目录）准备 docker-compose.yml + .env：
+#        cp .env.example .env && vim .env
+#        # 必填：DB_PASSWORD / REDIS_PASSWORD / JWT_SECRET
+#   2. 启动前先建好 ./data 子目录（避免 docker 以 root 创建后续读写不便）：
+#        mkdir -p data/postgres data/redis data/plugins data/uploads
+#   3. 启动：
+#        docker compose up -d
+#   4. 查看日志：
+#        docker compose logs -f core
+#   5. 停止：
+#        docker compose down       # 保留 ./data
+#        rm -rf data               # 同时清理数据（慎用）
+#
+# 数据持久化：所有数据写入当前目录下的 ./data，方便备份、迁移、查看大小。
 # 镜像版本通过 AIRGATE_IMAGE_TAG 控制，默认 latest。
 # 如需本地构建（开发用），改用 docker-compose.dev.yml。
 # ============================================================
@@ -27,7 +34,7 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airgate -d airgate"]
       interval: 10s
@@ -57,7 +64,7 @@ services:
       # 仅供 healthcheck 内部读取，不影响 Redis 自身鉴权（鉴权由 --requirepass 决定）
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required, see .env.example}
     volumes:
-      - redis_data:/data
+      - ./data/redis:/data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
       interval: 10s
@@ -103,9 +110,9 @@ services:
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
       # 插件目录持久化（重建容器不丢已安装插件）
-      - airgate_plugins:/app/data/plugins
+      - ./data/plugins:/app/data/plugins
       # 上传文件持久化
-      - airgate_uploads:/app/data/uploads
+      - ./data/uploads:/app/data/uploads
     ports:
       - "${BIND_HOST:-0.0.0.0}:${PORT:-9517}:9517"
     healthcheck:
@@ -120,12 +127,6 @@ services:
         hard: 65536
     networks:
       - airgate-net
-
-volumes:
-  postgres_data:
-  redis_data:
-  airgate_plugins:
-  airgate_uploads:
 
 networks:
   airgate-net:

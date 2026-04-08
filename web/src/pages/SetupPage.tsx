@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '../shared/components/Card';
 import {
@@ -9,34 +9,42 @@ import {
   Zap,
 } from 'lucide-react';
 import type { TestDBReq, TestRedisReq, AdminSetup } from '../shared/types';
+import { setupApi } from '../shared/api/setup';
 import StepDatabase from './setup/StepDatabase';
 import StepRedis from './setup/StepRedis';
 import StepAdmin from './setup/StepAdmin';
 import StepFinish from './setup/StepFinish';
 
 // ==================== 步骤配置 ====================
+//
+// docker compose 之类的部署会通过环境变量预先注入 DB / Redis 连接信息，
+// 此时后端 /setup/status 会返回 env_db / env_redis 提示，wizard 会自动隐藏对应步骤，
+// 用户只需要建管理员账号即可。
 
-const STEP_KEYS = [
-  { labelKey: 'setup.step_db', icon: Database },
-  { labelKey: 'setup.step_redis', icon: Server },
-  { labelKey: 'setup.step_admin', icon: UserCog },
-  { labelKey: 'setup.step_finish', icon: CheckCircle2 },
-] as const;
+type StepKey = 'db' | 'redis' | 'admin' | 'finish';
+
+const STEP_DEF: Record<StepKey, { labelKey: string; icon: typeof Database }> = {
+  db: { labelKey: 'setup.step_db', icon: Database },
+  redis: { labelKey: 'setup.step_redis', icon: Server },
+  admin: { labelKey: 'setup.step_admin', icon: UserCog },
+  finish: { labelKey: 'setup.step_finish', icon: CheckCircle2 },
+};
 
 // ==================== 步骤指示器 ====================
 
-function Stepper({ current }: { current: number }) {
+function Stepper({ current, steps }: { current: number; steps: StepKey[] }) {
   const { t } = useTranslation();
 
   return (
     <div className="flex items-center justify-center mb-10">
-      {STEP_KEYS.map((step, index) => {
+      {steps.map((key, index) => {
+        const step = STEP_DEF[key];
         const isCompleted = index < current;
         const isCurrent = index === current;
         const Icon = step.icon;
 
         return (
-          <div key={step.labelKey} className="flex items-center">
+          <div key={key} className="flex items-center">
             <div className="flex flex-col items-center">
               <div
                 className="relative flex items-center justify-center w-9 h-9 rounded-full transition-all duration-300"
@@ -72,7 +80,7 @@ function Stepper({ current }: { current: number }) {
                 {t(step.labelKey)}
               </span>
             </div>
-            {index < STEP_KEYS.length - 1 && (
+            {index < steps.length - 1 && (
               <div
                 className="w-12 h-px mx-2.5 mb-5 rounded-full transition-all duration-500"
                 style={{
@@ -98,6 +106,10 @@ export default function SetupPage() {
   const { t } = useTranslation();
   const [step, setStep] = useState(0);
 
+  // 是否有 env 提供的配置（影响是否跳过对应步骤）
+  const [envDBProvided, setEnvDBProvided] = useState(false);
+  const [envRedisProvided, setEnvRedisProvided] = useState(false);
+
   // 各步骤的表单数据
   const [dbConfig, setDBConfig] = useState<TestDBReq>({
     host: 'localhost',
@@ -121,6 +133,50 @@ export default function SetupPage() {
     password: '',
     confirmPassword: '',
   });
+
+  // 拉取后端 status，预填环境变量已提供的字段并标记跳过
+  useEffect(() => {
+    setupApi.status().then((resp) => {
+      if (resp.env_db) {
+        setEnvDBProvided(true);
+        setDBConfig((prev) => ({
+          ...prev,
+          host: resp.env_db!.host,
+          port: resp.env_db!.port,
+          user: resp.env_db!.user,
+          dbname: resp.env_db!.dbname,
+          sslmode: resp.env_db!.sslmode,
+          // password 由后端 install 时从 env 取，前端只占位以通过表单校验
+          password: '__env__',
+        }));
+      }
+      if (resp.env_redis) {
+        setEnvRedisProvided(true);
+        setRedisConfig((prev) => ({
+          ...prev,
+          host: resp.env_redis!.host,
+          port: resp.env_redis!.port,
+          db: resp.env_redis!.db,
+          // password 同上
+          password: '__env__',
+        }));
+      }
+    }).catch(() => {
+      // 状态接口不可用时降级为完整 wizard，不阻塞用户
+    });
+  }, []);
+
+  // 动态步骤列表：env 提供的步骤直接被去掉
+  const visibleSteps = useMemo<StepKey[]>(() => {
+    const list: StepKey[] = [];
+    if (!envDBProvided) list.push('db');
+    if (!envRedisProvided) list.push('redis');
+    list.push('admin');
+    list.push('finish');
+    return list;
+  }, [envDBProvided, envRedisProvided]);
+
+  const currentStepKey = visibleSteps[step] ?? 'finish';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -165,35 +221,38 @@ export default function SetupPage() {
         </div>
 
         {/* 步骤指示器 */}
-        <Stepper current={step} />
+        <Stepper current={step} steps={visibleSteps} />
 
         {/* 表单卡片 */}
         <Card>
-          {step === 0 && (
-            <StepDatabase data={dbConfig} onChange={setDBConfig} onNext={() => setStep(1)} />
+          {currentStepKey === 'db' && (
+            <StepDatabase data={dbConfig} onChange={setDBConfig} onNext={() => setStep(step + 1)} />
           )}
-          {step === 1 && (
+          {currentStepKey === 'redis' && (
             <StepRedis
               data={redisConfig}
               onChange={setRedisConfig}
-              onPrev={() => setStep(0)}
-              onNext={() => setStep(2)}
+              onPrev={() => setStep(step - 1)}
+              onNext={() => setStep(step + 1)}
             />
           )}
-          {step === 2 && (
+          {currentStepKey === 'admin' && (
             <StepAdmin
               data={adminConfig}
               onChange={setAdminConfig}
-              onPrev={() => setStep(1)}
-              onNext={() => setStep(3)}
+              // 当 db / redis 都来自 env 时，admin 是第一步，没有上一步可返回
+              onPrev={step > 0 ? () => setStep(step - 1) : undefined}
+              onNext={() => setStep(step + 1)}
             />
           )}
-          {step === 3 && (
+          {currentStepKey === 'finish' && (
             <StepFinish
               dbConfig={dbConfig}
               redisConfig={redisConfig}
               adminConfig={{ email: adminConfig.email, password: adminConfig.password }}
-              onPrev={() => setStep(2)}
+              envDBProvided={envDBProvided}
+              envRedisProvided={envRedisProvided}
+              onPrev={() => setStep(step - 1)}
             />
           )}
         </Card>

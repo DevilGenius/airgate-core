@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -26,6 +27,66 @@ import (
 )
 
 var installMu sync.Mutex
+
+// EnvDBConfig 从环境变量解析数据库配置。
+// 当 DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME 全部存在时返回非 nil；
+// 任意一项缺失返回 nil（用户需要走 wizard 手填）。
+//
+// 用途：docker compose 部署时 env 已经提供了完整连接信息，wizard 不应再问一遍。
+func EnvDBConfig() *config.DatabaseConfig {
+	host := os.Getenv("DB_HOST")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
+	portStr := os.Getenv("DB_PORT")
+	if host == "" || user == "" || password == "" || dbname == "" || portStr == "" {
+		return nil
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil
+	}
+	sslmode := os.Getenv("DB_SSLMODE")
+	if sslmode == "" {
+		sslmode = "disable"
+	}
+	return &config.DatabaseConfig{
+		Host:     host,
+		Port:     port,
+		User:     user,
+		Password: password,
+		DBName:   dbname,
+		SSLMode:  sslmode,
+	}
+}
+
+// EnvRedisConfig 从环境变量解析 Redis 配置。
+// 当 REDIS_HOST/REDIS_PORT/REDIS_PASSWORD 全部存在时返回非 nil；
+// 没有密码或缺主机视为不可用，wizard 仍需手填。
+func EnvRedisConfig() *config.RedisConfig {
+	host := os.Getenv("REDIS_HOST")
+	password := os.Getenv("REDIS_PASSWORD")
+	portStr := os.Getenv("REDIS_PORT")
+	if host == "" || password == "" || portStr == "" {
+		return nil
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil
+	}
+	dbNum := 0
+	if v := os.Getenv("REDIS_DB"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			dbNum = n
+		}
+	}
+	return &config.RedisConfig{
+		Host:     host,
+		Port:     port,
+		Password: password,
+		DB:       dbNum,
+	}
+}
 
 // NeedsSetup 检查是否需要安装。
 // 判断逻辑：config.yaml 不存在 → 需要安装；

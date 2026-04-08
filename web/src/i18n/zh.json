@@ -797,6 +797,8 @@
     "step_admin": "管理员账户",
     "step_admin_desc": "创建系统管理员账户",
     "step_finish": "完成安装",
+    "from_env": "ENV",
+    "from_env_hint": "已通过环境变量配置，将直接使用",
     "host": "主机地址",
     "port": "端口",
     "username": "用户名",

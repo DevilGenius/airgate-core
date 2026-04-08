@@ -86,9 +86,31 @@ type GatewayPlugin interface {
 
 ## 🚀 部署
 
-### 方式 1：Docker Compose（推荐）
+### 方式 1：一行安装（最简）
 
-适合所有自部署用户，**无需 clone 仓库**：
+宿主机只要装了 Docker，一行命令完成下载、生成密钥、起容器、等待健康：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/install.sh | bash
+```
+
+[install.sh](deploy/install.sh) 会：
+
+1. 检查 docker / docker compose / curl / openssl 等依赖
+2. 交互询问安装目录（默认 `./airgate`）、HTTP 端口（默认 9517）、镜像 tag
+3. 在安装目录下创建 `data/{postgres,redis,plugins,uploads}` 子目录，所有持久化数据落在这里
+4. 用 `openssl rand` 生成 `DB_PASSWORD` / `REDIS_PASSWORD` / `JWT_SECRET`，写入 `.env`（权限 600）
+5. 拉镜像、`docker compose up -d`、等待 `/healthz` 就绪
+6. 打印访问地址和后续命令
+
+启动完成后访问 `http://<your-host>:9517`，安装向导会**自动跳过 DB / Redis 配置**（环境变量已就绪），只需要建管理员账号即可。然后进入 **插件管理 → 插件市场** 按需安装插件。
+
+> 不喜欢 `curl | bash`？先下载再执行：`curl -fsSL .../install.sh -o install.sh && bash install.sh`。
+> CI 场景：`NON_INTERACTIVE=1 AIRGATE_DIR=/srv/airgate bash install.sh`。
+
+### 方式 1b：手动 Docker Compose
+
+如果你想完全自己控制每一步、或者要把部署纳入自己的 ansible / k8s helmfile 之类的体系：
 
 ```bash
 mkdir airgate && cd airgate
@@ -101,14 +123,15 @@ mv .env.example .env
 # 改三个必填项：DB_PASSWORD / REDIS_PASSWORD / JWT_SECRET
 vim .env
 
+# 准备持久化目录（避免 docker 用 root 身份创建后续读写不便）
+mkdir -p data/postgres data/redis data/plugins data/uploads
+
 # 启动
 docker compose up -d
-
-# 查看日志
 docker compose logs -f core
 ```
 
-启动完成后访问 `http://<your-host>:9517`，按引导创建管理员账号。
+启动完成后访问 `http://<your-host>:9517`，按引导创建管理员账号。所有数据落在 `./data/`，备份直接 `tar czf backup.tgz data .env` 即可。
 
 **关键环境变量**（完整列表见 [.env.example](deploy/.env.example)）：
 
@@ -264,6 +287,7 @@ airgate-core/
 │       ├── shared/api/       # API 客户端
 │       └── i18n/             # zh / en 文案
 ├── deploy/                   # Docker 部署
+│   ├── install.sh            # 一行安装脚本（curl | bash）
 │   ├── docker-compose.yml    # 生产编排（拉取 ghcr.io 镜像）
 │   ├── docker-compose.dev.yml# 开发编排（源码挂载）
 │   ├── Dockerfile            # 多阶段构建
@@ -278,10 +302,26 @@ airgate-core/
 ## 🔧 运维要点
 
 - **健康检查**：`GET /healthz` 公开端点，docker / k8s 直接用
-- **数据持久化**：`postgres_data` / `redis_data` / `airgate_plugins` / `airgate_uploads` 四个命名 volume，重建容器不丢数据
+- **数据持久化**：所有数据落在 `./data/{postgres,redis,plugins,uploads}` 四个 bind mount 子目录，备份只需 `tar czf backup.tgz data .env`
 - **升级**：改 `.env` 里的 `AIRGATE_IMAGE_TAG` → `docker compose pull && docker compose up -d`
 - **数据库迁移**：Ent schema 变更通过 `make ent` 生成代码，启动时自动 migrate
 - **插件升级**：管理后台插件市场点刷新 → 卸载旧版本 → 重新安装
+
+> **存量用户从 named volume 迁移**：旧版 compose 使用 `postgres_data` / `redis_data` / `airgate_plugins` / `airgate_uploads` 四个命名 volume，新版改为 `./data/*` bind mount。迁移步骤：
+> ```bash
+> docker compose down
+> mkdir -p data/postgres data/redis data/plugins data/uploads
+> docker run --rm -v <project>_postgres_data:/from -v $(pwd)/data/postgres:/to alpine cp -a /from/. /to/
+> docker run --rm -v <project>_redis_data:/from    -v $(pwd)/data/redis:/to    alpine cp -a /from/. /to/
+> docker run --rm -v <project>_airgate_plugins:/from -v $(pwd)/data/plugins:/to alpine cp -a /from/. /to/
+> docker run --rm -v <project>_airgate_uploads:/from -v $(pwd)/data/uploads:/to alpine cp -a /from/. /to/
+> # 拉取新 compose
+> curl -O https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/docker-compose.yml
+> docker compose up -d
+> # 验证一切正常后再删除旧的命名 volume
+> docker volume rm <project>_postgres_data <project>_redis_data <project>_airgate_plugins <project>_airgate_uploads
+> ```
+> `<project>` 是 docker compose 自动生成的项目前缀（默认是当前目录名），`docker volume ls` 可以查看实际名字。
 
 ## 🤝 贡献 / 反馈
 

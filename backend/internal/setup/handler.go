@@ -46,9 +46,33 @@ func setupGuard() gin.HandlerFunc {
 }
 
 func handleStatus(c *gin.Context) {
-	response.Success(c, dto.SetupStatusResp{
+	resp := dto.SetupStatusResp{
 		NeedsSetup: NeedsSetup(),
-	})
+	}
+	// 当 docker compose 之类的部署已经通过环境变量提供了完整的 DB / Redis 连接信息，
+	// 并且这些信息实际可连通时，把"提示"挂在响应里 —— 前端据此跳过对应配置步骤。
+	// 注意：密码字段一律不返回，避免 wizard 页面在浏览器里读出明文。
+	if envDB := EnvDBConfig(); envDB != nil {
+		if err := TestDBConnection(envDB.Host, envDB.Port, envDB.User, envDB.Password, envDB.DBName, envDB.SSLMode); err == nil {
+			resp.EnvDB = &dto.EnvDBHint{
+				Host:    envDB.Host,
+				Port:    envDB.Port,
+				User:    envDB.User,
+				DBName:  envDB.DBName,
+				SSLMode: envDB.SSLMode,
+			}
+		}
+	}
+	if envRedis := EnvRedisConfig(); envRedis != nil {
+		if err := TestRedisConnection(envRedis.Host, envRedis.Port, envRedis.Password, envRedis.DB); err == nil {
+			resp.EnvRedis = &dto.EnvRedisHint{
+				Host: envRedis.Host,
+				Port: envRedis.Port,
+				DB:   envRedis.DB,
+			}
+		}
+	}
+	response.Success(c, resp)
 }
 
 func handleTestDB(c *gin.Context) {
@@ -86,22 +110,34 @@ func handleInstall(c *gin.Context) {
 		return
 	}
 
+	// 构造 DB 配置：环境变量优先（含密码），覆盖前端可能传入的任何值。
+	// 这样即使前端因为跳过了 wizard 步骤、传了占位/空值，也能拿到真正的连接信息。
+	dbCfg := config.DatabaseConfig{
+		Host:     req.Database.Host,
+		Port:     req.Database.Port,
+		User:     req.Database.User,
+		Password: req.Database.Password,
+		DBName:   req.Database.DBName,
+		SSLMode:  req.Database.SSLMode,
+	}
+	if envDB := EnvDBConfig(); envDB != nil {
+		dbCfg = *envDB
+	}
+
+	redisCfg := config.RedisConfig{
+		Host:     req.Redis.Host,
+		Port:     req.Redis.Port,
+		Password: req.Redis.Password,
+		DB:       req.Redis.DB,
+		TLS:      req.Redis.TLS,
+	}
+	if envRedis := EnvRedisConfig(); envRedis != nil {
+		redisCfg = *envRedis
+	}
+
 	params := InstallParams{
-		DB: config.DatabaseConfig{
-			Host:     req.Database.Host,
-			Port:     req.Database.Port,
-			User:     req.Database.User,
-			Password: req.Database.Password,
-			DBName:   req.Database.DBName,
-			SSLMode:  req.Database.SSLMode,
-		},
-		Redis: config.RedisConfig{
-			Host:     req.Redis.Host,
-			Port:     req.Redis.Port,
-			Password: req.Redis.Password,
-			DB:       req.Redis.DB,
-			TLS:      req.Redis.TLS,
-		},
+		DB:    dbCfg,
+		Redis: redisCfg,
 	}
 	params.Admin.Email = req.Admin.Email
 	params.Admin.Password = req.Admin.Password

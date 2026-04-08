@@ -21,10 +21,13 @@ export interface StepFinishProps {
   dbConfig: TestDBReq;
   redisConfig: TestRedisReq;
   adminConfig: AdminSetup;
+  // 这两个标志由 env 注入触发：摘要里只展示主机/端口，不显示密码占位
+  envDBProvided?: boolean;
+  envRedisProvided?: boolean;
   onPrev: () => void;
 }
 
-export default function StepFinish({ dbConfig, redisConfig, adminConfig, onPrev }: StepFinishProps) {
+export default function StepFinish({ dbConfig, redisConfig, adminConfig, envDBProvided, envRedisProvided, onPrev }: StepFinishProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [installing, setInstalling] = useState(false);
@@ -91,6 +94,7 @@ export default function StepFinish({ dbConfig, redisConfig, adminConfig, onPrev 
     {
       icon: Database,
       title: t('setup.config_summary_db'),
+      fromEnv: envDBProvided,
       details: [
         { label: t('setup.config_host'), value: `${dbConfig.host}:${dbConfig.port}` },
         { label: t('setup.config_user'), value: dbConfig.user },
@@ -101,15 +105,17 @@ export default function StepFinish({ dbConfig, redisConfig, adminConfig, onPrev 
     {
       icon: Server,
       title: t('setup.config_summary_redis'),
+      fromEnv: envRedisProvided,
       details: [
         { label: t('setup.config_host'), value: `${redisConfig.host}:${redisConfig.port}` },
         { label: t('setup.config_database'), value: String(redisConfig.db ?? 0) },
-{ label: t('setup.config_tls'), value: redisConfig.tls ? t('common.enable') : t('common.disable') },
+        { label: t('setup.config_tls'), value: redisConfig.tls ? t('common.enable') : t('common.disable') },
       ],
     },
     {
       icon: UserCog,
       title: t('setup.config_summary_admin'),
+      fromEnv: false,
       details: [
         { label: t('setup.config_email'), value: adminConfig.email },
       ],
@@ -134,6 +140,19 @@ export default function StepFinish({ dbConfig, redisConfig, adminConfig, onPrev 
               <div className="flex items-center gap-2 mb-3">
                 <Icon className="w-4 h-4 text-primary" />
                 <h4 className="text-sm font-semibold text-text">{item.title}</h4>
+                {item.fromEnv && (
+                  <span
+                    className="ml-auto text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded"
+                    style={{
+                      background: 'var(--ag-info-subtle)',
+                      color: 'var(--ag-info)',
+                      border: '1px solid var(--ag-info-subtle)',
+                    }}
+                    title={t('setup.from_env_hint')}
+                  >
+                    {t('setup.from_env')}
+                  </span>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                 {item.details.map((d) => (

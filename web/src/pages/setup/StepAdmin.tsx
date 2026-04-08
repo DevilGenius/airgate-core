@@ -10,7 +10,8 @@ import type { AdminSetup } from '../../shared/types';
 export interface StepAdminProps {
   data: AdminSetup & { confirmPassword: string };
   onChange: (data: AdminSetup & { confirmPassword: string }) => void;
-  onPrev: () => void;
+  // 当 admin 是第一步（DB / Redis 全部由 env 提供）时为 undefined，不渲染返回按钮
+  onPrev?: () => void;
   onNext: () => void;
 }
 
@@ -96,13 +97,17 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
 
       {/* 操作按钮 */}
       <div className="flex justify-between pt-4">
-        <Button
-          variant="ghost"
-          onClick={onPrev}
-          icon={<ArrowLeft className="w-4 h-4" />}
-        >
-          {t('setup.step_redis')}
-        </Button>
+        {onPrev ? (
+          <Button
+            variant="ghost"
+            onClick={onPrev}
+            icon={<ArrowLeft className="w-4 h-4" />}
+          >
+            {t('setup.step_redis')}
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button
           onClick={onNext}
           disabled={!canProceed}
