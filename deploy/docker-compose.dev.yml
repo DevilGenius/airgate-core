@@ -1,5 +1,9 @@
 # 开发环境编排 — 源码挂载 + 实时编译
 # 使用方式: docker compose -f deploy/docker-compose.dev.yml up
+#
+# 仅拉起 core + pg + redis + 前端构建。插件（gateway-openai / payment-epay /
+# airgate-health 等）启动后通过管理后台「插件市场」自行安装即可，
+# data/plugins 是持久 volume，装一次后续重启不会丢。
 services:
   postgres:
     image: postgres:16
@@ -41,28 +45,7 @@ services:
       - >-
         set -e;
         cd /workspace/airgate-sdk/frontend && npm install && npm run build;
-        cd /workspace/airgate-openai/web && npm install && npm run build;
         cd /workspace/airgate-core/web && npm install && npm run build
-    restart: "no"
-
-  plugin-builder:
-    image: golang:1.25-bookworm
-    working_dir: /workspace/airgate-openai/backend
-    depends_on:
-      frontend-builder:
-        condition: service_completed_successfully
-    volumes:
-      - ../..:/workspace
-      - ../data/go_pkg_mod:/go/pkg/mod
-      - ../data/go_build_cache:/root/.cache/go-build
-    command:
-      - bash
-      - -lc
-      - >-
-        set -e;
-        rm -rf /workspace/airgate-openai/backend/internal/gateway/webdist;
-        cp -r /workspace/airgate-openai/web/dist /workspace/airgate-openai/backend/internal/gateway/webdist;
-        /usr/local/go/bin/go build -buildvcs=false -o /workspace/airgate-openai/bin/gateway-openai .
     restart: "no"
 
   core:
@@ -75,8 +58,6 @@ services:
       redis:
         condition: service_healthy
       frontend-builder:
-        condition: service_completed_successfully
-      plugin-builder:
         condition: service_completed_successfully
     environment:
       CONFIG_PATH: /workspace/airgate-core/backend/config.docker.yaml
@@ -91,9 +72,4 @@ services:
     command:
       - bash
       - -lc
-      - >-
-        set -e;
-        mkdir -p /workspace/airgate-core/backend/data/plugins/gateway-openai;
-        cp /workspace/airgate-openai/bin/gateway-openai /workspace/airgate-core/backend/data/plugins/gateway-openai/gateway-openai;
-        chmod +x /workspace/airgate-core/backend/data/plugins/gateway-openai/gateway-openai;
-        /usr/local/go/bin/go run -buildvcs=false ./cmd/server
+      - /usr/local/go/bin/go run -buildvcs=false ./cmd/server

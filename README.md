@@ -128,19 +128,20 @@ docker compose logs -f core
 
 **A. 全容器（推荐，宿主机零依赖）**
 
-宿主机只需要 Docker。父目录同时克隆 [`airgate-sdk`](https://github.com/DouDOU-start/airgate-sdk) / [`airgate-core`](https://github.com/DouDOU-start/airgate-core) / [`airgate-openai`](https://github.com/DouDOU-start/airgate-openai) 三个仓库：
+宿主机只需要 Docker。父目录同时克隆 [`airgate-sdk`](https://github.com/DouDOU-start/airgate-sdk) 与 [`airgate-core`](https://github.com/DouDOU-start/airgate-core)：
 
 ```bash
 mkdir airgate && cd airgate
 git clone https://github.com/DouDOU-start/airgate-sdk.git
 git clone https://github.com/DouDOU-start/airgate-core.git
-git clone https://github.com/DouDOU-start/airgate-openai.git
 
 cd airgate-core
 docker compose -f deploy/docker-compose.dev.yml up
 ```
 
-[deploy/docker-compose.dev.yml](deploy/docker-compose.dev.yml) 会拉起 postgres + redis，依次构建 sdk / openai / core 三个前端、构建 gateway-openai 插件，最后用 `go run ./cmd/server` 启动 core，全部跑在容器里。访问 `http://localhost:9517` 即可。
+[deploy/docker-compose.dev.yml](deploy/docker-compose.dev.yml) 会拉起 postgres + redis，构建 sdk / core 前端，最后用 `go run ./cmd/server` 启动 core，全部跑在容器里。访问 `http://localhost:9517` 即可。
+
+启动后是干净的 core，进入管理后台 → **插件管理 → 插件市场** 即可一键安装 gateway-openai / payment-epay / airgate-health（`data/plugins` 是持久 volume，装一次后续重启不会丢）。
 
 **B. 宿主机直跑**
 

@@ -128,19 +128,20 @@ For development or running the full stack inside containers. Pick one of the two
 
 **A. Fully containerized (recommended, zero host dependencies)**
 
-The host only needs Docker. Clone [`airgate-sdk`](https://github.com/DouDOU-start/airgate-sdk) / [`airgate-core`](https://github.com/DouDOU-start/airgate-core) / [`airgate-openai`](https://github.com/DouDOU-start/airgate-openai) into a shared parent directory:
+The host only needs Docker. Clone [`airgate-sdk`](https://github.com/DouDOU-start/airgate-sdk) and [`airgate-core`](https://github.com/DouDOU-start/airgate-core) into a shared parent directory:
 
 ```bash
 mkdir airgate && cd airgate
 git clone https://github.com/DouDOU-start/airgate-sdk.git
 git clone https://github.com/DouDOU-start/airgate-core.git
-git clone https://github.com/DouDOU-start/airgate-openai.git
 
 cd airgate-core
 docker compose -f deploy/docker-compose.dev.yml up
 ```
 
-[deploy/docker-compose.dev.yml](deploy/docker-compose.dev.yml) brings up postgres + redis, builds the sdk / openai / core frontends, builds the gateway-openai plugin, and finally runs core via `go run ./cmd/server` — all inside containers. Visit `http://localhost:9517` once it is up.
+[deploy/docker-compose.dev.yml](deploy/docker-compose.dev.yml) brings up postgres + redis, builds the sdk / core frontends, and runs core via `go run ./cmd/server` — all inside containers. Visit `http://localhost:9517` once it is up.
+
+You will land on a clean core. Open **Plugin Management → Marketplace** in the admin UI to one-click install gateway-openai / payment-epay / airgate-health (the `data/plugins` directory is a persistent volume — installs survive restarts).
 
 **B. Run on the host directly**
 
