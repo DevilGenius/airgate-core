@@ -23,10 +23,11 @@ services:
   redis:
     image: redis:7
     restart: unless-stopped
+    command: ["redis-server", "--requirepass", "airgate-dev"]
     volumes:
       - ../data/redis:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a airgate-dev --no-auth-warning ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -62,6 +63,7 @@ services:
     environment:
       CONFIG_PATH: /workspace/airgate-core/backend/config.docker.yaml
       PLUGINS_DIR: /workspace/airgate-core/backend/data/plugins
+      REDIS_PASSWORD: airgate-dev
     volumes:
       - ../..:/workspace
       - ../data/go_pkg_mod:/go/pkg/mod
