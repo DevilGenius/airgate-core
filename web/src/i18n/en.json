@@ -78,6 +78,7 @@
     "copy_failed": "Copy failed, please copy manually",
     "fill_required": "Please fill in required fields",
     "more": "More",
+    "refresh": "Refresh",
     "user": "User",
     "network_error": "Unable to connect to server. Please check your network or service status.",
     "server_error": "Server response error (HTTP {{status}})",

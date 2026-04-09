@@ -78,6 +78,7 @@
     "copy_failed": "复制失败，请手动复制",
     "fill_required": "请填写必填项",
     "more": "更多",
+    "refresh": "刷新",
     "user": "用户",
     "network_error": "无法连接到服务器，请检查网络或服务是否正常",
     "server_error": "服务端响应异常 (HTTP {{status}})",
