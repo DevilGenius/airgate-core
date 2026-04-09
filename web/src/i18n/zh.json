@@ -644,6 +644,7 @@
     "tab_defaults": "新用户默认值",
     "tab_smtp": "邮件配置",
     "tab_security": "安全与认证",
+    "tab_openclaw": "OpenClaw 接入",
 
     "security_admin_key": "管理员 API Key",
     "security_admin_key_desc": "用于外部系统集成的全局 API Key，拥有完整的管理员权限",
@@ -718,7 +719,34 @@
     "template_vars": "可用变量",
     "smtp_test": "发送测试邮件",
     "smtp_test_prompt": "请输入接收测试邮件的邮箱地址：",
-    "smtp_test_success": "测试邮件已发送，请检查收件箱"
+    "smtp_test_success": "测试邮件已发送，请检查收件箱",
+
+    "openclaw_quickstart": "一键安装命令",
+    "openclaw_quickstart_desc": "复制下面这行命令，用户在终端运行即可自动生成 ~/.openclaw/openclaw.json。命令指向本站 /openclaw/install.sh 动态脚本，支持交互式选择模型。",
+    "openclaw_copy_command": "复制命令",
+    "openclaw_base_url_missing_hint": "尚未配置 openclaw.base_url 或 api_base_url，命令中的 <站点地址> 占位符会在脚本运行时根据请求 Host 自动推导，但建议显式填写以避免反向代理下的误判。",
+    "openclaw_basic": "基础配置",
+    "openclaw_enabled": "启用 OpenClaw 接入",
+    "openclaw_enabled_desc": "关闭后 /openclaw/* 公共路由会返回 404，用户无法通过一键命令安装。",
+    "openclaw_provider_name": "Provider 名称",
+    "openclaw_provider_name_hint": "写入 openclaw.json 的 provider 键名（agents.defaults.model.primary 会使用 <name>/<model>）。默认 airgate。",
+    "openclaw_base_url": "站点 Base URL",
+    "openclaw_base_url_hint": "留空则回退到站点 api_base_url；再回退时按请求 Host 自动推导。写入配置时会自动追加 /v1。",
+    "openclaw_memory_search": "记忆检索（可选）",
+    "openclaw_memory_search_enabled": "启用 memorySearch",
+    "openclaw_memory_search_enabled_desc": "开启后生成的 openclaw.json 会写入 agents.defaults.memorySearch 段，指向本站的 embedding 模型。",
+    "openclaw_memory_search_model": "Embedding 模型",
+    "openclaw_memory_search_model_hint": "openclaw 用于记忆检索的 embedding 模型名。须与本站 /v1/models 中的一个模型 id 一致。",
+    "openclaw_models_preset": "模型预设清单",
+    "openclaw_models_preset_desc": "JSON 数组，管理员预设的可选模型。字段与 openclaw.json 里 provider.models[] 完全一致，额外带一个 label 供一键脚本展示给用户勾选。",
+    "openclaw_models_not_array": "预设必须是一个 JSON 数组",
+    "openclaw_install_doc": "使用文档",
+    "openclaw_install_doc_desc": "访问 /openclaw/doc 时返回的 markdown 文档，可在下方编辑。支持 {{site_name}} / {{base_url}} / {{install_command}} 占位符。"
+  },
+
+  "docs": {
+    "cta_hint": "准备好了吗？立即开始使用。",
+    "toc": "目录"
   },
 
   "profile": {

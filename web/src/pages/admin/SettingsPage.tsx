@@ -16,7 +16,7 @@ import { Alert } from '../../shared/components/Alert';
 import { useToast } from '../../shared/components/Toast';
 import {
   Save, Loader2, Globe, UserPlus, Gift, Mail, Send, Upload, X, Eye, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound,
+  ShieldCheck, Copy, Trash2, KeyRound, Zap,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
 
@@ -42,6 +42,72 @@ const SMTP_KEYS = [
   'email_template_subject', 'email_template_body',
   'balance_alert_email_subject', 'balance_alert_email_body',
 ] as const;
+
+// OpenClaw 一键接入相关 setting key。所有 key 统一加 "openclaw." 前缀，便于在 Setting 表中识别。
+// 默认值（DEFAULT_OPENCLAW_*）在后端 internal/app/openclaw/defaults.go 中维护了同构的一份，
+// 这里只负责前端展示 / 回填。keep in sync。
+const OPENCLAW_KEYS = [
+  'openclaw.enabled',
+  'openclaw.provider_name',
+  'openclaw.base_url',
+  'openclaw.models_preset',
+  'openclaw.install_doc',
+  'openclaw.memory_search_enabled',
+  'openclaw.memory_search_model',
+] as const;
+
+const DEFAULT_OPENCLAW_PROVIDER_NAME = 'airgate';
+const DEFAULT_OPENCLAW_MEMORY_MODEL = 'text-embedding-3-small';
+const DEFAULT_OPENCLAW_MODELS_PRESET = `[
+  {
+    "id": "gpt-5.4",
+    "label": "GPT-5.4 (推荐)",
+    "api": "openai-responses",
+    "reasoning": true,
+    "input": ["text", "image"]
+  },
+  {
+    "id": "claude-sonnet-4-6",
+    "label": "Claude Sonnet 4.6",
+    "api": "anthropic-messages",
+    "reasoning": true,
+    "input": ["text", "image"]
+  },
+  {
+    "id": "claude-opus-4-6",
+    "label": "Claude Opus 4.6",
+    "api": "anthropic-messages",
+    "reasoning": true,
+    "input": ["text", "image"]
+  }
+]`;
+
+const DEFAULT_OPENCLAW_INSTALL_DOC = `# 使用 {{site_name}} 一键接入 openclaw
+
+[openclaw](https://github.com/openclaw/openclaw) 是一款可以运行在本机的个人 AI 助理。
+{{site_name}} 已经兼容 openclaw 所需的 OpenAI / Anthropic 协议，你只需要运行一行命令即可完成接入：
+
+## 一键安装
+
+复制下面这行命令到终端执行：
+
+\`\`\`bash
+{{install_command}}
+\`\`\`
+
+脚本会：
+
+1. 交互式提示你粘贴一把 {{site_name}} 的 API Key（从个人中心 → API 密钥创建）
+2. 拉取管理员预设的可选模型列表让你勾选
+3. 自动生成 ~/.openclaw/openclaw.json
+4. 如果已有旧配置，会备份为 openclaw.json.bak.<时间戳>
+
+完成后按 openclaw 官方文档启动即可：
+
+\`\`\`bash
+openclaw gateway
+\`\`\`
+`;
 
 const DEFAULT_EMAIL_SUBJECT = '{{site_name}} - 邮箱验证码';
 const DEFAULT_EMAIL_BODY = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 420px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb;">
@@ -82,7 +148,7 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'security' | 'registration' | 'defaults' | 'smtp';
+type TabKey = 'site' | 'security' | 'registration' | 'defaults' | 'smtp' | 'openclaw';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
@@ -90,6 +156,7 @@ const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'registration', labelKey: 'settings.tab_registration', icon: UserPlus },
   { key: 'defaults', labelKey: 'settings.tab_defaults', icon: Gift },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
+  { key: 'openclaw', labelKey: 'settings.tab_openclaw', icon: Zap },
 ];
 
 // security tab 不走通用 settings save 流程，单独通过 admin-api-key 接口管理
@@ -98,6 +165,7 @@ const TAB_GROUP: Record<Exclude<TabKey, 'security'>, string> = {
   registration: 'registration',
   defaults: 'defaults',
   smtp: 'smtp',
+  openclaw: 'openclaw',
 };
 
 const TAB_KEYS: Record<Exclude<TabKey, 'security'>, readonly string[]> = {
@@ -105,6 +173,7 @@ const TAB_KEYS: Record<Exclude<TabKey, 'security'>, readonly string[]> = {
   registration: REG_KEYS,
   defaults: DEFAULT_KEYS,
   smtp: SMTP_KEYS,
+  openclaw: OPENCLAW_KEYS,
 };
 
 // ==================== Component ====================
@@ -446,6 +515,15 @@ export default function SettingsPage() {
             />
           )}
         </>)}
+
+        {activeTab === 'openclaw' && (
+          <OpenClawPanel
+            values={values}
+            set={set}
+            boolVal={boolVal}
+            val={val}
+          />
+        )}
       </div>
 
       {/* Save button (security tab manages its own actions) */}
@@ -745,6 +823,177 @@ function EmailTemplateEditor({
         )}
       </div>
     </Card>
+  );
+}
+
+// ==================== OpenClaw Panel ====================
+
+function OpenClawPanel({
+  values,
+  set,
+  boolVal,
+  val,
+}: {
+  values: Record<string, string>;
+  set: (key: string, value: string) => void;
+  boolVal: (key: string) => boolean;
+  val: (key: string) => string;
+}) {
+  const { t } = useTranslation();
+  const copy = useClipboard();
+
+  // 未设置时按钮态显示"启用"，即默认启用。
+  const enabled = (values['openclaw.enabled'] ?? 'true') === 'true';
+
+  // 管理员可能没填 site.api_base_url，这里只做展示预览，真正的 URL 推导在后端。
+  const previewBase = (val('openclaw.base_url') || val('api_base_url') || '').replace(/\/$/, '');
+  const installCommand = previewBase
+    ? `curl -fsSL ${previewBase}/openclaw/install.sh | bash`
+    : 'curl -fsSL <站点地址>/openclaw/install.sh | bash';
+
+  // 模型预设 JSON 的客户端校验：不阻塞保存，只给提示，让管理员自己决定。
+  const modelsRaw = values['openclaw.models_preset'] ?? '';
+  let modelsError = '';
+  if (modelsRaw.trim() !== '') {
+    try {
+      const parsed = JSON.parse(modelsRaw);
+      if (!Array.isArray(parsed)) {
+        modelsError = t('settings.openclaw_models_not_array');
+      }
+    } catch (e) {
+      modelsError = (e as Error).message;
+    }
+  }
+
+  return (
+    <>
+      <Card title={t('settings.openclaw_quickstart')}>
+        <p className="text-[12px] text-text-tertiary -mt-1 mb-4">
+          {t('settings.openclaw_quickstart_desc')}
+        </p>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 min-w-0 px-3 py-2 rounded-md bg-surface border border-glass-border text-[12px] font-mono text-text break-all">
+            {installCommand}
+          </code>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<Copy className="w-3.5 h-3.5" />}
+            onClick={() => copy(installCommand)}
+            disabled={!previewBase}
+          >
+            {t('settings.openclaw_copy_command')}
+          </Button>
+        </div>
+        {!previewBase && (
+          <p className="text-[11px] text-text-tertiary mt-2">
+            {t('settings.openclaw_base_url_missing_hint')}
+          </p>
+        )}
+      </Card>
+
+      <Card title={t('settings.openclaw_basic')}>
+        <div className="space-y-5">
+          <Switch
+            label={t('settings.openclaw_enabled')}
+            description={t('settings.openclaw_enabled_desc')}
+            checked={enabled}
+            onChange={(v) => set('openclaw.enabled', String(v))}
+          />
+          <Field label={t('settings.openclaw_provider_name')} hint={t('settings.openclaw_provider_name_hint')}>
+            <Input
+              value={val('openclaw.provider_name')}
+              onChange={(e) => set('openclaw.provider_name', e.target.value)}
+              placeholder={DEFAULT_OPENCLAW_PROVIDER_NAME}
+            />
+          </Field>
+          <Field label={t('settings.openclaw_base_url')} hint={t('settings.openclaw_base_url_hint')}>
+            <Input
+              value={val('openclaw.base_url')}
+              onChange={(e) => set('openclaw.base_url', e.target.value)}
+              placeholder="https://api.example.com"
+            />
+          </Field>
+        </div>
+      </Card>
+
+      <Card title={t('settings.openclaw_memory_search')}>
+        <div className="space-y-5">
+          <Switch
+            label={t('settings.openclaw_memory_search_enabled')}
+            description={t('settings.openclaw_memory_search_enabled_desc')}
+            checked={boolVal('openclaw.memory_search_enabled')}
+            onChange={(v) => set('openclaw.memory_search_enabled', String(v))}
+          />
+          <Field label={t('settings.openclaw_memory_search_model')} hint={t('settings.openclaw_memory_search_model_hint')}>
+            <Input
+              value={val('openclaw.memory_search_model')}
+              onChange={(e) => set('openclaw.memory_search_model', e.target.value)}
+              placeholder={DEFAULT_OPENCLAW_MEMORY_MODEL}
+            />
+          </Field>
+        </div>
+      </Card>
+
+      <Card
+        title={t('settings.openclaw_models_preset')}
+        extra={
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<RotateCcw className="w-3.5 h-3.5" />}
+            onClick={() => set('openclaw.models_preset', DEFAULT_OPENCLAW_MODELS_PRESET)}
+          >
+            {t('settings.template_reset')}
+          </Button>
+        }
+      >
+        <p className="text-[12px] text-text-tertiary -mt-1 mb-3">
+          {t('settings.openclaw_models_preset_desc')}
+        </p>
+        <Textarea
+          value={modelsRaw || DEFAULT_OPENCLAW_MODELS_PRESET}
+          onChange={(e) => set('openclaw.models_preset', e.target.value)}
+          rows={16}
+          className="font-mono text-xs"
+          placeholder={DEFAULT_OPENCLAW_MODELS_PRESET}
+        />
+        {modelsError && (
+          <p className="text-[11px] text-danger mt-1.5">{modelsError}</p>
+        )}
+      </Card>
+
+      <Card
+        title={t('settings.openclaw_install_doc')}
+        extra={
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<RotateCcw className="w-3.5 h-3.5" />}
+            onClick={() => set('openclaw.install_doc', DEFAULT_OPENCLAW_INSTALL_DOC)}
+          >
+            {t('settings.template_reset')}
+          </Button>
+        }
+      >
+        <p className="text-[12px] text-text-tertiary -mt-1 mb-3">
+          {t('settings.openclaw_install_doc_desc')}
+        </p>
+        <Textarea
+          value={val('openclaw.install_doc') || DEFAULT_OPENCLAW_INSTALL_DOC}
+          onChange={(e) => set('openclaw.install_doc', e.target.value)}
+          rows={16}
+          className="font-mono text-xs"
+          placeholder={DEFAULT_OPENCLAW_INSTALL_DOC}
+        />
+        <div className="text-[11px] text-text-tertiary mt-2 space-x-3">
+          <span>{t('settings.template_vars')}:</span>
+          <code className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{'{{site_name}}'}</code>
+          <code className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{'{{base_url}}'}</code>
+          <code className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{'{{install_command}}'}</code>
+        </div>
+      </Card>
+    </>
   );
 }
 

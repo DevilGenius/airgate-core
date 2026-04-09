@@ -219,6 +219,19 @@ func (s *Server) registerRoutes() {
 	})
 	r.GET("/status/*path", statusProxy)
 
+	// === OpenClaw 一键接入（公共路由，无需认证） ===
+	// 设计：install.sh 通过 `curl | bash` 分发，因此必须公开；models/doc/info
+	// 也无需鉴权，内容均为管理员已标记为 "可公开" 的元信息。
+	// 注意：这些路由必须在 NoRoute 之前注册，否则带 Bearer 的请求会被 NoRoute
+	// 的 API Key 转发逻辑吃掉。
+	openclawGroup := r.Group("/openclaw")
+	{
+		openclawGroup.GET("/install.sh", handlers.OpenClaw.HandleInstallScript)
+		openclawGroup.GET("/models", handlers.OpenClaw.HandleModels)
+		openclawGroup.GET("/doc", handlers.OpenClaw.HandleDoc)
+		openclawGroup.GET("/info", handlers.OpenClaw.HandleInfo)
+	}
+
 	// 上传文件静态服务（这部分仍然在磁盘上，因为是用户上传的运行时数据）
 	r.Static("/uploads", "data/uploads")
 

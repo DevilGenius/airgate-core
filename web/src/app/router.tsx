@@ -32,6 +32,7 @@ const SetupPage = lazy(() => import('../pages/SetupPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
 const PluginPage = lazy(() => import('../pages/PluginPage'));
 const PublicHomePage = lazy(() => import('../pages/HomePage'));
+const DocsPage = lazy(() => import('../pages/DocsPage'));
 
 // 缓存安装状态，避免每次路由跳转都请求
 let setupChecked = false;
@@ -111,6 +112,18 @@ const publicStatusRoute = createRoute({
     // 不做 setup 检查，状态页是最公开的入口
   },
   component: StatusPage,
+});
+
+// 内置默认文档页 —— 当管理员未在 系统设置 → 站点品牌 → 文档链接 中填写外部 URL 时，
+// 所有"文档"按钮 fallback 到这里。公开可访问，独立布局（不挂 AppShell）。
+const docsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/docs',
+  component: () => (
+    <Suspense fallback={null}>
+      <DocsPage />
+    </Suspense>
+  ),
 });
 
 // 登录页（无需认证，懒加载）
@@ -204,6 +217,7 @@ const routeTree = rootRoute.addChildren([
   homeRoute,
   loginRoute,
   publicStatusRoute,
+  docsRoute,
   authLayout.addChildren([
     dashboardRoute,
     adminLayout.addChildren([

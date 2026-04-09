@@ -640,6 +640,7 @@
     "tab_defaults": "User Defaults",
     "tab_smtp": "Email (SMTP)",
     "tab_security": "Security & Auth",
+    "tab_openclaw": "OpenClaw",
 
     "security_admin_key": "Admin API Key",
     "security_admin_key_desc": "Global API key for external system integration, with full administrator privileges",
@@ -714,7 +715,34 @@
     "template_vars": "Variables",
     "smtp_test": "Send Test Email",
     "smtp_test_prompt": "Enter the email address to receive the test email:",
-    "smtp_test_success": "Test email sent, please check your inbox"
+    "smtp_test_success": "Test email sent, please check your inbox",
+
+    "openclaw_quickstart": "One-line install command",
+    "openclaw_quickstart_desc": "Copy the command below. When users run it in their terminal, ~/.openclaw/openclaw.json is generated automatically with interactive model selection. The command points at this site's dynamic /openclaw/install.sh script.",
+    "openclaw_copy_command": "Copy command",
+    "openclaw_base_url_missing_hint": "Neither openclaw.base_url nor api_base_url is set. The script will fall back to the request Host at runtime, but setting it explicitly avoids misdetection behind reverse proxies.",
+    "openclaw_basic": "Basics",
+    "openclaw_enabled": "Enable OpenClaw integration",
+    "openclaw_enabled_desc": "When disabled, the public /openclaw/* routes return 404 and users cannot install via the one-line command.",
+    "openclaw_provider_name": "Provider name",
+    "openclaw_provider_name_hint": "Key name written into openclaw.json. agents.defaults.model.primary will use <name>/<model>. Default: airgate.",
+    "openclaw_base_url": "Site base URL",
+    "openclaw_base_url_hint": "Leave blank to fall back to api_base_url, then to the request Host. /v1 is appended automatically when writing the config.",
+    "openclaw_memory_search": "Memory search (optional)",
+    "openclaw_memory_search_enabled": "Enable memorySearch",
+    "openclaw_memory_search_enabled_desc": "When enabled, the generated openclaw.json includes agents.defaults.memorySearch pointing at this site's embedding model.",
+    "openclaw_memory_search_model": "Embedding model",
+    "openclaw_memory_search_model_hint": "Embedding model name openclaw uses for memory search. Must match a model id served by this site's /v1/models.",
+    "openclaw_models_preset": "Model preset list",
+    "openclaw_models_preset_desc": "JSON array. Fields match openclaw.json provider.models[] exactly; the extra 'label' field is shown to users by the install script.",
+    "openclaw_models_not_array": "Preset must be a JSON array",
+    "openclaw_install_doc": "Install guide",
+    "openclaw_install_doc_desc": "Markdown returned by /openclaw/doc. Supports {{site_name}} / {{base_url}} / {{install_command}} placeholders."
+  },
+
+  "docs": {
+    "cta_hint": "Ready to start? Jump in now.",
+    "toc": "Contents"
   },
 
   "profile": {

@@ -7,6 +7,7 @@ import { pluginsApi } from '../../shared/api/plugins';
 import { queryKeys } from '../../shared/queryKeys';
 import { useTheme } from '../providers/ThemeProvider';
 import { useSiteSettings, defaultLogoUrl } from '../providers/SiteSettingsProvider';
+import { effectiveDocUrl } from '../../shared/utils/docUrl';
 import { useIsMobile } from '../../shared/hooks/useMediaQuery';
 import { useStatusPageEnabled } from '../../shared/hooks/useStatusPageEnabled';
 import {
@@ -361,18 +362,20 @@ export function AppShell({ children }: AppShellProps) {
             >
               <Github className="w-3.5 h-3.5" />
             </a>
-            {/* Docs */}
-            {site.doc_url && (
-              <a
-                href={site.doc_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
-                title={t('nav.docs')}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-              </a>
-            )}
+            {/* Docs：未配置外部链接时回退到内置 /docs */}
+            {(() => {
+              const docs = effectiveDocUrl(site.doc_url);
+              return (
+                <a
+                  href={docs.href}
+                  {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                  className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+                  title={t('nav.docs')}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                </a>
+              );
+            })()}
             {/* Contact */}
             {site.contact_info && (
               <div className="flex items-center gap-1.5 text-text-tertiary hidden sm:flex">

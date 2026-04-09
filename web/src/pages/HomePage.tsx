@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { getToken } from '../shared/api/client';
+import { effectiveDocUrl } from '../shared/utils/docUrl';
 import {
   Zap, Shield, Globe, ArrowRight, Sun, Moon, Code, BarChart3, KeyRound, Layers, Activity,
 } from 'lucide-react';
@@ -14,6 +15,8 @@ export default function HomePage() {
   const { theme, toggleTheme } = useTheme();
 
   const isLoggedIn = !!getToken();
+  // 文档链接 fallback：管理员未填外部 doc_url 时回退到内置 /docs（详见 docUrl.ts）
+  const docs = effectiveDocUrl(site.doc_url);
 
   const features = [
     { icon: <Zap className="w-6 h-6" />, titleKey: 'home.feature_gateway', descKey: 'home.feature_gateway_desc' },
@@ -52,16 +55,13 @@ export default function HomePage() {
             <Activity className="w-3.5 h-3.5" />
             {t('nav.status')}
           </Link>
-          {site.doc_url && (
-            <a
-              href={site.doc_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors"
-            >
-              {t('home.docs')}
-            </a>
-          )}
+          <a
+            href={docs.href}
+            {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors"
+          >
+            {t('home.docs')}
+          </a>
           <button
             onClick={toggleTheme}
             className="flex items-center justify-center w-8 h-8 rounded-lg text-text-tertiary hover:text-text hover:bg-bg-hover transition-colors"
@@ -97,16 +97,13 @@ export default function HomePage() {
             {isLoggedIn ? t('home.go_dashboard') : t('home.get_started')}
             <ArrowRight className="w-4 h-4" />
           </button>
-          {site.doc_url && (
-            <a
-              href={site.doc_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium rounded-xl border border-[var(--ag-glass-border)] text-text-secondary hover:text-text hover:bg-bg-hover transition-colors"
-            >
-              {t('home.view_docs')}
-            </a>
-          )}
+          <a
+            href={docs.href}
+            {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium rounded-xl border border-[var(--ag-glass-border)] text-text-secondary hover:text-text hover:bg-bg-hover transition-colors"
+          >
+            {t('home.view_docs')}
+          </a>
         </div>
 
         {/* API 地址展示 */}
@@ -156,14 +153,14 @@ export default function HomePage() {
               <span>{site.contact_info}</span>
             </>
           )}
-          {site.doc_url && (
-            <>
-              <span className="w-px h-3 bg-[var(--ag-border)]" />
-              <a href={site.doc_url} target="_blank" rel="noopener noreferrer" className="hover:text-text transition-colors">
-                {t('home.docs')}
-              </a>
-            </>
-          )}
+          <span className="w-px h-3 bg-[var(--ag-border)]" />
+          <a
+            href={docs.href}
+            {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            className="hover:text-text transition-colors"
+          >
+            {t('home.docs')}
+          </a>
           <span className="w-px h-3 bg-[var(--ag-border)]" />
           <Link to="/status" className="inline-flex items-center gap-1 hover:text-text transition-colors">
             <Activity className="w-3 h-3" />
