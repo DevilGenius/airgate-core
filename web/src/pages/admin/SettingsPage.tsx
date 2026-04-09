@@ -51,7 +51,6 @@ const OPENCLAW_KEYS = [
   'openclaw.provider_name',
   'openclaw.base_url',
   'openclaw.models_preset',
-  'openclaw.install_doc',
   'openclaw.memory_search_enabled',
   'openclaw.memory_search_model',
 ] as const;
@@ -81,33 +80,6 @@ const DEFAULT_OPENCLAW_MODELS_PRESET = `[
     "input": ["text", "image"]
   }
 ]`;
-
-const DEFAULT_OPENCLAW_INSTALL_DOC = `# 使用 {{site_name}} 一键接入 openclaw
-
-[openclaw](https://github.com/openclaw/openclaw) 是一款可以运行在本机的个人 AI 助理。
-{{site_name}} 已经兼容 openclaw 所需的 OpenAI / Anthropic 协议，你只需要运行一行命令即可完成接入：
-
-## 一键安装
-
-复制下面这行命令到终端执行：
-
-\`\`\`bash
-{{install_command}}
-\`\`\`
-
-脚本会：
-
-1. 交互式提示你粘贴一把 {{site_name}} 的 API Key（从个人中心 → API 密钥创建）
-2. 拉取管理员预设的可选模型列表让你勾选
-3. 自动生成 ~/.openclaw/openclaw.json
-4. 如果已有旧配置，会备份为 openclaw.json.bak.<时间戳>
-
-完成后按 openclaw 官方文档启动即可：
-
-\`\`\`bash
-openclaw gateway
-\`\`\`
-`;
 
 const DEFAULT_EMAIL_SUBJECT = '{{site_name}} - 邮箱验证码';
 const DEFAULT_EMAIL_BODY = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 420px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb;">
@@ -961,37 +933,6 @@ function OpenClawPanel({
         {modelsError && (
           <p className="text-[11px] text-danger mt-1.5">{modelsError}</p>
         )}
-      </Card>
-
-      <Card
-        title={t('settings.openclaw_install_doc')}
-        extra={
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<RotateCcw className="w-3.5 h-3.5" />}
-            onClick={() => set('openclaw.install_doc', DEFAULT_OPENCLAW_INSTALL_DOC)}
-          >
-            {t('settings.template_reset')}
-          </Button>
-        }
-      >
-        <p className="text-[12px] text-text-tertiary -mt-1 mb-3">
-          {t('settings.openclaw_install_doc_desc')}
-        </p>
-        <Textarea
-          value={val('openclaw.install_doc') || DEFAULT_OPENCLAW_INSTALL_DOC}
-          onChange={(e) => set('openclaw.install_doc', e.target.value)}
-          rows={16}
-          className="font-mono text-xs"
-          placeholder={DEFAULT_OPENCLAW_INSTALL_DOC}
-        />
-        <div className="text-[11px] text-text-tertiary mt-2 space-x-3">
-          <span>{t('settings.template_vars')}:</span>
-          <code className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{'{{site_name}}'}</code>
-          <code className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{'{{base_url}}'}</code>
-          <code className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{'{{install_command}}'}</code>
-        </div>
       </Card>
     </>
   );

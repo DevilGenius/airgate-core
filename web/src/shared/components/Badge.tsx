@@ -90,7 +90,7 @@ function ErrorPopover({ anchor, content, onClose }: { anchor: DOMRect; content: 
       <div
         className="rounded-lg shadow-lg overflow-hidden"
         style={{
-          background: 'var(--ag-bg-card)',
+          background: 'var(--ag-bg-elevated)',
           borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-danger)',
           boxShadow: '0 4px 24px rgba(0,0,0,0.25), 0 0 12px var(--ag-danger-glow, rgba(239,68,68,0.15))',
         }}

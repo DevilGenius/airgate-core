@@ -739,9 +739,7 @@
     "openclaw_memory_search_model_hint": "openclaw 用于记忆检索的 embedding 模型名。须与本站 /v1/models 中的一个模型 id 一致。",
     "openclaw_models_preset": "模型预设清单",
     "openclaw_models_preset_desc": "JSON 数组，管理员预设的可选模型。字段与 openclaw.json 里 provider.models[] 完全一致，额外带一个 label 供一键脚本展示给用户勾选。",
-    "openclaw_models_not_array": "预设必须是一个 JSON 数组",
-    "openclaw_install_doc": "使用文档",
-    "openclaw_install_doc_desc": "访问 /openclaw/doc 时返回的 markdown 文档，可在下方编辑。支持 {{site_name}} / {{base_url}} / {{install_command}} 占位符。"
+    "openclaw_models_not_array": "预设必须是一个 JSON 数组"
   },
 
   "docs": {

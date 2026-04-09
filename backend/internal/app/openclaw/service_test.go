@@ -63,35 +63,6 @@ func TestRenderInstallScript_MemorySearchEnabled(t *testing.T) {
 	}
 }
 
-// TestRenderDoc_PlaceholdersReplaced 验证 RenderDoc 把三个简单占位符全部替换掉，
-// 同时不破坏 markdown 中本身就有的 ${...} / {{...}}（注意：DefaultInstallDoc 里
-// 不含其它 {{xxx}} 占位符）。
-func TestRenderDoc_PlaceholdersReplaced(t *testing.T) {
-	s := &Service{}
-	cfg := Config{
-		BaseURL:    "https://airgate.example.com",
-		SiteName:   "MyGate",
-		InstallDoc: DefaultInstallDoc,
-	}
-	cmd := "curl -fsSL https://airgate.example.com/openclaw/install.sh | bash"
-	out := s.RenderDoc(cfg, cmd)
-	for _, want := range []string{
-		"MyGate",
-		"https://airgate.example.com",
-		cmd,
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("rendered doc missing %q", want)
-		}
-	}
-	// 占位符必须被全部消化，确认没有 {{site_name}} 漏网。
-	for _, leftover := range []string{"{{site_name}}", "{{base_url}}", "{{install_command}}"} {
-		if strings.Contains(out, leftover) {
-			t.Errorf("placeholder %q was not replaced", leftover)
-		}
-	}
-}
-
 // TestDefaultModelsPresetJSON_IsValid 防止有人手抖把默认 JSON 改坏，导致
 // /openclaw/models handler 在管理员未配置时报 500。
 func TestDefaultModelsPresetJSON_IsValid(t *testing.T) {

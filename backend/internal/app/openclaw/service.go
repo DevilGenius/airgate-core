@@ -30,7 +30,6 @@ type Config struct {
 	ProviderName        string
 	BaseURL             string // 最终写进 openclaw.json 的 airgate 站点 URL（不含 /v1 后缀）
 	ModelsPresetJSON    string // 原样 JSON 文本，保留给脚本/前端
-	InstallDoc          string // markdown 原文（占位符尚未替换）
 	MemorySearchEnabled bool
 	MemorySearchModel   string
 	SiteName            string
@@ -45,7 +44,6 @@ func (s *Service) Load(ctx context.Context) (Config, error) {
 		Enabled:             true,
 		ProviderName:        DefaultProviderName,
 		ModelsPresetJSON:    DefaultModelsPresetJSON,
-		InstallDoc:          DefaultInstallDoc,
 		MemorySearchEnabled: false,
 		MemorySearchModel:   DefaultMemorySearchModel,
 		SiteName:            "AirGate",
@@ -70,10 +68,6 @@ func (s *Service) Load(ctx context.Context) (Config, error) {
 		case KeyModelsPreset:
 			if v := strings.TrimSpace(it.Value); v != "" {
 				cfg.ModelsPresetJSON = v
-			}
-		case KeyInstallDoc:
-			if it.Value != "" {
-				cfg.InstallDoc = it.Value
 			}
 		case KeyMemorySearchEnabled:
 			cfg.MemorySearchEnabled = it.Value == "true"
@@ -128,16 +122,4 @@ func (s *Service) RenderInstallScript(cfg Config) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
-}
-
-// RenderDoc 把 markdown 文档中的 {{site_name}} / {{base_url}} / {{install_command}}
-// 三个简单占位符替换掉。采用 strings.Replacer 而不是 text/template，是因为文档本身
-// 含有大量 json/bash 代码块，用 text/template 会和 ${...} / {{...}} 片段冲突。
-func (s *Service) RenderDoc(cfg Config, installCommand string) string {
-	r := strings.NewReplacer(
-		"{{site_name}}", cfg.SiteName,
-		"{{base_url}}", cfg.BaseURL,
-		"{{install_command}}", installCommand,
-	)
-	return r.Replace(cfg.InstallDoc)
 }

@@ -97,8 +97,6 @@ curl -fsSL https://your-airgate.example.com/openclaw/install.sh | bash
 openclaw gateway
 ```
 
-更详细的 openclaw 接入说明（含手动配置示例与 FAQ）见 [/openclaw/doc](/openclaw/doc)。
-
 ## 常见问题
 
 ### Q: 调用接口提示 401 / 余额不足？

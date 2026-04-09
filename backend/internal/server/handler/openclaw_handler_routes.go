@@ -101,25 +101,6 @@ func (h *OpenClawHandler) HandleModels(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json; charset=utf-8", []byte(cfg.ModelsPresetJSON))
 }
 
-// HandleDoc 返回占位符已替换的使用文档（markdown）。
-func (h *OpenClawHandler) HandleDoc(c *gin.Context) {
-	cfg, err := h.loadConfig(c)
-	if err != nil {
-		slog.Error("openclaw: 加载配置失败", "error", err)
-		c.String(http.StatusInternalServerError, "failed to load openclaw config")
-		return
-	}
-	if !h.ensureEnabled(c, cfg) {
-		return
-	}
-
-	installCmd := fmt.Sprintf("curl -fsSL %s/openclaw/install.sh | bash", cfg.BaseURL)
-	rendered := h.service.RenderDoc(cfg, installCmd)
-
-	c.Header("Cache-Control", "no-store")
-	c.Data(http.StatusOK, "text/markdown; charset=utf-8", []byte(rendered))
-}
-
 // HandleInfo 聚合 base_url / provider / memory_search 等元信息，供前端管理面板展示
 // "一键命令" 卡片时使用。
 func (h *OpenClawHandler) HandleInfo(c *gin.Context) {
