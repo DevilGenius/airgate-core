@@ -1,0 +1,94 @@
+import { useTranslation } from 'react-i18next';
+import { Pencil, Trash2, RefreshCw, Power, PowerOff, X } from 'lucide-react';
+
+/**
+ * 批量操作工具栏：仅在 selectedCount > 0 时渲染。
+ */
+export function BulkActionsBar({
+  selectedCount,
+  onClear,
+  onEdit,
+  onEnable,
+  onDisable,
+  onRefreshQuota,
+  onDelete,
+}: {
+  selectedCount: number;
+  onClear: () => void;
+  onEdit: () => void;
+  onEnable: () => void;
+  onDisable: () => void;
+  onRefreshQuota: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+
+  if (selectedCount === 0) return null;
+
+  return (
+    <div
+      className="flex items-center gap-2 px-4 py-2.5 mb-3 rounded-[10px]"
+      style={{
+        background: 'var(--ag-primary-subtle)',
+        border: '1px solid var(--ag-primary)',
+      }}
+    >
+      <span className="text-sm font-medium" style={{ color: 'var(--ag-primary)' }}>
+        {t('accounts.bulk_selected', { count: selectedCount })}
+      </span>
+      <button
+        onClick={onClear}
+        className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded hover:bg-bg-hover transition-colors"
+        style={{ color: 'var(--ag-text-tertiary)' }}
+        title={t('accounts.bulk_clear')}
+      >
+        <X className="w-3 h-3" />
+        {t('accounts.bulk_clear')}
+      </button>
+
+      <div className="flex-1" />
+
+      <ActionButton icon={<Pencil className="w-3.5 h-3.5" />} label={t('accounts.bulk_edit')} onClick={onEdit} />
+      <ActionButton icon={<Power className="w-3.5 h-3.5" />} label={t('accounts.bulk_enable')} onClick={onEnable} />
+      <ActionButton icon={<PowerOff className="w-3.5 h-3.5" />} label={t('accounts.bulk_disable')} onClick={onDisable} />
+      <ActionButton
+        icon={<RefreshCw className="w-3.5 h-3.5" />}
+        label={t('accounts.bulk_refresh_quota')}
+        onClick={onRefreshQuota}
+      />
+      <ActionButton
+        icon={<Trash2 className="w-3.5 h-3.5" />}
+        label={t('accounts.bulk_delete')}
+        onClick={onDelete}
+        danger
+      />
+    </div>
+  );
+}
+
+function ActionButton({
+  icon,
+  label,
+  onClick,
+  danger = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors"
+      style={{
+        background: 'var(--ag-bg-elevated)',
+        border: '1px solid var(--ag-glass-border)',
+        color: danger ? 'var(--ag-danger)' : 'var(--ag-text-secondary)',
+      }}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}

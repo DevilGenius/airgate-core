@@ -34,10 +34,15 @@ import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
+import { BulkActionsBar } from './accounts/BulkActionsBar';
+import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
+import { BulkRefreshProgressModal } from './accounts/BulkRefreshProgressModal';
 import type {
   AccountResp,
   CreateAccountReq,
   UpdateAccountReq,
+  BulkUpdateAccountsReq,
+  BulkOpResp,
   AccountExportFile,
   AccountExportItem,
 } from '../../shared/types';
@@ -104,6 +109,18 @@ export default function AccountsPage() {
   const [editingAccount, setEditingAccount] = useState<AccountResp | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<AccountResp | null>(null);
   const [testingAccount, setTestingAccount] = useState<AccountResp | null>(null);
+
+  // 批量选择状态
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
+  const clearSelection = () => setSelectedIds([]);
+
+  // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [page, pageSize, keyword, platformFilter, statusFilter, groupFilter, proxyFilter]);
 
   // 查询账号列表
   const { data, isLoading } = useQuery({
@@ -248,6 +265,64 @@ export default function AccountsPage() {
     successMessage: t('accounts.refresh_quota_success'),
     queryKey: queryKeys.accounts(),
   });
+
+  // 批量操作通用的结果处理：全部成功 → success toast；部分成功 → warning；全部失败 → error。
+  const handleBulkResult = (res: BulkOpResp, okKey: string) => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+    const total = res.success + res.failed;
+    if (res.failed === 0) {
+      toast('success', t(okKey, { count: res.success }));
+    } else if (res.success === 0) {
+      toast('error', t('accounts.bulk_all_failed'));
+    } else {
+      toast('warning', t('accounts.bulk_partial', { success: res.success, failed: res.failed, total }));
+    }
+    clearSelection();
+  };
+
+  // 批量更新
+  const bulkUpdateMutation = useMutation({
+    mutationFn: (data: BulkUpdateAccountsReq) => accountsApi.bulkUpdate(data),
+    onSuccess: (res) => {
+      handleBulkResult(res, 'accounts.bulk_update_success');
+      setShowBulkEditModal(false);
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  // 批量删除
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: number[]) => accountsApi.bulkDelete(ids),
+    onSuccess: (res) => {
+      handleBulkResult(res, 'accounts.bulk_delete_success');
+      setShowBulkDeleteConfirm(false);
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  const handleBulkEnable = () =>
+    bulkUpdateMutation.mutate({ account_ids: selectedIds, status: 'active' });
+  const handleBulkDisable = () =>
+    bulkUpdateMutation.mutate({ account_ids: selectedIds, status: 'disabled' });
+
+  // 批量刷新令牌：只有 OAuth 类型账号支持，预先过滤后开进度弹窗
+  const handleBulkRefresh = () => {
+    const selectedRows = (data?.list ?? []).filter((a) => selectedIds.includes(a.id));
+    const oauthRows = selectedRows
+      .filter((a) => a.type === 'oauth')
+      .map((a) => ({ id: a.id, name: a.name }));
+    if (oauthRows.length === 0) {
+      toast('warning', t('accounts.bulk_refresh_no_oauth'));
+      return;
+    }
+    if (oauthRows.length < selectedIds.length) {
+      toast('info', t('accounts.bulk_refresh_filtered', {
+        count: oauthRows.length,
+        skipped: selectedIds.length - oauthRows.length,
+      }));
+    }
+    setBulkRefreshTargets(oauthRows);
+  };
 
   // 更多菜单状态（合并 id 和位置为单一状态，避免分步更新导致闪跳）
   const [moreMenu, setMoreMenu] = useState<{ id: number; top: number; left: number } | null>(null);
@@ -694,12 +769,26 @@ export default function AccountsPage() {
         onChange={handleImportFile}
       />
 
+      {/* 批量操作工具栏 */}
+      <BulkActionsBar
+        selectedCount={selectedIds.length}
+        onClear={clearSelection}
+        onEdit={() => setShowBulkEditModal(true)}
+        onEnable={handleBulkEnable}
+        onDisable={handleBulkDisable}
+        onRefreshQuota={handleBulkRefresh}
+        onDelete={() => setShowBulkDeleteConfirm(true)}
+      />
+
       {/* 表格 */}
       <Table<AccountResp>
         columns={columns}
         data={data?.list ?? []}
         loading={isLoading}
         rowKey={(row) => row.id}
+        selectable
+        selectedKeys={selectedIds}
+        onSelectionChange={(keys) => setSelectedIds(keys.map(Number))}
         page={page}
         pageSize={pageSize}
         total={data?.total ?? 0}
@@ -792,6 +881,41 @@ export default function AccountsPage() {
         loading={deleteMutation.isPending}
         danger
       />
+
+      {/* 批量编辑弹窗 */}
+      <BulkEditAccountModal
+        open={showBulkEditModal}
+        count={selectedIds.length}
+        onClose={() => setShowBulkEditModal(false)}
+        onSubmit={(patch) =>
+          bulkUpdateMutation.mutate({ account_ids: selectedIds, ...patch })
+        }
+        loading={bulkUpdateMutation.isPending}
+      />
+
+      {/* 批量删除确认 */}
+      <ConfirmModal
+        open={showBulkDeleteConfirm}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+        onConfirm={() => bulkDeleteMutation.mutate(selectedIds)}
+        title={t('accounts.bulk_delete_title')}
+        message={t('accounts.bulk_delete_confirm', { count: selectedIds.length })}
+        loading={bulkDeleteMutation.isPending}
+        danger
+      />
+
+      {/* 批量刷新令牌进度弹窗 */}
+      {bulkRefreshTargets && (
+        <BulkRefreshProgressModal
+          open
+          accounts={bulkRefreshTargets}
+          onClose={() => setBulkRefreshTargets(null)}
+          onFinished={() => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+            clearSelection();
+          }}
+        />
+      )}
 
       {/* 测试连接 */}
       <AccountTestModal

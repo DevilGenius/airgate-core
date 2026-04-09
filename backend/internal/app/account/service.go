@@ -110,6 +110,59 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 	return s.repo.Delete(ctx, id)
 }
 
+// BulkUpdate 批量更新账号。逐条执行并收集每个账号的成功/失败信息，允许部分成功。
+// group_ids 为整体替换：若提供则覆盖账号原有分组，未提供则不触碰。
+func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkResult {
+	result := BulkResult{Results: make([]BulkResultItem, 0, len(input.IDs))}
+	for _, id := range input.IDs {
+		patch := UpdateInput{
+			Status:         input.Status,
+			Priority:       input.Priority,
+			MaxConcurrency: input.MaxConcurrency,
+			RateMultiplier: input.RateMultiplier,
+		}
+		if input.HasProxyID {
+			patch.ProxyID = input.ProxyID
+			patch.HasProxyID = true
+		}
+		if input.HasGroupIDs {
+			patch.GroupIDs = input.GroupIDs
+			patch.HasGroupIDs = true
+		}
+		if _, err := s.repo.Update(ctx, id, patch); err != nil {
+			result.appendFailure(id, err)
+			continue
+		}
+		result.appendSuccess(id)
+	}
+	return result
+}
+
+// BulkDelete 批量删除账号。
+func (s *Service) BulkDelete(ctx context.Context, ids []int) BulkResult {
+	result := BulkResult{Results: make([]BulkResultItem, 0, len(ids))}
+	for _, id := range ids {
+		if err := s.repo.Delete(ctx, id); err != nil {
+			result.appendFailure(id, err)
+			continue
+		}
+		result.appendSuccess(id)
+	}
+	return result
+}
+
+func (r *BulkResult) appendSuccess(id int) {
+	r.Success++
+	r.SuccessIDs = append(r.SuccessIDs, id)
+	r.Results = append(r.Results, BulkResultItem{ID: id, Success: true})
+}
+
+func (r *BulkResult) appendFailure(id int, err error) {
+	r.Failed++
+	r.FailedIDs = append(r.FailedIDs, id)
+	r.Results = append(r.Results, BulkResultItem{ID: id, Success: false, Error: err.Error()})
+}
+
 // ToggleScheduling 快速切换账号调度状态。
 func (s *Service) ToggleScheduling(ctx context.Context, id int) (ToggleResult, error) {
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{})

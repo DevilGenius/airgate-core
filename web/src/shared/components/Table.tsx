@@ -26,12 +26,18 @@ export interface TableProps<T> {
   pageSizeOptions?: number[];
   onPageSizeChange?: (size: number) => void;
   autoHeight?: boolean;
+  /** 是否启用多选 */
+  selectable?: boolean;
+  /** 当前选中的 rowKey 列表（受控） */
+  selectedKeys?: (string | number)[];
+  /** 选中项变化回调 */
+  onSelectionChange?: (keys: (string | number)[]) => void;
   /** @deprecated No longer needed – kept for backward compatibility */
   separateHeader?: boolean;
 }
 
 export function Table<T extends Record<string, any>>({
-  columns,
+  columns: userColumns,
   data,
   loading = false,
   rowKey,
@@ -42,9 +48,79 @@ export function Table<T extends Record<string, any>>({
   pageSizeOptions = [10, 20, 50, 100],
   onPageSizeChange,
   autoHeight = false,
+  selectable = false,
+  selectedKeys,
+  onSelectionChange,
 }: TableProps<T>) {
   const totalPages = Math.ceil(total / pageSize);
   const isMobile = useIsMobile();
+
+  // 多选逻辑：所有可见行是否全选 / 部分选
+  const pageKeys: (string | number)[] = selectable && rowKey ? data.map(rowKey) : [];
+  const selectedSet = new Set<string | number>(selectedKeys ?? []);
+  const selectedOnPage = pageKeys.filter((k) => selectedSet.has(k));
+  const allSelected = pageKeys.length > 0 && selectedOnPage.length === pageKeys.length;
+  const someSelected = selectedOnPage.length > 0 && !allSelected;
+
+  const toggleAll = () => {
+    if (!onSelectionChange || !rowKey) return;
+    const next = new Set(selectedKeys ?? []);
+    if (allSelected) {
+      pageKeys.forEach((k) => next.delete(k));
+    } else {
+      pageKeys.forEach((k) => next.add(k));
+    }
+    onSelectionChange(Array.from(next));
+  };
+
+  const toggleRow = (key: string | number) => {
+    if (!onSelectionChange) return;
+    const next = new Set(selectedKeys ?? []);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    onSelectionChange(Array.from(next));
+  };
+
+  // 生成受控勾选框元素（表头 + 每行）
+  const headerCheckbox = (
+    <input
+      type="checkbox"
+      aria-label="select all"
+      className="cursor-pointer w-4 h-4"
+      style={{ accentColor: 'var(--ag-primary)' }}
+      checked={allSelected}
+      ref={(el) => { if (el) el.indeterminate = someSelected; }}
+      onChange={toggleAll}
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+
+  const selectionColumn: Column<T> | null = selectable && rowKey
+    ? {
+        key: '__selection__',
+        width: '44px',
+        fixed: 'left',
+        align: 'center',
+        hideOnMobile: true,
+        title: headerCheckbox,
+        render: (row) => {
+          const key = rowKey(row);
+          return (
+            <input
+              type="checkbox"
+              aria-label="select row"
+              className="cursor-pointer w-4 h-4"
+      style={{ accentColor: 'var(--ag-primary)' }}
+              checked={selectedSet.has(key)}
+              onChange={() => toggleRow(key)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          );
+        },
+      }
+    : null;
+
+  const columns = selectionColumn ? [selectionColumn, ...userColumns] : userColumns;
 
   // Sync horizontal scroll between fixed header and scrollable body
   const headerRef = useRef<HTMLDivElement>(null);

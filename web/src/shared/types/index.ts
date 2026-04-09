@@ -164,6 +164,34 @@ export interface UpdateAccountReq {
   group_ids?: number[];
 }
 
+// 批量更新账号请求（只传需要修改的字段，缺失 = 不改）
+// add_group_ids 为「追加模式」：会与账号原有分组取并集
+export interface BulkUpdateAccountsReq {
+  account_ids: number[];
+  status?: 'active' | 'disabled';
+  priority?: number;
+  max_concurrency?: number;
+  rate_multiplier?: number;
+  group_ids?: number[];
+  proxy_id?: number;
+}
+
+// 批量操作单条结果
+export interface BulkOpResultItem {
+  id: number;
+  success: boolean;
+  error?: string;
+}
+
+// 批量操作汇总响应
+export interface BulkOpResp {
+  success: number;
+  failed: number;
+  success_ids: number[];
+  failed_ids: number[];
+  results: BulkOpResultItem[];
+}
+
 // 导出文件中的单条账号（精简字段，可被 import 还原）
 export interface AccountExportItem {
   name: string;

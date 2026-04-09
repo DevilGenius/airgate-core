@@ -102,6 +102,37 @@ type ToggleResult struct {
 	Status string
 }
 
+// BulkUpdateInput 批量更新账号输入。
+// 所有可选字段使用指针/HasXxx 标记：未设置表示「不修改」。
+// GroupIDs 采用整体替换语义：HasGroupIDs=true 时会用新列表覆盖账号原有分组。
+type BulkUpdateInput struct {
+	IDs            []int
+	Status         *string
+	Priority       *int
+	MaxConcurrency *int
+	RateMultiplier *float64
+	GroupIDs       []int64
+	HasGroupIDs    bool
+	ProxyID        *int64
+	HasProxyID     bool
+}
+
+// BulkResultItem 批量操作单条结果。
+type BulkResultItem struct {
+	ID      int    `json:"id"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// BulkResult 批量操作汇总结果。
+type BulkResult struct {
+	Success    int              `json:"success"`
+	Failed     int              `json:"failed"`
+	SuccessIDs []int            `json:"success_ids"`
+	FailedIDs  []int            `json:"failed_ids"`
+	Results    []BulkResultItem `json:"results"`
+}
+
 // Model 模型信息。
 type Model struct {
 	ID   string `json:"id"`

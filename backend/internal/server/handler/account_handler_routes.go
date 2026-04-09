@@ -210,6 +210,122 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+// BulkUpdateAccounts 批量更新账号字段（group_ids 为追加模式）。
+func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
+	var req dto.BulkUpdateAccountsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	result := h.service.BulkUpdate(c.Request.Context(), appaccount.BulkUpdateInput{
+		IDs:            req.AccountIDs,
+		Status:         req.Status,
+		Priority:       req.Priority,
+		MaxConcurrency: req.MaxConcurrency,
+		RateMultiplier: req.RateMultiplier,
+		GroupIDs:       req.GroupIDs,
+		HasGroupIDs:    req.GroupIDs != nil,
+		ProxyID:        req.ProxyID,
+		HasProxyID:     req.ProxyID != nil,
+	})
+	response.Success(c, toBulkOpResp(result))
+}
+
+// BulkDeleteAccounts 批量删除账号。
+func (h *AccountHandler) BulkDeleteAccounts(c *gin.Context) {
+	var req dto.BulkAccountIDsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	result := h.service.BulkDelete(c.Request.Context(), req.AccountIDs)
+	response.Success(c, toBulkOpResp(result))
+}
+
+// BulkRefreshQuota 批量刷新账号额度/令牌，使用 SSE 流式返回进度。
+// 事件类型：
+//   - {type:"start", total}
+//   - {type:"progress", id, done, total, success, error?, plan_type?}
+//   - {type:"complete", success, failed}
+func (h *AccountHandler) BulkRefreshQuota(c *gin.Context) {
+	var req dto.BulkAccountIDsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.Flush()
+
+	total := len(req.AccountIDs)
+	sendSSEEvent(c.Writer, map[string]any{"type": "start", "total": total})
+
+	success, failed := 0, 0
+	ctx := c.Request.Context()
+	for i, id := range req.AccountIDs {
+		if ctx.Err() != nil {
+			// 客户端主动关闭，终止循环
+			return
+		}
+		evt := map[string]any{
+			"type":  "progress",
+			"id":    id,
+			"done":  i + 1,
+			"total": total,
+		}
+		result, err := h.service.RefreshQuota(ctx, id)
+		if err != nil {
+			failed++
+			evt["success"] = false
+			evt["error"] = err.Error()
+		} else {
+			success++
+			evt["success"] = true
+			if result.PlanType != "" {
+				evt["plan_type"] = result.PlanType
+			}
+		}
+		sendSSEEvent(c.Writer, evt)
+	}
+
+	sendSSEEvent(c.Writer, map[string]any{
+		"type":    "complete",
+		"success": success,
+		"failed":  failed,
+	})
+}
+
+func toBulkOpResp(r appaccount.BulkResult) dto.BulkOpResp {
+	items := make([]dto.BulkOpItemResp, 0, len(r.Results))
+	for _, item := range r.Results {
+		items = append(items, dto.BulkOpItemResp{
+			ID:      item.ID,
+			Success: item.Success,
+			Error:   item.Error,
+		})
+	}
+	successIDs := r.SuccessIDs
+	if successIDs == nil {
+		successIDs = []int{}
+	}
+	failedIDs := r.FailedIDs
+	if failedIDs == nil {
+		failedIDs = []int{}
+	}
+	return dto.BulkOpResp{
+		Success:    r.Success,
+		Failed:     r.Failed,
+		SuccessIDs: successIDs,
+		FailedIDs:  failedIDs,
+		Results:    items,
+	}
+}
+
 // ToggleScheduling 快速切换账号调度状态。
 func (h *AccountHandler) ToggleScheduling(c *gin.Context) {
 	id, err := parseAccountID(c.Param("id"))

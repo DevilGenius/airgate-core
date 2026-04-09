@@ -2,6 +2,7 @@ import { get, post, put, del, patch } from './client';
 import type {
   AccountResp, CreateAccountReq, UpdateAccountReq,
   AccountExportFile, ImportAccountsResp, AccountExportItem,
+  BulkUpdateAccountsReq, BulkOpResp,
   CredentialSchemaResp, ModelInfo, PageReq, PagedData,
 } from '../types';
 
@@ -33,6 +34,14 @@ export const accountsApi = {
   // 手动刷新账号额度（调用插件 QueryQuota）
   refreshQuota: (id: number) =>
     post<{ plan_type?: string; email?: string; subscription_active_until?: string }>(`/api/v1/admin/accounts/${id}/refresh-quota`),
+  // 批量更新账号字段（group_ids 为追加模式）
+  bulkUpdate: (data: BulkUpdateAccountsReq) =>
+    post<BulkOpResp>('/api/v1/admin/accounts/bulk-update', data),
+  // 批量删除账号
+  bulkDelete: (ids: number[]) =>
+    post<BulkOpResp>('/api/v1/admin/accounts/bulk-delete', { account_ids: ids }),
+  // 批量刷新账号令牌/额度 —— SSE 流式接口，前端 URL，由调用方用 fetch 消费
+  bulkRefreshQuotaUrl: () => '/api/v1/admin/accounts/bulk-refresh-quota',
   // 获取账号使用统计（可选时间范围）
   stats: (id: number, params?: { start_date?: string; end_date?: string }) =>
     get<AccountStatsResp>(`/api/v1/admin/accounts/${id}/stats`, params),

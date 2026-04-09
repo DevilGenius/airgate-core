@@ -85,6 +85,40 @@ type ImportAccountsResp struct {
 	Errors   []ImportItemErrorResp `json:"errors,omitempty"`
 }
 
+// BulkUpdateAccountsReq 批量更新账号请求。
+// 所有可选字段：nil/缺失 = 不修改，仅 "account_ids" 必填。
+// add_group_ids 为追加模式，与账号原有分组取并集。
+type BulkUpdateAccountsReq struct {
+	AccountIDs     []int    `json:"account_ids" binding:"required,min=1"`
+	Status         *string  `json:"status" binding:"omitempty,oneof=active disabled"`
+	Priority       *int     `json:"priority"`
+	MaxConcurrency *int     `json:"max_concurrency"`
+	RateMultiplier *float64 `json:"rate_multiplier"`
+	GroupIDs       []int64  `json:"group_ids"`
+	ProxyID        *int64   `json:"proxy_id"`
+}
+
+// BulkAccountIDsReq 仅携带账号 ID 列表的批量请求（用于删除、刷新令牌等）。
+type BulkAccountIDsReq struct {
+	AccountIDs []int `json:"account_ids" binding:"required,min=1"`
+}
+
+// BulkOpItemResp 批量操作单条结果。
+type BulkOpItemResp struct {
+	ID      int    `json:"id"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// BulkOpResp 批量操作汇总响应。
+type BulkOpResp struct {
+	Success    int              `json:"success"`
+	Failed     int              `json:"failed"`
+	SuccessIDs []int            `json:"success_ids"`
+	FailedIDs  []int            `json:"failed_ids"`
+	Results    []BulkOpItemResp `json:"results"`
+}
+
 // CredentialSchemaResp 凭证字段 schema 响应
 type CredentialSchemaResp struct {
 	Fields       []CredentialFieldResp `json:"fields"`
