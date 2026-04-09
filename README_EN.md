@@ -167,6 +167,29 @@ After you `up -d`, visit `http://<your-host>:9517`. The install wizard will **au
 
 All persistent data lives under `./data/`, so backup is just `tar czf backup.tgz data .env`.
 
+**Upgrade / uninstall**:
+
+```bash
+# Upgrade to latest (run in the directory that holds docker-compose.yml)
+# Default AIRGATE_IMAGE_TAG=latest, so just pull the new image; if you pinned a version, edit AIRGATE_IMAGE_TAG in .env first
+docker compose pull
+docker compose up -d
+docker compose logs -f core
+
+# Upgrade to a specific version
+sed -i 's/^AIRGATE_IMAGE_TAG=.*/AIRGATE_IMAGE_TAG=v0.1.0/' .env
+docker compose pull && docker compose up -d
+
+# Uninstall (keep data): stop and remove containers; ./data and .env are untouched
+docker compose down
+
+# Full uninstall (also wipes data — back up first!)
+docker compose down
+rm -rf data .env docker-compose.yml
+```
+
+> Recommended: snapshot before upgrading with `tar czf backup-$(date +%F).tgz data .env`. Core runs database migrations automatically on startup, no manual step required.
+
 **Key environment variables** (full list in [.env.example](deploy/.env.example)):
 
 | Variable | Description | Required |

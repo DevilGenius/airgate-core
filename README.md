@@ -167,6 +167,29 @@ docker compose logs -f core
 
 所有持久化数据落在 `./data/`，备份直接 `tar czf backup.tgz data .env` 即可。
 
+**升级 / 卸载**：
+
+```bash
+# 升级到最新版本（在 docker-compose.yml 所在目录执行）
+# 默认 AIRGATE_IMAGE_TAG=latest，直接拉新镜像即可；如固定了版本，先在 .env 改 AIRGATE_IMAGE_TAG
+docker compose pull
+docker compose up -d
+docker compose logs -f core
+
+# 升级到指定版本
+sed -i 's/^AIRGATE_IMAGE_TAG=.*/AIRGATE_IMAGE_TAG=v0.1.0/' .env
+docker compose pull && docker compose up -d
+
+# 卸载（保留数据）：停止并删除容器，./data 与 .env 不动
+docker compose down
+
+# 彻底卸载（连同数据一起删，操作前务必备份）
+docker compose down
+rm -rf data .env docker-compose.yml
+```
+
+> 升级前建议先 `tar czf backup-$(date +%F).tgz data .env` 备份一次。Core 启动时会自动执行数据库 migrate，无需手动操作。
+
 **关键环境变量**（完整列表见 [.env.example](deploy/.env.example)）：
 
 | 变量 | 说明 | 是否必填 |
