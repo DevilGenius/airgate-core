@@ -180,6 +180,86 @@ All persistent data lives under `./data/`, so backup is just `tar czf backup.tgz
 | `AIRGATE_IMAGE_TAG` | Image tag, default `latest`, can pin to `v0.x.y` | ❌ |
 | `API_KEY_SECRET` | User API Key encryption key, hex-encoded ≥64 chars | ❌ |
 
+### Reverse Proxy: Caddy + Automatic HTTPS (Optional)
+
+If you want to expose core via `https://your-domain` instead of plain `http://host:9517`, the simplest option is [Caddy](https://caddyserver.com/) — it ships with automatic Let's Encrypt issuance and renewal, and the config is only a dozen lines. The example below targets Ubuntu / Debian and works for both Method 1A and 1B.
+
+**Prerequisites**
+
+1. The domain's A record points to this machine's public IP;
+2. Firewall / security group allows **80** and **443** (HTTP-01 challenge + HTTPS);
+3. Port 9517 may stay open or be restricted to localhost — Caddy will be the public entrypoint on 443.
+
+**Install Caddy**
+
+```bash
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt install -y caddy
+```
+
+For other systems see the [official install docs](https://caddyserver.com/docs/install). After installation Caddy runs as a systemd service and reads `/etc/caddy/Caddyfile`.
+
+**Configure `/etc/caddy/Caddyfile`**
+
+Replace the file contents with the following, then change the domain and email:
+
+```caddyfile
+{
+    email admin@example.com   # Let's Encrypt notification email
+}
+
+airgate.example.com {
+    encode zstd gzip
+
+    reverse_proxy 127.0.0.1:9517 {
+        # Disable response buffering so SSE / streaming responses arrive in real time
+        flush_interval -1
+
+        header_up Host                {host}
+        header_up X-Real-IP           {remote_host}
+        header_up X-Forwarded-For     {remote_host}
+        header_up X-Forwarded-Proto   {scheme}
+
+        # LLM requests can be slow — relax the timeouts
+        transport http {
+            read_timeout  30m
+            write_timeout 30m
+            dial_timeout  10s
+        }
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options    "nosniff"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+        -Server
+    }
+}
+```
+
+If core runs in docker compose and Caddy runs on the host, leave `127.0.0.1:9517` as is — compose already publishes 9517 on the host.
+
+**Apply / verify**
+
+```bash
+sudo caddy fmt --overwrite /etc/caddy/Caddyfile   # format (optional)
+sudo systemctl reload caddy                       # hot reload, no downtime
+sudo journalctl -u caddy -f                       # watch certificate issuance
+```
+
+On the first reload Caddy contacts Let's Encrypt automatically; within a few seconds to a minute the log shows `certificate obtained successfully`, and `https://airgate.example.com` becomes reachable. Renewal is fully automatic.
+
+**Common gotchas**
+
+- **Don't drop `flush_interval -1`** — without it Caddy buffers the response and SSE / streaming endpoints turn into "all-at-once" replies.
+- **Bump the timeouts** — large-model inference can take minutes; Caddy's default reverse-proxy timeouts are too short.
+- **Port 80 must be open** — Let's Encrypt uses HTTP-01 to validate; if 80 is blocked, no certificate. While debugging, you can temporarily add `acme_ca https://acme-staging-v02.api.letsencrypt.org/directory` under `email` to switch to staging and avoid the production rate limits.
+- **To close direct access on 9517** — change `core.ports` in [deploy/docker-compose.yml](deploy/docker-compose.yml) to `127.0.0.1:9517:9517` so only Caddy can reach it from outside; for the bare-metal install, set the listen address to `127.0.0.1` in `config.yaml`.
+
 ### Method 2: Run from Source (Development)
 
 For development or contributions. Pick one of the two paths:

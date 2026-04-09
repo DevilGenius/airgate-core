@@ -180,6 +180,86 @@ docker compose logs -f core
 | `AIRGATE_IMAGE_TAG` | 镜像版本，默认 `latest`，可固定到 `v0.x.y` | ❌ |
 | `API_KEY_SECRET` | 用户 API Key 加密密钥，hex 编码 ≥64 字符 | ❌ |
 
+### 反向代理：Caddy + 自动 HTTPS（可选）
+
+如果想让 core 走 `https://your-domain` 而不是裸 `http://host:9517`，最省事的方案是用 [Caddy](https://caddyserver.com/)：自带 Let's Encrypt 自动签发与续期，配置只有十几行。下面以 Ubuntu / Debian 为例，1A / 1B 部署都适用。
+
+**前置条件**
+
+1. 域名 A 记录已经指向本机公网 IP；
+2. 防火墙 / 安全组放行 **80** 和 **443**（HTTP-01 验证 + HTTPS）；
+3. 9517 端口可以保留对外，也可以只允许本机访问 —— 由 Caddy 统一在 443 接收外部流量。
+
+**安装 Caddy**
+
+```bash
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt install -y caddy
+```
+
+其它系统参考 [官方安装文档](https://caddyserver.com/docs/install)。安装完 Caddy 会以 systemd 服务跑起来，配置文件位于 `/etc/caddy/Caddyfile`。
+
+**配置 `/etc/caddy/Caddyfile`**
+
+把下面内容覆盖进去，改掉域名和邮箱即可：
+
+```caddyfile
+{
+    email admin@example.com   # Let's Encrypt 通知邮箱
+}
+
+airgate.example.com {
+    encode zstd gzip
+
+    reverse_proxy 127.0.0.1:9517 {
+        # 关闭响应缓冲，保证 SSE / 流式输出实时返回
+        flush_interval -1
+
+        header_up Host                {host}
+        header_up X-Real-IP           {remote_host}
+        header_up X-Forwarded-For     {remote_host}
+        header_up X-Forwarded-Proto   {scheme}
+
+        # 大模型请求耗时较长，放宽超时
+        transport http {
+            read_timeout  30m
+            write_timeout 30m
+            dial_timeout  10s
+        }
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options    "nosniff"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+        -Server
+    }
+}
+```
+
+如果 core 跑在 docker compose 里、Caddy 跑在宿主机，`127.0.0.1:9517` 保持原样即可（compose 默认已经把 9517 映射到宿主机）。
+
+**应用 / 验证**
+
+```bash
+sudo caddy fmt --overwrite /etc/caddy/Caddyfile   # 格式化（可选）
+sudo systemctl reload caddy                       # 热加载，不会断连
+sudo journalctl -u caddy -f                       # 看证书签发日志
+```
+
+第一次 reload 后 Caddy 会自动向 Let's Encrypt 申请证书，几秒到几十秒后日志里出现 `certificate obtained successfully`，浏览器访问 `https://airgate.example.com` 即可。证书自动续期，无需人工干预。
+
+**几个常见坑**
+
+- **`flush_interval -1` 不能省**：默认会缓冲响应，SSE / 流式接口会变成"一次性返回"。
+- **超时一定要放宽**：大模型推理动辄几分钟，Caddy 默认反代超时不够。
+- **80 端口必须开**：Let's Encrypt 用 HTTP-01 验证，80 不通就签不到证书。调试期可在 `email` 下面临时加 `acme_ca https://acme-staging-v02.api.letsencrypt.org/directory` 切到 staging，避开正式环境的速率限制。
+- **想关掉 9517 直连**：把 [deploy/docker-compose.yml](deploy/docker-compose.yml) 里 `core.ports` 改成 `127.0.0.1:9517:9517`，外网就只能从 Caddy 进来；裸金属部署同理，在 `config.yaml` 里把监听地址改成 `127.0.0.1`。
+
 ### 方式 2：源码开发
 
 适合二次开发或贡献者。两条路任选其一：
