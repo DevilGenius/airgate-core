@@ -579,6 +579,8 @@ export interface MarketplacePluginResp {
   type: string;
   github_repo?: string;
   installed: boolean;
+  installed_version?: string;
+  has_update?: boolean;
 }
 
 // ==================== Settings ====================

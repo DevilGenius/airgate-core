@@ -49,12 +49,14 @@ func toPluginResp(item apppluginadmin.PluginMeta) dto.PluginResp {
 
 func toMarketplacePluginResp(item apppluginadmin.MarketplacePlugin) dto.MarketplacePluginResp {
 	return dto.MarketplacePluginResp{
-		Name:        item.Name,
-		Version:     item.Version,
-		Description: item.Description,
-		Author:      item.Author,
-		Type:        item.Type,
-		GithubRepo:  item.GithubRepo,
-		Installed:   item.Installed,
+		Name:             item.Name,
+		Version:          item.Version,
+		Description:      item.Description,
+		Author:           item.Author,
+		Type:             item.Type,
+		GithubRepo:       item.GithubRepo,
+		Installed:        item.Installed,
+		InstalledVersion: item.InstalledVersion,
+		HasUpdate:        item.HasUpdate,
 	}
 }

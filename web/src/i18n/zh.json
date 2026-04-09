@@ -613,6 +613,8 @@
     "config_success": "配置已保存",
     "config": "配置",
     "already_installed": "已安装",
+    "update_to": "更新到 v{{version}}",
+    "update_success": "插件已更新",
     "install_plugin": "安装插件",
     "upload_tab": "上传安装",
     "github_tab": "GitHub 安装",

@@ -2,6 +2,8 @@ package pluginadmin
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	sdk "github.com/DouDOU-start/airgate-sdk"
 )
@@ -120,22 +122,66 @@ func (s *Service) ListMarketplace(ctx context.Context) ([]MarketplacePlugin, err
 		return nil, err
 	}
 
-	installed := make(map[string]bool)
+	installedVersions := make(map[string]string)
 	for _, meta := range s.manager.GetAllPluginMeta() {
-		installed[meta.Name] = true
+		installedVersions[meta.Name] = meta.Version
 	}
 
 	result := make([]MarketplacePlugin, 0, len(items))
 	for _, item := range items {
+		installedVer, installed := installedVersions[item.Name]
 		result = append(result, MarketplacePlugin{
-			Name:        item.Name,
-			Version:     item.Version,
-			Description: item.Description,
-			Author:      item.Author,
-			Type:        item.Type,
-			GithubRepo:  item.GithubRepo,
-			Installed:   installed[item.Name],
+			Name:             item.Name,
+			Version:          item.Version,
+			Description:      item.Description,
+			Author:           item.Author,
+			Type:             item.Type,
+			GithubRepo:       item.GithubRepo,
+			Installed:        installed,
+			InstalledVersion: installedVer,
+			HasUpdate:        installed && isNewerVersion(item.Version, installedVer),
 		})
 	}
 	return result, nil
+}
+
+// isNewerVersion 判断 marketplaceVer 是否比 installedVer 新。
+// 采用简单的 semver 语义：按点分段数字比较，忽略前导 v。非数字段做字符串比较。
+// 任一参数为空则返回 false。
+func isNewerVersion(marketplaceVer, installedVer string) bool {
+	if marketplaceVer == "" || installedVer == "" {
+		return false
+	}
+	m := strings.TrimPrefix(strings.TrimSpace(marketplaceVer), "v")
+	i := strings.TrimPrefix(strings.TrimSpace(installedVer), "v")
+	if m == i {
+		return false
+	}
+	mParts := strings.Split(m, ".")
+	iParts := strings.Split(i, ".")
+	n := len(mParts)
+	if len(iParts) > n {
+		n = len(iParts)
+	}
+	for idx := 0; idx < n; idx++ {
+		var mp, ip string
+		if idx < len(mParts) {
+			mp = mParts[idx]
+		}
+		if idx < len(iParts) {
+			ip = iParts[idx]
+		}
+		mn, mErr := strconv.Atoi(mp)
+		in, iErr := strconv.Atoi(ip)
+		if mErr == nil && iErr == nil {
+			if mn != in {
+				return mn > in
+			}
+			continue
+		}
+		if mp != ip {
+			return mp > ip
+		}
+	}
+	return false
 }

@@ -72,11 +72,13 @@ type PluginOAuthExchangeResp struct {
 
 // MarketplacePluginResp 插件市场条目
 type MarketplacePluginResp struct {
-	Name        string `json:"name"`
-	Version     string `json:"version"`
-	Description string `json:"description"`
-	Author      string `json:"author"`
-	Type        string `json:"type"`
-	GithubRepo  string `json:"github_repo,omitempty"`
-	Installed   bool   `json:"installed"`
+	Name             string `json:"name"`
+	Version          string `json:"version"`
+	Description      string `json:"description"`
+	Author           string `json:"author"`
+	Type             string `json:"type"`
+	GithubRepo       string `json:"github_repo,omitempty"`
+	Installed        bool   `json:"installed"`
+	InstalledVersion string `json:"installed_version,omitempty"`
+	HasUpdate        bool   `json:"has_update,omitempty"`
 }

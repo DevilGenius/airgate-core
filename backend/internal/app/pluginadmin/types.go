@@ -46,13 +46,15 @@ type PluginMeta struct {
 
 // MarketplacePlugin 市场插件条目。
 type MarketplacePlugin struct {
-	Name        string
-	Version     string
-	Description string
-	Author      string
-	Type        string
-	GithubRepo  string
-	Installed   bool
+	Name             string
+	Version          string
+	Description      string
+	Author           string
+	Type             string
+	GithubRepo       string
+	Installed        bool
+	InstalledVersion string
+	HasUpdate        bool
 }
 
 // ProxyInput 表示插件代理输入。

@@ -50,21 +50,24 @@ export default function PluginsPage() {
 
   // 市场卡片直接安装（GitHub Release）
   const [installingRepo, setInstallingRepo] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const marketInstallMutation = useMutation({
     mutationFn: (repo: string) => pluginsApi.installGithub(repo),
     onSuccess: () => {
-      toast('success', t('plugins.github_success'));
+      toast('success', t(isUpdating ? 'plugins.update_success' : 'plugins.github_success'));
       // 插件前端模块需要整页重载才能生效
       window.location.reload();
     },
     onError: (err: Error) => {
       toast('error', err.message);
       setInstallingRepo(null);
+      setIsUpdating(false);
     },
   });
 
-  function handleMarketInstall(repo: string) {
+  function handleMarketInstall(repo: string, update = false) {
     setInstallingRepo(repo);
+    setIsUpdating(update);
     marketInstallMutation.mutate(repo);
   }
 
@@ -624,7 +627,7 @@ function MarketplaceCard({
 }: {
   plugin: MarketplacePluginResp;
   installing: boolean;
-  onInstall: (repo: string) => void;
+  onInstall: (repo: string, update?: boolean) => void;
 }) {
   const { t } = useTranslation();
   const canInstall = !!plugin.github_repo;
@@ -660,7 +663,27 @@ function MarketplaceCard({
         )}
         <div className="pt-3 border-t border-border">
           {plugin.installed ? (
-            <Badge variant="success">{t('plugins.already_installed')}</Badge>
+            plugin.has_update ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon={<RefreshCw className="w-3.5 h-3.5" />}
+                  disabled={!canInstall || installing}
+                  loading={installing}
+                  onClick={() => plugin.github_repo && onInstall(plugin.github_repo, true)}
+                >
+                  {t('plugins.update_to', { version: plugin.version })}
+                </Button>
+                {plugin.installed_version && (
+                  <span className="text-xs text-text-tertiary font-mono">
+                    v{plugin.installed_version} → v{plugin.version}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <Badge variant="success">{t('plugins.already_installed')}</Badge>
+            )
           ) : (
             <Button
               size="sm"
