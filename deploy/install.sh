@@ -46,13 +46,17 @@ SERVICE_NAME="airgate-core"
 SERVICE_USER="airgate"
 
 # Colors
+#
+# 使用 bash ANSI-C quoting `$'...'` 让变量直接保存真正的 ESC 字符（0x1B），
+# 这样无论是 echo / printf / heredoc 都能正确显示颜色。
+# 之前用 '\033[...]' 字面量在 heredoc 里会被原样输出乱码。
 if [ -t 1 ]; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    BLUE='\033[0;34m'
-    CYAN='\033[0;36m'
-    NC='\033[0m'
+    RED=$'\033[0;31m'
+    GREEN=$'\033[0;32m'
+    YELLOW=$'\033[1;33m'
+    BLUE=$'\033[0;34m'
+    CYAN=$'\033[0;36m'
+    NC=$'\033[0m'
 else
     RED=''
     GREEN=''
@@ -63,10 +67,10 @@ else
 fi
 
 # ---- Logging ----
-print_info()    { echo -e "${BLUE}[信息]${NC} $1"; }
-print_success() { echo -e "${GREEN}[成功]${NC} $1"; }
-print_warning() { echo -e "${YELLOW}[警告]${NC} $1"; }
-print_error()   { echo -e "${RED}[错误]${NC} $1" >&2; }
+print_info()    { echo "${BLUE}[信息]${NC} $1"; }
+print_success() { echo "${GREEN}[成功]${NC} $1"; }
+print_warning() { echo "${YELLOW}[警告]${NC} $1"; }
+print_error()   { echo "${RED}[错误]${NC} $1" >&2; }
 
 # ---- Banner ----
 print_banner() {

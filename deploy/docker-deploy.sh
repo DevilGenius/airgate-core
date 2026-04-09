@@ -35,18 +35,22 @@
 set -euo pipefail
 
 # ---- 颜色输出 ----
+#
+# 使用 bash ANSI-C quoting `$'...'` 让变量直接保存真正的 ESC 字符（0x1B），
+# 这样 printf / heredoc 都能正确显示。之前用 '\033[...]' 字面量在 heredoc
+# 里会被原样输出乱码（printf '%b' 能解释，但 cat <<DONE 不能）。
 if [[ -t 1 ]]; then
-  C_RESET='\033[0m'; C_BOLD='\033[1m'; C_DIM='\033[2m'
-  C_RED='\033[31m'; C_GREEN='\033[32m'; C_YELLOW='\033[33m'; C_BLUE='\033[34m'; C_CYAN='\033[36m'
+  C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'
+  C_RED=$'\033[31m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_BLUE=$'\033[34m'; C_CYAN=$'\033[36m'
 else
   C_RESET=''; C_BOLD=''; C_DIM=''; C_RED=''; C_GREEN=''; C_YELLOW=''; C_BLUE=''; C_CYAN=''
 fi
 
-info()    { printf '%b\n' "${C_CYAN}==>${C_RESET} $*"; }
-ok()      { printf '%b\n' "${C_GREEN}✓${C_RESET} $*"; }
-warn()    { printf '%b\n' "${C_YELLOW}!${C_RESET} $*"; }
-err()     { printf '%b\n' "${C_RED}✗${C_RESET} $*" >&2; }
-section() { printf '\n%b\n' "${C_BOLD}${C_BLUE}── $* ──${C_RESET}"; }
+info()    { printf '%s\n' "${C_CYAN}==>${C_RESET} $*"; }
+ok()      { printf '%s\n' "${C_GREEN}✓${C_RESET} $*"; }
+warn()    { printf '%s\n' "${C_YELLOW}!${C_RESET} $*"; }
+err()     { printf '%s\n' "${C_RED}✗${C_RESET} $*" >&2; }
+section() { printf '\n%s\n' "${C_BOLD}${C_BLUE}── $* ──${C_RESET}"; }
 
 # ---- 横幅 ----
 cat <<'BANNER'
