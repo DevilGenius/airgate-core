@@ -818,7 +818,10 @@ function OpenClawPanel({
   const enabled = (values['openclaw.enabled'] ?? 'true') === 'true';
 
   // 管理员可能没填 site.api_base_url，这里只做展示预览，真正的 URL 推导在后端。
-  const previewBase = (val('openclaw.base_url') || val('api_base_url') || '').replace(/\/$/, '');
+  // 都为空时回退到当前页面 origin（与 DocsPage 的处理一致），避免出现尴尬的 <站点地址> 占位符。
+  const fallbackOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const usingFallbackOrigin = !val('openclaw.base_url') && !val('api_base_url');
+  const previewBase = (val('openclaw.base_url') || val('api_base_url') || fallbackOrigin || '').replace(/\/$/, '');
   const installCommand = previewBase
     ? `curl -fsSL ${previewBase}/openclaw/install.sh | bash`
     : 'curl -fsSL <站点地址>/openclaw/install.sh | bash';
@@ -857,7 +860,7 @@ function OpenClawPanel({
             {t('settings.openclaw_copy_command')}
           </Button>
         </div>
-        {!previewBase && (
+        {usingFallbackOrigin && (
           <p className="text-[11px] text-text-tertiary mt-2">
             {t('settings.openclaw_base_url_missing_hint')}
           </p>
