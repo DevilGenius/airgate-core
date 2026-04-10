@@ -166,17 +166,23 @@ export default function PluginsPage() {
               配置
             </Button>
           )}
-          {row.is_dev && (
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={<RefreshCw className={`w-3.5 h-3.5 ${reloadMutation.isPending ? 'animate-spin' : ''}`} />}
-              onClick={() => reloadMutation.mutate(row.name)}
-              disabled={reloadMutation.isPending}
-            >
-              {t('plugins.reload')}
-            </Button>
-          )}
+          {row.is_dev && (() => {
+            // 只在当前正在重载的这一行显示 loading；用 mutation.variables 区分
+            // 哪个 plugin 在途，避免点一个插件转全部
+            const isReloadingThis =
+              reloadMutation.isPending && reloadMutation.variables === row.name;
+            return (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<RefreshCw className={`w-3.5 h-3.5 ${isReloadingThis ? 'animate-spin' : ''}`} />}
+                onClick={() => reloadMutation.mutate(row.name)}
+                disabled={reloadMutation.isPending}
+              >
+                {t('plugins.reload')}
+              </Button>
+            );
+          })()}
           <Button
             size="sm"
             variant="ghost"
