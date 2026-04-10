@@ -127,27 +127,25 @@ export default function PluginsPage() {
     },
     {
       key: 'type',
-      title: t('common.type'),
+      title: `${t('common.type')} / ${t('plugins.platform')}`,
       render: (row) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           <Badge variant={typeVariant[row.type || 'gateway'] || 'default'}>
             {row.type || 'gateway'}
           </Badge>
+          {row.platform && (
+            <span className="text-xs text-text-tertiary">{row.platform}</span>
+          )}
           {row.version && (
             <span className="text-xs text-text-tertiary">
               {t('common.version')}: {row.version}
             </span>
           )}
-        </div>
-      ),
-    },
-    {
-      key: 'platform',
-      title: t('plugins.platform'),
-      render: (row) => (
-        <div className="flex items-center justify-center gap-2">
-          <span>{row.platform}</span>
-          {row.is_dev && <Badge variant="warning">{t('plugins.dev_badge')}</Badge>}
+          {row.is_dev && (
+            <span className="text-[10px] font-medium uppercase tracking-wider text-warning/70 border border-warning/30 rounded px-1.5 py-px">
+              {t('plugins.dev_badge')}
+            </span>
+          )}
         </div>
       ),
     },
