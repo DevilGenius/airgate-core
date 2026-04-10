@@ -32,7 +32,7 @@ func TestRenderInstallScript_Defaults(t *testing.T) {
 		`PROVIDER_NAME="airgate"`,
 		`/openclaw/models`,
 		`MEM_ENABLED="0"`,                       // memory_search 关闭时模板分支应输出 0
-		`/v1/models`,                            // API Key 校验路径
+		`/v1/usage`,                             // API Key 校验路径（core 自身端点，不经插件）
 		`info "已读取 API Key: ${MASKED_API_KEY}"`, // 输入后显示脱敏确认
 	} {
 		if !strings.Contains(out, want) {

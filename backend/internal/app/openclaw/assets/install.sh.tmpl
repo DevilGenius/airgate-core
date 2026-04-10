@@ -79,11 +79,15 @@ if [[ "${API_KEY}" == sk-* ]]; then
 fi
 info "已读取 API Key: ${MASKED_API_KEY}"
 
-# 轻量校验：调一下 /v1/models；非 200 即视为无效。
+# 轻量校验：调 core 自己暴露的 /v1/usage 端点。这条路由直接由 core 处理（不经过
+# 任何插件），用 sk-xxx 自鉴权并返回 { is_active, balance }：
+#   - 有效 key：HTTP 200
+#   - key 无效/过期/未绑定分组：HTTP 401
+# 比 /v1/models（依赖插件声明路由）更可靠。
 info "正在校验 API Key ..."
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "Authorization: Bearer ${API_KEY}" \
-  "${AIRGATE_BASE}/v1/models" || echo "000")
+  "${AIRGATE_BASE}/v1/usage" || echo "000")
 if [ "${HTTP_CODE}" != "200" ]; then
   die "API Key 校验失败 (HTTP ${HTTP_CODE})。请确认 Key 正确、未过期、未停用。"
 fi
