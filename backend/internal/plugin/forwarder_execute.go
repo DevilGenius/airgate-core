@@ -108,10 +108,18 @@ func (f *Forwarder) executeForward(c *gin.Context, state *forwardState) forwardE
 }
 
 func buildForwardRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest {
+	headers := buildForwardHeaders(c.Request.Header, state.keyInfo)
+	// 透传原始请求路径与方法给插件。buildForwardHeaders 只克隆了 c.Request.Header，
+	// 插件收到的 sdk.ForwardRequest 里没有 Method / URL 字段，光凭 header + body
+	// 反推路径非常 fragile（比如 GET /v1/models 和空 body 的 POST 无法区分）。
+	// 这里显式把路径和方法塞进头里，插件侧 extractForwardedPath 会优先读取。
+	headers.Set("X-Forwarded-Path", state.requestPath)
+	headers.Set("X-Forwarded-Method", c.Request.Method)
+
 	fwdReq := &sdk.ForwardRequest{
 		Account: buildSDKAccount(state.account),
 		Body:    state.body,
-		Headers: buildForwardHeaders(c.Request.Header, state.keyInfo),
+		Headers: headers,
 		Model:   state.model,
 		Stream:  state.stream,
 	}
