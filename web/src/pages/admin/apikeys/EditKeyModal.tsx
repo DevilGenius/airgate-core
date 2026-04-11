@@ -23,6 +23,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     name: apiKey.name,
     quota_usd: apiKey.quota_usd,
     sell_rate: apiKey.sell_rate,
+    max_concurrency: apiKey.max_concurrency,
     expires_at: apiKey.expires_at,
     status: apiKey.status as 'active' | 'disabled',
   });
@@ -98,6 +99,19 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
           hint={t(
             'api_keys.sell_rate_hint',
             '对客户的售价倍率（如 0.6 表示按基础成本的 0.6 倍计费）。留空或 0 表示按平台原价，不启用 markup。可随时调整。',
+          )}
+        />
+
+        <Input
+          label={t('api_keys.max_concurrency_label', '最大并发数')}
+          type="number"
+          step="1"
+          min="0"
+          value={String(form.max_concurrency ?? 0)}
+          onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
+          hint={t(
+            'api_keys.max_concurrency_hint',
+            '同一把 key 允许同时在途的请求数。0 表示不限制（默认）。达到上限时返回 429 + apikey_concurrency_limit，建议按实际客户端并发能力设置。',
           )}
         />
 

@@ -15,6 +15,34 @@ import (
 	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
+// acquireAPIKeySlot 在 forward 路径最前面争抢 API Key 级并发槽。
+//
+//   - keyInfo.KeyMaxConcurrency <= 0 时直接返回 no-op release，表示该 key 不限制并发；
+//   - 成功获取返回配对的 release 函数，Forward() 应 defer 调用；
+//   - 争抢失败直接写 429 响应并返回 nil，调用方看到 nil 就应立即 return。
+//
+// 注意 slot ID 独立于 state.requestID，因为后者会在每次 failover attempt 里被重新生成；
+// 而 API Key 槽位跨 attempt 稳定，必须有独立且稳定的成员 ID 保证 SREM 能匹配上。
+func (f *Forwarder) acquireAPIKeySlot(c *gin.Context, state *forwardState) func() {
+	maxConc := state.keyInfo.KeyMaxConcurrency
+	if maxConc <= 0 {
+		return func() {}
+	}
+
+	ctx := c.Request.Context()
+	slotID := uuid.New().String()
+
+	if err := f.concurrency.AcquireAPIKeySlot(ctx, state.keyInfo.KeyID, slotID, maxConc, 0); err != nil {
+		openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "apikey_concurrency_limit", "API Key 并发已达上限，请稍后重试")
+		return nil
+	}
+
+	keyID := state.keyInfo.KeyID
+	return func() {
+		f.concurrency.ReleaseAPIKeySlot(ctx, keyID, slotID)
+	}
+}
+
 func (f *Forwarder) ensureForwardAllowed(c *gin.Context, state *forwardState) bool {
 	// 注：原本这里有一个硬编码 60 req/min 的用户级 RPM 限流，
 	// 粒度太粗（同一个 user 的多把 key 共享一个配额）且无法配置，误伤严重，已移除。

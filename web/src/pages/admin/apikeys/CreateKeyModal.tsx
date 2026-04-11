@@ -22,6 +22,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
     group_id: 0,
     quota_usd: 0,
     sell_rate: 0,
+    max_concurrency: 0,
     expires_at: '',
   });
   const [ipWhitelist, setIpWhitelist] = useState('');
@@ -33,6 +34,8 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
       ...form,
       quota_usd: form.quota_usd || undefined,
       sell_rate: form.sell_rate || undefined,
+      // 0 代表"不限制"，依然显式传给后端以便明确语义；留空/undefined 后端也会按 0 处理
+      max_concurrency: form.max_concurrency ?? 0,
       expires_at: form.expires_at || undefined,
       ip_whitelist: parseIpList(ipWhitelist),
       ip_blacklist: parseIpList(ipBlacklist),
@@ -40,7 +43,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
   };
 
   const handleClose = () => {
-    setForm({ name: '', group_id: 0, quota_usd: 0, sell_rate: 0, expires_at: '' });
+    setForm({ name: '', group_id: 0, quota_usd: 0, sell_rate: 0, max_concurrency: 0, expires_at: '' });
     setIpWhitelist('');
     setIpBlacklist('');
     onClose();
@@ -109,6 +112,19 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
           hint={t(
             'api_keys.sell_rate_hint',
             '对客户的售价倍率（如 0.6 表示按基础成本的 0.6 倍计费）。留空或 0 表示按平台原价，不启用 markup。可随时调整。',
+          )}
+        />
+
+        <Input
+          label={t('api_keys.max_concurrency_label', '最大并发数')}
+          type="number"
+          step="1"
+          min="0"
+          value={String(form.max_concurrency ?? 0)}
+          onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
+          hint={t(
+            'api_keys.max_concurrency_hint',
+            '同一把 key 允许同时在途的请求数。0 表示不限制（默认）。达到上限时返回 429 + apikey_concurrency_limit，建议按实际客户端并发能力设置。',
           )}
         />
 

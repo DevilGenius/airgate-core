@@ -21,6 +21,7 @@ var (
 		{Name: "used_quota", Type: field.TypeFloat64, Default: 0},
 		{Name: "used_quota_actual", Type: field.TypeFloat64, Default: 0},
 		{Name: "sell_rate", Type: field.TypeFloat64, Default: 0},
+		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "disabled"}, Default: "active"},
 		{Name: "created_at", Type: field.TypeTime},
@@ -36,13 +37,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "api_keys_groups_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[15]},
+				Columns:    []*schema.Column{APIKeysColumns[16]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "api_keys_users_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[16]},
+				Columns:    []*schema.Column{APIKeysColumns[17]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},

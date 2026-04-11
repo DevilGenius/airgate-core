@@ -55,13 +55,14 @@ func (h *APIKeyHandler) CreateKey(c *gin.Context) {
 	}
 
 	item, err := h.service.CreateOwned(c.Request.Context(), userID, appapikey.CreateInput{
-		Name:        req.Name,
-		GroupID:     req.GroupID,
-		IPWhitelist: req.IPWhitelist,
-		IPBlacklist: req.IPBlacklist,
-		QuotaUSD:    req.QuotaUSD,
-		SellRate:    req.SellRate,
-		ExpiresAt:   req.ExpiresAt,
+		Name:           req.Name,
+		GroupID:        req.GroupID,
+		IPWhitelist:    req.IPWhitelist,
+		IPBlacklist:    req.IPBlacklist,
+		QuotaUSD:       req.QuotaUSD,
+		SellRate:       req.SellRate,
+		MaxConcurrency: req.MaxConcurrency,
+		ExpiresAt:      req.ExpiresAt,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建 API 密钥失败", "创建失败", err)
@@ -101,6 +102,7 @@ func (h *APIKeyHandler) UpdateKey(c *gin.Context) {
 		HasIPBlacklist: req.IPBlacklist != nil,
 		QuotaUSD:       req.QuotaUSD,
 		SellRate:       req.SellRate,
+		MaxConcurrency: req.MaxConcurrency,
 		ExpiresAt:      req.ExpiresAt,
 		Status:         req.Status,
 	})
@@ -159,6 +161,7 @@ func (h *APIKeyHandler) AdminUpdateKey(c *gin.Context) {
 		HasIPBlacklist: req.IPBlacklist != nil,
 		QuotaUSD:       req.QuotaUSD,
 		SellRate:       req.SellRate,
+		MaxConcurrency: req.MaxConcurrency,
 		ExpiresAt:      req.ExpiresAt,
 		Status:         req.Status,
 	})

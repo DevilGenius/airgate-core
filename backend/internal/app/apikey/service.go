@@ -79,6 +79,10 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 		return Key{}, err
 	}
 
+	maxConc := input.MaxConcurrency
+	if maxConc < 0 {
+		maxConc = 0
+	}
 	item, err := s.repo.Create(ctx, Mutation{
 		Name:           &input.Name,
 		KeyHint:        stringPtr(buildKeyHint(rawKey)),
@@ -92,6 +96,7 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 		HasIPBlacklist: input.IPBlacklist != nil,
 		QuotaUSD:       &input.QuotaUSD,
 		SellRate:       &input.SellRate,
+		MaxConcurrency: &maxConc,
 		ExpiresAt:      expiresAt,
 		HasExpiresAt:   hasExpiresAt,
 	})
@@ -157,6 +162,7 @@ func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInp
 		HasIPBlacklist: input.HasIPBlacklist,
 		QuotaUSD:       input.QuotaUSD,
 		SellRate:       input.SellRate,
+		MaxConcurrency: input.MaxConcurrency,
 		ExpiresAt:      expiresAt,
 		HasExpiresAt:   hasExpiresAt,
 		Status:         input.Status,

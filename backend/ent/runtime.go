@@ -55,12 +55,18 @@ func init() {
 	apikey.DefaultSellRate = apikeyDescSellRate.Default.(float64)
 	// apikey.SellRateValidator is a validator for the "sell_rate" field. It is called by the builders before save.
 	apikey.SellRateValidator = apikeyDescSellRate.Validators[0].(func(float64) error)
+	// apikeyDescMaxConcurrency is the schema descriptor for max_concurrency field.
+	apikeyDescMaxConcurrency := apikeyFields[10].Descriptor()
+	// apikey.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
+	apikey.DefaultMaxConcurrency = apikeyDescMaxConcurrency.Default.(int)
+	// apikey.MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
+	apikey.MaxConcurrencyValidator = apikeyDescMaxConcurrency.Validators[0].(func(int) error)
 	// apikeyDescCreatedAt is the schema descriptor for created_at field.
-	apikeyDescCreatedAt := apikeyFields[12].Descriptor()
+	apikeyDescCreatedAt := apikeyFields[13].Descriptor()
 	// apikey.DefaultCreatedAt holds the default value on creation for the created_at field.
 	apikey.DefaultCreatedAt = apikeyDescCreatedAt.Default.(func() time.Time)
 	// apikeyDescUpdatedAt is the schema descriptor for updated_at field.
-	apikeyDescUpdatedAt := apikeyFields[13].Descriptor()
+	apikeyDescUpdatedAt := apikeyFields[14].Descriptor()
 	// apikey.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	apikey.DefaultUpdatedAt = apikeyDescUpdatedAt.Default.(func() time.Time)
 	// apikey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

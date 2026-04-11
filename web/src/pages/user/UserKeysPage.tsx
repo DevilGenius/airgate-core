@@ -139,6 +139,7 @@ export default function UserKeysPage() {
       group_id: key.group_id == null ? '' : String(key.group_id),
       quota_usd: key.quota_usd ? String(key.quota_usd) : '',
       sell_rate: key.sell_rate ? String(key.sell_rate) : '',
+      max_concurrency: key.max_concurrency ? String(key.max_concurrency) : '',
       expires_at: key.expires_at ? key.expires_at.slice(0, 10) : '',
     });
     setModalOpen(true);
@@ -169,6 +170,8 @@ export default function UserKeysPage() {
         group_id: form.group_id ? Number(form.group_id) : undefined,
         quota_usd: form.quota_usd ? Number(form.quota_usd) : undefined,
         sell_rate: form.sell_rate ? Number(form.sell_rate) : 0,
+        // 空字符串显式改为 0 = 关闭并发限制；后端看到 0 会清除旧值
+        max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : 0,
         expires_at: expiresAt,
       };
       updateMutation.mutate({ id: editingKey.id, data: payload });
@@ -178,6 +181,7 @@ export default function UserKeysPage() {
         group_id: Number(form.group_id),
         quota_usd: form.quota_usd ? Number(form.quota_usd) : undefined,
         sell_rate: form.sell_rate ? Number(form.sell_rate) : undefined,
+        max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : undefined,
         expires_at: expiresAt,
       };
       createMutation.mutate(payload);

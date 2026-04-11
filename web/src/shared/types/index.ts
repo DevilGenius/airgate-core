@@ -321,6 +321,8 @@ export interface APIKeyResp {
   used_quota_actual: number;
   /** 销售倍率：>0 启用 reseller markup，0 表示按平台原价计费 */
   sell_rate: number;
+  /** API Key 级并发上限：同一把 key 同时在途请求数。0 表示不限制 */
+  max_concurrency: number;
   today_cost: number;
   thirty_day_cost: number;
   expires_at?: string;
@@ -337,6 +339,8 @@ export interface CreateAPIKeyReq {
   quota_usd?: number;
   /** 销售倍率：>0 启用 reseller markup（对客户的售价倍率）。可空，默认 0 */
   sell_rate?: number;
+  /** API Key 并发上限，0 或不传表示不限制 */
+  max_concurrency?: number;
   expires_at?: string;
 }
 
@@ -348,6 +352,8 @@ export interface UpdateAPIKeyReq {
   quota_usd?: number;
   /** 销售倍率可随时动态调整，不影响历史 used_quota 累加值 */
   sell_rate?: number;
+  /** API Key 并发上限，0 表示关闭限制；不传则不改动 */
+  max_concurrency?: number;
   expires_at?: string;
   status?: 'active' | 'disabled';
 }

@@ -36,6 +36,10 @@ type APIKeyInfo struct {
 	// SellRate Reseller 设置的销售倍率（>0 时启用 markup，独立于平台计费）
 	SellRate float64
 
+	// KeyMaxConcurrency API Key 级并发上限，0 表示不限制。
+	// 在 forwarder 路径里会用 Redis 原子 SET 按 key_id 维度争抢槽位。
+	KeyMaxConcurrency int
+
 	// 预加载字段，避免 forwarder 重复查询
 	UserBalance            float64           // 用户余额
 	UserGroupRates         map[int64]float64 // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
@@ -170,14 +174,15 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 	}
 
 	return &APIKeyInfo{
-		KeyID:         ak.ID,
-		KeyName:       ak.Name,
-		UserID:        u.ID,
-		GroupID:       g.ID,
-		GroupPlatform: g.Platform,
-		QuotaUSD:      ak.QuotaUsd,
-		UsedQuota:     ak.UsedQuota,
-		SellRate:      ak.SellRate,
+		KeyID:             ak.ID,
+		KeyName:           ak.Name,
+		UserID:            u.ID,
+		GroupID:           g.ID,
+		GroupPlatform:     g.Platform,
+		QuotaUSD:          ak.QuotaUsd,
+		UsedQuota:         ak.UsedQuota,
+		SellRate:          ak.SellRate,
+		KeyMaxConcurrency: ak.MaxConcurrency,
 
 		UserBalance:            u.Balance,
 		UserGroupRates:         u.GroupRates,

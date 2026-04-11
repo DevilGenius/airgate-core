@@ -76,6 +76,17 @@ export function EditKeyModal({
             '对客户的售价倍率（如 0.6 表示按基础成本的 0.6 倍计费）。留空或 0 表示按平台原价，不启用 markup。可随时调整。',
           )}
         />
+        <Input
+          label={t('user_keys.max_concurrency_label', '最大并发数')}
+          type="number"
+          value={form.max_concurrency}
+          onChange={(e) => setForm({ ...form, max_concurrency: e.target.value })}
+          placeholder="0"
+          hint={t(
+            'user_keys.max_concurrency_hint',
+            '同一把 key 允许同时在途的请求数。留空或 0 表示不限制。达到上限时返回 429，建议按实际客户端并发能力设置。',
+          )}
+        />
         <DatePicker
           label={t('user_keys.expires_at')}
           value={form.expires_at}

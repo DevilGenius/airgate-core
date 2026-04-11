@@ -153,6 +153,17 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		return
 	}
 
+	// API Key 级并发闸：只有该 key 设置了 max_concurrency > 0 时才生效。
+	// 这里用独立于 state.requestID 的 slot ID，因为 state.requestID 在每次 failover
+	// 的 prepareForwardExecution 里会被重新生成；而 API Key 槽位是整个 Forward 请求
+	// 只持有一份，跨 failover 尝试稳定，所以需要一个独立 ID 保证 SADD/SREM 对得上。
+	apiKeySlotRelease := f.acquireAPIKeySlot(c, state)
+	if apiKeySlotRelease == nil {
+		// acquireAPIKeySlot 已在失败路径写过 429 响应
+		return
+	}
+	defer apiKeySlotRelease()
+
 	// 记录已尝试过的账户 ID，传给调度器做排除
 	var excludeIDs []int
 

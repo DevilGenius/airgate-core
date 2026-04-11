@@ -40,6 +40,8 @@ type APIKey struct {
 	UsedQuotaActual float64 `json:"used_quota_actual,omitempty"`
 	// 销售倍率：>0 时启用 reseller markup, billed_cost = base_cost × sell_rate；=0 表示不加价，billed_cost = actual_cost
 	SellRate float64 `json:"sell_rate,omitempty"`
+	// API Key 级并发上限：同一把 key 同时在途的请求数。0 表示不限制（默认）。达到上限时返回 429 + apikey_concurrency_limit，保护单个客户端不因并发过高被自己打死或耗光上游账号的并发预算。
+	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// Status holds the value of the "status" field.
@@ -109,7 +111,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case apikey.FieldQuotaUsd, apikey.FieldUsedQuota, apikey.FieldUsedQuotaActual, apikey.FieldSellRate:
 			values[i] = new(sql.NullFloat64)
-		case apikey.FieldID:
+		case apikey.FieldID, apikey.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
 		case apikey.FieldName, apikey.FieldKeyHint, apikey.FieldKeyHash, apikey.FieldKeyEncrypted, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -203,6 +205,12 @@ func (ak *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field sell_rate", values[i])
 			} else if value.Valid {
 				ak.SellRate = value.Float64
+			}
+		case apikey.FieldMaxConcurrency:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field max_concurrency", values[i])
+			} else if value.Valid {
+				ak.MaxConcurrency = int(value.Int64)
 			}
 		case apikey.FieldExpiresAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -321,6 +329,9 @@ func (ak *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("sell_rate=")
 	builder.WriteString(fmt.Sprintf("%v", ak.SellRate))
+	builder.WriteString(", ")
+	builder.WriteString("max_concurrency=")
+	builder.WriteString(fmt.Sprintf("%v", ak.MaxConcurrency))
 	builder.WriteString(", ")
 	if v := ak.ExpiresAt; v != nil {
 		builder.WriteString("expires_at=")

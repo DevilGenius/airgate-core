@@ -131,6 +131,20 @@ func (akc *APIKeyCreate) SetNillableSellRate(f *float64) *APIKeyCreate {
 	return akc
 }
 
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (akc *APIKeyCreate) SetMaxConcurrency(i int) *APIKeyCreate {
+	akc.mutation.SetMaxConcurrency(i)
+	return akc
+}
+
+// SetNillableMaxConcurrency sets the "max_concurrency" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableMaxConcurrency(i *int) *APIKeyCreate {
+	if i != nil {
+		akc.SetMaxConcurrency(*i)
+	}
+	return akc
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (akc *APIKeyCreate) SetExpiresAt(t time.Time) *APIKeyCreate {
 	akc.mutation.SetExpiresAt(t)
@@ -287,6 +301,10 @@ func (akc *APIKeyCreate) defaults() {
 		v := apikey.DefaultSellRate
 		akc.mutation.SetSellRate(v)
 	}
+	if _, ok := akc.mutation.MaxConcurrency(); !ok {
+		v := apikey.DefaultMaxConcurrency
+		akc.mutation.SetMaxConcurrency(v)
+	}
 	if _, ok := akc.mutation.Status(); !ok {
 		v := apikey.DefaultStatus
 		akc.mutation.SetStatus(v)
@@ -337,6 +355,14 @@ func (akc *APIKeyCreate) check() error {
 	if v, ok := akc.mutation.SellRate(); ok {
 		if err := apikey.SellRateValidator(v); err != nil {
 			return &ValidationError{Name: "sell_rate", err: fmt.Errorf(`ent: validator failed for field "APIKey.sell_rate": %w`, err)}
+		}
+	}
+	if _, ok := akc.mutation.MaxConcurrency(); !ok {
+		return &ValidationError{Name: "max_concurrency", err: errors.New(`ent: missing required field "APIKey.max_concurrency"`)}
+	}
+	if v, ok := akc.mutation.MaxConcurrency(); ok {
+		if err := apikey.MaxConcurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_concurrency": %w`, err)}
 		}
 	}
 	if _, ok := akc.mutation.Status(); !ok {
@@ -421,6 +447,10 @@ func (akc *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := akc.mutation.SellRate(); ok {
 		_spec.SetField(apikey.FieldSellRate, field.TypeFloat64, value)
 		_node.SellRate = value
+	}
+	if value, ok := akc.mutation.MaxConcurrency(); ok {
+		_spec.SetField(apikey.FieldMaxConcurrency, field.TypeInt, value)
+		_node.MaxConcurrency = value
 	}
 	if value, ok := akc.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)
