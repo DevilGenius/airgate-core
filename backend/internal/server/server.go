@@ -16,19 +16,17 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
-	"github.com/DouDOU-start/airgate-core/internal/ratelimit"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 )
 
 // Server HTTP 服务器
 type Server struct {
-	cfg     *config.Config
-	db      *ent.Client
-	rdb     *redis.Client
-	jwtMgr  *auth.JWTManager
-	limiter *ratelimit.Limiter
-	engine  *gin.Engine
-	srv     *http.Server
+	cfg    *config.Config
+	db     *ent.Client
+	rdb    *redis.Client
+	jwtMgr *auth.JWTManager
+	engine *gin.Engine
+	srv    *http.Server
 
 	// 插件系统组件
 	pluginMgr      *plugin.Manager
@@ -54,7 +52,6 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	}
 
 	jwtMgr := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.ExpireHour)
-	limiter := ratelimit.NewLimiter(rdb, ratelimit.DefaultConfig())
 
 	// 核心服务组件
 	sched := scheduler.NewScheduler(db, rdb)
@@ -71,7 +68,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	// HostService 通过 hashicorp/go-plugin GRPCBroker 暴露给所有插件子进程，
 	// 替代旧的 admin HTTP API + admin_api_key 模式。必须在加载任何插件之前注入。
 	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched))
-	forwarder := plugin.NewForwarder(db, pluginMgr, sched, concurrency, limiter, calculator, recorder)
+	forwarder := plugin.NewForwarder(db, pluginMgr, sched, concurrency, calculator, recorder)
 
 	marketOpts := []plugin.MarketplaceOption{
 		plugin.WithGithubToken(cfg.Plugins.Marketplace.GithubToken),
@@ -89,7 +86,6 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		db:             db,
 		rdb:            rdb,
 		jwtMgr:         jwtMgr,
-		limiter:        limiter,
 		engine:         gin.Default(),
 		pluginMgr:      pluginMgr,
 		forwarder:      forwarder,

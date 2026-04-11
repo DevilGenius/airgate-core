@@ -16,10 +16,11 @@ import (
 )
 
 func (f *Forwarder) ensureForwardAllowed(c *gin.Context, state *forwardState) bool {
-	if err := f.limiter.Check(c.Request.Context(), state.keyInfo.UserID, state.plugin.Platform); err != nil {
-		openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "rate_limit_exceeded", err.Error())
-		return false
-	}
+	// 注：原本这里有一个硬编码 60 req/min 的用户级 RPM 限流，
+	// 粒度太粗（同一个 user 的多把 key 共享一个配额）且无法配置，误伤严重，已移除。
+	// 现在的限流层级：
+	//   1. API Key 并发（可在管理面板按 key 单独设置，见 prepareForwardExecution）
+	//   2. 账号级 max_rpm / 并发槽（在 prepareForwardExecution 里，保护上游）
 
 	if state.keyInfo.UserBalance <= 0 {
 		c.JSON(http.StatusPaymentRequired, gin.H{

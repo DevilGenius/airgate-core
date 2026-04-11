@@ -38,9 +38,12 @@ func (s *Server) registerRoutes() {
 	// === 公共路由（无需认证） ===
 	v1.GET("/settings/public", handlers.Settings.GetPublicSettings)
 
-	// === 认证路由（无需 JWT，带限流保护） ===
+	// === 认证路由（无需 JWT） ===
+	//
+	// 注：原本这里挂了 middleware.RateLimit，但那个中间件依赖 c.Get(CtxKeyUserID)，
+	// 而登录/注册这些前置鉴权阶段根本还没设 user_id，中间件直接 c.Next() 放行，
+	// 实际是空转。随同硬编码 60 req/min 的用户限流一起移除了。
 	authGroup := v1.Group("/auth")
-	authGroup.Use(middleware.RateLimit(s.limiter))
 	{
 		authGroup.POST("/login", handlers.Auth.Login)
 		authGroup.POST("/login-apikey", handlers.Auth.LoginByAPIKey)

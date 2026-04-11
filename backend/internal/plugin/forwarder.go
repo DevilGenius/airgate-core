@@ -9,7 +9,6 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
-	"github.com/DouDOU-start/airgate-core/internal/ratelimit"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	sdk "github.com/DouDOU-start/airgate-sdk"
 )
@@ -26,13 +25,12 @@ func openAIError(c *gin.Context, status int, errType, code, message string) {
 }
 
 // Forwarder 请求转发器。
-// 完整流程：认证 → 限流 → 余额预检 → 调度 → 并发控制 → 转发 → 计费 → 记录。
+// 完整流程：认证 → 余额预检 → 调度 → API Key 并发 + 账号并发 → 转发 → 计费 → 记录。
 type Forwarder struct {
 	db          *ent.Client
 	manager     *Manager
 	scheduler   *scheduler.Scheduler
 	concurrency *scheduler.ConcurrencyManager
-	limiter     *ratelimit.Limiter
 	calculator  *billing.Calculator
 	recorder    *billing.Recorder
 }
@@ -119,7 +117,6 @@ func NewForwarder(
 	manager *Manager,
 	sched *scheduler.Scheduler,
 	concurrency *scheduler.ConcurrencyManager,
-	limiter *ratelimit.Limiter,
 	calculator *billing.Calculator,
 	recorder *billing.Recorder,
 ) *Forwarder {
@@ -128,7 +125,6 @@ func NewForwarder(
 		manager:     manager,
 		scheduler:   sched,
 		concurrency: concurrency,
-		limiter:     limiter,
 		calculator:  calculator,
 		recorder:    recorder,
 	}
