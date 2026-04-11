@@ -56,6 +56,37 @@ func TestRenderInstallScript_Defaults(t *testing.T) {
 	}
 }
 
+// TestRenderInstallScriptPowerShell_Defaults 验证 PowerShell 版安装脚本能正确渲染，
+// 并且用到的关键端点和跨平台约定（USERPROFILE 目录）都在。
+func TestRenderInstallScriptPowerShell_Defaults(t *testing.T) {
+	s := &Service{}
+	cfg := Config{
+		BaseURL:      "https://airgate.example.com",
+		SiteName:     "AirGate",
+		ProviderName: DefaultProviderName,
+	}
+	out, err := s.RenderInstallScriptPowerShell(cfg)
+	if err != nil {
+		t.Fatalf("RenderInstallScriptPowerShell: %v", err)
+	}
+	// 必需项：BaseURL / SiteName 已替换，版本检查、两个端点、Windows 目录约定都在
+	for _, want := range []string{
+		`$AirgateBase = 'https://airgate.example.com'`,
+		`$SiteName    = 'AirGate'`,
+		`$PSVersionTable.PSVersion.Major -lt 5`,
+		`/openclaw/models.txt`,
+		`/openclaw/render-config`,
+		`/v1/usage`,
+		`Join-Path $env:USERPROFILE '.openclaw'`,
+		`Invoke-RestMethod`, // 关键 HTTP 调用
+		`ConvertTo-Json`,    // body 序列化
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("rendered PowerShell script missing %q", want)
+		}
+	}
+}
+
 // TestDefaultModelsPresetJSON_IsValid 防止有人手抖把默认 JSON 改坏，导致
 // /openclaw/models handler 在管理员未配置时报 500。
 func TestDefaultModelsPresetJSON_IsValid(t *testing.T) {

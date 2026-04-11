@@ -101,28 +101,27 @@ func (s *Service) Load(ctx context.Context) (Config, error) {
 	return cfg, nil
 }
 
-// RenderInstallScript 用 text/template 把 install.sh 模板中的占位符替换掉。
+// installScriptTemplateData 是两份安装脚本模板共享的变量集合。
 //
-// 模板中使用 Go template 语法（{{.BaseURL}} 等），而不是简单字符串替换，
-// 因为脚本里有条件块（memorySearch 是否启用）。
-func (s *Service) RenderInstallScript(cfg Config) (string, error) {
-	tpl, err := template.New("install.sh").Parse(InstallScriptTemplate())
-	if err != nil {
-		return "", err
-	}
-	var buf bytes.Buffer
+// 因为 bash 和 PowerShell 都只需要 BaseURL / SiteName（其他 provider / memorySearch /
+// gatewayMode 相关的渲染都挪到了服务端 render-config 端点），这里保留 ProviderName 等
+// 字段是为了不破坏已有的 Go 模板（将来可能还会用到），text/template 不会因为字段
+// 未被引用而报错。
+type installScriptTemplateData struct {
+	BaseURL             string
+	SiteName            string
+	ProviderName        string
+	MemorySearchEnabled bool
+	MemorySearchModel   string
+	GatewayMode         string
+}
+
+func (s *Service) newInstallScriptData(cfg Config) installScriptTemplateData {
 	gatewayMode := strings.TrimSpace(cfg.GatewayMode)
 	if gatewayMode == "" {
 		gatewayMode = DefaultGatewayMode
 	}
-	data := struct {
-		BaseURL             string
-		SiteName            string
-		ProviderName        string
-		MemorySearchEnabled bool
-		MemorySearchModel   string
-		GatewayMode         string
-	}{
+	return installScriptTemplateData{
 		BaseURL:             cfg.BaseURL,
 		SiteName:            cfg.SiteName,
 		ProviderName:        cfg.ProviderName,
@@ -130,7 +129,34 @@ func (s *Service) RenderInstallScript(cfg Config) (string, error) {
 		MemorySearchModel:   cfg.MemorySearchModel,
 		GatewayMode:         gatewayMode,
 	}
-	if err := tpl.Execute(&buf, data); err != nil {
+}
+
+// RenderInstallScript 用 text/template 把 install.sh 模板中的占位符替换掉。
+//
+// 模板中使用 Go template 语法（{{.BaseURL}} 等），而不是简单字符串替换，
+// 方便以后要加条件块（虽然当前版本已经去掉了所有客户端分支）。
+func (s *Service) RenderInstallScript(cfg Config) (string, error) {
+	tpl, err := template.New("install.sh").Parse(InstallScriptTemplate())
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, s.newInstallScriptData(cfg)); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// RenderInstallScriptPowerShell 渲染 Windows PowerShell 版安装脚本（/openclaw/install.ps1）。
+//
+// 与 bash 版共用模板数据结构，保证两份脚本嵌入的 BaseURL / SiteName 行为一致。
+func (s *Service) RenderInstallScriptPowerShell(cfg Config) (string, error) {
+	tpl, err := template.New("install.ps1").Parse(InstallScriptPowerShellTemplate())
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, s.newInstallScriptData(cfg)); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

@@ -40,6 +40,7 @@ export default function DocsPage() {
     site.api_base_url || (typeof window !== 'undefined' ? window.location.origin : '')
   ).replace(/\/$/, '');
   const installCommand = `curl -fsSL ${baseUrl}/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh`;
+  const installCommandPowerShell = `iwr -useb ${baseUrl}/openclaw/install.ps1 | iex`;
 
   // 占位符替换：把 markdown 文本中所有 your-airgate.example.com / {{site_name}} 等
   // 全局替换为当前站点真实值。注意 markdown 源文件里用的是 your-airgate.example.com 这种
@@ -49,9 +50,10 @@ export default function DocsPage() {
       .replace(/\{\{site_name\}\}/g, siteName)
       .replace(/\{\{base_url\}\}/g, baseUrl)
       .replace(/\{\{install_command\}\}/g, installCommand)
+      .replace(/\{\{install_command_powershell\}\}/g, installCommandPowerShell)
       .replace(/https:\/\/your-airgate\.example\.com/g, baseUrl || 'https://your-airgate.example.com')
       .replace(/AirGate/g, siteName);
-  }, [siteName, baseUrl, installCommand]);
+  }, [siteName, baseUrl, installCommand, installCommandPowerShell]);
 
   // 从 markdown 源里抽取 H2 作为目录。简单正则按行匹配 `## xxx`，
   // 不会被代码块里的 ## 干扰（围栏内的内容会被跳过）。

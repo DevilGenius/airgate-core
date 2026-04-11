@@ -794,9 +794,17 @@ function OpenClawPanel({
   const fallbackOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const usingFallbackOrigin = !val('openclaw.base_url') && !val('api_base_url');
   const previewBase = (val('openclaw.base_url') || val('api_base_url') || fallbackOrigin || '').replace(/\/$/, '');
-  const installCommand = previewBase
-    ? `curl -fsSL ${previewBase}/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh`
-    : 'curl -fsSL <站点地址>/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh';
+
+  // 两个平台对应两份命令：Unix 用 bash + curl，Windows 用 PowerShell iwr|iex。
+  // 后端 HandleInfo 同时返回 install_command_bash / install_command_powershell 两个字段，
+  // 这里也分开展示，通过 tab 切换。
+  const baseForCmd = previewBase || '<站点地址>';
+  const installCommandBash = `curl -fsSL ${baseForCmd}/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh`;
+  const installCommandPowerShell = `iwr -useb ${baseForCmd}/openclaw/install.ps1 | iex`;
+
+  // 安装平台 tab：默认 Unix，状态只存在本地（刷新重置），因为纯展示不值得持久化。
+  const [installPlatform, setInstallPlatform] = useState<'unix' | 'windows'>('unix');
+  const installCommand = installPlatform === 'windows' ? installCommandPowerShell : installCommandBash;
 
   // 模型预设 JSON 的客户端校验：不阻塞保存，只给提示，让管理员自己决定。
   const modelsRaw = values['openclaw.models_preset'] ?? '';
@@ -815,9 +823,34 @@ function OpenClawPanel({
   return (
     <>
       <Card title={t('settings.openclaw_quickstart')}>
-        <p className="text-[12px] text-text-tertiary -mt-1 mb-4">
+        <p className="text-[12px] text-text-tertiary -mt-1 mb-3">
           {t('settings.openclaw_quickstart_desc')}
         </p>
+        {/* 平台切换：Unix 用 bash，Windows 用 PowerShell。两份命令都由后端渲染出对应的 install.sh / install.ps1 */}
+        <div className="inline-flex rounded-md border border-glass-border overflow-hidden mb-3 text-[12px]">
+          <button
+            type="button"
+            onClick={() => setInstallPlatform('unix')}
+            className={`px-3 py-1.5 transition-colors ${
+              installPlatform === 'unix'
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'bg-surface text-text-secondary hover:text-text'
+            }`}
+          >
+            {t('settings.openclaw_install_tab_unix')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setInstallPlatform('windows')}
+            className={`px-3 py-1.5 transition-colors border-l border-glass-border ${
+              installPlatform === 'windows'
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'bg-surface text-text-secondary hover:text-text'
+            }`}
+          >
+            {t('settings.openclaw_install_tab_windows')}
+          </button>
+        </div>
         <div className="flex items-center gap-2">
           <code className="flex-1 min-w-0 px-3 py-2 rounded-md bg-surface border border-glass-border text-[12px] font-mono text-text break-all">
             {installCommand}

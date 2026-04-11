@@ -85,6 +85,36 @@ func (h *OpenClawHandler) HandleInstallScript(c *gin.Context) {
 	c.Data(http.StatusOK, "text/x-shellscript; charset=utf-8", []byte(script))
 }
 
+// HandleInstallScriptPowerShell 返回 Windows PowerShell 版安装脚本。
+//
+// 用法（用户 PowerShell 终端）：
+//
+//	iwr -useb https://<airgate-host>/openclaw/install.ps1 | iex
+//
+// 与 bash 版相对，PowerShell 版的 Content-Type 用 text/plain —— PowerShell 对
+// MIME type 并不敏感，但 text/plain 能让浏览器直接预览而不是强制下载。
+func (h *OpenClawHandler) HandleInstallScriptPowerShell(c *gin.Context) {
+	cfg, err := h.loadConfig(c)
+	if err != nil {
+		slog.Error("openclaw: 加载配置失败", "error", err)
+		c.String(http.StatusInternalServerError, "failed to load openclaw config")
+		return
+	}
+	if !h.ensureEnabled(c, cfg) {
+		return
+	}
+
+	script, err := h.service.RenderInstallScriptPowerShell(cfg)
+	if err != nil {
+		slog.Error("openclaw: 渲染 PowerShell 安装脚本失败", "error", err)
+		c.String(http.StatusInternalServerError, "failed to render install.ps1")
+		return
+	}
+
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(script))
+}
+
 // HandleModels 返回管理员预设的模型清单 JSON。
 //
 // 公共无鉴权：清单本身是 "可以用哪些模型" 的元信息，不含 apikey 等敏感内容。
@@ -189,12 +219,18 @@ func (h *OpenClawHandler) HandleInfo(c *gin.Context) {
 		return
 	}
 
+	installCmdBash := fmt.Sprintf("curl -fsSL %s/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh", cfg.BaseURL)
+	installCmdPowerShell := fmt.Sprintf("iwr -useb %s/openclaw/install.ps1 | iex", cfg.BaseURL)
+
 	response.Success(c, gin.H{
-		"enabled":         cfg.Enabled,
-		"provider_name":   cfg.ProviderName,
-		"base_url":        cfg.BaseURL,
-		"site_name":       cfg.SiteName,
-		"install_command": fmt.Sprintf("curl -fsSL %s/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh", cfg.BaseURL),
+		"enabled":       cfg.Enabled,
+		"provider_name": cfg.ProviderName,
+		"base_url":      cfg.BaseURL,
+		"site_name":     cfg.SiteName,
+		// install_command 保留兼容老前端（指向 bash 版），新前端请用下面两个分系统命令。
+		"install_command":            installCmdBash,
+		"install_command_bash":       installCmdBash,
+		"install_command_powershell": installCmdPowerShell,
 		"memory_search": gin.H{
 			"enabled": cfg.MemorySearchEnabled,
 			"model":   cfg.MemorySearchModel,

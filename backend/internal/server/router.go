@@ -248,6 +248,7 @@ func (s *Server) registerRoutes() {
 	openclawGroup := r.Group("/openclaw")
 	{
 		openclawGroup.GET("/install.sh", handlers.OpenClaw.HandleInstallScript)
+		openclawGroup.GET("/install.ps1", handlers.OpenClaw.HandleInstallScriptPowerShell)
 		openclawGroup.GET("/models", handlers.OpenClaw.HandleModels)
 		openclawGroup.GET("/models.txt", handlers.OpenClaw.HandleModelsText)
 		openclawGroup.POST("/render-config", handlers.OpenClaw.HandleRenderConfig)

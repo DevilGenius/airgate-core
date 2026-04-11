@@ -79,17 +79,25 @@ print(resp.content[0].text)
 ## 一键接入 openclaw
 
 [openclaw](https://github.com/openclaw/openclaw) 是一款可以运行在本机的个人 AI 助理，可同时桥接 WhatsApp、Telegram、Slack、Discord 等十几种聊天平台。
-AirGate 已经兼容 openclaw 所需的全部协议，只需运行一行命令即可完成接入：
+AirGate 已经兼容 openclaw 所需的全部协议，只需运行一行命令即可完成接入。
+
+**Linux / macOS**（终端）：
 
 ```bash
 curl -fsSL https://your-airgate.example.com/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh
+```
+
+**Windows**（PowerShell 5 或更高版本）：
+
+```powershell
+iwr -useb https://your-airgate.example.com/openclaw/install.ps1 | iex
 ```
 
 脚本会：
 
 1. 提示你粘贴一把 AirGate 的 API Key
 2. 拉取管理员预设的可选模型列表让你勾选
-3. 自动生成 `~/.openclaw/openclaw.json`（旧配置会被备份）
+3. 自动生成 `~/.openclaw/openclaw.json`（Windows 为 `%USERPROFILE%\.openclaw\openclaw.json`，旧配置会被备份）
 
 完成后启动 openclaw 即可：
 

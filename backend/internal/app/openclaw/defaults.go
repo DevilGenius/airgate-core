@@ -59,12 +59,22 @@ const DefaultModelsPresetJSON = `[
   }
 ]`
 
-// installScriptTemplate 是 /openclaw/install.sh 返回的脚本模板，由 go:embed 打进二进制。
+// installScriptTemplate 是 /openclaw/install.sh 返回的 bash 脚本模板，由 go:embed 打进二进制。
 //
 //go:embed assets/install.sh.tmpl
 var installScriptTemplate string
 
-// InstallScriptTemplate 返回安装脚本模板原文。
+// InstallScriptTemplate 返回 bash 安装脚本模板原文。
 func InstallScriptTemplate() string {
 	return installScriptTemplate
+}
+
+// installScriptPowerShellTemplate 是 /openclaw/install.ps1 返回的 PowerShell 脚本模板。
+//
+//go:embed assets/install.ps1.tmpl
+var installScriptPowerShellTemplate string
+
+// InstallScriptPowerShellTemplate 返回 PowerShell 安装脚本模板原文。
+func InstallScriptPowerShellTemplate() string {
+	return installScriptPowerShellTemplate
 }
