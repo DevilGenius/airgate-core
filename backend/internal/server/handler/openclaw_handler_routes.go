@@ -112,6 +112,70 @@ func (h *OpenClawHandler) HandleModels(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json; charset=utf-8", []byte(cfg.ModelsPresetJSON))
 }
 
+// HandleModelsText 返回 pipe 分隔的模型清单，供 install.sh 里纯 bash 解析。
+//
+// 与 HandleModels 的区别：
+//   - /openclaw/models 返回原始 JSON（给前端管理面板用）
+//   - /openclaw/models.txt 返回已预处理的 `idx|id|label|api|caps` 纯文本，bash
+//     `while IFS='|' read` 一行搞定，避免在客户端依赖 python3/jq
+func (h *OpenClawHandler) HandleModelsText(c *gin.Context) {
+	cfg, err := h.loadConfig(c)
+	if err != nil {
+		slog.Error("openclaw: 加载配置失败", "error", err)
+		c.String(http.StatusInternalServerError, "failed to load openclaw config")
+		return
+	}
+	if !h.ensureEnabled(c, cfg) {
+		return
+	}
+
+	text, err := h.service.BuildModelsText(cfg)
+	if err != nil {
+		slog.Error("openclaw: 渲染 models.txt 失败", "error", err)
+		c.String(http.StatusInternalServerError, "models_preset is not valid JSON; please fix it in admin settings")
+		return
+	}
+
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(text))
+}
+
+// HandleRenderConfig 根据客户端提交的 API Key + 选中的模型 ID，服务端渲染出完整的 openclaw.json。
+//
+// 把这段逻辑从 install.sh 里的 python3 搬到服务端，让安装脚本彻底摆脱 python 依赖。
+// 注意：服务端不做 API Key 有效性校验（install.sh 在更早的步骤已经调 /v1/usage 校过了），
+// 也不落库保存，只做 JSON 组装并直接回写给客户端。
+func (h *OpenClawHandler) HandleRenderConfig(c *gin.Context) {
+	cfg, err := h.loadConfig(c)
+	if err != nil {
+		slog.Error("openclaw: 加载配置失败", "error", err)
+		c.String(http.StatusInternalServerError, "failed to load openclaw config")
+		return
+	}
+	if !h.ensureEnabled(c, cfg) {
+		return
+	}
+
+	var req appopenclaw.RenderConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.String(http.StatusBadRequest, "invalid request body: %s", err)
+		return
+	}
+
+	out, err := h.service.BuildOpenClawConfig(cfg, req)
+	if err != nil {
+		// 客户端错误（unknown model id / 空 api_key 等）直接回 400，带原始错误信息；
+		// models_preset 坏掉之类的服务端问题由 service 层向上冒泡，这里也统一作为 400
+		// 返回，因为脚本对所有渲染失败的处理都是 die，不需要区分 4xx/5xx。
+		slog.Warn("openclaw: 渲染 openclaw.json 失败", "error", err)
+		c.String(http.StatusBadRequest, "render failed: %s", err)
+		return
+	}
+
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, "application/json; charset=utf-8", out)
+}
+
 // HandleInfo 聚合 base_url / provider / memory_search 等元信息，供前端管理面板展示
 // "一键命令" 卡片时使用。
 func (h *OpenClawHandler) HandleInfo(c *gin.Context) {

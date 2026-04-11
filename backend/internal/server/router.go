@@ -249,6 +249,8 @@ func (s *Server) registerRoutes() {
 	{
 		openclawGroup.GET("/install.sh", handlers.OpenClaw.HandleInstallScript)
 		openclawGroup.GET("/models", handlers.OpenClaw.HandleModels)
+		openclawGroup.GET("/models.txt", handlers.OpenClaw.HandleModelsText)
+		openclawGroup.POST("/render-config", handlers.OpenClaw.HandleRenderConfig)
 		openclawGroup.GET("/info", handlers.OpenClaw.HandleInfo)
 	}
 

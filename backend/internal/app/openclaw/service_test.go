@@ -7,10 +7,15 @@ import (
 )
 
 // TestRenderInstallScript_Defaults 验证 RenderInstallScript 在默认 Config 下能产出
-// 一份语法上看起来正常的 bash 脚本：含 shebang、占位符已替换、关键步骤都在。
+// 一份语法上看起来正常的 bash 脚本：含 shebang、BaseURL/SiteName 占位符已替换、
+// 新版脚本依赖的关键端点都在。
 //
 // 这里直接构造 Service{} 而不是 NewService(...)，因为模板渲染只用到 InstallScriptTemplate()，
 // 不依赖 settings.Service。
+//
+// 注意：新版脚本把 provider / memorySearch / gatewayMode 的渲染全部挪到服务端
+// /openclaw/render-config，客户端脚本不再包含 PROVIDER_NAME / MEM_ENABLED 等变量，
+// 这里也就不再断言它们的存在。
 func TestRenderInstallScript_Defaults(t *testing.T) {
 	s := &Service{}
 	cfg := Config{
@@ -29,38 +34,25 @@ func TestRenderInstallScript_Defaults(t *testing.T) {
 	}
 	for _, want := range []string{
 		`AIRGATE_BASE="https://airgate.example.com"`,
-		`PROVIDER_NAME="airgate"`,
-		`/openclaw/models`,
-		`MEM_ENABLED="0"`,                       // memory_search 关闭时模板分支应输出 0
-		`/v1/usage`,                             // API Key 校验路径（core 自身端点，不经插件）
-		`info "已读取 API Key: ${MASKED_API_KEY}"`, // 输入后显示脱敏确认
+		`SITE_NAME="AirGate"`,
+		`/openclaw/models.txt`,    // 新版拉模型列表的端点
+		`/openclaw/render-config`, // 新版渲染配置的端点
+		`/v1/usage`,               // API Key 校验路径（core 自身端点，不经插件）
+		`command -v curl`,         // 前置检查应仍在（但 python3 依赖已被移除）
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered script missing %q", want)
 		}
 	}
-}
-
-// TestRenderInstallScript_MemorySearchEnabled 检查 {{if .MemorySearchEnabled}} 分支
-// 在开启时正确把 1 写进 MEM_ENABLED。
-func TestRenderInstallScript_MemorySearchEnabled(t *testing.T) {
-	s := &Service{}
-	cfg := Config{
-		BaseURL:             "http://localhost:8080",
-		SiteName:            "Local",
-		ProviderName:        "airgate",
-		MemorySearchEnabled: true,
-		MemorySearchModel:   "text-embedding-3-large",
-	}
-	out, err := s.RenderInstallScript(cfg)
-	if err != nil {
-		t.Fatalf("RenderInstallScript: %v", err)
-	}
-	if !strings.Contains(out, `MEM_ENABLED="1"`) {
-		t.Error("expected MEM_ENABLED=1 when memory search enabled")
-	}
-	if !strings.Contains(out, `MEM_MODEL="text-embedding-3-large"`) {
-		t.Error("expected MEM_MODEL to be substituted")
+	// 反向断言：确认 python3 依赖和脱敏显示的历史逻辑已被彻底移除。
+	for _, notWant := range []string{
+		"python3",
+		"MASKED_API_KEY",
+		"已读取 API Key",
+	} {
+		if strings.Contains(out, notWant) {
+			t.Errorf("rendered script should no longer contain %q", notWant)
+		}
 	}
 }
 
