@@ -133,6 +133,8 @@ var (
 	DefaultBalance float64
 	// DefaultMaxConcurrency holds the default value on creation for the "max_concurrency" field.
 	DefaultMaxConcurrency int
+	// MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
+	MaxConcurrencyValidator func(int) error
 	// DefaultBalanceAlertThreshold holds the default value on creation for the "balance_alert_threshold" field.
 	DefaultBalanceAlertThreshold float64
 	// DefaultBalanceAlertNotified holds the default value on creation for the "balance_alert_notified" field.

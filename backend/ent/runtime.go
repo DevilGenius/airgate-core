@@ -421,6 +421,8 @@ func init() {
 	userDescMaxConcurrency := userFields[5].Descriptor()
 	// user.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	user.DefaultMaxConcurrency = userDescMaxConcurrency.Default.(int)
+	// user.MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
+	user.MaxConcurrencyValidator = userDescMaxConcurrency.Validators[0].(func(int) error)
 	// userDescBalanceAlertThreshold is the schema descriptor for balance_alert_threshold field.
 	userDescBalanceAlertThreshold := userFields[8].Descriptor()
 	// user.DefaultBalanceAlertThreshold holds the default value on creation for the balance_alert_threshold field.

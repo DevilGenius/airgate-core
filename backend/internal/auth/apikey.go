@@ -40,6 +40,11 @@ type APIKeyInfo struct {
 	// 在 forwarder 路径里会用 Redis 原子 SET 按 key_id 维度争抢槽位。
 	KeyMaxConcurrency int
 
+	// UserMaxConcurrency 用户级并发上限，0 表示不限制。
+	// 同一个 user 下所有 API Key 共享这个配额——无论创建多少把 key，
+	// 加起来同时在途的请求数不能超过这个值。与 KeyMaxConcurrency 是 AND 关系。
+	UserMaxConcurrency int
+
 	// 预加载字段，避免 forwarder 重复查询
 	UserBalance            float64           // 用户余额
 	UserGroupRates         map[int64]float64 // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
@@ -174,15 +179,16 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 	}
 
 	return &APIKeyInfo{
-		KeyID:             ak.ID,
-		KeyName:           ak.Name,
-		UserID:            u.ID,
-		GroupID:           g.ID,
-		GroupPlatform:     g.Platform,
-		QuotaUSD:          ak.QuotaUsd,
-		UsedQuota:         ak.UsedQuota,
-		SellRate:          ak.SellRate,
-		KeyMaxConcurrency: ak.MaxConcurrency,
+		KeyID:              ak.ID,
+		KeyName:            ak.Name,
+		UserID:             u.ID,
+		GroupID:            g.ID,
+		GroupPlatform:      g.Platform,
+		QuotaUSD:           ak.QuotaUsd,
+		UsedQuota:          ak.UsedQuota,
+		SellRate:           ak.SellRate,
+		KeyMaxConcurrency:  ak.MaxConcurrency,
+		UserMaxConcurrency: u.MaxConcurrency,
 
 		UserBalance:            u.Balance,
 		UserGroupRates:         u.GroupRates,

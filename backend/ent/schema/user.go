@@ -20,7 +20,8 @@ func (User) Fields() []ent.Field {
 		field.Float("balance").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Enum("role").Values("admin", "user").Default("user"),
-		field.Int("max_concurrency").Default(5),
+		field.Int("max_concurrency").Default(0).Min(0).
+			Comment("用户级并发上限：同一 user 所有 API Key 加起来同时在途的请求数。0 表示不限制（默认）。与 api_key.max_concurrency 是 AND 关系，两者都会检查。"),
 		field.String("totp_secret").Optional().Nillable().Sensitive(),
 		field.JSON("group_rates", map[int64]float64{}).Optional(),
 		field.Float("balance_alert_threshold").Default(0), // 0 表示关闭预警

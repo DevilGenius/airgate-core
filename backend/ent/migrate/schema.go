@@ -272,7 +272,7 @@ var (
 		{Name: "username", Type: field.TypeString, Default: ""},
 		{Name: "balance", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "role", Type: field.TypeEnum, Enums: []string{"admin", "user"}, Default: "user"},
-		{Name: "max_concurrency", Type: field.TypeInt, Default: 5},
+		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
 		{Name: "totp_secret", Type: field.TypeString, Nullable: true},
 		{Name: "group_rates", Type: field.TypeJSON, Nullable: true},
 		{Name: "balance_alert_threshold", Type: field.TypeFloat64, Default: 0},

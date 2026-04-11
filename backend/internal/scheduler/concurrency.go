@@ -16,10 +16,10 @@ const (
 	defaultSlotTTL = 5 * time.Minute
 )
 
-// acquireSlotScript 是 account / apikey 两种并发槽共用的原子 Lua 脚本。
+// acquireSlotScript 是 account / apikey / user 三种并发槽共用的原子 Lua 脚本。
 // 逻辑：SCARD < max → SADD 并续期；否则返回 0。
-// 注：两类槽用不同前缀的 key 隔离（concurrency:<id> 与 concurrency:apikey:<id>），
-// 所以同一个脚本可以服务双方而不互相干扰。
+// 注：三类槽用不同前缀的 key 隔离（concurrency:<id> / concurrency:apikey:<id> /
+// concurrency:user:<id>），所以同一个脚本可以服务三方而不互相干扰。
 var acquireSlotScript = redis.NewScript(`
 	local current = redis.call('SCARD', KEYS[1])
 	if current < tonumber(ARGV[1]) then
@@ -50,6 +50,13 @@ func concurrencyKey(accountID int) string {
 // 与账号级 key 用不同前缀隔离，避免 key_id / account_id 数值相同时相互串扰。
 func apiKeyConcurrencyKey(keyID int) string {
 	return fmt.Sprintf("concurrency:apikey:%d", keyID)
+}
+
+// userConcurrencyKey 生成用户级 Redis Key。
+// 用户 A 下的所有 API Key 共享同一个 SET，实现"用户总并发"语义：
+// 无论创建多少 key，同一个 user 同时在途的请求数加起来不超过 user.max_concurrency。
+func userConcurrencyKey(userID int) string {
+	return fmt.Sprintf("concurrency:user:%d", userID)
 }
 
 // acquireSlotByKey 通用并发槽获取：给定 Redis key 和上限，原子性检查 + SADD。
@@ -110,6 +117,21 @@ func (cm *ConcurrencyManager) ReleaseAPIKeySlot(ctx context.Context, keyID int, 
 		return
 	}
 	cm.rdb.SRem(ctx, apiKeyConcurrencyKey(keyID), requestID)
+}
+
+// AcquireUserSlot 获取用户级并发槽位。
+// maxConcurrency <= 0 时直接放行（表示该用户不限制总并发）。
+// 与 apikey / 账号 两级槽位独立，调用方需要分别 release。
+func (cm *ConcurrencyManager) AcquireUserSlot(ctx context.Context, userID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
+	return cm.acquireSlotByKey(ctx, userConcurrencyKey(userID), requestID, maxConcurrency, slotTTL)
+}
+
+// ReleaseUserSlot 释放用户级并发槽位
+func (cm *ConcurrencyManager) ReleaseUserSlot(ctx context.Context, userID int, requestID string) {
+	if cm.rdb == nil {
+		return
+	}
+	cm.rdb.SRem(ctx, userConcurrencyKey(userID), requestID)
 }
 
 // GetCurrentCount 获取账户当前并发数

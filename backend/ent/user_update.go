@@ -456,6 +456,11 @@ func (uu *UserUpdate) check() error {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
 		}
 	}
+	if v, ok := uu.mutation.MaxConcurrency(); ok {
+		if err := user.MaxConcurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "User.max_concurrency": %w`, err)}
+		}
+	}
 	if v, ok := uu.mutation.Status(); ok {
 		if err := user.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "User.status": %w`, err)}
@@ -1206,6 +1211,11 @@ func (uuo *UserUpdateOne) check() error {
 	if v, ok := uuo.mutation.Role(); ok {
 		if err := user.RoleValidator(v); err != nil {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
+		}
+	}
+	if v, ok := uuo.mutation.MaxConcurrency(); ok {
+		if err := user.MaxConcurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "User.max_concurrency": %w`, err)}
 		}
 	}
 	if v, ok := uuo.mutation.Status(); ok {

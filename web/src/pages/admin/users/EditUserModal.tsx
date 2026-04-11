@@ -58,7 +58,8 @@ export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUs
         <Input
           label={t('users.max_concurrency')}
           type="number"
-          value={String(form.max_concurrency ?? 5)}
+          min="0"
+          value={String(form.max_concurrency ?? 0)}
           onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
         />
         <div className="space-y-1.5">

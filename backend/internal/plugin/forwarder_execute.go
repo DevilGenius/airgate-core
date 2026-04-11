@@ -15,31 +15,57 @@ import (
 	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
-// acquireAPIKeySlot 在 forward 路径最前面争抢 API Key 级并发槽。
+// acquireClientSlots 在 forward 路径最前面同时争抢 "用户级" 和 "API Key 级" 两层并发槽。
 //
-//   - keyInfo.KeyMaxConcurrency <= 0 时直接返回 no-op release，表示该 key 不限制并发；
-//   - 成功获取返回配对的 release 函数，Forward() 应 defer 调用；
-//   - 争抢失败直接写 429 响应并返回 nil，调用方看到 nil 就应立即 return。
+// 语义：
+//   - 两个闸门是 AND 关系：两者都设了上限才需要都过；任意一个为 0 表示该层级不限制。
+//   - 获取顺序：先拿 user 槽（更粗粒度，更容易挡掉），再拿 apikey 槽。
+//   - 释放顺序：apikey 先，user 后（反向释放）。
+//   - 任何一步失败都直接写 429 响应并返回 nil；调用方看到 nil 就应立即 return。
 //
 // 注意 slot ID 独立于 state.requestID，因为后者会在每次 failover attempt 里被重新生成；
-// 而 API Key 槽位跨 attempt 稳定，必须有独立且稳定的成员 ID 保证 SREM 能匹配上。
-func (f *Forwarder) acquireAPIKeySlot(c *gin.Context, state *forwardState) func() {
-	maxConc := state.keyInfo.KeyMaxConcurrency
-	if maxConc <= 0 {
-		return func() {}
-	}
-
+// 而这两层槽位跨 attempt 稳定，必须有独立且稳定的成员 ID 保证 SREM 能匹配上。
+func (f *Forwarder) acquireClientSlots(c *gin.Context, state *forwardState) func() {
 	ctx := c.Request.Context()
 	slotID := uuid.New().String()
 
-	if err := f.concurrency.AcquireAPIKeySlot(ctx, state.keyInfo.KeyID, slotID, maxConc, 0); err != nil {
-		openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "apikey_concurrency_limit", "API Key 并发已达上限，请稍后重试")
-		return nil
+	// 1. 用户级：同一 user 的所有 key 共享这个配额
+	userMax := state.keyInfo.UserMaxConcurrency
+	userHeld := false
+	if userMax > 0 {
+		if err := f.concurrency.AcquireUserSlot(ctx, state.keyInfo.UserID, slotID, userMax, 0); err != nil {
+			openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "user_concurrency_limit", "用户并发已达上限，请稍后重试")
+			return nil
+		}
+		userHeld = true
 	}
 
+	// 2. API Key 级：单把 key 独立上限
+	keyMax := state.keyInfo.KeyMaxConcurrency
+	keyHeld := false
+	if keyMax > 0 {
+		if err := f.concurrency.AcquireAPIKeySlot(ctx, state.keyInfo.KeyID, slotID, keyMax, 0); err != nil {
+			// 回滚用户槽，避免泄漏
+			if userHeld {
+				f.concurrency.ReleaseUserSlot(ctx, state.keyInfo.UserID, slotID)
+			}
+			openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "apikey_concurrency_limit", "API Key 并发已达上限，请稍后重试")
+			return nil
+		}
+		keyHeld = true
+	}
+
+	// 两把槽都成功（或因为不限制而没拿），返回组合 release。
+	// 反向释放：apikey 先，user 后。
+	userID := state.keyInfo.UserID
 	keyID := state.keyInfo.KeyID
 	return func() {
-		f.concurrency.ReleaseAPIKeySlot(ctx, keyID, slotID)
+		if keyHeld {
+			f.concurrency.ReleaseAPIKeySlot(ctx, keyID, slotID)
+		}
+		if userHeld {
+			f.concurrency.ReleaseUserSlot(ctx, userID, slotID)
+		}
 	}
 }
 
@@ -47,8 +73,10 @@ func (f *Forwarder) ensureForwardAllowed(c *gin.Context, state *forwardState) bo
 	// 注：原本这里有一个硬编码 60 req/min 的用户级 RPM 限流，
 	// 粒度太粗（同一个 user 的多把 key 共享一个配额）且无法配置，误伤严重，已移除。
 	// 现在的限流层级：
-	//   1. API Key 并发（可在管理面板按 key 单独设置，见 prepareForwardExecution）
-	//   2. 账号级 max_rpm / 并发槽（在 prepareForwardExecution 里，保护上游）
+	//   1. 用户级并发（user.max_concurrency，同一 user 所有 key 共享配额）
+	//   2. API Key 级并发（api_key.max_concurrency，每把 key 独立上限）
+	//   3. 账号级 max_rpm / 并发槽（在 prepareForwardExecution 里，保护上游）
+	// 1 和 2 在 acquireClientSlots 里取，Forward() 在此函数之后调用。
 
 	if state.keyInfo.UserBalance <= 0 {
 		c.JSON(http.StatusPaymentRequired, gin.H{

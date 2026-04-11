@@ -15,7 +15,7 @@ interface CreateUserModalProps {
 }
 
 const defaultForm: CreateUserReq = {
-  email: '', password: '', username: '', role: 'user', max_concurrency: 5,
+  email: '', password: '', username: '', role: 'user', max_concurrency: 0,
 };
 
 export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUserModalProps) {
@@ -81,7 +81,8 @@ export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUser
         <Input
           label={t('users.max_concurrency')}
           type="number"
-          value={String(form.max_concurrency ?? 5)}
+          min="0"
+          value={String(form.max_concurrency ?? 0)}
           onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
         />
       </div>

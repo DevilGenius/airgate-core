@@ -28,7 +28,7 @@ type User struct {
 	Balance float64 `json:"balance,omitempty"`
 	// Role holds the value of the "role" field.
 	Role user.Role `json:"role,omitempty"`
-	// MaxConcurrency holds the value of the "max_concurrency" field.
+	// 用户级并发上限：同一 user 所有 API Key 加起来同时在途的请求数。0 表示不限制（默认）。与 api_key.max_concurrency 是 AND 关系，两者都会检查。
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	// TotpSecret holds the value of the "totp_secret" field.
 	TotpSecret *string `json:"-"`

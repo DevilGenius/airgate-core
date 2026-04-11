@@ -366,6 +366,11 @@ func (uc *UserCreate) check() error {
 	if _, ok := uc.mutation.MaxConcurrency(); !ok {
 		return &ValidationError{Name: "max_concurrency", err: errors.New(`ent: missing required field "User.max_concurrency"`)}
 	}
+	if v, ok := uc.mutation.MaxConcurrency(); ok {
+		if err := user.MaxConcurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "User.max_concurrency": %w`, err)}
+		}
+	}
 	if _, ok := uc.mutation.BalanceAlertThreshold(); !ok {
 		return &ValidationError{Name: "balance_alert_threshold", err: errors.New(`ent: missing required field "User.balance_alert_threshold"`)}
 	}
