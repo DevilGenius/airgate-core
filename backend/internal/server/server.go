@@ -101,6 +101,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	s.handlers = bootstrap.NewHTTPHandlers(bootstrap.HTTPDependencies{
 		Config:      cfg,
 		DB:          db,
+		Redis:       rdb,
 		JWTMgr:      jwtMgr,
 		PluginMgr:   pluginMgr,
 		Marketplace: marketplace,

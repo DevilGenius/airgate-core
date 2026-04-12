@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
 	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
@@ -27,12 +29,14 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/handler"
+	"github.com/DouDOU-start/airgate-core/internal/upgrade"
 )
 
 // HTTPDependencies 描述 HTTP 处理器装配所需依赖。
 type HTTPDependencies struct {
 	Config      *config.Config
 	DB          *ent.Client
+	Redis       *redis.Client
 	JWTMgr      *auth.JWTManager
 	PluginMgr   *plugin.Manager
 	Marketplace *plugin.Marketplace
@@ -54,6 +58,7 @@ type HTTPHandlers struct {
 	Plugin       *handler.PluginHandler
 	OpenClaw     *handler.OpenClawHandler
 	Version      *handler.VersionHandler
+	Upgrade      *handler.UpgradeHandler
 }
 
 // NewHTTPHandlers 统一构造 HTTP 处理器。
@@ -87,6 +92,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	usageStore := store.NewUsageStore(dep.DB)
 	usageService := appusage.NewService(usageStore)
 
+	upgradeService := upgrade.NewService(upgrade.DetectMode(), dep.Redis)
+
 	return &HTTPHandlers{
 		Auth:         handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
 		User:         handler.NewUserHandler(userService),
@@ -101,6 +108,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Plugin:       handler.NewPluginHandler(pluginAdminService),
 		OpenClaw:     handler.NewOpenClawHandler(openclawService),
 		Version:      handler.NewVersionHandler(),
+		Upgrade:      handler.NewUpgradeHandler(upgradeService),
 	}
 }
 

@@ -16,9 +16,10 @@ import { Alert } from '../../shared/components/Alert';
 import { useToast } from '../../shared/components/Toast';
 import {
   Save, Loader2, Globe, UserPlus, Gift, Mail, Send, Upload, X, Eye, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Zap,
+  ShieldCheck, Copy, Trash2, KeyRound, Zap, Download,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
+import { SystemUpdatePanel } from './SystemUpdatePanel';
 
 // ==================== 设置 key 定义 ====================
 
@@ -120,7 +121,7 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'security' | 'registration' | 'defaults' | 'smtp' | 'openclaw';
+type TabKey = 'site' | 'security' | 'registration' | 'defaults' | 'smtp' | 'openclaw' | 'system';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
@@ -129,10 +130,14 @@ const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'defaults', labelKey: 'settings.tab_defaults', icon: Gift },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
   { key: 'openclaw', labelKey: 'settings.tab_openclaw', icon: Zap },
+  { key: 'system', labelKey: 'settings.tab_system', icon: Download },
 ];
 
-// security tab 不走通用 settings save 流程，单独通过 admin-api-key 接口管理
-const TAB_GROUP: Record<Exclude<TabKey, 'security'>, string> = {
+// security 和 system tab 不走通用 settings save 流程；前者管理 admin-api-key，
+// 后者通过独立的 upgrade API 管理。
+type SaveTabKey = Exclude<TabKey, 'security' | 'system'>;
+
+const TAB_GROUP: Record<SaveTabKey, string> = {
   site: 'site',
   registration: 'registration',
   defaults: 'defaults',
@@ -140,7 +145,7 @@ const TAB_GROUP: Record<Exclude<TabKey, 'security'>, string> = {
   openclaw: 'openclaw',
 };
 
-const TAB_KEYS: Record<Exclude<TabKey, 'security'>, readonly string[]> = {
+const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
   site: SITE_KEYS,
   registration: REG_KEYS,
   defaults: DEFAULT_KEYS,
@@ -210,7 +215,7 @@ export default function SettingsPage() {
   }
 
   function handleSave() {
-    if (activeTab === 'security') return;
+    if (activeTab === 'security' || activeTab === 'system') return;
     const group = TAB_GROUP[activeTab];
     const keys = TAB_KEYS[activeTab];
     const items: SettingItem[] = keys.map((key) => ({
@@ -468,10 +473,12 @@ export default function SettingsPage() {
             val={val}
           />
         )}
+
+        {activeTab === 'system' && <SystemUpdatePanel />}
       </div>
 
-      {/* Save button (security tab manages its own actions) */}
-      {activeTab !== 'security' && (
+      {/* Save button (security/system tab 自管 actions) */}
+      {activeTab !== 'security' && activeTab !== 'system' && (
         <div className="flex justify-end mt-6">
           <Button
             icon={<Save className="w-4 h-4" />}
