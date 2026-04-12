@@ -205,12 +205,19 @@ setup-hooks: ## 安装 Git pre-commit hook
 
 # ===================== 依赖安装 =====================
 
-install: setup-hooks ## 安装全部依赖（含 SDK 前端构建）
+install: setup-hooks ## 安装全部依赖（含 SDK 前端构建、插件前端依赖、首次 webdist 构建）
 	@cd $(SDK_FRONTEND) && npm install && npm run build && echo "SDK 前端构建完成"
 	@cd $(BACKEND_DIR) && $(GO) mod download
 	@rm -rf $(WEB_DIR)/node_modules/.vite
 	@cd $(WEB_DIR) && npm install
+	@for p in $(OPENAI_PLUGIN) $(EPAY_PLUGIN) $(HEALTH_PLUGIN); do \
+		if [ -d $$p ]; then \
+			echo "安装插件前端依赖: $$p"; \
+			cd $$p && npm install && cd - > /dev/null; \
+		fi; \
+	done
 	@command -v air > /dev/null 2>&1 || (echo "安装 air（热重载工具）..."; $(GO) install github.com/air-verse/air@latest)
+	@$(MAKE) build-frontend ensure-webdist
 	@echo "依赖安装完成"
 
 # ===================== Docker =====================
