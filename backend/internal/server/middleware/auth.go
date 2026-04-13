@@ -129,16 +129,29 @@ func AdminOnly() gin.HandlerFunc {
 	}
 }
 
-// extractBearerToken 从 Authorization 头提取 Bearer Token
+// extractBearerToken 从 Authorization 头或 x-api-key 头提取 API Key
+// 优先使用 Authorization: Bearer <token>，回退到 x-api-key（Anthropic 标准格式）
 func extractBearerToken(c *gin.Context) string {
 	header := c.GetHeader("Authorization")
-	if header == "" {
-		return ""
+	if header != "" {
+		// 支持 "Bearer <token>" 格式
+		parts := strings.SplitN(header, " ", 2)
+		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+			return strings.TrimSpace(parts[1])
+		}
 	}
-	// 支持 "Bearer <token>" 格式
-	parts := strings.SplitN(header, " ", 2)
-	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
-		return strings.TrimSpace(parts[1])
+	// 回退：Anthropic 标准 x-api-key 头
+	if key := c.GetHeader("x-api-key"); key != "" {
+		return key
 	}
 	return ""
+}
+
+// HasAPIKey 检查请求是否携带 API Key（Authorization: Bearer 或 x-api-key）
+func HasAPIKey(c *gin.Context) bool {
+	auth := c.GetHeader("Authorization")
+	if len(auth) > 7 && strings.EqualFold(auth[:7], "Bearer ") {
+		return true
+	}
+	return c.GetHeader("x-api-key") != ""
 }

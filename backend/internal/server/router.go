@@ -287,11 +287,10 @@ func (s *Server) registerRoutes() {
 	r.StaticFS("/assets", http.FS(assetsFS))
 
 	// NoRoute: 携带 API Key 的请求转发到插件系统，其余返回前端 index.html
+	// 支持 Authorization: Bearer 和 x-api-key 两种认证方式（兼容 Anthropic 标准格式）
 	apiKeyAuth := middleware.APIKeyAuth(s.db)
 	r.NoRoute(func(c *gin.Context) {
-		// 检查是否携带 Bearer token（API Key 调用）
-		auth := c.GetHeader("Authorization")
-		if len(auth) > 7 && auth[:7] == "Bearer " {
+		if middleware.HasAPIKey(c) {
 			apiKeyAuth(c)
 			if c.IsAborted() {
 				return
