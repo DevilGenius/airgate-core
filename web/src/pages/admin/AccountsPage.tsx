@@ -534,16 +534,22 @@ export default function AccountsPage() {
           target.style.pointerEvents = '';
         };
 
-        if (!usage) return (
-          <div
-            className="flex items-center gap-1 cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]"
-            title={t('accounts.refresh_usage', '点击刷新用量')}
-            onClick={handleRefreshClick}
-          >
-            <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
-            <RefreshCw size={11} style={{ color: 'var(--ag-text-tertiary)' }} />
-          </div>
-        );
+        if (!usage) {
+          // apikey 类型账号不支持用量刷新，仅显示占位符
+          if (row.type === 'apikey') {
+            return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+          }
+          return (
+            <div
+              className="flex items-center gap-1 cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]"
+              title={t('accounts.refresh_usage', '点击刷新用量')}
+              onClick={handleRefreshClick}
+            >
+              <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
+              <RefreshCw size={11} style={{ color: 'var(--ag-text-tertiary)' }} />
+            </div>
+          );
+        }
 
         const windows: Array<{ label: string; used_percent: number; reset_seconds: number }> = usage.windows || [];
         const credits: { balance: number; unlimited: boolean } | null = usage.credits || null;
