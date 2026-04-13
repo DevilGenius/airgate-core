@@ -519,7 +519,10 @@ export default function AccountsPage() {
           try {
             await accountsApi.refreshQuota(row.id);
             queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
-          } catch { /* ignore */ }
+            toast('success', t('accounts.refresh_usage_success', '用量刷新成功'));
+          } catch {
+            toast('error', t('accounts.refresh_usage_failed', '用量刷新失败'));
+          }
           target.style.opacity = '1';
           target.style.pointerEvents = '';
         };
