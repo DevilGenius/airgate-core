@@ -36,6 +36,9 @@ func (s *AccountStore) List(ctx context.Context, filter appaccount.ListFilter) (
 	if filter.Status != "" {
 		query = query.Where(entaccount.StatusEQ(entaccount.Status(filter.Status)))
 	}
+	if filter.AccountType != "" {
+		query = query.Where(entaccount.TypeEQ(filter.AccountType))
+	}
 	if filter.GroupID != nil {
 		query = query.Where(entaccount.HasGroupsWith(entgroup.ID(*filter.GroupID)))
 	}
@@ -74,6 +77,9 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 	}
 	if filter.Status != "" {
 		query = query.Where(entaccount.StatusEQ(entaccount.Status(filter.Status)))
+	}
+	if filter.AccountType != "" {
+		query = query.Where(entaccount.TypeEQ(filter.AccountType))
 	}
 	if filter.GroupID != nil {
 		query = query.Where(entaccount.HasGroupsWith(entgroup.ID(*filter.GroupID)))

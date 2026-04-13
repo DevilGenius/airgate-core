@@ -51,13 +51,14 @@ type UsageLog struct {
 
 // ListFilter 账号列表筛选条件。
 type ListFilter struct {
-	Page     int
-	PageSize int
-	Keyword  string
-	Platform string
-	Status   string
-	GroupID  *int
-	ProxyID  *int
+	Page        int
+	PageSize    int
+	Keyword     string
+	Platform    string
+	Status      string
+	AccountType string // 账号类型筛选（如 "apikey"、"oauth"）
+	GroupID     *int
+	ProxyID     *int
 }
 
 // ListResult 账号列表结果。

@@ -71,6 +71,7 @@ export default function AccountsPage() {
   const [keyword, setKeyword] = useState('');
   const [platformFilter, setPlatformFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [proxyFilter, setProxyFilter] = useState('');
 
@@ -120,11 +121,11 @@ export default function AccountsPage() {
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
   useEffect(() => {
     setSelectedIds([]);
-  }, [page, pageSize, keyword, platformFilter, statusFilter, groupFilter, proxyFilter]);
+  }, [page, pageSize, keyword, platformFilter, statusFilter, typeFilter, groupFilter, proxyFilter]);
 
   // 查询账号列表
   const { data, isLoading } = useQuery({
-    queryKey: queryKeys.accounts(page, pageSize, keyword, platformFilter, statusFilter, groupFilter, proxyFilter),
+    queryKey: queryKeys.accounts(page, pageSize, keyword, platformFilter, statusFilter, typeFilter, groupFilter, proxyFilter),
     queryFn: () =>
       accountsApi.list({
         page,
@@ -132,6 +133,7 @@ export default function AccountsPage() {
         keyword: keyword || undefined,
         platform: platformFilter || undefined,
         status: statusFilter || undefined,
+        account_type: typeFilter || undefined,
         group_id: groupFilter ? Number(groupFilter) : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
       }),
@@ -178,6 +180,7 @@ export default function AccountsPage() {
         keyword: keyword || undefined,
         platform: platformFilter || undefined,
         status: statusFilter || undefined,
+        account_type: typeFilter || undefined,
         group_id: groupFilter ? Number(groupFilter) : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
       }),
@@ -707,6 +710,18 @@ export default function AccountsPage() {
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           options={STATUS_OPTIONS}
+        />
+        <Select
+          className="min-w-0"
+          value={typeFilter}
+          onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+          options={[
+            { value: '', label: t('accounts.all_types', '全部类型') },
+            { value: 'oauth', label: 'OAuth' },
+            { value: 'session_key', label: 'Session Key' },
+            { value: 'setup_token', label: 'Setup Token' },
+            { value: 'apikey', label: 'API Key' },
+          ]}
         />
         <Select
           className="min-w-0"

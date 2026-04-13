@@ -23,13 +23,14 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 	}
 
 	result, err := h.service.List(c.Request.Context(), appaccount.ListFilter{
-		Page:     page.Page,
-		PageSize: page.PageSize,
-		Keyword:  page.Keyword,
-		Platform: c.Query("platform"),
-		Status:   c.Query("status"),
-		GroupID:  parseOptionalInt(c.Query("group_id")),
-		ProxyID:  parseOptionalInt(c.Query("proxy_id")),
+		Page:        page.Page,
+		PageSize:    page.PageSize,
+		Keyword:     page.Keyword,
+		Platform:    c.Query("platform"),
+		Status:      c.Query("status"),
+		AccountType: c.Query("account_type"),
+		GroupID:     parseOptionalInt(c.Query("group_id")),
+		ProxyID:     parseOptionalInt(c.Query("proxy_id")),
 	})
 	if err != nil {
 		httpCode, message := h.handleError("查询账号列表失败", "查询失败", err)
@@ -48,11 +49,12 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 // ExportAccounts 按当前筛选条件导出账号（返回 JSON 数据，前端落盘为文件）。
 func (h *AccountHandler) ExportAccounts(c *gin.Context) {
 	accounts, err := h.service.ExportAll(c.Request.Context(), appaccount.ListFilter{
-		Keyword:  c.Query("keyword"),
-		Platform: c.Query("platform"),
-		Status:   c.Query("status"),
-		GroupID:  parseOptionalInt(c.Query("group_id")),
-		ProxyID:  parseOptionalInt(c.Query("proxy_id")),
+		Keyword:     c.Query("keyword"),
+		Platform:    c.Query("platform"),
+		Status:      c.Query("status"),
+		AccountType: c.Query("account_type"),
+		GroupID:     parseOptionalInt(c.Query("group_id")),
+		ProxyID:     parseOptionalInt(c.Query("proxy_id")),
 	})
 	if err != nil {
 		httpCode, message := h.handleError("导出账号失败", "导出失败", err)
