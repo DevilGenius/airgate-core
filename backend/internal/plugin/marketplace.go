@@ -127,6 +127,14 @@ var officialPlugins = []MarketplacePlugin{
 		Type:        "extension",
 		GithubRepo:  "DouDOU-start/airgate-health",
 	},
+	{
+		Name:        "gateway-anthropic",
+		Version:     "1.0.0",
+		Description: "Claude Messages API 网关插件：OAuth 授权、TLS 指纹、用量监控",
+		Author:      "AirGate",
+		Type:        "gateway",
+		GithubRepo:  "DouDOU-start/airgate-claude",
+	},
 }
 
 // ListAvailable 列出可用插件（返回缓存或同步后的数据）
