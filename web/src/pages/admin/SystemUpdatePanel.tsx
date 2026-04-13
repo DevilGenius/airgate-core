@@ -129,6 +129,15 @@ export function SystemUpdatePanel() {
             >
               {t('common.copy')}
             </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw className={`w-3.5 h-3.5 ${infoLoading ? 'animate-spin' : ''}`} />}
+              onClick={() => refetchInfo()}
+              disabled={infoLoading}
+            >
+              {t('settings.system_check_update')}
+            </Button>
           </div>
         </div>
       );
@@ -190,15 +199,17 @@ export function SystemUpdatePanel() {
         {/* 操作区 */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex-1 min-w-[200px]">{renderActionArea()}</div>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<RefreshCw className={`w-3.5 h-3.5 ${infoLoading ? 'animate-spin' : ''}`} />}
-            onClick={() => refetchInfo()}
-            disabled={infoLoading}
-          >
-            {t('settings.system_check_update')}
-          </Button>
+          {info?.mode !== 'docker' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw className={`w-3.5 h-3.5 ${infoLoading ? 'animate-spin' : ''}`} />}
+              onClick={() => refetchInfo()}
+              disabled={infoLoading}
+            >
+              {t('settings.system_check_update')}
+            </Button>
+          )}
         </div>
 
         {/* Release notes */}

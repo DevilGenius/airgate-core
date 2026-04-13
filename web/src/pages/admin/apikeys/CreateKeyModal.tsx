@@ -5,6 +5,7 @@ import { Modal } from '../../../shared/components/Modal';
 import { Button } from '../../../shared/components/Button';
 import { Input, Textarea, Select } from '../../../shared/components/Input';
 import { parseIpList } from '../../../shared/utils/ip';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import type { CreateAPIKeyReq, GroupResp } from '../../../shared/types';
 
 interface CreateKeyModalProps {
@@ -49,12 +50,21 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
     onClose();
   };
 
+  const { user } = useAuth();
+  const userGroupRates = user?.group_rates;
   const groupOptions = [
     { value: '0', label: t('api_keys.select_group') },
-    ...groups.map((g) => ({
-      value: String(g.id),
-      label: `${g.name} (${g.platform}) · ${g.rate_multiplier}x`,
-    })),
+    ...groups.map((g) => {
+      const override = userGroupRates?.[g.id];
+      const hasOverride = override != null && override > 0 && override !== g.rate_multiplier;
+      const rateLabel = hasOverride
+        ? `${g.rate_multiplier}x → ${override}x`
+        : `${g.rate_multiplier}x`;
+      return {
+        value: String(g.id),
+        label: `${g.name} (${g.platform}) · ${rateLabel}`,
+      };
+    }),
   ];
 
   return (

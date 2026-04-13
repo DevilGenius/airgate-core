@@ -29,6 +29,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq, GroupResp } from '../../shared/types';
+import { useAuth } from '../../app/providers/AuthProvider';
 import { EditKeyModal } from './userkeys/EditKeyModal';
 import { CreateKeyModal } from './userkeys/CreateKeyModal';
 import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
@@ -39,6 +40,7 @@ export default function UserKeysPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE);
   const [modalOpen, setModalOpen] = useState(false);
@@ -194,7 +196,8 @@ export default function UserKeysPage() {
 
   const hasAvailableGroups = groupList.length > 0;
 
-  // 分组选项
+  // 分组选项（如果用户有专属倍率，显示专属倍率）
+  const userGroupRates = user?.group_rates;
   const groupOptions = [
     {
       value: '',
@@ -202,10 +205,17 @@ export default function UserKeysPage() {
         ? t('user_keys.select_group')
         : t('user_keys.no_groups_available'),
     },
-    ...groupList.map((g) => ({
-      value: String(g.id),
-      label: `${g.name} (${g.platform}) · ${g.rate_multiplier}x`,
-    })),
+    ...groupList.map((g) => {
+      const override = userGroupRates?.[g.id];
+      const hasOverride = override != null && override > 0 && override !== g.rate_multiplier;
+      const rateLabel = hasOverride
+        ? `${g.rate_multiplier}x → ${override}x`
+        : `${g.rate_multiplier}x`;
+      return {
+        value: String(g.id),
+        label: `${g.name} (${g.platform}) · ${rateLabel}`,
+      };
+    }),
   ];
 
   // 使用配置弹窗
