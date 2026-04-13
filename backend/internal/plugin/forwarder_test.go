@@ -77,6 +77,16 @@ func TestShouldPenalizeForwardError(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "gRPC Unavailable（插件重启）不计入失败",
+			err:  errors.New("gRPC 流接收失败: rpc error: code = Unavailable desc = error reading from server: EOF"),
+			want: false,
+		},
+		{
+			name: "gRPC transport closing 不计入失败",
+			err:  errors.New("rpc error: code = Unavailable desc = transport is closing"),
+			want: false,
+		},
+		{
 			name: "普通上游错误计入失败",
 			err:  errors.New("gRPC 流接收失败: rpc error: code = Unknown desc = upstream 502"),
 			want: true,

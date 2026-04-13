@@ -49,12 +49,18 @@ func shouldPenalizeForwardError(err error) bool {
 
 	msg := strings.ToLower(err.Error())
 	ignored := []string{
+		// WebSocket 正常断开
 		"websocket 连接失败: eof",
 		"读取 websocket 消息失败: eof",
 		"读取上游消息: eof",
 		"读取客户端消息: eof",
 		"websocket: close 1000",
 		"websocket: close 1001",
+		// gRPC 基础设施错误（插件进程重启/crash），不应归咎账号
+		"rpc error: code = unavailable",
+		"error reading from server: eof",
+		"transport is closing",
+		"connection refused",
 	}
 	for _, needle := range ignored {
 		if strings.Contains(msg, needle) {
