@@ -7,7 +7,6 @@ import {
   Pencil,
   Trash2,
   Zap,
-  Shield,
   MoreHorizontal,
   BarChart3,
   RefreshCw,
@@ -149,13 +148,11 @@ export default function AccountsPage() {
   );
 
   // 查询代理列表（用于表格中 ID→名称映射）
+  // 代理列表（只用于顶部筛选器；之前的"代理"列已移除）
   const { data: allProxiesData } = useQuery({
     queryKey: queryKeys.proxiesAll(),
     queryFn: () => proxiesApi.list(FETCH_ALL_PARAMS),
   });
-  const proxyMap = new Map(
-    (allProxiesData?.list ?? []).map((p) => [p.id, p.name]),
-  );
 
   // 查询用量窗口
   const { data: usageData } = useQuery({
@@ -469,21 +466,6 @@ export default function AccountsPage() {
           {row.rate_multiplier}x
         </span>
       ),
-    },
-    {
-      key: 'proxy_id',
-      title: t('accounts.proxy'),
-      width: '80px',
-      hideOnMobile: true,
-      render: (row) =>
-        row.proxy_id ? (
-          <span className="inline-flex items-center gap-1">
-            <Shield className="w-3 h-3" style={{ color: 'var(--ag-text-tertiary)' }} />
-            {proxyMap.get(row.proxy_id) ?? `#${row.proxy_id}`}
-          </span>
-        ) : (
-          <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
-        ),
     },
     {
       key: 'groups',
