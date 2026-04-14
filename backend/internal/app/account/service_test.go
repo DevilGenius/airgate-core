@@ -262,3 +262,71 @@ func TestEnrichTodayStats_BatchesAllAccountsInOneQuery(t *testing.T) {
 		t.Errorf("expected all 3 account IDs in one call, got %v", repo.captured[0])
 	}
 }
+
+func TestExtractBodyError(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "Anthropic standard nested error",
+			body: `{"error":{"type":"authentication_error","message":"Invalid x-api-key"}}`,
+			want: "authentication_error: Invalid x-api-key",
+		},
+		{
+			name: "nested error with only message",
+			body: `{"error":{"message":"rate limited"}}`,
+			want: "rate limited",
+		},
+		{
+			name: "nested error with only type",
+			body: `{"error":{"type":"overloaded"}}`,
+			want: "overloaded",
+		},
+		{
+			name: "error as plain string",
+			body: `{"error":"upstream gone"}`,
+			want: "upstream gone",
+		},
+		{
+			name: "top-level code + message (pool format)",
+			body: `{"code":"INVALID_API_KEY","message":"Invalid API key"}`,
+			want: "INVALID_API_KEY: Invalid API key",
+		},
+		{
+			name: "top-level only message",
+			body: `{"message":"something broke"}`,
+			want: "something broke",
+		},
+		{
+			name: "top-level only code",
+			body: `{"code":"BAD_REQUEST"}`,
+			want: "BAD_REQUEST",
+		},
+		{
+			name: "empty body",
+			body: ``,
+			want: "",
+		},
+		{
+			name: "non-JSON body",
+			body: `<html>500 Internal Server Error</html>`,
+			want: "",
+		},
+		{
+			name: "unrelated JSON",
+			body: `{"foo":"bar"}`,
+			want: "",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := extractBodyError([]byte(c.body))
+			if got != c.want {
+				t.Errorf("extractBodyError(%q) = %q, want %q", c.body, got, c.want)
+			}
+		})
+	}
+}

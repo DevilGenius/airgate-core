@@ -271,10 +271,18 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			//   - SSE 流式响应成功的 HTTP 状态就是 200
 			//   - 401 invalid api key / 403 forbidden / 429 rate limit /
 			//     5xx upstream error 全部应该报告测试失败
-			// 优先用插件已提取的 ErrorMessage（如 "invalid_api_key: Invalid
-			// API key"），插件没填则用状态码兜底。
+			//
+			// 错误消息提取顺序：
+			//   1. 插件已填的 ErrorMessage（Anthropic 标准格式）
+			//   2. 自己解析 Body 兜底（覆盖非标准格式，如池子转发器返回的
+			//      {"code":"INVALID_API_KEY","message":"..."}，插件 extractErrorMessage
+			//      只认 error.type+error.message 嵌套结构所以提不出来）
+			//   3. 兜底到 "upstream returned HTTP %d"
 			if result != nil && (result.StatusCode < 200 || result.StatusCode >= 300) {
 				msg := result.ErrorMessage
+				if msg == "" {
+					msg = extractBodyError(result.Body)
+				}
 				if msg == "" {
 					msg = fmt.Sprintf("upstream returned HTTP %d", result.StatusCode)
 				}
@@ -283,6 +291,67 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			return nil
 		},
 	}, nil
+}
+
+// extractBodyError 从上游错误响应 body 中提取人类可读的错误消息。
+//
+// Claude 等插件的 extractErrorMessage 只认 Anthropic 标准嵌套格式
+// {"error":{"type":"...","message":"..."}}，对于以下变体会失败：
+//   - 顶层 code+message：{"code":"INVALID_API_KEY","message":"Invalid API key"}
+//     （某些池子转发器 / 反代会用这种格式）
+//   - 顶层只有 message：{"message":"..."}
+//   - error 是字符串：{"error":"some plain text"}
+//   - error.message 但没有 error.type
+//
+// 这里把这些格式都覆盖一遍。返回空字符串表示无法提取。
+func extractBodyError(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return ""
+	}
+
+	asString := func(v any) string {
+		if s, ok := v.(string); ok {
+			return s
+		}
+		return ""
+	}
+
+	// 1. {"error": {"type": "...", "message": "..."}} (Anthropic 标准)
+	if errObj, ok := raw["error"].(map[string]any); ok {
+		t := asString(errObj["type"])
+		m := asString(errObj["message"])
+		switch {
+		case t != "" && m != "":
+			return t + ": " + m
+		case m != "":
+			return m
+		case t != "":
+			return t
+		}
+	}
+
+	// 2. {"error": "plain text"}
+	if s := asString(raw["error"]); s != "" {
+		return s
+	}
+
+	// 3. 顶层 {"code": "...", "message": "..."}（池子转发器常见格式）
+	code := asString(raw["code"])
+	msg := asString(raw["message"])
+	switch {
+	case code != "" && msg != "":
+		return code + ": " + msg
+	case msg != "":
+		return msg
+	case code != "":
+		return code
+	}
+
+	return ""
 }
 
 // GetModels 获取账号平台的模型列表。
