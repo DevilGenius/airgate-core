@@ -414,6 +414,7 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
                 innerRadius={35}
                 outerRadius={70}
                 dataKey="value"
+                minAngle={3}
                 stroke="var(--ag-bg-elevated)"
                 strokeWidth={1}
               >
