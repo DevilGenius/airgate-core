@@ -120,9 +120,15 @@ func (f *Forwarder) reportForwardExecution(ctx context.Context, state *forwardSt
 	isRateLimited := accountStatus == sdk.AccountStatusRateLimited
 	isAccountError := accountStatus == sdk.AccountStatusExpired || accountStatus == sdk.AccountStatusDisabled
 
-	// 账号池场景：上游是账号池（如 sub2api）时，"No available accounts"
-	// / "Upstream access forbidden" 之类的耗尽错误不是账号级故障，本地
-	// 账号的凭证完全没坏，池子可能几秒内就恢复。
+	// 账号池场景：上游是账号池（如 sub2api）时，任何失败响应都不是
+	// 本地账号的故障，而是池子内部的问题。本地账号凭证完全没坏，池子
+	// 可能几秒内就恢复。
+	//
+	// 触发条件（比之前宽泛得多）：只要是池子账号，任何形式的失败都
+	// 走降级路径：
+	//   - execution.err != nil（插件返回 error，比如 5xx "上游返回 502"）
+	//   - StatusCode >= 400（任何 4xx/5xx 响应）
+	//   - AccountStatus 是 Expired / Disabled / RateLimited
 	//
 	// 处理策略：把账号打入一个**临时降级窗口**（默认 60s）。窗口内：
 	//   - 账号仍然可被调度器选中（不像 overload 那样硬排除）
@@ -131,9 +137,15 @@ func (f *Forwarder) reportForwardExecution(ctx context.Context, state *forwardSt
 	//   - 窗口过期后（Redis TTL 自动），优先级自动恢复正常
 	//
 	// 不写 status=error，不累计 fail count。本次请求由上层返回给客户端。
-	if isAccountError && state.account != nil && state.account.UpstreamIsPool {
-		slog.Warn("上游账号池耗尽，打入降级窗口",
+	if !isSuccess && state.account != nil && state.account.UpstreamIsPool {
+		statusCode := 0
+		if execution.result != nil {
+			statusCode = execution.result.StatusCode
+		}
+		slog.Warn("池子账号上游失败，打入降级窗口",
 			"account_id", state.account.ID,
+			"status_code", statusCode,
+			"account_status", accountStatus,
 			"reason", resolveAccountErrorReason(execution))
 		f.scheduler.DecrementRPM(ctx, state.account.ID)
 		f.scheduler.MarkDegraded(ctx, state.account.ID, 0) // 0 = 使用默认窗口
