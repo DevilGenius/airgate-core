@@ -488,13 +488,15 @@ export default function AccountsPage() {
     {
       key: 'groups',
       title: t('accounts.groups'),
+      width: '140px',
+      align: 'center',
       hideOnMobile: true,
       render: (row) => {
         if (!row.group_ids || row.group_ids.length === 0) {
           return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
         }
         return (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-col items-center gap-1">
             {row.group_ids.map((gid) => (
               <span
                 key={gid}
