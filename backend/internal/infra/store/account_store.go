@@ -109,7 +109,8 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 		SetCredentials(cloneCredentials(input.Credentials)).
 		SetPriority(input.Priority).
 		SetMaxConcurrency(input.MaxConcurrency).
-		SetRateMultiplier(input.RateMultiplier)
+		SetRateMultiplier(input.RateMultiplier).
+		SetUpstreamIsPool(input.UpstreamIsPool)
 
 	if len(input.GroupIDs) > 0 {
 		builder = builder.AddGroupIDs(toIntSlice(input.GroupIDs)...)
@@ -150,6 +151,9 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 	}
 	if input.RateMultiplier != nil {
 		builder = builder.SetRateMultiplier(*input.RateMultiplier)
+	}
+	if input.UpstreamIsPool != nil {
+		builder = builder.SetUpstreamIsPool(*input.UpstreamIsPool)
 	}
 	if input.HasGroupIDs {
 		builder = builder.ClearGroups()
@@ -360,6 +364,7 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		MaxConcurrency: item.MaxConcurrency,
 		RateMultiplier: item.RateMultiplier,
 		ErrorMsg:       item.ErrorMsg,
+		UpstreamIsPool: item.UpstreamIsPool,
 		Extra:          cloneAnyMap(item.Extra),
 		CreatedAt:      item.CreatedAt,
 		UpdatedAt:      item.UpdatedAt,

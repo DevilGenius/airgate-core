@@ -37,6 +37,8 @@ type Account struct {
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
 	// ErrorMsg holds the value of the "error_msg" field.
 	ErrorMsg string `json:"error_msg,omitempty"`
+	// 上游是账号池：把 expired/disabled 降级为临时限流，避免池子耗尽时本地账号被永久标错
+	UpstreamIsPool bool `json:"upstream_is_pool,omitempty"`
 	// LastUsedAt holds the value of the "last_used_at" field.
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	// 扩展配置（插件/调度器使用）
@@ -101,6 +103,8 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case account.FieldCredentials, account.FieldExtra:
 			values[i] = new([]byte)
+		case account.FieldUpstreamIsPool:
+			values[i] = new(sql.NullBool)
 		case account.FieldRateMultiplier:
 			values[i] = new(sql.NullFloat64)
 		case account.FieldID, account.FieldPriority, account.FieldMaxConcurrency:
@@ -187,6 +191,12 @@ func (a *Account) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field error_msg", values[i])
 			} else if value.Valid {
 				a.ErrorMsg = value.String
+			}
+		case account.FieldUpstreamIsPool:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field upstream_is_pool", values[i])
+			} else if value.Valid {
+				a.UpstreamIsPool = value.Bool
 			}
 		case account.FieldLastUsedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -299,6 +309,9 @@ func (a *Account) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("error_msg=")
 	builder.WriteString(a.ErrorMsg)
+	builder.WriteString(", ")
+	builder.WriteString("upstream_is_pool=")
+	builder.WriteString(fmt.Sprintf("%v", a.UpstreamIsPool))
 	builder.WriteString(", ")
 	if v := a.LastUsedAt; v != nil {
 		builder.WriteString("last_used_at=")

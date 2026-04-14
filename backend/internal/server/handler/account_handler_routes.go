@@ -134,6 +134,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		MaxConcurrency: req.MaxConcurrency,
 		ProxyID:        req.ProxyID,
 		RateMultiplier: req.RateMultiplier,
+		UpstreamIsPool: req.UpstreamIsPool,
 		GroupIDs:       req.GroupIDs,
 	})
 	if err != nil {
@@ -173,6 +174,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		Priority:       req.Priority,
 		MaxConcurrency: req.MaxConcurrency,
 		RateMultiplier: req.RateMultiplier,
+		UpstreamIsPool: req.UpstreamIsPool,
 		GroupIDs:       req.GroupIDs,
 		HasGroupIDs:    req.GroupIDs != nil,
 	}

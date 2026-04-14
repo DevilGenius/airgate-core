@@ -33,6 +33,8 @@ const (
 	FieldRateMultiplier = "rate_multiplier"
 	// FieldErrorMsg holds the string denoting the error_msg field in the database.
 	FieldErrorMsg = "error_msg"
+	// FieldUpstreamIsPool holds the string denoting the upstream_is_pool field in the database.
+	FieldUpstreamIsPool = "upstream_is_pool"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
 	FieldLastUsedAt = "last_used_at"
 	// FieldExtra holds the string denoting the extra field in the database.
@@ -82,6 +84,7 @@ var Columns = []string{
 	FieldMaxConcurrency,
 	FieldRateMultiplier,
 	FieldErrorMsg,
+	FieldUpstreamIsPool,
 	FieldLastUsedAt,
 	FieldExtra,
 	FieldCreatedAt,
@@ -134,6 +137,8 @@ var (
 	DefaultRateMultiplier float64
 	// DefaultErrorMsg holds the default value on creation for the "error_msg" field.
 	DefaultErrorMsg string
+	// DefaultUpstreamIsPool holds the default value on creation for the "upstream_is_pool" field.
+	DefaultUpstreamIsPool bool
 	// DefaultExtra holds the default value on creation for the "extra" field.
 	DefaultExtra map[string]interface{}
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -217,6 +222,11 @@ func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 // ByErrorMsg orders the results by the error_msg field.
 func ByErrorMsg(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldErrorMsg, opts...).ToFunc()
+}
+
+// ByUpstreamIsPool orders the results by the upstream_is_pool field.
+func ByUpstreamIsPool(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUpstreamIsPool, opts...).ToFunc()
 }
 
 // ByLastUsedAt orders the results by the last_used_at field.

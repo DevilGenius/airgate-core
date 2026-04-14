@@ -90,6 +90,11 @@ func ErrorMsg(v string) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldErrorMsg, v))
 }
 
+// UpstreamIsPool applies equality check predicate on the "upstream_is_pool" field. It's identical to UpstreamIsPoolEQ.
+func UpstreamIsPool(v bool) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUpstreamIsPool, v))
+}
+
 // LastUsedAt applies equality check predicate on the "last_used_at" field. It's identical to LastUsedAtEQ.
 func LastUsedAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldLastUsedAt, v))
@@ -513,6 +518,16 @@ func ErrorMsgEqualFold(v string) predicate.Account {
 // ErrorMsgContainsFold applies the ContainsFold predicate on the "error_msg" field.
 func ErrorMsgContainsFold(v string) predicate.Account {
 	return predicate.Account(sql.FieldContainsFold(FieldErrorMsg, v))
+}
+
+// UpstreamIsPoolEQ applies the EQ predicate on the "upstream_is_pool" field.
+func UpstreamIsPoolEQ(v bool) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUpstreamIsPool, v))
+}
+
+// UpstreamIsPoolNEQ applies the NEQ predicate on the "upstream_is_pool" field.
+func UpstreamIsPoolNEQ(v bool) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldUpstreamIsPool, v))
 }
 
 // LastUsedAtEQ applies the EQ predicate on the "last_used_at" field.

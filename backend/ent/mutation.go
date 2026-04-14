@@ -1639,6 +1639,7 @@ type AccountMutation struct {
 	rate_multiplier    *float64
 	addrate_multiplier *float64
 	error_msg          *string
+	upstream_is_pool   *bool
 	last_used_at       *time.Time
 	extra              *map[string]interface{}
 	created_at         *time.Time
@@ -2152,6 +2153,42 @@ func (m *AccountMutation) ResetErrorMsg() {
 	m.error_msg = nil
 }
 
+// SetUpstreamIsPool sets the "upstream_is_pool" field.
+func (m *AccountMutation) SetUpstreamIsPool(b bool) {
+	m.upstream_is_pool = &b
+}
+
+// UpstreamIsPool returns the value of the "upstream_is_pool" field in the mutation.
+func (m *AccountMutation) UpstreamIsPool() (r bool, exists bool) {
+	v := m.upstream_is_pool
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpstreamIsPool returns the old "upstream_is_pool" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldUpstreamIsPool(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpstreamIsPool is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpstreamIsPool requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpstreamIsPool: %w", err)
+	}
+	return oldValue.UpstreamIsPool, nil
+}
+
+// ResetUpstreamIsPool resets all changes to the "upstream_is_pool" field.
+func (m *AccountMutation) ResetUpstreamIsPool() {
+	m.upstream_is_pool = nil
+}
+
 // SetLastUsedAt sets the "last_used_at" field.
 func (m *AccountMutation) SetLastUsedAt(t time.Time) {
 	m.last_used_at = &t
@@ -2503,7 +2540,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.name != nil {
 		fields = append(fields, account.FieldName)
 	}
@@ -2530,6 +2567,9 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m.error_msg != nil {
 		fields = append(fields, account.FieldErrorMsg)
+	}
+	if m.upstream_is_pool != nil {
+		fields = append(fields, account.FieldUpstreamIsPool)
 	}
 	if m.last_used_at != nil {
 		fields = append(fields, account.FieldLastUsedAt)
@@ -2569,6 +2609,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.RateMultiplier()
 	case account.FieldErrorMsg:
 		return m.ErrorMsg()
+	case account.FieldUpstreamIsPool:
+		return m.UpstreamIsPool()
 	case account.FieldLastUsedAt:
 		return m.LastUsedAt()
 	case account.FieldExtra:
@@ -2604,6 +2646,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldRateMultiplier(ctx)
 	case account.FieldErrorMsg:
 		return m.OldErrorMsg(ctx)
+	case account.FieldUpstreamIsPool:
+		return m.OldUpstreamIsPool(ctx)
 	case account.FieldLastUsedAt:
 		return m.OldLastUsedAt(ctx)
 	case account.FieldExtra:
@@ -2683,6 +2727,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetErrorMsg(v)
+		return nil
+	case account.FieldUpstreamIsPool:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpstreamIsPool(v)
 		return nil
 	case account.FieldLastUsedAt:
 		v, ok := value.(time.Time)
@@ -2847,6 +2898,9 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldErrorMsg:
 		m.ResetErrorMsg()
+		return nil
+	case account.FieldUpstreamIsPool:
+		m.ResetUpstreamIsPool()
 		return nil
 	case account.FieldLastUsedAt:
 		m.ResetLastUsedAt()

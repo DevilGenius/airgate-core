@@ -134,6 +134,7 @@ export interface AccountResp {
   proxy_id?: number;
   rate_multiplier: number;
   error_msg?: string;
+  upstream_is_pool: boolean;
   last_used_at?: string;
   group_ids: number[];
   created_at: string;
@@ -149,6 +150,7 @@ export interface CreateAccountReq {
   max_concurrency?: number;
   proxy_id?: number;
   rate_multiplier?: number;
+  upstream_is_pool?: boolean;
   group_ids?: number[];
 }
 
@@ -161,6 +163,7 @@ export interface UpdateAccountReq {
   max_concurrency?: number;
   proxy_id?: number | null;
   rate_multiplier?: number;
+  upstream_is_pool?: boolean;
   group_ids?: number[];
 }
 

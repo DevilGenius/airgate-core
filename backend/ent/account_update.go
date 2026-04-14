@@ -176,6 +176,20 @@ func (au *AccountUpdate) SetNillableErrorMsg(s *string) *AccountUpdate {
 	return au
 }
 
+// SetUpstreamIsPool sets the "upstream_is_pool" field.
+func (au *AccountUpdate) SetUpstreamIsPool(b bool) *AccountUpdate {
+	au.mutation.SetUpstreamIsPool(b)
+	return au
+}
+
+// SetNillableUpstreamIsPool sets the "upstream_is_pool" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableUpstreamIsPool(b *bool) *AccountUpdate {
+	if b != nil {
+		au.SetUpstreamIsPool(*b)
+	}
+	return au
+}
+
 // SetLastUsedAt sets the "last_used_at" field.
 func (au *AccountUpdate) SetLastUsedAt(t time.Time) *AccountUpdate {
 	au.mutation.SetLastUsedAt(t)
@@ -427,6 +441,9 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := au.mutation.ErrorMsg(); ok {
 		_spec.SetField(account.FieldErrorMsg, field.TypeString, value)
+	}
+	if value, ok := au.mutation.UpstreamIsPool(); ok {
+		_spec.SetField(account.FieldUpstreamIsPool, field.TypeBool, value)
 	}
 	if value, ok := au.mutation.LastUsedAt(); ok {
 		_spec.SetField(account.FieldLastUsedAt, field.TypeTime, value)
@@ -727,6 +744,20 @@ func (auo *AccountUpdateOne) SetNillableErrorMsg(s *string) *AccountUpdateOne {
 	return auo
 }
 
+// SetUpstreamIsPool sets the "upstream_is_pool" field.
+func (auo *AccountUpdateOne) SetUpstreamIsPool(b bool) *AccountUpdateOne {
+	auo.mutation.SetUpstreamIsPool(b)
+	return auo
+}
+
+// SetNillableUpstreamIsPool sets the "upstream_is_pool" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableUpstreamIsPool(b *bool) *AccountUpdateOne {
+	if b != nil {
+		auo.SetUpstreamIsPool(*b)
+	}
+	return auo
+}
+
 // SetLastUsedAt sets the "last_used_at" field.
 func (auo *AccountUpdateOne) SetLastUsedAt(t time.Time) *AccountUpdateOne {
 	auo.mutation.SetLastUsedAt(t)
@@ -1008,6 +1039,9 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if value, ok := auo.mutation.ErrorMsg(); ok {
 		_spec.SetField(account.FieldErrorMsg, field.TypeString, value)
+	}
+	if value, ok := auo.mutation.UpstreamIsPool(); ok {
+		_spec.SetField(account.FieldUpstreamIsPool, field.TypeBool, value)
 	}
 	if value, ok := auo.mutation.LastUsedAt(); ok {
 		_spec.SetField(account.FieldLastUsedAt, field.TypeTime, value)

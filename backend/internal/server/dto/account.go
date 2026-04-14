@@ -14,6 +14,7 @@ type AccountResp struct {
 	ProxyID            *int64            `json:"proxy_id,omitempty"`
 	RateMultiplier     float64           `json:"rate_multiplier"`
 	ErrorMsg           string            `json:"error_msg,omitempty"`
+	UpstreamIsPool     bool              `json:"upstream_is_pool"`
 	LastUsedAt         *string           `json:"last_used_at,omitempty"`
 	GroupIDs           []int64           `json:"group_ids"`
 	TimeMixin
@@ -29,6 +30,7 @@ type CreateAccountReq struct {
 	MaxConcurrency int               `json:"max_concurrency"`
 	ProxyID        *int64            `json:"proxy_id"`
 	RateMultiplier float64           `json:"rate_multiplier"`
+	UpstreamIsPool bool              `json:"upstream_is_pool"`
 	GroupIDs       []int64           `json:"group_ids"`
 }
 
@@ -42,6 +44,7 @@ type UpdateAccountReq struct {
 	MaxConcurrency *int              `json:"max_concurrency"`
 	ProxyID        *int64            `json:"proxy_id"`
 	RateMultiplier *float64          `json:"rate_multiplier"`
+	UpstreamIsPool *bool             `json:"upstream_is_pool"`
 	GroupIDs       []int64           `json:"group_ids"`
 }
 

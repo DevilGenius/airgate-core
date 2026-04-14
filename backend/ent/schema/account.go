@@ -22,6 +22,8 @@ func (Account) Fields() []ent.Field {
 		field.Int("max_concurrency").Default(10),
 		field.Float("rate_multiplier").Default(1.0),
 		field.String("error_msg").Default(""),
+		field.Bool("upstream_is_pool").Default(false).
+			Comment("上游是账号池：把 expired/disabled 降级为临时限流，避免池子耗尽时本地账号被永久标错"),
 		field.Time("last_used_at").Optional().Nillable(),
 		field.JSON("extra", map[string]interface{}{}).Optional().Default(map[string]interface{}{}). // 扩展配置：max_rpm, max_window_cost, max_sessions 等
 														Comment("扩展配置（插件/调度器使用）"),

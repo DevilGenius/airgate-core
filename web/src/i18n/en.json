@@ -302,6 +302,8 @@
     "priority_hint": "Priority (0-999, higher = preferred)",
     "concurrency": "Concurrency",
     "rate_multiplier": "Rate Multiplier",
+    "upstream_is_pool": "Upstream is account pool",
+    "upstream_is_pool_hint": "When checked, 'No available accounts' and similar pool-exhausted errors from upstream are downgraded to temporary rate limit, so the local account won't be permanently marked as error",
     "proxy": "Proxy",
     "proxy_id": "Proxy ID",
     "proxy_hint": "Leave empty to not use proxy",

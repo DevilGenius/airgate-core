@@ -47,6 +47,7 @@ export function EditAccountModal({
     priority: account.priority,
     max_concurrency: account.max_concurrency,
     rate_multiplier: account.rate_multiplier,
+    upstream_is_pool: account.upstream_is_pool,
     proxy_id: account.proxy_id,
   });
 
@@ -258,6 +259,25 @@ export function EditAccountModal({
               })),
             ]}
           />
+          <label className="flex items-start gap-2 text-sm cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={form.upstream_is_pool ?? false}
+              onChange={(e) =>
+                setForm({ ...form, upstream_is_pool: e.target.checked })
+              }
+            />
+            <span className="flex flex-col">
+              <span>{t('accounts.upstream_is_pool', '上游是账号池')}</span>
+              <span className="text-xs text-text-tertiary">
+                {t(
+                  'accounts.upstream_is_pool_hint',
+                  '勾选后，上游返回的"No available accounts"之类的池子耗尽错误会降级为临时限流，不会把本地账号永久标记为错误状态',
+                )}
+              </span>
+            </span>
+          </label>
         </div>
       )}
     </Modal>

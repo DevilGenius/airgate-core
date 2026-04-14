@@ -125,6 +125,20 @@ func (ac *AccountCreate) SetNillableErrorMsg(s *string) *AccountCreate {
 	return ac
 }
 
+// SetUpstreamIsPool sets the "upstream_is_pool" field.
+func (ac *AccountCreate) SetUpstreamIsPool(b bool) *AccountCreate {
+	ac.mutation.SetUpstreamIsPool(b)
+	return ac
+}
+
+// SetNillableUpstreamIsPool sets the "upstream_is_pool" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableUpstreamIsPool(b *bool) *AccountCreate {
+	if b != nil {
+		ac.SetUpstreamIsPool(*b)
+	}
+	return ac
+}
+
 // SetLastUsedAt sets the "last_used_at" field.
 func (ac *AccountCreate) SetLastUsedAt(t time.Time) *AccountCreate {
 	ac.mutation.SetLastUsedAt(t)
@@ -285,6 +299,10 @@ func (ac *AccountCreate) defaults() {
 		v := account.DefaultErrorMsg
 		ac.mutation.SetErrorMsg(v)
 	}
+	if _, ok := ac.mutation.UpstreamIsPool(); !ok {
+		v := account.DefaultUpstreamIsPool
+		ac.mutation.SetUpstreamIsPool(v)
+	}
 	if _, ok := ac.mutation.Extra(); !ok {
 		v := account.DefaultExtra
 		ac.mutation.SetExtra(v)
@@ -344,6 +362,9 @@ func (ac *AccountCreate) check() error {
 	}
 	if _, ok := ac.mutation.ErrorMsg(); !ok {
 		return &ValidationError{Name: "error_msg", err: errors.New(`ent: missing required field "Account.error_msg"`)}
+	}
+	if _, ok := ac.mutation.UpstreamIsPool(); !ok {
+		return &ValidationError{Name: "upstream_is_pool", err: errors.New(`ent: missing required field "Account.upstream_is_pool"`)}
 	}
 	if _, ok := ac.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Account.created_at"`)}
@@ -412,6 +433,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.ErrorMsg(); ok {
 		_spec.SetField(account.FieldErrorMsg, field.TypeString, value)
 		_node.ErrorMsg = value
+	}
+	if value, ok := ac.mutation.UpstreamIsPool(); ok {
+		_spec.SetField(account.FieldUpstreamIsPool, field.TypeBool, value)
+		_node.UpstreamIsPool = value
 	}
 	if value, ok := ac.mutation.LastUsedAt(); ok {
 		_spec.SetField(account.FieldLastUsedAt, field.TypeTime, value)

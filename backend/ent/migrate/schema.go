@@ -61,6 +61,7 @@ var (
 		{Name: "max_concurrency", Type: field.TypeInt, Default: 10},
 		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
 		{Name: "error_msg", Type: field.TypeString, Default: ""},
+		{Name: "upstream_is_pool", Type: field.TypeBool, Default: false},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "extra", Type: field.TypeJSON, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
@@ -75,7 +76,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[14]},
+				Columns:    []*schema.Column{AccountsColumns[15]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

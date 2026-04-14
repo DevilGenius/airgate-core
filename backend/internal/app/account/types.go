@@ -29,12 +29,15 @@ type Account struct {
 	CurrentConcurrency int
 	RateMultiplier     float64
 	ErrorMsg           string
-	LastUsedAt         *time.Time
-	GroupIDs           []int64
-	Proxy              *Proxy
-	Extra              map[string]any
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	// UpstreamIsPool 上游是账号池时置 true：池子报 "no available accounts" 之类
+	// 的耗尽错误（expired/disabled 状态）会被降级为临时限流，不永久标错。
+	UpstreamIsPool bool
+	LastUsedAt     *time.Time
+	GroupIDs       []int64
+	Proxy          *Proxy
+	Extra          map[string]any
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // AccountWindowStats 单个账号在某个时间窗口内的聚合统计。
@@ -89,6 +92,7 @@ type CreateInput struct {
 	ProxyID        *int64
 	RateMultiplier float64
 	GroupIDs       []int64
+	UpstreamIsPool bool
 }
 
 // UpdateInput 更新账号输入。
@@ -100,6 +104,7 @@ type UpdateInput struct {
 	Priority       *int
 	MaxConcurrency *int
 	RateMultiplier *float64
+	UpstreamIsPool *bool
 	GroupIDs       []int64
 	HasGroupIDs    bool
 	ProxyID        *int64

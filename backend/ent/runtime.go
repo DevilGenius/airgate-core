@@ -121,16 +121,20 @@ func init() {
 	accountDescErrorMsg := accountFields[8].Descriptor()
 	// account.DefaultErrorMsg holds the default value on creation for the error_msg field.
 	account.DefaultErrorMsg = accountDescErrorMsg.Default.(string)
+	// accountDescUpstreamIsPool is the schema descriptor for upstream_is_pool field.
+	accountDescUpstreamIsPool := accountFields[9].Descriptor()
+	// account.DefaultUpstreamIsPool holds the default value on creation for the upstream_is_pool field.
+	account.DefaultUpstreamIsPool = accountDescUpstreamIsPool.Default.(bool)
 	// accountDescExtra is the schema descriptor for extra field.
-	accountDescExtra := accountFields[10].Descriptor()
+	accountDescExtra := accountFields[11].Descriptor()
 	// account.DefaultExtra holds the default value on creation for the extra field.
 	account.DefaultExtra = accountDescExtra.Default.(map[string]interface{})
 	// accountDescCreatedAt is the schema descriptor for created_at field.
-	accountDescCreatedAt := accountFields[11].Descriptor()
+	accountDescCreatedAt := accountFields[12].Descriptor()
 	// account.DefaultCreatedAt holds the default value on creation for the created_at field.
 	account.DefaultCreatedAt = accountDescCreatedAt.Default.(func() time.Time)
 	// accountDescUpdatedAt is the schema descriptor for updated_at field.
-	accountDescUpdatedAt := accountFields[12].Descriptor()
+	accountDescUpdatedAt := accountFields[13].Descriptor()
 	// account.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	account.DefaultUpdatedAt = accountDescUpdatedAt.Default.(func() time.Time)
 	// account.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

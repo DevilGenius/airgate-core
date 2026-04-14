@@ -18,6 +18,7 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		CurrentConcurrency: account.CurrentConcurrency,
 		RateMultiplier:     account.RateMultiplier,
 		ErrorMsg:           account.ErrorMsg,
+		UpstreamIsPool:     account.UpstreamIsPool,
 		GroupIDs:           account.GroupIDs,
 		TimeMixin: dto.TimeMixin{
 			CreatedAt: account.CreatedAt,
