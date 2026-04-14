@@ -15,7 +15,6 @@ import {
   Search,
   Download,
   Upload,
-  KeyRound,
 } from 'lucide-react';
 import { useToast } from '../../shared/components/Toast';
 import { Button } from '../../shared/components/Button';
@@ -38,7 +37,6 @@ import { EditAccountModal } from './accounts/EditAccountModal';
 import { BulkActionsBar } from './accounts/BulkActionsBar';
 import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
 import { BulkRefreshProgressModal } from './accounts/BulkRefreshProgressModal';
-import { BatchSKImportModal } from './accounts/BatchSKImportModal';
 import type {
   AccountResp,
   CreateAccountReq,
@@ -118,7 +116,6 @@ export default function AccountsPage() {
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
-  const [showBatchSKModal, setShowBatchSKModal] = useState(false);
   const clearSelection = () => setSelectedIds([]);
 
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
@@ -835,14 +832,6 @@ export default function AccountsPage() {
           </div>
           <Button
             variant="secondary"
-            icon={<KeyRound className="w-4 h-4" />}
-            onClick={() => setShowBatchSKModal(true)}
-            title={t('accounts.batch_sk_import')}
-          >
-            {t('accounts.batch_sk_import')}
-          </Button>
-          <Button
-            variant="secondary"
             icon={<Upload className="w-4 h-4" />}
             onClick={() => importInputRef.current?.click()}
             loading={importMutation.isPending}
@@ -906,6 +895,18 @@ export default function AccountsPage() {
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSubmit={(data) => createMutation.mutate(data)}
+        onBatchImport={async (accounts) => {
+          const res = await accountsApi.import(accounts);
+          queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
+          if (res.failed > 0) {
+            toast('warning', t('accounts.import_partial', { imported: res.imported, failed: res.failed }));
+          } else {
+            toast('success', t('accounts.import_success', { count: res.imported }));
+          }
+          setShowCreateModal(false);
+          return { imported: res.imported, failed: res.failed };
+        }}
         loading={createMutation.isPending}
         platforms={platforms}
       />
@@ -1020,12 +1021,6 @@ export default function AccountsPage() {
           }}
         />
       )}
-
-      {/* 批量 SK 导入 */}
-      <BatchSKImportModal
-        open={showBatchSKModal}
-        onClose={() => setShowBatchSKModal(false)}
-      />
 
       {/* 测试连接 */}
       <AccountTestModal

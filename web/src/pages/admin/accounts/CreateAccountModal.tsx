@@ -19,18 +19,24 @@ import {
   filterCredentialsForAccountType,
 } from './accountUtils';
 import { SchemaCredentialsForm, GroupCheckboxList } from './CredentialForm';
-import type { CreateAccountReq } from '../../../shared/types';
+import type { CreateAccountReq, AccountExportItem } from '../../../shared/types';
+import type {
+  PluginBatchAccountInput,
+  PluginBatchImportResult,
+} from '../../../app/plugin-loader';
 
 export function CreateAccountModal({
   open,
   onClose,
   onSubmit,
+  onBatchImport,
   loading,
   platforms,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: CreateAccountReq) => void;
+  onBatchImport?: (accounts: AccountExportItem[]) => Promise<PluginBatchImportResult>;
   loading: boolean;
   platforms: string[];
 }) {
@@ -47,6 +53,7 @@ export function CreateAccountModal({
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [step, setStep] = useState(1);
+  const [batchMode, setBatchMode] = useState(false);
 
   // 根据平台获取凭证字段定义
   const { data: schema } = useQuery({
@@ -77,11 +84,49 @@ export function CreateAccountModal({
     setAccountType(selectedType.key);
   }, [schema, accountType]);
 
+  // 弹窗关闭时重置所有内部状态，避免父组件直接 setShowCreateModal(false)
+  // 绕过 handleClose 导致的状态残留（例如重开后停留在第 2 步）
+  useEffect(() => {
+    if (open) return;
+    setPlatform('');
+    setAccountType('');
+    setForm({ name: '', priority: 0, max_concurrency: 5, rate_multiplier: 1 });
+    setCredentials({});
+    setGroupIds([]);
+    setStep(1);
+    setBatchMode(false);
+  }, [open]);
+
   // 平台变化时重置凭证和账号类型
   const handlePlatformChange = (newPlatform: string) => {
     setPlatform(newPlatform);
     setCredentials({});
     setAccountType('');
+    setBatchMode(false);
+  };
+
+  // 插件表单触发的批量导入：补全 platform/元数据后交给外层 import
+  // 命名规则：
+  //  1. 填了名称 → 作为前缀，生成 {prefix}1 / {prefix}2 / ...
+  //  2. 未填名称 → 优先用插件返回的账号名（通常是邮箱）
+  //  3. 兜底 → "Claude Code {i+1}"
+  const handlePluginBatchImport = async (
+    accounts: PluginBatchAccountInput[],
+  ): Promise<PluginBatchImportResult> => {
+    if (!onBatchImport) return { imported: 0, failed: accounts.length };
+    const prefix = form.name.trim();
+    const toImport: AccountExportItem[] = accounts.map((a, i) => ({
+      name: prefix ? `${prefix}${i + 1}` : a.name || `Claude Code ${i + 1}`,
+      platform,
+      type: a.type || 'oauth',
+      credentials: a.credentials,
+      priority: form.priority ?? 0,
+      max_concurrency: form.max_concurrency ?? 5,
+      rate_multiplier: form.rate_multiplier ?? 1,
+      group_ids: groupIds.length ? groupIds : undefined,
+      proxy_id: form.proxy_id,
+    }));
+    return onBatchImport(toImport);
   };
 
   const handleSchemaAccountTypeChange = (type: string) => {
@@ -108,6 +153,7 @@ export function CreateAccountModal({
     setCredentials({});
     setGroupIds([]);
     setStep(1);
+    setBatchMode(false);
     onClose();
   };
 
@@ -120,7 +166,7 @@ export function CreateAccountModal({
       footer={
         <div className="flex justify-between w-full">
           <div>
-            {step > 1 && (
+            {step > 1 && !batchMode && (
               <Button variant="secondary" onClick={() => setStep(1)}>
                 {t('common.back', '上一步')}
               </Button>
@@ -130,7 +176,7 @@ export function CreateAccountModal({
             <Button variant="secondary" onClick={handleClose}>
               {t('common.cancel')}
             </Button>
-            {step === 1 ? (
+            {!batchMode && (step === 1 ? (
               <Button onClick={() => setStep(2)} disabled={!platform || !form.name}>
                 {t('common.next', '下一步')}
               </Button>
@@ -138,7 +184,7 @@ export function CreateAccountModal({
               <Button onClick={handleSubmit} loading={loading}>
                 {t('common.create')}
               </Button>
-            )}
+            ))}
           </div>
         </div>
       }
@@ -158,7 +204,7 @@ export function CreateAccountModal({
 
           <Input
             label={t('common.name')}
-            required
+            required={!batchMode}
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             icon={<Layers className="w-4 h-4" />}
@@ -179,6 +225,8 @@ export function CreateAccountModal({
                 onSuggestedName={(name) =>
                   setForm((prev) => (prev.name ? prev : { ...prev, name }))
                 }
+                onBatchModeChange={setBatchMode}
+                onBatchImport={handlePluginBatchImport}
                 oauth={pluginOAuth}
               />
             </div>

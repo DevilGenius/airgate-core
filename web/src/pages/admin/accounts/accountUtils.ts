@@ -145,5 +145,23 @@ export function createPluginOAuthBridge(pluginId: string): PluginOAuthBridge | u
         credentials: result.credentials,
       };
     },
+    batchExchange: async (sessionKeys: string[]) => {
+      const resp = await pluginsApi.rpc<{
+        results: Array<{
+          account_type?: string;
+          account_name?: string;
+          credentials?: Record<string, string>;
+          status: string;
+          error?: string;
+        }>;
+      }>(pluginId, 'console/batch-cookie-auth', { session_keys: sessionKeys });
+      return resp.results.map((r) => ({
+        accountType: r.account_type ?? 'oauth',
+        accountName: r.account_name ?? '',
+        credentials: r.credentials ?? {},
+        status: (r.status === 'ok' ? 'ok' : 'failed') as 'ok' | 'failed',
+        error: r.error,
+      }));
+    },
   };
 }

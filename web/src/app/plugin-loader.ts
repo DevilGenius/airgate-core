@@ -11,9 +11,30 @@ export interface PluginOAuthExchangeResult {
   credentials: Record<string, string>;
 }
 
+export interface PluginOAuthBatchExchangeResult {
+  accountType: string;
+  accountName: string;
+  credentials: Record<string, string>;
+  status: 'ok' | 'failed';
+  error?: string;
+}
+
 export interface PluginOAuthBridge {
   start: () => Promise<PluginOAuthStartResult>;
   exchange: (callbackURL: string) => Promise<PluginOAuthExchangeResult>;
+  batchExchange?: (sessionKeys: string[]) => Promise<PluginOAuthBatchExchangeResult[]>;
+}
+
+/** 插件表单发起的批量导入账号项（由核心侧补全 platform/priority 等元数据） */
+export interface PluginBatchAccountInput {
+  name: string;
+  type: string;
+  credentials: Record<string, string>;
+}
+
+export interface PluginBatchImportResult {
+  imported: number;
+  failed: number;
 }
 
 /**
@@ -26,6 +47,10 @@ export interface AccountFormProps {
   accountType?: string;
   onAccountTypeChange?: (type: string) => void;
   onSuggestedName?: (name: string) => void;
+  /** 进入/退出批量模式时通知外层，用于隐藏"下一步/创建"按钮 */
+  onBatchModeChange?: (isBatch: boolean) => void;
+  /** 批量导入账号，由核心侧调用 accountsApi.import 完成落库 */
+  onBatchImport?: (accounts: PluginBatchAccountInput[]) => Promise<PluginBatchImportResult>;
   oauth?: PluginOAuthBridge;
 }
 
