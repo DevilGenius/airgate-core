@@ -19,6 +19,9 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int("input_tokens").Default(0),
 		field.Int("output_tokens").Default(0),
 		field.Int("cached_input_tokens").Default(0),
+		field.Int("cache_creation_tokens").Default(0),
+		field.Int("cache_creation_5m_tokens").Default(0),
+		field.Int("cache_creation_1h_tokens").Default(0),
 		field.Int("reasoning_output_tokens").Default(0),
 		field.Float("input_price").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
@@ -26,11 +29,17 @@ func (UsageLog) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("cached_input_price").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("cache_creation_price").Default(0).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("cache_creation_1h_price").Default(0).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("input_cost").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("output_cost").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("cached_input_cost").Default(0).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("cache_creation_cost").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("total_cost").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),

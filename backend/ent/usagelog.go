@@ -31,6 +31,12 @@ type UsageLog struct {
 	OutputTokens int `json:"output_tokens,omitempty"`
 	// CachedInputTokens holds the value of the "cached_input_tokens" field.
 	CachedInputTokens int `json:"cached_input_tokens,omitempty"`
+	// CacheCreationTokens holds the value of the "cache_creation_tokens" field.
+	CacheCreationTokens int `json:"cache_creation_tokens,omitempty"`
+	// CacheCreation5mTokens holds the value of the "cache_creation_5m_tokens" field.
+	CacheCreation5mTokens int `json:"cache_creation_5m_tokens,omitempty"`
+	// CacheCreation1hTokens holds the value of the "cache_creation_1h_tokens" field.
+	CacheCreation1hTokens int `json:"cache_creation_1h_tokens,omitempty"`
 	// ReasoningOutputTokens holds the value of the "reasoning_output_tokens" field.
 	ReasoningOutputTokens int `json:"reasoning_output_tokens,omitempty"`
 	// InputPrice holds the value of the "input_price" field.
@@ -39,12 +45,18 @@ type UsageLog struct {
 	OutputPrice float64 `json:"output_price,omitempty"`
 	// CachedInputPrice holds the value of the "cached_input_price" field.
 	CachedInputPrice float64 `json:"cached_input_price,omitempty"`
+	// CacheCreationPrice holds the value of the "cache_creation_price" field.
+	CacheCreationPrice float64 `json:"cache_creation_price,omitempty"`
+	// CacheCreation1hPrice holds the value of the "cache_creation_1h_price" field.
+	CacheCreation1hPrice float64 `json:"cache_creation_1h_price,omitempty"`
 	// InputCost holds the value of the "input_cost" field.
 	InputCost float64 `json:"input_cost,omitempty"`
 	// OutputCost holds the value of the "output_cost" field.
 	OutputCost float64 `json:"output_cost,omitempty"`
 	// CachedInputCost holds the value of the "cached_input_cost" field.
 	CachedInputCost float64 `json:"cached_input_cost,omitempty"`
+	// CacheCreationCost holds the value of the "cache_creation_cost" field.
+	CacheCreationCost float64 `json:"cache_creation_cost,omitempty"`
 	// TotalCost holds the value of the "total_cost" field.
 	TotalCost float64 `json:"total_cost,omitempty"`
 	// 平台对 reseller 的真实扣费 = total × billing_rate（group/user）
@@ -149,9 +161,9 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case usagelog.FieldStream:
 			values[i] = new(sql.NullBool)
-		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldBilledCost, usagelog.FieldAccountCost, usagelog.FieldRateMultiplier, usagelog.FieldSellRate, usagelog.FieldAccountRateMultiplier:
+		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldCacheCreationPrice, usagelog.FieldCacheCreation1hPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldCacheCreationCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldBilledCost, usagelog.FieldAccountCost, usagelog.FieldRateMultiplier, usagelog.FieldSellRate, usagelog.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs:
+		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs:
 			values[i] = new(sql.NullInt64)
 		case usagelog.FieldPlatform, usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldUserAgent, usagelog.FieldIPAddress:
 			values[i] = new(sql.NullString)
@@ -216,6 +228,24 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.CachedInputTokens = int(value.Int64)
 			}
+		case usagelog.FieldCacheCreationTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_creation_tokens", values[i])
+			} else if value.Valid {
+				ul.CacheCreationTokens = int(value.Int64)
+			}
+		case usagelog.FieldCacheCreation5mTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_creation_5m_tokens", values[i])
+			} else if value.Valid {
+				ul.CacheCreation5mTokens = int(value.Int64)
+			}
+		case usagelog.FieldCacheCreation1hTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_creation_1h_tokens", values[i])
+			} else if value.Valid {
+				ul.CacheCreation1hTokens = int(value.Int64)
+			}
 		case usagelog.FieldReasoningOutputTokens:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field reasoning_output_tokens", values[i])
@@ -240,6 +270,18 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.CachedInputPrice = value.Float64
 			}
+		case usagelog.FieldCacheCreationPrice:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_creation_price", values[i])
+			} else if value.Valid {
+				ul.CacheCreationPrice = value.Float64
+			}
+		case usagelog.FieldCacheCreation1hPrice:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_creation_1h_price", values[i])
+			} else if value.Valid {
+				ul.CacheCreation1hPrice = value.Float64
+			}
 		case usagelog.FieldInputCost:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
 				return fmt.Errorf("unexpected type %T for field input_cost", values[i])
@@ -257,6 +299,12 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field cached_input_cost", values[i])
 			} else if value.Valid {
 				ul.CachedInputCost = value.Float64
+			}
+		case usagelog.FieldCacheCreationCost:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_creation_cost", values[i])
+			} else if value.Valid {
+				ul.CacheCreationCost = value.Float64
 			}
 		case usagelog.FieldTotalCost:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
@@ -441,6 +489,15 @@ func (ul *UsageLog) String() string {
 	builder.WriteString("cached_input_tokens=")
 	builder.WriteString(fmt.Sprintf("%v", ul.CachedInputTokens))
 	builder.WriteString(", ")
+	builder.WriteString("cache_creation_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", ul.CacheCreationTokens))
+	builder.WriteString(", ")
+	builder.WriteString("cache_creation_5m_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", ul.CacheCreation5mTokens))
+	builder.WriteString(", ")
+	builder.WriteString("cache_creation_1h_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", ul.CacheCreation1hTokens))
+	builder.WriteString(", ")
 	builder.WriteString("reasoning_output_tokens=")
 	builder.WriteString(fmt.Sprintf("%v", ul.ReasoningOutputTokens))
 	builder.WriteString(", ")
@@ -453,6 +510,12 @@ func (ul *UsageLog) String() string {
 	builder.WriteString("cached_input_price=")
 	builder.WriteString(fmt.Sprintf("%v", ul.CachedInputPrice))
 	builder.WriteString(", ")
+	builder.WriteString("cache_creation_price=")
+	builder.WriteString(fmt.Sprintf("%v", ul.CacheCreationPrice))
+	builder.WriteString(", ")
+	builder.WriteString("cache_creation_1h_price=")
+	builder.WriteString(fmt.Sprintf("%v", ul.CacheCreation1hPrice))
+	builder.WriteString(", ")
 	builder.WriteString("input_cost=")
 	builder.WriteString(fmt.Sprintf("%v", ul.InputCost))
 	builder.WriteString(", ")
@@ -461,6 +524,9 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("cached_input_cost=")
 	builder.WriteString(fmt.Sprintf("%v", ul.CachedInputCost))
+	builder.WriteString(", ")
+	builder.WriteString("cache_creation_cost=")
+	builder.WriteString(fmt.Sprintf("%v", ul.CacheCreationCost))
 	builder.WriteString(", ")
 	builder.WriteString("total_cost=")
 	builder.WriteString(fmt.Sprintf("%v", ul.TotalCost))

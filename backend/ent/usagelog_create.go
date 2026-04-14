@@ -78,6 +78,48 @@ func (ulc *UsageLogCreate) SetNillableCachedInputTokens(i *int) *UsageLogCreate 
 	return ulc
 }
 
+// SetCacheCreationTokens sets the "cache_creation_tokens" field.
+func (ulc *UsageLogCreate) SetCacheCreationTokens(i int) *UsageLogCreate {
+	ulc.mutation.SetCacheCreationTokens(i)
+	return ulc
+}
+
+// SetNillableCacheCreationTokens sets the "cache_creation_tokens" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableCacheCreationTokens(i *int) *UsageLogCreate {
+	if i != nil {
+		ulc.SetCacheCreationTokens(*i)
+	}
+	return ulc
+}
+
+// SetCacheCreation5mTokens sets the "cache_creation_5m_tokens" field.
+func (ulc *UsageLogCreate) SetCacheCreation5mTokens(i int) *UsageLogCreate {
+	ulc.mutation.SetCacheCreation5mTokens(i)
+	return ulc
+}
+
+// SetNillableCacheCreation5mTokens sets the "cache_creation_5m_tokens" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableCacheCreation5mTokens(i *int) *UsageLogCreate {
+	if i != nil {
+		ulc.SetCacheCreation5mTokens(*i)
+	}
+	return ulc
+}
+
+// SetCacheCreation1hTokens sets the "cache_creation_1h_tokens" field.
+func (ulc *UsageLogCreate) SetCacheCreation1hTokens(i int) *UsageLogCreate {
+	ulc.mutation.SetCacheCreation1hTokens(i)
+	return ulc
+}
+
+// SetNillableCacheCreation1hTokens sets the "cache_creation_1h_tokens" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableCacheCreation1hTokens(i *int) *UsageLogCreate {
+	if i != nil {
+		ulc.SetCacheCreation1hTokens(*i)
+	}
+	return ulc
+}
+
 // SetReasoningOutputTokens sets the "reasoning_output_tokens" field.
 func (ulc *UsageLogCreate) SetReasoningOutputTokens(i int) *UsageLogCreate {
 	ulc.mutation.SetReasoningOutputTokens(i)
@@ -134,6 +176,34 @@ func (ulc *UsageLogCreate) SetNillableCachedInputPrice(f *float64) *UsageLogCrea
 	return ulc
 }
 
+// SetCacheCreationPrice sets the "cache_creation_price" field.
+func (ulc *UsageLogCreate) SetCacheCreationPrice(f float64) *UsageLogCreate {
+	ulc.mutation.SetCacheCreationPrice(f)
+	return ulc
+}
+
+// SetNillableCacheCreationPrice sets the "cache_creation_price" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableCacheCreationPrice(f *float64) *UsageLogCreate {
+	if f != nil {
+		ulc.SetCacheCreationPrice(*f)
+	}
+	return ulc
+}
+
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (ulc *UsageLogCreate) SetCacheCreation1hPrice(f float64) *UsageLogCreate {
+	ulc.mutation.SetCacheCreation1hPrice(f)
+	return ulc
+}
+
+// SetNillableCacheCreation1hPrice sets the "cache_creation_1h_price" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableCacheCreation1hPrice(f *float64) *UsageLogCreate {
+	if f != nil {
+		ulc.SetCacheCreation1hPrice(*f)
+	}
+	return ulc
+}
+
 // SetInputCost sets the "input_cost" field.
 func (ulc *UsageLogCreate) SetInputCost(f float64) *UsageLogCreate {
 	ulc.mutation.SetInputCost(f)
@@ -172,6 +242,20 @@ func (ulc *UsageLogCreate) SetCachedInputCost(f float64) *UsageLogCreate {
 func (ulc *UsageLogCreate) SetNillableCachedInputCost(f *float64) *UsageLogCreate {
 	if f != nil {
 		ulc.SetCachedInputCost(*f)
+	}
+	return ulc
+}
+
+// SetCacheCreationCost sets the "cache_creation_cost" field.
+func (ulc *UsageLogCreate) SetCacheCreationCost(f float64) *UsageLogCreate {
+	ulc.mutation.SetCacheCreationCost(f)
+	return ulc
+}
+
+// SetNillableCacheCreationCost sets the "cache_creation_cost" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableCacheCreationCost(f *float64) *UsageLogCreate {
+	if f != nil {
+		ulc.SetCacheCreationCost(*f)
 	}
 	return ulc
 }
@@ -487,6 +571,18 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultCachedInputTokens
 		ulc.mutation.SetCachedInputTokens(v)
 	}
+	if _, ok := ulc.mutation.CacheCreationTokens(); !ok {
+		v := usagelog.DefaultCacheCreationTokens
+		ulc.mutation.SetCacheCreationTokens(v)
+	}
+	if _, ok := ulc.mutation.CacheCreation5mTokens(); !ok {
+		v := usagelog.DefaultCacheCreation5mTokens
+		ulc.mutation.SetCacheCreation5mTokens(v)
+	}
+	if _, ok := ulc.mutation.CacheCreation1hTokens(); !ok {
+		v := usagelog.DefaultCacheCreation1hTokens
+		ulc.mutation.SetCacheCreation1hTokens(v)
+	}
 	if _, ok := ulc.mutation.ReasoningOutputTokens(); !ok {
 		v := usagelog.DefaultReasoningOutputTokens
 		ulc.mutation.SetReasoningOutputTokens(v)
@@ -503,6 +599,14 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultCachedInputPrice
 		ulc.mutation.SetCachedInputPrice(v)
 	}
+	if _, ok := ulc.mutation.CacheCreationPrice(); !ok {
+		v := usagelog.DefaultCacheCreationPrice
+		ulc.mutation.SetCacheCreationPrice(v)
+	}
+	if _, ok := ulc.mutation.CacheCreation1hPrice(); !ok {
+		v := usagelog.DefaultCacheCreation1hPrice
+		ulc.mutation.SetCacheCreation1hPrice(v)
+	}
 	if _, ok := ulc.mutation.InputCost(); !ok {
 		v := usagelog.DefaultInputCost
 		ulc.mutation.SetInputCost(v)
@@ -514,6 +618,10 @@ func (ulc *UsageLogCreate) defaults() {
 	if _, ok := ulc.mutation.CachedInputCost(); !ok {
 		v := usagelog.DefaultCachedInputCost
 		ulc.mutation.SetCachedInputCost(v)
+	}
+	if _, ok := ulc.mutation.CacheCreationCost(); !ok {
+		v := usagelog.DefaultCacheCreationCost
+		ulc.mutation.SetCacheCreationCost(v)
 	}
 	if _, ok := ulc.mutation.TotalCost(); !ok {
 		v := usagelog.DefaultTotalCost
@@ -600,6 +708,15 @@ func (ulc *UsageLogCreate) check() error {
 	if _, ok := ulc.mutation.CachedInputTokens(); !ok {
 		return &ValidationError{Name: "cached_input_tokens", err: errors.New(`ent: missing required field "UsageLog.cached_input_tokens"`)}
 	}
+	if _, ok := ulc.mutation.CacheCreationTokens(); !ok {
+		return &ValidationError{Name: "cache_creation_tokens", err: errors.New(`ent: missing required field "UsageLog.cache_creation_tokens"`)}
+	}
+	if _, ok := ulc.mutation.CacheCreation5mTokens(); !ok {
+		return &ValidationError{Name: "cache_creation_5m_tokens", err: errors.New(`ent: missing required field "UsageLog.cache_creation_5m_tokens"`)}
+	}
+	if _, ok := ulc.mutation.CacheCreation1hTokens(); !ok {
+		return &ValidationError{Name: "cache_creation_1h_tokens", err: errors.New(`ent: missing required field "UsageLog.cache_creation_1h_tokens"`)}
+	}
 	if _, ok := ulc.mutation.ReasoningOutputTokens(); !ok {
 		return &ValidationError{Name: "reasoning_output_tokens", err: errors.New(`ent: missing required field "UsageLog.reasoning_output_tokens"`)}
 	}
@@ -612,6 +729,12 @@ func (ulc *UsageLogCreate) check() error {
 	if _, ok := ulc.mutation.CachedInputPrice(); !ok {
 		return &ValidationError{Name: "cached_input_price", err: errors.New(`ent: missing required field "UsageLog.cached_input_price"`)}
 	}
+	if _, ok := ulc.mutation.CacheCreationPrice(); !ok {
+		return &ValidationError{Name: "cache_creation_price", err: errors.New(`ent: missing required field "UsageLog.cache_creation_price"`)}
+	}
+	if _, ok := ulc.mutation.CacheCreation1hPrice(); !ok {
+		return &ValidationError{Name: "cache_creation_1h_price", err: errors.New(`ent: missing required field "UsageLog.cache_creation_1h_price"`)}
+	}
 	if _, ok := ulc.mutation.InputCost(); !ok {
 		return &ValidationError{Name: "input_cost", err: errors.New(`ent: missing required field "UsageLog.input_cost"`)}
 	}
@@ -620,6 +743,9 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.CachedInputCost(); !ok {
 		return &ValidationError{Name: "cached_input_cost", err: errors.New(`ent: missing required field "UsageLog.cached_input_cost"`)}
+	}
+	if _, ok := ulc.mutation.CacheCreationCost(); !ok {
+		return &ValidationError{Name: "cache_creation_cost", err: errors.New(`ent: missing required field "UsageLog.cache_creation_cost"`)}
 	}
 	if _, ok := ulc.mutation.TotalCost(); !ok {
 		return &ValidationError{Name: "total_cost", err: errors.New(`ent: missing required field "UsageLog.total_cost"`)}
@@ -712,6 +838,18 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldCachedInputTokens, field.TypeInt, value)
 		_node.CachedInputTokens = value
 	}
+	if value, ok := ulc.mutation.CacheCreationTokens(); ok {
+		_spec.SetField(usagelog.FieldCacheCreationTokens, field.TypeInt, value)
+		_node.CacheCreationTokens = value
+	}
+	if value, ok := ulc.mutation.CacheCreation5mTokens(); ok {
+		_spec.SetField(usagelog.FieldCacheCreation5mTokens, field.TypeInt, value)
+		_node.CacheCreation5mTokens = value
+	}
+	if value, ok := ulc.mutation.CacheCreation1hTokens(); ok {
+		_spec.SetField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
+		_node.CacheCreation1hTokens = value
+	}
 	if value, ok := ulc.mutation.ReasoningOutputTokens(); ok {
 		_spec.SetField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
 		_node.ReasoningOutputTokens = value
@@ -728,6 +866,14 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldCachedInputPrice, field.TypeFloat64, value)
 		_node.CachedInputPrice = value
 	}
+	if value, ok := ulc.mutation.CacheCreationPrice(); ok {
+		_spec.SetField(usagelog.FieldCacheCreationPrice, field.TypeFloat64, value)
+		_node.CacheCreationPrice = value
+	}
+	if value, ok := ulc.mutation.CacheCreation1hPrice(); ok {
+		_spec.SetField(usagelog.FieldCacheCreation1hPrice, field.TypeFloat64, value)
+		_node.CacheCreation1hPrice = value
+	}
 	if value, ok := ulc.mutation.InputCost(); ok {
 		_spec.SetField(usagelog.FieldInputCost, field.TypeFloat64, value)
 		_node.InputCost = value
@@ -739,6 +885,10 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.CachedInputCost(); ok {
 		_spec.SetField(usagelog.FieldCachedInputCost, field.TypeFloat64, value)
 		_node.CachedInputCost = value
+	}
+	if value, ok := ulc.mutation.CacheCreationCost(); ok {
+		_spec.SetField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
+		_node.CacheCreationCost = value
 	}
 	if value, ok := ulc.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)

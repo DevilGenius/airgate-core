@@ -8096,66 +8096,78 @@ func (m *SettingMutation) ResetEdge(name string) error {
 // UsageLogMutation represents an operation that mutates the UsageLog nodes in the graph.
 type UsageLogMutation struct {
 	config
-	op                         Op
-	typ                        string
-	id                         *int
-	platform                   *string
-	model                      *string
-	input_tokens               *int
-	addinput_tokens            *int
-	output_tokens              *int
-	addoutput_tokens           *int
-	cached_input_tokens        *int
-	addcached_input_tokens     *int
-	reasoning_output_tokens    *int
-	addreasoning_output_tokens *int
-	input_price                *float64
-	addinput_price             *float64
-	output_price               *float64
-	addoutput_price            *float64
-	cached_input_price         *float64
-	addcached_input_price      *float64
-	input_cost                 *float64
-	addinput_cost              *float64
-	output_cost                *float64
-	addoutput_cost             *float64
-	cached_input_cost          *float64
-	addcached_input_cost       *float64
-	total_cost                 *float64
-	addtotal_cost              *float64
-	actual_cost                *float64
-	addactual_cost             *float64
-	billed_cost                *float64
-	addbilled_cost             *float64
-	account_cost               *float64
-	addaccount_cost            *float64
-	rate_multiplier            *float64
-	addrate_multiplier         *float64
-	sell_rate                  *float64
-	addsell_rate               *float64
-	account_rate_multiplier    *float64
-	addaccount_rate_multiplier *float64
-	service_tier               *string
-	stream                     *bool
-	duration_ms                *int64
-	addduration_ms             *int64
-	first_token_ms             *int64
-	addfirst_token_ms          *int64
-	user_agent                 *string
-	ip_address                 *string
-	created_at                 *time.Time
-	clearedFields              map[string]struct{}
-	user                       *int
-	cleareduser                bool
-	api_key                    *int
-	clearedapi_key             bool
-	account                    *int
-	clearedaccount             bool
-	group                      *int
-	clearedgroup               bool
-	done                       bool
-	oldValue                   func(context.Context) (*UsageLog, error)
-	predicates                 []predicate.UsageLog
+	op                          Op
+	typ                         string
+	id                          *int
+	platform                    *string
+	model                       *string
+	input_tokens                *int
+	addinput_tokens             *int
+	output_tokens               *int
+	addoutput_tokens            *int
+	cached_input_tokens         *int
+	addcached_input_tokens      *int
+	cache_creation_tokens       *int
+	addcache_creation_tokens    *int
+	cache_creation_5m_tokens    *int
+	addcache_creation_5m_tokens *int
+	cache_creation_1h_tokens    *int
+	addcache_creation_1h_tokens *int
+	reasoning_output_tokens     *int
+	addreasoning_output_tokens  *int
+	input_price                 *float64
+	addinput_price              *float64
+	output_price                *float64
+	addoutput_price             *float64
+	cached_input_price          *float64
+	addcached_input_price       *float64
+	cache_creation_price        *float64
+	addcache_creation_price     *float64
+	cache_creation_1h_price     *float64
+	addcache_creation_1h_price  *float64
+	input_cost                  *float64
+	addinput_cost               *float64
+	output_cost                 *float64
+	addoutput_cost              *float64
+	cached_input_cost           *float64
+	addcached_input_cost        *float64
+	cache_creation_cost         *float64
+	addcache_creation_cost      *float64
+	total_cost                  *float64
+	addtotal_cost               *float64
+	actual_cost                 *float64
+	addactual_cost              *float64
+	billed_cost                 *float64
+	addbilled_cost              *float64
+	account_cost                *float64
+	addaccount_cost             *float64
+	rate_multiplier             *float64
+	addrate_multiplier          *float64
+	sell_rate                   *float64
+	addsell_rate                *float64
+	account_rate_multiplier     *float64
+	addaccount_rate_multiplier  *float64
+	service_tier                *string
+	stream                      *bool
+	duration_ms                 *int64
+	addduration_ms              *int64
+	first_token_ms              *int64
+	addfirst_token_ms           *int64
+	user_agent                  *string
+	ip_address                  *string
+	created_at                  *time.Time
+	clearedFields               map[string]struct{}
+	user                        *int
+	cleareduser                 bool
+	api_key                     *int
+	clearedapi_key              bool
+	account                     *int
+	clearedaccount              bool
+	group                       *int
+	clearedgroup                bool
+	done                        bool
+	oldValue                    func(context.Context) (*UsageLog, error)
+	predicates                  []predicate.UsageLog
 }
 
 var _ ent.Mutation = (*UsageLogMutation)(nil)
@@ -8496,6 +8508,174 @@ func (m *UsageLogMutation) ResetCachedInputTokens() {
 	m.addcached_input_tokens = nil
 }
 
+// SetCacheCreationTokens sets the "cache_creation_tokens" field.
+func (m *UsageLogMutation) SetCacheCreationTokens(i int) {
+	m.cache_creation_tokens = &i
+	m.addcache_creation_tokens = nil
+}
+
+// CacheCreationTokens returns the value of the "cache_creation_tokens" field in the mutation.
+func (m *UsageLogMutation) CacheCreationTokens() (r int, exists bool) {
+	v := m.cache_creation_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheCreationTokens returns the old "cache_creation_tokens" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCacheCreationTokens(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheCreationTokens is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheCreationTokens requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheCreationTokens: %w", err)
+	}
+	return oldValue.CacheCreationTokens, nil
+}
+
+// AddCacheCreationTokens adds i to the "cache_creation_tokens" field.
+func (m *UsageLogMutation) AddCacheCreationTokens(i int) {
+	if m.addcache_creation_tokens != nil {
+		*m.addcache_creation_tokens += i
+	} else {
+		m.addcache_creation_tokens = &i
+	}
+}
+
+// AddedCacheCreationTokens returns the value that was added to the "cache_creation_tokens" field in this mutation.
+func (m *UsageLogMutation) AddedCacheCreationTokens() (r int, exists bool) {
+	v := m.addcache_creation_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheCreationTokens resets all changes to the "cache_creation_tokens" field.
+func (m *UsageLogMutation) ResetCacheCreationTokens() {
+	m.cache_creation_tokens = nil
+	m.addcache_creation_tokens = nil
+}
+
+// SetCacheCreation5mTokens sets the "cache_creation_5m_tokens" field.
+func (m *UsageLogMutation) SetCacheCreation5mTokens(i int) {
+	m.cache_creation_5m_tokens = &i
+	m.addcache_creation_5m_tokens = nil
+}
+
+// CacheCreation5mTokens returns the value of the "cache_creation_5m_tokens" field in the mutation.
+func (m *UsageLogMutation) CacheCreation5mTokens() (r int, exists bool) {
+	v := m.cache_creation_5m_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheCreation5mTokens returns the old "cache_creation_5m_tokens" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCacheCreation5mTokens(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheCreation5mTokens is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheCreation5mTokens requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheCreation5mTokens: %w", err)
+	}
+	return oldValue.CacheCreation5mTokens, nil
+}
+
+// AddCacheCreation5mTokens adds i to the "cache_creation_5m_tokens" field.
+func (m *UsageLogMutation) AddCacheCreation5mTokens(i int) {
+	if m.addcache_creation_5m_tokens != nil {
+		*m.addcache_creation_5m_tokens += i
+	} else {
+		m.addcache_creation_5m_tokens = &i
+	}
+}
+
+// AddedCacheCreation5mTokens returns the value that was added to the "cache_creation_5m_tokens" field in this mutation.
+func (m *UsageLogMutation) AddedCacheCreation5mTokens() (r int, exists bool) {
+	v := m.addcache_creation_5m_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheCreation5mTokens resets all changes to the "cache_creation_5m_tokens" field.
+func (m *UsageLogMutation) ResetCacheCreation5mTokens() {
+	m.cache_creation_5m_tokens = nil
+	m.addcache_creation_5m_tokens = nil
+}
+
+// SetCacheCreation1hTokens sets the "cache_creation_1h_tokens" field.
+func (m *UsageLogMutation) SetCacheCreation1hTokens(i int) {
+	m.cache_creation_1h_tokens = &i
+	m.addcache_creation_1h_tokens = nil
+}
+
+// CacheCreation1hTokens returns the value of the "cache_creation_1h_tokens" field in the mutation.
+func (m *UsageLogMutation) CacheCreation1hTokens() (r int, exists bool) {
+	v := m.cache_creation_1h_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheCreation1hTokens returns the old "cache_creation_1h_tokens" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCacheCreation1hTokens(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheCreation1hTokens is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheCreation1hTokens requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheCreation1hTokens: %w", err)
+	}
+	return oldValue.CacheCreation1hTokens, nil
+}
+
+// AddCacheCreation1hTokens adds i to the "cache_creation_1h_tokens" field.
+func (m *UsageLogMutation) AddCacheCreation1hTokens(i int) {
+	if m.addcache_creation_1h_tokens != nil {
+		*m.addcache_creation_1h_tokens += i
+	} else {
+		m.addcache_creation_1h_tokens = &i
+	}
+}
+
+// AddedCacheCreation1hTokens returns the value that was added to the "cache_creation_1h_tokens" field in this mutation.
+func (m *UsageLogMutation) AddedCacheCreation1hTokens() (r int, exists bool) {
+	v := m.addcache_creation_1h_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheCreation1hTokens resets all changes to the "cache_creation_1h_tokens" field.
+func (m *UsageLogMutation) ResetCacheCreation1hTokens() {
+	m.cache_creation_1h_tokens = nil
+	m.addcache_creation_1h_tokens = nil
+}
+
 // SetReasoningOutputTokens sets the "reasoning_output_tokens" field.
 func (m *UsageLogMutation) SetReasoningOutputTokens(i int) {
 	m.reasoning_output_tokens = &i
@@ -8720,6 +8900,118 @@ func (m *UsageLogMutation) ResetCachedInputPrice() {
 	m.addcached_input_price = nil
 }
 
+// SetCacheCreationPrice sets the "cache_creation_price" field.
+func (m *UsageLogMutation) SetCacheCreationPrice(f float64) {
+	m.cache_creation_price = &f
+	m.addcache_creation_price = nil
+}
+
+// CacheCreationPrice returns the value of the "cache_creation_price" field in the mutation.
+func (m *UsageLogMutation) CacheCreationPrice() (r float64, exists bool) {
+	v := m.cache_creation_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheCreationPrice returns the old "cache_creation_price" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCacheCreationPrice(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheCreationPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheCreationPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheCreationPrice: %w", err)
+	}
+	return oldValue.CacheCreationPrice, nil
+}
+
+// AddCacheCreationPrice adds f to the "cache_creation_price" field.
+func (m *UsageLogMutation) AddCacheCreationPrice(f float64) {
+	if m.addcache_creation_price != nil {
+		*m.addcache_creation_price += f
+	} else {
+		m.addcache_creation_price = &f
+	}
+}
+
+// AddedCacheCreationPrice returns the value that was added to the "cache_creation_price" field in this mutation.
+func (m *UsageLogMutation) AddedCacheCreationPrice() (r float64, exists bool) {
+	v := m.addcache_creation_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheCreationPrice resets all changes to the "cache_creation_price" field.
+func (m *UsageLogMutation) ResetCacheCreationPrice() {
+	m.cache_creation_price = nil
+	m.addcache_creation_price = nil
+}
+
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (m *UsageLogMutation) SetCacheCreation1hPrice(f float64) {
+	m.cache_creation_1h_price = &f
+	m.addcache_creation_1h_price = nil
+}
+
+// CacheCreation1hPrice returns the value of the "cache_creation_1h_price" field in the mutation.
+func (m *UsageLogMutation) CacheCreation1hPrice() (r float64, exists bool) {
+	v := m.cache_creation_1h_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheCreation1hPrice returns the old "cache_creation_1h_price" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCacheCreation1hPrice(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheCreation1hPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheCreation1hPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheCreation1hPrice: %w", err)
+	}
+	return oldValue.CacheCreation1hPrice, nil
+}
+
+// AddCacheCreation1hPrice adds f to the "cache_creation_1h_price" field.
+func (m *UsageLogMutation) AddCacheCreation1hPrice(f float64) {
+	if m.addcache_creation_1h_price != nil {
+		*m.addcache_creation_1h_price += f
+	} else {
+		m.addcache_creation_1h_price = &f
+	}
+}
+
+// AddedCacheCreation1hPrice returns the value that was added to the "cache_creation_1h_price" field in this mutation.
+func (m *UsageLogMutation) AddedCacheCreation1hPrice() (r float64, exists bool) {
+	v := m.addcache_creation_1h_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheCreation1hPrice resets all changes to the "cache_creation_1h_price" field.
+func (m *UsageLogMutation) ResetCacheCreation1hPrice() {
+	m.cache_creation_1h_price = nil
+	m.addcache_creation_1h_price = nil
+}
+
 // SetInputCost sets the "input_cost" field.
 func (m *UsageLogMutation) SetInputCost(f float64) {
 	m.input_cost = &f
@@ -8886,6 +9178,62 @@ func (m *UsageLogMutation) AddedCachedInputCost() (r float64, exists bool) {
 func (m *UsageLogMutation) ResetCachedInputCost() {
 	m.cached_input_cost = nil
 	m.addcached_input_cost = nil
+}
+
+// SetCacheCreationCost sets the "cache_creation_cost" field.
+func (m *UsageLogMutation) SetCacheCreationCost(f float64) {
+	m.cache_creation_cost = &f
+	m.addcache_creation_cost = nil
+}
+
+// CacheCreationCost returns the value of the "cache_creation_cost" field in the mutation.
+func (m *UsageLogMutation) CacheCreationCost() (r float64, exists bool) {
+	v := m.cache_creation_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheCreationCost returns the old "cache_creation_cost" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCacheCreationCost(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheCreationCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheCreationCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheCreationCost: %w", err)
+	}
+	return oldValue.CacheCreationCost, nil
+}
+
+// AddCacheCreationCost adds f to the "cache_creation_cost" field.
+func (m *UsageLogMutation) AddCacheCreationCost(f float64) {
+	if m.addcache_creation_cost != nil {
+		*m.addcache_creation_cost += f
+	} else {
+		m.addcache_creation_cost = &f
+	}
+}
+
+// AddedCacheCreationCost returns the value that was added to the "cache_creation_cost" field in this mutation.
+func (m *UsageLogMutation) AddedCacheCreationCost() (r float64, exists bool) {
+	v := m.addcache_creation_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheCreationCost resets all changes to the "cache_creation_cost" field.
+func (m *UsageLogMutation) ResetCacheCreationCost() {
+	m.cache_creation_cost = nil
+	m.addcache_creation_cost = nil
 }
 
 // SetTotalCost sets the "total_cost" field.
@@ -9762,7 +10110,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 26)
+	fields := make([]string, 0, 32)
 	if m.platform != nil {
 		fields = append(fields, usagelog.FieldPlatform)
 	}
@@ -9778,6 +10126,15 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.cached_input_tokens != nil {
 		fields = append(fields, usagelog.FieldCachedInputTokens)
 	}
+	if m.cache_creation_tokens != nil {
+		fields = append(fields, usagelog.FieldCacheCreationTokens)
+	}
+	if m.cache_creation_5m_tokens != nil {
+		fields = append(fields, usagelog.FieldCacheCreation5mTokens)
+	}
+	if m.cache_creation_1h_tokens != nil {
+		fields = append(fields, usagelog.FieldCacheCreation1hTokens)
+	}
 	if m.reasoning_output_tokens != nil {
 		fields = append(fields, usagelog.FieldReasoningOutputTokens)
 	}
@@ -9790,6 +10147,12 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.cached_input_price != nil {
 		fields = append(fields, usagelog.FieldCachedInputPrice)
 	}
+	if m.cache_creation_price != nil {
+		fields = append(fields, usagelog.FieldCacheCreationPrice)
+	}
+	if m.cache_creation_1h_price != nil {
+		fields = append(fields, usagelog.FieldCacheCreation1hPrice)
+	}
 	if m.input_cost != nil {
 		fields = append(fields, usagelog.FieldInputCost)
 	}
@@ -9798,6 +10161,9 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.cached_input_cost != nil {
 		fields = append(fields, usagelog.FieldCachedInputCost)
+	}
+	if m.cache_creation_cost != nil {
+		fields = append(fields, usagelog.FieldCacheCreationCost)
 	}
 	if m.total_cost != nil {
 		fields = append(fields, usagelog.FieldTotalCost)
@@ -9859,6 +10225,12 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.OutputTokens()
 	case usagelog.FieldCachedInputTokens:
 		return m.CachedInputTokens()
+	case usagelog.FieldCacheCreationTokens:
+		return m.CacheCreationTokens()
+	case usagelog.FieldCacheCreation5mTokens:
+		return m.CacheCreation5mTokens()
+	case usagelog.FieldCacheCreation1hTokens:
+		return m.CacheCreation1hTokens()
 	case usagelog.FieldReasoningOutputTokens:
 		return m.ReasoningOutputTokens()
 	case usagelog.FieldInputPrice:
@@ -9867,12 +10239,18 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.OutputPrice()
 	case usagelog.FieldCachedInputPrice:
 		return m.CachedInputPrice()
+	case usagelog.FieldCacheCreationPrice:
+		return m.CacheCreationPrice()
+	case usagelog.FieldCacheCreation1hPrice:
+		return m.CacheCreation1hPrice()
 	case usagelog.FieldInputCost:
 		return m.InputCost()
 	case usagelog.FieldOutputCost:
 		return m.OutputCost()
 	case usagelog.FieldCachedInputCost:
 		return m.CachedInputCost()
+	case usagelog.FieldCacheCreationCost:
+		return m.CacheCreationCost()
 	case usagelog.FieldTotalCost:
 		return m.TotalCost()
 	case usagelog.FieldActualCost:
@@ -9920,6 +10298,12 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldOutputTokens(ctx)
 	case usagelog.FieldCachedInputTokens:
 		return m.OldCachedInputTokens(ctx)
+	case usagelog.FieldCacheCreationTokens:
+		return m.OldCacheCreationTokens(ctx)
+	case usagelog.FieldCacheCreation5mTokens:
+		return m.OldCacheCreation5mTokens(ctx)
+	case usagelog.FieldCacheCreation1hTokens:
+		return m.OldCacheCreation1hTokens(ctx)
 	case usagelog.FieldReasoningOutputTokens:
 		return m.OldReasoningOutputTokens(ctx)
 	case usagelog.FieldInputPrice:
@@ -9928,12 +10312,18 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldOutputPrice(ctx)
 	case usagelog.FieldCachedInputPrice:
 		return m.OldCachedInputPrice(ctx)
+	case usagelog.FieldCacheCreationPrice:
+		return m.OldCacheCreationPrice(ctx)
+	case usagelog.FieldCacheCreation1hPrice:
+		return m.OldCacheCreation1hPrice(ctx)
 	case usagelog.FieldInputCost:
 		return m.OldInputCost(ctx)
 	case usagelog.FieldOutputCost:
 		return m.OldOutputCost(ctx)
 	case usagelog.FieldCachedInputCost:
 		return m.OldCachedInputCost(ctx)
+	case usagelog.FieldCacheCreationCost:
+		return m.OldCacheCreationCost(ctx)
 	case usagelog.FieldTotalCost:
 		return m.OldTotalCost(ctx)
 	case usagelog.FieldActualCost:
@@ -10006,6 +10396,27 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCachedInputTokens(v)
 		return nil
+	case usagelog.FieldCacheCreationTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheCreationTokens(v)
+		return nil
+	case usagelog.FieldCacheCreation5mTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheCreation5mTokens(v)
+		return nil
+	case usagelog.FieldCacheCreation1hTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheCreation1hTokens(v)
+		return nil
 	case usagelog.FieldReasoningOutputTokens:
 		v, ok := value.(int)
 		if !ok {
@@ -10034,6 +10445,20 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCachedInputPrice(v)
 		return nil
+	case usagelog.FieldCacheCreationPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheCreationPrice(v)
+		return nil
+	case usagelog.FieldCacheCreation1hPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheCreation1hPrice(v)
+		return nil
 	case usagelog.FieldInputCost:
 		v, ok := value.(float64)
 		if !ok {
@@ -10054,6 +10479,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCachedInputCost(v)
+		return nil
+	case usagelog.FieldCacheCreationCost:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheCreationCost(v)
 		return nil
 	case usagelog.FieldTotalCost:
 		v, ok := value.(float64)
@@ -10170,6 +10602,15 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addcached_input_tokens != nil {
 		fields = append(fields, usagelog.FieldCachedInputTokens)
 	}
+	if m.addcache_creation_tokens != nil {
+		fields = append(fields, usagelog.FieldCacheCreationTokens)
+	}
+	if m.addcache_creation_5m_tokens != nil {
+		fields = append(fields, usagelog.FieldCacheCreation5mTokens)
+	}
+	if m.addcache_creation_1h_tokens != nil {
+		fields = append(fields, usagelog.FieldCacheCreation1hTokens)
+	}
 	if m.addreasoning_output_tokens != nil {
 		fields = append(fields, usagelog.FieldReasoningOutputTokens)
 	}
@@ -10182,6 +10623,12 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addcached_input_price != nil {
 		fields = append(fields, usagelog.FieldCachedInputPrice)
 	}
+	if m.addcache_creation_price != nil {
+		fields = append(fields, usagelog.FieldCacheCreationPrice)
+	}
+	if m.addcache_creation_1h_price != nil {
+		fields = append(fields, usagelog.FieldCacheCreation1hPrice)
+	}
 	if m.addinput_cost != nil {
 		fields = append(fields, usagelog.FieldInputCost)
 	}
@@ -10190,6 +10637,9 @@ func (m *UsageLogMutation) AddedFields() []string {
 	}
 	if m.addcached_input_cost != nil {
 		fields = append(fields, usagelog.FieldCachedInputCost)
+	}
+	if m.addcache_creation_cost != nil {
+		fields = append(fields, usagelog.FieldCacheCreationCost)
 	}
 	if m.addtotal_cost != nil {
 		fields = append(fields, usagelog.FieldTotalCost)
@@ -10232,6 +10682,12 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedOutputTokens()
 	case usagelog.FieldCachedInputTokens:
 		return m.AddedCachedInputTokens()
+	case usagelog.FieldCacheCreationTokens:
+		return m.AddedCacheCreationTokens()
+	case usagelog.FieldCacheCreation5mTokens:
+		return m.AddedCacheCreation5mTokens()
+	case usagelog.FieldCacheCreation1hTokens:
+		return m.AddedCacheCreation1hTokens()
 	case usagelog.FieldReasoningOutputTokens:
 		return m.AddedReasoningOutputTokens()
 	case usagelog.FieldInputPrice:
@@ -10240,12 +10696,18 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedOutputPrice()
 	case usagelog.FieldCachedInputPrice:
 		return m.AddedCachedInputPrice()
+	case usagelog.FieldCacheCreationPrice:
+		return m.AddedCacheCreationPrice()
+	case usagelog.FieldCacheCreation1hPrice:
+		return m.AddedCacheCreation1hPrice()
 	case usagelog.FieldInputCost:
 		return m.AddedInputCost()
 	case usagelog.FieldOutputCost:
 		return m.AddedOutputCost()
 	case usagelog.FieldCachedInputCost:
 		return m.AddedCachedInputCost()
+	case usagelog.FieldCacheCreationCost:
+		return m.AddedCacheCreationCost()
 	case usagelog.FieldTotalCost:
 		return m.AddedTotalCost()
 	case usagelog.FieldActualCost:
@@ -10294,6 +10756,27 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddCachedInputTokens(v)
 		return nil
+	case usagelog.FieldCacheCreationTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheCreationTokens(v)
+		return nil
+	case usagelog.FieldCacheCreation5mTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheCreation5mTokens(v)
+		return nil
+	case usagelog.FieldCacheCreation1hTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheCreation1hTokens(v)
+		return nil
 	case usagelog.FieldReasoningOutputTokens:
 		v, ok := value.(int)
 		if !ok {
@@ -10322,6 +10805,20 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddCachedInputPrice(v)
 		return nil
+	case usagelog.FieldCacheCreationPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheCreationPrice(v)
+		return nil
+	case usagelog.FieldCacheCreation1hPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheCreation1hPrice(v)
+		return nil
 	case usagelog.FieldInputCost:
 		v, ok := value.(float64)
 		if !ok {
@@ -10342,6 +10839,13 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddCachedInputCost(v)
+		return nil
+	case usagelog.FieldCacheCreationCost:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheCreationCost(v)
 		return nil
 	case usagelog.FieldTotalCost:
 		v, ok := value.(float64)
@@ -10448,6 +10952,15 @@ func (m *UsageLogMutation) ResetField(name string) error {
 	case usagelog.FieldCachedInputTokens:
 		m.ResetCachedInputTokens()
 		return nil
+	case usagelog.FieldCacheCreationTokens:
+		m.ResetCacheCreationTokens()
+		return nil
+	case usagelog.FieldCacheCreation5mTokens:
+		m.ResetCacheCreation5mTokens()
+		return nil
+	case usagelog.FieldCacheCreation1hTokens:
+		m.ResetCacheCreation1hTokens()
+		return nil
 	case usagelog.FieldReasoningOutputTokens:
 		m.ResetReasoningOutputTokens()
 		return nil
@@ -10460,6 +10973,12 @@ func (m *UsageLogMutation) ResetField(name string) error {
 	case usagelog.FieldCachedInputPrice:
 		m.ResetCachedInputPrice()
 		return nil
+	case usagelog.FieldCacheCreationPrice:
+		m.ResetCacheCreationPrice()
+		return nil
+	case usagelog.FieldCacheCreation1hPrice:
+		m.ResetCacheCreation1hPrice()
+		return nil
 	case usagelog.FieldInputCost:
 		m.ResetInputCost()
 		return nil
@@ -10468,6 +10987,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldCachedInputCost:
 		m.ResetCachedInputCost()
+		return nil
+	case usagelog.FieldCacheCreationCost:
+		m.ResetCacheCreationCost()
 		return nil
 	case usagelog.FieldTotalCost:
 		m.ResetTotalCost()

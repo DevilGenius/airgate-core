@@ -48,6 +48,7 @@ func BuildTrendBuckets(entries []TrendEntry, granularity, tz string) []TrendBuck
 		bucket.InputTokens += entry.InputTokens
 		bucket.OutputTokens += entry.OutputTokens
 		bucket.CacheRead += entry.CachedInputTokens
+		bucket.CacheCreation += entry.CacheCreationTokens
 		bucket.ActualCost += entry.ActualCost
 		bucket.StandardCost += entry.StandardCost
 		bucket.BilledCost += entry.BilledCost

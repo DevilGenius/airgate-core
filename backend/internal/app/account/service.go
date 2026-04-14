@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -291,19 +292,44 @@ func (s *Service) InvalidateUsageCache(platform string) {
 	}
 }
 
-// GetAccountUsage 查询插件上报的账号额度（带内存缓存）。
+// GetAccountUsage 查询账号当前用量视图。
+//
+// 分层缓存策略（重要）：
+//   - 上游 quota 数据（windows / credits）耗时（要调各平台 API），5 分钟内存缓存
+//   - today_stats 是本地 usage_logs 聚合，**每次请求重新查询**，不进缓存
+//
+// 如果把 today_stats 和 upstream 数据一起缓存，刚写入的 usage_log 最多要等 5 分钟
+// 才会在账号列表里显示，和"实时监控"的预期不符。
 func (s *Service) GetAccountUsage(ctx context.Context, platform string) (map[string]any, error) {
-	// 检查缓存
+	base, err := s.getUpstreamUsage(ctx, platform)
+	if err != nil {
+		return nil, err
+	}
+
+	// 浅克隆一份：后续把 today_stats 注入克隆体，避免污染缓存里那份"纯上游数据"。
+	// 深度无需——我们只给外层 map 和每个 account map 加一个字段，不会动 windows / credits。
+	result := cloneMergedShallow(base)
+	s.enrichTodayStats(ctx, result)
+	return result, nil
+}
+
+// getUpstreamUsage 拿到上游账号的 quota 窗口 / credits（带 5 分钟 TTL 内存缓存）。
+// 返回的 map 结构是 map[accountID]map[string]any，对齐 sdk.AccountUsageInfo 的 JSON 形态。
+// 这一层不包含 today_stats，由调用方单独注入。
+func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[string]any, error) {
 	cacheKey := platform
 	if cacheKey == "" {
 		cacheKey = "__all__"
 	}
+
 	s.usageMu.RLock()
 	if entry, ok := s.usageCache[cacheKey]; ok && time.Since(entry.fetchedAt) < usageCacheTTL {
+		data := entry.data
 		s.usageMu.RUnlock()
-		return entry.data, nil
+		return data, nil
 	}
 	s.usageMu.RUnlock()
+
 	type platformQuery struct {
 		platform string
 		inst     *plugin.PluginInstance
@@ -339,10 +365,25 @@ func (s *Service) GetAccountUsage(ctx context.Context, platform string) (map[str
 			continue
 		}
 
+		// 先给所有活跃账号（包括 apikey）在 merged 里留一个占位 entry，
+		// 这样 enrichTodayStats 能遍历到它们。apikey 账号走不到下面的插件
+		// 调用（没有 OAuth credentials），它们的占位会保持为空 map，
+		// 前端渲染时跳过 windows/credits，只显示 today_stats。
+		//
+		// 只对"支持 OAuth quota 查询"的账号类型发 HTTP 请求：目前判定依据是
+		// item.Type != "apikey" && 有 credentials，与原行为一致。
 		reqList := make([]accountUsageRequest, 0, len(accounts))
 		for _, item := range accounts {
-			// 仅查询活跃账号的用量（非活跃账号跳过，避免无意义的 API 调用）
+			// 非活跃账号完全跳过
 			if item.Status != "active" {
+				continue
+			}
+			key := strconv.Itoa(item.ID)
+			if _, exists := merged[key]; !exists {
+				merged[key] = map[string]any{}
+			}
+			// apikey 类型不调插件（没有上游 quota 接口）
+			if item.Type == "apikey" {
 				continue
 			}
 			reqList = append(reqList, accountUsageRequest{
@@ -371,6 +412,8 @@ func (s *Service) GetAccountUsage(ctx context.Context, platform string) (map[str
 			continue
 		}
 
+		// 插件返回的 OAuth 账号会覆盖掉占位的空 map（插件响应里有完整的
+		// windows / credits）；apikey 账号的占位保持原样。
 		for key, value := range result.Accounts {
 			merged[key] = value
 		}
@@ -379,12 +422,88 @@ func (s *Service) GetAccountUsage(ctx context.Context, platform string) (map[str
 		}
 	}
 
-	// 写入缓存
 	s.usageMu.Lock()
 	s.usageCache[cacheKey] = &usageCacheEntry{data: merged, fetchedAt: time.Now()}
 	s.usageMu.Unlock()
 
 	return merged, nil
+}
+
+// cloneMergedShallow 浅克隆 map[accountID]accountMap 两层结构。
+//
+// 场景：上游缓存里存的是"纯上游数据"，返回前需要额外注入 today_stats，
+// 但不能在缓存原件上打补丁（会造成并发读到半成品、或者今日 stats 被冻在缓存里）。
+// 两层浅克隆就够了：我们只给外层 map 的每个 account entry 新增一个字段，
+// 不会改动 windows / credits 等引用字段。
+func cloneMergedShallow(src map[string]any) map[string]any {
+	dst := make(map[string]any, len(src))
+	for k, v := range src {
+		if accountMap, ok := v.(map[string]any); ok {
+			accountCopy := make(map[string]any, len(accountMap)+1)
+			for ak, av := range accountMap {
+				accountCopy[ak] = av
+			}
+			dst[k] = accountCopy
+		} else {
+			dst[k] = v
+		}
+	}
+	return dst
+}
+
+// enrichTodayStats 为每个账号从 usage_logs 聚合**当天**（本地时区自然日）的
+// 请求数 / token 数 / 账号成本 / 用户消耗，作为 account-level `today_stats` 字段
+// 注入 merged 返回体。
+//
+// 和上游 quota 窗口（"5h"/"7d"/"7d_spark"）完全解耦：那些窗口来自插件上报的
+// upstream API percentages，这里反映的是本地 gateway 视角的账号当天真实消耗。
+//
+// 实现：所有账号共用同一个 startTime（今天 00:00），一次批量聚合即可。
+func (s *Service) enrichTodayStats(ctx context.Context, merged map[string]any) {
+	if len(merged) == 0 {
+		return
+	}
+
+	// 收集所有合法的 accountID
+	accountIDs := make([]int, 0, len(merged))
+	accountMaps := make(map[int]map[string]any, len(merged))
+	for accountIDStr, raw := range merged {
+		accountID, err := strconv.Atoi(accountIDStr)
+		if err != nil {
+			continue
+		}
+		accountMap, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		accountIDs = append(accountIDs, accountID)
+		accountMaps[accountID] = accountMap
+	}
+	if len(accountIDs) == 0 {
+		return
+	}
+
+	// 今天 00:00（服务器本地时区；time.Local 与 usage_logs.created_at 存储时区一致）
+	todayStart := timezone.StartOfDay(s.now().In(time.Local))
+
+	statsMap, err := s.repo.BatchWindowStats(ctx, accountIDs, todayStart)
+	if err != nil {
+		return
+	}
+
+	for accountID, accountMap := range accountMaps {
+		stats, ok := statsMap[accountID]
+		if !ok {
+			// 没有任何请求时也回填 0，前端据此稳定展示"0 req / 0 / A $0.00 / U $0.00"
+			stats = AccountWindowStats{}
+		}
+		accountMap["today_stats"] = map[string]any{
+			"requests":     stats.Requests,
+			"tokens":       stats.Tokens,
+			"account_cost": stats.AccountCost,
+			"user_cost":    stats.UserCost,
+		}
+	}
 }
 
 // GetCredentialsSchema 获取指定平台凭证字段 schema。

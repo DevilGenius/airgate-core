@@ -34,9 +34,7 @@ func (f *Forwarder) finishForward(c *gin.Context, state *forwardState, execution
 	}
 
 	if execution.result.StatusCode >= 400 {
-		if !state.stream && execution.result.Body != nil {
-			writeForwardResponse(c, execution.result)
-		}
+		writeSanitizedForwardError(c, state, execution)
 		return
 	}
 
@@ -65,6 +63,50 @@ func maybeWriteForwardError(c *gin.Context, state *forwardState, execution forwa
 		return
 	}
 	openAIError(c, http.StatusBadGateway, "server_error", "upstream_error", "插件转发失败")
+}
+
+// writeSanitizedForwardError 处理上游返回 4xx/5xx 时的响应。
+// 客户端侧错误（如 model 不支持）透传原始信息；其余一律脱敏为 502 upstream_error，
+// 仅按账号状态给出大类说明，完整错误仅落服务端日志，避免暴露上游内部状态。
+func writeSanitizedForwardError(c *gin.Context, state *forwardState, execution forwardExecution) {
+	if state.stream && c.Writer.Written() {
+		return
+	}
+
+	if isClientSideForwardError(execution) {
+		if !state.stream && execution.result.Body != nil {
+			writeForwardResponse(c, execution.result)
+			return
+		}
+		message := execution.result.ErrorMessage
+		if message == "" {
+			message = "请求参数无效"
+		}
+		openAIError(c, execution.result.StatusCode, "invalid_request_error", "invalid_request", message)
+		return
+	}
+
+	slog.Error("上游返回错误，已脱敏响应给客户端",
+		"plugin", state.plugin.Name,
+		"account_id", state.account.ID,
+		"status", execution.result.StatusCode,
+		"account_status", execution.result.AccountStatus,
+		"error_message", execution.result.ErrorMessage)
+
+	openAIError(c, http.StatusBadGateway, "server_error", "upstream_error", sanitizedUpstreamMessage(execution.result.AccountStatus))
+}
+
+func sanitizedUpstreamMessage(status sdk.AccountStatus) string {
+	switch status {
+	case sdk.AccountStatusRateLimited:
+		return "上游账号当前被限流，请稍后重试"
+	case sdk.AccountStatusDisabled:
+		return "上游账号不可用，请联系管理员"
+	case sdk.AccountStatusExpired:
+		return "上游账号凭证已过期，请联系管理员"
+	default:
+		return "上游服务暂不可用，请稍后重试"
+	}
 }
 
 func (f *Forwarder) reportForwardExecution(ctx context.Context, state *forwardState, execution forwardExecution) {
@@ -141,12 +183,13 @@ func (f *Forwarder) recordForwardUsage(c *gin.Context, state *forwardState, exec
 	accountRate := state.account.RateMultiplier
 
 	calcResult := f.calculator.Calculate(billing.CalculateInput{
-		InputCost:       result.InputCost,
-		OutputCost:      result.OutputCost,
-		CachedInputCost: result.CachedInputCost,
-		BillingRate:     billingRate,
-		SellRate:        sellRate,
-		AccountRate:     accountRate,
+		InputCost:         result.InputCost,
+		OutputCost:        result.OutputCost,
+		CachedInputCost:   result.CachedInputCost,
+		CacheCreationCost: result.CacheCreationCost,
+		BillingRate:       billingRate,
+		SellRate:          sellRate,
+		AccountRate:       accountRate,
 	})
 
 	// scheduler 的 window cost 沿用 account_cost（= total × account_rate），
@@ -163,13 +206,19 @@ func (f *Forwarder) recordForwardUsage(c *gin.Context, state *forwardState, exec
 		InputTokens:           result.InputTokens,
 		OutputTokens:          result.OutputTokens,
 		CachedInputTokens:     result.CachedInputTokens,
+		CacheCreationTokens:   result.CacheCreationTokens,
+		CacheCreation5mTokens: result.CacheCreation5mTokens,
+		CacheCreation1hTokens: result.CacheCreation1hTokens,
 		ReasoningOutputTokens: result.ReasoningOutputTokens,
 		InputPrice:            result.InputPrice,
 		OutputPrice:           result.OutputPrice,
 		CachedInputPrice:      result.CachedInputPrice,
+		CacheCreationPrice:    result.CacheCreationPrice,
+		CacheCreation1hPrice:  result.CacheCreation1hPrice,
 		InputCost:             calcResult.InputCost,
 		OutputCost:            calcResult.OutputCost,
 		CachedInputCost:       calcResult.CachedInputCost,
+		CacheCreationCost:     calcResult.CacheCreationCost,
 		TotalCost:             calcResult.TotalCost,
 		ActualCost:            calcResult.ActualCost,
 		BilledCost:            calcResult.BilledCost,

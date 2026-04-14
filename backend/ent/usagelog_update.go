@@ -122,6 +122,69 @@ func (ulu *UsageLogUpdate) AddCachedInputTokens(i int) *UsageLogUpdate {
 	return ulu
 }
 
+// SetCacheCreationTokens sets the "cache_creation_tokens" field.
+func (ulu *UsageLogUpdate) SetCacheCreationTokens(i int) *UsageLogUpdate {
+	ulu.mutation.ResetCacheCreationTokens()
+	ulu.mutation.SetCacheCreationTokens(i)
+	return ulu
+}
+
+// SetNillableCacheCreationTokens sets the "cache_creation_tokens" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableCacheCreationTokens(i *int) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetCacheCreationTokens(*i)
+	}
+	return ulu
+}
+
+// AddCacheCreationTokens adds i to the "cache_creation_tokens" field.
+func (ulu *UsageLogUpdate) AddCacheCreationTokens(i int) *UsageLogUpdate {
+	ulu.mutation.AddCacheCreationTokens(i)
+	return ulu
+}
+
+// SetCacheCreation5mTokens sets the "cache_creation_5m_tokens" field.
+func (ulu *UsageLogUpdate) SetCacheCreation5mTokens(i int) *UsageLogUpdate {
+	ulu.mutation.ResetCacheCreation5mTokens()
+	ulu.mutation.SetCacheCreation5mTokens(i)
+	return ulu
+}
+
+// SetNillableCacheCreation5mTokens sets the "cache_creation_5m_tokens" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableCacheCreation5mTokens(i *int) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetCacheCreation5mTokens(*i)
+	}
+	return ulu
+}
+
+// AddCacheCreation5mTokens adds i to the "cache_creation_5m_tokens" field.
+func (ulu *UsageLogUpdate) AddCacheCreation5mTokens(i int) *UsageLogUpdate {
+	ulu.mutation.AddCacheCreation5mTokens(i)
+	return ulu
+}
+
+// SetCacheCreation1hTokens sets the "cache_creation_1h_tokens" field.
+func (ulu *UsageLogUpdate) SetCacheCreation1hTokens(i int) *UsageLogUpdate {
+	ulu.mutation.ResetCacheCreation1hTokens()
+	ulu.mutation.SetCacheCreation1hTokens(i)
+	return ulu
+}
+
+// SetNillableCacheCreation1hTokens sets the "cache_creation_1h_tokens" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableCacheCreation1hTokens(i *int) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetCacheCreation1hTokens(*i)
+	}
+	return ulu
+}
+
+// AddCacheCreation1hTokens adds i to the "cache_creation_1h_tokens" field.
+func (ulu *UsageLogUpdate) AddCacheCreation1hTokens(i int) *UsageLogUpdate {
+	ulu.mutation.AddCacheCreation1hTokens(i)
+	return ulu
+}
+
 // SetReasoningOutputTokens sets the "reasoning_output_tokens" field.
 func (ulu *UsageLogUpdate) SetReasoningOutputTokens(i int) *UsageLogUpdate {
 	ulu.mutation.ResetReasoningOutputTokens()
@@ -206,6 +269,48 @@ func (ulu *UsageLogUpdate) AddCachedInputPrice(f float64) *UsageLogUpdate {
 	return ulu
 }
 
+// SetCacheCreationPrice sets the "cache_creation_price" field.
+func (ulu *UsageLogUpdate) SetCacheCreationPrice(f float64) *UsageLogUpdate {
+	ulu.mutation.ResetCacheCreationPrice()
+	ulu.mutation.SetCacheCreationPrice(f)
+	return ulu
+}
+
+// SetNillableCacheCreationPrice sets the "cache_creation_price" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableCacheCreationPrice(f *float64) *UsageLogUpdate {
+	if f != nil {
+		ulu.SetCacheCreationPrice(*f)
+	}
+	return ulu
+}
+
+// AddCacheCreationPrice adds f to the "cache_creation_price" field.
+func (ulu *UsageLogUpdate) AddCacheCreationPrice(f float64) *UsageLogUpdate {
+	ulu.mutation.AddCacheCreationPrice(f)
+	return ulu
+}
+
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (ulu *UsageLogUpdate) SetCacheCreation1hPrice(f float64) *UsageLogUpdate {
+	ulu.mutation.ResetCacheCreation1hPrice()
+	ulu.mutation.SetCacheCreation1hPrice(f)
+	return ulu
+}
+
+// SetNillableCacheCreation1hPrice sets the "cache_creation_1h_price" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableCacheCreation1hPrice(f *float64) *UsageLogUpdate {
+	if f != nil {
+		ulu.SetCacheCreation1hPrice(*f)
+	}
+	return ulu
+}
+
+// AddCacheCreation1hPrice adds f to the "cache_creation_1h_price" field.
+func (ulu *UsageLogUpdate) AddCacheCreation1hPrice(f float64) *UsageLogUpdate {
+	ulu.mutation.AddCacheCreation1hPrice(f)
+	return ulu
+}
+
 // SetInputCost sets the "input_cost" field.
 func (ulu *UsageLogUpdate) SetInputCost(f float64) *UsageLogUpdate {
 	ulu.mutation.ResetInputCost()
@@ -266,6 +371,27 @@ func (ulu *UsageLogUpdate) SetNillableCachedInputCost(f *float64) *UsageLogUpdat
 // AddCachedInputCost adds f to the "cached_input_cost" field.
 func (ulu *UsageLogUpdate) AddCachedInputCost(f float64) *UsageLogUpdate {
 	ulu.mutation.AddCachedInputCost(f)
+	return ulu
+}
+
+// SetCacheCreationCost sets the "cache_creation_cost" field.
+func (ulu *UsageLogUpdate) SetCacheCreationCost(f float64) *UsageLogUpdate {
+	ulu.mutation.ResetCacheCreationCost()
+	ulu.mutation.SetCacheCreationCost(f)
+	return ulu
+}
+
+// SetNillableCacheCreationCost sets the "cache_creation_cost" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableCacheCreationCost(f *float64) *UsageLogUpdate {
+	if f != nil {
+		ulu.SetCacheCreationCost(*f)
+	}
+	return ulu
+}
+
+// AddCacheCreationCost adds f to the "cache_creation_cost" field.
+func (ulu *UsageLogUpdate) AddCacheCreationCost(f float64) *UsageLogUpdate {
+	ulu.mutation.AddCacheCreationCost(f)
 	return ulu
 }
 
@@ -692,6 +818,24 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.AddedCachedInputTokens(); ok {
 		_spec.AddField(usagelog.FieldCachedInputTokens, field.TypeInt, value)
 	}
+	if value, ok := ulu.mutation.CacheCreationTokens(); ok {
+		_spec.SetField(usagelog.FieldCacheCreationTokens, field.TypeInt, value)
+	}
+	if value, ok := ulu.mutation.AddedCacheCreationTokens(); ok {
+		_spec.AddField(usagelog.FieldCacheCreationTokens, field.TypeInt, value)
+	}
+	if value, ok := ulu.mutation.CacheCreation5mTokens(); ok {
+		_spec.SetField(usagelog.FieldCacheCreation5mTokens, field.TypeInt, value)
+	}
+	if value, ok := ulu.mutation.AddedCacheCreation5mTokens(); ok {
+		_spec.AddField(usagelog.FieldCacheCreation5mTokens, field.TypeInt, value)
+	}
+	if value, ok := ulu.mutation.CacheCreation1hTokens(); ok {
+		_spec.SetField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
+	}
+	if value, ok := ulu.mutation.AddedCacheCreation1hTokens(); ok {
+		_spec.AddField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
+	}
 	if value, ok := ulu.mutation.ReasoningOutputTokens(); ok {
 		_spec.SetField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
 	}
@@ -716,6 +860,18 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.AddedCachedInputPrice(); ok {
 		_spec.AddField(usagelog.FieldCachedInputPrice, field.TypeFloat64, value)
 	}
+	if value, ok := ulu.mutation.CacheCreationPrice(); ok {
+		_spec.SetField(usagelog.FieldCacheCreationPrice, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AddedCacheCreationPrice(); ok {
+		_spec.AddField(usagelog.FieldCacheCreationPrice, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.CacheCreation1hPrice(); ok {
+		_spec.SetField(usagelog.FieldCacheCreation1hPrice, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AddedCacheCreation1hPrice(); ok {
+		_spec.AddField(usagelog.FieldCacheCreation1hPrice, field.TypeFloat64, value)
+	}
 	if value, ok := ulu.mutation.InputCost(); ok {
 		_spec.SetField(usagelog.FieldInputCost, field.TypeFloat64, value)
 	}
@@ -733,6 +889,12 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := ulu.mutation.AddedCachedInputCost(); ok {
 		_spec.AddField(usagelog.FieldCachedInputCost, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.CacheCreationCost(); ok {
+		_spec.SetField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AddedCacheCreationCost(); ok {
+		_spec.AddField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
 	}
 	if value, ok := ulu.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)
@@ -1027,6 +1189,69 @@ func (uluo *UsageLogUpdateOne) AddCachedInputTokens(i int) *UsageLogUpdateOne {
 	return uluo
 }
 
+// SetCacheCreationTokens sets the "cache_creation_tokens" field.
+func (uluo *UsageLogUpdateOne) SetCacheCreationTokens(i int) *UsageLogUpdateOne {
+	uluo.mutation.ResetCacheCreationTokens()
+	uluo.mutation.SetCacheCreationTokens(i)
+	return uluo
+}
+
+// SetNillableCacheCreationTokens sets the "cache_creation_tokens" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableCacheCreationTokens(i *int) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetCacheCreationTokens(*i)
+	}
+	return uluo
+}
+
+// AddCacheCreationTokens adds i to the "cache_creation_tokens" field.
+func (uluo *UsageLogUpdateOne) AddCacheCreationTokens(i int) *UsageLogUpdateOne {
+	uluo.mutation.AddCacheCreationTokens(i)
+	return uluo
+}
+
+// SetCacheCreation5mTokens sets the "cache_creation_5m_tokens" field.
+func (uluo *UsageLogUpdateOne) SetCacheCreation5mTokens(i int) *UsageLogUpdateOne {
+	uluo.mutation.ResetCacheCreation5mTokens()
+	uluo.mutation.SetCacheCreation5mTokens(i)
+	return uluo
+}
+
+// SetNillableCacheCreation5mTokens sets the "cache_creation_5m_tokens" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableCacheCreation5mTokens(i *int) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetCacheCreation5mTokens(*i)
+	}
+	return uluo
+}
+
+// AddCacheCreation5mTokens adds i to the "cache_creation_5m_tokens" field.
+func (uluo *UsageLogUpdateOne) AddCacheCreation5mTokens(i int) *UsageLogUpdateOne {
+	uluo.mutation.AddCacheCreation5mTokens(i)
+	return uluo
+}
+
+// SetCacheCreation1hTokens sets the "cache_creation_1h_tokens" field.
+func (uluo *UsageLogUpdateOne) SetCacheCreation1hTokens(i int) *UsageLogUpdateOne {
+	uluo.mutation.ResetCacheCreation1hTokens()
+	uluo.mutation.SetCacheCreation1hTokens(i)
+	return uluo
+}
+
+// SetNillableCacheCreation1hTokens sets the "cache_creation_1h_tokens" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableCacheCreation1hTokens(i *int) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetCacheCreation1hTokens(*i)
+	}
+	return uluo
+}
+
+// AddCacheCreation1hTokens adds i to the "cache_creation_1h_tokens" field.
+func (uluo *UsageLogUpdateOne) AddCacheCreation1hTokens(i int) *UsageLogUpdateOne {
+	uluo.mutation.AddCacheCreation1hTokens(i)
+	return uluo
+}
+
 // SetReasoningOutputTokens sets the "reasoning_output_tokens" field.
 func (uluo *UsageLogUpdateOne) SetReasoningOutputTokens(i int) *UsageLogUpdateOne {
 	uluo.mutation.ResetReasoningOutputTokens()
@@ -1111,6 +1336,48 @@ func (uluo *UsageLogUpdateOne) AddCachedInputPrice(f float64) *UsageLogUpdateOne
 	return uluo
 }
 
+// SetCacheCreationPrice sets the "cache_creation_price" field.
+func (uluo *UsageLogUpdateOne) SetCacheCreationPrice(f float64) *UsageLogUpdateOne {
+	uluo.mutation.ResetCacheCreationPrice()
+	uluo.mutation.SetCacheCreationPrice(f)
+	return uluo
+}
+
+// SetNillableCacheCreationPrice sets the "cache_creation_price" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableCacheCreationPrice(f *float64) *UsageLogUpdateOne {
+	if f != nil {
+		uluo.SetCacheCreationPrice(*f)
+	}
+	return uluo
+}
+
+// AddCacheCreationPrice adds f to the "cache_creation_price" field.
+func (uluo *UsageLogUpdateOne) AddCacheCreationPrice(f float64) *UsageLogUpdateOne {
+	uluo.mutation.AddCacheCreationPrice(f)
+	return uluo
+}
+
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (uluo *UsageLogUpdateOne) SetCacheCreation1hPrice(f float64) *UsageLogUpdateOne {
+	uluo.mutation.ResetCacheCreation1hPrice()
+	uluo.mutation.SetCacheCreation1hPrice(f)
+	return uluo
+}
+
+// SetNillableCacheCreation1hPrice sets the "cache_creation_1h_price" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableCacheCreation1hPrice(f *float64) *UsageLogUpdateOne {
+	if f != nil {
+		uluo.SetCacheCreation1hPrice(*f)
+	}
+	return uluo
+}
+
+// AddCacheCreation1hPrice adds f to the "cache_creation_1h_price" field.
+func (uluo *UsageLogUpdateOne) AddCacheCreation1hPrice(f float64) *UsageLogUpdateOne {
+	uluo.mutation.AddCacheCreation1hPrice(f)
+	return uluo
+}
+
 // SetInputCost sets the "input_cost" field.
 func (uluo *UsageLogUpdateOne) SetInputCost(f float64) *UsageLogUpdateOne {
 	uluo.mutation.ResetInputCost()
@@ -1171,6 +1438,27 @@ func (uluo *UsageLogUpdateOne) SetNillableCachedInputCost(f *float64) *UsageLogU
 // AddCachedInputCost adds f to the "cached_input_cost" field.
 func (uluo *UsageLogUpdateOne) AddCachedInputCost(f float64) *UsageLogUpdateOne {
 	uluo.mutation.AddCachedInputCost(f)
+	return uluo
+}
+
+// SetCacheCreationCost sets the "cache_creation_cost" field.
+func (uluo *UsageLogUpdateOne) SetCacheCreationCost(f float64) *UsageLogUpdateOne {
+	uluo.mutation.ResetCacheCreationCost()
+	uluo.mutation.SetCacheCreationCost(f)
+	return uluo
+}
+
+// SetNillableCacheCreationCost sets the "cache_creation_cost" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableCacheCreationCost(f *float64) *UsageLogUpdateOne {
+	if f != nil {
+		uluo.SetCacheCreationCost(*f)
+	}
+	return uluo
+}
+
+// AddCacheCreationCost adds f to the "cache_creation_cost" field.
+func (uluo *UsageLogUpdateOne) AddCacheCreationCost(f float64) *UsageLogUpdateOne {
+	uluo.mutation.AddCacheCreationCost(f)
 	return uluo
 }
 
@@ -1627,6 +1915,24 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	if value, ok := uluo.mutation.AddedCachedInputTokens(); ok {
 		_spec.AddField(usagelog.FieldCachedInputTokens, field.TypeInt, value)
 	}
+	if value, ok := uluo.mutation.CacheCreationTokens(); ok {
+		_spec.SetField(usagelog.FieldCacheCreationTokens, field.TypeInt, value)
+	}
+	if value, ok := uluo.mutation.AddedCacheCreationTokens(); ok {
+		_spec.AddField(usagelog.FieldCacheCreationTokens, field.TypeInt, value)
+	}
+	if value, ok := uluo.mutation.CacheCreation5mTokens(); ok {
+		_spec.SetField(usagelog.FieldCacheCreation5mTokens, field.TypeInt, value)
+	}
+	if value, ok := uluo.mutation.AddedCacheCreation5mTokens(); ok {
+		_spec.AddField(usagelog.FieldCacheCreation5mTokens, field.TypeInt, value)
+	}
+	if value, ok := uluo.mutation.CacheCreation1hTokens(); ok {
+		_spec.SetField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
+	}
+	if value, ok := uluo.mutation.AddedCacheCreation1hTokens(); ok {
+		_spec.AddField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
+	}
 	if value, ok := uluo.mutation.ReasoningOutputTokens(); ok {
 		_spec.SetField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
 	}
@@ -1651,6 +1957,18 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	if value, ok := uluo.mutation.AddedCachedInputPrice(); ok {
 		_spec.AddField(usagelog.FieldCachedInputPrice, field.TypeFloat64, value)
 	}
+	if value, ok := uluo.mutation.CacheCreationPrice(); ok {
+		_spec.SetField(usagelog.FieldCacheCreationPrice, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AddedCacheCreationPrice(); ok {
+		_spec.AddField(usagelog.FieldCacheCreationPrice, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.CacheCreation1hPrice(); ok {
+		_spec.SetField(usagelog.FieldCacheCreation1hPrice, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AddedCacheCreation1hPrice(); ok {
+		_spec.AddField(usagelog.FieldCacheCreation1hPrice, field.TypeFloat64, value)
+	}
 	if value, ok := uluo.mutation.InputCost(); ok {
 		_spec.SetField(usagelog.FieldInputCost, field.TypeFloat64, value)
 	}
@@ -1668,6 +1986,12 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.AddedCachedInputCost(); ok {
 		_spec.AddField(usagelog.FieldCachedInputCost, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.CacheCreationCost(); ok {
+		_spec.SetField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AddedCacheCreationCost(); ok {
+		_spec.AddField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
 	}
 	if value, ok := uluo.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)

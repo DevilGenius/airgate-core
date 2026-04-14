@@ -83,7 +83,7 @@ func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, five
 	activeUserSet := make(map[int]bool)
 	for _, item := range todayLogs {
 		todayRequests++
-		todayTokens += int64(item.InputTokens + item.OutputTokens + item.CachedInputTokens)
+		todayTokens += int64(item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens)
 		todayCost += item.ActualCost
 		todayStandardCost += item.TotalCost
 		todayDurationMs += item.DurationMs
@@ -151,13 +151,14 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 	result := make([]appdashboard.TrendLog, 0, len(list))
 	for _, item := range list {
 		log := appdashboard.TrendLog{
-			Model:             item.Model,
-			InputTokens:       int64(item.InputTokens),
-			OutputTokens:      int64(item.OutputTokens),
-			CachedInputTokens: int64(item.CachedInputTokens),
-			ActualCost:        item.ActualCost,
-			StandardCost:      item.TotalCost,
-			CreatedAt:         item.CreatedAt,
+			Model:               item.Model,
+			InputTokens:         int64(item.InputTokens),
+			OutputTokens:        int64(item.OutputTokens),
+			CachedInputTokens:   int64(item.CachedInputTokens),
+			CacheCreationTokens: int64(item.CacheCreationTokens),
+			ActualCost:          item.ActualCost,
+			StandardCost:        item.TotalCost,
+			CreatedAt:           item.CreatedAt,
 		}
 		if edgeUser := item.Edges.User; edgeUser != nil {
 			log.UserID = edgeUser.ID
@@ -171,16 +172,18 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 
 func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (int64, float64, float64, error) {
 	var rows []struct {
-		InputSum        int64   `json:"input_sum"`
-		OutputSum       int64   `json:"output_sum"`
-		CacheSum        int64   `json:"cache_sum"`
-		CostSum         float64 `json:"cost_sum"`
-		StandardCostSum float64 `json:"standard_cost_sum"`
+		InputSum         int64   `json:"input_sum"`
+		OutputSum        int64   `json:"output_sum"`
+		CacheSum         int64   `json:"cache_sum"`
+		CacheCreationSum int64   `json:"cache_creation_sum"`
+		CostSum          float64 `json:"cost_sum"`
+		StandardCostSum  float64 `json:"standard_cost_sum"`
 	}
 	if err := query.Aggregate(
 		ent.As(ent.Sum(entusagelog.FieldInputTokens), "input_sum"),
 		ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_sum"),
 		ent.As(ent.Sum(entusagelog.FieldCachedInputTokens), "cache_sum"),
+		ent.As(ent.Sum(entusagelog.FieldCacheCreationTokens), "cache_creation_sum"),
 		ent.As(ent.Sum(entusagelog.FieldActualCost), "cost_sum"),
 		ent.As(ent.Sum(entusagelog.FieldTotalCost), "standard_cost_sum"),
 	).Scan(ctx, &rows); err != nil {
@@ -189,5 +192,5 @@ func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (int64, flo
 	if len(rows) == 0 {
 		return 0, 0, 0, nil
 	}
-	return rows[0].InputSum + rows[0].OutputSum + rows[0].CacheSum, rows[0].CostSum, rows[0].StandardCostSum, nil
+	return rows[0].InputSum + rows[0].OutputSum + rows[0].CacheSum + rows[0].CacheCreationSum, rows[0].CostSum, rows[0].StandardCostSum, nil
 }

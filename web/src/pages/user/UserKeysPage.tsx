@@ -256,17 +256,42 @@ export default function UserKeysPage() {
     {
       key: 'group_id',
       title: t('user_keys.group'),
+      align: 'center',
       render: (row) => {
         if (row.group_id == null) return t('user_keys.group_unbound');
         const group = groupMap.get(row.group_id);
         const name = group?.name || `#${row.group_id}`;
         const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
+
+        // 用户在当前分组上是否有"用户专属倍率"覆盖
+        // 优先级：UserGroupRates[groupID] > GroupRateMultiplier
+        // 与后端 billing/rate.go:ResolveBillingRate 的解析规则保持一致
+        const userOverride = user?.group_rates?.[row.group_id];
+        const hasOverride =
+          typeof userOverride === 'number' &&
+          Number.isFinite(userOverride) &&
+          userOverride > 0 &&
+          group != null &&
+          userOverride !== group.rate_multiplier;
+
         return (
-          <div className="space-y-0.5">
+          <div className="space-y-0.5 text-center">
             <div>{name}</div>
             {group && (
               <div className="font-mono text-xs text-text-tertiary">
-                {t('user_keys.group_rate_short', '分组倍率')}: {group.rate_multiplier.toFixed(2)}
+                {t('user_keys.group_rate_short', '分组倍率')}:{' '}
+                {hasOverride ? (
+                  <span
+                    title={`${t('user_keys.group_rate_default', '分组默认')}: ${group.rate_multiplier.toFixed(2)}`}
+                  >
+                    {userOverride.toFixed(2)}
+                    <span className="ml-1 inline-block rounded bg-amber-500/10 px-1 text-[9px] leading-[14px] text-amber-500 align-middle">
+                      {t('user_keys.user_override_tag', '专属')}
+                    </span>
+                  </span>
+                ) : (
+                  group.rate_multiplier.toFixed(2)
+                )}
               </div>
             )}
             {hasSellRate && (

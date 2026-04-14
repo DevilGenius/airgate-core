@@ -258,6 +258,61 @@ func (s *AccountStore) FindUsageLogs(ctx context.Context, id int, startDate, end
 	return result, nil
 }
 
+// BatchWindowStats 批量查询多个账号在 [startTime, now] 时间窗口内的聚合统计。
+//
+// 实现：一次 GROUP BY account_id 的聚合查询，覆盖所有传入的账号 ID。
+// 返回的 map 只包含至少有一条 usage_log 的账号，其余账号由调用方按零值处理。
+func (s *AccountStore) BatchWindowStats(ctx context.Context, accountIDs []int, startTime time.Time) (map[int]appaccount.AccountWindowStats, error) {
+	if len(accountIDs) == 0 {
+		return map[int]appaccount.AccountWindowStats{}, nil
+	}
+
+	var rows []struct {
+		AccountID           int     `json:"account_usage_logs"`
+		Count               int     `json:"count"`
+		InputTokens         int64   `json:"input_tokens"`
+		OutputTokens        int64   `json:"output_tokens"`
+		CachedInputTokens   int64   `json:"cached_input_tokens"`
+		CacheCreationTokens int64   `json:"cache_creation_tokens"`
+		AccountCost         float64 `json:"account_cost"`
+		ActualCost          float64 `json:"actual_cost"`
+	}
+
+	err := s.db.UsageLog.Query().
+		Where(
+			entusagelog.HasAccountWith(entaccount.IDIn(accountIDs...)),
+			entusagelog.CreatedAtGTE(startTime),
+		).
+		GroupBy(entusagelog.AccountColumn).
+		Aggregate(
+			ent.Count(),
+			ent.As(ent.Sum(entusagelog.FieldInputTokens), "input_tokens"),
+			ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_tokens"),
+			ent.As(ent.Sum(entusagelog.FieldCachedInputTokens), "cached_input_tokens"),
+			ent.As(ent.Sum(entusagelog.FieldCacheCreationTokens), "cache_creation_tokens"),
+			ent.As(ent.Sum(entusagelog.FieldAccountCost), "account_cost"),
+			ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost"),
+		).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[int]appaccount.AccountWindowStats, len(rows))
+	for _, r := range rows {
+		if r.AccountID == 0 {
+			continue
+		}
+		result[r.AccountID] = appaccount.AccountWindowStats{
+			Requests:    int64(r.Count),
+			Tokens:      r.InputTokens + r.OutputTokens + r.CachedInputTokens + r.CacheCreationTokens,
+			AccountCost: r.AccountCost,
+			UserCost:    r.ActualCost,
+		}
+	}
+	return result, nil
+}
+
 // SaveCredentials 保存账号凭证。
 func (s *AccountStore) SaveCredentials(ctx context.Context, id int, credentials map[string]string) error {
 	if err := s.db.Account.UpdateOneID(id).

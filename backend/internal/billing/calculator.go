@@ -11,9 +11,10 @@ func NewCalculator() *Calculator {
 
 // CalculateInput 计算输入参数
 type CalculateInput struct {
-	InputCost       float64 // 插件已计算的输入费用
-	OutputCost      float64 // 插件已计算的输出费用
-	CachedInputCost float64 // 插件已计算的缓存输入费用
+	InputCost         float64 // 插件已计算的输入费用
+	OutputCost        float64 // 插件已计算的输出费用
+	CachedInputCost   float64 // 插件已计算的缓存读取费用
+	CacheCreationCost float64 // 插件已计算的缓存写入费用
 
 	// BillingRate 平台真实计费倍率（已由 ResolveBillingRate 解析过的单值，不再相乘）。
 	// 用于扣 reseller 的 user.balance 和写入 actual_cost。
@@ -34,8 +35,9 @@ type CalculateInput struct {
 type CalculateResult struct {
 	InputCost             float64 // 输入费用
 	OutputCost            float64 // 输出费用
-	CachedInputCost       float64 // cached input 费用
-	TotalCost             float64 // 原始基础成本 = input + cached_input + output（未乘任何倍率）
+	CachedInputCost       float64 // cached input 费用（cache read）
+	CacheCreationCost     float64 // cache creation 费用（cache write）
+	TotalCost             float64 // 原始基础成本 = input + cached_input + cache_creation + output（未乘任何倍率）
 	ActualCost            float64 // 平台真实成本 = TotalCost × BillingRate（扣 reseller 余额）
 	BilledCost            float64 // 客户账面消耗 = TotalCost × SellRate（sell_rate=0 时回退为 ActualCost）
 	AccountCost           float64 // 账号实际成本 = TotalCost × AccountRate（仅服务于"账号计费"统计）
@@ -57,7 +59,7 @@ type CalculateResult struct {
 //
 // 三者互不影响，各自存储在独立列里。
 func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
-	totalCost := input.InputCost + input.OutputCost + input.CachedInputCost
+	totalCost := input.InputCost + input.OutputCost + input.CachedInputCost + input.CacheCreationCost
 
 	billingRate := input.BillingRate
 	if billingRate <= 0 {
@@ -81,6 +83,7 @@ func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
 		InputCost:             input.InputCost,
 		OutputCost:            input.OutputCost,
 		CachedInputCost:       input.CachedInputCost,
+		CacheCreationCost:     input.CacheCreationCost,
 		TotalCost:             totalCost,
 		ActualCost:            actualCost,
 		BilledCost:            billedCost,

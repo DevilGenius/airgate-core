@@ -57,13 +57,19 @@ type LogRecord struct {
 	InputTokens           int
 	OutputTokens          int
 	CachedInputTokens     int
+	CacheCreationTokens   int
+	CacheCreation5mTokens int
+	CacheCreation1hTokens int
 	ReasoningOutputTokens int
 	InputPrice            float64
 	OutputPrice           float64
 	CachedInputPrice      float64
+	CacheCreationPrice    float64
+	CacheCreation1hPrice  float64
 	InputCost             float64
 	OutputCost            float64
 	CachedInputCost       float64
+	CacheCreationCost     float64
 	TotalCost             float64
 	ActualCost            float64 // 平台真实成本（用户扣费）
 	BilledCost            float64 // 客户账面消耗（reseller 销售管道）
@@ -153,13 +159,14 @@ type StatsResult struct {
 
 // TrendEntry 趋势聚合的原始项。
 type TrendEntry struct {
-	CreatedAt         string
-	InputTokens       int64
-	OutputTokens      int64
-	CachedInputTokens int64
-	ActualCost        float64
-	StandardCost      float64
-	BilledCost        float64
+	CreatedAt           string
+	InputTokens         int64
+	OutputTokens        int64
+	CachedInputTokens   int64
+	CacheCreationTokens int64
+	ActualCost          float64
+	StandardCost        float64
+	BilledCost          float64
 }
 
 // TrendBucket 趋势时间桶。

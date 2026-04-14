@@ -381,6 +381,7 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 			entusagelog.FieldInputTokens,
 			entusagelog.FieldOutputTokens,
 			entusagelog.FieldCachedInputTokens,
+			entusagelog.FieldCacheCreationTokens,
 			entusagelog.FieldActualCost,
 			entusagelog.FieldBilledCost,
 			entusagelog.FieldTotalCost,
@@ -394,13 +395,14 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 	result := make([]appusage.TrendEntry, 0, len(logs))
 	for _, item := range logs {
 		result = append(result, appusage.TrendEntry{
-			CreatedAt:         item.CreatedAt.Format(time.RFC3339),
-			InputTokens:       int64(item.InputTokens),
-			OutputTokens:      int64(item.OutputTokens),
-			CachedInputTokens: int64(item.CachedInputTokens),
-			ActualCost:        item.ActualCost,
-			StandardCost:      item.TotalCost,
-			BilledCost:        item.BilledCost,
+			CreatedAt:           item.CreatedAt.Format(time.RFC3339),
+			InputTokens:         int64(item.InputTokens),
+			OutputTokens:        int64(item.OutputTokens),
+			CachedInputTokens:   int64(item.CachedInputTokens),
+			CacheCreationTokens: int64(item.CacheCreationTokens),
+			ActualCost:          item.ActualCost,
+			StandardCost:        item.TotalCost,
+			BilledCost:          item.BilledCost,
 		})
 	}
 	return result, nil
@@ -457,18 +459,20 @@ func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summar
 	}
 
 	var rows []struct {
-		InputTokens       int64   `json:"input_tokens"`
-		OutputTokens      int64   `json:"output_tokens"`
-		CachedInputTokens int64   `json:"cached_input_tokens"`
-		TotalCost         float64 `json:"total_cost"`
-		ActualCost        float64 `json:"actual_cost"`
-		BilledCost        float64 `json:"billed_cost"`
+		InputTokens         int64   `json:"input_tokens"`
+		OutputTokens        int64   `json:"output_tokens"`
+		CachedInputTokens   int64   `json:"cached_input_tokens"`
+		CacheCreationTokens int64   `json:"cache_creation_tokens"`
+		TotalCost           float64 `json:"total_cost"`
+		ActualCost          float64 `json:"actual_cost"`
+		BilledCost          float64 `json:"billed_cost"`
 	}
 	err = query.Clone().
 		Aggregate(
 			ent.As(ent.Sum(entusagelog.FieldInputTokens), "input_tokens"),
 			ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_tokens"),
 			ent.As(ent.Sum(entusagelog.FieldCachedInputTokens), "cached_input_tokens"),
+			ent.As(ent.Sum(entusagelog.FieldCacheCreationTokens), "cache_creation_tokens"),
 			ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost"),
 			ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost"),
 			ent.As(ent.Sum(entusagelog.FieldBilledCost), "billed_cost"),
@@ -480,7 +484,7 @@ func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summar
 
 	summary := appusage.Summary{TotalRequests: int64(totalRequests)}
 	if len(rows) > 0 {
-		summary.TotalTokens = rows[0].InputTokens + rows[0].OutputTokens + rows[0].CachedInputTokens
+		summary.TotalTokens = rows[0].InputTokens + rows[0].OutputTokens + rows[0].CachedInputTokens + rows[0].CacheCreationTokens
 		summary.TotalCost = rows[0].TotalCost
 		summary.TotalActualCost = rows[0].ActualCost
 		summary.TotalBilledCost = rows[0].BilledCost
@@ -496,13 +500,19 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		InputTokens:           item.InputTokens,
 		OutputTokens:          item.OutputTokens,
 		CachedInputTokens:     item.CachedInputTokens,
+		CacheCreationTokens:   item.CacheCreationTokens,
+		CacheCreation5mTokens: item.CacheCreation5mTokens,
+		CacheCreation1hTokens: item.CacheCreation1hTokens,
 		ReasoningOutputTokens: item.ReasoningOutputTokens,
 		InputPrice:            item.InputPrice,
 		OutputPrice:           item.OutputPrice,
 		CachedInputPrice:      item.CachedInputPrice,
+		CacheCreationPrice:    item.CacheCreationPrice,
+		CacheCreation1hPrice:  item.CacheCreation1hPrice,
 		InputCost:             item.InputCost,
 		OutputCost:            item.OutputCost,
 		CachedInputCost:       item.CachedInputCost,
+		CacheCreationCost:     item.CacheCreationCost,
 		TotalCost:             item.TotalCost,
 		ActualCost:            item.ActualCost,
 		BilledCost:            item.BilledCost,

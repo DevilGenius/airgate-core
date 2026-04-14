@@ -124,7 +124,7 @@ func aggregateModelDistribution(logs []TrendLog) []ModelStats {
 			modelMap[item.Model] = stat
 		}
 		stat.Requests++
-		stat.Tokens += item.InputTokens + item.OutputTokens + item.CachedInputTokens
+		stat.Tokens += item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens
 		stat.ActualCost += item.ActualCost
 		stat.StandardCost += item.StandardCost
 	}
@@ -151,7 +151,7 @@ func aggregateUserRanking(logs []TrendLog) []UserRanking {
 			userMap[item.UserID] = ranking
 		}
 		ranking.Requests++
-		ranking.Tokens += item.InputTokens + item.OutputTokens + item.CachedInputTokens
+		ranking.Tokens += item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens
 		ranking.ActualCost += item.ActualCost
 		ranking.StandardCost += item.StandardCost
 	}
@@ -179,6 +179,7 @@ func aggregateTokenTrend(logs []TrendLog, granularity string, loc *time.Location
 		bucket.InputTokens += item.InputTokens
 		bucket.OutputTokens += item.OutputTokens
 		bucket.CachedInput += item.CachedInputTokens
+		bucket.CacheCreation += item.CacheCreationTokens
 	}
 
 	result := make([]TimeBucket, 0, len(bucketMap))
@@ -205,7 +206,7 @@ func aggregateTopUsers(logs []TrendLog, granularity string, loc *time.Location) 
 			total = &userTotal{UserID: item.UserID, Email: item.UserEmail}
 			totalMap[item.UserID] = total
 		}
-		total.Tokens += item.InputTokens + item.OutputTokens + item.CachedInputTokens
+		total.Tokens += item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens
 	}
 
 	totals := make([]userTotal, 0, len(totalMap))
@@ -234,7 +235,7 @@ func aggregateTopUsers(logs []TrendLog, granularity string, loc *time.Location) 
 		if userBuckets[item.UserID] == nil {
 			userBuckets[item.UserID] = make(map[string]int64)
 		}
-		userBuckets[item.UserID][key] += item.InputTokens + item.OutputTokens + item.CachedInputTokens
+		userBuckets[item.UserID][key] += item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens
 	}
 
 	result := make([]UserTrend, 0, len(totals))

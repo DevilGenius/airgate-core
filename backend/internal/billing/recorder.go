@@ -28,13 +28,19 @@ type UsageRecord struct {
 	InputTokens           int
 	OutputTokens          int
 	CachedInputTokens     int
+	CacheCreationTokens   int
+	CacheCreation5mTokens int
+	CacheCreation1hTokens int
 	ReasoningOutputTokens int
 	InputPrice            float64
 	OutputPrice           float64
 	CachedInputPrice      float64
+	CacheCreationPrice    float64
+	CacheCreation1hPrice  float64
 	InputCost             float64
 	OutputCost            float64
 	CachedInputCost       float64
+	CacheCreationCost     float64
 	TotalCost             float64
 	ActualCost            float64 // 平台真实成本（扣 reseller 余额）
 	BilledCost            float64 // 客户账面消耗（累加到 APIKey.used_quota）
@@ -180,13 +186,19 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 			SetInputTokens(rec.InputTokens).
 			SetOutputTokens(rec.OutputTokens).
 			SetCachedInputTokens(rec.CachedInputTokens).
+			SetCacheCreationTokens(rec.CacheCreationTokens).
+			SetCacheCreation5mTokens(rec.CacheCreation5mTokens).
+			SetCacheCreation1hTokens(rec.CacheCreation1hTokens).
 			SetReasoningOutputTokens(rec.ReasoningOutputTokens).
 			SetInputPrice(rec.InputPrice).
 			SetOutputPrice(rec.OutputPrice).
 			SetCachedInputPrice(rec.CachedInputPrice).
+			SetCacheCreationPrice(rec.CacheCreationPrice).
+			SetCacheCreation1hPrice(rec.CacheCreation1hPrice).
 			SetInputCost(rec.InputCost).
 			SetOutputCost(rec.OutputCost).
 			SetCachedInputCost(rec.CachedInputCost).
+			SetCacheCreationCost(rec.CacheCreationCost).
 			SetTotalCost(rec.TotalCost).
 			SetActualCost(rec.ActualCost).
 			SetBilledCost(rec.BilledCost).

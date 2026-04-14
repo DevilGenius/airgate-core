@@ -77,15 +77,16 @@ type Trend struct {
 
 // TrendLog 表示趋势聚合所需的使用日志。
 type TrendLog struct {
-	UserID            int
-	UserEmail         string
-	Model             string
-	InputTokens       int64
-	OutputTokens      int64
-	CachedInputTokens int64
-	ActualCost        float64
-	StandardCost      float64
-	CreatedAt         time.Time
+	UserID              int
+	UserEmail           string
+	Model               string
+	InputTokens         int64
+	OutputTokens        int64
+	CachedInputTokens   int64
+	CacheCreationTokens int64
+	ActualCost          float64
+	StandardCost        float64
+	CreatedAt           time.Time
 }
 
 // ModelStats 表示模型分布统计。
@@ -109,10 +110,11 @@ type UserRanking struct {
 
 // TimeBucket 表示趋势时间桶。
 type TimeBucket struct {
-	Time         string
-	InputTokens  int64
-	OutputTokens int64
-	CachedInput  int64
+	Time          string
+	InputTokens   int64
+	OutputTokens  int64
+	CachedInput   int64
+	CacheCreation int64
 }
 
 // UserTrend 表示单个用户的趋势。

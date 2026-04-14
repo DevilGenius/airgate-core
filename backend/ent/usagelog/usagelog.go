@@ -24,6 +24,12 @@ const (
 	FieldOutputTokens = "output_tokens"
 	// FieldCachedInputTokens holds the string denoting the cached_input_tokens field in the database.
 	FieldCachedInputTokens = "cached_input_tokens"
+	// FieldCacheCreationTokens holds the string denoting the cache_creation_tokens field in the database.
+	FieldCacheCreationTokens = "cache_creation_tokens"
+	// FieldCacheCreation5mTokens holds the string denoting the cache_creation_5m_tokens field in the database.
+	FieldCacheCreation5mTokens = "cache_creation_5m_tokens"
+	// FieldCacheCreation1hTokens holds the string denoting the cache_creation_1h_tokens field in the database.
+	FieldCacheCreation1hTokens = "cache_creation_1h_tokens"
 	// FieldReasoningOutputTokens holds the string denoting the reasoning_output_tokens field in the database.
 	FieldReasoningOutputTokens = "reasoning_output_tokens"
 	// FieldInputPrice holds the string denoting the input_price field in the database.
@@ -32,12 +38,18 @@ const (
 	FieldOutputPrice = "output_price"
 	// FieldCachedInputPrice holds the string denoting the cached_input_price field in the database.
 	FieldCachedInputPrice = "cached_input_price"
+	// FieldCacheCreationPrice holds the string denoting the cache_creation_price field in the database.
+	FieldCacheCreationPrice = "cache_creation_price"
+	// FieldCacheCreation1hPrice holds the string denoting the cache_creation_1h_price field in the database.
+	FieldCacheCreation1hPrice = "cache_creation_1h_price"
 	// FieldInputCost holds the string denoting the input_cost field in the database.
 	FieldInputCost = "input_cost"
 	// FieldOutputCost holds the string denoting the output_cost field in the database.
 	FieldOutputCost = "output_cost"
 	// FieldCachedInputCost holds the string denoting the cached_input_cost field in the database.
 	FieldCachedInputCost = "cached_input_cost"
+	// FieldCacheCreationCost holds the string denoting the cache_creation_cost field in the database.
+	FieldCacheCreationCost = "cache_creation_cost"
 	// FieldTotalCost holds the string denoting the total_cost field in the database.
 	FieldTotalCost = "total_cost"
 	// FieldActualCost holds the string denoting the actual_cost field in the database.
@@ -114,13 +126,19 @@ var Columns = []string{
 	FieldInputTokens,
 	FieldOutputTokens,
 	FieldCachedInputTokens,
+	FieldCacheCreationTokens,
+	FieldCacheCreation5mTokens,
+	FieldCacheCreation1hTokens,
 	FieldReasoningOutputTokens,
 	FieldInputPrice,
 	FieldOutputPrice,
 	FieldCachedInputPrice,
+	FieldCacheCreationPrice,
+	FieldCacheCreation1hPrice,
 	FieldInputCost,
 	FieldOutputCost,
 	FieldCachedInputCost,
+	FieldCacheCreationCost,
 	FieldTotalCost,
 	FieldActualCost,
 	FieldBilledCost,
@@ -172,6 +190,12 @@ var (
 	DefaultOutputTokens int
 	// DefaultCachedInputTokens holds the default value on creation for the "cached_input_tokens" field.
 	DefaultCachedInputTokens int
+	// DefaultCacheCreationTokens holds the default value on creation for the "cache_creation_tokens" field.
+	DefaultCacheCreationTokens int
+	// DefaultCacheCreation5mTokens holds the default value on creation for the "cache_creation_5m_tokens" field.
+	DefaultCacheCreation5mTokens int
+	// DefaultCacheCreation1hTokens holds the default value on creation for the "cache_creation_1h_tokens" field.
+	DefaultCacheCreation1hTokens int
 	// DefaultReasoningOutputTokens holds the default value on creation for the "reasoning_output_tokens" field.
 	DefaultReasoningOutputTokens int
 	// DefaultInputPrice holds the default value on creation for the "input_price" field.
@@ -180,12 +204,18 @@ var (
 	DefaultOutputPrice float64
 	// DefaultCachedInputPrice holds the default value on creation for the "cached_input_price" field.
 	DefaultCachedInputPrice float64
+	// DefaultCacheCreationPrice holds the default value on creation for the "cache_creation_price" field.
+	DefaultCacheCreationPrice float64
+	// DefaultCacheCreation1hPrice holds the default value on creation for the "cache_creation_1h_price" field.
+	DefaultCacheCreation1hPrice float64
 	// DefaultInputCost holds the default value on creation for the "input_cost" field.
 	DefaultInputCost float64
 	// DefaultOutputCost holds the default value on creation for the "output_cost" field.
 	DefaultOutputCost float64
 	// DefaultCachedInputCost holds the default value on creation for the "cached_input_cost" field.
 	DefaultCachedInputCost float64
+	// DefaultCacheCreationCost holds the default value on creation for the "cache_creation_cost" field.
+	DefaultCacheCreationCost float64
 	// DefaultTotalCost holds the default value on creation for the "total_cost" field.
 	DefaultTotalCost float64
 	// DefaultActualCost holds the default value on creation for the "actual_cost" field.
@@ -249,6 +279,21 @@ func ByCachedInputTokens(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCachedInputTokens, opts...).ToFunc()
 }
 
+// ByCacheCreationTokens orders the results by the cache_creation_tokens field.
+func ByCacheCreationTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheCreationTokens, opts...).ToFunc()
+}
+
+// ByCacheCreation5mTokens orders the results by the cache_creation_5m_tokens field.
+func ByCacheCreation5mTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheCreation5mTokens, opts...).ToFunc()
+}
+
+// ByCacheCreation1hTokens orders the results by the cache_creation_1h_tokens field.
+func ByCacheCreation1hTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheCreation1hTokens, opts...).ToFunc()
+}
+
 // ByReasoningOutputTokens orders the results by the reasoning_output_tokens field.
 func ByReasoningOutputTokens(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldReasoningOutputTokens, opts...).ToFunc()
@@ -269,6 +314,16 @@ func ByCachedInputPrice(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCachedInputPrice, opts...).ToFunc()
 }
 
+// ByCacheCreationPrice orders the results by the cache_creation_price field.
+func ByCacheCreationPrice(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheCreationPrice, opts...).ToFunc()
+}
+
+// ByCacheCreation1hPrice orders the results by the cache_creation_1h_price field.
+func ByCacheCreation1hPrice(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheCreation1hPrice, opts...).ToFunc()
+}
+
 // ByInputCost orders the results by the input_cost field.
 func ByInputCost(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldInputCost, opts...).ToFunc()
@@ -282,6 +337,11 @@ func ByOutputCost(opts ...sql.OrderTermOption) OrderOption {
 // ByCachedInputCost orders the results by the cached_input_cost field.
 func ByCachedInputCost(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCachedInputCost, opts...).ToFunc()
+}
+
+// ByCacheCreationCost orders the results by the cache_creation_cost field.
+func ByCacheCreationCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheCreationCost, opts...).ToFunc()
 }
 
 // ByTotalCost orders the results by the total_cost field.

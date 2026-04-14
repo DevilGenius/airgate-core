@@ -15,6 +15,7 @@ import {
   Search,
   Download,
   Upload,
+  KeyRound,
 } from 'lucide-react';
 import { useToast } from '../../shared/components/Toast';
 import { Button } from '../../shared/components/Button';
@@ -37,6 +38,7 @@ import { EditAccountModal } from './accounts/EditAccountModal';
 import { BulkActionsBar } from './accounts/BulkActionsBar';
 import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
 import { BulkRefreshProgressModal } from './accounts/BulkRefreshProgressModal';
+import { BatchSKImportModal } from './accounts/BatchSKImportModal';
 import type {
   AccountResp,
   CreateAccountReq,
@@ -116,6 +118,7 @@ export default function AccountsPage() {
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
+  const [showBatchSKModal, setShowBatchSKModal] = useState(false);
   const clearSelection = () => setSelectedIds([]);
 
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
@@ -535,10 +538,7 @@ export default function AccountsPage() {
         };
 
         if (!usage) {
-          // apikey 类型账号不支持用量刷新，仅显示占位符
-          if (row.type === 'apikey') {
-            return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
-          }
+          // 非活跃账号（backend 没 seed 占位）或平台不支持：显示占位 + 刷新
           return (
             <div
               className="flex items-center gap-1 cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]"
@@ -551,10 +551,24 @@ export default function AccountsPage() {
           );
         }
 
-        const windows: Array<{ label: string; used_percent: number; reset_seconds: number }> = usage.windows || [];
+        type TodayStats = { requests: number; tokens: number; account_cost: number; user_cost: number };
+        type UsageWindow = { label: string; used_percent: number; reset_seconds: number };
+        const windows: UsageWindow[] = usage.windows || [];
         const credits: { balance: number; unlimited: boolean } | null = usage.credits || null;
+        const todayStats: TodayStats | null = usage.today_stats || null;
 
-        if (windows.length === 0 && !credits) {
+        // 紧凑数字格式化（和 sub2api 对齐：K / M / B 后缀）
+        const formatCompact = (num: number, allowBillions = true) => {
+          if (!num) return '0';
+          const abs = Math.abs(num);
+          if (allowBillions && abs >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
+          if (abs >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+          if (abs >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+          return String(num);
+        };
+
+        const hasTodayStats = !!todayStats && (todayStats.requests > 0 || todayStats.tokens > 0);
+        if (windows.length === 0 && !credits && !hasTodayStats) {
           return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
         }
 
@@ -587,12 +601,19 @@ export default function AccountsPage() {
 
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', minWidth: 24 };
 
+        // apikey 账号没有上游 quota，刷新操作无意义；禁用点击和 hover 样式
+        const canRefresh = row.type !== 'apikey';
+
         return (
           <div
-            className="flex flex-col gap-1.5 text-[11px] cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]"
+            className={
+              canRefresh
+                ? 'flex flex-col gap-1.5 text-[11px] cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
+                : 'flex flex-col gap-1.5 text-[11px] rounded px-1 py-0.5'
+            }
             style={{ fontFamily: 'var(--ag-font-mono)', minWidth: 160 }}
-            title={t('accounts.refresh_usage', '点击刷新用量')}
-            onClick={handleRefreshClick}
+            title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
+            onClick={canRefresh ? handleRefreshClick : undefined}
           >
             {windows.map((w, i) => (
               <div key={i} className="flex items-center gap-1.5">
@@ -613,6 +634,26 @@ export default function AccountsPage() {
                 </span>
               </div>
             ))}
+            {hasTodayStats && todayStats && (
+              <div
+                className="flex items-center gap-1.5 mt-0.5"
+                style={{ fontSize: 9, color: 'var(--ag-text-tertiary)', lineHeight: 1.3 }}
+                title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
+              >
+                <span style={{ opacity: 0.5 }}>{t('accounts.today', '今日')}</span>
+                <span>{formatCompact(todayStats.requests, false)} req</span>
+                <span style={{ opacity: 0.4 }}>·</span>
+                <span>{formatCompact(todayStats.tokens)}</span>
+                <span style={{ opacity: 0.4 }}>·</span>
+                <span title={t('accounts.window_account_cost', '账号成本（上游计费）')}>
+                  <span style={{ opacity: 0.6 }}>A </span>${todayStats.account_cost.toFixed(2)}
+                </span>
+                <span style={{ opacity: 0.4 }}>·</span>
+                <span title={t('accounts.window_user_cost', '用户消耗（平台计费）')}>
+                  <span style={{ opacity: 0.6 }}>U </span>${todayStats.user_cost.toFixed(2)}
+                </span>
+              </div>
+            )}
             {credits && (
               <div className="flex items-center gap-1">
                 <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
@@ -794,6 +835,14 @@ export default function AccountsPage() {
           </div>
           <Button
             variant="secondary"
+            icon={<KeyRound className="w-4 h-4" />}
+            onClick={() => setShowBatchSKModal(true)}
+            title={t('accounts.batch_sk_import')}
+          >
+            {t('accounts.batch_sk_import')}
+          </Button>
+          <Button
+            variant="secondary"
             icon={<Upload className="w-4 h-4" />}
             onClick={() => importInputRef.current?.click()}
             loading={importMutation.isPending}
@@ -971,6 +1020,12 @@ export default function AccountsPage() {
           }}
         />
       )}
+
+      {/* 批量 SK 导入 */}
+      <BatchSKImportModal
+        open={showBatchSKModal}
+        onClose={() => setShowBatchSKModal(false)}
+      />
 
       {/* 测试连接 */}
       <AccountTestModal

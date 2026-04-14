@@ -37,6 +37,15 @@ type Account struct {
 	UpdatedAt          time.Time
 }
 
+// AccountWindowStats 单个账号在某个时间窗口内的聚合统计。
+// 对应 UI 上每个 usage window（如 5h / 7d）底下一行 "req | tokens | A $ | U $" 展示。
+type AccountWindowStats struct {
+	Requests    int64
+	Tokens      int64
+	AccountCost float64 // SUM(account_cost)，账号真实消耗（上游成本）
+	UserCost    float64 // SUM(actual_cost)，用户扣费总额（平台计费）
+}
+
 // UsageLog 使用记录聚合输入。
 type UsageLog struct {
 	Model        string
@@ -284,6 +293,9 @@ type Repository interface {
 	FindByID(context.Context, int, LoadOptions) (Account, error)
 	ListByPlatform(context.Context, string) ([]Account, error)
 	FindUsageLogs(context.Context, int, time.Time, time.Time) ([]UsageLog, error)
+	// BatchWindowStats 批量查询多个账号在同一时间窗口（created_at >= startTime）内的聚合统计。
+	// 返回 map[accountID]stats；没有记录的账号不会出现在结果中。
+	BatchWindowStats(ctx context.Context, accountIDs []int, startTime time.Time) (map[int]AccountWindowStats, error)
 	SaveCredentials(context.Context, int, map[string]string) error
 	MarkError(context.Context, int, string) error
 }

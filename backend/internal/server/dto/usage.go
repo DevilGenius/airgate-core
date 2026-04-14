@@ -17,13 +17,19 @@ type UsageLogResp struct {
 	InputTokens           int     `json:"input_tokens"`
 	OutputTokens          int     `json:"output_tokens"`
 	CachedInputTokens     int     `json:"cached_input_tokens"`
+	CacheCreationTokens   int     `json:"cache_creation_tokens"`
+	CacheCreation5mTokens int     `json:"cache_creation_5m_tokens"`
+	CacheCreation1hTokens int     `json:"cache_creation_1h_tokens"`
 	ReasoningOutputTokens int     `json:"reasoning_output_tokens"`
 	InputPrice            float64 `json:"input_price"`
 	OutputPrice           float64 `json:"output_price"`
 	CachedInputPrice      float64 `json:"cached_input_price"`
+	CacheCreationPrice    float64 `json:"cache_creation_price"`
+	CacheCreation1hPrice  float64 `json:"cache_creation_1h_price"`
 	InputCost             float64 `json:"input_cost"`
 	OutputCost            float64 `json:"output_cost"`
 	CachedInputCost       float64 `json:"cached_input_cost"`
+	CacheCreationCost     float64 `json:"cache_creation_cost"`
 	TotalCost             float64 `json:"total_cost"`
 	ActualCost            float64 `json:"actual_cost"`             // 平台真实成本/用户扣费
 	BilledCost            float64 `json:"billed_cost"`             // 客户账面消耗（reseller markup 后的金额）
