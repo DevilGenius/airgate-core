@@ -234,11 +234,19 @@ func (s *Scheduler) matchModelRouting(routing map[string][]int64, model string) 
 // 排序权重 = priority * 1000 + (1 - load_rate) * 100 + lru_score
 // 若账号处于降级窗口（upstream_is_pool 账号刚刚返回池耗尽错误），
 // 额外减去 degradedPenalty 把它打到所有非降级账号之后，作为兜底。
+// 降级账号**依然参与调度**，只是优先级被压低；组内没有非降级账号时
+// 仍会被选中。
 func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.Account) *ent.Account {
 	if len(candidates) == 0 {
 		return nil
 	}
 	if len(candidates) == 1 {
+		// 单一候选路径：即便处于降级窗口也直接返回，保证不因降级
+		// 导致"无账号可用"的假象。
+		if s.overload.IsDegraded(ctx, candidates[0].ID) {
+			slog.Warn("组内仅剩一个降级账号，作为兜底调度",
+				"account_id", candidates[0].ID)
+		}
 		return candidates[0]
 	}
 
@@ -293,7 +301,17 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 		return items[i].score > items[j].score
 	})
 
-	return items[0].acc
+	picked := items[0].acc
+
+	// 如果最终选中的是降级账号，说明组内没有非降级账号可用，
+	// 正在走"兜底"路径。打一条 warn 让运维看到是降级兜底不是正常调度。
+	if s.overload.IsDegraded(ctx, picked.ID) {
+		slog.Warn("组内无非降级账号，选中降级账号作为兜底",
+			"account_id", picked.ID,
+			"total_candidates", len(candidates))
+	}
+
+	return picked
 }
 
 // checkSchedulability 综合检查账户调度约束（限流冷却、窗口费用、RPM、会话数）
