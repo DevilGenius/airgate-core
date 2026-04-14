@@ -451,9 +451,23 @@ const dbTimeout = 10 * time.Second
 
 // ReportAccountError 立即标记账号为 error（用于 401/403 等确定性凭证错误）
 func (s *Scheduler) ReportAccountError(accountID int, reason string) {
-	slog.Error("账户凭证错误，立即标记为 error", "account_id", accountID, "reason", reason)
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
+
+	// 深度防御：池子账号永远不自动标 error。哪怕上层（forwarder_result 等）
+	// 忘了检查 upstream_is_pool，在这里再兜一道。查一次 DB 拿 pool 标志。
+	if acc, err := s.db.Account.Query().
+		Where(account.IDEQ(accountID)).
+		Select(account.FieldUpstreamIsPool).
+		Only(ctx); err == nil && acc.UpstreamIsPool {
+		slog.Warn("池子账号错误自动豁免，不标 error",
+			"account_id", accountID,
+			"reason", reason)
+		s.failCounts.Delete(accountID)
+		return
+	}
+
+	slog.Error("账户凭证错误，立即标记为 error", "account_id", accountID, "reason", reason)
 	if err := s.db.Account.UpdateOneID(accountID).
 		SetStatus(account.StatusError).
 		SetErrorMsg(reason).
@@ -496,6 +510,26 @@ func (s *Scheduler) ReportResult(accountID int, success bool, latency time.Durat
 
 	// 连续失败 N 次，标记账户为 error
 	if count >= s.maxFailCount {
+		// 池子账号豁免：池子抖动本质上不是本地账号的故障，不能因为
+		// 几次连续失败就永久关掉调度。查一次 DB 拿到 upstream_is_pool
+		// 标志（这条路径只在 nth 次连续失败时触发，开销可忽略）。
+		isPool := false
+		if acc, err := s.db.Account.Query().
+			Where(account.IDEQ(accountID)).
+			Select(account.FieldUpstreamIsPool).
+			Only(ctx); err == nil {
+			isPool = acc.UpstreamIsPool
+		}
+		if isPool {
+			slog.Warn("池子账号连续失败次数超限，跳过自动标错",
+				"account_id", accountID,
+				"consecutive_failures", count,
+			)
+			// 清掉计数，避免下次失败立刻又命中这个分支
+			s.failCounts.Delete(accountID)
+			return
+		}
+
 		slog.Error("账户连续失败次数超限，标记为 error",
 			"account_id", accountID,
 			"max_fail_count", s.maxFailCount,

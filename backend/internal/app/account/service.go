@@ -372,6 +372,13 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 		//
 		// 只对"支持 OAuth quota 查询"的账号类型发 HTTP 请求：目前判定依据是
 		// item.Type != "apikey" && 有 credentials，与原行为一致。
+		// 建立 accountID → 是否池子 的查询表，用于后面插件返回 errors
+		// 时判断是否应该跳过 MarkError（池子账号永远不自动标错）
+		poolByID := make(map[int]bool, len(accounts))
+		for _, item := range accounts {
+			poolByID[item.ID] = item.UpstreamIsPool
+		}
+
 		reqList := make([]accountUsageRequest, 0, len(accounts))
 		for _, item := range accounts {
 			// 非活跃账号完全跳过
@@ -418,6 +425,12 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 			merged[key] = value
 		}
 		for _, item := range result.Errors {
+			// 池子账号在后台配额巡检里返回的错误（比如 "Upstream access forbidden"）
+			// 只是池子暂时不可用，不代表本地账号坏了——不能标 error 永久关掉调度。
+			// 非池子账号保持原有行为：标 error 并暴露给管理员排查。
+			if poolByID[item.ID] {
+				continue
+			}
 			_ = s.repo.MarkError(ctx, item.ID, item.Message)
 		}
 	}
