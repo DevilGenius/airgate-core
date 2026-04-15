@@ -15,6 +15,7 @@ function getUseKeyConfig(
   tab: 'claude' | 'codex',
   shell: 'unix' | 'cmd' | 'powershell',
   apiKey: string,
+  t: (key: string) => string,
 ): { files: Array<{ path: string; content: string; hint?: string }> } {
   // OpenAI 平台同时支持 Claude Code（通过 /v1/messages 适配）和 Codex CLI
   if (platform === 'openai') {
@@ -49,47 +50,37 @@ function getUseKeyConfig(
         };
       }
     } else {
-      // Codex CLI 配置
-      if (shell === 'unix') {
-        return {
-          files: [
-            {
-              path: '~/.codex/config.toml',
-              content: `model = "gpt-5.4"\n\n[api]\napi_key_env = "OPENAI_API_KEY"\nbase_url = "${baseUrl}"`,
-            },
-            {
-              path: '~/.bashrc 或 ~/.zshrc',
-              content: `export OPENAI_API_KEY="${apiKey}"`,
-            },
-          ],
-        };
-      } else if (shell === 'cmd') {
-        return {
-          files: [
-            {
-              path: '%USERPROFILE%\\.codex\\config.toml',
-              content: `model = "gpt-5.4"\n\n[api]\napi_key_env = "OPENAI_API_KEY"\nbase_url = "${baseUrl}"`,
-            },
-            {
-              path: 'CMD',
-              content: `set OPENAI_API_KEY=${apiKey}`,
-            },
-          ],
-        };
-      } else {
-        return {
-          files: [
-            {
-              path: '$HOME\\.codex\\config.toml',
-              content: `model = "gpt-5.4"\n\n[api]\napi_key_env = "OPENAI_API_KEY"\nbase_url = "${baseUrl}"`,
-            },
-            {
-              path: 'PowerShell',
-              content: `$env:OPENAI_API_KEY="${apiKey}"`,
-            },
-          ],
-        };
-      }
+      // Codex CLI 配置 — 写入 ~/.codex/config.toml 与 ~/.codex/auth.json
+      const configDir = shell === 'unix' ? '~/.codex' : '%userprofile%\\.codex';
+      const configToml = `model_provider = "OpenAI"
+model = "gpt-5.4"
+review_model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
+disable_response_storage = true
+network_access = "enabled"
+windows_wsl_setup_acknowledged = true
+model_context_window = 1000000
+model_auto_compact_token_limit = 900000
+
+[model_providers.OpenAI]
+name = "OpenAI"
+base_url = "${baseUrl}"
+wire_api = "responses"
+requires_openai_auth = true`;
+      const authJson = `{\n  "OPENAI_API_KEY": "${apiKey}"\n}`;
+      return {
+        files: [
+          {
+            path: `${configDir}/config.toml`,
+            content: configToml,
+            hint: t('user_keys.codex_config_toml_hint'),
+          },
+          {
+            path: `${configDir}/auth.json`,
+            content: authJson,
+          },
+        ],
+      };
     }
   }
 
@@ -257,30 +248,45 @@ export function UseKeyModal({
               >
                 macOS / Linux
               </button>
-              <button
-                onClick={() => setUseKeyShell('cmd')}
-                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                  useKeyShell === 'cmd'
-                    ? 'bg-bg-elevated text-text shadow-sm'
-                    : 'text-text-tertiary hover:text-text-secondary'
-                }`}
-              >
-                Windows CMD
-              </button>
-              <button
-                onClick={() => setUseKeyShell('powershell')}
-                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                  useKeyShell === 'powershell'
-                    ? 'bg-bg-elevated text-text shadow-sm'
-                    : 'text-text-tertiary hover:text-text-secondary'
-                }`}
-              >
-                PowerShell
-              </button>
+              {useKeyTab === 'codex' ? (
+                <button
+                  onClick={() => setUseKeyShell('cmd')}
+                  className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                    useKeyShell !== 'unix'
+                      ? 'bg-bg-elevated text-text shadow-sm'
+                      : 'text-text-tertiary hover:text-text-secondary'
+                  }`}
+                >
+                  Windows
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setUseKeyShell('cmd')}
+                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                      useKeyShell === 'cmd'
+                        ? 'bg-bg-elevated text-text shadow-sm'
+                        : 'text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    Windows CMD
+                  </button>
+                  <button
+                    onClick={() => setUseKeyShell('powershell')}
+                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                      useKeyShell === 'powershell'
+                        ? 'bg-bg-elevated text-text shadow-sm'
+                        : 'text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    PowerShell
+                  </button>
+                </>
+              )}
             </div>
 
             {/* 配置代码块 */}
-            {getUseKeyConfig(baseUrl, useKeyPlatform, useKeyTab, useKeyShell, useKeyValue).files.map(
+            {getUseKeyConfig(baseUrl, useKeyPlatform, useKeyTab, useKeyShell, useKeyValue, t).files.map(
               (file, idx) => (
                 <div key={idx}>
                   {file.hint && (

@@ -64,14 +64,34 @@ function executeCcsImport(
 
   const deeplink = `ccswitch://v1/import?${params.toString()}`;
 
+  let protocolHandled = false;
+  const onBlur = () => {
+    protocolHandled = true;
+  };
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
+      protocolHandled = true;
+    }
+  };
+  window.addEventListener('blur', onBlur);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
   try {
-    window.open(deeplink, '_self');
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = deeplink;
+    document.body.appendChild(iframe);
     setTimeout(() => {
-      if (document.hasFocus()) {
+      iframe.remove();
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (!protocolHandled && document.hasFocus()) {
         toast('error', t('user_keys.ccs_not_installed'));
       }
-    }, 100);
+    }, 1500);
   } catch {
+    window.removeEventListener('blur', onBlur);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
     toast('error', t('user_keys.ccs_not_installed'));
   }
 }

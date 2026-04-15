@@ -915,7 +915,8 @@
     "ccs_claude_desc": "Anthropic Claude Code 编码助手",
     "ccs_codex_desc": "OpenAI Codex CLI 编码助手",
     "ccs_not_installed": "未检测到 CC-Switch，请先安装 CC-Switch 客户端。",
-    "ccs_session_expired": "登录会话已失效，请重新使用 API 密钥登录后再尝试导入"
+    "ccs_session_expired": "登录会话已失效，请重新使用 API 密钥登录后再尝试导入",
+    "codex_config_toml_hint": "请确保以下内容位于 config.toml 文件的开头部分"
   },
 
   "setup": {
