@@ -163,5 +163,33 @@ export function createPluginOAuthBridge(pluginId: string): PluginOAuthBridge | u
         error: r.error,
       }));
     },
+    importRefresh: async (refreshToken: string) => {
+      const result = await pluginsApi.rpc<{
+        account_type: string; account_name: string; credentials: Record<string, string>;
+      }>(pluginId, 'oauth/import-refresh', { refresh_token: refreshToken });
+      return {
+        accountType: result.account_type,
+        accountName: result.account_name,
+        credentials: result.credentials,
+      };
+    },
+    batchImportRefresh: async (refreshTokens: string[]) => {
+      const resp = await pluginsApi.rpc<{
+        results: Array<{
+          account_type?: string;
+          account_name?: string;
+          credentials?: Record<string, string>;
+          status: string;
+          error?: string;
+        }>;
+      }>(pluginId, 'oauth/batch-import-refresh', { refresh_tokens: refreshTokens });
+      return resp.results.map((r) => ({
+        accountType: r.account_type ?? 'oauth',
+        accountName: r.account_name ?? '',
+        credentials: r.credentials ?? {},
+        status: (r.status === 'ok' ? 'ok' : 'failed') as 'ok' | 'failed',
+        error: r.error,
+      }));
+    },
   };
 }
