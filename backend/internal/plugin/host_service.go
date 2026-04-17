@@ -257,6 +257,9 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 		"max_tokens": 5,
 	})
 
+	// X-Airgate-Internal 让下游网关（如 gateway-claude 的 claude_code_only 开关）
+	// 识别这是 HostService 自家的黑盒探测流量，跳过面向外部客户端的身份闸。
+	// 与 account.TestAccount 的管理后台测试走同一约定，插件侧统一用这一个 header 判。
 	fwdReq := &sdk.ForwardRequest{
 		Account: &sdk.Account{
 			ID:          int64(accFull.ID),
@@ -266,10 +269,13 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 			Credentials: cloneStringMapHost(accFull.Credentials),
 			ProxyURL:    proxyURLFromAccount(accFull),
 		},
-		Body:    body,
-		Headers: http.Header{"Content-Type": {"application/json"}},
-		Model:   model,
-		Stream:  false,
+		Body: body,
+		Headers: http.Header{
+			"Content-Type":       {"application/json"},
+			"X-Airgate-Internal": {"probe"},
+		},
+		Model:  model,
+		Stream: false,
 	}
 
 	// 调用插件，限制最长 30s（探测不应卡住调度循环）
@@ -298,16 +304,32 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 	resp.StatusCode = int64(result.StatusCode)
 	if result.StatusCode >= 400 {
 		resp.Success = false
+
+		// 区分"账号故障"与"客户端侧错误"：只有前者会影响调度健康度。
+		// 判定依据：AccountStatus（Expired/Disabled/RateLimited）由插件显式打标；
+		// 5xx 一律视为上游故障；其余 4xx（如 CC 闸返回的 403、请求体不合法的 400）
+		// 属于客户端问题，不应关闭账号调度。
+		isAccountLevel := result.AccountStatus == sdk.AccountStatusExpired ||
+			result.AccountStatus == sdk.AccountStatusDisabled ||
+			result.AccountStatus == sdk.AccountStatusRateLimited
+		is5xx := result.StatusCode >= 500
+
 		switch {
-		case result.StatusCode == 429:
+		case result.AccountStatus == sdk.AccountStatusRateLimited || result.StatusCode == 429:
 			resp.ErrorKind = "rate_limited"
-		case result.StatusCode >= 500:
+		case is5xx:
 			resp.ErrorKind = "upstream_5xx"
+		case isAccountLevel:
+			resp.ErrorKind = "account_error"
 		default:
-			resp.ErrorKind = "upstream_4xx"
+			resp.ErrorKind = "client_error"
 		}
 		resp.ErrorMsg = truncateProbeErr(result.ErrorMessage)
-		h.scheduler.ReportResult(acc.ID, false, latency, result.ErrorMessage)
+
+		// 仅账号级错误或 5xx 才反馈给调度器；客户端侧 4xx 不影响账号健康度。
+		if isAccountLevel || is5xx {
+			h.scheduler.ReportResult(acc.ID, false, latency, result.ErrorMessage)
+		}
 		return resp, nil
 	}
 

@@ -245,6 +245,8 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 		"stream":   true,
 	})
 
+	// X-Airgate-Internal 让下游网关（如 gateway-claude 的 claude_code_only 开关）
+	// 能识别这是管理后台自家的探测流量，跳过面向外部客户端的身份闸。
 	forwardReq := &sdk.ForwardRequest{
 		Account: &sdk.Account{
 			ID:          int64(item.ID),
@@ -254,10 +256,13 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			Credentials: cloneStringMap(item.Credentials),
 			ProxyURL:    buildProxyURL(item.Proxy),
 		},
-		Body:    testBody,
-		Headers: http.Header{"Content-Type": {"application/json"}},
-		Model:   modelID,
-		Stream:  true,
+		Body: testBody,
+		Headers: http.Header{
+			"Content-Type":       {"application/json"},
+			"X-Airgate-Internal": {"test"},
+		},
+		Model:  modelID,
+		Stream: true,
 	}
 
 	return &ConnectivityTest{
