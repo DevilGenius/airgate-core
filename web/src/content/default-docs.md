@@ -86,6 +86,28 @@ print("usage:", resp.usage)
 ```
 
 > 计费说明：  `input_tokens`（prompt）按 `gpt-image-1.5` `$5/1M`、`output_tokens`（图像输出）按 `$40/1M`。图像 token 数按尺寸 × 质量估算（`1024x1024 low ≈ 272 tokens`、`medium ≈ 1056`、`high ≈ 4160`）
+
+### OpenAI Images SDK（图生图）
+
+```python
+with open("in.png", "rb") as f:
+    resp = client.images.edit(
+        model="gpt-image-1.5",
+        image=f,                            # 也可传 [f1, f2] 列表传多张参考图
+        prompt="把背景换成青花瓷蓝，右下角加一枚红色篆刻印章",
+        size="1536x1024",
+        # mask=open("mask.png", "rb"),      # 可选：白色区域=要重绘的部分
+        # extra_body={"input_fidelity": "high"},  # 可选：high 更严格保留参考图细节
+        n=1,
+    )
+
+img = resp.data[0]
+with open("out.png", "wb") as f:
+    f.write(base64.b64decode(img.b64_json))
+```
+
+> 额外计费项：每张参考图按尺寸估一份 image input tokens（与 low 质量输出同量级，`1024x1024 ≈ 272 tokens`），并入 `input_tokens` 走 `$5/1M`。
+
 ### Anthropic Python SDK
 
 ```python
