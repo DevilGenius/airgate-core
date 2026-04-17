@@ -46,7 +46,13 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
     setLoadingModels(true);
     accountsApi.models(account.id)
       .then((list) => {
-        const items = list ?? [];
+        // 过滤掉生图专用模型：测试流程发的是 chat 格式 {messages:[{role:user,content:"hi"}]}，
+        // ChatGPT OAuth 对 gpt-image-* 系列的 chat 调用会直接报 "not supported"。
+        // 账号能跑普通 chat 就一定能跑图（图像走派生的 image_generation tool 通道），
+        // 不必在测试里单独验证生图。
+        const items = (list ?? []).filter(
+          (m) => !m.id.toLowerCase().startsWith('gpt-image-'),
+        );
         setModels(items);
         if (items.length > 0) setSelectedModel(items[0]!.id);
       })
