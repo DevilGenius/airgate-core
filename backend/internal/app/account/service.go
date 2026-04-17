@@ -856,12 +856,39 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 		}
 	}
 
+	// 顺手触发一次用量强制重探测：QueryQuota 只负责刷订阅信息（plan_type / 过期时间），
+	// 不动用量窗口缓存。用户点"刷新"时如果账号从没探测过，还是看不到 5h/7d 进度条。
+	// 主动调一次 usage/probe 把窗口数据灌进插件内存缓存，下次 usage/accounts 就能读到。
+	// 探测失败不阻断主流程——订阅信息已经成功返回，窗口数据下一个 5 分钟周期还会再试。
+	s.triggerUsageProbe(ctx, inst, id, credentials)
+
 	return QuotaRefreshResult{
 		PlanType:                credentials["plan_type"],
 		Email:                   credentials["email"],
 		SubscriptionActiveUntil: credentials["subscription_active_until"],
 		ReauthWarning:           warning,
 	}, nil
+}
+
+// triggerUsageProbe 调用插件的 usage/probe 路径强制重探测单账号用量窗口。
+// 只在插件声明支持时有效；失败只记日志，不影响调用方。
+func (s *Service) triggerUsageProbe(ctx context.Context, inst *plugin.PluginInstance, id int, credentials map[string]string) {
+	if inst == nil || inst.Gateway == nil {
+		return
+	}
+	reqBody, _ := json.Marshal(map[string]any{
+		"id":          id,
+		"credentials": credentials,
+	})
+	probeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	status, _, _, err := inst.Gateway.HandleHTTPRequest(probeCtx, "POST", "usage/probe", "", nil, reqBody)
+	if err != nil || status != http.StatusOK {
+		slog.Debug("usage/probe 探测失败（降级：等下一轮 5 分钟缓存过期重试）",
+			"account_id", id, "status", status, "error", err)
+	}
+	// 清掉本进程的 usage 5 分钟缓存，让下一次 GetAccountUsage 重新从插件拉窗口数据。
+	s.InvalidateUsageCache("")
 }
 
 // GetStats 获取单个账号统计。

@@ -60,7 +60,11 @@ func (h *AccountHandler) handleError(logMessage, publicMessage string, err error
 	case errors.Is(err, appaccount.ErrPluginNotFound):
 		return 500, err.Error()
 	case errors.Is(err, appaccount.ErrReauthRequired):
-		return 401, err.Error()
+		// 这里的"需要重新授权"说的是**上游账号**（OAuth）的凭证失效，不是当前
+		// 登录用户的 session。绝对不能返回 401——前端 HTTP 客户端有全局拦截，
+		// 看到 401 会把当前管理员踹出登录页。用 422 语义最贴切：请求合法但
+		// 因账号状态无法处理。
+		return 422, err.Error()
 	case errors.Is(err, appaccount.ErrModelRequired),
 		errors.Is(err, appaccount.ErrQuotaRefreshUnsupported),
 		errors.Is(err, appaccount.ErrInvalidDateRange):

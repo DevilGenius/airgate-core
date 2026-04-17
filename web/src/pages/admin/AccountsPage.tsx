@@ -596,8 +596,11 @@ export default function AccountsPage() {
             await accountsApi.refreshQuota(row.id);
             queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
             toast('success', t('accounts.refresh_usage_success', '用量刷新成功'));
-          } catch {
-            toast('error', t('accounts.refresh_usage_failed', '用量刷新失败'));
+          } catch (err) {
+            // 展开后端返回的具体原因（如"账号凭证已失效，请重新授权"）；
+            // 没有 message 时才回退到通用文案。
+            const message = err instanceof Error && err.message ? err.message : t('accounts.refresh_usage_failed', '用量刷新失败');
+            toast('error', message);
           }
           target.style.opacity = '1';
           target.style.pointerEvents = '';
