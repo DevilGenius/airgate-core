@@ -20,6 +20,7 @@ AirGate 对外暴露 OpenAI 兼容协议，并通过协议翻译同时兼容 Ant
 | --- | --- | --- |
 | `POST` | `/v1/chat/completions` | OpenAI Chat Completions（最广泛使用的协议，绝大多数 OpenAI SDK / 第三方客户端走这条） |
 | `POST` | `/v1/responses` | OpenAI Responses API（OpenAI 较新协议） |
+| `POST` | `/v1/images/generations` | OpenAI Images API（生图，支持 `gpt-image-1` / `gpt-image-1.5`） |
 | `POST` | `/v1/messages` | Anthropic Messages（Claude Code 等 Anthropic 客户端走这条；当前为协议翻译，未来对接原生 Claude 上游后将自动切换） |
 | `GET`  | `/v1/models` | 列出当前可用模型 |
 
@@ -58,6 +59,33 @@ resp = client.chat.completions.create(
 print(resp.choices[0].message.content)
 ```
 
+### OpenAI Images SDK（生图）
+
+```python
+import base64
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://your-airgate.example.com/v1",
+    api_key="sk-你的key",
+)
+
+resp = client.images.generate(
+    model="gpt-image-1.5",
+    prompt="a cute shiba inu puppy sitting on grass, studio lighting",
+    size="1024x1024",     # 1024x1024 | 1024x1536 | 1536x1024 | auto
+    quality="low",        # low | medium | high | auto
+    n=1,                  # 暂仅支持 1
+)
+
+img = resp.data[0]
+with open("out.png", "wb") as f:
+    f.write(base64.b64decode(img.b64_json))
+print("revised_prompt:", img.revised_prompt)
+print("usage:", resp.usage)
+```
+
+> 计费说明：  `input_tokens`（prompt）按 `gpt-image-1.5` `$5/1M`、`output_tokens`（图像输出）按 `$40/1M`。图像 token 数按尺寸 × 质量估算（`1024x1024 low ≈ 272 tokens`、`medium ≈ 1056`、`high ≈ 4160`）
 ### Anthropic Python SDK
 
 ```python
@@ -118,3 +146,15 @@ openclaw gateway
 ### Q: 如何切换模型？
 
 直接在请求体的 `model` 字段里写 AirGate 当前支持的模型 ID。可调用 `GET /v1/models` 拿到完整清单。
+
+### Q: 生图接口支持哪些模型和参数？
+
+支持 `gpt-image-1` / `gpt-image-1.5`。参数：
+
+- `size`：`1024x1024`、`1024x1536`、`1536x1024`、`auto`
+- `quality`：`low`、`medium`、`high`、`auto`
+- `n`：目前仅支持 `1`（多图请多次调用）
+- `background`：`opaque` / `transparent`
+- `output_format`：`png` / `jpeg` / `webp`
+
+响应使用标准 OpenAI Images API schema（`data[].b64_json` + `usage`），官方 SDK 能直接解析。
