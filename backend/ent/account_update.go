@@ -210,6 +210,26 @@ func (au *AccountUpdate) ClearLastUsedAt() *AccountUpdate {
 	return au
 }
 
+// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
+func (au *AccountUpdate) SetRateLimitResetAt(t time.Time) *AccountUpdate {
+	au.mutation.SetRateLimitResetAt(t)
+	return au
+}
+
+// SetNillableRateLimitResetAt sets the "rate_limit_reset_at" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableRateLimitResetAt(t *time.Time) *AccountUpdate {
+	if t != nil {
+		au.SetRateLimitResetAt(*t)
+	}
+	return au
+}
+
+// ClearRateLimitResetAt clears the value of the "rate_limit_reset_at" field.
+func (au *AccountUpdate) ClearRateLimitResetAt() *AccountUpdate {
+	au.mutation.ClearRateLimitResetAt()
+	return au
+}
+
 // SetExtra sets the "extra" field.
 func (au *AccountUpdate) SetExtra(m map[string]interface{}) *AccountUpdate {
 	au.mutation.SetExtra(m)
@@ -450,6 +470,12 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if au.mutation.LastUsedAtCleared() {
 		_spec.ClearField(account.FieldLastUsedAt, field.TypeTime)
+	}
+	if value, ok := au.mutation.RateLimitResetAt(); ok {
+		_spec.SetField(account.FieldRateLimitResetAt, field.TypeTime, value)
+	}
+	if au.mutation.RateLimitResetAtCleared() {
+		_spec.ClearField(account.FieldRateLimitResetAt, field.TypeTime)
 	}
 	if value, ok := au.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
@@ -778,6 +804,26 @@ func (auo *AccountUpdateOne) ClearLastUsedAt() *AccountUpdateOne {
 	return auo
 }
 
+// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
+func (auo *AccountUpdateOne) SetRateLimitResetAt(t time.Time) *AccountUpdateOne {
+	auo.mutation.SetRateLimitResetAt(t)
+	return auo
+}
+
+// SetNillableRateLimitResetAt sets the "rate_limit_reset_at" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableRateLimitResetAt(t *time.Time) *AccountUpdateOne {
+	if t != nil {
+		auo.SetRateLimitResetAt(*t)
+	}
+	return auo
+}
+
+// ClearRateLimitResetAt clears the value of the "rate_limit_reset_at" field.
+func (auo *AccountUpdateOne) ClearRateLimitResetAt() *AccountUpdateOne {
+	auo.mutation.ClearRateLimitResetAt()
+	return auo
+}
+
 // SetExtra sets the "extra" field.
 func (auo *AccountUpdateOne) SetExtra(m map[string]interface{}) *AccountUpdateOne {
 	auo.mutation.SetExtra(m)
@@ -1048,6 +1094,12 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if auo.mutation.LastUsedAtCleared() {
 		_spec.ClearField(account.FieldLastUsedAt, field.TypeTime)
+	}
+	if value, ok := auo.mutation.RateLimitResetAt(); ok {
+		_spec.SetField(account.FieldRateLimitResetAt, field.TypeTime, value)
+	}
+	if auo.mutation.RateLimitResetAtCleared() {
+		_spec.ClearField(account.FieldRateLimitResetAt, field.TypeTime)
 	}
 	if value, ok := auo.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)

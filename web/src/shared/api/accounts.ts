@@ -11,9 +11,14 @@ export type AccountListFilter = { platform?: string; status?: string; account_ty
 export const accountsApi = {
   list: (params: PageReq & AccountListFilter) =>
     get<PagedData<AccountResp>>('/api/v1/admin/accounts', params),
-  // 按当前筛选条件导出全部账号（不分页）
-  export: (params: { keyword?: string } & AccountListFilter) =>
-    get<AccountExportFile>('/api/v1/admin/accounts/export', params),
+  // 按当前筛选条件导出全部账号（不分页）；传入 ids 时仅导出指定账号。
+  export: (params: { keyword?: string; ids?: number[] } & AccountListFilter) => {
+    const { ids, ...rest } = params;
+    return get<AccountExportFile>('/api/v1/admin/accounts/export', {
+      ...rest,
+      ids: ids && ids.length > 0 ? ids.join(',') : undefined,
+    });
+  },
   // 批量导入账号
   import: (accounts: AccountExportItem[]) =>
     post<ImportAccountsResp>('/api/v1/admin/accounts/import', { accounts }),
@@ -31,9 +36,16 @@ export const accountsApi = {
     get<{ accounts: Record<string, any> }>('/api/v1/admin/accounts/usage', { platform }),
   credentialsSchema: (platform: string) =>
     get<CredentialSchemaResp>(`/api/v1/admin/accounts/credentials-schema/${platform}`),
-  // 手动刷新账号额度（调用插件 QueryQuota）
+  // 手动刷新账号额度（调用插件 QueryQuota）。
+  // reauth_warning 非空表示 refresh_token 已失效、本次是从存量 access_token 降级解析得到，
+  // 前端需提示用户尽快重新授权。
   refreshQuota: (id: number) =>
-    post<{ plan_type?: string; email?: string; subscription_active_until?: string }>(`/api/v1/admin/accounts/${id}/refresh-quota`),
+    post<{
+      plan_type?: string;
+      email?: string;
+      subscription_active_until?: string;
+      reauth_warning?: string;
+    }>(`/api/v1/admin/accounts/${id}/refresh-quota`),
   // 批量更新账号字段（group_ids 为追加模式）
   bulkUpdate: (data: BulkUpdateAccountsReq) =>
     post<BulkOpResp>('/api/v1/admin/accounts/bulk-update', data),

@@ -41,6 +41,8 @@ type Account struct {
 	UpstreamIsPool bool `json:"upstream_is_pool,omitempty"`
 	// LastUsedAt holds the value of the "last_used_at" field.
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	// 上游限流自动恢复时间：非空且 > now 表示账号处于限流中；调度器跳过、UI 显示倒计时；恢复后清空
+	RateLimitResetAt *time.Time `json:"rate_limit_reset_at,omitempty"`
 	// 扩展配置（插件/调度器使用）
 	Extra map[string]interface{} `json:"extra,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -111,7 +113,7 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case account.FieldName, account.FieldPlatform, account.FieldType, account.FieldStatus, account.FieldErrorMsg:
 			values[i] = new(sql.NullString)
-		case account.FieldLastUsedAt, account.FieldCreatedAt, account.FieldUpdatedAt:
+		case account.FieldLastUsedAt, account.FieldRateLimitResetAt, account.FieldCreatedAt, account.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		case account.ForeignKeys[0]: // account_proxy
 			values[i] = new(sql.NullInt64)
@@ -204,6 +206,13 @@ func (a *Account) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				a.LastUsedAt = new(time.Time)
 				*a.LastUsedAt = value.Time
+			}
+		case account.FieldRateLimitResetAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_limit_reset_at", values[i])
+			} else if value.Valid {
+				a.RateLimitResetAt = new(time.Time)
+				*a.RateLimitResetAt = value.Time
 			}
 		case account.FieldExtra:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -315,6 +324,11 @@ func (a *Account) String() string {
 	builder.WriteString(", ")
 	if v := a.LastUsedAt; v != nil {
 		builder.WriteString("last_used_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := a.RateLimitResetAt; v != nil {
+		builder.WriteString("rate_limit_reset_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")

@@ -137,6 +137,8 @@ export interface AccountResp {
   error_msg?: string;
   upstream_is_pool: boolean;
   last_used_at?: string;
+  /** 上游限流自动恢复时间（ISO 8601）。非空且 > now 时表示账号处于限流中。 */
+  rate_limit_reset_at?: string;
   group_ids: number[];
   created_at: string;
   updated_at: string;

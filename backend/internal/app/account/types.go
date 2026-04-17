@@ -33,11 +33,15 @@ type Account struct {
 	// 的耗尽错误（expired/disabled 状态）会被降级为临时限流，不永久标错。
 	UpstreamIsPool bool
 	LastUsedAt     *time.Time
-	GroupIDs       []int64
-	Proxy          *Proxy
-	Extra          map[string]any
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// RateLimitResetAt 限流自动恢复时间：非空且 > now 表示账号被上游打了
+	// 429 / usage_limit_reached，处于临时限流中。调度器跳过，UI 显示倒计时，
+	// 恢复后清空（成功请求或被清除时）。
+	RateLimitResetAt *time.Time
+	GroupIDs         []int64
+	Proxy            *Proxy
+	Extra            map[string]any
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // AccountWindowStats 单个账号在某个时间窗口内的聚合统计。
@@ -71,6 +75,7 @@ type ListFilter struct {
 	AccountType string // 账号类型筛选（如 "apikey"、"oauth"）
 	GroupID     *int
 	ProxyID     *int
+	IDs         []int // 指定账号 ID 列表（用于导出选中账号等场景，空切片表示不限定）
 }
 
 // ListResult 账号列表结果。
@@ -183,6 +188,9 @@ type QuotaRefreshResult struct {
 	PlanType                string
 	Email                   string
 	SubscriptionActiveUntil string
+	// ReauthWarning 非空表示 refresh_token 已失效、字段是从存量 access_token 降级解析得到，
+	// 调用方应提示用户尽快重新授权。内容为可展示的原因文案。
+	ReauthWarning string
 }
 
 // StatsQuery 账号统计查询参数。
@@ -303,4 +311,7 @@ type Repository interface {
 	BatchWindowStats(ctx context.Context, accountIDs []int, startTime time.Time) (map[int]AccountWindowStats, error)
 	SaveCredentials(context.Context, int, map[string]string) error
 	MarkError(context.Context, int, string) error
+	// SetRateLimitResetAt 持久化账号的限流恢复时间。
+	// resetAt 传 nil 表示清除（账号已恢复）。
+	SetRateLimitResetAt(ctx context.Context, id int, resetAt *time.Time) error
 }

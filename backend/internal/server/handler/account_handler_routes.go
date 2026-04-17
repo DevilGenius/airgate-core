@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -47,6 +48,7 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 }
 
 // ExportAccounts 按当前筛选条件导出账号（返回 JSON 数据，前端落盘为文件）。
+// 当前端传入 ids=1,2,3 时只导出这些账号；否则按查询条件导出全部匹配的账号。
 func (h *AccountHandler) ExportAccounts(c *gin.Context) {
 	accounts, err := h.service.ExportAll(c.Request.Context(), appaccount.ListFilter{
 		Keyword:     c.Query("keyword"),
@@ -55,6 +57,7 @@ func (h *AccountHandler) ExportAccounts(c *gin.Context) {
 		AccountType: c.Query("account_type"),
 		GroupID:     parseOptionalInt(c.Query("group_id")),
 		ProxyID:     parseOptionalInt(c.Query("proxy_id")),
+		IDs:         parseIDList(c.Query("ids")),
 	})
 	if err != nil {
 		httpCode, message := h.handleError("导出账号失败", "导出失败", err)
@@ -69,11 +72,20 @@ func (h *AccountHandler) ExportAccounts(c *gin.Context) {
 
 	response.Success(c, dto.AccountExportFile{
 		Version:    1,
-		ExportedAt: time.Now().UTC().Format(time.RFC3339),
+		ExportedAt: time.Now().In(beijingTZ).Format(time.RFC3339),
 		Count:      len(items),
 		Accounts:   items,
 	})
 }
+
+// beijingTZ 北京时区（UTC+8），用于导出文件时间戳。
+// LoadLocation 失败时回退为固定偏移，避免依赖系统 tzdata。
+var beijingTZ = func() *time.Location {
+	if loc, err := time.LoadLocation("Asia/Shanghai"); err == nil {
+		return loc
+	}
+	return time.FixedZone("CST", 8*3600)
+}()
 
 // ImportAccounts 批量导入账号。
 func (h *AccountHandler) ImportAccounts(c *gin.Context) {
@@ -285,11 +297,17 @@ func (h *AccountHandler) BulkRefreshQuota(c *gin.Context) {
 			failed++
 			evt["success"] = false
 			evt["error"] = err.Error()
+			if errors.Is(err, appaccount.ErrReauthRequired) {
+				evt["reauth_required"] = true
+			}
 		} else {
 			success++
 			evt["success"] = true
 			if result.PlanType != "" {
 				evt["plan_type"] = result.PlanType
+			}
+			if result.ReauthWarning != "" {
+				evt["reauth_warning"] = result.ReauthWarning
 			}
 		}
 		sendSSEEvent(c.Writer, evt)
@@ -448,11 +466,15 @@ func (h *AccountHandler) RefreshQuota(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{
+	resp := gin.H{
 		"plan_type":                 result.PlanType,
 		"email":                     result.Email,
 		"subscription_active_until": result.SubscriptionActiveUntil,
-	})
+	}
+	if result.ReauthWarning != "" {
+		resp["reauth_warning"] = result.ReauthWarning
+	}
+	response.Success(c, resp)
 }
 
 // GetAccountStats 获取单个账号使用统计。

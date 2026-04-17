@@ -87,6 +87,9 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 	if filter.ProxyID != nil {
 		query = query.Where(entaccount.HasProxyWith(entproxy.IDEQ(*filter.ProxyID)))
 	}
+	if len(filter.IDs) > 0 {
+		query = query.Where(entaccount.IDIn(filter.IDs...))
+	}
 
 	accounts, err := query.
 		WithGroups().
@@ -344,6 +347,24 @@ func (s *AccountStore) MarkError(ctx context.Context, id int, message string) er
 	return nil
 }
 
+// SetRateLimitResetAt 设置或清除账号的限流恢复时间。
+// resetAt == nil 会清空字段；否则写入指定时间。
+func (s *AccountStore) SetRateLimitResetAt(ctx context.Context, id int, resetAt *time.Time) error {
+	builder := s.db.Account.UpdateOneID(id)
+	if resetAt == nil {
+		builder = builder.ClearRateLimitResetAt()
+	} else {
+		builder = builder.SetRateLimitResetAt(*resetAt)
+	}
+	if err := builder.Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appaccount.ErrAccountNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 func mapAccounts(accounts []*ent.Account) []appaccount.Account {
 	result := make([]appaccount.Account, 0, len(accounts))
 	for _, item := range accounts {
@@ -373,6 +394,10 @@ func mapAccount(item *ent.Account) appaccount.Account {
 	if item.LastUsedAt != nil {
 		value := *item.LastUsedAt
 		result.LastUsedAt = &value
+	}
+	if item.RateLimitResetAt != nil {
+		value := *item.RateLimitResetAt
+		result.RateLimitResetAt = &value
 	}
 	if item.Edges.Proxy != nil {
 		result.Proxy = &appaccount.Proxy{

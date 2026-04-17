@@ -16,7 +16,10 @@ type AccountResp struct {
 	ErrorMsg           string            `json:"error_msg,omitempty"`
 	UpstreamIsPool     bool              `json:"upstream_is_pool"`
 	LastUsedAt         *string           `json:"last_used_at,omitempty"`
-	GroupIDs           []int64           `json:"group_ids"`
+	// RateLimitResetAt 上游限流自动恢复时间。非空且 > now 时表示账号被打了
+	// 429 / usage_limit_reached，前端据此显示"限流中 Xh Ym 自动恢复"徽标。
+	RateLimitResetAt *string `json:"rate_limit_reset_at,omitempty"`
+	GroupIDs         []int64 `json:"group_ids"`
 	TimeMixin
 }
 

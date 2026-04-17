@@ -63,6 +63,7 @@ var (
 		{Name: "error_msg", Type: field.TypeString, Default: ""},
 		{Name: "upstream_is_pool", Type: field.TypeBool, Default: false},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "rate_limit_reset_at", Type: field.TypeTime, Nullable: true},
 		{Name: "extra", Type: field.TypeJSON, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -76,7 +77,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[15]},
+				Columns:    []*schema.Column{AccountsColumns[16]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

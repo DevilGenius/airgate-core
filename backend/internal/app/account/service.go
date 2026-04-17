@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +17,10 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 )
+
+// reauthRequiredPrefix 与 airgate-openai 插件 ReauthRequiredPrefix 保持一致；
+// 经 gRPC 透传后只能按字符串识别，不能直接 errors.Is。
+const reauthRequiredPrefix = "reauth_required: "
 
 // PluginCatalog 账号域需要的插件能力集合。
 type PluginCatalog interface {
@@ -398,45 +404,38 @@ func (s *Service) GetAccountUsage(ctx context.Context, platform string) (map[str
 	// 深度无需——我们只给外层 map 和每个 account map 加一个字段，不会动 windows / credits。
 	result := cloneMergedShallow(base)
 
-	// 每次调用都重新 seed 当前活跃账号到 result。
-	// 原因：上游缓存里只有"上次 populate 时处于 active 的账号"，若某个账号之后才
-	// 从 error/disabled 变回 active（或刚创建），就不会出现在缓存里，enrichTodayStats
-	// 也遍历不到它，前端就看不到今日统计。这一步 DB 开销很小（单列 + 平台索引），
-	// 但保证状态变更立即生效，不用等缓存过期。
-	s.ensureActiveAccountsSeeded(ctx, platform, result)
+	// 每次调用都重新 seed 所有账号到 result。
+	// 原因：上游缓存里只有"上次 populate 时发起过 quota 查询的账号"，error/disabled
+	// 的账号不在上游调用里，不会出现在缓存里，enrichTodayStats 也遍历不到它们，
+	// 前端就看不到今日统计。这一步 DB 开销很小（单列 + 平台索引），但保证用量数据
+	// 对所有状态的账号都能持续显示（包括 error/disabled，便于事后排查）。
+	s.ensureAccountsSeeded(ctx, platform, result)
 
 	s.enrichTodayStats(ctx, result)
 	return result, nil
 }
 
-// ensureActiveAccountsSeeded 确保所有当前活跃账号都在 merged 里有占位条目。
-// 对于 apikey 类型的账号（没有上游 quota 接口），它们只靠 seed 占位才能走进
-// enrichTodayStats，拿到今日聚合统计。
-func (s *Service) ensureActiveAccountsSeeded(ctx context.Context, platform string, merged map[string]any) {
-	var platforms []string
-	if platform != "" {
-		platforms = []string{platform}
-	} else {
-		for _, meta := range s.plugins.GetAllPluginMeta() {
-			if meta.Platform != "" {
-				platforms = append(platforms, meta.Platform)
-			}
-		}
+// ensureAccountsSeeded 确保所有账号（不论 status）都在 merged 里有占位条目。
+//
+// 历史上这里只 seed status=active 账号，导致 error / disabled 账号在前端
+// 用量列直接显示"-"。但"用量数据"本身是历史维度的统计（usage_logs 聚合、
+// 上游 quota 快照），和当前能否调度无关——账号即便暂时不可调度，运维也
+// 需要看到它之前的消耗画像来定位问题（是不是 quota 打满导致的限流 / 封号）。
+// 因此对所有账号都 seed 占位，enrichTodayStats 会把今日聚合写进来；上游
+// quota 窗口由 getUpstreamUsage 决定要不要刷新。
+//
+// 不按 plugin meta 的 platform 列表去遍历 —— 那样会在插件尚未加载 / 加载失败
+// 时漏 seed（进而导致前端的 usage_window 整列因为 accounts map 空而被隐藏）。
+// 直接 ListAll 最稳，单次查询，DB 开销微不足道。
+func (s *Service) ensureAccountsSeeded(ctx context.Context, platform string, merged map[string]any) {
+	accounts, err := s.repo.ListAll(ctx, ListFilter{Platform: platform})
+	if err != nil {
+		return
 	}
-
-	for _, p := range platforms {
-		accounts, err := s.repo.ListByPlatform(ctx, p)
-		if err != nil || len(accounts) == 0 {
-			continue
-		}
-		for _, item := range accounts {
-			if item.Status != "active" {
-				continue
-			}
-			key := strconv.Itoa(item.ID)
-			if _, exists := merged[key]; !exists {
-				merged[key] = map[string]any{}
-			}
+	for _, item := range accounts {
+		key := strconv.Itoa(item.ID)
+		if _, exists := merged[key]; !exists {
+			merged[key] = map[string]any{}
 		}
 	}
 }
@@ -552,6 +551,11 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 		for key, value := range result.Accounts {
 			merged[key] = value
 		}
+		// 根据每个账号的 windows 反推限流恢复时间并持久化到 DB。
+		// 这样即便用户还没真正发起过会触发 429 的请求，只要 quota 接口看到
+		// 某个窗口已经 100%，调度器也能提前跳过、UI 也能显示"限流中"徽标。
+		s.persistRateLimitFromWindows(ctx, result.Accounts)
+
 		for _, item := range result.Errors {
 			// 池子账号在后台配额巡检里返回的错误（比如 "Upstream access forbidden"）
 			// 只是池子暂时不可用，不代表本地账号坏了——不能标 error 永久关掉调度。
@@ -568,6 +572,81 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 	s.usageMu.Unlock()
 
 	return merged, nil
+}
+
+// persistRateLimitFromWindows 扫描每个账号的 windows，把"有窗口已经 100%"的情况
+// 当作限流态持久化到 DB 的 rate_limit_reset_at。
+//
+// 判定规则：
+//   - 任意窗口 used_percent >= 100 → 账号受限。rate_limit_reset_at 取所有
+//     >=100% 窗口中最晚的 reset_at（因为只要还有一个窗口没恢复，账号就不可用）。
+//   - 所有窗口 used_percent < 100 → 账号已恢复。清空 rate_limit_reset_at。
+//
+// 与 429 路径不会打架：真实 429 通过 MarkOverloaded 写入的 reset 时间优先级
+// 等同于这里计算的值（都来自同一个 window 的 reset_seconds），轻微的覆盖是安全的。
+func (s *Service) persistRateLimitFromWindows(ctx context.Context, accounts map[string]any) {
+	now := time.Now()
+	for key, raw := range accounts {
+		accountMap, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		windowsRaw, ok := accountMap["windows"].([]any)
+		if !ok {
+			continue
+		}
+		id, err := strconv.Atoi(key)
+		if err != nil {
+			continue
+		}
+		var latestReset *time.Time
+		anyMaxed := false
+		for _, w := range windowsRaw {
+			wm, ok := w.(map[string]any)
+			if !ok {
+				continue
+			}
+			pct, _ := wm["used_percent"].(float64)
+			if pct < 100 {
+				continue
+			}
+			anyMaxed = true
+			reset := parseWindowReset(wm, now)
+			if reset == nil {
+				continue
+			}
+			if latestReset == nil || reset.After(*latestReset) {
+				latestReset = reset
+			}
+		}
+
+		switch {
+		case anyMaxed && latestReset != nil:
+			if err := s.repo.SetRateLimitResetAt(ctx, id, latestReset); err != nil {
+				slog.Debug("持久化 rate_limit_reset_at 失败", "account_id", id, "error", err)
+			}
+		case !anyMaxed:
+			// 所有窗口都 <100%，账号已恢复，清空字段让调度器重新纳入。
+			if err := s.repo.SetRateLimitResetAt(ctx, id, nil); err != nil {
+				slog.Debug("清空 rate_limit_reset_at 失败", "account_id", id, "error", err)
+			}
+		}
+	}
+}
+
+// parseWindowReset 从 window map 解析 reset 时间。
+// 优先使用绝对时间 reset_at（RFC3339），回退到相对秒数 reset_seconds。
+func parseWindowReset(w map[string]any, now time.Time) *time.Time {
+	if s, ok := w["reset_at"].(string); ok && s != "" {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			return &t
+		}
+	}
+	if secs, ok := w["reset_seconds"].(float64); ok && secs > 0 {
+		t := now.Add(time.Duration(secs) * time.Second)
+		return &t
+	}
+	return nil
 }
 
 // cloneMergedShallow 浅克隆 map[accountID]accountMap 两层结构。
@@ -743,7 +822,20 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 
 	quota, err := inst.Gateway.QueryQuota(callCtx, cloneStringMap(item.Credentials))
 	if err != nil {
+		// 识别插件返回的 reauth_required 前缀（字符串识别，gRPC 不透传 sentinel error）。
+		if strings.Contains(err.Error(), reauthRequiredPrefix) {
+			return QuotaRefreshResult{}, ErrReauthRequired
+		}
 		return QuotaRefreshResult{}, fmt.Errorf("刷新额度失败: %w", err)
+	}
+
+	// refresh_warning 是降级信号，不落库；取出后从 Extra 删除，避免写入 credentials。
+	var warning string
+	if quota.Extra != nil {
+		if w, ok := quota.Extra["refresh_warning"]; ok {
+			warning = w
+			delete(quota.Extra, "refresh_warning")
+		}
 	}
 
 	credentials := cloneStringMap(item.Credentials)
@@ -754,7 +846,7 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 			updated = true
 		}
 	}
-	if quota.ExpiresAt != "" {
+	if quota.ExpiresAt != "" && credentials["subscription_active_until"] != quota.ExpiresAt {
 		credentials["subscription_active_until"] = quota.ExpiresAt
 		updated = true
 	}
@@ -768,6 +860,7 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 		PlanType:                credentials["plan_type"],
 		Email:                   credentials["email"],
 		SubscriptionActiveUntil: credentials["subscription_active_until"],
+		ReauthWarning:           warning,
 	}, nil
 }
 

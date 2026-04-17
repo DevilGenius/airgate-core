@@ -322,6 +322,12 @@ func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account) S
 		return NotSchedulable
 	}
 
+	// DB 持久化的限流恢复时间兜底：Redis 可能重启丢 TTL，DB 的
+	// rate_limit_reset_at 是真实来源。只要还没到恢复时间就跳过。
+	if acc.RateLimitResetAt != nil && acc.RateLimitResetAt.After(time.Now()) {
+		return NotSchedulable
+	}
+
 	worst := Normal
 
 	// 窗口费用检查
@@ -386,9 +392,37 @@ func (s *Scheduler) DecrementRPM(ctx context.Context, accountID int) {
 }
 
 // MarkOverloaded 标记账户为临时限流状态（收到 429 后调用）
-// retryAfter 为上游建议的等待时间
+// retryAfter 为上游建议的等待时间。
+//
+// 除了 Redis 内的调度冷却标记外，还会把精确的恢复时间写到 DB 的
+// rate_limit_reset_at 字段，作为"限流中"的持久化状态：
+//   - 即便 Redis 重启也能在下次请求时正确跳过
+//   - DTO 把这个字段透传给前端，展示"限流中 Xh Ym 自动恢复"徽标
+//   - 调度 toggle（status）保持不变，不会因为临时限流被关掉
 func (s *Scheduler) MarkOverloaded(ctx context.Context, accountID int, retryAfter time.Duration) {
 	s.overload.MarkOverloaded(ctx, accountID, retryAfter)
+	s.persistRateLimitReset(accountID, retryAfter)
+}
+
+// persistRateLimitReset 把恢复时间写到 account.rate_limit_reset_at。
+// retryAfter <= 0 时沿用 OverloadManager 的默认冷却时间，保证 UI 上能看到
+// 倒计时而不是空。
+func (s *Scheduler) persistRateLimitReset(accountID int, retryAfter time.Duration) {
+	if retryAfter <= 0 {
+		retryAfter = defaultOverloadDuration
+	}
+	if retryAfter > maxOverloadDuration {
+		retryAfter = maxOverloadDuration
+	}
+	resetAt := time.Now().Add(retryAfter)
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+	if err := s.db.Account.UpdateOneID(accountID).
+		SetRateLimitResetAt(resetAt).
+		Exec(ctx); err != nil {
+		slog.Warn("持久化限流恢复时间失败", "account_id", accountID, "error", err)
+	}
 }
 
 // MarkDegraded 把账号打入临时降级窗口，调度器会在窗口内把该账号优先级
@@ -505,10 +539,13 @@ func (s *Scheduler) ReportResult(accountID int, success bool, latency time.Durat
 		// 成功时清零失败计数
 		s.failCounts.Delete(accountID)
 
-		// 更新 last_used_at
+		// 更新 last_used_at + 清除限流恢复时间。
+		// 清除 rate_limit_reset_at：一次成功请求说明上游已经放行，哪怕 reset_at
+		// 还没到也应该立即从"限流中"恢复，前端不再显示倒计时。
 		now := time.Now()
 		if err := s.db.Account.UpdateOneID(accountID).
 			SetLastUsedAt(now).
+			ClearRateLimitResetAt().
 			Exec(ctx); err != nil {
 			slog.Debug("更新 last_used_at 失败", "account_id", accountID, "error", err)
 		}

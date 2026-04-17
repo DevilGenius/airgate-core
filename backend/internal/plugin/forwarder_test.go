@@ -91,6 +91,21 @@ func TestShouldPenalizeForwardError(t *testing.T) {
 			err:  errors.New("gRPC 流接收失败: rpc error: code = Unknown desc = upstream 502"),
 			want: true,
 		},
+		{
+			name: "上游未送 response.completed 事件属于流抖动不计入失败",
+			err:  errors.New("gRPC Forward 调用失败: rpc error: code = Unknown desc = 未收到 response.completed 事件"),
+			want: false,
+		},
+		{
+			name: "回译失败不计入失败",
+			err:  errors.New("gRPC Forward 调用失败: rpc error: code = Unknown desc = responses 非流回译失败"),
+			want: false,
+		},
+		{
+			name: "context canceled 不计入失败",
+			err:  errors.New("rpc error: code = Canceled desc = context canceled"),
+			want: false,
+		},
 	}
 
 	for _, tc := range cases {

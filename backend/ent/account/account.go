@@ -37,6 +37,8 @@ const (
 	FieldUpstreamIsPool = "upstream_is_pool"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
 	FieldLastUsedAt = "last_used_at"
+	// FieldRateLimitResetAt holds the string denoting the rate_limit_reset_at field in the database.
+	FieldRateLimitResetAt = "rate_limit_reset_at"
 	// FieldExtra holds the string denoting the extra field in the database.
 	FieldExtra = "extra"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -86,6 +88,7 @@ var Columns = []string{
 	FieldErrorMsg,
 	FieldUpstreamIsPool,
 	FieldLastUsedAt,
+	FieldRateLimitResetAt,
 	FieldExtra,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -232,6 +235,11 @@ func ByUpstreamIsPool(opts ...sql.OrderTermOption) OrderOption {
 // ByLastUsedAt orders the results by the last_used_at field.
 func ByLastUsedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastUsedAt, opts...).ToFunc()
+}
+
+// ByRateLimitResetAt orders the results by the rate_limit_reset_at field.
+func ByRateLimitResetAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateLimitResetAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

@@ -153,6 +153,20 @@ func (ac *AccountCreate) SetNillableLastUsedAt(t *time.Time) *AccountCreate {
 	return ac
 }
 
+// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
+func (ac *AccountCreate) SetRateLimitResetAt(t time.Time) *AccountCreate {
+	ac.mutation.SetRateLimitResetAt(t)
+	return ac
+}
+
+// SetNillableRateLimitResetAt sets the "rate_limit_reset_at" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableRateLimitResetAt(t *time.Time) *AccountCreate {
+	if t != nil {
+		ac.SetRateLimitResetAt(*t)
+	}
+	return ac
+}
+
 // SetExtra sets the "extra" field.
 func (ac *AccountCreate) SetExtra(m map[string]interface{}) *AccountCreate {
 	ac.mutation.SetExtra(m)
@@ -441,6 +455,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.LastUsedAt(); ok {
 		_spec.SetField(account.FieldLastUsedAt, field.TypeTime, value)
 		_node.LastUsedAt = &value
+	}
+	if value, ok := ac.mutation.RateLimitResetAt(); ok {
+		_spec.SetField(account.FieldRateLimitResetAt, field.TypeTime, value)
+		_node.RateLimitResetAt = &value
 	}
 	if value, ok := ac.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)

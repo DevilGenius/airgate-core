@@ -100,6 +100,11 @@ func LastUsedAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldLastUsedAt, v))
 }
 
+// RateLimitResetAt applies equality check predicate on the "rate_limit_reset_at" field. It's identical to RateLimitResetAtEQ.
+func RateLimitResetAt(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldRateLimitResetAt, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldCreatedAt, v))
@@ -578,6 +583,56 @@ func LastUsedAtIsNil() predicate.Account {
 // LastUsedAtNotNil applies the NotNil predicate on the "last_used_at" field.
 func LastUsedAtNotNil() predicate.Account {
 	return predicate.Account(sql.FieldNotNull(FieldLastUsedAt))
+}
+
+// RateLimitResetAtEQ applies the EQ predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtEQ(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtNEQ applies the NEQ predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtNEQ(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtIn applies the In predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtIn(vs ...time.Time) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldRateLimitResetAt, vs...))
+}
+
+// RateLimitResetAtNotIn applies the NotIn predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtNotIn(vs ...time.Time) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldRateLimitResetAt, vs...))
+}
+
+// RateLimitResetAtGT applies the GT predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtGT(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtGTE applies the GTE predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtGTE(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtLT applies the LT predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtLT(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtLTE applies the LTE predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtLTE(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldRateLimitResetAt, v))
+}
+
+// RateLimitResetAtIsNil applies the IsNil predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtIsNil() predicate.Account {
+	return predicate.Account(sql.FieldIsNull(FieldRateLimitResetAt))
+}
+
+// RateLimitResetAtNotNil applies the NotNil predicate on the "rate_limit_reset_at" field.
+func RateLimitResetAtNotNil() predicate.Account {
+	return predicate.Account(sql.FieldNotNull(FieldRateLimitResetAt))
 }
 
 // ExtraIsNil applies the IsNil predicate on the "extra" field.

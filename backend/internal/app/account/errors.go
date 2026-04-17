@@ -13,4 +13,6 @@ var (
 	ErrQuotaRefreshUnsupported = errors.New("该平台不支持刷新额度")
 	// ErrInvalidDateRange 日期范围参数非法。
 	ErrInvalidDateRange = errors.New("日期范围无效")
+	// ErrReauthRequired OAuth 凭证已失效，需要重新授权（refresh_token 失效且无法本地降级）。
+	ErrReauthRequired = errors.New("账号凭证已失效，请重新授权")
 )

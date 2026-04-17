@@ -11,8 +11,10 @@ import (
 const (
 	// defaultOverloadDuration 默认限流冷却时间（当上游未返回 RetryAfter 时使用）
 	defaultOverloadDuration = 60 * time.Second
-	// maxOverloadDuration 最大限流冷却时间，防止异常值
-	maxOverloadDuration = 10 * time.Minute
+	// maxOverloadDuration 最大限流冷却时间，防止异常值。
+	// OpenAI OAuth 的 usage_limit_reached 可以长达数天（5h / 7d 窗口），
+	// 上限设得短会导致账号提前"解禁"后再次被真限流，浪费调度资源。
+	maxOverloadDuration = 7 * 24 * time.Hour
 	// defaultDegradedDuration 账号池耗尽时的默认降级窗口
 	// 和 overload 不同：降级账号仍然可被选中，只是优先级被打到最低，
 	// 只要还有其它非降级账号就会优先调度它们；窗口过后自动恢复正常优先级

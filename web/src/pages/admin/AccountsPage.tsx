@@ -46,6 +46,69 @@ import type {
   AccountExportItem,
 } from '../../shared/types';
 
+// formatCountdown 把剩余毫秒格式化成 "Xd Yh"/"Xh Ym"/"Ym" 样式，
+// 与 sub2api 的"限流中 10h 16m 自动恢复"徽标一致。
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return '';
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return `${sec}s`;
+}
+
+/**
+ * AccountStatusCell 渲染账号状态徽标。
+ *
+ * 设计选择：当 rate_limit_reset_at 非空且未过期时，**替换**原来的 status 徽标为
+ * 单个"限流中 Xh Ym"徽标（warning 配色）。原因：
+ *  - 上下叠两个徽标会让该行比其它行高，表格视觉抖动；
+ *  - 限流期间 "活跃" 这个状态对用户没有信息量（调度开关的颜色已经传递同样信号），
+ *    换成倒计时更有效；
+ *  - 鼠标悬停提示说明"到期自动恢复，调度开关不变"消除歧义。
+ * 每秒重算倒计时，reset 时间过后徽标自动切回 status。
+ */
+function AccountStatusCell({ row }: { row: AccountResp }) {
+  const { t } = useTranslation();
+  const resetAtMs = row.rate_limit_reset_at ? Date.parse(row.rate_limit_reset_at) : 0;
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!resetAtMs || resetAtMs <= now) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [resetAtMs, now]);
+
+  const remainingMs = resetAtMs - now;
+  const isRateLimited = resetAtMs > 0 && remainingMs > 0;
+
+  if (isRateLimited) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap"
+        style={{
+          background: 'var(--ag-warning-subtle)',
+          color: 'var(--ag-warning)',
+          borderColor: 'var(--ag-warning-subtle)',
+        }}
+        title={t('accounts.rate_limited_tooltip', '上游限流，到期自动恢复，不影响调度开关')}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full"
+          style={{ background: 'var(--ag-warning)' }}
+        />
+        {t('accounts.rate_limited_label', '限流中')} {formatCountdown(remainingMs)}
+      </span>
+    );
+  }
+
+  return <StatusBadge status={row.status} tooltip={row.error_msg || undefined} />;
+}
+
 export default function AccountsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -173,24 +236,35 @@ export default function AccountsPage() {
     },
   });
 
-  // 导出账号（按当前筛选条件）
+  // 导出账号：有选中项时仅导出选中账号；否则按当前筛选条件导出。
   const importInputRef = useRef<HTMLInputElement>(null);
   const exportMutation = useMutation({
-    mutationFn: () =>
-      accountsApi.export({
+    mutationFn: () => {
+      if (selectedIds.length > 0) {
+        return accountsApi.export({ ids: selectedIds });
+      }
+      return accountsApi.export({
         keyword: keyword || undefined,
         platform: platformFilter || undefined,
         status: statusFilter || undefined,
         account_type: typeFilter || undefined,
         group_id: groupFilter ? Number(groupFilter) : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
-      }),
+      });
+    },
     onSuccess: (file: AccountExportFile) => {
-      // 触发浏览器下载
+      // 触发浏览器下载，文件名使用北京时间便于用户辨识。
       const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false,
+      }).formatToParts(new Date());
+      const pick = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+      const ts = `${pick('year')}${pick('month')}${pick('day')}${pick('hour')}${pick('minute')}${pick('second')}`;
       a.href = url;
       a.download = `airgate-accounts-${ts}.json`;
       document.body.appendChild(a);
@@ -263,11 +337,19 @@ export default function AccountsPage() {
     queryKey: queryKeys.accounts(),
   });
 
-  // 刷新令牌
-  const refreshQuotaMutation = useCrudMutation({
+  // 刷新令牌：后端在 refresh_token 已失效但能从 access_token JWT 解析到 plan_type
+  // 时，会以 reauth_warning 形式回传降级提示；此时提示用户重新授权而不是弹 success。
+  const refreshQuotaMutation = useMutation({
     mutationFn: (id: number) => accountsApi.refreshQuota(id),
-    successMessage: t('accounts.refresh_quota_success'),
-    queryKey: queryKeys.accounts(),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      if (res?.reauth_warning) {
+        toast('warning', t('accounts.refresh_quota_reauth_warning'));
+      } else {
+        toast('success', t('accounts.refresh_quota_success'));
+      }
+    },
+    onError: (err: Error) => toast('error', err.message),
   });
 
   // 批量操作通用的结果处理：全部成功 → success toast；部分成功 → warning；全部失败 → error。
@@ -430,7 +512,7 @@ export default function AccountsPage() {
     {
       key: 'status',
       title: t('common.status'),
-      render: (row) => <StatusBadge status={row.status} tooltip={row.error_msg || undefined} />,
+      render: (row) => <AccountStatusCell row={row} />,
     },
     {
       key: 'scheduling',
@@ -492,8 +574,11 @@ export default function AccountsPage() {
         );
       },
     },
-    // 用量窗口
-    ...(usageData?.accounts && Object.keys(usageData.accounts).length > 0 ? [{
+    // 用量窗口 —— 始终显示该列。历史上这里用 accounts.length > 0 作为
+    // 显示门槛，但当插件尚未加载 / 上游 quota 接口都超时等边缘情况下，后端
+    // 可能返回空 accounts map 导致整列消失。那样用户连点"刷新用量"的入口都
+    // 没有。正确做法是：列始终在，每一行的 cell 自己处理 usage 缺失显示 "-"。
+    ...[{
       key: 'usage_window',
       title: t('accounts.usage_window'),
       width: '200px',
@@ -648,7 +733,7 @@ export default function AccountsPage() {
           </div>
         );
       },
-    } as Column<AccountResp>] : []),
+    } as Column<AccountResp>],
     {
       key: 'last_used_at',
       title: t('accounts.last_used'),

@@ -30,6 +30,10 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		lastUsedAt := account.LastUsedAt.Format("2006-01-02T15:04:05Z")
 		resp.LastUsedAt = &lastUsedAt
 	}
+	if account.RateLimitResetAt != nil {
+		resetAt := account.RateLimitResetAt.UTC().Format("2006-01-02T15:04:05Z")
+		resp.RateLimitResetAt = &resetAt
+	}
 	if account.Proxy != nil {
 		proxyID := int64(account.Proxy.ID)
 		resp.ProxyID = &proxyID

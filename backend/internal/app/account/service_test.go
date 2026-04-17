@@ -82,6 +82,8 @@ func (s stubRepository) SaveCredentials(context.Context, int, map[string]string)
 
 func (s stubRepository) MarkError(context.Context, int, string) error { return nil }
 
+func (s stubRepository) SetRateLimitResetAt(context.Context, int, *time.Time) error { return nil }
+
 type windowStatsStub struct {
 	stubRepository
 	captured [][]int
@@ -328,5 +330,75 @@ func TestExtractBodyError(t *testing.T) {
 				t.Errorf("extractBodyError(%q) = %q, want %q", c.body, got, c.want)
 			}
 		})
+	}
+}
+
+type rateLimitRepo struct {
+	stubRepository
+	calls map[int]*time.Time
+}
+
+func (r *rateLimitRepo) SetRateLimitResetAt(_ context.Context, id int, resetAt *time.Time) error {
+	if r.calls == nil {
+		r.calls = map[int]*time.Time{}
+	}
+	if resetAt == nil {
+		r.calls[id] = nil
+	} else {
+		cp := *resetAt
+		r.calls[id] = &cp
+	}
+	return nil
+}
+
+func TestPersistRateLimitFromWindows(t *testing.T) {
+	repo := &rateLimitRepo{}
+	svc := NewService(repo, nil, nil)
+
+	accounts := map[string]any{
+		// 7d 100% + 另一个 5h 99%：取 7d 的 reset_seconds 做恢复时间
+		"42": map[string]any{
+			"windows": []any{
+				map[string]any{"key": "5h", "used_percent": 99.0, "reset_seconds": float64(300)},
+				map[string]any{"key": "7d", "used_percent": 100.0, "reset_seconds": float64(34800)}, // 9h 40m
+			},
+		},
+		// 两个窗口都 100%：取两者中较晚的 reset
+		"7": map[string]any{
+			"windows": []any{
+				map[string]any{"key": "5h", "used_percent": 100.0, "reset_seconds": float64(1200)},
+				map[string]any{"key": "7d", "used_percent": 100.0, "reset_seconds": float64(3600)},
+			},
+		},
+		// 全部 <100%：清空
+		"3": map[string]any{
+			"windows": []any{
+				map[string]any{"key": "5h", "used_percent": 42.0, "reset_seconds": float64(600)},
+			},
+		},
+		// 无 windows：跳过（不调用 SetRateLimitResetAt）
+		"1": map[string]any{},
+	}
+
+	svc.persistRateLimitFromWindows(t.Context(), accounts)
+
+	if got, ok := repo.calls[42]; !ok || got == nil {
+		t.Fatalf("expected account 42 to get a non-nil reset, got %+v", got)
+	} else if until := time.Until(*got); until < 9*time.Hour+30*time.Minute || until > 9*time.Hour+50*time.Minute {
+		t.Errorf("account 42 reset expected ~9h40m, got %s", until)
+	}
+
+	if got, ok := repo.calls[7]; !ok || got == nil {
+		t.Fatalf("expected account 7 to get a non-nil reset, got %+v", got)
+	} else if until := time.Until(*got); until < 55*time.Minute || until > 65*time.Minute {
+		t.Errorf("account 7 should take LATER of two resets (~1h), got %s", until)
+	}
+
+	if got, ok := repo.calls[3]; !ok || got != nil {
+		t.Errorf("account 3 should be explicitly cleared (nil), got %+v (ok=%v)", got, ok)
+	}
+
+	if _, ok := repo.calls[1]; ok {
+		t.Errorf("account 1 has no windows, should not touch rate_limit_reset_at")
 	}
 }

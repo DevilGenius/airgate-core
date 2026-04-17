@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, X, Loader2 } from 'lucide-react';
+import { Check, X, Loader2, AlertTriangle } from 'lucide-react';
 import { Modal } from '../../../shared/components/Modal';
 import { Button } from '../../../shared/components/Button';
 import { accountsApi } from '../../../shared/api/accounts';
 import { getToken } from '../../../shared/api/client';
 
-type ItemStatus = 'pending' | 'running' | 'success' | 'error';
+type ItemStatus = 'pending' | 'running' | 'success' | 'warning' | 'error';
 
 interface ItemState {
   id: number;
   name: string;
   status: ItemStatus;
   error?: string;
+  warning?: string;
 }
 
 /**
@@ -121,10 +122,16 @@ export function BulkRefreshProgressModal({
                   const next = [...prev];
                   const idx = next.findIndex((it) => it.id === evt.id);
                   if (idx >= 0) {
+                    // reauth_warning：本次靠存量 access_token JWT 解析降级拿到；
+                    // 仍计作成功，但单独展示 warning 徽标引导重新授权。
+                    const status: ItemStatus = evt.success
+                      ? (evt.reauth_warning ? 'warning' : 'success')
+                      : 'error';
                     next[idx] = {
                       ...next[idx]!,
-                      status: evt.success ? 'success' : 'error',
+                      status,
                       error: evt.error,
+                      warning: evt.reauth_warning,
                     };
                   }
                   // 把下一个队列项标成 running
@@ -242,6 +249,15 @@ export function BulkRefreshProgressModal({
                   {item.error}
                 </span>
               )}
+              {!item.error && item.warning && (
+                <span
+                  className="truncate max-w-[180px]"
+                  style={{ color: 'var(--ag-warning)' }}
+                  title={item.warning}
+                >
+                  {t('accounts.refresh_quota_reauth_warning_short', '需重新授权')}
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -262,6 +278,9 @@ function StatusIcon({ status }: { status: ItemStatus }) {
   }
   if (status === 'success') {
     return <Check className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />;
+  }
+  if (status === 'warning') {
+    return <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />;
   }
   if (status === 'error') {
     return <X className="w-3.5 h-3.5" style={{ color: 'var(--ag-danger)' }} />;

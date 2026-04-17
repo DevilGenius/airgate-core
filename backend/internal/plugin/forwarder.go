@@ -61,6 +61,15 @@ func shouldPenalizeForwardError(err error) bool {
 		"error reading from server: eof",
 		"transport is closing",
 		"connection refused",
+		// 流协议级异常：上游 SSE/WS 流提前关闭、未终结事件、回译失败等，属于
+		// 链路/协议抖动而非账号凭证问题。账号本身可能下一秒就能用，不应因为
+		// 几次流中断就被永久标 error 关掉调度。
+		"未收到 response.completed 事件",
+		"responses 非流回译失败",
+		"stream closed",
+		"unexpected eof",
+		"context canceled",
+		"context deadline exceeded",
 	}
 	for _, needle := range ignored {
 		if strings.Contains(msg, needle) {

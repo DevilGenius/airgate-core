@@ -15,6 +15,52 @@ import (
 func RunStartupTasks(db *ent.Client, drv *entsql.Driver, apiKeySecret string) {
 	backfillKeyHints(db, apiKeySecret)
 	backfillResellerMarkupColumns(drv)
+	recoverMisflaggedRateLimitErrors(drv)
+}
+
+// recoverMisflaggedRateLimitErrors 把历史上被错误分类为 status=error 的临时性故障账号
+// 一次性恢复回 status=active。
+//
+// 背景：
+//   - 早期 WS/responses 分类器只识别 "rate_limit" 关键词，ChatGPT OAuth 的
+//     "The usage limit has been reached" 会掉到 default 分支并累计 fail count，
+//     3 次后账号被标成 error、调度开关被关掉。
+//   - shouldPenalizeForwardError 早期没有豁免 "未收到 response.completed 事件" /
+//     "responses 非流回译失败" / "context canceled" 等流协议级抖动，也会被计入失败
+//     累加到永久 error。
+//
+// 两类错误本质都是瞬时/非账号问题，分类器修好后存量账号需要一次性清理才能恢复。
+// 幂等：WHERE status='error' AND error_msg 命中关键词，多次启动重复执行安全。
+func recoverMisflaggedRateLimitErrors(drv *entsql.Driver) {
+	if drv == nil {
+		return
+	}
+	ctx := context.Background()
+	const sql = `UPDATE accounts
+		SET status='active', error_msg='', rate_limit_reset_at=NULL
+		WHERE status='error'
+		  AND (
+		    error_msg LIKE '%usage limit%'
+		    OR error_msg LIKE '%rate limit%'
+		    OR error_msg LIKE '%too many requests%'
+		    OR error_msg LIKE '%quota exceeded%'
+		    OR error_msg LIKE '%usage_limit_reached%'
+		    OR error_msg LIKE '%rate_limit_exceeded%'
+		    OR error_msg LIKE '%response.completed%'
+		    OR error_msg LIKE '%responses 非流回译失败%'
+		    OR error_msg LIKE '%context canceled%'
+		    OR error_msg LIKE '%context deadline exceeded%'
+		    OR error_msg LIKE '%stream closed%'
+		    OR error_msg LIKE '%unexpected eof%'
+		  )`
+	var res entsql.Result
+	if err := drv.Exec(ctx, sql, []any{}, &res); err != nil {
+		slog.Warn("恢复误标限流账号失败（可忽略，不影响启动）", "error", err)
+		return
+	}
+	if affected, err := res.RowsAffected(); err == nil && affected > 0 {
+		slog.Info("恢复被误标为 error 的临时性故障账号", "rows", affected)
+	}
 }
 
 // backfillResellerMarkupColumns 一次性回填 reseller markup 改造引入的两个新列：
