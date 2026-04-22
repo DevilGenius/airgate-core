@@ -105,7 +105,12 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				}
 				continue
 			}
-			slog.Warn("账户调度失败", "platform", state.plugin.Platform, "model", state.model, "error", err)
+			slog.Warn("账户调度失败",
+				"platform", state.plugin.Platform,
+				"model", state.model,
+				"hard_excluded", hardExclude,
+				"soft_excluded", softExclude,
+				"error", err)
 			openAIError(c, http.StatusServiceUnavailable, "server_error", "no_available_account", "无可用账户")
 			return
 		}
@@ -131,12 +136,30 @@ func (f *Forwarder) Forward(c *gin.Context) {
 
 		execution := f.callPlugin(c, state)
 		attempt++
-		// 真正打了上游的账号进入 hardExclude，确保 failover 时不会回头重选它。
-		hardExclude = append(hardExclude, accountID)
 
 		if f.canFailover(c, state, execution) {
+			// 失败被 failover 吞掉时没人写日志——状态机对 UpstreamTransient 非池账号是 no-op，
+			// writeResult 又不会走到这里。必须在这里打，否则排查 503 时根本看不到上游真正的错。
+			slog.Warn("账号调用失败，尝试 failover",
+				"plugin", state.plugin.Name,
+				"account_id", accountID,
+				"attempt", attempt,
+				"kind", execution.outcome.Kind,
+				"upstream_status", execution.outcome.Upstream.StatusCode,
+				"duration_ms", execution.duration.Milliseconds(),
+				"reason", judgmentReason(execution),
+				"error", execution.err)
 			releaseAccountSlot()
 			f.applyOutcome(ctx, state, execution)
+
+			// 账号级故障（Dead / RateLimited）→ hardExclude，永不回选
+			// 上游瞬时故障（UpstreamTransient，含上游自己的 502）→ softExclude，下一轮可重选
+			//   意味着单账号号池下也能对上游的 "please retry" 做真正的重试。
+			if execution.outcome.Kind.IsAccountFault() {
+				hardExclude = append(hardExclude, accountID)
+			} else {
+				softExclude = append(softExclude, accountID)
+			}
 			continue
 		}
 
@@ -146,6 +169,11 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		return
 	}
 
+	slog.Warn("所有 failover 尝试均失败",
+		"plugin", state.plugin.Name,
+		"model", state.model,
+		"attempts", attempt,
+		"tried_accounts", hardExclude)
 	openAIError(c, 503, "server_error", "all_accounts_failed", "所有可用账户均失败，请稍后重试")
 }
 
