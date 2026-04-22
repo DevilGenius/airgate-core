@@ -55,16 +55,30 @@ func (ac *AccountCreate) SetCredentials(m map[string]string) *AccountCreate {
 	return ac
 }
 
-// SetStatus sets the "status" field.
-func (ac *AccountCreate) SetStatus(a account.Status) *AccountCreate {
-	ac.mutation.SetStatus(a)
+// SetState sets the "state" field.
+func (ac *AccountCreate) SetState(a account.State) *AccountCreate {
+	ac.mutation.SetState(a)
 	return ac
 }
 
-// SetNillableStatus sets the "status" field if the given value is not nil.
-func (ac *AccountCreate) SetNillableStatus(a *account.Status) *AccountCreate {
+// SetNillableState sets the "state" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableState(a *account.State) *AccountCreate {
 	if a != nil {
-		ac.SetStatus(*a)
+		ac.SetState(*a)
+	}
+	return ac
+}
+
+// SetStateUntil sets the "state_until" field.
+func (ac *AccountCreate) SetStateUntil(t time.Time) *AccountCreate {
+	ac.mutation.SetStateUntil(t)
+	return ac
+}
+
+// SetNillableStateUntil sets the "state_until" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableStateUntil(t *time.Time) *AccountCreate {
+	if t != nil {
+		ac.SetStateUntil(*t)
 	}
 	return ac
 }
@@ -149,20 +163,6 @@ func (ac *AccountCreate) SetLastUsedAt(t time.Time) *AccountCreate {
 func (ac *AccountCreate) SetNillableLastUsedAt(t *time.Time) *AccountCreate {
 	if t != nil {
 		ac.SetLastUsedAt(*t)
-	}
-	return ac
-}
-
-// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
-func (ac *AccountCreate) SetRateLimitResetAt(t time.Time) *AccountCreate {
-	ac.mutation.SetRateLimitResetAt(t)
-	return ac
-}
-
-// SetNillableRateLimitResetAt sets the "rate_limit_reset_at" field if the given value is not nil.
-func (ac *AccountCreate) SetNillableRateLimitResetAt(t *time.Time) *AccountCreate {
-	if t != nil {
-		ac.SetRateLimitResetAt(*t)
 	}
 	return ac
 }
@@ -293,9 +293,9 @@ func (ac *AccountCreate) defaults() {
 		v := account.DefaultCredentials
 		ac.mutation.SetCredentials(v)
 	}
-	if _, ok := ac.mutation.Status(); !ok {
-		v := account.DefaultStatus
-		ac.mutation.SetStatus(v)
+	if _, ok := ac.mutation.State(); !ok {
+		v := account.DefaultState
+		ac.mutation.SetState(v)
 	}
 	if _, ok := ac.mutation.Priority(); !ok {
 		v := account.DefaultPriority
@@ -352,12 +352,12 @@ func (ac *AccountCreate) check() error {
 	if _, ok := ac.mutation.Credentials(); !ok {
 		return &ValidationError{Name: "credentials", err: errors.New(`ent: missing required field "Account.credentials"`)}
 	}
-	if _, ok := ac.mutation.Status(); !ok {
-		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Account.status"`)}
+	if _, ok := ac.mutation.State(); !ok {
+		return &ValidationError{Name: "state", err: errors.New(`ent: missing required field "Account.state"`)}
 	}
-	if v, ok := ac.mutation.Status(); ok {
-		if err := account.StatusValidator(v); err != nil {
-			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Account.status": %w`, err)}
+	if v, ok := ac.mutation.State(); ok {
+		if err := account.StateValidator(v); err != nil {
+			return &ValidationError{Name: "state", err: fmt.Errorf(`ent: validator failed for field "Account.state": %w`, err)}
 		}
 	}
 	if _, ok := ac.mutation.Priority(); !ok {
@@ -428,9 +428,13 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
 		_node.Credentials = value
 	}
-	if value, ok := ac.mutation.Status(); ok {
-		_spec.SetField(account.FieldStatus, field.TypeEnum, value)
-		_node.Status = value
+	if value, ok := ac.mutation.State(); ok {
+		_spec.SetField(account.FieldState, field.TypeEnum, value)
+		_node.State = value
+	}
+	if value, ok := ac.mutation.StateUntil(); ok {
+		_spec.SetField(account.FieldStateUntil, field.TypeTime, value)
+		_node.StateUntil = &value
 	}
 	if value, ok := ac.mutation.Priority(); ok {
 		_spec.SetField(account.FieldPriority, field.TypeInt, value)
@@ -455,10 +459,6 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.LastUsedAt(); ok {
 		_spec.SetField(account.FieldLastUsedAt, field.TypeTime, value)
 		_node.LastUsedAt = &value
-	}
-	if value, ok := ac.mutation.RateLimitResetAt(); ok {
-		_spec.SetField(account.FieldRateLimitResetAt, field.TypeTime, value)
-		_node.RateLimitResetAt = &value
 	}
 	if value, ok := ac.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)

@@ -62,51 +62,59 @@ function formatCountdown(ms: number): string {
 }
 
 /**
- * AccountStatusCell 渲染账号状态徽标。
- *
- * 设计选择：当 rate_limit_reset_at 非空且未过期时，**替换**原来的 status 徽标为
- * 单个"限流中 Xh Ym"徽标（warning 配色）。原因：
- *  - 上下叠两个徽标会让该行比其它行高，表格视觉抖动；
- *  - 限流期间 "活跃" 这个状态对用户没有信息量（调度开关的颜色已经传递同样信号），
- *    换成倒计时更有效；
- *  - 鼠标悬停提示说明"到期自动恢复，调度开关不变"消除歧义。
- * 每秒重算倒计时，reset 时间过后徽标自动切回 status。
+ * AccountStatusCell 渲染账号状态徽标，按 state + state_until 动态展示：
+ *   active       → 绿色 "活跃"
+ *   rate_limited → 橙色 "限流中 Xh Ym"（state_until 倒计时）
+ *   degraded     → 黄色 "降级 Xm"（池账号软降级，倒计时）
+ *   disabled     → 红色 "已禁用"（tooltip 显示 error_msg）
+ * 到期的 rate_limited / degraded 视作 active（后端 lazy 回收，前端可先显示 active）。
  */
 function AccountStatusCell({ row }: { row: AccountResp }) {
   const { t } = useTranslation();
-  const resetAtMs = row.rate_limit_reset_at ? Date.parse(row.rate_limit_reset_at) : 0;
+  const untilMs = row.state_until ? Date.parse(row.state_until) : 0;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!resetAtMs || resetAtMs <= now) return;
+    if (!untilMs || untilMs <= now) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [resetAtMs, now]);
+  }, [untilMs, now]);
 
-  const remainingMs = resetAtMs - now;
-  const isRateLimited = resetAtMs > 0 && remainingMs > 0;
+  const remainingMs = untilMs - now;
+  const hasCountdown = untilMs > 0 && remainingMs > 0;
 
-  if (isRateLimited) {
-    return (
-      <span
-        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap"
-        style={{
-          background: 'var(--ag-warning-subtle)',
-          color: 'var(--ag-warning)',
-          borderColor: 'var(--ag-warning-subtle)',
-        }}
-        title={t('accounts.rate_limited_tooltip', '上游限流，到期自动恢复，不影响调度开关')}
-      >
-        <span
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ background: 'var(--ag-warning)' }}
-        />
-        {t('accounts.rate_limited_label', '限流中')} {formatCountdown(remainingMs)}
-      </span>
+  const pill = (label: string, bg: string, fg: string, tooltip?: string) => (
+    <span
+      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap"
+      style={{ background: bg, color: fg, borderColor: bg }}
+      title={tooltip}
+    >
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: fg }} />
+      {label}
+    </span>
+  );
+
+  if (row.state === 'rate_limited' && hasCountdown) {
+    return pill(
+      `${t('accounts.rate_limited_label', '限流中')} ${formatCountdown(remainingMs)}`,
+      'var(--ag-warning-subtle)',
+      'var(--ag-warning)',
+      t('accounts.rate_limited_tooltip', '上游限流，到期自动恢复，不影响调度开关'),
     );
   }
-
-  return <StatusBadge status={row.status} tooltip={row.error_msg || undefined} />;
+  if (row.state === 'degraded' && hasCountdown) {
+    return pill(
+      `${t('accounts.degraded_label', '降级')} ${formatCountdown(remainingMs)}`,
+      'var(--ag-warning-subtle)',
+      'var(--ag-warning)',
+      t('accounts.degraded_tooltip', '上游池抖动，软降级仅做兜底，到期自动恢复'),
+    );
+  }
+  if (row.state === 'disabled') {
+    return <StatusBadge status="disabled" tooltip={row.error_msg || undefined} />;
+  }
+  // active，或 rate_limited/degraded 已到期（lazy 恢复）
+  return <StatusBadge status="active" />;
 }
 
 export default function AccountsPage() {
@@ -120,10 +128,11 @@ export default function AccountsPage() {
     ...platforms.map((p) => ({ value: p, label: platformName(p) })),
   ];
 
-  const STATUS_OPTIONS = [
+  const STATE_OPTIONS = [
     { value: '', label: t('users.all_status') },
     { value: 'active', label: t('status.active') },
-    { value: 'error', label: t('status.error') },
+    { value: 'rate_limited', label: t('status.rate_limited', '限流中') },
+    { value: 'degraded', label: t('status.degraded', '降级中') },
     { value: 'disabled', label: t('status.disabled') },
   ];
 
@@ -132,7 +141,7 @@ export default function AccountsPage() {
   const [pageSize, setPageSize] = useState(20);
   const [keyword, setKeyword] = useState('');
   const [platformFilter, setPlatformFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [proxyFilter, setProxyFilter] = useState('');
@@ -183,18 +192,18 @@ export default function AccountsPage() {
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
   useEffect(() => {
     setSelectedIds([]);
-  }, [page, pageSize, keyword, platformFilter, statusFilter, typeFilter, groupFilter, proxyFilter]);
+  }, [page, pageSize, keyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter]);
 
   // 查询账号列表
   const { data, isLoading } = useQuery({
-    queryKey: queryKeys.accounts(page, pageSize, keyword, platformFilter, statusFilter, typeFilter, groupFilter, proxyFilter),
+    queryKey: queryKeys.accounts(page, pageSize, keyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter),
     queryFn: () =>
       accountsApi.list({
         page,
         page_size: pageSize,
         keyword: keyword || undefined,
         platform: platformFilter || undefined,
-        status: statusFilter || undefined,
+        state: stateFilter || undefined,
         account_type: typeFilter || undefined,
         group_id: groupFilter ? Number(groupFilter) : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
@@ -246,7 +255,7 @@ export default function AccountsPage() {
       return accountsApi.export({
         keyword: keyword || undefined,
         platform: platformFilter || undefined,
-        status: statusFilter || undefined,
+        state: stateFilter || undefined,
         account_type: typeFilter || undefined,
         group_id: groupFilter ? Number(groupFilter) : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
@@ -387,9 +396,9 @@ export default function AccountsPage() {
   });
 
   const handleBulkEnable = () =>
-    bulkUpdateMutation.mutate({ account_ids: selectedIds, status: 'active' });
+    bulkUpdateMutation.mutate({ account_ids: selectedIds, state: 'active' });
   const handleBulkDisable = () =>
-    bulkUpdateMutation.mutate({ account_ids: selectedIds, status: 'disabled' });
+    bulkUpdateMutation.mutate({ account_ids: selectedIds, state: 'disabled' });
 
   // 批量刷新令牌：只有 OAuth 类型账号支持，预先过滤后开进度弹窗
   const handleBulkRefresh = () => {
@@ -528,12 +537,12 @@ export default function AccountsPage() {
           disabled={toggleMutation.isPending}
           className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none"
           style={{
-            backgroundColor: row.status === 'active' ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
+            backgroundColor: row.state !== 'disabled' ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
           }}
         >
           <span
             className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform duration-200"
-            style={{ transform: row.status === 'active' ? 'translateX(17px)' : 'translateX(3px)' }}
+            style={{ transform: row.state !== 'disabled' ? 'translateX(17px)' : 'translateX(3px)' }}
           />
         </button>
       ),
@@ -827,9 +836,9 @@ export default function AccountsPage() {
         />
         <Select
           className="min-w-0"
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          options={STATUS_OPTIONS}
+          value={stateFilter}
+          onChange={(e) => { setStateFilter(e.target.value); setPage(1); }}
+          options={STATE_OPTIONS}
         />
         <Select
           className="min-w-0"

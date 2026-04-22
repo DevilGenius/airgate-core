@@ -1,13 +1,17 @@
 package dto
 
-// AccountResp 账号响应
+// AccountResp 账号响应。
+//
+// state 枚举：active / rate_limited / degraded / disabled
+// state_until 仅 rate_limited / degraded 有值（到期自动恢复 active）
 type AccountResp struct {
 	ID                 int64             `json:"id"`
 	Name               string            `json:"name"`
 	Platform           string            `json:"platform"`
 	Type               string            `json:"type"`
 	Credentials        map[string]string `json:"credentials"`
-	Status             string            `json:"status"` // active / error / disabled
+	State              string            `json:"state"`
+	StateUntil         *string           `json:"state_until,omitempty"`
 	Priority           int               `json:"priority"`
 	MaxConcurrency     int               `json:"max_concurrency"`
 	CurrentConcurrency int               `json:"current_concurrency"`
@@ -16,10 +20,7 @@ type AccountResp struct {
 	ErrorMsg           string            `json:"error_msg,omitempty"`
 	UpstreamIsPool     bool              `json:"upstream_is_pool"`
 	LastUsedAt         *string           `json:"last_used_at,omitempty"`
-	// RateLimitResetAt 上游限流自动恢复时间。非空且 > now 时表示账号被打了
-	// 429 / usage_limit_reached，前端据此显示"限流中 Xh Ym 自动恢复"徽标。
-	RateLimitResetAt *string `json:"rate_limit_reset_at,omitempty"`
-	GroupIDs         []int64 `json:"group_ids"`
+	GroupIDs           []int64           `json:"group_ids"`
 	TimeMixin
 }
 
@@ -37,12 +38,14 @@ type CreateAccountReq struct {
 	GroupIDs       []int64           `json:"group_ids"`
 }
 
-// UpdateAccountReq 更新账号请求
+// UpdateAccountReq 更新账号请求。
+// State 只允许 "active" / "disabled"（运维手动恢复 / 禁用）；
+// rate_limited / degraded 由状态机自动写入，不接受 API 显式赋值。
 type UpdateAccountReq struct {
 	Name           *string           `json:"name"`
 	Type           *string           `json:"type"`
 	Credentials    map[string]string `json:"credentials"`
-	Status         *string           `json:"status" binding:"omitempty,oneof=active disabled"`
+	State          *string           `json:"state" binding:"omitempty,oneof=active disabled"`
 	Priority       *int              `json:"priority"`
 	MaxConcurrency *int              `json:"max_concurrency"`
 	ProxyID        *int64            `json:"proxy_id"`
@@ -93,11 +96,9 @@ type ImportAccountsResp struct {
 }
 
 // BulkUpdateAccountsReq 批量更新账号请求。
-// 所有可选字段：nil/缺失 = 不修改，仅 "account_ids" 必填。
-// add_group_ids 为追加模式，与账号原有分组取并集。
 type BulkUpdateAccountsReq struct {
 	AccountIDs     []int    `json:"account_ids" binding:"required,min=1"`
-	Status         *string  `json:"status" binding:"omitempty,oneof=active disabled"`
+	State          *string  `json:"state" binding:"omitempty,oneof=active disabled"`
 	Priority       *int     `json:"priority"`
 	MaxConcurrency *int     `json:"max_concurrency"`
 	RateMultiplier *float64 `json:"rate_multiplier"`

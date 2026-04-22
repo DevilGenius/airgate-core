@@ -282,59 +282,52 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 	fwdCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	result, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
+	outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
 	latency := time.Since(start)
 	resp.LatencyMs = latency.Milliseconds()
+	resp.StatusCode = int64(outcome.Upstream.StatusCode)
 
-	// 反馈调度器（成功 / 失败都会让状态机受益）
+	// 插件自身故障（进程异常等）—— 不经过状态机，仅记录。
 	if fwdErr != nil {
 		resp.Success = false
-		resp.ErrorKind = "forward_error"
+		resp.ErrorKind = "plugin_error"
 		resp.ErrorMsg = truncateProbeErr(fwdErr.Error())
-		h.scheduler.ReportResult(acc.ID, false, latency, fwdErr.Error())
 		return resp, nil
 	}
-	if result == nil {
+
+	// 探测的判决同样交给状态机（与真实流量同一入口），让探测信号驱动账号状态。
+	h.scheduler.Apply(ctx, acc.ID, scheduler.Judgment{
+		Kind:       outcome.Kind,
+		RetryAfter: outcome.RetryAfter,
+		Reason:     outcome.Reason,
+		Duration:   latency,
+		IsPool:     accFull.UpstreamIsPool,
+	})
+
+	switch outcome.Kind {
+	case sdk.OutcomeSuccess:
+		resp.Success = true
+	case sdk.OutcomeAccountRateLimited:
 		resp.Success = false
-		resp.ErrorKind = "nil_result"
-		h.scheduler.ReportResult(acc.ID, false, latency, "插件返回 nil")
-		return resp, nil
-	}
-
-	resp.StatusCode = int64(result.StatusCode)
-	if result.StatusCode >= 400 {
+		resp.ErrorKind = "rate_limited"
+		resp.ErrorMsg = truncateProbeErr(outcome.Reason)
+	case sdk.OutcomeAccountDead:
 		resp.Success = false
-
-		// 区分"账号故障"与"客户端侧错误"：只有前者会影响调度健康度。
-		// 判定依据：AccountStatus（Expired/Disabled/RateLimited）由插件显式打标；
-		// 5xx 一律视为上游故障；其余 4xx（如 CC 闸返回的 403、请求体不合法的 400）
-		// 属于客户端问题，不应关闭账号调度。
-		isAccountLevel := result.AccountStatus == sdk.AccountStatusExpired ||
-			result.AccountStatus == sdk.AccountStatusDisabled ||
-			result.AccountStatus == sdk.AccountStatusRateLimited
-		is5xx := result.StatusCode >= 500
-
-		switch {
-		case result.AccountStatus == sdk.AccountStatusRateLimited || result.StatusCode == 429:
-			resp.ErrorKind = "rate_limited"
-		case is5xx:
-			resp.ErrorKind = "upstream_5xx"
-		case isAccountLevel:
-			resp.ErrorKind = "account_error"
-		default:
-			resp.ErrorKind = "client_error"
-		}
-		resp.ErrorMsg = truncateProbeErr(result.ErrorMessage)
-
-		// 仅账号级错误或 5xx 才反馈给调度器；客户端侧 4xx 不影响账号健康度。
-		if isAccountLevel || is5xx {
-			h.scheduler.ReportResult(acc.ID, false, latency, result.ErrorMessage)
-		}
-		return resp, nil
+		resp.ErrorKind = "account_error"
+		resp.ErrorMsg = truncateProbeErr(outcome.Reason)
+	case sdk.OutcomeUpstreamTransient, sdk.OutcomeStreamAborted:
+		resp.Success = false
+		resp.ErrorKind = "upstream_5xx"
+		resp.ErrorMsg = truncateProbeErr(outcome.Reason)
+	case sdk.OutcomeClientError:
+		resp.Success = false
+		resp.ErrorKind = "client_error"
+		resp.ErrorMsg = truncateProbeErr(outcome.Reason)
+	default:
+		resp.Success = false
+		resp.ErrorKind = "unknown"
+		resp.ErrorMsg = truncateProbeErr(outcome.Reason)
 	}
-
-	resp.Success = true
-	h.scheduler.ReportResult(acc.ID, true, latency)
 	return resp, nil
 }
 
@@ -362,16 +355,22 @@ func (h *HostService) listGroups(ctx context.Context, _ *pb.HostListGroupsReques
 
 // reportAccountResult 把账号调用结果反馈给 scheduler。
 // 内部 worker，由 pluginHostHandle.ReportAccountResult 委托。
-func (h *HostService) reportAccountResult(_ context.Context, req *pb.HostReportAccountResultRequest) (*pb.Empty, error) {
+//
+// success=true 直接走 Apply(OutcomeSuccess)；success=false 按"上游抖动"上报
+// （由状态机的滚动窗口计数决定是否升级为 disabled），避免探测插件单次失败
+// 就把账号标死。
+func (h *HostService) reportAccountResult(ctx context.Context, req *pb.HostReportAccountResultRequest) (*pb.Empty, error) {
 	if req.AccountId <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "account_id 必须 > 0")
 	}
-	// latency 未知时传 0
+	kind := sdk.OutcomeUpstreamTransient
 	if req.Success {
-		h.scheduler.ReportResult(int(req.AccountId), true, 0)
-	} else {
-		h.scheduler.ReportResult(int(req.AccountId), false, 0, req.ErrorMsg)
+		kind = sdk.OutcomeSuccess
 	}
+	h.scheduler.Apply(ctx, int(req.AccountId), scheduler.Judgment{
+		Kind:   kind,
+		Reason: req.ErrorMsg,
+	})
 	return &pb.Empty{}, nil
 }
 

@@ -43,7 +43,8 @@ export function EditAccountModal({
   const [form, setForm] = useState<UpdateAccountReq>({
     name: account.name,
     type: initialAccountType || undefined,
-    status: account.status === 'error' ? 'active' : (account.status as 'active' | 'disabled'),
+    // 非 disabled 的任何 state（active / rate_limited / degraded）在表单里都视作 "active"
+    state: account.state === 'disabled' ? 'disabled' : 'active',
     priority: account.priority,
     max_concurrency: account.max_concurrency,
     rate_multiplier: account.rate_multiplier,
@@ -201,8 +202,8 @@ export function EditAccountModal({
         <div className="space-y-4">
           <Switch
             label={t('accounts.enable_dispatch')}
-            checked={form.status !== 'disabled'}
-            onChange={(on) => setForm({ ...form, status: on ? 'active' : 'disabled' })}
+            checked={form.state !== 'disabled'}
+            onChange={(on) => setForm({ ...form, state: on ? 'active' : 'disabled' })}
           />
           <Input
             label={t('accounts.priority_hint')}

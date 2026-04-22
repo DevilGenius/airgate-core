@@ -27,23 +27,23 @@ type Account struct {
 	Type string `json:"type,omitempty"`
 	// Credentials holds the value of the "credentials" field.
 	Credentials map[string]string `json:"credentials,omitempty"`
-	// Status holds the value of the "status" field.
-	Status account.Status `json:"status,omitempty"`
+	// State holds the value of the "state" field.
+	State account.State `json:"state,omitempty"`
+	// state 的到期时间：rate_limited / degraded 到期自动恢复 active；disabled 无到期
+	StateUntil *time.Time `json:"state_until,omitempty"`
 	// Priority holds the value of the "priority" field.
 	Priority int `json:"priority,omitempty"`
 	// MaxConcurrency holds the value of the "max_concurrency" field.
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	// RateMultiplier holds the value of the "rate_multiplier" field.
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
-	// ErrorMsg holds the value of the "error_msg" field.
+	// 进入当前状态的原因（给运维看）
 	ErrorMsg string `json:"error_msg,omitempty"`
-	// 上游是账号池：把 expired/disabled 降级为临时限流，避免池子耗尽时本地账号被永久标错
+	// 上游是账号池：Dead 判决降级为 degraded，避免池抖动把本地账号永久标 disabled
 	UpstreamIsPool bool `json:"upstream_is_pool,omitempty"`
 	// LastUsedAt holds the value of the "last_used_at" field.
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
-	// 上游限流自动恢复时间：非空且 > now 表示账号处于限流中；调度器跳过、UI 显示倒计时；恢复后清空
-	RateLimitResetAt *time.Time `json:"rate_limit_reset_at,omitempty"`
-	// 扩展配置（插件/调度器使用）
+	// 扩展配置（max_rpm / max_window_cost / max_sessions 等）
 	Extra map[string]interface{} `json:"extra,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
@@ -111,9 +111,9 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case account.FieldID, account.FieldPriority, account.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
-		case account.FieldName, account.FieldPlatform, account.FieldType, account.FieldStatus, account.FieldErrorMsg:
+		case account.FieldName, account.FieldPlatform, account.FieldType, account.FieldState, account.FieldErrorMsg:
 			values[i] = new(sql.NullString)
-		case account.FieldLastUsedAt, account.FieldRateLimitResetAt, account.FieldCreatedAt, account.FieldUpdatedAt:
+		case account.FieldStateUntil, account.FieldLastUsedAt, account.FieldCreatedAt, account.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		case account.ForeignKeys[0]: // account_proxy
 			values[i] = new(sql.NullInt64)
@@ -164,11 +164,18 @@ func (a *Account) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field credentials: %w", err)
 				}
 			}
-		case account.FieldStatus:
+		case account.FieldState:
 			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field status", values[i])
+				return fmt.Errorf("unexpected type %T for field state", values[i])
 			} else if value.Valid {
-				a.Status = account.Status(value.String)
+				a.State = account.State(value.String)
+			}
+		case account.FieldStateUntil:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field state_until", values[i])
+			} else if value.Valid {
+				a.StateUntil = new(time.Time)
+				*a.StateUntil = value.Time
 			}
 		case account.FieldPriority:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -206,13 +213,6 @@ func (a *Account) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				a.LastUsedAt = new(time.Time)
 				*a.LastUsedAt = value.Time
-			}
-		case account.FieldRateLimitResetAt:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field rate_limit_reset_at", values[i])
-			} else if value.Valid {
-				a.RateLimitResetAt = new(time.Time)
-				*a.RateLimitResetAt = value.Time
 			}
 		case account.FieldExtra:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -304,8 +304,13 @@ func (a *Account) String() string {
 	builder.WriteString("credentials=")
 	builder.WriteString(fmt.Sprintf("%v", a.Credentials))
 	builder.WriteString(", ")
-	builder.WriteString("status=")
-	builder.WriteString(fmt.Sprintf("%v", a.Status))
+	builder.WriteString("state=")
+	builder.WriteString(fmt.Sprintf("%v", a.State))
+	builder.WriteString(", ")
+	if v := a.StateUntil; v != nil {
+		builder.WriteString("state_until=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("priority=")
 	builder.WriteString(fmt.Sprintf("%v", a.Priority))
@@ -324,11 +329,6 @@ func (a *Account) String() string {
 	builder.WriteString(", ")
 	if v := a.LastUsedAt; v != nil {
 		builder.WriteString("last_used_at=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
-	builder.WriteString(", ")
-	if v := a.RateLimitResetAt; v != nil {
-		builder.WriteString("rate_limit_reset_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")

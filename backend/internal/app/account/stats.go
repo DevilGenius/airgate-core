@@ -72,7 +72,7 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 		AccountID: account.ID,
 		Name:      account.Name,
 		Platform:  account.Platform,
-		Status:    account.Status,
+		State:     account.State,
 		StartDate: startDate.Format("2006-01-02"),
 		EndDate:   endDate.Format("2006-01-02"),
 		TotalDays: totalDays,

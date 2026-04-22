@@ -122,13 +122,18 @@ export interface BalanceLogResp {
 
 // ==================== Account ====================
 
+/** 账号状态枚举（与后端 scheduler 状态机对应）。 */
+export type AccountState = 'active' | 'rate_limited' | 'degraded' | 'disabled';
+
 export interface AccountResp {
   id: number;
   name: string;
   platform: string;
   type: string;
   credentials: Record<string, string>;
-  status: 'active' | 'error' | 'disabled';
+  state: AccountState;
+  /** 当前 state 的到期时间（rate_limited / degraded 有值；active / disabled 为空）。 */
+  state_until?: string;
   priority: number;
   max_concurrency: number;
   current_concurrency: number;
@@ -137,8 +142,6 @@ export interface AccountResp {
   error_msg?: string;
   upstream_is_pool: boolean;
   last_used_at?: string;
-  /** 上游限流自动恢复时间（ISO 8601）。非空且 > now 时表示账号处于限流中。 */
-  rate_limit_reset_at?: string;
   group_ids: number[];
   created_at: string;
   updated_at: string;
@@ -161,7 +164,8 @@ export interface UpdateAccountReq {
   name?: string;
   type?: string;
   credentials?: Record<string, string>;
-  status?: 'active' | 'disabled';
+  /** 仅允许 "active" / "disabled"：运维手动恢复 / 禁用。 */
+  state?: 'active' | 'disabled';
   priority?: number;
   max_concurrency?: number;
   proxy_id?: number | null;
@@ -171,10 +175,9 @@ export interface UpdateAccountReq {
 }
 
 // 批量更新账号请求（只传需要修改的字段，缺失 = 不改）
-// add_group_ids 为「追加模式」：会与账号原有分组取并集
 export interface BulkUpdateAccountsReq {
   account_ids: number[];
-  status?: 'active' | 'disabled';
+  state?: 'active' | 'disabled';
   priority?: number;
   max_concurrency?: number;
   rate_multiplier?: number;

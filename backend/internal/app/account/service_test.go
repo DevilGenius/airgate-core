@@ -17,7 +17,7 @@ func TestImportIgnoresEnvironmentScopedIDs(t *testing.T) {
 			}
 			return Account{ID: 1, Name: input.Name}, nil
 		},
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	proxyID := int64(99)
 	summary := service.Import(t.Context(), []CreateInput{{
@@ -80,9 +80,33 @@ func (s stubRepository) BatchWindowStats(context.Context, []int, time.Time) (map
 
 func (s stubRepository) SaveCredentials(context.Context, int, map[string]string) error { return nil }
 
-func (s stubRepository) MarkError(context.Context, int, string) error { return nil }
+// stubStateWriter 捕获 StateWriter 调用。
+type stubStateWriter struct {
+	rateLimited map[int]*time.Time
+	cleared     map[int]bool
+	disabled    map[int]string
+}
 
-func (s stubRepository) SetRateLimitResetAt(context.Context, int, *time.Time) error { return nil }
+func newStubStateWriter() *stubStateWriter {
+	return &stubStateWriter{
+		rateLimited: map[int]*time.Time{},
+		cleared:     map[int]bool{},
+		disabled:    map[int]string{},
+	}
+}
+
+func (s *stubStateWriter) MarkRateLimited(_ context.Context, accountID int, until time.Time, _ string) {
+	cp := until
+	s.rateLimited[accountID] = &cp
+}
+
+func (s *stubStateWriter) ClearRateLimited(_ context.Context, accountID int) {
+	s.cleared[accountID] = true
+}
+
+func (s *stubStateWriter) MarkDisabled(_ context.Context, accountID int, reason string) {
+	s.disabled[accountID] = reason
+}
 
 type windowStatsStub struct {
 	stubRepository
@@ -111,7 +135,7 @@ func TestEnrichTodayStats_AttachesAccountLevelStats(t *testing.T) {
 			},
 		},
 	}
-	svc := NewService(repo, nil, nil)
+	svc := NewService(repo, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 
 	// 上游 quota 窗口不影响 today_stats，今日统计是账号级的
@@ -168,7 +192,7 @@ func TestEnrichTodayStats_ApikeyPlaceholderGetsStats(t *testing.T) {
 			},
 		},
 	}
-	svc := NewService(repo, nil, nil)
+	svc := NewService(repo, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 
 	// 模拟 getUpstreamUsage seed 之后的状态：apikey 账号只有一个空 map
@@ -195,7 +219,7 @@ func TestEnrichTodayStats_ZeroWhenNoRecords(t *testing.T) {
 	now := time.Date(2026, 4, 14, 15, 30, 0, 0, time.Local)
 
 	repo := &windowStatsStub{byStart: map[int64]map[int]AccountWindowStats{}}
-	svc := NewService(repo, nil, nil)
+	svc := NewService(repo, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 
 	merged := map[string]any{
@@ -247,7 +271,7 @@ func TestEnrichTodayStats_BatchesAllAccountsInOneQuery(t *testing.T) {
 			},
 		},
 	}
-	svc := NewService(repo, nil, nil)
+	svc := NewService(repo, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 
 	merged := map[string]any{
@@ -333,27 +357,9 @@ func TestExtractBodyError(t *testing.T) {
 	}
 }
 
-type rateLimitRepo struct {
-	stubRepository
-	calls map[int]*time.Time
-}
-
-func (r *rateLimitRepo) SetRateLimitResetAt(_ context.Context, id int, resetAt *time.Time) error {
-	if r.calls == nil {
-		r.calls = map[int]*time.Time{}
-	}
-	if resetAt == nil {
-		r.calls[id] = nil
-	} else {
-		cp := *resetAt
-		r.calls[id] = &cp
-	}
-	return nil
-}
-
 func TestPersistRateLimitFromWindows(t *testing.T) {
-	repo := &rateLimitRepo{}
-	svc := NewService(repo, nil, nil)
+	writer := newStubStateWriter()
+	svc := NewService(stubRepository{}, nil, nil, writer)
 
 	accounts := map[string]any{
 		// 7d 100% + 另一个 5h 99%：取 7d 的 reset_seconds 做恢复时间
@@ -376,29 +382,31 @@ func TestPersistRateLimitFromWindows(t *testing.T) {
 				map[string]any{"key": "5h", "used_percent": 42.0, "reset_seconds": float64(600)},
 			},
 		},
-		// 无 windows：跳过（不调用 SetRateLimitResetAt）
+		// 无 windows：跳过
 		"1": map[string]any{},
 	}
 
 	svc.persistRateLimitFromWindows(t.Context(), accounts)
 
-	if got, ok := repo.calls[42]; !ok || got == nil {
-		t.Fatalf("expected account 42 to get a non-nil reset, got %+v", got)
+	if got, ok := writer.rateLimited[42]; !ok || got == nil {
+		t.Fatalf("expected account 42 to be MarkRateLimited, got %+v", got)
 	} else if until := time.Until(*got); until < 9*time.Hour+30*time.Minute || until > 9*time.Hour+50*time.Minute {
 		t.Errorf("account 42 reset expected ~9h40m, got %s", until)
 	}
 
-	if got, ok := repo.calls[7]; !ok || got == nil {
-		t.Fatalf("expected account 7 to get a non-nil reset, got %+v", got)
+	if got, ok := writer.rateLimited[7]; !ok || got == nil {
+		t.Fatalf("expected account 7 to be MarkRateLimited, got %+v", got)
 	} else if until := time.Until(*got); until < 55*time.Minute || until > 65*time.Minute {
 		t.Errorf("account 7 should take LATER of two resets (~1h), got %s", until)
 	}
 
-	if got, ok := repo.calls[3]; !ok || got != nil {
-		t.Errorf("account 3 should be explicitly cleared (nil), got %+v (ok=%v)", got, ok)
+	if !writer.cleared[3] {
+		t.Errorf("account 3 should have ClearRateLimited called")
 	}
-
-	if _, ok := repo.calls[1]; ok {
-		t.Errorf("account 1 has no windows, should not touch rate_limit_reset_at")
+	if _, ok := writer.rateLimited[1]; ok {
+		t.Errorf("account 1 has no windows, should not call MarkRateLimited")
+	}
+	if writer.cleared[1] {
+		t.Errorf("account 1 has no windows, should not call ClearRateLimited")
 	}
 }

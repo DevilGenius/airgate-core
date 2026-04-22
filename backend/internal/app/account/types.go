@@ -17,31 +17,31 @@ type Proxy struct {
 }
 
 // Account 账号领域对象。
+//
+// State 枚举：active / rate_limited / degraded / disabled
+// StateUntil rate_limited / degraded 的到期时间；disabled 无到期；active 为 nil
 type Account struct {
 	ID                 int
 	Name               string
 	Platform           string
 	Type               string
 	Credentials        map[string]string
-	Status             string
+	State              string
+	StateUntil         *time.Time
 	Priority           int
 	MaxConcurrency     int
 	CurrentConcurrency int
 	RateMultiplier     float64
-	ErrorMsg           string
-	// UpstreamIsPool 上游是账号池时置 true：池子报 "no available accounts" 之类
-	// 的耗尽错误（expired/disabled 状态）会被降级为临时限流，不永久标错。
+	// ErrorMsg 进入当前非 active 状态的原因（给运维看）。
+	ErrorMsg string
+	// UpstreamIsPool 上游是账号池时置 true：池抖动会被降级到 degraded 不永久标错。
 	UpstreamIsPool bool
 	LastUsedAt     *time.Time
-	// RateLimitResetAt 限流自动恢复时间：非空且 > now 表示账号被上游打了
-	// 429 / usage_limit_reached，处于临时限流中。调度器跳过，UI 显示倒计时，
-	// 恢复后清空（成功请求或被清除时）。
-	RateLimitResetAt *time.Time
-	GroupIDs         []int64
-	Proxy            *Proxy
-	Extra            map[string]any
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	GroupIDs       []int64
+	Proxy          *Proxy
+	Extra          map[string]any
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // AccountWindowStats 单个账号在某个时间窗口内的聚合统计。
@@ -71,11 +71,11 @@ type ListFilter struct {
 	PageSize    int
 	Keyword     string
 	Platform    string
-	Status      string
-	AccountType string // 账号类型筛选（如 "apikey"、"oauth"）
+	State       string // active / rate_limited / degraded / disabled
+	AccountType string
 	GroupID     *int
 	ProxyID     *int
-	IDs         []int // 指定账号 ID 列表（用于导出选中账号等场景，空切片表示不限定）
+	IDs         []int
 }
 
 // ListResult 账号列表结果。
@@ -101,11 +101,14 @@ type CreateInput struct {
 }
 
 // UpdateInput 更新账号输入。
+//
+// State 传 "active" / "disabled" 表示运维手动恢复 / 禁用；
+// 其它 state 值（rate_limited / degraded）由调度状态机自行维护，不由 API 写入。
 type UpdateInput struct {
 	Name           *string
 	Type           *string
 	Credentials    map[string]string
-	Status         *string
+	State          *string
 	Priority       *int
 	MaxConcurrency *int
 	RateMultiplier *float64
@@ -118,8 +121,8 @@ type UpdateInput struct {
 
 // ToggleResult 快速切换调度状态结果。
 type ToggleResult struct {
-	ID     int
-	Status string
+	ID    int
+	State string
 }
 
 // BulkUpdateInput 批量更新账号输入。
@@ -127,7 +130,7 @@ type ToggleResult struct {
 // GroupIDs 采用整体替换语义：HasGroupIDs=true 时会用新列表覆盖账号原有分组。
 type BulkUpdateInput struct {
 	IDs            []int
-	Status         *string
+	State          *string
 	Priority       *int
 	MaxConcurrency *int
 	RateMultiplier *float64
@@ -249,7 +252,7 @@ type StatsResult struct {
 	AccountID      int
 	Name           string
 	Platform       string
-	Status         string
+	State          string
 	StartDate      string
 	EndDate        string
 	TotalDays      int
@@ -297,6 +300,9 @@ type ImportItemError struct {
 }
 
 // Repository 账号领域的持久化接口。
+//
+// 注意：状态机相关的写入（rate_limited / disabled 自动转移）不通过 Repository，
+// 而是走 scheduler.StateMachine.Apply。这里只暴露管理员视角的 CRUD 与只读查询。
 type Repository interface {
 	List(context.Context, ListFilter) ([]Account, int64, error)
 	ListAll(context.Context, ListFilter) ([]Account, error)
@@ -306,12 +312,7 @@ type Repository interface {
 	FindByID(context.Context, int, LoadOptions) (Account, error)
 	ListByPlatform(context.Context, string) ([]Account, error)
 	FindUsageLogs(context.Context, int, time.Time, time.Time) ([]UsageLog, error)
-	// BatchWindowStats 批量查询多个账号在同一时间窗口（created_at >= startTime）内的聚合统计。
-	// 返回 map[accountID]stats；没有记录的账号不会出现在结果中。
+	// BatchWindowStats 批量聚合统计，没有记录的账号不出现在返回 map 中。
 	BatchWindowStats(ctx context.Context, accountIDs []int, startTime time.Time) (map[int]AccountWindowStats, error)
 	SaveCredentials(context.Context, int, map[string]string) error
-	MarkError(context.Context, int, string) error
-	// SetRateLimitResetAt 持久化账号的限流恢复时间。
-	// resetAt 传 nil 表示清除（账号已恢复）。
-	SetRateLimitResetAt(ctx context.Context, id int, resetAt *time.Time) error
 }

@@ -85,17 +85,37 @@ func (au *AccountUpdate) SetCredentials(m map[string]string) *AccountUpdate {
 	return au
 }
 
-// SetStatus sets the "status" field.
-func (au *AccountUpdate) SetStatus(a account.Status) *AccountUpdate {
-	au.mutation.SetStatus(a)
+// SetState sets the "state" field.
+func (au *AccountUpdate) SetState(a account.State) *AccountUpdate {
+	au.mutation.SetState(a)
 	return au
 }
 
-// SetNillableStatus sets the "status" field if the given value is not nil.
-func (au *AccountUpdate) SetNillableStatus(a *account.Status) *AccountUpdate {
+// SetNillableState sets the "state" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableState(a *account.State) *AccountUpdate {
 	if a != nil {
-		au.SetStatus(*a)
+		au.SetState(*a)
 	}
+	return au
+}
+
+// SetStateUntil sets the "state_until" field.
+func (au *AccountUpdate) SetStateUntil(t time.Time) *AccountUpdate {
+	au.mutation.SetStateUntil(t)
+	return au
+}
+
+// SetNillableStateUntil sets the "state_until" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableStateUntil(t *time.Time) *AccountUpdate {
+	if t != nil {
+		au.SetStateUntil(*t)
+	}
+	return au
+}
+
+// ClearStateUntil clears the value of the "state_until" field.
+func (au *AccountUpdate) ClearStateUntil() *AccountUpdate {
+	au.mutation.ClearStateUntil()
 	return au
 }
 
@@ -207,26 +227,6 @@ func (au *AccountUpdate) SetNillableLastUsedAt(t *time.Time) *AccountUpdate {
 // ClearLastUsedAt clears the value of the "last_used_at" field.
 func (au *AccountUpdate) ClearLastUsedAt() *AccountUpdate {
 	au.mutation.ClearLastUsedAt()
-	return au
-}
-
-// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
-func (au *AccountUpdate) SetRateLimitResetAt(t time.Time) *AccountUpdate {
-	au.mutation.SetRateLimitResetAt(t)
-	return au
-}
-
-// SetNillableRateLimitResetAt sets the "rate_limit_reset_at" field if the given value is not nil.
-func (au *AccountUpdate) SetNillableRateLimitResetAt(t *time.Time) *AccountUpdate {
-	if t != nil {
-		au.SetRateLimitResetAt(*t)
-	}
-	return au
-}
-
-// ClearRateLimitResetAt clears the value of the "rate_limit_reset_at" field.
-func (au *AccountUpdate) ClearRateLimitResetAt() *AccountUpdate {
-	au.mutation.ClearRateLimitResetAt()
 	return au
 }
 
@@ -398,9 +398,9 @@ func (au *AccountUpdate) check() error {
 			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "Account.platform": %w`, err)}
 		}
 	}
-	if v, ok := au.mutation.Status(); ok {
-		if err := account.StatusValidator(v); err != nil {
-			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Account.status": %w`, err)}
+	if v, ok := au.mutation.State(); ok {
+		if err := account.StateValidator(v); err != nil {
+			return &ValidationError{Name: "state", err: fmt.Errorf(`ent: validator failed for field "Account.state": %w`, err)}
 		}
 	}
 	if v, ok := au.mutation.Priority(); ok {
@@ -438,8 +438,14 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := au.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
 	}
-	if value, ok := au.mutation.Status(); ok {
-		_spec.SetField(account.FieldStatus, field.TypeEnum, value)
+	if value, ok := au.mutation.State(); ok {
+		_spec.SetField(account.FieldState, field.TypeEnum, value)
+	}
+	if value, ok := au.mutation.StateUntil(); ok {
+		_spec.SetField(account.FieldStateUntil, field.TypeTime, value)
+	}
+	if au.mutation.StateUntilCleared() {
+		_spec.ClearField(account.FieldStateUntil, field.TypeTime)
 	}
 	if value, ok := au.mutation.Priority(); ok {
 		_spec.SetField(account.FieldPriority, field.TypeInt, value)
@@ -470,12 +476,6 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if au.mutation.LastUsedAtCleared() {
 		_spec.ClearField(account.FieldLastUsedAt, field.TypeTime)
-	}
-	if value, ok := au.mutation.RateLimitResetAt(); ok {
-		_spec.SetField(account.FieldRateLimitResetAt, field.TypeTime, value)
-	}
-	if au.mutation.RateLimitResetAtCleared() {
-		_spec.ClearField(account.FieldRateLimitResetAt, field.TypeTime)
 	}
 	if value, ok := au.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
@@ -679,17 +679,37 @@ func (auo *AccountUpdateOne) SetCredentials(m map[string]string) *AccountUpdateO
 	return auo
 }
 
-// SetStatus sets the "status" field.
-func (auo *AccountUpdateOne) SetStatus(a account.Status) *AccountUpdateOne {
-	auo.mutation.SetStatus(a)
+// SetState sets the "state" field.
+func (auo *AccountUpdateOne) SetState(a account.State) *AccountUpdateOne {
+	auo.mutation.SetState(a)
 	return auo
 }
 
-// SetNillableStatus sets the "status" field if the given value is not nil.
-func (auo *AccountUpdateOne) SetNillableStatus(a *account.Status) *AccountUpdateOne {
+// SetNillableState sets the "state" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableState(a *account.State) *AccountUpdateOne {
 	if a != nil {
-		auo.SetStatus(*a)
+		auo.SetState(*a)
 	}
+	return auo
+}
+
+// SetStateUntil sets the "state_until" field.
+func (auo *AccountUpdateOne) SetStateUntil(t time.Time) *AccountUpdateOne {
+	auo.mutation.SetStateUntil(t)
+	return auo
+}
+
+// SetNillableStateUntil sets the "state_until" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableStateUntil(t *time.Time) *AccountUpdateOne {
+	if t != nil {
+		auo.SetStateUntil(*t)
+	}
+	return auo
+}
+
+// ClearStateUntil clears the value of the "state_until" field.
+func (auo *AccountUpdateOne) ClearStateUntil() *AccountUpdateOne {
+	auo.mutation.ClearStateUntil()
 	return auo
 }
 
@@ -801,26 +821,6 @@ func (auo *AccountUpdateOne) SetNillableLastUsedAt(t *time.Time) *AccountUpdateO
 // ClearLastUsedAt clears the value of the "last_used_at" field.
 func (auo *AccountUpdateOne) ClearLastUsedAt() *AccountUpdateOne {
 	auo.mutation.ClearLastUsedAt()
-	return auo
-}
-
-// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
-func (auo *AccountUpdateOne) SetRateLimitResetAt(t time.Time) *AccountUpdateOne {
-	auo.mutation.SetRateLimitResetAt(t)
-	return auo
-}
-
-// SetNillableRateLimitResetAt sets the "rate_limit_reset_at" field if the given value is not nil.
-func (auo *AccountUpdateOne) SetNillableRateLimitResetAt(t *time.Time) *AccountUpdateOne {
-	if t != nil {
-		auo.SetRateLimitResetAt(*t)
-	}
-	return auo
-}
-
-// ClearRateLimitResetAt clears the value of the "rate_limit_reset_at" field.
-func (auo *AccountUpdateOne) ClearRateLimitResetAt() *AccountUpdateOne {
-	auo.mutation.ClearRateLimitResetAt()
 	return auo
 }
 
@@ -1005,9 +1005,9 @@ func (auo *AccountUpdateOne) check() error {
 			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "Account.platform": %w`, err)}
 		}
 	}
-	if v, ok := auo.mutation.Status(); ok {
-		if err := account.StatusValidator(v); err != nil {
-			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Account.status": %w`, err)}
+	if v, ok := auo.mutation.State(); ok {
+		if err := account.StateValidator(v); err != nil {
+			return &ValidationError{Name: "state", err: fmt.Errorf(`ent: validator failed for field "Account.state": %w`, err)}
 		}
 	}
 	if v, ok := auo.mutation.Priority(); ok {
@@ -1062,8 +1062,14 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	if value, ok := auo.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
 	}
-	if value, ok := auo.mutation.Status(); ok {
-		_spec.SetField(account.FieldStatus, field.TypeEnum, value)
+	if value, ok := auo.mutation.State(); ok {
+		_spec.SetField(account.FieldState, field.TypeEnum, value)
+	}
+	if value, ok := auo.mutation.StateUntil(); ok {
+		_spec.SetField(account.FieldStateUntil, field.TypeTime, value)
+	}
+	if auo.mutation.StateUntilCleared() {
+		_spec.ClearField(account.FieldStateUntil, field.TypeTime)
 	}
 	if value, ok := auo.mutation.Priority(); ok {
 		_spec.SetField(account.FieldPriority, field.TypeInt, value)
@@ -1094,12 +1100,6 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if auo.mutation.LastUsedAtCleared() {
 		_spec.ClearField(account.FieldLastUsedAt, field.TypeTime)
-	}
-	if value, ok := auo.mutation.RateLimitResetAt(); ok {
-		_spec.SetField(account.FieldRateLimitResetAt, field.TypeTime, value)
-	}
-	if auo.mutation.RateLimitResetAtCleared() {
-		_spec.ClearField(account.FieldRateLimitResetAt, field.TypeTime)
 	}
 	if value, ok := auo.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)

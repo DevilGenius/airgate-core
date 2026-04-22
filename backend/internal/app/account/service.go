@@ -45,22 +45,36 @@ type usageCacheEntry struct {
 
 const usageCacheTTL = 5 * time.Minute
 
+// StateWriter 管理员巡检场景下对账号状态的写入口。
+// 由 scheduler 包实现；让 account service 不直接依赖 scheduler。
+type StateWriter interface {
+	// MarkRateLimited 把账号打入 rate_limited 状态直到 until。
+	MarkRateLimited(ctx context.Context, accountID int, until time.Time, reason string)
+	// ClearRateLimited 账号已从限流中恢复，回到 active。
+	ClearRateLimited(ctx context.Context, accountID int)
+	// MarkDisabled 永久禁用（凭证失效等，需要人工重新验证）。
+	MarkDisabled(ctx context.Context, accountID int, reason string)
+}
+
 type Service struct {
 	repo        Repository
 	plugins     PluginCatalog
 	concurrency ConcurrencyReader
+	stateWriter StateWriter
 	now         func() time.Time
 
 	usageMu    sync.RWMutex
-	usageCache map[string]*usageCacheEntry // platform -> cache
+	usageCache map[string]*usageCacheEntry
 }
 
 // NewService 创建账号服务。
-func NewService(repo Repository, plugins PluginCatalog, concurrency ConcurrencyReader) *Service {
+// stateWriter 可传 nil（测试场景）；nil 时额度巡检不会主动标记账号状态。
+func NewService(repo Repository, plugins PluginCatalog, concurrency ConcurrencyReader, stateWriter StateWriter) *Service {
 	return &Service{
 		repo:        repo,
 		plugins:     plugins,
 		concurrency: concurrency,
+		stateWriter: stateWriter,
 		now:         time.Now,
 		usageCache:  make(map[string]*usageCacheEntry),
 	}
@@ -148,7 +162,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 	result := BulkResult{Results: make([]BulkResultItem, 0, len(input.IDs))}
 	for _, id := range input.IDs {
 		patch := UpdateInput{
-			Status:         input.Status,
+			State:          input.State,
 			Priority:       input.Priority,
 			MaxConcurrency: input.MaxConcurrency,
 			RateMultiplier: input.RateMultiplier,
@@ -195,26 +209,24 @@ func (r *BulkResult) appendFailure(id int, err error) {
 	r.Results = append(r.Results, BulkResultItem{ID: id, Success: false, Error: err.Error()})
 }
 
-// ToggleScheduling 快速切换账号调度状态。
+// ToggleScheduling 快速切换账号调度状态。active ↔ disabled。
+// 其它中间态（rate_limited / degraded）一律视为"非 disabled"，切换后目标 = disabled。
 func (s *Service) ToggleScheduling(ctx context.Context, id int) (ToggleResult, error) {
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
 	if err != nil {
 		return ToggleResult{}, err
 	}
 
-	newStatus := "disabled"
-	if item.Status != "active" {
-		newStatus = "active"
+	newState := "disabled"
+	if item.State == "disabled" {
+		newState = "active"
 	}
 
-	updated, err := s.repo.Update(ctx, id, UpdateInput{
-		Status: &newStatus,
-	})
+	updated, err := s.repo.Update(ctx, id, UpdateInput{State: &newState})
 	if err != nil {
 		return ToggleResult{}, err
 	}
-
-	return ToggleResult{ID: updated.ID, Status: updated.Status}, nil
+	return ToggleResult{ID: updated.ID, State: updated.State}, nil
 }
 
 // PrepareConnectivityTest 准备账号连通性测试。
@@ -272,34 +284,27 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 		run: func(runCtx context.Context, writer http.ResponseWriter) error {
 			req := *forwardReq
 			req.Writer = writer
-			result, forwardErr := inst.Gateway.Forward(runCtx, &req)
+			outcome, forwardErr := inst.Gateway.Forward(runCtx, &req)
 			if forwardErr != nil {
 				return forwardErr
 			}
-			// 关键：Claude 等插件对上游 4xx 返回 (result, nil) 是为了让正常
-			// 请求路径透传错误给客户端，但测试路径必须严格判定——只要不是
-			// 2xx 都视为失败：
-			//   - SSE 流式响应成功的 HTTP 状态就是 200
-			//   - 401 invalid api key / 403 forbidden / 429 rate limit /
-			//     5xx upstream error 全部应该报告测试失败
-			//
-			// 错误消息提取顺序：
-			//   1. 插件已填的 ErrorMessage（Anthropic 标准格式）
-			//   2. 自己解析 Body 兜底（覆盖非标准格式，如池子转发器返回的
-			//      {"code":"INVALID_API_KEY","message":"..."}，插件 extractErrorMessage
-			//      只认 error.type+error.message 嵌套结构所以提不出来）
-			//   3. 兜底到 "upstream returned HTTP %d"
-			if result != nil && (result.StatusCode < 200 || result.StatusCode >= 300) {
-				msg := result.ErrorMessage
-				if msg == "" {
-					msg = extractBodyError(result.Body)
-				}
-				if msg == "" {
-					msg = fmt.Sprintf("upstream returned HTTP %d", result.StatusCode)
-				}
-				return errors.New(msg)
+			// 测试路径严格判定：只有 OutcomeSuccess 算通过；任何其它 Kind 都报告失败。
+			// 正常请求路径的"4xx 透传给客户端"在这里被故意跳过——测试就是要把
+			// invalid api key / rate limit / upstream 5xx 都暴露出来。
+			if outcome.Kind == sdk.OutcomeSuccess {
+				return nil
 			}
-			return nil
+			msg := outcome.Reason
+			if msg == "" {
+				msg = extractBodyError(outcome.Upstream.Body)
+			}
+			if msg == "" && outcome.Upstream.StatusCode > 0 {
+				msg = fmt.Sprintf("upstream returned HTTP %d", outcome.Upstream.StatusCode)
+			}
+			if msg == "" {
+				msg = fmt.Sprintf("plugin returned %s", outcome.Kind)
+			}
+			return errors.New(msg)
 		},
 	}, nil
 }
@@ -513,8 +518,8 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 
 		reqList := make([]accountUsageRequest, 0, len(accounts))
 		for _, item := range accounts {
-			// 非活跃账号完全跳过
-			if item.Status != "active" {
+			// 非 active 账号完全跳过（rate_limited / degraded / disabled 都不查配额）
+			if item.State != "active" {
 				continue
 			}
 			key := strconv.Itoa(item.ID)
@@ -562,13 +567,11 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 		s.persistRateLimitFromWindows(ctx, result.Accounts)
 
 		for _, item := range result.Errors {
-			// 池子账号在后台配额巡检里返回的错误（比如 "Upstream access forbidden"）
-			// 只是池子暂时不可用，不代表本地账号坏了——不能标 error 永久关掉调度。
-			// 非池子账号保持原有行为：标 error 并暴露给管理员排查。
-			if poolByID[item.ID] {
+			// 池账号在巡检里返回的错误只是池暂时不可用，不代表本地账号坏，不自动禁用。
+			if poolByID[item.ID] || s.stateWriter == nil {
 				continue
 			}
-			_ = s.repo.MarkError(ctx, item.ID, item.Message)
+			s.stateWriter.MarkDisabled(ctx, item.ID, item.Message)
 		}
 	}
 
@@ -579,17 +582,15 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 	return merged, nil
 }
 
-// persistRateLimitFromWindows 扫描每个账号的 windows，把"有窗口已经 100%"的情况
-// 当作限流态持久化到 DB 的 rate_limit_reset_at。
+// persistRateLimitFromWindows 扫描每个账号的 windows，把"有窗口已 100%"的情况
+// 当作限流态通过状态机写入（与真实 429 走同一入口）。
 //
-// 判定规则：
-//   - 任意窗口 used_percent >= 100 → 账号受限。rate_limit_reset_at 取所有
-//     >=100% 窗口中最晚的 reset_at（因为只要还有一个窗口没恢复，账号就不可用）。
-//   - 所有窗口 used_percent < 100 → 账号已恢复。清空 rate_limit_reset_at。
-//
-// 与 429 路径不会打架：真实 429 通过 MarkOverloaded 写入的 reset 时间优先级
-// 等同于这里计算的值（都来自同一个 window 的 reset_seconds），轻微的覆盖是安全的。
+//   - 任意窗口 used_percent >= 100 → MarkRateLimited 到所有已满窗口中最晚的 reset_at
+//   - 所有窗口 < 100%              → ClearRateLimited，账号回到 active
 func (s *Service) persistRateLimitFromWindows(ctx context.Context, accounts map[string]any) {
+	if s.stateWriter == nil {
+		return
+	}
 	now := time.Now()
 	for key, raw := range accounts {
 		accountMap, ok := raw.(map[string]any)
@@ -627,14 +628,9 @@ func (s *Service) persistRateLimitFromWindows(ctx context.Context, accounts map[
 
 		switch {
 		case anyMaxed && latestReset != nil:
-			if err := s.repo.SetRateLimitResetAt(ctx, id, latestReset); err != nil {
-				slog.Debug("持久化 rate_limit_reset_at 失败", "account_id", id, "error", err)
-			}
+			s.stateWriter.MarkRateLimited(ctx, id, *latestReset, "quota window saturated")
 		case !anyMaxed:
-			// 所有窗口都 <100%，账号已恢复，清空字段让调度器重新纳入。
-			if err := s.repo.SetRateLimitResetAt(ctx, id, nil); err != nil {
-				slog.Debug("清空 rate_limit_reset_at 失败", "account_id", id, "error", err)
-			}
+			s.stateWriter.ClearRateLimited(ctx, id)
 		}
 	}
 }

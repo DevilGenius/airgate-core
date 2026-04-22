@@ -1624,39 +1624,39 @@ func (m *APIKeyMutation) ResetEdge(name string) error {
 // AccountMutation represents an operation that mutates the Account nodes in the graph.
 type AccountMutation struct {
 	config
-	op                  Op
-	typ                 string
-	id                  *int
-	name                *string
-	platform            *string
-	_type               *string
-	credentials         *map[string]string
-	status              *account.Status
-	priority            *int
-	addpriority         *int
-	max_concurrency     *int
-	addmax_concurrency  *int
-	rate_multiplier     *float64
-	addrate_multiplier  *float64
-	error_msg           *string
-	upstream_is_pool    *bool
-	last_used_at        *time.Time
-	rate_limit_reset_at *time.Time
-	extra               *map[string]interface{}
-	created_at          *time.Time
-	updated_at          *time.Time
-	clearedFields       map[string]struct{}
-	groups              map[int]struct{}
-	removedgroups       map[int]struct{}
-	clearedgroups       bool
-	proxy               *int
-	clearedproxy        bool
-	usage_logs          map[int]struct{}
-	removedusage_logs   map[int]struct{}
-	clearedusage_logs   bool
-	done                bool
-	oldValue            func(context.Context) (*Account, error)
-	predicates          []predicate.Account
+	op                 Op
+	typ                string
+	id                 *int
+	name               *string
+	platform           *string
+	_type              *string
+	credentials        *map[string]string
+	state              *account.State
+	state_until        *time.Time
+	priority           *int
+	addpriority        *int
+	max_concurrency    *int
+	addmax_concurrency *int
+	rate_multiplier    *float64
+	addrate_multiplier *float64
+	error_msg          *string
+	upstream_is_pool   *bool
+	last_used_at       *time.Time
+	extra              *map[string]interface{}
+	created_at         *time.Time
+	updated_at         *time.Time
+	clearedFields      map[string]struct{}
+	groups             map[int]struct{}
+	removedgroups      map[int]struct{}
+	clearedgroups      bool
+	proxy              *int
+	clearedproxy       bool
+	usage_logs         map[int]struct{}
+	removedusage_logs  map[int]struct{}
+	clearedusage_logs  bool
+	done               bool
+	oldValue           func(context.Context) (*Account, error)
+	predicates         []predicate.Account
 }
 
 var _ ent.Mutation = (*AccountMutation)(nil)
@@ -1914,40 +1914,89 @@ func (m *AccountMutation) ResetCredentials() {
 	m.credentials = nil
 }
 
-// SetStatus sets the "status" field.
-func (m *AccountMutation) SetStatus(a account.Status) {
-	m.status = &a
+// SetState sets the "state" field.
+func (m *AccountMutation) SetState(a account.State) {
+	m.state = &a
 }
 
-// Status returns the value of the "status" field in the mutation.
-func (m *AccountMutation) Status() (r account.Status, exists bool) {
-	v := m.status
+// State returns the value of the "state" field in the mutation.
+func (m *AccountMutation) State() (r account.State, exists bool) {
+	v := m.state
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldStatus returns the old "status" field's value of the Account entity.
+// OldState returns the old "state" field's value of the Account entity.
 // If the Account object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *AccountMutation) OldStatus(ctx context.Context) (v account.Status, err error) {
+func (m *AccountMutation) OldState(ctx context.Context) (v account.State, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+		return v, errors.New("OldState is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldStatus requires an ID field in the mutation")
+		return v, errors.New("OldState requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+		return v, fmt.Errorf("querying old value for OldState: %w", err)
 	}
-	return oldValue.Status, nil
+	return oldValue.State, nil
 }
 
-// ResetStatus resets all changes to the "status" field.
-func (m *AccountMutation) ResetStatus() {
-	m.status = nil
+// ResetState resets all changes to the "state" field.
+func (m *AccountMutation) ResetState() {
+	m.state = nil
+}
+
+// SetStateUntil sets the "state_until" field.
+func (m *AccountMutation) SetStateUntil(t time.Time) {
+	m.state_until = &t
+}
+
+// StateUntil returns the value of the "state_until" field in the mutation.
+func (m *AccountMutation) StateUntil() (r time.Time, exists bool) {
+	v := m.state_until
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStateUntil returns the old "state_until" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldStateUntil(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStateUntil is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStateUntil requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStateUntil: %w", err)
+	}
+	return oldValue.StateUntil, nil
+}
+
+// ClearStateUntil clears the value of the "state_until" field.
+func (m *AccountMutation) ClearStateUntil() {
+	m.state_until = nil
+	m.clearedFields[account.FieldStateUntil] = struct{}{}
+}
+
+// StateUntilCleared returns if the "state_until" field was cleared in this mutation.
+func (m *AccountMutation) StateUntilCleared() bool {
+	_, ok := m.clearedFields[account.FieldStateUntil]
+	return ok
+}
+
+// ResetStateUntil resets all changes to the "state_until" field.
+func (m *AccountMutation) ResetStateUntil() {
+	m.state_until = nil
+	delete(m.clearedFields, account.FieldStateUntil)
 }
 
 // SetPriority sets the "priority" field.
@@ -2237,55 +2286,6 @@ func (m *AccountMutation) LastUsedAtCleared() bool {
 func (m *AccountMutation) ResetLastUsedAt() {
 	m.last_used_at = nil
 	delete(m.clearedFields, account.FieldLastUsedAt)
-}
-
-// SetRateLimitResetAt sets the "rate_limit_reset_at" field.
-func (m *AccountMutation) SetRateLimitResetAt(t time.Time) {
-	m.rate_limit_reset_at = &t
-}
-
-// RateLimitResetAt returns the value of the "rate_limit_reset_at" field in the mutation.
-func (m *AccountMutation) RateLimitResetAt() (r time.Time, exists bool) {
-	v := m.rate_limit_reset_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldRateLimitResetAt returns the old "rate_limit_reset_at" field's value of the Account entity.
-// If the Account object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *AccountMutation) OldRateLimitResetAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldRateLimitResetAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldRateLimitResetAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldRateLimitResetAt: %w", err)
-	}
-	return oldValue.RateLimitResetAt, nil
-}
-
-// ClearRateLimitResetAt clears the value of the "rate_limit_reset_at" field.
-func (m *AccountMutation) ClearRateLimitResetAt() {
-	m.rate_limit_reset_at = nil
-	m.clearedFields[account.FieldRateLimitResetAt] = struct{}{}
-}
-
-// RateLimitResetAtCleared returns if the "rate_limit_reset_at" field was cleared in this mutation.
-func (m *AccountMutation) RateLimitResetAtCleared() bool {
-	_, ok := m.clearedFields[account.FieldRateLimitResetAt]
-	return ok
-}
-
-// ResetRateLimitResetAt resets all changes to the "rate_limit_reset_at" field.
-func (m *AccountMutation) ResetRateLimitResetAt() {
-	m.rate_limit_reset_at = nil
-	delete(m.clearedFields, account.FieldRateLimitResetAt)
 }
 
 // SetExtra sets the "extra" field.
@@ -2603,8 +2603,11 @@ func (m *AccountMutation) Fields() []string {
 	if m.credentials != nil {
 		fields = append(fields, account.FieldCredentials)
 	}
-	if m.status != nil {
-		fields = append(fields, account.FieldStatus)
+	if m.state != nil {
+		fields = append(fields, account.FieldState)
+	}
+	if m.state_until != nil {
+		fields = append(fields, account.FieldStateUntil)
 	}
 	if m.priority != nil {
 		fields = append(fields, account.FieldPriority)
@@ -2623,9 +2626,6 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m.last_used_at != nil {
 		fields = append(fields, account.FieldLastUsedAt)
-	}
-	if m.rate_limit_reset_at != nil {
-		fields = append(fields, account.FieldRateLimitResetAt)
 	}
 	if m.extra != nil {
 		fields = append(fields, account.FieldExtra)
@@ -2652,8 +2652,10 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.GetType()
 	case account.FieldCredentials:
 		return m.Credentials()
-	case account.FieldStatus:
-		return m.Status()
+	case account.FieldState:
+		return m.State()
+	case account.FieldStateUntil:
+		return m.StateUntil()
 	case account.FieldPriority:
 		return m.Priority()
 	case account.FieldMaxConcurrency:
@@ -2666,8 +2668,6 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.UpstreamIsPool()
 	case account.FieldLastUsedAt:
 		return m.LastUsedAt()
-	case account.FieldRateLimitResetAt:
-		return m.RateLimitResetAt()
 	case account.FieldExtra:
 		return m.Extra()
 	case account.FieldCreatedAt:
@@ -2691,8 +2691,10 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldType(ctx)
 	case account.FieldCredentials:
 		return m.OldCredentials(ctx)
-	case account.FieldStatus:
-		return m.OldStatus(ctx)
+	case account.FieldState:
+		return m.OldState(ctx)
+	case account.FieldStateUntil:
+		return m.OldStateUntil(ctx)
 	case account.FieldPriority:
 		return m.OldPriority(ctx)
 	case account.FieldMaxConcurrency:
@@ -2705,8 +2707,6 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldUpstreamIsPool(ctx)
 	case account.FieldLastUsedAt:
 		return m.OldLastUsedAt(ctx)
-	case account.FieldRateLimitResetAt:
-		return m.OldRateLimitResetAt(ctx)
 	case account.FieldExtra:
 		return m.OldExtra(ctx)
 	case account.FieldCreatedAt:
@@ -2750,12 +2750,19 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCredentials(v)
 		return nil
-	case account.FieldStatus:
-		v, ok := value.(account.Status)
+	case account.FieldState:
+		v, ok := value.(account.State)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetStatus(v)
+		m.SetState(v)
+		return nil
+	case account.FieldStateUntil:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStateUntil(v)
 		return nil
 	case account.FieldPriority:
 		v, ok := value.(int)
@@ -2798,13 +2805,6 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLastUsedAt(v)
-		return nil
-	case account.FieldRateLimitResetAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetRateLimitResetAt(v)
 		return nil
 	case account.FieldExtra:
 		v, ok := value.(map[string]interface{})
@@ -2899,11 +2899,11 @@ func (m *AccountMutation) ClearedFields() []string {
 	if m.FieldCleared(account.FieldType) {
 		fields = append(fields, account.FieldType)
 	}
+	if m.FieldCleared(account.FieldStateUntil) {
+		fields = append(fields, account.FieldStateUntil)
+	}
 	if m.FieldCleared(account.FieldLastUsedAt) {
 		fields = append(fields, account.FieldLastUsedAt)
-	}
-	if m.FieldCleared(account.FieldRateLimitResetAt) {
-		fields = append(fields, account.FieldRateLimitResetAt)
 	}
 	if m.FieldCleared(account.FieldExtra) {
 		fields = append(fields, account.FieldExtra)
@@ -2925,11 +2925,11 @@ func (m *AccountMutation) ClearField(name string) error {
 	case account.FieldType:
 		m.ClearType()
 		return nil
+	case account.FieldStateUntil:
+		m.ClearStateUntil()
+		return nil
 	case account.FieldLastUsedAt:
 		m.ClearLastUsedAt()
-		return nil
-	case account.FieldRateLimitResetAt:
-		m.ClearRateLimitResetAt()
 		return nil
 	case account.FieldExtra:
 		m.ClearExtra()
@@ -2954,8 +2954,11 @@ func (m *AccountMutation) ResetField(name string) error {
 	case account.FieldCredentials:
 		m.ResetCredentials()
 		return nil
-	case account.FieldStatus:
-		m.ResetStatus()
+	case account.FieldState:
+		m.ResetState()
+		return nil
+	case account.FieldStateUntil:
+		m.ResetStateUntil()
 		return nil
 	case account.FieldPriority:
 		m.ResetPriority()
@@ -2974,9 +2977,6 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldLastUsedAt:
 		m.ResetLastUsedAt()
-		return nil
-	case account.FieldRateLimitResetAt:
-		m.ResetRateLimitResetAt()
 		return nil
 	case account.FieldExtra:
 		m.ResetExtra()

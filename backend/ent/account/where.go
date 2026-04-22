@@ -70,6 +70,11 @@ func Type(v string) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldType, v))
 }
 
+// StateUntil applies equality check predicate on the "state_until" field. It's identical to StateUntilEQ.
+func StateUntil(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldStateUntil, v))
+}
+
 // Priority applies equality check predicate on the "priority" field. It's identical to PriorityEQ.
 func Priority(v int) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldPriority, v))
@@ -98,11 +103,6 @@ func UpstreamIsPool(v bool) predicate.Account {
 // LastUsedAt applies equality check predicate on the "last_used_at" field. It's identical to LastUsedAtEQ.
 func LastUsedAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldLastUsedAt, v))
-}
-
-// RateLimitResetAt applies equality check predicate on the "rate_limit_reset_at" field. It's identical to RateLimitResetAtEQ.
-func RateLimitResetAt(v time.Time) predicate.Account {
-	return predicate.Account(sql.FieldEQ(FieldRateLimitResetAt, v))
 }
 
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
@@ -320,24 +320,74 @@ func TypeContainsFold(v string) predicate.Account {
 	return predicate.Account(sql.FieldContainsFold(FieldType, v))
 }
 
-// StatusEQ applies the EQ predicate on the "status" field.
-func StatusEQ(v Status) predicate.Account {
-	return predicate.Account(sql.FieldEQ(FieldStatus, v))
+// StateEQ applies the EQ predicate on the "state" field.
+func StateEQ(v State) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldState, v))
 }
 
-// StatusNEQ applies the NEQ predicate on the "status" field.
-func StatusNEQ(v Status) predicate.Account {
-	return predicate.Account(sql.FieldNEQ(FieldStatus, v))
+// StateNEQ applies the NEQ predicate on the "state" field.
+func StateNEQ(v State) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldState, v))
 }
 
-// StatusIn applies the In predicate on the "status" field.
-func StatusIn(vs ...Status) predicate.Account {
-	return predicate.Account(sql.FieldIn(FieldStatus, vs...))
+// StateIn applies the In predicate on the "state" field.
+func StateIn(vs ...State) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldState, vs...))
 }
 
-// StatusNotIn applies the NotIn predicate on the "status" field.
-func StatusNotIn(vs ...Status) predicate.Account {
-	return predicate.Account(sql.FieldNotIn(FieldStatus, vs...))
+// StateNotIn applies the NotIn predicate on the "state" field.
+func StateNotIn(vs ...State) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldState, vs...))
+}
+
+// StateUntilEQ applies the EQ predicate on the "state_until" field.
+func StateUntilEQ(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldStateUntil, v))
+}
+
+// StateUntilNEQ applies the NEQ predicate on the "state_until" field.
+func StateUntilNEQ(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldStateUntil, v))
+}
+
+// StateUntilIn applies the In predicate on the "state_until" field.
+func StateUntilIn(vs ...time.Time) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldStateUntil, vs...))
+}
+
+// StateUntilNotIn applies the NotIn predicate on the "state_until" field.
+func StateUntilNotIn(vs ...time.Time) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldStateUntil, vs...))
+}
+
+// StateUntilGT applies the GT predicate on the "state_until" field.
+func StateUntilGT(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldStateUntil, v))
+}
+
+// StateUntilGTE applies the GTE predicate on the "state_until" field.
+func StateUntilGTE(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldStateUntil, v))
+}
+
+// StateUntilLT applies the LT predicate on the "state_until" field.
+func StateUntilLT(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldStateUntil, v))
+}
+
+// StateUntilLTE applies the LTE predicate on the "state_until" field.
+func StateUntilLTE(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldStateUntil, v))
+}
+
+// StateUntilIsNil applies the IsNil predicate on the "state_until" field.
+func StateUntilIsNil() predicate.Account {
+	return predicate.Account(sql.FieldIsNull(FieldStateUntil))
+}
+
+// StateUntilNotNil applies the NotNil predicate on the "state_until" field.
+func StateUntilNotNil() predicate.Account {
+	return predicate.Account(sql.FieldNotNull(FieldStateUntil))
 }
 
 // PriorityEQ applies the EQ predicate on the "priority" field.
@@ -583,56 +633,6 @@ func LastUsedAtIsNil() predicate.Account {
 // LastUsedAtNotNil applies the NotNil predicate on the "last_used_at" field.
 func LastUsedAtNotNil() predicate.Account {
 	return predicate.Account(sql.FieldNotNull(FieldLastUsedAt))
-}
-
-// RateLimitResetAtEQ applies the EQ predicate on the "rate_limit_reset_at" field.
-func RateLimitResetAtEQ(v time.Time) predicate.Account {
-	return predicate.Account(sql.FieldEQ(FieldRateLimitResetAt, v))
-}
-
-// RateLimitResetAtNEQ applies the NEQ predicate on the "rate_limit_reset_at" field.
-func RateLimitResetAtNEQ(v time.Time) predicate.Account {
-	return predicate.Account(sql.FieldNEQ(FieldRateLimitResetAt, v))
-}
-
-// RateLimitResetAtIn applies the In predicate on the "rate_limit_reset_at" field.
-func RateLimitResetAtIn(vs ...time.Time) predicate.Account {
-	return predicate.Account(sql.FieldIn(FieldRateLimitResetAt, vs...))
-}
-
-// RateLimitResetAtNotIn applies the NotIn predicate on the "rate_limit_reset_at" field.
-func RateLimitResetAtNotIn(vs ...time.Time) predicate.Account {
-	return predicate.Account(sql.FieldNotIn(FieldRateLimitResetAt, vs...))
-}
-
-// RateLimitResetAtGT applies the GT predicate on the "rate_limit_reset_at" field.
-func RateLimitResetAtGT(v time.Time) predicate.Account {
-	return predicate.Account(sql.FieldGT(FieldRateLimitResetAt, v))
-}
-
-// RateLimitResetAtGTE applies the GTE predicate on the "rate_limit_reset_at" field.
-func RateLimitResetAtGTE(v time.Time) predicate.Account {
-	return predicate.Account(sql.FieldGTE(FieldRateLimitResetAt, v))
-}
-
-// RateLimitResetAtLT applies the LT predicate on the "rate_limit_reset_at" field.
-func RateLimitResetAtLT(v time.Time) predicate.Account {
-	return predicate.Account(sql.FieldLT(FieldRateLimitResetAt, v))
-}
-
-// RateLimitResetAtLTE applies the LTE predicate on the "rate_limit_reset_at" field.
-func RateLimitResetAtLTE(v time.Time) predicate.Account {
-	return predicate.Account(sql.FieldLTE(FieldRateLimitResetAt, v))
-}
-
-// RateLimitResetAtIsNil applies the IsNil predicate on the "rate_limit_reset_at" field.
-func RateLimitResetAtIsNil() predicate.Account {
-	return predicate.Account(sql.FieldIsNull(FieldRateLimitResetAt))
-}
-
-// RateLimitResetAtNotNil applies the NotNil predicate on the "rate_limit_reset_at" field.
-func RateLimitResetAtNotNil() predicate.Account {
-	return predicate.Account(sql.FieldNotNull(FieldRateLimitResetAt))
 }
 
 // ExtraIsNil applies the IsNil predicate on the "extra" field.

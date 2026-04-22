@@ -90,7 +90,7 @@ func init() {
 	// account.DefaultCredentials holds the default value on creation for the credentials field.
 	account.DefaultCredentials = accountDescCredentials.Default.(map[string]string)
 	// accountDescPriority is the schema descriptor for priority field.
-	accountDescPriority := accountFields[5].Descriptor()
+	accountDescPriority := accountFields[6].Descriptor()
 	// account.DefaultPriority holds the default value on creation for the priority field.
 	account.DefaultPriority = accountDescPriority.Default.(int)
 	// account.PriorityValidator is a validator for the "priority" field. It is called by the builders before save.
@@ -110,19 +110,19 @@ func init() {
 		}
 	}()
 	// accountDescMaxConcurrency is the schema descriptor for max_concurrency field.
-	accountDescMaxConcurrency := accountFields[6].Descriptor()
+	accountDescMaxConcurrency := accountFields[7].Descriptor()
 	// account.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	account.DefaultMaxConcurrency = accountDescMaxConcurrency.Default.(int)
 	// accountDescRateMultiplier is the schema descriptor for rate_multiplier field.
-	accountDescRateMultiplier := accountFields[7].Descriptor()
+	accountDescRateMultiplier := accountFields[8].Descriptor()
 	// account.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	account.DefaultRateMultiplier = accountDescRateMultiplier.Default.(float64)
 	// accountDescErrorMsg is the schema descriptor for error_msg field.
-	accountDescErrorMsg := accountFields[8].Descriptor()
+	accountDescErrorMsg := accountFields[9].Descriptor()
 	// account.DefaultErrorMsg holds the default value on creation for the error_msg field.
 	account.DefaultErrorMsg = accountDescErrorMsg.Default.(string)
 	// accountDescUpstreamIsPool is the schema descriptor for upstream_is_pool field.
-	accountDescUpstreamIsPool := accountFields[9].Descriptor()
+	accountDescUpstreamIsPool := accountFields[10].Descriptor()
 	// account.DefaultUpstreamIsPool holds the default value on creation for the upstream_is_pool field.
 	account.DefaultUpstreamIsPool = accountDescUpstreamIsPool.Default.(bool)
 	// accountDescExtra is the schema descriptor for extra field.

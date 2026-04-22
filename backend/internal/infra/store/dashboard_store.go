@@ -44,11 +44,17 @@ func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, five
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
-	enabledAccounts, err := s.db.Account.Query().Where(entaccount.StatusEQ(entaccount.StatusActive)).Count(ctx)
+	// "enabled" = 任何非 disabled 状态（active / rate_limited / degraded 都能被调度）。
+	enabledAccounts, err := s.db.Account.Query().
+		Where(entaccount.StateNEQ(entaccount.StateDisabled)).
+		Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
-	errorAccounts, err := s.db.Account.Query().Where(entaccount.StatusEQ(entaccount.StatusError)).Count(ctx)
+	// "error" = disabled + 有错误信息（区分人工禁用和状态机自动禁用）。
+	errorAccounts, err := s.db.Account.Query().
+		Where(entaccount.StateEQ(entaccount.StateDisabled), entaccount.ErrorMsgNEQ("")).
+		Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}

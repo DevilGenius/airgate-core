@@ -106,6 +106,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		PluginMgr:   pluginMgr,
 		Marketplace: marketplace,
 		Concurrency: concurrency,
+		Scheduler:   sched,
 	})
 
 	// 注册路由

@@ -31,7 +31,7 @@ func TestBuildStatsResult_FillsDailyTrendAndSortsModels(t *testing.T) {
 		ID:       7,
 		Name:     "主账号",
 		Platform: "openai",
-		Status:   "active",
+		State:    "active",
 	}, []UsageLog{
 		{
 			Model:        "gpt-4.1",

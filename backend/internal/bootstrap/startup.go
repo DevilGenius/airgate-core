@@ -15,52 +15,73 @@ import (
 func RunStartupTasks(db *ent.Client, drv *entsql.Driver, apiKeySecret string) {
 	backfillKeyHints(db, apiKeySecret)
 	backfillResellerMarkupColumns(drv)
-	recoverMisflaggedRateLimitErrors(drv)
+	migrateAccountState(drv)
 }
 
-// recoverMisflaggedRateLimitErrors 把历史上被错误分类为 status=error 的临时性故障账号
-// 一次性恢复回 status=active。
+// migrateAccountState 把老的 status / rate_limit_reset_at 字段一次性迁移到新的
+// state / state_until，然后 DROP 旧列。幂等：首次启动或升级时有效，之后旧列已不存在时跳过。
 //
-// 背景：
-//   - 早期 WS/responses 分类器只识别 "rate_limit" 关键词，ChatGPT OAuth 的
-//     "The usage limit has been reached" 会掉到 default 分支并累计 fail count，
-//     3 次后账号被标成 error、调度开关被关掉。
-//   - shouldPenalizeForwardError 早期没有豁免 "未收到 response.completed 事件" /
-//     "responses 非流回译失败" / "context canceled" 等流协议级抖动，也会被计入失败
-//     累加到永久 error。
+// 映射规则：
 //
-// 两类错误本质都是瞬时/非账号问题，分类器修好后存量账号需要一次性清理才能恢复。
-// 幂等：WHERE status='error' AND error_msg 命中关键词，多次启动重复执行安全。
-func recoverMisflaggedRateLimitErrors(drv *entsql.Driver) {
+//	status='error'    → state='disabled'
+//	status='disabled' → state='disabled'
+//	rate_limit_reset_at > now() → state='rate_limited', state_until = rate_limit_reset_at
+//	其它               → state='active'（ent 默认值，不需要改）
+func migrateAccountState(drv *entsql.Driver) {
 	if drv == nil {
 		return
 	}
 	ctx := context.Background()
-	const sql = `UPDATE accounts
-		SET status='active', error_msg='', rate_limit_reset_at=NULL
-		WHERE status='error'
-		  AND (
-		    error_msg LIKE '%usage limit%'
-		    OR error_msg LIKE '%rate limit%'
-		    OR error_msg LIKE '%too many requests%'
-		    OR error_msg LIKE '%quota exceeded%'
-		    OR error_msg LIKE '%usage_limit_reached%'
-		    OR error_msg LIKE '%rate_limit_exceeded%'
-		    OR error_msg LIKE '%response.completed%'
-		    OR error_msg LIKE '%responses 非流回译失败%'
-		    OR error_msg LIKE '%context canceled%'
-		    OR error_msg LIKE '%context deadline exceeded%'
-		    OR error_msg LIKE '%stream closed%'
-		    OR error_msg LIKE '%unexpected eof%'
-		  )`
-	var res entsql.Result
-	if err := drv.Exec(ctx, sql, []any{}, &res); err != nil {
-		slog.Warn("恢复误标限流账号失败（可忽略，不影响启动）", "error", err)
+
+	// 先检查旧列是否存在。不存在 = 已迁移过 / 全新部署，直接返回。
+	var exists entsql.Rows
+	const checkSQL = `SELECT 1 FROM information_schema.columns
+		WHERE table_name='accounts' AND column_name='status' LIMIT 1`
+	if err := drv.Query(ctx, checkSQL, []any{}, &exists); err != nil {
+		slog.Warn("检查 accounts.status 旧列失败（跳过迁移）", "error", err)
 		return
 	}
-	if affected, err := res.RowsAffected(); err == nil && affected > 0 {
-		slog.Info("恢复被误标为 error 的临时性故障账号", "rows", affected)
+	hasOld := exists.Next()
+	_ = exists.Close()
+	if !hasOld {
+		return
 	}
+
+	slog.Info("检测到 accounts 表的旧状态列，开始迁移到 state / state_until")
+
+	// data migration
+	const updateSQL = `UPDATE accounts SET
+		state = CASE
+			WHEN status IN ('error', 'disabled') THEN 'disabled'
+			WHEN rate_limit_reset_at IS NOT NULL AND rate_limit_reset_at > NOW() THEN 'rate_limited'
+			ELSE 'active'
+		END,
+		state_until = CASE
+			WHEN rate_limit_reset_at IS NOT NULL AND rate_limit_reset_at > NOW() THEN rate_limit_reset_at
+			ELSE NULL
+		END
+	`
+	var res entsql.Result
+	if err := drv.Exec(ctx, updateSQL, []any{}, &res); err != nil {
+		slog.Error("迁移 accounts.state 数据失败", "error", err)
+		return
+	}
+	if affected, err := res.RowsAffected(); err == nil {
+		slog.Info("accounts.state 数据迁移完成", "rows", affected)
+	}
+
+	// 然后删旧列。WithDropColumn(false) 让 ent 不自动删，所以手工 DROP。
+	drops := []string{
+		`ALTER TABLE accounts DROP COLUMN IF EXISTS status`,
+		`ALTER TABLE accounts DROP COLUMN IF EXISTS rate_limit_reset_at`,
+	}
+	for _, sql := range drops {
+		var r entsql.Result
+		if err := drv.Exec(ctx, sql, []any{}, &r); err != nil {
+			slog.Warn("DROP 旧账号列失败（可忽略，下次启动会重试）", "sql", sql, "error", err)
+		}
+	}
+	slog.Info("accounts 旧 status / rate_limit_reset_at 列已 DROP")
 }
 
 // backfillResellerMarkupColumns 一次性回填 reseller markup 改造引入的两个新列：

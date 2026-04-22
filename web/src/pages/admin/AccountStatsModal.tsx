@@ -162,7 +162,7 @@ function StatsContent({ data }: { data: AccountStatsResp }) {
             {rangeLabel} · {t('accounts.stats_range_summary', { days: data.total_days, active: activeDays })}
           </span>
         </div>
-        <StatusBadge status={data.status} />
+        <StatusBadge status={data.state === 'disabled' ? 'disabled' : 'active'} />
       </div>
 
       {/* 顶部 4 个统计卡片 */}

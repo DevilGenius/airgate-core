@@ -33,8 +33,8 @@ func (s *AccountStore) List(ctx context.Context, filter appaccount.ListFilter) (
 	if filter.Platform != "" {
 		query = query.Where(entaccount.PlatformEQ(filter.Platform))
 	}
-	if filter.Status != "" {
-		query = query.Where(entaccount.StatusEQ(entaccount.Status(filter.Status)))
+	if filter.State != "" {
+		query = query.Where(entaccount.StateEQ(entaccount.State(filter.State)))
 	}
 	if filter.AccountType != "" {
 		query = query.Where(entaccount.TypeEQ(filter.AccountType))
@@ -75,8 +75,8 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 	if filter.Platform != "" {
 		query = query.Where(entaccount.PlatformEQ(filter.Platform))
 	}
-	if filter.Status != "" {
-		query = query.Where(entaccount.StatusEQ(entaccount.Status(filter.Status)))
+	if filter.State != "" {
+		query = query.Where(entaccount.StateEQ(entaccount.State(filter.State)))
 	}
 	if filter.AccountType != "" {
 		query = query.Where(entaccount.TypeEQ(filter.AccountType))
@@ -143,8 +143,8 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 	if input.Credentials != nil {
 		builder = builder.SetCredentials(cloneCredentials(input.Credentials))
 	}
-	if input.Status != nil {
-		builder = builder.SetStatus(entaccount.Status(*input.Status))
+	if input.State != nil {
+		builder = builder.SetState(entaccount.State(*input.State))
 	}
 	if input.Priority != nil {
 		builder = builder.SetPriority(*input.Priority)
@@ -333,38 +333,6 @@ func (s *AccountStore) SaveCredentials(ctx context.Context, id int, credentials 
 	return nil
 }
 
-// MarkError 将账号标记为错误状态。
-func (s *AccountStore) MarkError(ctx context.Context, id int, message string) error {
-	if err := s.db.Account.UpdateOneID(id).
-		SetStatus(entaccount.StatusError).
-		SetErrorMsg(message).
-		Exec(ctx); err != nil {
-		if ent.IsNotFound(err) {
-			return appaccount.ErrAccountNotFound
-		}
-		return err
-	}
-	return nil
-}
-
-// SetRateLimitResetAt 设置或清除账号的限流恢复时间。
-// resetAt == nil 会清空字段；否则写入指定时间。
-func (s *AccountStore) SetRateLimitResetAt(ctx context.Context, id int, resetAt *time.Time) error {
-	builder := s.db.Account.UpdateOneID(id)
-	if resetAt == nil {
-		builder = builder.ClearRateLimitResetAt()
-	} else {
-		builder = builder.SetRateLimitResetAt(*resetAt)
-	}
-	if err := builder.Exec(ctx); err != nil {
-		if ent.IsNotFound(err) {
-			return appaccount.ErrAccountNotFound
-		}
-		return err
-	}
-	return nil
-}
-
 func mapAccounts(accounts []*ent.Account) []appaccount.Account {
 	result := make([]appaccount.Account, 0, len(accounts))
 	for _, item := range accounts {
@@ -380,7 +348,7 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		Platform:       item.Platform,
 		Type:           item.Type,
 		Credentials:    cloneCredentials(item.Credentials),
-		Status:         item.Status.String(),
+		State:          item.State.String(),
 		Priority:       item.Priority,
 		MaxConcurrency: item.MaxConcurrency,
 		RateMultiplier: item.RateMultiplier,
@@ -395,9 +363,9 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		value := *item.LastUsedAt
 		result.LastUsedAt = &value
 	}
-	if item.RateLimitResetAt != nil {
-		value := *item.RateLimitResetAt
-		result.RateLimitResetAt = &value
+	if item.StateUntil != nil {
+		value := *item.StateUntil
+		result.StateUntil = &value
 	}
 	if item.Edges.Proxy != nil {
 		result.Proxy = &appaccount.Proxy{

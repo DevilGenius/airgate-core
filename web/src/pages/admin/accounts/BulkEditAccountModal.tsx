@@ -68,7 +68,7 @@ export function BulkEditAccountModal({
 
   const handleSubmit = () => {
     const patch: Omit<BulkUpdateAccountsReq, 'account_ids'> = {};
-    if (enableStatus) patch.status = status;
+    if (enableStatus) patch.state = status;
     if (enablePriority) patch.priority = priority;
     if (enableConcurrency) patch.max_concurrency = maxConcurrency;
     if (enableRateMultiplier) patch.rate_multiplier = rateMultiplier;

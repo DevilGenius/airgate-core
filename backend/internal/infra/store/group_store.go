@@ -325,7 +325,7 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 	groups, err := s.db.Group.Query().
 		Where(entgroup.IDIn(groupIDs...)).
 		WithAccounts(func(q *ent.AccountQuery) {
-			q.Select(entaccount.FieldStatus, entaccount.FieldMaxConcurrency)
+			q.Select(entaccount.FieldState, entaccount.FieldMaxConcurrency, entaccount.FieldErrorMsg)
 		}).
 		All(ctx)
 	if err != nil {
@@ -334,18 +334,20 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 	for _, g := range groups {
 		stats := appgroup.GroupStats{}
 		for _, a := range g.Edges.Accounts {
-			switch a.Status {
-			case entaccount.StatusActive:
+			switch a.State {
+			case entaccount.StateActive, entaccount.StateRateLimited, entaccount.StateDegraded:
 				stats.AccountActive++
 				stats.CapacityTotal += a.MaxConcurrency
 				activeAccounts[g.ID] = append(activeAccounts[g.ID], appgroup.AccountCapacity{
 					AccountID:      a.ID,
 					MaxConcurrency: a.MaxConcurrency,
 				})
-			case entaccount.StatusError:
-				stats.AccountError++
-			case entaccount.StatusDisabled:
-				stats.AccountDisabled++
+			case entaccount.StateDisabled:
+				if a.ErrorMsg != "" {
+					stats.AccountError++
+				} else {
+					stats.AccountDisabled++
+				}
 			}
 			stats.AccountTotal++
 		}

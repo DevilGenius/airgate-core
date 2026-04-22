@@ -41,6 +41,7 @@ type HTTPDependencies struct {
 	PluginMgr   *plugin.Manager
 	Marketplace *plugin.Marketplace
 	Concurrency *scheduler.ConcurrencyManager
+	Scheduler   *scheduler.Scheduler
 }
 
 // HTTPHandlers 聚合所有 HTTP 处理器。
@@ -69,7 +70,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	authService := appauth.NewService(authStore, dep.JWTMgr)
 	verifyCodeStore := mailer.NewVerifyCodeStore()
 	accountStore := store.NewAccountStore(dep.DB)
-	accountService := appaccount.NewService(accountStore, dep.PluginMgr, dep.Concurrency)
+	accountService := appaccount.NewService(accountStore, dep.PluginMgr, dep.Concurrency, dep.Scheduler)
 	groupStore := store.NewGroupStore(dep.DB)
 	groupService := appgroup.NewService(groupStore, dep.Concurrency)
 	proxyStore := store.NewProxyStore(dep.DB)

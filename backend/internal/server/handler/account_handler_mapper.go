@@ -12,7 +12,7 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		Platform:           account.Platform,
 		Type:               account.Type,
 		Credentials:        account.Credentials,
-		Status:             account.Status,
+		State:              account.State,
 		Priority:           account.Priority,
 		MaxConcurrency:     account.MaxConcurrency,
 		CurrentConcurrency: account.CurrentConcurrency,
@@ -30,9 +30,9 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		lastUsedAt := account.LastUsedAt.Format("2006-01-02T15:04:05Z")
 		resp.LastUsedAt = &lastUsedAt
 	}
-	if account.RateLimitResetAt != nil {
-		resetAt := account.RateLimitResetAt.UTC().Format("2006-01-02T15:04:05Z")
-		resp.RateLimitResetAt = &resetAt
+	if account.StateUntil != nil {
+		until := account.StateUntil.UTC().Format("2006-01-02T15:04:05Z")
+		resp.StateUntil = &until
 	}
 	if account.Proxy != nil {
 		proxyID := int64(account.Proxy.ID)

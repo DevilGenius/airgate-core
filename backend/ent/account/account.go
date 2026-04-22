@@ -23,8 +23,10 @@ const (
 	FieldType = "type"
 	// FieldCredentials holds the string denoting the credentials field in the database.
 	FieldCredentials = "credentials"
-	// FieldStatus holds the string denoting the status field in the database.
-	FieldStatus = "status"
+	// FieldState holds the string denoting the state field in the database.
+	FieldState = "state"
+	// FieldStateUntil holds the string denoting the state_until field in the database.
+	FieldStateUntil = "state_until"
 	// FieldPriority holds the string denoting the priority field in the database.
 	FieldPriority = "priority"
 	// FieldMaxConcurrency holds the string denoting the max_concurrency field in the database.
@@ -37,8 +39,6 @@ const (
 	FieldUpstreamIsPool = "upstream_is_pool"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
 	FieldLastUsedAt = "last_used_at"
-	// FieldRateLimitResetAt holds the string denoting the rate_limit_reset_at field in the database.
-	FieldRateLimitResetAt = "rate_limit_reset_at"
 	// FieldExtra holds the string denoting the extra field in the database.
 	FieldExtra = "extra"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -81,14 +81,14 @@ var Columns = []string{
 	FieldPlatform,
 	FieldType,
 	FieldCredentials,
-	FieldStatus,
+	FieldState,
+	FieldStateUntil,
 	FieldPriority,
 	FieldMaxConcurrency,
 	FieldRateMultiplier,
 	FieldErrorMsg,
 	FieldUpstreamIsPool,
 	FieldLastUsedAt,
-	FieldRateLimitResetAt,
 	FieldExtra,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -152,30 +152,31 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 )
 
-// Status defines the type for the "status" enum field.
-type Status string
+// State defines the type for the "state" enum field.
+type State string
 
-// StatusActive is the default value of the Status enum.
-const DefaultStatus = StatusActive
+// StateActive is the default value of the State enum.
+const DefaultState = StateActive
 
-// Status values.
+// State values.
 const (
-	StatusActive   Status = "active"
-	StatusError    Status = "error"
-	StatusDisabled Status = "disabled"
+	StateActive      State = "active"
+	StateRateLimited State = "rate_limited"
+	StateDegraded    State = "degraded"
+	StateDisabled    State = "disabled"
 )
 
-func (s Status) String() string {
+func (s State) String() string {
 	return string(s)
 }
 
-// StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
-func StatusValidator(s Status) error {
+// StateValidator is a validator for the "state" field enum values. It is called by the builders before save.
+func StateValidator(s State) error {
 	switch s {
-	case StatusActive, StatusError, StatusDisabled:
+	case StateActive, StateRateLimited, StateDegraded, StateDisabled:
 		return nil
 	default:
-		return fmt.Errorf("account: invalid enum value for status field: %q", s)
+		return fmt.Errorf("account: invalid enum value for state field: %q", s)
 	}
 }
 
@@ -202,9 +203,14 @@ func ByType(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldType, opts...).ToFunc()
 }
 
-// ByStatus orders the results by the status field.
-func ByStatus(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+// ByState orders the results by the state field.
+func ByState(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldState, opts...).ToFunc()
+}
+
+// ByStateUntil orders the results by the state_until field.
+func ByStateUntil(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStateUntil, opts...).ToFunc()
 }
 
 // ByPriority orders the results by the priority field.
@@ -235,11 +241,6 @@ func ByUpstreamIsPool(opts ...sql.OrderTermOption) OrderOption {
 // ByLastUsedAt orders the results by the last_used_at field.
 func ByLastUsedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastUsedAt, opts...).ToFunc()
-}
-
-// ByRateLimitResetAt orders the results by the rate_limit_reset_at field.
-func ByRateLimitResetAt(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldRateLimitResetAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

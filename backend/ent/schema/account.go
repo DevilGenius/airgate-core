@@ -6,7 +6,14 @@ import (
 	"entgo.io/ent/schema/field"
 )
 
-// Account 上游 AI 账户
+// Account 上游 AI 账户。
+//
+// 状态机（详见 scheduler/state.go）：
+//
+//	active        可调度
+//	rate_limited  被上游限流，state_until 到期前 NotSchedulable，到期后自动恢复 active
+//	degraded      软降级（池账号临时抖动），state_until 到期前优先级降到最低仅兜底
+//	disabled      凭证失效 / 连续失败超阈值，需要人工重新验证
 type Account struct {
 	ent.Schema
 }
@@ -15,20 +22,26 @@ func (Account) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
 		field.String("platform").NotEmpty(),
-		field.String("type").Default("").Optional(), // 账号类型，由插件定义（如 "apikey", "oauth"）
+		field.String("type").Default("").Optional(),
 		field.JSON("credentials", map[string]string{}).Default(map[string]string{}),
-		field.Enum("status").Values("active", "error", "disabled").Default("active"),
+
+		// state / state_until 是账号状态的单一真相源。Redis 只做缓存加速。
+		field.Enum("state").
+			Values("active", "rate_limited", "degraded", "disabled").
+			Default("active"),
+		field.Time("state_until").Optional().Nillable().
+			Comment("state 的到期时间：rate_limited / degraded 到期自动恢复 active；disabled 无到期"),
+
 		field.Int("priority").Default(50).Min(0).Max(999),
 		field.Int("max_concurrency").Default(10),
 		field.Float("rate_multiplier").Default(1.0),
-		field.String("error_msg").Default(""),
+		field.String("error_msg").Default("").
+			Comment("进入当前状态的原因（给运维看）"),
 		field.Bool("upstream_is_pool").Default(false).
-			Comment("上游是账号池：把 expired/disabled 降级为临时限流，避免池子耗尽时本地账号被永久标错"),
+			Comment("上游是账号池：Dead 判决降级为 degraded，避免池抖动把本地账号永久标 disabled"),
 		field.Time("last_used_at").Optional().Nillable(),
-		field.Time("rate_limit_reset_at").Optional().Nillable().
-			Comment("上游限流自动恢复时间：非空且 > now 表示账号处于限流中；调度器跳过、UI 显示倒计时；恢复后清空"),
-		field.JSON("extra", map[string]interface{}{}).Optional().Default(map[string]interface{}{}). // 扩展配置：max_rpm, max_window_cost, max_sessions 等
-														Comment("扩展配置（插件/调度器使用）"),
+		field.JSON("extra", map[string]interface{}{}).Optional().Default(map[string]interface{}{}).
+			Comment("扩展配置（max_rpm / max_window_cost / max_sessions 等）"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
 	}
@@ -36,9 +49,7 @@ func (Account) Fields() []ent.Field {
 
 func (Account) Edges() []ent.Edge {
 	return []ent.Edge{
-		// 账号所属分组（多对多）
 		edge.To("groups", Group.Type),
-		// 账号使用的代理
 		edge.To("proxy", Proxy.Type).Unique(),
 		edge.To("usage_logs", UsageLog.Type),
 	}

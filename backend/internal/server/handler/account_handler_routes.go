@@ -28,7 +28,7 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 		PageSize:    page.PageSize,
 		Keyword:     page.Keyword,
 		Platform:    c.Query("platform"),
-		Status:      c.Query("status"),
+		State:       c.Query("state"),
 		AccountType: c.Query("account_type"),
 		GroupID:     parseOptionalInt(c.Query("group_id")),
 		ProxyID:     parseOptionalInt(c.Query("proxy_id")),
@@ -53,7 +53,7 @@ func (h *AccountHandler) ExportAccounts(c *gin.Context) {
 	accounts, err := h.service.ExportAll(c.Request.Context(), appaccount.ListFilter{
 		Keyword:     c.Query("keyword"),
 		Platform:    c.Query("platform"),
-		Status:      c.Query("status"),
+		State:       c.Query("state"),
 		AccountType: c.Query("account_type"),
 		GroupID:     parseOptionalInt(c.Query("group_id")),
 		ProxyID:     parseOptionalInt(c.Query("proxy_id")),
@@ -182,7 +182,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		Name:           req.Name,
 		Type:           req.Type,
 		Credentials:    req.Credentials,
-		Status:         req.Status,
+		State:          req.State,
 		Priority:       req.Priority,
 		MaxConcurrency: req.MaxConcurrency,
 		RateMultiplier: req.RateMultiplier,
@@ -234,7 +234,7 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 
 	result := h.service.BulkUpdate(c.Request.Context(), appaccount.BulkUpdateInput{
 		IDs:            req.AccountIDs,
-		Status:         req.Status,
+		State:          req.State,
 		Priority:       req.Priority,
 		MaxConcurrency: req.MaxConcurrency,
 		RateMultiplier: req.RateMultiplier,
@@ -362,8 +362,8 @@ func (h *AccountHandler) ToggleScheduling(c *gin.Context) {
 	}
 
 	response.Success(c, map[string]any{
-		"id":     result.ID,
-		"status": result.Status,
+		"id":    result.ID,
+		"state": result.State,
 	})
 }
 
@@ -500,7 +500,7 @@ func (h *AccountHandler) GetAccountStats(c *gin.Context) {
 		"account_id":       result.AccountID,
 		"name":             result.Name,
 		"platform":         result.Platform,
-		"status":           result.Status,
+		"state":            result.State,
 		"start_date":       result.StartDate,
 		"end_date":         result.EndDate,
 		"total_days":       result.TotalDays,
