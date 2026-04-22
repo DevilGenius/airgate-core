@@ -92,7 +92,8 @@ func parseBody(body []byte) parsedRequest {
 	}
 }
 
-// matchPlugin 按 (GroupPlatform, path) 路由到具体插件。未命中返回 nil 并写 404。
+// matchPlugin 按 (GroupPlatform, path) 路由到具体插件。
+// 插件未运行返回 503；路由不匹配返回 404。
 func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, path string) *PluginInstance {
 	if keyInfo.GroupPlatform != "" {
 		inst := f.manager.MatchPluginByPlatformAndPath(keyInfo.GroupPlatform, path)
@@ -103,7 +104,11 @@ func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, path s
 			"group_id", keyInfo.GroupID,
 			"platform", keyInfo.GroupPlatform,
 			"path", path)
-		openAIError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "当前 API Key 绑定的平台不支持该 API 路径")
+		if f.manager.GetPluginByPlatform(keyInfo.GroupPlatform) == nil {
+			openAIError(c, http.StatusServiceUnavailable, "server_error", "plugin_unavailable", "插件不可用，请联系管理员")
+		} else {
+			openAIError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "当前 API Key 绑定的平台不支持该 API 路径")
+		}
 		return nil
 	}
 
