@@ -66,13 +66,19 @@ export function GroupFormModal({
     parseQuotas(group?.quotas as Record<string, unknown> | undefined),
   );
 
-  // 分组级插件开关（当前仅 Claude 插件使用 claude_code_only）
-  // 后端按 {"claude": {"claude_code_only": "true"}} 的约定存储。
+  // 分组级插件开关
+  // 后端按 {"claude": {"claude_code_only": "true"}, "openai": {"image_enabled": "true"}} 的约定存储。
   const initialClaudeCodeOnly = (() => {
     const raw = group?.plugin_settings?.claude?.claude_code_only;
     return raw === 'true';
   })();
   const [claudeCodeOnly, setClaudeCodeOnly] = useState(initialClaudeCodeOnly);
+
+  const initialImageEnabled = (() => {
+    const raw = group?.plugin_settings?.openai?.image_enabled;
+    return raw === 'true';
+  })();
+  const [imageEnabled, setImageEnabled] = useState(initialImageEnabled);
 
   // 创建模式下：从分组复制账号（同平台，可多选，自动去重）
   const [copyFromGroupIds, setCopyFromGroupIds] = useState<number[]>([]);
@@ -89,12 +95,17 @@ export function GroupFormModal({
   const handleSubmit = () => {
     if (!isEdit && (!form.name || !form.platform)) return;
 
-    // plugin_settings：仅 Claude 平台发 claude 命名空间；切回"关闭"时显式写 "false"
+    // plugin_settings：按平台发对应命名空间；切回"关闭"时显式写 "false"
     // 让后端把字段真实清零，而不是留着旧值。
     const pluginSettings: Record<string, Record<string, string>> = {};
     if (form.platform === 'claude') {
       pluginSettings.claude = {
         claude_code_only: claudeCodeOnly ? 'true' : 'false',
+      };
+    }
+    if (form.platform === 'openai') {
+      pluginSettings.openai = {
+        image_enabled: imageEnabled ? 'true' : 'false',
       };
     }
 
@@ -392,6 +403,34 @@ export function GroupFormModal({
             <p className="text-[11px] mt-1" style={{ color: 'var(--ag-text-tertiary)' }}>
               开启后，本分组的账号只接受官方 Claude CLI 发起的流量；非 CLI 请求返回 403。可显著降低 OAuth 额度被 Anthropic 行为模型识别为第三方的概率。
             </p>
+          </div>
+        )}
+
+        {/* 仅 OpenAI 平台：图片生成开关 */}
+        {form.platform === 'openai' && (
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: 'var(--ag-text-secondary)' }}>
+                图片生成
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={imageEnabled}
+                onClick={() => setImageEnabled(!imageEnabled)}
+                className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+                style={{
+                  backgroundColor: imageEnabled ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
+                }}
+              >
+                <span
+                  className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform"
+                  style={{
+                    transform: imageEnabled ? 'translateX(18px)' : 'translateX(3px)',
+                  }}
+                />
+              </button>
+            </div>
           </div>
         )}
 
