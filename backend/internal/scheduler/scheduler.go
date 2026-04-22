@@ -116,13 +116,23 @@ func (s *Scheduler) RegisterSession(ctx context.Context, accountID int, sessionI
 	return allowed
 }
 
+// defaultMsgLockWait msg lock 的默认 wait timeout。
+// 号池大 / 每账号并发小的场景下，占用中的账号不如快速跳过让其它账号接住。
+// 通过 account.extra.msg_lock_wait_seconds 可调整（例如号池小时设大）。
+const defaultMsgLockWait = 3 * time.Second
+
 // AcquireMessageLock 真实用户消息的账号级串行锁。
+// wait timeout：extra.msg_lock_wait_seconds > 0 时用配置值，否则用 defaultMsgLockWait。
 func (s *Scheduler) AcquireMessageLock(ctx context.Context, accountID int, requestID string, extra map[string]interface{}) (bool, error) {
 	lockTTL := defaultLockTTL
 	if ttlSec := ExtraInt(extra, "msg_lock_ttl_seconds"); ttlSec > 0 {
 		lockTTL = time.Duration(ttlSec) * time.Second
 	}
-	return s.msgQueue.WaitAcquire(ctx, accountID, requestID, lockTTL, 30*time.Second)
+	wait := defaultMsgLockWait
+	if waitSec := ExtraInt(extra, "msg_lock_wait_seconds"); waitSec > 0 {
+		wait = time.Duration(waitSec) * time.Second
+	}
+	return s.msgQueue.WaitAcquire(ctx, accountID, requestID, lockTTL, wait)
 }
 
 // ReleaseMessageLock 释放消息锁。

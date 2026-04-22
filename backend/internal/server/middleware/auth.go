@@ -86,6 +86,8 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 			code := "invalid_api_key"
 			status := http.StatusUnauthorized
 			switch err {
+			case auth.ErrInvalidAPIKey:
+				// 维持默认 401 / invalid_api_key
 			case auth.ErrAPIKeyExpired:
 				code = "api_key_expired"
 			case auth.ErrAPIKeyQuota:
@@ -94,6 +96,11 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 			case auth.ErrAPIKeyGroupUnbound:
 				code = "api_key_misconfigured"
 				status = http.StatusForbidden
+			default:
+				// DB 超时 / 连接池满 / ctx 取消 等服务端侧问题：返 503 让客户端重试，
+				// 绝不能误判为"凭证无效"让客户端以为 key 被吊销。
+				code = "service_unavailable"
+				status = http.StatusServiceUnavailable
 			}
 			abortWithOpenAIError(c, status, code, err.Error())
 			return

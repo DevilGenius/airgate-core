@@ -6,11 +6,37 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	entsetting "github.com/DouDOU-start/airgate-core/ent/setting"
+)
+
+// API Key 缓存。
+//
+// 高并发下同一个 key 会被反复验证（每次 forward 都要走一次）。缓存后：
+//   - 命中：零 DB 查询，O(1) 内存访问
+//   - 未命中：1 次 DB 查询 + 写缓存
+//
+// TTL 设短（默认 5s）是个折衷：key 被禁用 / 配额耗尽 / 过期等动态变化能快速传播到
+// 网关。运维手动禁用 key 后最多 5s 用户会看到 401，可接受。
+//
+// 失败结果（invalid / expired / quota / group_unbound）同样缓存——避免被拒的 key
+// 反复打 DB 制造压力。
+const apiKeyCacheTTL = 5 * time.Second
+
+type apiKeyCacheEntry struct {
+	info      *APIKeyInfo // 成功结果；失败时为 nil
+	err       error       // 失败原因；成功时为 nil
+	expiresAt time.Time
+}
+
+var (
+	apiKeyCache   sync.Map // map[hash] → apiKeyCacheEntry
+	apiKeyCacheMu sync.Mutex
 )
 
 var (
@@ -142,11 +168,25 @@ func ValidateAPIKeyForLogin(ctx context.Context, db *ent.Client, key string) (*A
 	}, nil
 }
 
-// ValidateAPIKey 验证 API Key 并返回关联信息
+// ValidateAPIKey 验证 API Key 并返回关联信息。带 5s TTL 内存缓存，
+// 高并发下同一个 key 300 req → 1 次 DB 查询 + 299 次缓存命中。
+//
+// 错误语义：
+//   - ent.IsNotFound(err)：真的"key 不存在或已禁用" → ErrInvalidAPIKey（客户端 401）
+//   - 其它 DB 错误（超时 / 连接池满 / ctx 取消）：原样返回 → middleware 按 5xx 处理
+//
+// DB 错误不缓存（下次请求立即重试，加快从瞬时故障中恢复）。
 func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInfo, error) {
 	hash := HashAPIKey(key)
 
-	// 查询 API Key，同时加载关联的 user 和 group
+	// 读缓存
+	if cached, ok := apiKeyCache.Load(hash); ok {
+		if e := cached.(apiKeyCacheEntry); time.Now().Before(e.expiresAt) {
+			return e.info, e.err
+		}
+	}
+
+	// 缓存未命中，查 DB
 	ak, err := db.APIKey.Query().
 		Where(
 			apikey.KeyHash(hash),
@@ -156,30 +196,40 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		WithGroup().
 		Only(ctx)
 	if err != nil {
-		return nil, ErrInvalidAPIKey
+		if ent.IsNotFound(err) {
+			// 真"key 不存在"：缓存负结果，避免被拒的 key 反复打 DB
+			cacheAPIKeyResult(hash, nil, ErrInvalidAPIKey)
+			return nil, ErrInvalidAPIKey
+		}
+		// DB 瞬时故障：不缓存，下次请求重试
+		return nil, fmt.Errorf("查询 API Key 失败: %w", err)
 	}
 
 	// 检查过期时间
 	if ak.ExpiresAt != nil && ak.ExpiresAt.Before(time.Now()) {
+		cacheAPIKeyResult(hash, nil, ErrAPIKeyExpired)
 		return nil, ErrAPIKeyExpired
 	}
 
 	// 检查配额（quota_usd > 0 时才检查）
 	if ak.QuotaUsd > 0 && ak.UsedQuota >= ak.QuotaUsd {
+		cacheAPIKeyResult(hash, nil, ErrAPIKeyQuota)
 		return nil, ErrAPIKeyQuota
 	}
 
 	// 获取关联的 user 和 group ID
 	u, err := ak.Edges.UserOrErr()
 	if err != nil {
+		cacheAPIKeyResult(hash, nil, ErrInvalidAPIKey)
 		return nil, ErrInvalidAPIKey
 	}
 	g := ak.Edges.Group
 	if g == nil {
+		cacheAPIKeyResult(hash, nil, ErrAPIKeyGroupUnbound)
 		return nil, ErrAPIKeyGroupUnbound
 	}
 
-	return &APIKeyInfo{
+	info := &APIKeyInfo{
 		KeyID:              ak.ID,
 		KeyName:            ak.Name,
 		UserID:             u.ID,
@@ -197,7 +247,35 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		GroupServiceTier:       g.ServiceTier,
 		GroupForceInstructions: g.ForceInstructions,
 		GroupPluginSettings:    g.PluginSettings,
-	}, nil
+	}
+	cacheAPIKeyResult(hash, info, nil)
+	return info, nil
+}
+
+// cacheAPIKeyResult 把验证结果（成功或已知失败）写入缓存。
+// 成功结果的 UserBalance / UsedQuota 会在 TTL 内"陈旧"，但缓存 TTL 很短（5s），
+// 用户主流程不会明显感知到；balance 余额在并发扣费时的准确性由别处的数据库事务保证。
+func cacheAPIKeyResult(hash string, info *APIKeyInfo, err error) {
+	apiKeyCache.Store(hash, apiKeyCacheEntry{
+		info:      info,
+		err:       err,
+		expiresAt: time.Now().Add(apiKeyCacheTTL),
+	})
+}
+
+// InvalidateAPIKeyCache 清除指定 key 的缓存（用于运维手动禁用 / 改配额等场景）。
+// 传空字符串清除所有缓存。
+func InvalidateAPIKeyCache(key string) {
+	if key == "" {
+		apiKeyCacheMu.Lock()
+		defer apiKeyCacheMu.Unlock()
+		apiKeyCache.Range(func(k, _ any) bool {
+			apiKeyCache.Delete(k)
+			return true
+		})
+		return
+	}
+	apiKeyCache.Delete(HashAPIKey(key))
 }
 
 // ValidateAdminAPIKey 验证管理员 API Key，返回 nil 表示验证通过。

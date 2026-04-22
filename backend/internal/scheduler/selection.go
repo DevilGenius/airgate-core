@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
@@ -168,7 +170,7 @@ func matchModelRouting(routing map[string][]int64, model string) []int64 {
 	return nil
 }
 
-// checkSchedulability 先看状态（state + state_until），再叠加软约束（windowCost / RPM / session），取最严格者。
+// checkSchedulability 先看状态（state + state_until），再叠加软约束（并发 / windowCost / RPM / session），取最严格者。
 func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, now time.Time) Schedulability {
 	base := SchedulabilityOf(acc, now)
 	if base == NotSchedulable {
@@ -176,6 +178,12 @@ func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, n
 	}
 	worst := base
 
+	if sched := s.concurrencySchedulability(ctx, acc); sched > worst {
+		worst = sched
+	}
+	if worst == NotSchedulable {
+		return worst
+	}
 	if sched := s.windowCost.GetSchedulability(ctx, acc.ID, acc.Extra); sched > worst {
 		worst = sched
 	}
@@ -194,7 +202,33 @@ func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, n
 	return worst
 }
 
-// selectByLoadBalance 按 priority × 1000 + (1-load)×100 + lru_score 打分挑最高。
+// concurrencySchedulability 根据当前并发用量返回调度约束：
+//
+//	load >= 100% → NotSchedulable（调度器直接跳过，避免下游 acquireSlot 失败浪费 failover）
+//	load >=  80% → StickyOnly（软降级：只有粘性会话能选中，新请求优先换账号）
+//	否则         → Normal
+//
+// 存在 TOCTOU（这里看没满、下一瞬 acquireSlot 却满）：forwarder 会 failover 到下一个账号兜底。
+func (s *Scheduler) concurrencySchedulability(ctx context.Context, acc *ent.Account) Schedulability {
+	maxConc := acc.MaxConcurrency
+	if maxConc <= 0 {
+		maxConc = 5
+	}
+	load := s.getCurrentLoad(ctx, acc.ID)
+	if load >= maxConc {
+		return NotSchedulable
+	}
+	if float64(load)/float64(maxConc) >= 0.8 {
+		return StickyOnly
+	}
+	return Normal
+}
+
+// selectByLoadBalance 按 priority × 1000 + (1-load)×100 + lru_score 打分。
+//
+// 从 top-N 里随机选一个（而不是固定 argmax），解决高并发下所有 pickAccount 同时
+// 看到一致的 Redis 状态 → 全部选中同一账号 → AcquireSlot race → 大量 failover 浪费
+// 的问题。N 取 min(len, 8)，既能分散压力又保留"倾向好账号"的语义。
 func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.Account, now time.Time) *ent.Account {
 	if len(candidates) == 0 {
 		return nil
@@ -232,15 +266,36 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 	}
 
 	sort.Slice(items, func(i, j int) bool { return items[i].score > items[j].score })
-	return items[0].acc
+
+	// 高并发热点打散：从 top-N 随机选。
+	//
+	// N 的取值决定了"多宽的账号池能参与分流"：
+	//   - 号池很小时：N 接近 len，几乎等于均匀随机
+	//   - 号池很大（百级）时：封顶一个较大的值，既保留"偏好 priority/LRU 高分"的倾向，
+	//     又让 failover 每一轮都能分散到足够多的候选（max 成功数 ≈ N × failoverAttempts）
+	//
+	// 以前 N=8 对 124 号池显得太窄：150 并发最多只用到 8×3=24 个账号，剩 100 个完全闲置。
+	// 提高到 32：3 次 failover 可覆盖 96 个账号，基本打满常见号池。
+	const maxTopN = 32
+	topN := len(items)
+	if topN > maxTopN {
+		topN = maxTopN
+	}
+	return items[rand.Intn(topN)].acc
 }
 
-// getCurrentLoad 从 Redis SET 读账号当前并发数。
+// getCurrentLoad 从 Redis ZSET 读账号当前"有效"并发数（过滤僵尸 slot）。
+//
+// 用 ZCount + score > (now - slotTTL) 只计算未过期的 slot，避免 release 异常的
+// 僵尸 slot 把账号一直标满（下次 acquire 会清理它们，但 selection 不能等）。
+// key 必须与 concurrency.go 的 concurrencyKey 保持一致（`concurrency:v2:<id>`）。
 func (s *Scheduler) getCurrentLoad(ctx context.Context, accountID int) int {
 	if s.rdb == nil {
 		return 0
 	}
-	n, err := s.rdb.SCard(ctx, fmt.Sprintf("concurrency:%d", accountID)).Result()
+	cutoff := time.Now().Add(-defaultSlotTTL).Unix()
+	min := "(" + strconv.FormatInt(cutoff, 10) // 开区间：严格 > cutoff
+	n, err := s.rdb.ZCount(ctx, concurrencyKey(accountID), min, "+inf").Result()
 	if err != nil {
 		return 0
 	}

@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -39,8 +41,15 @@ func NewForwarder(
 	}
 }
 
-// maxFailoverAttempts 最大 failover 次数（含首次）。
+// maxFailoverAttempts 最大 failover 次数（账号级失败后切换新账号上游调用的上限）。
 const maxFailoverAttempts = 3
+
+// queueWaitTimeout 所有账号 slot 都被占满时，请求最多排队等多久再放弃。
+// 1 分钟对号池小 / 并发高的场景能把毛刺吸收掉；超过这个时长意味着号池真的不够用。
+const queueWaitTimeout = 60 * time.Second
+
+// queuePollInterval slot 未释放时的轮询间隔。
+const queuePollInterval = 200 * time.Millisecond
 
 // Forward 入口。失败时自动 failover 到其它账号，最多 maxFailoverAttempts 次。
 //
@@ -67,27 +76,53 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	}
 	defer releaseClientQuota()
 
-	var excludeIDs []int
+	// 两类排除：
+	//   hardExclude —— callPlugin 后判为账号级失败的账号；整条 forward 不再重选它
+	//   softExclude —— acquireAccountSlot 因 slot race/RPM/并发 满失败；短暂跳过它，
+	//                  等 slot 释放或到 queueDeadline 再重新考虑
+	var hardExclude []int
+	var softExclude []int
 	var mwBag map[string]string
 	beginCalled := false
+	attempt := 0
 
-	for attempt := 0; attempt < maxFailoverAttempts; attempt++ {
-		if !f.pickAccount(c, state, excludeIDs...) {
+	ctx := c.Request.Context()
+	queueDeadline := time.Now().Add(queueWaitTimeout)
+
+	for attempt < maxFailoverAttempts {
+		exclude := make([]int, 0, len(hardExclude)+len(softExclude))
+		exclude = append(exclude, hardExclude...)
+		exclude = append(exclude, softExclude...)
+
+		if err := f.pickAccount(c, state, exclude...); err != nil {
+			// 所有账号都被排除了。如果其中部分只是被 slot race 软排除，给它们时间释放。
+			if len(softExclude) > 0 && time.Now().Before(queueDeadline) {
+				softExclude = nil // 清软排除，让下轮重新考虑
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(queuePollInterval):
+				}
+				continue
+			}
+			slog.Warn("账户调度失败", "platform", state.plugin.Platform, "model", state.model, "error", err)
+			openAIError(c, http.StatusServiceUnavailable, "server_error", "no_available_account", "无可用账户")
 			return
 		}
-		excludeIDs = append(excludeIDs, state.account.ID)
 
+		accountID := state.account.ID
 		releaseAccountSlot, ok := f.acquireAccountSlot(c, state)
 		if !ok {
-			return // 429 已写
+			// slot race：软排除此账号，下一轮选别的；等所有账号都 soft 排再排队等待。
+			softExclude = append(softExclude, accountID)
+			continue
 		}
 
 		if !beginCalled {
 			allowed, bag := f.runForwardBeginChain(c, state)
 			beginCalled = true
 			if !allowed {
-				// DENY 未调用上游，必须回退本次 attempt 占用的 RPM 配额。
-				f.scheduler.DecrementRPM(c.Request.Context(), state.account.ID)
+				f.scheduler.DecrementRPM(ctx, accountID)
 				releaseAccountSlot()
 				return
 			}
@@ -95,22 +130,22 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		}
 
 		execution := f.callPlugin(c, state)
+		attempt++
+		// 真正打了上游的账号进入 hardExclude，确保 failover 时不会回头重选它。
+		hardExclude = append(hardExclude, accountID)
 
-		if attempt < maxFailoverAttempts-1 && f.canFailover(c, state, execution) {
+		if f.canFailover(c, state, execution) {
 			releaseAccountSlot()
-			f.applyOutcome(c.Request.Context(), state, execution)
+			f.applyOutcome(ctx, state, execution)
 			continue
 		}
 
-		// 最终结果：OnForwardEnd 先于 writeResult，保证 middleware 看到的 metadata
-		// 与 usage_log 写入是同一份事实。
 		f.runForwardEndChain(c, state, execution, mwBag)
 		f.writeResult(c, state, execution)
 		releaseAccountSlot()
 		return
 	}
 
-	// failover 用尽。OnForwardEnd 已在最后一次 attempt 触发过，这里只做兜底响应。
 	openAIError(c, 503, "server_error", "all_accounts_failed", "所有可用账户均失败，请稍后重试")
 }
 

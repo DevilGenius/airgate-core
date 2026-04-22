@@ -110,6 +110,13 @@ type DatabaseConfig struct {
 	Password string `yaml:"password"`
 	DBName   string `yaml:"dbname"`
 	SSLMode  string `yaml:"sslmode"`
+	// MaxOpenConns 连接池最大连接数。默认 50。
+	// 必须小于 Postgres 的 max_connections，否则高并发会打出 "too many clients"。
+	MaxOpenConns int `yaml:"max_open_conns"`
+	// MaxIdleConns 最大空闲连接数。默认 25。
+	MaxIdleConns int `yaml:"max_idle_conns"`
+	// ConnMaxLifetimeMinutes 连接最大生命周期（分钟）。默认 30。
+	ConnMaxLifetimeMinutes int `yaml:"conn_max_lifetime_minutes"`
 }
 
 // RedisConfig Redis 配置

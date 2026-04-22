@@ -141,6 +141,25 @@ func startMainServer(cfg *config.Config) {
 		slog.Error("打开数据库失败", "error", err)
 		os.Exit(1)
 	}
+	// 配置连接池：不限制时 Go 会无限开连接，高并发下 Postgres "too many clients already"
+	maxOpen := cfg.Database.MaxOpenConns
+	if maxOpen <= 0 {
+		maxOpen = 50
+	}
+	maxIdle := cfg.Database.MaxIdleConns
+	if maxIdle <= 0 {
+		maxIdle = 25
+	}
+	lifeMin := cfg.Database.ConnMaxLifetimeMinutes
+	if lifeMin <= 0 {
+		lifeMin = 30
+	}
+	drv.DB().SetMaxOpenConns(maxOpen)
+	drv.DB().SetMaxIdleConns(maxIdle)
+	drv.DB().SetConnMaxLifetime(time.Duration(lifeMin) * time.Minute)
+	slog.Info("数据库连接池已配置",
+		"max_open", maxOpen, "max_idle", maxIdle, "lifetime_min", lifeMin)
+
 	db := ent.NewClient(ent.Driver(drv))
 	defer func() {
 		if err := db.Close(); err != nil {

@@ -85,8 +85,9 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 	}
 }
 
-// pickAccount 调度选号并写到 state.account。失败时直接写 503。
-func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs ...int) bool {
+// pickAccount 调度选号并写到 state.account。失败时返回 error，由调用方决定如何处理
+// （例如主循环可以根据 softExclude 是否非空决定排队等待还是直接写 503）。
+func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs ...int) error {
 	account, err := f.scheduler.SelectAccount(
 		c.Request.Context(),
 		state.plugin.Platform,
@@ -97,16 +98,16 @@ func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs 
 		excludeIDs...,
 	)
 	if err != nil {
-		slog.Warn("账户调度失败", "platform", state.plugin.Platform, "model", state.model, "error", err)
-		openAIError(c, http.StatusServiceUnavailable, "server_error", "no_available_account", "无可用账户")
-		return false
+		return err
 	}
 	state.account = account
-	return true
+	return nil
 }
 
 // acquireAccountSlot 获取账号级闸门：RPM 配额 + 真实用户消息串行锁 + 账号并发槽。
-// 返回一个统一的 release func；任一层失败都自动回滚已获取的部分并写 429。
+// 返回 release func 与 ok 标记。ok=false 表示当前账号暂不可用（RPM 已满 / 并发已满），
+// 调用方应把本账号加入 excludeIDs 并 failover 到下一个账号。失败时不写客户端响应——
+// 由主循环在 failover 全部用尽时兜底写 503。
 //
 // 每次 failover attempt 都要重新 acquire。release 顺序和 acquire 顺序相反。
 func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (func(), bool) {
@@ -116,7 +117,8 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 	// 1. RPM 原子检查并递增
 	maxRPM := scheduler.ExtraInt(state.account.Extra, "max_rpm")
 	if !f.scheduler.TryIncrementRPM(ctx, state.account.ID, maxRPM) {
-		openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "rpm_limit", "账户 RPM 已达上限，请稍后重试")
+		slog.Info("账号 RPM 已达上限，尝试 failover",
+			"account_id", state.account.ID, "max_rpm", maxRPM)
 		return nil, false
 	}
 
@@ -142,7 +144,8 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 	if err := f.concurrency.AcquireSlot(ctx, state.account.ID, state.requestID, maxConc, slotTTL); err != nil {
 		releaseMsgLock()
 		f.scheduler.DecrementRPM(ctx, state.account.ID)
-		openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "concurrency_limit", "并发已满，请稍后重试")
+		slog.Info("账号并发已满，尝试 failover",
+			"account_id", state.account.ID, "max_concurrency", maxConc)
 		return nil, false
 	}
 
