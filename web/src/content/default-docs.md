@@ -20,7 +20,8 @@ AirGate 对外暴露 OpenAI 兼容协议，并通过协议翻译同时兼容 Ant
 | --- | --- | --- |
 | `POST` | `/v1/chat/completions` | OpenAI Chat Completions（最广泛使用的协议，绝大多数 OpenAI SDK / 第三方客户端走这条） |
 | `POST` | `/v1/responses` | OpenAI Responses API（OpenAI 较新协议） |
-| `POST` | `/v1/images/generations` | OpenAI Images API（生图，支持 `gpt-image-1` / `gpt-image-1.5`） |
+| `POST` | `/v1/images/generations` | OpenAI Images API（文生图，支持 `gpt-image-1.5` / `gpt-image-2`） |
+| `POST` | `/v1/images/edits` | OpenAI Images API（图生图，支持 `gpt-image-1.5` / `gpt-image-2`） |
 | `POST` | `/v1/messages` | Anthropic Messages（Claude Code 等 Anthropic 客户端走这条；当前为协议翻译，未来对接原生 Claude 上游后将自动切换） |
 | `GET`  | `/v1/models` | 列出当前可用模型 |
 
@@ -59,7 +60,7 @@ resp = client.chat.completions.create(
 print(resp.choices[0].message.content)
 ```
 
-### OpenAI Images SDK（生图）
+### OpenAI Images SDK（文生图）
 
 ```python
 import base64
@@ -71,33 +72,29 @@ client = OpenAI(
 )
 
 resp = client.images.generate(
-    model="gpt-image-1.5",
-    prompt="a cute shiba inu puppy sitting on grass, studio lighting",
-    size="1024x1024",     # 1024x1024 | 1024x1536 | 1536x1024 | auto
-    quality="low",        # low | medium | high | auto
-    n=1,                  # 暂仅支持 1
+    model="gpt-image-2",            # gpt-image-1 | gpt-image-1.5 | gpt-image-2
+    prompt="一只可爱的柴犬坐在樱花树下，日系水彩风格",
+    size="1024x1024",               # 1024x1024 | 1024x1536 | 1536x1024 | auto
+    quality="medium",               # low | medium | high | auto
+    n=1,
 )
 
 img = resp.data[0]
 with open("out.png", "wb") as f:
     f.write(base64.b64decode(img.b64_json))
-print("revised_prompt:", img.revised_prompt)
-print("usage:", resp.usage)
 ```
 
-> 计费说明：  `input_tokens`（prompt）按 `gpt-image-1.5` `$5/1M`、`output_tokens`（图像输出）按 `$40/1M`。图像 token 数按尺寸 × 质量估算（`1024x1024 low ≈ 272 tokens`、`medium ≈ 1056`、`high ≈ 4160`）
+> 计费说明：`input_tokens`（prompt）按 `$5/1M`、`output_tokens`（图像输出）按 `$40/1M`。图像 token 数按尺寸 × 质量估算（`1024x1024 low ≈ 272 tokens`、`medium ≈ 1056`、`high ≈ 4160`）
 
 ### OpenAI Images SDK（图生图）
 
 ```python
 with open("in.png", "rb") as f:
     resp = client.images.edit(
-        model="gpt-image-1.5",
-        image=f,                            # 也可传 [f1, f2] 列表传多张参考图
-        prompt="把背景换成青花瓷蓝，右下角加一枚红色篆刻印章",
-        size="1536x1024",
-        # mask=open("mask.png", "rb"),      # 可选：白色区域=要重绘的部分
-        # extra_body={"input_fidelity": "high"},  # 可选：high 更严格保留参考图细节
+        model="gpt-image-2",        # gpt-image-1.5 | gpt-image-2
+        image=f,                    # 也可传 [f1, f2] 列表传多张参考图
+        prompt="把这张图变成梵高星空风格的油画",
+        size="1024x1024",
         n=1,
     )
 
@@ -171,7 +168,14 @@ openclaw gateway
 
 ### Q: 生图接口支持哪些模型和参数？
 
-支持 `gpt-image-1` / `gpt-image-1.5`。参数：
+支持 `gpt-image-1.5` / `gpt-image-2`。
+
+| 模型 | 文生图 | 图生图 |
+| --- | --- | --- |
+| `gpt-image-1.5` | ✅ | ✅ |
+| `gpt-image-2` | ✅ | ✅ |
+
+参数：
 
 - `size`：`1024x1024`、`1024x1536`、`1536x1024`、`auto`
 - `quality`：`low`、`medium`、`high`、`auto`
