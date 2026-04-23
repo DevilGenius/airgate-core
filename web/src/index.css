@@ -343,3 +343,14 @@ select option {
   background: var(--ag-bg-elevated);
   color: var(--ag-text);
 }
+
+/* ── 全屏插件布局（插件根元素设置 data-full-bleed 即可启用） ── */
+.ag-main:has([data-full-bleed]) {
+  overflow: hidden;
+}
+
+.ag-main-content:has([data-full-bleed]) {
+  padding: 0;
+  max-width: none;
+  height: 100%;
+}

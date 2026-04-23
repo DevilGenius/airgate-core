@@ -9,7 +9,7 @@ func TestParseBody(t *testing.T) {
 
 	body := []byte(`{"model":"gpt-4.1","stream":false,"metadata":{"user_id":"session-123"}}`)
 
-	parsed := parseBody(body)
+	parsed := parseBody(body, "application/json")
 	if parsed.Model != "gpt-4.1" {
 		t.Fatalf("Model = %q, want %q", parsed.Model, "gpt-4.1")
 	}
@@ -26,7 +26,7 @@ func TestParseBody_StreamTrue(t *testing.T) {
 
 	body := []byte(`{"model":"gpt-4.1","stream":true,"metadata":{"user_id":"sess-1"}}`)
 
-	parsed := parseBody(body)
+	parsed := parseBody(body, "application/json")
 	if parsed.Model != "gpt-4.1" {
 		t.Fatalf("Model = %q, want %q", parsed.Model, "gpt-4.1")
 	}

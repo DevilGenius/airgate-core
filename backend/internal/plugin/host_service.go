@@ -15,6 +15,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/account"
+	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	sdk "github.com/DouDOU-start/airgate-sdk"
 	pb "github.com/DouDOU-start/airgate-sdk/proto"
@@ -26,16 +27,19 @@ import (
 // pluginHostHandle，它在每个 RPC 入口先做 capability 校验，再委托给本结构。
 //
 // 设计原则（详见 ADR-0001）：
-//   - 克制暴露面：只暴露 ProbeForward / SelectAccount / ListGroups /
-//     ReportAccountResult，未来需要再加；
+//   - 提供通用平台原语层——新增插件应只组合已有 RPC，无需扩 proto；
 //   - ProbeForward 与普通 Forward 严格隔离：跳过 usage_log 写入、跳过余额扣款，
 //     但仍然 ReportResult 让账号状态机受益；
+//   - Forward 走完整管线（调度 → 网关 → 计费 → 记录），用于操练场等面向用户的插件；
 //   - 不要求插件持有 admin_api_key——broker 子进程隧道天然互信，但仍然要做
 //     capability 级权限隔离。
 type HostService struct {
-	db        *ent.Client
-	manager   *Manager
-	scheduler *scheduler.Scheduler
+	db          *ent.Client
+	manager     *Manager
+	scheduler   *scheduler.Scheduler
+	concurrency *scheduler.ConcurrencyManager
+	calculator  *billing.Calculator
+	recorder    *billing.Recorder
 }
 
 // NewHostService 构造 HostService 工厂。
@@ -43,8 +47,22 @@ type HostService struct {
 //
 // HostService 自身不实现 pb.HostServiceServer—— 用 NewPluginHandle 给每个插件
 // 派生一个 pluginHostHandle 才是真正的 server 实例。
-func NewHostService(db *ent.Client, mgr *Manager, sched *scheduler.Scheduler) *HostService {
-	return &HostService{db: db, manager: mgr, scheduler: sched}
+func NewHostService(
+	db *ent.Client,
+	mgr *Manager,
+	sched *scheduler.Scheduler,
+	concurrency *scheduler.ConcurrencyManager,
+	calculator *billing.Calculator,
+	recorder *billing.Recorder,
+) *HostService {
+	return &HostService{
+		db:          db,
+		manager:     mgr,
+		scheduler:   sched,
+		concurrency: concurrency,
+		calculator:  calculator,
+		recorder:    recorder,
+	}
 }
 
 // NewPluginHandle 为指定插件派生一个 host handle。
@@ -145,6 +163,41 @@ func (h *pluginHostHandle) ReportAccountResult(ctx context.Context, req *pb.Host
 		return nil, err
 	}
 	return h.base.reportAccountResult(ctx, req)
+}
+
+func (h *pluginHostHandle) Forward(ctx context.Context, req *pb.HostForwardRequest) (*pb.HostForwardResponse, error) {
+	if err := h.requireCap(sdk.CapabilityHostForward); err != nil {
+		return nil, err
+	}
+	return h.base.forward(ctx, req)
+}
+
+func (h *pluginHostHandle) ForwardStream(req *pb.HostForwardRequest, stream pb.HostService_ForwardStreamServer) error {
+	if err := h.requireCap(sdk.CapabilityHostForward); err != nil {
+		return err
+	}
+	return h.base.forwardStream(stream.Context(), req, stream)
+}
+
+func (h *pluginHostHandle) ListPlatforms(ctx context.Context, req *pb.HostListPlatformsRequest) (*pb.HostListPlatformsResponse, error) {
+	if err := h.requireCap(sdk.CapabilityHostListPlatforms); err != nil {
+		return nil, err
+	}
+	return h.base.listPlatforms(ctx, req)
+}
+
+func (h *pluginHostHandle) ListModels(ctx context.Context, req *pb.HostListModelsRequest) (*pb.HostListModelsResponse, error) {
+	if err := h.requireCap(sdk.CapabilityHostListModels); err != nil {
+		return nil, err
+	}
+	return h.base.listModels(ctx, req)
+}
+
+func (h *pluginHostHandle) GetUserInfo(ctx context.Context, req *pb.HostGetUserInfoRequest) (*pb.HostGetUserInfoResponse, error) {
+	if err := h.requireCap(sdk.CapabilityHostGetUserInfo); err != nil {
+		return nil, err
+	}
+	return h.base.getUserInfo(ctx, req)
 }
 
 // selectAccount 调度选号：走和真实用户请求完全相同的路径。
@@ -372,6 +425,529 @@ func (h *HostService) reportAccountResult(ctx context.Context, req *pb.HostRepor
 		Reason: req.ErrorMsg,
 	})
 	return &pb.Empty{}, nil
+}
+
+// forward 非流式业务转发：调度 → 网关 → 计费 → 记录。
+// 与 probeForward 的区别：走完整计费管线，不跳过 usage_log / 余额扣款。
+// 账号级故障自动 failover，最多 maxHostForwardAttempts 次。
+func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (*pb.HostForwardResponse, error) {
+	if req.GroupId <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "group_id 必须 > 0")
+	}
+	if req.UserId <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
+	}
+
+	g, err := h.db.Group.Get(ctx, int(req.GroupId))
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, status.Error(codes.NotFound, "分组不存在")
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	model := req.Model
+	if model == "" {
+		if models := h.manager.GetModels(g.Platform); len(models) > 0 {
+			model = models[0].ID
+		}
+	}
+	if model == "" {
+		return nil, status.Errorf(codes.NotFound, "platform %s 没有可用 model", g.Platform)
+	}
+
+	inst := h.manager.GetPluginByPlatform(g.Platform)
+	if inst == nil || inst.Gateway == nil {
+		return nil, status.Errorf(codes.Unavailable, "platform %s 没有可用插件", g.Platform)
+	}
+
+	fwdCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	defer cancel()
+
+	var excludeIDs []int
+
+	for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
+		acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupId), "", excludeIDs...)
+		if err != nil {
+			if errors.Is(err, scheduler.ErrNoAvailableAccount) {
+				return nil, status.Error(codes.Unavailable, err.Error())
+			}
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "加载账号失败: "+err.Error())
+		}
+
+		headers := protoHeadersToHTTPHost(req.Headers)
+		headers.Set("X-Forwarded-Path", req.Path)
+		headers.Set("X-Forwarded-Method", req.Method)
+		headers.Set("X-Airgate-Internal", "host-forward")
+		if headers.Get("Content-Type") == "" {
+			headers.Set("Content-Type", "application/json")
+		}
+
+		fwdReq := &sdk.ForwardRequest{
+			Account: &sdk.Account{
+				ID:          int64(accFull.ID),
+				Name:        accFull.Name,
+				Platform:    accFull.Platform,
+				Type:        accFull.Type,
+				Credentials: cloneStringMapHost(accFull.Credentials),
+				ProxyURL:    proxyURLFromAccount(accFull),
+			},
+			Body:    req.Body,
+			Headers: headers,
+			Model:   model,
+			Stream:  false,
+		}
+
+		start := time.Now()
+		outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
+		duration := time.Since(start)
+
+		h.scheduler.Apply(ctx, acc.ID, scheduler.Judgment{
+			Kind:       outcome.Kind,
+			RetryAfter: outcome.RetryAfter,
+			Reason:     outcome.Reason,
+			Duration:   duration,
+			IsPool:     accFull.UpstreamIsPool,
+		})
+
+		if (fwdErr != nil || outcome.Kind.ShouldFailover()) && attempt < maxHostForwardAttempts-1 {
+			slog.Warn("HostService Forward failover",
+				"account_id", acc.ID, "attempt", attempt+1,
+				"kind", outcome.Kind, "reason", outcome.Reason, "error", fwdErr)
+			excludeIDs = append(excludeIDs, acc.ID)
+			continue
+		}
+
+		if fwdErr != nil {
+			return nil, status.Errorf(codes.Internal, "网关插件调用失败: %s", fwdErr.Error())
+		}
+
+		resp := &pb.HostForwardResponse{
+			StatusCode: int32(outcome.Upstream.StatusCode),
+			Headers:    httpHeadersToProtoHost(outcome.Upstream.Headers),
+			Body:       outcome.Upstream.Body,
+		}
+
+		if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
+			h.recordHostForwardUsage(ctx, req, acc.ID, g.Platform, model, accFull, outcome, duration)
+			resp.Usage = &pb.HostForwardUsage{
+				InputTokens:  int64(outcome.Usage.InputTokens),
+				OutputTokens: int64(outcome.Usage.OutputTokens),
+				Cost:         outcome.Usage.InputCost + outcome.Usage.OutputCost + outcome.Usage.CachedInputCost + outcome.Usage.CacheCreationCost,
+				Model:        model,
+			}
+		}
+
+		return resp, nil
+	}
+
+	return nil, status.Error(codes.Unavailable, "所有可用账户均失败，请稍后重试")
+}
+
+// forwardStream 流式业务转发。
+// 账号级故障自动 failover：通过 failoverStreamWriter 延迟提交，
+// 成功（< 400）时立即切换到真流式，失败时缓冲数据后丢弃重试。
+func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequest, stream pb.HostService_ForwardStreamServer) error {
+	if req.GroupId <= 0 {
+		return status.Error(codes.InvalidArgument, "group_id 必须 > 0")
+	}
+	if req.UserId <= 0 {
+		return status.Error(codes.InvalidArgument, "user_id 必须 > 0")
+	}
+
+	g, err := h.db.Group.Get(ctx, int(req.GroupId))
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return status.Error(codes.NotFound, "分组不存在")
+		}
+		return status.Error(codes.Internal, err.Error())
+	}
+
+	model := req.Model
+	if model == "" {
+		if models := h.manager.GetModels(g.Platform); len(models) > 0 {
+			model = models[0].ID
+		}
+	}
+	if model == "" {
+		return status.Errorf(codes.NotFound, "platform %s 没有可用 model", g.Platform)
+	}
+
+	inst := h.manager.GetPluginByPlatform(g.Platform)
+	if inst == nil || inst.Gateway == nil {
+		return status.Errorf(codes.Unavailable, "platform %s 没有可用插件", g.Platform)
+	}
+
+	fwdCtx, cancel := context.WithTimeout(ctx, 300*time.Second)
+	defer cancel()
+
+	sw := &hostStreamWriter{stream: stream}
+	var excludeIDs []int
+
+	for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
+		acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupId), "", excludeIDs...)
+		if err != nil {
+			if errors.Is(err, scheduler.ErrNoAvailableAccount) {
+				return status.Error(codes.Unavailable, err.Error())
+			}
+			return status.Error(codes.Internal, err.Error())
+		}
+
+		accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
+		if err != nil {
+			return status.Error(codes.Internal, "加载账号失败: "+err.Error())
+		}
+
+		headers := protoHeadersToHTTPHost(req.Headers)
+		headers.Set("X-Forwarded-Path", req.Path)
+		headers.Set("X-Forwarded-Method", req.Method)
+		headers.Set("X-Airgate-Internal", "host-forward")
+		if headers.Get("Content-Type") == "" {
+			headers.Set("Content-Type", "application/json")
+		}
+
+		fw := &failoverStreamWriter{target: sw}
+		fwdReq := &sdk.ForwardRequest{
+			Account: &sdk.Account{
+				ID:          int64(accFull.ID),
+				Name:        accFull.Name,
+				Platform:    accFull.Platform,
+				Type:        accFull.Type,
+				Credentials: cloneStringMapHost(accFull.Credentials),
+				ProxyURL:    proxyURLFromAccount(accFull),
+			},
+			Body:    req.Body,
+			Headers: headers,
+			Model:   model,
+			Stream:  true,
+			Writer:  fw,
+		}
+
+		start := time.Now()
+		outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
+		duration := time.Since(start)
+
+		h.scheduler.Apply(ctx, acc.ID, scheduler.Judgment{
+			Kind:       outcome.Kind,
+			RetryAfter: outcome.RetryAfter,
+			Reason:     outcome.Reason,
+			Duration:   duration,
+			IsPool:     accFull.UpstreamIsPool,
+		})
+
+		canRetry := !fw.committed && (fwdErr != nil || outcome.Kind.ShouldFailover())
+		if canRetry && attempt < maxHostForwardAttempts-1 {
+			slog.Warn("HostService ForwardStream failover",
+				"account_id", acc.ID, "attempt", attempt+1,
+				"kind", outcome.Kind, "reason", outcome.Reason, "error", fwdErr)
+			excludeIDs = append(excludeIDs, acc.ID)
+			continue
+		}
+
+		if !fw.committed {
+			fw.flush()
+		}
+
+		if fwdErr != nil {
+			return status.Errorf(codes.Internal, "网关插件调用失败: %s", fwdErr.Error())
+		}
+
+		var usage *pb.HostForwardUsage
+		if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
+			h.recordHostForwardUsage(ctx, req, acc.ID, g.Platform, model, accFull, outcome, duration)
+			usage = &pb.HostForwardUsage{
+				InputTokens:  int64(outcome.Usage.InputTokens),
+				OutputTokens: int64(outcome.Usage.OutputTokens),
+				Cost:         outcome.Usage.InputCost + outcome.Usage.OutputCost + outcome.Usage.CachedInputCost + outcome.Usage.CacheCreationCost,
+				Model:        model,
+			}
+		}
+
+		return stream.Send(&pb.HostForwardChunk{Done: true, Usage: usage})
+	}
+
+	return status.Error(codes.Unavailable, "所有可用账户均失败，请稍后重试")
+}
+
+// maxHostForwardAttempts 最大 failover 次数，与 Forwarder 保持一致。
+const maxHostForwardAttempts = 3
+
+// failoverStreamWriter 包装 hostStreamWriter，支持 failover 重试。
+// 成功响应（StatusCode < 400）立即提交到真正的 gRPC stream，实现真流式；
+// 错误响应缓冲数据，允许调用方丢弃后重试下一个账号。
+type failoverStreamWriter struct {
+	target    *hostStreamWriter
+	committed bool
+	bufStatus int
+	bufHdr    http.Header
+	bufData   [][]byte
+}
+
+func (w *failoverStreamWriter) Header() http.Header {
+	if w.committed {
+		return w.target.Header()
+	}
+	if w.bufHdr == nil {
+		w.bufHdr = make(http.Header)
+	}
+	return w.bufHdr
+}
+
+func (w *failoverStreamWriter) WriteHeader(statusCode int) {
+	if w.committed {
+		w.target.WriteHeader(statusCode)
+		return
+	}
+	w.bufStatus = statusCode
+	if statusCode > 0 && statusCode < 400 {
+		w.flush()
+	}
+}
+
+func (w *failoverStreamWriter) Write(data []byte) (int, error) {
+	if w.committed {
+		return w.target.Write(data)
+	}
+	buf := make([]byte, len(data))
+	copy(buf, data)
+	w.bufData = append(w.bufData, buf)
+	return len(data), nil
+}
+
+func (w *failoverStreamWriter) Flush() {
+	if w.committed {
+		w.target.Flush()
+	}
+}
+
+func (w *failoverStreamWriter) flush() {
+	if w.committed {
+		return
+	}
+	w.committed = true
+	for k, v := range w.bufHdr {
+		w.target.Header()[k] = v
+	}
+	if w.bufStatus > 0 {
+		w.target.WriteHeader(w.bufStatus)
+	}
+	for _, d := range w.bufData {
+		if _, err := w.target.Write(d); err != nil {
+			return
+		}
+	}
+	w.bufData = nil
+}
+
+// hostStreamWriter 适配 http.ResponseWriter，将流式数据转为 gRPC stream chunks。
+type hostStreamWriter struct {
+	stream     pb.HostService_ForwardStreamServer
+	headerSent bool
+	header     http.Header
+	statusCode int
+}
+
+func (w *hostStreamWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (w *hostStreamWriter) WriteHeader(statusCode int) {
+	if w.headerSent {
+		return
+	}
+	w.statusCode = statusCode
+	w.headerSent = true
+	_ = w.stream.Send(&pb.HostForwardChunk{
+		StatusCode: int32(statusCode),
+		Headers:    httpHeadersToProtoHost(w.header),
+	})
+}
+
+func (w *hostStreamWriter) Write(data []byte) (int, error) {
+	if !w.headerSent {
+		w.WriteHeader(http.StatusOK)
+	}
+	if len(data) == 0 {
+		return 0, nil
+	}
+	chunk := make([]byte, len(data))
+	copy(chunk, data)
+	if err := w.stream.Send(&pb.HostForwardChunk{Data: chunk}); err != nil {
+		return 0, err
+	}
+	return len(data), nil
+}
+
+func (w *hostStreamWriter) Flush() {}
+
+// recordHostForwardUsage 为 Host.Forward 发起的请求记录 usage_log 并扣费。
+// 与 forwarder.recordUsage 的区别：没有 APIKeyInfo，APIKeyID=0，billingRate 取分组倍率。
+func (h *HostService) recordHostForwardUsage(
+	ctx context.Context,
+	req *pb.HostForwardRequest,
+	accountID int,
+	platform, model string,
+	accFull *ent.Account,
+	outcome sdk.ForwardOutcome,
+	duration time.Duration,
+) {
+	usage := outcome.Usage
+	if usage == nil {
+		return
+	}
+
+	g, _ := h.db.Group.Get(ctx, int(req.GroupId))
+	billingRate := 1.0
+	if g != nil && g.RateMultiplier > 0 {
+		billingRate = g.RateMultiplier
+	}
+
+	calc := h.calculator.Calculate(billing.CalculateInput{
+		InputCost:         usage.InputCost,
+		OutputCost:        usage.OutputCost,
+		CachedInputCost:   usage.CachedInputCost,
+		CacheCreationCost: usage.CacheCreationCost,
+		BillingRate:       billingRate,
+		AccountRate:       accFull.RateMultiplier,
+	})
+
+	h.scheduler.AddWindowCost(ctx, accountID, calc.AccountCost)
+
+	actualModel := usage.Model
+	if actualModel == "" {
+		actualModel = model
+	}
+
+	h.recorder.Record(billing.UsageRecord{
+		UserID:                int(req.UserId),
+		APIKeyID:              0,
+		AccountID:             accountID,
+		GroupID:               int(req.GroupId),
+		Platform:              platform,
+		Model:                 actualModel,
+		InputTokens:           usage.InputTokens,
+		OutputTokens:          usage.OutputTokens,
+		CachedInputTokens:     usage.CachedInputTokens,
+		CacheCreationTokens:   usage.CacheCreationTokens,
+		CacheCreation5mTokens: usage.CacheCreation5mTokens,
+		CacheCreation1hTokens: usage.CacheCreation1hTokens,
+		ReasoningOutputTokens: usage.ReasoningOutputTokens,
+		InputPrice:            usage.InputPrice,
+		OutputPrice:           usage.OutputPrice,
+		CachedInputPrice:      usage.CachedInputPrice,
+		CacheCreationPrice:    usage.CacheCreationPrice,
+		CacheCreation1hPrice:  usage.CacheCreation1hPrice,
+		InputCost:             calc.InputCost,
+		OutputCost:            calc.OutputCost,
+		CachedInputCost:       calc.CachedInputCost,
+		CacheCreationCost:     calc.CacheCreationCost,
+		TotalCost:             calc.TotalCost,
+		ActualCost:            calc.ActualCost,
+		BilledCost:            calc.BilledCost,
+		AccountCost:           calc.AccountCost,
+		RateMultiplier:        calc.RateMultiplier,
+		AccountRateMultiplier: calc.AccountRateMultiplier,
+		ServiceTier:           usage.ServiceTier,
+		Stream:                req.Stream,
+		DurationMs:            duration.Milliseconds(),
+		FirstTokenMs:          usage.FirstTokenMs,
+	})
+}
+
+// listPlatforms 列出已加载的网关平台。
+func (h *HostService) listPlatforms(_ context.Context, _ *pb.HostListPlatformsRequest) (*pb.HostListPlatformsResponse, error) {
+	metas := h.manager.GetAllPluginMeta()
+	seen := make(map[string]bool)
+	var platforms []*pb.HostPlatform
+	for _, m := range metas {
+		if m.Type != "gateway" || m.Platform == "" || seen[m.Platform] {
+			continue
+		}
+		seen[m.Platform] = true
+		platforms = append(platforms, &pb.HostPlatform{
+			Name:        m.Platform,
+			DisplayName: m.DisplayName,
+		})
+	}
+	return &pb.HostListPlatformsResponse{Platforms: platforms}, nil
+}
+
+// listModels 列出指定平台的模型列表。
+func (h *HostService) listModels(_ context.Context, req *pb.HostListModelsRequest) (*pb.HostListModelsResponse, error) {
+	if req.Platform == "" {
+		return nil, status.Error(codes.InvalidArgument, "platform 不能为空")
+	}
+	models := h.manager.GetModels(req.Platform)
+	resp := &pb.HostListModelsResponse{
+		Models: make([]*pb.ModelInfoProto, 0, len(models)),
+	}
+	for _, m := range models {
+		resp.Models = append(resp.Models, &pb.ModelInfoProto{
+			Id:                       m.ID,
+			Name:                     m.Name,
+			InputPrice:               m.InputPrice,
+			OutputPrice:              m.OutputPrice,
+			CachedInputPrice:         m.CachedInputPrice,
+			CacheCreationPrice:       m.CacheCreationPrice,
+			CacheCreation_1HPrice:    m.CacheCreation1hPrice,
+			ContextWindow:            int64(m.ContextWindow),
+			MaxOutputTokens:          int64(m.MaxOutputTokens),
+			InputPricePriority:       m.InputPricePriority,
+			OutputPricePriority:      m.OutputPricePriority,
+			CachedInputPricePriority: m.CachedInputPricePriority,
+		})
+	}
+	return resp, nil
+}
+
+// getUserInfo 获取用户基本信息。
+func (h *HostService) getUserInfo(ctx context.Context, req *pb.HostGetUserInfoRequest) (*pb.HostGetUserInfoResponse, error) {
+	if req.UserId <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
+	}
+	u, err := h.db.User.Get(ctx, int(req.UserId))
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, status.Error(codes.NotFound, "用户不存在")
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &pb.HostGetUserInfoResponse{
+		UserId:   int64(u.ID),
+		Username: u.Username,
+		Email:    u.Email,
+		Role:     string(u.Role),
+		Balance:  u.Balance,
+		Status:   string(u.Status),
+	}, nil
+}
+
+// protoHeadersToHTTPHost / httpHeadersToProtoHost 是 host_service.go 内部的 header 转换。
+// 与 grpc/gateway_server.go 的同名函数等价，但跨包引用会引入循环依赖。
+func protoHeadersToHTTPHost(ph map[string]*pb.HeaderValues) http.Header {
+	h := make(http.Header, len(ph))
+	for k, v := range ph {
+		if v != nil {
+			h[k] = v.Values
+		}
+	}
+	return h
+}
+
+func httpHeadersToProtoHost(h http.Header) map[string]*pb.HeaderValues {
+	ph := make(map[string]*pb.HeaderValues, len(h))
+	for k, v := range h {
+		ph[k] = &pb.HeaderValues{Values: v}
+	}
+	return ph
 }
 
 // errProbeResp 构造一个失败的 probe response（不通过 gRPC error 返回，

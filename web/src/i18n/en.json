@@ -965,5 +965,32 @@
     "install_failed": "Installation failed: {{error}}",
     "run_install": "Run Installation",
     "installing_btn": "Installing..."
+  },
+
+  "playground": {
+    "title": "AI Playground",
+    "conversations": "Conversations",
+    "new_conversation": "New Conversation",
+    "no_conversations": "No conversations yet",
+    "no_conversations_hint": "Create a conversation to get started",
+    "delete_conversation": "Delete",
+    "empty_title": "Start a Conversation",
+    "empty_description": "Select a model and start chatting with AI",
+    "balance": "Balance",
+    "you": "You",
+    "assistant": "Assistant",
+    "thinking": "Thinking...",
+    "streaming": "Generating...",
+    "no_response": "No response from AI service",
+    "send": "Send",
+    "stop": "Stop",
+    "input_placeholder": "Type a message...",
+    "input_hint": "Enter to send, Shift+Enter for newline",
+    "platform": "Platform",
+    "model": "Model",
+    "tokens_in": "In",
+    "tokens_out": "Out",
+    "cost": "Cost",
+    "create_failed": "Failed to create conversation"
   }
 }

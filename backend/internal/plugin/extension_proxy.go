@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
 	pb "github.com/DouDOU-start/airgate-sdk/proto"
 
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
@@ -84,24 +85,13 @@ func (ep *ExtensionProxy) HandleNamed(pluginName, entry string) gin.HandlerFunc 
 	}
 }
 
-// handle 是 Handle / HandleNamed 的共享实现：把 HTTP 请求序列化成 pb.HttpRequest
-// 通过 gRPC 转发给目标插件，再把响应写回 client。
-func (ep *ExtensionProxy) handle(c *gin.Context, pluginName, subPath, entry string) {
-	slog.Debug("ExtensionProxy 收到请求", "pluginName", pluginName, "subPath", subPath, "entry", entry, "method", c.Request.Method, "fullPath", c.Request.URL.Path)
-
-	ext := ep.manager.GetExtensionByName(pluginName)
-	if ext == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "extension 插件未找到或未运行"})
-		return
-	}
-
-	// 限制请求体大小，防止恶意大请求导致内存溢出
+// buildProxyRequest 把 gin.Context 序列化成 pb.HttpRequest（handle / handleStream 共用）。
+func (ep *ExtensionProxy) buildProxyRequest(c *gin.Context, subPath, entry string) (*pb.HttpRequest, error) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxExtensionBodySize)
 
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "读取请求体失败（可能超过大小限制）"})
-		return
+		return nil, err
 	}
 
 	headers := make(map[string]*pb.HeaderValues)
@@ -109,8 +99,6 @@ func (ep *ExtensionProxy) handle(c *gin.Context, pluginName, subPath, entry stri
 		headers[strings.ToLower(k)] = &pb.HeaderValues{Values: v}
 	}
 
-	// 注入 airgate 内部头：让插件知道入口类型与请求用户身份
-	// 这些头由 core 强制覆盖，外部无法伪造（因为客户端发送的同名头会被 c.Request.Header 中的最新值覆盖）
 	headers["x-airgate-entry"] = &pb.HeaderValues{Values: []string{entry}}
 	if uid, ok := c.Get(middleware.CtxKeyUserID); ok {
 		if id, ok := uid.(int); ok {
@@ -123,20 +111,51 @@ func (ep *ExtensionProxy) handle(c *gin.Context, pluginName, subPath, entry stri
 		}
 	}
 
-	req := &pb.HttpRequest{
+	return &pb.HttpRequest{
 		Method:     c.Request.Method,
 		Path:       subPath,
 		Query:      c.Request.URL.RawQuery,
 		Headers:    headers,
 		Body:       body,
 		RemoteAddr: c.ClientIP(),
+	}, nil
+}
+
+// isStreamRequest 判断请求是否要求流式响应（SSE）。
+func isStreamRequest(r *http.Request) bool {
+	for _, v := range r.Header.Values("Accept") {
+		if strings.Contains(v, "text/event-stream") {
+			return true
+		}
+	}
+	return false
+}
+
+// handle 是 Handle / HandleNamed 的共享实现：把 HTTP 请求序列化成 pb.HttpRequest
+// 通过 gRPC 转发给目标插件，再把响应写回 client。
+func (ep *ExtensionProxy) handle(c *gin.Context, pluginName, subPath, entry string) {
+	slog.Debug("ExtensionProxy 收到请求", "pluginName", pluginName, "subPath", subPath, "entry", entry, "method", c.Request.Method, "fullPath", c.Request.URL.Path)
+
+	ext := ep.manager.GetExtensionByName(pluginName)
+	if ext == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "extension 插件未找到或未运行"})
+		return
+	}
+
+	req, err := ep.buildProxyRequest(c, subPath, entry)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "读取请求体失败（可能超过大小限制）"})
+		return
+	}
+
+	if isStreamRequest(c.Request) {
+		ep.handleStream(c, ext, req, pluginName, subPath, entry)
+		return
 	}
 
 	resp, err := ext.HandleHTTPRequest(c.Request.Context(), req)
 	if err != nil {
 		slog.Error("extension 插件请求失败", "plugin", pluginName, "path", subPath, "error", err)
-		// 仅对内部入口（admin / user）回显原始错误，便于定位问题；
-		// 对外部入口（callback / public）保持泛化，避免向第三方泄漏内部细节。
 		msg := "extension 插件请求失败"
 		if entry == "admin" || entry == "user" {
 			msg = msg + ": " + err.Error()
@@ -155,17 +174,67 @@ func (ep *ExtensionProxy) handle(c *gin.Context, pluginName, subPath, entry stri
 		}
 	}
 
-	// 确保 Content-Type 有默认值
 	contentType := c.Writer.Header().Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
 
-	// 验证状态码范围
 	statusCode := int(resp.StatusCode)
 	if statusCode < 100 || statusCode > 599 {
 		statusCode = http.StatusBadGateway
 	}
 
 	c.Data(statusCode, contentType, resp.Body)
+}
+
+// handleStream 流式代理：逐 chunk 读取插件响应并 flush 给客户端。
+// 第一个 chunk 携带 status_code 和 headers，后续 chunk 只有 data。
+func (ep *ExtensionProxy) handleStream(c *gin.Context, ext *sdkgrpc.ExtensionGRPCClient, req *pb.HttpRequest, pluginName, subPath, entry string) {
+	stream, err := ext.HandleHTTPStreamRequest(c.Request.Context(), req)
+	if err != nil {
+		slog.Error("extension 插件流式请求失败", "plugin", pluginName, "path", subPath, "error", err)
+		msg := "extension 插件请求失败"
+		if entry == "admin" || entry == "user" {
+			msg = msg + ": " + err.Error()
+		}
+		c.JSON(http.StatusBadGateway, gin.H{"error": msg})
+		return
+	}
+
+	headersSent := false
+	for {
+		chunk, err := stream.Recv()
+		if err != nil {
+			if !headersSent {
+				c.JSON(http.StatusBadGateway, gin.H{"error": "extension 插件流式读取失败"})
+			}
+			return
+		}
+
+		if !headersSent {
+			headersSent = true
+			for k, vals := range chunk.Headers {
+				if blockedResponseHeaders[strings.ToLower(k)] {
+					continue
+				}
+				for _, v := range vals.Values {
+					c.Writer.Header().Add(k, v)
+				}
+			}
+			statusCode := int(chunk.StatusCode)
+			if statusCode < 100 || statusCode > 599 {
+				statusCode = http.StatusOK
+			}
+			c.Writer.WriteHeader(statusCode)
+		}
+
+		if len(chunk.Data) > 0 {
+			_, _ = c.Writer.Write(chunk.Data)
+			c.Writer.Flush()
+		}
+
+		if chunk.Done {
+			return
+		}
+	}
 }

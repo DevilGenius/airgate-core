@@ -1,11 +1,15 @@
 package plugin
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -33,7 +37,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	}
 
 	path := requestPath(c)
-	parsed := parseBody(body)
+	parsed := parseBody(body, c.GetHeader("Content-Type"))
 	inst := f.matchPlugin(c, keyInfo, path)
 	if inst == nil {
 		return nil, false
@@ -82,14 +86,43 @@ func requestPath(c *gin.Context) string {
 	return c.Request.URL.Path
 }
 
-func parseBody(body []byte) parsedRequest {
+func parseBody(body []byte, contentType string) parsedRequest {
 	var fields requestFields
-	_ = json.Unmarshal(body, &fields)
-	return parsedRequest{
-		Model:     fields.Model,
-		Stream:    fields.Stream,
-		SessionID: fields.Metadata.UserID,
+	if json.Unmarshal(body, &fields) == nil {
+		return parsedRequest{
+			Model:     fields.Model,
+			Stream:    fields.Stream,
+			SessionID: fields.Metadata.UserID,
+		}
 	}
+	if strings.HasPrefix(contentType, "multipart/") {
+		return parseMultipartFields(body, contentType)
+	}
+	return parsedRequest{}
+}
+
+func parseMultipartFields(body []byte, contentType string) parsedRequest {
+	_, params, err := mime.ParseMediaType(contentType)
+	if err != nil || params["boundary"] == "" {
+		return parsedRequest{}
+	}
+	reader := multipart.NewReader(bytes.NewReader(body), params["boundary"])
+	var pr parsedRequest
+	for {
+		part, err := reader.NextPart()
+		if err != nil {
+			break
+		}
+		data, _ := io.ReadAll(part)
+		_ = part.Close()
+		switch part.FormName() {
+		case "model":
+			pr.Model = strings.TrimSpace(string(data))
+		case "stream":
+			pr.Stream = strings.TrimSpace(string(data)) == "true"
+		}
+	}
+	return pr
 }
 
 // matchPlugin 按 (GroupPlatform, path) 路由到具体插件。

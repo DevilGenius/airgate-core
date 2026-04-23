@@ -969,5 +969,32 @@
     "install_failed": "安装失败：{{error}}",
     "run_install": "执行安装",
     "installing_btn": "安装中..."
+  },
+
+  "playground": {
+    "title": "AI 对话",
+    "conversations": "对话列表",
+    "new_conversation": "新建对话",
+    "no_conversations": "暂无对话",
+    "no_conversations_hint": "创建对话开始体验",
+    "delete_conversation": "删除",
+    "empty_title": "开始对话",
+    "empty_description": "选择模型，与 AI 开始聊天",
+    "balance": "余额",
+    "you": "你",
+    "assistant": "助手",
+    "thinking": "思考中...",
+    "streaming": "生成中...",
+    "no_response": "AI 服务未返回结果",
+    "send": "发送",
+    "stop": "停止",
+    "input_placeholder": "输入消息...",
+    "input_hint": "Enter 发送，Shift+Enter 换行",
+    "platform": "平台",
+    "model": "模型",
+    "tokens_in": "输入",
+    "tokens_out": "输出",
+    "cost": "费用",
+    "create_failed": "创建对话失败"
   }
 }

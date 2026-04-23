@@ -251,6 +251,7 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 	}
 
 	// APIKey 双累加器：billed 和 actual 都更新（key 集合相同，合并一次 update 调用）
+	// APIKeyID == 0 表示 Host.Forward 发起的请求（无 API Key），跳过 APIKey 累加。
 	keyIDs := make(map[int]struct{}, len(keyBilledCosts))
 	for k := range keyBilledCosts {
 		keyIDs[k] = struct{}{}
@@ -259,6 +260,9 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 		keyIDs[k] = struct{}{}
 	}
 	for keyID := range keyIDs {
+		if keyID == 0 {
+			continue
+		}
 		update := tx.APIKey.UpdateOneID(keyID)
 		if billed := keyBilledCosts[keyID]; billed > 0 {
 			update = update.AddUsedQuota(billed)

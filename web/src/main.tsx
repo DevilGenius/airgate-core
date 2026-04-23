@@ -1,6 +1,7 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import * as ReactJSXRuntime from 'react/jsx-runtime';
+import * as ReactI18next from 'react-i18next';
 import { StrictMode, useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -19,6 +20,7 @@ import './index.css';
   'react': React,
   'react-dom': ReactDOM,
   'react/jsx-runtime': ReactJSXRuntime,
+  'react-i18next': ReactI18next,
 };
 
 // PluginAPIBridge 把 core 内的运行时能力暴露到 window.airgate，供插件前端调用。

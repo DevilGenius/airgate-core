@@ -182,8 +182,9 @@ export function AppShell({ children }: AppShellProps) {
   const pluginUserItemsMerged = pluginUserItems.map((item, i) =>
     i === 0 ? { path: item.path, labelKey: item.labelKey, icon: item.icon } : item,
   );
+  const apiKeyPluginItems = pluginUserItemsMerged.filter((item) => item.path.includes('/plugins/airgate-playground/'));
   const menuItems = isAPIKeySession
-    ? apiKeyMenuItems
+    ? [...apiKeyMenuItems, ...apiKeyPluginItems]
     : isAdmin
       ? [...adminMenuItems, ...pluginAdminItems, ...adminUserItems, ...pluginUserItemsMerged]
       : [...userMenuItems, ...pluginUserItemsMerged];
@@ -457,8 +458,8 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto">
-          <div className="p-4 md:p-6 lg:p-8 max-w-[1400px] mx-auto">
+        <main className="flex-1 overflow-auto ag-main">
+          <div className="ag-main-content p-4 md:p-6 lg:p-8 max-w-[1400px] mx-auto">
             {children}
           </div>
         </main>

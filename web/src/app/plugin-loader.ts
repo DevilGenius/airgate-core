@@ -99,7 +99,7 @@ function normalizePluginFrontendModule(
 }
 
 // 核心通过 window.__airgate_shared 暴露的共享模块列表
-const SHARED_MODULES = ['react', 'react-dom', 'react/jsx-runtime'];
+const SHARED_MODULES = ['react', 'react-dom', 'react/jsx-runtime', 'react-i18next'];
 
 function rewriteNamedImportSpecifiers(specifiers: string): string {
   return specifiers
