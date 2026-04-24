@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../shared/components/Button';
 import { Input, Select } from '../../shared/components/Input';
@@ -70,8 +70,13 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
     { value: 'verify-full', label: 'verify-full' },
   ];
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (testResult?.success) onNext();
+  };
+
   return (
-    <div className="space-y-4">
+    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
       <p className="text-sm text-text-secondary mb-2">
         {t('setup.step_db_desc')}
       </p>
@@ -129,6 +134,7 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
       {/* 操作按钮 */}
       <div className="flex justify-between pt-4">
         <Button
+          type="button"
           variant="secondary"
           onClick={handleTest}
           loading={testing}
@@ -137,13 +143,13 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
           {t('setup.test_connection')}
         </Button>
         <Button
-          onClick={onNext}
+          type="submit"
           disabled={!testResult?.success}
           icon={<ArrowRight className="w-4 h-4" />}
         >
           {t('setup.step_redis')}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usersApi } from '../../shared/api/users';
@@ -59,7 +59,8 @@ export default function ProfilePage() {
     profileMutation.mutate({ username: username.trim() });
   }
 
-  function handleChangePassword() {
+  function handleChangePassword(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     if (!passwords.old_password || !passwords.new_password) {
       toast('error', t('profile.password_incomplete'));
       return;
@@ -152,7 +153,7 @@ export default function ProfilePage() {
 
       {/* 修改密码 */}
       <Card title={t('profile.change_password')} className="mb-6">
-        <div className="space-y-4">
+        <form className="space-y-4" onSubmit={handleChangePassword} noValidate>
           <Input
             label={t('profile.old_password')}
             type="password"
@@ -187,13 +188,13 @@ export default function ProfilePage() {
             icon={<KeyRound className="w-4 h-4" />}
           />
           <Button
-            onClick={handleChangePassword}
+            type="submit"
             loading={passwordMutation.isPending}
             icon={<Lock className="w-4 h-4" />}
           >
             {t('profile.change_password')}
           </Button>
-        </div>
+        </form>
       </Card>
     </div>
   );

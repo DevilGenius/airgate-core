@@ -1,3 +1,4 @@
+import { type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../shared/components/Button';
 import { Input } from '../../shared/components/Input';
@@ -45,8 +46,13 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
     data.password.length >= 8 &&
     data.password === data.confirmPassword;
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (canProceed) onNext();
+  };
+
   return (
-    <div className="space-y-4">
+    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
       <p className="text-sm text-text-secondary mb-2">
         {t('setup.step_admin_desc')}
       </p>
@@ -99,6 +105,7 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
       <div className="flex justify-between pt-4">
         {onPrev ? (
           <Button
+            type="button"
             variant="ghost"
             onClick={onPrev}
             icon={<ArrowLeft className="w-4 h-4" />}
@@ -109,13 +116,13 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
           <span />
         )}
         <Button
-          onClick={onNext}
+          type="submit"
           disabled={!canProceed}
           icon={<ArrowRight className="w-4 h-4" />}
         >
           {t('setup.step_finish')}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

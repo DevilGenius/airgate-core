@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { proxiesApi } from '../../shared/api/proxies';
@@ -125,7 +125,8 @@ export default function ProxiesPage() {
   }
 
   // 提交表单
-  function handleSubmit() {
+  function handleSubmit(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     if (!form.name || !form.address || !form.port) {
       toast('error', t('common.fill_required'));
       return;
@@ -276,16 +277,16 @@ export default function ProxiesPage() {
         title={editingProxy ? t('proxies.edit') : t('proxies.create')}
         footer={
           <>
-            <Button variant="secondary" onClick={closeModal}>
+            <Button type="button" variant="secondary" onClick={closeModal}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleSubmit} loading={saving}>
+            <Button type="submit" form="proxy-form" loading={saving}>
               {editingProxy ? t('common.save') : t('common.create')}
             </Button>
           </>
         }
       >
-        <div className="space-y-4">
+        <form id="proxy-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
           <Input
             label={t('common.name')}
             required
@@ -335,7 +336,7 @@ export default function ProxiesPage() {
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             placeholder={editingProxy ? t('proxies.password_hint') : ''}
           />
-        </div>
+        </form>
       </Modal>
 
       {/* 删除确认 */}

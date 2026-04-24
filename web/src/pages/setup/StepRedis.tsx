@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../shared/components/Button';
 import { Input } from '../../shared/components/Input';
@@ -66,8 +66,13 @@ export default function StepRedis({ data, onChange, onPrev, onNext }: StepRedisP
     }
   };
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (testResult?.success) onNext();
+  };
+
   return (
-    <div className="space-y-4">
+    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
       <p className="text-sm text-text-secondary mb-2">
         {t('setup.step_redis_desc')}
       </p>
@@ -126,6 +131,7 @@ export default function StepRedis({ data, onChange, onPrev, onNext }: StepRedisP
       <div className="flex justify-between pt-4">
         <div className="flex gap-2">
           <Button
+            type="button"
             variant="ghost"
             onClick={onPrev}
             icon={<ArrowLeft className="w-4 h-4" />}
@@ -133,6 +139,7 @@ export default function StepRedis({ data, onChange, onPrev, onNext }: StepRedisP
             {t('setup.step_db')}
           </Button>
           <Button
+            type="button"
             variant="secondary"
             onClick={handleTest}
             loading={testing}
@@ -142,13 +149,13 @@ export default function StepRedis({ data, onChange, onPrev, onNext }: StepRedisP
           </Button>
         </div>
         <Button
-          onClick={onNext}
+          type="submit"
           disabled={!testResult?.success}
           icon={<ArrowRight className="w-4 h-4" />}
         >
           {t('setup.step_admin')}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Modal } from '../../../shared/components/Modal';
@@ -33,7 +33,8 @@ export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUser
     copy(pwd);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
     if (!form.email || !form.password) return;
     onSubmit(form);
   };
@@ -50,12 +51,12 @@ export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUser
       title={t('users.create')}
       footer={
         <>
-          <Button variant="secondary" onClick={handleClose}>{t('common.cancel')}</Button>
-          <Button onClick={handleSubmit} loading={loading}>{t('common.create')}</Button>
+          <Button type="button" variant="secondary" onClick={handleClose}>{t('common.cancel')}</Button>
+          <Button type="submit" form="create-user-form" loading={loading}>{t('common.create')}</Button>
         </>
       }
     >
-      <div className="space-y-4">
+      <form id="create-user-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
         <Input label={t('users.email')} type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         <div>
           <div className="relative">
@@ -85,7 +86,7 @@ export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUser
           value={String(form.max_concurrency ?? 0)}
           onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
         />
-      </div>
+      </form>
     </Modal>
   );
 }

@@ -150,17 +150,15 @@ export default function UserOverviewPage() {
           {models.length > 0 ? (
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="w-44 h-44 flex-shrink-0 mx-auto sm:mx-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" minAngle={3} stroke="var(--ag-bg-elevated)" strokeWidth={1}>
-                      {models.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                    </Pie>
-                    <RechartsTooltip
-                      contentStyle={{ background: 'var(--ag-bg-elevated)', border: '1px solid var(--ag-border)', borderRadius: 8, fontSize: 12 }}
-                      formatter={(value) => [fmtNum(Number(value)), 'Token']}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <PieChart width={176} height={176}>
+                  <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" minAngle={3} stroke="var(--ag-bg-elevated)" strokeWidth={1}>
+                    {models.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <RechartsTooltip
+                    contentStyle={{ background: 'var(--ag-bg-elevated)', border: '1px solid var(--ag-border)', borderRadius: 8, fontSize: 12 }}
+                    formatter={(value) => [fmtNum(Number(value)), 'Token']}
+                  />
+                </PieChart>
               </div>
               <div className="flex-1 overflow-auto">
                 <table className="w-full text-xs">

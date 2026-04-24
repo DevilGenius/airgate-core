@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff } from 'lucide-react';
 import { Modal } from '../../../shared/components/Modal';
@@ -24,6 +24,11 @@ export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUs
   });
   const [showPassword, setShowPassword] = useState(false);
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSubmit(form);
+  };
+
   return (
     <Modal
       open={open}
@@ -31,12 +36,12 @@ export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUs
       title={t('users.edit')}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button onClick={() => onSubmit(form)} loading={loading}>{t('common.save')}</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button type="submit" form="edit-user-form" loading={loading}>{t('common.save')}</Button>
         </>
       }
     >
-      <div className="space-y-4">
+      <form id="edit-user-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
         <Input label={t('users.email')} value={user.email} disabled />
         <Input label={t('users.username')} value={form.username ?? ''} onChange={(e) => setForm({ ...form, username: e.target.value })} />
         <div className="relative">
@@ -81,7 +86,7 @@ export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUs
             </span>
           </div>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }

@@ -313,33 +313,31 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
         <div className="flex gap-4">
           {/* 饼图 */}
           <div className="w-48 h-48 flex-shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={35}
-                  outerRadius={70}
-                  dataKey="value"
-                  minAngle={3}
-                  stroke="var(--ag-bg-elevated)"
-                  strokeWidth={1}
-                >
-                  {pieData.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <RechartsTooltip
-                  contentStyle={{
-                    background: 'var(--ag-bg-elevated)',
-                    border: '1px solid var(--ag-border)',
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <PieChart width={192} height={192}>
+              <Pie
+                data={pieData}
+                cx="50%"
+                cy="50%"
+                innerRadius={35}
+                outerRadius={70}
+                dataKey="value"
+                minAngle={3}
+                stroke="var(--ag-bg-elevated)"
+                strokeWidth={1}
+              >
+                {pieData.map((_, i) => (
+                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <RechartsTooltip
+                contentStyle={{
+                  background: 'var(--ag-bg-elevated)',
+                  border: '1px solid var(--ag-border)',
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
+              />
+            </PieChart>
           </div>
 
           {/* 模型表格 */}

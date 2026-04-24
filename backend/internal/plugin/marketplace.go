@@ -128,6 +128,14 @@ var officialPlugins = []MarketplacePlugin{
 		GithubRepo:  "DouDOU-start/airgate-health",
 	},
 	{
+		Name:        "airgate-playground",
+		Version:     "0.1.0",
+		Description: "AI 对话插件：网页聊天、多模型切换、会话管理",
+		Author:      "AirGate",
+		Type:        "extension",
+		GithubRepo:  "DouDOU-start/airgate-playground",
+	},
+	{
 		Name:        "gateway-claude",
 		Version:     "1.0.0",
 		Description: "Claude Messages API 网关插件：OAuth 授权、TLS 指纹、用量监控",
