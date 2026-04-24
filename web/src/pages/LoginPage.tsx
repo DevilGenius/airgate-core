@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../shared/components/Button';
@@ -8,7 +8,6 @@ import { useAuth } from '../app/providers/AuthProvider';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
-import { useStatusPageEnabled } from '../shared/hooks/useStatusPageEnabled';
 import { ApiError, setSessionAPIKey } from '../shared/api/client';
 import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Activity } from 'lucide-react';
 
@@ -97,16 +96,13 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   const passwordMismatch = confirmPassword !== '' && password !== confirmPassword;
 
   // 倒计时
-  useState(() => {
+  useEffect(() => {
     if (countdown <= 0) return;
-    const timer = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) { clearInterval(timer); return 0; }
-        return c - 1;
-      });
+    const timer = window.setInterval(() => {
+      setCountdown((c) => (c <= 1 ? 0 : c - 1));
     }, 1000);
-    return () => clearInterval(timer);
-  });
+    return () => window.clearInterval(timer);
+  }, [countdown]);
 
   // 发送验证码
   const handleSendCode = async () => {
@@ -117,13 +113,6 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
       await authApi.sendVerifyCode(email);
       setCodeSent(true);
       setCountdown(60);
-      // 启动倒计时
-      const timer = setInterval(() => {
-        setCountdown((c) => {
-          if (c <= 1) { clearInterval(timer); return 0; }
-          return c - 1;
-        });
-      }, 1000);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('auth.send_code_failed'));
     } finally {
@@ -332,7 +321,6 @@ export default function LoginPage() {
   const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const site = useSiteSettings();
-  const statusPageEnabled = useStatusPageEnabled();
   const [activeTab, setActiveTab] = useState<TabKey>('login');
   const [registerSuccess, setRegisterSuccess] = useState(false);
 
@@ -477,15 +465,13 @@ export default function LoginPage() {
 
           {/* 底部 */}
           <div className="mt-6 flex flex-col items-center gap-2">
-            {statusPageEnabled && (
-              <a
-                href="/status"
-                className="inline-flex items-center gap-1.5 text-[11px] text-text-tertiary hover:text-primary transition-colors"
-              >
-                <Activity className="w-3 h-3" />
-                {t('nav.status')}
-              </a>
-            )}
+            <a
+              href="/status"
+              className="inline-flex items-center gap-1.5 text-[11px] text-text-tertiary hover:text-primary transition-colors"
+            >
+              <Activity className="w-3 h-3" />
+              {t('nav.status')}
+            </a>
             <p className="text-center text-[10px] text-text-tertiary font-mono uppercase tracking-[0.15em]">
               Powered by {site.site_name || 'AirGate'}
             </p>

@@ -10,7 +10,6 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useSiteSettings, defaultLogoUrl } from '../providers/SiteSettingsProvider';
 import { effectiveDocUrl } from '../../shared/utils/docUrl';
 import { useIsMobile } from '../../shared/hooks/useMediaQuery';
-import { useStatusPageEnabled } from '../../shared/hooks/useStatusPageEnabled';
 import {
   LayoutDashboard,
   Users,
@@ -170,9 +169,7 @@ export function AppShell({ children }: AppShellProps) {
     refetchOnWindowFocus: false,
   });
   const { adminItems: pluginAdminItems, userItems: pluginUserItems, healthInstalled } = usePluginMenuItems(isAdmin);
-  const statusPageEnabled = useStatusPageEnabled();
-  // 入口可见性：插件已安装 + 公开状态页开关已开启。两者缺一就隐藏，避免点进去看到 404。
-  const showStatusEntry = healthInstalled && statusPageEnabled;
+  const showStatusEntry = healthInstalled;
   const adminUserItems = userMenuItems
     .filter((item) => item.path !== '/')
     .map((item, i) => (i === 0 ? { ...item, sectionKey: 'nav.personal' } : item));
@@ -363,7 +360,7 @@ export function AppShell({ children }: AppShellProps) {
             <h2 className="text-sm font-semibold text-text">{pageTitle}</h2>
           </div>
           <div className="flex items-center gap-1.5">
-            {/* Service status — 仅当 airgate-health 插件已安装且公开状态页已开启时显示
+            {/* Service status — 仅当 airgate-health 插件已安装时显示
                 注意：用普通 <a> 而非 <Link>，因为 /status 由后端反代到 health 插件
                 的 standalone 页面，不在 SPA 路由树里 */}
             {showStatusEntry && (
