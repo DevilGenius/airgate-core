@@ -996,6 +996,17 @@
     "tokens_in": "输入",
     "tokens_out": "输出",
     "cost": "费用",
-    "create_failed": "创建对话失败"
+    "create_failed": "创建对话失败",
+    "generated_image": "生成图片",
+    "image_preview": "图片预览",
+    "preview_image": "预览图片",
+    "download": "下载",
+    "download_image": "下载图片",
+    "download_started": "图片下载已开始",
+    "download_failed": "图片下载失败",
+    "close_image_preview": "关闭图片预览",
+    "retry": "重试",
+    "retry_image": "重试图片生成",
+    "no_image_prompt": "未找到这张图片对应的提示词"
   }
 }

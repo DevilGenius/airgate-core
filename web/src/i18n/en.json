@@ -992,6 +992,17 @@
     "tokens_in": "In",
     "tokens_out": "Out",
     "cost": "Cost",
-    "create_failed": "Failed to create conversation"
+    "create_failed": "Failed to create conversation",
+    "generated_image": "Generated image",
+    "image_preview": "Image preview",
+    "preview_image": "Preview image",
+    "download": "Download",
+    "download_image": "Download image",
+    "download_started": "Image download started",
+    "download_failed": "Image download failed",
+    "close_image_preview": "Close image preview",
+    "retry": "Retry",
+    "retry_image": "Retry image",
+    "no_image_prompt": "No prompt found for this image"
   }
 }
