@@ -447,7 +447,7 @@ export default function UsagePage() {
       hideOnMobile: true,
       render: (row) => {
         if (row.api_key_deleted) {
-          return <span className="block max-w-full truncate text-text-tertiary text-xs">{t('usage.api_key_deleted')}</span>;
+          return <span className="block max-w-full truncate text-text-tertiary text-xs">-</span>;
         }
         const hint = row.api_key_hint || `#${row.api_key_id}`;
         const name = row.api_key_name || hint;
