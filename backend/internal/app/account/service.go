@@ -92,12 +92,36 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	}
 
 	ids := make([]int, 0, len(accounts))
+	openaiIDs := make([]int, 0, len(accounts))
 	for _, item := range accounts {
 		ids = append(ids, item.ID)
+		// 生图统计仅 OpenAI 平台账号需要：其它平台没有 image endpoint，跑 SQL 也是 0 行白浪费。
+		if item.Platform == "openai" {
+			openaiIDs = append(openaiIDs, item.ID)
+		}
 	}
 	counts := s.concurrency.GetCurrentCounts(ctx, ids)
 	for index := range accounts {
 		accounts[index].CurrentConcurrency = counts[accounts[index].ID]
+	}
+
+	// 生图请求计数：今日 + 累计。BatchImageStats 失败不阻断主响应（运维路径优先稳定）。
+	if len(openaiIDs) > 0 {
+		todayStart := timezone.StartOfDay(s.now().In(time.Local))
+		if imageStats, err := s.repo.BatchImageStats(ctx, openaiIDs, todayStart); err == nil {
+			for index := range accounts {
+				if accounts[index].Platform != "openai" {
+					continue
+				}
+				if entry, ok := imageStats[accounts[index].ID]; ok {
+					stats := entry
+					accounts[index].ImageStats = &stats
+				} else {
+					// 没记录：显式给个零值结构，让前端拿到 today=0/total=0 而不是 nil（区分"没数据"和"非 openai"）
+					accounts[index].ImageStats = &AccountImageStats{}
+				}
+			}
+		}
 	}
 
 	return ListResult{
@@ -110,10 +134,22 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 
 // Create 创建账号。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	account, err := s.repo.Create(ctx, input)
-	if err == nil {
-		s.InvalidateUsageCache("") // 新账号创建后清除用量缓存
+	if err != nil {
+		logger.Error("account_credential_persist_failed",
+			sdk.LogFieldPlatform, input.Platform,
+			"type", input.Type,
+			"name", input.Name,
+			sdk.LogFieldError, err)
+		return account, err
 	}
+	logger.Info("account_created",
+		sdk.LogFieldAccountID, account.ID,
+		sdk.LogFieldPlatform, account.Platform,
+		"type", account.Type,
+		"name", account.Name)
+	s.InvalidateUsageCache("") // 新账号创建后清除用量缓存
 	return account, err
 }
 
@@ -144,15 +180,39 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary
 
 // Update 更新账号。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Account, error) {
-	return s.repo.Update(ctx, id, input)
+	logger := sdk.LoggerFromContext(ctx)
+	updated, err := s.repo.Update(ctx, id, input)
+	if err != nil {
+		logger.Error("account_credential_persist_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldError, err)
+		return updated, err
+	}
+	switch {
+	case input.State != nil:
+		logger.Info("account_status_changed",
+			sdk.LogFieldAccountID, id,
+			"state", *input.State)
+	case input.MaxConcurrency != nil || input.RateMultiplier != nil:
+		logger.Info("account_quota_updated",
+			sdk.LogFieldAccountID, id)
+	}
+	return updated, err
 }
 
 // Delete 删除账号。
 func (s *Service) Delete(ctx context.Context, id int) error {
+	logger := sdk.LoggerFromContext(ctx)
 	err := s.repo.Delete(ctx, id)
-	if err == nil {
-		s.InvalidateUsageCache("")
+	if err != nil {
+		logger.Error("account_credential_persist_failed",
+			sdk.LogFieldAccountID, id,
+			"op", "delete",
+			sdk.LogFieldError, err)
+		return err
 	}
+	logger.Info("account_deleted", sdk.LogFieldAccountID, id)
+	s.InvalidateUsageCache("")
 	return err
 }
 
@@ -212,8 +272,12 @@ func (r *BulkResult) appendFailure(id int, err error) {
 // ToggleScheduling 快速切换账号调度状态。active ↔ disabled。
 // 其它中间态（rate_limited / degraded）一律视为"非 disabled"，切换后目标 = disabled。
 func (s *Service) ToggleScheduling(ctx context.Context, id int) (ToggleResult, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
 	if err != nil {
+		logger.Error("account_lookup_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldError, err)
 		return ToggleResult{}, err
 	}
 
@@ -224,20 +288,35 @@ func (s *Service) ToggleScheduling(ctx context.Context, id int) (ToggleResult, e
 
 	updated, err := s.repo.Update(ctx, id, UpdateInput{State: &newState})
 	if err != nil {
+		logger.Error("account_credential_persist_failed",
+			sdk.LogFieldAccountID, id,
+			"op", "toggle_scheduling",
+			sdk.LogFieldError, err)
 		return ToggleResult{}, err
 	}
+	logger.Info("account_status_changed",
+		sdk.LogFieldAccountID, id,
+		"state", updated.State)
 	return ToggleResult{ID: updated.ID, State: updated.State}, nil
 }
 
 // PrepareConnectivityTest 准备账号连通性测试。
 func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID string) (*ConnectivityTest, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{WithProxy: true})
 	if err != nil {
+		logger.Error("account_lookup_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldError, err)
 		return nil, err
 	}
 
 	inst := s.plugins.GetPluginByPlatform(item.Platform)
 	if inst == nil || inst.Gateway == nil {
+		logger.Warn("account_credential_validation_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldPlatform, item.Platform,
+			sdk.LogFieldReason, "plugin_not_found")
 		return nil, ErrPluginNotFound
 	}
 
@@ -808,13 +887,21 @@ func (s *Service) GetCredentialsSchema(platform string) CredentialSchema {
 
 // RefreshQuota 刷新账号额度。
 func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
 	if err != nil {
+		logger.Error("account_lookup_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldError, err)
 		return QuotaRefreshResult{}, err
 	}
 
 	inst := s.plugins.GetPluginByPlatform(item.Platform)
 	if inst == nil || inst.Gateway == nil {
+		logger.Warn("account_credential_validation_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldPlatform, item.Platform,
+			sdk.LogFieldReason, "quota_refresh_unsupported")
 		return QuotaRefreshResult{}, ErrQuotaRefreshUnsupported
 	}
 
@@ -825,8 +912,16 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 	if err != nil {
 		// 识别插件返回的 reauth_required 前缀（字符串识别，gRPC 不透传 sentinel error）。
 		if strings.Contains(err.Error(), reauthRequiredPrefix) {
+			logger.Warn("account_credential_validation_failed",
+				sdk.LogFieldAccountID, id,
+				sdk.LogFieldPlatform, item.Platform,
+				sdk.LogFieldReason, "reauth_required")
 			return QuotaRefreshResult{}, ErrReauthRequired
 		}
+		logger.Error("account_credential_validation_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldPlatform, item.Platform,
+			sdk.LogFieldError, err)
 		return QuotaRefreshResult{}, fmt.Errorf("刷新额度失败: %w", err)
 	}
 
@@ -853,6 +948,10 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 	}
 	if updated {
 		if err := s.repo.SaveCredentials(ctx, id, credentials); err != nil {
+			logger.Error("account_credential_persist_failed",
+				sdk.LogFieldAccountID, id,
+				"op", "save_credentials",
+				sdk.LogFieldError, err)
 			return QuotaRefreshResult{}, err
 		}
 	}
@@ -885,8 +984,10 @@ func (s *Service) triggerUsageProbe(ctx context.Context, inst *plugin.PluginInst
 	defer cancel()
 	status, _, _, err := inst.Gateway.HandleHTTPRequest(probeCtx, "POST", "usage/probe", "", nil, reqBody)
 	if err != nil || status != http.StatusOK {
-		slog.Debug("usage/probe 探测失败（降级：等下一轮 5 分钟缓存过期重试）",
-			"account_id", id, "status", status, "error", err)
+		slog.Debug("account_usage_probe_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldStatus, status,
+			sdk.LogFieldError, err)
 	}
 	// 清掉本进程的 usage 5 分钟缓存，让下一次 GetAccountUsage 重新从插件拉窗口数据。
 	s.InvalidateUsageCache("")
@@ -894,8 +995,12 @@ func (s *Service) triggerUsageProbe(ctx context.Context, inst *plugin.PluginInst
 
 // GetStats 获取单个账号统计。
 func (s *Service) GetStats(ctx context.Context, id int, query StatsQuery) (StatsResult, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
 	if err != nil {
+		logger.Error("account_lookup_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldError, err)
 		return StatsResult{}, err
 	}
 
@@ -908,6 +1013,10 @@ func (s *Service) GetStats(ctx context.Context, id int, query StatsQuery) (Stats
 
 	logs, err := s.repo.FindUsageLogs(ctx, id, startDate, endDate)
 	if err != nil {
+		logger.Error("account_lookup_failed",
+			sdk.LogFieldAccountID, id,
+			"op", "find_usage_logs",
+			sdk.LogFieldError, err)
 		return StatsResult{}, err
 	}
 

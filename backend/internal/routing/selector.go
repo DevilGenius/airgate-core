@@ -2,8 +2,11 @@ package routing
 
 import (
 	"context"
+	"log/slog"
 	"sort"
 	"strings"
+
+	sdk "github.com/DouDOU-start/airgate-sdk"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/group"
@@ -31,6 +34,10 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 		Where(group.PlatformEQ(platform)).
 		All(ctx)
 	if err != nil {
+		slog.Error("routing_load_failed",
+			sdk.LogFieldPlatform, platform,
+			sdk.LogFieldUserID, userID,
+			sdk.LogFieldError, err)
 		return nil, err
 	}
 
@@ -42,6 +49,12 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 		if g.IsExclusive {
 			allowed, err := g.QueryAllowedUsers().Where(user.IDEQ(userID)).Exist(ctx)
 			if err != nil {
+				slog.Error("routing_load_failed",
+					sdk.LogFieldPlatform, platform,
+					sdk.LogFieldUserID, userID,
+					sdk.LogFieldGroupID, g.ID,
+					"stage", "exclusive_user_check",
+					sdk.LogFieldError, err)
 				return nil, err
 			}
 			if !allowed {
@@ -69,6 +82,21 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 		}
 		return candidates[i].GroupID < candidates[j].GroupID
 	})
+
+	if len(candidates) == 0 {
+		slog.Warn("routing_no_match",
+			sdk.LogFieldPlatform, platform,
+			sdk.LogFieldUserID, userID,
+			"needs_image", requirements.NeedsImage,
+			"groups_scanned", len(groups))
+	} else {
+		slog.Debug("routing_match",
+			sdk.LogFieldPlatform, platform,
+			sdk.LogFieldUserID, userID,
+			"candidate_count", len(candidates),
+			"top_group_id", candidates[0].GroupID,
+			"top_rate", candidates[0].EffectiveRate)
+	}
 	return candidates, nil
 }
 

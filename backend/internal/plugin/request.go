@@ -33,6 +33,11 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
+		slog.Error("request_body_read_failed",
+			sdk.LogFieldUserID, keyInfo.UserID,
+			sdk.LogFieldAPIKeyID, keyInfo.KeyID,
+			sdk.LogFieldError, err,
+		)
 		openAIError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request", "读取请求体失败")
 		return nil, false
 	}
@@ -164,13 +169,22 @@ func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, platfo
 		if inst != nil {
 			return inst
 		}
-		slog.Warn("请求平台未找到可处理请求的插件",
-			"group_id", keyInfo.GroupID,
-			"platform", platform,
-			"path", path)
 		if f.manager.GetPluginByPlatform(platform) == nil {
+			slog.Error("plugin_not_loaded_for_platform",
+				sdk.LogFieldPlatform, platform,
+				"available", availablePlatforms(f.manager),
+				sdk.LogFieldUserID, keyInfo.UserID,
+				sdk.LogFieldGroupID, keyInfo.GroupID,
+				sdk.LogFieldPath, path,
+			)
 			openAIError(c, http.StatusServiceUnavailable, "server_error", "plugin_unavailable", "插件不可用，请联系管理员")
 		} else {
+			slog.Warn("plugin_route_not_found",
+				sdk.LogFieldPlatform, platform,
+				sdk.LogFieldPath, path,
+				sdk.LogFieldGroupID, keyInfo.GroupID,
+				sdk.LogFieldUserID, keyInfo.UserID,
+			)
 			openAIError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "当前平台不支持该 API 路径")
 		}
 		return nil
@@ -178,6 +192,10 @@ func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, platfo
 
 	inst := f.manager.MatchPluginByPathPrefix(path)
 	if inst == nil {
+		slog.Warn("plugin_route_not_found",
+			sdk.LogFieldPath, path,
+			sdk.LogFieldUserID, keyInfo.UserID,
+		)
 		openAIError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "未找到匹配的插件")
 	}
 	return inst
@@ -265,4 +283,22 @@ func buildProxyURL(account *ent.Account) string {
 		return fmt.Sprintf("%s://%s:%s@%s:%d", proxy.Protocol, proxy.Username, proxy.Password, proxy.Address, proxy.Port)
 	}
 	return fmt.Sprintf("%s://%s:%d", proxy.Protocol, proxy.Address, proxy.Port)
+}
+
+// availablePlatforms 列出当前已加载的网关平台，用于 plugin_not_loaded_for_platform 日志诊断。
+func availablePlatforms(m *Manager) []string {
+	metas := m.GetAllPluginMeta()
+	seen := make(map[string]struct{}, len(metas))
+	out := make([]string, 0, len(metas))
+	for _, mt := range metas {
+		if mt.Platform == "" {
+			continue
+		}
+		if _, ok := seen[mt.Platform]; ok {
+			continue
+		}
+		seen[mt.Platform] = struct{}{}
+		out = append(out, mt.Platform)
+	}
+	return out
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/i18n"
+	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 	"github.com/DouDOU-start/airgate-core/internal/server"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
 	"github.com/DouDOU-start/airgate-core/internal/version"
@@ -70,14 +71,16 @@ func main() {
 	}
 
 	// 加载配置
-	cfg, err := config.Load(config.ConfigPath())
+	cfgPath := config.ConfigPath()
+	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		slog.Error("加载配置失败", "error", err)
+		slog.Error("config_load_failed", "path", cfgPath, "error", err)
 		os.Exit(1)
 	}
 
 	// 用配置值重新初始化日志（应用配置文件中的 level/format）
 	sdk.InitLogger("core", cfg.Log.Level, cfg.Log.Format)
+	slog.Info("config_loaded", "path", cfgPath, "log_level", cfg.Log.Level, "log_format", cfg.Log.Format)
 
 	// 启动正常服务
 	startMainServer(cfg)
@@ -135,12 +138,22 @@ func startSetupServer() {
 
 // startMainServer 启动主服务器
 func startMainServer(cfg *config.Config) {
+	bootStart := time.Now()
+
 	// 初始化数据库连接（Ent Client）
-	drv, err := sql.Open(dialect.Postgres, cfg.Database.DSN())
+	dsn := cfg.Database.DSN()
+	drv, err := sql.Open(dialect.Postgres, dsn)
 	if err != nil {
-		slog.Error("打开数据库失败", "error", err)
+		slog.Error("db_open_failed", "dsn", store.RedactDSN(dsn), sdk.LogFieldError, err)
 		os.Exit(1)
 	}
+	slog.Info("db_connected",
+		"driver", "postgres",
+		"host", cfg.Database.Host,
+		"port", cfg.Database.Port,
+		"db", cfg.Database.DBName,
+		"dsn", store.RedactDSN(dsn))
+
 	// 配置连接池：不限制时 Go 会无限开连接，高并发下 Postgres "too many clients already"
 	maxOpen := cfg.Database.MaxOpenConns
 	if maxOpen <= 0 {
@@ -157,19 +170,33 @@ func startMainServer(cfg *config.Config) {
 	drv.DB().SetMaxOpenConns(maxOpen)
 	drv.DB().SetMaxIdleConns(maxIdle)
 	drv.DB().SetConnMaxLifetime(time.Duration(lifeMin) * time.Minute)
-	slog.Info("数据库连接池已配置",
+	slog.Info("db_pool_configured",
 		"max_open", maxOpen, "max_idle", maxIdle, "lifetime_min", lifeMin)
 
-	db := ent.NewClient(ent.Driver(drv))
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := drv.DB().PingContext(pingCtx); err != nil {
+		pingCancel()
+		slog.Error("db_ping_failed", sdk.LogFieldError, err)
+		os.Exit(1)
+	}
+	pingCancel()
+
+	// 注入 slog 桥接，让 ent 内部 debug/error 日志走结构化通道
+	db := ent.NewClient(ent.Driver(drv), store.EntSlogLogger())
+	slog.Info("ent_client_initialized",
+		"driver", "postgres",
+		"max_open_conns", maxOpen,
+		"max_idle_conns", maxIdle,
+		"lifetime_min", lifeMin)
 	defer func() {
 		if err := db.Close(); err != nil {
-			slog.Warn("关闭数据库连接失败", "error", err)
+			slog.Warn("db_close_failed", sdk.LogFieldError, err)
 		}
 	}()
 
 	// 启动时执行非破坏性迁移，补齐缺失表和字段，避免升级后因 schema 落后导致接口报错。
 	if err := db.Schema.Create(context.Background(), migrate.WithDropIndex(false), migrate.WithDropColumn(false)); err != nil {
-		slog.Error("执行数据库迁移失败", "error", err)
+		slog.Error("db_migration_failed", sdk.LogFieldError, err)
 		os.Exit(1)
 	}
 
@@ -182,11 +209,27 @@ func startMainServer(cfg *config.Config) {
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
 	})
+	redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := rdb.Ping(redisCtx).Err(); err != nil {
+		redisCancel()
+		slog.Error("redis_ping_failed",
+			"host", cfg.Redis.Host,
+			"port", cfg.Redis.Port,
+			sdk.LogFieldError, err)
+		os.Exit(1)
+	}
+	redisCancel()
+	slog.Info("redis_connected",
+		"host", cfg.Redis.Host,
+		"port", cfg.Redis.Port,
+		"db", cfg.Redis.DB)
 	defer func() {
 		if err := rdb.Close(); err != nil {
-			slog.Warn("关闭 Redis 连接失败", "error", err)
+			slog.Warn("redis_close_failed", sdk.LogFieldError, err)
 		}
 	}()
+
+	slog.Info("bootstrap_completed", "duration_ms", time.Since(bootStart).Milliseconds())
 
 	// 创建并启动 HTTP 服务器
 	srv := server.NewServer(cfg, db, rdb)

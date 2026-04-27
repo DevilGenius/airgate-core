@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
+	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
 const (
@@ -40,34 +41,73 @@ func (s *Service) Get(ctx context.Context, id int) (User, error) {
 
 // UpdateProfile 更新当前用户资料。
 func (s *Service) UpdateProfile(ctx context.Context, id int, username string) (User, error) {
-	return s.repo.Update(ctx, id, Mutation{Username: &username})
+	logger := sdk.LoggerFromContext(ctx)
+	updated, err := s.repo.Update(ctx, id, Mutation{Username: &username})
+	if err != nil {
+		logger.Error("user_profile_update_failed",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldError, err,
+		)
+		return User{}, err
+	}
+	logger.Info("user_profile_updated", sdk.LogFieldUserID, id)
+	return updated, nil
 }
 
 // ChangePassword 修改当前用户密码。
 func (s *Service) ChangePassword(ctx context.Context, id int, oldPassword, newPassword string) error {
+	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, false)
 	if err != nil {
+		logger.Error("user_lookup_failed",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldReason, "change_password",
+			sdk.LogFieldError, err,
+		)
 		return err
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(item.PasswordHash), []byte(oldPassword)); err != nil {
+		logger.Warn("user_password_change_rejected",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldReason, "old_password_mismatch",
+		)
 		return ErrOldPasswordMismatch
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
+		logger.Error("user_password_change_failed",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldReason, "password_hash",
+			sdk.LogFieldError, err,
+		)
 		return err
 	}
 	_, err = s.repo.Update(ctx, id, Mutation{PasswordHash: stringPtr(string(hash))})
-	return err
+	if err != nil {
+		logger.Error("user_password_change_failed",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldReason, "persist",
+			sdk.LogFieldError, err,
+		)
+		return err
+	}
+	logger.Info("user_password_changed", sdk.LogFieldUserID, id)
+	return nil
 }
 
 // List 查询用户列表。
 func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	page, pageSize := normalizePage(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 
 	list, total, err := s.repo.List(ctx, filter)
 	if err != nil {
+		logger.Error("user_lookup_failed",
+			sdk.LogFieldReason, "list",
+			sdk.LogFieldError, err,
+		)
 		return ListResult{}, err
 	}
 	return ListResult{List: list, Total: total, Page: page, PageSize: pageSize}, nil
@@ -75,19 +115,29 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 
 // Create 创建用户。
 func (s *Service) Create(ctx context.Context, input CreateInput) (User, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	exists, err := s.repo.EmailExists(ctx, input.Email)
 	if err != nil {
+		logger.Error("user_lookup_failed",
+			sdk.LogFieldReason, "email_check",
+			sdk.LogFieldError, err,
+		)
 		return User{}, err
 	}
 	if exists {
+		logger.Warn("user_create_rejected", sdk.LogFieldReason, "email_already_exists")
 		return User{}, ErrEmailAlreadyExists
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
+		logger.Error("user_create_failed",
+			sdk.LogFieldReason, "password_hash",
+			sdk.LogFieldError, err,
+		)
 		return User{}, err
 	}
 
-	return s.repo.Create(ctx, Mutation{
+	created, err := s.repo.Create(ctx, Mutation{
 		Email:          &input.Email,
 		PasswordHash:   stringPtr(string(hash)),
 		Username:       &input.Username,
@@ -96,13 +146,27 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (User, error) {
 		GroupRates:     cloneGroupRates(input.GroupRates),
 		HasGroupRates:  input.GroupRates != nil,
 	})
+	if err != nil {
+		logger.Error("user_create_failed",
+			sdk.LogFieldReason, "persist",
+			sdk.LogFieldError, err,
+		)
+		return User{}, err
+	}
+	logger.Info("user_created", sdk.LogFieldUserID, created.ID)
+	return created, nil
 }
 
 // Update 更新用户。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (User, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	if input.HasGroupRates {
 		for _, v := range input.GroupRates {
 			if v < 0 {
+				logger.Warn("user_update_rejected",
+					sdk.LogFieldUserID, id,
+					sdk.LogFieldReason, "invalid_rate_multiplier",
+				)
 				return User{}, ErrInvalidRateMultiplier
 			}
 		}
@@ -120,17 +184,43 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (User, 
 	if input.Password != nil {
 		hash, err := bcrypt.GenerateFromPassword([]byte(*input.Password), bcrypt.DefaultCost)
 		if err != nil {
+			logger.Error("user_password_change_failed",
+				sdk.LogFieldUserID, id,
+				sdk.LogFieldReason, "password_hash",
+				sdk.LogFieldError, err,
+			)
 			return User{}, err
 		}
 		mutation.PasswordHash = stringPtr(string(hash))
 	}
-	return s.repo.Update(ctx, id, mutation)
+	updated, err := s.repo.Update(ctx, id, mutation)
+	if err != nil {
+		logger.Error("user_update_failed",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldError, err,
+		)
+		return User{}, err
+	}
+	if input.Password != nil {
+		logger.Info("user_password_changed", sdk.LogFieldUserID, id)
+	}
+	if input.Status != nil && *input.Status == "disabled" {
+		logger.Info("user_disabled", sdk.LogFieldUserID, id)
+	}
+	logger.Info("user_profile_updated", sdk.LogFieldUserID, id)
+	return updated, nil
 }
 
 // AdjustBalance 调整用户余额。
 func (s *Service) AdjustBalance(ctx context.Context, id int, change BalanceChange) (User, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, false)
 	if err != nil {
+		logger.Error("user_lookup_failed",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldReason, "adjust_balance",
+			sdk.LogFieldError, err,
+		)
 		return User{}, err
 	}
 
@@ -143,10 +233,20 @@ func (s *Service) AdjustBalance(ctx context.Context, id int, change BalanceChang
 		afterBalance = beforeBalance + change.Amount
 	case "subtract":
 		if beforeBalance < change.Amount {
+			logger.Warn("user_balance_change_rejected",
+				sdk.LogFieldUserID, id,
+				sdk.LogFieldReason, "insufficient_balance",
+				"action", change.Action,
+			)
 			return User{}, ErrInsufficientBalance
 		}
 		afterBalance = beforeBalance - change.Amount
 	default:
+		logger.Warn("user_balance_change_rejected",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldReason, "invalid_action",
+			"action", change.Action,
+		)
 		return User{}, ErrInvalidBalanceAction
 	}
 
@@ -158,8 +258,21 @@ func (s *Service) AdjustBalance(ctx context.Context, id int, change BalanceChang
 		Remark:        change.Remark,
 	})
 	if err != nil {
+		logger.Error("user_balance_change_failed",
+			sdk.LogFieldUserID, id,
+			"action", change.Action,
+			sdk.LogFieldError, err,
+		)
 		return User{}, err
 	}
+
+	logger.Info("user_balance_changed",
+		sdk.LogFieldUserID, id,
+		"action", change.Action,
+		"before", beforeBalance,
+		"after", afterBalance,
+		sdk.LogFieldReason, change.Remark,
+	)
 
 	// 余额预警检查
 	s.checkBalanceAlert(ctx, updated, beforeBalance)
@@ -246,20 +359,44 @@ func (s *Service) DeleteGroupRate(ctx context.Context, userID int, groupID int64
 
 // Delete 删除用户。
 func (s *Service) Delete(ctx context.Context, id int) error {
+	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, false)
 	if err != nil {
+		logger.Error("user_lookup_failed",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldReason, "delete",
+			sdk.LogFieldError, err,
+		)
 		return err
 	}
 	if item.Role == "admin" {
+		logger.Warn("user_delete_rejected",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldReason, "delete_admin_forbidden",
+		)
 		return ErrDeleteAdminForbidden
 	}
-	return s.repo.Delete(ctx, id)
+	if err := s.repo.Delete(ctx, id); err != nil {
+		logger.Error("user_delete_failed",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldError, err,
+		)
+		return err
+	}
+	logger.Info("user_deleted", sdk.LogFieldUserID, id)
+	return nil
 }
 
 // ToggleStatus 切换用户状态。
 func (s *Service) ToggleStatus(ctx context.Context, id int) (ToggleResult, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, false)
 	if err != nil {
+		logger.Error("user_lookup_failed",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldReason, "toggle_status",
+			sdk.LogFieldError, err,
+		)
 		return ToggleResult{}, err
 	}
 	newStatus := "disabled"
@@ -268,7 +405,17 @@ func (s *Service) ToggleStatus(ctx context.Context, id int) (ToggleResult, error
 	}
 	updated, err := s.repo.Update(ctx, id, Mutation{Status: &newStatus})
 	if err != nil {
+		logger.Error("user_update_failed",
+			sdk.LogFieldUserID, id,
+			sdk.LogFieldReason, "toggle_status",
+			sdk.LogFieldError, err,
+		)
 		return ToggleResult{}, err
+	}
+	if newStatus == "disabled" {
+		logger.Info("user_disabled", sdk.LogFieldUserID, id)
+	} else {
+		logger.Info("user_enabled", sdk.LogFieldUserID, id)
 	}
 	return ToggleResult{ID: updated.ID, Status: updated.Status}, nil
 }

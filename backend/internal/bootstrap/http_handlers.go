@@ -9,6 +9,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	sdk "github.com/DouDOU-start/airgate-sdk"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
 	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
@@ -98,7 +100,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	return &HTTPHandlers{
 		Auth:         handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
 		User:         handler.NewUserHandler(userService),
-		Account:      handler.NewAccountHandler(accountService),
+		Account:      handler.NewAccountHandler(accountService, dep.Scheduler),
 		Group:        handler.NewGroupHandler(groupService),
 		APIKey:       handler.NewAPIKeyHandler(apiKeyService),
 		Subscription: handler.NewSubscriptionHandler(subscriptionService),
@@ -142,7 +144,7 @@ func balanceAlertSendEmail(settingsService *appsettings.Service, email string, b
 	// 读取 SMTP 配置
 	smtpSettings, err := settingsService.List(ctx, "smtp")
 	if err != nil {
-		slog.Error("余额预警：读取 SMTP 设置失败", "error", err)
+		slog.Error("balance_alert_smtp_load_failed", sdk.LogFieldError, err)
 		return
 	}
 	cfg := mailer.Config{}
@@ -165,7 +167,7 @@ func balanceAlertSendEmail(settingsService *appsettings.Service, email string, b
 		}
 	}
 	if cfg.Host == "" {
-		slog.Warn("余额预警：SMTP 未配置，跳过发送")
+		slog.Warn("mail_disabled_no_config", "context", "balance_alert")
 		return
 	}
 	if cfg.Port == 0 {
@@ -211,8 +213,11 @@ func balanceAlertSendEmail(settingsService *appsettings.Service, email string, b
 
 	m := mailer.New(cfg)
 	if err := m.Send(email, subject, body); err != nil {
-		slog.Error("余额预警邮件发送失败", "email", email, "error", err)
+		slog.Error("balance_alert_email_failed", "to_hash", store.EmailHash(email), sdk.LogFieldError, err)
 	} else {
-		slog.Info("余额预警邮件已发送", "email", email, "balance", balance, "threshold", threshold)
+		slog.Info("balance_alert_email_sent",
+			"to_hash", store.EmailHash(email),
+			"balance", balance,
+			"threshold", threshold)
 	}
 }

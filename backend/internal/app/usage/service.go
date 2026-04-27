@@ -3,6 +3,8 @@ package usage
 import (
 	"context"
 	"strings"
+
+	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
 // Service 使用记录用例服务。
@@ -23,6 +25,10 @@ func (s *Service) ListUser(ctx context.Context, userID int64, filter ListFilter)
 
 	list, total, err := s.repo.ListUser(ctx, userID, filter)
 	if err != nil {
+		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+			"scope", "user_list",
+			sdk.LogFieldUserID, userID,
+			sdk.LogFieldError, err)
 		return ListResult{}, err
 	}
 
@@ -36,7 +42,14 @@ func (s *Service) ListUser(ctx context.Context, userID int64, filter ListFilter)
 
 // UserStats 查询当前用户汇总统计。
 func (s *Service) UserStats(ctx context.Context, userID int64, filter StatsFilter) (Summary, error) {
-	return s.repo.SummaryUser(ctx, userID, filter)
+	summary, err := s.repo.SummaryUser(ctx, userID, filter)
+	if err != nil {
+		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+			"scope", "user_summary",
+			sdk.LogFieldUserID, userID,
+			sdk.LogFieldError, err)
+	}
+	return summary, err
 }
 
 // ListAdmin 查询管理员使用记录列表。
@@ -47,6 +60,9 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult,
 
 	list, total, err := s.repo.ListAdmin(ctx, filter)
 	if err != nil {
+		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+			"scope", "admin_list",
+			sdk.LogFieldError, err)
 		return ListResult{}, err
 	}
 
@@ -60,19 +76,30 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult,
 
 // StatsByModel 按模型分组统计。
 func (s *Service) StatsByModel(ctx context.Context, filter StatsFilter) ([]ModelStats, error) {
-	return s.repo.StatsByModel(ctx, filter)
+	stats, err := s.repo.StatsByModel(ctx, filter)
+	if err != nil {
+		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+			"scope", "stats_by_model",
+			sdk.LogFieldError, err)
+	}
+	return stats, err
 }
 
 // AdminStats 查询管理员聚合统计。
 func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy string) (StatsResult, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	summary, err := s.repo.SummaryAdmin(ctx, filter)
 	if err != nil {
+		logger.Error("usage_query_failed",
+			"scope", "admin_summary",
+			sdk.LogFieldError, err)
 		return StatsResult{}, err
 	}
 
 	result := StatsResult{Summary: summary}
 	for _, item := range strings.Split(groupBy, ",") {
-		switch strings.TrimSpace(item) {
+		dimension := strings.TrimSpace(item)
+		switch dimension {
 		case "model":
 			result.ByModel, err = s.repo.StatsByModel(ctx, filter)
 		case "user":
@@ -85,6 +112,10 @@ func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy st
 			continue
 		}
 		if err != nil {
+			logger.Error("usage_query_failed",
+				"scope", "admin_stats",
+				"group_by", dimension,
+				sdk.LogFieldError, err)
 			return StatsResult{}, err
 		}
 	}
@@ -100,6 +131,9 @@ func (s *Service) AdminTrend(ctx context.Context, filter TrendFilter) ([]TrendBu
 
 	entries, err := s.repo.TrendEntries(ctx, filter)
 	if err != nil {
+		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+			"scope", "admin_trend",
+			sdk.LogFieldError, err)
 		return nil, err
 	}
 	return BuildTrendBuckets(entries, filter.Granularity, filter.TZ), nil

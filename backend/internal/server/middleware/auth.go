@@ -2,10 +2,13 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	sdk "github.com/DouDOU-start/airgate-sdk"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
@@ -28,6 +31,7 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := extractBearerToken(c)
 		if tokenStr == "" {
+			slog.Warn("jwt_validation_failed", sdk.LogFieldReason, "missing_token", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
 			response.Unauthorized(c, "缺少认证 Token")
 			c.Abort()
 			return
@@ -36,6 +40,7 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 		// 管理员 API Key 认证
 		if auth.IsAdminAPIKey(tokenStr) && len(db) > 0 && db[0] != nil {
 			if err := auth.ValidateAdminAPIKey(c.Request.Context(), db[0], tokenStr); err != nil {
+				slog.Warn("admin_api_key_validation_failed", sdk.LogFieldReason, "invalid_admin_key", sdk.LogFieldError, err, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
 				response.Unauthorized(c, "管理员 API Key 无效")
 				c.Abort()
 				return
@@ -43,12 +48,17 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 			c.Set(CtxKeyUserID, 0)
 			c.Set(CtxKeyRole, "admin")
 			c.Set(CtxKeyEmail, "")
+			// 派生带 user_id/role 的 logger 写回 ctx，便于后续 handler 复用
+			ctx := c.Request.Context()
+			logger := sdk.LoggerFromContext(ctx).With(sdk.LogFieldUserID, 0, "role", "admin")
+			c.Request = c.Request.WithContext(sdk.WithLogger(ctx, logger))
 			c.Next()
 			return
 		}
 
 		claims, err := jwtMgr.ParseToken(tokenStr)
 		if err != nil {
+			slog.Warn("jwt_validation_failed", sdk.LogFieldReason, "invalid_or_expired", sdk.LogFieldError, err, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
 			response.Unauthorized(c, "Token 无效或已过期")
 			c.Abort()
 			return
@@ -60,6 +70,13 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 		if claims.APIKeyID > 0 {
 			c.Set(CtxKeyAPIKeyID, claims.APIKeyID)
 		}
+		// 用 user_id / role / api_key_id 派生新 logger 写回 ctx
+		ctx := c.Request.Context()
+		logger := sdk.LoggerFromContext(ctx).With(sdk.LogFieldUserID, claims.UserID, "role", claims.Role)
+		if claims.APIKeyID > 0 {
+			logger = logger.With(sdk.LogFieldAPIKeyID, claims.APIKeyID)
+		}
+		c.Request = c.Request.WithContext(sdk.WithLogger(ctx, logger))
 		c.Next()
 	}
 }
@@ -71,12 +88,14 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := extractBearerToken(c)
 		if key == "" {
+			slog.Warn("api_key_validation_failed", sdk.LogFieldReason, "missing_api_key", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
 			abortWithOpenAIError(c, http.StatusUnauthorized, "missing_api_key", "缺少 API Key")
 			return
 		}
 
 		// 验证 API Key 格式
 		if !strings.HasPrefix(key, "sk-") {
+			slog.Warn("api_key_validation_failed", sdk.LogFieldReason, "invalid_format", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
 			abortWithOpenAIError(c, http.StatusUnauthorized, "invalid_api_key", "无效的 API Key 格式")
 			return
 		}
@@ -85,29 +104,43 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 		if err != nil {
 			code := "invalid_api_key"
 			status := http.StatusUnauthorized
+			reason := "invalid_key"
 			switch err {
 			case auth.ErrInvalidAPIKey:
 				// 维持默认 401 / invalid_api_key
 			case auth.ErrAPIKeyExpired:
 				code = "api_key_expired"
+				reason = "expired"
 			case auth.ErrAPIKeyQuota:
 				code = "insufficient_quota"
 				status = http.StatusPaymentRequired
+				reason = "quota_exceeded"
 			case auth.ErrAPIKeyGroupUnbound:
 				code = "api_key_misconfigured"
 				status = http.StatusForbidden
+				reason = "group_unbound"
 			default:
 				// DB 超时 / 连接池满 / ctx 取消 等服务端侧问题：返 503 让客户端重试，
 				// 绝不能误判为"凭证无效"让客户端以为 key 被吊销。
 				code = "service_unavailable"
 				status = http.StatusServiceUnavailable
+				reason = "service_unavailable"
 			}
+			slog.Warn("api_key_validation_failed", sdk.LogFieldReason, reason, sdk.LogFieldError, err, sdk.LogFieldStatus, status, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
 			abortWithOpenAIError(c, status, code, err.Error())
 			return
 		}
 
 		c.Set(CtxKeyUserID, info.UserID)
 		c.Set(CtxKeyKeyInfo, info)
+		// 派生带 user_id/group_id/api_key_id 的 logger 写回 ctx，给后续插件链路复用
+		ctx := c.Request.Context()
+		logger := sdk.LoggerFromContext(ctx).With(
+			sdk.LogFieldUserID, info.UserID,
+			sdk.LogFieldGroupID, info.GroupID,
+			sdk.LogFieldAPIKeyID, info.KeyID,
+		)
+		c.Request = c.Request.WithContext(sdk.WithLogger(ctx, logger))
 		c.Next()
 	}
 }
@@ -128,6 +161,7 @@ func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get(CtxKeyRole)
 		if !exists || role.(string) != "admin" {
+			slog.Warn("admin_access_denied", sdk.LogFieldReason, "non_admin_role", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
 			response.Forbidden(c, "需要管理员权限")
 			c.Abort()
 			return

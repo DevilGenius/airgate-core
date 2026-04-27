@@ -82,11 +82,12 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	extensionProxy := plugin.NewExtensionProxy(pluginMgr)
 
 	s := &Server{
-		cfg:            cfg,
-		db:             db,
-		rdb:            rdb,
-		jwtMgr:         jwtMgr,
-		engine:         gin.Default(),
+		cfg:    cfg,
+		db:     db,
+		rdb:    rdb,
+		jwtMgr: jwtMgr,
+		// gin.New 不挂默认 Logger/Recovery，由我们的中间件接管以便接入结构化日志
+		engine:         gin.New(),
 		pluginMgr:      pluginMgr,
 		forwarder:      forwarder,
 		marketplace:    marketplace,
@@ -140,8 +141,12 @@ func convertMarketEntries(entries []config.MarketEntry) []plugin.MarketplacePlug
 
 // Start 启动 HTTP 服务器（阻塞）
 func (s *Server) Start() error {
-	slog.Info("AirGate Core 服务器启动", "addr", s.srv.Addr)
-	return s.srv.ListenAndServe()
+	slog.Info("server_listening", "host", s.cfg.Server.Host, "port", s.cfg.Server.Port, "addr", s.srv.Addr)
+	if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		slog.Error("server_listen_failed", "addr", s.srv.Addr, "error", err)
+		return err
+	}
+	return nil
 }
 
 // StartPlugins 启动异步记录器和插件系统

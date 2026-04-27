@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
+	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
 // Service 提供仪表盘用例编排。
@@ -33,6 +34,11 @@ func (s *Service) Stats(ctx context.Context, userID int, tz string) (Stats, erro
 
 	snapshot, err := s.repo.LoadStatsSnapshot(ctx, todayStart, fiveMinAgo, userID)
 	if err != nil {
+		sdk.LoggerFromContext(ctx).Error("dashboard_query_failed",
+			sdk.LogFieldUserID, userID,
+			sdk.LogFieldReason, "stats_snapshot",
+			sdk.LogFieldError, err,
+		)
 		return Stats{}, err
 	}
 
@@ -71,6 +77,11 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 	startTime, endTime := resolveTrendTimeRange(query, now)
 	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime, query.UserID)
 	if err != nil {
+		sdk.LoggerFromContext(ctx).Error("dashboard_query_failed",
+			sdk.LogFieldUserID, query.UserID,
+			sdk.LogFieldReason, "trend_logs",
+			sdk.LogFieldError, err,
+		)
 		return Trend{}, err
 	}
 

@@ -125,16 +125,16 @@ func (h *pluginHostHandle) requireCap(cap sdk.Capability) error {
 	caps := h.caps.Load()
 	if caps == nil {
 		// 兼容模式：sdk_version 豁免的老插件
-		slog.Debug("HostService capability 校验跳过（兼容模式）",
-			"plugin", h.pluginName, "capability", cap)
+		slog.Debug("host_service_capability_skipped",
+			sdk.LogFieldPluginID, h.pluginName, "capability", cap)
 		return nil
 	}
 	if (*caps)[cap] {
 		return nil
 	}
 	// Warn 级别便于运维快速发现"插件代码与声明的 capability 不一致"
-	slog.Warn("HostService capability 拒绝",
-		"plugin", h.pluginName, "capability", cap)
+	slog.Warn("host_service_capability_denied",
+		sdk.LogFieldPluginID, h.pluginName, "capability", cap)
 	return status.Errorf(codes.PermissionDenied,
 		"plugin %q lacks capability %q", h.pluginName, cap)
 }
@@ -357,6 +357,7 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 		Reason:     outcome.Reason,
 		Duration:   latency,
 		IsPool:     accFull.UpstreamIsPool,
+		Family:     scheduler.ModelFamily(accFull.Platform, model),
 	})
 
 	switch outcome.Kind {
@@ -388,7 +389,7 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 
 // listGroups 列出所有分组。内部 worker，由 pluginHostHandle.ListGroups 委托。
 func (h *HostService) listGroups(ctx context.Context, _ *pb.HostListGroupsRequest) (*pb.HostListGroupsResponse, error) {
-	slog.Debug("HostService.ListGroups", "module", "host")
+	slog.Debug("host_service_list_groups", "module", "host")
 	groups, err := h.db.Group.Query().All(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -451,27 +452,34 @@ func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (
 	for _, route := range routes {
 		model := h.resolveHostModel(route.Platform, req.Model)
 		if model == "" {
-			slog.Warn("HostService Forward 候选分组没有可用模型", "platform", route.Platform, "group_id", route.GroupID)
+			slog.Warn("host_forward_no_model",
+				sdk.LogFieldPlatform, route.Platform, sdk.LogFieldGroupID, route.GroupID)
 			continue
 		}
 		inst := h.manager.GetPluginByPlatform(route.Platform)
 		if inst == nil || inst.Gateway == nil {
-			slog.Warn("HostService Forward 候选分组没有可用插件", "platform", route.Platform, "group_id", route.GroupID)
+			slog.Warn("host_forward_no_plugin",
+				sdk.LogFieldPlatform, route.Platform, sdk.LogFieldGroupID, route.GroupID)
 			continue
 		}
 
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
 			acc, err := h.scheduler.SelectAccount(ctx, route.Platform, model, 0, route.GroupID, "", hardExclude...)
 			if err != nil {
-				slog.Warn("HostService Forward 调度失败",
-					"platform", route.Platform, "model", model, "group_id", route.GroupID,
-					"effective_rate", route.EffectiveRate, "error", err)
+				slog.Warn("host_forward_pick_account_failed",
+					sdk.LogFieldPlatform, route.Platform,
+					sdk.LogFieldModel, model,
+					sdk.LogFieldGroupID, route.GroupID,
+					"effective_rate", route.EffectiveRate,
+					sdk.LogFieldError, err,
+				)
 				break
 			}
 
 			accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
 			if err != nil {
-				slog.Error("HostService Forward 加载账号失败", "account_id", acc.ID, "error", err)
+				slog.Error("host_forward_account_load_failed",
+					sdk.LogFieldAccountID, acc.ID, sdk.LogFieldError, err)
 				return nil, hostForwardGenericError()
 			}
 
@@ -487,27 +495,38 @@ func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (
 			start := time.Now()
 			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
 			duration := time.Since(start)
-			h.applyHostOutcome(ctx, acc.ID, accFull, outcome, duration)
+			h.applyHostOutcome(ctx, acc.ID, accFull, model, outcome, duration)
 
 			if fwdErr != nil || outcome.Kind.ShouldFailover() {
-				slog.Warn("HostService Forward failover",
-					"group_id", route.GroupID, "effective_rate", route.EffectiveRate,
-					"account_id", acc.ID, "attempt", attempt+1,
-					"kind", outcome.Kind, "reason", outcome.Reason, "error", fwdErr)
+				slog.Warn("host_forward_attempt_failed",
+					sdk.LogFieldGroupID, route.GroupID,
+					"effective_rate", route.EffectiveRate,
+					sdk.LogFieldAccountID, acc.ID,
+					"attempt", attempt+1,
+					"kind", outcome.Kind,
+					sdk.LogFieldReason, outcome.Reason,
+					sdk.LogFieldError, fwdErr,
+				)
 				hardExclude = append(hardExclude, acc.ID)
 				continue
 			}
 
 			if outcome.Kind == sdk.OutcomeClientError {
-				slog.Warn("HostService Forward 上游客户端错误，脱敏返回",
-					"group_id", route.GroupID, "account_id", acc.ID,
-					"status_code", outcome.Upstream.StatusCode, "reason", outcome.Reason)
+				slog.Warn("host_forward_client_error",
+					sdk.LogFieldGroupID, route.GroupID,
+					sdk.LogFieldAccountID, acc.ID,
+					sdk.LogFieldStatus, outcome.Upstream.StatusCode,
+					sdk.LogFieldReason, outcome.Reason,
+				)
 				return nil, status.Error(codes.InvalidArgument, "请求无法完成，请检查输入后重试")
 			}
 			if outcome.Kind != sdk.OutcomeSuccess {
-				slog.Warn("HostService Forward 判决失败",
-					"group_id", route.GroupID, "account_id", acc.ID,
-					"kind", outcome.Kind, "reason", outcome.Reason)
+				slog.Warn("host_forward_outcome_failed",
+					sdk.LogFieldGroupID, route.GroupID,
+					sdk.LogFieldAccountID, acc.ID,
+					"kind", outcome.Kind,
+					sdk.LogFieldReason, outcome.Reason,
+				)
 				break
 			}
 
@@ -558,27 +577,34 @@ func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequ
 	for _, route := range routes {
 		model := h.resolveHostModel(route.Platform, req.Model)
 		if model == "" {
-			slog.Warn("HostService ForwardStream 候选分组没有可用模型", "platform", route.Platform, "group_id", route.GroupID)
+			slog.Warn("host_forward_stream_no_model",
+				sdk.LogFieldPlatform, route.Platform, sdk.LogFieldGroupID, route.GroupID)
 			continue
 		}
 		inst := h.manager.GetPluginByPlatform(route.Platform)
 		if inst == nil || inst.Gateway == nil {
-			slog.Warn("HostService ForwardStream 候选分组没有可用插件", "platform", route.Platform, "group_id", route.GroupID)
+			slog.Warn("host_forward_stream_no_plugin",
+				sdk.LogFieldPlatform, route.Platform, sdk.LogFieldGroupID, route.GroupID)
 			continue
 		}
 
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
 			acc, err := h.scheduler.SelectAccount(ctx, route.Platform, model, 0, route.GroupID, "", hardExclude...)
 			if err != nil {
-				slog.Warn("HostService ForwardStream 调度失败",
-					"platform", route.Platform, "model", model, "group_id", route.GroupID,
-					"effective_rate", route.EffectiveRate, "error", err)
+				slog.Warn("host_forward_stream_pick_account_failed",
+					sdk.LogFieldPlatform, route.Platform,
+					sdk.LogFieldModel, model,
+					sdk.LogFieldGroupID, route.GroupID,
+					"effective_rate", route.EffectiveRate,
+					sdk.LogFieldError, err,
+				)
 				break
 			}
 
 			accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
 			if err != nil {
-				slog.Error("HostService ForwardStream 加载账号失败", "account_id", acc.ID, "error", err)
+				slog.Error("host_forward_stream_account_load_failed",
+					sdk.LogFieldAccountID, acc.ID, sdk.LogFieldError, err)
 				return hostForwardGenericError()
 			}
 
@@ -595,22 +621,30 @@ func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequ
 			start := time.Now()
 			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
 			duration := time.Since(start)
-			h.applyHostOutcome(ctx, acc.ID, accFull, outcome, duration)
+			h.applyHostOutcome(ctx, acc.ID, accFull, model, outcome, duration)
 
 			canRetry := !fw.committed && (fwdErr != nil || outcome.Kind.ShouldFailover())
 			if canRetry {
-				slog.Warn("HostService ForwardStream failover",
-					"group_id", route.GroupID, "effective_rate", route.EffectiveRate,
-					"account_id", acc.ID, "attempt", attempt+1,
-					"kind", outcome.Kind, "reason", outcome.Reason, "error", fwdErr)
+				slog.Warn("host_forward_stream_attempt_failed",
+					sdk.LogFieldGroupID, route.GroupID,
+					"effective_rate", route.EffectiveRate,
+					sdk.LogFieldAccountID, acc.ID,
+					"attempt", attempt+1,
+					"kind", outcome.Kind,
+					sdk.LogFieldReason, outcome.Reason,
+					sdk.LogFieldError, fwdErr,
+				)
 				hardExclude = append(hardExclude, acc.ID)
 				continue
 			}
 
 			if outcome.Kind == sdk.OutcomeClientError {
-				slog.Warn("HostService ForwardStream 上游客户端错误，脱敏返回",
-					"group_id", route.GroupID, "account_id", acc.ID,
-					"status_code", outcome.Upstream.StatusCode, "reason", outcome.Reason)
+				slog.Warn("host_forward_stream_client_error",
+					sdk.LogFieldGroupID, route.GroupID,
+					sdk.LogFieldAccountID, acc.ID,
+					sdk.LogFieldStatus, outcome.Upstream.StatusCode,
+					sdk.LogFieldReason, outcome.Reason,
+				)
 				return status.Error(codes.InvalidArgument, "请求无法完成，请检查输入后重试")
 			}
 
@@ -619,15 +653,23 @@ func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequ
 			}
 
 			if outcome.Kind != sdk.OutcomeSuccess && fwdErr == nil {
-				slog.Warn("HostService ForwardStream 上游失败，流已提交无法重试",
-					"group_id", route.GroupID, "effective_rate", route.EffectiveRate,
-					"account_id", acc.ID, "kind", outcome.Kind,
-					"status_code", outcome.Upstream.StatusCode, "reason", outcome.Reason,
-					"stream_committed", fw.committed)
+				slog.Warn("host_forward_stream_committed_failure",
+					sdk.LogFieldGroupID, route.GroupID,
+					"effective_rate", route.EffectiveRate,
+					sdk.LogFieldAccountID, acc.ID,
+					"kind", outcome.Kind,
+					sdk.LogFieldStatus, outcome.Upstream.StatusCode,
+					sdk.LogFieldReason, outcome.Reason,
+					"stream_committed", fw.committed,
+				)
 			}
 
 			if fwdErr != nil {
-				slog.Warn("HostService ForwardStream 插件调用失败", "group_id", route.GroupID, "account_id", acc.ID, "error", fwdErr)
+				slog.Warn("host_forward_stream_plugin_error",
+					sdk.LogFieldGroupID, route.GroupID,
+					sdk.LogFieldAccountID, acc.ID,
+					sdk.LogFieldError, fwdErr,
+				)
 				return hostForwardGenericError()
 			}
 
@@ -906,7 +948,8 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForward
 	if req.GroupId > 0 {
 		u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserId))).Only(ctx)
 		if err != nil {
-			slog.Error("HostService 查询用户失败", "user_id", req.UserId, "error", err)
+			slog.Error("host_forward_user_lookup_failed",
+				sdk.LogFieldUserID, req.UserId, sdk.LogFieldError, err)
 			return nil, hostForwardGenericError()
 		}
 		g, err := h.db.Group.Get(ctx, int(req.GroupId))
@@ -914,11 +957,16 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForward
 			if ent.IsNotFound(err) {
 				return nil, status.Error(codes.NotFound, "分组不存在")
 			}
-			slog.Error("HostService 查询分组失败", "group_id", req.GroupId, "error", err)
+			slog.Error("host_forward_group_lookup_failed",
+				sdk.LogFieldGroupID, req.GroupId, sdk.LogFieldError, err)
 			return nil, hostForwardGenericError()
 		}
 		if !routing.GroupMatchesRequirements(g, hostForwardRequirements(req)) {
-			slog.Warn("HostService Forward 指定分组不满足请求能力", "group_id", req.GroupId, "model", req.Model, "path", req.Path)
+			slog.Warn("host_forward_group_requirement_unmet",
+				sdk.LogFieldGroupID, req.GroupId,
+				sdk.LogFieldModel, req.Model,
+				sdk.LogFieldPath, req.Path,
+			)
 			return nil, hostForwardGenericError()
 		}
 		return []routing.Candidate{{
@@ -939,16 +987,24 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForward
 	}
 	u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserId))).Only(ctx)
 	if err != nil {
-		slog.Error("HostService 查询用户失败", "user_id", req.UserId, "error", err)
+		slog.Error("host_forward_user_lookup_failed",
+			sdk.LogFieldUserID, req.UserId, sdk.LogFieldError, err)
 		return nil, hostForwardGenericError()
 	}
 	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserId), platform, u.GroupRates, hostForwardRequirements(req))
 	if err != nil {
-		slog.Error("HostService 查询候选分组失败", "platform", platform, "user_id", req.UserId, "error", err)
+		slog.Error("host_forward_routes_lookup_failed",
+			sdk.LogFieldPlatform, platform,
+			sdk.LogFieldUserID, req.UserId,
+			sdk.LogFieldError, err,
+		)
 		return nil, hostForwardGenericError()
 	}
 	if len(routes) == 0 {
-		slog.Warn("HostService 没有可用候选分组", "platform", platform, "user_id", req.UserId)
+		slog.Warn("host_forward_no_eligible_route",
+			sdk.LogFieldPlatform, platform,
+			sdk.LogFieldUserID, req.UserId,
+		)
 		return nil, hostForwardGenericError()
 	}
 	return routes, nil
@@ -1008,13 +1064,14 @@ func hostSDKAccount(acc *ent.Account) *sdk.Account {
 	}
 }
 
-func (h *HostService) applyHostOutcome(ctx context.Context, accountID int, accFull *ent.Account, outcome sdk.ForwardOutcome, duration time.Duration) {
+func (h *HostService) applyHostOutcome(ctx context.Context, accountID int, accFull *ent.Account, model string, outcome sdk.ForwardOutcome, duration time.Duration) {
 	h.scheduler.Apply(ctx, accountID, scheduler.Judgment{
 		Kind:       outcome.Kind,
 		RetryAfter: outcome.RetryAfter,
 		Reason:     outcome.Reason,
 		Duration:   duration,
 		IsPool:     accFull.UpstreamIsPool,
+		Family:     scheduler.ModelFamily(accFull.Platform, model),
 	})
 }
 
@@ -1024,7 +1081,8 @@ func (h *HostService) checkHostForwardBalance(ctx context.Context, userID int64)
 		if ent.IsNotFound(err) {
 			return status.Error(codes.NotFound, "用户不存在")
 		}
-		slog.Error("HostService 余额预检查询用户失败", "user_id", userID, "error", err)
+		slog.Error("host_forward_balance_check_user_lookup_failed",
+			sdk.LogFieldUserID, userID, sdk.LogFieldError, err)
 		return hostForwardGenericError()
 	}
 	if u.Balance <= 0 {

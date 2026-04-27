@@ -3,6 +3,8 @@ package subscription
 import (
 	"context"
 	"time"
+
+	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
 // Service 提供订阅域用例编排。
@@ -68,48 +70,101 @@ func (s *Service) AdminListSubscriptions(ctx context.Context, filter AdminListFi
 
 // AdminAssign 管理员分配订阅。
 func (s *Service) AdminAssign(ctx context.Context, input AssignInput) (Subscription, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	expiresAt, err := time.Parse(time.RFC3339, input.ExpiresAt)
 	if err != nil {
+		logger.Warn("subscription_rejected",
+			sdk.LogFieldReason, "invalid_expires_at",
+			sdk.LogFieldUserID, input.UserID,
+			sdk.LogFieldGroupID, input.GroupID)
 		return Subscription{}, ErrInvalidExpiresAt
 	}
 
-	return s.repo.Create(ctx, CreateInput{
+	sub, err := s.repo.Create(ctx, CreateInput{
 		UserID:      input.UserID,
 		GroupID:     input.GroupID,
 		EffectiveAt: s.now(),
 		ExpiresAt:   expiresAt,
 		Status:      "active",
 	})
+	if err != nil {
+		logger.Error("subscription_persist_failed",
+			"op", "create",
+			sdk.LogFieldUserID, input.UserID,
+			sdk.LogFieldGroupID, input.GroupID,
+			sdk.LogFieldError, err)
+		return sub, err
+	}
+	logger.Info("subscription_created",
+		"subscription_id", sub.ID,
+		sdk.LogFieldUserID, sub.UserID,
+		sdk.LogFieldGroupID, sub.GroupID)
+	return sub, nil
 }
 
 // AdminBulkAssign 管理员批量分配订阅。
 func (s *Service) AdminBulkAssign(ctx context.Context, input BulkAssignInput) (int, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	expiresAt, err := time.Parse(time.RFC3339, input.ExpiresAt)
 	if err != nil {
+		logger.Warn("subscription_rejected",
+			sdk.LogFieldReason, "invalid_expires_at",
+			"op", "bulk_assign",
+			sdk.LogFieldGroupID, input.GroupID)
 		return 0, ErrInvalidExpiresAt
 	}
 
-	return s.repo.BulkCreate(ctx, BulkCreateInput{
+	count, err := s.repo.BulkCreate(ctx, BulkCreateInput{
 		UserIDs:     append([]int(nil), input.UserIDs...),
 		GroupID:     input.GroupID,
 		EffectiveAt: s.now(),
 		ExpiresAt:   expiresAt,
 		Status:      "active",
 	})
+	if err != nil {
+		logger.Error("subscription_persist_failed",
+			"op", "bulk_create",
+			sdk.LogFieldGroupID, input.GroupID,
+			"user_count", len(input.UserIDs),
+			sdk.LogFieldError, err)
+		return count, err
+	}
+	logger.Info("subscription_created",
+		"op", "bulk",
+		sdk.LogFieldGroupID, input.GroupID,
+		"created", count)
+	return count, nil
 }
 
 // AdminAdjust 管理员调整订阅。
 func (s *Service) AdminAdjust(ctx context.Context, id int, input AdjustInput) (Subscription, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	update := UpdateInput{
 		Status: input.Status,
 	}
 	if input.ExpiresAt != nil {
 		parsed, err := time.Parse(time.RFC3339, *input.ExpiresAt)
 		if err != nil {
+			logger.Warn("subscription_rejected",
+				sdk.LogFieldReason, "invalid_adjust_expires_at",
+				"subscription_id", id)
 			return Subscription{}, ErrInvalidAdjustExpiresAt
 		}
 		update.ExpiresAt = &parsed
 	}
 
-	return s.repo.Update(ctx, id, update)
+	sub, err := s.repo.Update(ctx, id, update)
+	if err != nil {
+		logger.Error("subscription_persist_failed",
+			"op", "update",
+			"subscription_id", id,
+			sdk.LogFieldError, err)
+		return sub, err
+	}
+	if input.Status != nil && *input.Status == "cancelled" {
+		logger.Info("subscription_cancelled", "subscription_id", id)
+	} else {
+		logger.Info("subscription_plan_changed", "subscription_id", id)
+	}
+	return sub, nil
 }

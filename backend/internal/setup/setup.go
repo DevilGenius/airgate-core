@@ -21,9 +21,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
 
+	sdk "github.com/DouDOU-start/airgate-sdk"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/migrate"
 	"github.com/DouDOU-start/airgate-core/internal/config"
+	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 )
 
 var installMu sync.Mutex
@@ -100,13 +103,14 @@ func NeedsSetup() bool {
 	// config.yaml 存在，尝试加载并连接数据库确认是否已初始化
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		slog.Warn("加载配置文件失败，进入安装向导", "error", err)
+		slog.Warn("setup_config_load_failed", "stage", "config_load", sdk.LogFieldError, err)
 		return true
 	}
 
-	db, err := sql.Open("postgres", cfg.Database.DSN())
+	dsn := cfg.Database.DSN()
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		slog.Warn("打开数据库失败，进入安装向导", "error", err)
+		slog.Warn("db_open_failed", "stage", "needs_setup", "dsn", store.RedactDSN(dsn), sdk.LogFieldError, err)
 		return true
 	}
 	defer func() { _ = db.Close() }()
@@ -115,7 +119,7 @@ func NeedsSetup() bool {
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
-		slog.Warn("数据库连接失败，进入安装向导", "error", err)
+		slog.Warn("db_ping_failed", "stage", "needs_setup", sdk.LogFieldError, err)
 		return true
 	}
 
@@ -124,11 +128,15 @@ func NeedsSetup() bool {
 	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&count)
 	if err != nil {
 		// 表不存在或查询失败，视为未安装
-		slog.Warn("查询管理员记录失败，进入安装向导", "error", err)
+		slog.Warn("setup_admin_query_failed", "stage", "needs_setup", sdk.LogFieldError, err)
 		return true
 	}
 
-	return count == 0
+	if count == 0 {
+		return true
+	}
+	slog.Info("setup_already_initialized")
+	return false
 }
 
 // TestDBConnection 测试数据库连接。
@@ -148,11 +156,11 @@ func TestDBConnection(host string, port int, user, password, dbname, sslmode str
 		if !isDatabaseNotExistError(err) {
 			return err
 		}
-		slog.Info("目标数据库不存在，尝试自动创建", "dbname", dbname)
+		slog.Info("setup_database_create_start", "dbname", dbname)
 		if createErr := createDatabase(host, port, user, password, dbname, sslmode); createErr != nil {
 			return fmt.Errorf("数据库 %q 不存在且自动创建失败: %w", dbname, createErr)
 		}
-		slog.Info("数据库创建成功，重试连接", "dbname", dbname)
+		slog.Info("setup_database_created", "dbname", dbname)
 		return pingDatabase(host, port, user, password, dbname, sslmode)
 	}
 	return nil
@@ -168,7 +176,7 @@ func pingDatabase(host string, port int, user, password, dbname, sslmode string)
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			slog.Warn("关闭测试数据库连接失败", "error", err)
+			slog.Warn("db_close_failed", "stage", "setup_ping", sdk.LogFieldError, err)
 		}
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -201,7 +209,7 @@ func createDatabase(host string, port int, user, password, dbname, sslmode strin
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			slog.Warn("关闭 postgres 系统库连接失败", "error", err)
+			slog.Warn("db_close_failed", "stage", "setup_create_db", sdk.LogFieldError, err)
 		}
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -230,7 +238,7 @@ func TestRedisConnection(host string, port int, password string, db int) error {
 	})
 	defer func() {
 		if err := rdb.Close(); err != nil {
-			slog.Warn("关闭测试 Redis 连接失败", "error", err)
+			slog.Warn("redis_close_failed", "stage", "setup_test", sdk.LogFieldError, err)
 		}
 	}()
 
@@ -258,10 +266,11 @@ func Install(params InstallParams) error {
 		return fmt.Errorf("系统已安装")
 	}
 
-	slog.Info("开始安装...")
+	slog.Info("setup_initialization_start")
 
 	// 1. 测试数据库连接
 	if err := TestDBConnection(params.DB.Host, params.DB.Port, params.DB.User, params.DB.Password, params.DB.DBName, params.DB.SSLMode); err != nil {
+		slog.Error("setup_failed", "stage", "test_db_connection", sdk.LogFieldError, err)
 		return fmt.Errorf("数据库连接失败: %w", err)
 	}
 
@@ -269,27 +278,30 @@ func Install(params InstallParams) error {
 	dsn := params.DB.DSN()
 	drv, err := entsql.Open(dialect.Postgres, dsn)
 	if err != nil {
+		slog.Error("setup_failed", "stage", "open_database", "dsn", store.RedactDSN(dsn), sdk.LogFieldError, err)
 		return fmt.Errorf("打开数据库失败: %w", err)
 	}
-	client := ent.NewClient(ent.Driver(drv))
+	client := ent.NewClient(ent.Driver(drv), store.EntSlogLogger())
 	defer func() {
 		if err := client.Close(); err != nil {
-			slog.Warn("关闭安装数据库客户端失败", "error", err)
+			slog.Warn("db_close_failed", "stage", "setup_install", sdk.LogFieldError, err)
 		}
 	}()
 
-	slog.Info("正在执行数据库迁移...")
+	slog.Info("setup_migration_start")
 	if err := client.Schema.Create(context.Background(),
 		migrate.WithDropIndex(false),
 		migrate.WithDropColumn(false),
 	); err != nil {
+		slog.Error("setup_failed", "stage", "schema_migration", sdk.LogFieldError, err)
 		return fmt.Errorf("数据库迁移失败: %w", err)
 	}
-	slog.Info("数据库迁移完成")
+	slog.Info("setup_migration_done")
 
 	// 3. 创建管理员账户
 	hash, err := bcrypt.GenerateFromPassword([]byte(params.Admin.Password), bcrypt.DefaultCost)
 	if err != nil {
+		slog.Error("setup_failed", "stage", "password_hash", sdk.LogFieldError, err)
 		return fmt.Errorf("密码加密失败: %w", err)
 	}
 	_, err = client.User.Create().
@@ -299,8 +311,10 @@ func Install(params InstallParams) error {
 		SetStatus("active").
 		Save(context.Background())
 	if err != nil {
+		slog.Error("setup_failed", "stage", "create_admin", "admin_email", store.EmailHash(params.Admin.Email), sdk.LogFieldError, err)
 		return fmt.Errorf("创建管理员失败: %w", err)
 	}
+	slog.Info("setup_admin_created", "admin_email", store.EmailHash(params.Admin.Email))
 
 	// 4. 写入配置文件
 	cfg := &config.Config{
@@ -311,13 +325,16 @@ func Install(params InstallParams) error {
 	}
 	cfgData, err := yaml.Marshal(cfg)
 	if err != nil {
+		slog.Error("setup_failed", "stage", "marshal_config", sdk.LogFieldError, err)
 		return fmt.Errorf("序列化配置失败: %w", err)
 	}
 	if err := os.WriteFile(config.ConfigPath(), cfgData, 0644); err != nil {
+		slog.Error("setup_failed", "stage", "write_config", sdk.LogFieldError, err)
 		return fmt.Errorf("写入配置文件失败: %w", err)
 	}
+	slog.Info("setup_defaults_seeded", "config_path", config.ConfigPath())
 
-	slog.Info("安装完成")
+	slog.Info("setup_initialization_done")
 	return nil
 }
 

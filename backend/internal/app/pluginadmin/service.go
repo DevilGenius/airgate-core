@@ -54,34 +54,88 @@ func (s *Service) GetConfig(ctx context.Context, name string) (map[string]string
 //
 // 注意 reload 失败不会回滚配置：用户应当看到错误后修改配置再重试。
 func (s *Service) UpdateConfig(ctx context.Context, name string, config map[string]string) error {
+	logger := sdk.LoggerFromContext(ctx)
 	if err := s.manager.UpdatePluginConfig(ctx, name, config); err != nil {
+		logger.Error("plugin_admin_config_updated_failed",
+			sdk.LogFieldPluginID, name,
+			sdk.LogFieldError, err)
 		return err
 	}
-	return s.manager.ReloadInstance(ctx, name)
+	logger.Info("plugin_admin_config_updated", sdk.LogFieldPluginID, name)
+	if err := s.manager.ReloadInstance(ctx, name); err != nil {
+		logger.Error("plugin_admin_reload_failed",
+			sdk.LogFieldPluginID, name,
+			sdk.LogFieldError, err)
+		return err
+	}
+	return nil
 }
 
 // Upload 从二进制安装插件。
 func (s *Service) Upload(ctx context.Context, name string, binary []byte) error {
+	logger := sdk.LoggerFromContext(ctx)
 	copied := append([]byte(nil), binary...)
-	return s.manager.InstallFromBinary(ctx, name, copied)
+	if err := s.manager.InstallFromBinary(ctx, name, copied); err != nil {
+		logger.Error("plugin_admin_uploaded_failed",
+			sdk.LogFieldPluginID, name,
+			"size_bytes", len(copied),
+			sdk.LogFieldError, err)
+		return err
+	}
+	logger.Info("plugin_admin_uploaded",
+		sdk.LogFieldPluginID, name,
+		"size_bytes", len(copied))
+	return nil
 }
 
 // InstallFromGithub 从 GitHub 安装插件。
 func (s *Service) InstallFromGithub(ctx context.Context, repo string) error {
-	return s.manager.InstallFromGithub(ctx, repo)
+	logger := sdk.LoggerFromContext(ctx)
+	if err := s.manager.InstallFromGithub(ctx, repo); err != nil {
+		logger.Error("plugin_admin_uploaded_failed",
+			"repo", repo,
+			"source", "github",
+			sdk.LogFieldError, err)
+		return err
+	}
+	logger.Info("plugin_admin_uploaded",
+		"repo", repo,
+		"source", "github")
+	return nil
 }
 
 // Uninstall 卸载插件。
 func (s *Service) Uninstall(ctx context.Context, name string) error {
-	return s.manager.Uninstall(ctx, name)
+	logger := sdk.LoggerFromContext(ctx)
+	if err := s.manager.Uninstall(ctx, name); err != nil {
+		logger.Error("plugin_admin_removed_failed",
+			sdk.LogFieldPluginID, name,
+			sdk.LogFieldError, err)
+		return err
+	}
+	logger.Info("plugin_admin_removed", sdk.LogFieldPluginID, name)
+	return nil
 }
 
 // Reload 热加载插件。
 func (s *Service) Reload(ctx context.Context, name string) error {
+	logger := sdk.LoggerFromContext(ctx)
 	if !s.manager.IsDev(name) {
+		logger.Warn("plugin_admin_reload_failed",
+			sdk.LogFieldPluginID, name,
+			sdk.LogFieldReason, "not_dev_plugin")
 		return ErrPluginNotDev
 	}
-	return s.manager.ReloadDev(ctx, name)
+	if err := s.manager.ReloadDev(ctx, name); err != nil {
+		logger.Error("plugin_admin_reload_failed",
+			sdk.LogFieldPluginID, name,
+			sdk.LogFieldError, err)
+		return err
+	}
+	logger.Info("plugin_admin_enabled",
+		sdk.LogFieldPluginID, name,
+		"op", "dev_reload")
+	return nil
 }
 
 // Proxy 转发插件管理请求。

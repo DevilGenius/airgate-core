@@ -16,6 +16,10 @@ import (
 const (
 	// rateLimitedDefault 上游没给 RetryAfter 时的兜底冷却。
 	rateLimitedDefault = 60 * time.Second
+	// rateLimitedMin 最小冷却下限。OpenAI 共享 org 限流时给的 RetryAfter 经常是 15ms~50ms，
+	// 跟着这种瞬时值会让账号刚解锁就被同请求或并发请求立刻再撞墙。设一个下限让实际放出
+	// 的请求拉开间隔，配合上游窗口老化才有效果。
+	rateLimitedMin = 200 * time.Millisecond
 	// rateLimitedMax OAuth 某些限流可能长达数天，设上限防止异常值。
 	rateLimitedMax = 7 * 24 * time.Hour
 	// degradedDefault 池账号抖动时的软降级窗口。
@@ -31,6 +35,7 @@ type Judgment struct {
 	Reason     string
 	Duration   time.Duration // 仅用于日志 / 指标
 	IsPool     bool          // 池账号（upstream_is_pool）走豁免路径
+	Family     string        // 模型家族键（见 ModelFamily）。非空时 RateLimited 走 Redis 家族冷却而非账号级 DB state，避免 gpt-image 限流误伤 chat。
 }
 
 // StateMachine 账号状态机。所有状态转移必须通过 Apply 入口。
@@ -42,8 +47,9 @@ type Judgment struct {
 // 只有确定性的账号级信号才动 state：AccountRateLimited / AccountDead。
 // UpstreamTransient（SSE EOF、上游 5xx、连接抖动）是上游锅，不扣账号分——让 failover 兜底。
 type StateMachine struct {
-	db  *ent.Client
-	rdb *redis.Client
+	db             *ent.Client
+	rdb            *redis.Client
+	familyCooldown *FamilyCooldown
 
 	// onCriticalTransition Active ↔ Disabled 转移后的回调（由 Scheduler 注入）。
 	// 用来清 route 缓存，让下次 SelectAccount 立刻看到新状态；
@@ -51,9 +57,10 @@ type StateMachine struct {
 	onCriticalTransition func()
 }
 
-// NewStateMachine 构造状态机。
-func NewStateMachine(db *ent.Client, rdb *redis.Client) *StateMachine {
-	return &StateMachine{db: db, rdb: rdb}
+// NewStateMachine 构造状态机。fc 提供 (account, family) 维度的限流冷却，
+// nil 时退化为旧行为：所有 RateLimited 都写账号级 DB state。
+func NewStateMachine(db *ent.Client, rdb *redis.Client, fc *FamilyCooldown) *StateMachine {
+	return &StateMachine{db: db, rdb: rdb, familyCooldown: fc}
 }
 
 // notifyCritical 发出关键状态变更事件。nil 回调时安静跳过。
@@ -82,10 +89,25 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		if dur <= 0 {
 			dur = rateLimitedDefault
 		}
+		if dur < rateLimitedMin {
+			dur = rateLimitedMin
+		}
 		if dur > rateLimitedMax {
 			dur = rateLimitedMax
 		}
 		until := time.Now().Add(dur)
+		// 有 Family 信息时走家族级冷却：撞 gpt-image 4000/min 不会让同账号 chat 被跳过。
+		// 无 Family（admin 巡检 / 老插件）保留账号级 rate_limited 兜底，行为与改造前一致。
+		if j.Family != "" && sm.familyCooldown != nil {
+			sm.familyCooldown.Mark(ctx, accountID, j.Family, until, j.Reason)
+			slog.Info("scheduler_family_cooldown",
+				sdk.LogFieldAccountID, accountID,
+				"family", j.Family,
+				"until", until,
+				sdk.LogFieldReason, j.Reason,
+			)
+			return
+		}
 		sm.transition(ctx, accountID, account.StateRateLimited, &until, j.Reason)
 
 	case sdk.OutcomeAccountDead:
@@ -140,7 +162,8 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int) {
 		SetLastUsedAt(now).
 		Exec(dbCtx)
 	if err != nil {
-		slog.Warn("状态机：转移到 active 失败", "account_id", accountID, "error", err)
+		slog.Warn("scheduler_state_active_failed",
+			sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
 		return
 	}
 	if prevState != account.StateActive {
@@ -163,17 +186,19 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 	}
 
 	if err := upd.Exec(dbCtx); err != nil {
-		slog.Error("状态机：转移状态失败",
-			"account_id", accountID,
+		slog.Error("scheduler_state_transition_failed",
+			sdk.LogFieldAccountID, accountID,
 			"target_state", newState,
-			"error", err)
+			sdk.LogFieldError, err,
+		)
 		return
 	}
-	slog.Info("账号状态转移",
-		"account_id", accountID,
+	slog.Info("scheduler_state_transition",
+		sdk.LogFieldAccountID, accountID,
 		"state", newState,
 		"until", stateUntil,
-		"reason", reason)
+		sdk.LogFieldReason, reason,
+	)
 
 	// Disabled 是关键转移：缓存里还挂着 active 的快照会让调度器反复选它、白白浪费 failover。
 	// RateLimited / Degraded 有 state_until，缓存 3s 陈旧期可接受。

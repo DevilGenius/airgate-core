@@ -3,10 +3,12 @@ package openclaw
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"strings"
 	"text/template"
 
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
+	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
 // Service 提供 OpenClaw 一键接入相关的领域用例。
@@ -53,6 +55,9 @@ func (s *Service) Load(ctx context.Context) (Config, error) {
 
 	ocItems, err := s.settings.List(ctx, GroupName)
 	if err != nil {
+		sdk.LoggerFromContext(ctx).Error("openclaw_sync_failed",
+			"stage", "load_openclaw_settings",
+			sdk.LogFieldError, err)
 		return cfg, err
 	}
 	for _, it := range ocItems {
@@ -138,10 +143,16 @@ func (s *Service) newInstallScriptData(cfg Config) installScriptTemplateData {
 func (s *Service) RenderInstallScript(cfg Config) (string, error) {
 	tpl, err := template.New("install.sh").Parse(InstallScriptTemplate())
 	if err != nil {
+		slog.Default().Error("openclaw_sync_failed",
+			"stage", "parse_install_sh",
+			sdk.LogFieldError, err)
 		return "", err
 	}
 	var buf bytes.Buffer
 	if err := tpl.Execute(&buf, s.newInstallScriptData(cfg)); err != nil {
+		slog.Default().Error("openclaw_sync_failed",
+			"stage", "render_install_sh",
+			sdk.LogFieldError, err)
 		return "", err
 	}
 	return buf.String(), nil
@@ -153,10 +164,16 @@ func (s *Service) RenderInstallScript(cfg Config) (string, error) {
 func (s *Service) RenderInstallScriptPowerShell(cfg Config) (string, error) {
 	tpl, err := template.New("install.ps1").Parse(InstallScriptPowerShellTemplate())
 	if err != nil {
+		slog.Default().Error("openclaw_sync_failed",
+			"stage", "parse_install_ps1",
+			sdk.LogFieldError, err)
 		return "", err
 	}
 	var buf bytes.Buffer
 	if err := tpl.Execute(&buf, s.newInstallScriptData(cfg)); err != nil {
+		slog.Default().Error("openclaw_sync_failed",
+			"stage", "render_install_ps1",
+			sdk.LogFieldError, err)
 		return "", err
 	}
 	return buf.String(), nil

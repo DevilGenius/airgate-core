@@ -18,6 +18,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	sdk "github.com/DouDOU-start/airgate-sdk"
+
 	"github.com/DouDOU-start/airgate-core/internal/version"
 )
 
@@ -53,6 +55,7 @@ func (s *Service) Info(ctx context.Context) (*Info, error) {
 		Mode:    s.mode,
 		Current: current,
 	}
+	slog.Info("upgrade_check_start", "current_version", current, "mode", string(s.mode))
 
 	if s.mode == ModeSystemd {
 		if exe, err := os.Executable(); err == nil {
@@ -63,7 +66,7 @@ func (s *Service) Info(ctx context.Context) (*Info, error) {
 	rel, err := s.github.LatestRelease(ctx)
 	if err != nil {
 		// GitHub 失败不算硬错误：前端仍能展示当前版本，按钮置灰即可。
-		slog.Warn("拉取 GitHub release 失败", "error", err)
+		slog.Warn("upgrade_check_failed", sdk.LogFieldError, err)
 		return info, nil
 	}
 
@@ -74,6 +77,9 @@ func (s *Service) Info(ctx context.Context) (*Info, error) {
 		info.CheckedAt = &t
 	}
 	info.HasUpdate = isNewer(rel.TagName, current)
+	if info.HasUpdate {
+		slog.Info("upgrade_available", "latest", rel.TagName, "current", current)
+	}
 
 	switch s.mode {
 	case ModeDocker:
@@ -215,7 +221,7 @@ func (s *Service) runAsync(target string, asset *Asset) {
 		return
 	}
 
-	slog.Info("airgate-core 已替换二进制，准备退出由 systemd 拉起新版本",
+	slog.Info("upgrade_migration_applied",
 		"from", version.Version,
 		"to", target,
 		"backup", bakPath,
@@ -230,7 +236,7 @@ func (s *Service) runAsync(target string, asset *Asset) {
 	// 给 HTTP 响应一点时间送出，再退出
 	go func() {
 		time.Sleep(800 * time.Millisecond)
-		slog.Warn("airgate-core 主动退出以完成升级（systemd 将自动重启）",
+		slog.Warn("upgrade_self_exit",
 			"target", target,
 			"rollback_hint", "如反复重启，运行 `mv "+bakPath+" "+exe+"` 回滚",
 		)
@@ -239,7 +245,11 @@ func (s *Service) runAsync(target string, asset *Asset) {
 }
 
 func (s *Service) fail(target, msg string, err error) {
-	slog.Error("airgate-core 升级失败", "target", target, "stage", msg, "error", err)
+	slog.Error("upgrade_migration_failed",
+		"from", version.Version,
+		"to", target,
+		"stage", msg,
+		sdk.LogFieldError, err)
 	s.box.store(Status{
 		State:   StateFailed,
 		Target:  target,

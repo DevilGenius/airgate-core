@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,6 +24,24 @@ func openAIError(c *gin.Context, status int, errType, code, message string) {
 			"code":    code,
 		},
 	})
+}
+
+// openAIRateLimitError 写 429 + Retry-After 头 + OpenAI 兼容的 rate_limit_error 错误体。
+// retryAfter < 1s 一律向上取整到 1s（OpenAI 客户端 SDK 普遍按整数秒读 Retry-After）。
+// 同时输出 retry-after-ms 头，便于精度敏感的客户端做更细粒度的退避。
+func openAIRateLimitError(c *gin.Context, status int, code, message string, retryAfter time.Duration) {
+	if retryAfter < 0 {
+		retryAfter = 0
+	}
+	if retryAfter > 0 {
+		secs := int64((retryAfter + time.Second - 1) / time.Second)
+		if secs < 1 {
+			secs = 1
+		}
+		c.Writer.Header().Set("Retry-After", strconv.FormatInt(secs, 10))
+		c.Writer.Header().Set("Retry-After-Ms", strconv.FormatInt(retryAfter.Milliseconds(), 10))
+	}
+	openAIError(c, status, "rate_limit_error", code, message)
 }
 
 // writeResult 是一次 forward 的终点。按 outcome.Kind 分派响应写入。
@@ -96,11 +115,12 @@ func writeFailureResponse(c *gin.Context, state *forwardState, execution forward
 		"status_code", execution.outcome.Upstream.StatusCode,
 		"reason", execution.outcome.Reason)
 
-	status := http.StatusBadGateway
 	if execution.outcome.Kind == sdk.OutcomeAccountRateLimited {
-		status = http.StatusTooManyRequests
+		openAIRateLimitError(c, http.StatusTooManyRequests, "upstream_rate_limit",
+			sanitizedMessage(execution.outcome.Kind), execution.outcome.RetryAfter)
+		return
 	}
-	openAIError(c, status, "server_error", "upstream_error", sanitizedMessage(execution.outcome.Kind))
+	openAIError(c, http.StatusBadGateway, "server_error", "upstream_error", sanitizedMessage(execution.outcome.Kind))
 }
 
 func sanitizedMessage(kind sdk.OutcomeKind) string {
@@ -127,6 +147,9 @@ func (f *Forwarder) applyOutcome(ctx context.Context, state *forwardState, execu
 		Reason:     judgmentReason(execution),
 		Duration:   execution.duration,
 		IsPool:     state.account != nil && state.account.UpstreamIsPool,
+		// Family 让限流冷却落到 (account, family) 维度。撞 gpt-image 4000/min
+		// 时账号上 chat 模型仍可调用，避免单模型限流误伤整账号。
+		Family: scheduler.ModelFamily(state.requestedPlatform, state.model),
 	}
 	f.scheduler.Apply(ctx, state.account.ID, j)
 

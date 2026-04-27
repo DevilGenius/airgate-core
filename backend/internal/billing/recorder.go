@@ -85,7 +85,7 @@ func (r *Recorder) Record(record UsageRecord) {
 	select {
 	case r.ch <- record:
 	default:
-		slog.Warn("使用量记录缓冲已满，丢弃记录",
+		slog.Warn("billing_record_buffer_full",
 			"user_id", record.UserID,
 			"model", record.Model,
 		)
@@ -148,7 +148,7 @@ func (r *Recorder) run() {
 func (r *Recorder) flush(ctx context.Context, batch []UsageRecord) {
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if err := r.batchInsert(ctx, batch); err != nil {
-			slog.Error("批量写入使用记录失败",
+			slog.Error("billing_batch_flush_failed",
 				"attempt", attempt+1,
 				"count", len(batch),
 				"error", err,
@@ -157,10 +157,10 @@ func (r *Recorder) flush(ctx context.Context, batch []UsageRecord) {
 				time.Sleep(time.Duration(attempt+1) * time.Second)
 				continue
 			}
-			slog.Error("批量写入使用记录最终失败，丢弃数据", "count", len(batch))
+			slog.Error("billing_batch_flush_dropped", "count", len(batch))
 			return
 		}
-		slog.Debug("批量写入使用记录成功", "count", len(batch))
+		slog.Debug("billing_batch_flush_succeeded", "count", len(batch))
 		return
 	}
 }

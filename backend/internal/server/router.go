@@ -21,7 +21,9 @@ func (s *Server) registerRoutes() {
 	r := s.engine
 	handlers := s.handlers
 
-	// 全局中间件
+	// 全局中间件：Recovery → RequestLogger → I18n → 业务
+	r.Use(middleware.Recovery())
+	r.Use(middleware.RequestLogger())
 	r.Use(middleware.I18n())
 
 	// 健康检查（无需认证，供 docker / k8s healthcheck 使用）

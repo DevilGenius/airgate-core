@@ -14,6 +14,8 @@ import (
 	"time"
 
 	xproxy "golang.org/x/net/proxy"
+
+	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
 // Service 提供代理域用例编排。
@@ -55,26 +57,74 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 
 // Create 创建代理。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Proxy, error) {
-	return s.repo.Create(ctx, input)
+	logger := sdk.LoggerFromContext(ctx)
+	p, err := s.repo.Create(ctx, input)
+	if err != nil {
+		// 不打印 username/password；只保留协议与地址作为定位线索。
+		logger.Error("proxy_config_persist_failed",
+			"op", "create",
+			"name", input.Name,
+			"protocol", input.Protocol,
+			"address", input.Address,
+			sdk.LogFieldError, err)
+		return p, err
+	}
+	logger.Info("proxy_config_created",
+		"proxy_id", p.ID,
+		"name", p.Name,
+		"protocol", p.Protocol,
+		"address", p.Address)
+	return p, nil
 }
 
 // Update 更新代理。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Proxy, error) {
-	return s.repo.Update(ctx, id, input)
+	logger := sdk.LoggerFromContext(ctx)
+	p, err := s.repo.Update(ctx, id, input)
+	if err != nil {
+		logger.Error("proxy_config_persist_failed",
+			"op", "update",
+			"proxy_id", id,
+			sdk.LogFieldError, err)
+		return p, err
+	}
+	return p, nil
 }
 
 // Delete 删除代理。
 func (s *Service) Delete(ctx context.Context, id int) error {
-	return s.repo.Delete(ctx, id)
+	logger := sdk.LoggerFromContext(ctx)
+	if err := s.repo.Delete(ctx, id); err != nil {
+		logger.Error("proxy_config_persist_failed",
+			"op", "delete",
+			"proxy_id", id,
+			sdk.LogFieldError, err)
+		return err
+	}
+	logger.Info("proxy_config_deleted", "proxy_id", id)
+	return nil
 }
 
 // Test 测试代理连通性。
 func (s *Service) Test(ctx context.Context, id int) (TestResult, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id)
 	if err != nil {
+		logger.Error("proxy_config_persist_failed",
+			"op", "find_by_id",
+			"proxy_id", id,
+			sdk.LogFieldError, err)
 		return TestResult{}, err
 	}
-	return s.prober.Probe(ctx, item), nil
+	result := s.prober.Probe(ctx, item)
+	if !result.Success {
+		logger.Warn("proxy_test_failed",
+			"proxy_id", id,
+			"protocol", item.Protocol,
+			"address", item.Address,
+			sdk.LogFieldReason, result.ErrorMsg)
+	}
+	return result, nil
 }
 
 // DefaultProber 是默认代理探测器。
@@ -139,7 +189,7 @@ func (DefaultProber) Probe(ctx context.Context, p Proxy) TestResult {
 		latency := time.Since(start).Milliseconds()
 		if doErr != nil {
 			lastErr = fmt.Sprintf("[%s] 请求失败: %v", ep.url, doErr)
-			slog.Warn("代理检测端点请求失败", "url", ep.url, "error", doErr)
+			slog.Warn("proxy_probe_endpoint_failed", "url", ep.url, sdk.LogFieldError, doErr)
 			continue
 		}
 

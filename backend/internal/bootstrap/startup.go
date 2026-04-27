@@ -6,6 +6,8 @@ import (
 
 	entsql "entgo.io/ent/dialect/sql"
 
+	sdk "github.com/DouDOU-start/airgate-sdk"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
@@ -13,9 +15,11 @@ import (
 
 // RunStartupTasks 运行启动阶段的整理任务。
 func RunStartupTasks(db *ent.Client, drv *entsql.Driver, apiKeySecret string) {
+	slog.Info("bootstrap_startup_tasks_start")
 	backfillKeyHints(db, apiKeySecret)
 	backfillResellerMarkupColumns(drv)
 	migrateAccountState(drv)
+	slog.Info("bootstrap_startup_tasks_done")
 }
 
 // migrateAccountState 把老的 status / rate_limit_reset_at 字段一次性迁移到新的
@@ -38,7 +42,7 @@ func migrateAccountState(drv *entsql.Driver) {
 	const checkSQL = `SELECT 1 FROM information_schema.columns
 		WHERE table_name='accounts' AND column_name='status' LIMIT 1`
 	if err := drv.Query(ctx, checkSQL, []any{}, &exists); err != nil {
-		slog.Warn("检查 accounts.status 旧列失败（跳过迁移）", "error", err)
+		slog.Warn("bootstrap_account_state_check_failed", sdk.LogFieldError, err)
 		return
 	}
 	hasOld := exists.Next()
@@ -47,7 +51,7 @@ func migrateAccountState(drv *entsql.Driver) {
 		return
 	}
 
-	slog.Info("检测到 accounts 表的旧状态列，开始迁移到 state / state_until")
+	slog.Info("bootstrap_account_state_migration_start")
 
 	// data migration
 	const updateSQL = `UPDATE accounts SET
@@ -63,11 +67,11 @@ func migrateAccountState(drv *entsql.Driver) {
 	`
 	var res entsql.Result
 	if err := drv.Exec(ctx, updateSQL, []any{}, &res); err != nil {
-		slog.Error("迁移 accounts.state 数据失败", "error", err)
+		slog.Error("bootstrap_account_state_migration_failed", sdk.LogFieldError, err)
 		return
 	}
 	if affected, err := res.RowsAffected(); err == nil {
-		slog.Info("accounts.state 数据迁移完成", "rows", affected)
+		slog.Info("bootstrap_account_state_migration_done", "rows", affected)
 	}
 
 	// 然后删旧列。WithDropColumn(false) 让 ent 不自动删，所以手工 DROP。
@@ -78,10 +82,10 @@ func migrateAccountState(drv *entsql.Driver) {
 	for _, sql := range drops {
 		var r entsql.Result
 		if err := drv.Exec(ctx, sql, []any{}, &r); err != nil {
-			slog.Warn("DROP 旧账号列失败（可忽略，下次启动会重试）", "sql", sql, "error", err)
+			slog.Warn("bootstrap_drop_legacy_column_failed", "sql", sql, sdk.LogFieldError, err)
 		}
 	}
-	slog.Info("accounts 旧 status / rate_limit_reset_at 列已 DROP")
+	slog.Info("bootstrap_account_legacy_columns_dropped")
 }
 
 // backfillResellerMarkupColumns 一次性回填 reseller markup 改造引入的两个新列：
@@ -109,11 +113,11 @@ func backfillResellerMarkupColumns(drv *entsql.Driver) {
 	for _, stmt := range statements {
 		var res entsql.Result
 		if err := drv.Exec(ctx, stmt.sql, []any{}, &res); err != nil {
-			slog.Warn("回填 reseller markup 列失败（可忽略，仅影响历史展示）", "table", stmt.label, "error", err)
+			slog.Warn("bootstrap_reseller_backfill_failed", "table", stmt.label, sdk.LogFieldError, err)
 			continue
 		}
 		if affected, err := res.RowsAffected(); err == nil && affected > 0 {
-			slog.Info("回填 reseller markup 列", "table", stmt.label, "rows", affected)
+			slog.Info("bootstrap_reseller_backfill_done", "table", stmt.label, "rows", affected)
 		}
 	}
 }
@@ -128,27 +132,27 @@ func backfillKeyHints(db *ent.Client, secret string) {
 		)).
 		All(ctx)
 	if err != nil {
-		slog.Warn("查询待回填 API Key 失败", "error", err)
+		slog.Warn("bootstrap_keyhint_query_failed", sdk.LogFieldError, err)
 		return
 	}
 	if len(keys) == 0 {
 		return
 	}
 
-	slog.Info("回填 API Key hint", "count", len(keys))
+	slog.Info("bootstrap_keyhint_backfill_start", "count", len(keys))
 	for _, item := range keys {
 		if item.KeyEncrypted == "" {
 			continue
 		}
 		plain, err := auth.DecryptAPIKey(item.KeyEncrypted, secret)
 		if err != nil {
-			slog.Warn("解密 API Key 失败，跳过", "id", item.ID, "error", err)
+			slog.Warn("bootstrap_keyhint_decrypt_failed", sdk.LogFieldAPIKeyID, item.ID, sdk.LogFieldError, err)
 			continue
 		}
 		hint := plain[:7] + "..." + plain[len(plain)-4:]
 		if err := db.APIKey.UpdateOneID(item.ID).SetKeyHint(hint).Exec(ctx); err != nil {
-			slog.Warn("回填 key_hint 失败", "id", item.ID, "error", err)
+			slog.Warn("bootstrap_keyhint_update_failed", sdk.LogFieldAPIKeyID, item.ID, sdk.LogFieldError, err)
 		}
 	}
-	slog.Info("API Key hint 回填完成")
+	slog.Info("bootstrap_keyhint_backfill_done", "count", len(keys))
 }

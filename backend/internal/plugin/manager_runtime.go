@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -116,8 +117,8 @@ func (m *Manager) buildInitConfig(ctx context.Context, name string) map[string]i
 	// 给插件准备一个独立 schema + 受限 role，注入 plugin_dsn
 	if m.pluginDB != nil {
 		if pluginDSN, err := m.pluginDB.EnsureFor(ctx, name); err != nil {
-			slog.Warn("provision plugin DB 失败，plugin_dsn 将不可用",
-				"plugin", name, "error", err)
+			slog.Warn("plugin_db_provision_failed",
+				sdk.LogFieldPluginID, name, sdk.LogFieldError, err)
 		} else {
 			cfg["plugin_dsn"] = pluginDSN
 		}
@@ -129,7 +130,8 @@ func (m *Manager) buildInitConfig(ctx context.Context, name string) map[string]i
 	if err != nil {
 		// not found 是常态，不打 warn
 		if !ent.IsNotFound(err) {
-			slog.Warn("读取插件 DB 配置失败", "plugin", name, "error", err)
+			slog.Warn("plugin_config_load_failed",
+				sdk.LogFieldPluginID, name, sdk.LogFieldError, err)
 		}
 		return cfg
 	}
@@ -163,12 +165,13 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 			continue
 		}
 
+		slog.Debug("plugin_load_start", sdk.LogFieldPluginID, name)
 		canonicalName, err := m.startPlugin(ctx, name, exec.Command(binaryPath), name)
 		if err != nil {
-			slog.Error("加载插件失败", "name", name, "error", err)
+			slog.Error("plugin_load_failed", sdk.LogFieldPluginID, name, sdk.LogFieldError, err)
 			continue
 		}
-		slog.Info("插件加载成功", "name", canonicalName, "source", name)
+		slog.Info("plugin_load_completed", sdk.LogFieldPluginID, canonicalName, "source", name)
 	}
 
 	return nil
@@ -207,7 +210,11 @@ func (m *Manager) LoadDev(ctx context.Context, name, srcPath string) error {
 		m.devWatcher.add(canonicalName, srcPath)
 	}
 
-	slog.Info("开发插件加载成功", "name", canonicalName, "requested_name", requestedName, "src", srcPath)
+	slog.Debug("plugin_dev_load_completed",
+		sdk.LogFieldPluginID, canonicalName,
+		"requested_name", requestedName,
+		"src", srcPath,
+	)
 	return nil
 }
 
@@ -222,7 +229,7 @@ func (m *Manager) ReloadDev(ctx context.Context, name string) error {
 		return fmt.Errorf("插件 %s 不是开发模式插件，无法热加载", name)
 	}
 
-	slog.Info("正在热加载开发插件", "name", resolvedName, "src", srcPath)
+	slog.Debug("plugin_dev_reload_start", sdk.LogFieldPluginID, resolvedName, "src", srcPath)
 	m.stopPlugin(resolvedName)
 	return m.LoadDev(ctx, resolvedName, srcPath)
 }
@@ -324,6 +331,13 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		return "", fmt.Errorf("初始化插件失败: %w", err)
 	}
 	if err := gateway.Start(startCtx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			slog.Error("plugin_start_timeout",
+				sdk.LogFieldPluginID, canonicalName,
+				"timeout_ms", pluginStartTimeout.Milliseconds(),
+				sdk.LogFieldError, err,
+			)
+		}
 		client.Kill()
 		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("启动插件失败: %w", err)
@@ -377,8 +391,17 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 	m.extractPluginWebAssets(canonicalName, gateway)
 
 	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
-		slog.Info("插件名称已统一到 Info().ID", "requested_name", requestedName, "canonical_name", canonicalName)
+		slog.Info("plugin_name_canonicalized",
+			"requested_name", requestedName,
+			"canonical_name", canonicalName,
+		)
 	}
+
+	slog.Info("plugin_runtime_started",
+		sdk.LogFieldPluginID, canonicalName,
+		sdk.LogFieldPlatform, platform,
+		"kind", pluginType,
+	)
 
 	return canonicalName, nil
 }
@@ -406,12 +429,21 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 		return "", fmt.Errorf("初始化 extension 插件失败: %w", err)
 	}
 	if err := ext.Start(startCtx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			slog.Error("plugin_start_timeout",
+				sdk.LogFieldPluginID, canonicalName,
+				"timeout_ms", pluginStartTimeout.Milliseconds(),
+				"kind", "extension",
+				sdk.LogFieldError, err,
+			)
+		}
 		client.Kill()
 		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("启动 extension 插件失败: %w", err)
 	}
 	if err := ext.Migrate(); err != nil {
-		slog.Warn("extension 插件迁移失败", "plugin", canonicalName, "error", err)
+		slog.Warn("plugin_extension_migrate_failed",
+			sdk.LogFieldPluginID, canonicalName, sdk.LogFieldError, err)
 	}
 
 	pluginType := string(info.Type)
@@ -452,8 +484,16 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 	m.startExtensionBackgroundTasks(instance)
 
 	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
-		slog.Info("插件名称已统一到 Info().ID", "requested_name", requestedName, "canonical_name", canonicalName)
+		slog.Info("plugin_name_canonicalized",
+			"requested_name", requestedName,
+			"canonical_name", canonicalName,
+		)
 	}
+
+	slog.Info("plugin_runtime_started",
+		sdk.LogFieldPluginID, canonicalName,
+		"kind", pluginType,
+	)
 
 	return canonicalName, nil
 }
@@ -490,6 +530,14 @@ func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Cl
 		return "", fmt.Errorf("初始化 middleware 插件失败: %w", err)
 	}
 	if err := mw.Start(startCtx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			slog.Error("plugin_start_timeout",
+				sdk.LogFieldPluginID, canonicalName,
+				"timeout_ms", pluginStartTimeout.Milliseconds(),
+				"kind", "middleware",
+				sdk.LogFieldError, err,
+			)
+		}
 		client.Kill()
 		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("启动 middleware 插件失败: %w", err)
@@ -524,13 +572,18 @@ func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Cl
 	m.extractPluginWebAssets(canonicalName, mw)
 
 	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
-		slog.Info("插件名称已统一到 Info().ID", "requested_name", requestedName, "canonical_name", canonicalName)
+		slog.Info("plugin_name_canonicalized",
+			"requested_name", requestedName,
+			"canonical_name", canonicalName,
+		)
 	}
 
-	slog.Info("middleware 插件已加载",
-		"name", canonicalName,
+	slog.Info("plugin_runtime_started",
+		sdk.LogFieldPluginID, canonicalName,
+		"kind", "middleware",
 		"priority", info.Priority,
-		"capabilities", info.Capabilities)
+		"capabilities", info.Capabilities,
+	)
 
 	return canonicalName, nil
 }
@@ -566,24 +619,27 @@ func (m *Manager) stopPlugin(name string) {
 
 	if inst.Gateway != nil {
 		if err := inst.Gateway.Stop(context.Background()); err != nil {
-			slog.Warn("停止 gateway 插件失败", "name", inst.Name, "error", err)
+			slog.Warn("plugin_stop_failed",
+				sdk.LogFieldPluginID, inst.Name, "kind", "gateway", sdk.LogFieldError, err)
 		}
 	}
 	if inst.Extension != nil {
 		if err := inst.Extension.Stop(context.Background()); err != nil {
-			slog.Warn("停止 extension 插件失败", "name", inst.Name, "error", err)
+			slog.Warn("plugin_stop_failed",
+				sdk.LogFieldPluginID, inst.Name, "kind", "extension", sdk.LogFieldError, err)
 		}
 	}
 	if inst.Middleware != nil {
 		if err := inst.Middleware.Stop(context.Background()); err != nil {
-			slog.Warn("停止 middleware 插件失败", "name", inst.Name, "error", err)
+			slog.Warn("plugin_stop_failed",
+				sdk.LogFieldPluginID, inst.Name, "kind", "middleware", sdk.LogFieldError, err)
 		}
 	}
 	if inst.Client != nil {
 		inst.Client.Kill()
 	}
 
-	slog.Info("插件已停止", "name", inst.Name)
+	slog.Info("plugin_runtime_stopped", sdk.LogFieldPluginID, inst.Name)
 }
 
 // StopAll 停止所有插件。

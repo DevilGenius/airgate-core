@@ -7,8 +7,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
+
+	sdk "github.com/DouDOU-start/airgate-sdk"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
@@ -182,9 +185,15 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 	// 读缓存
 	if cached, ok := apiKeyCache.Load(hash); ok {
 		if e := cached.(apiKeyCacheEntry); time.Now().Before(e.expiresAt) {
+			if e.info != nil {
+				slog.Debug("api_key_cache_hit", sdk.LogFieldAPIKeyID, e.info.KeyID)
+			} else {
+				slog.Debug("api_key_cache_hit_negative", sdk.LogFieldError, e.err)
+			}
 			return e.info, e.err
 		}
 	}
+	slog.Debug("api_key_cache_miss")
 
 	// 缓存未命中，查 DB
 	ak, err := db.APIKey.Query().
@@ -202,6 +211,7 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 			return nil, ErrInvalidAPIKey
 		}
 		// DB 瞬时故障：不缓存，下次请求重试
+		slog.Error("api_key_lookup_failed", sdk.LogFieldError, err)
 		return nil, fmt.Errorf("查询 API Key 失败: %w", err)
 	}
 

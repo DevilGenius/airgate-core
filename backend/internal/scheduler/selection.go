@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	sdk "github.com/DouDOU-start/airgate-sdk"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/account"
 )
@@ -32,7 +34,7 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 	now := time.Now()
 	var normalCandidates, stickyCandidates []*ent.Account
 	for _, acc := range candidates {
-		switch s.checkSchedulability(ctx, acc, now) {
+		switch s.checkSchedulability(ctx, acc, model, now) {
 		case Normal:
 			normalCandidates = append(normalCandidates, acc)
 			stickyCandidates = append(stickyCandidates, acc)
@@ -64,7 +66,11 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 		if selected == nil {
 			return nil, ErrNoAvailableAccount
 		}
-		slog.Warn("无正常账号，兜底使用降级账号", "account_id", selected.ID)
+		slog.Warn("scheduler_fallback_degraded_account",
+			sdk.LogFieldAccountID, selected.ID,
+			sdk.LogFieldPlatform, platform,
+			sdk.LogFieldModel, model,
+		)
 		return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, stickyCandidates, now)
 	}
 
@@ -187,12 +193,22 @@ func matchModelRouting(routing map[string][]int64, model string) []int64 {
 }
 
 // checkSchedulability 先看状态（state + state_until），再叠加软约束（并发 / windowCost / RPM / session），取最严格者。
-func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, now time.Time) Schedulability {
+// model 用于推导请求所属的家族（gpt-image / chat 各算一个池），仅当该家族正在
+// 冷却时才把账号当作 NotSchedulable —— 别的家族不受影响。
+func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, model string, now time.Time) Schedulability {
 	base := SchedulabilityOf(acc, now)
 	if base == NotSchedulable {
 		return NotSchedulable
 	}
 	worst := base
+
+	// 家族级冷却：撞过这个 family 的账号在冷却期内对该 family 不可调度，
+	// 但对其它 family 仍可用。Redis 不可用时退化为不冷却，不阻断主链路。
+	if family := ModelFamily(acc.Platform, model); family != "" && s.familyCooldown != nil {
+		if _, inCooldown := s.familyCooldown.Until(ctx, acc.ID, family); inCooldown {
+			return NotSchedulable
+		}
+	}
 
 	if sched := s.concurrencySchedulability(ctx, acc); sched > worst {
 		worst = sched
