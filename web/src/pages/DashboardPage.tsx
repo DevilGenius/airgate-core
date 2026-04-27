@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../shared/components/Card';
 import { Alert } from '../shared/components/Alert';
+import { Select } from '../shared/components/Input';
 import { Tabs } from '../shared/components/Tabs';
 import { dashboardApi } from '../shared/api/dashboard';
 import { usersApi } from '../shared/api/users';
@@ -106,28 +107,28 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-xs text-text-tertiary">{t('dashboard.filter_user')}</span>
-            <select
-              className="text-xs rounded-md border border-border-subtle bg-bg-elevated px-3 py-1.5 text-text-secondary max-w-[180px]"
-              value={selectedUserId ?? ''}
+            <Select
+              className="text-xs rounded-md px-3 py-1.5 max-w-[180px]"
+              value={selectedUserId ? String(selectedUserId) : ''}
               onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : undefined)}
-            >
-              <option value="">{t('dashboard.all_users')}</option>
-              {(usersData?.list ?? []).map((u) => (
-                <option key={u.id} value={u.id}>{u.email}</option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: t('dashboard.all_users') },
+                ...(usersData?.list ?? []).map((u) => ({ value: String(u.id), label: u.email })),
+              ]}
+            />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-text-tertiary">{t('dashboard.granularity')}</span>
-            <select
-              className="text-xs rounded-md border border-border-subtle bg-bg-elevated px-3 py-1.5 text-text-secondary"
+            <Select
+              className="text-xs rounded-md px-3 py-1.5"
               value={range === 'today' ? 'hour' : granularity}
               onChange={(e) => setGranularity(e.target.value as Granularity)}
               disabled={range === 'today'}
-            >
-              <option value="day">{t('dashboard.granularity_day')}</option>
-              <option value="hour">{t('dashboard.granularity_hour')}</option>
-            </select>
+              options={[
+                { value: 'day', label: t('dashboard.granularity_day') },
+                { value: 'hour', label: t('dashboard.granularity_hour') },
+              ]}
+            />
           </div>
         </div>
       </div>

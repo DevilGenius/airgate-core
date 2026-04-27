@@ -121,7 +121,8 @@
     "user": "User",
     "docs": "Docs",
     "contact": "Contact",
-    "status": "Status"
+    "status": "Status",
+    "back_to_console": "Back to Console"
   },
 
   "auth": {

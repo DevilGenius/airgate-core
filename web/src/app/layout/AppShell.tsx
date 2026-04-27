@@ -78,14 +78,15 @@ const apiKeyMenuItems: MenuItem[] = [
  *   audience = "all"                     — 所有登录用户可见，按当前角色挂分组
  */
 function pluginPagePath(pluginName: string, pagePath: string) {
+  // airgate-playground 走全屏 /chat 独立布局，不挂在 AppShell 里
   if (pluginName === 'airgate-playground' && pagePath === '/playground') {
-    return '/plugins/playground';
+    return '/chat';
   }
   return `/plugins/${pluginName}${pagePath}`;
 }
 
 function isPlaygroundPluginPath(path: string) {
-  return path === '/plugins/playground' || path.includes('/plugins/airgate-playground/');
+  return path === '/chat' || path === '/plugins/playground' || path.includes('/plugins/airgate-playground/');
 }
 
 function usePluginMenuItems(isAdmin: boolean): {

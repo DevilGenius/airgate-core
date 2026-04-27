@@ -121,7 +121,8 @@
     "user": "用户",
     "docs": "文档",
     "contact": "联系我们",
-    "status": "服务状态"
+    "status": "服务状态",
+    "back_to_console": "返回控制台"
   },
 
   "auth": {

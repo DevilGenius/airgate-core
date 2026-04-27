@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-router';
 import { Suspense, lazy } from 'react';
 import { AppShell } from './layout/AppShell';
+import { ChatShell } from './layout/ChatShell';
 import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
 import { getToken } from '../shared/api/client';
@@ -189,14 +190,37 @@ const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/pro
 const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: UserKeysPage });
 const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/usage', component: UserUsagePage });
 
-const playgroundPluginRoute = createRoute({
-  getParentRoute: () => authLayout,
-  path: '/plugins/playground',
+// /chat: 全屏沉浸式 AI 对话页（airgate-playground 插件），独立布局不挂 AppShell。
+// 仍要求登录 + 安装完成；走 ChatShell 极简顶栏。
+const chatRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/chat',
+  beforeLoad: async () => {
+    const needs = await checkSetup();
+    if (needs) {
+      throw redirect({ to: '/setup' });
+    }
+    if (!getToken()) {
+      throw redirect({ to: '/home' });
+    }
+  },
   component: () => (
-    <Suspense fallback={null}>
-      <PluginPage pluginNameOverride="airgate-playground" subPathOverride="/playground" />
-    </Suspense>
+    <ChatShell>
+      <Suspense fallback={null}>
+        <PluginPage pluginNameOverride="airgate-playground" subPathOverride="/playground" />
+      </Suspense>
+    </ChatShell>
   ),
+});
+
+// 旧路径 /plugins/playground 重定向到 /chat，避免历史书签 / 链接失效。
+const playgroundLegacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/plugins/playground',
+  beforeLoad: () => {
+    throw redirect({ to: '/chat' });
+  },
+  component: () => null,
 });
 
 // 插件页面路由（catch-all）
@@ -216,6 +240,8 @@ const routeTree = rootRoute.addChildren([
   homeRoute,
   loginRoute,
   docsRoute,
+  chatRoute,
+  playgroundLegacyRoute,
   authLayout.addChildren([
     dashboardRoute,
     adminLayout.addChildren([
@@ -231,7 +257,6 @@ const routeTree = rootRoute.addChildren([
     profileRoute,
     userKeysRoute,
     userUsageRoute,
-    playgroundPluginRoute,
     pluginRoute,
   ]),
 ]);

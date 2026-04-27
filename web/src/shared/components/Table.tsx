@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode, type CSSProperties } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { EmptyState } from './EmptyState';
+import { Select } from './Input';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 export interface Column<T> {
@@ -155,15 +156,12 @@ export function Table<T extends Record<string, any>>({
           共 {total} 条 · 第 {page}/{totalPages} 页
         </span>
         {onPageSizeChange && (
-          <select
-            value={pageSize}
+          <Select
+            value={String(pageSize)}
             onChange={(e) => { onPageSizeChange(Number(e.target.value)); onPageChange(1); }}
-            className="text-xs text-text-secondary bg-transparent border border-glass-border rounded px-1.5 py-0.5 cursor-pointer hover:border-primary transition-colors outline-none"
-          >
-            {pageSizeOptions.map((s) => (
-              <option key={s} value={s}>{s} 条/页</option>
-            ))}
-          </select>
+            className="text-xs rounded px-1.5 py-0.5"
+            options={pageSizeOptions.map((s) => ({ value: String(s), label: `${s} 条/页` }))}
+          />
         )}
       </div>
       <div className="flex items-center gap-1">
