@@ -63,12 +63,14 @@ services:
     environment:
       CONFIG_PATH: /workspace/airgate-core/backend/config.docker.yaml
       PLUGINS_DIR: /workspace/airgate-core/backend/data/plugins
+      ASSETS_DIR: /workspace/airgate-core/backend/data/assets
       REDIS_PASSWORD: airgate-dev
     volumes:
       - ../..:/workspace
       - ../data/go_pkg_mod:/go/pkg/mod
       - ../data/go_build_cache:/root/.cache/go-build
       - ../data/plugins:/workspace/airgate-core/backend/data/plugins
+      - ../data/assets:/workspace/airgate-core/backend/data/assets
     ports:
       - "9517:9517"
     command:

@@ -228,7 +228,7 @@ create_user() {
 # ---- Setup directories ----
 setup_directories() {
     print_info "创建目录与权限 ..."
-    mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR/plugins" "$DATA_DIR/uploads"
+    mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR/plugins" "$DATA_DIR/uploads" "$DATA_DIR/assets"
     chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR" "$DATA_DIR"
     chown -R "$SERVICE_USER:$SERVICE_USER" "$CONFIG_DIR"
     chmod 750 "$CONFIG_DIR"

@@ -29,8 +29,10 @@ LimitNOFILE=65536
 # 默认环境变量；首次启动后用户应当通过 install.sh 或手工编辑配置：
 #  - CONFIG_PATH 可以由 --config 覆盖
 #  - PLUGINS_DIR 默认 /var/lib/airgate-core/plugins
+#  - ASSETS_DIR 默认 /var/lib/airgate-core/assets
 Environment=GIN_MODE=release
 Environment=PLUGINS_DIR=/var/lib/airgate-core/plugins
+Environment=ASSETS_DIR=/var/lib/airgate-core/assets
 
 [Install]
 WantedBy=multi-user.target

@@ -5,11 +5,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
@@ -270,6 +272,7 @@ func (s *Server) registerRoutes() {
 
 	// 上传文件静态服务（这部分仍然在磁盘上，因为是用户上传的运行时数据）
 	r.Static("/uploads", "data/uploads")
+	r.GET("/assets-runtime/*path", s.handleRuntimeAsset)
 
 	// 插件前端静态资源（/plugins/{pluginName}/assets/*）
 	//
@@ -315,6 +318,20 @@ func (s *Server) registerRoutes() {
 //     由 core 启动时通过 GetWebAssets() 把插件 binary embed 的 webdist 提取出来。
 //
 // 路径穿越防御：clean 后检查不允许 ".."。
+func (s *Server) handleRuntimeAsset(c *gin.Context) {
+	localDir := plugin.DefaultAssetStorageDir
+	if item, err := s.db.Setting.Query().Where(setting.GroupEQ("storage"), setting.KeyEQ("local_storage_dir")).Only(c.Request.Context()); err == nil && strings.TrimSpace(item.Value) != "" {
+		localDir = strings.TrimSpace(item.Value)
+	}
+	rel := strings.TrimPrefix(path.Clean("/"+c.Param("path")), "/")
+	if rel == "" || rel == "." || strings.HasPrefix(rel, "../") || strings.Contains(rel, "/../") {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	c.Header("Cache-Control", "public, max-age=31536000, immutable")
+	c.File(filepath.Join(localDir, filepath.FromSlash(rel)))
+}
+
 func servePluginAsset(mgr *plugin.Manager, baseDir string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		name := c.Param("name")

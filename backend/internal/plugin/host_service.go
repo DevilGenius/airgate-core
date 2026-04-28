@@ -202,6 +202,20 @@ func (h *pluginHostHandle) GetUserInfo(ctx context.Context, req *pb.HostGetUserI
 	return h.base.getUserInfo(ctx, req)
 }
 
+func (h *pluginHostHandle) StoreAsset(ctx context.Context, req *pb.HostStoreAssetRequest) (*pb.HostStoreAssetResponse, error) {
+	if err := h.requireCap(sdk.CapabilityHostAssetStorage); err != nil {
+		return nil, err
+	}
+	return h.base.storeAsset(ctx, req)
+}
+
+func (h *pluginHostHandle) GetAssetURL(ctx context.Context, req *pb.HostGetAssetURLRequest) (*pb.HostGetAssetURLResponse, error) {
+	if err := h.requireCap(sdk.CapabilityHostAssetStorage); err != nil {
+		return nil, err
+	}
+	return h.base.getAssetURL(ctx, req)
+}
+
 // selectAccount 调度选号：走和真实用户请求完全相同的路径。
 // 内部 worker，由 pluginHostHandle.SelectAccount 在 capability 校验后调用。
 func (h *HostService) selectAccount(ctx context.Context, req *pb.HostSelectAccountRequest) (*pb.HostSelectAccountResponse, error) {
@@ -941,6 +955,42 @@ func (h *HostService) getUserInfo(ctx context.Context, req *pb.HostGetUserInfoRe
 		Balance:  u.Balance,
 		Status:   string(u.Status),
 	}, nil
+}
+
+func (h *HostService) storeAsset(ctx context.Context, req *pb.HostStoreAssetRequest) (*pb.HostStoreAssetResponse, error) {
+	if req.UserId <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
+	}
+	if len(req.Data) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "asset data is required")
+	}
+	storage, err := newAssetStorage(ctx, h.db)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	asset, err := storage.store(ctx, req.UserId, req.Scope, req.ContentType, req.FileExtension, req.Data)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &pb.HostStoreAssetResponse{
+		AssetId:     asset.ID,
+		ObjectKey:   asset.ObjectKey,
+		PublicUrl:   asset.PublicURL,
+		SizeBytes:   asset.SizeBytes,
+		ContentType: asset.ContentType,
+	}, nil
+}
+
+func (h *HostService) getAssetURL(ctx context.Context, req *pb.HostGetAssetURLRequest) (*pb.HostGetAssetURLResponse, error) {
+	storage, err := newAssetStorage(ctx, h.db)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	publicURL, err := storage.publicURL(ctx, req.ObjectKey)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &pb.HostGetAssetURLResponse{PublicUrl: publicURL}, nil
 }
 
 // protoHeadersToHTTPHost / httpHeadersToProtoHost 是 host_service.go 内部的 header 转换。

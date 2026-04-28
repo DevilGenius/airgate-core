@@ -53,7 +53,7 @@ WORKDIR /app
 COPY --from=backend /server ./server
 COPY airgate-core/deploy/config.docker.yaml ./config.yaml
 
-RUN mkdir -p data/plugins data/uploads
+RUN mkdir -p data/plugins data/uploads data/assets
 
 EXPOSE 9517
 

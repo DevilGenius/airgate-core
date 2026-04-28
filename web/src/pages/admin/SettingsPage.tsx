@@ -46,8 +46,8 @@ const SMTP_KEYS = [
 
 const STORAGE_KEYS = [
   's3_endpoint', 's3_bucket', 's3_access_key', 's3_secret_key',
-  's3_region', 's3_use_ssl', 's3_path_prefix', 's3_public_base_url',
-  's3_presign_ttl_minutes',
+  's3_region', 's3_use_ssl', 's3_public_base_url',
+  's3_presign_ttl_minutes', 's3_path_prefix', 'local_storage_dir',
 ] as const;
 
 // OpenClaw 一键接入相关 setting key。所有 key 统一加 "openclaw." 前缀，便于在 Setting 表中识别。
@@ -856,13 +856,6 @@ function StoragePanel({
             />
           </Field>
         </div>
-        <Field label={t('settings.s3_path_prefix')} hint={t('settings.s3_path_prefix_hint')}>
-          <Input
-            value={val('s3_path_prefix')}
-            onChange={(e) => set('s3_path_prefix', e.target.value)}
-            placeholder="playground"
-          />
-        </Field>
         <Field label={t('settings.s3_public_base_url')} hint={t('settings.s3_public_base_url_hint')}>
           <Input
             value={val('s3_public_base_url')}
@@ -870,6 +863,22 @@ function StoragePanel({
             placeholder="https://cdn.example.com/airgate"
           />
         </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label={t('settings.s3_path_prefix')} hint={t('settings.s3_path_prefix_hint')}>
+            <Input
+              value={val('s3_path_prefix')}
+              onChange={(e) => set('s3_path_prefix', e.target.value)}
+              placeholder="airgate"
+            />
+          </Field>
+          <Field label={t('settings.local_storage_dir')} hint={t('settings.local_storage_dir_hint')}>
+            <Input
+              value={val('local_storage_dir')}
+              onChange={(e) => set('local_storage_dir', e.target.value)}
+              placeholder="data/assets"
+            />
+          </Field>
+        </div>
         <Switch
           label={t('settings.s3_use_ssl')}
           description={t('settings.s3_use_ssl_desc')}
