@@ -100,6 +100,7 @@ export default defineConfig({
         },
       },
       '/uploads': BACKEND,
+      '/assets-runtime': BACKEND,
       // 注意：只代理插件 assets 的请求路径（用 bypass 函数细分）。
       // /plugins/{name}/{页面} 是 SPA 路由（由 PluginPage 内部加载组件），
       // 必须让 vite 自己 fallback 到 index.html，**不能**整路代理到 core。
