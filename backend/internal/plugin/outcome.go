@@ -244,6 +244,7 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		SellRate:              calc.SellRate,
 		AccountRateMultiplier: calc.AccountRateMultiplier,
 		ServiceTier:           usage.ServiceTier,
+		ImageSize:             usage.ImageSize,
 		Stream:                state.stream,
 		DurationMs:            execution.duration.Milliseconds(),
 		FirstTokenMs:          usage.FirstTokenMs,

@@ -556,6 +556,20 @@ func (ulu *UsageLogUpdate) SetNillableServiceTier(s *string) *UsageLogUpdate {
 	return ulu
 }
 
+// SetImageSize sets the "image_size" field.
+func (ulu *UsageLogUpdate) SetImageSize(s string) *UsageLogUpdate {
+	ulu.mutation.SetImageSize(s)
+	return ulu
+}
+
+// SetNillableImageSize sets the "image_size" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableImageSize(s *string) *UsageLogUpdate {
+	if s != nil {
+		ulu.SetImageSize(*s)
+	}
+	return ulu
+}
+
 // SetStream sets the "stream" field.
 func (ulu *UsageLogUpdate) SetStream(b bool) *UsageLogUpdate {
 	ulu.mutation.SetStream(b)
@@ -940,6 +954,9 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := ulu.mutation.ServiceTier(); ok {
 		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
+	}
+	if value, ok := ulu.mutation.ImageSize(); ok {
+		_spec.SetField(usagelog.FieldImageSize, field.TypeString, value)
 	}
 	if value, ok := ulu.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -1623,6 +1640,20 @@ func (uluo *UsageLogUpdateOne) SetNillableServiceTier(s *string) *UsageLogUpdate
 	return uluo
 }
 
+// SetImageSize sets the "image_size" field.
+func (uluo *UsageLogUpdateOne) SetImageSize(s string) *UsageLogUpdateOne {
+	uluo.mutation.SetImageSize(s)
+	return uluo
+}
+
+// SetNillableImageSize sets the "image_size" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableImageSize(s *string) *UsageLogUpdateOne {
+	if s != nil {
+		uluo.SetImageSize(*s)
+	}
+	return uluo
+}
+
 // SetStream sets the "stream" field.
 func (uluo *UsageLogUpdateOne) SetStream(b bool) *UsageLogUpdateOne {
 	uluo.mutation.SetStream(b)
@@ -2037,6 +2068,9 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.ServiceTier(); ok {
 		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
+	}
+	if value, ok := uluo.mutation.ImageSize(); ok {
+		_spec.SetField(usagelog.FieldImageSize, field.TypeString, value)
 	}
 	if value, ok := uluo.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)

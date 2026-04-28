@@ -472,6 +472,8 @@ export interface UsageLogResp {
   /** 快照：本次请求生效的 account_rate */
   account_rate_multiplier: number;
   service_tier?: string;
+  /** 图像生成实际出图尺寸（"WxH"），非图像请求不返。admin 后台显示在模型名下方做计费分档解释。 */
+  image_size?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
@@ -497,6 +499,8 @@ export interface CustomerUsageLogResp {
   /** 客户视角："本次消耗 = X 美元" */
   cost: number;
   service_tier?: string;
+  /** 图像生成实际出图尺寸（"WxH"），非图像请求不返。 */
+  image_size?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;

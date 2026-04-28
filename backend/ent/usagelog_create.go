@@ -372,6 +372,20 @@ func (ulc *UsageLogCreate) SetNillableServiceTier(s *string) *UsageLogCreate {
 	return ulc
 }
 
+// SetImageSize sets the "image_size" field.
+func (ulc *UsageLogCreate) SetImageSize(s string) *UsageLogCreate {
+	ulc.mutation.SetImageSize(s)
+	return ulc
+}
+
+// SetNillableImageSize sets the "image_size" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableImageSize(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetImageSize(*s)
+	}
+	return ulc
+}
+
 // SetStream sets the "stream" field.
 func (ulc *UsageLogCreate) SetStream(b bool) *UsageLogCreate {
 	ulc.mutation.SetStream(b)
@@ -655,6 +669,10 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultServiceTier
 		ulc.mutation.SetServiceTier(v)
 	}
+	if _, ok := ulc.mutation.ImageSize(); !ok {
+		v := usagelog.DefaultImageSize
+		ulc.mutation.SetImageSize(v)
+	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		v := usagelog.DefaultStream
 		ulc.mutation.SetStream(v)
@@ -770,6 +788,9 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.ServiceTier(); !ok {
 		return &ValidationError{Name: "service_tier", err: errors.New(`ent: missing required field "UsageLog.service_tier"`)}
+	}
+	if _, ok := ulc.mutation.ImageSize(); !ok {
+		return &ValidationError{Name: "image_size", err: errors.New(`ent: missing required field "UsageLog.image_size"`)}
 	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		return &ValidationError{Name: "stream", err: errors.New(`ent: missing required field "UsageLog.stream"`)}
@@ -921,6 +942,10 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.ServiceTier(); ok {
 		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
 		_node.ServiceTier = value
+	}
+	if value, ok := ulc.mutation.ImageSize(); ok {
+		_spec.SetField(usagelog.FieldImageSize, field.TypeString, value)
+		_node.ImageSize = value
 	}
 	if value, ok := ulc.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)

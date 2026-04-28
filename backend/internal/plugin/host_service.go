@@ -868,6 +868,7 @@ func (h *HostService) recordHostForwardUsage(
 		RateMultiplier:        calc.RateMultiplier,
 		AccountRateMultiplier: calc.AccountRateMultiplier,
 		ServiceTier:           usage.ServiceTier,
+		ImageSize:             usage.ImageSize,
 		Stream:                req.Stream,
 		DurationMs:            duration.Milliseconds(),
 		FirstTokenMs:          usage.FirstTokenMs,

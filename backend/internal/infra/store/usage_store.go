@@ -521,6 +521,7 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		SellRate:              item.SellRate,
 		AccountRateMultiplier: item.AccountRateMultiplier,
 		ServiceTier:           item.ServiceTier,
+		ImageSize:             item.ImageSize,
 		Stream:                item.Stream,
 		DurationMs:            item.DurationMs,
 		FirstTokenMs:          item.FirstTokenMs,

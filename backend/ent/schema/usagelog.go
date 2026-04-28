@@ -59,6 +59,9 @@ func (UsageLog) Fields() []ent.Field {
 		field.Float("account_rate_multiplier").Default(1.0).
 			Comment("快照：本次请求生效的 account_rate"),
 		field.String("service_tier").Default(""),
+		// image_size 图像生成请求实际出图尺寸（"WxH"）。非图像请求留空。
+		// admin 后台展示用，让用户能直观看出"为什么这次图扣了 0.40"——按 1K/2K/4K 分档计费。
+		field.String("image_size").Default(""),
 		field.Bool("stream").Default(false),
 		field.Int64("duration_ms").Default(0),
 		field.Int64("first_token_ms").Default(0),

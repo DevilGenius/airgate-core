@@ -16,7 +16,7 @@ import { Alert } from '../../shared/components/Alert';
 import { useToast } from '../../shared/components/Toast';
 import {
   Save, Loader2, Globe, UserPlus, Gift, Mail, Send, Upload, X, Eye, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Zap, Download,
+  ShieldCheck, Copy, Trash2, KeyRound, Zap, Download, Database,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
 import { SystemUpdatePanel } from './SystemUpdatePanel';
@@ -42,6 +42,12 @@ const SMTP_KEYS = [
   'smtp_from_email', 'smtp_from_name', 'smtp_use_tls',
   'email_template_subject', 'email_template_body',
   'balance_alert_email_subject', 'balance_alert_email_body',
+] as const;
+
+const STORAGE_KEYS = [
+  's3_endpoint', 's3_bucket', 's3_access_key', 's3_secret_key',
+  's3_region', 's3_use_ssl', 's3_path_prefix', 's3_public_base_url',
+  's3_presign_ttl_minutes',
 ] as const;
 
 // OpenClaw 一键接入相关 setting key。所有 key 统一加 "openclaw." 前缀，便于在 Setting 表中识别。
@@ -121,7 +127,7 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'security' | 'registration' | 'defaults' | 'smtp' | 'openclaw' | 'system';
+type TabKey = 'site' | 'security' | 'registration' | 'defaults' | 'smtp' | 'storage' | 'openclaw' | 'system';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
@@ -129,6 +135,7 @@ const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'registration', labelKey: 'settings.tab_registration', icon: UserPlus },
   { key: 'defaults', labelKey: 'settings.tab_defaults', icon: Gift },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
+  { key: 'storage', labelKey: 'settings.tab_storage', icon: Database },
   { key: 'openclaw', labelKey: 'settings.tab_openclaw', icon: Zap },
   { key: 'system', labelKey: 'settings.tab_system', icon: Download },
 ];
@@ -142,6 +149,7 @@ const TAB_GROUP: Record<SaveTabKey, string> = {
   registration: 'registration',
   defaults: 'defaults',
   smtp: 'smtp',
+  storage: 'storage',
   openclaw: 'openclaw',
 };
 
@@ -150,6 +158,7 @@ const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
   registration: REG_KEYS,
   defaults: DEFAULT_KEYS,
   smtp: SMTP_KEYS,
+  storage: STORAGE_KEYS,
   openclaw: OPENCLAW_KEYS,
 };
 
@@ -465,6 +474,10 @@ export default function SettingsPage() {
           )}
         </>)}
 
+        {activeTab === 'storage' && (
+          <StoragePanel set={set} boolVal={boolVal} val={val} />
+        )}
+
         {activeTab === 'openclaw' && (
           <OpenClawPanel
             values={values}
@@ -772,6 +785,97 @@ function EmailTemplateEditor({
             />
           </Field>
         )}
+      </div>
+    </Card>
+  );
+}
+
+// ==================== Storage Panel ====================
+
+function StoragePanel({
+  set,
+  boolVal,
+  val,
+}: {
+  set: (key: string, value: string) => void;
+  boolVal: (key: string) => boolean;
+  val: (key: string) => string;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Card title={t('settings.storage_config')}>
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label={t('settings.s3_endpoint')} hint={t('settings.s3_endpoint_hint')}>
+            <Input
+              value={val('s3_endpoint')}
+              onChange={(e) => set('s3_endpoint', e.target.value)}
+              placeholder="http://minio:9000"
+            />
+          </Field>
+          <Field label={t('settings.s3_bucket')} hint={t('settings.s3_bucket_hint')}>
+            <Input
+              value={val('s3_bucket')}
+              onChange={(e) => set('s3_bucket', e.target.value)}
+              placeholder="airgate"
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label={t('settings.s3_access_key')}>
+            <Input
+              value={val('s3_access_key')}
+              onChange={(e) => set('s3_access_key', e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+          <Field label={t('settings.s3_secret_key')}>
+            <Input
+              type="password"
+              value={val('s3_secret_key')}
+              onChange={(e) => set('s3_secret_key', e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label={t('settings.s3_region')} hint={t('settings.s3_region_hint')}>
+            <Input
+              value={val('s3_region')}
+              onChange={(e) => set('s3_region', e.target.value)}
+              placeholder="us-east-1"
+            />
+          </Field>
+          <Field label={t('settings.s3_presign_ttl_minutes')} hint={t('settings.s3_presign_ttl_minutes_hint')}>
+            <Input
+              type="number"
+              value={val('s3_presign_ttl_minutes')}
+              onChange={(e) => set('s3_presign_ttl_minutes', e.target.value)}
+              placeholder="360"
+            />
+          </Field>
+        </div>
+        <Field label={t('settings.s3_path_prefix')} hint={t('settings.s3_path_prefix_hint')}>
+          <Input
+            value={val('s3_path_prefix')}
+            onChange={(e) => set('s3_path_prefix', e.target.value)}
+            placeholder="playground"
+          />
+        </Field>
+        <Field label={t('settings.s3_public_base_url')} hint={t('settings.s3_public_base_url_hint')}>
+          <Input
+            value={val('s3_public_base_url')}
+            onChange={(e) => set('s3_public_base_url', e.target.value)}
+            placeholder="https://cdn.example.com/airgate"
+          />
+        </Field>
+        <Switch
+          label={t('settings.s3_use_ssl')}
+          description={t('settings.s3_use_ssl_desc')}
+          checked={boolVal('s3_use_ssl')}
+          onChange={(v) => set('s3_use_ssl', String(v))}
+        />
       </div>
     </Card>
   );

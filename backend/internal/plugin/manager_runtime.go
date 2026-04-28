@@ -19,6 +19,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	pluginent "github.com/DouDOU-start/airgate-core/ent/plugin"
+	settingent "github.com/DouDOU-start/airgate-core/ent/setting"
 )
 
 // pluginGRPCMaxMessageBytes 是与插件之间 gRPC 单条消息的最大字节数（收/发同值）。
@@ -133,15 +134,27 @@ func (m *Manager) buildInitConfig(ctx context.Context, name string) map[string]i
 			slog.Warn("plugin_config_load_failed",
 				sdk.LogFieldPluginID, name, sdk.LogFieldError, err)
 		}
-		return cfg
-	}
-	for k, v := range row.Config {
-		if _, exists := cfg[k]; exists {
-			continue // 系统字段不被用户覆盖
+	} else {
+		for k, v := range row.Config {
+			if _, exists := cfg[k]; exists {
+				continue // 系统字段不被用户覆盖
+			}
+			cfg[k] = v
 		}
-		cfg[k] = v
 	}
+	m.injectGlobalStorageConfig(ctx, name, cfg)
 	return cfg
+}
+
+func (m *Manager) injectGlobalStorageConfig(ctx context.Context, pluginName string, cfg map[string]interface{}) {
+	items, err := m.db.Setting.Query().Where(settingent.GroupEQ("storage")).All(ctx)
+	if err != nil {
+		slog.Warn("global_storage_config_load_failed", sdk.LogFieldPluginID, pluginName, sdk.LogFieldError, err)
+		return
+	}
+	for _, item := range items {
+		cfg[item.Key] = item.Value
+	}
 }
 
 // LoadAll 启动时扫描插件目录，发现可执行二进制则直接加载。

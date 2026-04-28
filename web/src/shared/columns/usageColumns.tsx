@@ -185,9 +185,18 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): Column<Usag
       title: t('usage.model'),
       width: '220px',
       render: (row) => (
-        <span className="block max-w-full truncate text-text" title={row.model}>
-          {row.model}
-        </span>
+        // 图像生成请求把实际出图尺寸（image_size，"WxH"）显示在模型名下面，
+        // 让用户能直观看出"为什么这次扣这么多"——按 1K/2K/4K 分档计费。
+        <div className="flex flex-col">
+          <span className="block max-w-full truncate text-text" title={row.model}>
+            {row.model}
+          </span>
+          {row.image_size && (
+            <span className="text-xs text-text-tertiary font-mono" title={row.image_size}>
+              {row.image_size}
+            </span>
+          )}
+        </div>
       ),
     },
     {

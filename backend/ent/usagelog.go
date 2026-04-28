@@ -73,6 +73,8 @@ type UsageLog struct {
 	AccountRateMultiplier float64 `json:"account_rate_multiplier,omitempty"`
 	// ServiceTier holds the value of the "service_tier" field.
 	ServiceTier string `json:"service_tier,omitempty"`
+	// ImageSize holds the value of the "image_size" field.
+	ImageSize string `json:"image_size,omitempty"`
 	// Stream holds the value of the "stream" field.
 	Stream bool `json:"stream,omitempty"`
 	// DurationMs holds the value of the "duration_ms" field.
@@ -165,7 +167,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldPlatform, usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldUserAgent, usagelog.FieldIPAddress:
+		case usagelog.FieldPlatform, usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldImageSize, usagelog.FieldUserAgent, usagelog.FieldIPAddress:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -353,6 +355,12 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field service_tier", values[i])
 			} else if value.Valid {
 				ul.ServiceTier = value.String
+			}
+		case usagelog.FieldImageSize:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field image_size", values[i])
+			} else if value.Valid {
+				ul.ImageSize = value.String
 			}
 		case usagelog.FieldStream:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -551,6 +559,9 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("service_tier=")
 	builder.WriteString(ul.ServiceTier)
+	builder.WriteString(", ")
+	builder.WriteString("image_size=")
+	builder.WriteString(ul.ImageSize)
 	builder.WriteString(", ")
 	builder.WriteString("stream=")
 	builder.WriteString(fmt.Sprintf("%v", ul.Stream))

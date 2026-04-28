@@ -78,6 +78,7 @@ type LogRecord struct {
 	SellRate              float64 // 快照：本次生效的销售倍率（0 表示未启用 markup）
 	AccountRateMultiplier float64 // 快照：本次生效的 account_rate
 	ServiceTier           string
+	ImageSize             string // 图像生成请求的实际出图尺寸（"WxH"），非图像请求留空
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64

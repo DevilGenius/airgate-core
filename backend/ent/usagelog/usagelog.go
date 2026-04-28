@@ -66,6 +66,8 @@ const (
 	FieldAccountRateMultiplier = "account_rate_multiplier"
 	// FieldServiceTier holds the string denoting the service_tier field in the database.
 	FieldServiceTier = "service_tier"
+	// FieldImageSize holds the string denoting the image_size field in the database.
+	FieldImageSize = "image_size"
 	// FieldStream holds the string denoting the stream field in the database.
 	FieldStream = "stream"
 	// FieldDurationMs holds the string denoting the duration_ms field in the database.
@@ -147,6 +149,7 @@ var Columns = []string{
 	FieldSellRate,
 	FieldAccountRateMultiplier,
 	FieldServiceTier,
+	FieldImageSize,
 	FieldStream,
 	FieldDurationMs,
 	FieldFirstTokenMs,
@@ -232,6 +235,8 @@ var (
 	DefaultAccountRateMultiplier float64
 	// DefaultServiceTier holds the default value on creation for the "service_tier" field.
 	DefaultServiceTier string
+	// DefaultImageSize holds the default value on creation for the "image_size" field.
+	DefaultImageSize string
 	// DefaultStream holds the default value on creation for the "stream" field.
 	DefaultStream bool
 	// DefaultDurationMs holds the default value on creation for the "duration_ms" field.
@@ -382,6 +387,11 @@ func ByAccountRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 // ByServiceTier orders the results by the service_tier field.
 func ByServiceTier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldServiceTier, opts...).ToFunc()
+}
+
+// ByImageSize orders the results by the image_size field.
+func ByImageSize(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageSize, opts...).ToFunc()
 }
 
 // ByStream orders the results by the stream field.
