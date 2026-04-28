@@ -114,6 +114,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/accounts/import", handlers.Account.ImportAccounts)
 		adminGroup.POST("/accounts/bulk-update", handlers.Account.BulkUpdateAccounts)
 		adminGroup.POST("/accounts/bulk-delete", handlers.Account.BulkDeleteAccounts)
+		adminGroup.POST("/accounts/bulk-clear-family-cooldowns", handlers.Account.BulkClearFamilyCooldowns)
 		adminGroup.POST("/accounts/bulk-refresh-quota", handlers.Account.BulkRefreshQuota)
 		adminGroup.POST("/accounts", handlers.Account.CreateAccount)
 		adminGroup.PUT("/accounts/:id", handlers.Account.UpdateAccount)

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pencil, Trash2, RefreshCw, Power, PowerOff, X } from 'lucide-react';
+import { Pencil, Trash2, RefreshCw, Power, PowerOff, X, Eraser } from 'lucide-react';
 
 /**
  * 批量操作工具栏：仅在 selectedCount > 0 时渲染。
@@ -11,6 +11,7 @@ export function BulkActionsBar({
   onEnable,
   onDisable,
   onRefreshQuota,
+  onClearRateLimitMarkers,
   onDelete,
 }: {
   selectedCount: number;
@@ -19,6 +20,7 @@ export function BulkActionsBar({
   onEnable: () => void;
   onDisable: () => void;
   onRefreshQuota: () => void;
+  onClearRateLimitMarkers: () => void;
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
@@ -55,6 +57,11 @@ export function BulkActionsBar({
         icon={<RefreshCw className="w-3.5 h-3.5" />}
         label={t('accounts.bulk_refresh_quota')}
         onClick={onRefreshQuota}
+      />
+      <ActionButton
+        icon={<Eraser className="w-3.5 h-3.5" />}
+        label={t('accounts.bulk_clear_family_cooldowns')}
+        onClick={onClearRateLimitMarkers}
       />
       <ActionButton
         icon={<Trash2 className="w-3.5 h-3.5" />}

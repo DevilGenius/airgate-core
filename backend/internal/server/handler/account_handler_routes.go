@@ -266,6 +266,28 @@ func (h *AccountHandler) BulkDeleteAccounts(c *gin.Context) {
 	response.Success(c, toBulkOpResp(result))
 }
 
+// BulkClearFamilyCooldowns 批量清除账号上的临时限流标记。
+func (h *AccountHandler) BulkClearFamilyCooldowns(c *gin.Context) {
+	var req dto.BulkAccountIDsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+	if h.scheduler == nil {
+		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "调度器不可用")
+		return
+	}
+
+	result := appaccount.BulkResult{Results: make([]appaccount.BulkResultItem, 0, len(req.AccountIDs))}
+	for _, id := range req.AccountIDs {
+		h.scheduler.ClearRateLimitMarkers(c.Request.Context(), id)
+		result.Success++
+		result.SuccessIDs = append(result.SuccessIDs, id)
+		result.Results = append(result.Results, appaccount.BulkResultItem{ID: id, Success: true})
+	}
+	response.Success(c, toBulkOpResp(result))
+}
+
 // BulkRefreshQuota 批量刷新账号额度/令牌，使用 SSE 流式返回进度。
 // 事件类型：
 //   - {type:"start", total}

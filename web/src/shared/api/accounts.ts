@@ -28,6 +28,8 @@ export const accountsApi = {
   // 切换调度状态（active ↔ disabled）
   toggleScheduling: (id: number) => patch<{ id: number; state: string }>(`/api/v1/admin/accounts/${id}/toggle`),
   clearFamilyCooldowns: (id: number) => del<{ cleared: number }>(`/api/v1/admin/accounts/${id}/family-cooldowns`),
+  bulkClearFamilyCooldowns: (ids: number[]) =>
+    post<BulkOpResp>('/api/v1/admin/accounts/bulk-clear-family-cooldowns', { account_ids: ids }),
   // 获取账号所属平台的模型列表
   models: (id: number) => get<ModelInfo[]>(`/api/v1/admin/accounts/${id}/models`),
   // 测试连接 URL（SSE 流式，前端用 fetch 消费）

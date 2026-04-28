@@ -14,6 +14,7 @@ import {
   Search,
   Download,
   Upload,
+  Eraser,
 } from 'lucide-react';
 import { useToast } from '../../shared/components/Toast';
 import { Button } from '../../shared/components/Button';
@@ -59,11 +60,6 @@ function formatCountdown(ms: number): string {
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m`;
   return `${sec}s`;
-}
-
-function hasAccountRateLimitMarker(row: AccountResp, now = Date.now()): boolean {
-  return (row.state === 'rate_limited' || row.state === 'degraded') &&
-    !!row.state_until && Date.parse(row.state_until) > now;
 }
 
 /**
@@ -454,6 +450,15 @@ export default function AccountsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
+  const bulkClearRateLimitMarkersMutation = useMutation({
+    mutationFn: (ids: number[]) => accountsApi.bulkClearFamilyCooldowns(ids),
+    onSuccess: (res) => {
+      handleBulkResult(res, 'accounts.bulk_clear_family_cooldowns_success');
+      queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
   const handleBulkEnable = () =>
     bulkUpdateMutation.mutate({ account_ids: selectedIds, state: 'active' });
   const handleBulkDisable = () =>
@@ -706,8 +711,22 @@ export default function AccountsPage() {
         };
 
         const hasTodayStats = !!todayStats && (todayStats.requests > 0 || todayStats.tokens > 0);
+        const canRefresh = row.type !== 'apikey';
         if (windows.length === 0 && !credits && !hasTodayStats) {
-          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+          return (
+            <div
+              className={
+                canRefresh
+                  ? 'flex items-center gap-1 cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
+                  : 'flex items-center gap-1 rounded px-1 py-0.5'
+              }
+              title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
+              onClick={canRefresh ? handleRefreshClick : undefined}
+            >
+              <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
+              {canRefresh && <RefreshCw size={11} style={{ color: 'var(--ag-text-tertiary)' }} />}
+            </div>
+          );
         }
 
         const formatReset = (seconds: number) => {
@@ -738,9 +757,6 @@ export default function AccountsPage() {
         };
 
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', minWidth: 24 };
-
-        // apikey 账号没有上游 quota，刷新操作无意义；禁用点击和 hover 样式
-        const canRefresh = row.type !== 'apikey';
 
         return (
           <div
@@ -854,6 +870,14 @@ export default function AccountsPage() {
             onClick={() => setEditingAccount(row)}
           >
             <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
+            style={{ color: 'var(--ag-warning)' }}
+            title={t('accounts.clear_family_cooldowns')}
+            onClick={() => clearRateLimitMarkersMutation.mutate(row.id)}
+          >
+            <Eraser className="w-3.5 h-3.5" />
           </button>
           <button
             className="p-1.5 rounded hover:bg-bg-hover transition-colors"
@@ -1020,6 +1044,7 @@ export default function AccountsPage() {
         onEnable={handleBulkEnable}
         onDisable={handleBulkDisable}
         onRefreshQuota={handleBulkRefresh}
+        onClearRateLimitMarkers={() => bulkClearRateLimitMarkersMutation.mutate(selectedIds)}
         onDelete={() => setShowBulkDeleteConfirm(true)}
       />
 
@@ -1117,16 +1142,6 @@ export default function AccountsPage() {
                   >
                     <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
                     {t('accounts.refresh_quota')}
-                  </button>
-                )}
-                {(((row.family_cooldowns?.length ?? 0) > 0) || hasAccountRateLimitMarker(row)) && (
-                  <button
-                    className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
-                    style={{ color: 'var(--ag-text-secondary)' }}
-                    onClick={() => { clearRateLimitMarkersMutation.mutate(row.id); setMoreMenu(null); }}
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                    {t('accounts.clear_family_cooldowns')}
                   </button>
                 )}
               </>
