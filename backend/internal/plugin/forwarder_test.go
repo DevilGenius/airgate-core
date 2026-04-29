@@ -1,15 +1,18 @@
 package plugin
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/routing"
+	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
 func TestParseBody(t *testing.T) {
@@ -159,5 +162,94 @@ func TestRoutesForAPIKeyRejectsImageWhenBoundGroupDisabled(t *testing.T) {
 	routes := routesForAPIKey(state, routing.Requirements{NeedsImage: true})
 	if len(routes) != 0 {
 		t.Fatalf("len(routes) = %d, want 0", len(routes))
+	}
+}
+
+func TestSelectAllRoutesFailureResponse(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		summary    allRoutesFailureSummary
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name: "upstream rate limited",
+			summary: allRoutesFailureSummary{
+				rateLimitedSeen:       true,
+				rateLimitedRetryAfter: 3 * time.Second,
+				upstreamFailureSeen:   true,
+			},
+			wantStatus: http.StatusTooManyRequests,
+			wantCode:   "all_routes_rate_limited",
+		},
+		{
+			name: "local capacity exhausted",
+			summary: allRoutesFailureSummary{
+				localCapacitySeen:   true,
+				upstreamFailureSeen: true,
+			},
+			wantStatus: http.StatusTooManyRequests,
+			wantCode:   "all_routes_capacity_exhausted",
+		},
+		{
+			name: "upstream timeout",
+			summary: allRoutesFailureSummary{
+				upstreamTimeoutSeen: true,
+				upstreamFailureSeen: true,
+			},
+			wantStatus: http.StatusGatewayTimeout,
+			wantCode:   "upstream_timeout",
+		},
+		{
+			name: "upstream failure",
+			summary: allRoutesFailureSummary{
+				upstreamFailureSeen: true,
+			},
+			wantStatus: http.StatusBadGateway,
+			wantCode:   "upstream_error",
+		},
+		{
+			name: "no available account",
+			summary: allRoutesFailureSummary{
+				accountDeadSeen:    true,
+				accountUnavailable: true,
+			},
+			wantStatus: http.StatusServiceUnavailable,
+			wantCode:   "no_available_account",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := selectAllRoutesFailureResponse(tt.summary)
+			if got.status != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", got.status, tt.wantStatus)
+			}
+			if got.code != tt.wantCode {
+				t.Fatalf("code = %q, want %q", got.code, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestAllRoutesFailureSummaryRecordsTimeout(t *testing.T) {
+	t.Parallel()
+
+	summary := allRoutesFailureSummary{}
+	summary.recordExecution(forwardExecution{
+		outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient},
+		err:     context.DeadlineExceeded,
+	})
+
+	if !summary.upstreamTimeoutSeen {
+		t.Fatalf("upstreamTimeoutSeen = false, want true")
+	}
+	if summary.upstreamFailureSeen {
+		t.Fatalf("upstreamFailureSeen = true, want false")
 	}
 }

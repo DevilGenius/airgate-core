@@ -74,8 +74,10 @@ client = OpenAI(
 resp = client.images.generate(
     model="gpt-image-2",            # gpt-image-1 | gpt-image-1.5 | gpt-image-2
     prompt="一只可爱的柴犬坐在樱花树下，日系水彩风格",
-    size="1024x1024",               # 1024x1024 | 1024x1536 | 1536x1024 | auto
+    size="2048x2048",               # gpt-image-2 支持任意合规 WIDTHxHEIGHT，或 auto
     quality="medium",               # low | medium | high | auto
+    background="opaque",            # opaque | transparent
+    output_format="png",            # png | jpeg | webp
     n=1,
     extra_body={"stream": True},    # AirGate 长任务分块/保活，返回值仍是 ImagesResponse
 )
@@ -85,8 +87,6 @@ with open("out.png", "wb") as f:
     f.write(base64.b64decode(img.b64_json))
 ```
 
-> 计费说明：`input_tokens`（prompt）按 `$5/1M`、`output_tokens`（图像输出）按 `$40/1M`。图像 token 数按尺寸 × 质量估算（`1024x1024 low ≈ 272 tokens`、`medium ≈ 1056`、`high ≈ 4160`）
-
 ### OpenAI Images SDK（图生图）
 
 ```python
@@ -95,7 +95,10 @@ with open("in.png", "rb") as f:
         model="gpt-image-2",        # gpt-image-1.5 | gpt-image-2
         image=f,                    # 也可传 [f1, f2] 列表传多张参考图
         prompt="把这张图变成梵高星空风格的油画",
-        size="1024x1024",
+        size="1536x1024",
+        quality="medium",
+        background="opaque",
+        output_format="png",
         n=1,
         extra_body={"stream": True},  # AirGate 长任务分块/保活，返回值仍是 ImagesResponse
     )
@@ -104,8 +107,6 @@ img = resp.data[0]
 with open("out.png", "wb") as f:
     f.write(base64.b64decode(img.b64_json))
 ```
-
-> 额外计费项：每张参考图按尺寸估一份 image input tokens（与 low 质量输出同量级，`1024x1024 ≈ 272 tokens`），并入 `input_tokens` 走 `$5/1M`。
 
 ### Anthropic Python SDK
 
@@ -179,10 +180,11 @@ openclaw gateway
 
 参数：
 
-- `size`：`1024x1024`、`1024x1536`、`1536x1024`、`auto`
+- `size`：`auto` 或 `WIDTHxHEIGHT`。`gpt-image-2` 要求宽高均为 16 的倍数、单边不超过 3840、长短边比例不超过 3:1、总像素在 `655360` 到 `8294400` 之间；常用值如 `1024x1024`、`1536x1024`、`1024x1536`、`2048x2048`、`3840x2160`。
 - `quality`：`low`、`medium`、`high`、`auto`
-- `n`：目前仅支持 `1`（多图请多次调用）
+- `n`：OAuth 模式目前仅支持 `1`；API Key 直通模式按上游能力处理。
 - `background`：`opaque` / `transparent`
 - `output_format`：`png` / `jpeg` / `webp`
+- `input_fidelity`：仅图生图可用，`gpt-image-1` / `gpt-image-1.5` 可传 `low` / `high`；`gpt-image-2` 默认高保真处理参考图，无需传。
 
 响应使用标准 OpenAI Images API schema（`data[].b64_json` + `usage`），官方 SDK 能直接解析。

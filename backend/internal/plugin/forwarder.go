@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -126,11 +128,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	startedAt := state.startedAt
 	totalAttempts := 0
 
-	// rateLimited* 跟踪本次请求最近一次被上游限流时的退避建议。最终走到 all_routes_failed
-	// 时用来给客户端回 429 + Retry-After，而不是无信号的 503，让 SDK 能正确退避。
-	// 多次命中限流时取最小值（最早恢复的账号决定何时重试最合理）。
-	rateLimitedSeen := false
-	rateLimitedRetryAfter := time.Duration(0)
+	failureSummary := allRoutesFailureSummary{}
 
 	for _, route := range routes {
 		state.selectedRoute = route
@@ -146,6 +144,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			exclude = append(exclude, softExclude...)
 
 			if err := f.pickAccount(c, state, exclude...); err != nil {
+				failureSummary.recordPickAccountError(err)
 				if len(softExclude) > 0 && time.Now().Before(queueDeadline) {
 					softExclude = nil
 					select {
@@ -171,6 +170,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			attemptLogger := logger.With(sdk.LogFieldAccountID, accountID)
 			releaseAccountSlot, ok := f.acquireAccountSlot(c, state)
 			if !ok {
+				failureSummary.recordLocalCapacityFailure()
 				softExclude = append(softExclude, accountID)
 				continue
 			}
@@ -191,6 +191,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			totalAttempts++
 
 			if f.canFailover(c, state, execution) {
+				failureSummary.recordExecution(execution)
 				attrs := []any{
 					"attempt", attempt,
 					"kind", execution.outcome.Kind,
@@ -206,14 +207,6 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				attemptLogger.Warn("forward_attempt_failed", attrs...)
 				releaseAccountSlot()
 				f.applyOutcome(ctx, state, execution)
-
-				if execution.outcome.Kind == sdk.OutcomeAccountRateLimited {
-					ra := execution.outcome.RetryAfter
-					if !rateLimitedSeen || (ra > 0 && (rateLimitedRetryAfter == 0 || ra < rateLimitedRetryAfter)) {
-						rateLimitedSeen = true
-						rateLimitedRetryAfter = ra
-					}
-				}
 
 				if execution.outcome.Kind.IsAccountFault() {
 					hardExclude = append(hardExclude, accountID)
@@ -257,21 +250,146 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	if len(hardExclude) > 0 {
 		failAttrs = append(failAttrs, "tried_accounts", hardExclude)
 	}
-	if rateLimitedSeen {
-		failAttrs = append(failAttrs, "rate_limited_retry_after_ms", rateLimitedRetryAfter.Milliseconds())
+	if failureSummary.rateLimitedSeen {
+		failAttrs = append(failAttrs, "rate_limited_retry_after_ms", failureSummary.rateLimitedRetryAfter.Milliseconds())
 	}
 	logger.Error("forward_request_failed", failAttrs...)
 
-	// 走到这里都是"上游容量不足"——上游 429、家族冷却中、并发槽满 + 排队超时，
-	// 客户端视角统一归为可重试的限流，回 429 + Retry-After 让 SDK 自动退避。
-	// 真正的"无候选分组 / 配置错"已经在最前面 routes 为空时回了 no_available_route，
-	// 不会走到这里；这里再回 503 只会让客户端拿到无信号的失败，触发更猛的重试。
-	retryAfter := rateLimitedRetryAfter
-	if retryAfter <= 0 {
-		retryAfter = allRoutesFailedDefaultRetryAfter
+	writeAllRoutesFailed(c, failureSummary)
+}
+
+type allRoutesFailureSummary struct {
+	rateLimitedSeen       bool
+	rateLimitedRetryAfter time.Duration
+	localCapacitySeen     bool
+	accountUnavailable    bool
+	accountDeadSeen       bool
+	upstreamTimeoutSeen   bool
+	upstreamFailureSeen   bool
+}
+
+func (s *allRoutesFailureSummary) recordExecution(execution forwardExecution) {
+	switch execution.outcome.Kind {
+	case sdk.OutcomeAccountRateLimited:
+		s.rateLimitedSeen = true
+		s.recordRetryAfter(execution.outcome.RetryAfter)
+	case sdk.OutcomeAccountDead:
+		s.accountDeadSeen = true
+	case sdk.OutcomeUpstreamTransient:
+		if isTimeoutFailure(execution) {
+			s.upstreamTimeoutSeen = true
+			return
+		}
+		s.upstreamFailureSeen = true
+	case sdk.OutcomeUnknown:
+		if execution.err != nil {
+			s.upstreamFailureSeen = true
+		}
 	}
-	openAIRateLimitError(c, http.StatusTooManyRequests, "all_routes_failed",
-		"上游容量暂时不足，请稍后重试", retryAfter)
+}
+
+func (s *allRoutesFailureSummary) recordRetryAfter(retryAfter time.Duration) {
+	if retryAfter <= 0 {
+		return
+	}
+	if s.rateLimitedRetryAfter == 0 || retryAfter < s.rateLimitedRetryAfter {
+		s.rateLimitedRetryAfter = retryAfter
+	}
+}
+
+func (s *allRoutesFailureSummary) recordPickAccountError(error) {
+	s.accountUnavailable = true
+}
+
+func (s *allRoutesFailureSummary) recordLocalCapacityFailure() {
+	s.localCapacitySeen = true
+}
+
+type allRoutesFailureResponse struct {
+	status     int
+	errType    string
+	code       string
+	message    string
+	retryAfter time.Duration
+}
+
+func writeAllRoutesFailed(c *gin.Context, summary allRoutesFailureSummary) {
+	response := selectAllRoutesFailureResponse(summary)
+	if response.status == http.StatusTooManyRequests {
+		openAIRateLimitError(c, response.status, response.code, response.message, response.retryAfter)
+		return
+	}
+	openAIError(c, response.status, response.errType, response.code, response.message)
+}
+
+func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFailureResponse {
+	if summary.rateLimitedSeen {
+		retryAfter := summary.rateLimitedRetryAfter
+		if retryAfter <= 0 {
+			retryAfter = allRoutesFailedDefaultRetryAfter
+		}
+		return allRoutesFailureResponse{
+			status:     http.StatusTooManyRequests,
+			errType:    "rate_limit_error",
+			code:       "all_routes_rate_limited",
+			message:    "上游账号当前被限流，请稍后重试",
+			retryAfter: retryAfter,
+		}
+	}
+	if summary.localCapacitySeen {
+		return allRoutesFailureResponse{
+			status:     http.StatusTooManyRequests,
+			errType:    "rate_limit_error",
+			code:       "all_routes_capacity_exhausted",
+			message:    "上游容量暂时不足，请稍后重试",
+			retryAfter: allRoutesFailedDefaultRetryAfter,
+		}
+	}
+	if summary.upstreamTimeoutSeen {
+		return allRoutesFailureResponse{
+			status:  http.StatusGatewayTimeout,
+			errType: "server_error",
+			code:    "upstream_timeout",
+			message: "上游请求超时，请稍后重试",
+		}
+	}
+	if summary.upstreamFailureSeen {
+		return allRoutesFailureResponse{
+			status:  http.StatusBadGateway,
+			errType: "server_error",
+			code:    "upstream_error",
+			message: "上游服务暂不可用，请稍后重试",
+		}
+	}
+	if summary.accountDeadSeen || summary.accountUnavailable {
+		return allRoutesFailureResponse{
+			status:  http.StatusServiceUnavailable,
+			errType: "server_error",
+			code:    "no_available_account",
+			message: "暂无可用上游账号，请稍后重试",
+		}
+	}
+	return allRoutesFailureResponse{
+		status:  http.StatusServiceUnavailable,
+		errType: "server_error",
+		code:    "all_routes_failed",
+		message: "请求暂时无法完成，请稍后重试",
+	}
+}
+
+func isTimeoutFailure(execution forwardExecution) bool {
+	if execution.outcome.Upstream.StatusCode == http.StatusGatewayTimeout {
+		return true
+	}
+	if errors.Is(execution.err, context.DeadlineExceeded) {
+		return true
+	}
+	var timeoutErr interface{ Timeout() bool }
+	if errors.As(execution.err, &timeoutErr) && timeoutErr.Timeout() {
+		return true
+	}
+	reason := strings.ToLower(judgmentReason(execution))
+	return strings.Contains(reason, "timeout") || strings.Contains(reason, "timed out") || strings.Contains(reason, "deadline exceeded")
 }
 
 func routesForAPIKey(state *forwardState, requirements routing.Requirements) []routing.Candidate {
