@@ -459,7 +459,7 @@ func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (
 	if err != nil {
 		return nil, err
 	}
-	fwdCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	fwdCtx, cancel := context.WithTimeout(ctx, hostForwardTimeout(req))
 	defer cancel()
 
 	var hardExclude []int
@@ -706,7 +706,18 @@ func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequ
 }
 
 // maxHostForwardAttempts 最大 failover 次数，与 Forwarder 保持一致。
-const maxHostForwardAttempts = 3
+const (
+	maxHostForwardAttempts    = 3
+	defaultHostForwardTimeout = 120 * time.Second
+	imageHostForwardTimeout   = 300 * time.Second
+)
+
+func hostForwardTimeout(req *pb.HostForwardRequest) time.Duration {
+	if req != nil && requestNeedsImage(req.Path, req.Model) {
+		return imageHostForwardTimeout
+	}
+	return defaultHostForwardTimeout
+}
 
 // failoverStreamWriter 包装 hostStreamWriter，支持 failover 重试。
 // 成功响应（StatusCode < 400）立即提交到真正的 gRPC stream，实现真流式；

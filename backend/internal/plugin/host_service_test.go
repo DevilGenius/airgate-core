@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"testing"
+	"time"
 
 	"entgo.io/ent/dialect/sql/schema"
 	_ "github.com/mattn/go-sqlite3"
@@ -10,7 +11,29 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/DouDOU-start/airgate-core/ent/enttest"
+	pb "github.com/DouDOU-start/airgate-sdk/proto"
 )
+
+func TestHostForwardTimeout(t *testing.T) {
+	cases := []struct {
+		name string
+		req  *pb.HostForwardRequest
+		want time.Duration
+	}{
+		{name: "nil request", req: nil, want: defaultHostForwardTimeout},
+		{name: "chat request", req: &pb.HostForwardRequest{Path: "/v1/chat/completions", Model: "gpt-4o"}, want: defaultHostForwardTimeout},
+		{name: "images API request", req: &pb.HostForwardRequest{Path: "/v1/images/generations", Model: "gpt-4o"}, want: imageHostForwardTimeout},
+		{name: "image model request", req: &pb.HostForwardRequest{Path: "/v1/responses", Model: "gpt-image-2"}, want: imageHostForwardTimeout},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hostForwardTimeout(tc.req); got != tc.want {
+				t.Fatalf("hostForwardTimeout() = %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestCheckHostForwardBalance(t *testing.T) {
 	ctx := context.Background()
