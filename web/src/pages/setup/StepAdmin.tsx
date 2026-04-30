@@ -58,6 +58,7 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
       </p>
       <Input
         label={t('setup.admin_email')}
+        name="email"
         type="email"
         value={data.email}
         onChange={(e) => update('email', e.target.value)}
@@ -68,6 +69,7 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
       <div>
         <Input
           label={t('profile.new_password')}
+          name="new-password"
           type="password"
           value={data.password}
           onChange={(e) => update('password', e.target.value)}
@@ -95,6 +97,7 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
       </div>
       <Input
         label={t('profile.confirm_new_password')}
+        name="confirm-new-password"
         type="password"
         value={data.confirmPassword}
         onChange={(e) => update('confirmPassword', e.target.value)}

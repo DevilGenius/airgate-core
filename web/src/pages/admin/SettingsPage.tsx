@@ -381,7 +381,7 @@ export default function SettingsPage() {
               </Button>
             }
           >
-            <div className="space-y-4">
+            <form className="space-y-4" onSubmit={(e) => e.preventDefault()} noValidate>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label={t('settings.smtp_host')}>
                   <Input value={val('smtp_host')} onChange={(e) => set('smtp_host', e.target.value)} placeholder="smtp.gmail.com" />
@@ -395,7 +395,7 @@ export default function SettingsPage() {
                   <Input value={val('smtp_username')} onChange={(e) => set('smtp_username', e.target.value)} />
                 </Field>
                 <Field label={t('settings.smtp_password')}>
-                  <Input type="password" value={val('smtp_password')} onChange={(e) => set('smtp_password', e.target.value)} autoComplete="off" />
+                  <Input name="smtp_password" type="password" value={val('smtp_password')} onChange={(e) => set('smtp_password', e.target.value)} autoComplete="off" />
                 </Field>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -412,7 +412,7 @@ export default function SettingsPage() {
                 checked={boolVal('smtp_use_tls')}
                 onChange={(v) => set('smtp_use_tls', String(v))}
               />
-            </div>
+            </form>
           </Card>
 
           {/* 邮件模板切换 */}
@@ -805,7 +805,7 @@ function StoragePanel({
 
   return (
     <Card title={t('settings.storage_config')}>
-      <div className="space-y-5">
+      <form className="space-y-5" onSubmit={(e) => e.preventDefault()} noValidate>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label={t('settings.s3_endpoint')} hint={t('settings.s3_endpoint_hint')}>
             <Input
@@ -832,6 +832,7 @@ function StoragePanel({
           </Field>
           <Field label={t('settings.s3_secret_key')}>
             <Input
+              name="s3_secret_key"
               type="password"
               value={val('s3_secret_key')}
               onChange={(e) => set('s3_secret_key', e.target.value)}
@@ -885,7 +886,7 @@ function StoragePanel({
           checked={boolVal('s3_use_ssl')}
           onChange={(v) => set('s3_use_ssl', String(v))}
         />
-      </div>
+      </form>
     </Card>
   );
 }

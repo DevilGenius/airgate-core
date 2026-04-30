@@ -79,6 +79,8 @@ export default function StepRedis({ data, onChange, onPrev, onNext }: StepRedisP
       <div className="grid grid-cols-2 gap-4">
         <Input
           label={t('setup.host')}
+          name="host"
+          autoComplete="off"
           value={data.host}
           onChange={(e) => update('host', e.target.value)}
           placeholder="localhost"
@@ -96,6 +98,7 @@ export default function StepRedis({ data, onChange, onPrev, onNext }: StepRedisP
       <div className="grid grid-cols-2 gap-4">
         <Input
           label={t('setup.password')}
+          name="password"
           type="password"
           value={data.password || ''}
           onChange={(e) => update('password', e.target.value)}

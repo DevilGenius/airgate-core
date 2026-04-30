@@ -45,6 +45,8 @@ type usageCacheEntry struct {
 
 const usageCacheTTL = 5 * time.Minute
 
+const autoQuotaRefreshInterval = 6 * time.Hour
+
 // StateWriter 管理员巡检场景下对账号状态的写入口。
 // 由 scheduler 包实现；让 account service 不直接依赖 scheduler。
 type StateWriter interface {
@@ -80,6 +82,57 @@ func NewService(repo Repository, plugins PluginCatalog, concurrency ConcurrencyR
 		now:         time.Now,
 		usageCache:  make(map[string]*usageCacheEntry),
 	}
+}
+
+// StartQuotaRefreshLoop periodically refreshes OAuth account plan metadata written into credentials.
+func (s *Service) StartQuotaRefreshLoop(ctx context.Context) {
+	go s.runQuotaRefreshLoop(ctx)
+}
+
+func (s *Service) runQuotaRefreshLoop(ctx context.Context) {
+	s.refreshAllOAuthQuotas(ctx)
+
+	ticker := time.NewTicker(autoQuotaRefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.refreshAllOAuthQuotas(ctx)
+		}
+	}
+}
+
+func (s *Service) refreshAllOAuthQuotas(ctx context.Context) {
+	logger := sdk.LoggerFromContext(ctx)
+	accounts, err := s.repo.ListAll(ctx, ListFilter{})
+	if err != nil {
+		logger.Warn("account_quota_auto_refresh_list_failed", sdk.LogFieldError, err)
+		return
+	}
+
+	success, failed, skipped := 0, 0, 0
+	for _, item := range accounts {
+		if ctx.Err() != nil {
+			return
+		}
+		if item.Type == "apikey" || len(item.Credentials) == 0 {
+			skipped++
+			continue
+		}
+		if _, err := s.refreshQuota(ctx, item, false); err != nil {
+			failed++
+			logger.Warn("account_quota_auto_refresh_failed",
+				sdk.LogFieldAccountID, item.ID,
+				sdk.LogFieldPlatform, item.Platform,
+				sdk.LogFieldError, err)
+			continue
+		}
+		success++
+	}
+
+	logger.Info("account_quota_auto_refresh_complete", "success", success, "failed", failed, "skipped", skipped)
 }
 
 // List 查询账号列表。
@@ -898,10 +951,15 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 		return QuotaRefreshResult{}, err
 	}
 
+	return s.refreshQuota(ctx, item, true)
+}
+
+func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage bool) (QuotaRefreshResult, error) {
+	logger := sdk.LoggerFromContext(ctx)
 	inst := s.plugins.GetPluginByPlatform(item.Platform)
 	if inst == nil || inst.Gateway == nil {
 		logger.Warn("account_credential_validation_failed",
-			sdk.LogFieldAccountID, id,
+			sdk.LogFieldAccountID, item.ID,
 			sdk.LogFieldPlatform, item.Platform,
 			sdk.LogFieldReason, "quota_refresh_unsupported")
 		return QuotaRefreshResult{}, ErrQuotaRefreshUnsupported
@@ -915,13 +973,13 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 		// 识别插件返回的 reauth_required 前缀（字符串识别，gRPC 不透传 sentinel error）。
 		if strings.Contains(err.Error(), reauthRequiredPrefix) {
 			logger.Warn("account_credential_validation_failed",
-				sdk.LogFieldAccountID, id,
+				sdk.LogFieldAccountID, item.ID,
 				sdk.LogFieldPlatform, item.Platform,
 				sdk.LogFieldReason, "reauth_required")
 			return QuotaRefreshResult{}, ErrReauthRequired
 		}
 		logger.Error("account_credential_validation_failed",
-			sdk.LogFieldAccountID, id,
+			sdk.LogFieldAccountID, item.ID,
 			sdk.LogFieldPlatform, item.Platform,
 			sdk.LogFieldError, err)
 		return QuotaRefreshResult{}, fmt.Errorf("刷新额度失败: %w", err)
@@ -939,7 +997,7 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 	credentials := cloneStringMap(item.Credentials)
 	updated := false
 	for key, value := range quota.Extra {
-		if value != "" && credentials[key] != value {
+		if shouldPersistQuotaExtra(key, value) && credentials[key] != value {
 			credentials[key] = value
 			updated = true
 		}
@@ -949,22 +1007,24 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 		updated = true
 	}
 	if updated {
-		if err := s.repo.SaveCredentials(ctx, id, credentials); err != nil {
+		if err := s.repo.SaveCredentials(ctx, item.ID, credentials); err != nil {
 			logger.Error("account_credential_persist_failed",
-				sdk.LogFieldAccountID, id,
+				sdk.LogFieldAccountID, item.ID,
 				"op", "save_credentials",
 				sdk.LogFieldError, err)
 			return QuotaRefreshResult{}, err
 		}
 	}
 
-	// 顺手触发一次用量强制重探测：QueryQuota 只负责刷订阅信息（plan_type / 过期时间），
-	// 不动用量窗口缓存。用户点"刷新"时如果账号从没探测过，还是看不到 5h/7d 进度条。
-	// 主动调一次 usage/probe 把窗口数据灌进插件内存缓存，下次 usage/accounts 就能读到。
-	// 探测失败不阻断主流程——订阅信息已经成功返回，窗口数据下一个 5 分钟周期还会再试。
-	s.triggerUsageProbe(ctx, inst, id, credentials)
+	if probeUsage {
+		// 顺手触发一次用量强制重探测：QueryQuota 只负责刷订阅信息（plan_type / 过期时间），
+		// 不动用量窗口缓存。用户点"刷新"时如果账号从没探测过，还是看不到 5h/7d 进度条。
+		// 主动调一次 usage/probe 把窗口数据灌进插件内存缓存，下次 usage/accounts 就能读到。
+		// 探测失败不阻断主流程——订阅信息已经成功返回，窗口数据下一个 5 分钟周期还会再试。
+		s.triggerUsageProbe(ctx, inst, item.ID, credentials)
+	}
 	if s.stateWriter != nil {
-		s.stateWriter.ClearRateLimitMarkers(ctx, id)
+		s.stateWriter.ClearRateLimitMarkers(ctx, item.ID)
 	}
 
 	return QuotaRefreshResult{
@@ -977,6 +1037,18 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 
 // triggerUsageProbe 调用插件的 usage/probe 路径强制重探测单账号用量窗口。
 // 只在插件声明支持时有效；失败只记日志，不影响调用方。
+func shouldPersistQuotaExtra(key, value string) bool {
+	if value != "" {
+		return true
+	}
+	switch key {
+	case "plan_type", "subscription_active_until":
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *Service) triggerUsageProbe(ctx context.Context, inst *plugin.PluginInstance, id int, credentials map[string]string) {
 	if inst == nil || inst.Gateway == nil {
 		return

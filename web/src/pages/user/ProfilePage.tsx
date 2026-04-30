@@ -156,6 +156,7 @@ export default function ProfilePage() {
         <form className="space-y-4" onSubmit={handleChangePassword} noValidate>
           <Input
             label={t('profile.old_password')}
+            name="current-password"
             type="password"
             required
             value={passwords.old_password}
@@ -168,6 +169,7 @@ export default function ProfilePage() {
           />
           <Input
             label={t('profile.new_password')}
+            name="new-password"
             type="password"
             required
             value={passwords.new_password}
@@ -180,6 +182,7 @@ export default function ProfilePage() {
           />
           <Input
             label={t('profile.confirm_new_password')}
+            name="confirm-new-password"
             type="password"
             required
             value={passwords.confirm_password}

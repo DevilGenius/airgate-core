@@ -163,17 +163,17 @@ export function createPluginOAuthBridge(pluginId: string): PluginOAuthBridge | u
         error: r.error,
       }));
     },
-    importRefresh: async (refreshToken: string) => {
+    importRefresh: async (refreshToken: string, clientId?: string) => {
       const result = await pluginsApi.rpc<{
         account_type: string; account_name: string; credentials: Record<string, string>;
-      }>(pluginId, 'oauth/import-refresh', { refresh_token: refreshToken });
+      }>(pluginId, 'oauth/import-refresh', { refresh_token: refreshToken, client_id: clientId });
       return {
         accountType: result.account_type,
         accountName: result.account_name,
         credentials: result.credentials,
       };
     },
-    batchImportRefresh: async (refreshTokens: string[]) => {
+    batchImportRefresh: async (refreshTokens: string[], clientId?: string) => {
       const resp = await pluginsApi.rpc<{
         results: Array<{
           account_type?: string;
@@ -182,7 +182,7 @@ export function createPluginOAuthBridge(pluginId: string): PluginOAuthBridge | u
           status: string;
           error?: string;
         }>;
-      }>(pluginId, 'oauth/batch-import-refresh', { refresh_tokens: refreshTokens });
+      }>(pluginId, 'oauth/batch-import-refresh', { refresh_tokens: refreshTokens, client_id: clientId });
       return resp.results.map((r) => ({
         accountType: r.account_type ?? 'oauth',
         accountName: r.account_name ?? '',

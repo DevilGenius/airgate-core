@@ -190,9 +190,10 @@ export function CreateAccountModal({
       }
     >
       {step === 1 ? (
-        <div className="space-y-4">
+        <form className="space-y-4" onSubmit={(e) => e.preventDefault()} noValidate>
           <Select
             label={t('accounts.platform')}
+            name="platform"
             required
             value={platform}
             onChange={(e) => handlePlatformChange(e.target.value)}
@@ -204,6 +205,8 @@ export function CreateAccountModal({
 
           <Input
             label={t('common.name')}
+            name="name"
+            autoComplete="off"
             required={!batchMode}
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -239,7 +242,7 @@ export function CreateAccountModal({
               onCredentialsChange={setCredentials}
             />
           ) : null}
-        </div>
+        </form>
       ) : (
         <div className="space-y-4">
           <Input

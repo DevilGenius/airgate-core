@@ -37,6 +37,18 @@ func TestImportIgnoresEnvironmentScopedIDs(t *testing.T) {
 	}
 }
 
+func TestShouldPersistQuotaExtraAllowsClearingPlanMetadata(t *testing.T) {
+	if !shouldPersistQuotaExtra("plan_type", "") {
+		t.Fatalf("empty plan_type should be persisted to clear stale subscription data")
+	}
+	if !shouldPersistQuotaExtra("subscription_active_until", "") {
+		t.Fatalf("empty subscription_active_until should be persisted to clear stale subscription data")
+	}
+	if shouldPersistQuotaExtra("email", "") {
+		t.Fatalf("empty non-plan metadata should not be persisted")
+	}
+}
+
 type stubRepository struct {
 	create func(context.Context, CreateInput) (Account, error)
 }

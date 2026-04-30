@@ -45,6 +45,7 @@ import type {
   BulkOpResp,
   AccountExportFile,
   AccountExportItem,
+  PagedData,
 } from '../../shared/types';
 
 // formatCountdown 把剩余毫秒格式化成 "Xd Yh"/"Xh Ym"/"Ym" 样式，
@@ -167,6 +168,37 @@ export default function AccountsPage() {
   const queryClient = useQueryClient();
   const { platforms, platformName } = usePlatforms();
   const { toast } = useToast();
+
+  const applyQuotaRefreshResult = (
+    id: number,
+    result: Awaited<ReturnType<typeof accountsApi.refreshQuota>>,
+  ) => {
+    queryClient.setQueriesData<PagedData<AccountResp>>(
+      { queryKey: queryKeys.accounts() },
+      (old) => {
+        if (!old?.list?.length) return old;
+
+        let matched = false;
+        const list = old.list.map((account) => {
+          if (account.id !== id) return account;
+          matched = true;
+          return {
+            ...account,
+            credentials: {
+              ...account.credentials,
+              ...(result.plan_type !== undefined ? { plan_type: result.plan_type } : {}),
+              ...(result.email !== undefined ? { email: result.email } : {}),
+              ...(result.subscription_active_until !== undefined
+                ? { subscription_active_until: result.subscription_active_until }
+                : {}),
+            },
+          };
+        });
+
+        return matched ? { ...old, list } : old;
+      },
+    );
+  };
 
   const PLATFORM_OPTIONS = [
     { value: '', label: t('accounts.all_platforms') },
@@ -395,7 +427,8 @@ export default function AccountsPage() {
   // 时，会以 reauth_warning 形式回传降级提示；此时提示用户重新授权而不是弹 success。
   const refreshQuotaMutation = useMutation({
     mutationFn: (id: number) => accountsApi.refreshQuota(id),
-    onSuccess: (res) => {
+    onSuccess: (res, id) => {
+      applyQuotaRefreshResult(id, res);
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
       if (res?.reauth_warning) {
         toast('warning', t('accounts.refresh_quota_reauth_warning'));
@@ -536,8 +569,12 @@ export default function AccountsPage() {
         const planType = row.credentials?.plan_type;
         const subUntil = row.credentials?.subscription_active_until;
         const subExpired = subUntil ? new Date(subUntil) < new Date() : false;
+        const hasQuotaMetadata = row.platform === 'openai' && row.type === 'oauth' && (
+          planType !== undefined || row.credentials?.email !== undefined || subUntil !== undefined
+        );
+        const rawDisplayPlanType = planType || (hasQuotaMetadata ? 'free' : '');
         // 订阅过期时降级显示为 free
-        const displayPlanType = (planType && subExpired && planType.toLowerCase() !== 'free') ? 'free' : planType;
+        const displayPlanType = (rawDisplayPlanType && subExpired && rawDisplayPlanType.toLowerCase() !== 'free') ? 'free' : rawDisplayPlanType;
         // 仅未过期的付费订阅 hover 显示过期时间
         const isPaid = displayPlanType && displayPlanType.toLowerCase() !== 'free';
         const planTooltip = isPaid && subUntil && !subExpired
@@ -666,7 +703,8 @@ export default function AccountsPage() {
           target.style.opacity = '0.5';
           target.style.pointerEvents = 'none';
           try {
-            await accountsApi.refreshQuota(row.id);
+            const result = await accountsApi.refreshQuota(row.id);
+            applyQuotaRefreshResult(row.id, result);
             queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
             queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
             toast('success', t('accounts.refresh_usage_success', '用量刷新成功'));

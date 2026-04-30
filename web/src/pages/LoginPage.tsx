@@ -49,6 +49,7 @@ function LoginForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <Input
         label={t('auth.email')}
+        name="email"
         type="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -60,6 +61,7 @@ function LoginForm() {
       />
       <Input
         label={t('auth.password')}
+        name="password"
         type="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
@@ -172,6 +174,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
       <form onSubmit={handleStep1} className="space-y-4">
         <Input
           label={t('auth.email')}
+          name="email"
           type="email"
           value={email}
           onChange={(e) => { setEmail(e.target.value); setError(''); }}
@@ -189,6 +192,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
             <div className="flex gap-2">
               <div className="flex-1">
                 <Input
+                  name="verify_code"
                   value={verifyCode}
                   onChange={(e) => { setVerifyCode(e.target.value); setError(''); }}
                   placeholder={t('auth.verify_code_placeholder')}
@@ -231,6 +235,8 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
       <Input
         label={t('auth.username')}
+        name="username"
+        autoComplete="username"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
         placeholder={t('auth.username_placeholder')}
@@ -239,6 +245,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
       />
       <Input
         label={t('auth.password')}
+        name="new-password"
         type="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
@@ -249,6 +256,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
       />
       <Input
         label={t('auth.confirm_password')}
+        name="confirm-new-password"
         type="password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -303,6 +311,7 @@ function APIKeyLoginForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <Input
         label="API Key"
+        name="api_key"
         type="password"
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}

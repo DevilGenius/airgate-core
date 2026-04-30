@@ -30,6 +30,7 @@ export function CredentialFieldInput({
     return (
       <Textarea
         label={field.label}
+        name={field.key}
         required={field.required}
         placeholder={hint}
         value={value}
@@ -46,6 +47,7 @@ export function CredentialFieldInput({
   return (
     <Input
       label={field.label}
+      name={field.key}
       type="text"
       required={field.required}
       placeholder={hint}

@@ -83,6 +83,8 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
       <div className="grid grid-cols-2 gap-4">
         <Input
           label={t('setup.host')}
+          name="host"
+          autoComplete="off"
           value={data.host}
           onChange={(e) => update('host', e.target.value)}
           placeholder="localhost"
@@ -100,6 +102,8 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
       <div className="grid grid-cols-2 gap-4">
         <Input
           label={t('setup.username')}
+          name="username"
+          autoComplete="username"
           value={data.user}
           onChange={(e) => update('user', e.target.value)}
           placeholder="airgate"
@@ -107,6 +111,7 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
         />
         <Input
           label={t('setup.password')}
+          name="password"
           type="password"
           value={data.password || ''}
           onChange={(e) => update('password', e.target.value)}

@@ -62,6 +62,8 @@ type HTTPHandlers struct {
 	OpenClaw     *handler.OpenClawHandler
 	Version      *handler.VersionHandler
 	Upgrade      *handler.UpgradeHandler
+
+	AccountService *appaccount.Service
 }
 
 // NewHTTPHandlers 统一构造 HTTP 处理器。
@@ -98,20 +100,21 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	upgradeService := upgrade.NewService(upgrade.DetectMode(), dep.Redis)
 
 	return &HTTPHandlers{
-		Auth:         handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
-		User:         handler.NewUserHandler(userService),
-		Account:      handler.NewAccountHandler(accountService, dep.Scheduler),
-		Group:        handler.NewGroupHandler(groupService),
-		APIKey:       handler.NewAPIKeyHandler(apiKeyService),
-		Subscription: handler.NewSubscriptionHandler(subscriptionService),
-		Usage:        handler.NewUsageHandler(usageService),
-		Proxy:        handler.NewProxyHandler(proxyService),
-		Settings:     handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret()),
-		Dashboard:    handler.NewDashboardHandler(dashboardService),
-		Plugin:       handler.NewPluginHandler(pluginAdminService),
-		OpenClaw:     handler.NewOpenClawHandler(openclawService),
-		Version:      handler.NewVersionHandler(),
-		Upgrade:      handler.NewUpgradeHandler(upgradeService),
+		Auth:           handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
+		User:           handler.NewUserHandler(userService),
+		Account:        handler.NewAccountHandler(accountService, dep.Scheduler),
+		Group:          handler.NewGroupHandler(groupService),
+		APIKey:         handler.NewAPIKeyHandler(apiKeyService),
+		Subscription:   handler.NewSubscriptionHandler(subscriptionService),
+		Usage:          handler.NewUsageHandler(usageService),
+		Proxy:          handler.NewProxyHandler(proxyService),
+		Settings:       handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret()),
+		Dashboard:      handler.NewDashboardHandler(dashboardService),
+		Plugin:         handler.NewPluginHandler(pluginAdminService),
+		OpenClaw:       handler.NewOpenClawHandler(openclawService),
+		Version:        handler.NewVersionHandler(),
+		Upgrade:        handler.NewUpgradeHandler(upgradeService),
+		AccountService: accountService,
 	}
 }
 

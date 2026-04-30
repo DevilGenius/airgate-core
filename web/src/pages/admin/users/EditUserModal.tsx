@@ -42,11 +42,12 @@ export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUs
       }
     >
       <form id="edit-user-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
-        <Input label={t('users.email')} value={user.email} disabled />
-        <Input label={t('users.username')} value={form.username ?? ''} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+        <Input label={t('users.email')} name="email" value={user.email} disabled />
+        <Input label={t('users.username')} name="username" value={form.username ?? ''} onChange={(e) => setForm({ ...form, username: e.target.value })} autoComplete="username" />
         <div className="relative">
           <Input
             label={t('users.password')}
+            name="new-password"
             type={showPassword ? 'text' : 'password'}
             placeholder={t('accounts.leave_empty_to_keep')}
             value={form.password ?? ''}

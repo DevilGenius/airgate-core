@@ -289,6 +289,8 @@ export default function ProxiesPage() {
         <form id="proxy-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
           <Input
             label={t('common.name')}
+            name="name"
+            autoComplete="off"
             required
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -326,11 +328,14 @@ export default function ProxiesPage() {
           />
           <Input
             label={t('proxies.username')}
+            name="username"
+            autoComplete="username"
             value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
           />
           <Input
             label={t('proxies.password_label')}
+            name="password"
             type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}

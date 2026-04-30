@@ -163,10 +163,12 @@ export function EditAccountModal({
       }
     >
       {step === 1 ? (
-        <div className="space-y-4">
-          <Input label={t('accounts.platform')} value={pName(account.platform)} disabled />
+        <form className="space-y-4" onSubmit={(e) => e.preventDefault()} noValidate>
+          <Input label={t('accounts.platform')} name="platform" value={pName(account.platform)} disabled />
           <Input
             label={t('common.name')}
+            name="name"
+            autoComplete="off"
             value={form.name ?? ''}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             icon={<Layers className="w-4 h-4" />}
@@ -197,7 +199,7 @@ export function EditAccountModal({
               mode="edit"
             />
           ) : null}
-        </div>
+        </form>
       ) : (
         <div className="space-y-4">
           <Switch

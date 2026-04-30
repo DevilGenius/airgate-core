@@ -24,9 +24,9 @@ export interface PluginOAuthBridge {
   exchange: (callbackURL: string) => Promise<PluginOAuthExchangeResult>;
   batchExchange?: (sessionKeys: string[]) => Promise<PluginOAuthBatchExchangeResult[]>;
   /** 用已有的 refresh_token 换取完整凭证（插件侧解析 id_token 自动补齐字段） */
-  importRefresh?: (refreshToken: string) => Promise<PluginOAuthExchangeResult>;
+  importRefresh?: (refreshToken: string, clientId?: string) => Promise<PluginOAuthExchangeResult>;
   /** 批量版 importRefresh */
-  batchImportRefresh?: (refreshTokens: string[]) => Promise<PluginOAuthBatchExchangeResult[]>;
+  batchImportRefresh?: (refreshTokens: string[], clientId?: string) => Promise<PluginOAuthBatchExchangeResult[]>;
 }
 
 /** 插件表单发起的批量导入账号项（由核心侧补全 platform/priority 等元数据） */
