@@ -104,3 +104,56 @@ func TestWriteFailureResponse_RateLimitedReturns429(t *testing.T) {
 		t.Fatalf("body = %q, want contain '限流'", body)
 	}
 }
+
+func TestSanitizedClientErrorMessage_ImageTooLarge(t *testing.T) {
+	t.Parallel()
+
+	outcome := sdk.ForwardOutcome{
+		Kind: sdk.OutcomeClientError,
+		Upstream: sdk.UpstreamResponse{
+			StatusCode: http.StatusRequestEntityTooLarge,
+			Body:       []byte(`{"error":{"message":"Request entity too large"}}`),
+		},
+		Reason: "upstream request entity too large",
+	}
+
+	if got := sanitizedClientErrorStatus(outcome); got != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d", got, http.StatusRequestEntityTooLarge)
+	}
+	if got := sanitizedClientErrorMessage(outcome); got != imageTooLargeMessage {
+		t.Fatalf("message = %q, want %q", got, imageTooLargeMessage)
+	}
+}
+
+func TestSanitizedClientErrorMessage_UsesUpstreamMessage(t *testing.T) {
+	t.Parallel()
+
+	outcome := sdk.ForwardOutcome{
+		Kind: sdk.OutcomeClientError,
+		Upstream: sdk.UpstreamResponse{
+			StatusCode: http.StatusBadRequest,
+			Body:       []byte(`{"error":{"message":"messages 中未找到用户消息"}}`),
+		},
+		Reason: "image model via chat completions: no user message",
+	}
+
+	if got := sanitizedClientErrorStatus(outcome); got != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", got, http.StatusBadRequest)
+	}
+	if got := sanitizedClientErrorMessage(outcome); got != "messages 中未找到用户消息" {
+		t.Fatalf("message = %q, want upstream message", got)
+	}
+}
+
+func TestSanitizedClientErrorMessage_DefaultWhenNoMessage(t *testing.T) {
+	t.Parallel()
+
+	outcome := sdk.ForwardOutcome{
+		Kind:     sdk.OutcomeClientError,
+		Upstream: sdk.UpstreamResponse{StatusCode: http.StatusBadRequest},
+	}
+
+	if got := sanitizedClientErrorMessage(outcome); got != defaultClientErrorMessage {
+		t.Fatalf("message = %q, want %q", got, defaultClientErrorMessage)
+	}
+}

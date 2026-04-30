@@ -100,6 +100,16 @@ func (ep *ExtensionProxy) buildProxyRequest(c *gin.Context, subPath, entry strin
 	}
 
 	headers["x-airgate-entry"] = &pb.HeaderValues{Values: []string{entry}}
+	if _, ok := headers["x-forwarded-host"]; !ok && c.Request.Host != "" {
+		headers["x-forwarded-host"] = &pb.HeaderValues{Values: []string{c.Request.Host}}
+	}
+	if _, ok := headers["x-forwarded-proto"]; !ok {
+		proto := "http"
+		if c.Request.TLS != nil {
+			proto = "https"
+		}
+		headers["x-forwarded-proto"] = &pb.HeaderValues{Values: []string{proto}}
+	}
 	if uid, ok := c.Get(middleware.CtxKeyUserID); ok {
 		if id, ok := uid.(int); ok {
 			headers["x-airgate-user-id"] = &pb.HeaderValues{Values: []string{strconv.Itoa(id)}}

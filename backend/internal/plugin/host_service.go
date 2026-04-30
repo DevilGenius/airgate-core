@@ -216,6 +216,13 @@ func (h *pluginHostHandle) GetAssetURL(ctx context.Context, req *pb.HostGetAsset
 	return h.base.getAssetURL(ctx, req)
 }
 
+func (h *pluginHostHandle) GetAssetBytes(ctx context.Context, req *pb.HostGetAssetBytesRequest) (*pb.HostGetAssetBytesResponse, error) {
+	if err := h.requireCap(sdk.CapabilityHostAssetStorage); err != nil {
+		return nil, err
+	}
+	return h.base.getAssetBytes(ctx, req)
+}
+
 // selectAccount 调度选号：走和真实用户请求完全相同的路径。
 // 内部 worker，由 pluginHostHandle.SelectAccount 在 capability 校验后调用。
 func (h *HostService) selectAccount(ctx context.Context, req *pb.HostSelectAccountRequest) (*pb.HostSelectAccountResponse, error) {
@@ -532,7 +539,7 @@ func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (
 					sdk.LogFieldStatus, outcome.Upstream.StatusCode,
 					sdk.LogFieldReason, outcome.Reason,
 				)
-				return nil, status.Error(codes.InvalidArgument, "请求无法完成，请检查输入后重试")
+				return nil, hostForwardClientError(outcome)
 			}
 			if outcome.Kind != sdk.OutcomeSuccess {
 				slog.Warn("host_forward_outcome_failed",
@@ -659,7 +666,7 @@ func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequ
 					sdk.LogFieldStatus, outcome.Upstream.StatusCode,
 					sdk.LogFieldReason, outcome.Reason,
 				)
-				return status.Error(codes.InvalidArgument, "请求无法完成，请检查输入后重试")
+				return hostForwardClientError(outcome)
 			}
 
 			if !fw.committed {
@@ -1004,6 +1011,18 @@ func (h *HostService) getAssetURL(ctx context.Context, req *pb.HostGetAssetURLRe
 	return &pb.HostGetAssetURLResponse{PublicUrl: publicURL}, nil
 }
 
+func (h *HostService) getAssetBytes(ctx context.Context, req *pb.HostGetAssetBytesRequest) (*pb.HostGetAssetBytesResponse, error) {
+	storage, err := newAssetStorage(ctx, h.db)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	data, contentType, err := storage.getBytes(ctx, req.ObjectKey)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &pb.HostGetAssetBytesResponse{Data: data, ContentType: contentType}, nil
+}
+
 // protoHeadersToHTTPHost / httpHeadersToProtoHost 是 host_service.go 内部的 header 转换。
 // 与 grpc/gateway_server.go 的同名函数等价，但跨包引用会引入循环依赖。
 func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForwardRequest) ([]routing.Candidate, error) {
@@ -1155,6 +1174,10 @@ func (h *HostService) checkHostForwardBalance(ctx context.Context, userID int64)
 
 func hostForwardGenericError() error {
 	return status.Error(codes.Unavailable, "请求暂时无法完成，请稍后重试")
+}
+
+func hostForwardClientError(outcome sdk.ForwardOutcome) error {
+	return status.Error(codes.InvalidArgument, sanitizedClientErrorMessage(outcome))
 }
 
 func hostForwardInsufficientQuotaError() error {

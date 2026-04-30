@@ -2,9 +2,11 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -79,7 +81,8 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 			"status_code", execution.outcome.Upstream.StatusCode,
 			"reason", execution.outcome.Reason)
 		if !state.stream {
-			openAIError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request", "请求无法完成，请检查输入后重试")
+			statusCode := sanitizedClientErrorStatus(execution.outcome)
+			openAIError(c, statusCode, "invalid_request_error", "invalid_request", sanitizedClientErrorMessage(execution.outcome))
 		}
 		if execution.outcome.Usage != nil {
 			f.recordUsage(c, state, execution)
@@ -87,6 +90,59 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 	default:
 		writeFailureResponse(c, state, execution)
 	}
+}
+
+const (
+	defaultClientErrorMessage = "请求无法完成，请检查输入后重试"
+	imageTooLargeMessage      = "图片过大，请压缩后重试"
+)
+
+func sanitizedClientErrorStatus(outcome sdk.ForwardOutcome) int {
+	status := outcome.Upstream.StatusCode
+	if status >= 400 && status < 500 {
+		return status
+	}
+	return http.StatusBadRequest
+}
+
+func sanitizedClientErrorMessage(outcome sdk.ForwardOutcome) string {
+	message := extractErrorMessage(outcome.Upstream.Body)
+	if message == "" {
+		message = outcome.Reason
+	}
+	if containsImageTooLargeSignal(message) || outcome.Upstream.StatusCode == http.StatusRequestEntityTooLarge {
+		return imageTooLargeMessage
+	}
+	if message != "" {
+		return message
+	}
+	return defaultClientErrorMessage
+}
+
+func containsImageTooLargeSignal(message string) bool {
+	msg := strings.ToLower(message)
+	return strings.Contains(msg, "too large") || strings.Contains(msg, "request entity too large") || strings.Contains(msg, "413") || strings.Contains(msg, "图片过大")
+}
+
+func extractErrorMessage(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	var payload struct {
+		Error any `json:"error"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return ""
+	}
+	switch e := payload.Error.(type) {
+	case string:
+		return e
+	case map[string]any:
+		if msg, ok := e["message"].(string); ok {
+			return msg
+		}
+	}
+	return ""
 }
 
 // writeFailureResponse 非 Success / 非 ClientError 的响应：脱敏为 502（或 429），

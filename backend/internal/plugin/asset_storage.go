@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path"
@@ -146,6 +147,34 @@ func (s *assetStorage) publicURL(ctx context.Context, objectKey string) (string,
 	return u.String(), nil
 }
 
+func (s *assetStorage) getBytes(ctx context.Context, objectKey string) ([]byte, string, error) {
+	if !s.useS3 {
+		localPath, err := s.localPath(objectKey)
+		if err != nil {
+			return nil, "", err
+		}
+		data, err := os.ReadFile(localPath)
+		if err != nil {
+			return nil, "", err
+		}
+		return data, contentTypeForAssetKey(objectKey), nil
+	}
+	obj, err := s.client.GetObject(ctx, s.bucket, objectKey, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() { _ = obj.Close() }()
+	info, err := obj.Stat()
+	if err != nil {
+		return nil, "", err
+	}
+	data, err := io.ReadAll(obj)
+	if err != nil {
+		return nil, "", err
+	}
+	return data, info.ContentType, nil
+}
+
 func (s *assetStorage) localPath(objectKey string) (string, error) {
 	clean := strings.TrimPrefix(path.Clean("/"+objectKey), "/")
 	if clean == "" || clean == "." || strings.HasPrefix(clean, "../") || strings.Contains(clean, "/../") {
@@ -192,6 +221,21 @@ func cleanAssetExtension(ext string) string {
 		}
 	}
 	return ext
+}
+
+func contentTypeForAssetKey(objectKey string) string {
+	switch strings.ToLower(path.Ext(objectKey)) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".webp":
+		return "image/webp"
+	case ".gif":
+		return "image/gif"
+	default:
+		return "application/octet-stream"
+	}
 }
 
 func escapeAssetKey(objectKey string) string {
