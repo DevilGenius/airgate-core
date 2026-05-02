@@ -53,10 +53,10 @@ type UsageRecord struct {
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
-	UserAgent       string
-	IPAddress       string
-	Endpoint        string
-	ReasoningEffort string
+	UserAgent             string
+	IPAddress             string
+	Endpoint              string
+	ReasoningEffort       string
 }
 
 // Recorder 异步记录器
