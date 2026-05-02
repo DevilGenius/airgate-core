@@ -19,3 +19,17 @@ func TestParseExpiresAtRejectsInvalidFormat(t *testing.T) {
 		t.Fatalf("expected ErrInvalidExpiresAt, got %v", err)
 	}
 }
+
+func TestParseExpiresAtClearsWhenEmpty(t *testing.T) {
+	value := ""
+	expiresAt, hasExpiresAt, err := parseExpiresAt(&value)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !hasExpiresAt {
+		t.Fatal("expected expires_at to be marked for update")
+	}
+	if expiresAt != nil {
+		t.Fatalf("expected nil expires_at, got %v", expiresAt)
+	}
+}

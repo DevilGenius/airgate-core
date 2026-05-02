@@ -84,6 +84,8 @@ type LogRecord struct {
 	FirstTokenMs          int64
 	UserAgent             string
 	IPAddress             string
+	Endpoint              string
+	ReasoningEffort       string
 	CreatedAt             string
 }
 

@@ -44,6 +44,8 @@ type UsageLogResp struct {
 	FirstTokenMs          int64   `json:"first_token_ms"`
 	UserAgent             string  `json:"user_agent,omitempty"`
 	IPAddress             string  `json:"ip_address,omitempty"`
+	Endpoint              string  `json:"endpoint,omitempty"`
+	ReasoningEffort       string  `json:"reasoning_effort,omitempty"` // 推理强度档位
 	CreatedAt             string  `json:"created_at"`
 }
 

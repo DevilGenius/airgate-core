@@ -527,6 +527,8 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		FirstTokenMs:          item.FirstTokenMs,
 		UserAgent:             item.UserAgent,
 		IPAddress:             item.IPAddress,
+		Endpoint:              item.Endpoint,
+		ReasoningEffort:       item.ReasoningEffort,
 		CreatedAt:             item.CreatedAt.Format(time.RFC3339),
 	}
 

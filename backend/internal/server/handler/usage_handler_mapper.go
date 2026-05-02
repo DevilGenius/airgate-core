@@ -50,6 +50,8 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		FirstTokenMs:          record.FirstTokenMs,
 		UserAgent:             record.UserAgent,
 		IPAddress:             record.IPAddress,
+		Endpoint:              record.Endpoint,
+		ReasoningEffort:       record.ReasoningEffort,
 		CreatedAt:             record.CreatedAt,
 	}
 }
