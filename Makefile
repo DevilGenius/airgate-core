@@ -9,7 +9,8 @@ SDK_FRONTEND := ../airgate-sdk/frontend
 # data/plugins/<id>/assets 读。这样三个插件的 dev 体验完全一致，没有特例。
 OPENAI_PLUGIN := ../airgate-openai/web
 CLAUDE_PLUGIN := ../airgate-claude/web
-PLAYGROUND_PLUGIN := ../airgate-playground/web
+PLAYGROUND_DIR := ../airgate-playground
+PLAYGROUND_PLUGIN := $(PLAYGROUND_DIR)/web
 EPAY_PLUGIN := ../airgate-epay/web
 HEALTH_PLUGIN := ../airgate-health/web
 # build-plugins 阶段（生产）同步各插件的 admin dist/index.js 到
@@ -158,14 +159,14 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 	else \
 		echo "跳过 claude 插件前端构建：$(CLAUDE_PLUGIN) 不存在"; \
 	fi
-	@if [ -d $(PLAYGROUND_PLUGIN) ]; then \
+	@if [ -d $(PLAYGROUND_DIR) ]; then \
 		echo "构建并同步 playground 插件前端..."; \
-		(cd $(PLAYGROUND_PLUGIN) && npm run build); \
+		$(MAKE) -C $(PLAYGROUND_DIR) webdist; \
 		mkdir -p $(PLAYGROUND_ASSETS); \
 		cp $(PLAYGROUND_PLUGIN)/dist/index.js $(PLAYGROUND_ASSETS)/index.js; \
 		echo "playground 插件前端已同步到 $(PLAYGROUND_ASSETS)/"; \
 	else \
-		echo "跳过 playground 插件前端构建：$(PLAYGROUND_PLUGIN) 不存在"; \
+		echo "跳过 playground 插件前端构建：$(PLAYGROUND_DIR) 不存在"; \
 	fi
 	@if [ -d $(EPAY_PLUGIN) ]; then \
 		echo "构建并同步 epay 插件前端..."; \
@@ -250,7 +251,7 @@ install: setup-hooks ## 安装全部依赖（含 SDK 前端构建、插件前端
 	@cd $(BACKEND_DIR) && $(GO) mod download
 	@rm -rf $(WEB_DIR)/node_modules/.vite
 	@cd $(WEB_DIR) && npm install
-	@for p in $(OPENAI_PLUGIN) $(CLAUDE_PLUGIN) $(EPAY_PLUGIN) $(HEALTH_PLUGIN); do \
+	@for p in $(OPENAI_PLUGIN) $(CLAUDE_PLUGIN) $(PLAYGROUND_PLUGIN) $(EPAY_PLUGIN) $(HEALTH_PLUGIN); do \
 		if [ -d $$p ]; then \
 			echo "安装插件前端依赖: $$p"; \
 			cd $$p && npm install && cd - > /dev/null; \

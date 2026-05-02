@@ -26,8 +26,7 @@ func TestMatchPluginByPlatformAndPath(t *testing.T) {
 	inst := mgr.MatchPluginByPlatformAndPath("anthropic", "/v1/messages")
 	if inst == nil {
 		t.Fatal("expected plugin instance, got nil")
-	}
-	if inst.Platform != "anthropic" {
+	} else if inst.Platform != "anthropic" {
 		t.Fatalf("expected anthropic plugin, got %q", inst.Platform)
 	}
 }

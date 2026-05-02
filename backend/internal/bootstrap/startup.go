@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	entsql "entgo.io/ent/dialect/sql"
 
@@ -37,35 +38,41 @@ func migrateAccountState(drv *entsql.Driver) {
 	}
 	ctx := context.Background()
 
-	// 先检查旧列是否存在。不存在 = 已迁移过 / 全新部署，直接返回。
-	var exists entsql.Rows
-	const checkSQL = `SELECT 1 FROM information_schema.columns
-		WHERE table_name='accounts' AND column_name='status' LIMIT 1`
-	if err := drv.Query(ctx, checkSQL, []any{}, &exists); err != nil {
-		slog.Warn("bootstrap_account_state_check_failed", sdk.LogFieldError, err)
+	hasStatus, ok := accountColumnExists(ctx, drv, "status")
+	if !ok {
 		return
 	}
-	hasOld := exists.Next()
-	_ = exists.Close()
-	if !hasOld {
+	hasRateLimitResetAt, ok := accountColumnExists(ctx, drv, "rate_limit_reset_at")
+	if !ok {
+		return
+	}
+	if !hasStatus && !hasRateLimitResetAt {
 		return
 	}
 
 	slog.Info("bootstrap_account_state_migration_start")
 
-	// data migration
-	const updateSQL = `UPDATE accounts SET
-		state = CASE
-			WHEN status IN ('error', 'disabled') THEN 'disabled'
-			WHEN rate_limit_reset_at IS NOT NULL AND rate_limit_reset_at > NOW() THEN 'rate_limited'
-			ELSE 'active'
-		END,
-		state_until = CASE
+	updates := make([]string, 0, 2)
+	if hasStatus || hasRateLimitResetAt {
+		stateCase := []string{"state = CASE"}
+		if hasStatus {
+			stateCase = append(stateCase, "WHEN status IN ('error', 'disabled') THEN 'disabled'")
+		}
+		if hasRateLimitResetAt {
+			stateCase = append(stateCase, "WHEN rate_limit_reset_at IS NOT NULL AND rate_limit_reset_at > NOW() THEN 'rate_limited'")
+		}
+		stateCase = append(stateCase, "ELSE 'active' END")
+		updates = append(updates, strings.Join(stateCase, " "))
+	}
+	if hasRateLimitResetAt {
+		updates = append(updates, `state_until = CASE
 			WHEN rate_limit_reset_at IS NOT NULL AND rate_limit_reset_at > NOW() THEN rate_limit_reset_at
 			ELSE NULL
-		END
-	`
+		END`)
+	}
+
 	var res entsql.Result
+	updateSQL := "UPDATE accounts SET " + strings.Join(updates, ", ")
 	if err := drv.Exec(ctx, updateSQL, []any{}, &res); err != nil {
 		slog.Error("bootstrap_account_state_migration_failed", sdk.LogFieldError, err)
 		return
@@ -86,6 +93,18 @@ func migrateAccountState(drv *entsql.Driver) {
 		}
 	}
 	slog.Info("bootstrap_account_legacy_columns_dropped")
+}
+
+func accountColumnExists(ctx context.Context, drv *entsql.Driver, column string) (bool, bool) {
+	var exists entsql.Rows
+	const checkSQL = `SELECT 1 FROM information_schema.columns
+		WHERE table_name='accounts' AND column_name=$1 LIMIT 1`
+	if err := drv.Query(ctx, checkSQL, []any{column}, &exists); err != nil {
+		slog.Warn("bootstrap_account_state_check_failed", "column", column, sdk.LogFieldError, err)
+		return false, false
+	}
+	defer func() { _ = exists.Close() }()
+	return exists.Next(), true
 }
 
 // backfillResellerMarkupColumns 一次性回填 reseller markup 改造引入的两个新列：
