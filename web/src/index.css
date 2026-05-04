@@ -1254,6 +1254,44 @@ input[type="number"]::-webkit-outer-spin-button {
    11. Animation Utilities
    ========================================================================== */
 
+.ag-global-loading-line {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ag-global-loading-line > span {
+  position: absolute;
+  inset-block: 0;
+  left: -38%;
+  width: 38%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--ag-primary) 18%, transparent) 20%,
+    color-mix(in oklab, var(--ag-primary) 70%, white) 58%,
+    transparent 100%
+  );
+  box-shadow: 0 0 10px color-mix(in oklab, var(--ag-primary) 52%, transparent);
+  animation: ag-global-loading-line 1s ease-in-out infinite;
+}
+
+@keyframes ag-global-loading-line {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(365%);
+  }
+}
+
 @keyframes ag-fade-in {
   from {
     opacity: 0;

@@ -5,7 +5,7 @@ import { apikeysApi } from '../../shared/api/apikeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { groupsApi } from '../../shared/api/groups';
 import { useToast } from '../../shared/ui';
-import { Alert, AlertDialog, Button, Dropdown, EmptyState, Modal, Spinner, Table as HeroTable, useOverlayState } from '@heroui/react';
+import { Alert, AlertDialog, Button, Dropdown, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
 import {
   StatusChip,
 } from '../../shared/ui';
@@ -15,6 +15,7 @@ import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
+import { CommonTable } from '../../shared/components/CommonTable';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import {
   AlertTriangle,
@@ -38,6 +39,8 @@ import { CreateKeyModal } from './userkeys/CreateKeyModal';
 import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
 import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
+
+const HeroTable = CommonTable;
 
 export default function UserKeysPage() {
   const { t } = useTranslation();
@@ -275,9 +278,20 @@ export default function UserKeysPage() {
         </div>
       </div>
 
-      <HeroTable variant="primary">
-        <HeroTable.ScrollContainer>
-          <HeroTable.Content aria-label={t('user_keys.title', 'API keys')}>
+      <CommonTable
+        ariaLabel={t('user_keys.title', 'API keys')}
+        footer={(
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            setPage={setPage}
+            setPageSize={setPageSize}
+            total={total}
+            totalPages={totalPages}
+          />
+        )}
+        minWidth={1040}
+      >
             <HeroTable.Header>
               <HeroTable.Column id="name">{t('common.name')}</HeroTable.Column>
               <HeroTable.Column id="key_prefix">{t('user_keys.title')}</HeroTable.Column>
@@ -502,19 +516,7 @@ export default function UserKeysPage() {
                 })
               )}
             </HeroTable.Body>
-          </HeroTable.Content>
-        </HeroTable.ScrollContainer>
-        <HeroTable.Footer>
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        </HeroTable.Footer>
-      </HeroTable>
+      </CommonTable>
 
       {/* 创建/编辑弹窗 */}
       <EditKeyModal

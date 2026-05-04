@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useMatchRoute, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useIsFetching, useQuery } from '@tanstack/react-query';
 import { Button, Link as HeroLink, Tooltip } from '@heroui/react';
 import { useAuth } from '../providers/AuthProvider';
 import { getTokenRole } from '../../shared/api/client';
@@ -12,6 +12,7 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useSiteSettings, defaultLogoUrl } from '../providers/SiteSettingsProvider';
 import { effectiveDocUrl } from '../../shared/utils/docUrl';
 import { useIsMobile } from '../../shared/hooks/useMediaQuery';
+import { TopLoadingLine } from '../../shared/components/PageLoading';
 import {
   LayoutDashboard,
   Users,
@@ -161,6 +162,9 @@ export function AppShell({ children }: AppShellProps) {
   const isMobile = useIsMobile();
   const matchRoute = useMatchRoute();
   const routerPath = useRouterState({ select: (s) => s.location.pathname });
+  const blockingFetches = useIsFetching({
+    predicate: (query) => query.state.status === 'pending',
+  });
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -365,6 +369,8 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="fixed inset-0 flex overflow-hidden bg-bg text-text">
+      <TopLoadingLine active={blockingFetches > 0} />
+
       {/* Mobile backdrop */}
       {isMobile && mobileOpen && (
         <div
