@@ -54,7 +54,7 @@ export function UserApiKeysModal({ open, user, onClose }: UserApiKeysModalProps)
                 <HeroTable.ScrollContainer>
                   <HeroTable.Content aria-label={t('users.api_keys')}>
             <HeroTable.Header>
-              <HeroTable.Column id="name">{t('api_keys.title')}</HeroTable.Column>
+              <HeroTable.Column id="name" isRowHeader>{t('api_keys.title')}</HeroTable.Column>
               <HeroTable.Column id="key_prefix">{t('api_keys.key_prefix')}</HeroTable.Column>
               <HeroTable.Column id="quota_usd">{t('api_keys.quota_used')}</HeroTable.Column>
               <HeroTable.Column id="status">{t('common.status')}</HeroTable.Column>

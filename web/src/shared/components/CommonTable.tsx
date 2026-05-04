@@ -2,6 +2,9 @@ import type { ComponentProps, CSSProperties, ReactNode } from 'react';
 import { Table as HeroTable } from '@heroui/react';
 
 type HeroTableContentProps = ComponentProps<typeof HeroTable.Content>;
+type HeroTableColumnProps = ComponentProps<typeof HeroTable.Column>;
+
+const DEFAULT_ROW_HEADER_COLUMN_IDS = new Set(['action', 'email', 'id', 'name', 'user_id']);
 
 interface CommonTableProps {
   ariaLabel: string;
@@ -54,10 +57,17 @@ function CommonTableRoot({
   );
 }
 
+function CommonTableColumn({ id, isRowHeader, ...props }: HeroTableColumnProps) {
+  const shouldMarkRowHeader =
+    isRowHeader ?? (typeof id === 'string' && DEFAULT_ROW_HEADER_COLUMN_IDS.has(id));
+
+  return <HeroTable.Column id={id} isRowHeader={shouldMarkRowHeader} {...props} />;
+}
+
 export const CommonTable = Object.assign(CommonTableRoot, {
   Body: HeroTable.Body,
   Cell: HeroTable.Cell,
-  Column: HeroTable.Column,
+  Column: CommonTableColumn,
   Header: HeroTable.Header,
   Row: HeroTable.Row,
 });

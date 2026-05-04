@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, ComboBox, Description, Input, Label, ListBox, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Description, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
+import { CommonModal } from '../../../shared/components/CommonModal';
 import type { KeyForm } from './types';
 
 export interface KeyGroupOption {
@@ -41,6 +42,12 @@ export function EditKeyModal({
     ),
     textValue: option.label,
   }));
+  const selectedGroupLabel = selectedGroup ? (
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      <span className="truncate">{selectedGroup.label}</span>
+      {selectedGroup.suffix ? <span className="shrink-0 text-xs">{selectedGroup.suffix}</span> : null}
+    </div>
+  ) : t('user_keys.select_group');
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -49,15 +56,21 @@ export function EditKeyModal({
   });
 
   return (
-    <Modal state={modalState}>
-      <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="md">
-          <Modal.Dialog className="ag-elevation-modal">
-            <Modal.Header>
-              <Modal.Heading>{isEdit ? t('user_keys.edit') : t('user_keys.create')}</Modal.Heading>
-              <Modal.CloseTrigger />
-            </Modal.Header>
-            <Modal.Body>
+    <CommonModal
+      footer={(
+        <div className="flex w-full justify-end gap-2">
+          <Button variant="secondary" onPress={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="primary" isDisabled={loading} onPress={onSubmit}>
+            {loading ? <Spinner size="sm" /> : null}
+            {isEdit ? t('common.save') : t('common.create')}
+          </Button>
+        </div>
+      )}
+      state={modalState}
+      title={isEdit ? t('user_keys.edit') : t('user_keys.create')}
+    >
       <div className="space-y-4">
         <HeroTextField fullWidth isRequired>
           <Label>{t('common.name')}</Label>
@@ -68,22 +81,18 @@ export function EditKeyModal({
             required
           />
         </HeroTextField>
-        <ComboBox
-          allowsCustomValue
+        <Select
           fullWidth
-          inputValue={selectedGroup?.label ?? ''}
           isRequired
-          items={groupItems}
-          menuTrigger="focus"
           selectedKey={form.group_id || null}
           onSelectionChange={(key) => setForm({ ...form, group_id: key == null ? '' : String(key) })}
         >
           <Label>{t('user_keys.group')}</Label>
-          <ComboBox.InputGroup>
-            <Input placeholder={t('user_keys.select_group')} required />
-            <ComboBox.Trigger />
-          </ComboBox.InputGroup>
-          <ComboBox.Popover>
+          <Select.Trigger>
+            <Select.Value>{selectedGroupLabel}</Select.Value>
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
             <ListBox items={groupItems}>
               {(item) => (
                 <ListBox.Item id={item.id} textValue={item.textValue}>
@@ -91,8 +100,8 @@ export function EditKeyModal({
                 </ListBox.Item>
               )}
             </ListBox>
-          </ComboBox.Popover>
-        </ComboBox>
+          </Select.Popover>
+        </Select>
         <HeroTextField fullWidth>
           <Label>{t('user_keys.quota_label')}</Label>
           <Input
@@ -130,19 +139,6 @@ export function EditKeyModal({
           onChange={(value) => setForm({ ...form, expires_at: value })}
         />
       </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="secondary" onPress={onClose}>
-                {t('common.cancel')}
-              </Button>
-              <Button variant="primary" isDisabled={loading} onPress={onSubmit}>
-                {loading ? <Spinner size="sm" /> : null}
-                {isEdit ? t('common.save') : t('common.create')}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    </CommonModal>
   );
 }

@@ -72,7 +72,7 @@ export function BalanceHistoryModal({ open, user, onClose }: BalanceHistoryModal
                 <HeroTable.ScrollContainer>
                   <HeroTable.Content aria-label={t('users.balance_history')}>
             <HeroTable.Header>
-              <HeroTable.Column id="action" style={{ width: 96 }}>
+              <HeroTable.Column id="action" isRowHeader style={{ width: 96 }}>
                 {t('users.action_type')}
               </HeroTable.Column>
               <HeroTable.Column id="amount">{t('users.amount')}</HeroTable.Column>

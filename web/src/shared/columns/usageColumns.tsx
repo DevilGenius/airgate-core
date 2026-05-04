@@ -244,17 +244,12 @@ function buildResellerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
         >
           <div className="flex w-full flex-col items-end font-mono text-xs text-right">
             {row.sell_rate > 0 && row.billed_cost !== row.actual_cost ? (
-              <>
-                <div className="text-[15px] font-semibold leading-none text-text">
-                  <CostValue value={row.billed_cost} decimals={6} />
-                </div>
-                <div className="mt-0.5 text-xs leading-none text-text-tertiary">
-                  {t('usage.cost_actual_short', '成本')} <CostValue value={row.actual_cost} decimals={6} tone="actual" />
-                </div>
-              </>
+              <div className="text-[15px] font-semibold leading-none text-text">
+                <CostValue value={row.billed_cost} decimals={6} tone="warning" />
+              </div>
             ) : (
               <div className="text-[15px] font-semibold leading-none text-text">
-                <CostValue value={row.actual_cost} decimals={6} tone="actual" />
+                <CostValue value={row.actual_cost} decimals={6} tone="warning" />
               </div>
             )}
           </div>

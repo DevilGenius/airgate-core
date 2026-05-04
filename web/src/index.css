@@ -497,8 +497,15 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .ag-page-tabs-compact :where(.tabs__tab, [data-slot="tabs-tab"]),
 .ag-segmented-tabs-compact :where(.tabs__tab, [data-slot="tabs-tab"]) {
+  height: 1.625rem;
+  min-height: 1.625rem;
   min-width: 4.75rem;
-  padding-inline: 0.75rem;
+  padding-inline: 0.625rem;
+}
+
+.ag-page-tabs-compact :where(.tabs__list, [data-slot="tabs-list"]),
+.ag-segmented-tabs-compact :where(.tabs__list, [data-slot="tabs-list"]) {
+  padding: 0.125rem;
 }
 
 .ag-page-tabs-auto :where(.tabs__tab, [data-slot="tabs-tab"]),
@@ -521,6 +528,15 @@ input[type="number"]::-webkit-outer-spin-button {
   z-index: 1;
   white-space: nowrap;
   line-height: 1;
+}
+
+.ag-tabs-panel-flush {
+  margin-top: 0 !important;
+  padding: 0 !important;
+}
+
+.ag-install-tabs .tabs__panel {
+  min-height: 13.5rem;
 }
 
 /* Settings page */
@@ -869,6 +885,14 @@ input[type="number"]::-webkit-outer-spin-button {
 /* ==========================================================================
    09. Page-Specific Overrides
    ========================================================================== */
+
+/* Admin API keys: 创建密钥弹窗布局 */
+
+.ag-elevation-modal.ag-create-key-modal,
+.ag-elevation-modal.modal__dialog--lg.ag-create-key-modal {
+  width: min(45rem, calc(100vw - 2rem)) !important;
+  max-width: min(45rem, calc(100vw - 2rem)) !important;
+}
 
 /* Admin accounts: 添加凭证弹窗布局 */
 

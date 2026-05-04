@@ -807,7 +807,7 @@ export default function AccountsPage() {
     ...[{
       key: 'usage_window',
       title: t('accounts.usage_window'),
-      width: '360px',
+      width: '440px',
       hideOnMobile: true,
       render: (row: AccountResp) => {
         const usage = usageData?.accounts?.[String(row.id)];
@@ -911,12 +911,60 @@ export default function AccountsPage() {
         };
 
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
-        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[2rem_minmax(0,1fr)] items-center gap-1 rounded-[var(--field-radius)] border px-1 text-[10px] leading-none shadow-sm';
+        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[1.9rem_minmax(0,1fr)] items-center gap-1 rounded-[var(--field-radius)] border px-1 text-[10px] leading-none shadow-sm';
         const todayMetricStyle = (color: string, foreground = color) => ({
           background: `color-mix(in srgb, ${color} 10%, transparent)`,
           borderColor: `color-mix(in srgb, ${color} 22%, var(--ag-border))`,
           color: foreground,
         });
+        const todayMetricColumnClass = 'grid w-[10.5rem] justify-self-end grid-cols-2 gap-1';
+        const todayMetricChips = hasTodayStats && todayStats ? (
+          <div
+            className={todayMetricColumnClass}
+            title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
+          >
+            <span className={todayMetricClass} style={todayMetricStyle('var(--ag-info)')}>
+              <span className="truncate text-text-tertiary">{t('accounts.today_access_count', '访问')}</span>
+              <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.requests, false)}</span>
+            </span>
+            <span className={todayMetricClass} style={todayMetricStyle('var(--ag-primary)')}>
+              <span className="truncate text-text-tertiary">Token</span>
+              <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.tokens)}</span>
+            </span>
+            <span
+              className={todayMetricClass}
+              style={todayMetricStyle('var(--ag-warning)')}
+              title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
+            >
+              <span className="truncate text-text-tertiary">{t('accounts.user_cost_short', '消费')}</span>
+              <span className="text-right tabular-nums">
+                <span style={{ color: 'var(--ag-warning)' }}>$</span>
+                <span className="text-text">{todayStats.user_cost.toFixed(2)}</span>
+              </span>
+            </span>
+            <span
+              className={todayMetricClass}
+              style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
+              title={t('accounts.window_account_cost', '账号成本（上游计费）')}
+            >
+              <span className="truncate text-text-tertiary">{t('accounts.account_cost_short', '成本')}</span>
+              <span className="text-right tabular-nums">
+                <span style={{ color: 'var(--ag-success)' }}>$</span>
+                <span className="text-text">{todayStats.account_cost.toFixed(2)}</span>
+              </span>
+            </span>
+            {row.platform === 'openai' && (row.today_image_count ?? 0) > 0 && (
+              <span
+                className={`${todayMetricClass} col-span-2`}
+                style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
+                title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}
+              >
+                <span className="truncate text-text-tertiary">{t('accounts.image_count_inline_label', '图')}</span>
+                <span className="text-right font-semibold tabular-nums">{formatCompact(row.today_image_count ?? 0, false)}</span>
+              </span>
+            )}
+          </div>
+        ) : null;
 
         return (
           <div
@@ -925,86 +973,50 @@ export default function AccountsPage() {
                 ? 'flex flex-col gap-1.5 text-[11px] cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
                 : 'flex flex-col gap-1.5 text-[11px] rounded px-1 py-0.5'
             }
-            style={{ fontFamily: 'var(--ag-font-mono)', minWidth: 332, width: '100%' }}
+            style={{ fontFamily: 'var(--ag-font-mono)', minWidth: 412, width: '100%' }}
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
-            {windows.map((w, i) => (
-              <div key={i} className="grid grid-cols-[4rem_minmax(0,1fr)_2.25rem_3rem] items-center gap-1.5">
-                <span className="inline-flex min-w-0 items-center justify-center truncate rounded px-1 py-0 text-[10px] font-medium" style={badgeStyle} title={w.label}>
-                  {shortLabel(w.label)}
-                </span>
-                <div className="h-1.5 min-w-0 overflow-hidden rounded-full" style={{ background: 'var(--ag-glass-border)' }}>
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(100, Math.round(w.used_percent))}%`, background: usageColor(w.used_percent) }}
-                  />
-                </div>
-                <span className="text-right" style={{ color: usageColor(w.used_percent), fontSize: 10 }}>
-                  {Math.round(w.used_percent)}%
-                </span>
-                <span className="text-right" style={{ color: 'var(--ag-text-tertiary)', fontSize: 10 }}>
-                  {formatReset(w.reset_seconds)}
-                </span>
-              </div>
-            ))}
-            {hasTodayStats && todayStats && (
-              <div
-                className="mt-0.5 grid grid-cols-4 gap-1"
-                title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
-              >
-                <span className={todayMetricClass} style={todayMetricStyle('var(--ag-info)')}>
-                  <span className="truncate text-text-tertiary">{t('accounts.today_access_count', '访问')}</span>
-                  <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.requests, false)}</span>
-                </span>
-                <span className={todayMetricClass} style={todayMetricStyle('var(--ag-primary)')}>
-                  <span className="truncate text-text-tertiary">Token</span>
-                  <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.tokens)}</span>
-                </span>
-                <span
-                  className={todayMetricClass}
-                  style={todayMetricStyle('var(--ag-warning)')}
-                  title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
-                >
-                  <span className="truncate text-text-tertiary">{t('accounts.user_cost_short', '消费')}</span>
-                  <span className="text-right tabular-nums">
-                    <span style={{ color: 'var(--ag-warning)' }}>$</span>
-                    <span className="text-text">{todayStats.user_cost.toFixed(2)}</span>
-                  </span>
-                </span>
-                <span
-                  className={todayMetricClass}
-                  style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
-                  title={t('accounts.window_account_cost', '账号成本（上游计费）')}
-                >
-                  <span className="truncate text-text-tertiary">{t('accounts.account_cost_short', '成本')}</span>
-                  <span className="text-right tabular-nums">
-                    <span style={{ color: 'var(--ag-success)' }}>$</span>
-                    <span className="text-text">{todayStats.account_cost.toFixed(2)}</span>
-                  </span>
-                </span>
-                {row.platform === 'openai' && (row.today_image_count ?? 0) > 0 && (
-                  <span
-                    className={todayMetricClass}
-                    style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
-                    title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}
-                  >
-                    <span className="truncate text-text-tertiary">{t('accounts.image_count_inline_label', '图')}</span>
-                    <span className="text-right font-semibold tabular-nums">{formatCompact(row.today_image_count ?? 0, false)}</span>
-                  </span>
+            <div
+              className={
+                windows.length > 0
+                  ? 'grid w-full grid-cols-[minmax(0,1fr)_10.5rem] items-start gap-1.5'
+                  : 'flex flex-col gap-1.5'
+              }
+            >
+              <div className="flex min-w-0 flex-col gap-1">
+                {windows.map((w, i) => (
+                  <div key={i} className="grid h-5 grid-cols-[4rem_minmax(0,1fr)_2.25rem_3rem] items-center gap-1.5">
+                    <span className="inline-flex min-w-0 items-center justify-center truncate rounded px-1 py-0 text-[10px] font-medium" style={badgeStyle} title={w.label}>
+                      {shortLabel(w.label)}
+                    </span>
+                    <div className="h-1.5 min-w-0 overflow-hidden rounded-full" style={{ background: 'var(--ag-glass-border)' }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(100, Math.round(w.used_percent))}%`, background: usageColor(w.used_percent) }}
+                      />
+                    </div>
+                    <span className="text-right" style={{ color: usageColor(w.used_percent), fontSize: 10 }}>
+                      {Math.round(w.used_percent)}%
+                    </span>
+                    <span className="text-right" style={{ color: 'var(--ag-text-tertiary)', fontSize: 10 }}>
+                      {formatReset(w.reset_seconds)}
+                    </span>
+                  </div>
+                ))}
+                {credits && (
+                  <div className="flex h-5 items-center gap-1">
+                    <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
+                      $
+                    </span>
+                    <span style={{ color: credits.unlimited ? 'var(--ag-success)' : credits.balance > 0 ? 'var(--ag-text)' : 'var(--ag-danger)' }}>
+                      {credits.unlimited ? '∞' : `$${Number(credits.balance).toFixed(2)}`}
+                    </span>
+                  </div>
                 )}
               </div>
-            )}
-            {credits && (
-              <div className="flex items-center gap-1">
-                <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
-                  $
-                </span>
-                <span style={{ color: credits.unlimited ? 'var(--ag-success)' : credits.balance > 0 ? 'var(--ag-text)' : 'var(--ag-danger)' }}>
-                  {credits.unlimited ? '∞' : `$${Number(credits.balance).toFixed(2)}`}
-                </span>
-              </div>
-            )}
+              {windows.length > 0 ? todayMetricChips ?? <div className={todayMetricColumnClass} /> : todayMetricChips}
+            </div>
           </div>
         );
       },
@@ -1063,10 +1075,11 @@ export default function AccountsPage() {
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
           <Dropdown>
-            <Dropdown.Trigger>
-              <Button isIconOnly aria-label={t('common.more')} size="sm" variant="secondary">
-                <MoreHorizontal className="w-3.5 h-3.5" />
-              </Button>
+            <Dropdown.Trigger
+              aria-label={t('common.more')}
+              className="button button--sm button--secondary button--icon-only"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
             </Dropdown.Trigger>
             <Dropdown.Popover placement="bottom end">
               <Dropdown.Menu
@@ -1259,11 +1272,11 @@ export default function AccountsPage() {
               <RefreshCw className="h-4 w-4" />
             </Button>
             <Dropdown>
-              <Dropdown.Trigger>
-                <Button size="sm" variant={autoRefresh ? 'secondary' : 'ghost'}>
-                  {autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}
-                  <ChevronDown className="h-3 w-3" />
-                </Button>
+              <Dropdown.Trigger
+                className={`button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'}`}
+              >
+                {autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}
+                <ChevronDown className="h-3 w-3" />
               </Dropdown.Trigger>
               <Dropdown.Popover placement="bottom end">
                 <Dropdown.Menu

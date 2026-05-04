@@ -9,7 +9,7 @@ import { FETCH_ALL_PARAMS } from '../../shared/constants';
 import { AlertDialog, Button, Card, Checkbox, Chip, Description, EmptyState, Input, Label, Modal, Skeleton, Spinner, Table as HeroTable, Tabs, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import {
   Trash2, Download, Loader2, RefreshCw,
-  Package, User, Tag, Plus, Upload, Github, Settings,
+  Package, User, Tag, Plus, Upload, Github, Settings, Store,
 } from 'lucide-react';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
 
@@ -104,56 +104,63 @@ export default function PluginsPage() {
   });
 
   const tabs = [
-    { key: 'installed' as const, label: t('plugins.installed_tab') },
-    { key: 'marketplace' as const, label: t('plugins.marketplace_tab') },
+    { key: 'installed' as const, label: t('plugins.installed_tab'), icon: Package },
+    { key: 'marketplace' as const, label: t('plugins.marketplace_tab'), icon: Store },
   ];
   const installedRows = pluginsData?.list ?? [];
 
   return (
     <div className="ag-plugins-page">
-      {/* Tab 切换 + 操作按钮 */}
-      <div className="ag-page-toolbar">
-        <Tabs
-          className="ag-page-tabs ag-page-tabs-compact w-full sm:w-auto"
-          selectedKey={activeTab}
-          onSelectionChange={(key) => setActiveTab(key as typeof activeTab)}
-        >
-          <Tabs.List>
-            {tabs.map((tab) => (
-              <Tabs.Tab key={tab.key} id={tab.key}>
-                {tab.label}
-              </Tabs.Tab>
-            ))}
-          </Tabs.List>
-        </Tabs>
-        <div className="flex items-center gap-2 sm:ml-auto">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
-            isDisabled={refreshMarketMutation.isPending}
-            size="md"
-            variant="ghost"
-            onPress={handleHeaderRefresh}
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshMarketMutation.isPending ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button
-            variant="primary"
-            onPress={() => setInstallOpen(true)}
-          >
-            <Plus className="w-4 h-4" />
-            {t('plugins.install_plugin')}
-          </Button>
+      <Tabs
+        className="ag-plugins-tabs"
+        selectedKey={activeTab}
+        onSelectionChange={(key) => setActiveTab(key as typeof activeTab)}
+      >
+        {/* Tab 切换 + 操作按钮 */}
+        <div className="ag-page-toolbar">
+          <Tabs.ListContainer className="ag-page-tabs w-full sm:w-auto">
+            <Tabs.List>
+              {tabs.map((tab, index) => {
+                const Icon = tab.icon;
+                return (
+                  <Tabs.Tab key={tab.key} id={tab.key}>
+                    {index > 0 ? <Tabs.Separator /> : null}
+                    <Tabs.Indicator />
+                    <Icon className="w-4 h-4" />
+                    {tab.label}
+                  </Tabs.Tab>
+                );
+              })}
+            </Tabs.List>
+          </Tabs.ListContainer>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <Button
+              isIconOnly
+              aria-label={t('common.refresh', 'Refresh')}
+              isDisabled={refreshMarketMutation.isPending}
+              size="md"
+              variant="ghost"
+              onPress={handleHeaderRefresh}
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshMarketMutation.isPending ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button
+              variant="primary"
+              onPress={() => setInstallOpen(true)}
+            >
+              <Plus className="w-4 h-4" />
+              {t('plugins.install_plugin')}
+            </Button>
+          </div>
         </div>
-      </div>
 
       {/* 已安装 Tab */}
-      {activeTab === 'installed' && (
+      <Tabs.Panel id="installed" className="ag-tabs-panel-flush">
         <HeroTable variant="primary">
           <HeroTable.ScrollContainer>
             <HeroTable.Content aria-label={t('plugins.installed_tab', 'Installed plugins')}>
               <HeroTable.Header>
-                <HeroTable.Column id="name">{t('common.name')}</HeroTable.Column>
+                <HeroTable.Column id="name" isRowHeader>{t('common.name')}</HeroTable.Column>
                 <HeroTable.Column id="type">
                   {t('common.type')} / {t('plugins.platform')}
                 </HeroTable.Column>
@@ -261,10 +268,10 @@ export default function PluginsPage() {
             </HeroTable.Content>
           </HeroTable.ScrollContainer>
         </HeroTable>
-      )}
+      </Tabs.Panel>
 
       {/* 插件市场 Tab */}
-      {activeTab === 'marketplace' && (
+      <Tabs.Panel id="marketplace" className="ag-tabs-panel-flush">
         <div>
           {marketLoading ? (
             <div className="flex items-center justify-center py-16">
@@ -289,7 +296,8 @@ export default function PluginsPage() {
             </div>
           )}
         </div>
-      )}
+      </Tabs.Panel>
+      </Tabs>
 
       {/* 安装插件弹窗 */}
       <InstallPluginModal
@@ -617,100 +625,98 @@ function InstallPluginModal({
               <Modal.CloseTrigger />
             </Modal.Header>
             <Modal.Body>
-              {/* 安装方式切换 */}
               <Tabs
-                className="ag-page-tabs ag-page-tabs-compact mb-5"
+                className="ag-install-tabs ag-page-tabs ag-page-tabs-compact"
                 selectedKey={installTab}
                 onSelectionChange={(key) => {
                   if (installing) return;
                   setInstallTab(key as typeof installTab);
                 }}
               >
-                <Tabs.List>
-                  {installTabs.map((tab) => (
-                    <Tabs.Tab
-                      key={tab.key}
-                      id={tab.key}
-                    >
-                      {tab.icon}
-                      {tab.label}
-                    </Tabs.Tab>
-                  ))}
-                </Tabs.List>
+                <Tabs.ListContainer className="mb-5">
+                  <Tabs.List>
+                    {installTabs.map((tab, index) => (
+                      <Tabs.Tab key={tab.key} id={tab.key}>
+                        {index > 0 ? <Tabs.Separator /> : null}
+                        <Tabs.Indicator />
+                        {tab.icon}
+                        {tab.label}
+                      </Tabs.Tab>
+                    ))}
+                  </Tabs.List>
+                </Tabs.ListContainer>
+
+                <Tabs.Panel id="upload" className="ag-tabs-panel-flush">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="block text-xs font-medium text-text-secondary uppercaser mb-1.5">
+                        {t('plugins.plugin_file')} <span className="text-danger">*</span>
+                      </Label>
+                      <div
+                        className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${selectedFile
+                            ? 'border-primary bg-primary-subtle'
+                            : dragActive
+                              ? 'border-border-focus bg-[var(--ag-bg-muted)]'
+                              : 'border-glass-border hover:border-border-focus'
+                          }`}
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={handleDragEvent}
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+                        />
+                        {selectedFile ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <Package className="w-5 h-5 text-primary" />
+                            <span className="text-sm text-text">{selectedFile.name}</span>
+                            <span className="text-xs text-text-tertiary">
+                              ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <Upload className={`w-8 h-8 mx-auto mb-2 ${dragActive ? 'text-primary' : 'text-text-tertiary'}`} />
+                            <p className="text-sm text-text-tertiary">
+                              {t('plugins.upload_hint')}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <HeroTextField fullWidth>
+                      <Label>{t('plugins.plugin_name')}</Label>
+                      <Input
+                        value={pluginName}
+                        onChange={(e) => setPluginName(e.target.value)}
+                        placeholder={t('plugins.plugin_name_hint')}
+                      />
+                    </HeroTextField>
+                  </div>
+                </Tabs.Panel>
+
+                <Tabs.Panel id="github" className="ag-tabs-panel-flush">
+                  <div className="space-y-4">
+                    <HeroTextField fullWidth isRequired>
+                      <Label>{t('plugins.github_repo')}</Label>
+                      <Input
+                        value={githubRepo}
+                        onChange={(e) => setGithubRepo(e.target.value)}
+                        placeholder={t('plugins.github_repo_placeholder')}
+                        required
+                      />
+                    </HeroTextField>
+                    <p className="text-xs text-text-tertiary">
+                      {t('plugins.github_hint')}
+                    </p>
+                  </div>
+                </Tabs.Panel>
               </Tabs>
-
-              {/* 上传安装 */}
-              {installTab === 'upload' && (
-                <div className="space-y-4">
-          <div>
-            <Label className="block text-xs font-medium text-text-secondary uppercaser mb-1.5">
-              {t('plugins.plugin_file')} <span className="text-danger">*</span>
-            </Label>
-            <div
-              className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${selectedFile
-                  ? 'border-primary bg-primary-subtle'
-                  : dragActive
-                    ? 'border-border-focus bg-[var(--ag-bg-muted)]'
-                    : 'border-glass-border hover:border-border-focus'
-                }`}
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={handleDragEvent}
-              onDragEnter={handleDragEnter}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
-              />
-              {selectedFile ? (
-                <div className="flex items-center justify-center gap-2">
-                  <Package className="w-5 h-5 text-primary" />
-                  <span className="text-sm text-text">{selectedFile.name}</span>
-                  <span className="text-xs text-text-tertiary">
-                    ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
-                  </span>
-                </div>
-              ) : (
-                <div>
-                  <Upload className={`w-8 h-8 mx-auto mb-2 ${dragActive ? 'text-primary' : 'text-text-tertiary'}`} />
-                  <p className="text-sm text-text-tertiary">
-                    {t('plugins.upload_hint')}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          <HeroTextField fullWidth>
-            <Label>{t('plugins.plugin_name')}</Label>
-            <Input
-              value={pluginName}
-              onChange={(e) => setPluginName(e.target.value)}
-              placeholder={t('plugins.plugin_name_hint')}
-            />
-          </HeroTextField>
-                </div>
-              )}
-
-              {/* GitHub 安装 */}
-              {installTab === 'github' && (
-                <div className="space-y-4">
-          <HeroTextField fullWidth isRequired>
-            <Label>{t('plugins.github_repo')}</Label>
-            <Input
-              value={githubRepo}
-              onChange={(e) => setGithubRepo(e.target.value)}
-              placeholder={t('plugins.github_repo_placeholder')}
-              required
-            />
-          </HeroTextField>
-          <p className="text-xs text-text-tertiary">
-            {t('plugins.github_hint')}
-          </p>
-                </div>
-              )}
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" isDisabled={installing} onPress={handleClose}>

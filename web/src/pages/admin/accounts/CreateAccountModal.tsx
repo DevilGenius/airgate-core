@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Checkbox, Form, Input, Label, ListBox, Select, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Checkbox, Form, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { IdCard, Hash, Gauge } from 'lucide-react';
 import type {
   PluginBatchAccountInput,
@@ -23,6 +23,8 @@ import {
 import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import type { CreateAccountReq, AccountExportItem } from '../../../shared/types';
+
+const CREATE_ACCOUNT_FORM_ID = 'create-account-form';
 
 export function CreateAccountModal({
   open,
@@ -134,7 +136,7 @@ export function CreateAccountModal({
   };
 
   const handleSubmit = () => {
-    if (!platform || !form.name) return;
+    if (loading || batchMode || !platform || !form.name) return;
     onSubmit({
       ...form,
       platform,
@@ -190,11 +192,13 @@ export function CreateAccountModal({
           </Button>
           {!batchMode && (
             <Button
-              variant="primary"
-              onPress={handleSubmit}
-              isDisabled={loading || !platform || !form.name}
               aria-busy={loading}
+              form={CREATE_ACCOUNT_FORM_ID}
+              isDisabled={loading || !platform || !form.name}
+              type="submit"
+              variant="primary"
             >
+              {loading ? <Spinner size="sm" /> : null}
               {t('common.create')}
             </Button>
           )}
@@ -204,7 +208,14 @@ export function CreateAccountModal({
       state={modalState}
       title={t('accounts.create')}
     >
-              <Form className="ag-form-scroll-safe ag-create-account-form" onSubmit={(e) => e.preventDefault()}>
+      <Form
+        id={CREATE_ACCOUNT_FORM_ID}
+        className="ag-form-scroll-safe ag-create-account-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleSubmit();
+        }}
+      >
                 <section className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
                     <Select
@@ -388,7 +399,7 @@ export function CreateAccountModal({
                     </div>
                   )}
                 </section>
-              </Form>
+      </Form>
     </CommonModal>
   );
 }

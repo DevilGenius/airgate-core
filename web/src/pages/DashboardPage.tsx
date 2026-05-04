@@ -691,7 +691,7 @@ export default function DashboardPage() {
       <div className="ag-dashboard-toolbar flex flex-col gap-3 p-4 2xl:p-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.time_range')}</span>
-          <Tabs className="ag-segmented-tabs" selectedKey={range} onSelectionChange={(key) => setRange(key as RangePreset)}>
+          <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={range} onSelectionChange={(key) => setRange(key as RangePreset)}>
             <Tabs.List>
               {RANGE_PRESETS.map((item, index) => (
                 <Tabs.Tab id={item} key={item}>
