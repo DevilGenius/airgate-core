@@ -76,7 +76,7 @@ type MetaTone = 'default' | 'success' | 'warning' | 'danger' | 'accent';
 const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
   amber: 'bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
   blue: 'bg-blue-100 text-blue-600 ring-blue-200 dark:bg-blue-400/15 dark:text-blue-300 dark:ring-blue-400/25',
-  emerald: 'bg-emerald-100 text-emerald-600 ring-emerald-200 dark:bg-emerald-400/15 dark:text-emerald-300 dark:ring-emerald-400/25',
+  emerald: 'bg-success-subtle text-success ring-success/25',
   indigo: 'bg-indigo-100 text-indigo-600 ring-indigo-200 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-indigo-400/25',
   purple: 'bg-purple-100 text-purple-600 ring-purple-200 dark:bg-purple-400/15 dark:text-purple-300 dark:ring-purple-400/25',
   rose: 'bg-rose-100 text-rose-600 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/25',
@@ -87,7 +87,7 @@ const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
 const META_TONE_CLASSES: Record<MetaTone, string> = {
   accent: 'text-primary',
   danger: 'text-danger',
-  default: 'text-text-tertiary',
+  default: 'text-text',
   success: 'text-emerald-600 dark:text-emerald-400',
   warning: 'text-amber-600 dark:text-amber-400',
 };
@@ -204,7 +204,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       <MetricCard
         icon={<KeyRound className="h-5 w-5" />}
         tone="blue"
-        metaTone="success"
         title={t('dashboard.api_keys')}
         value={stats.total_api_keys}
         meta={t('dashboard.api_keys_enabled', { count: stats.enabled_api_keys })}
@@ -212,7 +211,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       <MetricCard
         icon={<Monitor className="h-5 w-5" />}
         tone="violet"
-        metaTone={stats.error_accounts > 0 ? 'danger' : 'success'}
         title={t('dashboard.accounts')}
         value={stats.total_accounts}
         meta={t('dashboard.accounts_status', { enabled: stats.enabled_accounts, errors: stats.error_accounts })}
@@ -227,7 +225,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       <MetricCard
         icon={<Users className="h-5 w-5" />}
         tone="teal"
-        metaTone="success"
         title={t('dashboard.users')}
         value={t('dashboard.new_users', { count: stats.new_users_today })}
         meta={t('dashboard.total_count', { count: stats.total_users })}
@@ -285,7 +282,7 @@ function ChartTooltip({
         {payload.map((item) => (
           <div key={`${item.dataKey}-${item.name}`} className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
-            <span className="text-text-tertiary">{item.name ?? item.dataKey}</span>
+            <span className="text-text">{item.name ?? item.dataKey}</span>
             <span className="font-mono">{fmtNum(Number(item.value ?? 0))}</span>
           </div>
         ))}
@@ -327,14 +324,14 @@ function TokenTrendTooltip({
         {orderedPayload.map((item) => (
           <div key={item.dataKey} className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
-            <span className="text-text-tertiary">{labels[item.dataKey ?? ''] ?? item.dataKey}</span>
+            <span className="text-text">{labels[item.dataKey ?? ''] ?? item.dataKey}</span>
             <span className="font-mono">
               {TOKEN_TREND_RATIO_KEYS.has(item.dataKey as keyof typeof USAGE_TOKEN_COLORS) ? `${Number(item.value ?? 0).toFixed(1)}%` : fmtNum(Number(item.value ?? 0))}
             </span>
           </div>
         ))}
       </div>
-      <div className="mt-2 border-t border-border pt-2 text-text-tertiary">
+      <div className="mt-2 border-t border-border pt-2 text-text">
         {t('dashboard.actual')}: <CostValue className="font-mono" value={datum?.actualCost} tone="actual" />
         {' / '}
         {t('dashboard.standard')}: <CostValue className="font-mono" value={datum?.standardCost} tone="standard" />
@@ -427,7 +424,7 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
               />
             </PieChart>
           ) : (
-            <div className="flex h-44 w-44 items-center justify-center text-xs text-text-tertiary">{t('common.no_data')}</div>
+            <div className="flex h-44 w-44 items-center justify-center text-xs text-text">{t('common.no_data')}</div>
           )}
         </div>
 
@@ -446,7 +443,7 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
                 width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.name,
                 render: (row, index) => (
                   <>
-                    <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
+                    <span className="shrink-0 font-mono text-[11px] font-semibold text-text">#{index + 1}</span>
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
                     <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
                   </>
@@ -457,14 +454,14 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
                 key: 'requests',
                 title: t('dashboard.requests'),
                 width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.requests,
-                render: (row) => <span className="truncate font-mono text-text-secondary">{row.requests.toLocaleString()}</span>,
+                render: (row) => <span className="truncate font-mono text-text">{row.requests.toLocaleString()}</span>,
               },
               {
                 align: 'end',
                 key: 'tokens',
                 title: t('dashboard.tokens'),
                 width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.tokens,
-                render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.tokens)}</span>,
+                render: (row) => <span className="truncate font-mono text-text">{fmtNum(row.tokens)}</span>,
               },
               {
                 align: 'end',
@@ -537,14 +534,14 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
           <ResponsiveContainer width="100%" height="100%" debounce={80}>
             <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
               <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-              <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickLine={false} />
-              <YAxis yAxisId="tokens" axisLine={false} tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
+              <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
+              <YAxis yAxisId="tokens" axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
               <YAxis
                 yAxisId="ratio"
                 axisLine={false}
                 domain={[0, 100]}
                 orientation="right"
-                tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }}
+                tick={{ fill: 'var(--ag-text)', fontSize: 11 }}
                 tickFormatter={(value: number) => `${Math.round(value)}%`}
                 tickLine={false}
                 width={32}
@@ -553,7 +550,7 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
               <Legend
                 height={24}
                 content={() => (
-                  <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text-tertiary">
+                  <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
                     {TOKEN_TREND_LINE_ORDER.map((key) => (
                       <span key={key} className="inline-flex items-center gap-1.5">
                         {TOKEN_TREND_RATIO_KEYS.has(key) ? (
@@ -577,7 +574,7 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="flex h-[248px] items-center justify-center text-sm text-text-tertiary 2xl:h-[288px]">{t('common.no_data')}</div>
+        <div className="flex h-[248px] items-center justify-center text-sm text-text 2xl:h-[288px]">{t('common.no_data')}</div>
       )}
     </DashboardCard>
   );
@@ -606,10 +603,10 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
           <ResponsiveContainer width="100%" height="100%" debounce={80}>
             <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 8, top: 4 }}>
               <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-              <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickLine={false} />
-              <YAxis axisLine={false} tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
+              <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
+              <YAxis axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
               <RechartsTooltip content={<ChartTooltip />} />
-              <Legend iconSize={8} iconType="circle" wrapperStyle={{ color: 'var(--ag-text-tertiary)', fontSize: 11 }} />
+              <Legend iconSize={8} iconType="circle" wrapperStyle={{ color: 'var(--ag-text)', fontSize: 11 }} />
               {topUsers.map((user, index) => (
                 <Line key={user.user_id} dataKey={user.email} dot={false} isAnimationActive={false} stroke={USER_COLORS[index % USER_COLORS.length]} strokeWidth={2.5} type="monotone" />
               ))}
@@ -617,7 +614,7 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="flex h-[268px] items-center justify-center text-sm text-text-tertiary 2xl:h-[320px]">{t('common.no_data')}</div>
+        <div className="flex h-[268px] items-center justify-center text-sm text-text 2xl:h-[320px]">{t('common.no_data')}</div>
       )}
     </DashboardCard>
   );
@@ -693,7 +690,7 @@ export default function DashboardPage() {
 
       <div className="ag-dashboard-toolbar flex flex-col gap-3 p-4 2xl:p-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <span className="shrink-0 text-sm font-semibold text-text-tertiary">{t('dashboard.time_range')}</span>
+          <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.time_range')}</span>
           <Tabs className="ag-segmented-tabs" selectedKey={range} onSelectionChange={(key) => setRange(key as RangePreset)}>
             <Tabs.List>
               {RANGE_PRESETS.map((item, index) => (
@@ -712,7 +709,7 @@ export default function DashboardPage() {
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <span className="shrink-0 text-sm font-semibold text-text-tertiary">{t('dashboard.filter_user')}</span>
+            <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.filter_user')}</span>
             <div className="w-full sm:w-64">
               <Select
                 fullWidth
@@ -721,7 +718,7 @@ export default function DashboardPage() {
               >
                 <Label className="sr-only">{t('dashboard.filter_user')}</Label>
                 <Select.Trigger>
-                  <UserRound className="mr-2 h-4 w-4 text-text-tertiary" />
+                  <UserRound className="mr-2 h-4 w-4 text-text" />
                   <Select.Value>{selectedUserLabel}</Select.Value>
                   <Select.Indicator />
                 </Select.Trigger>
@@ -739,7 +736,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <span className="shrink-0 text-sm font-semibold text-text-tertiary">{t('dashboard.granularity')}</span>
+            <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.granularity')}</span>
             <div className="w-full sm:w-40">
               <Select
                 fullWidth
@@ -749,7 +746,7 @@ export default function DashboardPage() {
               >
                 <Label className="sr-only">{t('dashboard.granularity')}</Label>
                 <Select.Trigger>
-                  <CalendarDays className="mr-2 h-4 w-4 text-text-tertiary" />
+                  <CalendarDays className="mr-2 h-4 w-4 text-text" />
                   <Select.Value>{selectedGranularityLabel}</Select.Value>
                   <Select.Indicator />
                 </Select.Trigger>
