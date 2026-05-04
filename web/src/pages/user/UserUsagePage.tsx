@@ -347,7 +347,7 @@ export default function UserUsagePage() {
 
       {/* 筛选栏 */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-72">
+        <div className="w-full sm:w-64">
           <UsageDateRangeFilter
             clearLabel={t('common.clear')}
             endDate={filters.end_date}
@@ -359,7 +359,7 @@ export default function UserUsagePage() {
             }}
           />
         </div>
-        <div className="w-40">
+        <div className="w-full sm:w-48">
           <Select
             aria-label={t('usage.platform')}
             fullWidth
@@ -385,7 +385,7 @@ export default function UserUsagePage() {
             </Select.Popover>
           </Select>
         </div>
-        <div className="w-40">
+        <div className="w-full sm:w-48">
           <HeroTextField fullWidth>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />

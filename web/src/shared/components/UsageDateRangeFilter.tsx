@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 
 interface UsageDateRangeFilterProps {
   clearLabel?: string;
+  className?: string;
   endDate?: string;
   label: string;
   onChange: (startDate: string, endDate: string) => void;
@@ -28,6 +29,7 @@ function toDateValue(value?: string): DateValue | null {
 
 export function UsageDateRangeFilter({
   clearLabel = 'Clear',
+  className = 'w-full sm:w-64',
   endDate,
   label,
   onChange,
@@ -42,7 +44,7 @@ export function UsageDateRangeFilter({
   return (
     <DateRangePicker
       aria-label={label}
-      className="ag-usage-date-range w-full sm:w-72"
+      className={`ag-usage-date-range ${className}`}
       endName="endDate"
       startName="startDate"
       value={value}
