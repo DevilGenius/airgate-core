@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@heroui/react';
-import { Pencil, Trash2, RefreshCw, Power, PowerOff, X, Eraser } from 'lucide-react';
+import { Eraser, Pencil, Power, PowerOff, RefreshCw, Trash2, X } from 'lucide-react';
 
 /**
  * 批量操作工具栏：仅在 selectedCount > 0 时渲染。
@@ -30,10 +30,10 @@ export function BulkActionsBar({
 
   return (
     <div
-      className="flex items-center gap-2 px-4 py-2.5 mb-3 rounded-[10px]"
+      className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius)] px-4 py-2.5"
       style={{
         background: 'var(--ag-primary-subtle)',
-        border: '1px solid var(--ag-primary)',
+        border: '1px solid color-mix(in oklab, var(--ag-primary) 52%, transparent)',
       }}
     >
       <span className="text-sm font-medium" style={{ color: 'var(--ag-primary)' }}>
@@ -49,21 +49,22 @@ export function BulkActionsBar({
         {t('accounts.bulk_clear')}
       </Button>
 
-      <div className="flex-1" />
+      <div className="hidden h-5 w-px bg-border sm:block" />
 
       <ActionButton icon={<Pencil className="w-3.5 h-3.5" />} label={t('accounts.bulk_edit')} onClick={onEdit} />
       <ActionButton icon={<Power className="w-3.5 h-3.5" />} label={t('accounts.bulk_enable')} onClick={onEnable} />
       <ActionButton icon={<PowerOff className="w-3.5 h-3.5" />} label={t('accounts.bulk_disable')} onClick={onDisable} />
       <ActionButton
-        icon={<RefreshCw className="w-3.5 h-3.5" />}
+        icon={<RefreshCw className="w-3.5 h-3.5 text-success" />}
         label={t('accounts.bulk_refresh_quota')}
         onClick={onRefreshQuota}
       />
       <ActionButton
-        icon={<Eraser className="w-3.5 h-3.5" />}
+        icon={<Eraser className="w-3.5 h-3.5 text-warning" />}
         label={t('accounts.bulk_clear_family_cooldowns')}
         onClick={onClearRateLimitMarkers}
       />
+      <div className="flex-1" />
       <ActionButton
         icon={<Trash2 className="w-3.5 h-3.5" />}
         label={t('accounts.bulk_delete')}

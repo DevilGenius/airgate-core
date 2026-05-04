@@ -15,6 +15,8 @@ import {
   Download,
   Upload,
   Eraser,
+  SlidersHorizontal,
+  X,
 } from 'lucide-react';
 import { useToast } from '../../shared/ui';
 import { PlatformIcon } from '../../shared/ui';
@@ -71,6 +73,32 @@ function StatusPill({ status, tooltip }: { status: 'active' | 'disabled'; toolti
       <Tooltip.Trigger>{chip}</Tooltip.Trigger>
       <Tooltip.Content className="max-w-[360px] whitespace-pre-wrap">{tooltip}</Tooltip.Content>
     </Tooltip>
+  );
+}
+
+function TableSelectionCheckbox({
+  ariaLabel,
+  isIndeterminate,
+  isSelected,
+  onChange,
+}: {
+  ariaLabel: string;
+  isIndeterminate?: boolean;
+  isSelected: boolean;
+  onChange: (isSelected: boolean) => void;
+}) {
+  return (
+    <Checkbox
+      aria-label={ariaLabel}
+      isIndeterminate={isIndeterminate}
+      isSelected={isSelected}
+      slot={null}
+      onChange={onChange}
+    >
+      <Checkbox.Control>
+        <Checkbox.Indicator />
+      </Checkbox.Control>
+    </Checkbox>
   );
 }
 
@@ -286,6 +314,7 @@ export default function AccountsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [proxyFilter, setProxyFilter] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // 自动刷新
   const AUTO_REFRESH_OPTIONS = [0, 5, 10, 15, 30];
@@ -583,12 +612,12 @@ export default function AccountsPage() {
       render: (row) => {
         const email = row.credentials?.email;
         return (
-          <div className="flex flex-col items-center">
-            <span style={{ color: 'var(--ag-text)' }} className="font-medium">
+          <div className="flex w-full min-w-0 flex-col items-start text-left">
+            <span style={{ color: 'var(--ag-text)' }} className="max-w-full truncate font-medium" title={row.name}>
               {row.name}
             </span>
             {email && (
-              <span className="text-[11px]" style={{ color: 'var(--ag-text-tertiary)' }}>
+              <span className="max-w-full truncate text-[11px]" style={{ color: 'var(--ag-text-tertiary)' }} title={email}>
                 {email}
               </span>
             )}
@@ -615,7 +644,7 @@ export default function AccountsPage() {
           ? `${t('accounts.expires_at')}: ${new Date(subUntil).toLocaleDateString()}`
           : undefined;
         return (
-          <div className="flex flex-col items-center gap-1.5">
+          <div className="flex w-full min-w-0 flex-col items-start gap-1.5 text-left">
             <span className="inline-flex items-center gap-1">
               <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" />
               <span>{platformName(row.platform)}</span>
@@ -640,6 +669,7 @@ export default function AccountsPage() {
       key: 'capacity',
       title: t('accounts.capacity'),
       width: '100px',
+      align: 'right',
       render: (row) => {
         const current = row.current_concurrency || 0;
         const max = row.max_concurrency;
@@ -657,12 +687,14 @@ export default function AccountsPage() {
       key: 'status',
       title: t('common.status'),
       width: '84px',
+      align: 'center',
       render: (row) => <AccountStatusCell row={row} />,
     },
     {
       key: 'scheduling',
       title: t('accounts.scheduling'),
       width: '80px',
+      align: 'center',
       hideOnMobile: true,
       render: (row) => (
         <Switch
@@ -684,6 +716,7 @@ export default function AccountsPage() {
       key: 'rate_multiplier',
       title: t('accounts.rate_multiplier'),
       width: '80px',
+      align: 'right',
       hideOnMobile: true,
       render: (row) => (
         <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
@@ -923,6 +956,7 @@ export default function AccountsPage() {
       key: 'last_used_at',
       title: t('accounts.last_used'),
       width: '120px',
+      align: 'center',
       hideOnMobile: true,
       render: (row) => {
         if (!row.last_used_at) {
@@ -949,6 +983,7 @@ export default function AccountsPage() {
       key: 'actions',
       title: t('common.actions'),
       width: '128px',
+      align: 'center',
       render: (row) => (
         <div className="flex items-center justify-center gap-1">
           <Button
@@ -1032,7 +1067,27 @@ export default function AccountsPage() {
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
-  const selectedKeys = new Set(selectedIds.map(String));
+  const selectedIdSet = new Set(selectedIds);
+  const visibleRowIds = rows.map((row) => row.id);
+  const selectedVisibleCount = visibleRowIds.filter((id) => selectedIdSet.has(id)).length;
+  const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
+  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+  const setVisibleRowsSelected = (isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleRowIds])));
+      return;
+    }
+    const visibleSet = new Set(visibleRowIds);
+    setSelectedIds((prev) => prev.filter((id) => !visibleSet.has(id)));
+  };
+  const setRowSelected = (id: number, isSelected: boolean) => {
+    setSelectedIds((prev) => {
+      if (isSelected) {
+        return prev.includes(id) ? prev : [...prev, id];
+      }
+      return prev.filter((selectedId) => selectedId !== id);
+    });
+  };
   const typeOptions = [
     { id: '', label: t('accounts.all_types', '全部类型') },
     { id: 'oauth', label: 'OAuth' },
@@ -1051,193 +1106,289 @@ export default function AccountsPage() {
   const selectedTypeLabel = typeOptions.find((item) => item.id === typeFilter)?.label ?? t('accounts.all_types', '全部类型');
   const selectedGroupLabel = groupOptions.find((item) => item.id === groupFilter)?.label ?? t('accounts.all_groups');
   const selectedProxyLabel = proxyOptions.find((item) => item.id === proxyFilter)?.label ?? t('accounts.all_proxies');
+  const clearNamedFilter = (key: 'group' | 'platform' | 'proxy' | 'state' | 'type') => {
+    switch (key) {
+      case 'platform':
+        setPlatformFilter('');
+        break;
+      case 'state':
+        setStateFilter('');
+        break;
+      case 'type':
+        setTypeFilter('');
+        break;
+      case 'group':
+        setGroupFilter('');
+        break;
+      case 'proxy':
+        setProxyFilter('');
+        break;
+    }
+    setPage(1);
+  };
+  const clearAllFilters = () => {
+    setPlatformFilter('');
+    setStateFilter('');
+    setTypeFilter('');
+    setGroupFilter('');
+    setProxyFilter('');
+    setPage(1);
+  };
+  const activeFilters = [
+    platformFilter ? { key: 'platform' as const, label: `${t('groups.platform')}: ${selectedPlatformLabel}` } : null,
+    stateFilter ? { key: 'state' as const, label: `${t('common.status')}: ${selectedStateLabel}` } : null,
+    typeFilter ? { key: 'type' as const, label: `${t('common.type')}: ${selectedTypeLabel}` } : null,
+    groupFilter ? { key: 'group' as const, label: `${t('accounts.group')}: ${selectedGroupLabel}` } : null,
+    proxyFilter ? { key: 'proxy' as const, label: `${t('accounts.proxy')}: ${selectedProxyLabel}` } : null,
+  ].filter((item): item is NonNullable<typeof item> => item != null);
+  const activeFilterCount = activeFilters.length;
+  const columnAlignClass = (align?: AccountTableColumn['align']) => (
+    align === 'center'
+      ? 'text-center'
+      : align === 'right'
+        ? 'text-right'
+        : 'text-left'
+  );
+  const cellJustifyClass = (align?: AccountTableColumn['align']) => (
+    align === 'center'
+      ? 'justify-center'
+      : align === 'right'
+        ? 'justify-end'
+        : 'justify-start'
+  );
 
   return (
     <div>
-      {/* 筛选 */}
-      <div className="flex items-end gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-[200px]">
-          <HeroTextField fullWidth>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
-              <Input
-                className="pl-9"
-                value={keyword}
-                onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-                placeholder={t('common.search')}
-              />
-            </div>
-          </HeroTextField>
-        </div>
-        <div className="w-40">
-          <Select
-            fullWidth
-            selectedKey={platformFilter}
-            onSelectionChange={(key) => { setPlatformFilter(key == null ? '' : String(key)); setPage(1); }}
+      <div className="mb-5 space-y-3">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="w-full lg:w-[260px]">
+            <HeroTextField fullWidth>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                <Input
+                  className="pl-9"
+                  value={keyword}
+                  onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                  placeholder={t('accounts.search_placeholder', '搜索凭证名称...')}
+                />
+              </div>
+            </HeroTextField>
+          </div>
+
+          <Button
+            className="justify-center lg:justify-start"
+            size="sm"
+            variant={filtersOpen || activeFilterCount > 0 ? 'secondary' : 'ghost'}
+            onPress={() => setFiltersOpen((open) => !open)}
           >
-            <Label className="sr-only">{t('groups.platform')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedPlatformLabel}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={PLATFORM_OPTIONS}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
-        <div className="w-40">
-          <Select
-            fullWidth
-            selectedKey={stateFilter}
-            onSelectionChange={(key) => { setStateFilter(key == null ? '' : String(key)); setPage(1); }}
-          >
-            <Label className="sr-only">{t('common.status')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedStateLabel}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={STATE_OPTIONS}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
-        <div className="w-40">
-          <Select
-            fullWidth
-            selectedKey={typeFilter}
-            onSelectionChange={(key) => { setTypeFilter(key == null ? '' : String(key)); setPage(1); }}
-          >
-            <Label className="sr-only">{t('common.type')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedTypeLabel}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={typeOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
-        <div className="w-40">
-          <Select
-            fullWidth
-            selectedKey={groupFilter}
-            onSelectionChange={(key) => { setGroupFilter(key == null ? '' : String(key)); setPage(1); }}
-          >
-            <Label className="sr-only">{t('accounts.group')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedGroupLabel}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={groupOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
-        <div className="w-40">
-          <Select
-            fullWidth
-            selectedKey={proxyFilter}
-            onSelectionChange={(key) => { setProxyFilter(key == null ? '' : String(key)); setPage(1); }}
-          >
-            <Label className="sr-only">{t('accounts.proxy')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedProxyLabel}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={proxyOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+            <SlidersHorizontal className="h-4 w-4" />
+            {t('common.filter', '筛选')}
+            {activeFilterCount > 0 ? (
+              <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-text-inverse">
+                {activeFilterCount}
+              </span>
+            ) : null}
+          </Button>
+
+          <div className="flex-1" />
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              isIconOnly
+              aria-label={t('common.refresh')}
+              variant="ghost"
+              onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Dropdown>
+              <Dropdown.Trigger>
+                <Button size="sm" variant={autoRefresh ? 'secondary' : 'ghost'}>
+                  {autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </Dropdown.Trigger>
+              <Dropdown.Popover placement="bottom end">
+                <Dropdown.Menu
+                  aria-label={t('accounts.auto_refresh')}
+                  selectedKeys={new Set([`auto_${autoRefresh}`])}
+                  selectionMode="single"
+                  onAction={(key) => {
+                    const action = String(key);
+                    setAutoRefresh(Number(action.replace('auto_', '')));
+                  }}
+                >
+                  {AUTO_REFRESH_OPTIONS.map((sec) => (
+                    <Dropdown.Item key={sec} id={`auto_${sec}`} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}>
+                      <span className="flex items-center justify-between gap-6">
+                        <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}</span>
+                        {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
+                      </span>
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown>
+            <Button
+              variant="secondary"
+              onPress={() => importInputRef.current?.click()}
+              isDisabled={importMutation.isPending}
+              aria-busy={importMutation.isPending}
+            >
+              <Upload className="h-4 w-4" />
+              {t('accounts.import')}
+            </Button>
+            <Button
+              variant="secondary"
+              onPress={() => exportMutation.mutate()}
+              isDisabled={exportMutation.isPending}
+              aria-busy={exportMutation.isPending}
+            >
+              <Download className="h-4 w-4" />
+              {t('accounts.export')}
+            </Button>
+            <Button variant="primary" onPress={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4" />
+              {t('accounts.create')}
+            </Button>
+          </div>
         </div>
 
-        {/* 刷新 & 自动刷新 & 创建 */}
-        <div className="flex items-center gap-2 ml-auto">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh')}
-            variant="ghost"
-            onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
-          <Dropdown>
-            <Dropdown.Trigger>
-              <Button size="sm" variant={autoRefresh ? 'secondary' : 'ghost'}>
-                {autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}
-                <ChevronDown className="w-3 h-3" />
-              </Button>
-            </Dropdown.Trigger>
-            <Dropdown.Popover placement="bottom end">
-              <Dropdown.Menu
-                aria-label={t('accounts.auto_refresh')}
-                selectedKeys={new Set([String(autoRefresh)])}
-                selectionMode="single"
-                onAction={(key) => setAutoRefresh(Number(key))}
+        {filtersOpen ? (
+          <div className="rounded-[var(--radius)] border border-border bg-surface p-3 shadow-sm">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <Select
+                fullWidth
+                selectedKey={platformFilter}
+                onSelectionChange={(key) => { setPlatformFilter(key == null ? '' : String(key)); setPage(1); }}
               >
-                {AUTO_REFRESH_OPTIONS.map((sec) => (
-                  <Dropdown.Item key={sec} id={String(sec)} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${sec}s`}>
-                    <span className="flex items-center justify-between gap-4">
-                      <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${sec}s`}</span>
-                      {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
-                    </span>
-                  </Dropdown.Item>
-                ))}
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
-          <Button
-            variant="secondary"
-            onPress={() => importInputRef.current?.click()}
-            isDisabled={importMutation.isPending}
-            aria-busy={importMutation.isPending}
-          >
-            <Upload className="w-4 h-4" />
-            {t('accounts.import')}
-          </Button>
-          <Button
-            variant="secondary"
-            onPress={() => exportMutation.mutate()}
-            isDisabled={exportMutation.isPending}
-            aria-busy={exportMutation.isPending}
-          >
-            <Download className="w-4 h-4" />
-            {t('accounts.export')}
-          </Button>
-          <Button variant="primary" onPress={() => setShowCreateModal(true)}>
-            <Plus className="w-4 h-4" />
-            {t('accounts.create')}
-          </Button>
-        </div>
+                <Label>{t('groups.platform')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedPlatformLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={PLATFORM_OPTIONS}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+              <Select
+                fullWidth
+                selectedKey={stateFilter}
+                onSelectionChange={(key) => { setStateFilter(key == null ? '' : String(key)); setPage(1); }}
+              >
+                <Label>{t('common.status')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedStateLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={STATE_OPTIONS}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+              <Select
+                fullWidth
+                selectedKey={typeFilter}
+                onSelectionChange={(key) => { setTypeFilter(key == null ? '' : String(key)); setPage(1); }}
+              >
+                <Label>{t('common.type')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedTypeLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={typeOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+              <Select
+                fullWidth
+                selectedKey={groupFilter}
+                onSelectionChange={(key) => { setGroupFilter(key == null ? '' : String(key)); setPage(1); }}
+              >
+                <Label>{t('accounts.group')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedGroupLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={groupOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+              <Select
+                fullWidth
+                selectedKey={proxyFilter}
+                onSelectionChange={(key) => { setProxyFilter(key == null ? '' : String(key)); setPage(1); }}
+              >
+                <Label>{t('accounts.proxy')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedProxyLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={proxyOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onPress={clearAllFilters}>
+                <Eraser className="h-3.5 w-3.5" />
+                {t('common.clear')}
+              </Button>
+              <Button size="sm" variant="primary" onPress={() => setFiltersOpen(false)}>
+                {t('common.confirm')}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {activeFilters.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {activeFilters.map((filter) => (
+              <Chip key={filter.key} color="accent" size="sm" variant="soft">
+                <span className="inline-flex items-center gap-1">
+                  {filter.label}
+                  <button
+                    aria-label={t('common.clear')}
+                    className="-mr-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full opacity-70 transition hover:bg-primary/15 hover:opacity-100"
+                    type="button"
+                    onClick={() => clearNamedFilter(filter.key)}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              </Chip>
+            ))}
+          </div>
+        ) : null}
       </div>
       {/* 隐藏的文件选择器（供导入按钮触发） */}
       <input
@@ -1263,17 +1414,6 @@ export default function AccountsPage() {
       {/* 表格 */}
       <CommonTable
         ariaLabel={t('accounts.title', 'Accounts')}
-        contentProps={{
-          selectionMode: 'multiple',
-          selectedKeys,
-          onSelectionChange: (keys) => {
-              if (keys === 'all') {
-                setSelectedIds(rows.map((row) => row.id));
-                return;
-              }
-              setSelectedIds(Array.from(keys).map((key) => Number(key)));
-            },
-        }}
         footer={(
           <TablePaginationFooter
             page={page}
@@ -1288,14 +1428,21 @@ export default function AccountsPage() {
         minWidth={1180}
       >
             <CommonTable.Header>
-              <CommonTable.Column id="__selection__" style={{ width: 52 }}>
-                <Checkbox slot="selection" aria-label={t('common.select_all', 'Select all')} />
+              <CommonTable.Column id="__selection__" className="text-center" style={{ minWidth: 52, width: 52 }}>
+                <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                  <TableSelectionCheckbox
+                    ariaLabel={t('common.select_all', 'Select all')}
+                    isIndeterminate={someVisibleSelected}
+                    isSelected={allVisibleSelected}
+                    onChange={setVisibleRowsSelected}
+                  />
+                </div>
               </CommonTable.Column>
               {columns.map((column) => (
                 <CommonTable.Column
                   id={column.key}
                   key={column.key}
-                  className={column.hideOnMobile ? 'hidden md:table-cell' : undefined}
+                  className={`${columnAlignClass(column.align)} ${column.hideOnMobile ? 'hidden md:table-cell' : ''}`}
                   style={column.width ? { minWidth: column.width, width: column.width } : undefined}
                 >
                   {column.title}
@@ -1314,23 +1461,21 @@ export default function AccountsPage() {
               ) : (
                 rows.map((row) => (
                   <CommonTable.Row id={String(row.id)} key={row.id}>
-                    <CommonTable.Cell>
-                      <Checkbox slot="selection" aria-label={t('common.select', 'Select')} />
+                    <CommonTable.Cell className="text-center" style={{ minWidth: 52, width: 52 }}>
+                      <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                        <TableSelectionCheckbox
+                          ariaLabel={t('common.select', 'Select')}
+                          isSelected={selectedIdSet.has(row.id)}
+                          onChange={(isSelected) => setRowSelected(row.id, isSelected)}
+                        />
+                      </div>
                     </CommonTable.Cell>
                     {columns.map((column) => (
                       <CommonTable.Cell
                         key={column.key}
                         className={column.hideOnMobile ? 'hidden md:table-cell' : undefined}
                       >
-                        <div
-                          className={`flex items-center ${
-                            column.align === 'left'
-                              ? 'justify-start'
-                              : column.align === 'right'
-                                ? 'justify-end'
-                                : 'justify-center'
-                          }`}
-                        >
+                        <div className={`flex w-full min-w-0 items-center ${cellJustifyClass(column.align)}`}>
                           {column.render(row)}
                         </div>
                       </CommonTable.Cell>
