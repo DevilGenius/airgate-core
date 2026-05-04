@@ -4,7 +4,7 @@ import { Button, ComboBox, Description, Input, Label, ListBox, Modal, Spinner, T
 import { Key } from 'lucide-react';
 import { parseIpList } from '../../../shared/utils/ip';
 import { useAuth } from '../../../app/providers/AuthProvider';
-import { AirGateDatePicker } from '../../../shared/components/AirGateDatePicker';
+import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type { CreateAPIKeyReq, GroupResp } from '../../../shared/types';
 
 interface CreateKeyModalProps {
@@ -175,7 +175,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
                       <Description>{t('api_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
                     </HeroTextField>
 
-                    <AirGateDatePicker
+                    <CommonDatePicker
                       description={t('api_keys.expire_hint')}
                       label={t('api_keys.expire_time')}
                       value={form.expires_at ? form.expires_at.split('T')[0] : ''}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, Table as HeroTable, TextField as HeroTextField } from '@heroui/react';
+import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField } from '@heroui/react';
 import { usersApi } from '../../shared/api/users';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -10,6 +10,7 @@ import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
+import { CommonTable } from '../../shared/components/CommonTable';
 import { getAvatarColor } from '../../shared/utils/avatar';
 import { formatDateTime } from '../../shared/utils/format';
 import { CreateUserModal } from './users/CreateUserModal';
@@ -162,37 +163,48 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <HeroTable variant="primary">
-        <HeroTable.ScrollContainer>
-          <HeroTable.Content aria-label={t('users.title', 'Users')}>
-            <HeroTable.Header>
-              <HeroTable.Column id="id" style={{ width: 72 }}>
+      <CommonTable
+        ariaLabel={t('users.title', 'Users')}
+        footer={(
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            setPage={setPage}
+            setPageSize={setPageSize}
+            total={total}
+            totalPages={totalPages}
+          />
+        )}
+        minWidth={980}
+      >
+            <CommonTable.Header>
+              <CommonTable.Column id="id" style={{ width: 72 }}>
                 ID
-              </HeroTable.Column>
-              <HeroTable.Column id="email">{t('users.email')}</HeroTable.Column>
-              <HeroTable.Column id="username">{t('users.username')}</HeroTable.Column>
-              <HeroTable.Column id="role">{t('users.role')}</HeroTable.Column>
-              <HeroTable.Column id="balance">{t('users.balance')}</HeroTable.Column>
-              <HeroTable.Column id="status">{t('common.status')}</HeroTable.Column>
-              <HeroTable.Column id="created_at">{t('users.created_at')}</HeroTable.Column>
-              <HeroTable.Column id="actions">{t('common.actions')}</HeroTable.Column>
-            </HeroTable.Header>
-            <HeroTable.Body>
+              </CommonTable.Column>
+              <CommonTable.Column id="email">{t('users.email')}</CommonTable.Column>
+              <CommonTable.Column id="username">{t('users.username')}</CommonTable.Column>
+              <CommonTable.Column id="role">{t('users.role')}</CommonTable.Column>
+              <CommonTable.Column id="balance">{t('users.balance')}</CommonTable.Column>
+              <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
+              <CommonTable.Column id="created_at">{t('users.created_at')}</CommonTable.Column>
+              <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
+            </CommonTable.Header>
+            <CommonTable.Body>
               {isLoading ? (
                 <TableLoadingRow colSpan={8} />
               ) : rows.length === 0 ? (
-                <HeroTable.Row id="empty">
-                  <HeroTable.Cell colSpan={8}>
+                <CommonTable.Row id="empty">
+                  <CommonTable.Cell colSpan={8}>
                     <EmptyState />
-                  </HeroTable.Cell>
-                </HeroTable.Row>
+                  </CommonTable.Cell>
+                </CommonTable.Row>
               ) : (
                 rows.map((row) => (
-                  <HeroTable.Row id={String(row.id)} key={row.id}>
-                    <HeroTable.Cell>
+                  <CommonTable.Row id={String(row.id)} key={row.id}>
+                    <CommonTable.Cell>
                       <span className="text-text-tertiary font-mono">{row.id}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <div className="flex items-center gap-2.5">
                         <div
                           className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
@@ -202,19 +214,19 @@ export default function UsersPage() {
                         </div>
                         <span className="text-text truncate">{row.email}</span>
                       </div>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <span className="text-text-secondary">{row.username || '-'}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <Chip color={row.role === 'admin' ? 'accent' : 'default'} size="sm" variant="soft">
                         {row.role === 'admin' ? t('users.role_admin') : t('users.role_user')}
                       </Chip>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <span className="font-mono">${row.balance.toFixed(2)}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <Switch
                         aria-label={row.status === 'active' ? t('users.disable') : t('users.enable')}
                         isDisabled={row.role === 'admin'}
@@ -238,11 +250,11 @@ export default function UsersPage() {
                           {row.status === 'active' ? t('status.enabled') : t('status.disabled')}
                         </Switch.Content>
                       </Switch>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <span className="text-xs text-text-secondary">{formatDateTime(row.created_at)}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <div className="flex items-center justify-center gap-0.5">
                         <Button
                           isIconOnly
@@ -332,24 +344,12 @@ export default function UsersPage() {
                           </Dropdown.Popover>
                         </Dropdown>
                       </div>
-                    </HeroTable.Cell>
-                  </HeroTable.Row>
+                    </CommonTable.Cell>
+                  </CommonTable.Row>
                 ))
               )}
-            </HeroTable.Body>
-          </HeroTable.Content>
-        </HeroTable.ScrollContainer>
-        <HeroTable.Footer>
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        </HeroTable.Footer>
-      </HeroTable>
+            </CommonTable.Body>
+      </CommonTable>
 
       <CreateUserModal
         open={showCreateModal}

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Description, Input, Label, ListBox, Modal, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { Key } from 'lucide-react';
 import { parseIpList, formatIpList } from '../../../shared/utils/ip';
-import { AirGateDatePicker } from '../../../shared/components/AirGateDatePicker';
+import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type { APIKeyResp, UpdateAPIKeyReq, GroupResp } from '../../../shared/types';
 
 interface EditKeyModalProps {
@@ -141,7 +141,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
           <Description>{t('api_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
         </HeroTextField>
 
-        <AirGateDatePicker
+        <CommonDatePicker
           description={t('api_keys.expire_hint')}
           label={t('api_keys.expire_time')}
           value={form.expires_at ? form.expires_at.split('T')[0] : ''}

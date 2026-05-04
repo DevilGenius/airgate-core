@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { PlatformIcon } from '../../shared/ui';
 import { accountsApi, type AccountStatsResp } from '../../shared/api/accounts';
-import { AirGateDatePicker } from '../../shared/components/AirGateDatePicker';
+import { CommonDatePicker } from '../../shared/components/CommonDatePicker';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 
 import { decorativePalette } from '@airgate/theme';
@@ -147,14 +147,14 @@ export function AccountStatsModal({
                 </Tabs>
                 {preset === 'custom' && (
                   <div className="ml-2 grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-[minmax(10rem,1fr)_auto_minmax(10rem,1fr)] sm:items-end">
-                    <AirGateDatePicker
+                    <CommonDatePicker
                       className="w-full sm:w-40"
                       label={t('accounts.stats_start_date')}
                       value={customStart}
                       onChange={setCustomStart}
                     />
                     <span className="text-text-tertiary text-xs">—</span>
-                    <AirGateDatePicker
+                    <CommonDatePicker
                       className="w-full sm:w-40"
                       label={t('accounts.stats_end_date')}
                       value={customEnd}

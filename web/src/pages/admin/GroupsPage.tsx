@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Percent,
 } from 'lucide-react';
-import { AlertDialog, Button, Chip, EmptyState, Label, ListBox, Select, Spinner, Table as HeroTable } from '@heroui/react';
+import { AlertDialog, Button, Chip, EmptyState, Label, ListBox, Select, Spinner } from '@heroui/react';
 import { PlatformIcon } from '../../shared/ui';
 import { groupsApi } from '../../shared/api/groups';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
@@ -21,6 +21,7 @@ import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
+import { CommonTable } from '../../shared/components/CommonTable';
 import { GroupFormModal } from './groups/EditGroupModal';
 import { GroupRateOverridesModal } from './groups/GroupRateOverridesModal';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
@@ -138,79 +139,90 @@ export default function GroupsPage() {
       </div>
 
       {/* 表格 */}
-      <HeroTable variant="primary">
-        <HeroTable.ScrollContainer>
-          <HeroTable.Content aria-label={t('groups.title', 'Groups')}>
-            <HeroTable.Header>
-              <HeroTable.Column id="name">{t('common.name')}</HeroTable.Column>
-              <HeroTable.Column id="platform">{t('groups.platform')}</HeroTable.Column>
-              <HeroTable.Column id="subscription_type">{t('groups.subscription_type')}</HeroTable.Column>
-              <HeroTable.Column id="rate_multiplier" style={{ width: 96 }}>
+      <CommonTable
+        ariaLabel={t('groups.title', 'Groups')}
+        footer={(
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            setPage={setPage}
+            setPageSize={setPageSize}
+            total={total}
+            totalPages={totalPages}
+          />
+        )}
+        minWidth={1180}
+      >
+            <CommonTable.Header>
+              <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
+              <CommonTable.Column id="platform">{t('groups.platform')}</CommonTable.Column>
+              <CommonTable.Column id="subscription_type">{t('groups.subscription_type')}</CommonTable.Column>
+              <CommonTable.Column id="rate_multiplier" style={{ width: 96 }}>
                 {t('groups.rate_multiplier')}
-              </HeroTable.Column>
-              <HeroTable.Column id="is_exclusive" style={{ width: 96 }}>
+              </CommonTable.Column>
+              <CommonTable.Column id="is_exclusive" style={{ width: 96 }}>
                 {t('groups.group_type')}
-              </HeroTable.Column>
-              <HeroTable.Column id="account_stats" style={{ width: 144 }}>
+              </CommonTable.Column>
+              <CommonTable.Column id="account_stats" style={{ width: 144 }}>
                 {t('groups.account_stats')}
-              </HeroTable.Column>
-              <HeroTable.Column id="usage" style={{ width: 128 }}>
+              </CommonTable.Column>
+              <CommonTable.Column id="usage" style={{ width: 128 }}>
                 {t('groups.usage')}
-              </HeroTable.Column>
-              <HeroTable.Column id="capacity" style={{ width: 128 }}>
+              </CommonTable.Column>
+              <CommonTable.Column id="capacity" style={{ width: 128 }}>
                 {t('groups.capacity')}
-              </HeroTable.Column>
-              <HeroTable.Column id="sort_weight" style={{ width: 96 }}>
+              </CommonTable.Column>
+              <CommonTable.Column id="sort_weight" style={{ width: 96 }}>
                 {t('groups.sort_weight')}
-              </HeroTable.Column>
-              <HeroTable.Column id="actions" style={{ width: 132 }}>
+              </CommonTable.Column>
+              <CommonTable.Column id="actions" style={{ width: 132 }}>
                 {t('common.actions')}
-              </HeroTable.Column>
-            </HeroTable.Header>
-            <HeroTable.Body>
+              </CommonTable.Column>
+            </CommonTable.Header>
+            <CommonTable.Body>
               {isLoading ? (
                 <TableLoadingRow colSpan={10} />
               ) : rows.length === 0 ? (
-                <HeroTable.Row id="empty">
-                  <HeroTable.Cell colSpan={10}>
+                <CommonTable.Row id="empty">
+                  <CommonTable.Cell colSpan={10}>
                     <EmptyState />
-                  </HeroTable.Cell>
-                </HeroTable.Row>
+                  </CommonTable.Cell>
+                </CommonTable.Row>
               ) : (
                 rows.map((row) => (
-                  <HeroTable.Row id={String(row.id)} key={row.id}>
-                    <HeroTable.Cell>
+                  <CommonTable.Row id={String(row.id)} key={row.id}>
+                    <CommonTable.Cell>
                       <span className="inline-flex items-center gap-1.5">
                         <Layers className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
                         <span style={{ color: 'var(--ag-text)' }} className="font-medium">
                           {row.name}
                         </span>
                       </span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <span className="inline-flex items-center gap-1.5">
                         <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" />
                         {platformName(row.platform)}
                       </span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <Chip color={row.subscription_type === 'subscription' ? 'accent' : 'default'} size="sm" variant="soft">
                         {row.subscription_type === 'subscription' ? t('groups.type_subscription') : t('groups.type_standard')}
                       </Chip>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
                         {row.rate_multiplier}x
                       </span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       {row.is_exclusive ? (
                         <Chip color="warning" size="sm" variant="soft">{t('groups.type_exclusive')}</Chip>
                       ) : (
                         <Chip color="default" size="sm" variant="soft">{t('groups.type_public')}</Chip>
                       )}
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <div className="text-xs leading-relaxed">
                         <div>
                           <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.account_available')}: </span>
@@ -228,8 +240,8 @@ export default function GroupsPage() {
                           <span style={{ color: 'var(--ag-text-tertiary)' }}> {t('groups.account_unit')}</span>
                         </div>
                       </div>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <div className="text-xs leading-relaxed">
                         <div>
                           <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.today_cost')} </span>
@@ -240,8 +252,8 @@ export default function GroupsPage() {
                           <span className="font-mono">{formatCost(row.total_cost)}</span>
                         </div>
                       </div>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <div>
                         <span className="font-mono" style={{ color: row.capacity_used > 0 ? 'var(--ag-primary)' : undefined }}>
                           {row.capacity_used}
@@ -249,14 +261,14 @@ export default function GroupsPage() {
                         <span style={{ color: 'var(--ag-text-tertiary)' }}> / </span>
                         <span className="font-mono">{row.capacity_total}</span>
                       </div>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <span className="inline-flex items-center gap-1 font-mono">
                         <ArrowUpDown className="w-3 h-3" style={{ color: 'var(--ag-text-tertiary)' }} />
                         {row.sort_weight}
                       </span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <div className="flex items-center justify-center gap-0.5">
                         <Button
                           isIconOnly
@@ -287,24 +299,12 @@ export default function GroupsPage() {
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
-                    </HeroTable.Cell>
-                  </HeroTable.Row>
+                    </CommonTable.Cell>
+                  </CommonTable.Row>
                 ))
               )}
-            </HeroTable.Body>
-          </HeroTable.Content>
-        </HeroTable.ScrollContainer>
-        <HeroTable.Footer>
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        </HeroTable.Footer>
-      </HeroTable>
+            </CommonTable.Body>
+      </CommonTable>
 
       {/* 创建弹窗 */}
       <GroupFormModal

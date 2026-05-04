@@ -823,6 +823,88 @@ input[type="number"]::-webkit-outer-spin-button {
   border-bottom: none !important;
 }
 
+/* Shared resource tables used by CRUD management pages. */
+
+.ag-resource-table {
+  --ag-resource-table-header-height: 2.375rem;
+  --ag-resource-table-row-min-height: 3rem;
+}
+
+.ag-resource-table-scroll {
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.ag-resource-table-content {
+  table-layout: auto;
+}
+
+.ag-resource-table :where([data-slot="table-header"] [data-slot="table-row"], [data-slot="thead"] [data-slot="tr"]),
+.ag-resource-table .table__header .table__row {
+  height: var(--ag-resource-table-header-height) !important;
+}
+
+.ag-resource-table :where([data-slot="table-column"], [data-slot="th"]),
+.ag-resource-table .table__column {
+  height: var(--ag-resource-table-header-height) !important;
+  min-height: var(--ag-resource-table-header-height) !important;
+  background: var(--ag-surface-secondary) !important;
+  color: var(--ag-text-tertiary) !important;
+  font-size: 0.75rem !important;
+  font-weight: 650 !important;
+  letter-spacing: 0 !important;
+  line-height: 1 !important;
+  padding: 0.625rem 0.75rem !important;
+  text-transform: none !important;
+  white-space: nowrap !important;
+}
+
+.ag-resource-table :where([data-slot="table-cell"], [data-slot="td"]),
+.ag-resource-table .table__cell {
+  min-height: var(--ag-resource-table-row-min-height) !important;
+  padding: 0.625rem 0.75rem !important;
+  color: var(--ag-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.25;
+}
+
+.ag-resource-table :where([data-slot="table-cell"]:last-child, [data-slot="td"]:last-child),
+.ag-resource-table .table__cell:last-child {
+  text-align: right;
+}
+
+.ag-resource-table :where([data-slot="table-cell"]:last-child) :where(button),
+.ag-resource-table :where([data-slot="td"]:last-child) :where(button),
+.ag-resource-table .table__cell:last-child button {
+  background: var(--ag-surface-secondary);
+}
+
+.ag-resource-table :where([data-slot="table-cell"]:last-child) :where(button:hover),
+.ag-resource-table :where([data-slot="td"]:last-child) :where(button:hover),
+.ag-resource-table .table__cell:last-child button:hover {
+  background: var(--ag-bg-hover);
+}
+
+@media (max-width: 1023px) {
+  .ag-resource-table :where([data-slot="table-column"]:first-child, [data-slot="table-cell"]:first-child),
+  .ag-resource-table .table__column:first-child,
+  .ag-resource-table .table__cell:first-child {
+    position: sticky !important;
+    left: 0;
+    z-index: 2;
+    background: var(--ag-surface) !important;
+  }
+
+  .ag-resource-table :where([data-slot="table-column"]:first-child),
+  .ag-resource-table .table__column:first-child {
+    z-index: 4;
+    background: var(--ag-surface-secondary) !important;
+  }
+}
+
 /* 使用记录表格：固定 header / row 高度，避免中英文切换造成尺寸漂移。 */
 
 .ag-usage-records-table {

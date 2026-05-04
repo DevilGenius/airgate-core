@@ -9,7 +9,7 @@ import {
   User,
   RefreshCw,
 } from 'lucide-react';
-import { Button, EmptyState, Label, ListBox, Select, Table as HeroTable } from '@heroui/react';
+import { Button, EmptyState, Label, ListBox, Select } from '@heroui/react';
 import {
   StatusChip,
 } from '../../shared/ui';
@@ -23,6 +23,7 @@ import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
+import { CommonTable } from '../../shared/components/CommonTable';
 import { AssignModal } from './subscriptions/AssignModal';
 import { BulkAssignModal } from './subscriptions/BulkAssignModal';
 import { AdjustModal } from './subscriptions/AdjustModal';
@@ -177,73 +178,9 @@ export default function SubscriptionsPage() {
         </div>
       </div>
 
-      <HeroTable variant="primary">
-        <HeroTable.ScrollContainer>
-          <HeroTable.Content aria-label={t('subscriptions.title', 'Subscriptions')}>
-            <HeroTable.Header>
-              <HeroTable.Column id="id" style={{ width: 72 }}>
-                {t('common.id')}
-              </HeroTable.Column>
-              <HeroTable.Column id="user_id">{t('subscriptions.user')}</HeroTable.Column>
-              <HeroTable.Column id="group_name">{t('subscriptions.group')}</HeroTable.Column>
-              <HeroTable.Column id="effective_at">{t('subscriptions.effective_time')}</HeroTable.Column>
-              <HeroTable.Column id="expires_at">{t('subscriptions.expire_time')}</HeroTable.Column>
-              <HeroTable.Column id="status">{t('common.status')}</HeroTable.Column>
-              <HeroTable.Column id="actions">{t('common.actions')}</HeroTable.Column>
-            </HeroTable.Header>
-            <HeroTable.Body>
-              {isLoading ? (
-                <TableLoadingRow colSpan={7} />
-              ) : rows.length === 0 ? (
-                <HeroTable.Row id="empty">
-                  <HeroTable.Cell colSpan={7}>
-                    <EmptyState />
-                  </HeroTable.Cell>
-                </HeroTable.Row>
-              ) : (
-                rows.map((row) => (
-                  <HeroTable.Row id={String(row.id)} key={row.id}>
-                    <HeroTable.Cell>
-                      <span className="font-mono">{row.id}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
-                      <span className="inline-flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5 text-text-tertiary" />
-                        {getUserEmail(row.user_id)}
-                      </span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
-                      <span className="inline-flex items-center gap-1.5">
-                        <Layers className="h-3.5 w-3.5 text-text-tertiary" />
-                        <span className="font-medium text-text">{row.group_name}</span>
-                      </span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
-                      <span className="font-mono">{formatDate(row.effective_at)}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
-                      <span className="font-mono">{formatDate(row.expires_at)}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
-                      <StatusChip status={row.status} />
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onPress={() => setAdjustingSub(row)}
-                      >
-                        <Settings2 className="w-3.5 h-3.5" />
-                        {t('subscriptions.adjust')}
-                      </Button>
-                    </HeroTable.Cell>
-                  </HeroTable.Row>
-                ))
-              )}
-            </HeroTable.Body>
-          </HeroTable.Content>
-        </HeroTable.ScrollContainer>
-        <HeroTable.Footer>
+      <CommonTable
+        ariaLabel={t('subscriptions.title', 'Subscriptions')}
+        footer={(
           <TablePaginationFooter
             page={page}
             pageSize={pageSize}
@@ -252,8 +189,71 @@ export default function SubscriptionsPage() {
             total={total}
             totalPages={totalPages}
           />
-        </HeroTable.Footer>
-      </HeroTable>
+        )}
+        minWidth={920}
+      >
+            <CommonTable.Header>
+              <CommonTable.Column id="id" style={{ width: 72 }}>
+                {t('common.id')}
+              </CommonTable.Column>
+              <CommonTable.Column id="user_id">{t('subscriptions.user')}</CommonTable.Column>
+              <CommonTable.Column id="group_name">{t('subscriptions.group')}</CommonTable.Column>
+              <CommonTable.Column id="effective_at">{t('subscriptions.effective_time')}</CommonTable.Column>
+              <CommonTable.Column id="expires_at">{t('subscriptions.expire_time')}</CommonTable.Column>
+              <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
+              <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
+            </CommonTable.Header>
+            <CommonTable.Body>
+              {isLoading ? (
+                <TableLoadingRow colSpan={7} />
+              ) : rows.length === 0 ? (
+                <CommonTable.Row id="empty">
+                  <CommonTable.Cell colSpan={7}>
+                    <EmptyState />
+                  </CommonTable.Cell>
+                </CommonTable.Row>
+              ) : (
+                rows.map((row) => (
+                  <CommonTable.Row id={String(row.id)} key={row.id}>
+                    <CommonTable.Cell>
+                      <span className="font-mono">{row.id}</span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="inline-flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5 text-text-tertiary" />
+                        {getUserEmail(row.user_id)}
+                      </span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 text-text-tertiary" />
+                        <span className="font-medium text-text">{row.group_name}</span>
+                      </span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="font-mono">{formatDate(row.effective_at)}</span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="font-mono">{formatDate(row.expires_at)}</span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <StatusChip status={row.status} />
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onPress={() => setAdjustingSub(row)}
+                      >
+                        <Settings2 className="w-3.5 h-3.5" />
+                        {t('subscriptions.adjust')}
+                      </Button>
+                    </CommonTable.Cell>
+                  </CommonTable.Row>
+                ))
+              )}
+            </CommonTable.Body>
+      </CommonTable>
 
       {/* 分配订阅弹窗 */}
       <AssignModal

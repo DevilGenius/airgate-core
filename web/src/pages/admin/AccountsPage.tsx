@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, Table as HeroTable, TextField as HeroTextField, Tooltip } from '@heroui/react';
+import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField, Tooltip } from '@heroui/react';
 import {
   Plus,
   Pencil,
@@ -30,6 +30,7 @@ import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
+import { CommonTable } from '../../shared/components/CommonTable';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { BulkActionsBar } from './accounts/BulkActionsBar';
@@ -1221,52 +1222,64 @@ export default function AccountsPage() {
       />
 
       {/* 表格 */}
-      <HeroTable variant="primary">
-        <HeroTable.ScrollContainer>
-          <HeroTable.Content
-            aria-label={t('accounts.title', 'Accounts')}
-            selectionMode="multiple"
-            selectedKeys={selectedKeys}
-            onSelectionChange={(keys) => {
+      <CommonTable
+        ariaLabel={t('accounts.title', 'Accounts')}
+        contentProps={{
+          selectionMode: 'multiple',
+          selectedKeys,
+          onSelectionChange: (keys) => {
               if (keys === 'all') {
                 setSelectedIds(rows.map((row) => row.id));
                 return;
               }
               setSelectedIds(Array.from(keys).map((key) => Number(key)));
-            }}
-          >
-            <HeroTable.Header>
-              <HeroTable.Column id="__selection__" style={{ width: 52 }}>
+            },
+        }}
+        footer={(
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            setPage={setPage}
+            setPageSize={setPageSize}
+            total={total}
+            totalPages={totalPages}
+          />
+        )}
+        minWidth={1180}
+      >
+            <CommonTable.Header>
+              <CommonTable.Column id="__selection__" style={{ width: 52 }}>
                 <Checkbox slot="selection" aria-label={t('common.select_all', 'Select all')} />
-              </HeroTable.Column>
+              </CommonTable.Column>
               {columns.map((column) => (
-                <HeroTable.Column
+                <CommonTable.Column
                   id={column.key}
                   key={column.key}
                   className={column.hideOnMobile ? 'hidden md:table-cell' : undefined}
                   style={column.width ? { minWidth: column.width, width: column.width } : undefined}
                 >
                   {column.title}
-                </HeroTable.Column>
+                </CommonTable.Column>
               ))}
-            </HeroTable.Header>
-            <HeroTable.Body>
+            </CommonTable.Header>
+            <CommonTable.Body>
               {isLoading ? (
                 <TableLoadingRow colSpan={columns.length + 1} />
               ) : rows.length === 0 ? (
-                <HeroTable.Row id="empty">
-                  <HeroTable.Cell colSpan={columns.length + 1}>
+                <CommonTable.Row id="empty">
+                  <CommonTable.Cell colSpan={columns.length + 1}>
                     <EmptyState />
-                  </HeroTable.Cell>
-                </HeroTable.Row>
+                  </CommonTable.Cell>
+                </CommonTable.Row>
               ) : (
                 rows.map((row) => (
-                  <HeroTable.Row id={String(row.id)} key={row.id}>
-                    <HeroTable.Cell>
+                  <CommonTable.Row id={String(row.id)} key={row.id}>
+                    <CommonTable.Cell>
                       <Checkbox slot="selection" aria-label={t('common.select', 'Select')} />
-                    </HeroTable.Cell>
+                    </CommonTable.Cell>
                     {columns.map((column) => (
-                      <HeroTable.Cell
+                      <CommonTable.Cell
                         key={column.key}
                         className={column.hideOnMobile ? 'hidden md:table-cell' : undefined}
                       >
@@ -1281,26 +1294,13 @@ export default function AccountsPage() {
                         >
                           {column.render(row)}
                         </div>
-                      </HeroTable.Cell>
+                      </CommonTable.Cell>
                     ))}
-                  </HeroTable.Row>
+                  </CommonTable.Row>
                 ))
               )}
-            </HeroTable.Body>
-          </HeroTable.Content>
-        </HeroTable.ScrollContainer>
-        <HeroTable.Footer>
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            pageSizeOptions={PAGE_SIZE_OPTIONS}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        </HeroTable.Footer>
-      </HeroTable>
+            </CommonTable.Body>
+      </CommonTable>
 
       {/* 创建弹窗 */}
       <CreateAccountModal

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Label, ListBox, Modal, Select, Spinner, useOverlayState } from '@heroui/react';
-import { AirGateDatePicker } from '../../../shared/components/AirGateDatePicker';
+import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type {
   SubscriptionResp,
   AdjustSubscriptionReq,
@@ -48,7 +48,7 @@ export function AdjustModal({
             </Modal.Header>
             <Modal.Body>
               <div className="space-y-4">
-                <AirGateDatePicker
+                <CommonDatePicker
                   label={t('subscriptions.expire_time')}
                   value={form.expires_at ? form.expires_at.split('T')[0] : ''}
                   onChange={(value) => setForm({ ...form, expires_at: value ? `${value}T23:59:59Z` : undefined })}

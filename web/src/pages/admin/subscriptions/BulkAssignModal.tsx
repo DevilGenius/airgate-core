@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Label, ListBox, Modal, Select, Spinner, useOverlayState } from '@heroui/react';
 import { User } from 'lucide-react';
-import { AirGateDatePicker } from '../../../shared/components/AirGateDatePicker';
+import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type {
   BulkAssignReq,
   GroupResp,
@@ -128,7 +128,7 @@ export function BulkAssignModal({
                   </Select.Popover>
                 </Select>
 
-                <AirGateDatePicker
+                <CommonDatePicker
                   isRequired
                   label={t('subscriptions.expire_time')}
                   value={expiresAt ? expiresAt.split('T')[0] : ''}

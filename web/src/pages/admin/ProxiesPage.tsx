@@ -6,13 +6,14 @@ import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { AlertDialog, Button, Chip, EmptyState, Form, Input, Label, ListBox, Modal, Select, Spinner, Table as HeroTable, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { AlertDialog, Button, Chip, EmptyState, Form, Input, Label, ListBox, Modal, Select, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { StatusChip } from '../../shared/ui';
 import { Plus, Pencil, Trash2, Zap, RefreshCw } from 'lucide-react';
 import type { ProxyResp, CreateProxyReq, UpdateProxyReq } from '../../shared/types';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
+import { CommonTable } from '../../shared/components/CommonTable';
 
 // 代理表单数据
 interface ProxyForm {
@@ -191,55 +192,66 @@ export default function ProxiesPage() {
         </div>
       </div>
 
-      <HeroTable variant="primary">
-        <HeroTable.ScrollContainer>
-          <HeroTable.Content aria-label={t('proxies.title', 'Proxies')}>
-            <HeroTable.Header>
-              <HeroTable.Column id="id" style={{ width: 72 }}>
+      <CommonTable
+        ariaLabel={t('proxies.title', 'Proxies')}
+        footer={(
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            setPage={setPage}
+            setPageSize={setPageSize}
+            total={total}
+            totalPages={totalPages}
+          />
+        )}
+        minWidth={860}
+      >
+            <CommonTable.Header>
+              <CommonTable.Column id="id" style={{ width: 72 }}>
                 {t('common.id')}
-              </HeroTable.Column>
-              <HeroTable.Column id="name">{t('common.name')}</HeroTable.Column>
-              <HeroTable.Column id="protocol">{t('proxies.protocol')}</HeroTable.Column>
-              <HeroTable.Column id="endpoint">{t('proxies.address')}</HeroTable.Column>
-              <HeroTable.Column id="username">{t('proxies.username')}</HeroTable.Column>
-              <HeroTable.Column id="status">{t('common.status')}</HeroTable.Column>
-              <HeroTable.Column id="actions">{t('common.actions')}</HeroTable.Column>
-            </HeroTable.Header>
-            <HeroTable.Body>
+              </CommonTable.Column>
+              <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
+              <CommonTable.Column id="protocol">{t('proxies.protocol')}</CommonTable.Column>
+              <CommonTable.Column id="endpoint">{t('proxies.address')}</CommonTable.Column>
+              <CommonTable.Column id="username">{t('proxies.username')}</CommonTable.Column>
+              <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
+              <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
+            </CommonTable.Header>
+            <CommonTable.Body>
               {isLoading ? (
                 <TableLoadingRow colSpan={7} />
               ) : rows.length === 0 ? (
-                <HeroTable.Row id="empty">
-                  <HeroTable.Cell colSpan={7}>
+                <CommonTable.Row id="empty">
+                  <CommonTable.Cell colSpan={7}>
                     <EmptyState />
-                  </HeroTable.Cell>
-                </HeroTable.Row>
+                  </CommonTable.Cell>
+                </CommonTable.Row>
               ) : (
                 rows.map((row) => (
-                  <HeroTable.Row id={String(row.id)} key={row.id}>
-                    <HeroTable.Cell>
+                  <CommonTable.Row id={String(row.id)} key={row.id}>
+                    <CommonTable.Cell>
                       <span className="font-mono text-text-tertiary">{row.id}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <span className="text-text">{row.name}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <Chip color={row.protocol === 'http' ? 'accent' : 'warning'} size="sm" variant="soft">
                         {row.protocol.toUpperCase()}
                       </Chip>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <span className="font-mono">
                         {row.address}:{row.port}
                       </span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <span className="text-text-secondary">{row.username || '-'}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <StatusChip status={row.status} />
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
                       <div className="flex gap-1">
                         <Button
                           size="sm"
@@ -268,24 +280,12 @@ export default function ProxiesPage() {
                           {t('common.delete')}
                         </Button>
                       </div>
-                    </HeroTable.Cell>
-                  </HeroTable.Row>
+                    </CommonTable.Cell>
+                  </CommonTable.Row>
                 ))
               )}
-            </HeroTable.Body>
-          </HeroTable.Content>
-        </HeroTable.ScrollContainer>
-        <HeroTable.Footer>
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        </HeroTable.Footer>
-      </HeroTable>
+            </CommonTable.Body>
+      </CommonTable>
 
       {/* 创建/编辑弹窗 */}
       <Modal state={proxyDialogState}>

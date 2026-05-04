@@ -3,7 +3,7 @@ import type { DateValue } from '@internationalized/date';
 import { parseDate } from '@internationalized/date';
 import { useMemo } from 'react';
 
-interface AirGateDatePickerProps {
+interface CommonDatePickerProps {
   className?: string;
   description?: string;
   isRequired?: boolean;
@@ -22,7 +22,7 @@ function toDateValue(value?: string): DateValue | null {
   }
 }
 
-export function AirGateDatePicker({
+export function CommonDatePicker({
   className = 'w-full',
   description,
   isRequired,
@@ -30,7 +30,7 @@ export function AirGateDatePicker({
   name,
   onChange,
   value,
-}: AirGateDatePickerProps) {
+}: CommonDatePickerProps) {
   const dateValue = useMemo(() => toDateValue(value), [value]);
 
   return (

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, ComboBox, Description, Input, Label, ListBox, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
-import { AirGateDatePicker } from '../../../shared/components/AirGateDatePicker';
+import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type { KeyForm } from './types';
 
 export interface KeyGroupOption {
@@ -123,7 +123,7 @@ export function EditKeyModal({
           />
           <Description>{t('user_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
         </HeroTextField>
-        <AirGateDatePicker
+        <CommonDatePicker
           description={t('user_keys.expire_hint')}
           label={t('user_keys.expires_at')}
           value={form.expires_at}
