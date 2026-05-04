@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Card, Label, ListBox, Select, Skeleton, Tabs } from '@heroui/react';
 import {
@@ -32,12 +32,13 @@ import { decorativePalette } from '@airgate/theme';
 import { dashboardApi } from '../shared/api/dashboard';
 import { usersApi } from '../shared/api/users';
 import { queryKeys } from '../shared/queryKeys';
-import { FETCH_ALL_PARAMS } from '../shared/constants';
+import { FETCH_ALL_PARAMS, USAGE_TOKEN_COLORS } from '../shared/constants';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
 const PIE_COLORS = decorativePalette.slice(0, 10);
 const USER_COLORS = [...decorativePalette];
+const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio'];
 
 type PieTooltipPayload = Array<{
   name?: unknown;
@@ -310,19 +311,29 @@ function TokenTrendTooltip({
   if (!active || !payload?.length) return null;
   const datum = payload[0]?.payload;
   const labels: Record<string, string> = {
-    cachedInput: t('dashboard.cached_input'),
     input: t('dashboard.input'),
     output: t('dashboard.output'),
+    cacheCreation: t('dashboard.cache_creation'),
+    cacheRead: t('dashboard.cache_read'),
+    cacheRatio: t('dashboard.cache_cumulative_ratio'),
   };
+  const orderedPayload = [...payload].sort((a, b) => {
+    const aIndex = TOKEN_TREND_LINE_ORDER.indexOf(String(a.dataKey) as keyof typeof USAGE_TOKEN_COLORS);
+    const bIndex = TOKEN_TREND_LINE_ORDER.indexOf(String(b.dataKey) as keyof typeof USAGE_TOKEN_COLORS);
+    return (aIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : aIndex) - (bIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : bIndex);
+  });
+
   return (
     <div className="rounded-[var(--radius)] border border-border bg-surface px-3 py-2 text-xs text-text shadow-lg">
       <div className="mb-1 font-medium">{label}</div>
       <div className="space-y-1">
-        {payload.map((item) => (
+        {orderedPayload.map((item) => (
           <div key={item.dataKey} className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
             <span className="text-text-tertiary">{labels[item.dataKey ?? ''] ?? item.dataKey}</span>
-            <span className="font-mono">{fmtNum(Number(item.value ?? 0))}</span>
+            <span className="font-mono">
+              {item.dataKey === 'cacheRatio' ? `${Number(item.value ?? 0).toFixed(1)}%` : fmtNum(Number(item.value ?? 0))}
+            </span>
           </div>
         ))}
       </div>
@@ -474,32 +485,83 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
 
 function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
   const { t } = useTranslation();
-  const chartData = useMemo(
-    () => (trend.token_trend ?? []).map((item) => ({
-      actualCost: item.actual_cost,
-      cachedInput: item.cached_input,
-      input: item.input_tokens,
-      output: item.output_tokens,
-      standardCost: item.standard_cost,
-      time: fmtTime(item.time),
-    })),
-    [trend],
-  );
+  const lineLabels: Record<string, string> = {
+    input: t('dashboard.input'),
+    output: t('dashboard.output'),
+    cacheCreation: t('dashboard.cache_creation'),
+    cacheRead: t('dashboard.cache_read'),
+    cacheRatio: t('dashboard.cache_cumulative_ratio'),
+  };
+  const chartData = useMemo(() => {
+    let cumulativeCache = 0;
+    let cumulativeTotal = 0;
+
+    return (trend.token_trend ?? []).map((item) => {
+      const cacheRead = item.cache_read ?? item.cached_input ?? 0;
+      const cacheCreation = item.cache_creation ?? 0;
+      const cacheTokens = cacheRead + cacheCreation;
+      const totalTokens = item.input_tokens + item.output_tokens + cacheTokens;
+      cumulativeCache += cacheTokens;
+      cumulativeTotal += totalTokens;
+      const cacheRatio = cumulativeTotal > 0
+        ? Math.min(100, Math.max(0, (cumulativeCache / cumulativeTotal) * 100))
+        : 0;
+
+      return {
+        actualCost: item.actual_cost,
+        cacheCreation,
+        cacheRatio,
+        cacheRead,
+        input: item.input_tokens,
+        output: item.output_tokens,
+        standardCost: item.standard_cost,
+        time: fmtTime(item.time),
+      };
+    });
+  }, [trend]);
 
   return (
-    <DashboardCard>
+    <DashboardCard title={t('dashboard.token_trend')}>
       {chartData.length > 0 ? (
         <div className="h-[248px] 2xl:h-[288px]">
           <ResponsiveContainer width="100%" height="100%" debounce={80}>
-            <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 8, top: 4 }}>
+            <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
               <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
               <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickLine={false} />
-              <YAxis axisLine={false} tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
+              <YAxis yAxisId="tokens" axisLine={false} tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
+              <YAxis
+                yAxisId="ratio"
+                axisLine={false}
+                domain={[0, 100]}
+                orientation="right"
+                tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }}
+                tickFormatter={(value: number) => `${Math.round(value)}%`}
+                tickLine={false}
+                width={32}
+              />
               <RechartsTooltip content={<TokenTrendTooltip />} />
-              <Legend iconSize={8} iconType="circle" wrapperStyle={{ color: 'var(--ag-text-tertiary)', fontSize: 11 }} />
-              <Line dataKey="input" dot={false} isAnimationActive={false} name={t('dashboard.input')} stroke="#3b82f6" strokeWidth={2.5} type="monotone" />
-              <Line dataKey="output" dot={false} isAnimationActive={false} name={t('dashboard.output')} stroke="#10b981" strokeWidth={2.5} type="monotone" />
-              <Line dataKey="cachedInput" dot={false} isAnimationActive={false} name={t('dashboard.cached_input')} stroke="#8b5cf6" strokeWidth={2.5} type="monotone" />
+              <Legend
+                height={24}
+                content={() => (
+                  <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text-tertiary">
+                    {TOKEN_TREND_LINE_ORDER.map((key) => (
+                      <span key={key} className="inline-flex items-center gap-1.5">
+                        {key === 'cacheRatio' ? (
+                          <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: USAGE_TOKEN_COLORS[key] }} />
+                        ) : (
+                          <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
+                        )}
+                        <span>{lineLabels[key]}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              />
+              <Line yAxisId="tokens" dataKey="input" dot={false} isAnimationActive={false} name={lineLabels.input} stroke={USAGE_TOKEN_COLORS.input} strokeWidth={2.5} type="monotone" />
+              <Line yAxisId="tokens" dataKey="output" dot={false} isAnimationActive={false} name={lineLabels.output} stroke={USAGE_TOKEN_COLORS.output} strokeWidth={2.5} type="monotone" />
+              <Line yAxisId="tokens" dataKey="cacheCreation" dot={false} isAnimationActive={false} name={lineLabels.cacheCreation} stroke={USAGE_TOKEN_COLORS.cacheCreation} strokeWidth={2.5} type="monotone" />
+              <Line yAxisId="tokens" dataKey="cacheRead" dot={false} isAnimationActive={false} name={lineLabels.cacheRead} stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2.5} type="monotone" />
+              <Line yAxisId="ratio" dataKey="cacheRatio" dot={false} isAnimationActive={false} name={lineLabels.cacheRatio} stroke={USAGE_TOKEN_COLORS.cacheRatio} strokeDasharray="5 5" strokeWidth={2} type="monotone" />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -600,6 +662,7 @@ export default function DashboardPage() {
   const trendQuery = useQuery({
     queryKey: queryKeys.dashboardTrend(trendParams),
     queryFn: () => dashboardApi.trend(trendParams),
+    placeholderData: keepPreviousData,
   });
 
   const refresh = () => {
@@ -694,7 +757,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {trendQuery.isLoading ? (
+      {trendQuery.isLoading && !trendQuery.data ? (
         <div className="ag-dashboard-trends space-y-4 2xl:space-y-5">
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {Array.from({ length: 2 }).map((_, index) => (

@@ -40,8 +40,6 @@ import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
 import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
 
-const HeroTable = CommonTable;
-
 export default function UserKeysPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -292,230 +290,230 @@ export default function UserKeysPage() {
         )}
         minWidth={1040}
       >
-            <HeroTable.Header>
-              <HeroTable.Column id="name">{t('common.name')}</HeroTable.Column>
-              <HeroTable.Column id="key_prefix">{t('user_keys.title')}</HeroTable.Column>
-              <HeroTable.Column id="group_id">{t('user_keys.group')}</HeroTable.Column>
-              <HeroTable.Column id="quota">{t('user_keys.quota_label')}</HeroTable.Column>
-              <HeroTable.Column id="markup">{t('user_keys.markup_title', '销售/成本')}</HeroTable.Column>
-              <HeroTable.Column id="usage">{t('api_keys.usage')}</HeroTable.Column>
-              <HeroTable.Column id="expires_at">{t('user_keys.expires_at')}</HeroTable.Column>
-              <HeroTable.Column id="status">{t('common.status')}</HeroTable.Column>
-              <HeroTable.Column id="actions" style={{ width: 132 }}>
-                {t('common.actions')}
-              </HeroTable.Column>
-            </HeroTable.Header>
-            <HeroTable.Body>
-              {isLoading ? (
-                <TableLoadingRow colSpan={9} />
-              ) : rows.length === 0 ? (
-                <HeroTable.Row id="empty">
-                  <HeroTable.Cell colSpan={9}>
-                    <EmptyState />
-                  </HeroTable.Cell>
-                </HeroTable.Row>
-              ) : (
-                rows.map((row) => {
-                  const group = row.group_id == null ? null : groupMap.get(row.group_id);
-                  const groupName = row.group_id == null
-                    ? t('user_keys.group_unbound')
-                    : group?.name || `#${row.group_id}`;
-                  const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
-                  const userOverride = row.group_id == null ? undefined : user?.group_rates?.[row.group_id];
-                  const hasOverride =
-                    typeof userOverride === 'number' &&
-                    Number.isFinite(userOverride) &&
-                    userOverride > 0 &&
-                    group != null &&
-                    userOverride !== group.rate_multiplier;
-                  const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
-                  const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
-                  const displayStatus = isExpired ? 'expired' : row.status;
+        <CommonTable.Header>
+          <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
+          <CommonTable.Column id="key_prefix">{t('user_keys.title')}</CommonTable.Column>
+          <CommonTable.Column id="group_id">{t('user_keys.group')}</CommonTable.Column>
+          <CommonTable.Column id="quota">{t('user_keys.quota_label')}</CommonTable.Column>
+          <CommonTable.Column id="markup">{t('user_keys.markup_title', '销售/成本')}</CommonTable.Column>
+          <CommonTable.Column id="usage">{t('api_keys.usage')}</CommonTable.Column>
+          <CommonTable.Column id="expires_at">{t('user_keys.expires_at')}</CommonTable.Column>
+          <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
+          <CommonTable.Column id="actions" style={{ width: 132 }}>
+            {t('common.actions')}
+          </CommonTable.Column>
+        </CommonTable.Header>
+        <CommonTable.Body>
+          {isLoading ? (
+            <TableLoadingRow colSpan={9} />
+          ) : rows.length === 0 ? (
+            <CommonTable.Row id="empty">
+              <CommonTable.Cell colSpan={9}>
+                <EmptyState />
+              </CommonTable.Cell>
+            </CommonTable.Row>
+          ) : (
+            rows.map((row) => {
+              const group = row.group_id == null ? null : groupMap.get(row.group_id);
+              const groupName = row.group_id == null
+                ? t('user_keys.group_unbound')
+                : group?.name || `#${row.group_id}`;
+              const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
+              const userOverride = row.group_id == null ? undefined : user?.group_rates?.[row.group_id];
+              const hasOverride =
+                typeof userOverride === 'number' &&
+                Number.isFinite(userOverride) &&
+                userOverride > 0 &&
+                group != null &&
+                userOverride !== group.rate_multiplier;
+              const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
+              const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
+              const displayStatus = isExpired ? 'expired' : row.status;
 
-                  return (
-                    <HeroTable.Row id={String(row.id)} key={row.id}>
-                      <HeroTable.Cell>
-                        <span className="font-medium text-text">{row.name}</span>
-                      </HeroTable.Cell>
-                      <HeroTable.Cell>
-                        <span className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono">
-                          <Key className="w-3 h-3 text-text-tertiary" />
-                          {row.key_prefix}...
-                        </span>
-                      </HeroTable.Cell>
-                      <HeroTable.Cell>
-                        <div className="space-y-0.5 text-center">
-                          <div>{groupName}</div>
-                          {group && (
-                            <div className="font-mono text-xs text-text-tertiary">
-                              {t('user_keys.group_rate_short', '分组倍率')}:{' '}
-                              {hasOverride && userOverride != null ? (
-                                <span
-                                  title={`${t('user_keys.group_rate_default', '分组默认')}: ${group.rate_multiplier.toFixed(2)}`}
-                                >
-                                  {userOverride.toFixed(2)}
-                                  <span className="ml-1 inline-block rounded bg-amber-500/10 px-1 text-[9px] leading-[14px] text-amber-500 align-middle">
-                                    {t('user_keys.user_override_tag', '专属')}
-                                  </span>
-                                </span>
-                              ) : (
-                                group.rate_multiplier.toFixed(2)
-                              )}
-                            </div>
-                          )}
-                          {hasSellRate && (
-                            <div className="font-mono text-xs text-text-tertiary">
-                              {t('user_keys.sell_rate_short', '销售倍率')}: {row.sell_rate!.toFixed(2)}
-                            </div>
-                          )}
-                        </div>
-                      </HeroTable.Cell>
-                      <HeroTable.Cell>
-                        <span className="font-mono">
-                          {row.quota_usd > 0 ? (
-                            <>
-                              ${row.used_quota.toFixed(4)} / ${row.quota_usd.toFixed(4)}
-                            </>
-                          ) : (
-                            <span className="text-text-tertiary">{t('user_keys.quota_unlimited_hint')}</span>
-                          )}
-                        </span>
-                      </HeroTable.Cell>
-                      <HeroTable.Cell>
-                        {!row.sell_rate || row.sell_rate <= 0 ? (
-                          <span className="text-text-tertiary text-xs">—</span>
-                        ) : (
-                          <div className="font-mono text-xs space-y-0.5">
-                            <div>
-                              <span className="text-text-tertiary">{t('user_keys.sell_rate_short', '倍率')}: </span>
-                              <span>{row.sell_rate.toFixed(2)}</span>
-                            </div>
-                            <div>
-                              <span className="text-text-tertiary">{t('user_keys.cost_actual', '成本')}: </span>
-                              <span>${(row.used_quota_actual || 0).toFixed(4)}</span>
-                            </div>
-                            <div>
-                              <span className="text-text-tertiary">{t('user_keys.profit', '利润')}: </span>
-                              <span style={{ color: profit > 0 ? 'var(--ag-success)' : undefined }}>
-                                ${profit.toFixed(4)}
+              return (
+                <CommonTable.Row id={String(row.id)} key={row.id}>
+                  <CommonTable.Cell>
+                    <span className="font-medium text-text">{row.name}</span>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <span className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono">
+                      <Key className="w-3 h-3 text-text-tertiary" />
+                      {row.key_prefix}...
+                    </span>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <div className="space-y-0.5 text-center">
+                      <div>{groupName}</div>
+                      {group && (
+                        <div className="font-mono text-xs text-text-tertiary">
+                          {t('user_keys.group_rate_short', '分组倍率')}:{' '}
+                          {hasOverride && userOverride != null ? (
+                            <span
+                              title={`${t('user_keys.group_rate_default', '分组默认')}: ${group.rate_multiplier.toFixed(2)}`}
+                            >
+                              {userOverride.toFixed(2)}
+                              <span className="ml-1 inline-block rounded bg-amber-500/10 px-1 text-[9px] leading-[14px] text-amber-500 align-middle">
+                                {t('user_keys.user_override_tag', '专属')}
                               </span>
-                            </div>
-                          </div>
-                        )}
-                      </HeroTable.Cell>
-                      <HeroTable.Cell>
-                        <div className="font-mono text-xs space-y-0.5">
-                          <div>
-                            <span className="text-text-tertiary">{t('api_keys.today')}: </span>
-                            <span style={{ color: 'var(--ag-primary)' }}>${row.today_cost.toFixed(4)}</span>
-                          </div>
-                          <div>
-                            <span className="text-text-tertiary">{t('api_keys.thirty_days')}: </span>
-                            <span>${row.thirty_day_cost.toFixed(4)}</span>
-                          </div>
+                            </span>
+                          ) : (
+                            group.rate_multiplier.toFixed(2)
+                          )}
                         </div>
-                      </HeroTable.Cell>
-                      <HeroTable.Cell>
-                        {row.expires_at
-                          ? new Date(row.expires_at).toLocaleDateString('zh-CN')
-                          : t('user_keys.never_expire')}
-                      </HeroTable.Cell>
-                      <HeroTable.Cell>
-                        <StatusChip status={displayStatus} />
-                      </HeroTable.Cell>
-                      <HeroTable.Cell>
-                        <div className="flex items-center justify-center gap-0.5">
+                      )}
+                      {hasSellRate && (
+                        <div className="font-mono text-xs text-text-tertiary">
+                          {t('user_keys.sell_rate_short', '销售倍率')}: {row.sell_rate!.toFixed(2)}
+                        </div>
+                      )}
+                    </div>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <span className="font-mono">
+                      {row.quota_usd > 0 ? (
+                        <>
+                          ${row.used_quota.toFixed(4)} / ${row.quota_usd.toFixed(4)}
+                        </>
+                      ) : (
+                        <span className="text-text-tertiary">{t('user_keys.quota_unlimited_hint')}</span>
+                      )}
+                    </span>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    {!row.sell_rate || row.sell_rate <= 0 ? (
+                      <span className="text-text-tertiary text-xs">—</span>
+                    ) : (
+                      <div className="font-mono text-xs space-y-0.5">
+                        <div>
+                          <span className="text-text-tertiary">{t('user_keys.sell_rate_short', '倍率')}: </span>
+                          <span>{row.sell_rate.toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-text-tertiary">{t('user_keys.cost_actual', '成本')}: </span>
+                          <span>${(row.used_quota_actual || 0).toFixed(4)}</span>
+                        </div>
+                        <div>
+                          <span className="text-text-tertiary">{t('user_keys.profit', '利润')}: </span>
+                          <span style={{ color: profit > 0 ? 'var(--ag-success)' : undefined }}>
+                            ${profit.toFixed(4)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <div className="font-mono text-xs space-y-0.5">
+                      <div>
+                        <span className="text-text-tertiary">{t('api_keys.today')}: </span>
+                        <span style={{ color: 'var(--ag-primary)' }}>${row.today_cost.toFixed(4)}</span>
+                      </div>
+                      <div>
+                        <span className="text-text-tertiary">{t('api_keys.thirty_days')}: </span>
+                        <span>${row.thirty_day_cost.toFixed(4)}</span>
+                      </div>
+                    </div>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    {row.expires_at
+                      ? new Date(row.expires_at).toLocaleDateString('zh-CN')
+                      : t('user_keys.never_expire')}
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <StatusChip status={displayStatus} />
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <div className="flex items-center justify-center gap-0.5">
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="ghost"
+                        aria-label={t('api_keys.reveal')}
+                        onPress={() => revealMutation.mutate(row.id)}
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="ghost"
+                        aria-label={t('user_keys.use_key')}
+                        onPress={() => openUseKeyModal(row)}
+                      >
+                        <Terminal className="w-3.5 h-3.5" />
+                      </Button>
+                      <Dropdown>
+                        <Dropdown.Trigger>
                           <Button
                             isIconOnly
+                            aria-label={t('common.more')}
                             size="sm"
                             variant="ghost"
-                            aria-label={t('api_keys.reveal')}
-                            onPress={() => revealMutation.mutate(row.id)}
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <MoreHorizontal className="w-3.5 h-3.5" />
                           </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="ghost"
-                            aria-label={t('user_keys.use_key')}
-                            onPress={() => openUseKeyModal(row)}
+                        </Dropdown.Trigger>
+                        <Dropdown.Popover placement="bottom end">
+                          <Dropdown.Menu
+                            aria-label={t('common.actions')}
+                            onAction={(key) => {
+                              switch (String(key)) {
+                                case 'import_ccs':
+                                  openCcsModal(row);
+                                  break;
+                                case 'toggle':
+                                  toggleStatusMutation.mutate({
+                                    id: row.id,
+                                    status: row.status === 'active' ? 'disabled' : 'active',
+                                  });
+                                  break;
+                                case 'edit':
+                                  openEdit(row);
+                                  break;
+                                case 'delete':
+                                  setDeleteTarget(row);
+                                  break;
+                              }
+                            }}
                           >
-                            <Terminal className="w-3.5 h-3.5" />
-                          </Button>
-                          <Dropdown>
-                            <Dropdown.Trigger>
-                              <Button
-                                isIconOnly
-                                aria-label={t('common.more')}
-                                size="sm"
-                                variant="ghost"
-                              >
-                                <MoreHorizontal className="w-3.5 h-3.5" />
-                              </Button>
-                            </Dropdown.Trigger>
-                            <Dropdown.Popover placement="bottom end">
-                              <Dropdown.Menu
-                                aria-label={t('common.actions')}
-                                onAction={(key) => {
-                                  switch (String(key)) {
-                                    case 'import_ccs':
-                                      openCcsModal(row);
-                                      break;
-                                    case 'toggle':
-                                      toggleStatusMutation.mutate({
-                                        id: row.id,
-                                        status: row.status === 'active' ? 'disabled' : 'active',
-                                      });
-                                      break;
-                                    case 'edit':
-                                      openEdit(row);
-                                      break;
-                                    case 'delete':
-                                      setDeleteTarget(row);
-                                      break;
-                                  }
-                                }}
-                              >
-                                <Dropdown.Item id="import_ccs" textValue={t('user_keys.import_ccs')}>
-                                  <span className="flex items-center gap-2">
-                                    <Upload className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-                                    {t('user_keys.import_ccs')}
-                                  </span>
-                                </Dropdown.Item>
-                                <Dropdown.Item
-                                  id="toggle"
-                                  textValue={row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
-                                >
-                                  <span className="flex items-center gap-2">
-                                    {row.status === 'active'
-                                      ? <Ban className="w-3.5 h-3.5" />
-                                      : <CheckCircle className="w-3.5 h-3.5" />}
-                                    {row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
-                                  </span>
-                                </Dropdown.Item>
-                                <Dropdown.Item id="edit" textValue={t('common.edit')}>
-                                  <span className="flex items-center gap-2">
-                                    <Pencil className="w-3.5 h-3.5" />
-                                    {t('common.edit')}
-                                  </span>
-                                </Dropdown.Item>
-                                <Dropdown.Item id="delete" className="text-danger" textValue={t('common.delete')}>
-                                  <span className="flex items-center gap-2">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    {t('common.delete')}
-                                  </span>
-                                </Dropdown.Item>
-                              </Dropdown.Menu>
-                            </Dropdown.Popover>
-                          </Dropdown>
-                        </div>
-                      </HeroTable.Cell>
-                    </HeroTable.Row>
-                  );
-                })
-              )}
-            </HeroTable.Body>
+                            <Dropdown.Item id="import_ccs" textValue={t('user_keys.import_ccs')}>
+                              <span className="flex items-center gap-2">
+                                <Upload className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+                                {t('user_keys.import_ccs')}
+                              </span>
+                            </Dropdown.Item>
+                            <Dropdown.Item
+                              id="toggle"
+                              textValue={row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
+                            >
+                              <span className="flex items-center gap-2">
+                                {row.status === 'active'
+                                  ? <Ban className="w-3.5 h-3.5" />
+                                  : <CheckCircle className="w-3.5 h-3.5" />}
+                                {row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
+                              </span>
+                            </Dropdown.Item>
+                            <Dropdown.Item id="edit" textValue={t('common.edit')}>
+                              <span className="flex items-center gap-2">
+                                <Pencil className="w-3.5 h-3.5" />
+                                {t('common.edit')}
+                              </span>
+                            </Dropdown.Item>
+                            <Dropdown.Item id="delete" className="text-danger" textValue={t('common.delete')}>
+                              <span className="flex items-center gap-2">
+                                <Trash2 className="w-3.5 h-3.5" />
+                                {t('common.delete')}
+                              </span>
+                            </Dropdown.Item>
+                          </Dropdown.Menu>
+                        </Dropdown.Popover>
+                      </Dropdown>
+                    </div>
+                  </CommonTable.Cell>
+                </CommonTable.Row>
+              );
+            })
+          )}
+        </CommonTable.Body>
       </CommonTable>
 
       {/* 创建/编辑弹窗 */}

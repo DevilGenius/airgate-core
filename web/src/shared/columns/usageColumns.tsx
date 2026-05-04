@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Chip, Tooltip } from '@heroui/react';
 import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
 import type { UsageLogResp, CustomerUsageLogResp } from '../types';
+import { USAGE_TOKEN_COLORS } from '../constants';
 
 /**
  * 列定义统一使用一个宽松的行类型：管理端拿到的是 UsageLogResp，
@@ -311,6 +312,9 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
       render: (row) => {
         const reasoningEffort = (row as UsageLogResp).reasoning_effort;
         const badgeValue = row.image_size || reasoningEffort || '';
+        const badgeLabel = row.image_size
+          ? row.image_size
+          : reasoningEffort?.trim().toLowerCase() || '';
         const badgeStyle = row.image_size
           ? getImageSizeStyle()
           : reasoningEffort
@@ -320,11 +324,11 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
         return (
           <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
             <span
-              className={`inline-flex h-4 w-[5.5rem] shrink-0 items-center justify-center truncate rounded-[var(--radius)] border px-1 font-mono text-[11px] leading-none ${row.image_size ? 'font-medium' : 'font-bold uppercase tracking-wide'} ${badgeValue ? '' : 'invisible'}`}
+              className={`inline-flex h-4 w-[5.5rem] shrink-0 items-center justify-center truncate rounded-[var(--radius)] border px-1 font-mono text-[11px] leading-none ${row.image_size ? 'font-medium' : 'font-bold tracking-wide'} ${badgeValue ? '' : 'invisible'}`}
               style={badgeStyle}
-              title={badgeValue || undefined}
+              title={badgeLabel || undefined}
             >
-              {badgeValue || '0000x0000'}
+              {badgeLabel || '0000x0000'}
             </span>
             <span className="block min-w-0 truncate text-sm font-medium leading-none text-text" title={row.model}>
               {row.model}
@@ -374,12 +378,12 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
             <div className="grid h-full max-h-[var(--ag-usage-table-row-height)] w-full grid-cols-[minmax(0,8.75rem)_4.75rem] items-center justify-end gap-2 overflow-visible px-1">
               <div className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-px">
                 <TokenRow
-                  color="#10b981"
+                  color={USAGE_TOKEN_COLORS.input}
                   icon={<ArrowDown className="h-3 w-3 shrink-0" />}
                   value={fmtNum(row.input_tokens)}
                 />
                 <TokenRow
-                  color="#0ea5e9"
+                  color={USAGE_TOKEN_COLORS.output}
                   icon={<ArrowUp className="h-3 w-3 shrink-0" />}
                   value={fmtNum(row.output_tokens)}
                 />
@@ -387,14 +391,14 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
                   <>
                     {hasCacheRead ? (
                       <TokenRow
-                        color="var(--ag-muted)"
+                        color={USAGE_TOKEN_COLORS.cacheRead}
                         icon={<BookOpen className="h-3 w-3 shrink-0" />}
                         value={fmtNum(row.cached_input_tokens)}
                       />
                     ) : <div />}
                     {hasCacheWrite ? (
                       <TokenRow
-                        color="#f59e0b"
+                        color={USAGE_TOKEN_COLORS.cacheCreation}
                         icon={<Sparkles className="h-3 w-3 shrink-0" />}
                         value={fmtNum(cacheCreation)}
                       />

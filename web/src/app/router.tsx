@@ -32,13 +32,18 @@ function lazyWithPreload<TProps>(
 }
 
 function requestIdle(work: () => void) {
-  if ('requestIdleCallback' in window) {
-    const id = window.requestIdleCallback(work, { timeout: 2500 });
-    return () => window.cancelIdleCallback(id);
+  const runtime = globalThis as typeof globalThis & {
+    cancelIdleCallback?: (id: number) => void;
+    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+  };
+
+  if (runtime.requestIdleCallback) {
+    const id = runtime.requestIdleCallback(work, { timeout: 2500 });
+    return () => runtime.cancelIdleCallback?.(id);
   }
 
-  const id = window.setTimeout(work, 500);
-  return () => window.clearTimeout(id);
+  const id = globalThis.setTimeout(work, 500);
+  return () => globalThis.clearTimeout(id);
 }
 
 const AppShell = lazyWithPreload<{ children: ReactNode }>(() =>

@@ -81,12 +81,13 @@ type DashboardUserRanking struct {
 
 // DashboardTimeBucket Token 趋势时间桶
 type DashboardTimeBucket struct {
-	Time         string  `json:"time"`
-	InputTokens  int64   `json:"input_tokens"`
-	OutputTokens int64   `json:"output_tokens"`
-	CachedInput  int64   `json:"cached_input"`
-	ActualCost   float64 `json:"actual_cost"`
-	StandardCost float64 `json:"standard_cost"`
+	Time          string  `json:"time"`
+	InputTokens   int64   `json:"input_tokens"`
+	OutputTokens  int64   `json:"output_tokens"`
+	CachedInput   int64   `json:"cached_input"`
+	CacheCreation int64   `json:"cache_creation"`
+	ActualCost    float64 `json:"actual_cost"`
+	StandardCost  float64 `json:"standard_cost"`
 }
 
 // DashboardUserTrend Top 用户使用趋势

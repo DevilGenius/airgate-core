@@ -71,12 +71,13 @@ func toDashboardTimeBuckets(items []appdashboard.TimeBucket) []dto.DashboardTime
 	result := make([]dto.DashboardTimeBucket, 0, len(items))
 	for _, item := range items {
 		result = append(result, dto.DashboardTimeBucket{
-			Time:         item.Time,
-			InputTokens:  item.InputTokens,
-			OutputTokens: item.OutputTokens,
-			CachedInput:  item.CachedInput,
-			ActualCost:   item.ActualCost,
-			StandardCost: item.StandardCost,
+			Time:          item.Time,
+			InputTokens:   item.InputTokens,
+			OutputTokens:  item.OutputTokens,
+			CachedInput:   item.CachedInput,
+			CacheCreation: item.CacheCreation,
+			ActualCost:    item.ActualCost,
+			StandardCost:  item.StandardCost,
 		})
 	}
 	return result
