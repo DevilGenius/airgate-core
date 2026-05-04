@@ -19,10 +19,21 @@
 [data-theme="light"],
 [data-theme="default"],
 [data-theme="dark"] {
-  /*
-   * HeroUI radius preset:
-   * keep --radius and --field-radius as the only AirGate-controlled radius sources.
-   */
+  /* HeroUI common variables */
+  --white: oklch(100% 0 0);
+  --black: oklch(0% 0 0);
+  --snow: oklch(0.9911 0 0);
+  --eclipse: oklch(0.2103 0.0059 285.89);
+  --spacing: 0.25rem;
+  --border-width: 1px;
+  --field-border-width: 1px;
+  --disabled-opacity: 0.5;
+  --ring-offset-width: 2px;
+  --cursor-interactive: pointer;
+  --cursor-disabled: not-allowed;
+  --skeleton-animation: shimmer;
+
+  /* HeroUI radius preset */
   --radius: 0.25rem;
   --field-radius: 0.25rem;
   --radius-xs: var(--radius);
@@ -52,6 +63,9 @@
 
   --accent: var(--ag-primary);
   --accent-foreground: var(--ag-primary-foreground);
+  --accent-hover: var(--ag-primary-hover);
+  --accent-soft: var(--ag-primary-subtle);
+  --accent-soft-foreground: var(--ag-primary);
 
   --success: var(--ag-success);
   --success-foreground: var(--ag-success-foreground);
@@ -67,20 +81,24 @@
   --field-background: var(--ag-field-background);
   --field-foreground: var(--ag-field-foreground);
   --field-placeholder: var(--ag-field-placeholder);
-  --field-border: color-mix(in oklab, var(--ag-border) 88%, transparent);
-  --field-border-width: 1px;
+  --field-border: color-mix(in oklab, var(--border) 88%, transparent);
 
   --border: var(--ag-border);
   --separator: var(--ag-border-subtle);
-  --focus: var(--ag-primary);
-  --link: var(--ag-primary);
+  --focus: var(--accent);
+  --link: var(--foreground);
   --scrollbar: var(--ag-scrollbar);
   --segment: var(--ag-segment);
   --segment-foreground: var(--ag-segment-foreground);
 
-  --surface-shadow: var(--ag-shadow-sm);
-  --overlay-shadow: var(--ag-shadow-lg);
-  --field-shadow: var(--ag-shadow-sm);
+  --backdrop: rgba(0, 0, 0, 0.5);
+  --surface-shadow:
+    0 2px 4px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.06),
+    0 0 1px 0 rgba(0, 0, 0, 0.06);
+  --overlay-shadow: 0 4px 16px 0 rgba(24, 24, 27, 0.08), 0 8px 24px 0 rgba(24, 24, 27, 0.09);
+  --field-shadow:
+    0 2px 4px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.06),
+    0 0 1px 0 rgba(0, 0, 0, 0.06);
 }
 
 :root:not([data-theme="dark"]),
@@ -94,6 +112,10 @@
 .dark,
 [data-theme="dark"] {
   color-scheme: dark;
+  --backdrop: rgba(0, 0, 0, 0.6);
+  --surface-shadow: 0 0 0 0 transparent inset;
+  --overlay-shadow: 0 0 0 0 transparent inset;
+  --field-shadow: 0 0 0 0 transparent inset;
 }
 
 /* ==========================================================================
@@ -102,37 +124,76 @@
    Token 命名与 SDK createTailwindThemeBridge() 对齐
    ========================================================================== */
 
-@theme {
-  /* ── Colors ── */
-  --color-primary: var(--ag-primary);
-  --color-primary-hover: var(--ag-primary-hover);
-  --color-primary-subtle: var(--ag-primary-subtle);
-  --color-primary-glow: var(--ag-primary-glow);
+@theme inline {
+  /* ── HeroUI semantic colors ── */
+  --color-white: var(--white);
+  --color-black: var(--black);
+  --color-snow: var(--snow);
+  --color-eclipse: var(--eclipse);
 
-  --color-success: var(--ag-success);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-overlay: var(--overlay);
+  --color-overlay-foreground: var(--overlay-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent-soft-foreground);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-success-subtle: var(--ag-success-subtle);
-  --color-warning: var(--ag-warning);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-warning-subtle: var(--ag-warning-subtle);
-  --color-danger: var(--ag-danger);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
   --color-danger-subtle: var(--ag-danger-subtle);
+
+  --color-default: var(--default);
+  --color-default-foreground: var(--default-foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-separator: var(--separator);
+  --color-focus: var(--focus);
+  --color-link: var(--link);
+  --color-backdrop: var(--backdrop);
+  --color-scrollbar: var(--scrollbar);
+
+  --color-field-background: var(--field-background);
+  --color-field-foreground: var(--field-foreground);
+  --color-field-placeholder: var(--field-placeholder);
+  --color-field-border: var(--field-border);
+
+  --color-segment: var(--segment);
+  --color-segment-foreground: var(--segment-foreground);
+
+  /* ── AirGate compatibility aliases ── */
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-hover);
+  --color-primary-subtle: var(--accent-soft);
+  --color-primary-glow: var(--ag-primary-glow);
   --color-info: var(--ag-info);
   --color-info-subtle: var(--ag-info-subtle);
 
-  --color-bg: var(--ag-bg);
-  --color-bg-deep: var(--ag-bg-deep);
-  --color-bg-elevated: var(--ag-bg-elevated);
-  --color-surface: var(--ag-bg-surface);
-  --color-bg-hover: var(--ag-bg-hover);
-  --color-bg-active: var(--ag-bg-active);
+  --color-bg: var(--background);
+  --color-bg-deep: var(--background);
+  --color-bg-elevated: var(--overlay);
+  --color-bg-surface: var(--surface);
+  --color-bg-hover: color-mix(in oklab, var(--default) 82%, var(--background) 18%);
+  --color-bg-active: color-mix(in oklab, var(--default) 72%, var(--foreground) 8%);
 
-  --color-border: var(--ag-border);
-  --color-border-subtle: var(--ag-border-subtle);
-  --color-border-focus: var(--ag-border-focus);
+  --color-border-subtle: var(--separator);
+  --color-border-focus: var(--focus);
 
-  --color-text: var(--ag-text);
-  --color-text-secondary: var(--ag-text-secondary);
-  --color-text-tertiary: var(--ag-text-tertiary);
-  --color-text-inverse: var(--ag-text-inverse);
+  --color-text: var(--foreground);
+  --color-text-secondary: color-mix(in oklab, var(--foreground) 74%, var(--muted) 26%);
+  --color-text-tertiary: var(--muted);
+  --color-text-inverse: var(--accent-foreground);
 
   --color-glass: var(--ag-glass);
   --color-glass-border: var(--ag-glass-border);
@@ -145,13 +206,13 @@
   --radius-field: var(--field-radius);
 
   /* ── Font Family ── */
-  --font-sans: var(--ag-font-sans);
+  --font-sans: var(--font-geist);
   --font-mono: var(--ag-font-mono);
 
   /* ── Box Shadow ── */
-  --shadow-sm: var(--ag-shadow-sm);
-  --shadow-md: var(--ag-shadow-md);
-  --shadow-lg: var(--ag-shadow-lg);
+  --shadow-sm: var(--surface-shadow);
+  --shadow-md: var(--surface-shadow);
+  --shadow-lg: var(--overlay-shadow);
   --shadow-glow: var(--ag-shadow-glow);
 }
 
@@ -161,12 +222,12 @@
 
 /* 亮色主题：干净纯白背景 */
 [data-theme="light"] body {
-  background: var(--ag-bg);
+  background: var(--background);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--ag-bg-active) transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -179,12 +240,12 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: var(--ag-bg-active);
+  background: var(--scrollbar);
   border-radius: 3px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--ag-text-tertiary);
+  background: color-mix(in oklab, var(--scrollbar) 76%, var(--foreground) 24%);
 }
 
 html {
@@ -193,23 +254,23 @@ html {
 
 body {
   margin: 0;
-  font-family: var(--ag-font-sans);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: var(--ag-text);
-  background: var(--ag-bg-deep);
+  color: var(--foreground);
+  background: var(--background);
   line-height: 1.6;
   letter-spacing: 0;
 }
 
 ::selection {
-  background: var(--ag-primary-subtle);
-  color: var(--ag-primary);
+  background: var(--accent-soft);
+  color: var(--accent-soft-foreground);
 }
 
 :focus-visible {
-  outline: 1.5px solid var(--ag-primary);
-  outline-offset: 2px;
+  outline: 1.5px solid var(--focus);
+  outline-offset: var(--ring-offset-width);
 }
 
 input[type="number"]::-webkit-inner-spin-button,
@@ -220,7 +281,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* HeroUI success chips use green backgrounds, but text should stay dark for contrast. */
 .chip.chip--success {
-  --chip-fg: var(--ag-success-foreground);
+  --chip-fg: var(--success-foreground);
 }
 
 /* ==========================================================================
@@ -231,7 +292,7 @@ input[type="number"]::-webkit-outer-spin-button {
   width: 2.5rem;
   min-width: 2.5rem;
   height: 2.5rem;
-  color: var(--ag-text-secondary);
+  color: color-mix(in oklab, var(--foreground) 74%, var(--muted) 26%);
 }
 
 .ag-sidebar-collapse-button svg {
@@ -247,7 +308,7 @@ input[type="number"]::-webkit-outer-spin-button {
   min-height: 2.25rem;
   gap: 0.75rem;
   border-radius: var(--radius);
-  color: var(--ag-text);
+  color: var(--foreground);
   font-size: 0.9375rem;
   font-weight: 400;
   line-height: 1.25rem;
@@ -257,23 +318,23 @@ input[type="number"]::-webkit-outer-spin-button {
 .ag-sidebar-nav-item svg {
   width: 1.25rem;
   height: 1.25rem;
-  color: var(--ag-muted);
+  color: var(--muted);
   stroke-width: 2.1;
 }
 
 .ag-sidebar-nav-item:hover {
   background: var(--default);
-  color: var(--ag-text);
+  color: var(--foreground);
 }
 
 .ag-sidebar-nav-item[data-active="true"] {
   background: var(--default);
-  color: var(--ag-text);
+  color: var(--foreground);
   font-weight: 500;
 }
 
 .ag-sidebar-nav-item[data-active="true"] svg {
-  color: var(--ag-text);
+  color: var(--foreground);
 }
 
 .ag-sidebar-nav-item-label {
@@ -283,19 +344,19 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .ag-topbar {
-  background: color-mix(in oklab, var(--ag-bg) 78%, transparent);
-  border-bottom: 1px solid color-mix(in oklab, var(--ag-border) 28%, transparent);
+  background: color-mix(in oklab, var(--background) 78%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 28%, transparent);
   box-shadow:
     0 1px 0 color-mix(in oklab, white 16%, transparent) inset,
-    0 4px 16px color-mix(in oklab, var(--ag-bg) 10%, transparent);
+    0 4px 16px color-mix(in oklab, var(--background) 10%, transparent);
   -webkit-backdrop-filter: saturate(160%) blur(16px);
   backdrop-filter: saturate(160%) blur(16px);
 }
 
 [data-theme="dark"] .ag-topbar,
 .dark .ag-topbar {
-  background: color-mix(in oklab, var(--ag-bg) 82%, transparent);
-  border-bottom-color: color-mix(in oklab, var(--ag-border) 34%, transparent);
+  background: color-mix(in oklab, var(--background) 82%, transparent);
+  border-bottom-color: color-mix(in oklab, var(--border) 34%, transparent);
   box-shadow:
     0 1px 0 color-mix(in oklab, white 4%, transparent) inset,
     0 4px 16px color-mix(in oklab, black 10%, transparent);
@@ -303,7 +364,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
   .ag-topbar {
-    background: color-mix(in oklab, var(--ag-surface) 92%, transparent);
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
   }
 }
 
@@ -345,9 +406,9 @@ input[type="number"]::-webkit-outer-spin-button {
 .ag-dashboard-panel,
 .ag-dashboard-metric,
 .ag-dashboard-toolbar {
-  border: 1px solid color-mix(in oklab, var(--ag-border) 72%, transparent);
-  background: var(--ag-surface);
-  box-shadow: var(--ag-shadow-sm);
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  background: var(--surface);
+  box-shadow: var(--surface-shadow);
 }
 
 .ag-dashboard-panel,
@@ -475,10 +536,11 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .ag-elevation-modal {
   max-height: min(86dvh, 62rem) !important;
-  border: 1px solid color-mix(in oklab, var(--ag-border) 72%, transparent) !important;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
   border-radius: var(--field-radius) !important;
-  background: var(--ag-overlay) !important;
-  box-shadow: var(--ag-shadow-lg) !important;
+  background: var(--overlay) !important;
+  color: var(--overlay-foreground) !important;
+  box-shadow: var(--overlay-shadow) !important;
 }
 
 .ag-elevation-modal.modal__dialog--md {
@@ -522,9 +584,10 @@ input[type="number"]::-webkit-outer-spin-button {
 .select__trigger,
 .combo-box__trigger,
 .search-field__input {
-  background-color: var(--ag-field-background) !important;
-  border-color: color-mix(in oklab, var(--ag-border) 88%, transparent) !important;
-  box-shadow: var(--ag-shadow-sm) !important;
+  background-color: var(--field-background) !important;
+  border-color: var(--field-border) !important;
+  color: var(--field-foreground) !important;
+  box-shadow: var(--field-shadow) !important;
 }
 
 .input:hover,
@@ -539,8 +602,8 @@ input[type="number"]::-webkit-outer-spin-button {
 .select__trigger[data-hovered="true"],
 .combo-box__trigger[data-hovered="true"],
 .search-field__input[data-hovered="true"] {
-  background-color: color-mix(in oklab, var(--ag-field-background) 86%, var(--ag-surface) 14%) !important;
-  border-color: color-mix(in oklab, var(--ag-border) 92%, var(--ag-text) 8%) !important;
+  background-color: color-mix(in oklab, var(--field-background) 86%, var(--surface) 14%) !important;
+  border-color: color-mix(in oklab, var(--border) 92%, var(--foreground) 8%) !important;
 }
 
 .input:focus,
@@ -555,8 +618,8 @@ input[type="number"]::-webkit-outer-spin-button {
 .select__trigger[data-focus-visible="true"],
 .combo-box__trigger[data-focus-visible="true"],
 .search-field__input[data-focused="true"] {
-  background-color: color-mix(in oklab, var(--ag-field-background) 72%, var(--ag-surface) 28%) !important;
-  border-color: var(--ag-border-focus) !important;
+  background-color: color-mix(in oklab, var(--field-background) 72%, var(--surface) 28%) !important;
+  border-color: var(--focus) !important;
 }
 
 .ag-usage-date-range .date-input-group__suffix {
@@ -567,25 +630,25 @@ input[type="number"]::-webkit-outer-spin-button {
   width: 1.625rem !important;
   min-width: 1.625rem !important;
   height: 1.625rem !important;
-  color: var(--ag-text-tertiary) !important;
+  color: var(--muted) !important;
 }
 
 .ag-date-range-clear:hover,
 .ag-date-range-clear[data-hovered="true"] {
-  background: var(--ag-bg-hover) !important;
-  color: var(--ag-text) !important;
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
+  color: var(--foreground) !important;
 }
 
 .checkbox__control {
-  border: 1px solid color-mix(in oklab, var(--ag-border) 88%, transparent);
-  background: var(--ag-field-background);
-  box-shadow: var(--ag-shadow-sm);
+  border: 1px solid var(--field-border);
+  background: var(--field-background);
+  box-shadow: var(--field-shadow);
 }
 
 .checkbox:hover .checkbox__control,
 .checkbox[data-hovered="true"] .checkbox__control {
-  border-color: color-mix(in oklab, var(--ag-border) 92%, var(--ag-text) 8%);
-  background: color-mix(in oklab, var(--ag-field-background) 86%, var(--ag-surface) 14%);
+  border-color: color-mix(in oklab, var(--border) 92%, var(--foreground) 8%);
+  background: color-mix(in oklab, var(--field-background) 86%, var(--surface) 14%);
 }
 
 .checkbox[data-selected="true"] .checkbox__control,
@@ -616,10 +679,11 @@ input[type="number"]::-webkit-outer-spin-button {
 .dropdown__popover,
 .popover {
   max-height: min(28rem, calc(100dvh - 6rem)) !important;
-  border: 1px solid color-mix(in oklab, var(--ag-border) 72%, transparent) !important;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
   border-radius: var(--field-radius) !important;
-  background: var(--ag-overlay) !important;
-  box-shadow: var(--ag-shadow-lg) !important;
+  background: var(--overlay) !important;
+  color: var(--overlay-foreground) !important;
+  box-shadow: var(--overlay-shadow) !important;
 }
 
 .dropdown__popover {
@@ -698,7 +762,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .ag-create-account-advanced {
   min-width: 0;
-  border-top: 1px solid var(--ag-border);
+  border-top: 1px solid var(--separator);
   padding-top: 1rem;
 }
 
@@ -727,20 +791,20 @@ input[type="number"]::-webkit-outer-spin-button {
   min-width: 0;
   align-items: center;
   gap: 0.625rem;
-  border: 1px solid color-mix(in oklab, var(--ag-border) 72%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
   border-radius: var(--field-radius);
-  background: var(--ag-field-background);
-  box-shadow: var(--ag-shadow-sm);
+  background: var(--field-background);
+  box-shadow: var(--field-shadow);
   padding: 0.625rem 0.75rem;
 }
 
 .ag-create-account-group-item:hover {
-  background: var(--ag-bg-hover);
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%);
 }
 
 .ag-create-account-group-item[data-selected="true"] {
-  border-color: color-mix(in oklab, var(--ag-accent) 72%, var(--ag-border));
-  background: color-mix(in oklab, var(--ag-accent) 8%, var(--ag-field-background));
+  border-color: color-mix(in oklab, var(--accent) 72%, var(--border));
+  background: color-mix(in oklab, var(--accent) 8%, var(--field-background));
 }
 
 .ag-create-account-group-item [data-slot="checkbox-content"] {
@@ -753,10 +817,10 @@ input[type="number"]::-webkit-outer-spin-button {
 
 :where([data-slot="wrapper"]:has(> [data-slot="table"])) {
   overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--ag-border) 72%, transparent) !important;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
   border-radius: var(--radius) !important;
-  background: var(--ag-surface) !important;
-  box-shadow: var(--ag-shadow-sm) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--surface-shadow) !important;
   padding: 0 !important;
 }
 
@@ -767,10 +831,10 @@ input[type="number"]::-webkit-outer-spin-button {
 :where([data-slot="table-column"], [data-slot="th"]) {
   box-sizing: border-box;
   height: 2.375rem !important;
-  border-bottom: 1px solid var(--ag-border) !important;
+  border-bottom: 1px solid var(--border) !important;
   border-radius: 0 !important;
-  background: var(--ag-surface-secondary) !important;
-  color: var(--ag-text-tertiary) !important;
+  background: var(--surface-secondary) !important;
+  color: var(--muted) !important;
   font-size: 0.75rem !important;
   font-weight: 600 !important;
   letter-spacing: 0;
@@ -783,8 +847,8 @@ input[type="number"]::-webkit-outer-spin-button {
 
 :where([data-slot="table-cell"], [data-slot="td"]) {
   box-sizing: border-box;
-  border-bottom: 1px solid color-mix(in oklab, var(--ag-border) 40%, transparent) !important;
-  color: var(--ag-text-secondary);
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 40%, transparent) !important;
+  color: color-mix(in oklab, var(--foreground) 74%, var(--muted) 26%);
   font-size: 0.875rem;
   line-height: 1.25;
   padding: 0.625rem 0.75rem !important;
@@ -796,7 +860,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 :where([data-slot="table-body"] [data-slot="table-row"]:hover, [data-slot="tbody"] [data-slot="tr"]:hover) {
-  background: var(--ag-bg-hover) !important;
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
 }
 
 :where(
@@ -879,7 +943,7 @@ input[type="number"]::-webkit-outer-spin-button {
   .table__body .table__row:hover .table__cell,
   .table__body .table__row[data-hovered="true"] .table__cell
 ) {
-  background: var(--ag-bg-hover) !important;
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
 }
 
 .ag-usage-table :where(
@@ -912,7 +976,7 @@ input[type="number"]::-webkit-outer-spin-button {
     position: sticky !important;
     left: 0;
     z-index: 2;
-    background: var(--ag-surface) !important;
+    background: var(--surface) !important;
   }
 
   .ag-usage-table :where(
@@ -921,7 +985,7 @@ input[type="number"]::-webkit-outer-spin-button {
     .table__column:first-child
   ) {
     z-index: 4;
-    background: var(--ag-surface-secondary) !important;
+    background: var(--surface-secondary) !important;
   }
 }
 
@@ -942,13 +1006,13 @@ input[type="number"]::-webkit-outer-spin-button {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.25rem;
-  color: var(--ag-text-tertiary);
+  color: var(--muted);
   font-size: 0.75rem;
   line-height: 1rem;
 }
 
 .ag-table-pagination-number {
-  color: var(--ag-text);
+  color: var(--foreground);
   font-family: var(--font-mono);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
@@ -958,7 +1022,7 @@ input[type="number"]::-webkit-outer-spin-button {
   width: 1px;
   height: 0.875rem;
   margin-inline: 0.375rem;
-  background: color-mix(in oklab, var(--ag-border) 80%, transparent);
+  background: color-mix(in oklab, var(--border) 80%, transparent);
 }
 
 .ag-table-page-size {
@@ -967,7 +1031,7 @@ input[type="number"]::-webkit-outer-spin-button {
   align-items: center;
   gap: 0.125rem;
   margin-left: 0.25rem;
-  color: var(--ag-text-tertiary);
+  color: var(--muted);
   font-size: 0.75rem;
   line-height: 1;
 }
@@ -991,7 +1055,7 @@ input[type="number"]::-webkit-outer-spin-button {
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-  color: var(--ag-text) !important;
+  color: var(--foreground) !important;
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 600;
@@ -1004,7 +1068,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"])[data-focus-visible="true"] {
   background: transparent !important;
   box-shadow: none !important;
-  color: var(--ag-primary) !important;
+  color: var(--accent) !important;
 }
 
 .ag-table-page-size-select :where(.select__value, [data-slot="value"]) {
@@ -1030,7 +1094,7 @@ input[type="number"]::-webkit-outer-spin-button {
   height: 0.625rem !important;
   margin: 0 !important;
   transform: none !important;
-  color: var(--ag-text-tertiary);
+  color: var(--muted);
 }
 
 .ag-table-pagination .pagination__content {
@@ -1104,9 +1168,9 @@ input[type="number"]::-webkit-outer-spin-button {
 .ag-compact-data-table :where([data-slot="table-column"], [data-slot="th"], .table__column) {
   height: var(--ag-compact-table-header-height) !important;
   min-height: var(--ag-compact-table-header-height) !important;
-  border-bottom: 1px solid var(--ag-border-subtle) !important;
+  border-bottom: 1px solid var(--separator) !important;
   background: transparent !important;
-  color: var(--ag-text-tertiary) !important;
+  color: var(--muted) !important;
   font-size: var(--ag-compact-table-heading-font-size) !important;
   letter-spacing: 0 !important;
   line-height: 1 !important;
@@ -1117,7 +1181,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .ag-compact-data-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
   height: var(--ag-compact-table-row-height) !important;
   min-height: var(--ag-compact-table-row-height) !important;
-  border-bottom: 1px solid var(--ag-border-subtle) !important;
+  border-bottom: 1px solid var(--separator) !important;
   line-height: 1 !important;
   padding: 0 !important;
 }
@@ -1149,7 +1213,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .ag-compact-data-table-cell {
   overflow: hidden;
   height: var(--ag-compact-table-row-height);
-  color: var(--ag-text-secondary);
+  color: color-mix(in oklab, var(--foreground) 74%, var(--muted) 26%);
   font-size: var(--ag-compact-table-body-font-size);
 }
 
@@ -1164,7 +1228,7 @@ input[type="number"]::-webkit-outer-spin-button {
   width: 100%;
   align-items: center;
   justify-content: center;
-  color: var(--ag-text-tertiary);
+  color: var(--muted);
   font-size: 0.75rem;
   text-align: center;
 }
@@ -1195,10 +1259,10 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .ag-markdown-table {
   overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--ag-border) 72%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
   border-radius: var(--radius);
-  background: var(--ag-surface);
-  box-shadow: var(--ag-shadow-sm);
+  background: var(--surface);
+  box-shadow: var(--surface-shadow);
 }
 
 .ag-markdown-table .table__scroll-container {
@@ -1211,16 +1275,16 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .ag-markdown-table .table__column {
-  border-bottom: 1px solid var(--ag-border) !important;
-  background: var(--ag-surface-secondary) !important;
-  color: var(--ag-text-tertiary) !important;
+  border-bottom: 1px solid var(--border) !important;
+  background: var(--surface-secondary) !important;
+  color: var(--muted) !important;
   font-size: 0.75rem !important;
   letter-spacing: 0;
   text-transform: none;
 }
 
 .ag-markdown-table .table__cell {
-  border-bottom: 1px solid color-mix(in oklab, var(--ag-border) 40%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 40%, transparent);
 }
 
 .ag-markdown-table tbody tr:last-child .table__cell {
@@ -1274,11 +1338,11 @@ input[type="number"]::-webkit-outer-spin-button {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in oklab, var(--ag-primary) 18%, transparent) 20%,
-    color-mix(in oklab, var(--ag-primary) 70%, white) 58%,
+    color-mix(in oklab, var(--accent) 18%, transparent) 20%,
+    color-mix(in oklab, var(--accent) 70%, white) 58%,
     transparent 100%
   );
-  box-shadow: 0 0 10px color-mix(in oklab, var(--ag-primary) 52%, transparent);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--accent) 52%, transparent);
   animation: ag-global-loading-line 1s ease-in-out infinite;
 }
 
@@ -1294,7 +1358,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 @keyframes ag-usage-row-new-enter {
   0% {
-    box-shadow: inset 0 0 0 999px color-mix(in oklab, var(--ag-success) 24%, transparent);
+    box-shadow: inset 0 0 0 999px color-mix(in oklab, var(--success) 24%, transparent);
   }
 
   100% {
@@ -1336,9 +1400,9 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .ag-shimmer {
   background: linear-gradient(90deg,
-      var(--ag-bg-surface) 25%,
-      var(--ag-bg-hover) 50%,
-      var(--ag-bg-surface) 75%);
+      var(--surface) 25%,
+      color-mix(in oklab, var(--default) 82%, var(--background) 18%) 50%,
+      var(--surface) 75%);
   background-size: 200% 100%;
   animation: ag-shimmer 1.5s infinite;
 }

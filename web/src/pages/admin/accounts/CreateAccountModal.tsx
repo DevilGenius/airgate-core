@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Checkbox, Form, Input, Label, ListBox, Modal, Select, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Checkbox, Form, Input, Label, ListBox, Select, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { Layers, Hash, Gauge } from 'lucide-react';
 import type {
   PluginBatchAccountInput,
@@ -21,6 +21,7 @@ import {
   filterCredentialsForAccountType,
 } from './accountUtils';
 import { SchemaCredentialsForm } from './CredentialForm';
+import { CommonModal } from '../../../shared/components/CommonModal';
 import type { CreateAccountReq, AccountExportItem } from '../../../shared/types';
 
 export function CreateAccountModal({
@@ -180,17 +181,30 @@ export function CreateAccountModal({
   });
 
   return (
-    <Modal state={modalState}>
-      <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="lg">
-          <Modal.Dialog
-            className="ag-elevation-modal ag-create-account-modal"
-          >
-            <Modal.Header>
-              <Modal.Heading>{t('accounts.create')}</Modal.Heading>
-              <Modal.CloseTrigger />
-            </Modal.Header>
-            <Modal.Body>
+    <CommonModal
+      className="ag-create-account-modal"
+      footer={(
+        <div className="flex w-full justify-end gap-2">
+          <Button variant="secondary" onPress={handleClose}>
+            {t('common.cancel')}
+          </Button>
+          {!batchMode && (
+            <Button
+              variant="primary"
+              onPress={handleSubmit}
+              isDisabled={loading || !platform || !form.name}
+              aria-busy={loading}
+            >
+              {t('common.create')}
+            </Button>
+          )}
+        </div>
+      )}
+      icon={<Layers className="size-5" />}
+      size="lg"
+      state={modalState}
+      title={t('accounts.create')}
+    >
               <Form className="ag-form-scroll-safe ag-create-account-form" onSubmit={(e) => e.preventDefault()}>
                 <section className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
@@ -376,27 +390,6 @@ export function CreateAccountModal({
                   )}
                 </section>
               </Form>
-            </Modal.Body>
-            <Modal.Footer>
-              <div className="flex justify-end gap-2 w-full">
-                <Button variant="secondary" onPress={handleClose}>
-                  {t('common.cancel')}
-                </Button>
-                {!batchMode && (
-                  <Button
-                    variant="primary"
-                    onPress={handleSubmit}
-                    isDisabled={loading || !platform || !form.name}
-                    aria-busy={loading}
-                  >
-                    {t('common.create')}
-                  </Button>
-                )}
-              </div>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    </CommonModal>
   );
 }

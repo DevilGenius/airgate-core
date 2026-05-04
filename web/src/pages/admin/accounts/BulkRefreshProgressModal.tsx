@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, useOverlayState } from '@heroui/react';
-import { Check, X, Loader2, AlertTriangle } from 'lucide-react';
+import { Button, useOverlayState } from '@heroui/react';
+import { Check, X, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { accountsApi } from '../../../shared/api/accounts';
 import { getToken } from '../../../shared/api/client';
+import { CommonModal } from '../../../shared/components/CommonModal';
 
 type ItemStatus = 'pending' | 'running' | 'success' | 'warning' | 'error';
 
@@ -185,18 +186,18 @@ export function BulkRefreshProgressModal({
   });
 
   return (
-    <Modal state={modalState}>
-      <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="md">
-          <Modal.Dialog
-            className="ag-elevation-modal"
-            style={{ maxWidth: '520px', width: 'min(100%, calc(100vw - 2rem))' }}
-          >
-            <Modal.Header>
-              <Modal.Heading>{t('accounts.bulk_refresh_title')}</Modal.Heading>
-              <Modal.CloseTrigger />
-            </Modal.Header>
-            <Modal.Body>
+    <CommonModal
+      dialogStyle={{ maxWidth: '520px', width: 'min(100%, calc(100vw - 2rem))' }}
+      footer={(
+        <Button variant={finished ? 'primary' : 'secondary'} onPress={handleClose}>
+          {finished ? t('common.close') : t('common.cancel')}
+        </Button>
+      )}
+      icon={<RefreshCw className="size-5" />}
+      size="md"
+      state={modalState}
+      title={t('accounts.bulk_refresh_title')}
+    >
               <div className="space-y-4">
         {/* 进度条 */}
         <div>
@@ -274,16 +275,7 @@ export function BulkRefreshProgressModal({
           </div>
         )}
               </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant={finished ? 'primary' : 'secondary'} onPress={handleClose}>
-                {finished ? t('common.close') : t('common.cancel')}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    </CommonModal>
   );
 }
 

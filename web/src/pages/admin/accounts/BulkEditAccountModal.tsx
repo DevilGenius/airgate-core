@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Checkbox, Input, Label, ListBox, Modal, Select, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Checkbox, Input, Label, ListBox, Select, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { Hash, Gauge } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
 import { proxiesApi } from '../../../shared/api/proxies';
 import { queryKeys } from '../../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { GroupCheckboxList } from './CredentialForm';
+import { CommonModal } from '../../../shared/components/CommonModal';
 import type { BulkUpdateAccountsReq } from '../../../shared/types';
 
 /**
@@ -90,18 +91,23 @@ export function BulkEditAccountModal({
   });
 
   return (
-    <Modal state={modalState}>
-      <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="md">
-          <Modal.Dialog
-            className="ag-elevation-modal"
-            style={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
-          >
-            <Modal.Header>
-              <Modal.Heading>{`${t('accounts.bulk_update_title')} (${count})`}</Modal.Heading>
-              <Modal.CloseTrigger />
-            </Modal.Header>
-            <Modal.Body>
+    <CommonModal
+      dialogStyle={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
+      footer={(
+        <div className="flex w-full justify-end gap-2">
+          <Button variant="secondary" onPress={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="primary" onPress={handleSubmit} isDisabled={loading || !hasAnyField} aria-busy={loading}>
+            {t('common.save')}
+          </Button>
+        </div>
+      )}
+      icon={<Hash className="size-5" />}
+      size="md"
+      state={modalState}
+      title={`${t('accounts.bulk_update_title')} (${count})`}
+    >
               <div className="space-y-4">
         <div
           className="text-xs px-3 py-2 rounded"
@@ -237,21 +243,7 @@ export function BulkEditAccountModal({
           </Select>
         </FieldRow>
               </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <div className="flex justify-end gap-2 w-full">
-                <Button variant="secondary" onPress={onClose}>
-                  {t('common.cancel')}
-                </Button>
-                <Button variant="primary" onPress={handleSubmit} isDisabled={loading || !hasAnyField} aria-busy={loading}>
-                  {t('common.save')}
-                </Button>
-              </div>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    </CommonModal>
   );
 }
 

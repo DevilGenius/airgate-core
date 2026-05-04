@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Chip, Label, ListBox, Modal, Select, useOverlayState } from '@heroui/react';
+import { Button, Chip, Label, ListBox, Select, useOverlayState } from '@heroui/react';
 import { Play, RotateCcw, Copy, Check, X } from 'lucide-react';
 import { accountsApi } from '../../shared/api/accounts';
 import { getToken } from '../../shared/api/client';
 import { useClipboard } from '../../shared/hooks/useClipboard';
+import { CommonModal } from '../../shared/components/CommonModal';
 import type { AccountResp, ModelInfo } from '../../shared/types';
 
 type TestStatus = 'idle' | 'connecting' | 'streaming' | 'success' | 'error';
@@ -306,18 +307,35 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
   const isRunning = status === 'connecting' || status === 'streaming';
 
   return (
-    <Modal state={modalState}>
-      <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="md">
-          <Modal.Dialog
-            className="ag-elevation-modal"
-            style={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
+    <CommonModal
+      dialogStyle={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
+      footer={(
+        <div className="flex w-full justify-end gap-2">
+          <Button variant="secondary" onPress={handleClose}>
+            {t('common.close')}
+          </Button>
+          <Button
+            variant={status === 'error' ? 'danger' : 'primary'}
+            onPress={startTest}
+            isDisabled={!canStart}
+            aria-busy={isRunning}
           >
-            <Modal.Header>
-              <Modal.Heading>{t('accounts.test_modal_title')}</Modal.Heading>
-              <Modal.CloseTrigger />
-            </Modal.Header>
-            <Modal.Body>
+            {status === 'idle' || status === 'connecting' || status === 'streaming'
+              ? <Play className="w-3.5 h-3.5" />
+              : <RotateCcw className="w-3.5 h-3.5" />
+            }
+            {status === 'success' || status === 'error'
+              ? t('accounts.retry')
+              : t('accounts.start_test')
+            }
+          </Button>
+        </div>
+      )}
+      icon={<Play className="size-5" />}
+      size="md"
+      state={modalState}
+      title={t('accounts.test_modal_title')}
+    >
               <div className="space-y-4">
                 {/* 账号信息卡片 */}
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--ag-bg-surface)] border border-[var(--ag-glass-border)]">
@@ -406,30 +424,6 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
                   )}
                 </div>
               </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="secondary" onPress={handleClose}>
-                {t('common.close')}
-              </Button>
-              <Button
-                variant={status === 'error' ? 'danger' : 'primary'}
-                onPress={startTest}
-                isDisabled={!canStart}
-                aria-busy={isRunning}
-              >
-                {status === 'idle' || status === 'connecting' || status === 'streaming'
-                  ? <Play className="w-3.5 h-3.5" />
-                  : <RotateCcw className="w-3.5 h-3.5" />
-                }
-                {status === 'success' || status === 'error'
-                  ? t('accounts.retry')
-                  : t('accounts.start_test')
-                }
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    </CommonModal>
   );
 }

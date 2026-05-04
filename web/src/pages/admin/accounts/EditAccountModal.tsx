@@ -8,7 +8,6 @@ import {
   Input,
   Label,
   ListBox,
-  Modal,
   Select,
   Switch,
   TextField as HeroTextField,
@@ -30,6 +29,7 @@ import {
   filterCredentialsForAccountType,
 } from './accountUtils';
 import { SchemaCredentialsForm } from './CredentialForm';
+import { CommonModal } from '../../../shared/components/CommonModal';
 import type { AccountResp, UpdateAccountReq } from '../../../shared/types';
 
 export function EditAccountModal({
@@ -163,15 +163,28 @@ export function EditAccountModal({
   });
 
   return (
-    <Modal state={modalState}>
-      <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="lg">
-          <Modal.Dialog className="ag-elevation-modal ag-create-account-modal">
-            <Modal.Header>
-              <Modal.Heading>{t('accounts.edit')}</Modal.Heading>
-              <Modal.CloseTrigger />
-            </Modal.Header>
-            <Modal.Body>
+    <CommonModal
+      className="ag-create-account-modal"
+      footer={(
+        <div className="flex w-full justify-end gap-2">
+          <Button variant="secondary" onPress={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            onPress={handleSubmit}
+            isDisabled={loading || !form.name}
+            aria-busy={loading}
+          >
+            {t('common.save')}
+          </Button>
+        </div>
+      )}
+      icon={<Layers className="size-5" />}
+      size="lg"
+      state={modalState}
+      title={t('accounts.edit')}
+    >
               <Form
                 className="ag-form-scroll-safe ag-create-account-form"
                 onSubmit={(event) => event.preventDefault()}
@@ -352,25 +365,6 @@ export function EditAccountModal({
                   )}
                 </section>
               </Form>
-            </Modal.Body>
-            <Modal.Footer>
-              <div className="flex w-full justify-end gap-2">
-                <Button variant="secondary" onPress={onClose}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  variant="primary"
-                  onPress={handleSubmit}
-                  isDisabled={loading || !form.name}
-                  aria-busy={loading}
-                >
-                  {t('common.save')}
-                </Button>
-              </div>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    </CommonModal>
   );
 }

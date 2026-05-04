@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Chip, Modal, Tabs, useOverlayState } from '@heroui/react';
+import { Chip, Tabs, useOverlayState } from '@heroui/react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -14,6 +14,7 @@ import { PlatformIcon } from '../../shared/ui';
 import { accountsApi, type AccountStatsResp } from '../../shared/api/accounts';
 import { CommonDatePicker } from '../../shared/components/CommonDatePicker';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
+import { CommonModal } from '../../shared/components/CommonModal';
 
 import { decorativePalette } from '@airgate/theme';
 
@@ -118,18 +119,13 @@ export function AccountStatsModal({
   });
 
   return (
-    <Modal state={modalState}>
-      <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="lg">
-          <Modal.Dialog
-            className="ag-elevation-modal"
-            style={{ maxWidth: '880px', width: 'min(100%, calc(100vw - 2rem))' }}
-          >
-            <Modal.Header>
-              <Modal.Heading>{t('accounts.view_stats')}</Modal.Heading>
-              <Modal.CloseTrigger />
-            </Modal.Header>
-            <Modal.Body>
+    <CommonModal
+      dialogStyle={{ maxWidth: '880px', width: 'min(100%, calc(100vw - 2rem))' }}
+      icon={<Activity className="size-5" />}
+      size="lg"
+      state={modalState}
+      title={t('accounts.view_stats')}
+    >
               {/* 时间范围选择器 */}
               <div className="flex items-center gap-2 mb-4 flex-wrap">
                 <Tabs
@@ -171,11 +167,7 @@ export function AccountStatsModal({
               ) : data ? (
                 <StatsContent data={data} lifetimeImageCount={lifetimeImageCount} />
               ) : null}
-            </Modal.Body>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    </CommonModal>
   );
 }
 
