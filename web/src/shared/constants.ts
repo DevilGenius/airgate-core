@@ -14,6 +14,7 @@ export const USAGE_TOKEN_COLORS = {
   cacheCreation: '#f59e0b',
   cacheRead: 'var(--ag-muted)',
   cacheRatio: '#c084fc',
+  cacheCumulativeRatio: 'var(--success)',
 } as const;
 
 /** 饼图专用低饱和调色板，避免分布图在黑色主题下过于刺眼 */

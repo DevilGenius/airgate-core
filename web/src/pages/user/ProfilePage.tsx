@@ -139,7 +139,7 @@ export default function ProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
             <div className="flex-1">
               <HeroTextField fullWidth>
-                <Label>{t('profile.change_username')}</Label>
+                <Label className="sr-only">{t('profile.change_username')}</Label>
                 <div className="relative">
                   <User className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
                   <Input
@@ -172,7 +172,7 @@ export default function ProfilePage() {
         <Card.Content>
           <Form className="space-y-4" onSubmit={handleChangePassword}>
             <HeroTextField fullWidth isRequired>
-              <Label>{t('profile.old_password')}</Label>
+              <Label className="sr-only">{t('profile.old_password')}</Label>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
                 <Input
@@ -190,7 +190,7 @@ export default function ProfilePage() {
               </div>
             </HeroTextField>
             <HeroTextField fullWidth isRequired>
-              <Label>{t('profile.new_password')}</Label>
+              <Label className="sr-only">{t('profile.new_password')}</Label>
               <div className="relative">
                 <KeyRound className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
                 <Input
@@ -208,7 +208,7 @@ export default function ProfilePage() {
               </div>
             </HeroTextField>
             <HeroTextField fullWidth isRequired>
-              <Label>{t('profile.confirm_new_password')}</Label>
+              <Label className="sr-only">{t('profile.confirm_new_password')}</Label>
               <div className="relative">
                 <KeyRound className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
                 <Input
@@ -289,7 +289,7 @@ function BalanceAlertCard({ threshold, balance }: { threshold: number; balance: 
             <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
               <div className="flex-1">
                 <HeroTextField fullWidth>
-                  <Label>{t('profile.balance_alert_threshold')}</Label>
+                  <Label className="sr-only">{t('profile.balance_alert_threshold')}</Label>
                   <div className="relative">
                     <Bell className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
                     <Input

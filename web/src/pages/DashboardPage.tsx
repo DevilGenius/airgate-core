@@ -34,11 +34,13 @@ import { usersApi } from '../shared/api/users';
 import { queryKeys } from '../shared/queryKeys';
 import { FETCH_ALL_PARAMS, PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
+import { CostPair, CostValue } from '../shared/components/CostValue';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
 const PIE_COLORS = PIE_CHART_COLORS;
 const USER_COLORS = [...decorativePalette];
-const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio'];
+const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio', 'cacheCumulativeRatio'];
+const TOKEN_TREND_RATIO_KEYS = new Set<keyof typeof USAGE_TOKEN_COLORS>(['cacheRatio', 'cacheCumulativeRatio']);
 
 type PieTooltipPayload = Array<{
   name?: unknown;
@@ -98,12 +100,6 @@ function fmtNum(n: number | undefined | null): string {
   return n.toLocaleString();
 }
 
-function fmtCost(n: number | undefined | null): string {
-  if (n == null) return '$0.00';
-  if (n >= 1000) return `$${(n / 1000).toFixed(2)}K`;
-  return `$${n.toFixed(2)}`;
-}
-
 function fmtTime(timeStr: string): string {
   if (timeStr.includes(' ')) {
     const time = timeStr.split(' ')[1] ?? '';
@@ -152,7 +148,7 @@ function MetricCard({
   valueSuffix,
 }: {
   icon: ReactNode;
-  meta: string;
+  meta: ReactNode;
   metaTone?: MetaTone;
   title: string;
   tone: MetricTone;
@@ -242,7 +238,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         metaTone="warning"
         title={t('dashboard.today_tokens')}
         value={fmtNum(stats.today_tokens)}
-        meta={`${fmtCost(stats.today_cost)} / ${fmtCost(stats.today_standard_cost)}`}
+        meta={<CostPair actual={stats.today_cost} standard={stats.today_standard_cost} />}
       />
       <MetricCard
         icon={<Database className="h-5 w-5" />}
@@ -250,7 +246,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         metaTone="success"
         title={t('dashboard.total_tokens')}
         value={fmtNum(stats.alltime_tokens)}
-        meta={`${fmtCost(stats.alltime_cost)} / ${fmtCost(stats.alltime_standard_cost)}`}
+        meta={<CostPair actual={stats.alltime_cost} standard={stats.alltime_standard_cost} />}
       />
       <MetricCard
         icon={<Zap className="h-5 w-5" />}
@@ -315,7 +311,8 @@ function TokenTrendTooltip({
     output: t('dashboard.output'),
     cacheCreation: t('dashboard.cache_creation'),
     cacheRead: t('dashboard.cache_read'),
-    cacheRatio: t('dashboard.cache_cumulative_ratio'),
+    cacheRatio: t('dashboard.cache_ratio'),
+    cacheCumulativeRatio: t('dashboard.cache_cumulative_ratio'),
   };
   const orderedPayload = [...payload].sort((a, b) => {
     const aIndex = TOKEN_TREND_LINE_ORDER.indexOf(String(a.dataKey) as keyof typeof USAGE_TOKEN_COLORS);
@@ -332,15 +329,15 @@ function TokenTrendTooltip({
             <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
             <span className="text-text-tertiary">{labels[item.dataKey ?? ''] ?? item.dataKey}</span>
             <span className="font-mono">
-              {item.dataKey === 'cacheRatio' ? `${Number(item.value ?? 0).toFixed(1)}%` : fmtNum(Number(item.value ?? 0))}
+              {TOKEN_TREND_RATIO_KEYS.has(item.dataKey as keyof typeof USAGE_TOKEN_COLORS) ? `${Number(item.value ?? 0).toFixed(1)}%` : fmtNum(Number(item.value ?? 0))}
             </span>
           </div>
         ))}
       </div>
       <div className="mt-2 border-t border-border pt-2 text-text-tertiary">
-        {t('dashboard.actual')}: <span className="text-warning">{fmtCost(datum?.actualCost)}</span>
+        {t('dashboard.actual')}: <CostValue className="font-mono" value={datum?.actualCost} tone="actual" />
         {' / '}
-        {t('dashboard.standard')}: {fmtCost(datum?.standardCost)}
+        {t('dashboard.standard')}: <CostValue className="font-mono" value={datum?.standardCost} tone="standard" />
       </div>
     </div>
   );
@@ -474,14 +471,14 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
                 key: 'actual',
                 title: t('dashboard.actual'),
                 width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.actual,
-                render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actualCost)}</span>,
+                render: (row) => <CostValue className="truncate font-mono" value={row.actualCost} tone="actual" />,
               },
               {
                 align: 'end',
                 key: 'standard',
                 title: t('dashboard.standard'),
                 width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.standard,
-                render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.standardCost)}</span>,
+                render: (row) => <CostValue className="truncate font-mono" value={row.standardCost} tone="standard" />,
               },
             ]}
           />
@@ -498,7 +495,8 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
     output: t('dashboard.output'),
     cacheCreation: t('dashboard.cache_creation'),
     cacheRead: t('dashboard.cache_read'),
-    cacheRatio: t('dashboard.cache_cumulative_ratio'),
+    cacheRatio: t('dashboard.cache_ratio'),
+    cacheCumulativeRatio: t('dashboard.cache_cumulative_ratio'),
   };
   const chartData = useMemo(() => {
     let cumulativeCache = 0;
@@ -511,13 +509,17 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
       const totalTokens = item.input_tokens + item.output_tokens + cacheTokens;
       cumulativeCache += cacheTokens;
       cumulativeTotal += totalTokens;
-      const cacheRatio = cumulativeTotal > 0
+      const cacheRatio = totalTokens > 0
+        ? Math.min(100, Math.max(0, (cacheTokens / totalTokens) * 100))
+        : 0;
+      const cacheCumulativeRatio = cumulativeTotal > 0
         ? Math.min(100, Math.max(0, (cumulativeCache / cumulativeTotal) * 100))
         : 0;
 
       return {
         actualCost: item.actual_cost,
         cacheCreation,
+        cacheCumulativeRatio,
         cacheRatio,
         cacheRead,
         input: item.input_tokens,
@@ -554,7 +556,7 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
                   <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text-tertiary">
                     {TOKEN_TREND_LINE_ORDER.map((key) => (
                       <span key={key} className="inline-flex items-center gap-1.5">
-                        {key === 'cacheRatio' ? (
+                        {TOKEN_TREND_RATIO_KEYS.has(key) ? (
                           <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: USAGE_TOKEN_COLORS[key] }} />
                         ) : (
                           <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
@@ -570,6 +572,7 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
               <Line yAxisId="tokens" dataKey="cacheCreation" dot={false} isAnimationActive={false} name={lineLabels.cacheCreation} stroke={USAGE_TOKEN_COLORS.cacheCreation} strokeWidth={2.5} type="monotone" />
               <Line yAxisId="tokens" dataKey="cacheRead" dot={false} isAnimationActive={false} name={lineLabels.cacheRead} stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2.5} type="monotone" />
               <Line yAxisId="ratio" dataKey="cacheRatio" dot={false} isAnimationActive={false} name={lineLabels.cacheRatio} stroke={USAGE_TOKEN_COLORS.cacheRatio} strokeDasharray="5 5" strokeWidth={2} type="monotone" />
+              <Line yAxisId="ratio" dataKey="cacheCumulativeRatio" dot={false} isAnimationActive={false} name={lineLabels.cacheCumulativeRatio} stroke={USAGE_TOKEN_COLORS.cacheCumulativeRatio} strokeDasharray="5 5" strokeWidth={2} type="monotone" />
             </LineChart>
           </ResponsiveContainer>
         </div>

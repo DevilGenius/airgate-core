@@ -35,7 +35,7 @@
 
   /* HeroUI radius preset */
   --radius: 0.25rem;
-  --field-radius: 0.25rem;
+  --field-radius: 0.5rem;
   --font-geist: var(--ag-font-sans);
   --font-sans: var(--font-geist);
   --font-mono: var(--ag-font-mono);
@@ -273,11 +273,6 @@ input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
-}
-
-/* HeroUI success chips use green backgrounds, but text should stay dark for contrast. */
-.chip.chip--success {
-  --chip-fg: var(--success-foreground);
 }
 
 .switch {

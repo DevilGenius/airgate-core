@@ -13,6 +13,7 @@ import { useAuth } from '../../app/providers/AuthProvider';
 import { usageApi } from '../../shared/api/usage';
 import { queryKeys } from '../../shared/queryKeys';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
+import { CostValue } from '../../shared/components/CostValue';
 import { PIE_CHART_COLORS } from '../../shared/constants';
 
 const PIE_COLORS = PIE_CHART_COLORS;
@@ -63,7 +64,7 @@ function StatCard({
   accentColor: string;
   icon: ReactNode;
   title: string;
-  value: string;
+  value: ReactNode;
 }) {
   return (
     <Card className="relative overflow-hidden">
@@ -95,11 +96,6 @@ function fmtNum(n: number | undefined | null): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(2)}K`;
   return n.toLocaleString();
-}
-
-function fmtCost(n: number): string {
-  if (n >= 1000) return `$${(n / 1000).toFixed(2)}K`;
-  return `$${n.toFixed(4)}`;
 }
 
 function rangeToDate(range: RangePreset): { start_date: string; end_date: string } {
@@ -189,9 +185,9 @@ export default function UserOverviewPage() {
         />
         <StatCard
           title={t('usage.actual_cost')}
-          value={fmtCost(stats?.total_actual_cost ?? 0)}
+          value={<CostValue value={stats?.total_actual_cost ?? 0} decimals={4} tone="actual" />}
           icon={<Coins className="w-5 h-5" />}
-          accentColor="var(--ag-success)"
+          accentColor="var(--ag-warning)"
         />
       </div>
 
@@ -271,7 +267,7 @@ export default function UserOverviewPage() {
                       key: 'cost',
                       title: t('usage.cost'),
                       width: '24%',
-                      render: (row) => <span className="truncate font-mono text-primary">{fmtCost(row.actual_cost)}</span>,
+                      render: (row) => <CostValue className="truncate font-mono" value={row.actual_cost} decimals={4} tone="actual" />,
                     },
                   ]}
                 />

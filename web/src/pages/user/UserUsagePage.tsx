@@ -17,6 +17,7 @@ import { getSessionAPIKey } from '../../shared/api/client';
 import { CcsImportModal } from './userkeys/CcsImportModal';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
+import { CostValue } from '../../shared/components/CostValue';
 
 const USAGE_AUTO_UPDATE_INTERVAL_MS = 1_000;
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.user.usage.auto_update';
@@ -30,7 +31,7 @@ function StatCard({
   accentColor: string;
   icon: ReactNode;
   title: string;
-  value: string;
+  value: ReactNode;
 }) {
   return (
     <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
@@ -332,15 +333,15 @@ export default function UserUsagePage() {
           accentColor="var(--ag-info)"
         />
         <StatCard
-          title={t('usage.total_cost')}
-          value={`$${(stats?.total_cost ?? 0).toFixed(4)}`}
-          icon={<DollarSign className="w-5 h-5" />}
+          title={t('usage.actual_cost')}
+          value={<CostValue value={stats?.total_actual_cost ?? 0} decimals={4} tone="actual" />}
+          icon={<Coins className="w-5 h-5" />}
           accentColor="var(--ag-warning)"
         />
         <StatCard
-          title={t('usage.actual_cost')}
-          value={`$${(stats?.total_actual_cost ?? 0).toFixed(4)}`}
-          icon={<Coins className="w-5 h-5" />}
+          title={t('usage.total_cost')}
+          value={<CostValue value={stats?.total_cost ?? 0} decimals={4} tone="standard" />}
+          icon={<DollarSign className="w-5 h-5" />}
           accentColor="var(--ag-success)"
         />
       </div>

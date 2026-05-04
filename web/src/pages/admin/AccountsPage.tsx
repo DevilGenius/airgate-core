@@ -678,6 +678,7 @@ export default function AccountsPage() {
     {
       key: 'platform',
       title: t('accounts.platform_type'),
+      width: '108px',
       render: (row) => {
         const planType = row.credentials?.plan_type;
         const subUntil = row.credentials?.subscription_active_until;
@@ -694,23 +695,48 @@ export default function AccountsPage() {
           ? `${t('accounts.expires_at')}: ${new Date(subUntil).toLocaleDateString()}`
           : undefined;
         return (
-          <div className="flex w-full min-w-0 flex-col items-start gap-1.5 text-left">
-            <span className="inline-flex items-center gap-1">
+          <div className="flex w-full min-w-0 flex-col items-start gap-1 text-left">
+            <span className="inline-flex max-w-full min-w-0 items-center gap-1">
               <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" />
-              <span>{platformName(row.platform)}</span>
+              <span className="min-w-0 truncate">{platformName(row.platform)}</span>
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex max-w-full items-center gap-1">
               {row.type && (
-                <span className="text-[10px] px-1 py-0 rounded" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
+                <span className="truncate rounded px-1 py-0 text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
                   {{ oauth: 'OAuth', session_key: 'Session Key', apikey: 'API Key' }[row.type] ?? row.type}
                 </span>
               )}
               {displayPlanType && (
-                <span className="text-[10px] px-1 py-0 rounded font-medium cursor-default" title={planTooltip} style={{ background: 'var(--ag-primary)', color: 'var(--ag-text-inverse)', opacity: 0.85 }}>
+                <span className="cursor-default truncate rounded px-1 py-0 text-[10px] font-medium" title={planTooltip} style={{ background: 'var(--ag-primary)', color: 'var(--ag-text-inverse)', opacity: 0.85 }}>
                   {displayPlanType.charAt(0).toUpperCase() + displayPlanType.slice(1)}
                 </span>
               )}
             </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'groups',
+      title: t('accounts.groups'),
+      width: '140px',
+      align: 'center',
+      hideOnMobile: true,
+      render: (row) => {
+        if (!row.group_ids || row.group_ids.length === 0) {
+          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+        }
+        return (
+          <div className="flex flex-col items-center gap-1">
+            {row.group_ids.map((gid) => (
+              <span
+                key={gid}
+                className="text-[10px] px-1.5 py-0 rounded"
+                style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}
+              >
+                {groupMap.get(gid) ?? `#${gid}`}
+              </span>
+            ))}
           </div>
         );
       },
@@ -774,31 +800,6 @@ export default function AccountsPage() {
         </span>
       ),
     },
-    {
-      key: 'groups',
-      title: t('accounts.groups'),
-      width: '140px',
-      align: 'center',
-      hideOnMobile: true,
-      render: (row) => {
-        if (!row.group_ids || row.group_ids.length === 0) {
-          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
-        }
-        return (
-          <div className="flex flex-col items-center gap-1">
-            {row.group_ids.map((gid) => (
-              <span
-                key={gid}
-                className="text-[10px] px-1.5 py-0 rounded"
-                style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}
-              >
-                {groupMap.get(gid) ?? `#${gid}`}
-              </span>
-            ))}
-          </div>
-        );
-      },
-    },
     // 用量窗口 —— 始终显示该列。历史上这里用 accounts.length > 0 作为
     // 显示门槛，但当插件尚未加载 / 上游 quota 接口都超时等边缘情况下，后端
     // 可能返回空 accounts map 导致整列消失。那样用户连点"刷新用量"的入口都
@@ -806,7 +807,7 @@ export default function AccountsPage() {
     ...[{
       key: 'usage_window',
       title: t('accounts.usage_window'),
-      width: '260px',
+      width: '360px',
       hideOnMobile: true,
       render: (row: AccountResp) => {
         const usage = usageData?.accounts?.[String(row.id)];
@@ -909,8 +910,8 @@ export default function AccountsPage() {
           return `${timePart} ${segments[segments.length - 1]}`;
         };
 
-        const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', minWidth: 24 };
-        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[2.5rem_1fr] items-center gap-1 rounded-[var(--field-radius)] border px-1.5 text-[10px] leading-none shadow-sm';
+        const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
+        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[2rem_minmax(0,1fr)] items-center gap-1 rounded-[var(--field-radius)] border px-1 text-[10px] leading-none shadow-sm';
         const todayMetricStyle = (color: string, foreground = color) => ({
           background: `color-mix(in srgb, ${color} 10%, transparent)`,
           borderColor: `color-mix(in srgb, ${color} 22%, var(--ag-border))`,
@@ -924,32 +925,32 @@ export default function AccountsPage() {
                 ? 'flex flex-col gap-1.5 text-[11px] cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
                 : 'flex flex-col gap-1.5 text-[11px] rounded px-1 py-0.5'
             }
-            style={{ fontFamily: 'var(--ag-font-mono)', minWidth: 232, width: '100%' }}
+            style={{ fontFamily: 'var(--ag-font-mono)', minWidth: 332, width: '100%' }}
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
             {windows.map((w, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium shrink-0" style={badgeStyle}>
+              <div key={i} className="grid grid-cols-[4rem_minmax(0,1fr)_2.25rem_3rem] items-center gap-1.5">
+                <span className="inline-flex min-w-0 items-center justify-center truncate rounded px-1 py-0 text-[10px] font-medium" style={badgeStyle} title={w.label}>
                   {shortLabel(w.label)}
                 </span>
-                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ag-glass-border)', minWidth: 40 }}>
+                <div className="h-1.5 min-w-0 overflow-hidden rounded-full" style={{ background: 'var(--ag-glass-border)' }}>
                   <div
                     className="h-full rounded-full transition-all"
                     style={{ width: `${Math.min(100, Math.round(w.used_percent))}%`, background: usageColor(w.used_percent) }}
                   />
                 </div>
-                <span className="shrink-0" style={{ color: usageColor(w.used_percent), fontSize: 10 }}>
+                <span className="text-right" style={{ color: usageColor(w.used_percent), fontSize: 10 }}>
                   {Math.round(w.used_percent)}%
                 </span>
-                <span className="shrink-0" style={{ color: 'var(--ag-text-tertiary)', fontSize: 10 }}>
+                <span className="text-right" style={{ color: 'var(--ag-text-tertiary)', fontSize: 10 }}>
                   {formatReset(w.reset_seconds)}
                 </span>
               </div>
             ))}
             {hasTodayStats && todayStats && (
               <div
-                className="mt-0.5 grid grid-cols-2 gap-1"
+                className="mt-0.5 grid grid-cols-4 gap-1"
                 title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
               >
                 <span className={todayMetricClass} style={todayMetricStyle('var(--ag-info)')}>
@@ -963,18 +964,24 @@ export default function AccountsPage() {
                 <span
                   className={todayMetricClass}
                   style={todayMetricStyle('var(--ag-warning)')}
-                  title={t('accounts.window_account_cost', '账号成本（上游计费）')}
+                  title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
                 >
-                  <span className="truncate text-text-tertiary">{t('accounts.account_cost_short', '成本')}</span>
-                  <span className="text-right tabular-nums">${todayStats.account_cost.toFixed(2)}</span>
+                  <span className="truncate text-text-tertiary">{t('accounts.user_cost_short', '消费')}</span>
+                  <span className="text-right tabular-nums">
+                    <span style={{ color: 'var(--ag-warning)' }}>$</span>
+                    <span className="text-text">{todayStats.user_cost.toFixed(2)}</span>
+                  </span>
                 </span>
                 <span
                   className={todayMetricClass}
                   style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
-                  title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
+                  title={t('accounts.window_account_cost', '账号成本（上游计费）')}
                 >
-                  <span className="truncate text-text-tertiary">{t('accounts.user_cost_short', '消费')}</span>
-                  <span className="text-right tabular-nums">${todayStats.user_cost.toFixed(2)}</span>
+                  <span className="truncate text-text-tertiary">{t('accounts.account_cost_short', '成本')}</span>
+                  <span className="text-right tabular-nums">
+                    <span style={{ color: 'var(--ag-success)' }}>$</span>
+                    <span className="text-text">{todayStats.account_cost.toFixed(2)}</span>
+                  </span>
                 </span>
                 {row.platform === 'openai' && (row.today_image_count ?? 0) > 0 && (
                   <span
@@ -1312,7 +1319,7 @@ export default function AccountsPage() {
                 selectedKey={platformFilter}
                 onSelectionChange={(key) => { setPlatformFilter(key == null ? '' : String(key)); setPage(1); }}
               >
-                <Label>{t('groups.platform')}</Label>
+                <Label className="sr-only">{t('groups.platform')}</Label>
                 <Select.Trigger>
                   <Select.Value>{selectedPlatformLabel}</Select.Value>
                   <Select.Indicator />
@@ -1332,7 +1339,7 @@ export default function AccountsPage() {
                 selectedKey={stateFilter}
                 onSelectionChange={(key) => { setStateFilter(key == null ? '' : String(key)); setPage(1); }}
               >
-                <Label>{t('common.status')}</Label>
+                <Label className="sr-only">{t('common.status')}</Label>
                 <Select.Trigger>
                   <Select.Value>{selectedStateLabel}</Select.Value>
                   <Select.Indicator />
@@ -1352,7 +1359,7 @@ export default function AccountsPage() {
                 selectedKey={typeFilter}
                 onSelectionChange={(key) => { setTypeFilter(key == null ? '' : String(key)); setPage(1); }}
               >
-                <Label>{t('common.type')}</Label>
+                <Label className="sr-only">{t('common.type')}</Label>
                 <Select.Trigger>
                   <Select.Value>{selectedTypeLabel}</Select.Value>
                   <Select.Indicator />
@@ -1372,7 +1379,7 @@ export default function AccountsPage() {
                 selectedKey={groupFilter}
                 onSelectionChange={(key) => { setGroupFilter(key == null ? '' : String(key)); setPage(1); }}
               >
-                <Label>{t('accounts.group')}</Label>
+                <Label className="sr-only">{t('accounts.group')}</Label>
                 <Select.Trigger>
                   <Select.Value>{selectedGroupLabel}</Select.Value>
                   <Select.Indicator />
@@ -1392,7 +1399,7 @@ export default function AccountsPage() {
                 selectedKey={proxyFilter}
                 onSelectionChange={(key) => { setProxyFilter(key == null ? '' : String(key)); setPage(1); }}
               >
-                <Label>{t('accounts.proxy')}</Label>
+                <Label className="sr-only">{t('accounts.proxy')}</Label>
                 <Select.Trigger>
                   <Select.Value>{selectedProxyLabel}</Select.Value>
                   <Select.Indicator />
@@ -1475,7 +1482,7 @@ export default function AccountsPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1180}
+        minWidth={1320}
       >
             <CommonTable.Header>
               <CommonTable.Column id="__selection__" className="text-center" style={{ minWidth: 52, width: 52 }}>

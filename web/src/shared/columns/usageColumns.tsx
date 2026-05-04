@@ -5,6 +5,7 @@ import { Chip, Tooltip } from '@heroui/react';
 import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
 import type { UsageLogResp, CustomerUsageLogResp } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
+import { CostValue } from '../components/CostValue';
 
 /**
  * 列定义统一使用一个宽松的行类型：管理端拿到的是 UsageLogResp，
@@ -66,10 +67,12 @@ function TooltipPanel({
 }
 
 function TooltipRow({
+  color,
   label,
   tone,
   value,
 }: {
+  color?: string;
   label: ReactNode;
   tone?: 'accent' | 'info' | 'strong' | 'success' | 'warning';
   value: ReactNode;
@@ -89,7 +92,12 @@ function TooltipRow({
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,max-content)] items-center gap-3 rounded-[var(--radius)] bg-surface px-2 py-1 text-xs">
       <span className="min-w-0 truncate text-text-tertiary">{label}</span>
-      <span className={`min-w-0 max-w-[12rem] justify-self-end truncate text-right font-mono font-medium ${toneClass}`}>{value}</span>
+      <span
+        className={`min-w-0 max-w-[12rem] justify-self-end truncate text-right font-mono font-medium ${toneClass}`}
+        style={color ? { color } : undefined}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -99,6 +107,12 @@ function TooltipDivider() {
 }
 
 const HEROUI_BLUE = 'oklch(62.04% 0.1950 253.83)';
+
+const STREAM_CHIP_STYLE: CSSProperties = {
+  background: `color-mix(in srgb, ${HEROUI_BLUE} 18%, transparent)`,
+  boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${HEROUI_BLUE} 34%, transparent)`,
+  color: HEROUI_BLUE,
+};
 
 const reasoningEffortColorMap: Record<string, string> = {
   auto: 'var(--ag-success)',
@@ -214,15 +228,15 @@ function buildResellerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
                 <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={`${row.sell_rate.toFixed(2)}x`} />
               )}
               <TooltipDivider />
-              <TooltipRow label={t('usage.original_cost')} value={`$${row.total_cost.toFixed(6)}`} />
+              <TooltipRow label={t('usage.original_cost')} value={<CostValue value={row.total_cost} decimals={6} tone="standard" />} />
               {row.account_cost !== row.total_cost && (
-                <TooltipRow label={t('usage.account_cost', '账号计费')} value={`$${row.account_cost.toFixed(6)}`} />
+                <TooltipRow label={t('usage.account_cost', '账号计费')} value={<CostValue value={row.account_cost} decimals={6} />} />
               )}
-              <TooltipRow label={t('usage.user_charged', '用户扣费')} value={`$${row.actual_cost.toFixed(6)}`} tone="warning" />
+              <TooltipRow label={t('usage.user_charged', '用户扣费')} value={<CostValue value={row.actual_cost} decimals={6} tone="actual" />} />
               {row.sell_rate > 0 && row.billed_cost !== row.actual_cost && (
                 <>
-                  <TooltipRow label={t('usage.billed_cost', '客户账面')} value={`$${row.billed_cost.toFixed(6)}`} />
-                  <TooltipRow label={t('usage.profit', '利润')} value={`$${(row.billed_cost - row.actual_cost).toFixed(6)}`} tone="success" />
+                  <TooltipRow label={t('usage.billed_cost', '客户账面')} value={<CostValue value={row.billed_cost} decimals={6} />} />
+                  <TooltipRow label={t('usage.profit', '利润')} value={<CostValue value={row.billed_cost - row.actual_cost} decimals={6} tone="success" />} />
                 </>
               )}
             </TooltipPanel>
@@ -231,13 +245,17 @@ function buildResellerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
           <div className="flex w-full flex-col items-end font-mono text-xs text-right">
             {row.sell_rate > 0 && row.billed_cost !== row.actual_cost ? (
               <>
-                <div className="text-[15px] font-semibold leading-none text-text">${row.billed_cost.toFixed(6)}</div>
+                <div className="text-[15px] font-semibold leading-none text-text">
+                  <CostValue value={row.billed_cost} decimals={6} />
+                </div>
                 <div className="mt-0.5 text-xs leading-none text-text-tertiary">
-                  {t('usage.cost_actual_short', '成本')} ${row.actual_cost.toFixed(6)}
+                  {t('usage.cost_actual_short', '成本')} <CostValue value={row.actual_cost} decimals={6} tone="actual" />
                 </div>
               </>
             ) : (
-              <div className="text-[15px] font-semibold leading-none text-text">${row.actual_cost.toFixed(6)}</div>
+              <div className="text-[15px] font-semibold leading-none text-text">
+                <CostValue value={row.actual_cost} decimals={6} tone="actual" />
+              </div>
             )}
           </div>
         </RichTooltip>
@@ -359,19 +377,19 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
             placement="left"
             content={
               <TooltipPanel title={`Token ${t('usage.detail')}`} subtitle={row.model}>
-                <TooltipRow label={t('usage.input_tokens')} value={row.input_tokens.toLocaleString()} tone="success" />
-                <TooltipRow label={t('usage.output_tokens')} value={row.output_tokens.toLocaleString()} tone="info" />
+                <TooltipRow label={t('usage.input_tokens')} value={row.input_tokens.toLocaleString()} color={USAGE_TOKEN_COLORS.input} />
+                <TooltipRow label={t('usage.output_tokens')} value={row.output_tokens.toLocaleString()} color={USAGE_TOKEN_COLORS.output} />
                 {hasCacheRead && (
-                  <TooltipRow label={t('usage.cache_read')} value={row.cached_input_tokens.toLocaleString()} />
+                  <TooltipRow label={t('usage.cache_read')} value={row.cached_input_tokens.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheRead} />
                 )}
                 {hasCacheWrite && (
-                  <TooltipRow label={t('usage.cache_creation')} value={cacheCreation.toLocaleString()} tone="warning" />
+                  <TooltipRow label={t('usage.cache_creation')} value={cacheCreation.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheCreation} />
                 )}
                 {cacheCreation5m > 0 && (
-                  <TooltipRow label={t('usage.cache_creation_5m')} value={cacheCreation5m.toLocaleString()} tone="warning" />
+                  <TooltipRow label={t('usage.cache_creation_5m')} value={cacheCreation5m.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheCreation} />
                 )}
                 {cacheCreation1h > 0 && (
-                  <TooltipRow label={t('usage.cache_creation_1h')} value={cacheCreation1h.toLocaleString()} tone="warning" />
+                  <TooltipRow label={t('usage.cache_creation_1h')} value={cacheCreation1h.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheCreation} />
                 )}
                 <TooltipRow label={t('usage.total_tokens')} value={total.toLocaleString()} tone="strong" />
               </TooltipPanel>
@@ -423,7 +441,13 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
       width: '72px',
       hideOnMobile: true,
       render: (row) => (
-        <Chip className="px-1.5 text-[13px]" color={row.stream ? 'success' : 'default'} size="sm" variant="soft">
+        <Chip
+          className="px-1.5 text-[13px]"
+          color="default"
+          size="sm"
+          style={row.stream ? STREAM_CHIP_STYLE : undefined}
+          variant="soft"
+        >
           {row.stream ? t('usage.type_stream') : t('usage.type_sync')}
         </Chip>
       ),

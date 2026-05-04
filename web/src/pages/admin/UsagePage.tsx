@@ -13,15 +13,17 @@ import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
-import { useUsageColumns, fmtNum, fmtCost, type UsageColumnConfig } from '../../shared/columns/usageColumns';
+import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../../shared/constants';
+import { CostValue } from '../../shared/components/CostValue';
 
 const PIE_COLORS = PIE_CHART_COLORS;
-const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio'];
+const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio', 'cacheCumulativeRatio'];
+const TOKEN_TREND_RATIO_KEYS = new Set<keyof typeof USAGE_TOKEN_COLORS>(['cacheRatio', 'cacheCumulativeRatio']);
 
 type PieTooltipPayload = Array<{
   name?: unknown;
@@ -80,7 +82,7 @@ function StatCard({
   accentColor: string;
   icon: ReactNode;
   title: string;
-  value: string;
+  value: ReactNode;
 }) {
   return (
     <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
@@ -253,14 +255,14 @@ function DistributionCard({
                 key: 'actualCost',
                 title: t('usage.actual_cost'),
                 width: '18%',
-                render: (item) => <span className="truncate font-mono text-warning">{fmtCost(item.actualCost)}</span>,
+                render: (item) => <CostValue className="truncate font-mono" value={item.actualCost} tone="actual" />,
               },
               {
                 align: 'end',
                 key: 'totalCost',
                 title: t('usage.standard_cost'),
                 width: '18%',
-                render: (item) => <span className="truncate font-mono text-text-secondary">{fmtCost(item.totalCost)}</span>,
+                render: (item) => <CostValue className="truncate font-mono" value={item.totalCost} tone="standard" />,
               },
             ]}
           />
@@ -356,14 +358,14 @@ function GroupStatsCard({
               key: 'actualCost',
               title: t('usage.actual_cost'),
               width: '18%',
-              render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actual_cost)}</span>,
+              render: (row) => <CostValue className="truncate font-mono" value={row.actual_cost} tone="actual" />,
             },
             {
               align: 'end',
               key: 'totalCost',
               title: t('usage.standard_cost'),
               width: '18%',
-              render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.total_cost)}</span>,
+              render: (row) => <CostValue className="truncate font-mono" value={row.total_cost} tone="standard" />,
             },
           ]}
         />
@@ -394,7 +396,10 @@ function TokenTrendCard({
       const totalTokens = d.input_tokens + d.output_tokens + cacheTokens;
       cumulativeCache += cacheTokens;
       cumulativeTotal += totalTokens;
-      const cacheRatio = cumulativeTotal > 0
+      const cacheRatio = totalTokens > 0
+        ? Math.min(100, Math.max(0, (cacheTokens / totalTokens) * 100))
+        : 0;
+      const cacheCumulativeRatio = cumulativeTotal > 0
         ? Math.min(100, Math.max(0, (cumulativeCache / cumulativeTotal) * 100))
         : 0;
 
@@ -406,6 +411,7 @@ function TokenTrendCard({
         cacheCreation: d.cache_creation,
         cacheRead: d.cache_read,
         cacheRatio,
+        cacheCumulativeRatio,
         actualCost: d.actual_cost,
         standardCost: d.standard_cost,
       };
@@ -417,7 +423,8 @@ function TokenTrendCard({
     output: t('usage.output'),
     cacheCreation: t('usage.cache_creation'),
     cacheRead: t('usage.cache_read'),
-    cacheRatio: t('usage.cache_cumulative_ratio'),
+    cacheRatio: t('usage.cache_ratio'),
+    cacheCumulativeRatio: t('usage.cache_cumulative_ratio'),
   };
   const granularityTabs = (
     <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={granularity} onSelectionChange={(key) => onGranularityChange(String(key))}>
@@ -491,7 +498,7 @@ function TokenTrendCard({
               return _label;
             }}
             formatter={(value, name) => [
-              String(name) === 'cacheRatio' ? `${Number(value).toFixed(1)}%` : fmtNum(Number(value)),
+              TOKEN_TREND_RATIO_KEYS.has(String(name) as keyof typeof USAGE_TOKEN_COLORS) ? `${Number(value).toFixed(1)}%` : fmtNum(Number(value)),
               lineLabels[String(name)] || String(name),
             ]}
             content={({ active, payload, label }) => {
@@ -510,14 +517,14 @@ function TokenTrendCard({
                       <div className="w-2.5 h-2.5 rounded-sm" style={{ background: entry.color }} />
                       <span className="text-text-secondary">{lineLabels[String(entry.dataKey)] || String(entry.dataKey)}:</span>
                       <span className="font-mono text-text ml-auto">
-                        {entry.dataKey === 'cacheRatio' ? `${Number(entry.value).toFixed(1)}%` : fmtNum(Number(entry.value))}
+                        {TOKEN_TREND_RATIO_KEYS.has(String(entry.dataKey) as keyof typeof USAGE_TOKEN_COLORS) ? `${Number(entry.value).toFixed(1)}%` : fmtNum(Number(entry.value))}
                       </span>
                     </div>
                   ))}
                   <div className="border-t border-border-subtle mt-2 pt-2 text-text-secondary">
-                    Actual: <span className="font-mono text-warning">{fmtCost(d?.actualCost ?? 0)}</span>
+                    Actual: <CostValue className="font-mono" value={d?.actualCost ?? 0} tone="actual" />
                     {' | '}
-                    Standard: <span className="font-mono text-text">{fmtCost(d?.standardCost ?? 0)}</span>
+                    Standard: <CostValue className="font-mono" value={d?.standardCost ?? 0} tone="standard" />
                   </div>
                 </div>
               );
@@ -529,7 +536,7 @@ function TokenTrendCard({
               <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text-tertiary">
                 {TOKEN_TREND_LINE_ORDER.map((key) => (
                   <span key={key} className="inline-flex items-center gap-1.5">
-                    {key === 'cacheRatio' ? (
+                    {TOKEN_TREND_RATIO_KEYS.has(key) ? (
                       <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: USAGE_TOKEN_COLORS[key] }} />
                     ) : (
                       <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
@@ -545,6 +552,7 @@ function TokenTrendCard({
           <Line yAxisId="tokens" type="monotone" dataKey="cacheCreation" stroke={USAGE_TOKEN_COLORS.cacheCreation} strokeWidth={2} dot={false} isAnimationActive={false} />
           <Line yAxisId="tokens" type="monotone" dataKey="cacheRead" stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2} dot={false} isAnimationActive={false} />
           <Line yAxisId="ratio" type="monotone" dataKey="cacheRatio" stroke={USAGE_TOKEN_COLORS.cacheRatio} strokeWidth={2} strokeDasharray="5 5" dot={false} isAnimationActive={false} />
+          <Line yAxisId="ratio" type="monotone" dataKey="cacheCumulativeRatio" stroke={USAGE_TOKEN_COLORS.cacheCumulativeRatio} strokeWidth={2} strokeDasharray="5 5" dot={false} isAnimationActive={false} />
         </LineChart>
         </ResponsiveContainer>
       </div>
@@ -816,15 +824,15 @@ export default function UsagePage() {
               accentColor="var(--ag-info)"
             />
             <StatCard
-              title={t('usage.total_cost')}
-              value={`$${stats.total_cost.toFixed(4)}`}
-              icon={<DollarSign className="w-5 h-5" />}
+              title={t('usage.actual_cost')}
+              value={<CostValue value={stats.total_actual_cost} decimals={4} tone="actual" />}
+              icon={<Coins className="w-5 h-5" />}
               accentColor="var(--ag-warning)"
             />
             <StatCard
-              title={t('usage.actual_cost')}
-              value={`$${stats.total_actual_cost.toFixed(4)}`}
-              icon={<Coins className="w-5 h-5" />}
+              title={t('usage.total_cost')}
+              value={<CostValue value={stats.total_cost} decimals={4} tone="standard" />}
+              icon={<DollarSign className="w-5 h-5" />}
               accentColor="var(--ag-success)"
             />
           </div>
