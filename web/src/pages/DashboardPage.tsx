@@ -32,11 +32,11 @@ import { decorativePalette } from '@airgate/theme';
 import { dashboardApi } from '../shared/api/dashboard';
 import { usersApi } from '../shared/api/users';
 import { queryKeys } from '../shared/queryKeys';
-import { FETCH_ALL_PARAMS, USAGE_TOKEN_COLORS } from '../shared/constants';
+import { FETCH_ALL_PARAMS, PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
-const PIE_COLORS = decorativePalette.slice(0, 10);
+const PIE_COLORS = PIE_CHART_COLORS;
 const USER_COLORS = [...decorativePalette];
 const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio'];
 
@@ -355,6 +355,14 @@ type DashboardDistributionTableRow = {
   tokens: number;
 };
 
+const DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS = {
+  name: '32%',
+  requests: '16%',
+  tokens: '18%',
+  actual: '17%',
+  standard: '17%',
+} as const;
+
 function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'model' | 'user'>('model');
@@ -438,7 +446,7 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
               {
                 key: 'name',
                 title: firstColumnTitle,
-                width: tab === 'model' ? '30%' : '34%',
+                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.name,
                 render: (row, index) => (
                   <>
                     <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
@@ -451,28 +459,28 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
                 align: 'end',
                 key: 'requests',
                 title: t('dashboard.requests'),
-                width: tab === 'model' ? '16%' : '15%',
+                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.requests,
                 render: (row) => <span className="truncate font-mono text-text-secondary">{row.requests.toLocaleString()}</span>,
               },
               {
                 align: 'end',
                 key: 'tokens',
                 title: t('dashboard.tokens'),
-                width: tab === 'model' ? '18%' : '17%',
+                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.tokens,
                 render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.tokens)}</span>,
               },
               {
                 align: 'end',
                 key: 'actual',
                 title: t('dashboard.actual'),
-                width: '18%',
+                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.actual,
                 render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actualCost)}</span>,
               },
               {
                 align: 'end',
                 key: 'standard',
                 title: t('dashboard.standard'),
-                width: tab === 'model' ? '18%' : '16%',
+                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.standard,
                 render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.standardCost)}</span>,
               },
             ]}

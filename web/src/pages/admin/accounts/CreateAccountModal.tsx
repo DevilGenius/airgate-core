@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Checkbox, Form, Input, Label, ListBox, Select, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
-import { Layers, Hash, Gauge } from 'lucide-react';
+import { IdCard, Hash, Gauge } from 'lucide-react';
 import type {
   PluginBatchAccountInput,
   PluginBatchImportResult,
@@ -200,7 +200,6 @@ export function CreateAccountModal({
           )}
         </div>
       )}
-      icon={<Layers className="size-5" />}
       size="lg"
       state={modalState}
       title={t('accounts.create')}
@@ -233,7 +232,7 @@ export function CreateAccountModal({
                     <HeroTextField fullWidth isRequired={!batchMode}>
                       <Label>{t('common.name')}</Label>
                       <div className="relative">
-                        <Layers className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                        <IdCard className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
                         <Input
                           className="pl-9"
                           name="name"

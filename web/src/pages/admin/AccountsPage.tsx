@@ -344,6 +344,7 @@ export default function AccountsPage() {
 
   // 批量选择状态
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [pendingToggleIds, setPendingToggleIds] = useState<Set<number>>(() => new Set());
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
@@ -501,10 +502,59 @@ export default function AccountsPage() {
     onSuccess: () => setDeletingAccount(null),
   });
 
-  // 切换调度状态
-  const toggleMutation = useCrudMutation({
+  // 切换调度状态。这里做乐观更新，避免 Switch 先跳回旧状态再等列表刷新。
+  const toggleMutation = useMutation({
     mutationFn: (id: number) => accountsApi.toggleScheduling(id),
-    queryKey: queryKeys.accounts(),
+    onMutate: async (id) => {
+      setPendingToggleIds((prev) => new Set(prev).add(id));
+      await queryClient.cancelQueries({ queryKey: queryKeys.accounts() });
+      const previous = queryClient.getQueriesData<PagedData<AccountResp>>({ queryKey: queryKeys.accounts() });
+
+      queryClient.setQueriesData<PagedData<AccountResp>>({ queryKey: queryKeys.accounts() }, (old) => {
+        if (!old?.list) return old;
+        return {
+          ...old,
+          list: old.list.map((account) => (
+            account.id === id
+              ? {
+                  ...account,
+                  state: (account.state === 'disabled' ? 'active' : 'disabled') as AccountResp['state'],
+                  state_until: undefined,
+                }
+              : account
+          )),
+        };
+      });
+
+      return { previous };
+    },
+    onSuccess: (res, id) => {
+      queryClient.setQueriesData<PagedData<AccountResp>>({ queryKey: queryKeys.accounts() }, (old) => {
+        if (!old?.list) return old;
+        return {
+          ...old,
+          list: old.list.map((account) => (
+            account.id === id
+              ? { ...account, state: res.state as AccountResp['state'], state_until: undefined }
+              : account
+          )),
+        };
+      });
+    },
+    onError: (err: Error, _id, context) => {
+      context?.previous.forEach(([queryKey, value]) => {
+        queryClient.setQueryData(queryKey, value);
+      });
+      toast('error', err.message);
+    },
+    onSettled: (_data, _error, id) => {
+      setPendingToggleIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+    },
   });
 
   // 刷新令牌：后端在 refresh_token 已失效但能从 access_token JWT 解析到 plan_type
@@ -699,10 +749,10 @@ export default function AccountsPage() {
       render: (row) => (
         <Switch
           aria-label={t('accounts.scheduling')}
-          isDisabled={toggleMutation.isPending}
           isSelected={row.state !== 'disabled'}
           size="sm"
           onChange={() => {
+            if (pendingToggleIds.has(row.id)) return;
             toggleMutation.mutate(row.id);
           }}
         >

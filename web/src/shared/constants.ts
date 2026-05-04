@@ -16,5 +16,19 @@ export const USAGE_TOKEN_COLORS = {
   cacheRatio: '#c084fc',
 } as const;
 
+/** 饼图专用低饱和调色板，避免分布图在黑色主题下过于刺眼 */
+export const PIE_CHART_COLORS = [
+  'oklch(64% 0.105 253.83)',
+  'oklch(66% 0.095 156)',
+  'oklch(72% 0.105 76)',
+  'oklch(65% 0.1 24)',
+  'oklch(65% 0.095 298)',
+  'oklch(68% 0.085 205)',
+  'oklch(67% 0.09 338)',
+  'oklch(62% 0.075 262)',
+  'oklch(70% 0.085 124)',
+  'oklch(66% 0.085 48)',
+] as const;
+
 /** 头像颜色池（引用 SDK 装饰色） */
 export { decorativePalette as AVATAR_COLORS } from '@airgate/theme';

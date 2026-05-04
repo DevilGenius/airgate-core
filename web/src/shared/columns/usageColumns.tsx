@@ -98,11 +98,13 @@ function TooltipDivider() {
   return <div className="my-0.5 border-t border-border" />;
 }
 
+const HEROUI_BLUE = 'oklch(62.04% 0.1950 253.83)';
+
 const reasoningEffortColorMap: Record<string, string> = {
   auto: 'var(--ag-success)',
   minimal: 'var(--ag-muted)',
   low: 'var(--ag-muted)',
-  medium: 'var(--ag-primary)',
+  medium: HEROUI_BLUE,
   high: 'var(--ag-warning)',
   xhigh: 'var(--ag-danger)',
   extrahigh: 'var(--ag-danger)',
@@ -111,7 +113,7 @@ const reasoningEffortColorMap: Record<string, string> = {
 
 function getReasoningEffortStyle(effort: string): CSSProperties {
   const normalized = effort.trim().toLowerCase().replace(/[\s_-]/g, '');
-  const color = reasoningEffortColorMap[normalized] ?? 'var(--ag-primary)';
+  const color = reasoningEffortColorMap[normalized] ?? HEROUI_BLUE;
 
   return {
     background: `color-mix(in srgb, ${color} 20%, transparent)`,
@@ -421,7 +423,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
       width: '72px',
       hideOnMobile: true,
       render: (row) => (
-        <Chip className="px-1.5 text-[13px]" color={row.stream ? 'accent' : 'default'} size="sm" variant="soft">
+        <Chip className="px-1.5 text-[13px]" color={row.stream ? 'success' : 'default'} size="sm" variant="soft">
           {row.stream ? t('usage.type_stream') : t('usage.type_sync')}
         </Chip>
       ),

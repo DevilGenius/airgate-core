@@ -18,11 +18,9 @@ import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/ty
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
-import { USAGE_TOKEN_COLORS } from '../../shared/constants';
+import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../../shared/constants';
 
-import { decorativePalette } from '@airgate/theme';
-
-const PIE_COLORS = decorativePalette.slice(0, 10);
+const PIE_COLORS = PIE_CHART_COLORS;
 const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio'];
 
 type PieTooltipPayload = Array<{

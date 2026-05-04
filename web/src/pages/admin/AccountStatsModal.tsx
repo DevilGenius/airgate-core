@@ -15,10 +15,9 @@ import { accountsApi, type AccountStatsResp } from '../../shared/api/accounts';
 import { CommonDatePicker } from '../../shared/components/CommonDatePicker';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { CommonModal } from '../../shared/components/CommonModal';
+import { PIE_CHART_COLORS } from '../../shared/constants';
 
-import { decorativePalette } from '@airgate/theme';
-
-const PIE_COLORS = decorativePalette.slice(0, 10);
+const PIE_COLORS = PIE_CHART_COLORS;
 
 type PieTooltipPayload = Array<{
   name?: unknown;

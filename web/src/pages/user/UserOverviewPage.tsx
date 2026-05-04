@@ -13,10 +13,9 @@ import { useAuth } from '../../app/providers/AuthProvider';
 import { usageApi } from '../../shared/api/usage';
 import { queryKeys } from '../../shared/queryKeys';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
+import { PIE_CHART_COLORS } from '../../shared/constants';
 
-import { decorativePalette } from '@airgate/theme';
-
-const PIE_COLORS = decorativePalette.slice(0, 10);
+const PIE_COLORS = PIE_CHART_COLORS;
 
 type PieTooltipPayload = Array<{
   name?: unknown;

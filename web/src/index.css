@@ -36,14 +36,6 @@
   /* HeroUI radius preset */
   --radius: 0.25rem;
   --field-radius: 0.25rem;
-  --radius-xs: var(--radius);
-  --radius-sm: var(--radius);
-  --radius-md: var(--radius);
-  --radius-lg: var(--radius);
-  --radius-xl: var(--radius);
-  --radius-2xl: var(--radius);
-  --radius-3xl: var(--radius);
-  --radius-4xl: var(--radius);
   --font-geist: var(--ag-font-sans);
   --font-sans: var(--font-geist);
   --font-mono: var(--ag-font-mono);
@@ -198,13 +190,6 @@
   --color-glass: var(--ag-glass);
   --color-glass-border: var(--ag-glass-border);
 
-  /* ── Border Radius ── */
-  --radius-sm: var(--radius);
-  --radius-md: var(--radius);
-  --radius-lg: var(--radius);
-  --radius-xl: var(--radius);
-  --radius-field: var(--field-radius);
-
   /* ── Font Family ── */
   --font-sans: var(--font-geist);
   --font-mono: var(--ag-font-mono);
@@ -273,6 +258,17 @@ body {
   outline-offset: var(--ring-offset-width);
 }
 
+:where(
+  .input,
+  .textarea,
+  .date-input-group,
+  .select__trigger,
+  .combo-box__trigger,
+  .search-field__input
+):focus-visible {
+  outline: none;
+}
+
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -282,6 +278,17 @@ input[type="number"]::-webkit-outer-spin-button {
 /* HeroUI success chips use green backgrounds, but text should stay dark for contrast. */
 .chip.chip--success {
   --chip-fg: var(--success-foreground);
+}
+
+.switch {
+  --switch-control-bg-checked: var(--success);
+  --switch-control-bg-checked-hover: color-mix(in oklab, var(--success) 90%, var(--success-foreground) 10%);
+}
+
+.switch[aria-checked="true"] .switch__thumb,
+.switch[data-selected="true"] .switch__thumb {
+  background-color: var(--white);
+  color: var(--success);
 }
 
 /* ==========================================================================
@@ -407,12 +414,14 @@ input[type="number"]::-webkit-outer-spin-button {
 .ag-dashboard-metric,
 .ag-dashboard-toolbar {
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  border-radius: var(--radius-3xl);
   background: var(--surface);
   box-shadow: var(--surface-shadow);
 }
 
 .ag-dashboard-panel,
-.ag-dashboard-metric {
+.ag-dashboard-metric,
+.ag-dashboard-toolbar {
   overflow: hidden;
 }
 
@@ -435,10 +444,6 @@ input[type="number"]::-webkit-outer-spin-button {
   flex: 1 1 auto;
   min-width: 0;
   text-align: left;
-}
-
-.ag-dashboard-toolbar {
-  border-radius: var(--radius);
 }
 
 .ag-dashboard-trends {
@@ -534,13 +539,66 @@ input[type="number"]::-webkit-outer-spin-button {
   padding-block: clamp(1rem, 3vh, 3rem) !important;
 }
 
+.modal__backdrop,
+.modal__backdrop--opaque,
+.modal__backdrop--blur,
+.alert-dialog__backdrop,
+.alert-dialog__backdrop--opaque,
+.alert-dialog__backdrop--blur {
+  background: color-mix(in oklab, var(--background) 24%, transparent) !important;
+  -webkit-backdrop-filter: saturate(115%) blur(6px);
+  backdrop-filter: saturate(115%) blur(6px);
+}
+
+[data-theme="dark"] .modal__backdrop,
+[data-theme="dark"] .modal__backdrop--opaque,
+[data-theme="dark"] .modal__backdrop--blur,
+[data-theme="dark"] .alert-dialog__backdrop,
+[data-theme="dark"] .alert-dialog__backdrop--opaque,
+[data-theme="dark"] .alert-dialog__backdrop--blur,
+.dark .modal__backdrop,
+.dark .modal__backdrop--opaque,
+.dark .modal__backdrop--blur,
+.dark .alert-dialog__backdrop,
+.dark .alert-dialog__backdrop--opaque,
+.dark .alert-dialog__backdrop--blur {
+  background: color-mix(in oklab, var(--background) 36%, transparent) !important;
+}
+
 .ag-elevation-modal {
   max-height: min(86dvh, 62rem) !important;
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
-  border-radius: var(--field-radius) !important;
-  background: var(--overlay) !important;
+  border-radius: var(--radius-3xl) !important;
+  background: color-mix(in oklab, var(--overlay) 92%, transparent) !important;
   color: var(--overlay-foreground) !important;
-  box-shadow: var(--overlay-shadow) !important;
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 48%, transparent) inset,
+    0 18px 44px color-mix(in oklab, black 14%, transparent) !important;
+  -webkit-backdrop-filter: saturate(150%) blur(22px);
+  backdrop-filter: saturate(150%) blur(22px);
+}
+
+[data-theme="dark"] .ag-elevation-modal,
+.dark .ag-elevation-modal {
+  background: color-mix(in oklab, var(--overlay) 88%, transparent) !important;
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 9%, transparent) inset,
+    0 18px 44px color-mix(in oklab, black 28%, transparent) !important;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .modal__backdrop,
+  .modal__backdrop--opaque,
+  .modal__backdrop--blur,
+  .alert-dialog__backdrop,
+  .alert-dialog__backdrop--opaque,
+  .alert-dialog__backdrop--blur {
+    background: color-mix(in oklab, var(--background) 88%, transparent) !important;
+  }
+
+  .ag-elevation-modal {
+    background: var(--overlay) !important;
+  }
 }
 
 .ag-elevation-modal.modal__dialog--md {
@@ -620,6 +678,8 @@ input[type="number"]::-webkit-outer-spin-button {
 .search-field__input[data-focused="true"] {
   background-color: color-mix(in oklab, var(--field-background) 72%, var(--surface) 28%) !important;
   border-color: var(--focus) !important;
+  box-shadow: var(--field-shadow), 0 0 0 1px var(--focus) !important;
+  outline: none !important;
 }
 
 .ag-usage-date-range .date-input-group__suffix {
@@ -664,12 +724,6 @@ input[type="number"]::-webkit-outer-spin-button {
   overflow: visible;
 }
 
-/* Card containers use --radius. Form controls use --field-radius. */
-
-.card {
-  border-radius: var(--radius) !important;
-}
-
 /* 下拉和浮层 */
 
 .select__popover,
@@ -680,7 +734,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .popover {
   max-height: min(28rem, calc(100dvh - 6rem)) !important;
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
-  border-radius: var(--field-radius) !important;
+  border-radius: var(--radius-3xl) !important;
   background: var(--overlay) !important;
   color: var(--overlay-foreground) !important;
   box-shadow: var(--overlay-shadow) !important;
@@ -818,7 +872,7 @@ input[type="number"]::-webkit-outer-spin-button {
 :where([data-slot="wrapper"]:has(> [data-slot="table"])) {
   overflow: hidden;
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
-  border-radius: var(--radius) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
   background: var(--surface) !important;
   box-shadow: var(--surface-shadow) !important;
   padding: 0 !important;
@@ -853,6 +907,85 @@ input[type="number"]::-webkit-outer-spin-button {
   line-height: 1.25;
   padding: 0.625rem 0.75rem !important;
   vertical-align: middle !important;
+}
+
+.ag-resource-table,
+.ag-usage-records-table {
+  --ag-table-empty-background: var(--surface-secondary);
+  --ag-table-empty-row-height: 2.75rem;
+}
+
+.ag-resource-table :where([data-slot="table-body"], [data-slot="tbody"], .table__body),
+.ag-usage-records-table :where([data-slot="table-body"], [data-slot="tbody"], .table__body) {
+  background: var(--ag-table-empty-background) !important;
+}
+
+.ag-resource-table :where([data-slot="table-body"]:empty, [data-slot="tbody"]:empty, .table__body:empty),
+.ag-usage-records-table :where([data-slot="table-body"]:empty, [data-slot="tbody"]:empty, .table__body:empty) {
+  min-height: var(--ag-table-empty-row-height);
+  background: var(--ag-table-empty-background) !important;
+}
+
+.ag-resource-table:has(.empty-state) :where([data-slot="table-column"], [data-slot="th"], .table__column),
+.ag-resource-table:has([aria-busy="true"]) :where([data-slot="table-column"], [data-slot="th"], .table__column),
+.ag-usage-records-table:has(.empty-state) :where([data-slot="table-column"], [data-slot="th"], .table__column),
+.ag-usage-records-table:has([aria-busy="true"]) :where([data-slot="table-column"], [data-slot="th"], .table__column) {
+  border-bottom-color: transparent !important;
+  background: var(--ag-table-empty-background) !important;
+}
+
+.ag-resource-table :where([data-slot="table-body"] [data-slot="table-row"], [data-slot="tbody"] [data-slot="tr"], .table__body .table__row),
+.ag-usage-records-table :where([data-slot="table-body"] [data-slot="table-row"], [data-slot="tbody"] [data-slot="tr"], .table__body .table__row) {
+  background: var(--surface) !important;
+}
+
+.ag-resource-table :where(
+  [data-slot="table-row"]:has(.empty-state),
+  [data-slot="tr"]:has(.empty-state),
+  .table__row:has(.empty-state),
+  [data-slot="table-row"]:has([aria-busy="true"]),
+  [data-slot="tr"]:has([aria-busy="true"]),
+  .table__row:has([aria-busy="true"])
+),
+.ag-usage-records-table :where(
+  [data-slot="table-row"]:has(.empty-state),
+  [data-slot="tr"]:has(.empty-state),
+  .table__row:has(.empty-state),
+  [data-slot="table-row"]:has([aria-busy="true"]),
+  [data-slot="tr"]:has([aria-busy="true"]),
+  .table__row:has([aria-busy="true"])
+) {
+  background: var(--ag-table-empty-background) !important;
+}
+
+.ag-resource-table :where(
+  [data-slot="table-row"]:has(.empty-state) [data-slot="table-cell"],
+  [data-slot="tr"]:has(.empty-state) [data-slot="td"],
+  .table__row:has(.empty-state) .table__cell,
+  [data-slot="table-row"]:has([aria-busy="true"]) [data-slot="table-cell"],
+  [data-slot="tr"]:has([aria-busy="true"]) [data-slot="td"],
+  .table__row:has([aria-busy="true"]) .table__cell
+),
+.ag-usage-records-table :where(
+  [data-slot="table-row"]:has(.empty-state) [data-slot="table-cell"],
+  [data-slot="tr"]:has(.empty-state) [data-slot="td"],
+  .table__row:has(.empty-state) .table__cell,
+  [data-slot="table-row"]:has([aria-busy="true"]) [data-slot="table-cell"],
+  [data-slot="tr"]:has([aria-busy="true"]) [data-slot="td"],
+  .table__row:has([aria-busy="true"]) .table__cell
+) {
+  border-bottom: 0 !important;
+  background: var(--ag-table-empty-background) !important;
+}
+
+.ag-resource-table :where(.empty-state),
+.ag-usage-records-table :where(.empty-state) {
+  display: flex;
+  min-height: var(--ag-table-empty-row-height);
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
 }
 
 :where([data-slot="table-body"] [data-slot="table-row"], [data-slot="tbody"] [data-slot="tr"]) {
@@ -1260,7 +1393,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .ag-markdown-table {
   overflow: hidden;
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) * 2.5);
   background: var(--surface);
   box-shadow: var(--surface-shadow);
 }
