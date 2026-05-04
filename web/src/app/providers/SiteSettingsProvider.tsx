@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { settingsApi } from '../../shared/api/settings';
 import defaultLogoUrl from '../../assets/logo.svg';
@@ -41,13 +41,13 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     refetchOnWindowFocus: true,
   });
 
-  const value: SiteSettings = {
+  const value: SiteSettings = useMemo(() => ({
     ...defaults,
     ...data,
     // Boolean 字段从字符串转换
     registration_enabled: data?.registration_enabled !== 'false',
     email_verify_enabled: data?.email_verify_enabled === 'true',
-  };
+  }), [data]);
 
   // 动态设置 favicon（优先自定义 logo，否则使用默认 logo）
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useMatchRoute, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -104,49 +104,51 @@ function usePluginMenuItems(isAdmin: boolean): {
     staleTime: 60_000,
   });
 
-  if (!data?.list) return { adminItems: [], userItems: [], healthInstalled: false };
+  return useMemo(() => {
+    if (!data?.list) return { adminItems: [], userItems: [], healthInstalled: false };
 
-  // 服务状态页由 airgate-health 插件提供（core 反代 /status/* → 插件）；
-  // 未装该插件时顶栏不显示状态入口，避免点进去看到 404 / "状态页未启用" 错误。
-  const healthInstalled = data.list.some((p) => p.name === 'airgate-health');
+    // 服务状态页由 airgate-health 插件提供（core 反代 /status/* → 插件）；
+    // 未装该插件时顶栏不显示状态入口，避免点进去看到 404 / "状态页未启用" 错误。
+    const healthInstalled = data.list.some((p) => p.name === 'airgate-health');
 
-  const adminItems: MenuItem[] = [];
-  const userItems: MenuItem[] = [];
-  let firstAdmin = true;
-  let firstUser = true;
+    const adminItems: MenuItem[] = [];
+    const userItems: MenuItem[] = [];
+    let firstAdmin = true;
+    let firstUser = true;
 
-  for (const p of data.list) {
-    if (!p.frontend_pages?.length) continue;
-    for (const page of p.frontend_pages) {
-      const audience = page.audience || 'admin';
-      const showInUser =
-        audience === 'user' || (audience === 'all' && !isAdmin);
-      const showInAdmin =
-        isAdmin && (audience === 'admin' || audience === 'all');
+    for (const p of data.list) {
+      if (!p.frontend_pages?.length) continue;
+      for (const page of p.frontend_pages) {
+        const audience = page.audience || 'admin';
+        const showInUser =
+          audience === 'user' || (audience === 'all' && !isAdmin);
+        const showInAdmin =
+          isAdmin && (audience === 'admin' || audience === 'all');
 
-      const item: MenuItem = {
-        path: pluginPagePath(p.name, page.path),
-        labelKey: page.title,
-        icon: <Puzzle className="h-5 w-5" />,
-      };
+        const item: MenuItem = {
+          path: pluginPagePath(p.name, page.path),
+          labelKey: page.title,
+          icon: <Puzzle className="h-5 w-5" />,
+        };
 
-      if (showInAdmin) {
-        adminItems.push({
-          ...item,
-          ...(firstAdmin ? { sectionKey: 'nav.plugins' } : {}),
-        });
-        firstAdmin = false;
-      }
-      if (showInUser) {
-        userItems.push({
-          ...item,
-          ...(firstUser ? { sectionKey: 'nav.personal' } : {}),
-        });
-        firstUser = false;
+        if (showInAdmin) {
+          adminItems.push({
+            ...item,
+            ...(firstAdmin ? { sectionKey: 'nav.plugins' } : {}),
+          });
+          firstAdmin = false;
+        }
+        if (showInUser) {
+          userItems.push({
+            ...item,
+            ...(firstUser ? { sectionKey: 'nav.personal' } : {}),
+          });
+          firstUser = false;
+        }
       }
     }
-  }
-  return { adminItems, userItems, healthInstalled };
+    return { adminItems, userItems, healthInstalled };
+  }, [data?.list, isAdmin]);
 }
 
 export function AppShell({ children }: AppShellProps) {
@@ -186,36 +188,40 @@ export function AppShell({ children }: AppShellProps) {
   });
   const { adminItems: pluginAdminItems, userItems: pluginUserItems, healthInstalled } = usePluginMenuItems(isAdmin);
   const showStatusEntry = healthInstalled;
-  const adminUserItems = userMenuItems
-    .filter((item) => item.path !== '/')
-    .map((item, i) => (i === 0 ? { ...item, sectionKey: 'nav.personal' } : item));
-  // 不论 admin 还是普通用户视图，pluginUserItems 都会紧跟一个已有的「个人中心」section
-  // （admin 视图：adminUserItems；普通用户视图：userMenuItems），所以必须剥掉首项的
-  // sectionKey 避免 sections 数组里出现两个同名 section header → 渲染成两个「我的账户」。
-  const pluginUserItemsMerged = pluginUserItems.map((item, i) =>
-    i === 0 ? { path: item.path, labelKey: item.labelKey, icon: item.icon } : item,
-  );
-  const apiKeyPluginItems = pluginUserItemsMerged.filter((item) => isPlaygroundPluginPath(item.path));
-  const menuItems = isAPIKeySession
-    ? [...apiKeyMenuItems, ...apiKeyPluginItems]
-    : isAdmin
-      ? [...adminMenuItems, ...pluginAdminItems, ...adminUserItems, ...pluginUserItemsMerged]
-      : [...userMenuItems, ...pluginUserItemsMerged];
+  const sections = useMemo(() => {
+    const adminUserItems = userMenuItems
+      .filter((item) => item.path !== '/')
+      .map((item, i) => (i === 0 ? { ...item, sectionKey: 'nav.personal' } : item));
+    // 不论 admin 还是普通用户视图，pluginUserItems 都会紧跟一个已有的「个人中心」section
+    // （admin 视图：adminUserItems；普通用户视图：userMenuItems），所以必须剥掉首项的
+    // sectionKey 避免 sections 数组里出现两个同名 section header → 渲染成两个「我的账户」。
+    const pluginUserItemsMerged = pluginUserItems.map((item, i) =>
+      i === 0 ? { path: item.path, labelKey: item.labelKey, icon: item.icon } : item,
+    );
+    const apiKeyPluginItems = pluginUserItemsMerged.filter((item) => isPlaygroundPluginPath(item.path));
+    const menuItems = isAPIKeySession
+      ? [...apiKeyMenuItems, ...apiKeyPluginItems]
+      : isAdmin
+        ? [...adminMenuItems, ...pluginAdminItems, ...adminUserItems, ...pluginUserItemsMerged]
+        : [...userMenuItems, ...pluginUserItemsMerged];
 
-  const sections: Array<{ titleKey?: string; items: MenuItem[] }> = [];
-  let currentSection: { titleKey?: string; items: MenuItem[] } | null = null;
+    const nextSections: Array<{ titleKey?: string; items: MenuItem[] }> = [];
+    let currentSection: { titleKey?: string; items: MenuItem[] } | null = null;
 
-  menuItems.forEach((item) => {
-    if (item.sectionKey) {
-      currentSection = { titleKey: item.sectionKey, items: [item] };
-      sections.push(currentSection);
-    } else if (currentSection) {
-      currentSection.items.push(item);
-    } else {
-      currentSection = { items: [item] };
-      sections.push(currentSection);
-    }
-  });
+    menuItems.forEach((item) => {
+      if (item.sectionKey) {
+        currentSection = { titleKey: item.sectionKey, items: [item] };
+        nextSections.push(currentSection);
+      } else if (currentSection) {
+        currentSection.items.push(item);
+      } else {
+        currentSection = { items: [item] };
+        nextSections.push(currentSection);
+      }
+    });
+
+    return nextSections;
+  }, [isAPIKeySession, isAdmin, pluginAdminItems, pluginUserItems]);
 
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'zh' ? 'en' : 'zh';

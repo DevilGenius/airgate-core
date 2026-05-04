@@ -5,33 +5,116 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { Suspense, lazy } from 'react';
-import { AppShell } from './layout/AppShell';
-import { ChatShell } from './layout/ChatShell';
+import { Suspense, lazy, useEffect } from 'react';
+import type { ComponentType, ElementType, LazyExoticComponent, ReactNode } from 'react';
 import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
 import { getToken, getTokenRole } from '../shared/api/client';
 import { usersApi } from '../shared/api/users';
 import { setupApi } from '../shared/api/setup';
 import { ChatPageLoading, FullPageLoading, PageLoading } from '../shared/components/PageLoading';
-const SetupPage = lazy(() => import('../pages/SetupPage'));
-const LoginPage = lazy(() => import('../pages/LoginPage'));
-const PluginPage = lazy(() => import('../pages/PluginPage'));
-const PublicHomePage = lazy(() => import('../pages/HomePage'));
-const DocsPage = lazy(() => import('../pages/DocsPage'));
-const DashboardPage = lazy(() => import('../pages/DashboardPage'));
-const UserOverviewPage = lazy(() => import('../pages/user/UserOverviewPage'));
-const UsersPage = lazy(() => import('../pages/admin/UsersPage'));
-const AccountsPage = lazy(() => import('../pages/admin/AccountsPage'));
-const GroupsPage = lazy(() => import('../pages/admin/GroupsPage'));
-const SubscriptionsPage = lazy(() => import('../pages/admin/SubscriptionsPage'));
-const ProxiesPage = lazy(() => import('../pages/admin/ProxiesPage'));
-const UsagePage = lazy(() => import('../pages/admin/UsagePage'));
-const PluginsPage = lazy(() => import('../pages/admin/PluginsPage'));
-const SettingsPage = lazy(() => import('../pages/admin/SettingsPage'));
-const ProfilePage = lazy(() => import('../pages/user/ProfilePage'));
-const UserKeysPage = lazy(() => import('../pages/user/UserKeysPage'));
-const UserUsagePage = lazy(() => import('../pages/user/UserUsagePage'));
+
+type PreloadableLazyComponent<TProps = Record<string, never>> = LazyExoticComponent<ComponentType<TProps>> & {
+  preload: () => Promise<{ default: ComponentType<TProps> }>;
+};
+
+function lazyWithPreload<TProps>(
+  load: () => Promise<{ default: ComponentType<TProps> }>,
+): PreloadableLazyComponent<TProps> {
+  let promise: Promise<{ default: ComponentType<TProps> }> | undefined;
+  const preload = () => {
+    promise ??= load();
+    return promise;
+  };
+  const Component = lazy(preload) as PreloadableLazyComponent<TProps>;
+  Component.preload = preload;
+  return Component;
+}
+
+function requestIdle(work: () => void) {
+  if ('requestIdleCallback' in window) {
+    const id = window.requestIdleCallback(work, { timeout: 2500 });
+    return () => window.cancelIdleCallback(id);
+  }
+
+  const id = window.setTimeout(work, 500);
+  return () => window.clearTimeout(id);
+}
+
+const AppShell = lazyWithPreload<{ children: ReactNode }>(() =>
+  import('./layout/AppShell').then((m) => ({ default: m.AppShell })),
+);
+const ChatShell = lazyWithPreload<{ children: ReactNode }>(() =>
+  import('./layout/ChatShell').then((m) => ({ default: m.ChatShell })),
+);
+const SetupPage = lazyWithPreload(() => import('../pages/SetupPage'));
+const LoginPage = lazyWithPreload(() => import('../pages/LoginPage'));
+const PluginPage = lazyWithPreload(() => import('../pages/PluginPage'));
+const PublicHomePage = lazyWithPreload(() => import('../pages/HomePage'));
+const DocsPage = lazyWithPreload(() => import('../pages/DocsPage'));
+const DashboardPage = lazyWithPreload(() => import('../pages/DashboardPage'));
+const UserOverviewPage = lazyWithPreload(() => import('../pages/user/UserOverviewPage'));
+const UsersPage = lazyWithPreload(() => import('../pages/admin/UsersPage'));
+const AccountsPage = lazyWithPreload(() => import('../pages/admin/AccountsPage'));
+const GroupsPage = lazyWithPreload(() => import('../pages/admin/GroupsPage'));
+const SubscriptionsPage = lazyWithPreload(() => import('../pages/admin/SubscriptionsPage'));
+const ProxiesPage = lazyWithPreload(() => import('../pages/admin/ProxiesPage'));
+const UsagePage = lazyWithPreload(() => import('../pages/admin/UsagePage'));
+const PluginsPage = lazyWithPreload(() => import('../pages/admin/PluginsPage'));
+const SettingsPage = lazyWithPreload(() => import('../pages/admin/SettingsPage'));
+const ProfilePage = lazyWithPreload(() => import('../pages/user/ProfilePage'));
+const UserKeysPage = lazyWithPreload(() => import('../pages/user/UserKeysPage'));
+const UserUsagePage = lazyWithPreload(() => import('../pages/user/UserUsagePage'));
+
+const ADMIN_IDLE_PRELOADS = [
+  DashboardPage,
+  UsersPage,
+  AccountsPage,
+  GroupsPage,
+  UsagePage,
+  SettingsPage,
+];
+
+const USER_IDLE_PRELOADS = [
+  UserOverviewPage,
+  UserKeysPage,
+  UserUsagePage,
+  ProfilePage,
+];
+
+function RoutePreloader() {
+  const { user, isAPIKeySession } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+
+    const pages = isAPIKeySession
+      ? [UserUsagePage, PluginPage]
+      : user.role === 'admin'
+        ? ADMIN_IDLE_PRELOADS
+        : USER_IDLE_PRELOADS;
+    let index = 0;
+    let cancelIdle = () => {};
+    let cancelled = false;
+
+    const preloadNext = () => {
+      if (cancelled || index >= pages.length) return;
+      const page = pages[index++];
+      if (!page) return;
+      void page.preload().finally(() => {
+        if (!cancelled) cancelIdle = requestIdle(preloadNext);
+      });
+    };
+
+    cancelIdle = requestIdle(preloadNext);
+    return () => {
+      cancelled = true;
+      cancelIdle();
+    };
+  }, [isAPIKeySession, user]);
+
+  return null;
+}
 
 // 缓存安装状态，避免每次路由跳转都请求
 let setupChecked = false;
@@ -147,9 +230,12 @@ const authLayout = createRoute({
     }
   },
   component: () => (
-    <AppShell>
-      <Outlet />
-    </AppShell>
+    <Suspense fallback={<FullPageLoading />}>
+      <AppShell>
+        <RoutePreloader />
+        <Outlet />
+      </AppShell>
+    </Suspense>
   ),
 });
 
@@ -182,7 +268,7 @@ const adminLayout = createRoute({
   component: Outlet,
 });
 
-function renderPage(Page: React.LazyExoticComponent<React.ComponentType>) {
+function renderPage(Page: ElementType) {
   return () => (
     <Suspense fallback={<PageLoading />}>
       <Page />
@@ -218,11 +304,11 @@ const chatRoute = createRoute({
     }
   },
   component: () => (
-    <ChatShell>
-      <Suspense fallback={<ChatPageLoading />}>
+    <Suspense fallback={<ChatPageLoading />}>
+      <ChatShell>
         <PluginPage pluginNameOverride="airgate-playground" subPathOverride="/playground" />
-      </Suspense>
-    </ChatShell>
+      </ChatShell>
+    </Suspense>
   ),
 });
 

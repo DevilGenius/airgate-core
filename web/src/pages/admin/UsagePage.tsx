@@ -1,4 +1,4 @@
-import { useState, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Card, ComboBox, Input, ListBox, Select, Switch, Tabs, TextField as HeroTextField } from '@heroui/react';
@@ -11,6 +11,7 @@ import { usersApi } from '../../shared/api/users';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
+import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
 import { useUsageColumns, fmtNum, fmtCost, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
@@ -194,6 +195,7 @@ function DistributionCard({
               innerRadius={42}
               outerRadius={68}
               dataKey="value"
+              isAnimationActive={false}
               minAngle={3}
               stroke="var(--ag-surface)"
               strokeWidth={2}
@@ -433,7 +435,7 @@ function TokenTrendCard({
       extra={granularityTabs}
     >
       <div className="h-[248px] 2xl:h-[288px]">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" debounce={80}>
           <LineChart data={chartData} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
           <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
           <XAxis
@@ -493,10 +495,10 @@ function TokenTrendCard({
             wrapperStyle={{ fontSize: 11, color: 'var(--ag-text-tertiary)' }}
             formatter={(value: string) => lineLabels[value] || value}
           />
-          <Line type="monotone" dataKey="input" stroke="#3b82f6" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="output" stroke="#10b981" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="cacheCreation" stroke="#f59e0b" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="cacheRead" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="input" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="output" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="cacheCreation" stroke="#f59e0b" strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="cacheRead" stroke="#8b5cf6" strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
         </ResponsiveContainer>
       </div>
@@ -510,19 +512,28 @@ export default function UsagePage() {
   const { t } = useTranslation();
   const { page, setPage, pageSize, setPageSize } = usePagination(20);
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
+  const [modelInput, setModelInput] = useState('');
+  const debouncedModel = useDebouncedValue(modelInput.trim(), 250);
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
   const [granularity, setGranularity] = useState<string>('hour');
   const [autoRefresh, setAutoRefresh] = usePersistentBoolean(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, false);
   const { platforms, platformName } = usePlatforms();
   const autoRefreshInterval = autoRefresh ? USAGE_AUTO_UPDATE_INTERVAL_MS : false;
 
+  useEffect(() => {
+    const nextModel = debouncedModel || undefined;
+    setFilters((prev) => (prev.model === nextModel ? prev : { ...prev, model: nextModel }));
+    setPage(1);
+  }, [debouncedModel, setPage]);
+
   // 用户搜索
   const [userKeyword, setUserKeyword] = useState('');
+  const debouncedUserKeyword = useDebouncedValue(userKeyword.trim(), 250);
   const [selectedUserLabel, setSelectedUserLabel] = useState('');
   const { data: usersData } = useQuery({
-    queryKey: ['admin-users-search', userKeyword],
-    queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: userKeyword.trim() }),
-    enabled: userKeyword.trim().length > 0,
+    queryKey: ['admin-users-search', debouncedUserKeyword],
+    queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: debouncedUserKeyword }),
+    enabled: debouncedUserKeyword.length > 0,
   });
   const userOptions = (usersData?.list ?? []).map((u) => ({
     id: String(u.id),
@@ -547,11 +558,11 @@ export default function UsagePage() {
   })();
 
   // 构建查询参数
-  const queryParams: UsageQuery = {
+  const queryParams = useMemo<UsageQuery>(() => ({
     page,
     page_size: pageSize,
     ...filters,
-  };
+  }), [filters, page, pageSize]);
 
   // 使用记录列表
   const {
@@ -847,8 +858,8 @@ export default function UsagePage() {
               <Input
                 className="pl-9"
                 placeholder={t('usage.model_placeholder')}
-                value={filters.model || ''}
-                onChange={(e) => updateFilter('model', e.target.value)}
+                value={modelInput}
+                onChange={(e) => setModelInput(e.target.value)}
               />
             </div>
           </HeroTextField>

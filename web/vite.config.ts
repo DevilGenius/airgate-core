@@ -61,6 +61,9 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', '@tanstack/react-router', '@tanstack/react-query', 'i18next', 'react-i18next'],
+          ui: ['@heroui/react', '@heroui/styles', 'lucide-react', 'motion'],
+          charts: ['recharts'],
+          markdown: ['react-markdown', 'remark-gfm'],
         },
       },
     },

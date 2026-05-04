@@ -105,11 +105,10 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      // 30s 内复用缓存避免短时间内重复打接口；但只要组件重新 mount
-      // （比如用户切换侧边栏 tab 再回来）就强制 refetch，匹配"切 tab 应该看到最新数据"
-      // 的直觉。window focus 仍走默认行为，不会每次回到标签页都刷一遍。
-      staleTime: 30_000,
-      refetchOnMount: 'always',
+      // 短时间内切页返回直接复用缓存，避免路由切换时重复请求抢占首屏渲染。
+      staleTime: 60_000,
+      refetchOnMount: true,
+      refetchOnWindowFocus: false,
     },
   },
 });

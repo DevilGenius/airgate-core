@@ -222,7 +222,7 @@ export default function UserOverviewPage() {
             <div className="ag-distribution-card-body flex flex-col gap-3 xl:flex-row">
               <div className="ag-distribution-chart-frame">
                 <PieChart width={176} height={176}>
-                  <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" minAngle={3} stroke="var(--ag-bg-elevated)" strokeWidth={1}>
+                  <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" isAnimationActive={false} minAngle={3} stroke="var(--ag-bg-elevated)" strokeWidth={1}>
                     {models.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Pie>
                   <RechartsTooltip
@@ -286,7 +286,7 @@ export default function UserOverviewPage() {
         {/* Token 趋势 */}
         <SectionCard title={t('dashboard.token_trend')}>
           {trendData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={220} debounce={80}>
               <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--ag-border-subtle)" />
                 <XAxis
@@ -305,9 +305,9 @@ export default function UserOverviewPage() {
                   contentStyle={{ background: 'var(--ag-bg-elevated)', border: '1px solid var(--ag-border)', borderRadius: 8, fontSize: 12 }}
                   formatter={(value, name) => [fmtNum(Number(value)), name === 'input' ? t('usage.input') : name === 'output' ? t('usage.output') : t('usage.cache_read')]}
                 />
-                <Line type="monotone" dataKey="input" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="output" stroke="#10b981" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="cached" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="input" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="output" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="cached" stroke="#8b5cf6" strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           ) : (

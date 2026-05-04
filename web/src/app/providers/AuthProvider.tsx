@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { UserResp } from '../../shared/types';
 import {
   setToken,
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = (token: string, userData: UserResp) => {
+  const login = useCallback((token: string, userData: UserResp) => {
     setToken(token);
     setUser(normalizeSessionUser(userData, token));
     // 登录响应可能不包含全部用户字段（例如 API Key 登录时缺少 quota / expires_at），
@@ -67,19 +67,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (getToken() === token) setUser(normalizeSessionUser(freshUser, token));
       })
       .catch(() => {});
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setToken(null);
     setSessionAPIKey(null);
     setUser(null);
     window.location.href = '/login';
-  };
+  }, []);
 
   const isAPIKeySession = !!(user?.api_key_id && user.api_key_id > 0);
+  const value = useMemo(
+    () => ({ user, loading, isAPIKeySession, login, logout }),
+    [isAPIKeySession, loading, login, logout, user],
+  );
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAPIKeySession, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

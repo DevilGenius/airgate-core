@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button, Card, Input, ListBox, Meter, Select, Switch, TextField as HeroTextField } from '@heroui/react';
@@ -7,6 +7,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
+import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
 import { Activity, Hash, DollarSign, Coins, Search, Key, Clock, Gauge, Percent, Upload } from 'lucide-react';
@@ -186,14 +187,22 @@ export default function UserUsagePage() {
   const { t } = useTranslation();
   const { page, setPage, pageSize, setPageSize } = usePagination(20);
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
+  const [modelInput, setModelInput] = useState('');
+  const debouncedModel = useDebouncedValue(modelInput.trim(), 250);
   const [autoRefresh, setAutoRefresh] = usePersistentBoolean(USER_USAGE_AUTO_UPDATE_STORAGE_KEY, false);
   const autoRefreshInterval = autoRefresh ? USAGE_AUTO_UPDATE_INTERVAL_MS : false;
 
-  const queryParams: UsageQuery = {
+  useEffect(() => {
+    const nextModel = debouncedModel || undefined;
+    setFilters((prev) => (prev.model === nextModel ? prev : { ...prev, model: nextModel }));
+    setPage(1);
+  }, [debouncedModel, setPage]);
+
+  const queryParams = useMemo<UsageQuery>(() => ({
     page,
     page_size: pageSize,
     ...filters,
-  };
+  }), [filters, page, pageSize]);
 
   const { platforms, platformName } = usePlatforms();
   const platformOptions = [
@@ -383,8 +392,8 @@ export default function UserUsagePage() {
               <Input
                 className="pl-9"
                 placeholder={t('usage.model_placeholder')}
-                value={filters.model || ''}
-                onChange={(e) => updateFilter('model', e.target.value)}
+                value={modelInput}
+                onChange={(e) => setModelInput(e.target.value)}
               />
             </div>
           </HeroTextField>

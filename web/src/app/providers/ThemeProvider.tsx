@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { injectThemeStyle, setTheme, getStoredTheme, type ThemeName } from '@airgate/theme';
 
 interface ThemeContextValue {
@@ -27,12 +27,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     syncHeroUIThemeClass(theme);
   }, [theme]);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setThemeState((t) => (t === 'dark' ? 'light' : 'dark'));
-  };
+  }, []);
+  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
 
   return (
-    <ThemeContext value={{ theme, toggleTheme }}>
+    <ThemeContext value={value}>
       {children}
     </ThemeContext>
   );

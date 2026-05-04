@@ -396,7 +396,7 @@ function TrendChart({ data }: { data: AccountStatsResp }) {
   return (
     <div className="rounded-lg border border-border-subtle p-4">
       <h4 className="text-xs font-semibold text-text mb-3">{t('accounts.stats_trend_title')}</h4>
-      <ResponsiveContainer width="100%" height={260}>
+      <ResponsiveContainer width="100%" height={260} debounce={80}>
         <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--ag-border-subtle)" />
           <XAxis
@@ -436,9 +436,9 @@ function TrendChart({ data }: { data: AccountStatsResp }) {
               return [`$${v.toFixed(4)}`, name === 'totalCost' ? t('accounts.stats_total_cost_label') : t('accounts.stats_actual_cost_label')];
             }}
           />
-          <Line yAxisId="cost" type="monotone" dataKey="totalCost" stroke="#3b82f6" strokeWidth={2} dot={false} name="totalCost" />
-          <Line yAxisId="cost" type="monotone" dataKey="actualCost" stroke="#10b981" strokeWidth={2} dot={false} name="actualCost" />
-          <Line yAxisId="count" type="monotone" dataKey="count" stroke="#f59e0b" strokeWidth={2} dot={false} name="count" />
+          <Line yAxisId="cost" type="monotone" dataKey="totalCost" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} name="totalCost" />
+          <Line yAxisId="cost" type="monotone" dataKey="actualCost" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} name="actualCost" />
+          <Line yAxisId="count" type="monotone" dataKey="count" stroke="#f59e0b" strokeWidth={2} dot={false} isAnimationActive={false} name="count" />
         </LineChart>
       </ResponsiveContainer>
       <div className="flex items-center justify-center gap-4 mt-2">
@@ -484,6 +484,7 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
               innerRadius={35}
               outerRadius={70}
               dataKey="value"
+              isAnimationActive={false}
               minAngle={3}
               stroke="var(--ag-bg-elevated)"
               strokeWidth={1}

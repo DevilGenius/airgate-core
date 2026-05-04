@@ -5,6 +5,7 @@ import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox,
 import { usersApi } from '../../shared/api/users';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
@@ -31,6 +32,7 @@ export default function UsersPage() {
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE);
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
   const [statusFilter, setStatusFilter] = useState('');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -43,12 +45,12 @@ export default function UsersPage() {
   const [groupsUser, setGroupsUser] = useState<UserResp | null>(null);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: queryKeys.users(page, pageSize, keyword, statusFilter),
+    queryKey: queryKeys.users(page, pageSize, debouncedKeyword, statusFilter),
     queryFn: () =>
       usersApi.list({
         page,
         page_size: pageSize,
-        keyword: keyword || undefined,
+        keyword: debouncedKeyword || undefined,
         status: statusFilter || undefined,
       }),
     placeholderData: keepPreviousData,

@@ -398,7 +398,7 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
         <div className="ag-distribution-chart-frame">
           {activePieData.length > 0 ? (
             <PieChart width={176} height={176}>
-              <Pie data={activePieData} cx="50%" cy="50%" dataKey="value" innerRadius={42} minAngle={3} outerRadius={68} stroke="var(--ag-surface)" strokeWidth={2}>
+              <Pie data={activePieData} cx="50%" cy="50%" dataKey="value" innerRadius={42} isAnimationActive={false} minAngle={3} outerRadius={68} stroke="var(--ag-surface)" strokeWidth={2}>
                 {activePieData.map((_, index) => (
                   <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                 ))}
@@ -490,16 +490,16 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
     <DashboardCard>
       {chartData.length > 0 ? (
         <div className="h-[248px] 2xl:h-[288px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" debounce={80}>
             <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 8, top: 4 }}>
               <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
               <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickLine={false} />
               <YAxis axisLine={false} tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
               <RechartsTooltip content={<TokenTrendTooltip />} />
               <Legend iconSize={8} iconType="circle" wrapperStyle={{ color: 'var(--ag-text-tertiary)', fontSize: 11 }} />
-              <Line dataKey="input" dot={false} name={t('dashboard.input')} stroke="#3b82f6" strokeWidth={2.5} type="monotone" />
-              <Line dataKey="output" dot={false} name={t('dashboard.output')} stroke="#10b981" strokeWidth={2.5} type="monotone" />
-              <Line dataKey="cachedInput" dot={false} name={t('dashboard.cached_input')} stroke="#8b5cf6" strokeWidth={2.5} type="monotone" />
+              <Line dataKey="input" dot={false} isAnimationActive={false} name={t('dashboard.input')} stroke="#3b82f6" strokeWidth={2.5} type="monotone" />
+              <Line dataKey="output" dot={false} isAnimationActive={false} name={t('dashboard.output')} stroke="#10b981" strokeWidth={2.5} type="monotone" />
+              <Line dataKey="cachedInput" dot={false} isAnimationActive={false} name={t('dashboard.cached_input')} stroke="#8b5cf6" strokeWidth={2.5} type="monotone" />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -530,7 +530,7 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
     <DashboardCard title={t('dashboard.top_users')}>
       {topUsers.length > 0 ? (
         <div className="h-[268px] 2xl:h-[320px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" debounce={80}>
             <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 8, top: 4 }}>
               <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
               <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickLine={false} />
@@ -538,7 +538,7 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
               <RechartsTooltip content={<ChartTooltip />} />
               <Legend iconSize={8} iconType="circle" wrapperStyle={{ color: 'var(--ag-text-tertiary)', fontSize: 11 }} />
               {topUsers.map((user, index) => (
-                <Line key={user.user_id} dataKey={user.email} dot={false} stroke={USER_COLORS[index % USER_COLORS.length]} strokeWidth={2.5} type="monotone" />
+                <Line key={user.user_id} dataKey={user.email} dot={false} isAnimationActive={false} stroke={USER_COLORS[index % USER_COLORS.length]} strokeWidth={2.5} type="monotone" />
               ))}
             </LineChart>
           </ResponsiveContainer>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField, Tooltip } from '@heroui/react';
@@ -25,6 +25,7 @@ import { AccountTestModal } from './AccountTestModal';
 import { AccountStatsModal } from './AccountStatsModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
@@ -88,6 +89,51 @@ function formatCountdown(ms: number): string {
   return `${sec}s`;
 }
 
+function accountHasLiveCooldown(row: AccountResp, now: number): boolean {
+  const stateUntil = row.state_until ? Date.parse(row.state_until) : 0;
+  if (stateUntil > now) return true;
+  return (row.family_cooldowns || []).some((fc) => Date.parse(fc.until) > now);
+}
+
+let cooldownClockNow = Date.now();
+let cooldownClockTimer: number | null = null;
+const cooldownClockListeners = new Set<() => void>();
+
+function subscribeCooldownClock(listener: () => void) {
+  cooldownClockNow = Date.now();
+  cooldownClockListeners.add(listener);
+  if (cooldownClockTimer == null) {
+    cooldownClockTimer = window.setInterval(() => {
+      cooldownClockNow = Date.now();
+      cooldownClockListeners.forEach((notify) => notify());
+    }, 1000);
+  }
+
+  return () => {
+    cooldownClockListeners.delete(listener);
+    if (cooldownClockListeners.size === 0 && cooldownClockTimer != null) {
+      window.clearInterval(cooldownClockTimer);
+      cooldownClockTimer = null;
+    }
+  };
+}
+
+function subscribeIdleClock() {
+  return () => {};
+}
+
+function getCooldownClockSnapshot() {
+  return cooldownClockNow;
+}
+
+function useCooldownClock(enabled: boolean): number {
+  return useSyncExternalStore(
+    enabled ? subscribeCooldownClock : subscribeIdleClock,
+    getCooldownClockSnapshot,
+    getCooldownClockSnapshot,
+  );
+}
+
 /**
  * AccountStatusCell 渲染账号状态徽标，按 state + state_until 动态展示：
  *   active       → 绿色 "活跃"
@@ -102,18 +148,10 @@ function formatCountdown(ms: number): string {
  */
 function AccountStatusCell({ row }: { row: AccountResp }) {
   const { t } = useTranslation();
+  const hasLiveCooldown = accountHasLiveCooldown(row, Date.now());
+  const tickingNow = useCooldownClock(hasLiveCooldown);
+  const now = hasLiveCooldown ? tickingNow : Date.now();
   const untilMs = row.state_until ? Date.parse(row.state_until) : 0;
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!untilMs || untilMs <= now) {
-      // 即使账号 state 不需要倒计时，也可能有家族冷却需要刷新显示
-      if (!row.family_cooldowns || row.family_cooldowns.length === 0) return;
-    }
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [untilMs, now, row.family_cooldowns]);
-
   const remainingMs = untilMs - now;
   const hasCountdown = untilMs > 0 && remainingMs > 0;
 
@@ -242,6 +280,7 @@ export default function AccountsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
   const [platformFilter, setPlatformFilter] = useState('');
   const [stateFilter, setStateFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -288,12 +327,12 @@ export default function AccountsPage() {
 
   // 查询账号列表
   const { data, isLoading } = useQuery({
-    queryKey: queryKeys.accounts(page, pageSize, keyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter),
+    queryKey: queryKeys.accounts(page, pageSize, debouncedKeyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter),
     queryFn: () =>
       accountsApi.list({
         page,
         page_size: pageSize,
-        keyword: keyword || undefined,
+        keyword: debouncedKeyword || undefined,
         platform: platformFilter || undefined,
         state: stateFilter || undefined,
         account_type: typeFilter || undefined,
@@ -346,7 +385,7 @@ export default function AccountsPage() {
         return accountsApi.export({ ids: selectedIds });
       }
       return accountsApi.export({
-        keyword: keyword || undefined,
+        keyword: debouncedKeyword || undefined,
         platform: platformFilter || undefined,
         state: stateFilter || undefined,
         account_type: typeFilter || undefined,
