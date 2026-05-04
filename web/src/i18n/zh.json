@@ -733,7 +733,7 @@
     "tab_defaults": "新用户默认值",
     "tab_smtp": "邮件配置",
     "tab_storage": "对象存储",
-    "tab_security": "安全与认证",
+    "tab_security": "用户管理",
     "tab_openclaw": "OpenClaw 接入",
     "tab_system": "系统更新",
 

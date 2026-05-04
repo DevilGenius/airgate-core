@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Alert, AlertDialog, Button, Card, Form, Input, Label, Modal, Spinner, Switch, Tabs, TextArea as Textarea, useOverlayState } from '@heroui/react';
+import { Alert, AlertDialog, Button, Card, Form, Input, Label, Modal, Spinner, Switch, Tabs, TextArea, useOverlayState } from '@heroui/react';
 import { settingsApi } from '../../shared/api/settings';
 import { adminApiKeyApi, type AdminAPIKeyResp } from '../../shared/api/adminApiKey';
 import { defaultLogoUrl } from '../../app/providers/SiteSettingsProvider';
@@ -10,7 +10,7 @@ import { useClipboard } from '../../shared/hooks/useClipboard';
 import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
-  Save, Loader2, Globe, UserPlus, Gift, Mail, Send, Upload, X, Eye, RotateCcw,
+  Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
   ShieldCheck, Copy, Trash2, KeyRound, Zap, Download, Database,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
@@ -122,27 +122,22 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'security' | 'registration' | 'defaults' | 'smtp' | 'storage' | 'openclaw' | 'system';
+type TabKey = 'site' | 'security' | 'smtp' | 'storage' | 'openclaw' | 'system';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
   { key: 'security', labelKey: 'settings.tab_security', icon: ShieldCheck },
-  { key: 'registration', labelKey: 'settings.tab_registration', icon: UserPlus },
-  { key: 'defaults', labelKey: 'settings.tab_defaults', icon: Gift },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
   { key: 'storage', labelKey: 'settings.tab_storage', icon: Database },
   { key: 'openclaw', labelKey: 'settings.tab_openclaw', icon: Zap },
   { key: 'system', labelKey: 'settings.tab_system', icon: Download },
 ];
 
-// security 和 system tab 不走通用 settings save 流程；前者管理 admin-api-key，
-// 后者通过独立的 upgrade API 管理。
+// system tab 通过独立的 upgrade API 管理，不走通用 settings save 流程。
 type SaveTabKey = Exclude<TabKey, 'security' | 'system'>;
 
 const TAB_GROUP: Record<SaveTabKey, string> = {
   site: 'site',
-  registration: 'registration',
-  defaults: 'defaults',
   smtp: 'smtp',
   storage: 'storage',
   openclaw: 'openclaw',
@@ -150,8 +145,6 @@ const TAB_GROUP: Record<SaveTabKey, string> = {
 
 const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
   site: SITE_KEYS,
-  registration: REG_KEYS,
-  defaults: DEFAULT_KEYS,
   smtp: SMTP_KEYS,
   storage: STORAGE_KEYS,
   openclaw: OPENCLAW_KEYS,
@@ -168,6 +161,7 @@ export default function SettingsPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [emailTplType, setEmailTplType] = useState<'verify' | 'balance_alert'>('verify');
+  const [isEmailPreviewOpen, setEmailPreviewOpen] = useState(false);
 
   // 获取所有设置
   const { data: settings, isLoading } = useQuery({
@@ -218,15 +212,36 @@ export default function SettingsPage() {
     return val(key) === 'true';
   }
 
-  function handleSave() {
-    if (activeTab === 'security' || activeTab === 'system') return;
-    const group = TAB_GROUP[activeTab];
-    const keys = TAB_KEYS[activeTab];
-    const items: SettingItem[] = keys.map((key) => ({
+  function buildSaveItems(): SettingItem[] {
+    if (activeTab === 'system') return [];
+    if (activeTab === 'security') {
+      return [
+        ...REG_KEYS.map((key) => ({
+          key,
+          value: values[key] ?? '',
+          group: 'registration',
+        })),
+        ...DEFAULT_KEYS.map((key) => ({
+          key,
+          value: values[key] ?? '',
+          group: 'defaults',
+        })),
+      ];
+    }
+
+    const tab = activeTab as SaveTabKey;
+    const group = TAB_GROUP[tab];
+    const keys = TAB_KEYS[tab];
+    return keys.map((key) => ({
       key,
       value: values[key] ?? '',
       group,
     }));
+  }
+
+  function handleSave() {
+    const items = buildSaveItems();
+    if (items.length === 0) return;
     saveMutation.mutate(items);
   }
 
@@ -253,45 +268,93 @@ export default function SettingsPage() {
     );
   }
 
-  return (
-    <div className="ag-settings-page">
-      <Tabs
-        className="ag-page-tabs ag-page-tabs-wide mb-6 w-full"
-        selectedKey={activeTab}
-        onSelectionChange={(key) => setActiveTab(key as TabKey)}
+  function renderSaveAction(left?: React.ReactNode) {
+    if (activeTab === 'system') return null;
+    return (
+      <div className="ag-settings-card-footer">
+        {left ? <div className="ag-settings-card-footer-left">{left}</div> : null}
+        <Button
+          onPress={handleSave}
+          isDisabled={!hasChanges || saveMutation.isPending}
+          aria-busy={saveMutation.isPending}
+        >
+          <Save className="w-4 h-4" />
+          {t('common.save')}
+        </Button>
+      </div>
+    );
+  }
+
+  const saveAction = renderSaveAction();
+  const smtpSaveAction = renderSaveAction(
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        onPress={() => setEmailPreviewOpen(true)}
       >
-        <Tabs.List>
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <Tabs.Tab key={tab.key} id={tab.key}>
-                <Icon className="w-4 h-4" />
-                {t(tab.labelKey)}
-              </Tabs.Tab>
-            );
-          })}
-        </Tabs.List>
-      </Tabs>
+        <MailSearch className="w-3.5 h-3.5" />
+        {t('settings.template_preview')}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        onPress={() => {
+          if (emailTplType === 'verify') {
+            set('email_template_subject', DEFAULT_EMAIL_SUBJECT);
+            set('email_template_body', DEFAULT_EMAIL_BODY);
+            return;
+          }
+          set('balance_alert_email_subject', DEFAULT_BALANCE_ALERT_SUBJECT);
+          set('balance_alert_email_body', DEFAULT_BALANCE_ALERT_BODY);
+        }}
+      >
+        <RotateCcw className="w-3.5 h-3.5" />
+        {t('settings.template_reset')}
+      </Button>
+    </>,
+  );
+
+  return (
+    <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 md:py-8 flex flex-col gap-6 min-h-screen">
+      <div className="mx-auto w-full max-w-full overflow-x-auto hide-scrollbar pb-1">
+        <Tabs
+          className="ag-page-tabs ag-settings-tabs whitespace-nowrap"
+          selectedKey={activeTab}
+          onSelectionChange={(key) => setActiveTab(key as TabKey)}
+        >
+          <Tabs.List>
+            {TABS.map((tab, index) => {
+              const Icon = tab.icon;
+              return (
+                <Tabs.Tab key={tab.key} id={tab.key}>
+                  {index > 0 ? <Tabs.Separator /> : null}
+                  <Tabs.Indicator />
+                  <Icon className="w-4 h-4" />
+                  <span>{t(tab.labelKey)}</span>
+                </Tabs.Tab>
+              );
+            })}
+          </Tabs.List>
+        </Tabs>
+      </div>
 
       {/* Content */}
-      <div className="ag-page-body">
+      <div className="flex-1 w-full flex flex-col gap-6">
         {activeTab === 'site' && (
           <Card>
             <Card.Header>
               <Card.Title>{t('settings.site_branding')}</Card.Title>
             </Card.Header>
             <Card.Content>
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Field label={t('settings.site_name')} hint={t('settings.site_name_hint')}>
                   <Input value={val('site_name')} onChange={(e) => set('site_name', e.target.value)} placeholder="AirGate" />
                 </Field>
                 <Field label={t('settings.site_subtitle')}>
                   <Input value={val('site_subtitle')} onChange={(e) => set('site_subtitle', e.target.value)} placeholder="AI API Gateway" />
                 </Field>
-                <Field label={t('settings.site_logo')} hint={t('settings.site_logo_hint')}>
-                  <LogoUpload value={val('site_logo')} onChange={(url) => set('site_logo', url)} />
-                </Field>
-                <Field label={t('settings.api_base_url')} hint={t('settings.api_base_url_hint')}>
+                <Field className="col-span-1 md:col-span-2" label={t('settings.api_base_url')} hint={t('settings.api_base_url_hint')}>
                   <Input value={val('api_base_url')} onChange={(e) => set('api_base_url', e.target.value)} placeholder="https://api.example.com" />
                 </Field>
                 <Field label={t('settings.contact_info')}>
@@ -300,92 +363,96 @@ export default function SettingsPage() {
                 <Field label={t('settings.doc_url')}>
                   <Input value={val('doc_url')} onChange={(e) => set('doc_url', e.target.value)} placeholder="https://docs.example.com" />
                 </Field>
+                <Field className="col-span-1 md:col-span-2" label={t('settings.site_logo')} hint={t('settings.site_logo_hint')}>
+                  <LogoUpload value={val('site_logo')} onChange={(url) => set('site_logo', url)} />
+                </Field>
               </div>
+              {saveAction}
             </Card.Content>
           </Card>
         )}
 
-        {activeTab === 'security' && <SecurityPanel />}
-
-        {activeTab === 'registration' && (
+        {activeTab === 'security' && (
           <Card>
             <Card.Header>
-              <Card.Title>{t('settings.registration_auth')}</Card.Title>
+              <Card.Title>{t('settings.tab_security')}</Card.Title>
             </Card.Header>
             <Card.Content>
-              <div className="space-y-5">
-                <Switch
-                  isSelected={boolVal('registration_enabled')}
-                  onChange={(v) => set('registration_enabled', String(v))}
-                >
-                  <Switch.Control>
-                    <Switch.Thumb />
-                  </Switch.Control>
-                  <Switch.Content>
-                    <span className="text-sm font-medium text-text">{t('settings.registration_enabled')}</span>
-                    <span className="block text-xs text-text-tertiary">{t('settings.registration_enabled_desc')}</span>
-                  </Switch.Content>
-                </Switch>
-                <Switch
-                  isDisabled={!val('smtp_host')}
-                  isSelected={boolVal('email_verify_enabled')}
-                  onChange={(v) => {
-                    if (v && !val('smtp_host')) return;
-                    set('email_verify_enabled', String(v));
-                  }}
-                >
-                  <Switch.Control>
-                    <Switch.Thumb />
-                  </Switch.Control>
-                  <Switch.Content>
-                    <span className="text-sm font-medium text-text">{t('settings.email_verify_enabled')}</span>
-                    <span className="block text-xs text-text-tertiary">
-                      {val('smtp_host') ? t('settings.email_verify_enabled_desc') : t('settings.email_verify_no_smtp')}
-                    </span>
-                  </Switch.Content>
-                </Switch>
-                <Field label={t('settings.email_suffix_whitelist')} hint={t('settings.email_suffix_whitelist_hint')}>
-                  <Textarea
-                    value={val('registration_email_suffix_whitelist')}
-                    onChange={(e) => set('registration_email_suffix_whitelist', e.target.value)}
-                    rows={3}
-                    placeholder="gmail.com&#10;outlook.com"
-                  />
-                </Field>
+              <div className="ag-settings-section-stack">
+                <SecurityPanel />
+
+                <SettingsSection title={t('settings.registration_auth')}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-6">
+                      <Switch
+                        isSelected={boolVal('registration_enabled')}
+                        onChange={(v) => set('registration_enabled', String(v))}
+                      >
+                        <Switch.Control>
+                          <Switch.Thumb />
+                        </Switch.Control>
+                        <Switch.Content>
+                          <span className="text-sm font-medium text-text">{t('settings.registration_enabled')}</span>
+                          <span className="block text-xs text-text-tertiary">{t('settings.registration_enabled_desc')}</span>
+                        </Switch.Content>
+                      </Switch>
+                      <Switch
+                        isDisabled={!val('smtp_host')}
+                        isSelected={boolVal('email_verify_enabled')}
+                        onChange={(v) => {
+                          if (v && !val('smtp_host')) return;
+                          set('email_verify_enabled', String(v));
+                        }}
+                      >
+                        <Switch.Control>
+                          <Switch.Thumb />
+                        </Switch.Control>
+                        <Switch.Content>
+                          <span className="text-sm font-medium text-text">{t('settings.email_verify_enabled')}</span>
+                          <span className="block text-xs text-text-tertiary">
+                            {val('smtp_host') ? t('settings.email_verify_enabled_desc') : t('settings.email_verify_no_smtp')}
+                          </span>
+                        </Switch.Content>
+                      </Switch>
+                    </div>
+                    <Field className="col-span-1" label={t('settings.email_suffix_whitelist')} hint={t('settings.email_suffix_whitelist_hint')}>
+                    <TextArea
+                        value={val('registration_email_suffix_whitelist')}
+                        onChange={(e) => set('registration_email_suffix_whitelist', e.target.value)}
+                        rows={3}
+                        placeholder="gmail.com&#10;outlook.com"
+                      />
+                    </Field>
+                  </div>
+                </SettingsSection>
+
+                <SettingsSection title={t('settings.new_user_defaults')}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Field label={t('settings.default_balance')} hint={t('settings.default_balance_hint')}>
+                      <Input
+                        type="number"
+                        value={val('default_balance')}
+                        onChange={(e) => set('default_balance', e.target.value)}
+                        placeholder="0"
+                      />
+                    </Field>
+                    <Field label={t('settings.default_concurrency')} hint={t('settings.default_concurrency_hint')}>
+                      <Input
+                        type="number"
+                        value={val('default_concurrency')}
+                        onChange={(e) => set('default_concurrency', e.target.value)}
+                        placeholder="5"
+                      />
+                    </Field>
+                  </div>
+                </SettingsSection>
               </div>
+              {saveAction}
             </Card.Content>
           </Card>
         )}
 
-        {activeTab === 'defaults' && (
-          <Card>
-            <Card.Header>
-              <Card.Title>{t('settings.new_user_defaults')}</Card.Title>
-            </Card.Header>
-            <Card.Content>
-              <div className="space-y-4">
-                <Field label={t('settings.default_balance')} hint={t('settings.default_balance_hint')}>
-                  <Input
-                    type="number"
-                    value={val('default_balance')}
-                    onChange={(e) => set('default_balance', e.target.value)}
-                    placeholder="0"
-                  />
-                </Field>
-                <Field label={t('settings.default_concurrency')} hint={t('settings.default_concurrency_hint')}>
-                  <Input
-                    type="number"
-                    value={val('default_concurrency')}
-                    onChange={(e) => set('default_concurrency', e.target.value)}
-                    placeholder="5"
-                  />
-                </Field>
-              </div>
-            </Card.Content>
-          </Card>
-        )}
-
-        {activeTab === 'smtp' && (<>
+        {activeTab === 'smtp' && (
           <Card>
             <Card.Header className="justify-between gap-3">
               <Card.Title>{t('settings.smtp_config')}</Card.Title>
@@ -401,100 +468,110 @@ export default function SettingsPage() {
               </Button>
             </Card.Header>
             <Card.Content>
-              <Form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label={t('settings.smtp_host')}>
-                    <Input value={val('smtp_host')} onChange={(e) => set('smtp_host', e.target.value)} placeholder="smtp.gmail.com" />
-                  </Field>
-                  <Field label={t('settings.smtp_port')}>
-                    <Input type="number" value={val('smtp_port')} onChange={(e) => set('smtp_port', e.target.value)} placeholder="587" />
-                  </Field>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label={t('settings.smtp_username')}>
-                    <Input value={val('smtp_username')} onChange={(e) => set('smtp_username', e.target.value)} />
-                  </Field>
-                  <Field label={t('settings.smtp_password')}>
-                    <Input name="smtp_password" type="password" value={val('smtp_password')} onChange={(e) => set('smtp_password', e.target.value)} autoComplete="off" />
-                  </Field>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label={t('settings.smtp_from_email')}>
-                    <Input value={val('smtp_from_email')} onChange={(e) => set('smtp_from_email', e.target.value)} placeholder="noreply@example.com" />
-                  </Field>
-                  <Field label={t('settings.smtp_from_name')}>
-                    <Input value={val('smtp_from_name')} onChange={(e) => set('smtp_from_name', e.target.value)} placeholder="AirGate" />
-                  </Field>
-                </div>
-                <Switch
-                  isSelected={boolVal('smtp_use_tls')}
-                  onChange={(v) => set('smtp_use_tls', String(v))}
+              <div className="ag-settings-section-stack">
+                <SettingsSection title={t('settings.smtp_config')}>
+                  <Form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Field label={t('settings.smtp_host')}>
+                        <Input value={val('smtp_host')} onChange={(e) => set('smtp_host', e.target.value)} placeholder="smtp.gmail.com" />
+                      </Field>
+                      <Field label={t('settings.smtp_port')}>
+                        <Input type="number" value={val('smtp_port')} onChange={(e) => set('smtp_port', e.target.value)} placeholder="587" />
+                      </Field>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Field label={t('settings.smtp_username')}>
+                        <Input value={val('smtp_username')} onChange={(e) => set('smtp_username', e.target.value)} />
+                      </Field>
+                      <Field label={t('settings.smtp_password')}>
+                        <Input name="smtp_password" type="password" value={val('smtp_password')} onChange={(e) => set('smtp_password', e.target.value)} autoComplete="off" />
+                      </Field>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Field label={t('settings.smtp_from_email')}>
+                        <Input value={val('smtp_from_email')} onChange={(e) => set('smtp_from_email', e.target.value)} placeholder="noreply@example.com" />
+                      </Field>
+                      <Field label={t('settings.smtp_from_name')}>
+                        <Input value={val('smtp_from_name')} onChange={(e) => set('smtp_from_name', e.target.value)} placeholder="AirGate" />
+                      </Field>
+                    </div>
+                    <Switch
+                      isSelected={boolVal('smtp_use_tls')}
+                      onChange={(v) => set('smtp_use_tls', String(v))}
+                    >
+                      <Switch.Control>
+                        <Switch.Thumb />
+                      </Switch.Control>
+                      <Switch.Content>
+                        <span className="text-sm font-medium text-text">{t('settings.smtp_use_tls')}</span>
+                        <span className="block text-xs text-text-tertiary">{t('settings.smtp_use_tls_desc')}</span>
+                      </Switch.Content>
+                    </Switch>
+                  </Form>
+                </SettingsSection>
+
+                <SettingsSection
+                  action={(
+                    <Tabs
+                      className="ag-page-tabs ag-page-tabs-compact"
+                      selectedKey={emailTplType}
+                      onSelectionChange={(key) => setEmailTplType(key as 'verify' | 'balance_alert')}
+                    >
+                      <Tabs.List>
+                        <Tabs.Tab id="verify">
+                          <Tabs.Indicator />
+                          <span>{t('settings.email_template')}</span>
+                        </Tabs.Tab>
+                        <Tabs.Tab id="balance_alert">
+                          <Tabs.Separator />
+                          <Tabs.Indicator />
+                          <span>{t('settings.balance_alert_email_template')}</span>
+                        </Tabs.Tab>
+                      </Tabs.List>
+                    </Tabs>
+                  )}
+                  title={emailTplType === 'verify' ? t('settings.email_template') : t('settings.balance_alert_email_template')}
                 >
-                  <Switch.Control>
-                    <Switch.Thumb />
-                  </Switch.Control>
-                  <Switch.Content>
-                    <span className="text-sm font-medium text-text">{t('settings.smtp_use_tls')}</span>
-                    <span className="block text-xs text-text-tertiary">{t('settings.smtp_use_tls_desc')}</span>
-                  </Switch.Content>
-                </Switch>
-              </Form>
+                  {emailTplType === 'verify' ? (
+                    <EmailTemplateEditor
+                      subject={val('email_template_subject') || DEFAULT_EMAIL_SUBJECT}
+                      body={val('email_template_body') || DEFAULT_EMAIL_BODY}
+                      onSubjectChange={(v) => set('email_template_subject', v)}
+                      onBodyChange={(v) => set('email_template_body', v)}
+                      siteName={val('site_name') || 'AirGate'}
+                      variables={[
+                        { name: 'site_name', sample: val('site_name') || 'AirGate' },
+                        { name: 'code', sample: '888888' },
+                        { name: 'email', sample: 'user@example.com' },
+                      ]}
+                      isPreviewOpen={isEmailPreviewOpen}
+                      onPreviewOpenChange={setEmailPreviewOpen}
+                    />
+                  ) : (
+                    <EmailTemplateEditor
+                      subject={val('balance_alert_email_subject') || DEFAULT_BALANCE_ALERT_SUBJECT}
+                      body={val('balance_alert_email_body') || DEFAULT_BALANCE_ALERT_BODY}
+                      onSubjectChange={(v) => set('balance_alert_email_subject', v)}
+                      onBodyChange={(v) => set('balance_alert_email_body', v)}
+                      siteName={val('site_name') || 'AirGate'}
+                      variables={[
+                        { name: 'site_name', sample: val('site_name') || 'AirGate' },
+                        { name: 'balance', sample: '$1.2345' },
+                        { name: 'threshold', sample: '$5.00' },
+                      ]}
+                      isPreviewOpen={isEmailPreviewOpen}
+                      onPreviewOpenChange={setEmailPreviewOpen}
+                    />
+                  )}
+                </SettingsSection>
+              </div>
+              {smtpSaveAction}
             </Card.Content>
           </Card>
-
-          {/* 邮件模板切换 */}
-          <Tabs
-            className="ag-page-tabs ag-page-tabs-compact"
-            selectedKey={emailTplType}
-            onSelectionChange={(key) => setEmailTplType(key as 'verify' | 'balance_alert')}
-          >
-            <Tabs.List>
-              <Tabs.Tab id="verify">{t('settings.email_template')}</Tabs.Tab>
-              <Tabs.Tab id="balance_alert">{t('settings.balance_alert_email_template')}</Tabs.Tab>
-            </Tabs.List>
-          </Tabs>
-
-          {emailTplType === 'verify' ? (
-            <EmailTemplateEditor
-              title={t('settings.email_template')}
-              subject={val('email_template_subject') || DEFAULT_EMAIL_SUBJECT}
-              body={val('email_template_body') || DEFAULT_EMAIL_BODY}
-              onSubjectChange={(v) => set('email_template_subject', v)}
-              onBodyChange={(v) => set('email_template_body', v)}
-              onReset={() => {
-                set('email_template_subject', DEFAULT_EMAIL_SUBJECT);
-                set('email_template_body', DEFAULT_EMAIL_BODY);
-              }}
-              siteName={val('site_name') || 'AirGate'}
-              variables={[
-                { name: 'site_name', sample: val('site_name') || 'AirGate' },
-                { name: 'code', sample: '888888' },
-                { name: 'email', sample: 'user@example.com' },
-              ]}
-            />
-          ) : (
-            <EmailTemplateEditor
-              title={t('settings.balance_alert_email_template')}
-              subject={val('balance_alert_email_subject') || DEFAULT_BALANCE_ALERT_SUBJECT}
-              body={val('balance_alert_email_body') || DEFAULT_BALANCE_ALERT_BODY}
-              onSubjectChange={(v) => set('balance_alert_email_subject', v)}
-              onBodyChange={(v) => set('balance_alert_email_body', v)}
-              onReset={() => {
-                set('balance_alert_email_subject', DEFAULT_BALANCE_ALERT_SUBJECT);
-                set('balance_alert_email_body', DEFAULT_BALANCE_ALERT_BODY);
-              }}
-              siteName={val('site_name') || 'AirGate'}
-              variables={[
-                { name: 'site_name', sample: val('site_name') || 'AirGate' },
-                { name: 'balance', sample: '$1.2345' },
-                { name: 'threshold', sample: '$5.00' },
-              ]}
-            />
-          )}
-        </>)}
+        )}
 
         {activeTab === 'storage' && (
-          <StoragePanel set={set} boolVal={boolVal} val={val} />
+          <StoragePanel set={set} boolVal={boolVal} val={val} footer={saveAction} />
         )}
 
         {activeTab === 'openclaw' && (
@@ -503,25 +580,12 @@ export default function SettingsPage() {
             set={set}
             boolVal={boolVal}
             val={val}
+            footer={saveAction}
           />
         )}
 
         {activeTab === 'system' && <SystemUpdatePanel />}
       </div>
-
-      {/* Save button (security/system tab 自管 actions) */}
-      {activeTab !== 'security' && activeTab !== 'system' && (
-        <div className="flex justify-end mt-6">
-          <Button
-            onPress={handleSave}
-            isDisabled={!hasChanges || saveMutation.isPending}
-            aria-busy={saveMutation.isPending}
-          >
-            <Save className="w-4 h-4" />
-            {t('common.save')}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
@@ -585,15 +649,11 @@ function SecurityPanel() {
   });
 
   return (
-    <Card>
-      <Card.Header>
-        <Card.Title>{t('settings.security_admin_key')}</Card.Title>
-      </Card.Header>
-      <Card.Content>
-        <p className="text-[12px] text-text-tertiary -mt-1 mb-4">
-          {t('settings.security_admin_key_desc')}
-        </p>
-
+    <>
+      <SettingsSection
+        description={t('settings.security_admin_key_desc')}
+        title={t('settings.security_admin_key')}
+      >
         <div className="mb-4">
           <Alert status="warning">
             <Alert.Content>
@@ -662,7 +722,7 @@ function SecurityPanel() {
             </div>
           </div>
         )}
-      </Card.Content>
+      </SettingsSection>
 
       <Modal state={showKeyModalState}>
         <Modal.Backdrop>
@@ -767,26 +827,32 @@ function SecurityPanel() {
           </AlertDialog.Container>
         </AlertDialog.Backdrop>
       </AlertDialog>
-    </Card>
+    </>
   );
 }
 
 // ==================== Email Template Editor ====================
 
 function EmailTemplateEditor({
-  title, subject, body, onSubjectChange, onBodyChange, onReset, siteName, variables,
+  subject,
+  body,
+  onSubjectChange,
+  onBodyChange,
+  siteName,
+  variables,
+  isPreviewOpen,
+  onPreviewOpenChange,
 }: {
-  title: string;
   subject: string;
   body: string;
   onSubjectChange: (v: string) => void;
   onBodyChange: (v: string) => void;
-  onReset: () => void;
   siteName: string;
   variables: { name: string; sample: string }[];
+  isPreviewOpen: boolean;
+  onPreviewOpenChange: (isOpen: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const [showPreview, setShowPreview] = useState(false);
 
   // 模板变量替换预览
   function replaceVars(text: string) {
@@ -798,82 +864,74 @@ function EmailTemplateEditor({
   }
 
   const previewHtml = replaceVars(body);
+  const previewModalState = useOverlayState({
+    isOpen: isPreviewOpen,
+    onOpenChange: onPreviewOpenChange,
+  });
 
   return (
-    <Card>
-      <Card.Header className="justify-between gap-3">
-        <Card.Title>{title}</Card.Title>
-        <div className="flex items-center gap-1.5">
-          <Button
-            size="sm"
-            variant={showPreview ? 'primary' : 'ghost'}
-            onPress={() => setShowPreview(!showPreview)}
-          >
-            <Eye className="w-3.5 h-3.5" />
-            {t('settings.template_preview')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onPress={onReset}
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            {t('settings.template_reset')}
-          </Button>
+    <>
+      <div className="space-y-4">
+        <div className="text-[11px] text-text-tertiary space-x-3">
+          <span>{t('settings.template_vars')}:</span>
+          {variables.map((v) => (
+            <code key={v.name} className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{`{{${v.name}}}`}</code>
+          ))}
         </div>
-      </Card.Header>
-      <Card.Content>
-        <div className="space-y-4">
-          <div className="text-[11px] text-text-tertiary space-x-3">
-            <span>{t('settings.template_vars')}:</span>
-            {variables.map((v) => (
-              <code key={v.name} className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{`{{${v.name}}}`}</code>
-            ))}
-          </div>
-          <Field label={t('settings.template_subject')}>
-            <Input value={subject} onChange={(e) => onSubjectChange(e.target.value)} />
-          </Field>
-          {showPreview ? (
-            <div>
-              <Label className="block text-[13px] font-medium text-text-secondary mb-1.5">
-                {t('settings.template_preview')}
-              </Label>
-              {/* 模拟邮件客户端 */}
-              <div className="max-w-[520px] mx-auto border border-glass-border rounded-xl overflow-hidden shadow-sm">
-                {/* 邮件头 */}
-                <div className="px-4 py-2.5 border-b border-glass-border bg-bg-hover/50 text-[11px] space-y-0.5">
-                  <div className="flex gap-2">
-                    <span className="text-text-tertiary w-8 shrink-0">From</span>
-                    <span className="text-text-secondary">{siteName}</span>
+        <Field label={t('settings.template_subject')}>
+          <Input value={subject} onChange={(e) => onSubjectChange(e.target.value)} />
+        </Field>
+        <Field label={t('settings.template_body')} hint={t('settings.template_body_hint')}>
+          <TextArea
+            aria-label={t('settings.template_body')}
+            value={body}
+            onChange={(e) => onBodyChange(e.target.value)}
+            className="h-80 w-full font-mono text-xs leading-5"
+          />
+        </Field>
+      </div>
+      {isPreviewOpen ? (
+        <Modal state={previewModalState}>
+          <Modal.Backdrop>
+            <Modal.Container placement="center" scroll="inside" size="lg">
+              <Modal.Dialog
+                className="ag-elevation-modal"
+                style={{ maxWidth: '820px', width: 'min(100%, calc(100vw - 2rem))' }}
+              >
+                <Modal.Header>
+                  <Modal.Heading>{t('settings.template_preview')}</Modal.Heading>
+                  <Modal.CloseTrigger />
+                </Modal.Header>
+                <Modal.Body>
+                  <div className="overflow-hidden rounded-xl border border-glass-border bg-overlay shadow-sm">
+                    <div className="space-y-0.5 border-b border-glass-border bg-bg-hover/50 px-4 py-2.5 text-[11px]">
+                      <div className="flex gap-2">
+                        <span className="w-8 shrink-0 text-text-tertiary">From</span>
+                        <span className="text-text-secondary">{siteName}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="w-8 shrink-0 text-text-tertiary">To</span>
+                        <span className="text-text-secondary">user@example.com</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="w-8 shrink-0 text-text-tertiary">Sub</span>
+                        <span className="font-medium text-text">{replaceVars(subject)}</span>
+                      </div>
+                    </div>
+                    <div className="max-h-[60vh] overflow-y-auto bg-[#f8f9fa] p-5">
+                      <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <span className="text-text-tertiary w-8 shrink-0">To</span>
-                    <span className="text-text-secondary">user@example.com</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <span className="text-text-tertiary w-8 shrink-0">Sub</span>
-                    <span className="text-text font-medium">{replaceVars(subject)}</span>
-                  </div>
-                </div>
-                {/* 邮件正文 */}
-                <div className="bg-[#f8f9fa] p-5">
-                  <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Field label={t('settings.template_body')} hint={t('settings.template_body_hint')}>
-              <Textarea
-                value={body}
-                onChange={(e) => onBodyChange(e.target.value)}
-                rows={12}
-                className="font-mono text-xs"
-              />
-            </Field>
-          )}
-        </div>
-      </Card.Content>
-    </Card>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button onPress={() => onPreviewOpenChange(false)}>{t('common.close')}</Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal>
+      ) : null}
+    </>
   );
 }
 
@@ -883,10 +941,12 @@ function StoragePanel({
   set,
   boolVal,
   val,
+  footer,
 }: {
   set: (key: string, value: string) => void;
   boolVal: (key: string) => boolean;
   val: (key: string) => string;
+  footer?: React.ReactNode;
 }) {
   const { t } = useTranslation();
 
@@ -896,82 +956,75 @@ function StoragePanel({
         <Card.Title>{t('settings.storage_config')}</Card.Title>
       </Card.Header>
       <Card.Content>
-        <Form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label={t('settings.s3_endpoint')} hint={t('settings.s3_endpoint_hint')}>
-              <Input
-                value={val('s3_endpoint')}
-                onChange={(e) => set('s3_endpoint', e.target.value)}
-                placeholder="http://minio:9000"
-              />
-            </Field>
-            <Field label={t('settings.s3_bucket')} hint={t('settings.s3_bucket_hint')}>
-              <Input
-                value={val('s3_bucket')}
-                onChange={(e) => set('s3_bucket', e.target.value)}
-                placeholder="airgate"
-              />
-            </Field>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label={t('settings.s3_access_key')}>
-              <Input
-                value={val('s3_access_key')}
-                onChange={(e) => set('s3_access_key', e.target.value)}
-                autoComplete="off"
-              />
-            </Field>
-            <Field label={t('settings.s3_secret_key')}>
-              <Input
-                name="s3_secret_key"
-                type="password"
-                value={val('s3_secret_key')}
-                onChange={(e) => set('s3_secret_key', e.target.value)}
-                autoComplete="off"
-              />
-            </Field>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label={t('settings.s3_region')} hint={t('settings.s3_region_hint')}>
-              <Input
-                value={val('s3_region')}
-                onChange={(e) => set('s3_region', e.target.value)}
-                placeholder="us-east-1"
-              />
-            </Field>
-            <Field label={t('settings.s3_presign_ttl_minutes')} hint={t('settings.s3_presign_ttl_minutes_hint')}>
-              <Input
-                type="number"
-                value={val('s3_presign_ttl_minutes')}
-                onChange={(e) => set('s3_presign_ttl_minutes', e.target.value)}
-                placeholder="360"
-              />
-            </Field>
-          </div>
-          <Field label={t('settings.s3_public_base_url')} hint={t('settings.s3_public_base_url_hint')}>
+        <Form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={(e) => e.preventDefault()}>
+          <Field label={t('settings.s3_endpoint')} hint={t('settings.s3_endpoint_hint')}>
+            <Input
+              value={val('s3_endpoint')}
+              onChange={(e) => set('s3_endpoint', e.target.value)}
+              placeholder="http://minio:9000"
+            />
+          </Field>
+          <Field label={t('settings.s3_bucket')} hint={t('settings.s3_bucket_hint')}>
+            <Input
+              value={val('s3_bucket')}
+              onChange={(e) => set('s3_bucket', e.target.value)}
+              placeholder="airgate"
+            />
+          </Field>
+          <Field label={t('settings.s3_access_key')}>
+            <Input
+              value={val('s3_access_key')}
+              onChange={(e) => set('s3_access_key', e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+          <Field label={t('settings.s3_secret_key')}>
+            <Input
+              name="s3_secret_key"
+              type="password"
+              value={val('s3_secret_key')}
+              onChange={(e) => set('s3_secret_key', e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+          <Field label={t('settings.s3_region')} hint={t('settings.s3_region_hint')}>
+            <Input
+              value={val('s3_region')}
+              onChange={(e) => set('s3_region', e.target.value)}
+              placeholder="us-east-1"
+            />
+          </Field>
+          <Field label={t('settings.s3_presign_ttl_minutes')} hint={t('settings.s3_presign_ttl_minutes_hint')}>
+            <Input
+              type="number"
+              value={val('s3_presign_ttl_minutes')}
+              onChange={(e) => set('s3_presign_ttl_minutes', e.target.value)}
+              placeholder="360"
+            />
+          </Field>
+          <Field className="col-span-1 md:col-span-2" label={t('settings.s3_public_base_url')} hint={t('settings.s3_public_base_url_hint')}>
             <Input
               value={val('s3_public_base_url')}
               onChange={(e) => set('s3_public_base_url', e.target.value)}
               placeholder="https://cdn.example.com/airgate"
             />
           </Field>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label={t('settings.s3_path_prefix')} hint={t('settings.s3_path_prefix_hint')}>
-              <Input
-                value={val('s3_path_prefix')}
-                onChange={(e) => set('s3_path_prefix', e.target.value)}
-                placeholder="airgate"
-              />
-            </Field>
-            <Field label={t('settings.local_storage_dir')} hint={t('settings.local_storage_dir_hint')}>
-              <Input
-                value={val('local_storage_dir')}
-                onChange={(e) => set('local_storage_dir', e.target.value)}
-                placeholder="data/assets"
-              />
-            </Field>
-          </div>
+          <Field label={t('settings.s3_path_prefix')} hint={t('settings.s3_path_prefix_hint')}>
+            <Input
+              value={val('s3_path_prefix')}
+              onChange={(e) => set('s3_path_prefix', e.target.value)}
+              placeholder="airgate"
+            />
+          </Field>
+          <Field label={t('settings.local_storage_dir')} hint={t('settings.local_storage_dir_hint')}>
+            <Input
+              value={val('local_storage_dir')}
+              onChange={(e) => set('local_storage_dir', e.target.value)}
+              placeholder="data/assets"
+            />
+          </Field>
           <Switch
+            className="col-span-1 md:col-span-2"
             isSelected={boolVal('s3_use_ssl')}
             onChange={(v) => set('s3_use_ssl', String(v))}
           >
@@ -984,6 +1037,7 @@ function StoragePanel({
             </Switch.Content>
           </Switch>
         </Form>
+        {footer}
       </Card.Content>
     </Card>
   );
@@ -996,11 +1050,13 @@ function OpenClawPanel({
   set,
   boolVal,
   val,
+  footer,
 }: {
   values: Record<string, string>;
   set: (key: string, value: string) => void;
   boolVal: (key: string) => boolean;
   val: (key: string) => string;
+  footer?: React.ReactNode;
 }) {
   const { t } = useTranslation();
   const copy = useClipboard();
@@ -1021,10 +1077,6 @@ function OpenClawPanel({
   const installCommandBash = `curl -fsSL ${baseForCmd}/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh`;
   const installCommandPowerShell = `iwr -useb ${baseForCmd}/openclaw/install.ps1 | iex`;
 
-  // 安装平台 tab：默认 Unix，状态只存在本地（刷新重置），因为纯展示不值得持久化。
-  const [installPlatform, setInstallPlatform] = useState<'unix' | 'windows'>('unix');
-  const installCommand = installPlatform === 'windows' ? installCommandPowerShell : installCommandBash;
-
   // 模型预设 JSON 的客户端校验：不阻塞保存，只给提示，让管理员自己决定。
   const modelsRaw = values['openclaw.models_preset'] ?? '';
   let modelsError = '';
@@ -1040,141 +1092,150 @@ function OpenClawPanel({
   }
 
   return (
-    <>
-      <Card>
-        <Card.Header>
-          <Card.Title>{t('settings.openclaw_quickstart')}</Card.Title>
-        </Card.Header>
-        <Card.Content>
-          <p className="text-[12px] text-text-tertiary -mt-1 mb-3">
-            {t('settings.openclaw_quickstart_desc')}
-          </p>
-          <Tabs
-            className="ag-page-tabs ag-page-tabs-compact mb-3"
-            selectedKey={installPlatform}
-            onSelectionChange={(key) => setInstallPlatform(key as 'unix' | 'windows')}
+    <Card>
+      <Card.Header>
+        <Card.Title>{t('settings.tab_openclaw')}</Card.Title>
+      </Card.Header>
+      <Card.Content>
+        <div className="ag-settings-section-stack">
+          <SettingsSection
+            description={t('settings.openclaw_quickstart_desc')}
+            title={t('settings.openclaw_quickstart')}
           >
-            <Tabs.List>
-              <Tabs.Tab id="unix">{t('settings.openclaw_install_tab_unix')}</Tabs.Tab>
-              <Tabs.Tab id="windows">{t('settings.openclaw_install_tab_windows')}</Tabs.Tab>
-            </Tabs.List>
-          </Tabs>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 min-w-0 px-3 py-2 rounded-md bg-surface border border-glass-border text-[12px] font-mono text-text break-all">
-              {installCommand}
-            </code>
-            <Button
-              size="sm"
-              variant="secondary"
-              onPress={() => copy(installCommand)}
-              isDisabled={!previewBase}
-            >
-              <Copy className="w-3.5 h-3.5" />
-              {t('settings.openclaw_copy_command')}
-            </Button>
-          </div>
-          {usingFallbackOrigin && (
-            <p className="text-[11px] text-text-tertiary mt-2">
-              {t('settings.openclaw_base_url_missing_hint')}
-            </p>
-          )}
-        </Card.Content>
-      </Card>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-text">
+                  {t('settings.openclaw_install_tab_unix')}
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 min-w-0 px-3 py-2 rounded-md bg-surface border border-glass-border text-[12px] font-mono text-text break-all">
+                    {installCommandBash}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => copy(installCommandBash)}
+                    isDisabled={!previewBase}
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    {t('settings.openclaw_copy_command')}
+                  </Button>
+                </div>
+              </div>
 
-      <Card>
-        <Card.Header>
-          <Card.Title>{t('settings.openclaw_basic')}</Card.Title>
-        </Card.Header>
-        <Card.Content>
-          <div className="space-y-5">
-            <Switch
-              isSelected={enabled}
-              onChange={(v) => set('openclaw.enabled', String(v))}
-            >
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-              <Switch.Content>
-                <span className="text-sm font-medium text-text">{t('settings.openclaw_enabled')}</span>
-                <span className="block text-xs text-text-tertiary">{t('settings.openclaw_enabled_desc')}</span>
-              </Switch.Content>
-            </Switch>
-            <Field label={t('settings.openclaw_provider_name')} hint={t('settings.openclaw_provider_name_hint')}>
-              <Input
-                value={val('openclaw.provider_name')}
-                onChange={(e) => set('openclaw.provider_name', e.target.value)}
-                placeholder={DEFAULT_OPENCLAW_PROVIDER_NAME}
-              />
-            </Field>
-            <Field label={t('settings.openclaw_base_url')} hint={t('settings.openclaw_base_url_hint')}>
-              <Input
-                value={val('openclaw.base_url')}
-                onChange={(e) => set('openclaw.base_url', e.target.value)}
-                placeholder="https://api.example.com"
-              />
-            </Field>
-          </div>
-        </Card.Content>
-      </Card>
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-text">
+                  {t('settings.openclaw_install_tab_windows')}
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 min-w-0 px-3 py-2 rounded-md bg-surface border border-glass-border text-[12px] font-mono text-text break-all">
+                    {installCommandPowerShell}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => copy(installCommandPowerShell)}
+                    isDisabled={!previewBase}
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    {t('settings.openclaw_copy_command')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            {usingFallbackOrigin && (
+              <p className="text-[11px] text-text-tertiary mt-2">
+                {t('settings.openclaw_base_url_missing_hint')}
+              </p>
+            )}
+          </SettingsSection>
 
-      <Card>
-        <Card.Header>
-          <Card.Title>{t('settings.openclaw_memory_search')}</Card.Title>
-        </Card.Header>
-        <Card.Content>
-          <div className="space-y-5">
-            <Switch
-              isSelected={boolVal('openclaw.memory_search_enabled')}
-              onChange={(v) => set('openclaw.memory_search_enabled', String(v))}
-            >
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-              <Switch.Content>
-                <span className="text-sm font-medium text-text">{t('settings.openclaw_memory_search_enabled')}</span>
-                <span className="block text-xs text-text-tertiary">{t('settings.openclaw_memory_search_enabled_desc')}</span>
-              </Switch.Content>
-            </Switch>
-            <Field label={t('settings.openclaw_memory_search_model')} hint={t('settings.openclaw_memory_search_model_hint')}>
-              <Input
-                value={val('openclaw.memory_search_model')}
-                onChange={(e) => set('openclaw.memory_search_model', e.target.value)}
-                placeholder={DEFAULT_OPENCLAW_MEMORY_MODEL}
-              />
-            </Field>
-          </div>
-        </Card.Content>
-      </Card>
+          <SettingsSection title={t('settings.openclaw_basic')}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Switch
+                className="col-span-1 md:col-span-2"
+                isSelected={enabled}
+                onChange={(v) => set('openclaw.enabled', String(v))}
+              >
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
+                <Switch.Content>
+                  <span className="text-sm font-medium text-text">{t('settings.openclaw_enabled')}</span>
+                  <span className="block text-xs text-text-tertiary">{t('settings.openclaw_enabled_desc')}</span>
+                </Switch.Content>
+              </Switch>
+              <Field label={t('settings.openclaw_provider_name')} hint={t('settings.openclaw_provider_name_hint')}>
+                <Input
+                  value={val('openclaw.provider_name')}
+                  onChange={(e) => set('openclaw.provider_name', e.target.value)}
+                  placeholder={DEFAULT_OPENCLAW_PROVIDER_NAME}
+                />
+              </Field>
+              <Field label={t('settings.openclaw_base_url')} hint={t('settings.openclaw_base_url_hint')}>
+                <Input
+                  value={val('openclaw.base_url')}
+                  onChange={(e) => set('openclaw.base_url', e.target.value)}
+                  placeholder="https://api.example.com"
+                />
+              </Field>
+            </div>
+          </SettingsSection>
 
-      <Card>
-        <Card.Header className="justify-between gap-3">
-          <Card.Title>{t('settings.openclaw_models_preset')}</Card.Title>
-          <Button
-            size="sm"
-            variant="ghost"
-            onPress={() => set('openclaw.models_preset', DEFAULT_OPENCLAW_MODELS_PRESET)}
+          <SettingsSection title={t('settings.openclaw_memory_search')}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Switch
+                className="col-span-1 md:col-span-2"
+                isSelected={boolVal('openclaw.memory_search_enabled')}
+                onChange={(v) => set('openclaw.memory_search_enabled', String(v))}
+              >
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
+                <Switch.Content>
+                  <span className="text-sm font-medium text-text">{t('settings.openclaw_memory_search_enabled')}</span>
+                  <span className="block text-xs text-text-tertiary">{t('settings.openclaw_memory_search_enabled_desc')}</span>
+                </Switch.Content>
+              </Switch>
+              <Field label={t('settings.openclaw_memory_search_model')} hint={t('settings.openclaw_memory_search_model_hint')}>
+                <Input
+                  value={val('openclaw.memory_search_model')}
+                  onChange={(e) => set('openclaw.memory_search_model', e.target.value)}
+                  placeholder={DEFAULT_OPENCLAW_MEMORY_MODEL}
+                />
+              </Field>
+            </div>
+          </SettingsSection>
+
+          <SettingsSection
+            action={(
+              <Button
+                size="sm"
+                variant="ghost"
+                onPress={() => set('openclaw.models_preset', DEFAULT_OPENCLAW_MODELS_PRESET)}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                {t('settings.template_reset')}
+              </Button>
+            )}
+            description={t('settings.openclaw_models_preset_desc')}
+            title={t('settings.openclaw_models_preset')}
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            {t('settings.template_reset')}
-          </Button>
-        </Card.Header>
-        <Card.Content>
-          <p className="text-[12px] text-text-tertiary -mt-1 mb-3">
-            {t('settings.openclaw_models_preset_desc')}
-          </p>
-          <Textarea
-            value={modelsRaw || DEFAULT_OPENCLAW_MODELS_PRESET}
-            onChange={(e) => set('openclaw.models_preset', e.target.value)}
-            rows={16}
-            className="font-mono text-xs"
-            placeholder={DEFAULT_OPENCLAW_MODELS_PRESET}
-          />
-          {modelsError && (
-            <p className="text-[11px] text-danger mt-1.5">{modelsError}</p>
-          )}
-        </Card.Content>
-      </Card>
-    </>
+            <TextArea
+              aria-label={t('settings.openclaw_models_preset')}
+              value={modelsRaw || DEFAULT_OPENCLAW_MODELS_PRESET}
+              onChange={(e) => set('openclaw.models_preset', e.target.value)}
+              className="h-80 w-full font-mono text-xs leading-5"
+              placeholder={DEFAULT_OPENCLAW_MODELS_PRESET}
+            />
+            {modelsError && (
+              <p className="text-[11px] text-danger mt-1.5">{modelsError}</p>
+            )}
+          </SettingsSection>
+        </div>
+        {footer}
+      </Card.Content>
+    </Card>
   );
 }
 
@@ -1250,9 +1311,46 @@ function LogoUpload({ value, onChange }: { value: string; onChange: (url: string
 
 // ==================== Field wrapper ====================
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function SettingsSection({
+  action,
+  children,
+  description,
+  title,
+}: {
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  description?: React.ReactNode;
+  title: React.ReactNode;
+}) {
   return (
-    <div>
+    <section className="ag-settings-section">
+      <div className="ag-settings-section-heading">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-text">{title}</h3>
+          {description ? (
+            <p className="mt-1 text-[12px] leading-5 text-text-tertiary">{description}</p>
+          ) : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      <div className="ag-settings-section-body">{children}</div>
+    </section>
+  );
+}
+
+function Field({
+  className = '',
+  label,
+  hint,
+  children,
+}: {
+  className?: string;
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`flex flex-col ${className}`}>
       <Label className="block text-[13px] font-medium text-text-secondary mb-1.5">
         {label}
       </Label>

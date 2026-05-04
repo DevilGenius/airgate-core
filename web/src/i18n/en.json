@@ -730,7 +730,7 @@
     "tab_defaults": "User Defaults",
     "tab_smtp": "Email (SMTP)",
     "tab_storage": "Object Storage",
-    "tab_security": "Security & Auth",
+    "tab_security": "User Management",
     "tab_openclaw": "OpenClaw",
     "tab_system": "System Update",
 
