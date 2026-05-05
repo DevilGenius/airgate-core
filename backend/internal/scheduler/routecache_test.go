@@ -112,11 +112,27 @@ func TestApplyModelRouting_Filter(t *testing.T) {
 	if len(got) != 2 || got[0].ID != 1 || got[1].ID != 3 {
 		t.Errorf("按 routing 过滤失败: %+v", got)
 	}
+}
 
-	// 未命中 model：原样返回（上游规则）
-	got = applyModelRouting(accounts, routing, "gpt-5.4")
-	if len(got) != 3 {
-		t.Errorf("未命中 model 应返回全部: %+v", got)
+// TestApplyModelRouting_UnmatchedRoute 有路由规则但 model 未命中时不能回退到整组账号。
+func TestApplyModelRouting_UnmatchedRoute(t *testing.T) {
+	accounts := []*ent.Account{{ID: 1}, {ID: 2}, {ID: 3}}
+	routing := map[string][]int64{"gpt-4o": {1, 3}}
+
+	got := applyModelRouting(accounts, routing, "gpt-5.4")
+	if len(got) != 0 {
+		t.Errorf("未命中 model 不应返回候选: %+v", got)
+	}
+}
+
+// TestApplyModelRouting_EmptyRoute 空账号列表表示显式禁止该模型。
+func TestApplyModelRouting_EmptyRoute(t *testing.T) {
+	accounts := []*ent.Account{{ID: 1}, {ID: 2}, {ID: 3}}
+	routing := map[string][]int64{"gpt-4o": {}}
+
+	got := applyModelRouting(accounts, routing, "gpt-4o")
+	if len(got) != 0 {
+		t.Errorf("空路由不应返回候选: %+v", got)
 	}
 }
 

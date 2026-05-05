@@ -406,8 +406,9 @@ func apiKeyGroupMatchesRequirements(keyInfo *auth.APIKeyInfo, requirements routi
 	if keyInfo == nil {
 		return false
 	}
-	if requirements.NeedsImage && strings.EqualFold(keyInfo.GroupPlatform, "openai") {
-		return pluginSettingEnabledForKey(keyInfo.GroupPluginSettings, "openai", "image_enabled")
+	if strings.EqualFold(keyInfo.GroupPlatform, "openai") {
+		imageEnabled := pluginSettingEnabledForKey(keyInfo.GroupPluginSettings, "openai", "image_enabled")
+		return imageEnabled == requirements.NeedsImage
 	}
 	return true
 }

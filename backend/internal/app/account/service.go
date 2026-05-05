@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -506,9 +508,15 @@ func extractBodyError(body []byte) string {
 
 // GetModels 获取账号平台的模型列表。
 func (s *Service) GetModels(ctx context.Context, id int) ([]Model, error) {
-	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
+	item, err := s.repo.FindByID(ctx, id, LoadOptions{WithProxy: true})
 	if err != nil {
 		return nil, err
+	}
+
+	if item.Platform == "openai" && item.Type == "apikey" {
+		if models, err := getAPIKeyUpstreamModels(ctx, item); err == nil && len(models) > 0 {
+			return models, nil
+		}
 	}
 
 	rawModels := s.plugins.GetModels(item.Platform)
@@ -517,6 +525,88 @@ func (s *Service) GetModels(ctx context.Context, id int) ([]Model, error) {
 		models = append(models, Model{ID: raw.ID, Name: raw.Name})
 	}
 	return models, nil
+}
+
+func getAPIKeyUpstreamModels(ctx context.Context, item Account) ([]Model, error) {
+	apiKey := strings.TrimSpace(item.Credentials["api_key"])
+	if apiKey == "" {
+		return nil, errors.New("missing api_key")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildAPIKeyModelsURL(item.Credentials["base_url"]), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client, err := accountHTTPClient(item.Proxy)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("/v1/models returned HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return nil, err
+	}
+	return parseOpenAIModelsResponse(body), nil
+}
+
+func buildAPIKeyModelsURL(baseURL string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if baseURL == "" {
+		baseURL = "https://api.openai.com"
+	}
+	if strings.HasSuffix(baseURL, "/v1") {
+		return baseURL + "/models"
+	}
+	return baseURL + "/v1/models"
+}
+
+func accountHTTPClient(proxyInfo *Proxy) (*http.Client, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if proxyURL := buildProxyURL(proxyInfo); proxyURL != "" {
+		parsed, err := url.Parse(proxyURL)
+		if err != nil {
+			return nil, err
+		}
+		transport.Proxy = http.ProxyURL(parsed)
+	}
+	return &http.Client{Transport: transport, Timeout: 30 * time.Second}, nil
+}
+
+func parseOpenAIModelsResponse(body []byte) []Model {
+	var payload struct {
+		Data []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil
+	}
+	models := make([]Model, 0, len(payload.Data))
+	seen := make(map[string]bool, len(payload.Data))
+	for _, raw := range payload.Data {
+		id := strings.TrimSpace(raw.ID)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		name := strings.TrimSpace(raw.Name)
+		if name == "" {
+			name = id
+		}
+		models = append(models, Model{ID: id, Name: name})
+	}
+	return models
 }
 
 // InvalidateUsageCache 清除指定平台的用量缓存（创建/删除账号后调用）

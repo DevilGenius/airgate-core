@@ -104,8 +104,9 @@ func GroupMatchesRequirements(g *ent.Group, requirements Requirements) bool {
 	if g == nil {
 		return false
 	}
-	if requirements.NeedsImage && strings.EqualFold(g.Platform, "openai") {
-		return pluginSettingEnabled(g.PluginSettings, "openai", "image_enabled")
+	if strings.EqualFold(g.Platform, "openai") {
+		imageEnabled := pluginSettingEnabled(g.PluginSettings, "openai", "image_enabled")
+		return imageEnabled == requirements.NeedsImage
 	}
 	return true
 }
