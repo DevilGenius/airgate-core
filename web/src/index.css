@@ -886,7 +886,17 @@ input[type="number"]::-webkit-outer-spin-button {
    09. Page-Specific Overrides
    ========================================================================== */
 
-/* Admin API keys: 创建密钥弹窗布局 */
+/* API keys: 表格内容居中 */
+
+.ag-api-keys-table :where([data-slot="table-column"], [data-slot="th"], .table__column),
+.ag-api-keys-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
+  text-align: center !important;
+}
+
+.ag-api-keys-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) > :where(span, div, code) {
+  justify-content: center;
+  margin-inline: auto;
+}
 
 .ag-elevation-modal.ag-create-key-modal,
 .ag-elevation-modal.modal__dialog--lg.ag-create-key-modal {
@@ -1017,10 +1027,27 @@ input[type="number"]::-webkit-outer-spin-button {
   vertical-align: middle !important;
 }
 
+.ag-plugins-installed-table :where([data-slot="table-column"], [data-slot="th"]),
+.ag-plugins-installed-table :where([data-slot="table-cell"], [data-slot="td"]) {
+  text-align: center !important;
+}
+
 .ag-resource-table,
 .ag-usage-records-table {
   --ag-table-empty-background: var(--surface-secondary);
   --ag-table-empty-row-height: 2.75rem;
+}
+
+.ag-resource-table :where([data-slot="table-column"], [data-slot="th"], .table__column),
+.ag-resource-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
+  text-align: center !important;
+}
+
+.ag-resource-table :where([data-slot="table-column"] > *, [data-slot="th"] > *, .table__column > *),
+.ag-resource-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) > :where(span, div, code) {
+  justify-content: center !important;
+  margin-inline: auto;
+  text-align: center;
 }
 
 .ag-resource-table :where([data-slot="table-body"], [data-slot="tbody"], .table__body),
@@ -1151,11 +1178,13 @@ input[type="number"]::-webkit-outer-spin-button {
   letter-spacing: 0 !important;
   line-height: 1 !important;
   padding: 0 !important;
+  text-align: center !important;
   text-transform: none !important;
   white-space: nowrap !important;
 }
 
 .ag-usage-table :where([data-slot="table-column"] > *, [data-slot="th"] > *, .table__column > *) {
+  justify-content: center !important;
   height: 100%;
   min-height: 0;
 }

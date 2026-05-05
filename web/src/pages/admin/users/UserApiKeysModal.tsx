@@ -74,7 +74,9 @@ export function UserApiKeysModal({ open, user, onClose }: UserApiKeysModalProps)
               ) : rows.length === 0 ? (
                 <HeroTable.Row id="empty">
                   <HeroTable.Cell colSpan={5}>
-                    <EmptyState />
+                    <EmptyState>
+                      <div className="text-sm text-default-500">{t('common.no_data')}</div>
+                    </EmptyState>
                   </HeroTable.Cell>
                 </HeroTable.Row>
               ) : (

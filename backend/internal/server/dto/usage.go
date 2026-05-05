@@ -85,6 +85,7 @@ type UsageQuery struct {
 
 // UsageFilterQuery 使用记录筛选参数（不含分页，用于聚合统计）
 type UsageFilterQuery struct {
+	APIKeyID  *int64 `form:"api_key_id"`
 	Platform  string `form:"platform"`
 	Model     string `form:"model"`
 	StartDate string `form:"start_date"`

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Card, ComboBox, Input, ListBox, Select, Switch, Tabs, TextField as HeroTextField } from '@heroui/react';
+import { Button, Card, ComboBox, Input, ListBox, Select, Switch, Tabs, TextField as HeroTextField } from '@heroui/react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
@@ -12,7 +12,7 @@ import { usePagination } from '../../shared/hooks/usePagination';
 import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
-import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
+import { Activity, Coins, Hash, DollarSign, Search, RefreshCw } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
@@ -133,7 +133,7 @@ const groupByHeaderKeys: Record<string, string> = {
 };
 
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
-const USAGE_AUTO_UPDATE_INTERVAL_MS = 1_000;
+const USAGE_AUTO_UPDATE_INTERVAL_MS = 3_000;
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
 
 // ==================== 分布饼图卡片 ====================
@@ -622,6 +622,7 @@ export default function UsagePage() {
   const {
     data,
     dataUpdatedAt,
+    isFetching: isUsageFetching,
     isLoading,
     isPlaceholderData,
     refetch: refetchUsage,
@@ -635,7 +636,7 @@ export default function UsagePage() {
     placeholderData: keepPreviousData,
   });
 
-  const { data: stats, refetch: refetchStats } = useQuery({
+  const { data: stats, isFetching: isStatsFetching, refetch: refetchStats } = useQuery({
     queryKey: ['admin-usage-stats', filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id],
     queryFn: () =>
       usageApi.stats({
@@ -654,7 +655,7 @@ export default function UsagePage() {
   });
 
   // Token 趋势
-  const { data: trendData, refetch: refetchTrend } = useQuery({
+  const { data: trendData, isFetching: isTrendFetching, refetch: refetchTrend } = useQuery({
     queryKey: ['admin-usage-trend', granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id],
     queryFn: () =>
       usageApi.trend({
@@ -672,12 +673,18 @@ export default function UsagePage() {
     placeholderData: keepPreviousData,
   });
 
+  const isRefreshing = isUsageFetching || isStatsFetching || isTrendFetching;
+
+  function handleManualRefresh() {
+    void refetchUsage();
+    void refetchStats();
+    void refetchTrend();
+  }
+
   function handleAutoRefreshChange(enabled: boolean) {
     setAutoRefresh(enabled);
     if (enabled) {
-      void refetchUsage();
-      void refetchStats();
-      void refetchTrend();
+      handleManualRefresh();
     }
   }
 
@@ -977,8 +984,18 @@ export default function UsagePage() {
             </ComboBox.Popover>
           </ComboBox>
         </div>
+        <Button
+          isIconOnly
+          aria-label={t('common.refresh', 'Refresh')}
+          isDisabled={isRefreshing}
+          size="sm"
+          variant="ghost"
+          onPress={handleManualRefresh}
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </Button>
         <Switch
-          aria-label="自动更新"
+          aria-label={t('usage.auto_update')}
           className="shrink-0"
           isSelected={autoRefresh}
           size="sm"
@@ -988,7 +1005,7 @@ export default function UsagePage() {
             <Switch.Thumb />
           </Switch.Control>
           <Switch.Content>
-            <span className="text-sm text-text-secondary">自动更新</span>
+            <span className="text-sm text-text-secondary">{t('usage.auto_update')}</span>
           </Switch.Content>
         </Switch>
       </div>

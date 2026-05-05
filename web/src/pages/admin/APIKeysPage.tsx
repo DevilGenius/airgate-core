@@ -115,6 +115,7 @@ export default function APIKeysPage() {
 
       <CommonTable
         ariaLabel={t('api_keys.title', 'API keys')}
+        className="ag-api-keys-table"
         footer={(
           <TablePaginationFooter
             page={page}
@@ -146,7 +147,9 @@ export default function APIKeysPage() {
           ) : rows.length === 0 ? (
             <CommonTable.Row id="empty">
               <CommonTable.Cell colSpan={9}>
-                <EmptyState />
+                <EmptyState>
+                  <div className="text-sm text-default-500">{t('common.no_data')}</div>
+                </EmptyState>
               </CommonTable.Cell>
             </CommonTable.Row>
           ) : (

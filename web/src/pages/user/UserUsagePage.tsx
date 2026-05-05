@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button, Card, Input, ListBox, Meter, Select, Switch, TextField as HeroTextField } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
+import { apikeysApi } from '../../shared/api/apikeys';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
@@ -10,7 +11,7 @@ import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
-import { Activity, Hash, DollarSign, Coins, Search, Key, Clock, Gauge, Percent, Upload } from 'lucide-react';
+import { Activity, Hash, DollarSign, Coins, Search, Key, Clock, Gauge, Percent, Upload, RefreshCw } from 'lucide-react';
 import type { UsageQuery } from '../../shared/types';
 import { useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
 import { getSessionAPIKey } from '../../shared/api/client';
@@ -18,8 +19,9 @@ import { CcsImportModal } from './userkeys/CcsImportModal';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { CostValue } from '../../shared/components/CostValue';
+import { FETCH_ALL_PARAMS } from '../../shared/constants';
 
-const USAGE_AUTO_UPDATE_INTERVAL_MS = 1_000;
+const USAGE_AUTO_UPDATE_INTERVAL_MS = 3_000;
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.user.usage.auto_update';
 
 function StatCard({
@@ -186,6 +188,8 @@ function APIKeyInfoBar() {
 
 export default function UserUsagePage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const customerScope = !!user?.api_key_id;
   const { page, setPage, pageSize, setPageSize } = usePagination(20);
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
   const [modelInput, setModelInput] = useState('');
@@ -212,9 +216,21 @@ export default function UserUsagePage() {
   ];
   const selectedPlatformLabel = platformOptions.find((item) => item.id === (filters.platform || ''))?.label ?? t('common.all');
 
+  const { data: apiKeysData } = useQuery({
+    queryKey: queryKeys.userKeys('usage-filter'),
+    queryFn: () => apikeysApi.list(FETCH_ALL_PARAMS),
+    enabled: !customerScope,
+  });
+  const apiKeyOptions = [
+    { id: '', label: t('common.all') },
+    ...(apiKeysData?.list ?? []).map((key) => ({ id: String(key.id), label: key.name })),
+  ];
+  const selectedApiKeyLabel = apiKeyOptions.find((item) => item.id === String(filters.api_key_id ?? ''))?.label ?? t('common.all');
+
   const {
     data,
     dataUpdatedAt,
+    isFetching: isUsageFetching,
     isLoading,
     isPlaceholderData,
     refetch: refetchUsage,
@@ -229,7 +245,7 @@ export default function UserUsagePage() {
   });
 
   // 聚合统计（跟随筛选条件，独立于分页）
-  const { data: stats, refetch: refetchStats } = useQuery({
+  const { data: stats, isFetching: isStatsFetching, refetch: refetchStats } = useQuery({
     queryKey: queryKeys.userUsageStats(filters),
     queryFn: () => usageApi.userStats(filters),
     refetchInterval: autoRefreshInterval,
@@ -238,24 +254,29 @@ export default function UserUsagePage() {
     refetchOnWindowFocus: autoRefresh,
   });
 
+  const isRefreshing = isUsageFetching || isStatsFetching;
+
+  function handleManualRefresh() {
+    void refetchUsage();
+    void refetchStats();
+  }
+
   function handleAutoRefreshChange(enabled: boolean) {
     setAutoRefresh(enabled);
     if (enabled) {
-      void refetchUsage();
-      void refetchStats();
+      handleManualRefresh();
     }
   }
 
   function updateFilter(key: string, value: string) {
-    setFilters((prev) => ({ ...prev, [key]: value || undefined }));
+    const nextValue = key === 'api_key_id' && value ? Number(value) : value || undefined;
+    setFilters((prev) => ({ ...prev, [key]: nextValue }));
     setPage(1);
   }
 
   const list = data?.list ?? [];
   const total = data?.total ?? 0;
 
-  const { user } = useAuth();
-  const customerScope = !!user?.api_key_id;
   const sharedColumns = useUsageColumns({ customerScope });
   const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
   const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
@@ -386,6 +407,34 @@ export default function UserUsagePage() {
             </Select.Popover>
           </Select>
         </div>
+        {!customerScope && (
+          <div className="w-full sm:w-48">
+            <Select
+              aria-label="API Key"
+              fullWidth
+              selectedKey={String(filters.api_key_id ?? '')}
+              onSelectionChange={(key) => updateFilter('api_key_id', key == null ? '' : String(key))}
+            >
+              <Select.Trigger>
+                <Select.Value>
+                  {filters.api_key_id ? selectedApiKeyLabel : (
+                    <span className="text-text-tertiary">API Key</span>
+                  )}
+                </Select.Value>
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox items={apiKeyOptions}>
+                  {(item) => (
+                    <ListBox.Item id={item.id} textValue={item.label}>
+                      {item.label}
+                    </ListBox.Item>
+                  )}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          </div>
+        )}
         <div className="w-full sm:w-48">
           <HeroTextField fullWidth>
             <div className="relative">
@@ -399,8 +448,18 @@ export default function UserUsagePage() {
             </div>
           </HeroTextField>
         </div>
+        <Button
+          isIconOnly
+          aria-label={t('common.refresh', 'Refresh')}
+          isDisabled={isRefreshing}
+          size="sm"
+          variant="ghost"
+          onPress={handleManualRefresh}
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </Button>
         <Switch
-          aria-label="自动更新"
+          aria-label={t('usage.auto_update')}
           className="shrink-0"
           isSelected={autoRefresh}
           size="sm"
@@ -410,7 +469,7 @@ export default function UserUsagePage() {
             <Switch.Thumb />
           </Switch.Control>
           <Switch.Content>
-            <span className="text-sm text-text-secondary">自动更新</span>
+            <span className="text-sm text-text-secondary">{t('usage.auto_update')}</span>
           </Switch.Content>
         </Switch>
       </div>

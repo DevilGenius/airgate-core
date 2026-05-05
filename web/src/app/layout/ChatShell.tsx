@@ -34,6 +34,15 @@ export function ChatShell({ children }: ChatShellProps) {
     document.title = site.site_name || 'AirGate';
   }, [site.site_name]);
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.scrollTo(0, 0);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'zh' ? 'en' : 'zh';
     i18n.changeLanguage(nextLang);

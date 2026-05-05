@@ -53,6 +53,7 @@ func (s *Server) registerRoutes() {
 		authGroup.POST("/login-apikey", handlers.Auth.LoginByAPIKey)
 		authGroup.POST("/register", handlers.Auth.Register)
 		authGroup.POST("/send-verify-code", handlers.Auth.SendVerifyCode)
+		authGroup.POST("/verify-code", handlers.Auth.VerifyCode)
 	}
 
 	// === 用户路由（需要 JWT 认证） ===

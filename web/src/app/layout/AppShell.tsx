@@ -342,7 +342,7 @@ export function AppShell({ children }: AppShellProps) {
       <div className="space-y-1 border-t border-border p-3">
         {!sidebarCollapsed && (
           <Button
-            className="w-full justify-start"
+            className="w-full justify-center"
             size="sm"
             variant="ghost"
             onPress={() => { window.location.href = effectiveDocUrl(site.doc_url).href; }}

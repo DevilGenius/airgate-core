@@ -156,7 +156,7 @@ export default function PluginsPage() {
 
       {/* 已安装 Tab */}
       <Tabs.Panel id="installed" className="ag-tabs-panel-flush">
-        <HeroTable variant="primary">
+        <HeroTable variant="primary" className="ag-plugins-installed-table">
           <HeroTable.ScrollContainer>
             <HeroTable.Content aria-label={t('plugins.installed_tab', 'Installed plugins')}>
               <HeroTable.Header>
@@ -183,7 +183,9 @@ export default function PluginsPage() {
                 ) : installedRows.length === 0 ? (
                   <HeroTable.Row id="empty">
                     <HeroTable.Cell colSpan={3}>
-                      <EmptyState />
+                      <EmptyState>
+                        <div className="text-sm text-default-500">{t('common.no_data')}</div>
+                      </EmptyState>
                     </HeroTable.Cell>
                   </HeroTable.Row>
                 ) : (

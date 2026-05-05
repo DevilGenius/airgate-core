@@ -81,17 +81,16 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 		return
 	}
 
-	// API Key 登录场景：限定统计范围
-	var scopedKey *int64
+	apiKeyFilter := query.APIKeyID
 	scoped := false
 	if sk := scopedAPIKeyID(c); sk > 0 {
-		scopedKey = &sk
+		apiKeyFilter = &sk
 		scoped = true
 	}
 
 	tz := c.Query("tz")
 	summary, err := h.service.UserStats(c.Request.Context(), int64(userID), appusage.StatsFilter{
-		APIKeyID:    scopedKey,
+		APIKeyID:    apiKeyFilter,
 		Platform:    query.Platform,
 		Model:       query.Model,
 		StartDate:   query.StartDate,
@@ -109,7 +108,7 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 	uid64 := int64(userID)
 	modelStats, _ := h.service.StatsByModel(c.Request.Context(), appusage.StatsFilter{
 		UserID:      &uid64,
-		APIKeyID:    scopedKey,
+		APIKeyID:    apiKeyFilter,
 		Platform:    query.Platform,
 		Model:       query.Model,
 		StartDate:   query.StartDate,

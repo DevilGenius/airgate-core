@@ -6,6 +6,7 @@ import { useAuth } from '../app/providers/AuthProvider';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
+import { useStatusPageEnabled } from '../shared/hooks/useStatusPageEnabled';
 import { ApiError, setSessionAPIKey } from '../shared/api/client';
 import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Activity } from 'lucide-react';
 
@@ -143,12 +144,20 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   const handleStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!needVerify) {
-      // 不需要验证码，直接进入第二步
       setStep(2);
       return;
     }
     if (!verifyCode) { setError(t('auth.code_required')); return; }
-    setStep(2);
+    setLoading(true);
+    setError('');
+    try {
+      await authApi.verifyCode(email, verifyCode);
+      setStep(2);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('auth.register_failed'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 第二步：提交注册
@@ -240,7 +249,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
             </Alert.Content>
           </Alert>
         )}
-        <Button type="submit" className="w-full h-11" variant="primary">
+        <Button type="submit" isDisabled={loading} className="w-full h-11" variant="primary" aria-busy={loading}>
           <ArrowRight className="w-4 h-4" />
           {t('auth.next_step')}
         </Button>
@@ -401,6 +410,7 @@ export default function LoginPage() {
   const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const site = useSiteSettings();
+  const showStatusEntry = useStatusPageEnabled();
   const [activeTab, setActiveTab] = useState<TabKey>('login');
   const [registerSuccess, setRegisterSuccess] = useState(false);
 
@@ -410,37 +420,45 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex relative overflow-hidden">
+    <div className="min-h-screen flex relative overflow-hidden bg-bg-deep text-text">
       {/* ===== 左侧装饰面板（桌面端） ===== */}
       <div
-        className="hidden lg:flex lg:w-[45%] xl:w-[50%] relative items-center justify-center"
+        className="hidden lg:flex lg:w-[45%] xl:w-[50%] relative items-center justify-center overflow-hidden"
         style={{
           background: theme === 'dark'
-            ? 'linear-gradient(135deg, var(--ag-bg-elevated), var(--ag-bg))'
-            : 'linear-gradient(135deg, var(--ag-primary), color-mix(in srgb, var(--ag-primary) 60%, var(--ag-info)))',
+            ? 'radial-gradient(circle at 25% 35%, oklch(29% 0.018 250), transparent 32%), linear-gradient(135deg, oklch(18% 0.012 250), oklch(12% 0.006 250))'
+            : 'radial-gradient(circle at 25% 35%, oklch(34% 0.025 250), transparent 34%), linear-gradient(135deg, oklch(25% 0.018 250), oklch(16% 0.01 250))',
+          color: 'oklch(96% 0.004 250)',
         }}
       >
+        <div
+          className="pointer-events-none absolute -left-28 -top-28 h-72 w-72 rounded-full blur-3xl"
+          style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.07)' }}
+        />
+        <div
+          className="pointer-events-none absolute -bottom-32 right-10 h-80 w-80 rounded-full blur-3xl"
+          style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.05)' }}
+        />
         {/* 内容 */}
-        <div className={`relative z-10 px-12 max-w-md ${theme === 'dark' ? 'text-text' : 'text-white'}`}>
+        <div className="relative z-10 px-12 max-w-md">
           <div className="flex items-center gap-3 mb-8">
-            <img src={site.site_logo || defaultLogoUrl} alt="" className={`w-10 h-10 rounded-sm object-cover ${theme === 'dark' ? '' : (!site.site_logo ? '' : 'brightness-0 invert')}`} />
+            <img src={site.site_logo || defaultLogoUrl} alt="" className="w-10 h-10 rounded-sm object-cover" />
             <span className="text-xl font-bold">{site.site_name || 'AirGate'}</span>
           </div>
           <h2 className="text-3xl font-bold leading-snug mb-4">
             {t('auth.welcome_title')}
           </h2>
-          <p className={`text-sm leading-relaxed ${theme === 'dark' ? 'text-text-tertiary' : 'text-white/70'}`}>
+          <p className="text-sm leading-relaxed opacity-65">
             {t('auth.welcome_desc')}
           </p>
           <div className="flex gap-3 mt-10">
             {[t('auth.feature_1'), t('auth.feature_2'), t('auth.feature_3')].map((f) => (
               <span
                 key={f}
-                className="text-[11px] px-3 py-1.5 rounded-[var(--radius)] font-medium"
+                className="text-[11px] px-3 py-1.5 rounded-[var(--radius)] font-medium border"
                 style={{
-                  background: theme === 'dark' ? 'var(--ag-primary-subtle)' : 'rgba(255,255,255,0.1)',
-                  border: `1px solid ${theme === 'dark' ? 'var(--ag-glass-border)' : 'rgba(255,255,255,0.1)'}`,
-                  color: theme === 'dark' ? 'var(--ag-primary)' : 'white',
+                  background: 'rgba(255,255,255,0.08)',
+                  borderColor: 'rgba(255,255,255,0.10)',
                 }}
               >
                 {f}
@@ -514,13 +532,15 @@ export default function LoginPage() {
 
           {/* 底部 */}
           <div className="mt-6 flex flex-col items-center gap-2">
-            <HeroLink
-              href="/status"
-              className="inline-flex items-center gap-1.5 text-[11px] text-text-tertiary hover:text-primary transition-colors"
-            >
-              <Activity className="w-3 h-3" />
-              {t('nav.status')}
-            </HeroLink>
+            {showStatusEntry && (
+              <HeroLink
+                href="/status"
+                className="inline-flex items-center gap-1.5 text-[11px] text-text-tertiary hover:text-primary transition-colors"
+              >
+                <Activity className="w-3 h-3" />
+                {t('nav.status')}
+              </HeroLink>
+            )}
             <p className="text-center text-[10px] text-text-tertiary font-mono uppercase">
               Powered by {site.site_name || 'AirGate'}
             </p>

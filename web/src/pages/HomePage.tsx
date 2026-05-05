@@ -5,6 +5,7 @@ import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsPr
 import { useTheme } from '../app/providers/ThemeProvider';
 import { getToken } from '../shared/api/client';
 import { effectiveDocUrl } from '../shared/utils/docUrl';
+import { useStatusPageEnabled } from '../shared/hooks/useStatusPageEnabled';
 import {
   Zap, Shield, Globe, ArrowRight, Sun, Moon, Code, BarChart3, KeyRound, Layers, Activity,
 } from 'lucide-react';
@@ -14,6 +15,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const site = useSiteSettings();
   const { theme, toggleTheme } = useTheme();
+  const showStatusEntry = useStatusPageEnabled();
 
   const isLoggedIn = !!getToken();
   // 文档链接 fallback：管理员未填外部 doc_url 时回退到内置 /docs（详见 docUrl.ts）
@@ -37,14 +39,15 @@ export default function HomePage() {
           <span className="text-base font-bold">{site.site_name || 'AirGate'}</span>
         </div>
         <div className="flex items-center gap-2">
-          {/* /status 由 health 插件 standalone 渲染，不在 SPA 路由树里，用 href 跳转 */}
-          <HeroLink
-            href="/status"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors"
-          >
-            <Activity className="w-3.5 h-3.5" />
-            {t('nav.status')}
-          </HeroLink>
+          {showStatusEntry && (
+            <HeroLink
+              href="/status"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              {t('nav.status')}
+            </HeroLink>
+          )}
           <HeroLink
             href={docs.href}
             {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
@@ -156,11 +159,15 @@ export default function HomePage() {
           >
             {t('home.docs')}
           </HeroLink>
-          <span className="w-px h-3 bg-[var(--ag-border)]" />
-          <HeroLink href="/status" className="inline-flex items-center gap-1 hover:text-text transition-colors">
-            <Activity className="w-3 h-3" />
-            {t('nav.status')}
-          </HeroLink>
+          {showStatusEntry && (
+            <>
+              <span className="w-px h-3 bg-[var(--ag-border)]" />
+              <HeroLink href="/status" className="inline-flex items-center gap-1 hover:text-text transition-colors">
+                <Activity className="w-3 h-3" />
+                {t('nav.status')}
+              </HeroLink>
+            </>
+          )}
         </div>
       </footer>
     </div>

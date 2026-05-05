@@ -4,6 +4,9 @@ import (
 	"context"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqljson"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
@@ -23,12 +26,24 @@ func NewAccountStore(db *ent.Client) *AccountStore {
 	return &AccountStore{db: db}
 }
 
+func accountKeywordMatches(keyword string) predicate.Account {
+	return entaccount.Or(
+		entaccount.NameContains(keyword),
+		entaccount.And(
+			entaccount.TypeEQ("oauth"),
+			func(s *sql.Selector) {
+				s.Where(sqljson.StringContains(entaccount.FieldCredentials, keyword, sqljson.Path("email")))
+			},
+		),
+	)
+}
+
 // List 查询账号列表。
 func (s *AccountStore) List(ctx context.Context, filter appaccount.ListFilter) ([]appaccount.Account, int64, error) {
 	query := s.db.Account.Query()
 
 	if filter.Keyword != "" {
-		query = query.Where(entaccount.NameContains(filter.Keyword))
+		query = query.Where(accountKeywordMatches(filter.Keyword))
 	}
 	if filter.Platform != "" {
 		query = query.Where(entaccount.PlatformEQ(filter.Platform))
@@ -72,7 +87,7 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 	query := s.db.Account.Query()
 
 	if filter.Keyword != "" {
-		query = query.Where(entaccount.NameContains(filter.Keyword))
+		query = query.Where(accountKeywordMatches(filter.Keyword))
 	}
 	if filter.Platform != "" {
 		query = query.Where(entaccount.PlatformEQ(filter.Platform))

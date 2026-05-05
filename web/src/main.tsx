@@ -4,9 +4,10 @@ import * as ReactJSXRuntime from 'react/jsx-runtime';
 import * as ReactI18next from 'react-i18next';
 import { StrictMode, useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { useTranslation } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
-import { AlertDialog, Button } from '@heroui/react';
+import { AlertDialog, Button, I18nProvider } from '@heroui/react';
 import { AuthProvider } from './app/providers/AuthProvider';
 import { ThemeProvider } from './app/providers/ThemeProvider';
 import { SiteSettingsProvider } from './app/providers/SiteSettingsProvider';
@@ -35,6 +36,21 @@ import './index.css';
 // 必须在 ToastProvider 内渲染，否则 useToast 拿到的是默认 noop。
 type ConfirmOptions = { title?: string; danger?: boolean };
 type ConfirmRequest = ConfirmOptions & { message: string; resolve: (ok: boolean) => void };
+
+function AppProviders() {
+  const { i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage === 'en' ? 'en-US' : 'zh-CN';
+
+  return (
+    <I18nProvider locale={locale}>
+      <SiteSettingsProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </SiteSettingsProvider>
+    </I18nProvider>
+  );
+}
 
 function PluginAPIBridge() {
   const { toast } = useToast();
@@ -119,11 +135,7 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <PluginAPIBridge />
-          <SiteSettingsProvider>
-            <AuthProvider>
-              <RouterProvider router={router} />
-            </AuthProvider>
-          </SiteSettingsProvider>
+          <AppProviders />
         </ToastProvider>
       </QueryClientProvider>
     </ThemeProvider>

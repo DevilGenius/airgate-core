@@ -32,6 +32,11 @@ type SendVerifyCodeReq struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
+type VerifyCodeReq struct {
+	Email string `json:"email" binding:"required,email"`
+	Code  string `json:"code" binding:"required"`
+}
+
 // RefreshResp Token 刷新响应
 type RefreshResp struct {
 	Token string `json:"token"`

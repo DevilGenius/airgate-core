@@ -6,7 +6,6 @@ import { getTotalPages } from '../utils/pagination';
 import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
 
-const END_ALIGNED_COLUMNS = new Set(['tokens', 'cost', 'first_token_ms', 'duration_ms']);
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
 const NEW_ROW_MARK_DURATION_MS = 5000;
 
@@ -19,14 +18,9 @@ function parseColumnWidth(width?: string): number {
   return match ? Number(match[1]) : 128;
 }
 
-function ColumnHeader({ children, alignEnd }: { children: ReactNode; alignEnd: boolean }) {
+function ColumnHeader({ children }: { children: ReactNode }) {
   return (
-    <span
-      className={cx(
-        'flex h-full w-full items-center gap-2 whitespace-nowrap px-2.5 text-xs font-semibold leading-none',
-        alignEnd ? 'justify-end text-right' : 'justify-start text-left',
-      )}
-    >
+    <span className="flex h-full w-full items-center justify-center gap-2 whitespace-nowrap px-2.5 text-center text-xs font-semibold leading-none">
       {children}
     </span>
   );
@@ -181,25 +175,20 @@ export function UsageRecordsTable<T extends UsageRow>({
           style={tableStyle}
         >
           <HeroTable.Header>
-            {columns.map((column, index) => {
-              const alignEnd = END_ALIGNED_COLUMNS.has(column.key);
-
-              return (
-                <HeroTable.Column
-                  id={column.key}
-                  key={column.key}
-                  className={cx(
-                    getColumnClassName(column.key),
-                    alignEnd && 'text-end',
-                    index === 0 && 'after:hidden',
-                  )}
-                  isRowHeader={index === 0}
-                  style={column.width ? { width: column.width } : undefined}
-                >
-                  <ColumnHeader alignEnd={alignEnd}>{column.title}</ColumnHeader>
-                </HeroTable.Column>
-              );
-            })}
+            {columns.map((column, index) => (
+              <HeroTable.Column
+                id={column.key}
+                key={column.key}
+                className={cx(
+                  getColumnClassName(column.key),
+                  index === 0 && 'after:hidden',
+                )}
+                isRowHeader={index === 0}
+                style={column.width ? { width: column.width } : undefined}
+              >
+                <ColumnHeader>{column.title}</ColumnHeader>
+              </HeroTable.Column>
+            ))}
           </HeroTable.Header>
           <HeroTable.Body
             renderEmptyState={() => (
@@ -225,27 +214,22 @@ export function UsageRecordsTable<T extends UsageRow>({
                     className={markedRowIds.has(String(row.id)) ? 'ag-usage-table-row--new' : undefined}
                   >
                     {columns.map((column) => {
-                      const alignEnd = END_ALIGNED_COLUMNS.has(column.key);
                       const fullCellContent = FULL_CELL_CONTENT_COLUMNS.has(column.key);
 
                       return (
-                      <HeroTable.Cell
-                        key={column.key}
-                        className={cx(
-                          getColumnClassName(column.key),
-                          alignEnd && 'text-right',
-                        )}
-                      >
-                        <div
-                          className={cx(
-                            'flex h-[var(--ag-usage-table-row-height)] w-full items-center overflow-hidden',
-                            fullCellContent ? 'px-1 py-0.5' : 'px-2.5 py-0.5',
-                            alignEnd && 'justify-end text-right',
-                          )}
+                        <HeroTable.Cell
+                          key={column.key}
+                          className={cx(getColumnClassName(column.key), 'text-center')}
                         >
-                          {column.render(row)}
-                        </div>
-                      </HeroTable.Cell>
+                          <div
+                            className={cx(
+                              'flex h-[var(--ag-usage-table-row-height)] w-full items-center justify-center overflow-hidden text-center',
+                              fullCellContent ? 'px-1 py-0.5' : 'px-2.5 py-0.5',
+                            )}
+                          >
+                            {column.render(row)}
+                          </div>
+                        </HeroTable.Cell>
                       );
                     })}
                   </HeroTable.Row>

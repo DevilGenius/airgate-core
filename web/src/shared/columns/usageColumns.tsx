@@ -33,7 +33,7 @@ function RichTooltip({
 }) {
   return (
     <Tooltip delay={0} closeDelay={0}>
-      <Tooltip.Trigger className="flex h-full w-full cursor-default items-center justify-end rounded-[var(--radius)] px-1.5 py-0 text-right transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+      <Tooltip.Trigger className="flex h-full w-full cursor-default items-center justify-center rounded-[var(--radius)] px-1.5 py-0 text-center transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
         {children}
       </Tooltip.Trigger>
       <Tooltip.Content
@@ -169,7 +169,7 @@ function TokenRow({
         <span className="flex h-3 w-3 shrink-0 items-center justify-center">{icon}</span>
       </span>
       <span
-        className="w-[3.5rem] justify-self-end truncate text-right font-mono text-xs font-semibold tabular-nums leading-none"
+        className="w-[3.5rem] justify-self-center truncate text-center font-mono text-xs font-semibold tabular-nums leading-none"
         style={{ color }}
       >
         {value}
@@ -242,7 +242,7 @@ function buildResellerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
             </TooltipPanel>
           }
         >
-          <div className="flex w-full flex-col items-end font-mono text-xs text-right">
+          <div className="flex w-full flex-col items-center font-mono text-center text-xs">
             {row.sell_rate > 0 && row.billed_cost !== row.actual_cost ? (
               <div className="text-[15px] font-semibold leading-none text-text">
                 <CostValue value={row.billed_cost} decimals={6} tone="warning" />
@@ -276,7 +276,7 @@ function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
             </TooltipPanel>
           }
         >
-          <div className="flex w-full flex-col items-end font-mono text-xs text-right">
+          <div className="flex w-full flex-col items-center font-mono text-center text-xs">
             <div className="text-[15px] font-semibold leading-none text-text">${cost.toFixed(6)}</div>
           </div>
         </RichTooltip>
@@ -390,7 +390,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
               </TooltipPanel>
             }
           >
-            <div className="grid h-full max-h-[var(--ag-usage-table-row-height)] w-full grid-cols-[minmax(0,8.75rem)_4.75rem] items-center justify-end gap-2 overflow-visible px-1">
+            <div className="mx-auto grid h-full max-h-[var(--ag-usage-table-row-height)] grid-cols-[minmax(0,8.75rem)_4.75rem] items-center justify-center gap-2 overflow-visible px-1">
               <div className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-px">
                 <TokenRow
                   color={USAGE_TOKEN_COLORS.input}
@@ -421,7 +421,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
                   </>
                 ) : null}
               </div>
-              <div className="w-[4.75rem] text-right font-mono text-base font-semibold tabular-nums leading-none text-text">
+              <div className="w-[4.75rem] text-center font-mono text-base font-semibold tabular-nums leading-none text-text">
                 {fmtNum(total)}
               </div>
             </div>
@@ -453,7 +453,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
       width: '78px',
       hideOnMobile: true,
       render: (row) => (
-        <span className="block text-right font-mono text-[13px] text-text-secondary">
+        <span className="block text-center font-mono text-[13px] text-text-secondary">
           {row.first_token_ms > 0 ? (row.first_token_ms >= 1000 ? `${(row.first_token_ms / 1000).toFixed(2)}s` : `${row.first_token_ms}ms`) : '-'}
         </span>
       ),
@@ -464,7 +464,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
       width: '76px',
       hideOnMobile: true,
       render: (row) => (
-        <span className="block text-right font-mono text-[13px] text-text-secondary">
+        <span className="block text-center font-mono text-[13px] text-text-secondary">
           {row.duration_ms >= 1000 ? `${(row.duration_ms / 1000).toFixed(2)}s` : `${row.duration_ms}ms`}
         </span>
       ),

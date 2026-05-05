@@ -43,23 +43,33 @@ func (s *VerifyCodeStore) Generate(email string) string {
 	return code
 }
 
-// Verify 校验验证码，成功后自动删除。
-func (s *VerifyCodeStore) Verify(email, code string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+// Check 校验验证码，但不消耗验证码。
+func (s *VerifyCodeStore) Check(email, code string) bool {
+	s.mu.RLock()
 	entry, ok := s.codes[email]
+	s.mu.RUnlock()
 	if !ok {
 		return false
 	}
 	if time.Now().After(entry.expiresAt) {
-		delete(s.codes, email)
+		s.mu.Lock()
+		if current, exists := s.codes[email]; exists && current.expiresAt.Equal(entry.expiresAt) {
+			delete(s.codes, email)
+		}
+		s.mu.Unlock()
 		return false
 	}
-	if entry.code != code {
+	return entry.code == code
+}
+
+// Verify 校验验证码，成功后自动删除。
+func (s *VerifyCodeStore) Verify(email, code string) bool {
+	if !s.Check(email, code) {
 		return false
 	}
+	s.mu.Lock()
 	delete(s.codes, email)
+	s.mu.Unlock()
 	return true
 }
 

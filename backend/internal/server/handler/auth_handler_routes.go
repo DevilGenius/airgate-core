@@ -174,6 +174,19 @@ func (h *AuthHandler) Register(c *gin.Context) {
 }
 
 // SendVerifyCode 发送邮箱验证码。
+func (h *AuthHandler) VerifyCode(c *gin.Context) {
+	var req dto.VerifyCodeReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+	if !h.codeStore.Check(req.Email, req.Code) {
+		response.BadRequest(c, "验证码无效或已过期")
+		return
+	}
+	response.Success(c, nil)
+}
+
 func (h *AuthHandler) SendVerifyCode(c *gin.Context) {
 	var req dto.SendVerifyCodeReq
 	if err := c.ShouldBindJSON(&req); err != nil {

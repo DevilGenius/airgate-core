@@ -209,7 +209,9 @@ export default function SubscriptionsPage() {
               ) : rows.length === 0 ? (
                 <CommonTable.Row id="empty">
                   <CommonTable.Cell colSpan={7}>
-                    <EmptyState />
+                    <EmptyState>
+                      <div className="text-sm text-default-500">{t('common.no_data')}</div>
+                    </EmptyState>
                   </CommonTable.Cell>
                 </CommonTable.Row>
               ) : (

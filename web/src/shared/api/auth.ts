@@ -7,4 +7,5 @@ export const authApi = {
   register: (data: RegisterReq) => post<LoginResp>('/api/v1/auth/register', data),
   refresh: () => post<RefreshResp>('/api/v1/auth/refresh'),
   sendVerifyCode: (email: string) => post<void>('/api/v1/auth/send-verify-code', { email }),
+  verifyCode: (email: string, code: string) => post<void>('/api/v1/auth/verify-code', { email, code }),
 };

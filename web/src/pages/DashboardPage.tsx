@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Card, Label, ListBox, Select, Skeleton, Tabs } from '@heroui/react';
+import { Alert, Button, Card, ComboBox, Input, Label, ListBox, Select, Skeleton, Tabs } from '@heroui/react';
 import {
   CartesianGrid,
   Cell,
@@ -24,7 +24,7 @@ import {
   KeyRound,
   Monitor,
   RefreshCw,
-  UserRound,
+  Search,
   Users,
   Zap,
 } from 'lucide-react';
@@ -32,8 +32,9 @@ import { decorativePalette } from '@airgate/theme';
 import { dashboardApi } from '../shared/api/dashboard';
 import { usersApi } from '../shared/api/users';
 import { queryKeys } from '../shared/queryKeys';
-import { FETCH_ALL_PARAMS, PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
+import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
+import { useDebouncedValue } from '../shared/hooks/useDebouncedValue';
 import { CostPair, CostValue } from '../shared/components/CostValue';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
@@ -637,17 +638,38 @@ export default function DashboardPage() {
   const [range, setRange] = useState<RangePreset>('today');
   const [granularity, setGranularity] = useState<Granularity>('day');
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>();
+  const [userKeyword, setUserKeyword] = useState('');
+  const debouncedUserKeyword = useDebouncedValue(userKeyword.trim(), 250);
+  const [selectedUserLabel, setSelectedUserLabel] = useState('');
 
   const { data: usersData } = useQuery({
-    queryKey: queryKeys.usersAll(),
-    queryFn: () => usersApi.list(FETCH_ALL_PARAMS),
+    queryKey: queryKeys.users('dashboard-filter-search', debouncedUserKeyword),
+    queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: debouncedUserKeyword }),
+    enabled: debouncedUserKeyword.length > 0,
   });
 
-  const userOptions = [
-    { id: '', label: t('dashboard.all_users') },
-    ...(usersData?.list ?? []).map((item) => ({ id: String(item.id), label: item.email })),
-  ];
-  const selectedUserLabel = userOptions.find((item) => item.id === String(selectedUserId ?? ''))?.label ?? t('dashboard.all_users');
+  const userOptions = (usersData?.list ?? []).map((user) => ({
+    id: String(user.id),
+    label: user.username || user.email,
+    description: user.username ? user.email : undefined,
+    textValue: `${user.username || ''} ${user.email}`,
+  }));
+  const visibleUserOptions = (() => {
+    const selectedId = selectedUserId ? String(selectedUserId) : '';
+    if (!selectedId || !selectedUserLabel || userOptions.some((option) => option.id === selectedId)) {
+      return userOptions;
+    }
+
+    return [
+      {
+        id: selectedId,
+        label: selectedUserLabel,
+        description: undefined,
+        textValue: selectedUserLabel,
+      },
+      ...userOptions,
+    ];
+  })();
   const granularityOptions = [
     { id: 'day', label: t('dashboard.granularity_day') },
     { id: 'hour', label: t('dashboard.granularity_hour') },
@@ -711,27 +733,67 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.filter_user')}</span>
             <div className="w-full sm:w-64">
-              <Select
+              <ComboBox
+                aria-label={t('dashboard.filter_user')}
+                allowsEmptyCollection
                 fullWidth
-                selectedKey={selectedUserId ? String(selectedUserId) : ''}
-                onSelectionChange={(key) => setSelectedUserId(key ? Number(key) : undefined)}
+                inputValue={userKeyword}
+                items={visibleUserOptions}
+                menuTrigger="focus"
+                selectedKey={selectedUserId ? String(selectedUserId) : null}
+                onInputChange={(value) => {
+                  setUserKeyword(value);
+                  if (!value.trim()) {
+                    setSelectedUserId(undefined);
+                    setSelectedUserLabel('');
+                    return;
+                  }
+                  if (selectedUserId && value !== selectedUserLabel) {
+                    setSelectedUserId(undefined);
+                    setSelectedUserLabel('');
+                  }
+                }}
+                onSelectionChange={(key) => {
+                  const value = key == null ? '' : String(key);
+                  if (!value) {
+                    setSelectedUserId(undefined);
+                    setSelectedUserLabel('');
+                    setUserKeyword('');
+                    return;
+                  }
+                  const option = visibleUserOptions.find((item) => item.id === value);
+                  const label = option?.label ? String(option.label) : '';
+                  setSelectedUserId(Number(value));
+                  setSelectedUserLabel(label);
+                  setUserKeyword(label);
+                }}
               >
-                <Label className="sr-only">{t('dashboard.filter_user')}</Label>
-                <Select.Trigger>
-                  <UserRound className="mr-2 h-4 w-4 text-text" />
-                  <Select.Value>{selectedUserLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={userOptions}>
+                <ComboBox.InputGroup className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                  <Input className="pl-9" placeholder={t('dashboard.all_users')} />
+                </ComboBox.InputGroup>
+                <ComboBox.Popover>
+                  <ListBox
+                    items={visibleUserOptions}
+                    renderEmptyState={() => (
+                      <div className="px-3 py-6 text-center text-xs text-text-tertiary">
+                        {userKeyword.trim() ? t('common.no_data') : t('dashboard.filter_user')}
+                      </div>
+                    )}
+                  >
                     {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
+                      <ListBox.Item id={item.id} textValue={item.textValue}>
+                        <div className="min-w-0">
+                          <div className="truncate">{item.label}</div>
+                          {item.description ? (
+                            <div className="truncate text-xs text-text-tertiary">{item.description}</div>
+                          ) : null}
+                        </div>
                       </ListBox.Item>
                     )}
                   </ListBox>
-                </Select.Popover>
-              </Select>
+                </ComboBox.Popover>
+              </ComboBox>
             </div>
           </div>
 

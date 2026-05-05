@@ -71,7 +71,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
               <Modal.CloseTrigger />
             </Modal.Header>
             <Modal.Body>
-      <div className="space-y-4">
+              <div className="space-y-4">
         <HeroTextField fullWidth>
           <Label>{t('common.name')}</Label>
           <div className="relative">
@@ -192,7 +192,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
             rows={2}
           />
         </HeroTextField>
-      </div>
+              </div>
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onPress={onClose}>

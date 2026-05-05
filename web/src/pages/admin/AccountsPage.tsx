@@ -666,7 +666,7 @@ export default function AccountsPage() {
       render: (row) => {
         const email = row.credentials?.email;
         return (
-          <div className="flex w-full min-w-0 flex-col items-start text-left">
+          <div className="flex w-full min-w-0 flex-col items-center text-center">
             <span style={{ color: 'var(--ag-text)' }} className="max-w-full truncate font-medium" title={row.name}>
               {row.name}
             </span>
@@ -699,12 +699,12 @@ export default function AccountsPage() {
           ? `${t('accounts.expires_at')}: ${new Date(subUntil).toLocaleDateString()}`
           : undefined;
         return (
-          <div className="flex w-full min-w-0 flex-col items-start gap-1 text-left">
-            <span className="inline-flex max-w-full min-w-0 items-center gap-1">
+          <div className="flex w-full min-w-0 flex-col items-center gap-1 text-center">
+            <span className="inline-flex max-w-full min-w-0 items-center justify-center gap-1">
               <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" />
               <span className="min-w-0 truncate">{platformName(row.platform)}</span>
             </span>
-            <div className="flex max-w-full items-center gap-1">
+            <div className="flex max-w-full items-center justify-center gap-1">
               {row.type && (
                 <span className="truncate rounded px-1 py-0 text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
                   {{ oauth: 'OAuth', session_key: 'Session Key', apikey: 'API Key' }[row.type] ?? row.type}
@@ -749,7 +749,7 @@ export default function AccountsPage() {
       key: 'capacity',
       title: t('accounts.capacity'),
       width: '100px',
-      align: 'right',
+      align: 'center',
       render: (row) => {
         const current = row.current_concurrency || 0;
         const max = row.max_concurrency;
@@ -796,7 +796,7 @@ export default function AccountsPage() {
       key: 'rate_multiplier',
       title: t('accounts.rate_multiplier'),
       width: '80px',
-      align: 'right',
+      align: 'center',
       hideOnMobile: true,
       render: (row) => (
         <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
@@ -812,6 +812,7 @@ export default function AccountsPage() {
       key: 'usage_window',
       title: t('accounts.usage_window'),
       width: '440px',
+      align: 'center' as const,
       hideOnMobile: true,
       render: (row: AccountResp) => {
         const usage = usageData?.accounts?.[String(row.id)];
@@ -921,7 +922,7 @@ export default function AccountsPage() {
           borderColor: `color-mix(in srgb, ${color} 22%, var(--ag-border))`,
           color: foreground,
         });
-        const todayMetricColumnClass = 'grid w-[10.5rem] justify-self-end grid-cols-2 gap-1';
+        const todayMetricColumnClass = 'grid w-[10.5rem] justify-self-center grid-cols-2 gap-1';
         const todayMetricChips = hasTodayStats && todayStats ? (
           <div
             className={todayMetricColumnClass}
@@ -974,18 +975,18 @@ export default function AccountsPage() {
           <div
             className={
               canRefresh
-                ? 'flex flex-col gap-1.5 text-[11px] cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
-                : 'flex flex-col gap-1.5 text-[11px] rounded px-1 py-0.5'
+                ? 'mx-auto flex flex-col gap-1.5 text-[11px] cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
+                : 'mx-auto flex flex-col gap-1.5 text-[11px] rounded px-1 py-0.5'
             }
-            style={{ fontFamily: 'var(--ag-font-mono)', minWidth: 412, width: '100%' }}
+            style={{ fontFamily: 'var(--ag-font-mono)', width: 412, maxWidth: '100%' }}
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
             <div
               className={
                 windows.length > 0
-                  ? 'grid w-full grid-cols-[minmax(0,1fr)_10.5rem] items-start gap-1.5'
-                  : 'flex flex-col gap-1.5'
+                  ? 'grid w-full grid-cols-[minmax(0,1fr)_10.5rem] items-start justify-center gap-1.5'
+                  : 'flex flex-col items-center gap-1.5'
               }
             >
               <div className="flex min-w-0 flex-col gap-1">
@@ -1055,15 +1056,16 @@ export default function AccountsPage() {
     {
       key: 'actions',
       title: t('common.actions'),
-      width: '128px',
+      width: '116px',
       align: 'center',
       render: (row) => (
-        <div className="flex items-center justify-center gap-1">
+        <div className="mx-auto flex w-[92px] items-center justify-center gap-1">
           <Button
             isIconOnly
             aria-label={t('common.edit')}
             size="sm"
             variant="secondary"
+            className="h-7 w-7 min-w-7"
             onPress={() => setEditingAccount(row)}
           >
             <Pencil className="w-3.5 h-3.5" />
@@ -1073,17 +1075,22 @@ export default function AccountsPage() {
             aria-label={t('common.delete')}
             size="sm"
             variant="danger-soft"
-            className="text-danger"
+            className="h-7 w-7 min-w-7 text-danger"
             onPress={() => setDeletingAccount(row)}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
           <Dropdown>
-            <Dropdown.Trigger
-              aria-label={t('common.more')}
-              className="button button--sm button--secondary button--icon-only"
-            >
-              <MoreHorizontal className="w-3.5 h-3.5" />
+            <Dropdown.Trigger>
+              <Button
+                isIconOnly
+                aria-label={t('common.more')}
+                size="sm"
+                variant="secondary"
+                className="h-7 w-7 min-w-7"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </Button>
             </Dropdown.Trigger>
             <Dropdown.Popover placement="bottom end">
               <Dropdown.Menu
@@ -1169,6 +1176,7 @@ export default function AccountsPage() {
   ];
   const groupOptions = [
     { id: '', label: t('accounts.all_groups') },
+    { id: UNGROUPED_GROUP_FILTER, label: t('accounts.ungrouped') },
     ...(allGroupsData?.list ?? []).map((g) => ({ id: String(g.id), label: g.name })),
   ];
   const proxyOptions = [
@@ -1221,14 +1229,14 @@ export default function AccountsPage() {
       ? 'text-center'
       : align === 'right'
         ? 'text-right'
-        : 'text-left'
+        : 'text-center'
   );
   const cellJustifyClass = (align?: AccountTableColumn['align']) => (
     align === 'center'
       ? 'justify-center'
       : align === 'right'
         ? 'justify-end'
-        : 'justify-start'
+        : 'justify-center'
   );
 
   return (
@@ -1243,7 +1251,7 @@ export default function AccountsPage() {
                   className="pl-9"
                   value={keyword}
                   onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-                  placeholder={t('accounts.search_placeholder', '搜索凭证名称...')}
+                  placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
                 />
               </div>
             </HeroTextField>
@@ -1270,17 +1278,23 @@ export default function AccountsPage() {
             <Button
               isIconOnly
               aria-label={t('common.refresh')}
+              size="sm"
               variant="ghost"
+              className="h-8 w-8 min-w-8"
               onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
             <Dropdown>
-              <Dropdown.Trigger
-                className={`button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'}`}
-              >
-                {autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}
-                <ChevronDown className="h-3 w-3" />
+              <Dropdown.Trigger>
+                <Button
+                  size="sm"
+                  variant={autoRefresh ? 'secondary' : 'ghost'}
+                  className="h-8 min-w-[7.5rem] whitespace-nowrap px-3"
+                >
+                  <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
+                  <ChevronDown className="h-3 w-3 shrink-0" />
+                </Button>
               </Dropdown.Trigger>
               <Dropdown.Popover placement="bottom end">
                 <Dropdown.Menu
@@ -1529,7 +1543,9 @@ export default function AccountsPage() {
               ) : rows.length === 0 ? (
                 <CommonTable.Row id="empty">
                   <CommonTable.Cell colSpan={columns.length + 1}>
-                    <EmptyState />
+                    <EmptyState>
+                      <div className="text-sm text-default-500">{t('common.no_data')}</div>
+                    </EmptyState>
                   </CommonTable.Cell>
                 </CommonTable.Row>
               ) : (
