@@ -156,14 +156,17 @@ func (s *Scheduler) routeAccounts(ctx context.Context, platform, model string, g
 	return applyModelRouting(accounts, grp.ModelRouting, model), nil
 }
 
-// applyModelRouting 按 model 过滤候选账号。routing 为 nil/空或未命中时原样返回。
+// applyModelRouting 按 model 过滤候选账号。routing 为 nil/空时原样返回；有规则但未命中时无候选。
 func applyModelRouting(accounts []*ent.Account, routing map[string][]int64, model string) []*ent.Account {
 	if len(routing) == 0 {
 		return accounts
 	}
 	allowedIDs := matchModelRouting(routing, model)
+	if allowedIDs == nil {
+		return nil
+	}
 	if len(allowedIDs) == 0 {
-		return accounts
+		return nil
 	}
 	idSet := make(map[int64]bool, len(allowedIDs))
 	for _, id := range allowedIDs {

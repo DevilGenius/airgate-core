@@ -2,8 +2,14 @@ package account
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
+
+	sdk "github.com/DouDOU-start/airgate-sdk"
+
+	"github.com/DouDOU-start/airgate-core/internal/plugin"
 )
 
 func TestImportIgnoresEnvironmentScopedIDs(t *testing.T) {
@@ -37,6 +43,73 @@ func TestImportIgnoresEnvironmentScopedIDs(t *testing.T) {
 	}
 }
 
+func TestGetModelsUsesUpstreamForAPIKeyAccount(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("path = %s, want /v1/models", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer sk-test" {
+			t.Fatalf("Authorization = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"upstream-a"},{"id":"upstream-b","name":"Upstream B"}]}`))
+	}))
+	defer upstream.Close()
+
+	service := NewService(stubRepository{
+		findByID: func(_ context.Context, _ int, opts LoadOptions) (Account, error) {
+			if !opts.WithProxy {
+				t.Fatalf("expected WithProxy to be true")
+			}
+			return Account{
+				ID:          1,
+				Platform:    "openai",
+				Type:        "apikey",
+				Credentials: map[string]string{"api_key": "sk-test", "base_url": upstream.URL},
+			}, nil
+		},
+	}, stubPluginCatalog{models: []sdk.ModelInfo{{ID: "fallback"}}}, nil, nil)
+
+	models, err := service.GetModels(t.Context(), 1)
+	if err != nil {
+		t.Fatalf("GetModels returned error: %v", err)
+	}
+	if len(models) != 2 || models[0].ID != "upstream-a" || models[0].Name != "upstream-a" || models[1].ID != "upstream-b" || models[1].Name != "Upstream B" {
+		t.Fatalf("models = %+v", models)
+	}
+}
+
+func TestGetModelsUsesPluginModelsForOAuthAccount(t *testing.T) {
+	upstreamCalled := false
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalled = true
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer upstream.Close()
+
+	service := NewService(stubRepository{
+		findByID: func(context.Context, int, LoadOptions) (Account, error) {
+			return Account{
+				ID:          1,
+				Platform:    "openai",
+				Type:        "oauth",
+				Credentials: map[string]string{"access_token": "token", "base_url": upstream.URL},
+			}, nil
+		},
+	}, stubPluginCatalog{models: []sdk.ModelInfo{{ID: "plugin-model", Name: "Plugin Model"}}}, nil, nil)
+
+	models, err := service.GetModels(t.Context(), 1)
+	if err != nil {
+		t.Fatalf("GetModels returned error: %v", err)
+	}
+	if upstreamCalled {
+		t.Fatalf("OAuth account should not request upstream models")
+	}
+	if len(models) != 1 || models[0].ID != "plugin-model" || models[0].Name != "Plugin Model" {
+		t.Fatalf("models = %+v", models)
+	}
+}
+
 func TestShouldPersistQuotaExtraAllowsClearingPlanMetadata(t *testing.T) {
 	if !shouldPersistQuotaExtra("plan_type", "") {
 		t.Fatalf("empty plan_type should be persisted to clear stale subscription data")
@@ -50,7 +123,8 @@ func TestShouldPersistQuotaExtraAllowsClearingPlanMetadata(t *testing.T) {
 }
 
 type stubRepository struct {
-	create func(context.Context, CreateInput) (Account, error)
+	create   func(context.Context, CreateInput) (Account, error)
+	findByID func(context.Context, int, LoadOptions) (Account, error)
 }
 
 func (s stubRepository) List(context.Context, ListFilter) ([]Account, int64, error) {
@@ -74,8 +148,11 @@ func (s stubRepository) Update(context.Context, int, UpdateInput) (Account, erro
 
 func (s stubRepository) Delete(context.Context, int) error { return nil }
 
-func (s stubRepository) FindByID(context.Context, int, LoadOptions) (Account, error) {
-	return Account{}, nil
+func (s stubRepository) FindByID(ctx context.Context, id int, opts LoadOptions) (Account, error) {
+	if s.findByID == nil {
+		return Account{}, nil
+	}
+	return s.findByID(ctx, id, opts)
 }
 
 func (s stubRepository) ListByPlatform(context.Context, string) ([]Account, error) {
@@ -130,6 +207,16 @@ func (s *stubStateWriter) ClearRateLimitMarkers(_ context.Context, accountID int
 func (s *stubStateWriter) MarkDisabled(_ context.Context, accountID int, reason string) {
 	s.disabled[accountID] = reason
 }
+
+type stubPluginCatalog struct {
+	models []sdk.ModelInfo
+}
+
+func (s stubPluginCatalog) GetPluginByPlatform(string) *plugin.PluginInstance { return nil }
+func (s stubPluginCatalog) GetModels(string) []sdk.ModelInfo                  { return s.models }
+func (s stubPluginCatalog) GetAccountTypes(string) []sdk.AccountType          { return nil }
+func (s stubPluginCatalog) GetCredentialFields(string) []sdk.CredentialField  { return nil }
+func (s stubPluginCatalog) GetAllPluginMeta() []plugin.PluginMeta             { return nil }
 
 type windowStatsStub struct {
 	stubRepository

@@ -208,6 +208,21 @@ func TestRoutesForAPIKeyRejectsImageWhenBoundGroupDisabled(t *testing.T) {
 	}
 }
 
+func TestRoutesForAPIKeyRejectsChatWhenBoundGroupImageEnabled(t *testing.T) {
+	t.Parallel()
+
+	state := &forwardState{keyInfo: &auth.APIKeyInfo{
+		GroupID:             42,
+		GroupPlatform:       "openai",
+		GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "true"}},
+	}}
+
+	routes := routesForAPIKey(state, routing.Requirements{})
+	if len(routes) != 0 {
+		t.Fatalf("len(routes) = %d, want 0", len(routes))
+	}
+}
+
 func TestSelectAllRoutesFailureResponse(t *testing.T) {
 	t.Parallel()
 

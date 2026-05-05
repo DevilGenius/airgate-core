@@ -119,4 +119,17 @@ func TestListEligibleGroupsFiltersImageDisabledOpenAIGroups(t *testing.T) {
 	if routes[0].GroupID != imageEnabled.ID {
 		t.Fatalf("routes[0].GroupID = %d, want %d", routes[0].GroupID, imageEnabled.ID)
 	}
+
+	chatRoutes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, Requirements{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chatRoutes) != 2 {
+		t.Fatalf("len(chatRoutes) = %d, want 2", len(chatRoutes))
+	}
+	for _, route := range chatRoutes {
+		if route.GroupID == imageEnabled.ID {
+			t.Fatalf("chat routes should exclude image-enabled group %d", imageEnabled.ID)
+		}
+	}
 }
