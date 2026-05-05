@@ -50,7 +50,6 @@ import type {
   PagedData,
 } from '../../shared/types';
 
-<<<<<<< dev
 interface AccountTableColumn {
   key: string;
   title: ReactNode;
@@ -59,6 +58,8 @@ interface AccountTableColumn {
   hideOnMobile?: boolean;
   render: (row: AccountResp) => ReactNode;
 }
+
+const UNGROUPED_GROUP_FILTER = '__ungrouped__';
 
 function StatusPill({ status, tooltip }: { status: 'active' | 'disabled'; tooltip?: string }) {
   const { t } = useTranslation();
@@ -102,9 +103,6 @@ function TableSelectionCheckbox({
     </Checkbox>
   );
 }
-=======
-const UNGROUPED_GROUP_FILTER = '__ungrouped__';
->>>>>>> master
 
 // formatCountdown 把剩余毫秒格式化成 "Xd Yh"/"Xh Ym"/"Ym" 样式，
 // 与 sub2api 的"限流中 10h 16m 自动恢复"徽标一致。
@@ -1235,7 +1233,6 @@ export default function AccountsPage() {
 
   return (
     <div>
-<<<<<<< dev
       <div className="mb-5 space-y-3">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
           <div className="w-full lg:w-[260px]">
@@ -1251,59 +1248,6 @@ export default function AccountsPage() {
               </div>
             </HeroTextField>
           </div>
-=======
-      {/* 筛选 */}
-      <div className="flex items-end gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-[200px]">
-          <Input
-            value={keyword}
-            onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-            placeholder={t('common.search')}
-            icon={<Search className="w-4 h-4" />}
-          />
-        </div>
-        <Select
-          className="min-w-0"
-          value={platformFilter}
-          onChange={(e) => { setPlatformFilter(e.target.value); setPage(1); }}
-          options={PLATFORM_OPTIONS}
-        />
-        <Select
-          className="min-w-0"
-          value={stateFilter}
-          onChange={(e) => { setStateFilter(e.target.value); setPage(1); }}
-          options={STATE_OPTIONS}
-        />
-        <Select
-          className="min-w-0"
-          value={typeFilter}
-          onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-          options={[
-            { value: '', label: t('accounts.all_types', '全部类型') },
-            { value: 'oauth', label: 'OAuth' },
-            { value: 'apikey', label: 'API Key' },
-          ]}
-        />
-        <Select
-          className="min-w-0"
-          value={groupFilter}
-          onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
-          options={[
-            { value: '', label: t('accounts.all_groups') },
-            { value: UNGROUPED_GROUP_FILTER, label: t('accounts.ungrouped') },
-            ...(allGroupsData?.list ?? []).map((g) => ({ value: String(g.id), label: g.name })),
-          ]}
-        />
-        <Select
-          className="min-w-0"
-          value={proxyFilter}
-          onChange={(e) => { setProxyFilter(e.target.value); setPage(1); }}
-          options={[
-            { value: '', label: t('accounts.all_proxies') },
-            ...(allProxiesData?.list ?? []).map((p) => ({ value: String(p.id), label: p.name })),
-          ]}
-        />
->>>>>>> master
 
           <Button
             className="justify-center lg:justify-start"
