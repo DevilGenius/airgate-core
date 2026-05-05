@@ -6,11 +6,11 @@ import { StrictMode, useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
+import { AlertDialog, Button } from '@heroui/react';
 import { AuthProvider } from './app/providers/AuthProvider';
 import { ThemeProvider } from './app/providers/ThemeProvider';
 import { SiteSettingsProvider } from './app/providers/SiteSettingsProvider';
-import { ToastProvider, useToast } from './shared/components/Toast';
-import { ConfirmModal } from './shared/components/Modal';
+import { ToastProvider, useToast } from './shared/ui';
 import { router } from './app/router';
 import './i18n';
 import './index.css';
@@ -72,14 +72,32 @@ function PluginAPIBridge() {
   };
 
   return (
-    <ConfirmModal
-      open={pending !== null}
-      onClose={() => handleClose(false)}
-      onConfirm={() => handleClose(true)}
-      title={pending?.title ?? '请确认'}
-      message={pending?.message ?? ''}
-      danger={pending?.danger}
-    />
+    <AlertDialog
+      isOpen={pending !== null}
+      onOpenChange={(open) => {
+        if (!open) handleClose(false);
+      }}
+    >
+      <AlertDialog.Backdrop>
+        <AlertDialog.Container placement="center" size="sm">
+          <AlertDialog.Dialog className="ag-elevation-modal">
+            <AlertDialog.Header>
+              <AlertDialog.Icon status={pending?.danger ? 'danger' : 'accent'} />
+              <AlertDialog.Heading>{pending?.title ?? '请确认'}</AlertDialog.Heading>
+            </AlertDialog.Header>
+            <AlertDialog.Body>{pending?.message ?? ''}</AlertDialog.Body>
+            <AlertDialog.Footer>
+              <Button variant="secondary" onPress={() => handleClose(false)}>
+                取消
+              </Button>
+              <Button variant={pending?.danger ? 'danger' : 'primary'} onPress={() => handleClose(true)}>
+                确认
+              </Button>
+            </AlertDialog.Footer>
+          </AlertDialog.Dialog>
+        </AlertDialog.Container>
+      </AlertDialog.Backdrop>
+    </AlertDialog>
   );
 }
 
@@ -87,11 +105,10 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      // 30s 内复用缓存避免短时间内重复打接口；但只要组件重新 mount
-      // （比如用户切换侧边栏 tab 再回来）就强制 refetch，匹配"切 tab 应该看到最新数据"
-      // 的直觉。window focus 仍走默认行为，不会每次回到标签页都刷一遍。
-      staleTime: 30_000,
-      refetchOnMount: 'always',
+      // 短时间内切页返回直接复用缓存，避免路由切换时重复请求抢占首屏渲染。
+      staleTime: 60_000,
+      refetchOnMount: true,
+      refetchOnWindowFocus: false,
     },
   },
 });

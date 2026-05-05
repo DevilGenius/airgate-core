@@ -5,32 +5,121 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { Suspense, lazy } from 'react';
-import { AppShell } from './layout/AppShell';
-import { ChatShell } from './layout/ChatShell';
+import { Suspense, lazy, useEffect } from 'react';
+import type { ComponentType, ElementType, LazyExoticComponent, ReactNode } from 'react';
 import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
-import { getToken } from '../shared/api/client';
+import { getToken, getTokenRole } from '../shared/api/client';
 import { usersApi } from '../shared/api/users';
 import { setupApi } from '../shared/api/setup';
-const SetupPage = lazy(() => import('../pages/SetupPage'));
-const LoginPage = lazy(() => import('../pages/LoginPage'));
-const PluginPage = lazy(() => import('../pages/PluginPage'));
-const PublicHomePage = lazy(() => import('../pages/HomePage'));
-const DocsPage = lazy(() => import('../pages/DocsPage'));
-const DashboardPage = lazy(() => import('../pages/DashboardPage'));
-const UserOverviewPage = lazy(() => import('../pages/user/UserOverviewPage'));
-const UsersPage = lazy(() => import('../pages/admin/UsersPage'));
-const AccountsPage = lazy(() => import('../pages/admin/AccountsPage'));
-const GroupsPage = lazy(() => import('../pages/admin/GroupsPage'));
-const SubscriptionsPage = lazy(() => import('../pages/admin/SubscriptionsPage'));
-const ProxiesPage = lazy(() => import('../pages/admin/ProxiesPage'));
-const UsagePage = lazy(() => import('../pages/admin/UsagePage'));
-const PluginsPage = lazy(() => import('../pages/admin/PluginsPage'));
-const SettingsPage = lazy(() => import('../pages/admin/SettingsPage'));
-const ProfilePage = lazy(() => import('../pages/user/ProfilePage'));
-const UserKeysPage = lazy(() => import('../pages/user/UserKeysPage'));
-const UserUsagePage = lazy(() => import('../pages/user/UserUsagePage'));
+import { ChatPageLoading, FullPageLoading, PageLoading } from '../shared/components/PageLoading';
+
+type PreloadableLazyComponent<TProps = Record<string, never>> = LazyExoticComponent<ComponentType<TProps>> & {
+  preload: () => Promise<{ default: ComponentType<TProps> }>;
+};
+
+function lazyWithPreload<TProps>(
+  load: () => Promise<{ default: ComponentType<TProps> }>,
+): PreloadableLazyComponent<TProps> {
+  let promise: Promise<{ default: ComponentType<TProps> }> | undefined;
+  const preload = () => {
+    promise ??= load();
+    return promise;
+  };
+  const Component = lazy(preload) as PreloadableLazyComponent<TProps>;
+  Component.preload = preload;
+  return Component;
+}
+
+function requestIdle(work: () => void) {
+  const runtime = globalThis as typeof globalThis & {
+    cancelIdleCallback?: (id: number) => void;
+    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+  };
+
+  if (runtime.requestIdleCallback) {
+    const id = runtime.requestIdleCallback(work, { timeout: 2500 });
+    return () => runtime.cancelIdleCallback?.(id);
+  }
+
+  const id = globalThis.setTimeout(work, 500);
+  return () => globalThis.clearTimeout(id);
+}
+
+const AppShell = lazyWithPreload<{ children: ReactNode }>(() =>
+  import('./layout/AppShell').then((m) => ({ default: m.AppShell })),
+);
+const ChatShell = lazyWithPreload<{ children: ReactNode }>(() =>
+  import('./layout/ChatShell').then((m) => ({ default: m.ChatShell })),
+);
+const SetupPage = lazyWithPreload(() => import('../pages/SetupPage'));
+const LoginPage = lazyWithPreload(() => import('../pages/LoginPage'));
+const PluginPage = lazyWithPreload(() => import('../pages/PluginPage'));
+const PublicHomePage = lazyWithPreload(() => import('../pages/HomePage'));
+const DocsPage = lazyWithPreload(() => import('../pages/DocsPage'));
+const DashboardPage = lazyWithPreload(() => import('../pages/DashboardPage'));
+const UserOverviewPage = lazyWithPreload(() => import('../pages/user/UserOverviewPage'));
+const UsersPage = lazyWithPreload(() => import('../pages/admin/UsersPage'));
+const AccountsPage = lazyWithPreload(() => import('../pages/admin/AccountsPage'));
+const GroupsPage = lazyWithPreload(() => import('../pages/admin/GroupsPage'));
+const SubscriptionsPage = lazyWithPreload(() => import('../pages/admin/SubscriptionsPage'));
+const ProxiesPage = lazyWithPreload(() => import('../pages/admin/ProxiesPage'));
+const UsagePage = lazyWithPreload(() => import('../pages/admin/UsagePage'));
+const PluginsPage = lazyWithPreload(() => import('../pages/admin/PluginsPage'));
+const SettingsPage = lazyWithPreload(() => import('../pages/admin/SettingsPage'));
+const ProfilePage = lazyWithPreload(() => import('../pages/user/ProfilePage'));
+const UserKeysPage = lazyWithPreload(() => import('../pages/user/UserKeysPage'));
+const UserUsagePage = lazyWithPreload(() => import('../pages/user/UserUsagePage'));
+
+const ADMIN_IDLE_PRELOADS = [
+  DashboardPage,
+  UsersPage,
+  AccountsPage,
+  GroupsPage,
+  UsagePage,
+  SettingsPage,
+];
+
+const USER_IDLE_PRELOADS = [
+  UserOverviewPage,
+  UserKeysPage,
+  UserUsagePage,
+  ProfilePage,
+];
+
+function RoutePreloader() {
+  const { user, isAPIKeySession } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+
+    const pages = isAPIKeySession
+      ? [UserUsagePage, PluginPage]
+      : user.role === 'admin'
+        ? ADMIN_IDLE_PRELOADS
+        : USER_IDLE_PRELOADS;
+    let index = 0;
+    let cancelIdle = () => {};
+    let cancelled = false;
+
+    const preloadNext = () => {
+      if (cancelled || index >= pages.length) return;
+      const page = pages[index++];
+      if (!page) return;
+      void page.preload().finally(() => {
+        if (!cancelled) cancelIdle = requestIdle(preloadNext);
+      });
+    };
+
+    cancelIdle = requestIdle(preloadNext);
+    return () => {
+      cancelled = true;
+      cancelIdle();
+    };
+  }, [isAPIKeySession, user]);
+
+  return null;
+}
 
 // 缓存安装状态，避免每次路由跳转都请求
 let setupChecked = false;
@@ -76,7 +165,7 @@ const setupRoute = createRoute({
     }
   },
   component: () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<FullPageLoading />}>
       <SetupPage />
     </Suspense>
   ),
@@ -93,14 +182,14 @@ const homeRoute = createRoute({
     }
   },
   component: () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<FullPageLoading />}>
       <PublicHomePage />
     </Suspense>
   ),
 });
 
 // 注意：/status 不再注册客户端路由，整个公开状态页交给 airgate-health 插件维护。
-// 后端 GET /status 直接反代到插件的 handlePublicIndex，前端用 <a href="/status"> 跳转。
+// 后端 GET /status 直接反代到插件的 handlePublicIndex，前端用普通 href 跳转。
 // 这样避免 core 与插件出现两份重复的状态页实现。
 
 // 内置默认文档页 —— 当管理员未在 系统设置 → 站点品牌 → 文档链接 中填写外部 URL 时，
@@ -109,7 +198,7 @@ const docsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/docs',
   component: () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<FullPageLoading />}>
       <DocsPage />
     </Suspense>
   ),
@@ -126,7 +215,7 @@ const loginRoute = createRoute({
     }
   },
   component: () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<FullPageLoading />}>
       <LoginPage />
     </Suspense>
   ),
@@ -146,9 +235,12 @@ const authLayout = createRoute({
     }
   },
   component: () => (
-    <AppShell>
-      <Outlet />
-    </AppShell>
+    <Suspense fallback={<FullPageLoading />}>
+      <AppShell>
+        <RoutePreloader />
+        <Outlet />
+      </AppShell>
+    </Suspense>
   ),
 });
 
@@ -156,9 +248,10 @@ function HomePage() {
   const { user, isAPIKeySession } = useAuth();
   if (!user) return null;
 
-  const Page = isAPIKeySession ? UserUsagePage : user.role === 'admin' ? DashboardPage : UserOverviewPage;
+  const isAdmin = getTokenRole() === 'admin' || user.role === 'admin';
+  const Page = isAPIKeySession ? UserUsagePage : isAdmin ? DashboardPage : UserOverviewPage;
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
       <Page />
     </Suspense>
   );
@@ -170,6 +263,8 @@ const adminLayout = createRoute({
   getParentRoute: () => authLayout,
   id: 'admin',
   beforeLoad: async () => {
+    if (getTokenRole() === 'admin') return;
+
     const user = await usersApi.me();
     if (user.role !== 'admin') {
       throw redirect({ to: '/' });
@@ -178,9 +273,9 @@ const adminLayout = createRoute({
   component: Outlet,
 });
 
-function renderPage(Page: React.LazyExoticComponent<React.ComponentType>) {
+function renderPage(Page: ElementType) {
   return () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
       <Page />
     </Suspense>
   );
@@ -214,11 +309,11 @@ const chatRoute = createRoute({
     }
   },
   component: () => (
-    <ChatShell>
-      <Suspense fallback={null}>
+    <Suspense fallback={<ChatPageLoading />}>
+      <ChatShell>
         <PluginPage pluginNameOverride="airgate-playground" subPathOverride="/playground" />
-      </Suspense>
-    </ChatShell>
+      </ChatShell>
+    </Suspense>
   ),
 });
 
@@ -237,7 +332,7 @@ const pluginRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/plugins/$pluginName/$',
   component: () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
       <PluginPage />
     </Suspense>
   ),

@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, type ReactElement } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField, Tooltip } from '@heroui/react';
 import {
   Plus,
   Pencil,
@@ -15,14 +15,11 @@ import {
   Download,
   Upload,
   Eraser,
+  SlidersHorizontal,
+  X,
 } from 'lucide-react';
-import { useToast } from '../../shared/components/Toast';
-import { Button } from '../../shared/components/Button';
-import { Input, Select } from '../../shared/components/Input';
-import { Table, type Column } from '../../shared/components/Table';
-import { ConfirmModal } from '../../shared/components/Modal';
-import { StatusBadge } from '../../shared/components/Badge';
-import { PlatformIcon } from '../../shared/components/PlatformIcon';
+import { useToast } from '../../shared/ui';
+import { PlatformIcon } from '../../shared/ui';
 import { accountsApi } from '../../shared/api/accounts';
 import { groupsApi } from '../../shared/api/groups';
 import { proxiesApi } from '../../shared/api/proxies';
@@ -30,8 +27,13 @@ import { AccountTestModal } from './AccountTestModal';
 import { AccountStatsModal } from './AccountStatsModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
+import { getTotalPages } from '../../shared/utils/pagination';
+import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
+import { CommonTable } from '../../shared/components/CommonTable';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { BulkActionsBar } from './accounts/BulkActionsBar';
@@ -48,7 +50,61 @@ import type {
   PagedData,
 } from '../../shared/types';
 
+<<<<<<< dev
+interface AccountTableColumn {
+  key: string;
+  title: ReactNode;
+  width?: string;
+  align?: 'left' | 'center' | 'right';
+  hideOnMobile?: boolean;
+  render: (row: AccountResp) => ReactNode;
+}
+
+function StatusPill({ status, tooltip }: { status: 'active' | 'disabled'; tooltip?: string }) {
+  const { t } = useTranslation();
+  const chip = (
+    <Chip color={status === 'active' ? 'success' : 'default'} size="sm" variant="soft">
+      {status === 'active' ? t('status.active') : t('status.disabled')}
+    </Chip>
+  );
+
+  if (!tooltip) return chip;
+  return (
+    <Tooltip>
+      <Tooltip.Trigger>{chip}</Tooltip.Trigger>
+      <Tooltip.Content className="max-w-[360px] whitespace-pre-wrap">{tooltip}</Tooltip.Content>
+    </Tooltip>
+  );
+}
+
+function TableSelectionCheckbox({
+  ariaLabel,
+  isIndeterminate,
+  isSelected,
+  onChange,
+}: {
+  ariaLabel: string;
+  isIndeterminate?: boolean;
+  isSelected: boolean;
+  onChange: (isSelected: boolean) => void;
+}) {
+  return (
+    <Checkbox
+      aria-label={ariaLabel}
+      isIndeterminate={isIndeterminate}
+      isSelected={isSelected}
+      slot={null}
+      onChange={onChange}
+    >
+      <Checkbox.Control>
+        <Checkbox.Indicator />
+      </Checkbox.Control>
+    </Checkbox>
+  );
+}
+=======
 const UNGROUPED_GROUP_FILTER = '__ungrouped__';
+>>>>>>> master
 
 // formatCountdown 把剩余毫秒格式化成 "Xd Yh"/"Xh Ym"/"Ym" 样式，
 // 与 sub2api 的"限流中 10h 16m 自动恢复"徽标一致。
@@ -65,6 +121,51 @@ function formatCountdown(ms: number): string {
   return `${sec}s`;
 }
 
+function accountHasLiveCooldown(row: AccountResp, now: number): boolean {
+  const stateUntil = row.state_until ? Date.parse(row.state_until) : 0;
+  if (stateUntil > now) return true;
+  return (row.family_cooldowns || []).some((fc) => Date.parse(fc.until) > now);
+}
+
+let cooldownClockNow = Date.now();
+let cooldownClockTimer: number | null = null;
+const cooldownClockListeners = new Set<() => void>();
+
+function subscribeCooldownClock(listener: () => void) {
+  cooldownClockNow = Date.now();
+  cooldownClockListeners.add(listener);
+  if (cooldownClockTimer == null) {
+    cooldownClockTimer = window.setInterval(() => {
+      cooldownClockNow = Date.now();
+      cooldownClockListeners.forEach((notify) => notify());
+    }, 1000);
+  }
+
+  return () => {
+    cooldownClockListeners.delete(listener);
+    if (cooldownClockListeners.size === 0 && cooldownClockTimer != null) {
+      window.clearInterval(cooldownClockTimer);
+      cooldownClockTimer = null;
+    }
+  };
+}
+
+function subscribeIdleClock() {
+  return () => {};
+}
+
+function getCooldownClockSnapshot() {
+  return cooldownClockNow;
+}
+
+function useCooldownClock(enabled: boolean): number {
+  return useSyncExternalStore(
+    enabled ? subscribeCooldownClock : subscribeIdleClock,
+    getCooldownClockSnapshot,
+    getCooldownClockSnapshot,
+  );
+}
+
 /**
  * AccountStatusCell 渲染账号状态徽标，按 state + state_until 动态展示：
  *   active       → 绿色 "活跃"
@@ -79,18 +180,10 @@ function formatCountdown(ms: number): string {
  */
 function AccountStatusCell({ row }: { row: AccountResp }) {
   const { t } = useTranslation();
+  const hasLiveCooldown = accountHasLiveCooldown(row, Date.now());
+  const tickingNow = useCooldownClock(hasLiveCooldown);
+  const now = hasLiveCooldown ? tickingNow : Date.now();
   const untilMs = row.state_until ? Date.parse(row.state_until) : 0;
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!untilMs || untilMs <= now) {
-      // 即使账号 state 不需要倒计时，也可能有家族冷却需要刷新显示
-      if (!row.family_cooldowns || row.family_cooldowns.length === 0) return;
-    }
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [untilMs, now, row.family_cooldowns]);
-
   const remainingMs = untilMs - now;
   const hasCountdown = untilMs > 0 && remainingMs > 0;
 
@@ -127,10 +220,10 @@ function AccountStatusCell({ row }: { row: AccountResp }) {
       t('accounts.degraded_tooltip', '上游池抖动，软降级仅做兜底，到期自动恢复'),
     );
   } else if (row.state === 'disabled') {
-    mainBadge = <StatusBadge status="disabled" tooltip={row.error_msg || undefined} />;
+    mainBadge = <StatusPill status="disabled" tooltip={row.error_msg || undefined} />;
   } else {
     // active，或 rate_limited/degraded 已到期（lazy 恢复）
-    mainBadge = <StatusBadge status="active" />;
+    mainBadge = <StatusPill status="active" />;
   }
 
   if (liveFamilyCooldowns.length === 0) {
@@ -203,42 +296,34 @@ export default function AccountsPage() {
   };
 
   const PLATFORM_OPTIONS = [
-    { value: '', label: t('accounts.all_platforms') },
-    ...platforms.map((p) => ({ value: p, label: platformName(p) })),
+    { id: '', label: t('accounts.all_platforms') },
+    ...platforms.map((p) => ({ id: p, label: platformName(p) })),
   ];
 
   const STATE_OPTIONS = [
-    { value: '', label: t('users.all_status') },
-    { value: 'active', label: t('status.active') },
-    { value: 'rate_limited', label: t('status.rate_limited', '限流中') },
-    { value: 'degraded', label: t('status.degraded', '降级中') },
-    { value: 'disabled', label: t('status.disabled') },
+    { id: '', label: t('users.all_status') },
+    { id: 'active', label: t('status.active') },
+    { id: 'rate_limited', label: t('status.rate_limited', '限流中') },
+    { id: 'degraded', label: t('status.degraded', '降级中') },
+    { id: 'disabled', label: t('status.disabled') },
   ];
 
   // 筛选状态
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
   const [platformFilter, setPlatformFilter] = useState('');
   const [stateFilter, setStateFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [proxyFilter, setProxyFilter] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // 自动刷新
   const AUTO_REFRESH_OPTIONS = [0, 5, 10, 15, 30];
   const [autoRefresh, setAutoRefresh] = useState(0); // 秒，0=关闭
-  const [showRefreshMenu, setShowRefreshMenu] = useState(false);
-  const refreshMenuRef = useRef<HTMLDivElement>(null);
   const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (refreshMenuRef.current && !refreshMenuRef.current.contains(e.target as Node)) setShowRefreshMenu(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   useEffect(() => {
     if (!autoRefresh) { setCountdown(0); return; }
@@ -263,6 +348,7 @@ export default function AccountsPage() {
 
   // 批量选择状态
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [pendingToggleIds, setPendingToggleIds] = useState<Set<number>>(() => new Set());
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
@@ -275,12 +361,12 @@ export default function AccountsPage() {
 
   // 查询账号列表
   const { data, isLoading } = useQuery({
-    queryKey: queryKeys.accounts(page, pageSize, keyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter),
+    queryKey: queryKeys.accounts(page, pageSize, debouncedKeyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter),
     queryFn: () =>
       accountsApi.list({
         page,
         page_size: pageSize,
-        keyword: keyword || undefined,
+        keyword: debouncedKeyword || undefined,
         platform: platformFilter || undefined,
         state: stateFilter || undefined,
         account_type: typeFilter || undefined,
@@ -288,6 +374,7 @@ export default function AccountsPage() {
         ungrouped: groupFilter === UNGROUPED_GROUP_FILTER ? true : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
       }),
+    placeholderData: keepPreviousData,
   });
 
   // 查询分组列表（用于表格中 ID→名称映射）
@@ -333,7 +420,7 @@ export default function AccountsPage() {
         return accountsApi.export({ ids: selectedIds });
       }
       return accountsApi.export({
-        keyword: keyword || undefined,
+        keyword: debouncedKeyword || undefined,
         platform: platformFilter || undefined,
         state: stateFilter || undefined,
         account_type: typeFilter || undefined,
@@ -421,10 +508,59 @@ export default function AccountsPage() {
     onSuccess: () => setDeletingAccount(null),
   });
 
-  // 切换调度状态
-  const toggleMutation = useCrudMutation({
+  // 切换调度状态。这里做乐观更新，避免 Switch 先跳回旧状态再等列表刷新。
+  const toggleMutation = useMutation({
     mutationFn: (id: number) => accountsApi.toggleScheduling(id),
-    queryKey: queryKeys.accounts(),
+    onMutate: async (id) => {
+      setPendingToggleIds((prev) => new Set(prev).add(id));
+      await queryClient.cancelQueries({ queryKey: queryKeys.accounts() });
+      const previous = queryClient.getQueriesData<PagedData<AccountResp>>({ queryKey: queryKeys.accounts() });
+
+      queryClient.setQueriesData<PagedData<AccountResp>>({ queryKey: queryKeys.accounts() }, (old) => {
+        if (!old?.list) return old;
+        return {
+          ...old,
+          list: old.list.map((account) => (
+            account.id === id
+              ? {
+                  ...account,
+                  state: (account.state === 'disabled' ? 'active' : 'disabled') as AccountResp['state'],
+                  state_until: undefined,
+                }
+              : account
+          )),
+        };
+      });
+
+      return { previous };
+    },
+    onSuccess: (res, id) => {
+      queryClient.setQueriesData<PagedData<AccountResp>>({ queryKey: queryKeys.accounts() }, (old) => {
+        if (!old?.list) return old;
+        return {
+          ...old,
+          list: old.list.map((account) => (
+            account.id === id
+              ? { ...account, state: res.state as AccountResp['state'], state_until: undefined }
+              : account
+          )),
+        };
+      });
+    },
+    onError: (err: Error, _id, context) => {
+      context?.previous.forEach(([queryKey, value]) => {
+        queryClient.setQueryData(queryKey, value);
+      });
+      toast('error', err.message);
+    },
+    onSettled: (_data, _error, id) => {
+      setPendingToggleIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+    },
   });
 
   // 刷新令牌：后端在 refresh_token 已失效但能从 access_token JWT 解析到 plan_type
@@ -520,45 +656,24 @@ export default function AccountsPage() {
     setBulkRefreshTargets(oauthRows);
   };
 
-  // 更多菜单状态（合并 id 和位置为单一状态，避免分步更新导致闪跳）
-  const [moreMenu, setMoreMenu] = useState<{ id: number; top: number; left: number } | null>(null);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
-  const moreMenuBtnRef = useRef<HTMLButtonElement>(null);
-
   // 统计弹窗
   const [statsAccountId, setStatsAccountId] = useState<number | null>(null);
 
-  // 点击外部关闭更多菜单
-  useEffect(() => {
-    if (!moreMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node) &&
-        moreMenuBtnRef.current && !moreMenuBtnRef.current.contains(e.target as Node)
-      ) {
-        setMoreMenu(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [moreMenu]);
-
   // 表格列定义
-  const columns: Column<AccountResp>[] = [
+  const columns: AccountTableColumn[] = [
     {
       key: 'name',
       title: t('common.name'),
       width: '150px',
-      fixed: 'left',
       render: (row) => {
         const email = row.credentials?.email;
         return (
-          <div className="flex flex-col items-center">
-            <span style={{ color: 'var(--ag-text)' }} className="font-medium">
+          <div className="flex w-full min-w-0 flex-col items-start text-left">
+            <span style={{ color: 'var(--ag-text)' }} className="max-w-full truncate font-medium" title={row.name}>
               {row.name}
             </span>
             {email && (
-              <span className="text-[11px]" style={{ color: 'var(--ag-text-tertiary)' }}>
+              <span className="max-w-full truncate text-[11px]" style={{ color: 'var(--ag-text-tertiary)' }} title={email}>
                 {email}
               </span>
             )}
@@ -569,6 +684,7 @@ export default function AccountsPage() {
     {
       key: 'platform',
       title: t('accounts.platform_type'),
+      width: '108px',
       render: (row) => {
         const planType = row.credentials?.plan_type;
         const subUntil = row.credentials?.subscription_active_until;
@@ -585,19 +701,19 @@ export default function AccountsPage() {
           ? `${t('accounts.expires_at')}: ${new Date(subUntil).toLocaleDateString()}`
           : undefined;
         return (
-          <div className="flex flex-col items-center gap-1.5">
-            <span className="inline-flex items-center gap-1">
-              <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-              <span>{platformName(row.platform)}</span>
+          <div className="flex w-full min-w-0 flex-col items-start gap-1 text-left">
+            <span className="inline-flex max-w-full min-w-0 items-center gap-1">
+              <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" />
+              <span className="min-w-0 truncate">{platformName(row.platform)}</span>
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex max-w-full items-center gap-1">
               {row.type && (
-                <span className="text-[10px] px-1 py-0 rounded" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
+                <span className="truncate rounded px-1 py-0 text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
                   {{ oauth: 'OAuth', session_key: 'Session Key', apikey: 'API Key' }[row.type] ?? row.type}
                 </span>
               )}
               {displayPlanType && (
-                <span className="text-[10px] px-1 py-0 rounded font-medium cursor-default" title={planTooltip} style={{ background: 'var(--ag-primary)', color: 'var(--ag-text-inverse)', opacity: 0.85 }}>
+                <span className="cursor-default truncate rounded px-1 py-0 text-[10px] font-medium" title={planTooltip} style={{ background: 'var(--ag-primary)', color: 'var(--ag-text-inverse)', opacity: 0.85 }}>
                   {displayPlanType.charAt(0).toUpperCase() + displayPlanType.slice(1)}
                 </span>
               )}
@@ -605,63 +721,6 @@ export default function AccountsPage() {
           </div>
         );
       },
-    },
-    {
-      key: 'capacity',
-      title: t('accounts.capacity'),
-      width: '100px',
-      render: (row) => {
-        const current = row.current_concurrency || 0;
-        const max = row.max_concurrency;
-        const loadPct = max > 0 ? (current / max) * 100 : 0;
-        const color = loadPct < 50 ? 'var(--ag-success)' : loadPct < 80 ? 'var(--ag-warning)' : 'var(--ag-danger)';
-        return (
-          <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
-            <span style={{ color }}>{current}</span>
-            <span style={{ color: 'var(--ag-text-tertiary)' }}> / {max}</span>
-          </span>
-        );
-      },
-    },
-    {
-      key: 'status',
-      title: t('common.status'),
-      render: (row) => <AccountStatusCell row={row} />,
-    },
-    {
-      key: 'scheduling',
-      title: t('accounts.scheduling'),
-      width: '80px',
-      hideOnMobile: true,
-      render: (row) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleMutation.mutate(row.id);
-          }}
-          disabled={toggleMutation.isPending}
-          className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none"
-          style={{
-            backgroundColor: row.state !== 'disabled' ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
-          }}
-        >
-          <span
-            className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform duration-200"
-            style={{ transform: row.state !== 'disabled' ? 'translateX(17px)' : 'translateX(3px)' }}
-          />
-        </button>
-      ),
-    },
-    {
-      key: 'rate_multiplier',
-      title: t('accounts.rate_multiplier'),
-      width: '80px',
-      hideOnMobile: true,
-      render: (row) => (
-        <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
-          {row.rate_multiplier}x
-        </span>
-      ),
     },
     {
       key: 'groups',
@@ -688,6 +747,65 @@ export default function AccountsPage() {
         );
       },
     },
+    {
+      key: 'capacity',
+      title: t('accounts.capacity'),
+      width: '100px',
+      align: 'right',
+      render: (row) => {
+        const current = row.current_concurrency || 0;
+        const max = row.max_concurrency;
+        const loadPct = max > 0 ? (current / max) * 100 : 0;
+        const color = loadPct < 50 ? 'var(--ag-success)' : loadPct < 80 ? 'var(--ag-warning)' : 'var(--ag-danger)';
+        return (
+          <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            <span style={{ color }}>{current}</span>
+            <span style={{ color: 'var(--ag-text-tertiary)' }}> / {max}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'status',
+      title: t('common.status'),
+      width: '84px',
+      align: 'center',
+      render: (row) => <AccountStatusCell row={row} />,
+    },
+    {
+      key: 'scheduling',
+      title: t('accounts.scheduling'),
+      width: '80px',
+      align: 'center',
+      hideOnMobile: true,
+      render: (row) => (
+        <Switch
+          aria-label={t('accounts.scheduling')}
+          isSelected={row.state !== 'disabled'}
+          size="sm"
+          onChange={() => {
+            if (pendingToggleIds.has(row.id)) return;
+            toggleMutation.mutate(row.id);
+          }}
+        >
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
+        </Switch>
+      ),
+    },
+    {
+      key: 'rate_multiplier',
+      title: t('accounts.rate_multiplier'),
+      width: '80px',
+      align: 'right',
+      hideOnMobile: true,
+      render: (row) => (
+        <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
+          {row.rate_multiplier}x
+        </span>
+      ),
+    },
     // 用量窗口 —— 始终显示该列。历史上这里用 accounts.length > 0 作为
     // 显示门槛，但当插件尚未加载 / 上游 quota 接口都超时等边缘情况下，后端
     // 可能返回空 accounts map 导致整列消失。那样用户连点"刷新用量"的入口都
@@ -695,7 +813,7 @@ export default function AccountsPage() {
     ...[{
       key: 'usage_window',
       title: t('accounts.usage_window'),
-      width: '200px',
+      width: '440px',
       hideOnMobile: true,
       render: (row: AccountResp) => {
         const usage = usageData?.accounts?.[String(row.id)];
@@ -798,7 +916,61 @@ export default function AccountsPage() {
           return `${timePart} ${segments[segments.length - 1]}`;
         };
 
-        const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', minWidth: 24 };
+        const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
+        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[1.9rem_minmax(0,1fr)] items-center gap-1 rounded-[var(--field-radius)] border px-1 text-[10px] leading-none shadow-sm';
+        const todayMetricStyle = (color: string, foreground = color) => ({
+          background: `color-mix(in srgb, ${color} 10%, transparent)`,
+          borderColor: `color-mix(in srgb, ${color} 22%, var(--ag-border))`,
+          color: foreground,
+        });
+        const todayMetricColumnClass = 'grid w-[10.5rem] justify-self-end grid-cols-2 gap-1';
+        const todayMetricChips = hasTodayStats && todayStats ? (
+          <div
+            className={todayMetricColumnClass}
+            title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
+          >
+            <span className={todayMetricClass} style={todayMetricStyle('var(--ag-info)')}>
+              <span className="truncate text-text-tertiary">{t('accounts.today_access_count', '访问')}</span>
+              <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.requests, false)}</span>
+            </span>
+            <span className={todayMetricClass} style={todayMetricStyle('var(--ag-primary)')}>
+              <span className="truncate text-text-tertiary">Token</span>
+              <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.tokens)}</span>
+            </span>
+            <span
+              className={todayMetricClass}
+              style={todayMetricStyle('var(--ag-warning)')}
+              title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
+            >
+              <span className="truncate text-text-tertiary">{t('accounts.user_cost_short', '消费')}</span>
+              <span className="text-right tabular-nums">
+                <span style={{ color: 'var(--ag-warning)' }}>$</span>
+                <span className="text-text">{todayStats.user_cost.toFixed(2)}</span>
+              </span>
+            </span>
+            <span
+              className={todayMetricClass}
+              style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
+              title={t('accounts.window_account_cost', '账号成本（上游计费）')}
+            >
+              <span className="truncate text-text-tertiary">{t('accounts.account_cost_short', '成本')}</span>
+              <span className="text-right tabular-nums">
+                <span style={{ color: 'var(--ag-success)' }}>$</span>
+                <span className="text-text">{todayStats.account_cost.toFixed(2)}</span>
+              </span>
+            </span>
+            {row.platform === 'openai' && (row.today_image_count ?? 0) > 0 && (
+              <span
+                className={`${todayMetricClass} col-span-2`}
+                style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
+                title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}
+              >
+                <span className="truncate text-text-tertiary">{t('accounts.image_count_inline_label', '图')}</span>
+                <span className="text-right font-semibold tabular-nums">{formatCompact(row.today_image_count ?? 0, false)}</span>
+              </span>
+            )}
+          </div>
+        ) : null;
 
         return (
           <div
@@ -807,76 +979,59 @@ export default function AccountsPage() {
                 ? 'flex flex-col gap-1.5 text-[11px] cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
                 : 'flex flex-col gap-1.5 text-[11px] rounded px-1 py-0.5'
             }
-            style={{ fontFamily: 'var(--ag-font-mono)', minWidth: 160 }}
+            style={{ fontFamily: 'var(--ag-font-mono)', minWidth: 412, width: '100%' }}
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
-            {windows.map((w, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium shrink-0" style={badgeStyle}>
-                  {shortLabel(w.label)}
-                </span>
-                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ag-glass-border)', minWidth: 40 }}>
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(100, Math.round(w.used_percent))}%`, background: usageColor(w.used_percent) }}
-                  />
-                </div>
-                <span className="shrink-0" style={{ color: usageColor(w.used_percent), fontSize: 10 }}>
-                  {Math.round(w.used_percent)}%
-                </span>
-                <span className="shrink-0" style={{ color: 'var(--ag-text-tertiary)', fontSize: 10 }}>
-                  {formatReset(w.reset_seconds)}
-                </span>
-              </div>
-            ))}
-            {hasTodayStats && todayStats && (
-              <div
-                className="flex items-center gap-1.5 mt-0.5"
-                style={{ fontSize: 9, color: 'var(--ag-text-tertiary)', lineHeight: 1.3 }}
-                title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
-              >
-                <span style={{ opacity: 0.5 }}>{t('accounts.today', '今日')}</span>
-                <span>{formatCompact(todayStats.requests, false)} req</span>
-                <span style={{ opacity: 0.4 }}>·</span>
-                <span>{formatCompact(todayStats.tokens)}</span>
-                <span style={{ opacity: 0.4 }}>·</span>
-                <span title={t('accounts.window_account_cost', '账号成本（上游计费）')}>
-                  <span style={{ opacity: 0.6 }}>A </span>${todayStats.account_cost.toFixed(2)}
-                </span>
-                <span style={{ opacity: 0.4 }}>·</span>
-                <span title={t('accounts.window_user_cost', '用户消耗（平台计费）')}>
-                  <span style={{ opacity: 0.6 }}>U </span>${todayStats.user_cost.toFixed(2)}
-                </span>
-                {row.platform === 'openai' && (row.today_image_count ?? 0) > 0 && (
-                  <>
-                    <span style={{ opacity: 0.4 }}>·</span>
-                    <span title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}>
-                      <span style={{ opacity: 0.6 }}>{t('accounts.image_count_inline_label', '图 ')}</span>
-                      {formatCompact(row.today_image_count ?? 0, false)}
+            <div
+              className={
+                windows.length > 0
+                  ? 'grid w-full grid-cols-[minmax(0,1fr)_10.5rem] items-start gap-1.5'
+                  : 'flex flex-col gap-1.5'
+              }
+            >
+              <div className="flex min-w-0 flex-col gap-1">
+                {windows.map((w, i) => (
+                  <div key={i} className="grid h-5 grid-cols-[4rem_minmax(0,1fr)_2.25rem_3rem] items-center gap-1.5">
+                    <span className="inline-flex min-w-0 items-center justify-center truncate rounded px-1 py-0 text-[10px] font-medium" style={badgeStyle} title={w.label}>
+                      {shortLabel(w.label)}
                     </span>
-                  </>
+                    <div className="h-1.5 min-w-0 overflow-hidden rounded-full" style={{ background: 'var(--ag-glass-border)' }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(100, Math.round(w.used_percent))}%`, background: usageColor(w.used_percent) }}
+                      />
+                    </div>
+                    <span className="text-right" style={{ color: usageColor(w.used_percent), fontSize: 10 }}>
+                      {Math.round(w.used_percent)}%
+                    </span>
+                    <span className="text-right" style={{ color: 'var(--ag-text-tertiary)', fontSize: 10 }}>
+                      {formatReset(w.reset_seconds)}
+                    </span>
+                  </div>
+                ))}
+                {credits && (
+                  <div className="flex h-5 items-center gap-1">
+                    <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
+                      $
+                    </span>
+                    <span style={{ color: credits.unlimited ? 'var(--ag-success)' : credits.balance > 0 ? 'var(--ag-text)' : 'var(--ag-danger)' }}>
+                      {credits.unlimited ? '∞' : `$${Number(credits.balance).toFixed(2)}`}
+                    </span>
+                  </div>
                 )}
               </div>
-            )}
-            {credits && (
-              <div className="flex items-center gap-1">
-                <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
-                  $
-                </span>
-                <span style={{ color: credits.unlimited ? 'var(--ag-success)' : credits.balance > 0 ? 'var(--ag-text)' : 'var(--ag-danger)' }}>
-                  {credits.unlimited ? '∞' : `$${Number(credits.balance).toFixed(2)}`}
-                </span>
-              </div>
-            )}
+              {windows.length > 0 ? todayMetricChips ?? <div className={todayMetricColumnClass} /> : todayMetricChips}
+            </div>
           </div>
         );
       },
-    } as Column<AccountResp>],
+    }],
     {
       key: 'last_used_at',
       title: t('accounts.last_used'),
       width: '120px',
+      align: 'center',
       hideOnMobile: true,
       render: (row) => {
         if (!row.last_used_at) {
@@ -902,49 +1057,201 @@ export default function AccountsPage() {
     {
       key: 'actions',
       title: t('common.actions'),
-      fixed: 'right',
+      width: '128px',
+      align: 'center',
       render: (row) => (
-        <div className="flex items-center justify-center gap-0.5">
-          <button
-            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
-            style={{ color: 'var(--ag-text-secondary)' }}
-            title={t('common.edit')}
-            onClick={() => setEditingAccount(row)}
+        <div className="flex items-center justify-center gap-1">
+          <Button
+            isIconOnly
+            aria-label={t('common.edit')}
+            size="sm"
+            variant="secondary"
+            onPress={() => setEditingAccount(row)}
           >
             <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button
-            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
-            style={{ color: 'var(--ag-danger)' }}
-            title={t('common.delete')}
-            onClick={() => setDeletingAccount(row)}
+          </Button>
+          <Button
+            isIconOnly
+            aria-label={t('common.delete')}
+            size="sm"
+            variant="danger-soft"
+            className="text-danger"
+            onPress={() => setDeletingAccount(row)}
           >
             <Trash2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            ref={moreMenu?.id === row.id ? moreMenuBtnRef : undefined}
-            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
-            style={{ color: 'var(--ag-text-secondary)' }}
-            title={t('common.more')}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (moreMenu?.id === row.id) {
-                setMoreMenu(null);
-              } else {
-                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                setMoreMenu({ id: row.id, top: rect.bottom + 4, left: rect.right });
-              }
-            }}
-          >
-            <MoreHorizontal className="w-3.5 h-3.5" />
-          </button>
+          </Button>
+          <Dropdown>
+            <Dropdown.Trigger
+              aria-label={t('common.more')}
+              className="button button--sm button--secondary button--icon-only"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
+            </Dropdown.Trigger>
+            <Dropdown.Popover placement="bottom end">
+              <Dropdown.Menu
+                aria-label={t('common.actions')}
+                onAction={(key) => {
+                  switch (String(key)) {
+                    case 'test':
+                      setTestingAccount(row);
+                      break;
+                    case 'stats':
+                      setStatsAccountId(row.id);
+                      break;
+                    case 'refresh_quota':
+                      refreshQuotaMutation.mutate(row.id);
+                      break;
+                    case 'clear_cooldowns':
+                      clearRateLimitMarkersMutation.mutate(row.id);
+                      break;
+                  }
+                }}
+              >
+                <Dropdown.Item id="test" textValue={t('accounts.test_connection')}>
+                  <span className="flex items-center gap-2">
+                    <Zap className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
+                    {t('accounts.test_connection')}
+                  </span>
+                </Dropdown.Item>
+                <Dropdown.Item id="stats" textValue={t('accounts.view_stats')}>
+                  <span className="flex items-center gap-2">
+                    <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
+                    {t('accounts.view_stats')}
+                  </span>
+                </Dropdown.Item>
+                {row.type === 'oauth' ? (
+                  <Dropdown.Item id="refresh_quota" textValue={t('accounts.refresh_quota')}>
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
+                      {t('accounts.refresh_quota')}
+                    </span>
+                  </Dropdown.Item>
+                ) : null}
+                <Dropdown.Item id="clear_cooldowns" textValue={t('accounts.clear_family_cooldowns')}>
+                  <span className="flex items-center gap-2">
+                    <Eraser className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
+                    {t('accounts.clear_family_cooldowns')}
+                  </span>
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
         </div>
       ),
     },
   ];
+  const rows = data?.list ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = getTotalPages(total, pageSize);
+  const selectedIdSet = new Set(selectedIds);
+  const visibleRowIds = rows.map((row) => row.id);
+  const selectedVisibleCount = visibleRowIds.filter((id) => selectedIdSet.has(id)).length;
+  const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
+  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+  const setVisibleRowsSelected = (isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleRowIds])));
+      return;
+    }
+    const visibleSet = new Set(visibleRowIds);
+    setSelectedIds((prev) => prev.filter((id) => !visibleSet.has(id)));
+  };
+  const setRowSelected = (id: number, isSelected: boolean) => {
+    setSelectedIds((prev) => {
+      if (isSelected) {
+        return prev.includes(id) ? prev : [...prev, id];
+      }
+      return prev.filter((selectedId) => selectedId !== id);
+    });
+  };
+  const typeOptions = [
+    { id: '', label: t('accounts.all_types', '全部类型') },
+    { id: 'oauth', label: 'OAuth' },
+    { id: 'apikey', label: 'API Key' },
+  ];
+  const groupOptions = [
+    { id: '', label: t('accounts.all_groups') },
+    ...(allGroupsData?.list ?? []).map((g) => ({ id: String(g.id), label: g.name })),
+  ];
+  const proxyOptions = [
+    { id: '', label: t('accounts.all_proxies') },
+    ...(allProxiesData?.list ?? []).map((p) => ({ id: String(p.id), label: p.name })),
+  ];
+  const selectedPlatformLabel = PLATFORM_OPTIONS.find((item) => item.id === platformFilter)?.label ?? t('accounts.all_platforms');
+  const selectedStateLabel = STATE_OPTIONS.find((item) => item.id === stateFilter)?.label ?? t('users.all_status');
+  const selectedTypeLabel = typeOptions.find((item) => item.id === typeFilter)?.label ?? t('accounts.all_types', '全部类型');
+  const selectedGroupLabel = groupOptions.find((item) => item.id === groupFilter)?.label ?? t('accounts.all_groups');
+  const selectedProxyLabel = proxyOptions.find((item) => item.id === proxyFilter)?.label ?? t('accounts.all_proxies');
+  const clearNamedFilter = (key: 'group' | 'platform' | 'proxy' | 'state' | 'type') => {
+    switch (key) {
+      case 'platform':
+        setPlatformFilter('');
+        break;
+      case 'state':
+        setStateFilter('');
+        break;
+      case 'type':
+        setTypeFilter('');
+        break;
+      case 'group':
+        setGroupFilter('');
+        break;
+      case 'proxy':
+        setProxyFilter('');
+        break;
+    }
+    setPage(1);
+  };
+  const clearAllFilters = () => {
+    setPlatformFilter('');
+    setStateFilter('');
+    setTypeFilter('');
+    setGroupFilter('');
+    setProxyFilter('');
+    setPage(1);
+  };
+  const activeFilters = [
+    platformFilter ? { key: 'platform' as const, label: `${t('groups.platform')}: ${selectedPlatformLabel}` } : null,
+    stateFilter ? { key: 'state' as const, label: `${t('common.status')}: ${selectedStateLabel}` } : null,
+    typeFilter ? { key: 'type' as const, label: `${t('common.type')}: ${selectedTypeLabel}` } : null,
+    groupFilter ? { key: 'group' as const, label: `${t('accounts.group')}: ${selectedGroupLabel}` } : null,
+    proxyFilter ? { key: 'proxy' as const, label: `${t('accounts.proxy')}: ${selectedProxyLabel}` } : null,
+  ].filter((item): item is NonNullable<typeof item> => item != null);
+  const activeFilterCount = activeFilters.length;
+  const columnAlignClass = (align?: AccountTableColumn['align']) => (
+    align === 'center'
+      ? 'text-center'
+      : align === 'right'
+        ? 'text-right'
+        : 'text-left'
+  );
+  const cellJustifyClass = (align?: AccountTableColumn['align']) => (
+    align === 'center'
+      ? 'justify-center'
+      : align === 'right'
+        ? 'justify-end'
+        : 'justify-start'
+  );
 
   return (
     <div>
+<<<<<<< dev
+      <div className="mb-5 space-y-3">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="w-full lg:w-[260px]">
+            <HeroTextField fullWidth>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                <Input
+                  className="pl-9"
+                  value={keyword}
+                  onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                  placeholder={t('accounts.search_placeholder', '搜索凭证名称...')}
+                />
+              </div>
+            </HeroTextField>
+          </div>
+=======
       {/* 筛选 */}
       <div className="flex items-end gap-3 mb-5 flex-wrap">
         <div className="w-full sm:w-[200px]">
@@ -996,71 +1303,222 @@ export default function AccountsPage() {
             ...(allProxiesData?.list ?? []).map((p) => ({ value: String(p.id), label: p.name })),
           ]}
         />
+>>>>>>> master
 
-        {/* 刷新 & 自动刷新 & 创建 */}
-        <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
-            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
-            title={t('common.refresh')}
+          <Button
+            className="justify-center lg:justify-start"
+            size="sm"
+            variant={filtersOpen || activeFilterCount > 0 ? 'secondary' : 'ghost'}
+            onPress={() => setFiltersOpen((open) => !open)}
           >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          <div className="relative" ref={refreshMenuRef}>
-            <button
-              onClick={() => setShowRefreshMenu(!showRefreshMenu)}
-              className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs transition-colors ${
-                autoRefresh ? 'text-primary bg-primary-subtle' : 'text-text-tertiary hover:text-text-secondary hover:bg-bg-hover'
-              }`}
+            <SlidersHorizontal className="h-4 w-4" />
+            {t('common.filter', '筛选')}
+            {activeFilterCount > 0 ? (
+              <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-text-inverse">
+                {activeFilterCount}
+              </span>
+            ) : null}
+          </Button>
+
+          <div className="flex-1" />
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              isIconOnly
+              aria-label={t('common.refresh')}
+              variant="ghost"
+              onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
             >
-              {autoRefresh ? (
-                <span>{t('accounts.auto_refresh')}{countdown}s</span>
-              ) : (
-                <span>{t('accounts.auto_refresh_off')}</span>
-              )}
-              <ChevronDown className={`w-3 h-3 transition-transform ${showRefreshMenu ? 'rotate-180' : ''}`} />
-            </button>
-            {showRefreshMenu && (
-              <div
-                className="absolute right-0 mt-1 w-40 rounded-lg shadow-lg py-1 z-50"
-                style={{ background: 'var(--ag-bg-elevated)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-glass-border)' }}
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Dropdown>
+              <Dropdown.Trigger
+                className={`button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'}`}
               >
-                {AUTO_REFRESH_OPTIONS.map((sec) => (
-                  <button
-                    key={sec}
-                    onClick={() => { setAutoRefresh(sec); setShowRefreshMenu(false); }}
-                    className="flex items-center justify-between w-full px-3 py-2 text-sm hover:bg-bg-hover transition-colors text-left"
-                    style={{ color: 'var(--ag-text)' }}
-                  >
-                    <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${sec}s`}</span>
-                    {autoRefresh === sec && <span className="text-primary">✓</span>}
-                  </button>
-                ))}
-              </div>
-            )}
+                {autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}
+                <ChevronDown className="h-3 w-3" />
+              </Dropdown.Trigger>
+              <Dropdown.Popover placement="bottom end">
+                <Dropdown.Menu
+                  aria-label={t('accounts.auto_refresh')}
+                  selectedKeys={new Set([`auto_${autoRefresh}`])}
+                  selectionMode="single"
+                  onAction={(key) => {
+                    const action = String(key);
+                    setAutoRefresh(Number(action.replace('auto_', '')));
+                  }}
+                >
+                  {AUTO_REFRESH_OPTIONS.map((sec) => (
+                    <Dropdown.Item key={sec} id={`auto_${sec}`} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}>
+                      <span className="flex items-center justify-between gap-6">
+                        <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}</span>
+                        {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
+                      </span>
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown>
+            <Button
+              variant="secondary"
+              onPress={() => importInputRef.current?.click()}
+              isDisabled={importMutation.isPending}
+              aria-busy={importMutation.isPending}
+            >
+              <Upload className="h-4 w-4" />
+              {t('accounts.import')}
+            </Button>
+            <Button
+              variant="secondary"
+              onPress={() => exportMutation.mutate()}
+              isDisabled={exportMutation.isPending}
+              aria-busy={exportMutation.isPending}
+            >
+              <Download className="h-4 w-4" />
+              {t('accounts.export')}
+            </Button>
+            <Button variant="primary" onPress={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4" />
+              {t('accounts.create')}
+            </Button>
           </div>
-          <Button
-            variant="secondary"
-            icon={<Upload className="w-4 h-4" />}
-            onClick={() => importInputRef.current?.click()}
-            loading={importMutation.isPending}
-            title={t('accounts.import')}
-          >
-            {t('accounts.import')}
-          </Button>
-          <Button
-            variant="secondary"
-            icon={<Download className="w-4 h-4" />}
-            onClick={() => exportMutation.mutate()}
-            loading={exportMutation.isPending}
-            title={t('accounts.export')}
-          >
-            {t('accounts.export')}
-          </Button>
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
-            {t('accounts.create')}
-          </Button>
         </div>
+
+        {filtersOpen ? (
+          <div className="rounded-[var(--radius)] border border-border bg-surface p-3 shadow-sm">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <Select
+                fullWidth
+                selectedKey={platformFilter}
+                onSelectionChange={(key) => { setPlatformFilter(key == null ? '' : String(key)); setPage(1); }}
+              >
+                <Label className="sr-only">{t('groups.platform')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedPlatformLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={PLATFORM_OPTIONS}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+              <Select
+                fullWidth
+                selectedKey={stateFilter}
+                onSelectionChange={(key) => { setStateFilter(key == null ? '' : String(key)); setPage(1); }}
+              >
+                <Label className="sr-only">{t('common.status')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedStateLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={STATE_OPTIONS}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+              <Select
+                fullWidth
+                selectedKey={typeFilter}
+                onSelectionChange={(key) => { setTypeFilter(key == null ? '' : String(key)); setPage(1); }}
+              >
+                <Label className="sr-only">{t('common.type')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedTypeLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={typeOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+              <Select
+                fullWidth
+                selectedKey={groupFilter}
+                onSelectionChange={(key) => { setGroupFilter(key == null ? '' : String(key)); setPage(1); }}
+              >
+                <Label className="sr-only">{t('accounts.group')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedGroupLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={groupOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+              <Select
+                fullWidth
+                selectedKey={proxyFilter}
+                onSelectionChange={(key) => { setProxyFilter(key == null ? '' : String(key)); setPage(1); }}
+              >
+                <Label className="sr-only">{t('accounts.proxy')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedProxyLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={proxyOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onPress={clearAllFilters}>
+                <Eraser className="h-3.5 w-3.5" />
+                {t('common.clear')}
+              </Button>
+              <Button size="sm" variant="primary" onPress={() => setFiltersOpen(false)}>
+                {t('common.confirm')}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {activeFilters.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {activeFilters.map((filter) => (
+              <Chip key={filter.key} color="accent" size="sm" variant="soft">
+                <span className="inline-flex items-center gap-1">
+                  {filter.label}
+                  <button
+                    aria-label={t('common.clear')}
+                    className="-mr-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full opacity-70 transition hover:bg-primary/15 hover:opacity-100"
+                    type="button"
+                    onClick={() => clearNamedFilter(filter.key)}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              </Chip>
+            ))}
+          </div>
+        ) : null}
       </div>
       {/* 隐藏的文件选择器（供导入按钮触发） */}
       <input
@@ -1084,21 +1542,79 @@ export default function AccountsPage() {
       />
 
       {/* 表格 */}
-      <Table<AccountResp>
-        columns={columns}
-        data={data?.list ?? []}
-        loading={isLoading}
-        rowKey={(row) => row.id}
-        selectable
-        selectedKeys={selectedIds}
-        onSelectionChange={(keys) => setSelectedIds(keys.map(Number))}
-        page={page}
-        pageSize={pageSize}
-        total={data?.total ?? 0}
-        onPageChange={setPage}
-        pageSizeOptions={PAGE_SIZE_OPTIONS as unknown as number[]}
-        onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-      />
+      <CommonTable
+        ariaLabel={t('accounts.title', 'Accounts')}
+        footer={(
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            setPage={setPage}
+            setPageSize={setPageSize}
+            total={total}
+            totalPages={totalPages}
+          />
+        )}
+        minWidth={1320}
+      >
+            <CommonTable.Header>
+              <CommonTable.Column id="__selection__" className="text-center" style={{ minWidth: 52, width: 52 }}>
+                <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                  <TableSelectionCheckbox
+                    ariaLabel={t('common.select_all', 'Select all')}
+                    isIndeterminate={someVisibleSelected}
+                    isSelected={allVisibleSelected}
+                    onChange={setVisibleRowsSelected}
+                  />
+                </div>
+              </CommonTable.Column>
+              {columns.map((column) => (
+                <CommonTable.Column
+                  id={column.key}
+                  key={column.key}
+                  className={`${columnAlignClass(column.align)} ${column.hideOnMobile ? 'hidden md:table-cell' : ''}`}
+                  style={column.width ? { minWidth: column.width, width: column.width } : undefined}
+                >
+                  {column.title}
+                </CommonTable.Column>
+              ))}
+            </CommonTable.Header>
+            <CommonTable.Body>
+              {isLoading ? (
+                <TableLoadingRow colSpan={columns.length + 1} />
+              ) : rows.length === 0 ? (
+                <CommonTable.Row id="empty">
+                  <CommonTable.Cell colSpan={columns.length + 1}>
+                    <EmptyState />
+                  </CommonTable.Cell>
+                </CommonTable.Row>
+              ) : (
+                rows.map((row) => (
+                  <CommonTable.Row id={String(row.id)} key={row.id}>
+                    <CommonTable.Cell className="text-center" style={{ minWidth: 52, width: 52 }}>
+                      <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                        <TableSelectionCheckbox
+                          ariaLabel={t('common.select', 'Select')}
+                          isSelected={selectedIdSet.has(row.id)}
+                          onChange={(isSelected) => setRowSelected(row.id, isSelected)}
+                        />
+                      </div>
+                    </CommonTable.Cell>
+                    {columns.map((column) => (
+                      <CommonTable.Cell
+                        key={column.key}
+                        className={column.hideOnMobile ? 'hidden md:table-cell' : undefined}
+                      >
+                        <div className={`flex w-full min-w-0 items-center ${cellJustifyClass(column.align)}`}>
+                          {column.render(row)}
+                        </div>
+                      </CommonTable.Cell>
+                    ))}
+                  </CommonTable.Row>
+                ))
+              )}
+            </CommonTable.Body>
+      </CommonTable>
 
       {/* 创建弹窗 */}
       <CreateAccountModal
@@ -1134,76 +1650,39 @@ export default function AccountsPage() {
         />
       )}
 
-      {/* 更多操作下拉菜单 (Portal) */}
-      {moreMenu && createPortal(
-        <div
-          ref={moreMenuRef}
-          className="fixed py-1 rounded-lg shadow-lg min-w-[140px]"
-          style={{
-            top: moreMenu.top,
-            left: moreMenu.left,
-            transform: 'translateX(-100%)',
-            zIndex: 9999,
-            background: 'var(--ag-bg-elevated)',
-            border: '1px solid var(--ag-glass-border)',
-          }}
-        >
-          {(() => {
-            const row = data?.list?.find((a) => a.id === moreMenu.id);
-            if (!row) return null;
-            return (
-              <>
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
-                  style={{ color: 'var(--ag-text-secondary)' }}
-                  onClick={() => { setTestingAccount(row); setMoreMenu(null); }}
-                >
-                  <Zap className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                  {t('accounts.test_connection')}
-                </button>
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
-                  style={{ color: 'var(--ag-text-secondary)' }}
-                  onClick={() => { setStatsAccountId(row.id); setMoreMenu(null); }}
-                >
-                  <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
-                  {t('accounts.view_stats')}
-                </button>
-                {row.type === 'oauth' && (
-                  <button
-                    className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
-                    style={{ color: 'var(--ag-text-secondary)' }}
-                    onClick={() => { refreshQuotaMutation.mutate(row.id); setMoreMenu(null); }}
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
-                    {t('accounts.refresh_quota')}
-                  </button>
-                )}
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
-                  style={{ color: 'var(--ag-text-secondary)' }}
-                  onClick={() => { clearRateLimitMarkersMutation.mutate(row.id); setMoreMenu(null); }}
-                >
-                  <Eraser className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                  {t('accounts.clear_family_cooldowns')}
-                </button>
-              </>
-            );
-          })()}
-        </div>,
-        document.body,
-      )}
-
       {/* 删除确认 */}
-      <ConfirmModal
-        open={!!deletingAccount}
-        onClose={() => setDeletingAccount(null)}
-        onConfirm={() => deletingAccount && deleteMutation.mutate(deletingAccount.id)}
-        title={t('accounts.delete_title')}
-        message={t('accounts.delete_confirm', { name: deletingAccount?.name })}
-        loading={deleteMutation.isPending}
-        danger
-      />
+      <AlertDialog
+        isOpen={!!deletingAccount}
+        onOpenChange={(open) => {
+          if (!open) setDeletingAccount(null);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container placement="center" size="sm">
+            <AlertDialog.Dialog className="ag-elevation-modal">
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>{t('accounts.delete_title')}</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>{t('accounts.delete_confirm', { name: deletingAccount?.name })}</AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button variant="secondary" onPress={() => setDeletingAccount(null)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  aria-busy={deleteMutation.isPending}
+                  isDisabled={deleteMutation.isPending}
+                  variant="danger"
+                  onPress={() => deletingAccount && deleteMutation.mutate(deletingAccount.id)}
+                >
+                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
+                  {t('common.confirm')}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
 
       {/* 批量编辑弹窗 */}
       <BulkEditAccountModal
@@ -1217,15 +1696,33 @@ export default function AccountsPage() {
       />
 
       {/* 批量删除确认 */}
-      <ConfirmModal
-        open={showBulkDeleteConfirm}
-        onClose={() => setShowBulkDeleteConfirm(false)}
-        onConfirm={() => bulkDeleteMutation.mutate(selectedIds)}
-        title={t('accounts.bulk_delete_title')}
-        message={t('accounts.bulk_delete_confirm', { count: selectedIds.length })}
-        loading={bulkDeleteMutation.isPending}
-        danger
-      />
+      <AlertDialog isOpen={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container placement="center" size="sm">
+            <AlertDialog.Dialog className="ag-elevation-modal">
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>{t('accounts.bulk_delete_title')}</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>{t('accounts.bulk_delete_confirm', { count: selectedIds.length })}</AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button variant="secondary" onPress={() => setShowBulkDeleteConfirm(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  aria-busy={bulkDeleteMutation.isPending}
+                  isDisabled={bulkDeleteMutation.isPending}
+                  variant="danger"
+                  onPress={() => bulkDeleteMutation.mutate(selectedIds)}
+                >
+                  {bulkDeleteMutation.isPending ? <Spinner size="sm" /> : null}
+                  {t('common.confirm')}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
 
       {/* 批量刷新令牌进度弹窗 */}
       {bulkRefreshTargets && (

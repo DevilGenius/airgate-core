@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { injectThemeStyle, setTheme, getStoredTheme, type ThemeName } from '@airgate/theme';
 
 interface ThemeContextValue {
@@ -8,26 +8,32 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
+function syncHeroUIThemeClass(theme: ThemeName) {
+  document.documentElement.classList.toggle('light', theme === 'light');
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeName>(getStoredTheme);
 
-  // 初始化：注入 CSS 变量 + 设置 data-theme
+  // 初始化：注入 AirGate CSS 变量。
   useEffect(() => {
     injectThemeStyle();
-    setTheme(theme);
   }, []);
 
-  // 主题变化时更新 data-theme
+  // 主题变化时同步 AirGate data-theme 与 HeroUI light/dark class。
   useEffect(() => {
     setTheme(theme);
+    syncHeroUIThemeClass(theme);
   }, [theme]);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setThemeState((t) => (t === 'dark' ? 'light' : 'dark'));
-  };
+  }, []);
+  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
 
   return (
-    <ThemeContext value={{ theme, toggleTheme }}>
+    <ThemeContext value={value}>
       {children}
     </ThemeContext>
   );

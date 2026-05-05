@@ -1,16 +1,182 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Badge } from '../components/Badge';
-import { HoverCard } from '../components/HoverCard';
-import type { Column } from '../components/Table';
+import type { CSSProperties, ReactNode } from 'react';
+import { Chip, Tooltip } from '@heroui/react';
+import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
 import type { UsageLogResp, CustomerUsageLogResp } from '../types';
+import { USAGE_TOKEN_COLORS } from '../constants';
+import { CostValue } from '../components/CostValue';
 
 /**
  * 列定义统一使用一个宽松的行类型：管理端拿到的是 UsageLogResp，
  * 而 end customer（API Key 登录）拿到的是 CustomerUsageLogResp（无 input_cost / actual_cost 等字段）。
  * customerScope 列不会读取那些缺失字段。
  */
-type UsageRow = UsageLogResp | CustomerUsageLogResp;
+export type UsageRow = UsageLogResp | CustomerUsageLogResp;
+
+export interface UsageColumnConfig<T extends UsageRow = UsageRow> {
+  key: string;
+  title: ReactNode;
+  width?: string;
+  hideOnMobile?: boolean;
+  render: (row: T) => ReactNode;
+}
+
+function RichTooltip({
+  children,
+  content,
+  placement = 'right',
+}: {
+  children: ReactNode;
+  content: ReactNode;
+  placement?: 'left' | 'right';
+}) {
+  return (
+    <Tooltip delay={0} closeDelay={0}>
+      <Tooltip.Trigger className="flex h-full w-full cursor-default items-center justify-end rounded-[var(--radius)] px-1.5 py-0 text-right transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+        {children}
+      </Tooltip.Trigger>
+      <Tooltip.Content
+        className="w-[min(21rem,calc(100vw-2rem))] border border-border bg-surface p-0 shadow-lg"
+        placement={placement}
+      >
+        {content}
+      </Tooltip.Content>
+    </Tooltip>
+  );
+}
+
+function TooltipPanel({
+  children,
+  subtitle,
+  title,
+}: {
+  children: ReactNode;
+  subtitle?: ReactNode;
+  title: ReactNode;
+}) {
+  return (
+    <div className="overflow-hidden rounded-[var(--radius)]">
+      <div className="border-b border-border bg-default px-2.5 py-1.5">
+        <div className="text-sm font-semibold leading-none text-text">{title}</div>
+        {subtitle ? <div className="mt-1 truncate text-xs text-text-tertiary">{subtitle}</div> : null}
+      </div>
+      <div className="space-y-0.5 p-2">{children}</div>
+    </div>
+  );
+}
+
+function TooltipRow({
+  color,
+  label,
+  tone,
+  value,
+}: {
+  color?: string;
+  label: ReactNode;
+  tone?: 'accent' | 'info' | 'strong' | 'success' | 'warning';
+  value: ReactNode;
+}) {
+  const toneClass = tone === 'success'
+    ? 'text-success'
+    : tone === 'warning'
+      ? 'text-warning'
+      : tone === 'info'
+        ? 'text-info'
+        : tone === 'accent'
+          ? 'text-primary'
+          : tone === 'strong'
+            ? 'text-text'
+            : 'text-text-secondary';
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,max-content)] items-center gap-3 rounded-[var(--radius)] bg-surface px-2 py-1 text-xs">
+      <span className="min-w-0 truncate text-text-tertiary">{label}</span>
+      <span
+        className={`min-w-0 max-w-[12rem] justify-self-end truncate text-right font-mono font-medium ${toneClass}`}
+        style={color ? { color } : undefined}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function TooltipDivider() {
+  return <div className="my-0.5 border-t border-border" />;
+}
+
+const HEROUI_BLUE = 'oklch(62.04% 0.1950 253.83)';
+
+const STREAM_CHIP_STYLE: CSSProperties = {
+  background: `color-mix(in srgb, ${HEROUI_BLUE} 18%, transparent)`,
+  boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${HEROUI_BLUE} 34%, transparent)`,
+  color: HEROUI_BLUE,
+};
+
+const reasoningEffortColorMap: Record<string, string> = {
+  auto: 'var(--ag-success)',
+  minimal: 'var(--ag-muted)',
+  low: 'var(--ag-muted)',
+  medium: HEROUI_BLUE,
+  high: 'var(--ag-warning)',
+  xhigh: 'var(--ag-danger)',
+  extrahigh: 'var(--ag-danger)',
+  max: 'var(--ag-danger)',
+};
+
+function getReasoningEffortStyle(effort: string): CSSProperties {
+  const normalized = effort.trim().toLowerCase().replace(/[\s_-]/g, '');
+  const color = reasoningEffortColorMap[normalized] ?? HEROUI_BLUE;
+
+  return {
+    background: `color-mix(in srgb, ${color} 20%, transparent)`,
+    borderColor: `color-mix(in srgb, ${color} 40%, transparent)`,
+    color,
+  };
+}
+
+function getImageSizeStyle(): CSSProperties {
+  const color = 'var(--ag-success)';
+
+  return {
+    background: `color-mix(in srgb, ${color} 14%, transparent)`,
+    borderColor: `color-mix(in srgb, ${color} 28%, transparent)`,
+    color,
+  };
+}
+
+
+/** 单行 token 数据行：固定宽度图标 + 右对齐等宽数字 */
+function TokenRow({
+  color,
+  icon,
+  value,
+}: {
+  color: string;
+  icon: ReactNode;
+  value: string;
+}) {
+  return (
+    <div className="grid grid-cols-[1rem_minmax(0,1fr)] items-center gap-1">
+      <span
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[var(--radius)] leading-none"
+        style={{
+          background: `color-mix(in srgb, ${color} 18%, transparent)`,
+          color,
+        }}
+      >
+        <span className="flex h-3 w-3 shrink-0 items-center justify-center">{icon}</span>
+      </span>
+      <span
+        className="w-[3.5rem] justify-self-end truncate text-right font-mono text-xs font-semibold tabular-nums leading-none"
+        style={{ color }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
 
 /** 大数字友好显示：33518599 -> "33.52M"，1234 -> "1,234" */
 export function fmtNum(n: number): string {
@@ -27,7 +193,7 @@ export function fmtCost(n: number): string {
 }
 
 /** Reseller / admin 视角的成本列：包含完整的成本拆分与倍率信息 */
-function buildResellerCostColumn(t: TFunction): Column<UsageRow> {
+function buildResellerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
   return {
     key: 'cost',
     title: t('usage.cost'),
@@ -35,113 +201,66 @@ function buildResellerCostColumn(t: TFunction): Column<UsageRow> {
     render: (raw) => {
       const row = raw as UsageLogResp;
       return (
-        <HoverCard
+        <RichTooltip
+          placement="right"
           content={
-            <>
-              <div className="text-xs font-semibold text-text mb-2">{t('usage.cost_detail')}</div>
-              <div className="space-y-1 text-xs font-mono">
-                <div className="flex justify-between gap-6">
-                  <span className="text-text-tertiary">{t('usage.input_cost')}</span>
-                  <span className="text-text-secondary">${row.input_cost.toFixed(6)}</span>
-                </div>
-                <div className="flex justify-between gap-6">
-                  <span className="text-text-tertiary">{t('usage.output_cost')}</span>
-                  <span className="text-text-secondary">${row.output_cost.toFixed(6)}</span>
-                </div>
-                {row.input_price > 0 && (
-                  <div className="flex justify-between gap-6">
-                    <span className="text-text-tertiary">{t('usage.input_unit_price')}</span>
-                    <span className="text-text-secondary">${row.input_price.toFixed(4)} / 1M Token</span>
-                  </div>
-                )}
-                {row.output_price > 0 && (
-                  <div className="flex justify-between gap-6">
-                    <span className="text-text-tertiary">{t('usage.output_unit_price')}</span>
-                    <span className="text-text-secondary">${row.output_price.toFixed(4)} / 1M Token</span>
-                  </div>
-                )}
-                {row.cached_input_cost > 0 && (
-                  <div className="flex justify-between gap-6">
-                    <span className="text-text-tertiary">{t('usage.cached_input_cost')}</span>
-                    <span className="text-text-secondary">${row.cached_input_cost.toFixed(6)}</span>
-                  </div>
-                )}
-                <div className="my-1 border-t border-glass-border" />
-                {row.service_tier && (
-                  <div className="flex justify-between gap-6">
-                    <span className="text-text-tertiary">{t('usage.service_tier')}</span>
-                    <span className="text-text-secondary capitalize">{row.service_tier}</span>
-                  </div>
-                )}
-                <div className="flex justify-between gap-6">
-                  <span className="text-text-tertiary">{t('usage.rate_multiplier')}</span>
-                  <span className="text-text-secondary">{row.rate_multiplier.toFixed(2)}x</span>
-                </div>
-                {row.account_rate_multiplier > 0 && row.account_rate_multiplier !== 1 && (
-                  <div className="flex justify-between gap-6">
-                    <span className="text-text-tertiary">{t('usage.account_rate', '账号倍率')}</span>
-                    <span className="text-text-secondary">{row.account_rate_multiplier.toFixed(2)}x</span>
-                  </div>
-                )}
-                {row.sell_rate > 0 && (
-                  <div className="flex justify-between gap-6">
-                    <span className="text-text-tertiary">{t('usage.sell_rate', '销售倍率')}</span>
-                    <span className="text-text-secondary">{row.sell_rate.toFixed(2)}x</span>
-                  </div>
-                )}
-                <div className="my-1 border-t border-glass-border" />
-                <div className="flex justify-between gap-6">
-                  <span className="text-text-tertiary">{t('usage.original_cost')}</span>
-                  <span className="text-text-secondary">${row.total_cost.toFixed(6)}</span>
-                </div>
-                {row.account_cost !== row.total_cost && (
-                  <div className="flex justify-between gap-6">
-                    <span className="text-text-tertiary">{t('usage.account_cost', '账号计费')}</span>
-                    <span className="text-text-secondary">${row.account_cost.toFixed(6)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between gap-6">
-                  <span className="text-text-tertiary">{t('usage.user_charged', '用户扣费')}</span>
-                  <span className="text-text-secondary">${row.actual_cost.toFixed(6)}</span>
-                </div>
-                {row.sell_rate > 0 && row.billed_cost !== row.actual_cost && (
-                  <>
-                    <div className="flex justify-between gap-6">
-                      <span className="text-text-tertiary">{t('usage.billed_cost', '客户账面')}</span>
-                      <span className="text-text-secondary">${row.billed_cost.toFixed(6)}</span>
-                    </div>
-                    <div className="flex justify-between gap-6">
-                      <span className="text-text-tertiary">{t('usage.profit', '利润')}</span>
-                      <span style={{ color: 'var(--ag-success)' }}>
-                        ${(row.billed_cost - row.actual_cost).toFixed(6)}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </>
+            <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
+              <TooltipRow label={t('usage.input_cost')} value={`$${row.input_cost.toFixed(6)}`} />
+              <TooltipRow label={t('usage.output_cost')} value={`$${row.output_cost.toFixed(6)}`} />
+              {row.input_price > 0 && (
+                <TooltipRow label={t('usage.input_unit_price')} value={`$${row.input_price.toFixed(4)} / 1M Token`} />
+              )}
+              {row.output_price > 0 && (
+                <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
+              )}
+              {row.cached_input_cost > 0 && (
+                <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
+              )}
+              <TooltipDivider />
+              {row.service_tier && (
+                <TooltipRow label={t('usage.service_tier')} value={<span className="capitalize">{row.service_tier}</span>} />
+              )}
+              <TooltipRow label={t('usage.rate_multiplier')} value={`${row.rate_multiplier.toFixed(2)}x`} />
+              {row.account_rate_multiplier > 0 && row.account_rate_multiplier !== 1 && (
+                <TooltipRow label={t('usage.account_rate', '账号倍率')} value={`${row.account_rate_multiplier.toFixed(2)}x`} />
+              )}
+              {row.sell_rate > 0 && (
+                <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={`${row.sell_rate.toFixed(2)}x`} />
+              )}
+              <TooltipDivider />
+              <TooltipRow label={t('usage.original_cost')} value={<CostValue value={row.total_cost} decimals={6} tone="standard" />} />
+              {row.account_cost !== row.total_cost && (
+                <TooltipRow label={t('usage.account_cost', '账号计费')} value={<CostValue value={row.account_cost} decimals={6} />} />
+              )}
+              <TooltipRow label={t('usage.user_charged', '用户扣费')} value={<CostValue value={row.actual_cost} decimals={6} tone="actual" />} />
+              {row.sell_rate > 0 && row.billed_cost !== row.actual_cost && (
+                <>
+                  <TooltipRow label={t('usage.billed_cost', '客户账面')} value={<CostValue value={row.billed_cost} decimals={6} />} />
+                  <TooltipRow label={t('usage.profit', '利润')} value={<CostValue value={row.billed_cost - row.actual_cost} decimals={6} tone="success" />} />
+                </>
+              )}
+            </TooltipPanel>
           }
         >
-          <div className="font-mono text-xs text-right">
+          <div className="flex w-full flex-col items-end font-mono text-xs text-right">
             {row.sell_rate > 0 && row.billed_cost !== row.actual_cost ? (
-              <>
-                <div className="text-text">${row.billed_cost.toFixed(6)}</div>
-                <div className="text-text-tertiary">
-                  {t('usage.cost_actual_short', '成本')} ${row.actual_cost.toFixed(6)}
-                </div>
-              </>
+              <div className="text-[15px] font-semibold leading-none text-text">
+                <CostValue value={row.billed_cost} decimals={6} tone="warning" />
+              </div>
             ) : (
-              <div className="text-text">${row.actual_cost.toFixed(6)}</div>
+              <div className="text-[15px] font-semibold leading-none text-text">
+                <CostValue value={row.actual_cost} decimals={6} tone="warning" />
+              </div>
             )}
           </div>
-        </HoverCard>
+        </RichTooltip>
       );
     },
   };
 }
 
 /** End customer 视角的成本列：只展示后端剥离过的 cost 字段 */
-function buildCustomerCostColumn(t: TFunction): Column<UsageRow> {
+function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
   return {
     key: 'cost',
     title: t('usage.cost'),
@@ -149,9 +268,18 @@ function buildCustomerCostColumn(t: TFunction): Column<UsageRow> {
     render: (raw) => {
       const cost = (raw as CustomerUsageLogResp).cost ?? 0;
       return (
-        <div className="font-mono text-xs text-right">
-          <div className="text-text">${cost.toFixed(6)}</div>
-        </div>
+        <RichTooltip
+          placement="right"
+          content={
+            <TooltipPanel title={t('usage.cost_detail')} subtitle={raw.model}>
+              <TooltipRow label={t('usage.cost')} value={`$${cost.toFixed(6)}`} tone="strong" />
+            </TooltipPanel>
+          }
+        >
+          <div className="flex w-full flex-col items-end font-mono text-xs text-right">
+            <div className="text-[15px] font-semibold leading-none text-text">${cost.toFixed(6)}</div>
+          </div>
+        </RichTooltip>
       );
     },
   };
@@ -163,7 +291,7 @@ function buildCustomerCostColumn(t: TFunction): Column<UsageRow> {
  *
  * customerScope=true 时切换为 end customer 视角的成本列，避免读取后端剥离过的字段。
  */
-export function useUsageColumns(opts?: { customerScope?: boolean }): Column<UsageRow>[] {
+export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumnConfig<UsageRow>[] {
   const { t } = useTranslation();
   const customerScope = opts?.customerScope ?? false;
 
@@ -173,36 +301,61 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): Column<Usag
     {
       key: 'created_at',
       title: t('usage.time'),
-      width: '168px',
-      render: (row) => (
-        <span className="text-text-secondary">
-          {new Date(row.created_at).toLocaleString('zh-CN')}
-        </span>
-      ),
+      width: '142px',
+      render: (row) => {
+        const date = new Date(row.created_at);
+        const timeLabel = date.toLocaleTimeString('zh-CN', { hour12: false });
+        const dateLabel = date.toLocaleDateString('zh-CN');
+        const fullLabel = `${dateLabel} ${timeLabel}`;
+
+        return (
+          <div className="flex min-w-0 items-center gap-1.5 font-mono text-xs" title={fullLabel}>
+            <span className="font-mono text-[13px] font-medium text-text">
+              {timeLabel}
+            </span>
+            <span className="hidden text-text-tertiary lg:inline">
+              {dateLabel}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'model',
       title: t('usage.model'),
-      width: '220px',
-      render: (row) => (
-        // 图像生成请求把实际出图尺寸（image_size，"WxH"）显示在模型名下面，
-        // 让用户能直观看出"为什么这次扣这么多"——按 1K/2K/4K 分档计费。
-        <div className="flex flex-col">
-          <span className="block max-w-full truncate text-text" title={row.model}>
-            {row.model}
-          </span>
-          {row.image_size && (
-            <span className="text-xs text-text-tertiary font-mono" title={row.image_size}>
-              {row.image_size}
+      width: '250px',
+      render: (row) => {
+        const reasoningEffort = (row as UsageLogResp).reasoning_effort;
+        const badgeValue = row.image_size || reasoningEffort || '';
+        const badgeLabel = row.image_size
+          ? row.image_size
+          : reasoningEffort?.trim().toLowerCase() || '';
+        const badgeStyle = row.image_size
+          ? getImageSizeStyle()
+          : reasoningEffort
+            ? getReasoningEffortStyle(reasoningEffort)
+            : undefined;
+
+        return (
+          <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
+            <span
+              className={`inline-flex h-4 w-[5.5rem] shrink-0 items-center justify-center truncate rounded-[var(--radius)] border px-1 font-mono text-[11px] leading-none ${row.image_size ? 'font-medium' : 'font-bold tracking-wide'} ${badgeValue ? '' : 'invisible'}`}
+              style={badgeStyle}
+              title={badgeLabel || undefined}
+            >
+              {badgeLabel || '0000x0000'}
             </span>
-          )}
-        </div>
-      ),
+            <span className="block min-w-0 truncate text-sm font-medium leading-none text-text" title={row.model}>
+              {row.model}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'tokens',
       title: 'TOKEN',
-      width: '160px',
+      width: '220px',
       render: (row) => {
         // 注意：cached_input_tokens 表示 cache read；cache_creation_tokens 为 5m+1h 之和，
         // 两者与 input/output 互斥计入 total_tokens。
@@ -210,67 +363,69 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): Column<Usag
         const cacheCreation = (row as UsageLogResp).cache_creation_tokens ?? 0;
         const cacheCreation5m = (row as UsageLogResp).cache_creation_5m_tokens ?? 0;
         const cacheCreation1h = (row as UsageLogResp).cache_creation_1h_tokens ?? 0;
+        const hasCacheRead = row.cached_input_tokens > 0;
+        const hasCacheWrite = cacheCreation > 0;
         const total =
           row.input_tokens + row.output_tokens + row.cached_input_tokens + cacheCreation;
         return (
-          <HoverCard
+          <RichTooltip
+            placement="left"
             content={
-              <>
-                <div className="text-xs font-semibold text-text mb-2">Token {t('usage.detail')}</div>
-                <div className="space-y-1 text-xs font-mono">
-                  <div className="flex justify-between gap-6">
-                    <span className="text-text-tertiary">{t('usage.input_tokens')}</span>
-                    <span className="text-text-secondary">{row.input_tokens.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between gap-6">
-                    <span className="text-text-tertiary">{t('usage.output_tokens')}</span>
-                    <span className="text-text-secondary">{row.output_tokens.toLocaleString()}</span>
-                  </div>
-                  {row.cached_input_tokens > 0 && (
-                    <div className="flex justify-between gap-6">
-                      <span className="text-text-tertiary">{t('usage.cache_read')}</span>
-                      <span className="text-text-secondary">{row.cached_input_tokens.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {cacheCreation5m > 0 && (
-                    <div className="flex justify-between gap-6">
-                      <span className="text-text-tertiary">{t('usage.cache_creation_5m')}</span>
-                      <span className="text-text-secondary">{cacheCreation5m.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {cacheCreation1h > 0 && (
-                    <div className="flex justify-between gap-6">
-                      <span className="text-text-tertiary">{t('usage.cache_creation_1h')}</span>
-                      <span className="text-text-secondary">{cacheCreation1h.toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between gap-6 pt-1 border-t border-glass-border">
-                    <span className="text-text-tertiary">{t('usage.total_tokens')}</span>
-                    <span className="text-primary font-semibold">{total.toLocaleString()}</span>
-                  </div>
-                </div>
-              </>
+              <TooltipPanel title={`Token ${t('usage.detail')}`} subtitle={row.model}>
+                <TooltipRow label={t('usage.input_tokens')} value={row.input_tokens.toLocaleString()} color={USAGE_TOKEN_COLORS.input} />
+                <TooltipRow label={t('usage.output_tokens')} value={row.output_tokens.toLocaleString()} color={USAGE_TOKEN_COLORS.output} />
+                {hasCacheRead && (
+                  <TooltipRow label={t('usage.cache_read')} value={row.cached_input_tokens.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheRead} />
+                )}
+                {hasCacheWrite && (
+                  <TooltipRow label={t('usage.cache_creation')} value={cacheCreation.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheCreation} />
+                )}
+                {cacheCreation5m > 0 && (
+                  <TooltipRow label={t('usage.cache_creation_5m')} value={cacheCreation5m.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheCreation} />
+                )}
+                {cacheCreation1h > 0 && (
+                  <TooltipRow label={t('usage.cache_creation_1h')} value={cacheCreation1h.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheCreation} />
+                )}
+                <TooltipRow label={t('usage.total_tokens')} value={total.toLocaleString()} tone="strong" />
+              </TooltipPanel>
             }
           >
-            <div className="flex flex-col items-center gap-0.5">
-              <div className="font-mono text-xs flex items-center gap-1.5">
-                <span className="text-emerald-400">↓ {row.input_tokens.toLocaleString()}</span>
-                <span className="text-sky-400">↑ {row.output_tokens.toLocaleString()}</span>
+            <div className="grid h-full max-h-[var(--ag-usage-table-row-height)] w-full grid-cols-[minmax(0,8.75rem)_4.75rem] items-center justify-end gap-2 overflow-visible px-1">
+              <div className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-px">
+                <TokenRow
+                  color={USAGE_TOKEN_COLORS.input}
+                  icon={<ArrowDown className="h-3 w-3 shrink-0" />}
+                  value={fmtNum(row.input_tokens)}
+                />
+                <TokenRow
+                  color={USAGE_TOKEN_COLORS.output}
+                  icon={<ArrowUp className="h-3 w-3 shrink-0" />}
+                  value={fmtNum(row.output_tokens)}
+                />
+                {(hasCacheRead || hasCacheWrite) ? (
+                  <>
+                    {hasCacheRead ? (
+                      <TokenRow
+                        color={USAGE_TOKEN_COLORS.cacheRead}
+                        icon={<BookOpen className="h-3 w-3 shrink-0" />}
+                        value={fmtNum(row.cached_input_tokens)}
+                      />
+                    ) : <div />}
+                    {hasCacheWrite ? (
+                      <TokenRow
+                        color={USAGE_TOKEN_COLORS.cacheCreation}
+                        icon={<Sparkles className="h-3 w-3 shrink-0" />}
+                        value={fmtNum(cacheCreation)}
+                      />
+                    ) : <div />}
+                  </>
+                ) : null}
               </div>
-              {(row.cached_input_tokens > 0 || cacheCreation > 0) && (
-                <div className="text-[11px] font-mono text-text-tertiary flex items-center gap-2">
-                  {row.cached_input_tokens > 0 && (
-                    <span title={t('usage.cache_read')}>⊕ {fmtNum(row.cached_input_tokens)}</span>
-                  )}
-                  {cacheCreation > 0 && (
-                    <span className="text-amber-400" title={t('usage.cache_creation')}>
-                      ✦ {fmtNum(cacheCreation)}
-                    </span>
-                  )}
-                </div>
-              )}
+              <div className="w-[4.75rem] text-right font-mono text-base font-semibold tabular-nums leading-none text-text">
+                {fmtNum(total)}
+              </div>
             </div>
-          </HoverCard>
+          </RichTooltip>
         );
       },
     },
@@ -278,21 +433,27 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): Column<Usag
     {
       key: 'stream',
       title: t('usage.type'),
-      width: '84px',
+      width: '72px',
       hideOnMobile: true,
       render: (row) => (
-        <Badge variant={row.stream ? 'info' : 'default'}>
+        <Chip
+          className="px-1.5 text-[13px]"
+          color="default"
+          size="sm"
+          style={row.stream ? STREAM_CHIP_STYLE : undefined}
+          variant="soft"
+        >
           {row.stream ? t('usage.type_stream') : t('usage.type_sync')}
-        </Badge>
+        </Chip>
       ),
     },
     {
       key: 'first_token_ms',
       title: t('usage.first_token'),
-      width: '96px',
+      width: '78px',
       hideOnMobile: true,
       render: (row) => (
-        <span className="font-mono text-xs text-text-secondary">
+        <span className="block text-right font-mono text-[13px] text-text-secondary">
           {row.first_token_ms > 0 ? (row.first_token_ms >= 1000 ? `${(row.first_token_ms / 1000).toFixed(2)}s` : `${row.first_token_ms}ms`) : '-'}
         </span>
       ),
@@ -300,10 +461,10 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): Column<Usag
     {
       key: 'duration_ms',
       title: t('usage.duration'),
-      width: '96px',
+      width: '76px',
       hideOnMobile: true,
       render: (row) => (
-        <span className="font-mono text-xs">
+        <span className="block text-right font-mono text-[13px] text-text-secondary">
           {row.duration_ms >= 1000 ? `${(row.duration_ms / 1000).toFixed(2)}s` : `${row.duration_ms}ms`}
         </span>
       ),

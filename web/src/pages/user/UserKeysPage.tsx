@@ -1,21 +1,25 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { groupsApi } from '../../shared/api/groups';
-import { useToast } from '../../shared/components/Toast';
-import { Table, type Column } from '../../shared/components/Table';
-import { Button } from '../../shared/components/Button';
-import { ConfirmModal } from '../../shared/components/Modal';
-import { StatusBadge } from '../../shared/components/Badge';
+import { useToast } from '../../shared/ui';
+import { Alert, AlertDialog, Button, Dropdown, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
+import {
+  StatusChip,
+} from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
-import { useDropdownMenu } from '../../shared/hooks/useDropdownMenu';
-import { DropdownMenu, type DropdownMenuItem } from '../../shared/components/DropdownMenu';
-import { KeyRevealModal } from '../../shared/components/KeyRevealModal';
+import { getTotalPages } from '../../shared/utils/pagination';
+import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
+import { CommonTable } from '../../shared/components/CommonTable';
+import { useClipboard } from '../../shared/hooks/useClipboard';
 import {
+  AlertTriangle,
+  Copy,
   Plus,
   Pencil,
   Trash2,
@@ -39,6 +43,7 @@ import { type KeyForm, emptyForm } from './userkeys/types';
 export default function UserKeysPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const copy = useClipboard();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -52,13 +57,11 @@ export default function UserKeysPage() {
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
 
-  // 更多菜单
-  const { menu: moreMenu, menuRef: moreMenuRef, open: openMoreMenu, close: closeMoreMenu } = useDropdownMenu();
-
   // 密钥列表
   const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.userKeys(page, pageSize),
     queryFn: () => apikeysApi.list({ page, page_size: pageSize }),
+    placeholderData: keepPreviousData,
   });
 
   // 分组列表（用于选择）
@@ -238,272 +241,280 @@ export default function UserKeysPage() {
     closeCcsModal,
   } = useCcsImportModal(groupMap);
 
-  const columns: Column<APIKeyResp>[] = [
-    { key: 'name', title: t('common.name') },
-    {
-      key: 'key_prefix',
-      title: t('user_keys.title'),
-      hideOnMobile: true,
-      render: (row) => (
-        <span
-          className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono"
-        >
-          <Key className="w-3 h-3 text-text-tertiary" />
-          {row.key_prefix}...
-        </span>
-      ),
-    },
-    {
-      key: 'group_id',
-      title: t('user_keys.group'),
-      align: 'center',
-      render: (row) => {
-        if (row.group_id == null) return t('user_keys.group_unbound');
-        const group = groupMap.get(row.group_id);
-        const name = group?.name || `#${row.group_id}`;
-        const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
-
-        // 用户在当前分组上是否有"用户专属倍率"覆盖
-        // 优先级：UserGroupRates[groupID] > GroupRateMultiplier
-        // 与后端 billing/rate.go:ResolveBillingRate 的解析规则保持一致
-        const userOverride = user?.group_rates?.[row.group_id];
-        const hasOverride =
-          typeof userOverride === 'number' &&
-          Number.isFinite(userOverride) &&
-          userOverride > 0 &&
-          group != null &&
-          userOverride !== group.rate_multiplier;
-
-        return (
-          <div className="space-y-0.5 text-center">
-            <div>{name}</div>
-            {group && (
-              <div className="font-mono text-xs text-text-tertiary">
-                {t('user_keys.group_rate_short', '分组倍率')}:{' '}
-                {hasOverride ? (
-                  <span
-                    title={`${t('user_keys.group_rate_default', '分组默认')}: ${group.rate_multiplier.toFixed(2)}`}
-                  >
-                    {userOverride.toFixed(2)}
-                    <span className="ml-1 inline-block rounded bg-amber-500/10 px-1 text-[9px] leading-[14px] text-amber-500 align-middle">
-                      {t('user_keys.user_override_tag', '专属')}
-                    </span>
-                  </span>
-                ) : (
-                  group.rate_multiplier.toFixed(2)
-                )}
-              </div>
-            )}
-            {hasSellRate && (
-              <div className="font-mono text-xs text-text-tertiary">
-                {t('user_keys.sell_rate_short', '销售倍率')}: {row.sell_rate!.toFixed(2)}
-              </div>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'quota',
-      title: t('user_keys.quota_label'),
-      render: (row) => (
-        <span className="font-mono">
-          {row.quota_usd > 0 ? (
-            <>
-              ${row.used_quota.toFixed(4)} / ${row.quota_usd.toFixed(4)}
-            </>
-          ) : (
-            <span className="text-text-tertiary">{t('user_keys.quota_unlimited_hint')}</span>
-          )}
-        </span>
-      ),
-    },
-    {
-      key: 'markup',
-      title: t('user_keys.markup_title', '销售/成本'),
-      hideOnMobile: true,
-      render: (row) => {
-        // sell_rate=0 时账面 == 真实成本，没必要展示 markup
-        if (!row.sell_rate || row.sell_rate <= 0) {
-          return <span className="text-text-tertiary text-xs">—</span>;
-        }
-        const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
-        return (
-          <div className="font-mono text-xs space-y-0.5">
-            <div>
-              <span className="text-text-tertiary">{t('user_keys.sell_rate_short', '倍率')}: </span>
-              <span>{row.sell_rate.toFixed(2)}</span>
-            </div>
-            <div>
-              <span className="text-text-tertiary">{t('user_keys.cost_actual', '成本')}: </span>
-              <span>${(row.used_quota_actual || 0).toFixed(4)}</span>
-            </div>
-            <div>
-              <span className="text-text-tertiary">{t('user_keys.profit', '利润')}: </span>
-              <span style={{ color: profit > 0 ? 'var(--ag-success)' : undefined }}>
-                ${profit.toFixed(4)}
-              </span>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'usage',
-      title: t('api_keys.usage'),
-      render: (row) => (
-        <div className="font-mono text-xs space-y-0.5">
-          <div>
-            <span className="text-text-tertiary">{t('api_keys.today')}: </span>
-            <span style={{ color: 'var(--ag-primary)' }}>${row.today_cost.toFixed(4)}</span>
-          </div>
-          <div>
-            <span className="text-text-tertiary">{t('api_keys.thirty_days')}: </span>
-            <span>${row.thirty_day_cost.toFixed(4)}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'expires_at',
-      title: t('user_keys.expires_at'),
-      hideOnMobile: true,
-      render: (row) =>
-        row.expires_at
-          ? new Date(row.expires_at).toLocaleDateString('zh-CN')
-          : t('user_keys.never_expire'),
-    },
-    {
-      key: 'status',
-      title: t('common.status'),
-      render: (row) => {
-        // 前端判断：过期时间已过则显示为 expired
-        const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
-        const displayStatus = isExpired ? 'expired' : row.status;
-        return <StatusBadge status={displayStatus} />;
-      },
-    },
-    {
-      key: 'actions',
-      title: t('common.actions'),
-      width: '120px',
-      render: (row) => (
-        <div className="flex items-center justify-center gap-0.5">
-          <button
-            className="p-1.5 rounded hover:bg-bg-hover transition-colors cursor-pointer"
-            style={{ color: 'var(--ag-text-secondary)' }}
-            title={t('api_keys.reveal')}
-            onClick={() => revealMutation.mutate(row.id)}
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </button>
-          <button
-            className="p-1.5 rounded hover:bg-bg-hover transition-colors cursor-pointer"
-            style={{ color: 'var(--ag-text-secondary)' }}
-            title={t('user_keys.use_key')}
-            onClick={() => openUseKeyModal(row)}
-          >
-            <Terminal className="w-3.5 h-3.5" />
-          </button>
-          <button
-            className="p-1.5 rounded hover:bg-bg-hover transition-colors cursor-pointer"
-            style={{ color: 'var(--ag-text-secondary)' }}
-            title={t('common.more')}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (moreMenu?.id === row.id) {
-                closeMoreMenu();
-              } else {
-                openMoreMenu(row.id, e);
-              }
-            }}
-          >
-            <MoreHorizontal className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ),
-    },
-  ];
-
   const saving = createMutation.isPending || updateMutation.isPending;
-
-  // Build dropdown menu items for the active row
-  const moreMenuRow = moreMenu ? data?.list?.find((k) => k.id === moreMenu.id) : null;
-  const moreMenuItems: DropdownMenuItem[] = moreMenuRow
-    ? [
-        {
-          icon: <Upload className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />,
-          label: t('user_keys.import_ccs'),
-          onClick: () => openCcsModal(moreMenuRow),
-        },
-        {
-          icon: moreMenuRow.status === 'active'
-            ? <Ban className="w-3.5 h-3.5" />
-            : <CheckCircle className="w-3.5 h-3.5" />,
-          label: moreMenuRow.status === 'active' ? t('user_keys.disable') : t('user_keys.enable'),
-          onClick: () =>
-            toggleStatusMutation.mutate({
-              id: moreMenuRow.id,
-              status: moreMenuRow.status === 'active' ? 'disabled' : 'active',
-            }),
-        },
-        {
-          icon: <Pencil className="w-3.5 h-3.5" />,
-          label: t('common.edit'),
-          onClick: () => openEdit(moreMenuRow),
-        },
-        {
-          icon: <Trash2 className="w-3.5 h-3.5" />,
-          label: t('common.delete'),
-          onClick: () => setDeleteTarget(moreMenuRow),
-          danger: true,
-          divider: true,
-        },
-      ]
-    : [];
+  const rows = data?.list ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = getTotalPages(total, pageSize);
+  const revealedKeyModalState = useOverlayState({
+    isOpen: !!revealedKey,
+    onOpenChange: (open) => {
+      if (!open) setRevealedKey(null);
+    },
+  });
 
   return (
     <div className="p-6">
       <div className="flex justify-end mb-5">
         <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => refetch()}
-            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          <Button
+            isIconOnly
+            aria-label={t('common.refresh', 'Refresh')}
+            size="md"
+            variant="ghost"
+            onPress={() => refetch()}
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
+          </Button>
           <Button
-            onClick={openCreate}
-            icon={<Plus className="w-4 h-4" />}
-            disabled={!hasAvailableGroups}
-            title={!hasAvailableGroups ? t('user_keys.no_groups_available') : undefined}
+            isDisabled={!hasAvailableGroups}
+            variant="primary"
+            onPress={openCreate}
           >
+            <Plus className="w-4 h-4" />
             {hasAvailableGroups ? t('user_keys.create') : t('user_keys.create_disabled_no_groups')}
           </Button>
         </div>
       </div>
 
-      <Table
-        columns={columns}
-        data={data?.list ?? []}
-        loading={isLoading}
-        rowKey={(row) => row.id as number}
-        page={page}
-        pageSize={pageSize}
-        total={data?.total ?? 0}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
+      <CommonTable
+        ariaLabel={t('user_keys.title', 'API keys')}
+        footer={(
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            setPage={setPage}
+            setPageSize={setPageSize}
+            total={total}
+            totalPages={totalPages}
+          />
+        )}
+        minWidth={1040}
+      >
+        <CommonTable.Header>
+          <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
+          <CommonTable.Column id="key_prefix">{t('user_keys.title')}</CommonTable.Column>
+          <CommonTable.Column id="group_id">{t('user_keys.group')}</CommonTable.Column>
+          <CommonTable.Column id="quota">{t('user_keys.quota_label')}</CommonTable.Column>
+          <CommonTable.Column id="markup">{t('user_keys.markup_title', '销售/成本')}</CommonTable.Column>
+          <CommonTable.Column id="usage">{t('api_keys.usage')}</CommonTable.Column>
+          <CommonTable.Column id="expires_at">{t('user_keys.expires_at')}</CommonTable.Column>
+          <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
+          <CommonTable.Column id="actions" style={{ width: 132 }}>
+            {t('common.actions')}
+          </CommonTable.Column>
+        </CommonTable.Header>
+        <CommonTable.Body>
+          {isLoading ? (
+            <TableLoadingRow colSpan={9} />
+          ) : rows.length === 0 ? (
+            <CommonTable.Row id="empty">
+              <CommonTable.Cell colSpan={9}>
+                <EmptyState />
+              </CommonTable.Cell>
+            </CommonTable.Row>
+          ) : (
+            rows.map((row) => {
+              const group = row.group_id == null ? null : groupMap.get(row.group_id);
+              const groupName = row.group_id == null
+                ? t('user_keys.group_unbound')
+                : group?.name || `#${row.group_id}`;
+              const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
+              const userOverride = row.group_id == null ? undefined : user?.group_rates?.[row.group_id];
+              const hasOverride =
+                typeof userOverride === 'number' &&
+                Number.isFinite(userOverride) &&
+                userOverride > 0 &&
+                group != null &&
+                userOverride !== group.rate_multiplier;
+              const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
+              const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
+              const displayStatus = isExpired ? 'expired' : row.status;
 
-      {/* 更多操作下拉菜单 */}
-      {moreMenu && moreMenuRow && (
-        <DropdownMenu
-          ref={moreMenuRef}
-          items={moreMenuItems}
-          position={{ top: moreMenu.top, left: moreMenu.left }}
-          onClose={closeMoreMenu}
-        />
-      )}
+              return (
+                <CommonTable.Row id={String(row.id)} key={row.id}>
+                  <CommonTable.Cell>
+                    <span className="font-medium text-text">{row.name}</span>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <span className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono">
+                      <Key className="w-3 h-3 text-text-tertiary" />
+                      {row.key_prefix}...
+                    </span>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <div className="space-y-0.5 text-center">
+                      <div>{groupName}</div>
+                      {group && (
+                        <div className="font-mono text-xs text-text-tertiary">
+                          {t('user_keys.group_rate_short', '分组倍率')}:{' '}
+                          {hasOverride && userOverride != null ? (
+                            <span
+                              title={`${t('user_keys.group_rate_default', '分组默认')}: ${group.rate_multiplier.toFixed(2)}`}
+                            >
+                              {userOverride.toFixed(2)}
+                              <span className="ml-1 inline-block rounded bg-amber-500/10 px-1 text-[9px] leading-[14px] text-amber-500 align-middle">
+                                {t('user_keys.user_override_tag', '专属')}
+                              </span>
+                            </span>
+                          ) : (
+                            group.rate_multiplier.toFixed(2)
+                          )}
+                        </div>
+                      )}
+                      {hasSellRate && (
+                        <div className="font-mono text-xs text-text-tertiary">
+                          {t('user_keys.sell_rate_short', '销售倍率')}: {row.sell_rate!.toFixed(2)}
+                        </div>
+                      )}
+                    </div>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <span className="font-mono">
+                      {row.quota_usd > 0 ? (
+                        <>
+                          ${row.used_quota.toFixed(4)} / ${row.quota_usd.toFixed(4)}
+                        </>
+                      ) : (
+                        <span className="text-text-tertiary">{t('user_keys.quota_unlimited_hint')}</span>
+                      )}
+                    </span>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    {!row.sell_rate || row.sell_rate <= 0 ? (
+                      <span className="text-text-tertiary text-xs">—</span>
+                    ) : (
+                      <div className="font-mono text-xs space-y-0.5">
+                        <div>
+                          <span className="text-text-tertiary">{t('user_keys.sell_rate_short', '倍率')}: </span>
+                          <span>{row.sell_rate.toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-text-tertiary">{t('user_keys.cost_actual', '成本')}: </span>
+                          <span>${(row.used_quota_actual || 0).toFixed(4)}</span>
+                        </div>
+                        <div>
+                          <span className="text-text-tertiary">{t('user_keys.profit', '利润')}: </span>
+                          <span style={{ color: profit > 0 ? 'var(--ag-success)' : undefined }}>
+                            ${profit.toFixed(4)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <div className="font-mono text-xs space-y-0.5">
+                      <div>
+                        <span className="text-text-tertiary">{t('api_keys.today')}: </span>
+                        <span style={{ color: 'var(--ag-primary)' }}>${row.today_cost.toFixed(4)}</span>
+                      </div>
+                      <div>
+                        <span className="text-text-tertiary">{t('api_keys.thirty_days')}: </span>
+                        <span>${row.thirty_day_cost.toFixed(4)}</span>
+                      </div>
+                    </div>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    {row.expires_at
+                      ? new Date(row.expires_at).toLocaleDateString('zh-CN')
+                      : t('user_keys.never_expire')}
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <StatusChip status={displayStatus} />
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <div className="flex items-center justify-center gap-0.5">
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="ghost"
+                        aria-label={t('api_keys.reveal')}
+                        onPress={() => revealMutation.mutate(row.id)}
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="ghost"
+                        aria-label={t('user_keys.use_key')}
+                        onPress={() => openUseKeyModal(row)}
+                      >
+                        <Terminal className="w-3.5 h-3.5" />
+                      </Button>
+                      <Dropdown>
+                        <Dropdown.Trigger>
+                          <Button
+                            isIconOnly
+                            aria-label={t('common.more')}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            <MoreHorizontal className="w-3.5 h-3.5" />
+                          </Button>
+                        </Dropdown.Trigger>
+                        <Dropdown.Popover placement="bottom end">
+                          <Dropdown.Menu
+                            aria-label={t('common.actions')}
+                            onAction={(key) => {
+                              switch (String(key)) {
+                                case 'import_ccs':
+                                  openCcsModal(row);
+                                  break;
+                                case 'toggle':
+                                  toggleStatusMutation.mutate({
+                                    id: row.id,
+                                    status: row.status === 'active' ? 'disabled' : 'active',
+                                  });
+                                  break;
+                                case 'edit':
+                                  openEdit(row);
+                                  break;
+                                case 'delete':
+                                  setDeleteTarget(row);
+                                  break;
+                              }
+                            }}
+                          >
+                            <Dropdown.Item id="import_ccs" textValue={t('user_keys.import_ccs')}>
+                              <span className="flex items-center gap-2">
+                                <Upload className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+                                {t('user_keys.import_ccs')}
+                              </span>
+                            </Dropdown.Item>
+                            <Dropdown.Item
+                              id="toggle"
+                              textValue={row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
+                            >
+                              <span className="flex items-center gap-2">
+                                {row.status === 'active'
+                                  ? <Ban className="w-3.5 h-3.5" />
+                                  : <CheckCircle className="w-3.5 h-3.5" />}
+                                {row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
+                              </span>
+                            </Dropdown.Item>
+                            <Dropdown.Item id="edit" textValue={t('common.edit')}>
+                              <span className="flex items-center gap-2">
+                                <Pencil className="w-3.5 h-3.5" />
+                                {t('common.edit')}
+                              </span>
+                            </Dropdown.Item>
+                            <Dropdown.Item id="delete" className="text-danger" textValue={t('common.delete')}>
+                              <span className="flex items-center gap-2">
+                                <Trash2 className="w-3.5 h-3.5" />
+                                {t('common.delete')}
+                              </span>
+                            </Dropdown.Item>
+                          </Dropdown.Menu>
+                        </Dropdown.Popover>
+                      </Dropdown>
+                    </div>
+                  </CommonTable.Cell>
+                </CommonTable.Row>
+              );
+            })
+          )}
+        </CommonTable.Body>
+      </CommonTable>
 
       {/* 创建/编辑弹窗 */}
       <EditKeyModal
@@ -525,13 +536,44 @@ export default function UserKeysPage() {
       />
 
       {/* 查看密钥弹窗 */}
-      <KeyRevealModal
-        open={!!revealedKey}
-        keyValue={revealedKey || ''}
-        title={t('api_keys.reveal')}
-        warningText={t('api_keys.key_reveal_warning')}
-        onClose={() => setRevealedKey(null)}
-      />
+      <Modal state={revealedKeyModalState}>
+        <Modal.Backdrop>
+          <Modal.Container placement="center" scroll="inside" size="md">
+            <Modal.Dialog className="ag-elevation-modal">
+              <Modal.Header>
+                <Modal.Heading>{t('api_keys.reveal')}</Modal.Heading>
+                <Modal.CloseTrigger />
+              </Modal.Header>
+              <Modal.Body>
+                <div className="space-y-4">
+                  <Alert status="warning">
+                    <Alert.Indicator>
+                      <AlertTriangle className="h-4 w-4" />
+                    </Alert.Indicator>
+                    <Alert.Content>
+                      <Alert.Description>{t('api_keys.key_reveal_warning')}</Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 break-all rounded-md border border-glass-border bg-surface px-3 py-2 font-mono text-sm text-text">
+                      {revealedKey || ''}
+                    </code>
+                    <Button size="sm" variant="secondary" onPress={() => copy(revealedKey || '')}>
+                      <Copy className="h-3.5 w-3.5" />
+                      {t('common.copy')}
+                    </Button>
+                  </div>
+                </div>
+              </Modal.Body>
+              <Modal.Footer>
+                <Button variant="primary" onPress={() => setRevealedKey(null)}>
+                  {t('common.close')}
+                </Button>
+              </Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
 
       {/* 使用 API 密钥配置弹窗 */}
       <UseKeyModal
@@ -555,15 +597,38 @@ export default function UserKeysPage() {
       />
 
       {/* 删除确认 */}
-      <ConfirmModal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-        title={t('user_keys.delete_key')}
-        message={t('user_keys.delete_confirm', { name: deleteTarget?.name })}
-        loading={deleteMutation.isPending}
-        danger
-      />
+      <AlertDialog
+        isOpen={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container placement="center" size="sm">
+            <AlertDialog.Dialog className="ag-elevation-modal">
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>{t('user_keys.delete_key')}</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>{t('user_keys.delete_confirm', { name: deleteTarget?.name })}</AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button variant="secondary" onPress={() => setDeleteTarget(null)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  aria-busy={deleteMutation.isPending}
+                  isDisabled={deleteMutation.isPending}
+                  variant="danger"
+                  onPress={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+                >
+                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
+                  {t('common.confirm')}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
     </div>
   );
 }

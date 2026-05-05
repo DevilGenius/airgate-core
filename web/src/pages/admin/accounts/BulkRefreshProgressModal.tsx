@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, X, Loader2, AlertTriangle } from 'lucide-react';
-import { Modal } from '../../../shared/components/Modal';
-import { Button } from '../../../shared/components/Button';
+import { Button, useOverlayState } from '@heroui/react';
+import { Check, X, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { accountsApi } from '../../../shared/api/accounts';
 import { getToken } from '../../../shared/api/client';
+import { CommonModal } from '../../../shared/components/CommonModal';
 
 type ItemStatus = 'pending' | 'running' | 'success' | 'warning' | 'error';
 
@@ -178,20 +178,27 @@ export function BulkRefreshProgressModal({
   };
 
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) handleClose();
+    },
+  });
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t('accounts.bulk_refresh_title')}
-      width="520px"
-      footer={
-        <Button variant={finished ? 'primary' : 'secondary'} onClick={handleClose}>
+    <CommonModal
+      dialogStyle={{ maxWidth: '520px', width: 'min(100%, calc(100vw - 2rem))' }}
+      footer={(
+        <Button variant={finished ? 'primary' : 'secondary'} onPress={handleClose}>
           {finished ? t('common.close') : t('common.cancel')}
         </Button>
-      }
+      )}
+      icon={<RefreshCw className="size-5" />}
+      size="md"
+      state={modalState}
+      title={t('accounts.bulk_refresh_title')}
     >
-      <div className="space-y-4">
+              <div className="space-y-4">
         {/* 进度条 */}
         <div>
           <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: 'var(--ag-text-secondary)' }}>
@@ -267,8 +274,8 @@ export function BulkRefreshProgressModal({
             {fatalError}
           </div>
         )}
-      </div>
-    </Modal>
+              </div>
+    </CommonModal>
   );
 }
 

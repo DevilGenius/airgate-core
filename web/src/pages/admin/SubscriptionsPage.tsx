@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   Plus,
   Users,
@@ -9,10 +9,10 @@ import {
   User,
   RefreshCw,
 } from 'lucide-react';
-import { Button } from '../../shared/components/Button';
-import { Select } from '../../shared/components/Input';
-import { Table, type Column } from '../../shared/components/Table';
-import { StatusBadge } from '../../shared/components/Badge';
+import { Button, EmptyState, Label, ListBox, Select } from '@heroui/react';
+import {
+  StatusChip,
+} from '../../shared/ui';
 import { subscriptionsApi } from '../../shared/api/subscriptions';
 import { groupsApi } from '../../shared/api/groups';
 import { usersApi } from '../../shared/api/users';
@@ -20,6 +20,10 @@ import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
+import { getTotalPages } from '../../shared/utils/pagination';
+import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
+import { CommonTable } from '../../shared/components/CommonTable';
 import { AssignModal } from './subscriptions/AssignModal';
 import { BulkAssignModal } from './subscriptions/BulkAssignModal';
 import { AdjustModal } from './subscriptions/AdjustModal';
@@ -59,6 +63,7 @@ export default function SubscriptionsPage() {
         page_size: pageSize,
         status: statusFilter || undefined,
       }),
+    placeholderData: keepPreviousData,
   });
 
   // 查询分组列表
@@ -112,127 +117,143 @@ export default function SubscriptionsPage() {
     return user ? user.email : `${t('subscriptions.user')} #${userId}`;
   };
 
-  // 表格列定义
-  const columns: Column<SubscriptionResp>[] = [
-    {
-      key: 'id',
-      title: t('common.id'),
-      width: '60px',
-      hideOnMobile: true,
-      render: (row) => (
-        <span className="font-mono">
-          {row.id}
-        </span>
-      ),
-    },
-    {
-      key: 'user_id',
-      title: t('subscriptions.user'),
-      render: (row) => (
-        <span className="inline-flex items-center gap-1.5">
-          <User className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-          {getUserEmail(row.user_id)}
-        </span>
-      ),
-    },
-    {
-      key: 'group_name',
-      title: t('subscriptions.group'),
-      render: (row) => (
-        <span className="inline-flex items-center gap-1.5">
-          <Layers className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-          <span style={{ color: 'var(--ag-text)' }} className="font-medium">
-            {row.group_name}
-          </span>
-        </span>
-      ),
-    },
-    {
-      key: 'effective_at',
-      title: t('subscriptions.effective_time'),
-      render: (row) => (
-        <span className="font-mono">
-          {formatDate(row.effective_at)}
-        </span>
-      ),
-    },
-    {
-      key: 'expires_at',
-      title: t('subscriptions.expire_time'),
-      render: (row) => (
-        <span className="font-mono">
-          {formatDate(row.expires_at)}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      title: t('common.status'),
-      render: (row) => <StatusBadge status={row.status} />,
-    },
-    {
-      key: 'actions',
-      title: t('common.actions'),
-      render: (row) => (
-        <Button
-          size="sm"
-          variant="ghost"
-          icon={<Settings2 className="w-3.5 h-3.5" />}
-          onClick={() => setAdjustingSub(row)}
-        >
-          {t('subscriptions.adjust')}
-        </Button>
-      ),
-    },
-  ];
+  const rows = data?.list ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = getTotalPages(total, pageSize);
+  const selectedStatusLabel = STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label ?? t('subscriptions.all_status');
 
   return (
     <div>
       {/* 筛选 */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
-        <Select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-          options={STATUS_OPTIONS}
-        />
+        <div className="w-44">
+          <Select
+            fullWidth
+            selectedKey={statusFilter}
+            onSelectionChange={(key) => {
+              setStatusFilter(key == null ? '' : String(key));
+              setPage(1);
+            }}
+          >
+            <Label className="sr-only">{t('common.status')}</Label>
+            <Select.Trigger>
+              <Select.Value>{selectedStatusLabel}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={STATUS_OPTIONS}>
+                {(item) => (
+                  <ListBox.Item id={item.value} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </div>
         <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => refetch()}
-            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          <Button
+            isIconOnly
+            aria-label={t('common.refresh', 'Refresh')}
+            size="md"
+            variant="ghost"
+            onPress={() => refetch()}
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
+          </Button>
           <Button
             variant="secondary"
-            icon={<Users className="w-4 h-4" />}
-            onClick={() => setShowBulkModal(true)}
+            onPress={() => setShowBulkModal(true)}
           >
+            <Users className="w-4 h-4" />
             {t('subscriptions.bulk_assign')}
           </Button>
           <Button
-            icon={<Plus className="w-4 h-4" />}
-            onClick={() => setShowAssignModal(true)}
+            variant="primary"
+            onPress={() => setShowAssignModal(true)}
           >
+            <Plus className="w-4 h-4" />
             {t('subscriptions.assign')}
           </Button>
         </div>
       </div>
 
-      {/* 表格 */}
-      <Table<SubscriptionResp>
-        columns={columns}
-        data={data?.list ?? []}
-        loading={isLoading}
-        rowKey={(row) => row.id}
-        page={page}
-        pageSize={pageSize}
-        total={data?.total ?? 0}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
+      <CommonTable
+        ariaLabel={t('subscriptions.title', 'Subscriptions')}
+        footer={(
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            setPage={setPage}
+            setPageSize={setPageSize}
+            total={total}
+            totalPages={totalPages}
+          />
+        )}
+        minWidth={920}
+      >
+            <CommonTable.Header>
+              <CommonTable.Column id="id" style={{ width: 72 }}>
+                {t('common.id')}
+              </CommonTable.Column>
+              <CommonTable.Column id="user_id">{t('subscriptions.user')}</CommonTable.Column>
+              <CommonTable.Column id="group_name">{t('subscriptions.group')}</CommonTable.Column>
+              <CommonTable.Column id="effective_at">{t('subscriptions.effective_time')}</CommonTable.Column>
+              <CommonTable.Column id="expires_at">{t('subscriptions.expire_time')}</CommonTable.Column>
+              <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
+              <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
+            </CommonTable.Header>
+            <CommonTable.Body>
+              {isLoading ? (
+                <TableLoadingRow colSpan={7} />
+              ) : rows.length === 0 ? (
+                <CommonTable.Row id="empty">
+                  <CommonTable.Cell colSpan={7}>
+                    <EmptyState />
+                  </CommonTable.Cell>
+                </CommonTable.Row>
+              ) : (
+                rows.map((row) => (
+                  <CommonTable.Row id={String(row.id)} key={row.id}>
+                    <CommonTable.Cell>
+                      <span className="font-mono">{row.id}</span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="inline-flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5 text-text-tertiary" />
+                        {getUserEmail(row.user_id)}
+                      </span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 text-text-tertiary" />
+                        <span className="font-medium text-text">{row.group_name}</span>
+                      </span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="font-mono">{formatDate(row.effective_at)}</span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="font-mono">{formatDate(row.expires_at)}</span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <StatusChip status={row.status} />
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onPress={() => setAdjustingSub(row)}
+                      >
+                        <Settings2 className="w-3.5 h-3.5" />
+                        {t('subscriptions.adjust')}
+                      </Button>
+                    </CommonTable.Cell>
+                  </CommonTable.Row>
+                ))
+              )}
+            </CommonTable.Body>
+      </CommonTable>
 
       {/* 分配订阅弹窗 */}
       <AssignModal
