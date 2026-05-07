@@ -296,7 +296,7 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 	model := req.Model
 	if model == "" {
 		if models := h.manager.GetModels(g.Platform); len(models) > 0 {
-			model = models[0].ID
+			model = pickProbeModel(models)
 		}
 	}
 	if model == "" {
@@ -333,9 +333,6 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 		"max_tokens": 5,
 	})
 
-	// X-Airgate-Internal 让下游网关（如 gateway-claude 的 claude_code_only 开关）
-	// 识别这是 HostService 自家的黑盒探测流量，跳过面向外部客户端的身份闸。
-	// 与 account.TestAccount 的管理后台测试走同一约定，插件侧统一用这一个 header 判。
 	fwdReq := &sdk.ForwardRequest{
 		Account: &sdk.Account{
 			ID:          int64(accFull.ID),
@@ -371,15 +368,17 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 		return resp, nil
 	}
 
-	// 探测的判决同样交给状态机（与真实流量同一入口），让探测信号驱动账号状态。
-	h.scheduler.Apply(ctx, acc.ID, scheduler.Judgment{
-		Kind:       outcome.Kind,
-		RetryAfter: outcome.RetryAfter,
-		Reason:     outcome.Reason,
-		Duration:   latency,
-		IsPool:     accFull.UpstreamIsPool,
-		Family:     scheduler.ModelFamily(accFull.Platform, model),
-	})
+	// 探测成功时通知状态机，让降级账号有机会恢复；探测失败时不触发降级，
+	// 避免探测模型不可用（如上游缺通道）误伤整个账号的可调度性。
+	// 失败信号由 health 插件自行记录到 group_health_probes，不经过账号状态机。
+	if outcome.Kind.IsSuccess() {
+		h.scheduler.Apply(ctx, acc.ID, scheduler.Judgment{
+			Kind:     outcome.Kind,
+			Duration: latency,
+			IsPool:   accFull.UpstreamIsPool,
+			Family:   scheduler.ModelFamily(accFull.Platform, model),
+		})
+	}
 
 	switch outcome.Kind {
 	case sdk.OutcomeSuccess:
@@ -1220,6 +1219,17 @@ func errProbeResp(kind, msg string, start time.Time) *pb.HostProbeForwardRespons
 		ErrorMsg:  truncateProbeErr(msg),
 		LatencyMs: time.Since(start).Milliseconds(),
 	}
+}
+
+// pickProbeModel 从模型列表中选一个非图片模型用于探测。
+// 图片模型探测需要实际生图（成本高），跳过；如果全是图片模型则返回空。
+func pickProbeModel(models []sdk.ModelInfo) string {
+	for _, m := range models {
+		if !isImageModel(m.ID) {
+			return m.ID
+		}
+	}
+	return ""
 }
 
 // truncateProbeErr 限制 error_msg 长度，避免巨型上游错误体污染探测表。

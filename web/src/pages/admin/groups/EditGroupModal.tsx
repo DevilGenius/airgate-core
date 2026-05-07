@@ -250,21 +250,23 @@ export function GroupFormModal({
           />
         </HeroTextField>
 
-        <Switch
-          isSelected={form.is_exclusive}
-          onChange={(selected) => setForm({ ...form, is_exclusive: selected })}
-        >
-          <Switch.Control><Switch.Thumb /></Switch.Control>
-          <Switch.Content>{t('groups.exclusive_hint')}</Switch.Content>
-        </Switch>
+        <div className="grid grid-cols-2 gap-3">
+          <Switch
+            isSelected={form.is_exclusive}
+            onChange={(selected) => setForm({ ...form, is_exclusive: selected })}
+          >
+            <Switch.Control><Switch.Thumb /></Switch.Control>
+            <Switch.Content>{t('groups.exclusive_hint')}</Switch.Content>
+          </Switch>
 
-        <Switch
-          isSelected={form.status_visible}
-          onChange={(selected) => setForm({ ...form, status_visible: selected })}
-        >
-          <Switch.Control><Switch.Thumb /></Switch.Control>
-          <Switch.Content>{t('groups.status_visible_hint')}</Switch.Content>
-        </Switch>
+          <Switch
+            isSelected={form.status_visible}
+            onChange={(selected) => setForm({ ...form, status_visible: selected })}
+          >
+            <Switch.Control><Switch.Thumb /></Switch.Control>
+            <Switch.Content>{t('groups.status_visible_hint')}</Switch.Content>
+          </Switch>
+        </div>
 
         <Select
           fullWidth

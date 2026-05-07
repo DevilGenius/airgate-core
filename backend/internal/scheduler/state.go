@@ -76,7 +76,7 @@ func (sm *StateMachine) notifyCritical() {
 //
 //	Success             → state=active，清 state_until，last_used_at=now
 //	AccountRateLimited  → state=rate_limited，state_until=now+RetryAfter
-//	AccountDead         → 非池：state=disabled；池：state=degraded（限时）
+//	AccountDead         → state=disabled（凭证失效，需人工介入）
 //	UpstreamTransient   → 非池：**不动状态**（上游抖动不扣账号分，靠 failover 切走就行）；池：state=degraded
 //	ClientError / StreamAborted / Unknown → 不改状态（账号无辜）
 func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
@@ -111,10 +111,8 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		sm.transition(ctx, accountID, account.StateRateLimited, &until, j.Reason)
 
 	case sdk.OutcomeAccountDead:
-		if j.IsPool {
-			sm.applyDegraded(ctx, accountID, j.Reason)
-			return
-		}
+		// AccountDead 是确定性凭证错误，不论是否池账号都标 disabled。
+		// 池账号之前走 degraded 导致 60s 后自动恢复 → 再报错 → 无限循环。
 		sm.transition(ctx, accountID, account.StateDisabled, nil, j.Reason)
 
 	case sdk.OutcomeUpstreamTransient:
@@ -143,16 +141,24 @@ func (sm *StateMachine) applyDegraded(ctx context.Context, accountID int, reason
 }
 
 // transitionActive 成功时回到 active：清 state_until、清 reason、清失败计数、更新 last_used_at。
+//
+// disabled 状态受保护：只有管理员操作（ManualRecover / ToggleScheduling）才能解除，
+// forwarder 的 Success 判决不会覆盖它——防止在飞请求的成功回调把手动禁用的账号重新激活。
 func (sm *StateMachine) transitionActive(ctx context.Context, accountID int) {
 	now := time.Now()
 	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	// 读当前状态决定是否触发关键转移通知：只有从非 active 回到 active 才需要
-	// 清 route 缓存；已经是 active 的 Success 只是刷 last_used_at，不必清缓存。
 	prevState := account.StateActive
 	if existing, err := sm.db.Account.Get(dbCtx, accountID); err == nil {
 		prevState = existing.State
+	}
+
+	if prevState == account.StateDisabled {
+		_ = sm.db.Account.UpdateOneID(accountID).
+			SetLastUsedAt(now).
+			Exec(dbCtx)
+		return
 	}
 
 	err := sm.db.Account.UpdateOneID(accountID).

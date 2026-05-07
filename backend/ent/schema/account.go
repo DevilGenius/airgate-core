@@ -38,7 +38,7 @@ func (Account) Fields() []ent.Field {
 		field.String("error_msg").Default("").
 			Comment("进入当前状态的原因（给运维看）"),
 		field.Bool("upstream_is_pool").Default(false).
-			Comment("上游是账号池：Dead 判决降级为 degraded，避免池抖动把本地账号永久标 disabled"),
+			Comment("上游是账号池：UpstreamTransient 走软降级 degraded；AccountDead 仍标 disabled"),
 		field.Time("last_used_at").Optional().Nillable(),
 		field.JSON("extra", map[string]interface{}{}).Optional().Default(map[string]interface{}{}).
 			Comment("扩展配置（max_rpm / max_window_cost / max_sessions 等）"),

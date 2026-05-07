@@ -134,6 +134,9 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 		SetRateMultiplier(input.RateMultiplier).
 		SetUpstreamIsPool(input.UpstreamIsPool)
 
+	if input.Extra != nil {
+		builder = builder.SetExtra(input.Extra)
+	}
 	if len(input.GroupIDs) > 0 {
 		builder = builder.AddGroupIDs(toIntSlice(input.GroupIDs)...)
 	}
@@ -188,6 +191,13 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 			builder = builder.ClearProxy()
 		} else {
 			builder = builder.ClearProxy().SetProxyID(int(*input.ProxyID))
+		}
+	}
+	if input.HasExtra {
+		if input.Extra == nil {
+			builder = builder.SetExtra(map[string]interface{}{})
+		} else {
+			builder = builder.SetExtra(input.Extra)
 		}
 	}
 

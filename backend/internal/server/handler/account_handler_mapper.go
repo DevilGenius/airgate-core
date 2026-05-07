@@ -19,6 +19,7 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		RateMultiplier:     account.RateMultiplier,
 		ErrorMsg:           account.ErrorMsg,
 		UpstreamIsPool:     account.UpstreamIsPool,
+		Extra:              account.Extra,
 		GroupIDs:           account.GroupIDs,
 		TimeMixin: dto.TimeMixin{
 			CreatedAt: account.CreatedAt,

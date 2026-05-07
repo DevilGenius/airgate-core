@@ -58,6 +58,7 @@ export function EditAccountModal({
     rate_multiplier: account.rate_multiplier,
     upstream_is_pool: account.upstream_is_pool,
     proxy_id: account.proxy_id,
+    extra: account.extra ?? {},
   });
   const origCredentials = useRef(account.credentials);
   const [credentials, setCredentials] = useState<Record<string, string>>(account.credentials);
@@ -131,6 +132,7 @@ export function EditAccountModal({
       ...form,
       type: accountType || undefined,
       credentials: merged,
+      extra: form.extra,
       group_ids: groupIds,
     });
   };

@@ -60,6 +60,10 @@ type StateWriter interface {
 	ClearRateLimitMarkers(ctx context.Context, accountID int) int
 	// MarkDisabled 永久禁用（凭证失效等，需要人工重新验证）。
 	MarkDisabled(ctx context.Context, accountID int, reason string)
+	// ManualRecover 手动恢复到 active 并清除路由缓存。
+	ManualRecover(ctx context.Context, accountID int) error
+	// ManualDisable 手动禁用并清除路由缓存。
+	ManualDisable(ctx context.Context, accountID int, reason string) error
 }
 
 type Service struct {
@@ -328,6 +332,9 @@ func (r *BulkResult) appendFailure(id int, err error) {
 
 // ToggleScheduling 快速切换账号调度状态。active ↔ disabled。
 // 其它中间态（rate_limited / degraded）一律视为"非 disabled"，切换后目标 = disabled。
+//
+// 通过 StateWriter 走状态机路径，确保路由缓存立即失效——
+// 旧实现直接写 repo 绕过状态机，导致缓存里的旧快照让账号"自己起来"。
 func (s *Service) ToggleScheduling(ctx context.Context, id int) (ToggleResult, error) {
 	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
@@ -338,23 +345,31 @@ func (s *Service) ToggleScheduling(ctx context.Context, id int) (ToggleResult, e
 		return ToggleResult{}, err
 	}
 
-	newState := "disabled"
+	var newState string
 	if item.State == "disabled" {
 		newState = "active"
+		if s.stateWriter != nil {
+			if err := s.stateWriter.ManualRecover(ctx, id); err != nil {
+				logger.Error("account_manual_recover_failed",
+					sdk.LogFieldAccountID, id, sdk.LogFieldError, err)
+				return ToggleResult{}, err
+			}
+		}
+	} else {
+		newState = "disabled"
+		if s.stateWriter != nil {
+			if err := s.stateWriter.ManualDisable(ctx, id, "管理员手动关闭调度"); err != nil {
+				logger.Error("account_manual_disable_failed",
+					sdk.LogFieldAccountID, id, sdk.LogFieldError, err)
+				return ToggleResult{}, err
+			}
+		}
 	}
 
-	updated, err := s.repo.Update(ctx, id, UpdateInput{State: &newState})
-	if err != nil {
-		logger.Error("account_credential_persist_failed",
-			sdk.LogFieldAccountID, id,
-			"op", "toggle_scheduling",
-			sdk.LogFieldError, err)
-		return ToggleResult{}, err
-	}
 	logger.Info("account_status_changed",
 		sdk.LogFieldAccountID, id,
-		"state", updated.State)
-	return ToggleResult{ID: updated.ID, State: updated.State}, nil
+		"state", newState)
+	return ToggleResult{ID: id, State: newState}, nil
 }
 
 // PrepareConnectivityTest 准备账号连通性测试。

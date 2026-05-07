@@ -33,6 +33,7 @@ type AccountResp struct {
 	RateMultiplier     float64             `json:"rate_multiplier"`
 	ErrorMsg           string              `json:"error_msg,omitempty"`
 	UpstreamIsPool     bool                `json:"upstream_is_pool"`
+	Extra              map[string]any      `json:"extra,omitempty"`
 	LastUsedAt         *string             `json:"last_used_at,omitempty"`
 	GroupIDs           []int64             `json:"group_ids"`
 	FamilyCooldowns    []FamilyCooldownDTO `json:"family_cooldowns,omitempty"`
@@ -52,6 +53,7 @@ type CreateAccountReq struct {
 	ProxyID        *int64            `json:"proxy_id"`
 	RateMultiplier float64           `json:"rate_multiplier"`
 	UpstreamIsPool bool              `json:"upstream_is_pool"`
+	Extra          map[string]any    `json:"extra,omitempty"`
 	GroupIDs       []int64           `json:"group_ids"`
 }
 
@@ -68,6 +70,8 @@ type UpdateAccountReq struct {
 	ProxyID        *int64            `json:"proxy_id"`
 	RateMultiplier *float64          `json:"rate_multiplier"`
 	UpstreamIsPool *bool             `json:"upstream_is_pool"`
+	Extra          map[string]any    `json:"extra,omitempty"`
+	HasExtra       bool              `json:"-"`
 	GroupIDs       []int64           `json:"group_ids"`
 }
 

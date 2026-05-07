@@ -113,6 +113,7 @@ type CreateInput struct {
 	RateMultiplier float64
 	GroupIDs       []int64
 	UpstreamIsPool bool
+	Extra          map[string]any
 }
 
 // UpdateInput 更新账号输入。
@@ -132,6 +133,8 @@ type UpdateInput struct {
 	HasGroupIDs    bool
 	ProxyID        *int64
 	HasProxyID     bool
+	Extra          map[string]any
+	HasExtra       bool
 }
 
 // ToggleResult 快速切换调度状态结果。

@@ -12,6 +12,16 @@ const (
 	NotSchedulable
 )
 
+// ExtraString 从 account.Extra 中安全提取 string 值
+func ExtraString(extra map[string]interface{}, key string) string {
+	v, ok := extra[key]
+	if !ok {
+		return ""
+	}
+	s, _ := v.(string)
+	return s
+}
+
 // ExtraFloat64 从 account.Extra 中安全提取 float64 值
 func ExtraFloat64(extra map[string]interface{}, key string) float64 {
 	v, ok := extra[key]

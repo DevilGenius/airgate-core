@@ -20,6 +20,11 @@ var (
 // dbTimeout 后台 DB 操作超时，防止 goroutine 泄漏。
 const dbTimeout = 10 * time.Second
 
+// AccountFilterFunc 平台级账号过滤回调。
+// 在 SelectAccount 的模型路由之后、状态过滤之前执行，用于实现平台特有的账号筛选逻辑
+// （如 OpenAI 平台按 capability 区分生图/对话账号）。
+type AccountFilterFunc func(candidates []*ent.Account, model string) []*ent.Account
+
 // Scheduler 账户调度器。
 //
 // 两层职责清晰分离：
@@ -39,6 +44,16 @@ type Scheduler struct {
 	state          *StateMachine
 	familyCooldown *FamilyCooldown
 	routeCache     *routeCache
+	accountFilters map[string]AccountFilterFunc
+}
+
+// SetAccountFilter 注册平台级账号过滤函数。
+// 在 SelectAccount 选号管线中，模型路由之后、状态过滤之前执行。
+func (s *Scheduler) SetAccountFilter(platform string, fn AccountFilterFunc) {
+	if s.accountFilters == nil {
+		s.accountFilters = make(map[string]AccountFilterFunc)
+	}
+	s.accountFilters[platform] = fn
 }
 
 // NewScheduler 构造调度器。

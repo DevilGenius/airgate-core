@@ -159,6 +159,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		ProxyID:        req.ProxyID,
 		RateMultiplier: req.RateMultiplier,
 		UpstreamIsPool: req.UpstreamIsPool,
+		Extra:          req.Extra,
 		GroupIDs:       req.GroupIDs,
 	})
 	if err != nil {
@@ -203,6 +204,10 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		UpstreamIsPool: req.UpstreamIsPool,
 		GroupIDs:       req.GroupIDs,
 		HasGroupIDs:    req.GroupIDs != nil,
+	}
+	if _, ok := rawPayload["extra"]; ok {
+		input.HasExtra = true
+		input.Extra = req.Extra
 	}
 	if rawProxyID, ok := rawPayload["proxy_id"]; ok {
 		input.HasProxyID = true

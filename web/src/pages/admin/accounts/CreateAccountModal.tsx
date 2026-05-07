@@ -142,6 +142,7 @@ export function CreateAccountModal({
       platform,
       type: accountType || undefined,
       credentials,
+      extra: form.extra,
       group_ids: groupIds,
     });
   };

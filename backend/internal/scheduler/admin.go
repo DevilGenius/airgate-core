@@ -10,26 +10,34 @@ import (
 // 管理员 / 配额巡检的状态写入口。这些调用不经过 Apply —— 它们是"外部已知事实"
 // 的直接落库，不需要 RPM 回退、失败计数等逻辑。
 
-// ManualRecover 运维手动把账号恢复到 active：清状态、清到期、清原因。
+// ManualRecover 运维手动把账号恢复到 active：清状态、清到期、清原因，并立即刷新路由缓存。
 func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 	dbCtx, cancel := context.WithTimeout(ctx, dbTimeout)
 	defer cancel()
-	return s.db.Account.UpdateOneID(accountID).
+	err := s.db.Account.UpdateOneID(accountID).
 		SetState(account.StateActive).
 		ClearStateUntil().
 		SetErrorMsg("").
 		Exec(dbCtx)
+	if err == nil {
+		s.routeCache.InvalidateAll()
+	}
+	return err
 }
 
 // ManualDisable 运维手动禁用账号（语义等同自动 disabled，需要再次 ManualRecover 才能恢复）。
 func (s *Scheduler) ManualDisable(ctx context.Context, accountID int, reason string) error {
 	dbCtx, cancel := context.WithTimeout(ctx, dbTimeout)
 	defer cancel()
-	return s.db.Account.UpdateOneID(accountID).
+	err := s.db.Account.UpdateOneID(accountID).
 		SetState(account.StateDisabled).
 		ClearStateUntil().
 		SetErrorMsg(truncateReason(reason)).
 		Exec(dbCtx)
+	if err == nil {
+		s.routeCache.InvalidateAll()
+	}
+	return err
 }
 
 // MarkRateLimited 配额巡检发现额度窗口已满时打入 rate_limited 直到 until。

@@ -152,6 +152,7 @@ export interface AccountResp {
   rate_multiplier: number;
   error_msg?: string;
   upstream_is_pool: boolean;
+  extra?: Record<string, unknown>;
   last_used_at?: string;
   group_ids: number[];
   /** 当前在 Redis 上仍生效的家族级限流冷却列表；后端 omitempty，没有冷却时缺省。 */
@@ -176,6 +177,7 @@ export interface CreateAccountReq {
   proxy_id?: number;
   rate_multiplier?: number;
   upstream_is_pool?: boolean;
+  extra?: Record<string, unknown>;
   group_ids?: number[];
 }
 
@@ -190,6 +192,7 @@ export interface UpdateAccountReq {
   proxy_id?: number | null;
   rate_multiplier?: number;
   upstream_is_pool?: boolean;
+  extra?: Record<string, unknown>;
   group_ids?: number[];
 }
 

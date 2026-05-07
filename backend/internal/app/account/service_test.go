@@ -208,6 +208,15 @@ func (s *stubStateWriter) MarkDisabled(_ context.Context, accountID int, reason 
 	s.disabled[accountID] = reason
 }
 
+func (s *stubStateWriter) ManualRecover(_ context.Context, _ int) error {
+	return nil
+}
+
+func (s *stubStateWriter) ManualDisable(_ context.Context, accountID int, reason string) error {
+	s.disabled[accountID] = reason
+	return nil
+}
+
 type stubPluginCatalog struct {
 	models []sdk.ModelInfo
 }

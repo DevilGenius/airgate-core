@@ -39,7 +39,7 @@ type Account struct {
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
 	// 进入当前状态的原因（给运维看）
 	ErrorMsg string `json:"error_msg,omitempty"`
-	// 上游是账号池：Dead 判决降级为 degraded，避免池抖动把本地账号永久标 disabled
+	// 上游是账号池：UpstreamTransient 走软降级 degraded；AccountDead 仍标 disabled
 	UpstreamIsPool bool `json:"upstream_is_pool,omitempty"`
 	// LastUsedAt holds the value of the "last_used_at" field.
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`

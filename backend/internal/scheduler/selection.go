@@ -30,6 +30,11 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 	if candidates = excludeAccounts(candidates, excludeIDs); len(candidates) == 0 {
 		return nil, ErrNoAvailableAccount
 	}
+	if fn, ok := s.accountFilters[platform]; ok {
+		if candidates = fn(candidates, model); len(candidates) == 0 {
+			return nil, ErrNoAvailableAccount
+		}
+	}
 
 	now := time.Now()
 	var normalCandidates, stickyCandidates []*ent.Account
@@ -259,11 +264,11 @@ func (s *Scheduler) concurrencySchedulability(ctx context.Context, acc *ent.Acco
 	return Normal
 }
 
-// selectByLoadBalance 按 priority × 1000 + (1-load)×100 + lru_score 打分。
+// selectByLoadBalance 严格按优先级分层：只从最高优先级层选账号，
+// 同层内按 (1-load)*100 + lru_score 打分做加权随机。
 //
-// 从 top-N 里随机选一个（而不是固定 argmax），解决高并发下所有 pickAccount 同时
-// 看到一致的 Redis 状态 → 全部选中同一账号 → AcquireSlot race → 大量 failover 浪费
-// 的问题。N 取 min(len, 8)，既能分散压力又保留"倾向好账号"的语义。
+// 低优先级账号只有在高优先级全部被 checkSchedulability 过滤掉后才能被选中。
+// 同层内从 top-N 随机选一个，避免高并发下全部命中同一账号。
 func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.Account, now time.Time) *ent.Account {
 	if len(candidates) == 0 {
 		return nil
@@ -272,13 +277,31 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 		return candidates[0]
 	}
 
+	// 找到最高优先级，只保留该层候选
+	maxPriority := candidates[0].Priority
+	for _, acc := range candidates[1:] {
+		if acc.Priority > maxPriority {
+			maxPriority = acc.Priority
+		}
+	}
+	tier := make([]*ent.Account, 0, len(candidates))
+	for _, acc := range candidates {
+		if acc.Priority == maxPriority {
+			tier = append(tier, acc)
+		}
+	}
+	if len(tier) == 1 {
+		return tier[0]
+	}
+
+	// 同优先级内按负载 + LRU 打分
 	type scored struct {
 		acc   *ent.Account
 		score float64
 	}
-	items := make([]scored, 0, len(candidates))
+	items := make([]scored, 0, len(tier))
 
-	for _, acc := range candidates {
+	for _, acc := range tier {
 		maxConc := acc.MaxConcurrency
 		if maxConc <= 0 {
 			maxConc = 5
@@ -288,7 +311,7 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 			loadRate = 1
 		}
 
-		lruScore := 100.0 // 从未使用过 → 最高
+		lruScore := 100.0
 		if acc.LastUsedAt != nil {
 			if elapsed := now.Sub(*acc.LastUsedAt).Minutes(); elapsed < 100 {
 				lruScore = elapsed
@@ -296,21 +319,12 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 		}
 		items = append(items, scored{
 			acc:   acc,
-			score: float64(acc.Priority)*1000 + (1-loadRate)*100 + lruScore,
+			score: (1-loadRate)*100 + lruScore,
 		})
 	}
 
 	sort.Slice(items, func(i, j int) bool { return items[i].score > items[j].score })
 
-	// 高并发热点打散：从 top-N 随机选。
-	//
-	// N 的取值决定了"多宽的账号池能参与分流"：
-	//   - 号池很小时：N 接近 len，几乎等于均匀随机
-	//   - 号池很大（百级）时：封顶一个较大的值，既保留"偏好 priority/LRU 高分"的倾向，
-	//     又让 failover 每一轮都能分散到足够多的候选（max 成功数 ≈ N × failoverAttempts）
-	//
-	// 以前 N=8 对 124 号池显得太窄：150 并发最多只用到 8×3=24 个账号，剩 100 个完全闲置。
-	// 提高到 32：3 次 failover 可覆盖 96 个账号，基本打满常见号池。
 	const maxTopN = 32
 	topN := len(items)
 	if topN > maxTopN {
