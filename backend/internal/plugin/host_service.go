@@ -1154,13 +1154,18 @@ func hostSDKAccount(acc *ent.Account) *sdk.Account {
 }
 
 func (h *HostService) applyHostOutcome(ctx context.Context, accountID int, accFull *ent.Account, model string, outcome sdk.ForwardOutcome, duration time.Duration) {
+	reason := outcome.Reason
+	if outcome.Kind.IsAccountFault() && model != "" {
+		reason = "[" + model + "] " + reason
+	}
 	h.scheduler.Apply(ctx, accountID, scheduler.Judgment{
-		Kind:       outcome.Kind,
-		RetryAfter: outcome.RetryAfter,
-		Reason:     outcome.Reason,
-		Duration:   duration,
-		IsPool:     accFull.UpstreamIsPool,
-		Family:     scheduler.ModelFamily(accFull.Platform, model),
+		Kind:           outcome.Kind,
+		RetryAfter:     outcome.RetryAfter,
+		Reason:         reason,
+		Duration:       duration,
+		IsPool:         accFull.UpstreamIsPool,
+		UpstreamStatus: outcome.Upstream.StatusCode,
+		Family:         scheduler.ModelFamily(accFull.Platform, model),
 	})
 }
 

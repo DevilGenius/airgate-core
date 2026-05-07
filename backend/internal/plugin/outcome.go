@@ -197,12 +197,17 @@ func sanitizedMessage(kind sdk.OutcomeKind) string {
 // applyOutcome 把本次判决交给 scheduler.Apply，由状态机统一处理。
 // forwarder 不再关心 MarkOverloaded / MarkDegraded / ReportAccountError 等内部方法。
 func (f *Forwarder) applyOutcome(ctx context.Context, state *forwardState, execution forwardExecution) {
+	reason := judgmentReason(execution)
+	if execution.outcome.Kind.IsAccountFault() && state.model != "" {
+		reason = "[" + state.model + "] " + reason
+	}
 	j := scheduler.Judgment{
-		Kind:       execution.outcome.Kind,
-		RetryAfter: execution.outcome.RetryAfter,
-		Reason:     judgmentReason(execution),
-		Duration:   execution.duration,
-		IsPool:     state.account != nil && state.account.UpstreamIsPool,
+		Kind:           execution.outcome.Kind,
+		RetryAfter:     execution.outcome.RetryAfter,
+		Reason:         reason,
+		Duration:       execution.duration,
+		IsPool:         state.account != nil && state.account.UpstreamIsPool,
+		UpstreamStatus: execution.outcome.Upstream.StatusCode,
 		// Family 让限流冷却落到 (account, family) 维度。撞 gpt-image 4000/min
 		// 时账号上 chat 模型仍可调用，避免单模型限流误伤整账号。
 		Family: scheduler.ModelFamily(state.requestedPlatform, state.model),

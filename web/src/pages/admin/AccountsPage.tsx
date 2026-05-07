@@ -218,7 +218,16 @@ function AccountStatusCell({ row }: { row: AccountResp }) {
       t('accounts.degraded_tooltip', '上游池抖动，软降级仅做兜底，到期自动恢复'),
     );
   } else if (row.state === 'disabled') {
-    mainBadge = <StatusPill status="disabled" tooltip={row.error_msg || undefined} />;
+    mainBadge = (
+      <div className="inline-flex flex-col gap-0.5">
+        <StatusPill status="disabled" tooltip={row.error_msg || undefined} />
+        {row.error_msg && (
+          <span className="text-[10px] text-[var(--ag-muted)] truncate max-w-[200px]" title={row.error_msg}>
+            {row.error_msg}
+          </span>
+        )}
+      </div>
+    );
   } else {
     // active，或 rate_limited/degraded 已到期（lazy 恢复）
     mainBadge = <StatusPill status="active" />;

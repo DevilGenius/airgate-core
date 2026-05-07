@@ -30,12 +30,13 @@ const (
 
 // Judgment forwarder 对一次调用的判决，交给状态机做状态转移。
 type Judgment struct {
-	Kind       sdk.OutcomeKind
-	RetryAfter time.Duration
-	Reason     string
-	Duration   time.Duration // 仅用于日志 / 指标
-	IsPool     bool          // 池账号（upstream_is_pool）走豁免路径
-	Family     string        // 模型家族键（见 ModelFamily）。非空时 RateLimited 走 Redis 家族冷却而非账号级 DB state，避免 gpt-image 限流误伤 chat。
+	Kind           sdk.OutcomeKind
+	RetryAfter     time.Duration
+	Reason         string
+	Duration       time.Duration // 仅用于日志 / 指标
+	IsPool         bool          // 池账号（upstream_is_pool）走豁免路径
+	Family         string        // 模型家族键（见 ModelFamily）。非空时 RateLimited 走 Redis 家族冷却而非账号级 DB state，避免 gpt-image 限流误伤 chat。
+	UpstreamStatus int           // 上游 HTTP 状态码，用于池账号区分 401（自身凭证无效）和 403（透传上游错误）。
 }
 
 // StateMachine 账号状态机。所有状态转移必须通过 Apply 入口。
@@ -111,8 +112,12 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		sm.transition(ctx, accountID, account.StateRateLimited, &until, j.Reason)
 
 	case sdk.OutcomeAccountDead:
-		// AccountDead 是确定性凭证错误，不论是否池账号都标 disabled。
-		// 池账号之前走 degraded 导致 60s 后自动恢复 → 再报错 → 无限循环。
+		if j.IsPool && j.UpstreamStatus != 401 {
+			// 池账号的 403 等是上游透传的错误，池子本身没问题，
+			// 不动状态，靠 failover 重试消化。
+			// 401 表示池子自身的凭证无效，仍需禁用并说明原因。
+			return
+		}
 		sm.transition(ctx, accountID, account.StateDisabled, nil, j.Reason)
 
 	case sdk.OutcomeUpstreamTransient:
