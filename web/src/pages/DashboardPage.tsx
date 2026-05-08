@@ -732,7 +732,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.filter_user')}</span>
-            <div className="w-full sm:w-64">
+            <div className="w-full sm:w-48">
               <ComboBox
                 aria-label={t('dashboard.filter_user')}
                 allowsEmptyCollection
@@ -799,7 +799,7 @@ export default function DashboardPage() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.granularity')}</span>
-            <div className="w-full sm:w-40">
+            <div className="w-full sm:w-48">
               <Select
                 fullWidth
                 isDisabled={range === 'today'}

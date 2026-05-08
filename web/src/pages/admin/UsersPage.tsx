@@ -105,8 +105,8 @@ export default function UsersPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end gap-3 mb-5">
-        <div className="w-full sm:w-64">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
+        <div className="w-full sm:w-48">
           <HeroTextField fullWidth>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
@@ -119,7 +119,7 @@ export default function UsersPage() {
             </div>
           </HeroTextField>
         </div>
-        <div className="w-36">
+        <div className="w-full sm:w-48">
           <Select
             fullWidth
             selectedKey={statusFilter}
@@ -144,14 +144,14 @@ export default function UsersPage() {
             </Select.Popover>
           </Select>
         </div>
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 sm:ml-auto">
           {isFetching ? (
             <RefreshCw className="w-4 h-4 text-text-tertiary animate-spin" />
           ) : (
             <Button
               isIconOnly
               aria-label={t('common.refresh', 'Refresh')}
-              size="md"
+              size="sm"
               variant="ghost"
               onPress={() => refetch()}
             >

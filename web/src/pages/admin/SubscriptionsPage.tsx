@@ -125,8 +125,8 @@ export default function SubscriptionsPage() {
   return (
     <div>
       {/* 筛选 */}
-      <div className="flex flex-wrap items-center gap-3 mb-5">
-        <div className="w-44">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
+        <div className="w-full sm:w-48">
           <Select
             fullWidth
             selectedKey={statusFilter}
@@ -151,11 +151,11 @@ export default function SubscriptionsPage() {
             </Select.Popover>
           </Select>
         </div>
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 sm:ml-auto">
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}
-            size="md"
+            size="sm"
             variant="ghost"
             onPress={() => refetch()}
           >

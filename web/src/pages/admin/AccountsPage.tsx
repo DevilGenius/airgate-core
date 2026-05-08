@@ -15,8 +15,6 @@ import {
   Download,
   Upload,
   Eraser,
-  SlidersHorizontal,
-  X,
 } from 'lucide-react';
 import { useToast } from '../../shared/ui';
 import { PlatformIcon } from '../../shared/ui';
@@ -373,7 +371,6 @@ export default function AccountsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [proxyFilter, setProxyFilter] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // 自动刷新
   const AUTO_REFRESH_OPTIONS = [0, 5, 10, 15, 30];
@@ -1294,26 +1291,6 @@ export default function AccountsPage() {
   const selectedTypeLabel = typeOptions.find((item) => item.id === typeFilter)?.label ?? t('accounts.all_types', '全部类型');
   const selectedGroupLabel = groupOptions.find((item) => item.id === groupFilter)?.label ?? t('accounts.all_groups');
   const selectedProxyLabel = proxyOptions.find((item) => item.id === proxyFilter)?.label ?? t('accounts.all_proxies');
-  const clearNamedFilter = (key: 'group' | 'platform' | 'proxy' | 'state' | 'type') => {
-    switch (key) {
-      case 'platform':
-        setPlatformFilter('');
-        break;
-      case 'state':
-        setStateFilter('');
-        break;
-      case 'type':
-        setTypeFilter('');
-        break;
-      case 'group':
-        setGroupFilter('');
-        break;
-      case 'proxy':
-        setProxyFilter('');
-        break;
-    }
-    setPage(1);
-  };
   const clearAllFilters = () => {
     setPlatformFilter('');
     setStateFilter('');
@@ -1322,14 +1299,60 @@ export default function AccountsPage() {
     setProxyFilter('');
     setPage(1);
   };
-  const activeFilters = [
-    platformFilter ? { key: 'platform' as const, label: `${t('groups.platform')}: ${selectedPlatformLabel}` } : null,
-    stateFilter ? { key: 'state' as const, label: `${t('common.status')}: ${selectedStateLabel}` } : null,
-    typeFilter ? { key: 'type' as const, label: `${t('common.type')}: ${selectedTypeLabel}` } : null,
-    groupFilter ? { key: 'group' as const, label: `${t('accounts.group')}: ${selectedGroupLabel}` } : null,
-    proxyFilter ? { key: 'proxy' as const, label: `${t('accounts.proxy')}: ${selectedProxyLabel}` } : null,
-  ].filter((item): item is NonNullable<typeof item> => item != null);
-  const activeFilterCount = activeFilters.length;
+  const activeFilterCount = [
+    platformFilter,
+    stateFilter,
+    typeFilter,
+    groupFilter,
+    proxyFilter,
+  ].filter(Boolean).length;
+  const toolbarFilters = [
+    {
+      key: 'platform',
+      label: t('groups.platform'),
+      value: platformFilter,
+      selectedLabel: selectedPlatformLabel,
+      options: PLATFORM_OPTIONS,
+      setValue: setPlatformFilter,
+      widthClass: 'w-full sm:w-48',
+    },
+    {
+      key: 'state',
+      label: t('common.status'),
+      value: stateFilter,
+      selectedLabel: selectedStateLabel,
+      options: STATE_OPTIONS,
+      setValue: setStateFilter,
+      widthClass: 'w-full sm:w-48',
+    },
+    {
+      key: 'type',
+      label: t('common.type'),
+      value: typeFilter,
+      selectedLabel: selectedTypeLabel,
+      options: typeOptions,
+      setValue: setTypeFilter,
+      widthClass: 'w-full sm:w-48',
+    },
+    {
+      key: 'group',
+      label: t('accounts.group'),
+      value: groupFilter,
+      selectedLabel: selectedGroupLabel,
+      options: groupOptions,
+      setValue: setGroupFilter,
+      widthClass: 'w-full sm:w-48',
+    },
+    {
+      key: 'proxy',
+      label: t('accounts.proxy'),
+      value: proxyFilter,
+      selectedLabel: selectedProxyLabel,
+      options: proxyOptions,
+      setValue: setProxyFilter,
+      widthClass: 'w-full sm:w-48',
+    },
+  ];
   const columnAlignClass = (align?: AccountTableColumn['align']) => (
     align === 'center'
       ? 'text-center'
@@ -1347,238 +1370,138 @@ export default function AccountsPage() {
 
   return (
     <div>
-      <div className="mb-5 space-y-3">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-          <div className="w-full lg:w-[260px]">
-            <HeroTextField fullWidth>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-                <Input
-                  className="pl-9"
-                  value={keyword}
-                  onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-                  placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
-                />
-              </div>
-            </HeroTextField>
-          </div>
-
-          <Button
-            className="justify-center lg:justify-start"
-            size="sm"
-            variant={filtersOpen || activeFilterCount > 0 ? 'secondary' : 'ghost'}
-            onPress={() => setFiltersOpen((open) => !open)}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            {t('common.filter', '筛选')}
-            {activeFilterCount > 0 ? (
-              <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-text-inverse">
-                {activeFilterCount}
-              </span>
-            ) : null}
-          </Button>
-
-          <div className="flex-1" />
-
-          <div className="ag-account-toolbar-actions flex flex-wrap items-center justify-end gap-2">
-            <Button
-              isIconOnly
-              aria-label={t('common.refresh')}
-              size="sm"
-              variant="ghost"
-              className="h-8 w-8 min-w-8"
-              onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Dropdown>
-              <Dropdown.Trigger
-                className={`ag-account-auto-refresh-trigger button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
-              >
-                <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
-                <ChevronDown className="h-3 w-3 shrink-0" />
-              </Dropdown.Trigger>
-              <Dropdown.Popover placement="bottom end">
-                <Dropdown.Menu
-                  aria-label={t('accounts.auto_refresh')}
-                  selectedKeys={new Set([`auto_${autoRefresh}`])}
-                  selectionMode="single"
-                  onAction={(key) => {
-                    const action = String(key);
-                    setAutoRefresh(Number(action.replace('auto_', '')));
-                  }}
-                >
-                  {AUTO_REFRESH_OPTIONS.map((sec) => (
-                    <Dropdown.Item key={sec} id={`auto_${sec}`} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}>
-                      <span className="flex items-center justify-between gap-6">
-                        <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}</span>
-                        {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
-                      </span>
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown.Popover>
-            </Dropdown>
-            <Button
-              variant="secondary"
-              onPress={() => importInputRef.current?.click()}
-              isDisabled={importMutation.isPending}
-              aria-busy={importMutation.isPending}
-            >
-              <Upload className="h-4 w-4" />
-              {t('accounts.import')}
-            </Button>
-            <Button
-              variant="secondary"
-              onPress={() => exportMutation.mutate()}
-              isDisabled={exportMutation.isPending}
-              aria-busy={exportMutation.isPending}
-            >
-              <Download className="h-4 w-4" />
-              {t('accounts.export')}
-            </Button>
-            <Button variant="primary" onPress={() => setShowCreateModal(true)}>
-              <Plus className="h-4 w-4" />
-              {t('accounts.create')}
-            </Button>
-          </div>
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
+        <div className="w-full sm:w-48">
+          <HeroTextField fullWidth>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+              <Input
+                className="pl-9"
+                value={keyword}
+                onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
+              />
+            </div>
+          </HeroTextField>
         </div>
 
-        {filtersOpen ? (
-          <div className="rounded-[var(--radius)] border border-border bg-surface p-3 shadow-sm">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <Select
-                fullWidth
-                selectedKey={platformFilter}
-                onSelectionChange={(key) => { setPlatformFilter(key == null ? '' : String(key)); setPage(1); }}
-              >
-                <Label className="sr-only">{t('groups.platform')}</Label>
-                <Select.Trigger>
-                  <Select.Value>{selectedPlatformLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={PLATFORM_OPTIONS}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
-              <Select
-                fullWidth
-                selectedKey={stateFilter}
-                onSelectionChange={(key) => { setStateFilter(key == null ? '' : String(key)); setPage(1); }}
-              >
-                <Label className="sr-only">{t('common.status')}</Label>
-                <Select.Trigger>
-                  <Select.Value>{selectedStateLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={STATE_OPTIONS}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
-              <Select
-                fullWidth
-                selectedKey={typeFilter}
-                onSelectionChange={(key) => { setTypeFilter(key == null ? '' : String(key)); setPage(1); }}
-              >
-                <Label className="sr-only">{t('common.type')}</Label>
-                <Select.Trigger>
-                  <Select.Value>{selectedTypeLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={typeOptions}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
-              <Select
-                fullWidth
-                selectedKey={groupFilter}
-                onSelectionChange={(key) => { setGroupFilter(key == null ? '' : String(key)); setPage(1); }}
-              >
-                <Label className="sr-only">{t('accounts.group')}</Label>
-                <Select.Trigger>
-                  <Select.Value>{selectedGroupLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={groupOptions}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
-              <Select
-                fullWidth
-                selectedKey={proxyFilter}
-                onSelectionChange={(key) => { setProxyFilter(key == null ? '' : String(key)); setPage(1); }}
-              >
-                <Label className="sr-only">{t('accounts.proxy')}</Label>
-                <Select.Trigger>
-                  <Select.Value>{selectedProxyLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={proxyOptions}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
-            </div>
-            <div className="mt-3 flex justify-end gap-2">
-              <Button size="sm" variant="ghost" onPress={clearAllFilters}>
-                <Eraser className="h-3.5 w-3.5" />
-                {t('common.clear')}
-              </Button>
-              <Button size="sm" variant="primary" onPress={() => setFiltersOpen(false)}>
-                {t('common.confirm')}
-              </Button>
-            </div>
+        {toolbarFilters.map((filter) => (
+          <div
+            key={filter.key}
+            className={filter.widthClass}
+          >
+            <Select
+              aria-label={filter.label}
+              fullWidth
+              selectedKey={filter.value}
+              onSelectionChange={(key) => {
+                filter.setValue(key == null ? '' : String(key));
+                setPage(1);
+              }}
+            >
+              <Label className="sr-only">{filter.label}</Label>
+              <Select.Trigger>
+                <Select.Value>{filter.selectedLabel}</Select.Value>
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox items={filter.options}>
+                  {(item) => (
+                    <ListBox.Item id={item.id} textValue={item.label}>
+                      {item.label}
+                    </ListBox.Item>
+                  )}
+                </ListBox>
+              </Select.Popover>
+            </Select>
           </div>
+        ))}
+        {activeFilterCount > 0 ? (
+          <Button
+            className="whitespace-nowrap"
+            size="sm"
+            variant="ghost"
+            onPress={clearAllFilters}
+          >
+            <Eraser className="h-3.5 w-3.5" />
+            {t('common.clear')}
+          </Button>
         ) : null}
 
-        {activeFilters.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {activeFilters.map((filter) => (
-              <Chip key={filter.key} color="accent" size="sm" variant="soft">
-                <span className="inline-flex items-center gap-1">
-                  {filter.label}
-                  <button
-                    aria-label={t('common.clear')}
-                    className="-mr-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full opacity-70 transition hover:bg-primary/15 hover:opacity-100"
-                    type="button"
-                    onClick={() => clearNamedFilter(filter.key)}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              </Chip>
-            ))}
-          </div>
-        ) : null}
+        <BulkActionsBar
+          inline
+          selectedCount={selectedIds.length}
+          onClear={clearSelection}
+          onEdit={() => setShowBulkEditModal(true)}
+          onEnable={handleBulkEnable}
+          onDisable={handleBulkDisable}
+          onRefreshQuota={handleBulkRefresh}
+          onClearRateLimitMarkers={() => bulkClearRateLimitMarkersMutation.mutate(selectedIds)}
+          onDelete={() => setShowBulkDeleteConfirm(true)}
+        />
+
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:ml-auto">
+          <Button
+            isIconOnly
+            aria-label={t('common.refresh')}
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 min-w-8"
+            onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Dropdown>
+            <Dropdown.Trigger
+              className={`ag-account-auto-refresh-trigger button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
+            >
+              <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
+              <ChevronDown className="h-3 w-3 shrink-0" />
+            </Dropdown.Trigger>
+            <Dropdown.Popover placement="bottom end">
+              <Dropdown.Menu
+                aria-label={t('accounts.auto_refresh')}
+                selectedKeys={new Set([`auto_${autoRefresh}`])}
+                selectionMode="single"
+                onAction={(key) => {
+                  const action = String(key);
+                  setAutoRefresh(Number(action.replace('auto_', '')));
+                }}
+              >
+                {AUTO_REFRESH_OPTIONS.map((sec) => (
+                  <Dropdown.Item key={sec} id={`auto_${sec}`} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}>
+                    <span className="flex items-center justify-between gap-6">
+                      <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}</span>
+                      {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
+                    </span>
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
+          <Button
+            variant="secondary"
+            onPress={() => importInputRef.current?.click()}
+            isDisabled={importMutation.isPending}
+            aria-busy={importMutation.isPending}
+          >
+            <Upload className="h-4 w-4" />
+            {t('accounts.import')}
+          </Button>
+          <Button
+            variant="secondary"
+            onPress={() => exportMutation.mutate()}
+            isDisabled={exportMutation.isPending}
+            aria-busy={exportMutation.isPending}
+          >
+            <Download className="h-4 w-4" />
+            {t('accounts.export')}
+          </Button>
+          <Button variant="primary" onPress={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4" />
+            {t('accounts.create')}
+          </Button>
+        </div>
       </div>
       {/* 隐藏的文件选择器（供导入按钮触发） */}
       <input
@@ -1587,18 +1510,6 @@ export default function AccountsPage() {
         accept="application/json,.json"
         className="hidden"
         onChange={handleImportFile}
-      />
-
-      {/* 批量操作工具栏 */}
-      <BulkActionsBar
-        selectedCount={selectedIds.length}
-        onClear={clearSelection}
-        onEdit={() => setShowBulkEditModal(true)}
-        onEnable={handleBulkEnable}
-        onDisable={handleBulkDisable}
-        onRefreshQuota={handleBulkRefresh}
-        onClearRateLimitMarkers={() => bulkClearRateLimitMarkersMutation.mutate(selectedIds)}
-        onDelete={() => setShowBulkDeleteConfirm(true)}
       />
 
       {/* 表格 */}

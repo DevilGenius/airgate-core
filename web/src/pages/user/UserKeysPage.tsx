@@ -295,11 +295,11 @@ export default function UserKeysPage() {
           <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
           <CommonTable.Column id="key_prefix">{t('user_keys.title')}</CommonTable.Column>
           <CommonTable.Column id="group_id">{t('user_keys.group')}</CommonTable.Column>
+          <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
           <CommonTable.Column id="quota">{t('user_keys.quota_label')}</CommonTable.Column>
           <CommonTable.Column id="markup">{t('user_keys.markup_title', '销售/成本')}</CommonTable.Column>
           <CommonTable.Column id="usage">{t('api_keys.usage')}</CommonTable.Column>
           <CommonTable.Column id="expires_at">{t('user_keys.expires_at')}</CommonTable.Column>
-          <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
           <CommonTable.Column id="actions" style={{ width: 132 }}>
             {t('common.actions')}
           </CommonTable.Column>
@@ -372,6 +372,9 @@ export default function UserKeysPage() {
                     </div>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
+                    <StatusChip status={displayStatus} />
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
                     <span className="font-mono">
                       {row.quota_usd > 0 ? (
                         <>
@@ -420,9 +423,6 @@ export default function UserKeysPage() {
                     {row.expires_at
                       ? new Date(row.expires_at).toLocaleDateString('zh-CN')
                       : t('user_keys.never_expire')}
-                  </CommonTable.Cell>
-                  <CommonTable.Cell>
-                    <StatusChip status={displayStatus} />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <div className="flex items-center justify-center gap-0.5">

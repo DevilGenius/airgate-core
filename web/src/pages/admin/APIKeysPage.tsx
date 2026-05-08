@@ -135,10 +135,10 @@ export default function APIKeysPage() {
           <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
           <CommonTable.Column id="key_prefix">{t('api_keys.key_prefix')}</CommonTable.Column>
           <CommonTable.Column id="group_id">{t('api_keys.group')}</CommonTable.Column>
+          <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
           <CommonTable.Column id="quota">{t('api_keys.quota_used')}</CommonTable.Column>
           <CommonTable.Column id="usage">{t('api_keys.usage')}</CommonTable.Column>
           <CommonTable.Column id="expires_at">{t('api_keys.expire_time')}</CommonTable.Column>
-          <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
           <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
         </CommonTable.Header>
         <CommonTable.Body>
@@ -189,6 +189,9 @@ export default function APIKeysPage() {
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
+                    <StatusChip status={row.status} />
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
                     <span className="font-mono">
                       <span style={{ color: 'var(--ag-primary)' }}>${row.used_quota.toFixed(2)}</span>
                       <span style={{ color: 'var(--ag-text-tertiary)' }}> / </span>
@@ -209,9 +212,6 @@ export default function APIKeysPage() {
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <span className="font-mono">{formatExpiry(row.expires_at)}</span>
-                  </CommonTable.Cell>
-                  <CommonTable.Cell>
-                    <StatusChip status={row.status} />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <div className="flex gap-1">

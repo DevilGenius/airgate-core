@@ -6,6 +6,7 @@ import { Eraser, Pencil, Power, PowerOff, RefreshCw, Trash2, X } from 'lucide-re
  * 批量操作工具栏：仅在 selectedCount > 0 时渲染。
  */
 export function BulkActionsBar({
+  inline = false,
   selectedCount,
   onClear,
   onEdit,
@@ -15,6 +16,7 @@ export function BulkActionsBar({
   onClearRateLimitMarkers,
   onDelete,
 }: {
+  inline?: boolean;
   selectedCount: number;
   onClear: () => void;
   onEdit: () => void;
@@ -27,6 +29,44 @@ export function BulkActionsBar({
   const { t } = useTranslation();
 
   if (selectedCount === 0) return null;
+
+  if (inline) {
+    return (
+      <div className="inline-flex min-h-8 w-full flex-wrap items-center gap-1.5 border-l-0 pl-0 xl:w-auto xl:flex-nowrap xl:border-l xl:border-border-subtle xl:pl-1.5">
+        <span className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-text-secondary">
+          {t('accounts.bulk_selected', { count: selectedCount })}
+        </span>
+        <ActionButton icon={<Pencil className="w-3.5 h-3.5" />} label={t('accounts.bulk_edit')} onClick={onEdit} />
+        <ActionButton icon={<Power className="w-3.5 h-3.5" />} label={t('accounts.bulk_enable')} onClick={onEnable} />
+        <ActionButton icon={<PowerOff className="w-3.5 h-3.5" />} label={t('accounts.bulk_disable')} onClick={onDisable} />
+        <ActionButton
+          icon={<RefreshCw className="w-3.5 h-3.5 text-success" />}
+          label={t('accounts.bulk_refresh_quota')}
+          onClick={onRefreshQuota}
+        />
+        <ActionButton
+          icon={<Eraser className="w-3.5 h-3.5 text-warning" />}
+          label={t('accounts.bulk_clear_family_cooldowns')}
+          onClick={onClearRateLimitMarkers}
+        />
+        <ActionButton
+          icon={<Trash2 className="w-3.5 h-3.5" />}
+          label={t('accounts.bulk_delete')}
+          onClick={onDelete}
+          danger
+        />
+        <Button
+          isIconOnly
+          size="sm"
+          variant="ghost"
+          onPress={onClear}
+          aria-label={t('accounts.bulk_clear')}
+        >
+          <X className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -89,7 +129,8 @@ function ActionButton({
   return (
     <Button
       size="sm"
-      variant={danger ? 'danger-soft' : 'outline'}
+      variant="outline"
+      className={danger ? 'text-danger' : undefined}
       onPress={onClick}
     >
       {icon}

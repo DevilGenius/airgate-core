@@ -368,7 +368,7 @@ export default function UserUsagePage() {
       </div>
 
       {/* 筛选栏 */}
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
         <div className="w-full sm:w-64">
           <UsageDateRangeFilter
             clearLabel={t('common.clear')}
