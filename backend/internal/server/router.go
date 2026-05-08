@@ -56,13 +56,13 @@ func (s *Server) registerRoutes() {
 		authGroup.POST("/verify-code", handlers.Auth.VerifyCode)
 	}
 
+	// Token 刷新（独立于 JWT 中间件，允许过期 token 刷新）
+	v1.POST("/auth/refresh", handlers.Auth.RefreshToken)
+
 	// === 用户路由（需要 JWT 认证） ===
 	userGroup := v1.Group("")
 	userGroup.Use(middleware.JWTAuth(s.jwtMgr))
 	{
-		// Token 刷新
-		userGroup.POST("/auth/refresh", handlers.Auth.RefreshToken)
-
 		// 用户资料
 		userGroup.GET("/users/me", handlers.User.GetMe)
 		userGroup.PUT("/users/me", handlers.User.UpdateProfile)

@@ -9,6 +9,7 @@ let accessToken: string | null = localStorage.getItem('token');
 interface TokenClaims {
   role?: string;
   api_key_id?: number;
+  exp?: number;
 }
 
 export function setToken(token: string | null) {
@@ -93,6 +94,40 @@ function buildHeaders(includeContentType: boolean): Record<string, string> {
   return headers;
 }
 
+// Token 自动刷新：在过期前 30 分钟内首次请求时静默续期。
+let refreshPromise: Promise<boolean> | null = null;
+
+function tokenExpiresWithin(seconds: number): boolean {
+  const claims = getTokenClaims();
+  if (!claims?.exp) return false;
+  return claims.exp - Date.now() / 1000 < seconds;
+}
+
+async function tryRefreshToken(): Promise<boolean> {
+  if (!accessToken) return false;
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) return false;
+      const json = await res.json() as ApiResponse<{ token: string }>;
+      if (json.code !== 0 || !json.data?.token) return false;
+      setToken(json.data.token);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 // 统一响应处理
 async function handleResponse<T>(res: Response): Promise<T> {
   let json: ApiResponse<T>;
@@ -129,6 +164,11 @@ async function request<T>(
   body?: unknown,
   params?: QueryParams,
 ): Promise<T> {
+  // 过期前 30 分钟自动刷新
+  if (accessToken && tokenExpiresWithin(1800)) {
+    await tryRefreshToken();
+  }
+
   const url = new URL(`${BASE_URL}${path}`, window.location.origin);
 
   if (params) {
@@ -153,6 +193,19 @@ async function request<T>(
     headers: buildHeaders(true),
     body: body ? JSON.stringify(body) : undefined,
   });
+
+  // 401 时尝试刷新 token 并重试一次
+  if (res.status === 401 && accessToken) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      const retryRes = await doFetch(url.toString(), {
+        method,
+        headers: buildHeaders(true),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      return handleResponse<T>(retryRes);
+    }
+  }
 
   return handleResponse<T>(res);
 }

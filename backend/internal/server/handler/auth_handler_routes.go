@@ -275,12 +275,29 @@ func (h *AuthHandler) SendVerifyCode(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+// refreshGrace 允许过期不超过 7 天的 token 执行刷新。
+const refreshGrace = 7 * 24 * time.Hour
+
 // RefreshToken 刷新 JWT Token。
+// 接受已过期但不超过 refreshGrace 的旧 token，签发新 token。
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
-	identity, ok := authIdentityFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "用户未认证")
+	tokenStr := extractRefreshBearerToken(c)
+	if tokenStr == "" {
+		response.Unauthorized(c, "缺少认证 Token")
 		return
+	}
+
+	claims, err := h.jwtMgr.ParseTokenForRefresh(tokenStr, refreshGrace)
+	if err != nil {
+		response.Unauthorized(c, "Token 无效或已过期")
+		return
+	}
+
+	identity := appauth.AuthIdentity{
+		UserID:   claims.UserID,
+		Role:     claims.Role,
+		Email:    claims.Email,
+		APIKeyID: claims.APIKeyID,
 	}
 
 	token, err := h.service.RefreshToken(identity)
@@ -292,6 +309,18 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	response.Success(c, dto.RefreshResp{
 		Token: token,
 	})
+}
+
+func extractRefreshBearerToken(c *gin.Context) string {
+	header := c.GetHeader("Authorization")
+	if header == "" {
+		return ""
+	}
+	parts := strings.SplitN(header, " ", 2)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+		return strings.TrimSpace(parts[1])
+	}
+	return ""
 }
 
 // isRegistrationEnabled 检查是否允许注册（默认允许）。

@@ -95,6 +95,27 @@ func (m *JWTManager) GenerateAPIKeyToken(userID int, role, email string, apiKeyI
 	return token.SignedString(m.secret)
 }
 
+// ParseTokenForRefresh 与 ParseToken 一致，但允许过期不超过 refreshGrace 的 token。
+func (m *JWTManager) ParseTokenForRefresh(tokenStr string, refreshGrace time.Duration) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, ErrInvalidToken
+		}
+		return m.secret, nil
+	}, jwt.WithLeeway(refreshGrace))
+	if err != nil {
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return nil, ErrTokenExpired
+		}
+		return nil, ErrInvalidToken
+	}
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		return nil, ErrInvalidToken
+	}
+	return claims, nil
+}
+
 // RefreshToken 刷新 Token（基于旧 Claims 签发新 Token）
 func (m *JWTManager) RefreshToken(claims *Claims) (string, error) {
 	if claims.APIKeyID > 0 {
