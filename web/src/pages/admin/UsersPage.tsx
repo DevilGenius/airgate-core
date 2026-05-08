@@ -30,7 +30,7 @@ export default function UsersPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.users');
   const [keyword, setKeyword] = useState('');
   const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
   const [statusFilter, setStatusFilter] = useState('');

@@ -26,7 +26,7 @@ export default function APIKeysPage() {
   const { t } = useTranslation();
   const copy = useClipboard();
 
-  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
   const [deletingKey, setDeletingKey] = useState<APIKeyResp | null>(null);

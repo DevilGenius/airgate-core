@@ -190,7 +190,7 @@ export default function UserUsagePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const customerScope = !!user?.api_key_id;
-  const { page, setPage, pageSize, setPageSize } = usePagination(20);
+  const { page, setPage, pageSize, setPageSize } = usePagination(20, 'user.usage');
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
   const [modelInput, setModelInput] = useState('');
   const debouncedModel = useDebouncedValue(modelInput.trim(), 250);

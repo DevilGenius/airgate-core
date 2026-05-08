@@ -35,7 +35,7 @@ export default function GroupsPage() {
     ...platforms.map((p) => ({ value: p, label: platformName(p) })),
   ];
   // 筛选状态
-  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.groups');
   const [platformFilter, setPlatformFilter] = useState('');
 
   // 弹窗状态

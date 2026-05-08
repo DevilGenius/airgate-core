@@ -47,7 +47,7 @@ export default function UserKeysPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'user.keys');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
   const [form, setForm] = useState<KeyForm>(emptyForm);

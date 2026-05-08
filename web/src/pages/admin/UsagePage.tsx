@@ -564,7 +564,7 @@ function TokenTrendCard({
 
 export default function UsagePage() {
   const { t } = useTranslation();
-  const { page, setPage, pageSize, setPageSize } = usePagination(20);
+  const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.usage');
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
   const [modelInput, setModelInput] = useState('');
   const debouncedModel = useDebouncedValue(modelInput.trim(), 250);

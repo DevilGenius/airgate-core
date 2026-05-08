@@ -26,6 +26,7 @@ import { AccountStatsModal } from './AccountStatsModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
@@ -362,8 +363,7 @@ export default function AccountsPage() {
   ];
 
   // 筛选状态
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.accounts');
   const [keyword, setKeyword] = useState('');
   const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
   const [platformFilter, setPlatformFilter] = useState('');

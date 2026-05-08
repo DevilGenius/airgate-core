@@ -46,7 +46,7 @@ export default function SubscriptionsPage() {
   ];
 
   // 筛选状态
-  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.subscriptions');
   const [statusFilter, setStatusFilter] = useState('');
 
   // 弹窗状态

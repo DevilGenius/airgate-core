@@ -38,7 +38,7 @@ export default function ProxiesPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
 
-  const { page, setPage, pageSize, setPageSize } = usePagination(20);
+  const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.proxies');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProxy, setEditingProxy] = useState<ProxyResp | null>(null);
   const [form, setForm] = useState<ProxyForm>(emptyForm);
