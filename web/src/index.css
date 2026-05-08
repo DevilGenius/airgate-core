@@ -1162,6 +1162,134 @@ input[type="number"]::-webkit-outer-spin-button {
   table-layout: fixed;
 }
 
+.ag-account-auto-refresh-trigger.dropdown__trigger,
+.ag-account-row-more-trigger.dropdown__trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  box-sizing: border-box;
+  line-height: 1 !important;
+}
+
+.ag-account-auto-refresh-trigger.dropdown__trigger {
+  min-width: 7.5rem !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  gap: 0.375rem !important;
+  padding-inline: 0.75rem !important;
+}
+
+.ag-account-auto-refresh-trigger.dropdown__trigger > span {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.ag-account-auto-refresh-trigger.dropdown__trigger > svg {
+  width: 0.75rem !important;
+  height: 0.75rem !important;
+  margin: 0 !important;
+}
+
+.ag-account-row-actions {
+  height: 1.75rem;
+  line-height: 1;
+}
+
+.ag-account-row-actions > :where(.button, .dropdown) {
+  flex: 0 0 auto;
+}
+
+.ag-account-row-actions > .button,
+.ag-account-row-more-trigger.dropdown__trigger {
+  width: 1.75rem !important;
+  min-width: 1.75rem !important;
+  height: 1.75rem !important;
+  min-height: 1.75rem !important;
+  padding: 0 !important;
+}
+
+.ag-account-row-actions > .button > svg,
+.ag-account-row-more-trigger.dropdown__trigger > svg {
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+  margin: 0 !important;
+}
+
+.ag-account-capacity {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  min-width: 4.5rem;
+  height: 1.5rem;
+  padding-inline: 0.5rem;
+  border: 1px solid var(--ag-border-subtle);
+  border-radius: 999px;
+  background: var(--ag-default-bg);
+  color: var(--ag-text-tertiary);
+  font-family: var(--ag-font-mono);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.ag-account-capacity[data-state="active"] {
+  border-color: color-mix(in oklab, var(--ag-success) 32%, transparent);
+  background: var(--ag-success-subtle);
+  color: var(--ag-success);
+}
+
+.ag-account-capacity[data-state="full"] {
+  border-color: color-mix(in oklab, var(--ag-warning) 36%, transparent);
+  background: var(--ag-warning-subtle);
+  color: var(--ag-warning);
+}
+
+.ag-account-capacity[data-pulse="true"] {
+  animation: ag-account-capacity-pulse 520ms ease-out;
+  --ag-account-capacity-pulse-color: var(--ag-success);
+}
+
+.ag-account-capacity[data-pulse="true"][data-pulse-tone="warning"] {
+  --ag-account-capacity-pulse-color: var(--ag-warning);
+}
+
+.ag-account-capacity-current,
+.ag-account-capacity-max {
+  color: currentColor;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.ag-account-capacity-divider {
+  color: var(--ag-text);
+  opacity: 0.72;
+}
+
+.ag-account-capacity-max {
+  color: var(--ag-text);
+}
+
+@keyframes ag-account-capacity-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--ag-account-capacity-pulse-color) 48%, transparent);
+    transform: scale(1);
+  }
+
+  42% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--ag-account-capacity-pulse-color) 24%, transparent);
+    transform: scale(1.06);
+  }
+
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+    transform: scale(1);
+  }
+}
+
 .ag-accounts-table-content :where(
   [data-slot="table-header"] [data-slot="table-row"],
   [data-slot="thead"] [data-slot="tr"],

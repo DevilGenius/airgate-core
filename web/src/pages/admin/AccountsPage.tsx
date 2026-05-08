@@ -265,6 +265,54 @@ function AccountStatusCell({ row }: { row: AccountResp }) {
   );
 }
 
+function AccountCapacityChip({ current, max }: { current: number; max: number }) {
+  const previousCurrentRef = useRef(current);
+  const pulseTimerRef = useRef<number | null>(null);
+  const [isPulsing, setIsPulsing] = useState(false);
+  const [pulseTone, setPulseTone] = useState<'success' | 'warning'>('success');
+  const [pulseToken, setPulseToken] = useState(0);
+  const state = current <= 0 ? 'idle' : current >= max ? 'full' : 'active';
+
+  useEffect(() => {
+    if (previousCurrentRef.current === current) return;
+    const previousCurrent = previousCurrentRef.current;
+    previousCurrentRef.current = current;
+
+    if (pulseTimerRef.current != null) {
+      window.clearTimeout(pulseTimerRef.current);
+    }
+
+    setPulseTone(current < previousCurrent ? 'warning' : 'success');
+    setIsPulsing(true);
+    setPulseToken((token) => token + 1);
+    pulseTimerRef.current = window.setTimeout(() => {
+      setIsPulsing(false);
+      pulseTimerRef.current = null;
+    }, 520);
+  }, [current]);
+
+  useEffect(() => () => {
+    if (pulseTimerRef.current != null) {
+      window.clearTimeout(pulseTimerRef.current);
+    }
+  }, []);
+
+  return (
+    <span
+      key={pulseToken}
+      className="ag-account-capacity"
+      data-state={state}
+      data-pulse={isPulsing || undefined}
+      data-pulse-tone={pulseTone}
+      title={`${current} / ${max}`}
+    >
+      <span className="ag-account-capacity-current">{current}</span>
+      <span className="ag-account-capacity-divider">/</span>
+      <span className="ag-account-capacity-max">{max}</span>
+    </span>
+  );
+}
+
 export default function AccountsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -762,14 +810,7 @@ export default function AccountsPage() {
       render: (row) => {
         const current = row.current_concurrency || 0;
         const max = row.max_concurrency;
-        const loadPct = max > 0 ? (current / max) * 100 : 0;
-        const color = loadPct < 50 ? 'var(--ag-success)' : loadPct < 80 ? 'var(--ag-warning)' : 'var(--ag-danger)';
-        return (
-          <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
-            <span style={{ color }}>{current}</span>
-            <span style={{ color: 'var(--ag-text-tertiary)' }}> / {max}</span>
-          </span>
-        );
+        return <AccountCapacityChip current={current} max={max} />;
       },
     },
     {
@@ -1129,7 +1170,7 @@ export default function AccountsPage() {
       width: '116px',
       align: 'center',
       render: (row) => (
-        <div className="mx-auto flex w-[92px] items-center justify-center gap-1">
+        <div className="ag-account-row-actions mx-auto flex w-[92px] items-center justify-center gap-1">
           <Button
             isIconOnly
             aria-label={t('common.edit')}
@@ -1153,7 +1194,7 @@ export default function AccountsPage() {
           <Dropdown>
             <Dropdown.Trigger
               aria-label={t('common.more')}
-              className="button button--icon-only button--sm button--secondary h-7 w-7 min-w-7"
+              className="ag-account-row-more-trigger button button--icon-only button--sm button--secondary h-7 w-7 min-w-7"
             >
               <MoreHorizontal className="w-3.5 h-3.5" />
             </Dropdown.Trigger>
@@ -1339,7 +1380,7 @@ export default function AccountsPage() {
 
           <div className="flex-1" />
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="ag-account-toolbar-actions flex flex-wrap items-center justify-end gap-2">
             <Button
               isIconOnly
               aria-label={t('common.refresh')}
@@ -1352,7 +1393,7 @@ export default function AccountsPage() {
             </Button>
             <Dropdown>
               <Dropdown.Trigger
-                className={`button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
+                className={`ag-account-auto-refresh-trigger button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
               >
                 <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
                 <ChevronDown className="h-3 w-3 shrink-0" />
