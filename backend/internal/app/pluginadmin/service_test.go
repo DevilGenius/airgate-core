@@ -32,6 +32,24 @@ func TestListMarketplaceMarksInstalled(t *testing.T) {
 	}
 }
 
+func TestListMarketplaceDoesNotOfferUpdatesForDevPlugin(t *testing.T) {
+	service := NewService(pluginAdminManagerStub{
+		allMeta: []plugin.PluginMeta{{Name: "airgate-playground", Version: "0.1.0", IsDev: true}},
+	}, pluginMarketplaceStub{
+		listAvailable: func(context.Context) ([]plugin.MarketplacePlugin, error) {
+			return []plugin.MarketplacePlugin{{Name: "airgate-playground", Version: "0.1.10"}}, nil
+		},
+	})
+
+	items, err := service.ListMarketplace(t.Context())
+	if err != nil {
+		t.Fatalf("ListMarketplace() error = %v", err)
+	}
+	if len(items) != 1 || !items[0].Installed || items[0].HasUpdate {
+		t.Fatalf("unexpected marketplace items: %+v", items)
+	}
+}
+
 type pluginAdminManagerStub struct {
 	allMeta []plugin.PluginMeta
 }

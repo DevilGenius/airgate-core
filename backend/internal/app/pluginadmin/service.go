@@ -176,14 +176,21 @@ func (s *Service) ListMarketplace(ctx context.Context) ([]MarketplacePlugin, err
 		return nil, err
 	}
 
-	installedVersions := make(map[string]string)
+	type installedPlugin struct {
+		version string
+		isDev   bool
+	}
+	installed := make(map[string]installedPlugin)
 	for _, meta := range s.manager.GetAllPluginMeta() {
-		installedVersions[meta.Name] = meta.Version
+		installed[meta.Name] = installedPlugin{
+			version: meta.Version,
+			isDev:   meta.IsDev,
+		}
 	}
 
 	result := make([]MarketplacePlugin, 0, len(items))
 	for _, item := range items {
-		installedVer, installed := installedVersions[item.Name]
+		meta, ok := installed[item.Name]
 		result = append(result, MarketplacePlugin{
 			Name:             item.Name,
 			Version:          item.Version,
@@ -191,9 +198,9 @@ func (s *Service) ListMarketplace(ctx context.Context) ([]MarketplacePlugin, err
 			Author:           item.Author,
 			Type:             item.Type,
 			GithubRepo:       item.GithubRepo,
-			Installed:        installed,
-			InstalledVersion: installedVer,
-			HasUpdate:        installed && isNewerVersion(item.Version, installedVer),
+			Installed:        ok,
+			InstalledVersion: meta.version,
+			HasUpdate:        ok && !meta.isDev && isNewerVersion(item.Version, meta.version),
 		})
 	}
 	return result, nil

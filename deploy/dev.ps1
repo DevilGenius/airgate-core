@@ -18,11 +18,13 @@ $WorkspaceRoot = Resolve-Path (Join-Path $CoreRoot "..")
 $SdkFrontend = Join-Path $WorkspaceRoot "airgate-sdk\frontend"
 $OpenAIPluginRoot = Join-Path $WorkspaceRoot "airgate-openai"
 $ClaudePluginRoot = Join-Path $WorkspaceRoot "airgate-claude"
+$PlaygroundPluginRoot = Join-Path $WorkspaceRoot "airgate-playground"
 $WebDir = Join-Path $CoreRoot "web"
 $BackendDir = Join-Path $CoreRoot "backend"
 $WebDist = Join-Path $WebDir "dist"
 $WebDistEmbed = Join-Path $BackendDir "internal\web\webdist"
 $StateDir = Join-Path $CoreRoot ".dev"
+$DevConfigFile = Join-Path $StateDir "config.yaml"
 $BackendPidFile = Join-Path $StateDir "backend.pid"
 $FrontendPidFile = Join-Path $StateDir "frontend.pid"
 $BackendOut = Join-Path $BackendDir "tmp\backend.out.log"
@@ -53,6 +55,17 @@ $PluginSpecs = @(
     WatchPidFile = Join-Path $StateDir "gateway-claude-web.pid"
     WatchOut = Join-Path $ClaudePluginRoot "tmp\web-watch.out.log"
     WatchErr = Join-Path $ClaudePluginRoot "tmp\web-watch.err.log"
+  },
+  [pscustomobject]@{
+    Name = "airgate-playground"
+    Root = $PlaygroundPluginRoot
+    WebDir = Join-Path $PlaygroundPluginRoot "web"
+    BackendDir = Join-Path $PlaygroundPluginRoot "backend"
+    WebDist = Join-Path $PlaygroundPluginRoot "web\dist"
+    EmbedDir = Join-Path $PlaygroundPluginRoot "backend\internal\playground\webdist"
+    WatchPidFile = Join-Path $StateDir "airgate-playground-web.pid"
+    WatchOut = Join-Path $PlaygroundPluginRoot "tmp\web-watch.out.log"
+    WatchErr = Join-Path $PlaygroundPluginRoot "tmp\web-watch.err.log"
   }
 )
 
@@ -162,6 +175,93 @@ replace github.com/DouDOU-start/airgate-sdk => ../../airgate-sdk
   }
 }
 
+function ConvertTo-YamlSingleQuoted([string]$Value) {
+  "'" + $Value.Replace("'", "''") + "'"
+}
+
+function Get-DevPluginYamlLines {
+  $lines = [System.Collections.Generic.List[string]]::new()
+  $lines.Add("  dev:")
+  foreach ($plugin in $PluginSpecs) {
+    $path = (Resolve-Path $plugin.BackendDir).Path.Replace("\", "/")
+    $lines.Add("    - name: $($plugin.Name)")
+    $lines.Add("      path: $(ConvertTo-YamlSingleQuoted $path)")
+  }
+  $lines.ToArray()
+}
+
+function Write-DevConfig {
+  $sourceConfig = Join-Path $BackendDir "config.yaml"
+  if (-not (Test-Path $sourceConfig)) {
+    throw "Backend config not found: $sourceConfig"
+  }
+
+  $devLines = [string[]](Get-DevPluginYamlLines)
+  $sourceLines = Get-Content -Path $sourceConfig
+  $out = [System.Collections.Generic.List[string]]::new()
+  $sawPlugins = $false
+  $inPlugins = $false
+  $insertedDev = $false
+  $skippingDev = $false
+
+  foreach ($line in $sourceLines) {
+    if ($inPlugins) {
+      if ($line -match "^\S" -and $line -notmatch "^plugins:\s*$") {
+        if (-not $insertedDev) {
+          $out.AddRange($devLines)
+          $insertedDev = $true
+        }
+        $inPlugins = $false
+        $skippingDev = $false
+        $out.Add($line)
+        continue
+      }
+
+      if ($skippingDev) {
+        if ($line -match "^\s{2}[A-Za-z0-9_-]+:\s*") {
+          $skippingDev = $false
+        } else {
+          continue
+        }
+      }
+
+      if ($line -match "^\s{2}dev:\s*(\[\])?\s*$") {
+        $out.AddRange($devLines)
+        $insertedDev = $true
+        $skippingDev = $true
+        continue
+      }
+    }
+
+    if ($line -match "^plugins:\s*$") {
+      $sawPlugins = $true
+      $inPlugins = $true
+      $insertedDev = $false
+      $skippingDev = $false
+      $out.Add($line)
+      continue
+    }
+
+    $out.Add($line)
+  }
+
+  if ($inPlugins -and -not $insertedDev) {
+    $out.AddRange($devLines)
+  }
+
+  if (-not $sawPlugins) {
+    if ($out.Count -gt 0 -and $out[$out.Count - 1].Trim() -ne "") {
+      $out.Add("")
+    }
+    $out.Add("plugins:")
+    $out.AddRange($devLines)
+  }
+
+  Set-Content -Path $DevConfigFile -Value $out
+  Write-Step "wrote dev config with $($PluginSpecs.Count) plugins: $DevConfigFile"
+  $DevConfigFile
+}
+
 function Sync-PluginWebdist($Plugin) {
   if (-not (Test-Path (Join-Path $Plugin.WebDist "index.js"))) {
     throw "$($Plugin.Name) web dist is missing. Run: .\deploy\dev.ps1 build"
@@ -178,7 +278,7 @@ function Sync-PluginWebdist($Plugin) {
     Remove-Item -Recurse -Force
 
   Copy-Item -Path (Join-Path $Plugin.WebDist "*") -Destination $Plugin.EmbedDir -Recurse -Force
-  Write-Step "synced $($Plugin.Name) web/dist -> backend/internal/gateway/webdist"
+  Write-Step "synced $($Plugin.Name) web/dist -> $($Plugin.EmbedDir)"
 }
 
 function Build-Plugin($Plugin) {
@@ -330,12 +430,14 @@ function Start-Dev {
     throw "Port $FrontendDevPort is already in use. Run: .\deploy\dev.ps1 stop -ForcePortStop"
   }
 
+  $configFile = Write-DevConfig
+  $configArg = $configFile.Replace("'", "''")
   Remove-Item -Force $BackendOut, $BackendErr, $FrontendOut, $FrontendErr -ErrorAction SilentlyContinue
   Start-PluginWatchers
 
   $backend = Start-Process `
     -FilePath "pwsh" `
-    -ArgumentList @("-NoLogo", "-NoProfile", "-Command", "`$env:GOTOOLCHAIN = 'local'; go run ./cmd/server") `
+    -ArgumentList @("-NoLogo", "-NoProfile", "-Command", "`$env:GOTOOLCHAIN = 'local'; go run ./cmd/server --config '$configArg'") `
     -WorkingDirectory $BackendDir `
     -WindowStyle Hidden `
     -RedirectStandardOutput $BackendOut `
@@ -387,6 +489,9 @@ function Show-Status {
   $rows | Format-Table -AutoSize
   Write-Host "Frontend: http://localhost/"
   Write-Host "Backend:  http://127.0.0.1:9517"
+  if (Test-Path $DevConfigFile) {
+    Write-Host "Config:   $DevConfigFile"
+  }
   Write-Host "Backend log:  $BackendOut"
   Write-Host "Frontend log: $FrontendOut"
   foreach ($plugin in $PluginSpecs) {
