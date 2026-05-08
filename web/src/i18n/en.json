@@ -450,7 +450,7 @@
     "bulk_refresh_quota": "Refresh Tokens",
     "bulk_clear_family_cooldowns": "Clear Rate-limit Markers",
     "bulk_update_title": "Bulk Edit Accounts",
-    "bulk_update_hint": "Only fields with \"Enable\" checked will be updated; others stay unchanged.",
+    "bulk_update_hint": "Only enabled fields are updated. Disabled fields keep their current values.",
     "bulk_delete_title": "Delete Accounts",
     "bulk_delete_confirm": "Delete the {{count}} selected accounts? This cannot be undone.",
     "bulk_update_success": "Updated {{count}} accounts",

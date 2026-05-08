@@ -1151,16 +1151,11 @@ export default function AccountsPage() {
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
           <Dropdown>
-            <Dropdown.Trigger>
-              <Button
-                isIconOnly
-                aria-label={t('common.more')}
-                size="sm"
-                variant="secondary"
-                className="h-7 w-7 min-w-7"
-              >
-                <MoreHorizontal className="w-3.5 h-3.5" />
-              </Button>
+            <Dropdown.Trigger
+              aria-label={t('common.more')}
+              className="button button--icon-only button--sm button--secondary h-7 w-7 min-w-7"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
             </Dropdown.Trigger>
             <Dropdown.Popover placement="bottom end">
               <Dropdown.Menu
@@ -1356,15 +1351,11 @@ export default function AccountsPage() {
               <RefreshCw className="h-4 w-4" />
             </Button>
             <Dropdown>
-              <Dropdown.Trigger>
-                <Button
-                  size="sm"
-                  variant={autoRefresh ? 'secondary' : 'ghost'}
-                  className="h-8 min-w-[7.5rem] whitespace-nowrap px-3"
-                >
-                  <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
-                  <ChevronDown className="h-3 w-3 shrink-0" />
-                </Button>
+              <Dropdown.Trigger
+                className={`button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
+              >
+                <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
+                <ChevronDown className="h-3 w-3 shrink-0" />
               </Dropdown.Trigger>
               <Dropdown.Popover placement="bottom end">
                 <Dropdown.Menu

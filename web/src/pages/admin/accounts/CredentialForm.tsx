@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Input, Label, ListBox, Select, TextArea, TextField as HeroTextField } from '@heroui/react';
+import { Checkbox, Input, Label, ListBox, Popover, Select, TextArea, TextField as HeroTextField } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
 import {
   getSchemaAccountTypes,
@@ -147,78 +147,85 @@ export function SchemaCredentialsForm({
 
 export function GroupCheckboxList({
   groups,
+  showLabel = true,
   selectedIds,
   onChange,
 }: {
   groups: { id: number; name: string; platform: string }[];
+  showLabel?: boolean;
   selectedIds: number[];
   onChange: (ids: number[]) => void;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   if (groups.length === 0) return null;
 
-  const toggle = (id: number) => {
-    onChange(
-      selectedIds.includes(id)
-        ? selectedIds.filter((v) => v !== id)
-        : [...selectedIds, id],
-    );
-  };
-
   const selectedGroups = groups.filter((g) => selectedIds.includes(g.id));
+  const selectedLabel = selectedGroups.length === 0
+    ? t('accounts.select_groups')
+    : selectedGroups.map((g) => g.name).join('、');
 
   return (
-    <div ref={ref} className="relative">
-      <Label
-        className="block text-xs font-medium mb-1.5"
-        style={{ color: 'var(--ag-text-secondary)' }}
-      >
-        {t('accounts.groups')}
-      </Label>
-      <Button
-        type="button"
-        onPress={() => setOpen(!open)}
-        className="w-full justify-between"
-        variant="outline"
-      >
-        <span className="truncate" style={selectedGroups.length === 0 ? { color: 'var(--ag-text-tertiary)' } : undefined}>
-          {selectedGroups.length === 0
-            ? t('accounts.select_groups')
-            : selectedGroups.map((g) => g.name).join('、')}
-        </span>
-        <ChevronDown className={`w-4 h-4 flex-shrink-0 ml-2 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} style={{ color: 'var(--ag-text-tertiary)' }} />
-      </Button>
-      {open && (
-        <div
-          className="absolute z-50 mt-1 w-full rounded-lg shadow-lg max-h-48 overflow-y-auto py-1"
-          style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-glass-border)', background: 'var(--ag-bg-elevated)' }}
+    <div className="select select--full-width">
+      {showLabel ? (
+        <Label>{t('accounts.groups')}</Label>
+      ) : null}
+      <Popover>
+        <Popover.Trigger
+          aria-label={t('accounts.groups')}
+          className="select__trigger select__trigger--full-width"
         >
-          {groups.map((g) => (
-            <Checkbox
-              key={g.id}
-              className="w-full px-3 py-2"
-              isSelected={selectedIds.includes(g.id)}
-              onChange={() => toggle(g.id)}
+          <span className="select__value">
+            <span className={selectedGroups.length === 0 ? 'block min-w-0 truncate text-text-tertiary' : 'block min-w-0 truncate'}>
+              {selectedLabel}
+            </span>
+          </span>
+          <ChevronDown className="select__indicator h-4 w-4" />
+        </Popover.Trigger>
+        <Popover.Content className="select__popover max-h-64 overflow-y-auto" placement="bottom">
+          <Popover.Dialog className="p-0">
+            <ListBox
+              aria-label={t('accounts.groups')}
+              items={groups.map((g) => ({ id: String(g.id), name: g.name, platform: g.platform }))}
+              selectedKeys={selectedIds.map(String)}
+              selectionMode="multiple"
+              onSelectionChange={(keys) => {
+                if (keys === 'all') {
+                  onChange(groups.map((g) => g.id));
+                  return;
+                }
+                onChange(
+                  Array.from(keys)
+                    .map((key) => Number(key))
+                    .filter((id) => Number.isFinite(id)),
+                );
+              }}
             >
-              <span className="inline-flex items-center gap-2">
-                <span>{g.name}</span>
-                <span className="text-[10px]" style={{ color: 'var(--ag-text-tertiary)' }}>{g.platform}</span>
-              </span>
-            </Checkbox>
-          ))}
-        </div>
-      )}
+              {(g) => (
+                <ListBox.Item id={g.id} textValue={`${g.name} ${g.platform}`}>
+                  {({ isSelected }) => (
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <Checkbox
+                        aria-hidden="true"
+                        className="pointer-events-none shrink-0"
+                        isSelected={isSelected}
+                      >
+                        <Checkbox.Control className={isSelected ? 'border-success bg-success text-success-foreground' : undefined}>
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                      </Checkbox>
+                      <span className="min-w-0 truncate text-sm text-text">{g.name}</span>
+                      <span className="shrink-0 rounded border border-border-subtle px-1.5 py-0 text-[10px] leading-4 text-text-tertiary">
+                        {g.platform}
+                      </span>
+                    </span>
+                  )}
+                </ListBox.Item>
+              )}
+            </ListBox>
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
     </div>
   );
 }

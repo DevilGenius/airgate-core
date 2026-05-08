@@ -445,15 +445,11 @@ export default function UserKeysPage() {
                         <Terminal className="w-3.5 h-3.5" />
                       </Button>
                       <Dropdown>
-                        <Dropdown.Trigger>
-                          <Button
-                            isIconOnly
-                            aria-label={t('common.more')}
-                            size="sm"
-                            variant="ghost"
-                          >
-                            <MoreHorizontal className="w-3.5 h-3.5" />
-                          </Button>
+                        <Dropdown.Trigger
+                          aria-label={t('common.more')}
+                          className="button button--icon-only button--sm button--ghost"
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5" />
                         </Dropdown.Trigger>
                         <Dropdown.Popover placement="bottom end">
                           <Dropdown.Menu

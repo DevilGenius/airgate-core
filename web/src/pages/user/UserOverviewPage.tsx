@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, Tabs } from '@heroui/react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
 } from 'recharts';
 import {
   Wallet, Zap, Activity, Coins,
@@ -14,9 +14,10 @@ import { usageApi } from '../../shared/api/usage';
 import { queryKeys } from '../../shared/queryKeys';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { CostValue } from '../../shared/components/CostValue';
-import { PIE_CHART_COLORS } from '../../shared/constants';
+import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../../shared/constants';
 
 const PIE_COLORS = PIE_CHART_COLORS;
+const TOKEN_TREND_LINE_ORDER = ['input', 'output', 'cacheRead'] as const;
 
 type PieTooltipPayload = Array<{
   name?: unknown;
@@ -43,48 +44,53 @@ function PieNameTooltip({
 }
 
 type RangePreset = 'today' | '7d' | '30d' | '90d';
+type MetricTone = 'blue' | 'emerald' | 'amber' | 'indigo';
+type TokenTrendKey = typeof TOKEN_TREND_LINE_ORDER[number];
 
-function SectionCard({ children, title }: { children: ReactNode; title: string }) {
+const RANGE_PRESETS = ['today', '7d', '30d', '90d'] as const;
+const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
+  amber: 'bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
+  blue: 'bg-blue-100 text-blue-600 ring-blue-200 dark:bg-blue-400/15 dark:text-blue-300 dark:ring-blue-400/25',
+  emerald: 'bg-success-subtle text-success ring-success/25',
+  indigo: 'bg-indigo-100 text-indigo-600 ring-indigo-200 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-indigo-400/25',
+};
+
+function DashboardCard({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <Card>
-      <Card.Header>
-        <Card.Title>{title}</Card.Title>
-      </Card.Header>
-      <Card.Content>{children}</Card.Content>
+    <Card className="ag-dashboard-panel">
+      <div className="flex items-center justify-between gap-3 p-3 pb-2 2xl:p-4 2xl:pb-2">
+        <h3 className="text-base font-semibold leading-none text-text">{title}</h3>
+      </div>
+      <Card.Content className="px-3 pb-3 2xl:px-4 2xl:pb-4">{children}</Card.Content>
     </Card>
   );
 }
 
 function StatCard({
-  accentColor,
   icon,
+  tone,
   title,
   value,
 }: {
-  accentColor: string;
   icon: ReactNode;
+  tone: MetricTone;
   title: string;
   value: ReactNode;
 }) {
   return (
-    <Card className="relative overflow-hidden">
-      <div
-        className="absolute inset-x-0 top-0 h-px opacity-70"
-        style={{ background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)` }}
-      />
-      <Card.Content>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 space-y-2">
-            <p className="text-xs font-medium uppercase text-text-tertiary">{title}</p>
-            <p className="font-mono text-2xl font-bold">{value}</p>
-          </div>
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm"
-            style={{ background: `color-mix(in srgb, ${accentColor} 12%, transparent)`, color: accentColor }}
-          >
-            {icon}
+    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
+      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+        <div className="ag-dashboard-metric-copy">
+          <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
+          <div className="mt-1 flex min-w-0 items-baseline gap-2">
+            <div className="flex min-w-0 items-baseline font-mono text-[22px] font-semibold leading-none text-text 2xl:text-2xl">
+              {value}
+            </div>
           </div>
         </div>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:h-11 2xl:w-11 ${METRIC_TONE_CLASSES[tone]}`}>
+          {icon}
+        </span>
       </Card.Content>
     </Card>
   );
@@ -129,6 +135,48 @@ function fmtTime(timeStr: string): string {
   return timeStr;
 }
 
+function TokenTrendTooltip({
+  active,
+  label,
+  payload,
+}: {
+  active?: boolean;
+  label?: string;
+  payload?: Array<{ color?: string; dataKey?: string; name?: string; value?: number }>;
+}) {
+  const { t } = useTranslation();
+  if (!active || !payload?.length) return null;
+
+  const labels: Record<TokenTrendKey, string> = {
+    cacheRead: t('usage.cache_read'),
+    input: t('usage.input'),
+    output: t('usage.output'),
+  };
+  const orderedPayload = [...payload].sort((a, b) => {
+    const aIndex = TOKEN_TREND_LINE_ORDER.indexOf(a.dataKey as TokenTrendKey);
+    const bIndex = TOKEN_TREND_LINE_ORDER.indexOf(b.dataKey as TokenTrendKey);
+    return (aIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : aIndex) - (bIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : bIndex);
+  });
+
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-surface px-3 py-2 text-xs text-text shadow-lg">
+      <div className="mb-1 font-medium">{label}</div>
+      <div className="space-y-1">
+        {orderedPayload.map((item) => {
+          const key = item.dataKey as TokenTrendKey;
+          return (
+            <div key={item.dataKey} className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
+              <span className="text-text">{labels[key] ?? item.name ?? item.dataKey}</span>
+              <span className="font-mono">{fmtNum(Number(item.value ?? 0))}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function UserOverviewPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -156,53 +204,60 @@ export default function UserOverviewPage() {
       time: fmtTime(b.time),
       input: b.input_tokens,
       output: b.output_tokens,
-      cached: b.cache_read,
+      cacheRead: b.cache_read,
     })),
     [trend],
   );
+  const tokenTrendLabels: Record<TokenTrendKey, string> = {
+    cacheRead: t('usage.cache_read'),
+    input: t('usage.input'),
+    output: t('usage.output'),
+  };
 
   return (
-    <div>
+    <div className="space-y-5 2xl:space-y-6">
       {/* 账户信息 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
         <StatCard
           title={t('user_overview.balance')}
           value={`$${(user?.balance ?? 0).toFixed(2)}`}
           icon={<Wallet className="w-5 h-5" />}
-          accentColor="var(--ag-primary)"
+          tone="blue"
         />
         <StatCard
           title={t('user_overview.max_concurrency')}
           value={String(user?.max_concurrency ?? 0)}
           icon={<Zap className="w-5 h-5" />}
-          accentColor="var(--ag-info)"
+          tone="indigo"
         />
         <StatCard
           title={t('usage.total_requests')}
           value={(stats?.total_requests ?? 0).toLocaleString()}
           icon={<Activity className="w-5 h-5" />}
-          accentColor="var(--ag-warning)"
+          tone="emerald"
         />
         <StatCard
           title={t('usage.actual_cost')}
           value={<CostValue value={stats?.total_actual_cost ?? 0} decimals={4} tone="actual" />}
           icon={<Coins className="w-5 h-5" />}
-          accentColor="var(--ag-warning)"
+          tone="amber"
         />
       </div>
 
       {/* 时间范围选择 */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs text-text-tertiary">{t('dashboard.time_range')}</span>
+      <div className="ag-dashboard-toolbar flex flex-col gap-3 p-4 2xl:p-5 sm:flex-row sm:items-center">
+        <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.time_range')}</span>
         <Tabs
+          className="ag-segmented-tabs ag-segmented-tabs-compact"
           selectedKey={range}
           onSelectionChange={(key) => setRange(key as RangePreset)}
-          variant="secondary"
         >
           <Tabs.List>
-            {(['today', '7d', '30d', '90d'] as const).map((r) => (
+            {RANGE_PRESETS.map((r, index) => (
               <Tabs.Tab key={r} id={r}>
-                {t(`dashboard.range_${r}`)}
+                {index > 0 ? <Tabs.Separator /> : null}
+                <Tabs.Indicator />
+                <span>{t(`dashboard.range_${r}`)}</span>
               </Tabs.Tab>
             ))}
           </Tabs.List>
@@ -210,14 +265,14 @@ export default function UserOverviewPage() {
       </div>
 
       {/* 模型分布 + Token 趋势 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* 模型分布饼图 */}
-        <SectionCard title={t('dashboard.model_distribution')}>
-          {models.length > 0 ? (
-            <div className="ag-distribution-card-body flex flex-col gap-3 xl:flex-row">
-              <div className="ag-distribution-chart-frame">
+        <DashboardCard title={t('dashboard.model_distribution')}>
+          <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
+            <div className="ag-distribution-chart-frame">
+              {models.length > 0 ? (
                 <PieChart width={176} height={176}>
-                  <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" isAnimationActive={false} minAngle={3} stroke="var(--ag-bg-elevated)" strokeWidth={1}>
+                  <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={42} outerRadius={68} dataKey="value" isAnimationActive={false} minAngle={3} stroke="var(--ag-surface)" strokeWidth={2}>
                     {models.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Pie>
                   <RechartsTooltip
@@ -227,93 +282,91 @@ export default function UserOverviewPage() {
                     isAnimationActive={false}
                   />
                 </PieChart>
-              </div>
-              <div className="ag-distribution-table-scroll">
-                <CompactDataTable
-                  ariaLabel={t('dashboard.model_distribution')}
-                  className="ag-compact-data-table--dense"
-                  emptyText={t('common.no_data')}
-                  minWidth={380}
-                  rowKey={(row) => row.model}
-                  rows={models}
-                  columns={[
-                    {
-                      key: 'model',
-                      title: t('usage.model'),
-                      width: '30%',
-                      render: (row, index) => (
-                        <>
-                          <span className="w-2 h-2 shrink-0 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
-                          <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
-                        </>
-                      ),
-                    },
-                    {
-                      align: 'end',
-                      key: 'requests',
-                      title: t('dashboard.requests'),
-                      width: '22%',
-                      render: (row) => <span className="truncate text-text-secondary">{row.requests}</span>,
-                    },
-                    {
-                      align: 'end',
-                      key: 'tokens',
-                      title: 'TOKEN',
-                      width: '24%',
-                      render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.tokens)}</span>,
-                    },
-                    {
-                      align: 'end',
-                      key: 'cost',
-                      title: t('usage.cost'),
-                      width: '24%',
-                      render: (row) => <CostValue className="truncate font-mono" value={row.actual_cost} decimals={4} tone="actual" />,
-                    },
-                  ]}
-                />
-              </div>
+              ) : (
+                <div className="flex h-44 w-44 items-center justify-center text-xs text-text">{t('common.no_data')}</div>
+              )}
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-44 text-text-tertiary text-sm">{t('common.no_data')}</div>
-          )}
-        </SectionCard>
+            <div className="ag-distribution-table-scroll">
+              <CompactDataTable
+                ariaLabel={t('dashboard.model_distribution')}
+                className="ag-compact-data-table--dense"
+                emptyText={t('common.no_data')}
+                minWidth={480}
+                rowKey={(row) => row.model}
+                rows={models}
+                columns={[
+                  {
+                    key: 'model',
+                    title: t('usage.model'),
+                    width: '32%',
+                    render: (row, index) => (
+                      <>
+                        <span className="shrink-0 font-mono text-[11px] font-semibold text-text">#{index + 1}</span>
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                        <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
+                      </>
+                    ),
+                  },
+                  {
+                    align: 'end',
+                    key: 'requests',
+                    title: t('dashboard.requests'),
+                    width: '20%',
+                    render: (row) => <span className="truncate font-mono text-text">{row.requests.toLocaleString()}</span>,
+                  },
+                  {
+                    align: 'end',
+                    key: 'tokens',
+                    title: t('dashboard.tokens'),
+                    width: '24%',
+                    render: (row) => <span className="truncate font-mono text-text">{fmtNum(row.tokens)}</span>,
+                  },
+                  {
+                    align: 'end',
+                    key: 'cost',
+                    title: t('usage.cost'),
+                    width: '24%',
+                    render: (row) => <CostValue className="truncate font-mono" value={row.actual_cost} decimals={4} tone="actual" />,
+                  },
+                ]}
+              />
+            </div>
+          </div>
+        </DashboardCard>
 
         {/* Token 趋势 */}
-        <SectionCard title={t('dashboard.token_trend')}>
+        <DashboardCard title={t('dashboard.token_trend')}>
           {trendData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220} debounce={80}>
-              <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--ag-border-subtle)" />
-                <XAxis
-                  dataKey="time"
-                  tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
-                  axisLine={{ stroke: 'var(--ag-border)' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) => fmtNum(v)}
-                />
-                <RechartsTooltip
-                  contentStyle={{ background: 'var(--ag-bg-elevated)', border: '1px solid var(--ag-border)', borderRadius: 8, fontSize: 12 }}
-                  formatter={(value, name) => [fmtNum(Number(value)), name === 'input' ? t('usage.input') : name === 'output' ? t('usage.output') : t('usage.cache_read')]}
-                />
-                <Line type="monotone" dataKey="input" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
-                <Line type="monotone" dataKey="output" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
-                <Line type="monotone" dataKey="cached" stroke="#8b5cf6" strokeWidth={2} dot={false} isAnimationActive={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="h-[248px] 2xl:h-[288px]">
+              <ResponsiveContainer width="100%" height="100%" debounce={80}>
+                <LineChart data={trendData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
+                  <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
+                  <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
+                  <YAxis axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={(v: number) => fmtNum(v)} tickLine={false} />
+                  <RechartsTooltip content={<TokenTrendTooltip />} />
+                  <Legend
+                    height={24}
+                    content={() => (
+                      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
+                        {TOKEN_TREND_LINE_ORDER.map((key) => (
+                          <span key={key} className="inline-flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
+                            <span>{tokenTrendLabels[key]}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  />
+                  <Line type="monotone" dataKey="input" name={tokenTrendLabels.input} stroke={USAGE_TOKEN_COLORS.input} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="output" name={tokenTrendLabels.output} stroke={USAGE_TOKEN_COLORS.output} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="cacheRead" name={tokenTrendLabels.cacheRead} stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
-            <div className="flex items-center justify-center h-44 text-text-tertiary text-sm">{t('common.no_data')}</div>
+            <div className="flex h-[248px] items-center justify-center text-sm text-text 2xl:h-[288px]">{t('common.no_data')}</div>
           )}
-          <div className="flex items-center justify-center gap-4 mt-2 text-[11px] text-text-tertiary">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded bg-blue-500" /> {t('usage.input')}</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded bg-emerald-500" /> {t('usage.output')}</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded bg-violet-500" /> {t('usage.cache_read')}</span>
-          </div>
-        </SectionCard>
+        </DashboardCard>
       </div>
     </div>
   );

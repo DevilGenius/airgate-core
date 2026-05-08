@@ -1,7 +1,17 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Checkbox, Input, Label, ListBox, Select, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Checkbox,
+  Form,
+  Input,
+  ListBox,
+  Select,
+  Switch,
+  TextField as HeroTextField,
+  useOverlayState,
+} from '@heroui/react';
 import { Hash, Gauge } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
 import { proxiesApi } from '../../../shared/api/proxies';
@@ -13,7 +23,7 @@ import type { BulkUpdateAccountsReq } from '../../../shared/types';
 
 /**
  * 批量编辑弹窗：每个字段前有「启用」开关，只有启用的字段会进入 patch。
- * 分组为追加模式（add_group_ids）：新勾选的分组会并到账号已有分组中，不会移除。
+ * 分组为整体替换模式：启用后会用当前勾选列表覆盖账号已有分组。
  */
 export function BulkEditAccountModal({
   open,
@@ -63,8 +73,11 @@ export function BulkEditAccountModal({
     enableRateMultiplier ||
     enableGroups ||
     enableProxy;
+  const canSubmit = hasAnyField && (!enableProxy || proxyId != null);
 
   const handleSubmit = () => {
+    if (!canSubmit) return;
+
     const patch: Omit<BulkUpdateAccountsReq, 'account_ids'> = {};
     if (enableStatus) patch.state = status;
     if (enablePriority) patch.priority = priority;
@@ -75,10 +88,11 @@ export function BulkEditAccountModal({
     onSubmit(patch);
   };
   const proxyOptions = [
-    { id: '', label: t('accounts.select_proxy') },
+    { id: '', label: t('accounts.select_proxy'), endpoint: '' },
     ...(proxiesData?.list ?? []).map((p) => ({
       id: String(p.id),
-      label: `${p.name} (${p.protocol}://${p.address}:${p.port})`,
+      label: p.name,
+      endpoint: `${p.protocol}://${p.address}:${p.port}`,
     })),
   ];
   const selectedProxyLabel =
@@ -98,27 +112,19 @@ export function BulkEditAccountModal({
           <Button variant="secondary" onPress={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button variant="primary" onPress={handleSubmit} isDisabled={loading || !hasAnyField} aria-busy={loading}>
+          <Button variant="primary" onPress={handleSubmit} isDisabled={loading || !canSubmit} aria-busy={loading}>
             {t('common.save')}
           </Button>
         </div>
       )}
-      icon={<Hash className="size-5" />}
       size="md"
       state={modalState}
       title={`${t('accounts.bulk_update_title')} (${count})`}
     >
-              <div className="space-y-4">
-        <div
-          className="text-xs px-3 py-2 rounded"
-          style={{
-            background: 'var(--ag-bg-surface)',
-            border: '1px solid var(--ag-glass-border)',
-            color: 'var(--ag-text-secondary)',
-          }}
-        >
+      <Form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
+        <p className="rounded-md border border-border bg-surface px-3 py-2 text-xs leading-5 text-text-secondary">
           {t('accounts.bulk_update_hint')}
-        </div>
+        </p>
 
         {/* 调度状态 */}
         <FieldRow
@@ -127,12 +133,18 @@ export function BulkEditAccountModal({
           label={t('accounts.enable_dispatch')}
         >
           <Switch
+            isDisabled={!enableStatus}
             isSelected={status === 'active'}
             onChange={(on) => setStatus(on ? 'active' : 'disabled')}
           >
             <Switch.Control>
               <Switch.Thumb />
             </Switch.Control>
+            <Switch.Content>
+              <span className={enableStatus ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
+                {status === 'active' ? t('common.enabled', '已启用') : t('common.disabled', '已禁用')}
+              </span>
+            </Switch.Content>
           </Switch>
         </FieldRow>
 
@@ -194,7 +206,7 @@ export function BulkEditAccountModal({
               step="0.1"
               value={String(rateMultiplier)}
               disabled={!enableRateMultiplier}
-              onChange={(e) => setRateMultiplier(Number(e.target.value))}
+              onChange={(e) => setRateMultiplier(Math.max(0, Number(e.target.value)))}
             />
           </HeroTextField>
         </FieldRow>
@@ -208,6 +220,7 @@ export function BulkEditAccountModal({
           {enableGroups && (
             <GroupCheckboxList
               groups={groupsData?.list ?? []}
+              showLabel={false}
               selectedIds={groupIds}
               onChange={setGroupIds}
             />
@@ -222,27 +235,34 @@ export function BulkEditAccountModal({
         >
           <Select
             fullWidth
+            aria-label={t('accounts.proxy')}
             selectedKey={proxyId == null ? '' : String(proxyId)}
             isDisabled={!enableProxy}
-            onSelectionChange={(key) => setProxyId(key ? Number(key) : null)}
+            onSelectionChange={(key) => setProxyId(key == null || key === '' ? null : Number(key))}
           >
-            <Label>{t('accounts.proxy')}</Label>
             <Select.Trigger>
-              <Select.Value>{selectedProxyLabel}</Select.Value>
+              <Select.Value>
+                <span className="block min-w-0 truncate">{selectedProxyLabel}</span>
+              </Select.Value>
               <Select.Indicator />
             </Select.Trigger>
             <Select.Popover>
               <ListBox items={proxyOptions}>
                 {(item) => (
                   <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-text">{item.label}</div>
+                      {item.endpoint ? (
+                        <div className="truncate text-xs text-text-tertiary">{item.endpoint}</div>
+                      ) : null}
+                    </div>
                   </ListBox.Item>
                 )}
               </ListBox>
             </Select.Popover>
           </Select>
         </FieldRow>
-              </div>
+      </Form>
     </CommonModal>
   );
 }
@@ -256,27 +276,25 @@ function FieldRow({
   enabled: boolean;
   onToggle: (on: boolean) => void;
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div
-      className="flex items-start gap-3 py-2"
-      style={{ borderTop: '1px solid var(--ag-border-subtle)' }}
-    >
+    <div className="grid items-center gap-3 border-t border-border-subtle pt-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
       <Checkbox
-        className="shrink-0 pt-2"
-        style={{ minWidth: 120 }}
+        className="self-center"
         isSelected={enabled}
         onChange={onToggle}
       >
-        <span
-          className="text-sm"
-          style={{ color: enabled ? 'var(--ag-text)' : 'var(--ag-text-tertiary)' }}
-        >
-          {label}
-        </span>
+        <Checkbox.Control>
+          <Checkbox.Indicator />
+        </Checkbox.Control>
+        <Checkbox.Content>
+          <span className={enabled ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
+            {label}
+          </span>
+        </Checkbox.Content>
       </Checkbox>
-      <div className="flex-1 min-w-0">{children}</div>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }

@@ -141,6 +141,8 @@ export default function GroupsPage() {
       {/* 表格 */}
       <CommonTable
         ariaLabel={t('groups.title', 'Groups')}
+        className="ag-groups-table"
+        contentClassName="ag-groups-table-content"
         footer={(
           <TablePaginationFooter
             page={page}
@@ -225,7 +227,7 @@ export default function GroupsPage() {
                       )}
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <div className="text-xs leading-relaxed">
+                      <div className="text-xs leading-none">
                         <div>
                           <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.account_available')}: </span>
                           <span className="font-mono" style={{ color: 'var(--ag-success)' }}>{row.account_active}</span>
@@ -244,7 +246,7 @@ export default function GroupsPage() {
                       </div>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <div className="text-xs leading-relaxed">
+                      <div className="text-xs leading-none">
                         <div>
                           <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.today_cost')} </span>
                           <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>{formatCost(row.today_cost)}</span>

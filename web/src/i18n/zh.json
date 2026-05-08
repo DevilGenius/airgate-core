@@ -449,7 +449,7 @@
     "bulk_refresh_quota": "批量刷新令牌",
     "bulk_clear_family_cooldowns": "批量清除标记",
     "bulk_update_title": "批量编辑账号",
-    "bulk_update_hint": "只有勾选「启用」的字段才会被更新，未勾选的字段保持不变。",
+    "bulk_update_hint": "仅更新已启用字段，未启用项保持原值。",
     "bulk_delete_title": "批量删除账号",
     "bulk_delete_confirm": "确定要删除选中的 {{count}} 个账号吗？此操作不可恢复。",
     "bulk_update_success": "已更新 {{count}} 个账号",
