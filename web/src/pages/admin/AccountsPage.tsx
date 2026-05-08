@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField, Tooltip } from '@heroui/react';
@@ -434,8 +434,9 @@ export default function AccountsPage() {
     queryKey: queryKeys.groupsAll(),
     queryFn: () => groupsApi.list(FETCH_ALL_PARAMS),
   });
-  const groupMap = new Map(
-    (allGroupsData?.list ?? []).map((g) => [g.id, g.name]),
+  const groupMap = useMemo(
+    () => new Map((allGroupsData?.list ?? []).map((g) => [g.id, g.name])),
+    [allGroupsData?.list],
   );
 
   // 查询代理列表（用于表格中 ID→名称映射）
@@ -1251,41 +1252,44 @@ export default function AccountsPage() {
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
-  const selectedIdSet = new Set(selectedIds);
-  const visibleRowIds = rows.map((row) => row.id);
-  const selectedVisibleCount = visibleRowIds.filter((id) => selectedIdSet.has(id)).length;
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const visibleRowIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const selectedVisibleCount = useMemo(
+    () => visibleRowIds.filter((id) => selectedIdSet.has(id)).length,
+    [selectedIdSet, visibleRowIds],
+  );
   const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
   const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
-  const setVisibleRowsSelected = (isSelected: boolean) => {
+  const setVisibleRowsSelected = useCallback((isSelected: boolean) => {
     if (isSelected) {
       setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleRowIds])));
       return;
     }
     const visibleSet = new Set(visibleRowIds);
     setSelectedIds((prev) => prev.filter((id) => !visibleSet.has(id)));
-  };
-  const setRowSelected = (id: number, isSelected: boolean) => {
+  }, [visibleRowIds]);
+  const setRowSelected = useCallback((id: number, isSelected: boolean) => {
     setSelectedIds((prev) => {
       if (isSelected) {
         return prev.includes(id) ? prev : [...prev, id];
       }
       return prev.filter((selectedId) => selectedId !== id);
     });
-  };
-  const typeOptions = [
+  }, []);
+  const typeOptions = useMemo(() => [
     { id: '', label: t('accounts.all_types', '全部类型') },
     { id: 'oauth', label: 'OAuth' },
     { id: 'apikey', label: 'API Key' },
-  ];
-  const groupOptions = [
+  ], [t]);
+  const groupOptions = useMemo(() => [
     { id: '', label: t('accounts.all_groups') },
     { id: UNGROUPED_GROUP_FILTER, label: t('accounts.ungrouped') },
     ...(allGroupsData?.list ?? []).map((g) => ({ id: String(g.id), label: g.name })),
-  ];
-  const proxyOptions = [
+  ], [allGroupsData?.list, t]);
+  const proxyOptions = useMemo(() => [
     { id: '', label: t('accounts.all_proxies') },
     ...(allProxiesData?.list ?? []).map((p) => ({ id: String(p.id), label: p.name })),
-  ];
+  ], [allProxiesData?.list, t]);
   const selectedPlatformLabel = PLATFORM_OPTIONS.find((item) => item.id === platformFilter)?.label ?? t('accounts.all_platforms');
   const selectedStateLabel = STATE_OPTIONS.find((item) => item.id === stateFilter)?.label ?? t('users.all_status');
   const selectedTypeLabel = typeOptions.find((item) => item.id === typeFilter)?.label ?? t('accounts.all_types', '全部类型');

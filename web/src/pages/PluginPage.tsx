@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams } from '@tanstack/react-router';
 import type { PluginFrontendModule } from '@airgate/theme/plugin';
 import { loadPluginFrontend } from '../app/plugin-loader';
@@ -17,32 +17,54 @@ export default function PluginPage({ pluginNameOverride, subPathOverride }: Plug
   const { pluginName, _splat } = useParams({ strict: false });
   const resolvedPluginName = pluginNameOverride || pluginName;
   const [mod, setMod] = useState<PluginFrontendModule | null>(null);
+  const [loadedPluginName, setLoadedPluginName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const activeMod = loadedPluginName === resolvedPluginName ? mod : null;
+  const subPath = subPathOverride || '/' + (_splat || '');
+  const matched = useMemo(
+    () => activeMod?.routes?.find((r) => r.path === subPath) || activeMod?.routes?.[0],
+    [activeMod?.routes, subPath],
+  );
 
   useEffect(() => {
-    if (!resolvedPluginName) return;
+    if (!resolvedPluginName) {
+      setMod(null);
+      setLoadedPluginName(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
     setLoading(true);
+    setMod(null);
+    setLoadedPluginName(null);
     loadPluginFrontend(resolvedPluginName).then((m) => {
+      if (cancelled) return;
       setMod(m);
+      setLoadedPluginName(resolvedPluginName);
+      setLoading(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setMod(null);
+      setLoadedPluginName(resolvedPluginName);
       setLoading(false);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [resolvedPluginName]);
 
-  if (loading) {
+  if (loading || (resolvedPluginName && loadedPluginName !== resolvedPluginName)) {
     return pluginNameOverride ? <ChatPageLoading /> : <PageLoading />;
   }
 
-  if (!mod?.routes?.length) {
+  if (!activeMod?.routes?.length) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-text-secondary">插件未提供页面</div>
       </div>
     );
   }
-
-  // 从 _splat 匹配插件声明的路由
-  const subPath = subPathOverride || '/' + (_splat || '');
-  const matched = mod.routes.find((r) => r.path === subPath) || mod.routes[0];
 
   if (!matched) {
     return (

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@heroui/react';
 import { useAuth } from '../providers/AuthProvider';
 import { getTokenRole } from '../../shared/api/client';
+import { setStoredLanguage } from '../../i18n';
 import { useTheme } from '../providers/ThemeProvider';
 import { useSiteSettings, defaultLogoUrl } from '../providers/SiteSettingsProvider';
 import {
@@ -46,7 +47,7 @@ export function ChatShell({ children }: ChatShellProps) {
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'zh' ? 'en' : 'zh';
     i18n.changeLanguage(nextLang);
-    localStorage.setItem('lang', nextLang);
+    setStoredLanguage(nextLang);
   };
 
   return (

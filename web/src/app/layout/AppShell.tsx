@@ -5,6 +5,7 @@ import { useIsFetching, useQuery } from '@tanstack/react-query';
 import { Button, Link as HeroLink, Tooltip } from '@heroui/react';
 import { useAuth } from '../providers/AuthProvider';
 import { getTokenRole } from '../../shared/api/client';
+import { setStoredLanguage } from '../../i18n';
 import { pluginsApi } from '../../shared/api/plugins';
 import { settingsApi } from '../../shared/api/settings';
 import { queryKeys } from '../../shared/queryKeys';
@@ -230,7 +231,7 @@ export function AppShell({ children }: AppShellProps) {
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'zh' ? 'en' : 'zh';
     i18n.changeLanguage(nextLang);
-    localStorage.setItem('lang', nextLang);
+    setStoredLanguage(nextLang);
   };
 
   const displayName = user?.username || user?.email?.split('@')[0] || site.site_name || 'AirGate';

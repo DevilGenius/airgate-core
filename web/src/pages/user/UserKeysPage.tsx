@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apikeysApi } from '../../shared/api/apikeys';
@@ -194,14 +194,14 @@ export default function UserKeysPage() {
   }
 
   // 查找分组
-  const groupList = groupsData?.list ?? [];
-  const groupMap = new Map<number, GroupResp>(groupList.map((g) => [g.id, g]));
+  const groupList = useMemo(() => groupsData?.list ?? [], [groupsData?.list]);
+  const groupMap = useMemo(() => new Map<number, GroupResp>(groupList.map((g) => [g.id, g])), [groupList]);
 
   const hasAvailableGroups = groupList.length > 0;
 
   // 分组选项（如果用户有专属倍率，右侧显示划线原价 + 专属倍率）
   const userGroupRates = user?.group_rates;
-  const groupOptions = groupList.map((g) => {
+  const groupOptions = useMemo(() => groupList.map((g) => {
     const override = userGroupRates?.[g.id];
     const hasOverride = override != null && override > 0 && override !== g.rate_multiplier;
     return {
@@ -216,7 +216,7 @@ export default function UserKeysPage() {
         <span className="text-text-tertiary">{g.rate_multiplier}x {t('user_keys.rate_suffix', '倍率')}</span>
       ),
     };
-  });
+  }), [groupList, t, userGroupRates]);
 
   // 使用配置弹窗
   const {

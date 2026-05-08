@@ -8,7 +8,7 @@ interface CrudMutationOptions<TData, TVariables = void> {
   /** invalidateQueries 的 queryKey */
   queryKey: readonly unknown[];
   /** 成功后的额外回调（如关闭弹窗） */
-  onSuccess?: (data: TData) => void;
+  onSuccess?: (data: TData, variables: TVariables) => void;
 }
 
 export function useCrudMutation<TData, TVariables>(
@@ -19,10 +19,10 @@ export function useCrudMutation<TData, TVariables>(
 
   return useMutation({
     mutationFn: opts.mutationFn,
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       if (opts.successMessage) toast('success', opts.successMessage);
       queryClient.invalidateQueries({ queryKey: opts.queryKey });
-      opts.onSuccess?.(data);
+      opts.onSuccess?.(data, variables);
     },
     onError: (err: Error) => toast('error', err.message),
   });

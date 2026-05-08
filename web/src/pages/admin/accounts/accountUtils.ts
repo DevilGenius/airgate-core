@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type ComponentType } from 'react';
 import type { AccountFormProps, PluginOAuthBridge } from '@airgate/theme/plugin';
 import { pluginsApi } from '../../../shared/api/plugins';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
-import { loadPluginFrontend } from '../../../app/plugin-loader';
+import { loadPluginFrontend, onPluginFrontendCacheClear } from '../../../app/plugin-loader';
 import type {
   CredentialField,
   AccountTypeResp,
@@ -69,6 +69,17 @@ export function filterCredentialsForAccountType(
 }
 
 const pluginFormCache = new Map<string, ComponentType<AccountFormProps> | null>();
+
+export function clearPluginAccountFormCache(pluginId?: string) {
+  platformPluginMap = null;
+  if (pluginId) {
+    pluginFormCache.delete(pluginId);
+    return;
+  }
+  pluginFormCache.clear();
+}
+
+onPluginFrontendCacheClear(clearPluginAccountFormCache);
 
 export function usePluginAccountForm(platform: string) {
   const [Form, setForm] = useState<ComponentType<AccountFormProps> | null>(null);

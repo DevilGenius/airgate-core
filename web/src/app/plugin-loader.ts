@@ -34,6 +34,8 @@ function normalizePluginFrontendModule(
 
 // 核心通过 window.__airgate_shared 暴露的共享模块列表
 const SHARED_MODULES = ['react', 'react-dom', 'react/jsx-runtime', 'react-i18next'];
+const pluginFrontendCache = new Map<string, Promise<PluginFrontendModule | null>>();
+const pluginFrontendCacheListeners = new Set<(pluginId?: string) => void>();
 
 function rewriteNamedImportSpecifiers(specifiers: string): string {
   return specifiers
@@ -94,7 +96,7 @@ function rewriteBareImports(code: string): string {
  * 由于插件构建时将 react 等声明为 external，产物包含裸 import（浏览器无法解析）。
  * 这里通过 fetch → 重写 import → Blob URL → dynamic import 来解决。
  */
-export async function loadPluginFrontend(
+async function fetchPluginFrontend(
   pluginId: string,
 ): Promise<PluginFrontendModule | null> {
   try {
@@ -134,6 +136,36 @@ export async function loadPluginFrontend(
     console.warn(`[plugin-loader] Failed to load plugin frontend: ${pluginId}`, err);
     return null;
   }
+}
+
+export function loadPluginFrontend(
+  pluginId: string,
+): Promise<PluginFrontendModule | null> {
+  const cached = pluginFrontendCache.get(pluginId);
+  if (cached) return cached;
+
+  const promise = fetchPluginFrontend(pluginId).then((mod) => {
+    if (!mod) pluginFrontendCache.delete(pluginId);
+    return mod;
+  });
+  pluginFrontendCache.set(pluginId, promise);
+  return promise;
+}
+
+export function clearPluginFrontendCache(pluginId?: string) {
+  if (pluginId) {
+    pluginFrontendCache.delete(pluginId);
+  } else {
+    pluginFrontendCache.clear();
+  }
+  pluginFrontendCacheListeners.forEach((listener) => listener(pluginId));
+}
+
+export function onPluginFrontendCacheClear(listener: (pluginId?: string) => void) {
+  pluginFrontendCacheListeners.add(listener);
+  return () => {
+    pluginFrontendCacheListeners.delete(listener);
+  };
 }
 
 /** 全局平台图标注册表：platform → Icon 组件 */

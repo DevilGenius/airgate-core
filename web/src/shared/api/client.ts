@@ -4,7 +4,26 @@ import i18n from '../../i18n';
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 // Token 管理
-let accessToken: string | null = localStorage.getItem('token');
+function readBrowserStorage(kind: 'localStorage' | 'sessionStorage', key: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window[kind].getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeBrowserStorage(kind: 'localStorage' | 'sessionStorage', key: string, value: string | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (value == null) window[kind].removeItem(key);
+    else window[kind].setItem(key, value);
+  } catch {
+    // Storage can be unavailable in private mode or locked-down browsers.
+  }
+}
+
+let accessToken: string | null = readBrowserStorage('localStorage', 'token');
 
 interface TokenClaims {
   role?: string;
@@ -14,11 +33,7 @@ interface TokenClaims {
 
 export function setToken(token: string | null) {
   accessToken = token;
-  if (token) {
-    localStorage.setItem('token', token);
-  } else {
-    localStorage.removeItem('token');
-  }
+  writeBrowserStorage('localStorage', 'token', token);
 }
 
 export function getToken(): string | null {
@@ -58,15 +73,11 @@ export function getTokenAPIKeyID(token = accessToken): number | null {
 const API_KEY_SECRET_STORAGE = 'apikey_session_secret';
 
 export function setSessionAPIKey(key: string | null) {
-  if (key) {
-    sessionStorage.setItem(API_KEY_SECRET_STORAGE, key);
-  } else {
-    sessionStorage.removeItem(API_KEY_SECRET_STORAGE);
-  }
+  writeBrowserStorage('sessionStorage', API_KEY_SECRET_STORAGE, key);
 }
 
 export function getSessionAPIKey(): string | null {
-  return sessionStorage.getItem(API_KEY_SECRET_STORAGE);
+  return readBrowserStorage('sessionStorage', API_KEY_SECRET_STORAGE);
 }
 
 // 查询参数类型

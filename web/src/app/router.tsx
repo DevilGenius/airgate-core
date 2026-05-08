@@ -89,13 +89,15 @@ const USER_IDLE_PRELOADS = [
 
 function RoutePreloader() {
   const { user, isAPIKeySession } = useAuth();
+  const hasUser = Boolean(user);
+  const userRole = user?.role;
 
   useEffect(() => {
-    if (!user) return;
+    if (!hasUser) return;
 
     const pages = isAPIKeySession
       ? [UserUsagePage, PluginPage]
-      : user.role === 'admin'
+      : userRole === 'admin'
         ? ADMIN_IDLE_PRELOADS
         : USER_IDLE_PRELOADS;
     let index = 0;
@@ -116,7 +118,7 @@ function RoutePreloader() {
       cancelled = true;
       cancelIdle();
     };
-  }, [isAPIKeySession, user]);
+  }, [hasUser, isAPIKeySession, userRole]);
 
   return null;
 }

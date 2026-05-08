@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pluginsApi } from '../../shared/api/plugins';
+import { clearPluginFrontendCache } from '../../app/plugin-loader';
 import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
@@ -101,6 +102,9 @@ export default function PluginsPage() {
     mutationFn: (name: string) => pluginsApi.reload(name),
     successMessage: t('plugins.reload_success'),
     queryKey: queryKeys.plugins(),
+    onSuccess: (_data, name) => {
+      clearPluginFrontendCache(name);
+    },
   });
 
   const tabs = [
@@ -403,6 +407,9 @@ function PluginConfigModal({
   const saveMutation = useMutation({
     mutationFn: (cfg: Record<string, string>) => pluginsApi.updateConfig(plugin!.name, cfg),
     onSuccess: () => {
+      if (plugin?.name) {
+        clearPluginFrontendCache(plugin.name);
+      }
       toast('success', '配置已保存，插件已重新加载');
       onSaved();
     },
