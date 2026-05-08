@@ -304,7 +304,7 @@ function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; bala
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog
             className="ag-elevation-modal"
-            style={{ maxWidth: '750px', width: 'min(100%, calc(100vw - 2rem))' }}
+            style={{ maxWidth: '900px', width: 'min(100%, calc(100vw - 2rem))' }}
           >
             <Modal.Header>
               <Modal.Heading>{t('profile.balance_history')}</Modal.Heading>
@@ -323,12 +323,12 @@ function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; bala
                       <HeroTable.Column id="action" isRowHeader style={{ width: 96 }}>
                         {t('users.action_type')}
                       </HeroTable.Column>
-                      <HeroTable.Column id="amount">{t('users.amount')}</HeroTable.Column>
-                      <HeroTable.Column id="balance_change">
+                      <HeroTable.Column id="amount" style={{ whiteSpace: 'nowrap' }}>{t('users.amount')}</HeroTable.Column>
+                      <HeroTable.Column id="balance_change" style={{ whiteSpace: 'nowrap' }}>
                         {t('users.before_balance')} → {t('users.after_balance')}
                       </HeroTable.Column>
-                      <HeroTable.Column id="remark">{t('users.remark')}</HeroTable.Column>
-                      <HeroTable.Column id="created_at">{t('users.created_at')}</HeroTable.Column>
+                      <HeroTable.Column id="remark" style={{ minWidth: 100 }}>{t('users.remark')}</HeroTable.Column>
+                      <HeroTable.Column id="created_at" style={{ whiteSpace: 'nowrap' }}>{t('users.created_at')}</HeroTable.Column>
                     </HeroTable.Header>
                     <HeroTable.Body>
                       {isLoading ? (
@@ -358,17 +358,21 @@ function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; bala
                               </Chip>
                             </HeroTable.Cell>
                             <HeroTable.Cell>
-                              <span className={`font-mono text-xs font-semibold ${row.action === 'add' ? 'text-success' : row.action === 'subtract' ? 'text-danger' : 'text-info'}`}>
+                              <span className={`font-mono text-xs font-semibold whitespace-nowrap ${row.action === 'add' ? 'text-success' : row.action === 'subtract' ? 'text-danger' : 'text-info'}`}>
                                 {row.action === 'add' ? '+' : row.action === 'subtract' ? '-' : '='}{row.amount.toFixed(2)}
                               </span>
                             </HeroTable.Cell>
                             <HeroTable.Cell>
-                              <span className="font-mono text-xs text-text-secondary">
-                                ${row.before_balance.toFixed(2)} → ${row.after_balance.toFixed(2)}
+                              <span className="font-mono text-xs text-text-secondary whitespace-nowrap">
+                                ${row.before_balance.toFixed(2)}
+                                <span className="text-text-tertiary"> → </span>
+                                ${row.after_balance.toFixed(2)}
                               </span>
                             </HeroTable.Cell>
                             <HeroTable.Cell>
-                              <span className="text-xs text-text-tertiary">{row.remark || '-'}</span>
+                              <span className="text-xs text-text-tertiary block max-w-[200px] truncate" title={row.remark || undefined}>
+                                {row.remark || '-'}
+                              </span>
                             </HeroTable.Cell>
                             <HeroTable.Cell>
                               <span className="text-xs text-text-secondary">
