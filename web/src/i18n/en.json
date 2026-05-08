@@ -919,7 +919,8 @@
     "balance_alert_desc": "Send email notification when balance drops below threshold",
     "balance_alert_threshold": "Alert Threshold (USD)",
     "balance_alert_hint": "Current balance: ${{balance}}",
-    "balance_alert_saved": "Balance alert settings saved"
+    "balance_alert_saved": "Balance alert settings saved",
+    "balance_history": "Balance History"
   },
 
   "user_keys": {

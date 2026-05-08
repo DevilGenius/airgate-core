@@ -1,12 +1,15 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Chip, Description, Form, Input, Label, Switch, TextField as HeroTextField } from '@heroui/react';
+import { Button, Card, Chip, Description, EmptyState, Form, Input, Label, Modal, Skeleton, Switch, Table as HeroTable, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usersApi } from '../../shared/api/users';
 import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { getTotalPages } from '../../shared/utils/pagination';
+import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import type { BalanceLogResp } from '../../shared/types';
 import {
   User,
   Mail,
@@ -17,6 +20,7 @@ import {
   Lock,
   KeyRound,
   Bell,
+  ChevronRight,
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -75,6 +79,8 @@ export default function ProfilePage() {
     });
   }
 
+  const [balanceHistoryOpen, setBalanceHistoryOpen] = useState(false);
+
   if (!user) return null;
 
   return (
@@ -102,7 +108,11 @@ export default function ProfilePage() {
                 {user.role === 'admin' ? t('nav.admin') : t('nav.user')}
               </Chip>
             </div>
-            <div className="flex items-center gap-4">
+            <button
+              type="button"
+              className="flex items-center gap-4 w-full rounded-md px-1 -mx-1 py-1 transition-colors hover:bg-surface-hover cursor-pointer text-left"
+              onClick={() => setBalanceHistoryOpen(true)}
+            >
               <div className="flex items-center gap-2 w-28 shrink-0">
                 <Wallet className="w-4 h-4 text-text-tertiary" />
                 <span className="text-xs font-medium text-text-secondary">{t('profile.balance')}</span>
@@ -110,7 +120,8 @@ export default function ProfilePage() {
               <span className="text-sm text-text font-mono">
                 ${user.balance.toFixed(4)}
               </span>
-            </div>
+              <ChevronRight className="w-4 h-4 text-text-tertiary ml-auto" />
+            </button>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 w-28 shrink-0">
                 <Layers className="w-4 h-4 text-text-tertiary" />
@@ -163,6 +174,13 @@ export default function ProfilePage() {
           </div>
         </Card.Content>
       </Card>
+
+      {/* 余额记录 */}
+      <MyBalanceHistoryModal
+        open={balanceHistoryOpen}
+        balance={user.balance}
+        onClose={() => setBalanceHistoryOpen(false)}
+      />
 
       {/* 修改密码 */}
       <Card className="mb-6">
@@ -238,6 +256,150 @@ export default function ProfilePage() {
         </Card.Content>
       </Card>
     </div>
+  );
+}
+
+/* ==================== 余额记录弹窗 ==================== */
+
+function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; balance: number; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['my-balance-history', page],
+    queryFn: () => usersApi.myBalanceHistory({ page, page_size: 10 }),
+    enabled: open,
+  });
+
+  const actionLabel = (action: string) => {
+    switch (action) {
+      case 'add': return t('users.action_add');
+      case 'subtract': return t('users.action_subtract');
+      case 'set': return t('users.action_set');
+      default: return action;
+    }
+  };
+
+  const actionColor = (action: string): 'success' | 'warning' | 'accent' => {
+    switch (action) {
+      case 'add': return 'success';
+      case 'subtract': return 'warning';
+      default: return 'accent';
+    }
+  };
+
+  const rows = data?.list ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = getTotalPages(total, 10);
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) onClose();
+    },
+  });
+
+  return (
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '750px', width: 'min(100%, calc(100vw - 2rem))' }}
+          >
+            <Modal.Header>
+              <Modal.Heading>{t('profile.balance_history')}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              <div className="mb-4 rounded-md border border-glass-border bg-surface px-4 py-3">
+                <p className="text-xs text-text-tertiary">{t('users.current_balance')}</p>
+                <p className="mt-1 font-mono text-lg font-bold">${balance.toFixed(2)}</p>
+              </div>
+
+              <HeroTable variant="primary">
+                <HeroTable.ScrollContainer>
+                  <HeroTable.Content aria-label={t('profile.balance_history')}>
+                    <HeroTable.Header>
+                      <HeroTable.Column id="action" isRowHeader style={{ width: 96 }}>
+                        {t('users.action_type')}
+                      </HeroTable.Column>
+                      <HeroTable.Column id="amount">{t('users.amount')}</HeroTable.Column>
+                      <HeroTable.Column id="balance_change">
+                        {t('users.before_balance')} → {t('users.after_balance')}
+                      </HeroTable.Column>
+                      <HeroTable.Column id="remark">{t('users.remark')}</HeroTable.Column>
+                      <HeroTable.Column id="created_at">{t('users.created_at')}</HeroTable.Column>
+                    </HeroTable.Header>
+                    <HeroTable.Body>
+                      {isLoading ? (
+                        Array.from({ length: 5 }).map((_, index) => (
+                          <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
+                            {Array.from({ length: 5 }).map((__, cellIndex) => (
+                              <HeroTable.Cell key={cellIndex}>
+                                <Skeleton className="h-4 w-24" />
+                              </HeroTable.Cell>
+                            ))}
+                          </HeroTable.Row>
+                        ))
+                      ) : rows.length === 0 ? (
+                        <HeroTable.Row id="empty">
+                          <HeroTable.Cell colSpan={5}>
+                            <EmptyState>
+                              <div className="text-sm text-default-500">{t('common.no_data')}</div>
+                            </EmptyState>
+                          </HeroTable.Cell>
+                        </HeroTable.Row>
+                      ) : (
+                        rows.map((row: BalanceLogResp) => (
+                          <HeroTable.Row id={String(row.id)} key={row.id}>
+                            <HeroTable.Cell>
+                              <Chip color={actionColor(row.action)} size="sm" variant="soft">
+                                {actionLabel(row.action)}
+                              </Chip>
+                            </HeroTable.Cell>
+                            <HeroTable.Cell>
+                              <span className={`font-mono text-xs font-semibold ${row.action === 'add' ? 'text-success' : row.action === 'subtract' ? 'text-danger' : 'text-info'}`}>
+                                {row.action === 'add' ? '+' : row.action === 'subtract' ? '-' : '='}{row.amount.toFixed(2)}
+                              </span>
+                            </HeroTable.Cell>
+                            <HeroTable.Cell>
+                              <span className="font-mono text-xs text-text-secondary">
+                                ${row.before_balance.toFixed(2)} → ${row.after_balance.toFixed(2)}
+                              </span>
+                            </HeroTable.Cell>
+                            <HeroTable.Cell>
+                              <span className="text-xs text-text-tertiary">{row.remark || '-'}</span>
+                            </HeroTable.Cell>
+                            <HeroTable.Cell>
+                              <span className="text-xs text-text-secondary">
+                                {new Date(row.created_at).toLocaleString('zh-CN', {
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  month: '2-digit',
+                                })}
+                              </span>
+                            </HeroTable.Cell>
+                          </HeroTable.Row>
+                        ))
+                      )}
+                    </HeroTable.Body>
+                  </HeroTable.Content>
+                </HeroTable.ScrollContainer>
+                <HeroTable.Footer>
+                  <TablePaginationFooter
+                    page={page}
+                    setPage={setPage}
+                    total={total}
+                    totalPages={totalPages}
+                  />
+                </HeroTable.Footer>
+              </HeroTable>
+            </Modal.Body>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }
 

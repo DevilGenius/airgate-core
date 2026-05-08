@@ -922,7 +922,8 @@
     "balance_alert_desc": "当余额低于设定阈值时，发送邮件通知",
     "balance_alert_threshold": "预警阈值（美元）",
     "balance_alert_hint": "当前余额：${{balance}}",
-    "balance_alert_saved": "余额预警设置已保存"
+    "balance_alert_saved": "余额预警设置已保存",
+    "balance_history": "余额记录"
   },
 
   "user_keys": {

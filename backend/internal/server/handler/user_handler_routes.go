@@ -119,6 +119,34 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+// GetMyBalanceHistory 查询当前用户余额变更记录。
+func (h *UserHandler) GetMyBalanceHistory(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		response.Unauthorized(c, "用户未认证")
+		return
+	}
+
+	var page dto.PageReq
+	if err := c.ShouldBindQuery(&page); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	result, err := h.service.ListBalanceLogs(c.Request.Context(), userID, page.Page, page.PageSize)
+	if err != nil {
+		httpCode, message := h.handleError("查询余额日志失败", "查询失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	list := make([]dto.BalanceLogResp, 0, len(result.List))
+	for _, item := range result.List {
+		list = append(list, toBalanceLogResp(item))
+	}
+	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
+}
+
 // ListUsers 管理员查询用户列表。
 func (h *UserHandler) ListUsers(c *gin.Context) {
 	var page dto.PageReq

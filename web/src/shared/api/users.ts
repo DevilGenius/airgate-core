@@ -14,6 +14,8 @@ export const usersApi = {
   updateProfile: (data: UpdateProfileReq) => put<void>('/api/v1/users/me', data),
   changePassword: (data: ChangePasswordReq) => post<void>('/api/v1/users/me/password', data),
   updateBalanceAlert: (threshold: number) => put<void>('/api/v1/users/me/balance-alert', { threshold }),
+  myBalanceHistory: (params: PageReq) =>
+    get<PagedData<BalanceLogResp>>('/api/v1/users/me/balance-history', params),
 
   // 管理员接口
   list: (params: PageReq & { status?: string; role?: string }) =>
