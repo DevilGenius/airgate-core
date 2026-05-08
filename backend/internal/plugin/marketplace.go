@@ -105,7 +105,7 @@ func NewMarketplace(pluginDir string, opts ...MarketplaceOption) *Marketplace {
 var officialPlugins = []MarketplacePlugin{
 	{
 		Name:        "gateway-openai",
-		Version:     "0.1.42",
+		Version:     "0.1.0",
 		Description: "OpenAI API 网关插件",
 		Author:      "AirGate",
 		Type:        "gateway",
@@ -137,7 +137,7 @@ var officialPlugins = []MarketplacePlugin{
 	},
 	{
 		Name:        "gateway-claude",
-		Version:     "0.2.5",
+		Version:     "0.2.0",
 		Description: "Claude Messages API 网关插件：OAuth 授权、TLS 指纹、用量监控",
 		Author:      "AirGate",
 		Type:        "gateway",
