@@ -1370,66 +1370,135 @@ export default function AccountsPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-48">
-          <HeroTextField fullWidth>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-              <Input
-                className="pl-9"
-                value={keyword}
-                onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-                placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
-              />
+      <div className="relative mb-5 min-h-12">
+        <div
+          className={`flex min-h-12 flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap ${
+            selectedIds.length > 0 ? 'invisible' : ''
+          }`}
+        >
+          <div className="w-full sm:w-48">
+            <HeroTextField fullWidth>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                <Input
+                  className="pl-9"
+                  value={keyword}
+                  onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                  placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
+                />
+              </div>
+            </HeroTextField>
+          </div>
+
+          {toolbarFilters.map((filter) => (
+            <div
+              key={filter.key}
+              className={filter.widthClass}
+            >
+              <Select
+                aria-label={filter.label}
+                fullWidth
+                selectedKey={filter.value}
+                onSelectionChange={(key) => {
+                  filter.setValue(key == null ? '' : String(key));
+                  setPage(1);
+                }}
+              >
+                <Label className="sr-only">{filter.label}</Label>
+                <Select.Trigger>
+                  <Select.Value>{filter.selectedLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={filter.options}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
             </div>
-          </HeroTextField>
+          ))}
+          {activeFilterCount > 0 ? (
+            <Button
+              className="whitespace-nowrap"
+              size="sm"
+              variant="ghost"
+              onPress={clearAllFilters}
+            >
+              <Eraser className="h-3.5 w-3.5" />
+              {t('common.clear')}
+            </Button>
+          ) : null}
+
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:ml-auto">
+            <Button
+              isIconOnly
+              aria-label={t('common.refresh')}
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 min-w-8"
+              onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Dropdown>
+              <Dropdown.Trigger
+                className={`ag-account-auto-refresh-trigger button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
+              >
+                <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
+                <ChevronDown className="h-3 w-3 shrink-0" />
+              </Dropdown.Trigger>
+              <Dropdown.Popover placement="bottom end">
+                <Dropdown.Menu
+                  aria-label={t('accounts.auto_refresh')}
+                  selectedKeys={new Set([`auto_${autoRefresh}`])}
+                  selectionMode="single"
+                  onAction={(key) => {
+                    const action = String(key);
+                    setAutoRefresh(Number(action.replace('auto_', '')));
+                  }}
+                >
+                  {AUTO_REFRESH_OPTIONS.map((sec) => (
+                    <Dropdown.Item key={sec} id={`auto_${sec}`} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}>
+                      <span className="flex items-center justify-between gap-6">
+                        <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}</span>
+                        {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
+                      </span>
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown>
+            <Button
+              variant="secondary"
+              onPress={() => importInputRef.current?.click()}
+              isDisabled={importMutation.isPending}
+              aria-busy={importMutation.isPending}
+            >
+              <Upload className="h-4 w-4" />
+              {t('accounts.import')}
+            </Button>
+            <Button
+              variant="secondary"
+              onPress={() => exportMutation.mutate()}
+              isDisabled={exportMutation.isPending}
+              aria-busy={exportMutation.isPending}
+            >
+              <Download className="h-4 w-4" />
+              {t('accounts.export')}
+            </Button>
+            <Button variant="primary" onPress={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4" />
+              {t('accounts.create')}
+            </Button>
+          </div>
         </div>
 
-        {toolbarFilters.map((filter) => (
-          <div
-            key={filter.key}
-            className={filter.widthClass}
-          >
-            <Select
-              aria-label={filter.label}
-              fullWidth
-              selectedKey={filter.value}
-              onSelectionChange={(key) => {
-                filter.setValue(key == null ? '' : String(key));
-                setPage(1);
-              }}
-            >
-              <Label className="sr-only">{filter.label}</Label>
-              <Select.Trigger>
-                <Select.Value>{filter.selectedLabel}</Select.Value>
-                <Select.Indicator />
-              </Select.Trigger>
-              <Select.Popover>
-                <ListBox items={filter.options}>
-                  {(item) => (
-                    <ListBox.Item id={item.id} textValue={item.label}>
-                      {item.label}
-                    </ListBox.Item>
-                  )}
-                </ListBox>
-              </Select.Popover>
-            </Select>
-          </div>
-        ))}
-        {activeFilterCount > 0 ? (
-          <Button
-            className="whitespace-nowrap"
-            size="sm"
-            variant="ghost"
-            onPress={clearAllFilters}
-          >
-            <Eraser className="h-3.5 w-3.5" />
-            {t('common.clear')}
-          </Button>
-        ) : null}
-
         <BulkActionsBar
-          inline
+          overlay
           selectedCount={selectedIds.length}
           onClear={clearSelection}
           onEdit={() => setShowBulkEditModal(true)}
@@ -1439,69 +1508,6 @@ export default function AccountsPage() {
           onClearRateLimitMarkers={() => bulkClearRateLimitMarkersMutation.mutate(selectedIds)}
           onDelete={() => setShowBulkDeleteConfirm(true)}
         />
-
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:ml-auto">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh')}
-            size="sm"
-            variant="ghost"
-            className="h-8 w-8 min-w-8"
-            onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Dropdown>
-            <Dropdown.Trigger
-              className={`ag-account-auto-refresh-trigger button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
-            >
-              <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
-              <ChevronDown className="h-3 w-3 shrink-0" />
-            </Dropdown.Trigger>
-            <Dropdown.Popover placement="bottom end">
-              <Dropdown.Menu
-                aria-label={t('accounts.auto_refresh')}
-                selectedKeys={new Set([`auto_${autoRefresh}`])}
-                selectionMode="single"
-                onAction={(key) => {
-                  const action = String(key);
-                  setAutoRefresh(Number(action.replace('auto_', '')));
-                }}
-              >
-                {AUTO_REFRESH_OPTIONS.map((sec) => (
-                  <Dropdown.Item key={sec} id={`auto_${sec}`} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}>
-                    <span className="flex items-center justify-between gap-6">
-                      <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}</span>
-                      {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
-                    </span>
-                  </Dropdown.Item>
-                ))}
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
-          <Button
-            variant="secondary"
-            onPress={() => importInputRef.current?.click()}
-            isDisabled={importMutation.isPending}
-            aria-busy={importMutation.isPending}
-          >
-            <Upload className="h-4 w-4" />
-            {t('accounts.import')}
-          </Button>
-          <Button
-            variant="secondary"
-            onPress={() => exportMutation.mutate()}
-            isDisabled={exportMutation.isPending}
-            aria-busy={exportMutation.isPending}
-          >
-            <Download className="h-4 w-4" />
-            {t('accounts.export')}
-          </Button>
-          <Button variant="primary" onPress={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4" />
-            {t('accounts.create')}
-          </Button>
-        </div>
       </div>
       {/* 隐藏的文件选择器（供导入按钮触发） */}
       <input
