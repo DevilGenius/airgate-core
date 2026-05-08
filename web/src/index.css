@@ -1151,6 +1151,61 @@ input[type="number"]::-webkit-outer-spin-button {
   table-layout: auto;
 }
 
+/* 账号管理表格：沿用使用记录表格的紧凑行高，去掉单元格内边距。 */
+
+.ag-accounts-table {
+  --ag-accounts-table-header-height: 2.25rem;
+  --ag-accounts-table-row-height: 3rem;
+}
+
+.ag-accounts-table-content {
+  table-layout: fixed;
+}
+
+.ag-accounts-table-content :where(
+  [data-slot="table-header"] [data-slot="table-row"],
+  [data-slot="thead"] [data-slot="tr"],
+  .table__header .table__row
+) {
+  height: var(--ag-accounts-table-header-height) !important;
+}
+
+.ag-accounts-table-content :where([data-slot="table-column"], [data-slot="th"], .table__column) {
+  overflow: hidden !important;
+  height: var(--ag-accounts-table-header-height) !important;
+  min-height: var(--ag-accounts-table-header-height) !important;
+  max-height: var(--ag-accounts-table-header-height) !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  text-transform: none !important;
+  white-space: nowrap !important;
+}
+
+.ag-accounts-table-content :where(
+  [data-slot="table-body"] [data-slot="table-row"],
+  [data-slot="tbody"] [data-slot="tr"],
+  .table__body .table__row
+) {
+  height: var(--ag-accounts-table-row-height) !important;
+  min-height: var(--ag-accounts-table-row-height) !important;
+}
+
+.ag-accounts-table-content :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
+  height: var(--ag-accounts-table-row-height) !important;
+  min-height: var(--ag-accounts-table-row-height) !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+}
+
+.ag-accounts-table-content :where(
+  [data-slot="table-body"] [data-slot="table-row"]:hover [data-slot="table-cell"],
+  [data-slot="tbody"] [data-slot="tr"]:hover [data-slot="td"],
+  .table__body .table__row:hover .table__cell,
+  .table__body .table__row[data-hovered="true"] .table__cell
+) {
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
+}
+
 /* 使用记录表格：固定 header / row 高度，避免中英文切换造成尺寸漂移。 */
 
 .ag-usage-records-table {
@@ -1235,28 +1290,6 @@ input[type="number"]::-webkit-outer-spin-button {
     max-width: 92px !important;
   }
 
-  .ag-usage-table :where(
-    [data-slot="table-column"]:first-child,
-    [data-slot="table-cell"]:first-child,
-    [data-slot="th"]:first-child,
-    [data-slot="td"]:first-child,
-    .table__column:first-child,
-    .table__cell:first-child
-  ) {
-    position: sticky !important;
-    left: 0;
-    z-index: 2;
-    background: var(--surface) !important;
-  }
-
-  .ag-usage-table :where(
-    [data-slot="table-column"]:first-child,
-    [data-slot="th"]:first-child,
-    .table__column:first-child
-  ) {
-    z-index: 4;
-    background: var(--surface-secondary) !important;
-  }
 }
 
 /* 表格分页 */

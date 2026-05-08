@@ -7,6 +7,7 @@ import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
 
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
+const LEFT_ALIGNED_CONTENT_COLUMNS = new Set(['model']);
 const NEW_ROW_MARK_DURATION_MS = 5000;
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -215,15 +216,17 @@ export function UsageRecordsTable<T extends UsageRow>({
                   >
                     {columns.map((column) => {
                       const fullCellContent = FULL_CELL_CONTENT_COLUMNS.has(column.key);
+                      const leftAlignedContent = LEFT_ALIGNED_CONTENT_COLUMNS.has(column.key);
 
                       return (
                         <HeroTable.Cell
                           key={column.key}
-                          className={cx(getColumnClassName(column.key), 'text-center')}
+                          className={cx(getColumnClassName(column.key), leftAlignedContent ? 'text-left' : 'text-center')}
                         >
                           <div
                             className={cx(
-                              'flex h-[var(--ag-usage-table-row-height)] w-full items-center justify-center overflow-hidden text-center',
+                              'flex h-[var(--ag-usage-table-row-height)] w-full items-center overflow-hidden',
+                              leftAlignedContent ? 'justify-start text-left' : 'justify-center text-center',
                               fullCellContent ? 'px-1 py-0.5' : 'px-2.5 py-0.5',
                             )}
                           >

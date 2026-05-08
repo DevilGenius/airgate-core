@@ -820,7 +820,7 @@ export default function AccountsPage() {
     ...[{
       key: 'usage_window',
       title: t('accounts.usage_window'),
-      width: '440px',
+      width: '560px',
       align: 'center' as const,
       hideOnMobile: true,
       render: (row: AccountResp) => {
@@ -863,7 +863,8 @@ export default function AccountsPage() {
         }
 
         type TodayStats = { requests: number; tokens: number; account_cost: number; user_cost: number };
-        type UsageWindow = { label: string; used_percent: number; reset_seconds: number };
+        type UsageWindow = { key?: string; label: string; used_percent: number; reset_seconds: number };
+        type UsageWindowRow = { id: string; window?: UsageWindow };
         const windows: UsageWindow[] = usage.windows || [];
         const credits: { balance: number; unlimited: boolean } | null = usage.credits || null;
         const todayStats: TodayStats | null = usage.today_stats || null;
@@ -923,26 +924,89 @@ export default function AccountsPage() {
           const segments = modelPart.split('-');
           return `${timePart} ${segments[segments.length - 1]}`;
         };
+        const getWindowSlot = (w: UsageWindow) => {
+          const key = w.key || '';
+          const label = w.label || '';
+          const slot = key.includes(':7d') || key === '7d' || label.startsWith('7d') ? '7d' : '5h';
+          const group = key.startsWith('model:')
+            ? key.replace(/^model:(5h|7d):/, 'model:')
+            : 'base';
+          return { group, slot };
+        };
+        const buildWindowRows = (items: UsageWindow[]): UsageWindowRow[] => {
+          const groups: Array<{ id: string; five?: UsageWindow; seven?: UsageWindow }> = [];
+          const groupMap = new Map<string, { id: string; five?: UsageWindow; seven?: UsageWindow }>();
+
+          for (const item of items) {
+            const { group, slot } = getWindowSlot(item);
+            let bucket = groupMap.get(group);
+            if (!bucket) {
+              bucket = { id: group };
+              groupMap.set(group, bucket);
+              groups.push(bucket);
+            }
+            if (slot === '7d') bucket.seven = item;
+            else bucket.five = item;
+          }
+
+          return groups.flatMap((group) => {
+            const rows: UsageWindowRow[] = [];
+            if (group.five) {
+              rows.push({ id: `${group.id}:5h`, window: group.five });
+            } else if (group.seven) {
+              rows.push({ id: `${group.id}:5h-placeholder` });
+            }
+            if (group.seven) {
+              rows.push({ id: `${group.id}:7d`, window: group.seven });
+            }
+            return rows;
+          });
+        };
+        const windowRows = buildWindowRows(windows);
 
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
-        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[1.9rem_minmax(0,1fr)] items-center gap-1 rounded-[var(--field-radius)] border px-1 text-[10px] leading-none shadow-sm';
+        const todayImageCount = row.platform === 'openai' ? (row.today_image_count ?? 0) : 0;
+        const showImageCount = row.platform === 'openai';
+        const accessLabel = showImageCount
+          ? (
+            <span className="inline-flex min-w-0 items-center">
+              <span className="truncate">{t('accounts.today_access_count', '访问')}</span>
+              <span aria-hidden="true">|</span>
+              <span style={{ color: 'var(--ag-success)' }}>{t('accounts.image_count_inline_label', '图').trim()}</span>
+            </span>
+          )
+          : t('accounts.today_access_count', '访问');
+        const accessValue = showImageCount
+          ? (
+            <span className="inline-flex min-w-0 items-center justify-end">
+              <span>{formatCompact(todayStats?.requests ?? 0, false)}</span>
+              <span aria-hidden="true">|</span>
+              <span style={{ color: 'var(--ag-success)' }}>{formatCompact(todayImageCount, false)}</span>
+            </span>
+          )
+          : formatCompact(todayStats?.requests ?? 0, false);
+        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-1 rounded-[var(--field-radius)] border px-1.5 text-[11px] leading-none shadow-sm';
         const todayMetricStyle = (color: string, foreground = color) => ({
           background: `color-mix(in srgb, ${color} 10%, transparent)`,
           borderColor: `color-mix(in srgb, ${color} 22%, var(--ag-border))`,
           color: foreground,
         });
-        const todayMetricColumnClass = 'grid w-[10.5rem] justify-self-center grid-cols-2 gap-1';
+        const todayMetricColumnClass = 'grid w-[18rem] justify-self-end grid-cols-2 gap-1';
         const todayMetricChips = hasTodayStats && todayStats ? (
           <div
             className={todayMetricColumnClass}
             title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
           >
-            <span className={todayMetricClass} style={todayMetricStyle('var(--ag-info)')}>
-              <span className="truncate text-text-tertiary">{t('accounts.today_access_count', '访问')}</span>
-              <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.requests, false)}</span>
+            <span
+              className={todayMetricClass}
+              style={todayMetricStyle('var(--ag-info)')}
+              title={showImageCount ? t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）') : undefined}
+            >
+              <span className="min-w-0 truncate font-semibold text-text-secondary">{accessLabel}</span>
+              <span className="min-w-0 justify-self-end text-right font-semibold tabular-nums">{accessValue}</span>
             </span>
             <span className={todayMetricClass} style={todayMetricStyle('var(--ag-primary)')}>
-              <span className="truncate text-text-tertiary">Token</span>
+              <span className="truncate font-semibold text-text-secondary">Token</span>
               <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.tokens)}</span>
             </span>
             <span
@@ -950,7 +1014,7 @@ export default function AccountsPage() {
               style={todayMetricStyle('var(--ag-warning)')}
               title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
             >
-              <span className="truncate text-text-tertiary">{t('accounts.user_cost_short', '消费')}</span>
+              <span className="truncate font-semibold text-text-secondary">{t('accounts.user_cost_short', '消费')}</span>
               <span className="text-right tabular-nums">
                 <span style={{ color: 'var(--ag-warning)' }}>$</span>
                 <span className="text-text">{todayStats.user_cost.toFixed(2)}</span>
@@ -961,22 +1025,12 @@ export default function AccountsPage() {
               style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
               title={t('accounts.window_account_cost', '账号成本（上游计费）')}
             >
-              <span className="truncate text-text-tertiary">{t('accounts.account_cost_short', '成本')}</span>
+              <span className="truncate font-semibold text-text-secondary">{t('accounts.account_cost_short', '成本')}</span>
               <span className="text-right tabular-nums">
                 <span style={{ color: 'var(--ag-success)' }}>$</span>
                 <span className="text-text">{todayStats.account_cost.toFixed(2)}</span>
               </span>
             </span>
-            {row.platform === 'openai' && (row.today_image_count ?? 0) > 0 && (
-              <span
-                className={`${todayMetricClass} col-span-2`}
-                style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
-                title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}
-              >
-                <span className="truncate text-text-tertiary">{t('accounts.image_count_inline_label', '图')}</span>
-                <span className="text-right font-semibold tabular-nums">{formatCompact(row.today_image_count ?? 0, false)}</span>
-              </span>
-            )}
           </div>
         ) : null;
 
@@ -984,40 +1038,46 @@ export default function AccountsPage() {
           <div
             className={
               canRefresh
-                ? 'mx-auto flex flex-col gap-1.5 text-[11px] cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
-                : 'mx-auto flex flex-col gap-1.5 text-[11px] rounded px-1 py-0.5'
+                ? 'flex w-full flex-col gap-1.5 text-[11px] cursor-pointer rounded py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
+                : 'flex w-full flex-col gap-1.5 text-[11px] rounded py-0.5'
             }
-            style={{ fontFamily: 'var(--ag-font-mono)', width: 412, maxWidth: '100%' }}
+            style={{ fontFamily: 'var(--ag-font-mono)' }}
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
             <div
               className={
                 windows.length > 0
-                  ? 'grid w-full grid-cols-[minmax(0,1fr)_10.5rem] items-start justify-center gap-1.5'
+                  ? 'grid w-full grid-cols-[minmax(0,1fr)_1rem_18rem] items-start justify-center gap-0'
                   : 'flex flex-col items-center gap-1.5'
               }
             >
               <div className="flex min-w-0 flex-col gap-1">
-                {windows.map((w, i) => (
-                  <div key={i} className="grid h-5 grid-cols-[4rem_minmax(0,1fr)_2.25rem_3rem] items-center gap-1.5">
-                    <span className="inline-flex min-w-0 items-center justify-center truncate rounded px-1 py-0 text-[10px] font-medium" style={badgeStyle} title={w.label}>
-                      {shortLabel(w.label)}
-                    </span>
-                    <div className="h-1.5 min-w-0 overflow-hidden rounded-full" style={{ background: 'var(--ag-glass-border)' }}>
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{ width: `${Math.min(100, Math.round(w.used_percent))}%`, background: usageColor(w.used_percent) }}
-                      />
+                {windowRows.map((item) => {
+                  const w = item.window;
+                  if (!w) {
+                    return <div key={item.id} className="h-5" aria-hidden="true" />;
+                  }
+                  return (
+                    <div key={item.id} className="grid h-5 grid-cols-[2.5rem_minmax(7rem,1fr)_2.25rem_3rem] items-center gap-1.5">
+                      <span className="inline-flex min-w-0 items-center justify-center truncate rounded px-1 py-0 text-[11px] font-semibold text-text-secondary leading-none" style={badgeStyle} title={w.label}>
+                        {shortLabel(w.label)}
+                      </span>
+                      <div className="h-1.5 min-w-0 overflow-hidden rounded-full" style={{ background: 'var(--ag-glass-border)' }}>
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${Math.min(100, Math.round(w.used_percent))}%`, background: usageColor(w.used_percent) }}
+                        />
+                      </div>
+                      <span className="text-right leading-none" style={{ color: usageColor(w.used_percent), fontSize: 11, fontWeight: 600 }}>
+                        {Math.round(w.used_percent)}%
+                      </span>
+                      <span className="text-right leading-none" style={{ color: 'var(--ag-text-secondary)', fontSize: 11, fontWeight: 600 }}>
+                        {formatReset(w.reset_seconds)}
+                      </span>
                     </div>
-                    <span className="text-right" style={{ color: usageColor(w.used_percent), fontSize: 10 }}>
-                      {Math.round(w.used_percent)}%
-                    </span>
-                    <span className="text-right" style={{ color: 'var(--ag-text-tertiary)', fontSize: 10 }}>
-                      {formatReset(w.reset_seconds)}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
                 {credits && (
                   <div className="flex h-5 items-center gap-1">
                     <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
@@ -1029,6 +1089,7 @@ export default function AccountsPage() {
                   </div>
                 )}
               </div>
+              {windows.length > 0 ? <span aria-hidden="true" /> : null}
               {windows.length > 0 ? todayMetricChips ?? <div className={todayMetricColumnClass} /> : todayMetricChips}
             </div>
           </div>
@@ -1511,6 +1572,8 @@ export default function AccountsPage() {
       {/* 表格 */}
       <CommonTable
         ariaLabel={t('accounts.title', 'Accounts')}
+        className="ag-accounts-table"
+        contentClassName="ag-accounts-table-content"
         footer={(
           <TablePaginationFooter
             page={page}
@@ -1522,7 +1585,7 @@ export default function AccountsPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1320}
+        minWidth={1600}
       >
             <CommonTable.Header>
               <CommonTable.Column id="__selection__" className="text-center" style={{ minWidth: 52, width: 52 }}>
