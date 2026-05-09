@@ -193,9 +193,14 @@ func parseMultipartFields(body []byte, contentType string) parsedRequest {
 		if err != nil {
 			break
 		}
+		name := part.FormName()
+		if name != "model" && name != "stream" {
+			_ = part.Close()
+			continue
+		}
 		data, _ := io.ReadAll(part)
 		_ = part.Close()
-		switch part.FormName() {
+		switch name {
 		case "model":
 			pr.Model = strings.TrimSpace(string(data))
 		case "stream":

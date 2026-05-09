@@ -99,12 +99,20 @@ func (i *APIKeyInfo) UserGroupRate() (float64, bool) {
 // GenerateAPIKey 生成 API Key 和对应的哈希值
 // 返回明文密钥（仅展示一次）和用于存储的哈希
 func GenerateAPIKey() (key string, hash string, err error) {
-	// 生成 32 字节随机数据
+	return generatePrefixedAPIKey(apiKeyPrefix)
+}
+
+// GenerateAdminAPIKey 生成管理员 API Key，返回明文密钥和哈希。
+func GenerateAdminAPIKey() (key string, hash string, err error) {
+	return generatePrefixedAPIKey(adminKeyPrefix)
+}
+
+func generatePrefixedAPIKey(prefix string) (key string, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err = rand.Read(b); err != nil {
 		return "", "", err
 	}
-	key = apiKeyPrefix + hex.EncodeToString(b)
+	key = prefix + hex.EncodeToString(b)
 	hash = HashAPIKey(key)
 	return key, hash, nil
 }
@@ -113,17 +121,6 @@ func GenerateAPIKey() (key string, hash string, err error) {
 func HashAPIKey(key string) string {
 	h := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(h[:])
-}
-
-// GenerateAdminAPIKey 生成管理员 API Key，返回明文密钥和哈希。
-func GenerateAdminAPIKey() (key string, hash string, err error) {
-	b := make([]byte, 32)
-	if _, err = rand.Read(b); err != nil {
-		return "", "", err
-	}
-	key = adminKeyPrefix + hex.EncodeToString(b)
-	hash = HashAPIKey(key)
-	return key, hash, nil
 }
 
 // AdminKeyHint 生成管理员 API Key 的显示提示（前缀 + 前4位...后4位）。

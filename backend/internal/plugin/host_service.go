@@ -468,7 +468,7 @@ func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (
 	fwdCtx, cancel := context.WithTimeout(ctx, hostForwardTimeout(req))
 	defer cancel()
 
-	var hardExclude []int
+	hardExclude := make([]int, 0, maxHostForwardAttempts*len(routes))
 	for _, route := range routes {
 		model := h.resolveHostModel(route.Platform, req.Model)
 		if model == "" {
@@ -592,7 +592,7 @@ func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequ
 	defer cancel()
 
 	sw := &hostStreamWriter{stream: stream}
-	var hardExclude []int
+	hardExclude := make([]int, 0, maxHostForwardAttempts*len(routes))
 
 	for _, route := range routes {
 		model := h.resolveHostModel(route.Platform, req.Model)
@@ -911,13 +911,16 @@ func (h *HostService) recordHostForwardUsage(
 // listPlatforms 列出已加载的网关平台。
 func (h *HostService) listPlatforms(_ context.Context, _ *pb.HostListPlatformsRequest) (*pb.HostListPlatformsResponse, error) {
 	metas := h.manager.GetAllPluginMeta()
-	seen := make(map[string]bool)
-	var platforms []*pb.HostPlatform
+	seen := make(map[string]struct{}, len(metas))
+	platforms := make([]*pb.HostPlatform, 0, len(metas))
 	for _, m := range metas {
-		if m.Type != "gateway" || m.Platform == "" || seen[m.Platform] {
+		if m.Type != "gateway" || m.Platform == "" {
 			continue
 		}
-		seen[m.Platform] = true
+		if _, ok := seen[m.Platform]; ok {
+			continue
+		}
+		seen[m.Platform] = struct{}{}
 		platforms = append(platforms, &pb.HostPlatform{
 			Name:        m.Platform,
 			DisplayName: m.DisplayName,

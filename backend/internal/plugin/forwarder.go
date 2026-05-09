@@ -121,7 +121,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		return
 	}
 
-	var hardExclude []int
+	hardExclude := make([]int, 0, maxFailoverAttempts*len(routes))
 	var mwBag map[string]string
 	beginCalled := false
 	ctx := c.Request.Context()
@@ -134,7 +134,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		state.selectedRoute = route
 		state.keyInfo = keyInfoForRoute(state.keyInfo, route)
 
-		softExclude := []int(nil)
+		softExclude := make([]int, 0, maxFailoverAttempts)
 		attempt := 0
 		queueDeadline := time.Now().Add(queueWaitTimeout)
 
@@ -146,7 +146,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			if err := f.pickAccount(c, state, exclude...); err != nil {
 				failureSummary.recordPickAccountError(err)
 				if len(softExclude) > 0 && time.Now().Before(queueDeadline) {
-					softExclude = nil
+					softExclude = softExclude[:0]
 					select {
 					case <-ctx.Done():
 						return

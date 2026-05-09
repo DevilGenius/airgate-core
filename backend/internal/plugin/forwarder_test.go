@@ -1,7 +1,9 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -46,6 +48,37 @@ func TestParseBody_StreamTrue(t *testing.T) {
 	}
 	if parsed.SessionID != "sess-1" {
 		t.Fatalf("SessionID = %q, want %q", parsed.SessionID, "sess-1")
+	}
+}
+
+func TestParseBody_MultipartIgnoresFileParts(t *testing.T) {
+	t.Parallel()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	file, err := writer.CreateFormFile("image", "input.png")
+	if err != nil {
+		t.Fatalf("CreateFormFile error: %v", err)
+	}
+	if _, err := file.Write(bytes.Repeat([]byte("x"), 1024)); err != nil {
+		t.Fatalf("file.Write error: %v", err)
+	}
+	if err := writer.WriteField("model", " gpt-image-1 "); err != nil {
+		t.Fatalf("WriteField(model) error: %v", err)
+	}
+	if err := writer.WriteField("stream", "true"); err != nil {
+		t.Fatalf("WriteField(stream) error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close error: %v", err)
+	}
+
+	parsed := parseBody(body.Bytes(), writer.FormDataContentType())
+	if parsed.Model != "gpt-image-1" {
+		t.Fatalf("Model = %q, want %q", parsed.Model, "gpt-image-1")
+	}
+	if !parsed.Stream {
+		t.Fatalf("Stream = false, want true")
 	}
 }
 

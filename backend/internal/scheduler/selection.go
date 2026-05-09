@@ -37,7 +37,8 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 	}
 
 	now := time.Now()
-	var normalCandidates, stickyCandidates []*ent.Account
+	normalCandidates := make([]*ent.Account, 0, len(candidates))
+	stickyCandidates := make([]*ent.Account, 0, len(candidates))
 	for _, acc := range candidates {
 		switch s.checkSchedulability(ctx, acc, model, now) {
 		case Normal:
@@ -91,13 +92,13 @@ func excludeAccounts(candidates []*ent.Account, excludeIDs []int) []*ent.Account
 	if len(excludeIDs) == 0 {
 		return candidates
 	}
-	excludeSet := make(map[int]bool, len(excludeIDs))
+	excludeSet := make(map[int]struct{}, len(excludeIDs))
 	for _, id := range excludeIDs {
-		excludeSet[id] = true
+		excludeSet[id] = struct{}{}
 	}
-	filtered := candidates[:0]
+	filtered := make([]*ent.Account, 0, len(candidates))
 	for _, acc := range candidates {
-		if !excludeSet[acc.ID] {
+		if _, excluded := excludeSet[acc.ID]; !excluded {
 			filtered = append(filtered, acc)
 		}
 	}
