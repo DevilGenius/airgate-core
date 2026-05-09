@@ -1006,24 +1006,6 @@ export default function AccountsPage() {
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
         const todayImageCount = row.platform === 'openai' ? (row.today_image_count ?? 0) : 0;
         const showImageCount = row.platform === 'openai';
-        const accessLabel = showImageCount
-          ? (
-            <span className="inline-flex min-w-0 items-center">
-              <span className="truncate">{t('accounts.today_access_count', '访问')}</span>
-              <span aria-hidden="true" className="px-0.5 text-text">-</span>
-              <span>{t('accounts.image_count_inline_label', '图').trim()}</span>
-            </span>
-          )
-          : t('accounts.today_access_count', '访问');
-        const accessValue = showImageCount
-          ? (
-            <span className="inline-flex min-w-0 items-center justify-end">
-              <span>{formatCompact(todayStats?.requests ?? 0, false)}</span>
-              <span aria-hidden="true" className="px-0.5 text-text">-</span>
-              <span className="text-text">{formatCompact(todayImageCount, false)}</span>
-            </span>
-          )
-          : formatCompact(todayStats?.requests ?? 0, false);
         const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-0.5 rounded-[var(--field-radius)] border px-1 text-[11px] leading-none shadow-sm';
         const todayMetricStyle = (color: string, foreground = color) => ({
           background: `color-mix(in srgb, ${color} 10%, transparent)`,
@@ -1036,18 +1018,24 @@ export default function AccountsPage() {
             className={todayMetricColumnClass}
             title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
           >
-            <span
-              className={todayMetricClass}
-              style={todayMetricStyle('var(--ag-info)')}
-              title={showImageCount ? t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）') : undefined}
-            >
-              <span className="min-w-0 truncate font-semibold text-text-secondary">{accessLabel}</span>
-              <span className="min-w-0 justify-self-end text-right font-semibold tabular-nums">{accessValue}</span>
+            <span className={todayMetricClass} style={todayMetricStyle('var(--ag-info)')}>
+              <span className="min-w-0 truncate font-semibold text-text-secondary">{t('accounts.today_access_count', '访问')}</span>
+              <span className="min-w-0 justify-self-end text-right font-semibold tabular-nums">{formatCompact(todayStats.requests, false)}</span>
             </span>
             <span className={todayMetricClass} style={todayMetricStyle('var(--ag-primary)')}>
               <span className="truncate font-semibold text-text-secondary">Token</span>
               <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.tokens)}</span>
             </span>
+            {showImageCount && (
+              <span
+                className={todayMetricClass}
+                style={todayMetricStyle('var(--ag-info)')}
+                title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}
+              >
+                <span className="min-w-0 truncate font-semibold text-text-secondary">{t('accounts.image_count_inline_label', '生图')}</span>
+                <span className="min-w-0 justify-self-end text-right font-semibold tabular-nums">{formatCompact(todayImageCount, false)}</span>
+              </span>
+            )}
             <span
               className={todayMetricClass}
               style={todayMetricStyle('var(--ag-warning)')}
