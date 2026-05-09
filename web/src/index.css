@@ -781,6 +781,26 @@ input[type="number"]::-webkit-outer-spin-button {
   outline: none !important;
 }
 
+.ag-combobox-preview-trigger.combo-box__trigger {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.ag-combobox-preview-trigger.combo-box__trigger:hover,
+.ag-combobox-preview-trigger.combo-box__trigger[data-hovered="true"] {
+  background-color: color-mix(in oklab, var(--field-background) 72%, var(--surface) 28%) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.ag-combobox-preview-trigger.combo-box__trigger:focus-visible,
+.ag-combobox-preview-trigger.combo-box__trigger[data-focus-visible="true"] {
+  background-color: color-mix(in oklab, var(--field-background) 72%, var(--surface) 28%) !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 0 1px var(--focus) !important;
+}
+
 .ag-usage-date-range .date-input-group__suffix {
   gap: 0.125rem;
 }

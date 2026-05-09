@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Label, ListBox, Modal, Select, Spinner, useOverlayState } from '@heroui/react';
-import { User } from 'lucide-react';
+import { Button, Checkbox, Input, Label, ListBox, Modal, Select, Spinner, useOverlayState } from '@heroui/react';
+import { Search, User } from 'lucide-react';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type {
   BulkAssignReq,
@@ -28,11 +28,13 @@ export function BulkAssignModal({
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [groupId, setGroupId] = useState(0);
   const [expiresAt, setExpiresAt] = useState('');
+  const [userKeyword, setUserKeyword] = useState('');
 
   const handleClose = () => {
     setSelectedUserIds([]);
     setGroupId(0);
     setExpiresAt('');
+    setUserKeyword('');
     onClose();
   };
 
@@ -52,14 +54,21 @@ export function BulkAssignModal({
       user_ids: selectedUserIds,
     });
   };
-  const groupOptions = [
-    { id: '0', label: t('subscriptions.select_group') },
-    ...groups.map((group) => ({
-      id: String(group.id),
-      label: `${group.name} (${group.platform})`,
-    })),
-  ];
-  const selectedGroupLabel = groupOptions.find((item) => item.id === String(groupId))?.label ?? t('subscriptions.select_group');
+  const groupOptions = groups.map((group) => ({
+    id: String(group.id),
+    label: `${group.name} (${group.platform})`,
+  }));
+  const selectedGroupLabel = groupOptions.find((item) => item.id === String(groupId))?.label;
+  const selectedUserIdSet = useMemo(() => new Set(selectedUserIds), [selectedUserIds]);
+  const filteredUsers = useMemo(() => {
+    const keyword = userKeyword.trim().toLowerCase();
+    if (!keyword) return users;
+    return users.filter((user) =>
+      user.email.toLowerCase().includes(keyword) ||
+      (user.username ?? '').toLowerCase().includes(keyword) ||
+      String(user.id).includes(keyword),
+    );
+  }, [userKeyword, users]);
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -81,40 +90,71 @@ export function BulkAssignModal({
             </Modal.Header>
             <Modal.Body>
               <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium uppercaser text-text-secondary">
-                    {t('subscriptions.select_users')} <span className="text-danger">*</span>
-                  </p>
-                  <div className="max-h-48 space-y-0.5 overflow-y-auto rounded-md border border-glass-border bg-bg-surface p-2">
-                    {users.map((user) => (
-                      <Checkbox
-                        key={user.id}
-                        isSelected={selectedUserIds.includes(user.id)}
-                        onChange={(selected) => toggleUser(user.id, selected)}
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-text-tertiary" />
-                          <span className="text-sm">
-                            {user.email} ({user.username || '-'})
-                          </span>
-                        </span>
-                      </Checkbox>
-                    ))}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label>
+                      {t('subscriptions.select_users')} <span className="text-danger">*</span>
+                    </Label>
+                    <span className="font-mono text-xs text-text-tertiary">
+                      {t('subscriptions.selected_count', { count: selectedUserIds.length })}
+                    </span>
                   </div>
-                  <p className="font-mono text-xs text-text-tertiary">
-                    {t('subscriptions.selected_count', { count: selectedUserIds.length })}
-                  </p>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                    <Input
+                      className="pl-9"
+                      value={userKeyword}
+                      onChange={(event) => setUserKeyword(event.target.value)}
+                      placeholder={t('users.search_placeholder')}
+                    />
+                  </div>
+                  <div className="grid max-h-56 gap-2 overflow-y-auto rounded-md border border-glass-border bg-surface p-2">
+                    {filteredUsers.length === 0 ? (
+                      <div className="flex min-h-20 items-center justify-center text-sm text-text-tertiary">
+                        {t('common.no_data')}
+                      </div>
+                    ) : filteredUsers.map((user) => {
+                      const isSelected = selectedUserIdSet.has(user.id);
+                      return (
+                        <Checkbox
+                          key={user.id}
+                          className={`w-full rounded-md border p-2.5 transition-colors ${
+                            isSelected
+                              ? 'border-primary bg-primary-subtle'
+                              : 'border-border-subtle bg-bg-surface hover:bg-bg-hover'
+                          }`}
+                          isSelected={isSelected}
+                          onChange={(selected) => toggleUser(user.id, selected)}
+                        >
+                          <Checkbox.Control className={isSelected ? 'border-primary bg-primary text-primary-foreground' : undefined}>
+                            <Checkbox.Indicator />
+                          </Checkbox.Control>
+                          <Checkbox.Content>
+                            <span className="flex min-w-0 items-center gap-2">
+                              <User className={isSelected ? 'h-3.5 w-3.5 shrink-0 text-primary' : 'h-3.5 w-3.5 shrink-0 text-text-tertiary'} />
+                              <span className="min-w-0 text-left">
+                                <span className="block truncate text-sm font-medium text-text">{user.email}</span>
+                                <span className="block truncate text-xs text-text-tertiary">{user.username || '-'}</span>
+                              </span>
+                            </span>
+                          </Checkbox.Content>
+                        </Checkbox>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <Select
                   fullWidth
                   isRequired
-                  selectedKey={String(groupId)}
+                  selectedKey={groupId ? String(groupId) : null}
                   onSelectionChange={(key) => setGroupId(key == null ? 0 : Number(key))}
                 >
                   <Label>{t('subscriptions.group')}</Label>
                   <Select.Trigger>
-                    <Select.Value>{selectedGroupLabel}</Select.Value>
+                    <Select.Value>
+                      {selectedGroupLabel ?? <span className="text-text-tertiary">{t('subscriptions.select_group')}</span>}
+                    </Select.Value>
                     <Select.Indicator />
                   </Select.Trigger>
                   <Select.Popover>
