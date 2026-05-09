@@ -1299,7 +1299,7 @@ export default function AccountsPage() {
       selectedLabel: selectedPlatformLabel,
       options: PLATFORM_OPTIONS,
       setValue: setPlatformFilter,
-      widthClass: 'w-full sm:w-48',
+      widthClass: 'w-full sm:w-36',
     },
     {
       key: 'state',
@@ -1308,7 +1308,7 @@ export default function AccountsPage() {
       selectedLabel: selectedStateLabel,
       options: STATE_OPTIONS,
       setValue: setStateFilter,
-      widthClass: 'w-full sm:w-48',
+      widthClass: 'w-full sm:w-36',
     },
     {
       key: 'type',
@@ -1317,7 +1317,7 @@ export default function AccountsPage() {
       selectedLabel: selectedTypeLabel,
       options: typeOptions,
       setValue: setTypeFilter,
-      widthClass: 'w-full sm:w-48',
+      widthClass: 'w-full sm:w-36',
     },
     {
       key: 'group',
@@ -1326,7 +1326,7 @@ export default function AccountsPage() {
       selectedLabel: selectedGroupLabel,
       options: groupOptions,
       setValue: setGroupFilter,
-      widthClass: 'w-full sm:w-48',
+      widthClass: 'w-full sm:w-36',
     },
     {
       key: 'proxy',
@@ -1335,7 +1335,7 @@ export default function AccountsPage() {
       selectedLabel: selectedProxyLabel,
       options: proxyOptions,
       setValue: setProxyFilter,
-      widthClass: 'w-full sm:w-48',
+      widthClass: 'w-full sm:w-36',
     },
   ];
   const columnAlignClass = (align?: AccountTableColumn['align']) => (
@@ -1357,11 +1357,11 @@ export default function AccountsPage() {
     <div>
       <div className="relative mb-5 min-h-12">
         <div
-          className={`flex min-h-12 flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap ${
+          className={`flex min-h-12 flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap ${
             selectedIds.length > 0 ? 'invisible' : ''
           }`}
         >
-          <div className="w-full sm:w-48">
+          <div className="w-full sm:w-40">
             <HeroTextField fullWidth>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
@@ -1418,7 +1418,7 @@ export default function AccountsPage() {
             </Button>
           ) : null}
 
-          <div className="flex flex-wrap items-center justify-end gap-2 sm:ml-auto">
+          <div className="flex flex-wrap items-center justify-end gap-1.5 sm:ml-auto">
             <Button
               isIconOnly
               aria-label={t('common.refresh')}
