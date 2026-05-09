@@ -8,6 +8,7 @@ import { useToast } from '../ui';
  * 返回 copy 函数，自动处理错误和用户反馈。
  * - 成功时显示 toast 提示
  * - 失败时回退到 execCommand('copy') 并显示错误提示
+ * - 返回是否复制成功，便于按钮展示成功状态
  */
 export function useClipboard() {
   const { toast } = useToast();
@@ -20,7 +21,7 @@ export function useClipboard() {
         try {
           await navigator.clipboard.writeText(text);
           toast('success', successMsg ?? t('common.copied'));
-          return;
+          return true;
         } catch { /* 继续回退 */ }
       }
 
@@ -38,11 +39,12 @@ export function useClipboard() {
         document.body.removeChild(textarea);
         if (ok) {
           toast('success', successMsg ?? t('common.copied'));
-          return;
+          return true;
         }
       } catch { /* 继续回退 */ }
 
       toast('error', t('common.copy_failed', '复制失败'));
+      return false;
     },
     [toast, t],
   );

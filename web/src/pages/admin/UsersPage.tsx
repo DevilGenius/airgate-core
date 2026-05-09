@@ -259,11 +259,11 @@ export default function UsersPage() {
                       <span className="text-xs text-text-secondary">{formatDateTime(row.created_at)}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <div className="flex items-center justify-center gap-0.5">
+                      <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
                         <Button
                           isIconOnly
                           size="sm"
-                          variant="ghost"
+                          variant="secondary"
                           aria-label={t('common.edit')}
                           onPress={() => setEditingUser(row)}
                         >
@@ -272,7 +272,7 @@ export default function UsersPage() {
                         <Dropdown>
                           <Dropdown.Trigger
                             aria-label={t('common.more')}
-                            className="button button--icon-only button--sm button--ghost"
+                            className="ag-table-row-more-trigger button button--icon-only button--sm button--secondary"
                           >
                             <MoreHorizontal className="w-3.5 h-3.5" />
                           </Dropdown.Trigger>

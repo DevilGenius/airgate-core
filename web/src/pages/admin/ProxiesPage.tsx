@@ -254,10 +254,10 @@ export default function ProxiesPage() {
                       <StatusChip status={row.status} />
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <div className="flex gap-1">
+                      <div className="ag-table-row-actions flex justify-center gap-1">
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="secondary"
                           onPress={() => openEdit(row)}
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -265,7 +265,7 @@ export default function ProxiesPage() {
                         </Button>
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="secondary"
                           isDisabled={testingId === row.id}
                           onPress={() => handleTest(row.id)}
                         >
@@ -274,7 +274,7 @@ export default function ProxiesPage() {
                         </Button>
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="danger-soft"
                           className="text-danger"
                           onPress={() => setDeleteTarget(row)}
                         >

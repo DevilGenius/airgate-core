@@ -228,11 +228,11 @@ export default function PluginsPage() {
                         </div>
                       </HeroTable.Cell>
                       <HeroTable.Cell>
-                        <div className="flex gap-1 justify-center">
+                        <div className="ag-table-row-actions flex gap-1 justify-center">
                           {row.config_schema && row.config_schema.length > 0 && (
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="secondary"
                               onPress={() => setConfigTarget(row)}
                             >
                               <Settings className="w-3.5 h-3.5" />
@@ -247,7 +247,7 @@ export default function PluginsPage() {
                             return (
                               <Button
                                 size="sm"
-                                variant="ghost"
+                                variant="secondary"
                                 isDisabled={reloadMutation.isPending}
                                 onPress={() => reloadMutation.mutate(row.name)}
                               >
@@ -258,7 +258,7 @@ export default function PluginsPage() {
                           })()}
                           <Button
                             size="sm"
-                            variant="ghost"
+                            variant="danger-soft"
                             className="text-danger"
                             onPress={() => setUninstallTarget(row)}
                           >
