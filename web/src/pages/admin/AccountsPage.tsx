@@ -859,7 +859,7 @@ export default function AccountsPage() {
     ...[{
       key: 'usage_window',
       title: t('accounts.usage_window'),
-      width: '560px',
+      width: '240px',
       align: 'center' as const,
       hideOnMobile: true,
       render: (row: AccountResp) => {
@@ -1024,13 +1024,13 @@ export default function AccountsPage() {
             </span>
           )
           : formatCompact(todayStats?.requests ?? 0, false);
-        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-1 rounded-[var(--field-radius)] border px-1.5 text-[11px] leading-none shadow-sm';
+        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-0.5 rounded-[var(--field-radius)] border px-1 text-[11px] leading-none shadow-sm';
         const todayMetricStyle = (color: string, foreground = color) => ({
           background: `color-mix(in srgb, ${color} 10%, transparent)`,
           borderColor: `color-mix(in srgb, ${color} 22%, var(--ag-border))`,
           color: foreground,
         });
-        const todayMetricColumnClass = 'grid w-[18rem] justify-self-end grid-cols-2 gap-1';
+        const todayMetricColumnClass = 'grid w-full grid-cols-2 gap-0.5';
         const todayMetricChips = hasTodayStats && todayStats ? (
           <div
             className={todayMetricColumnClass}
@@ -1084,7 +1084,7 @@ export default function AccountsPage() {
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
-            <div className="grid w-full grid-cols-[minmax(0,1fr)_1rem_18rem] items-start justify-center gap-0">
+            <div className="flex w-full flex-col gap-2">
               <div className="flex min-w-0 flex-col gap-1">
                 {windowRows.map((item) => {
                   const w = item.window;
@@ -1092,22 +1092,22 @@ export default function AccountsPage() {
                     return <div key={item.id} className="h-5" aria-hidden="true" />;
                   }
                   return (
-                    <div key={item.id} className="grid h-5 grid-cols-[2.5rem_minmax(7rem,1fr)_2.25rem_3rem] items-center gap-1.5">
-                      <span className="inline-flex min-w-0 items-center justify-center truncate rounded px-1 py-0 text-[11px] font-semibold text-text-secondary leading-none" style={badgeStyle} title={w.label}>
-                        {shortLabel(w.label)}
-                      </span>
+                    <div key={item.id} className="flex min-w-0 flex-col gap-1">
+                      <div className="flex items-baseline justify-between">
+                        <span className="inline-flex min-w-0 items-center truncate rounded px-1 py-0 text-[11px] font-semibold text-text-secondary leading-none" style={badgeStyle} title={w.label}>
+                          {shortLabel(w.label)}
+                        </span>
+                        <span className="flex items-center gap-1.5 text-[11px] font-semibold leading-none">
+                          <span style={{ color: usageColor(w.used_percent) }}>{Math.round(w.used_percent)}%</span>
+                          <span style={{ color: 'var(--ag-text-tertiary)' }}>{formatReset(w.reset_seconds)}</span>
+                        </span>
+                      </div>
                       <div className="h-1.5 min-w-0 overflow-hidden rounded-full" style={{ background: 'var(--ag-glass-border)' }}>
                         <div
                           className="h-full rounded-full transition-all"
                           style={{ width: `${Math.min(100, Math.round(w.used_percent))}%`, background: usageColor(w.used_percent) }}
                         />
                       </div>
-                      <span className="text-right leading-none" style={{ color: usageColor(w.used_percent), fontSize: 11, fontWeight: 600 }}>
-                        {Math.round(w.used_percent)}%
-                      </span>
-                      <span className="text-right leading-none" style={{ color: 'var(--ag-text-secondary)', fontSize: 11, fontWeight: 600 }}>
-                        {formatReset(w.reset_seconds)}
-                      </span>
                     </div>
                   );
                 })}
@@ -1122,8 +1122,7 @@ export default function AccountsPage() {
                   </div>
                 )}
               </div>
-              <span aria-hidden="true" />
-              {todayMetricChips ?? <div className={todayMetricColumnClass} />}
+              {todayMetricChips}
             </div>
           </div>
         );
