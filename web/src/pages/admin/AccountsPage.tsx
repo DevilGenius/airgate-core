@@ -1010,8 +1010,8 @@ export default function AccountsPage() {
           ? (
             <span className="inline-flex min-w-0 items-center">
               <span className="truncate">{t('accounts.today_access_count', '访问')}</span>
-              <span aria-hidden="true">|</span>
-              <span style={{ color: 'var(--ag-success)' }}>{t('accounts.image_count_inline_label', '图').trim()}</span>
+              <span aria-hidden="true" className="px-0.5 text-text">-</span>
+              <span>{t('accounts.image_count_inline_label', '图').trim()}</span>
             </span>
           )
           : t('accounts.today_access_count', '访问');
@@ -1019,8 +1019,8 @@ export default function AccountsPage() {
           ? (
             <span className="inline-flex min-w-0 items-center justify-end">
               <span>{formatCompact(todayStats?.requests ?? 0, false)}</span>
-              <span aria-hidden="true">|</span>
-              <span style={{ color: 'var(--ag-success)' }}>{formatCompact(todayImageCount, false)}</span>
+              <span aria-hidden="true" className="px-0.5 text-text">-</span>
+              <span className="text-text">{formatCompact(todayImageCount, false)}</span>
             </span>
           )
           : formatCompact(todayStats?.requests ?? 0, false);
@@ -1084,13 +1084,7 @@ export default function AccountsPage() {
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
-            <div
-              className={
-                windows.length > 0
-                  ? 'grid w-full grid-cols-[minmax(0,1fr)_1rem_18rem] items-start justify-center gap-0'
-                  : 'flex flex-col items-center gap-1.5'
-              }
-            >
+            <div className="grid w-full grid-cols-[minmax(0,1fr)_1rem_18rem] items-start justify-center gap-0">
               <div className="flex min-w-0 flex-col gap-1">
                 {windowRows.map((item) => {
                   const w = item.window;
@@ -1128,8 +1122,8 @@ export default function AccountsPage() {
                   </div>
                 )}
               </div>
-              {windows.length > 0 ? <span aria-hidden="true" /> : null}
-              {windows.length > 0 ? todayMetricChips ?? <div className={todayMetricColumnClass} /> : todayMetricChips}
+              <span aria-hidden="true" />
+              {todayMetricChips ?? <div className={todayMetricColumnClass} />}
             </div>
           </div>
         );
