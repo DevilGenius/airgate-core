@@ -273,11 +273,11 @@ export default function GroupsPage() {
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <div className="flex items-center justify-center gap-0.5">
+                      <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
                         <Button
                           isIconOnly
                           size="sm"
-                          variant="ghost"
+                          variant="secondary"
                           aria-label={t('common.edit')}
                           onPress={() => setEditingGroup(row)}
                         >
@@ -286,7 +286,7 @@ export default function GroupsPage() {
                         <Button
                           isIconOnly
                           size="sm"
-                          variant="ghost"
+                          variant="secondary"
                           aria-label={t('groups.rate_override_manage')}
                           onPress={() => setRateOverrideGroup(row)}
                         >
@@ -295,7 +295,7 @@ export default function GroupsPage() {
                         <Button
                           isIconOnly
                           size="sm"
-                          variant="ghost"
+                          variant="danger-soft"
                           className="text-danger"
                           aria-label={t('common.delete')}
                           onPress={() => setDeletingGroup(row)}

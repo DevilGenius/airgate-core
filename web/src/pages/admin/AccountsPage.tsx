@@ -1161,7 +1161,7 @@ export default function AccountsPage() {
       width: '116px',
       align: 'center',
       render: (row) => (
-        <div className="ag-account-row-actions mx-auto flex w-[92px] items-center justify-center gap-1">
+        <div className="ag-table-row-actions ag-account-row-actions mx-auto flex w-[92px] items-center justify-center gap-1">
           <Button
             isIconOnly
             aria-label={t('common.edit')}

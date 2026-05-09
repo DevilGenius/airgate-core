@@ -17,8 +17,10 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { useClipboard } from '../../shared/hooks/useClipboard';
+import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
 import {
   AlertTriangle,
+  Check,
   Copy,
   Plus,
   Pencil,
@@ -56,6 +58,11 @@ export default function UserKeysPage() {
   // 显示新创建密钥的弹窗
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const {
+    copied: revealedKeyCopied,
+    showCopied: showRevealedKeyCopied,
+    resetCopied: resetRevealedKeyCopied,
+  } = useCopyFeedback();
 
   // 密钥列表
   const { data, isLoading, refetch } = useQuery({
@@ -245,10 +252,19 @@ export default function UserKeysPage() {
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
+  const closeRevealedKeyModal = () => {
+    resetRevealedKeyCopied();
+    setRevealedKey(null);
+  };
+  const handleCopyRevealedKey = async () => {
+    if (await copy(revealedKey || '')) {
+      showRevealedKeyCopied();
+    }
+  };
   const revealedKeyModalState = useOverlayState({
     isOpen: !!revealedKey,
     onOpenChange: (open) => {
-      if (!open) setRevealedKey(null);
+      if (!open) closeRevealedKeyModal();
     },
   });
 
@@ -425,11 +441,11 @@ export default function UserKeysPage() {
                       : t('user_keys.never_expire')}
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <div className="flex items-center justify-center gap-0.5">
+                    <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
                       <Button
                         isIconOnly
                         size="sm"
-                        variant="ghost"
+                        variant="secondary"
                         aria-label={t('api_keys.reveal')}
                         onPress={() => revealMutation.mutate(row.id)}
                       >
@@ -438,7 +454,7 @@ export default function UserKeysPage() {
                       <Button
                         isIconOnly
                         size="sm"
-                        variant="ghost"
+                        variant="secondary"
                         aria-label={t('user_keys.use_key')}
                         onPress={() => openUseKeyModal(row)}
                       >
@@ -447,7 +463,7 @@ export default function UserKeysPage() {
                       <Dropdown>
                         <Dropdown.Trigger
                           aria-label={t('common.more')}
-                          className="button button--icon-only button--sm button--ghost"
+                          className="ag-table-row-more-trigger button button--icon-only button--sm button--secondary"
                         >
                           <MoreHorizontal className="w-3.5 h-3.5" />
                         </Dropdown.Trigger>
@@ -557,15 +573,19 @@ export default function UserKeysPage() {
                     <code className="flex-1 break-all rounded-md border border-glass-border bg-surface px-3 py-2 font-mono text-sm text-text">
                       {revealedKey || ''}
                     </code>
-                    <Button size="sm" variant="secondary" onPress={() => copy(revealedKey || '')}>
-                      <Copy className="h-3.5 w-3.5" />
-                      {t('common.copy')}
+                    <Button size="sm" variant="secondary" onPress={handleCopyRevealedKey}>
+                      {revealedKeyCopied
+                        ? <Check className="h-3.5 w-3.5 text-success" />
+                        : <Copy className="h-3.5 w-3.5" />}
+                      <span className={revealedKeyCopied ? 'text-success' : undefined}>
+                        {t('common.copy')}
+                      </span>
                     </Button>
                   </div>
                 </div>
               </Modal.Body>
               <Modal.Footer>
-                <Button variant="primary" onPress={() => setRevealedKey(null)}>
+                <Button variant="primary" onPress={closeRevealedKeyModal}>
                   {t('common.close')}
                 </Button>
               </Modal.Footer>

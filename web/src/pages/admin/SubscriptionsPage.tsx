@@ -242,14 +242,16 @@ export default function SubscriptionsPage() {
                       <StatusChip status={row.status} />
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onPress={() => setAdjustingSub(row)}
-                      >
-                        <Settings2 className="w-3.5 h-3.5" />
-                        {t('subscriptions.adjust')}
-                      </Button>
+                      <div className="ag-table-row-actions flex justify-center">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onPress={() => setAdjustingSub(row)}
+                        >
+                          <Settings2 className="w-3.5 h-3.5" />
+                          {t('subscriptions.adjust')}
+                        </Button>
+                      </div>
                     </CommonTable.Cell>
                   </CommonTable.Row>
                 ))

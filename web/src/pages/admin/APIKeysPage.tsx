@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Copy, Plus, Pencil, Trash2, Key, Layers, Eye, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Plus, Pencil, Trash2, Key, Layers, Eye, RefreshCw } from 'lucide-react';
 import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
 import {
   StatusChip,
@@ -18,6 +18,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { useClipboard } from '../../shared/hooks/useClipboard';
+import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
 import { CreateKeyModal } from './apikeys/CreateKeyModal';
 import { EditKeyModal } from './apikeys/EditKeyModal';
 import type { APIKeyResp, GroupResp } from '../../shared/types';
@@ -32,6 +33,11 @@ export default function APIKeysPage() {
   const [deletingKey, setDeletingKey] = useState<APIKeyResp | null>(null);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const {
+    copied: revealedKeyCopied,
+    showCopied: showRevealedKeyCopied,
+    resetCopied: resetRevealedKeyCopied,
+  } = useCopyFeedback();
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.apikeys(page, pageSize),
@@ -80,6 +86,15 @@ export default function APIKeysPage() {
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
+  const closeRevealedKeyModal = () => {
+    resetRevealedKeyCopied();
+    setRevealedKey(null);
+  };
+  const handleCopyRevealedKey = async () => {
+    if (await copy(revealedKey ?? '')) {
+      showRevealedKeyCopied();
+    }
+  };
   const createdKeyModalState = useOverlayState({
     isOpen: !!createdKey,
     onOpenChange: (open) => {
@@ -89,7 +104,7 @@ export default function APIKeysPage() {
   const revealedKeyModalState = useOverlayState({
     isOpen: !!revealedKey,
     onOpenChange: (open) => {
-      if (!open) setRevealedKey(null);
+      if (!open) closeRevealedKeyModal();
     },
   });
 
@@ -214,10 +229,10 @@ export default function APIKeysPage() {
                     <span className="font-mono">{formatExpiry(row.expires_at)}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <div className="flex gap-1">
+                    <div className="ag-table-row-actions flex justify-center gap-1">
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="secondary"
                         isDisabled={revealMutation.isPending}
                         onPress={() => revealMutation.mutate(row.id)}
                       >
@@ -226,7 +241,7 @@ export default function APIKeysPage() {
                       </Button>
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="secondary"
                         onPress={() => setEditingKey(row)}
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -234,8 +249,8 @@ export default function APIKeysPage() {
                       </Button>
                       <Button
                         size="sm"
-                        variant="ghost"
-                        style={{ color: 'var(--ag-danger)' }}
+                        variant="danger-soft"
+                        className="text-danger"
                         onPress={() => setDeletingKey(row)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -319,15 +334,19 @@ export default function APIKeysPage() {
                     <code className="flex-1 break-all rounded-md border border-glass-border bg-surface px-3 py-2 font-mono text-sm text-text">
                       {revealedKey ?? ''}
                     </code>
-                    <Button size="sm" variant="secondary" onPress={() => copy(revealedKey ?? '')}>
-                      <Copy className="h-3.5 w-3.5" />
-                      {t('common.copy')}
+                    <Button size="sm" variant="secondary" onPress={handleCopyRevealedKey}>
+                      {revealedKeyCopied
+                        ? <Check className="h-3.5 w-3.5 text-success" />
+                        : <Copy className="h-3.5 w-3.5" />}
+                      <span className={revealedKeyCopied ? 'text-success' : undefined}>
+                        {t('common.copy')}
+                      </span>
                     </Button>
                   </div>
                 </div>
               </Modal.Body>
               <Modal.Footer>
-                <Button variant="primary" onPress={() => setRevealedKey(null)}>
+                <Button variant="primary" onPress={closeRevealedKeyModal}>
                   {t('common.close')}
                 </Button>
               </Modal.Footer>
