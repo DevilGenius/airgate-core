@@ -1149,6 +1149,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .ag-resource-table-scroll,
 .ag-usage-table-scroll {
+  position: relative;
   max-width: 100%;
   overflow-x: auto !important;
   overflow-y: hidden;
@@ -1217,10 +1218,37 @@ input[type="number"]::-webkit-outer-spin-button {
 .ag-accounts-table {
   --ag-accounts-table-header-height: 2.25rem;
   --ag-accounts-table-row-height: 3rem;
+  --ag-accounts-table-width: 1458px;
+  --ag-accounts-current-table-width: var(--ag-accounts-table-width);
+  --ag-accounts-selection-column-width: 36px;
 }
 
 .ag-accounts-table-content {
   table-layout: fixed;
+}
+
+@media (max-width: 767px) {
+  .ag-accounts-table {
+    --ag-accounts-table-width: 1144px;
+    --ag-accounts-current-table-width: 1144px;
+    --ag-accounts-selection-column-width: 32px;
+    --ag-accounts-col-name-width: 112px;
+    --ag-accounts-col-platform-width: 84px;
+    --ag-accounts-col-groups-width: 80px;
+    --ag-accounts-col-capacity-width: 68px;
+    --ag-accounts-col-status-width: 76px;
+    --ag-accounts-col-scheduling-width: 72px;
+    --ag-accounts-col-rate_multiplier-width: 72px;
+    --ag-accounts-col-usage_window-width: 364px;
+    --ag-accounts-col-last_used_at-width: 88px;
+    --ag-accounts-col-actions-width: 96px;
+  }
+
+  .ag-account-capacity {
+    min-width: 4rem;
+    padding-inline: 0.375rem;
+    font-size: 0.75rem;
+  }
 }
 
 .ag-account-auto-refresh-trigger.dropdown__trigger,
@@ -1339,6 +1367,138 @@ input[type="number"]::-webkit-outer-spin-button {
   color: var(--ag-text);
 }
 
+.ag-account-usage-cell {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  gap: 0.375rem;
+  border-radius: 0.25rem;
+  padding-block: 0.125rem;
+  font-size: 0.6875rem;
+  line-height: 1;
+}
+
+.ag-account-usage-cell--refreshable {
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+
+.ag-account-usage-cell--refreshable:hover {
+  background: var(--ag-glass-border);
+}
+
+.ag-account-usage-layout {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(10.75rem, 1fr) 0.25rem minmax(11.75rem, 1fr);
+  align-items: start;
+}
+
+.ag-account-usage-windows {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ag-account-usage-window-row {
+  display: grid;
+  height: 1.25rem;
+  min-width: 0;
+  grid-template-columns: 1.75rem minmax(5rem, 1fr) 1.375rem 2.25rem;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.ag-account-usage-window-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-usage-bar {
+  height: 0.375rem;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.ag-account-usage-percent,
+.ag-account-usage-reset {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ag-account-usage-reset {
+  color: var(--ag-text-secondary);
+}
+
+.ag-account-usage-metrics {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.125rem;
+}
+
+.ag-account-usage-metric {
+  display: inline-grid;
+  height: 1.25rem;
+  min-width: 0;
+  grid-template-columns: minmax(2.5rem, 0.9fr) minmax(2.75rem, 1.1fr);
+  align-items: center;
+  gap: 0.125rem;
+  border: 1px solid;
+  border-radius: var(--field-radius);
+  padding-inline: 0.125rem;
+  font-size: 0.625rem;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+}
+
+.ag-account-usage-metric-label,
+.ag-account-usage-metric-value {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ag-account-usage-metric-label {
+  text-overflow: ellipsis;
+}
+
+.ag-account-usage-metric-value {
+  justify-self: end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-account-usage-metric-value--solo {
+  grid-column: 1 / -1;
+  justify-self: center;
+  text-align: center;
+}
+
 @keyframes ag-account-capacity-pulse {
   0% {
     box-shadow: 0 0 0 0 color-mix(in oklab, var(--ag-account-capacity-pulse-color) 48%, transparent);
@@ -1403,6 +1563,67 @@ input[type="number"]::-webkit-outer-spin-button {
   white-space: nowrap !important;
 }
 
+.ag-accounts-table :where(.ag-accounts-bulk-header-bar) {
+  left: var(--ag-accounts-selection-column-width) !important;
+  width: max(
+    calc(var(--ag-accounts-table-width) - var(--ag-accounts-selection-column-width)),
+    calc(100% - var(--ag-accounts-selection-column-width))
+  ) !important;
+  max-width: none !important;
+  height: var(--ag-accounts-table-header-height) !important;
+  min-height: var(--ag-accounts-table-header-height) !important;
+  max-height: var(--ag-accounts-table-header-height) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button {
+  box-sizing: border-box !important;
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  padding: 0 0.55rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1 !important;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease !important;
+}
+
+.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button > :where(span, svg) {
+  line-height: 1 !important;
+}
+
+.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button > svg {
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+  margin: 0 !important;
+}
+
+.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button:hover,
+.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button[data-hovered="true"] {
+  border-color: color-mix(in oklab, var(--ag-primary) 38%, var(--border) 62%) !important;
+  background: color-mix(in oklab, var(--ag-primary) 12%, var(--background) 88%) !important;
+  color: var(--ag-primary) !important;
+}
+
+.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button:active,
+.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button[data-pressed="true"] {
+  transform: translateY(1px);
+}
+
+.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.text-danger:hover,
+.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.text-danger[data-hovered="true"] {
+  border-color: color-mix(in oklab, var(--ag-danger) 38%, var(--border) 62%) !important;
+  background: color-mix(in oklab, var(--ag-danger) 12%, var(--background) 88%) !important;
+  color: var(--ag-danger) !important;
+}
+
+.ag-accounts-table :where(.ag-accounts-bulk-header-bar .ag-bulk-selected-count) {
+  font-size: 0.875rem;
+}
+
 .ag-accounts-table-content :where([data-slot="table-body"] [data-slot="table-row"],
   [data-slot="tbody"] [data-slot="tr"],
   .table__body .table__row) {
@@ -1415,11 +1636,6 @@ input[type="number"]::-webkit-outer-spin-button {
   min-height: var(--ag-accounts-table-row-height) !important;
   line-height: 1 !important;
   padding: 0 !important;
-  vertical-align: middle !important;
-}
-
-.ag-accounts-table-content :where([data-slot="table-cell"], [data-slot="td"], .table__cell) > div {
-  height: 100%;
 }
 
 .ag-accounts-table-content :where([data-slot="table-body"] [data-slot="table-row"]:hover [data-slot="table-cell"],
