@@ -642,6 +642,8 @@ input[type="number"]::-webkit-outer-spin-button {
     radial-gradient(circle at 82% 18%, color-mix(in oklab, white 10%, transparent), transparent 22rem),
     repeating-linear-gradient(135deg, color-mix(in oklab, white 4%, transparent) 0 1px, transparent 1px 12px),
     color-mix(in oklab, var(--background) 58%, transparent) !important;
+  -webkit-backdrop-filter: saturate(125%) blur(10px);
+  backdrop-filter: saturate(125%) blur(10px);
   animation: none;
 }
 
@@ -665,6 +667,8 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .ag-elevation-modal {
+  position: relative;
+  overflow: hidden;
   max-height: min(86dvh, 62rem) !important;
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
   border-radius: var(--radius-3xl) !important;
@@ -698,6 +702,8 @@ input[type="number"]::-webkit-outer-spin-button {
   .alert-dialog__backdrop--opaque,
   .alert-dialog__backdrop--blur {
     animation: none;
+    -webkit-backdrop-filter: saturate(125%) blur(10px);
+    backdrop-filter: saturate(125%) blur(10px);
   }
 }
 
