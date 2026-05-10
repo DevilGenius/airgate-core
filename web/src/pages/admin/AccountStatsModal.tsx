@@ -134,7 +134,7 @@ export function AccountStatsModal({
                 >
                   <Tabs.List>
                     {(['7d', '30d', '90d', 'custom'] as const).map((p) => (
-                      <Tabs.Tab key={p} id={p}>
+                      <Tabs.Tab key={p} id={p} className="whitespace-nowrap">
                         {t(`accounts.stats_range_${p}`)}
                       </Tabs.Tab>
                     ))}

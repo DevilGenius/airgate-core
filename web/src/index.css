@@ -1415,6 +1415,11 @@ input[type="number"]::-webkit-outer-spin-button {
   min-height: var(--ag-accounts-table-row-height) !important;
   line-height: 1 !important;
   padding: 0 !important;
+  vertical-align: middle !important;
+}
+
+.ag-accounts-table-content :where([data-slot="table-cell"], [data-slot="td"], .table__cell) > div {
+  height: 100%;
 }
 
 .ag-accounts-table-content :where([data-slot="table-body"] [data-slot="table-row"]:hover [data-slot="table-cell"],

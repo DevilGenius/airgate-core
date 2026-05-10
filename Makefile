@@ -13,6 +13,7 @@ PLAYGROUND_DIR := ../airgate-playground
 PLAYGROUND_PLUGIN := $(PLAYGROUND_DIR)/web
 EPAY_PLUGIN := ../airgate-epay/web
 HEALTH_PLUGIN := ../airgate-health/web
+KIRO_PLUGIN := ../airgate-kiro/web
 # build-plugins 阶段（生产）同步各插件的 admin dist/index.js 到
 # core 的 plugin assets dir；health 的公开状态页仍走 /status 反代，不经过这套 assets。
 OPENAI_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-openai/assets
@@ -20,6 +21,7 @@ CLAUDE_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-anthropic/assets
 PLAYGROUND_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-playground/assets
 EPAY_ASSETS := $(BACKEND_DIR)/data/plugins/payment-epay/assets
 HEALTH_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-health/assets
+KIRO_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-kiro/assets
 BINARY := $(BACKEND_DIR)/server
 WEBDIST := $(BACKEND_DIR)/internal/web/webdist
 GO := GOTOOLCHAIN=local go
@@ -28,7 +30,7 @@ GO := GOTOOLCHAIN=local go
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X github.com/DouDOU-start/airgate-core/internal/version.Version=$(VERSION)
 
-.PHONY: help dev dev-backend dev-frontend dev-sdk dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-playground dev-plugin-epay dev-plugin-health \
+.PHONY: help dev dev-backend dev-frontend dev-sdk dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-playground dev-plugin-epay dev-plugin-health dev-plugin-kiro \
         build build-backend build-frontend \
         build-plugins sync-plugins \
         ent lint fmt test clean install ci pre-commit setup-hooks \
@@ -58,11 +60,13 @@ dev-plugins: ## 启动所有插件前端 watch 模式
 	@echo "  - playground  → ../airgate-playground/web/dist/"
 	@echo "  - epay        → ../airgate-epay/web/dist/"
 	@echo "  - health      → ../airgate-health/web/dist/  （含 admin index.js + standalone status page）"
+	@echo "  - kiro        → ../airgate-kiro/web/dist/"
 	@$(MAKE) dev-plugin-openai &
 	@$(MAKE) dev-plugin-claude &
 	@$(MAKE) dev-plugin-playground &
 	@$(MAKE) dev-plugin-epay &
 	@$(MAKE) dev-plugin-health &
+	@$(MAKE) dev-plugin-kiro &
 	@wait
 
 dev-plugin-openai: ## 单独 watch openai 插件前端（输出到 ../airgate-openai/web/dist）
@@ -98,6 +102,13 @@ dev-plugin-health: ## 单独 watch health 插件前端（同时 watch admin inde
 		cd $(HEALTH_PLUGIN) && npm run dev; \
 	else \
 		echo "跳过 health 插件前端 watch：$(HEALTH_PLUGIN) 不存在"; \
+	fi
+
+dev-plugin-kiro: ## 单独 watch kiro 插件前端（输出到 ../airgate-kiro/web/dist）
+	@if [ -d $(KIRO_PLUGIN) ]; then \
+		cd $(KIRO_PLUGIN) && npx vite build --watch; \
+	else \
+		echo "跳过 kiro 插件前端 watch：$(KIRO_PLUGIN) 不存在"; \
 	fi
 
 dev-backend: ## 启动后端（带热重载，需要 air）
@@ -185,6 +196,15 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 		echo "health 插件 admin 前端已同步到 $(HEALTH_ASSETS)/"; \
 	else \
 		echo "跳过 health 插件前端构建：$(HEALTH_PLUGIN) 不存在"; \
+	fi
+	@if [ -d $(KIRO_PLUGIN) ]; then \
+		echo "构建并同步 kiro 插件前端..."; \
+		(cd $(KIRO_PLUGIN) && npm run build); \
+		mkdir -p $(KIRO_ASSETS); \
+		cp $(KIRO_PLUGIN)/dist/index.js $(KIRO_ASSETS)/index.js; \
+		echo "kiro 插件前端已同步到 $(KIRO_ASSETS)/"; \
+	else \
+		echo "跳过 kiro 插件前端构建：$(KIRO_PLUGIN) 不存在"; \
 	fi
 
 # ===================== 代码生成 =====================

@@ -859,7 +859,7 @@ export default function AccountsPage() {
     ...[{
       key: 'usage_window',
       title: t('accounts.usage_window'),
-      width: '560px',
+      width: '240px',
       align: 'center' as const,
       hideOnMobile: true,
       render: (row: AccountResp) => {
@@ -1006,48 +1006,36 @@ export default function AccountsPage() {
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
         const todayImageCount = row.platform === 'openai' ? (row.today_image_count ?? 0) : 0;
         const showImageCount = row.platform === 'openai';
-        const accessLabel = showImageCount
-          ? (
-            <span className="inline-flex min-w-0 items-center">
-              <span className="truncate">{t('accounts.today_access_count', '访问')}</span>
-              <span aria-hidden="true" className="px-0.5 text-text">-</span>
-              <span>{t('accounts.image_count_inline_label', '图').trim()}</span>
-            </span>
-          )
-          : t('accounts.today_access_count', '访问');
-        const accessValue = showImageCount
-          ? (
-            <span className="inline-flex min-w-0 items-center justify-end">
-              <span>{formatCompact(todayStats?.requests ?? 0, false)}</span>
-              <span aria-hidden="true" className="px-0.5 text-text">-</span>
-              <span className="text-text">{formatCompact(todayImageCount, false)}</span>
-            </span>
-          )
-          : formatCompact(todayStats?.requests ?? 0, false);
-        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-1 rounded-[var(--field-radius)] border px-1.5 text-[11px] leading-none shadow-sm';
+        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-0.5 rounded-[var(--field-radius)] border px-1 text-[11px] leading-none shadow-sm';
         const todayMetricStyle = (color: string, foreground = color) => ({
           background: `color-mix(in srgb, ${color} 10%, transparent)`,
           borderColor: `color-mix(in srgb, ${color} 22%, var(--ag-border))`,
           color: foreground,
         });
-        const todayMetricColumnClass = 'grid w-[18rem] justify-self-end grid-cols-2 gap-1';
+        const todayMetricColumnClass = 'grid w-full grid-cols-2 gap-0.5';
         const todayMetricChips = hasTodayStats && todayStats ? (
           <div
             className={todayMetricColumnClass}
             title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
           >
-            <span
-              className={todayMetricClass}
-              style={todayMetricStyle('var(--ag-info)')}
-              title={showImageCount ? t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）') : undefined}
-            >
-              <span className="min-w-0 truncate font-semibold text-text-secondary">{accessLabel}</span>
-              <span className="min-w-0 justify-self-end text-right font-semibold tabular-nums">{accessValue}</span>
+            <span className={todayMetricClass} style={todayMetricStyle('var(--ag-info)')}>
+              <span className="min-w-0 truncate font-semibold text-text-secondary">{t('accounts.today_access_count', '访问')}</span>
+              <span className="min-w-0 justify-self-end text-right font-semibold tabular-nums">{formatCompact(todayStats.requests, false)}</span>
             </span>
             <span className={todayMetricClass} style={todayMetricStyle('var(--ag-primary)')}>
               <span className="truncate font-semibold text-text-secondary">Token</span>
               <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.tokens)}</span>
             </span>
+            {showImageCount && (
+              <span
+                className={todayMetricClass}
+                style={todayMetricStyle('var(--ag-info)')}
+                title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}
+              >
+                <span className="min-w-0 truncate font-semibold text-text-secondary">{t('accounts.image_count_inline_label', '生图')}</span>
+                <span className="min-w-0 justify-self-end text-right font-semibold tabular-nums">{formatCompact(todayImageCount, false)}</span>
+              </span>
+            )}
             <span
               className={todayMetricClass}
               style={todayMetricStyle('var(--ag-warning)')}
@@ -1084,7 +1072,7 @@ export default function AccountsPage() {
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
-            <div className="grid w-full grid-cols-[minmax(0,1fr)_1rem_18rem] items-start justify-center gap-0">
+            <div className="flex w-full flex-col gap-2">
               <div className="flex min-w-0 flex-col gap-1">
                 {windowRows.map((item) => {
                   const w = item.window;
@@ -1092,22 +1080,22 @@ export default function AccountsPage() {
                     return <div key={item.id} className="h-5" aria-hidden="true" />;
                   }
                   return (
-                    <div key={item.id} className="grid h-5 grid-cols-[2.5rem_minmax(7rem,1fr)_2.25rem_3rem] items-center gap-1.5">
-                      <span className="inline-flex min-w-0 items-center justify-center truncate rounded px-1 py-0 text-[11px] font-semibold text-text-secondary leading-none" style={badgeStyle} title={w.label}>
-                        {shortLabel(w.label)}
-                      </span>
+                    <div key={item.id} className="flex min-w-0 flex-col gap-1">
+                      <div className="flex items-baseline justify-between">
+                        <span className="inline-flex min-w-0 items-center truncate rounded px-1 py-0 text-[11px] font-semibold text-text-secondary leading-none" style={badgeStyle} title={w.label}>
+                          {shortLabel(w.label)}
+                        </span>
+                        <span className="flex items-center gap-1.5 text-[11px] font-semibold leading-none">
+                          <span style={{ color: usageColor(w.used_percent) }}>{Math.round(w.used_percent)}%</span>
+                          <span style={{ color: 'var(--ag-text-tertiary)' }}>{formatReset(w.reset_seconds)}</span>
+                        </span>
+                      </div>
                       <div className="h-1.5 min-w-0 overflow-hidden rounded-full" style={{ background: 'var(--ag-glass-border)' }}>
                         <div
                           className="h-full rounded-full transition-all"
                           style={{ width: `${Math.min(100, Math.round(w.used_percent))}%`, background: usageColor(w.used_percent) }}
                         />
                       </div>
-                      <span className="text-right leading-none" style={{ color: usageColor(w.used_percent), fontSize: 11, fontWeight: 600 }}>
-                        {Math.round(w.used_percent)}%
-                      </span>
-                      <span className="text-right leading-none" style={{ color: 'var(--ag-text-secondary)', fontSize: 11, fontWeight: 600 }}>
-                        {formatReset(w.reset_seconds)}
-                      </span>
                     </div>
                   );
                 })}
@@ -1122,8 +1110,7 @@ export default function AccountsPage() {
                   </div>
                 )}
               </div>
-              <span aria-hidden="true" />
-              {todayMetricChips ?? <div className={todayMetricColumnClass} />}
+              {todayMetricChips}
             </div>
           </div>
         );
@@ -1312,7 +1299,7 @@ export default function AccountsPage() {
       selectedLabel: selectedPlatformLabel,
       options: PLATFORM_OPTIONS,
       setValue: setPlatformFilter,
-      widthClass: 'w-full sm:w-48',
+      widthClass: 'w-full sm:w-36',
     },
     {
       key: 'state',
@@ -1321,7 +1308,7 @@ export default function AccountsPage() {
       selectedLabel: selectedStateLabel,
       options: STATE_OPTIONS,
       setValue: setStateFilter,
-      widthClass: 'w-full sm:w-48',
+      widthClass: 'w-full sm:w-36',
     },
     {
       key: 'type',
@@ -1330,7 +1317,7 @@ export default function AccountsPage() {
       selectedLabel: selectedTypeLabel,
       options: typeOptions,
       setValue: setTypeFilter,
-      widthClass: 'w-full sm:w-48',
+      widthClass: 'w-full sm:w-36',
     },
     {
       key: 'group',
@@ -1339,7 +1326,7 @@ export default function AccountsPage() {
       selectedLabel: selectedGroupLabel,
       options: groupOptions,
       setValue: setGroupFilter,
-      widthClass: 'w-full sm:w-48',
+      widthClass: 'w-full sm:w-36',
     },
     {
       key: 'proxy',
@@ -1348,7 +1335,7 @@ export default function AccountsPage() {
       selectedLabel: selectedProxyLabel,
       options: proxyOptions,
       setValue: setProxyFilter,
-      widthClass: 'w-full sm:w-48',
+      widthClass: 'w-full sm:w-36',
     },
   ];
   const columnAlignClass = (align?: AccountTableColumn['align']) => (
@@ -1370,11 +1357,11 @@ export default function AccountsPage() {
     <div>
       <div className="relative mb-5 min-h-12">
         <div
-          className={`flex min-h-12 flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap ${
+          className={`flex min-h-12 flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap ${
             selectedIds.length > 0 ? 'invisible' : ''
           }`}
         >
-          <div className="w-full sm:w-48">
+          <div className="w-full sm:w-40">
             <HeroTextField fullWidth>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
@@ -1431,7 +1418,7 @@ export default function AccountsPage() {
             </Button>
           ) : null}
 
-          <div className="flex flex-wrap items-center justify-end gap-2 sm:ml-auto">
+          <div className="flex flex-wrap items-center justify-end gap-1.5 sm:ml-auto">
             <Button
               isIconOnly
               aria-label={t('common.refresh')}
