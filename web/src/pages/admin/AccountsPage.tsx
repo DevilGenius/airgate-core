@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField, Tooltip } from '@heroui/react';
@@ -103,6 +103,79 @@ function TableSelectionCheckbox({
     </Checkbox>
   );
 }
+
+function columnAlignClass(align?: AccountTableColumn['align']) {
+  return align === 'center'
+    ? 'text-center'
+    : align === 'right'
+      ? 'text-right'
+      : 'text-center';
+}
+
+function cellJustifyClass(align?: AccountTableColumn['align']) {
+  return align === 'center'
+    ? 'justify-center'
+    : align === 'right'
+      ? 'justify-end'
+      : 'justify-center';
+}
+
+const ACCOUNT_SELECTION_COLUMN_STYLE: CSSProperties = {
+  minWidth: 'var(--ag-accounts-selection-column-width)',
+  width: 'var(--ag-accounts-selection-column-width)',
+};
+
+function columnWidthStyle(column: AccountTableColumn): CSSProperties | undefined {
+  if (!column.width) return undefined;
+  const width = column.mobileWidth
+    ? `var(--ag-accounts-col-${column.key}-width, ${column.width})`
+    : column.width;
+  return {
+    minWidth: width,
+    width,
+    maxWidth: column.maxWidth,
+  };
+}
+
+const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
+  ariaLabel,
+  isSelected,
+  rowId,
+  onSelectedChange,
+}: {
+  ariaLabel: string;
+  isSelected: boolean;
+  rowId: number;
+  onSelectedChange: (id: number, isSelected: boolean) => void;
+}) {
+  const handleChange = useCallback((nextSelected: boolean) => {
+    onSelectedChange(rowId, nextSelected);
+  }, [onSelectedChange, rowId]);
+
+  return (
+    <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
+      <TableSelectionCheckbox
+        ariaLabel={ariaLabel}
+        isSelected={isSelected}
+        onChange={handleChange}
+      />
+    </div>
+  );
+});
+
+const AccountTableCellContent = memo(function AccountTableCellContent({
+  column,
+  row,
+}: {
+  column: AccountTableColumn;
+  row: AccountResp;
+}) {
+  return (
+    <div className={`flex w-full min-w-0 items-center ${cellJustifyClass(column.align)}`}>
+      {column.render(row)}
+    </div>
+  );
+}, (prev, next) => prev.column === next.column && prev.row === next.row);
 
 // formatCountdown 把剩余毫秒格式化成 "Xd Yh"/"Xh Ym"/"Ym" 样式，
 // 与 sub2api 的"限流中 10h 16m 自动恢复"徽标一致。
@@ -320,7 +393,7 @@ export default function AccountsPage() {
   const { platforms, platformName } = usePlatforms();
   const { toast } = useToast();
 
-  const applyQuotaRefreshResult = (
+  const applyQuotaRefreshResult = useCallback((
     id: number,
     result: Awaited<ReturnType<typeof accountsApi.refreshQuota>>,
   ) => {
@@ -349,7 +422,7 @@ export default function AccountsPage() {
         return matched ? { ...old, list } : old;
       },
     );
-  };
+  }, [queryClient]);
 
   const PLATFORM_OPTIONS = [
     { id: '', label: t('accounts.all_platforms') },
@@ -403,10 +476,15 @@ export default function AccountsPage() {
   // 批量选择状态
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [pendingToggleIds, setPendingToggleIds] = useState<Set<number>>(() => new Set());
+  const pendingToggleIdsRef = useRef(pendingToggleIds);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
   const clearSelection = () => setSelectedIds([]);
+
+  useEffect(() => {
+    pendingToggleIdsRef.current = pendingToggleIds;
+  }, [pendingToggleIds]);
 
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
   useEffect(() => {
@@ -715,7 +793,7 @@ export default function AccountsPage() {
   const [statsAccountId, setStatsAccountId] = useState<number | null>(null);
 
   // 表格列定义
-  const columns: AccountTableColumn[] = [
+  const columns = useMemo<AccountTableColumn[]>(() => [
     {
       key: 'name',
       title: t('common.name'),
@@ -847,7 +925,7 @@ export default function AccountsPage() {
           isSelected={row.state !== 'disabled'}
           size="sm"
           onChange={() => {
-            if (pendingToggleIds.has(row.id)) return;
+            if (pendingToggleIdsRef.current.has(row.id)) return;
             toggleMutation.mutate(row.id);
           }}
         >
@@ -1271,7 +1349,19 @@ export default function AccountsPage() {
         </div>
       ),
     },
-  ];
+  ], [
+    applyQuotaRefreshResult,
+    clearRateLimitMarkersMutation.mutate,
+    groupMap,
+    platformFilter,
+    platformName,
+    queryClient,
+    refreshQuotaMutation.mutate,
+    t,
+    toast,
+    toggleMutation.mutate,
+    usageData?.accounts,
+  ]);
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
@@ -1283,6 +1373,8 @@ export default function AccountsPage() {
   );
   const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
   const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+  const selectAllAriaLabel = t('common.select_all', 'Select all');
+  const selectRowAriaLabel = t('common.select', 'Select');
   const setVisibleRowsSelected = useCallback((isSelected: boolean) => {
     if (isSelected) {
       setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleRowIds])));
@@ -1380,36 +1472,6 @@ export default function AccountsPage() {
       widthClass: 'w-full sm:w-48',
     },
   ];
-  const columnAlignClass = (align?: AccountTableColumn['align']) => (
-    align === 'center'
-      ? 'text-center'
-      : align === 'right'
-        ? 'text-right'
-        : 'text-center'
-  );
-  const cellJustifyClass = (align?: AccountTableColumn['align']) => (
-    align === 'center'
-      ? 'justify-center'
-      : align === 'right'
-        ? 'justify-end'
-        : 'justify-center'
-  );
-  const selectionColumnStyle: CSSProperties = {
-    minWidth: 'var(--ag-accounts-selection-column-width)',
-    width: 'var(--ag-accounts-selection-column-width)',
-  };
-  const columnWidthStyle = (column: AccountTableColumn): CSSProperties | undefined => {
-    if (!column.width) return undefined;
-    const width = column.mobileWidth
-      ? `var(--ag-accounts-col-${column.key}-width, ${column.width})`
-      : column.width;
-    return {
-      minWidth: width,
-      width,
-      maxWidth: column.maxWidth,
-    };
-  };
-
   return (
     <div>
       <div className="mb-5 flex min-h-12 flex-col gap-3 xl:flex-row xl:items-start">
@@ -1580,10 +1642,10 @@ export default function AccountsPage() {
         ) : null}
       >
             <CommonTable.Header>
-              <CommonTable.Column id="__selection__" className="text-center" style={selectionColumnStyle}>
+              <CommonTable.Column id="__selection__" className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
                 <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
                   <TableSelectionCheckbox
-                    ariaLabel={t('common.select_all', 'Select all')}
+                    ariaLabel={selectAllAriaLabel}
                     isIndeterminate={someVisibleSelected}
                     isSelected={allVisibleSelected}
                     onChange={setVisibleRowsSelected}
@@ -1615,23 +1677,20 @@ export default function AccountsPage() {
               ) : (
                 rows.map((row) => (
                   <CommonTable.Row id={String(row.id)} key={row.id}>
-                    <CommonTable.Cell className="text-center" style={selectionColumnStyle}>
-                      <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
-                        <TableSelectionCheckbox
-                          ariaLabel={t('common.select', 'Select')}
-                          isSelected={selectedIdSet.has(row.id)}
-                          onChange={(isSelected) => setRowSelected(row.id, isSelected)}
-                        />
-                      </div>
+                    <CommonTable.Cell className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
+                      <AccountRowSelectionCell
+                        ariaLabel={selectRowAriaLabel}
+                        isSelected={selectedIdSet.has(row.id)}
+                        rowId={row.id}
+                        onSelectedChange={setRowSelected}
+                      />
                     </CommonTable.Cell>
                     {columns.map((column) => (
                       <CommonTable.Cell
                         key={column.key}
                         style={columnWidthStyle(column)}
                       >
-                        <div className={`flex w-full min-w-0 items-center ${cellJustifyClass(column.align)}`}>
-                          {column.render(row)}
-                        </div>
+                        <AccountTableCellContent column={column} row={row} />
                       </CommonTable.Cell>
                     ))}
                   </CommonTable.Row>
