@@ -380,21 +380,20 @@ export function AppShell({ children }: AppShellProps) {
         <div
           className="fixed inset-0 z-40 bg-black/40"
           onClick={() => setMobileOpen(false)}
-          style={{ animation: 'ag-fade-in 0.15s ease-out' }}
         />
       )}
 
       {/* Sidebar */}
       {isMobile ? (
         <aside
-          className="fixed inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-transform duration-300 ease-in-out"
+          className="fixed inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-transform duration-150 ease-out"
           style={{ width: 'var(--ag-sidebar-width)', transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)' }}
         >
           {sidebarContent}
         </aside>
       ) : (
         <aside
-          className="relative flex flex-col border-r border-border bg-surface transition-all duration-300 ease-in-out"
+          className="relative flex flex-col border-r border-border bg-surface transition-[width] duration-150 ease-out"
           style={{ width: collapsed ? 'var(--ag-sidebar-collapsed)' : 'var(--ag-sidebar-width)' }}
         >
           {sidebarContent}

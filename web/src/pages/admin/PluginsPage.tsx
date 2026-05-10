@@ -178,7 +178,6 @@ export default function PluginsPage() {
                         <HeroTable.Cell key={cellIndex}>
                           <Skeleton
                             className="h-4 w-24"
-                            style={{ animationDelay: `${index * 90 + cellIndex * 20}ms` }}
                           />
                         </HeroTable.Cell>
                       ))}

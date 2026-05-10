@@ -481,7 +481,7 @@ export default function LoginPage() {
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </Button>
-        <div className="relative w-full max-w-[420px]" style={{ animation: 'ag-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+        <div className="relative w-full max-w-[420px]">
           {/* 移动端 Logo */}
           <div className="text-center mb-8 lg:hidden">
             <img src={site.site_logo || defaultLogoUrl} alt="" className="w-11 h-11 rounded-sm mb-3 mx-auto object-cover" />

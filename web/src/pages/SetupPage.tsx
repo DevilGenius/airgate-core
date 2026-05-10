@@ -48,11 +48,11 @@ function Stepper({ current, steps }: { current: number; steps: StepKey[] }) {
             <div className="flex flex-col items-center">
               <div
                 className={[
-                  'relative flex items-center justify-center w-9 h-9 rounded-[var(--radius)] border transition-all duration-300',
+                  'relative flex items-center justify-center w-9 h-9 rounded-[var(--radius)] border transition-colors duration-150',
                   isCompleted || isCurrent
                     ? 'border-primary bg-primary text-text-inverse'
                     : 'border-glass-border bg-surface text-text-tertiary',
-                  isCurrent ? 'shadow-[0_0_16px_var(--ag-primary-glow)]' : '',
+                  '',
                 ].filter(Boolean).join(' ')}
               >
                 {isCompleted ? (
@@ -73,8 +73,8 @@ function Stepper({ current, steps }: { current: number; steps: StepKey[] }) {
             {index < steps.length - 1 && (
               <div
                 className={[
-                  'w-12 h-px mx-2.5 mb-5 rounded-[var(--radius)] transition-all duration-500',
-                  isCompleted ? 'bg-primary shadow-[0_0_4px_var(--ag-primary-glow)]' : 'bg-glass-border',
+                  'w-12 h-px mx-2.5 mb-5 rounded-[var(--radius)] transition-colors duration-150',
+                  isCompleted ? 'bg-primary' : 'bg-glass-border',
                 ].join(' ')}
               />
             )}
@@ -182,7 +182,6 @@ export default function SetupPage() {
 
       <div
         className="relative w-full max-w-xl"
-        style={{ animation: 'ag-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
         {/* 标题 */}
         <div className="text-center mb-8">

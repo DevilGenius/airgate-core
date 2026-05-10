@@ -31,7 +31,7 @@
   --ring-offset-width: 2px;
   --cursor-interactive: pointer;
   --cursor-disabled: not-allowed;
-  --skeleton-animation: shimmer;
+  --skeleton-animation: none;
 
   /* HeroUI radius preset */
   --radius: 0.25rem;
@@ -345,28 +345,22 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .ag-topbar {
-  background: color-mix(in oklab, var(--background) 78%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, white 12%, transparent), transparent 58%),
+    linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 5%, transparent), transparent),
+    color-mix(in oklab, var(--background) 88%, transparent);
   border-bottom: 1px solid color-mix(in oklab, var(--border) 28%, transparent);
-  box-shadow:
-    0 1px 0 color-mix(in oklab, white 16%, transparent) inset,
-    0 4px 16px color-mix(in oklab, var(--background) 10%, transparent);
-  -webkit-backdrop-filter: saturate(160%) blur(16px);
-  backdrop-filter: saturate(160%) blur(16px);
+  box-shadow: 0 1px 0 color-mix(in oklab, white 12%, transparent) inset;
 }
 
 [data-theme="dark"] .ag-topbar,
 .dark .ag-topbar {
-  background: color-mix(in oklab, var(--background) 82%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, white 5%, transparent), transparent 58%),
+    linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 6%, transparent), transparent),
+    color-mix(in oklab, var(--background) 90%, transparent);
   border-bottom-color: color-mix(in oklab, var(--border) 34%, transparent);
-  box-shadow:
-    0 1px 0 color-mix(in oklab, white 4%, transparent) inset,
-    0 4px 16px color-mix(in oklab, black 10%, transparent);
-}
-
-@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .ag-topbar {
-    background: color-mix(in oklab, var(--surface) 92%, transparent);
-  }
+  box-shadow: 0 1px 0 color-mix(in oklab, white 4%, transparent) inset;
 }
 
 .ag-page-toolbar {
@@ -643,9 +637,12 @@ input[type="number"]::-webkit-outer-spin-button {
 .alert-dialog__backdrop,
 .alert-dialog__backdrop--opaque,
 .alert-dialog__backdrop--blur {
-  background: color-mix(in oklab, var(--background) 24%, transparent) !important;
-  -webkit-backdrop-filter: saturate(115%) blur(6px);
-  backdrop-filter: saturate(115%) blur(6px);
+  background:
+    radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 24rem),
+    radial-gradient(circle at 82% 18%, color-mix(in oklab, white 10%, transparent), transparent 22rem),
+    repeating-linear-gradient(135deg, color-mix(in oklab, white 4%, transparent) 0 1px, transparent 1px 12px),
+    color-mix(in oklab, var(--background) 58%, transparent) !important;
+  animation: none;
 }
 
 [data-theme="dark"] .modal__backdrop,
@@ -660,31 +657,39 @@ input[type="number"]::-webkit-outer-spin-button {
 .dark .alert-dialog__backdrop,
 .dark .alert-dialog__backdrop--opaque,
 .dark .alert-dialog__backdrop--blur {
-  background: color-mix(in oklab, var(--background) 36%, transparent) !important;
+  background:
+    radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--primary) 11%, transparent), transparent 24rem),
+    radial-gradient(circle at 82% 18%, color-mix(in oklab, white 4%, transparent), transparent 22rem),
+    repeating-linear-gradient(135deg, color-mix(in oklab, white 3%, transparent) 0 1px, transparent 1px 12px),
+    color-mix(in oklab, var(--background) 68%, transparent) !important;
 }
 
 .ag-elevation-modal {
   max-height: min(86dvh, 62rem) !important;
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
   border-radius: var(--radius-3xl) !important;
-  background: color-mix(in oklab, var(--overlay) 92%, transparent) !important;
+  background-color: var(--overlay) !important;
+  background-image:
+    linear-gradient(180deg, color-mix(in oklab, white 12%, transparent), transparent 34%),
+    radial-gradient(circle at 16% 0%, color-mix(in oklab, var(--primary) 5%, transparent), transparent 18rem) !important;
   color: var(--overlay-foreground) !important;
   box-shadow:
-    0 1px 0 color-mix(in oklab, white 48%, transparent) inset,
-    0 18px 44px color-mix(in oklab, black 14%, transparent) !important;
-  -webkit-backdrop-filter: saturate(150%) blur(22px);
-  backdrop-filter: saturate(150%) blur(22px);
+    0 1px 0 color-mix(in oklab, white 32%, transparent) inset,
+    0 12px 28px color-mix(in oklab, black 12%, transparent) !important;
 }
 
 [data-theme="dark"] .ag-elevation-modal,
 .dark .ag-elevation-modal {
-  background: color-mix(in oklab, var(--overlay) 88%, transparent) !important;
+  background-color: var(--overlay) !important;
+  background-image:
+    linear-gradient(180deg, color-mix(in oklab, white 6%, transparent), transparent 34%),
+    radial-gradient(circle at 16% 0%, color-mix(in oklab, var(--primary) 7%, transparent), transparent 18rem) !important;
   box-shadow:
-    0 1px 0 color-mix(in oklab, white 9%, transparent) inset,
-    0 18px 44px color-mix(in oklab, black 28%, transparent) !important;
+    0 1px 0 color-mix(in oklab, white 8%, transparent) inset,
+    0 12px 28px color-mix(in oklab, black 24%, transparent) !important;
 }
 
-@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+@media (prefers-reduced-motion: reduce) {
 
   .modal__backdrop,
   .modal__backdrop--opaque,
@@ -692,11 +697,7 @@ input[type="number"]::-webkit-outer-spin-button {
   .alert-dialog__backdrop,
   .alert-dialog__backdrop--opaque,
   .alert-dialog__backdrop--blur {
-    background: color-mix(in oklab, var(--background) 88%, transparent) !important;
-  }
-
-  .ag-elevation-modal {
-    background: var(--overlay) !important;
+    animation: none;
   }
 }
 
@@ -1343,7 +1344,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .ag-account-capacity[data-pulse="true"] {
-  animation: ag-account-capacity-pulse 520ms ease-out;
+  animation: ag-account-capacity-pulse 420ms ease-out;
   --ag-account-capacity-pulse-color: var(--ag-success);
 }
 
@@ -1529,7 +1530,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .ag-bulk-selected-count[data-pulse="true"] {
-  animation: ag-bulk-selected-count-pop 420ms ease-out;
+  animation: ag-bulk-selected-count-pop 160ms ease-out;
 }
 
 @keyframes ag-bulk-selected-count-pop {
@@ -1538,7 +1539,7 @@ input[type="number"]::-webkit-outer-spin-button {
   }
 
   38% {
-    transform: scale(1.22);
+    transform: scale(1.12);
   }
 
   100% {
@@ -1585,10 +1586,9 @@ input[type="number"]::-webkit-outer-spin-button {
   font-size: 0.75rem !important;
   line-height: 1 !important;
   transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease,
-    transform 0.16s ease !important;
+    background-color 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease !important;
 }
 
 .ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button > :where(span, svg) {
@@ -1752,7 +1752,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .ag-usage-table :where(.ag-usage-table-row--new [data-slot="table-cell"],
   .ag-usage-table-row--new [data-slot="td"],
   .ag-usage-table-row--new .table__cell) {
-  animation: ag-usage-row-new-enter 1.4s ease-out;
+  animation: none;
 }
 
 @media (max-width: 1023px) {
@@ -2125,7 +2125,7 @@ input[type="number"]::-webkit-outer-spin-button {
       color-mix(in oklab, var(--accent) 18%, transparent) 20%,
       color-mix(in oklab, var(--accent) 70%, white) 58%,
       transparent 100%);
-  box-shadow: 0 0 10px color-mix(in oklab, var(--accent) 52%, transparent);
+  box-shadow: none;
   animation: ag-global-loading-line 1s ease-in-out infinite;
 }
 
@@ -2137,55 +2137,4 @@ input[type="number"]::-webkit-outer-spin-button {
   to {
     transform: translateX(365%);
   }
-}
-
-@keyframes ag-usage-row-new-enter {
-  0% {
-    box-shadow: inset 0 0 0 999px color-mix(in oklab, var(--success) 24%, transparent);
-  }
-
-  100% {
-    box-shadow: inset 0 0 0 999px transparent;
-  }
-}
-
-@keyframes ag-fade-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes ag-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes ag-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-.ag-shimmer {
-  background: linear-gradient(90deg,
-      var(--surface) 25%,
-      color-mix(in oklab, var(--default) 82%, var(--background) 18%) 50%,
-      var(--surface) 75%);
-  background-size: 200% 100%;
-  animation: ag-shimmer 1.5s infinite;
 }

@@ -1204,7 +1204,7 @@ export default function AccountsPage() {
                       </span>
                       <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
                         <div
-                          className="h-full rounded-full transition-all"
+                          className="h-full rounded-full"
                           style={{ width: `${barPercent}%`, background: color }}
                         />
                       </div>
