@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { UserResp } from '../../shared/types';
 import {
   setToken,
@@ -40,36 +40,57 @@ function normalizeSessionUser(user: UserResp, token = getToken()): UserResp {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserResp | null>(null);
   const [loading, setLoading] = useState(true);
+  const authRevisionRef = useRef(0);
 
   useEffect(() => {
+    let cancelled = false;
+    const revision = authRevisionRef.current;
     const token = getToken();
     if (token) {
       usersApi.me()
         .then((userData) => {
-          if (getToken() === token) setUser(normalizeSessionUser(userData, token));
+          const currentToken = getToken();
+          if (!cancelled && authRevisionRef.current === revision && currentToken) {
+            setUser(normalizeSessionUser(userData, currentToken));
+          }
         })
         .catch(() => {
-          if (getToken() === token) setToken(null);
+          if (!cancelled && authRevisionRef.current === revision && getToken() === token) {
+            setToken(null);
+            setUser(null);
+          }
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (!cancelled && authRevisionRef.current === revision) setLoading(false);
+        });
     } else {
       setLoading(false);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback((token: string, userData: UserResp) => {
+    authRevisionRef.current += 1;
+    const revision = authRevisionRef.current;
     setToken(token);
     setUser(normalizeSessionUser(userData, token));
     // 登录响应可能不包含全部用户字段（例如 API Key 登录时缺少 quota / expires_at），
     // 异步用 /me 拉一次完整数据补齐，避免首屏额度等信息显示不准。
     usersApi.me()
       .then((freshUser) => {
-        if (getToken() === token) setUser(normalizeSessionUser(freshUser, token));
+        const currentToken = getToken();
+        if (authRevisionRef.current === revision && currentToken) {
+          setUser(normalizeSessionUser(freshUser, currentToken));
+        }
       })
       .catch(() => {});
   }, []);
 
   const logout = useCallback(() => {
+    authRevisionRef.current += 1;
     setToken(null);
     setSessionAPIKey(null);
     setUser(null);

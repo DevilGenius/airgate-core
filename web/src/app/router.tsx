@@ -247,7 +247,8 @@ const authLayout = createRoute({
 });
 
 function HomePage() {
-  const { user, isAPIKeySession } = useAuth();
+  const { user, loading, isAPIKeySession } = useAuth();
+  if (loading) return <PageLoading />;
   if (!user) return null;
 
   const isAdmin = getTokenRole() === 'admin' || user.role === 'admin';
