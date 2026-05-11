@@ -357,7 +357,7 @@ function UpgradeRunModal({
               <div>
                 <div className="h-2 rounded-full bg-bg-subtle overflow-hidden">
                   <div
-                    className="h-full bg-primary transition-all duration-300"
+                    className="h-full bg-primary"
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>

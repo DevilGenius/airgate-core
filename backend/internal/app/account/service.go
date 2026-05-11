@@ -358,7 +358,7 @@ func (s *Service) ToggleScheduling(ctx context.Context, id int) (ToggleResult, e
 	} else {
 		newState = "disabled"
 		if s.stateWriter != nil {
-			if err := s.stateWriter.ManualDisable(ctx, id, "管理员手动关闭调度"); err != nil {
+			if err := s.stateWriter.ManualDisable(ctx, id, "手动关闭"); err != nil {
 				logger.Error("account_manual_disable_failed",
 					sdk.LogFieldAccountID, id, sdk.LogFieldError, err)
 				return ToggleResult{}, err

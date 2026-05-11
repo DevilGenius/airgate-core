@@ -16,6 +16,7 @@ interface CommonTableProps {
   footer?: ReactNode;
   minWidth?: number | string;
   scrollClassName?: string;
+  scrollOverlay?: ReactNode;
 }
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -32,6 +33,7 @@ function CommonTableRoot({
   footer,
   minWidth,
   scrollClassName,
+  scrollOverlay,
 }: CommonTableProps) {
   const resolvedContentStyle = minWidth == null
     ? contentStyle
@@ -43,6 +45,7 @@ function CommonTableRoot({
   return (
     <HeroTable className={cx('ag-resource-table', className)} variant="primary">
       <HeroTable.ScrollContainer className={cx('ag-resource-table-scroll', scrollClassName)}>
+        {scrollOverlay}
         <HeroTable.Content
           {...contentProps}
           aria-label={ariaLabel}

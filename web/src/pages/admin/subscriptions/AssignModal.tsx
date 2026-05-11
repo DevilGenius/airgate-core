@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Label, ListBox, Modal, Select, Spinner, useOverlayState } from '@heroui/react';
+import { Button, ComboBox, Input, Label, ListBox, Modal, Select, Spinner, useOverlayState } from '@heroui/react';
+import { Search } from 'lucide-react';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type {
   AssignSubscriptionReq,
@@ -29,32 +30,67 @@ export function AssignModal({
     group_id: 0,
     user_id: 0,
   });
+  const [userKeyword, setUserKeyword] = useState('');
+  const [selectedUserLabel, setSelectedUserLabel] = useState('');
 
   const handleClose = () => {
     setForm({ user_id: 0, group_id: 0, expires_at: '' });
+    setUserKeyword('');
+    setSelectedUserLabel('');
     onClose();
+  };
+
+  const handleUserInputChange = (value: string) => {
+    if (form.user_id) {
+      if (value === selectedUserLabel) return;
+      setSelectedUserLabel('');
+      setForm((current) => ({ ...current, user_id: 0 }));
+      setUserKeyword('');
+      return;
+    }
+    setUserKeyword(value);
   };
 
   const handleSubmit = () => {
     if (!form.user_id || !form.group_id || !form.expires_at) return;
     onSubmit(form);
   };
-  const userOptions = [
-    { id: '0', label: t('subscriptions.select_user') },
-    ...users.map((user) => ({
-      id: String(user.id),
-      label: `${user.email} (${user.username || '-'})`,
-    })),
-  ];
-  const groupOptions = [
-    { id: '0', label: t('subscriptions.select_group') },
-    ...groups.map((group) => ({
-      id: String(group.id),
-      label: `${group.name} (${group.platform})`,
-    })),
-  ];
-  const selectedUserLabel = userOptions.find((item) => item.id === String(form.user_id))?.label ?? t('subscriptions.select_user');
-  const selectedGroupLabel = groupOptions.find((item) => item.id === String(form.group_id))?.label ?? t('subscriptions.select_group');
+  const userOptions = useMemo(() => users.map((user) => ({
+    id: String(user.id),
+    label: user.email,
+    description: user.username || '-',
+    matchText: `${user.id} ${user.email} ${user.username ?? ''}`.toLowerCase(),
+  })), [users]);
+  const groupOptions = useMemo(() => groups.map((group) => ({
+    id: String(group.id),
+    label: `${group.name} (${group.platform})`,
+  })), [groups]);
+  const selectedGroupLabel = groupOptions.find((item) => item.id === String(form.group_id))?.label;
+  const filteredUserOptions = useMemo(() => {
+    const keyword = userKeyword.trim().toLowerCase();
+    if (!keyword) return userOptions;
+    return userOptions.filter((item) =>
+      item.matchText.includes(keyword),
+    );
+  }, [userKeyword, userOptions]);
+  const handleUserSelectionChange = (key: string | number | null) => {
+    const value = key == null ? '' : String(key);
+    if (!value) {
+      setForm((current) => ({ ...current, user_id: 0 }));
+      setSelectedUserLabel('');
+      setUserKeyword('');
+      return;
+    }
+    const option = userOptions.find((item) => item.id === value);
+    setForm((current) => ({
+      ...current,
+      user_id: option ? Number(option.id) : 0,
+    }));
+    if (option) {
+      setSelectedUserLabel(option.label);
+      setUserKeyword(option.label);
+    }
+  };
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -73,37 +109,61 @@ export function AssignModal({
             </Modal.Header>
             <Modal.Body>
               <div className="space-y-4">
-                <Select
+                <ComboBox
+                  allowsEmptyCollection
                   fullWidth
+                  inputValue={userKeyword}
                   isRequired
-                  selectedKey={String(form.user_id)}
-                  onSelectionChange={(key) => setForm({ ...form, user_id: key == null ? 0 : Number(key) })}
+                  items={filteredUserOptions}
+                  menuTrigger="focus"
+                  selectedKey={form.user_id ? String(form.user_id) : null}
+                  onInputChange={handleUserInputChange}
+                  onBlur={() => {
+                    if (!form.user_id) setUserKeyword('');
+                  }}
+                  onSelectionChange={handleUserSelectionChange}
                 >
                   <Label>{t('subscriptions.user')}</Label>
-                  <Select.Trigger>
-                    <Select.Value>{selectedUserLabel}</Select.Value>
-                    <Select.Indicator />
-                  </Select.Trigger>
-                  <Select.Popover>
-                    <ListBox items={userOptions}>
+                  <ComboBox.InputGroup className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                    <Input className="pl-9 pr-10" placeholder={t('users.search_placeholder')} />
+                    <ComboBox.Trigger
+                      aria-label={t('subscriptions.select_user')}
+                      className="ag-combobox-preview-trigger absolute right-1 top-1/2 z-10 h-7 w-7 min-w-0 -translate-y-1/2 p-0 text-text-tertiary hover:text-text"
+                    />
+                  </ComboBox.InputGroup>
+                  <ComboBox.Popover>
+                    <ListBox
+                      items={filteredUserOptions}
+                      renderEmptyState={() => (
+                        <div className="px-3 py-6 text-center text-xs text-text-tertiary">
+                          {userKeyword.trim() ? t('common.no_data') : t('users.search_placeholder')}
+                        </div>
+                      )}
+                    >
                       {(item) => (
-                        <ListBox.Item id={item.id} textValue={item.label}>
-                          {item.label}
+                        <ListBox.Item id={item.id} textValue={`${item.label} ${item.description}`}>
+                          <div className="min-w-0">
+                            <div className="truncate text-sm text-text">{item.label}</div>
+                            <div className="truncate text-xs text-text-tertiary">{item.description}</div>
+                          </div>
                         </ListBox.Item>
                       )}
                     </ListBox>
-                  </Select.Popover>
-                </Select>
+                  </ComboBox.Popover>
+                </ComboBox>
 
                 <Select
                   fullWidth
                   isRequired
-                  selectedKey={String(form.group_id)}
+                  selectedKey={form.group_id ? String(form.group_id) : null}
                   onSelectionChange={(key) => setForm({ ...form, group_id: key == null ? 0 : Number(key) })}
                 >
                   <Label>{t('subscriptions.group')}</Label>
                   <Select.Trigger>
-                    <Select.Value>{selectedGroupLabel}</Select.Value>
+                    <Select.Value>
+                      {selectedGroupLabel ?? <span className="text-text-tertiary">{t('subscriptions.select_group')}</span>}
+                    </Select.Value>
                     <Select.Indicator />
                   </Select.Trigger>
                   <Select.Popover>

@@ -325,7 +325,7 @@ function MiniStatCard({
   label: string; value: string; sub: string; icon: React.ReactNode; color: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-border-subtle p-3.5 transition-all hover:border-border hover:shadow-sm">
+    <div className="relative overflow-hidden rounded-lg border border-border-subtle p-3.5 transition-colors hover:border-border">
       <div className="absolute top-0 left-0 right-0 h-px opacity-40" style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
       <div className="flex items-start justify-between mb-2">
         <span className="text-[11px] text-text-tertiary font-medium">{label}</span>

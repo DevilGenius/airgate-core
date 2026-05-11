@@ -209,7 +209,7 @@ export function BulkRefreshProgressModal({
           </div>
           <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ag-glass-border)' }}>
             <div
-              className="h-full transition-all duration-200"
+              className="h-full"
               style={{ width: `${pct}%`, background: 'var(--ag-primary)' }}
             />
           </div>

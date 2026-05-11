@@ -13,6 +13,7 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useSiteSettings, defaultLogoUrl } from '../providers/SiteSettingsProvider';
 import { effectiveDocUrl } from '../../shared/utils/docUrl';
 import { useIsMobile } from '../../shared/hooks/useMediaQuery';
+import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { TopLoadingLine } from '../../shared/components/PageLoading';
 import {
   LayoutDashboard,
@@ -76,6 +77,8 @@ const userMenuItems: MenuItem[] = [
 const apiKeyMenuItems: MenuItem[] = [
   { path: '/usage', labelKey: 'nav.my_usage', icon: <ReceiptText className="h-5 w-5" />, sectionKey: 'nav.personal' },
 ];
+
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'airgate:sidebar:collapsed';
 
 /**
  * 拉取插件菜单：所有登录用户均可调用 /plugins/menu，再按 page.audience 过滤显示。
@@ -158,7 +161,7 @@ export function AppShell({ children }: AppShellProps) {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const site = useSiteSettings();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = usePersistentBoolean(SIDEBAR_COLLAPSED_STORAGE_KEY, false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useIsMobile();
   const matchRoute = useMatchRoute();
@@ -377,21 +380,20 @@ export function AppShell({ children }: AppShellProps) {
         <div
           className="fixed inset-0 z-40 bg-black/40"
           onClick={() => setMobileOpen(false)}
-          style={{ animation: 'ag-fade-in 0.15s ease-out' }}
         />
       )}
 
       {/* Sidebar */}
       {isMobile ? (
         <aside
-          className="fixed inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-transform duration-300 ease-in-out"
+          className="fixed inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-transform duration-150 ease-out"
           style={{ width: 'var(--ag-sidebar-width)', transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)' }}
         >
           {sidebarContent}
         </aside>
       ) : (
         <aside
-          className="relative flex flex-col border-r border-border bg-surface transition-all duration-300 ease-in-out"
+          className="relative flex flex-col border-r border-border bg-surface transition-[width] duration-150 ease-out"
           style={{ width: collapsed ? 'var(--ag-sidebar-collapsed)' : 'var(--ag-sidebar-width)' }}
         >
           {sidebarContent}

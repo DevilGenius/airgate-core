@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField, Tooltip } from '@heroui/react';
@@ -53,8 +53,9 @@ interface AccountTableColumn {
   key: string;
   title: ReactNode;
   width?: string;
+  mobileWidth?: string;
+  maxWidth?: string;
   align?: 'left' | 'center' | 'right';
-  hideOnMobile?: boolean;
   render: (row: AccountResp) => ReactNode;
 }
 
@@ -102,6 +103,79 @@ function TableSelectionCheckbox({
     </Checkbox>
   );
 }
+
+function columnAlignClass(align?: AccountTableColumn['align']) {
+  return align === 'center'
+    ? 'text-center'
+    : align === 'right'
+      ? 'text-right'
+      : 'text-center';
+}
+
+function cellJustifyClass(align?: AccountTableColumn['align']) {
+  return align === 'center'
+    ? 'justify-center'
+    : align === 'right'
+      ? 'justify-end'
+      : 'justify-center';
+}
+
+const ACCOUNT_SELECTION_COLUMN_STYLE: CSSProperties = {
+  minWidth: 'var(--ag-accounts-selection-column-width)',
+  width: 'var(--ag-accounts-selection-column-width)',
+};
+
+function columnWidthStyle(column: AccountTableColumn): CSSProperties | undefined {
+  if (!column.width) return undefined;
+  const width = column.mobileWidth
+    ? `var(--ag-accounts-col-${column.key}-width, ${column.width})`
+    : column.width;
+  return {
+    minWidth: width,
+    width,
+    maxWidth: column.maxWidth,
+  };
+}
+
+const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
+  ariaLabel,
+  isSelected,
+  rowId,
+  onSelectedChange,
+}: {
+  ariaLabel: string;
+  isSelected: boolean;
+  rowId: number;
+  onSelectedChange: (id: number, isSelected: boolean) => void;
+}) {
+  const handleChange = useCallback((nextSelected: boolean) => {
+    onSelectedChange(rowId, nextSelected);
+  }, [onSelectedChange, rowId]);
+
+  return (
+    <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
+      <TableSelectionCheckbox
+        ariaLabel={ariaLabel}
+        isSelected={isSelected}
+        onChange={handleChange}
+      />
+    </div>
+  );
+});
+
+const AccountTableCellContent = memo(function AccountTableCellContent({
+  column,
+  row,
+}: {
+  column: AccountTableColumn;
+  row: AccountResp;
+}) {
+  return (
+    <div className={`flex w-full min-w-0 items-center ${cellJustifyClass(column.align)}`}>
+      {column.render(row)}
+    </div>
+  );
+}, (prev, next) => prev.column === next.column && prev.row === next.row);
 
 // formatCountdown 把剩余毫秒格式化成 "Xd Yh"/"Xh Ym"/"Ym" 样式，
 // 与 sub2api 的"限流中 10h 16m 自动恢复"徽标一致。
@@ -217,12 +291,13 @@ function AccountStatusCell({ row }: { row: AccountResp }) {
       t('accounts.degraded_tooltip', '上游池抖动，软降级仅做兜底，到期自动恢复'),
     );
   } else if (row.state === 'disabled') {
+    const reason = row.error_msg?.trim() === '管理员手动关闭调度' ? '手动关闭' : row.error_msg?.trim();
     mainBadge = (
-      <div className="inline-flex flex-col gap-0.5">
-        <StatusPill status="disabled" tooltip={row.error_msg || undefined} />
-        {row.error_msg && (
-          <span className="text-[10px] text-[var(--ag-muted)] truncate max-w-[200px]" title={row.error_msg}>
-            {row.error_msg}
+      <div className="inline-flex min-w-0 max-w-full flex-col items-center gap-0.5">
+        <StatusPill status="disabled" tooltip={reason || undefined} />
+        {reason && (
+          <span className="block max-w-[5.75rem] truncate text-center text-[10px] leading-none text-[var(--ag-muted)]" title={reason}>
+            {reason}
           </span>
         )}
       </div>
@@ -318,7 +393,7 @@ export default function AccountsPage() {
   const { platforms, platformName } = usePlatforms();
   const { toast } = useToast();
 
-  const applyQuotaRefreshResult = (
+  const applyQuotaRefreshResult = useCallback((
     id: number,
     result: Awaited<ReturnType<typeof accountsApi.refreshQuota>>,
   ) => {
@@ -347,7 +422,7 @@ export default function AccountsPage() {
         return matched ? { ...old, list } : old;
       },
     );
-  };
+  }, [queryClient]);
 
   const PLATFORM_OPTIONS = [
     { id: '', label: t('accounts.all_platforms') },
@@ -401,10 +476,15 @@ export default function AccountsPage() {
   // 批量选择状态
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [pendingToggleIds, setPendingToggleIds] = useState<Set<number>>(() => new Set());
+  const pendingToggleIdsRef = useRef(pendingToggleIds);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
   const clearSelection = () => setSelectedIds([]);
+
+  useEffect(() => {
+    pendingToggleIdsRef.current = pendingToggleIds;
+  }, [pendingToggleIds]);
 
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
   useEffect(() => {
@@ -713,11 +793,12 @@ export default function AccountsPage() {
   const [statsAccountId, setStatsAccountId] = useState<number | null>(null);
 
   // 表格列定义
-  const columns: AccountTableColumn[] = [
+  const columns = useMemo<AccountTableColumn[]>(() => [
     {
       key: 'name',
       title: t('common.name'),
-      width: '150px',
+      width: '132px',
+      mobileWidth: '112px',
       render: (row) => {
         const email = row.credentials?.email;
         return (
@@ -737,7 +818,8 @@ export default function AccountsPage() {
     {
       key: 'platform',
       title: t('accounts.platform_type'),
-      width: '108px',
+      width: '96px',
+      mobileWidth: '84px',
       render: (row) => {
         const planType = row.credentials?.plan_type;
         const subUntil = row.credentials?.subscription_active_until;
@@ -778,24 +860,35 @@ export default function AccountsPage() {
     {
       key: 'groups',
       title: t('accounts.groups'),
-      width: '140px',
+      width: '92px',
+      mobileWidth: '80px',
       align: 'center',
-      hideOnMobile: true,
       render: (row) => {
         if (!row.group_ids || row.group_ids.length === 0) {
           return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
         }
+        const groupNames = row.group_ids.map((gid) => groupMap.get(gid) ?? `#${gid}`);
+        const visibleGroups = groupNames.slice(0, 3);
+        const hiddenCount = Math.max(0, groupNames.length - visibleGroups.length);
         return (
-          <div className="flex flex-col items-center gap-1">
-            {row.group_ids.map((gid) => (
+          <div className="flex max-h-full min-w-0 max-w-full flex-col items-center justify-center gap-0.5 overflow-hidden" title={groupNames.join('\n')}>
+            {visibleGroups.map((name) => (
               <span
-                key={gid}
-                className="text-[10px] px-1.5 py-0 rounded"
+                key={name}
+                className="max-w-full truncate rounded px-1.5 py-0 text-[10px] leading-none"
                 style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}
               >
-                {groupMap.get(gid) ?? `#${gid}`}
+                {name}
               </span>
             ))}
+            {hiddenCount > 0 ? (
+              <span
+                className="max-w-full truncate rounded px-1.5 py-0 text-[10px] font-semibold leading-none"
+                style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}
+              >
+                +{hiddenCount}
+              </span>
+            ) : null}
           </div>
         );
       },
@@ -803,7 +896,8 @@ export default function AccountsPage() {
     {
       key: 'capacity',
       title: t('accounts.capacity'),
-      width: '100px',
+      width: '84px',
+      mobileWidth: '68px',
       align: 'center',
       render: (row) => {
         const current = row.current_concurrency || 0;
@@ -815,6 +909,7 @@ export default function AccountsPage() {
       key: 'status',
       title: t('common.status'),
       width: '84px',
+      mobileWidth: '76px',
       align: 'center',
       render: (row) => <AccountStatusCell row={row} />,
     },
@@ -822,15 +917,15 @@ export default function AccountsPage() {
       key: 'scheduling',
       title: t('accounts.scheduling'),
       width: '80px',
+      mobileWidth: '72px',
       align: 'center',
-      hideOnMobile: true,
       render: (row) => (
         <Switch
           aria-label={t('accounts.scheduling')}
           isSelected={row.state !== 'disabled'}
           size="sm"
           onChange={() => {
-            if (pendingToggleIds.has(row.id)) return;
+            if (pendingToggleIdsRef.current.has(row.id)) return;
             toggleMutation.mutate(row.id);
           }}
         >
@@ -844,8 +939,8 @@ export default function AccountsPage() {
       key: 'rate_multiplier',
       title: t('accounts.rate_multiplier'),
       width: '80px',
+      mobileWidth: '72px',
       align: 'center',
-      hideOnMobile: true,
       render: (row) => (
         <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
           {row.rate_multiplier}x
@@ -859,9 +954,10 @@ export default function AccountsPage() {
     ...[{
       key: 'usage_window',
       title: t('accounts.usage_window'),
-      width: '240px',
+      width: '364px',
+      mobileWidth: '364px',
+      maxWidth: '364px',
       align: 'center' as const,
-      hideOnMobile: true,
       render: (row: AccountResp) => {
         const usage = usageData?.accounts?.[String(row.id)];
 
@@ -942,8 +1038,8 @@ export default function AccountsPage() {
           const d = Math.floor(seconds / 86400);
           const h = Math.floor((seconds % 86400) / 3600);
           const m = Math.floor((seconds % 3600) / 60);
-          if (d > 0) return `${d}d ${h}h`;
-          if (h > 0) return `${h}h ${m}m`;
+          if (d > 0) return h > 0 ? `${d}d${h}h` : `${d}d`;
+          if (h > 0) return m > 0 ? `${h}h${m}m` : `${h}h`;
           return `${m}m`;
         };
 
@@ -1006,43 +1102,61 @@ export default function AccountsPage() {
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
         const todayImageCount = row.platform === 'openai' ? (row.today_image_count ?? 0) : 0;
         const showImageCount = row.platform === 'openai';
-        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-0.5 rounded-[var(--field-radius)] border px-1 text-[11px] leading-none shadow-sm';
+        const accessRequestsText = formatCompact(todayStats?.requests ?? 0, false);
+        const accessImageText = formatCompact(todayImageCount, false);
+        const accessText = showImageCount ? `${accessRequestsText}/${accessImageText}` : accessRequestsText;
+        const hideAccessLabel = showImageCount && accessText.length > '100/100'.length;
+        const accessLabel = showImageCount
+          ? (
+            <span className="inline-flex min-w-0 items-center">
+              <span className="truncate">{t('accounts.today_access_count', '访问')}</span>
+              <span aria-hidden="true" className="px-px text-text">/</span>
+              <span>{t('accounts.image_count_inline_label', '图').trim()}</span>
+            </span>
+          )
+          : t('accounts.today_access_count', '访问');
+        const accessValue = showImageCount
+          ? (
+            <span className="inline-flex min-w-0 items-center justify-end">
+              <span>{accessRequestsText}</span>
+              <span aria-hidden="true" className="px-px text-text">/</span>
+              <span className="text-text">{accessImageText}</span>
+            </span>
+          )
+          : accessText;
+        const todayMetricClass = 'ag-account-usage-metric';
         const todayMetricStyle = (color: string, foreground = color) => ({
           background: `color-mix(in srgb, ${color} 10%, transparent)`,
           borderColor: `color-mix(in srgb, ${color} 22%, var(--ag-border))`,
           color: foreground,
         });
-        const todayMetricColumnClass = 'grid w-full grid-cols-2 gap-0.5';
+        const todayMetricColumnClass = 'ag-account-usage-metrics';
         const todayMetricChips = hasTodayStats && todayStats ? (
           <div
             className={todayMetricColumnClass}
             title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
           >
-            <span className={todayMetricClass} style={todayMetricStyle('var(--ag-info)')}>
-              <span className="min-w-0 truncate font-semibold text-text-secondary">{t('accounts.today_access_count', '访问')}</span>
-              <span className="min-w-0 justify-self-end text-right font-semibold tabular-nums">{formatCompact(todayStats.requests, false)}</span>
+            <span
+              className={todayMetricClass}
+              style={todayMetricStyle('var(--ag-info)')}
+              title={showImageCount ? t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）') : undefined}
+            >
+              {hideAccessLabel ? null : (
+                <span className="ag-account-usage-metric-label text-text-secondary">{accessLabel}</span>
+              )}
+              <span className={`ag-account-usage-metric-value ${hideAccessLabel ? 'ag-account-usage-metric-value--solo' : ''}`}>{accessValue}</span>
             </span>
             <span className={todayMetricClass} style={todayMetricStyle('var(--ag-primary)')}>
-              <span className="truncate font-semibold text-text-secondary">Token</span>
-              <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.tokens)}</span>
+              <span className="ag-account-usage-metric-label text-text-secondary">Token</span>
+              <span className="ag-account-usage-metric-value">{formatCompact(todayStats.tokens)}</span>
             </span>
-            {showImageCount && (
-              <span
-                className={todayMetricClass}
-                style={todayMetricStyle('var(--ag-info)')}
-                title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}
-              >
-                <span className="min-w-0 truncate font-semibold text-text-secondary">{t('accounts.image_count_inline_label', '生图')}</span>
-                <span className="min-w-0 justify-self-end text-right font-semibold tabular-nums">{formatCompact(todayImageCount, false)}</span>
-              </span>
-            )}
             <span
               className={todayMetricClass}
               style={todayMetricStyle('var(--ag-warning)')}
               title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
             >
-              <span className="truncate font-semibold text-text-secondary">{t('accounts.user_cost_short', '消费')}</span>
-              <span className="text-right tabular-nums">
+              <span className="ag-account-usage-metric-label text-text-secondary">{t('accounts.user_cost_short', '消费')}</span>
+              <span className="ag-account-usage-metric-value">
                 <span style={{ color: 'var(--ag-warning)' }}>$</span>
                 <span className="text-text">{todayStats.user_cost.toFixed(2)}</span>
               </span>
@@ -1052,8 +1166,8 @@ export default function AccountsPage() {
               style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
               title={t('accounts.window_account_cost', '账号成本（上游计费）')}
             >
-              <span className="truncate font-semibold text-text-secondary">{t('accounts.account_cost_short', '成本')}</span>
-              <span className="text-right tabular-nums">
+              <span className="ag-account-usage-metric-label text-text-secondary">{t('accounts.account_cost_short', '成本')}</span>
+              <span className="ag-account-usage-metric-value">
                 <span style={{ color: 'var(--ag-success)' }}>$</span>
                 <span className="text-text">{todayStats.account_cost.toFixed(2)}</span>
               </span>
@@ -1065,37 +1179,41 @@ export default function AccountsPage() {
           <div
             className={
               canRefresh
-                ? 'flex w-full flex-col gap-1.5 text-[11px] cursor-pointer rounded py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
-                : 'flex w-full flex-col gap-1.5 text-[11px] rounded py-0.5'
+                ? 'ag-account-usage-cell ag-account-usage-cell--refreshable'
+                : 'ag-account-usage-cell'
             }
             style={{ fontFamily: 'var(--ag-font-mono)' }}
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
-            <div className="flex w-full flex-col gap-2">
-              <div className="flex min-w-0 flex-col gap-1">
+            <div className="ag-account-usage-layout">
+              <div className="ag-account-usage-windows">
                 {windowRows.map((item) => {
                   const w = item.window;
                   if (!w) {
                     return <div key={item.id} className="h-5" aria-hidden="true" />;
                   }
+                  const percent = Math.round(w.used_percent);
+                  const barPercent = Math.max(0, Math.min(100, percent));
+                  const color = usageColor(w.used_percent);
+                  const resetText = formatReset(w.reset_seconds);
                   return (
-                    <div key={item.id} className="flex min-w-0 flex-col gap-1">
-                      <div className="flex items-baseline justify-between">
-                        <span className="inline-flex min-w-0 items-center truncate rounded px-1 py-0 text-[11px] font-semibold text-text-secondary leading-none" style={badgeStyle} title={w.label}>
-                          {shortLabel(w.label)}
-                        </span>
-                        <span className="flex items-center gap-1.5 text-[11px] font-semibold leading-none">
-                          <span style={{ color: usageColor(w.used_percent) }}>{Math.round(w.used_percent)}%</span>
-                          <span style={{ color: 'var(--ag-text-tertiary)' }}>{formatReset(w.reset_seconds)}</span>
-                        </span>
-                      </div>
-                      <div className="h-1.5 min-w-0 overflow-hidden rounded-full" style={{ background: 'var(--ag-glass-border)' }}>
+                    <div key={item.id} className="ag-account-usage-window-row">
+                      <span className="ag-account-usage-window-label text-text-secondary" style={badgeStyle} title={w.label}>
+                        {shortLabel(w.label)}
+                      </span>
+                      <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
                         <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${Math.min(100, Math.round(w.used_percent))}%`, background: usageColor(w.used_percent) }}
+                          className="h-full rounded-full"
+                          style={{ width: `${barPercent}%`, background: color }}
                         />
                       </div>
+                      <span className="ag-account-usage-percent" style={{ color }}>
+                        {percent}%
+                      </span>
+                      <span className="ag-account-usage-reset" title={resetText}>
+                        {resetText}
+                      </span>
                     </div>
                   );
                 })}
@@ -1110,7 +1228,8 @@ export default function AccountsPage() {
                   </div>
                 )}
               </div>
-              {todayMetricChips}
+              <span aria-hidden="true" />
+              {todayMetricChips ?? <div className={todayMetricColumnClass} />}
             </div>
           </div>
         );
@@ -1120,8 +1239,8 @@ export default function AccountsPage() {
       key: 'last_used_at',
       title: t('accounts.last_used'),
       width: '120px',
+      mobileWidth: '88px',
       align: 'center',
-      hideOnMobile: true,
       render: (row) => {
         if (!row.last_used_at) {
           return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
@@ -1147,6 +1266,7 @@ export default function AccountsPage() {
       key: 'actions',
       title: t('common.actions'),
       width: '116px',
+      mobileWidth: '96px',
       align: 'center',
       render: (row) => (
         <div className="ag-table-row-actions ag-account-row-actions mx-auto flex w-[92px] items-center justify-center gap-1">
@@ -1229,7 +1349,19 @@ export default function AccountsPage() {
         </div>
       ),
     },
-  ];
+  ], [
+    applyQuotaRefreshResult,
+    clearRateLimitMarkersMutation.mutate,
+    groupMap,
+    platformFilter,
+    platformName,
+    queryClient,
+    refreshQuotaMutation.mutate,
+    t,
+    toast,
+    toggleMutation.mutate,
+    usageData?.accounts,
+  ]);
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
@@ -1241,6 +1373,8 @@ export default function AccountsPage() {
   );
   const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
   const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+  const selectAllAriaLabel = t('common.select_all', 'Select all');
+  const selectRowAriaLabel = t('common.select', 'Select');
   const setVisibleRowsSelected = useCallback((isSelected: boolean) => {
     if (isSelected) {
       setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleRowIds])));
@@ -1299,7 +1433,7 @@ export default function AccountsPage() {
       selectedLabel: selectedPlatformLabel,
       options: PLATFORM_OPTIONS,
       setValue: setPlatformFilter,
-      widthClass: 'w-full sm:w-36',
+      widthClass: 'w-full sm:w-48',
     },
     {
       key: 'state',
@@ -1308,7 +1442,7 @@ export default function AccountsPage() {
       selectedLabel: selectedStateLabel,
       options: STATE_OPTIONS,
       setValue: setStateFilter,
-      widthClass: 'w-full sm:w-36',
+      widthClass: 'w-full sm:w-48',
     },
     {
       key: 'type',
@@ -1317,7 +1451,7 @@ export default function AccountsPage() {
       selectedLabel: selectedTypeLabel,
       options: typeOptions,
       setValue: setTypeFilter,
-      widthClass: 'w-full sm:w-36',
+      widthClass: 'w-full sm:w-48',
     },
     {
       key: 'group',
@@ -1326,7 +1460,7 @@ export default function AccountsPage() {
       selectedLabel: selectedGroupLabel,
       options: groupOptions,
       setValue: setGroupFilter,
-      widthClass: 'w-full sm:w-36',
+      widthClass: 'w-full sm:w-48',
     },
     {
       key: 'proxy',
@@ -1335,164 +1469,135 @@ export default function AccountsPage() {
       selectedLabel: selectedProxyLabel,
       options: proxyOptions,
       setValue: setProxyFilter,
-      widthClass: 'w-full sm:w-36',
+      widthClass: 'w-full sm:w-48',
     },
   ];
-  const columnAlignClass = (align?: AccountTableColumn['align']) => (
-    align === 'center'
-      ? 'text-center'
-      : align === 'right'
-        ? 'text-right'
-        : 'text-center'
-  );
-  const cellJustifyClass = (align?: AccountTableColumn['align']) => (
-    align === 'center'
-      ? 'justify-center'
-      : align === 'right'
-        ? 'justify-end'
-        : 'justify-center'
-  );
-
   return (
     <div>
-      <div className="relative mb-5 min-h-12">
-        <div
-          className={`flex min-h-12 flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap ${
-            selectedIds.length > 0 ? 'invisible' : ''
-          }`}
-        >
-          <div className="w-full sm:w-40">
-            <HeroTextField fullWidth>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-                <Input
-                  className="pl-9"
-                  value={keyword}
-                  onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-                  placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
-                />
-              </div>
-            </HeroTextField>
-          </div>
-
-          {toolbarFilters.map((filter) => (
-            <div
-              key={filter.key}
-              className={filter.widthClass}
-            >
-              <Select
-                aria-label={filter.label}
-                fullWidth
-                selectedKey={filter.value}
-                onSelectionChange={(key) => {
-                  filter.setValue(key == null ? '' : String(key));
-                  setPage(1);
-                }}
-              >
-                <Label className="sr-only">{filter.label}</Label>
-                <Select.Trigger>
-                  <Select.Value>{filter.selectedLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={filter.options}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
+      <div className="mb-5 flex min-h-12 flex-col gap-3 xl:flex-row xl:items-start">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-h-12 flex-col flex-wrap items-stretch gap-3 sm:flex-row sm:items-center">
+            <div className="w-full sm:w-48">
+              <HeroTextField fullWidth>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                  <Input
+                    className="pl-9"
+                    value={keyword}
+                    onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                    placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
+                  />
+                </div>
+              </HeroTextField>
             </div>
-          ))}
-          {activeFilterCount > 0 ? (
-            <Button
-              className="whitespace-nowrap"
-              size="sm"
-              variant="ghost"
-              onPress={clearAllFilters}
-            >
-              <Eraser className="h-3.5 w-3.5" />
-              {t('common.clear')}
-            </Button>
-          ) : null}
 
-          <div className="flex flex-wrap items-center justify-end gap-1.5 sm:ml-auto">
-            <Button
-              isIconOnly
-              aria-label={t('common.refresh')}
-              size="sm"
-              variant="ghost"
-              className="h-8 w-8 min-w-8"
-              onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Dropdown>
-              <Dropdown.Trigger
-                className={`ag-account-auto-refresh-trigger button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
+            {toolbarFilters.map((filter) => (
+              <div
+                key={filter.key}
+                className={filter.widthClass}
               >
-                <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
-                <ChevronDown className="h-3 w-3 shrink-0" />
-              </Dropdown.Trigger>
-              <Dropdown.Popover placement="bottom end">
-                <Dropdown.Menu
-                  aria-label={t('accounts.auto_refresh')}
-                  selectedKeys={new Set([`auto_${autoRefresh}`])}
-                  selectionMode="single"
-                  onAction={(key) => {
-                    const action = String(key);
-                    setAutoRefresh(Number(action.replace('auto_', '')));
+                <Select
+                  aria-label={filter.label}
+                  fullWidth
+                  selectedKey={filter.value}
+                  onSelectionChange={(key) => {
+                    filter.setValue(key == null ? '' : String(key));
+                    setPage(1);
                   }}
                 >
-                  {AUTO_REFRESH_OPTIONS.map((sec) => (
-                    <Dropdown.Item key={sec} id={`auto_${sec}`} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}>
-                      <span className="flex items-center justify-between gap-6">
-                        <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}</span>
-                        {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
-                      </span>
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown.Popover>
-            </Dropdown>
-            <Button
-              variant="secondary"
-              onPress={() => importInputRef.current?.click()}
-              isDisabled={importMutation.isPending}
-              aria-busy={importMutation.isPending}
-            >
-              <Upload className="h-4 w-4" />
-              {t('accounts.import')}
-            </Button>
-            <Button
-              variant="secondary"
-              onPress={() => exportMutation.mutate()}
-              isDisabled={exportMutation.isPending}
-              aria-busy={exportMutation.isPending}
-            >
-              <Download className="h-4 w-4" />
-              {t('accounts.export')}
-            </Button>
-            <Button variant="primary" onPress={() => setShowCreateModal(true)}>
-              <Plus className="h-4 w-4" />
-              {t('accounts.create')}
-            </Button>
+                  <Label className="sr-only">{filter.label}</Label>
+                  <Select.Trigger>
+                    <Select.Value>{filter.selectedLabel}</Select.Value>
+                    <Select.Indicator />
+                  </Select.Trigger>
+                  <Select.Popover>
+                    <ListBox items={filter.options}>
+                      {(item) => (
+                        <ListBox.Item id={item.id} textValue={item.label}>
+                          {item.label}
+                        </ListBox.Item>
+                      )}
+                    </ListBox>
+                  </Select.Popover>
+                </Select>
+              </div>
+            ))}
+            {activeFilterCount > 0 ? (
+              <Button
+                className="whitespace-nowrap"
+                size="sm"
+                variant="ghost"
+                onPress={clearAllFilters}
+              >
+                <Eraser className="h-3.5 w-3.5" />
+                {t('common.clear')}
+              </Button>
+            ) : null}
           </div>
         </div>
 
-        <BulkActionsBar
-          overlay
-          selectedCount={selectedIds.length}
-          onClear={clearSelection}
-          onEdit={() => setShowBulkEditModal(true)}
-          onEnable={handleBulkEnable}
-          onDisable={handleBulkDisable}
-          onRefreshQuota={handleBulkRefresh}
-          onClearRateLimitMarkers={() => bulkClearRateLimitMarkersMutation.mutate(selectedIds)}
-          onDelete={() => setShowBulkDeleteConfirm(true)}
-        />
+        <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 xl:ml-auto xl:justify-end">
+          <Button
+            isIconOnly
+            aria-label={t('common.refresh')}
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 min-w-8"
+            onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Dropdown>
+            <Dropdown.Trigger
+              className={`ag-account-auto-refresh-trigger button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
+            >
+              <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
+              <ChevronDown className="h-3 w-3 shrink-0" />
+            </Dropdown.Trigger>
+            <Dropdown.Popover placement="bottom end">
+              <Dropdown.Menu
+                aria-label={t('accounts.auto_refresh')}
+                selectedKeys={new Set([`auto_${autoRefresh}`])}
+                selectionMode="single"
+                onAction={(key) => {
+                  const action = String(key);
+                  setAutoRefresh(Number(action.replace('auto_', '')));
+                }}
+              >
+                {AUTO_REFRESH_OPTIONS.map((sec) => (
+                  <Dropdown.Item key={sec} id={`auto_${sec}`} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}>
+                    <span className="flex items-center justify-between gap-6">
+                      <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}</span>
+                      {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
+                    </span>
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
+          <Button
+            variant="secondary"
+            onPress={() => importInputRef.current?.click()}
+            isDisabled={importMutation.isPending}
+            aria-busy={importMutation.isPending}
+          >
+            <Upload className="h-4 w-4" />
+            {t('accounts.import')}
+          </Button>
+          <Button
+            variant="secondary"
+            onPress={() => exportMutation.mutate()}
+            isDisabled={exportMutation.isPending}
+            aria-busy={exportMutation.isPending}
+          >
+            <Download className="h-4 w-4" />
+            {t('accounts.export')}
+          </Button>
+          <Button variant="primary" onPress={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4" />
+            {t('accounts.create')}
+          </Button>
+        </div>
       </div>
       {/* 隐藏的文件选择器（供导入按钮触发） */}
       <input
@@ -1519,13 +1624,28 @@ export default function AccountsPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1600}
+        minWidth="var(--ag-accounts-current-table-width)"
+        scrollOverlay={selectedIds.length > 0 ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <BulkActionsBar
+              overlay
+              selectedCount={selectedIds.length}
+              onClear={clearSelection}
+              onEdit={() => setShowBulkEditModal(true)}
+              onEnable={handleBulkEnable}
+              onDisable={handleBulkDisable}
+              onRefreshQuota={handleBulkRefresh}
+              onClearRateLimitMarkers={() => bulkClearRateLimitMarkersMutation.mutate(selectedIds)}
+              onDelete={() => setShowBulkDeleteConfirm(true)}
+            />
+          </div>
+        ) : null}
       >
             <CommonTable.Header>
-              <CommonTable.Column id="__selection__" className="text-center" style={{ minWidth: 52, width: 52 }}>
+              <CommonTable.Column id="__selection__" className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
                 <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
                   <TableSelectionCheckbox
-                    ariaLabel={t('common.select_all', 'Select all')}
+                    ariaLabel={selectAllAriaLabel}
                     isIndeterminate={someVisibleSelected}
                     isSelected={allVisibleSelected}
                     onChange={setVisibleRowsSelected}
@@ -1536,8 +1656,8 @@ export default function AccountsPage() {
                 <CommonTable.Column
                   id={column.key}
                   key={column.key}
-                  className={`${columnAlignClass(column.align)} ${column.hideOnMobile ? 'hidden md:table-cell' : ''}`}
-                  style={column.width ? { minWidth: column.width, width: column.width } : undefined}
+                  className={columnAlignClass(column.align)}
+                  style={columnWidthStyle(column)}
                 >
                   {column.title}
                 </CommonTable.Column>
@@ -1557,23 +1677,20 @@ export default function AccountsPage() {
               ) : (
                 rows.map((row) => (
                   <CommonTable.Row id={String(row.id)} key={row.id}>
-                    <CommonTable.Cell className="text-center" style={{ minWidth: 52, width: 52 }}>
-                      <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
-                        <TableSelectionCheckbox
-                          ariaLabel={t('common.select', 'Select')}
-                          isSelected={selectedIdSet.has(row.id)}
-                          onChange={(isSelected) => setRowSelected(row.id, isSelected)}
-                        />
-                      </div>
+                    <CommonTable.Cell className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
+                      <AccountRowSelectionCell
+                        ariaLabel={selectRowAriaLabel}
+                        isSelected={selectedIdSet.has(row.id)}
+                        rowId={row.id}
+                        onSelectedChange={setRowSelected}
+                      />
                     </CommonTable.Cell>
                     {columns.map((column) => (
                       <CommonTable.Cell
                         key={column.key}
-                        className={column.hideOnMobile ? 'hidden md:table-cell' : undefined}
+                        style={columnWidthStyle(column)}
                       >
-                        <div className={`flex w-full min-w-0 items-center ${cellJustifyClass(column.align)}`}>
-                          {column.render(row)}
-                        </div>
+                        <AccountTableCellContent column={column} row={row} />
                       </CommonTable.Cell>
                     ))}
                   </CommonTable.Row>

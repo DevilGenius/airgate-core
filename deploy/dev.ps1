@@ -447,7 +447,7 @@ function Start-Dev {
 
   $frontend = Start-Process `
     -FilePath "pwsh" `
-    -ArgumentList @("-NoLogo", "-NoProfile", "-Command", "pnpm dev -- --port $FrontendDevPort --strictPort") `
+    -ArgumentList @("-NoLogo", "-NoProfile", "-Command", "pnpm dev --port $FrontendDevPort --strictPort") `
     -WorkingDirectory $WebDir `
     -WindowStyle Hidden `
     -RedirectStandardOutput $FrontendOut `
