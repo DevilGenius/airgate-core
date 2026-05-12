@@ -511,6 +511,8 @@ export interface CustomerUsageLogResp {
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
+  /** 请求端点 */
+  endpoint?: string;
   created_at: string;
 }
 

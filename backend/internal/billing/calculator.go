@@ -29,6 +29,11 @@ type CalculateInput struct {
 	// 用于计算 account_cost（账号实际消耗），写入 usage_log，仅供"账号计费"统计使用。
 	// 与用户计费 (BillingRate) 完全独立，不影响 actual_cost / User.balance。
 	AccountRate float64
+
+	// OutputBillingCostOverride 可覆盖 output_cost 在 actual_cost 管道里的计价结果。
+	// 用于分组图片 1K/2K/4K 固定价：配置后 output 不再乘 BillingRate，
+	// 未配置时保持 output_cost × BillingRate 的旧行为。
+	OutputBillingCostOverride *float64
 }
 
 // CalculateResult 计算结果
@@ -70,7 +75,11 @@ func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
 		accountRate = 1.0
 	}
 
-	actualCost := totalCost * billingRate
+	nonOutputCost := input.InputCost + input.CachedInputCost + input.CacheCreationCost
+	actualCost := nonOutputCost*billingRate + input.OutputCost*billingRate
+	if input.OutputBillingCostOverride != nil {
+		actualCost = nonOutputCost*billingRate + *input.OutputBillingCostOverride
+	}
 
 	billedCost := actualCost
 	if input.SellRate > 0 {

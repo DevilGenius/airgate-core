@@ -11,7 +11,7 @@ import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
-import { Activity, Hash, DollarSign, Coins, Search, Key, Clock, Gauge, Percent, Upload, RefreshCw } from 'lucide-react';
+import { Activity, Hash, DollarSign, Coins, Search, Clock, Gauge, Percent, Upload, RefreshCw } from 'lucide-react';
 import type { UsageQuery } from '../../shared/types';
 import { useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
 import { getSessionAPIKey } from '../../shared/api/client';
@@ -103,11 +103,6 @@ function APIKeyInfoBar() {
   return (
     <Card className="mb-5">
       <Card.Content className="flex items-center gap-4 px-4 py-3 text-sm flex-wrap">
-        <div className="flex items-center gap-2 text-text-secondary">
-          <Key className="w-4 h-4 text-primary" />
-          <span className="font-medium text-text">{user.api_key_name}</span>
-        </div>
-
         {quota > 0 && (
           <div className="flex items-center gap-2">
             <Gauge className="w-3.5 h-3.5 text-text-tertiary" />

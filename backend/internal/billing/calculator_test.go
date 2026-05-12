@@ -158,3 +158,31 @@ func TestCalculate_MarkupIndependentOfBillingRate(t *testing.T) {
 		t.Fatalf("BilledCost should depend on SellRate but didn't change")
 	}
 }
+
+func TestCalculate_OutputBillingCostOverride(t *testing.T) {
+	c := NewCalculator()
+	outputOverride := 0.08
+	res := c.Calculate(CalculateInput{
+		InputCost:                 0.10,
+		OutputCost:                0.40,
+		BillingRate:               0.50,
+		OutputBillingCostOverride: &outputOverride,
+		AccountRate:               1.25,
+	})
+
+	if !almostEqual(res.TotalCost, 0.50) {
+		t.Fatalf("TotalCost = %v, want 0.50", res.TotalCost)
+	}
+	if !almostEqual(res.ActualCost, 0.13) {
+		t.Fatalf("ActualCost = %v, want 0.13", res.ActualCost)
+	}
+	if !almostEqual(res.BilledCost, res.ActualCost) {
+		t.Fatalf("BilledCost = %v, want %v", res.BilledCost, res.ActualCost)
+	}
+	if !almostEqual(res.AccountCost, 0.625) {
+		t.Fatalf("AccountCost = %v, want 0.625", res.AccountCost)
+	}
+	if !almostEqual(res.RateMultiplier, 0.50) {
+		t.Fatalf("RateMultiplier = %v, want original billing rate 0.50", res.RateMultiplier)
+	}
+}

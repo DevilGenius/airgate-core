@@ -261,7 +261,7 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 	//   billingRate: 平台对 reseller 的计费倍率（group/user 优先级链）
 	//   sellRate:    reseller 对客户的销售倍率（独立 markup 管道）
 	//   accountRate: 账号自身的真实成本系数（"账号计费"统计管道）
-	calc := f.calculator.Calculate(billing.CalculateInput{
+	calcInput := billing.CalculateInput{
 		InputCost:         usage.InputCost,
 		OutputCost:        usage.OutputCost,
 		CachedInputCost:   usage.CachedInputCost,
@@ -269,7 +269,11 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		BillingRate:       billing.ResolveBillingRate(state.keyInfo),
 		SellRate:          state.keyInfo.SellRate,
 		AccountRate:       state.account.RateMultiplier,
-	})
+	}
+	if override, ok := imageOutputBillingOverride(usage, state.keyInfo.GroupPluginSettings); ok {
+		calcInput.OutputBillingCostOverride = &override
+	}
+	calc := f.calculator.Calculate(calcInput)
 
 	// 窗口费用沿用 account_cost（= total × account_rate），与用户账单解耦。
 	f.scheduler.AddWindowCost(c.Request.Context(), state.account.ID, calc.AccountCost)
