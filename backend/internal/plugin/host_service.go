@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -270,13 +271,13 @@ func (h *HostService) invoke(
 		if err := decodeHostPayload(payload, &req); err != nil {
 			return nil, err
 		}
-		return h.getTask(ctx, req)
+		return h.getTask(ctx, pluginID, req)
 	case hostMethodTasksList:
 		var req hostListTasksRequest
 		if err := decodeHostPayload(payload, &req); err != nil {
 			return nil, err
 		}
-		return h.listTasks(ctx, req)
+		return h.listTasks(ctx, pluginID, req)
 	default:
 		return nil, status.Errorf(codes.Unimplemented, "unknown host method: %s", method)
 	}
@@ -393,6 +394,7 @@ type hostUpdateTaskRequest struct {
 
 type hostGetTaskRequest struct {
 	TaskID int64 `json:"task_id"`
+	UserID int64 `json:"user_id"`
 }
 
 type hostListTasksRequest struct {
@@ -734,7 +736,15 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			}
 
 			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
-				h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration)
+				if usageID, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration); err != nil {
+					slog.Error("host_forward_record_usage_failed",
+						sdk.LogFieldUserID, req.UserID,
+						sdk.LogFieldAccountID, acc.ID,
+						sdk.LogFieldError, err,
+					)
+				} else if usageID > 0 {
+					resp["usage_id"] = usageID
+				}
 				resp["usage"] = outcome.Usage
 			}
 
@@ -867,7 +877,13 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 
 			var usage *sdk.Usage
 			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
-				h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration)
+				if _, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration); err != nil {
+					slog.Error("host_forward_stream_record_usage_failed",
+						sdk.LogFieldUserID, req.UserID,
+						sdk.LogFieldAccountID, acc.ID,
+						sdk.LogFieldError, err,
+					)
+				}
 				usage = outcome.Usage
 			}
 
@@ -1030,10 +1046,10 @@ func (h *HostService) recordHostForwardUsage(
 	accFull *ent.Account,
 	outcome sdk.ForwardOutcome,
 	duration time.Duration,
-) {
+) (int, error) {
 	usage := outcome.Usage
 	if usage == nil {
-		return
+		return 0, nil
 	}
 	usageValues := usageSnapshotFromSDK(usage)
 
@@ -1057,7 +1073,7 @@ func (h *HostService) recordHostForwardUsage(
 		actualModel = model
 	}
 
-	h.recorder.Record(billing.UsageRecord{
+	record := billing.UsageRecord{
 		UserID:                int(req.UserID),
 		APIKeyID:              0,
 		AccountID:             accountID,
@@ -1093,7 +1109,11 @@ func (h *HostService) recordHostForwardUsage(
 		Stream:                req.Stream,
 		DurationMs:            duration.Milliseconds(),
 		FirstTokenMs:          usageValues.FirstTokenMs,
-	})
+	}
+	if h.recorder == nil {
+		return 0, nil
+	}
+	return h.recorder.RecordSync(ctx, record)
 }
 
 // listPlatforms 列出已加载的网关平台。
@@ -1299,6 +1319,12 @@ func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.He
 	headers.Set("X-Forwarded-Path", req.Path)
 	headers.Set("X-Forwarded-Method", req.Method)
 	headers.Set("X-Airgate-Internal", "host-forward")
+	if req.UserID > 0 {
+		headers.Set("X-Airgate-User-ID", strconv.FormatInt(req.UserID, 10))
+	}
+	if route.GroupID > 0 {
+		headers.Set("X-Airgate-Group-ID", strconv.Itoa(route.GroupID))
+	}
 	if headers.Get("Content-Type") == "" {
 		headers.Set("Content-Type", "application/json")
 	}

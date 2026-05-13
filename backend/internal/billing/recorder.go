@@ -95,6 +95,30 @@ func (r *Recorder) Record(record UsageRecord) {
 	}
 }
 
+// RecordSync 同步写入一条使用记录并返回 usage_log.id。
+// 需要立即把 usage_id 关联到任务时使用；普通转发仍走异步 Record。
+func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, error) {
+	tx, err := r.db.Tx(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("开启事务失败: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	log, err := usageLogCreate(tx, record).Save(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("插入 UsageLog 失败: %w", err)
+	}
+	if err := applyUsageCharges(ctx, tx, []UsageRecord{record}); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("提交事务失败: %w", err)
+	}
+	return log.ID, nil
+}
+
 // Start 启动后台写入 goroutine
 func (r *Recorder) Start() {
 	go r.run()
@@ -183,59 +207,74 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 	// 1. 批量写入 UsageLog（同时记录 actual_cost 和 billed_cost 双轨数据）
 	builders := make([]*ent.UsageLogCreate, 0, len(batch))
 	for _, rec := range batch {
-		b := tx.UsageLog.Create().
-			SetPlatform(rec.Platform).
-			SetModel(rec.Model).
-			SetInputTokens(rec.InputTokens).
-			SetOutputTokens(rec.OutputTokens).
-			SetCachedInputTokens(rec.CachedInputTokens).
-			SetCacheCreationTokens(rec.CacheCreationTokens).
-			SetCacheCreation5mTokens(rec.CacheCreation5mTokens).
-			SetCacheCreation1hTokens(rec.CacheCreation1hTokens).
-			SetReasoningOutputTokens(rec.ReasoningOutputTokens).
-			SetInputPrice(rec.InputPrice).
-			SetOutputPrice(rec.OutputPrice).
-			SetCachedInputPrice(rec.CachedInputPrice).
-			SetCacheCreationPrice(rec.CacheCreationPrice).
-			SetCacheCreation1hPrice(rec.CacheCreation1hPrice).
-			SetInputCost(rec.InputCost).
-			SetOutputCost(rec.OutputCost).
-			SetCachedInputCost(rec.CachedInputCost).
-			SetCacheCreationCost(rec.CacheCreationCost).
-			SetTotalCost(rec.TotalCost).
-			SetActualCost(rec.ActualCost).
-			SetBilledCost(rec.BilledCost).
-			SetAccountCost(rec.AccountCost).
-			SetRateMultiplier(rec.RateMultiplier).
-			SetSellRate(rec.SellRate).
-			SetAccountRateMultiplier(rec.AccountRateMultiplier).
-			SetServiceTier(rec.ServiceTier).
-			SetImageSize(rec.ImageSize).
-			SetStream(rec.Stream).
-			SetDurationMs(rec.DurationMs).
-			SetFirstTokenMs(rec.FirstTokenMs).
-			SetUserAgent(rec.UserAgent).
-			SetIPAddress(rec.IPAddress).
-			SetEndpoint(rec.Endpoint).
-			SetReasoningEffort(rec.ReasoningEffort).
-			SetUserID(rec.UserID).
-			SetAccountID(rec.AccountID).
-			SetGroupID(rec.GroupID)
-		if rec.APIKeyID > 0 {
-			b.SetAPIKeyID(rec.APIKeyID)
-		}
-		builders = append(builders, b)
+		builders = append(builders, usageLogCreate(tx, rec))
 	}
 
 	if _, err := tx.UsageLog.CreateBulk(builders...).Save(ctx); err != nil {
 		return fmt.Errorf("批量插入 UsageLog 失败: %w", err)
 	}
 
-	// 2. 在同一事务中扣费 —— 三个独立累加器：
-	//    - User.balance：按 actual_cost 扣减（平台真实成本，永远不受 sell_rate 影响）
-	//    - APIKey.used_quota：按 billed_cost 累加（客户账面值，对 end customer 可见）
-	//    - APIKey.used_quota_actual：按 actual_cost 累加（reseller 成本核算用，end customer 不可见）
-	//    sell_rate=0 时 billed_cost==actual_cost，used_quota 与 used_quota_actual 相等，行为完全等价于改造前。
+	if err := applyUsageCharges(ctx, tx, batch); err != nil {
+		return err
+	}
+
+	// 3. 提交事务
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("提交事务失败: %w", err)
+	}
+	return nil
+}
+
+func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
+	b := tx.UsageLog.Create().
+		SetPlatform(rec.Platform).
+		SetModel(rec.Model).
+		SetInputTokens(rec.InputTokens).
+		SetOutputTokens(rec.OutputTokens).
+		SetCachedInputTokens(rec.CachedInputTokens).
+		SetCacheCreationTokens(rec.CacheCreationTokens).
+		SetCacheCreation5mTokens(rec.CacheCreation5mTokens).
+		SetCacheCreation1hTokens(rec.CacheCreation1hTokens).
+		SetReasoningOutputTokens(rec.ReasoningOutputTokens).
+		SetInputPrice(rec.InputPrice).
+		SetOutputPrice(rec.OutputPrice).
+		SetCachedInputPrice(rec.CachedInputPrice).
+		SetCacheCreationPrice(rec.CacheCreationPrice).
+		SetCacheCreation1hPrice(rec.CacheCreation1hPrice).
+		SetInputCost(rec.InputCost).
+		SetOutputCost(rec.OutputCost).
+		SetCachedInputCost(rec.CachedInputCost).
+		SetCacheCreationCost(rec.CacheCreationCost).
+		SetTotalCost(rec.TotalCost).
+		SetActualCost(rec.ActualCost).
+		SetBilledCost(rec.BilledCost).
+		SetAccountCost(rec.AccountCost).
+		SetRateMultiplier(rec.RateMultiplier).
+		SetSellRate(rec.SellRate).
+		SetAccountRateMultiplier(rec.AccountRateMultiplier).
+		SetServiceTier(rec.ServiceTier).
+		SetImageSize(rec.ImageSize).
+		SetStream(rec.Stream).
+		SetDurationMs(rec.DurationMs).
+		SetFirstTokenMs(rec.FirstTokenMs).
+		SetUserAgent(rec.UserAgent).
+		SetIPAddress(rec.IPAddress).
+		SetEndpoint(rec.Endpoint).
+		SetReasoningEffort(rec.ReasoningEffort).
+		SetUserID(rec.UserID).
+		SetAccountID(rec.AccountID).
+		SetGroupID(rec.GroupID)
+	if rec.APIKeyID > 0 {
+		b.SetAPIKeyID(rec.APIKeyID)
+	}
+	return b
+}
+
+func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) error {
+	// 在同一事务中扣费 —— 三个独立累加器：
+	// - User.balance：按 actual_cost 扣减。
+	// - APIKey.used_quota：按 billed_cost 累加。
+	// - APIKey.used_quota_actual：按 actual_cost 累加。
 	userActualCosts := make(map[int]float64)
 	keyBilledCosts := make(map[int]float64)
 	keyActualCosts := make(map[int]float64)
@@ -283,11 +322,6 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 		if err := update.Exec(ctx); err != nil {
 			return fmt.Errorf("更新 API Key 用量失败 key_id=%d: %w", keyID, err)
 		}
-	}
-
-	// 3. 提交事务
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("提交事务失败: %w", err)
 	}
 	return nil
 }
