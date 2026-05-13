@@ -382,12 +382,26 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 	}
 
 	// 网关插件可以可选暴露 ExtensionService 来接收任务分发。
-	// 是否真的支持任务类型由 GetTaskTypes 决定，这里只做能力探测。
+	// Dispense 只会构造客户端，不代表服务端真的注册了 ExtensionService；
+	// 必须实际调用 GetTaskTypes 成功且返回非空类型后，才把它接入任务分发。
 	if rpc, err := client.Client(); err == nil {
 		if extRaw, err := rpc.Dispense(sdkgrpc.PluginKeyExtension); err == nil {
 			if ext, ok := extRaw.(*sdkgrpc.ExtensionGRPCClient); ok {
-				instance.Extension = ext
-				slog.Info("gateway_plugin_task_support_enabled", sdk.LogFieldPluginID, canonicalName)
+				taskCtx, taskCancel := context.WithTimeout(ctx, 2*time.Second)
+				taskTypes, err := ext.GetTaskTypes(taskCtx)
+				taskCancel()
+				if err == nil && len(taskTypes) > 0 {
+					instance.Extension = ext
+					slog.Info("gateway_plugin_task_support_enabled",
+						sdk.LogFieldPluginID, canonicalName,
+						"task_types", taskTypes,
+					)
+				} else if err != nil {
+					slog.Debug("gateway_plugin_task_support_unavailable",
+						sdk.LogFieldPluginID, canonicalName,
+						sdk.LogFieldError, err,
+					)
+				}
 			}
 		}
 	}
