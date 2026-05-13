@@ -430,6 +430,35 @@ export interface AdjustSubscriptionReq {
 
 // ==================== Usage ====================
 
+export interface UsageAttribute {
+  key?: string;
+  label: string;
+  kind?: string;
+  value: string;
+  metadata?: Record<string, string>;
+}
+
+export interface UsageMetric {
+  key?: string;
+  label: string;
+  kind?: string;
+  unit?: string;
+  value: number;
+  account_cost?: number;
+  currency?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface UsageCostDetail {
+  key?: string;
+  label: string;
+  account_cost: number;
+  user_cost?: number;
+  billing_multiplier?: number;
+  currency?: string;
+  metadata?: Record<string, string>;
+}
+
 export interface UsageLogResp {
   id: number;
   user_id: number;
@@ -486,6 +515,10 @@ export interface UsageLogResp {
   endpoint?: string;
   /** 推理强度档位 */
   reasoning_effort?: string;
+  usage_attributes?: UsageAttribute[];
+  usage_metrics?: UsageMetric[];
+  usage_cost_details?: UsageCostDetail[];
+  usage_metadata?: Record<string, string>;
   created_at: string;
 }
 
@@ -513,6 +546,9 @@ export interface CustomerUsageLogResp {
   first_token_ms: number;
   /** 请求端点 */
   endpoint?: string;
+  usage_attributes?: UsageAttribute[];
+  usage_metrics?: UsageMetric[];
+  usage_metadata?: Record<string, string>;
   created_at: string;
 }
 

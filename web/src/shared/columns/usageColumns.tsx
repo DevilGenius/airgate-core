@@ -1,9 +1,20 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import type { CSSProperties, ReactNode } from 'react';
+import { useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { Chip, Tooltip } from '@heroui/react';
 import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
-import type { UsageLogResp, CustomerUsageLogResp } from '../types';
+import {
+  getPluginUsageCostDetail,
+  getPluginUsageMetricDetail,
+  getPluginUsageModelMeta,
+  getUsageCostDetailVersion,
+  getUsageMetricDetailVersion,
+  getUsageModelMetaVersion,
+  subscribeUsageCostDetailChange,
+  subscribeUsageMetricDetailChange,
+  subscribeUsageModelMetaChange,
+} from '../../app/plugin-loader';
+import type { UsageLogResp, CustomerUsageLogResp, UsageMetric } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
 import { CostValue } from '../components/CostValue';
 
@@ -106,6 +117,28 @@ function TooltipDivider() {
   return <div className="my-0.5 border-t border-border" />;
 }
 
+const META_CHIP_EFFORT_COLORS: Record<string, string> = {
+  low: 'rgb(34,197,94)',
+  medium: 'rgb(59,130,246)',
+  high: 'rgb(249,115,22)',
+  xhigh: 'rgb(239,68,68)',
+};
+
+function MetaChip({ color, label }: { color: string; label: string }) {
+  return (
+    <span
+      className="inline-flex shrink-0 items-center rounded px-1.5 text-[11px] font-semibold leading-4 whitespace-nowrap"
+      style={{
+        background: `color-mix(in srgb, ${color} 18%, transparent)`,
+        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 34%, transparent)`,
+        color,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 const HEROUI_BLUE = 'oklch(62.04% 0.1950 253.83)';
 
 const STREAM_CHIP_STYLE: CSSProperties = {
@@ -113,39 +146,6 @@ const STREAM_CHIP_STYLE: CSSProperties = {
   boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${HEROUI_BLUE} 34%, transparent)`,
   color: HEROUI_BLUE,
 };
-
-const reasoningEffortColorMap: Record<string, string> = {
-  auto: 'var(--ag-success)',
-  minimal: 'var(--ag-muted)',
-  low: 'var(--ag-muted)',
-  medium: HEROUI_BLUE,
-  high: 'var(--ag-warning)',
-  xhigh: 'var(--ag-danger)',
-  extrahigh: 'var(--ag-danger)',
-  max: 'var(--ag-danger)',
-};
-
-function getReasoningEffortStyle(effort: string): CSSProperties {
-  const normalized = effort.trim().toLowerCase().replace(/[\s_-]/g, '');
-  const color = reasoningEffortColorMap[normalized] ?? HEROUI_BLUE;
-
-  return {
-    background: `color-mix(in srgb, ${color} 20%, transparent)`,
-    borderColor: `color-mix(in srgb, ${color} 40%, transparent)`,
-    color,
-  };
-}
-
-function getImageSizeStyle(): CSSProperties {
-  const color = 'var(--ag-success)';
-
-  return {
-    background: `color-mix(in srgb, ${color} 14%, transparent)`,
-    borderColor: `color-mix(in srgb, ${color} 28%, transparent)`,
-    color,
-  };
-}
-
 
 /** 单行 token 数据行：固定宽度图标 + 右对齐等宽数字 */
 function TokenRow({
@@ -192,54 +192,196 @@ export function fmtCost(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
+function normalizeMetricKey(metric: Pick<UsageMetric, 'key' | 'kind' | 'label'>): string {
+  const raw = metric.key || metric.kind || metric.label || '';
+  return raw.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function metricNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function metricMatches(metric: UsageMetric, keys: string[]) {
+  const key = normalizeMetricKey(metric);
+  return keys.includes(key);
+}
+
+function metricValue(metrics: UsageMetric[], keys: string[]): number | undefined {
+  const item = metrics.find((metric) => metricMatches(metric, keys));
+  return item ? metricNumber(item.value) : undefined;
+}
+
+function isTotalMetric(metric: UsageMetric) {
+  return metricMatches(metric, ['total_tokens', 'total_token', 'total']);
+}
+
+function formatMetricValue(metric: UsageMetric): string {
+  const value = metricNumber(metric.value);
+  const formatted = Number.isInteger(value)
+    ? value.toLocaleString()
+    : value.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  return metric.unit ? `${formatted} ${metric.unit}` : formatted;
+}
+
+function metricColor(metric: UsageMetric, index: number): string | undefined {
+  const key = normalizeMetricKey(metric);
+  if (key.includes('input') && !key.includes('cached')) return USAGE_TOKEN_COLORS.input;
+  if (key.includes('output')) return USAGE_TOKEN_COLORS.output;
+  if (key.includes('cache_read') || key.includes('cached_input')) return USAGE_TOKEN_COLORS.cacheRead;
+  if (key.includes('cache_creation')) return USAGE_TOKEN_COLORS.cacheCreation;
+  if (metric.kind === 'image') return 'var(--ag-success)';
+  return [USAGE_TOKEN_COLORS.input, USAGE_TOKEN_COLORS.output, USAGE_TOKEN_COLORS.cacheRead, USAGE_TOKEN_COLORS.cacheCreation][index % 4];
+}
+
+function legacyMetrics(row: UsageRow): UsageMetric[] {
+  const cacheCreation = (row as UsageLogResp).cache_creation_tokens ?? 0;
+  return [
+    { key: 'input_tokens', label: '输入 Token', kind: 'token', unit: 'token', value: row.input_tokens },
+    { key: 'output_tokens', label: '输出 Token', kind: 'token', unit: 'token', value: row.output_tokens },
+    { key: 'cached_input_tokens', label: '缓存读取 Token', kind: 'token', unit: 'token', value: row.cached_input_tokens },
+    { key: 'cache_creation_tokens', label: '缓存写入 Token', kind: 'token', unit: 'token', value: cacheCreation },
+  ].filter((metric) => metric.value > 0 || metric.key === 'input_tokens' || metric.key === 'output_tokens');
+}
+
+function rowMetrics(row: UsageRow): UsageMetric[] {
+  const metrics = row.usage_metrics ?? [];
+  if (metrics.length > 0) return metrics;
+  return legacyMetrics(row);
+}
+
+function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
+  const usageCostDetails = !customerScope && 'usage_cost_details' in row
+    ? (row.usage_cost_details ?? [])
+    : [];
+  const usageAttributes = row.usage_attributes ?? [];
+  const usageMetrics = row.usage_metrics ?? [];
+  const usageMetadata = row.usage_metadata ?? {};
+
+  const ctx: Record<string, unknown> = {
+    record: row,
+    customerScope,
+    usageAttributes,
+    usageMetrics,
+    usageCostDetails,
+    usageMetadata,
+    usage_attributes: usageAttributes,
+    usage_metrics: usageMetrics,
+    usage_cost_details: usageCostDetails,
+    usage_metadata: usageMetadata,
+    // 常用的行级别字段做扁平化，方便插件扩展渲染器直接取值。
+    model: row.model,
+    platform: row.platform,
+    service_tier: row.service_tier,
+    image_size: row.image_size,
+    endpoint: row.endpoint,
+    stream: row.stream,
+    created_at: row.created_at,
+  };
+
+  // reasoning_effort / reasoning_output_tokens 后端在 end customer scope 默认不返回，
+  // 这里做容错：字段存在就透传给插件扩展渲染器。
+  const maybeReasoningEffort = (row as Partial<UsageLogResp>).reasoning_effort;
+  if (maybeReasoningEffort) ctx.reasoning_effort = maybeReasoningEffort;
+  const maybeReasoningTokens = (row as Partial<UsageLogResp>).reasoning_output_tokens;
+  if (typeof maybeReasoningTokens === 'number' && maybeReasoningTokens > 0) {
+    ctx.reasoning_output_tokens = maybeReasoningTokens;
+  }
+
+  return ctx;
+}
+
+function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
+  const allMetrics = rowMetrics(row);
+  const hasSDKMetrics = (row.usage_metrics?.length ?? 0) > 0;
+  const metrics = allMetrics.filter((metric) => (
+    !isTotalMetric(metric) && (metricNumber(metric.value) > 0 || !hasSDKMetrics)
+  ));
+  const totalMetric = allMetrics.find(isTotalMetric);
+  const tokenTotal =
+    totalMetric?.value
+    ?? row.input_tokens + row.output_tokens + row.cached_input_tokens + ((row as UsageLogResp).cache_creation_tokens ?? 0);
+  const shouldShowTokenTotal = !!totalMetric || tokenTotal > 0 || metrics.some((metric) => metric.kind === 'token');
+
+  return (
+    <TooltipPanel title={t('usage.metric_detail', '计量明细')} subtitle={row.model}>
+      {metrics.map((metric, index) => (
+        <TooltipRow
+          key={metric.key || `${metric.label}:${index}`}
+          label={metric.label || metric.key || t('usage.metric', '计量')}
+          value={formatMetricValue(metric)}
+          color={metricColor(metric, index)}
+        />
+      ))}
+      {shouldShowTokenTotal && (
+        <>
+          <TooltipDivider />
+          <TooltipRow label={t('usage.total_tokens')} value={Number(tokenTotal).toLocaleString()} tone="strong" />
+        </>
+      )}
+    </TooltipPanel>
+  );
+}
+
 /** Reseller / admin 视角的成本列：包含完整的成本拆分与倍率信息 */
-function buildResellerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
+function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnConfig<UsageRow> {
   return {
     key: 'cost',
     title: t('usage.cost'),
     width: '140px',
     render: (raw) => {
       const row = raw as UsageLogResp;
+      const PluginUsageCostDetail = getPluginUsageCostDetail(row.platform);
+      const ctx = buildUsageRecordContext(row, false);
+      if (!adminView && ctx.record && typeof ctx.record === 'object') {
+        ctx.record = { ...(ctx.record as Record<string, unknown>), account_cost: undefined, account_rate_multiplier: undefined };
+      }
       return (
         <RichTooltip
           placement="right"
           content={
-            <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
-              <TooltipRow label={t('usage.input_cost')} value={`$${row.input_cost.toFixed(6)}`} />
-              <TooltipRow label={t('usage.output_cost')} value={`$${row.output_cost.toFixed(6)}`} />
-              {row.input_price > 0 && (
-                <TooltipRow label={t('usage.input_unit_price')} value={`$${row.input_price.toFixed(4)} / 1M Token`} />
-              )}
-              {row.output_price > 0 && (
-                <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
-              )}
-              {row.cached_input_cost > 0 && (
-                <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
-              )}
-              <TooltipDivider />
-              {row.service_tier && (
-                <TooltipRow label={t('usage.service_tier')} value={<span className="capitalize">{row.service_tier}</span>} />
-              )}
-              <TooltipRow label={t('usage.rate_multiplier')} value={`${row.rate_multiplier.toFixed(2)}x`} />
-              {row.account_rate_multiplier > 0 && row.account_rate_multiplier !== 1 && (
-                <TooltipRow label={t('usage.account_rate', '账号倍率')} value={`${row.account_rate_multiplier.toFixed(2)}x`} />
-              )}
-              {row.sell_rate > 0 && (
-                <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={`${row.sell_rate.toFixed(2)}x`} />
-              )}
-              <TooltipDivider />
-              <TooltipRow label={t('usage.original_cost')} value={<CostValue value={row.total_cost} decimals={6} tone="standard" />} />
-              {row.account_cost !== row.total_cost && (
-                <TooltipRow label={t('usage.account_cost', '账号计费')} value={<CostValue value={row.account_cost} decimals={6} />} />
-              )}
-              <TooltipRow label={t('usage.user_charged', '用户扣费')} value={<CostValue value={row.actual_cost} decimals={6} tone="actual" />} />
-              {row.sell_rate > 0 && row.billed_cost !== row.actual_cost && (
-                <>
-                  <TooltipRow label={t('usage.billed_cost', '客户账面')} value={<CostValue value={row.billed_cost} decimals={6} />} />
-                  <TooltipRow label={t('usage.profit', '利润')} value={<CostValue value={row.billed_cost - row.actual_cost} decimals={6} tone="success" />} />
-                </>
-              )}
-            </TooltipPanel>
+            PluginUsageCostDetail ? (
+              <PluginUsageCostDetail
+                recordId={row.id}
+                context={ctx}
+              />
+            ) : (
+              <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
+                <TooltipRow label={t('usage.input_cost')} value={`$${row.input_cost.toFixed(6)}`} />
+                <TooltipRow label={t('usage.output_cost')} value={`$${row.output_cost.toFixed(6)}`} />
+                {row.input_price > 0 && (
+                  <TooltipRow label={t('usage.input_unit_price')} value={`$${row.input_price.toFixed(4)} / 1M Token`} />
+                )}
+                {row.output_price > 0 && (
+                  <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
+                )}
+                {row.cached_input_cost > 0 && (
+                  <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
+                )}
+                <TooltipDivider />
+                {row.service_tier && (
+                  <TooltipRow label={t('usage.service_tier')} value={<span className="capitalize">{row.service_tier}</span>} />
+                )}
+                <TooltipRow label={t('usage.rate_multiplier')} value={`${row.rate_multiplier.toFixed(2)}x`} />
+                {adminView && row.account_rate_multiplier > 0 && (
+                  <TooltipRow label={t('usage.account_rate', '账号倍率')} value={`${row.account_rate_multiplier.toFixed(2)}x`} />
+                )}
+                {row.sell_rate > 0 && (
+                  <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={`${row.sell_rate.toFixed(2)}x`} />
+                )}
+                <TooltipDivider />
+                <TooltipRow label={t('usage.original_cost')} value={<CostValue value={row.total_cost} decimals={6} tone="standard" />} />
+                {adminView && (
+                  <TooltipRow label={t('usage.account_cost', '账号计费')} value={<CostValue value={row.account_cost} decimals={6} />} />
+                )}
+                <TooltipRow label={t('usage.user_charged', '用户扣费')} value={<CostValue value={row.actual_cost} decimals={6} tone="actual" />} />
+                {row.sell_rate > 0 && row.billed_cost !== row.actual_cost && (
+                  <>
+                    <TooltipRow label={t('usage.billed_cost', '客户账面')} value={<CostValue value={row.billed_cost} decimals={6} />} />
+                    <TooltipRow label={t('usage.profit', '利润')} value={<CostValue value={row.billed_cost - row.actual_cost} decimals={6} tone="success" />} />
+                  </>
+                )}
+              </TooltipPanel>
+            )
           }
         >
           <div className="flex w-full flex-col items-center font-mono text-center text-xs">
@@ -291,11 +433,15 @@ function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
  *
  * customerScope=true 时切换为 end customer 视角的成本列，避免读取后端剥离过的字段。
  */
-export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumnConfig<UsageRow>[] {
+export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: boolean }): UsageColumnConfig<UsageRow>[] {
   const { t } = useTranslation();
   const customerScope = opts?.customerScope ?? false;
+  const adminView = opts?.adminView ?? true;
+  useSyncExternalStore(subscribeUsageMetricDetailChange, getUsageMetricDetailVersion);
+  useSyncExternalStore(subscribeUsageCostDetailChange, getUsageCostDetailVersion);
+  useSyncExternalStore(subscribeUsageModelMetaChange, getUsageModelMetaVersion);
 
-  const costColumn = customerScope ? buildCustomerCostColumn(t) : buildResellerCostColumn(t);
+  const costColumn = customerScope ? buildCustomerCostColumn(t) : buildResellerCostColumn(t, adminView);
 
   return [
     {
@@ -323,29 +469,36 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
     {
       key: 'model',
       title: t('usage.model'),
-      width: '250px',
+      width: '220px',
       render: (row) => {
-        const reasoningEffort = (row as UsageLogResp).reasoning_effort;
-        const badgeValue = row.image_size || reasoningEffort || '';
-        const badgeLabel = row.image_size
-          ? row.image_size
-          : reasoningEffort?.trim().toLowerCase() || '';
-        const badgeStyle = row.image_size
-          ? getImageSizeStyle()
-          : reasoningEffort
-            ? getReasoningEffortStyle(reasoningEffort)
-            : undefined;
+        const PluginUsageModelMeta = getPluginUsageModelMeta(row.platform);
+
+        let fallbackMeta: ReactNode = null;
+        if (!PluginUsageModelMeta) {
+          const chips: Array<{ label: string; color: string }> = [];
+          if (!customerScope) {
+            const re = (row as UsageLogResp).reasoning_effort;
+            if (re) chips.push({ label: re, color: META_CHIP_EFFORT_COLORS[re] ?? 'rgb(148,163,184)' });
+          }
+          if (row.image_size) chips.push({ label: row.image_size, color: 'rgb(74,222,128)' });
+          if (chips.length) {
+            fallbackMeta = (
+              <div className="flex shrink-0 gap-1">
+                {chips.map((c) => <MetaChip key={c.label} color={c.color} label={c.label} />)}
+              </div>
+            );
+          }
+        }
 
         return (
-          <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
-            <span
-              className={`inline-flex h-4 w-[5.5rem] shrink-0 items-center justify-center truncate rounded-[var(--radius)] border px-1 font-mono text-[11px] leading-none ${row.image_size ? 'font-medium' : 'font-bold tracking-wide'} ${badgeValue ? '' : 'invisible'}`}
-              style={badgeStyle}
-              title={badgeLabel || undefined}
-            >
-              {badgeLabel || '0000x0000'}
-            </span>
-            <span className="block min-w-0 truncate text-sm font-medium leading-none text-text" title={row.model}>
+          <div className="flex min-w-0 items-center gap-2">
+            {PluginUsageModelMeta ? (
+              <PluginUsageModelMeta
+                recordId={row.id}
+                context={buildUsageRecordContext(row, customerScope)}
+              />
+            ) : fallbackMeta}
+            <span className="min-w-0 truncate text-sm font-medium leading-none text-text" title={row.model}>
               {row.model}
             </span>
           </div>
@@ -354,77 +507,82 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
     },
     {
       key: 'tokens',
-      title: 'TOKEN',
+      title: t('usage.metrics', '计量'),
       width: '220px',
       render: (row) => {
-        // 注意：cached_input_tokens 表示 cache read；cache_creation_tokens 为 5m+1h 之和，
-        // 两者与 input/output 互斥计入 total_tokens。
-        // CustomerUsageLogResp 不下发 cache_creation_* 字段，这里用 ?? 0 做兼容。
-        const cacheCreation = (row as UsageLogResp).cache_creation_tokens ?? 0;
-        const cacheCreation5m = (row as UsageLogResp).cache_creation_5m_tokens ?? 0;
-        const cacheCreation1h = (row as UsageLogResp).cache_creation_1h_tokens ?? 0;
-        const hasCacheRead = row.cached_input_tokens > 0;
-        const hasCacheWrite = cacheCreation > 0;
+        const metrics = rowMetrics(row);
+        const PluginUsageMetricDetail = getPluginUsageMetricDetail(row.platform);
+        const inputTokens = metricValue(metrics, ['input_tokens', 'input_token', 'prompt_tokens', 'prompt_token']) ?? row.input_tokens;
+        const outputTokens = metricValue(metrics, ['output_tokens', 'output_token', 'completion_tokens', 'completion_token']) ?? row.output_tokens;
+        const cacheReadTokens = metricValue(metrics, ['cached_input_tokens', 'cached_input_token', 'cache_read_tokens', 'cache_read_token']) ?? row.cached_input_tokens;
+        const cacheCreationTokens = metricValue(metrics, ['cache_creation_tokens', 'cache_creation_token']) ?? ((row as UsageLogResp).cache_creation_tokens ?? 0);
         const total =
-          row.input_tokens + row.output_tokens + row.cached_input_tokens + cacheCreation;
+          metricValue(metrics, ['total_tokens', 'total_token'])
+          ?? inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+        const hasCacheRead = cacheReadTokens > 0;
+        const hasCacheWrite = cacheCreationTokens > 0;
+        const tokenSummaryVisible = inputTokens > 0 || outputTokens > 0 || hasCacheRead || hasCacheWrite || total > 0;
+        const primaryMetric = metrics.find((metric) => metricNumber(metric.value) > 0 && !isTotalMetric(metric));
         return (
           <RichTooltip
             placement="left"
             content={
-              <TooltipPanel title={`Token ${t('usage.detail')}`} subtitle={row.model}>
-                <TooltipRow label={t('usage.input_tokens')} value={row.input_tokens.toLocaleString()} color={USAGE_TOKEN_COLORS.input} />
-                <TooltipRow label={t('usage.output_tokens')} value={row.output_tokens.toLocaleString()} color={USAGE_TOKEN_COLORS.output} />
-                {hasCacheRead && (
-                  <TooltipRow label={t('usage.cache_read')} value={row.cached_input_tokens.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheRead} />
-                )}
-                {hasCacheWrite && (
-                  <TooltipRow label={t('usage.cache_creation')} value={cacheCreation.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheCreation} />
-                )}
-                {cacheCreation5m > 0 && (
-                  <TooltipRow label={t('usage.cache_creation_5m')} value={cacheCreation5m.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheCreation} />
-                )}
-                {cacheCreation1h > 0 && (
-                  <TooltipRow label={t('usage.cache_creation_1h')} value={cacheCreation1h.toLocaleString()} color={USAGE_TOKEN_COLORS.cacheCreation} />
-                )}
-                <TooltipRow label={t('usage.total_tokens')} value={total.toLocaleString()} tone="strong" />
-              </TooltipPanel>
+              PluginUsageMetricDetail ? (
+                <PluginUsageMetricDetail
+                  recordId={row.id}
+                  context={buildUsageRecordContext(row, customerScope)}
+                />
+              ) : (
+                <GenericMetricDetail row={row} t={t} />
+              )
             }
           >
-            <div className="mx-auto grid h-full max-h-[var(--ag-usage-table-row-height)] grid-cols-[minmax(0,8.75rem)_4.75rem] items-center justify-center gap-2 overflow-visible px-1">
-              <div className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-px">
-                <TokenRow
-                  color={USAGE_TOKEN_COLORS.input}
-                  icon={<ArrowDown className="h-3 w-3 shrink-0" />}
-                  value={fmtNum(row.input_tokens)}
-                />
-                <TokenRow
-                  color={USAGE_TOKEN_COLORS.output}
-                  icon={<ArrowUp className="h-3 w-3 shrink-0" />}
-                  value={fmtNum(row.output_tokens)}
-                />
-                {(hasCacheRead || hasCacheWrite) ? (
-                  <>
-                    {hasCacheRead ? (
-                      <TokenRow
-                        color={USAGE_TOKEN_COLORS.cacheRead}
-                        icon={<BookOpen className="h-3 w-3 shrink-0" />}
-                        value={fmtNum(row.cached_input_tokens)}
-                      />
-                    ) : <div />}
-                    {hasCacheWrite ? (
-                      <TokenRow
-                        color={USAGE_TOKEN_COLORS.cacheCreation}
-                        icon={<Sparkles className="h-3 w-3 shrink-0" />}
-                        value={fmtNum(cacheCreation)}
-                      />
-                    ) : <div />}
-                  </>
-                ) : null}
+            {tokenSummaryVisible ? (
+              <div className="mx-auto grid h-full max-h-[var(--ag-usage-table-row-height)] grid-cols-[minmax(0,8.75rem)_4.75rem] items-center justify-center gap-2 overflow-visible px-1">
+                <div className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-px">
+                  <TokenRow
+                    color={USAGE_TOKEN_COLORS.input}
+                    icon={<ArrowDown className="h-3 w-3 shrink-0" />}
+                    value={fmtNum(inputTokens)}
+                  />
+                  <TokenRow
+                    color={USAGE_TOKEN_COLORS.output}
+                    icon={<ArrowUp className="h-3 w-3 shrink-0" />}
+                    value={fmtNum(outputTokens)}
+                  />
+                  {(hasCacheRead || hasCacheWrite) ? (
+                    <>
+                      {hasCacheRead ? (
+                        <TokenRow
+                          color={USAGE_TOKEN_COLORS.cacheRead}
+                          icon={<BookOpen className="h-3 w-3 shrink-0" />}
+                          value={fmtNum(cacheReadTokens)}
+                        />
+                      ) : <div />}
+                      {hasCacheWrite ? (
+                        <TokenRow
+                          color={USAGE_TOKEN_COLORS.cacheCreation}
+                          icon={<Sparkles className="h-3 w-3 shrink-0" />}
+                          value={fmtNum(cacheCreationTokens)}
+                        />
+                      ) : <div />}
+                    </>
+                  ) : null}
+                </div>
+                <div className="w-[4.75rem] text-center font-mono text-base font-semibold tabular-nums leading-none text-text">
+                  {fmtNum(total)}
+                </div>
               </div>
-              <div className="w-[4.75rem] text-center font-mono text-base font-semibold tabular-nums leading-none text-text">
-                {fmtNum(total)}
+            ) : (
+              <div className="flex h-full min-w-0 flex-col items-center justify-center px-2 text-center">
+                <span className="max-w-full truncate text-[11px] leading-none text-text-tertiary" title={primaryMetric?.label || primaryMetric?.key}>
+                  {primaryMetric?.label || primaryMetric?.key || '-'}
+                </span>
+                <span className="mt-1 max-w-full truncate font-mono text-sm font-semibold leading-none text-text">
+                  {primaryMetric ? formatMetricValue(primaryMetric) : '-'}
+                </span>
               </div>
-            </div>
+            )}
           </RichTooltip>
         );
       },

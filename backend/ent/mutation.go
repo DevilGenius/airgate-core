@@ -24,6 +24,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 const (
@@ -10358,6 +10359,13 @@ type UsageLogMutation struct {
 	ip_address                  *string
 	endpoint                    *string
 	reasoning_effort            *string
+	usage_attributes            *[]sdk.UsageAttribute
+	appendusage_attributes      []sdk.UsageAttribute
+	usage_metrics               *[]sdk.UsageMetric
+	appendusage_metrics         []sdk.UsageMetric
+	usage_cost_details          *[]sdk.UsageCostDetail
+	appendusage_cost_details    []sdk.UsageCostDetail
+	usage_metadata              *map[string]string
 	created_at                  *time.Time
 	clearedFields               map[string]struct{}
 	user                        *int
@@ -12195,6 +12203,250 @@ func (m *UsageLogMutation) ResetReasoningEffort() {
 	m.reasoning_effort = nil
 }
 
+// SetUsageAttributes sets the "usage_attributes" field.
+func (m *UsageLogMutation) SetUsageAttributes(sa []sdk.UsageAttribute) {
+	m.usage_attributes = &sa
+	m.appendusage_attributes = nil
+}
+
+// UsageAttributes returns the value of the "usage_attributes" field in the mutation.
+func (m *UsageLogMutation) UsageAttributes() (r []sdk.UsageAttribute, exists bool) {
+	v := m.usage_attributes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsageAttributes returns the old "usage_attributes" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldUsageAttributes(ctx context.Context) (v []sdk.UsageAttribute, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsageAttributes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsageAttributes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsageAttributes: %w", err)
+	}
+	return oldValue.UsageAttributes, nil
+}
+
+// AppendUsageAttributes adds sa to the "usage_attributes" field.
+func (m *UsageLogMutation) AppendUsageAttributes(sa []sdk.UsageAttribute) {
+	m.appendusage_attributes = append(m.appendusage_attributes, sa...)
+}
+
+// AppendedUsageAttributes returns the list of values that were appended to the "usage_attributes" field in this mutation.
+func (m *UsageLogMutation) AppendedUsageAttributes() ([]sdk.UsageAttribute, bool) {
+	if len(m.appendusage_attributes) == 0 {
+		return nil, false
+	}
+	return m.appendusage_attributes, true
+}
+
+// ClearUsageAttributes clears the value of the "usage_attributes" field.
+func (m *UsageLogMutation) ClearUsageAttributes() {
+	m.usage_attributes = nil
+	m.appendusage_attributes = nil
+	m.clearedFields[usagelog.FieldUsageAttributes] = struct{}{}
+}
+
+// UsageAttributesCleared returns if the "usage_attributes" field was cleared in this mutation.
+func (m *UsageLogMutation) UsageAttributesCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldUsageAttributes]
+	return ok
+}
+
+// ResetUsageAttributes resets all changes to the "usage_attributes" field.
+func (m *UsageLogMutation) ResetUsageAttributes() {
+	m.usage_attributes = nil
+	m.appendusage_attributes = nil
+	delete(m.clearedFields, usagelog.FieldUsageAttributes)
+}
+
+// SetUsageMetrics sets the "usage_metrics" field.
+func (m *UsageLogMutation) SetUsageMetrics(sm []sdk.UsageMetric) {
+	m.usage_metrics = &sm
+	m.appendusage_metrics = nil
+}
+
+// UsageMetrics returns the value of the "usage_metrics" field in the mutation.
+func (m *UsageLogMutation) UsageMetrics() (r []sdk.UsageMetric, exists bool) {
+	v := m.usage_metrics
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsageMetrics returns the old "usage_metrics" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldUsageMetrics(ctx context.Context) (v []sdk.UsageMetric, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsageMetrics is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsageMetrics requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsageMetrics: %w", err)
+	}
+	return oldValue.UsageMetrics, nil
+}
+
+// AppendUsageMetrics adds sm to the "usage_metrics" field.
+func (m *UsageLogMutation) AppendUsageMetrics(sm []sdk.UsageMetric) {
+	m.appendusage_metrics = append(m.appendusage_metrics, sm...)
+}
+
+// AppendedUsageMetrics returns the list of values that were appended to the "usage_metrics" field in this mutation.
+func (m *UsageLogMutation) AppendedUsageMetrics() ([]sdk.UsageMetric, bool) {
+	if len(m.appendusage_metrics) == 0 {
+		return nil, false
+	}
+	return m.appendusage_metrics, true
+}
+
+// ClearUsageMetrics clears the value of the "usage_metrics" field.
+func (m *UsageLogMutation) ClearUsageMetrics() {
+	m.usage_metrics = nil
+	m.appendusage_metrics = nil
+	m.clearedFields[usagelog.FieldUsageMetrics] = struct{}{}
+}
+
+// UsageMetricsCleared returns if the "usage_metrics" field was cleared in this mutation.
+func (m *UsageLogMutation) UsageMetricsCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldUsageMetrics]
+	return ok
+}
+
+// ResetUsageMetrics resets all changes to the "usage_metrics" field.
+func (m *UsageLogMutation) ResetUsageMetrics() {
+	m.usage_metrics = nil
+	m.appendusage_metrics = nil
+	delete(m.clearedFields, usagelog.FieldUsageMetrics)
+}
+
+// SetUsageCostDetails sets the "usage_cost_details" field.
+func (m *UsageLogMutation) SetUsageCostDetails(scd []sdk.UsageCostDetail) {
+	m.usage_cost_details = &scd
+	m.appendusage_cost_details = nil
+}
+
+// UsageCostDetails returns the value of the "usage_cost_details" field in the mutation.
+func (m *UsageLogMutation) UsageCostDetails() (r []sdk.UsageCostDetail, exists bool) {
+	v := m.usage_cost_details
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsageCostDetails returns the old "usage_cost_details" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldUsageCostDetails(ctx context.Context) (v []sdk.UsageCostDetail, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsageCostDetails is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsageCostDetails requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsageCostDetails: %w", err)
+	}
+	return oldValue.UsageCostDetails, nil
+}
+
+// AppendUsageCostDetails adds scd to the "usage_cost_details" field.
+func (m *UsageLogMutation) AppendUsageCostDetails(scd []sdk.UsageCostDetail) {
+	m.appendusage_cost_details = append(m.appendusage_cost_details, scd...)
+}
+
+// AppendedUsageCostDetails returns the list of values that were appended to the "usage_cost_details" field in this mutation.
+func (m *UsageLogMutation) AppendedUsageCostDetails() ([]sdk.UsageCostDetail, bool) {
+	if len(m.appendusage_cost_details) == 0 {
+		return nil, false
+	}
+	return m.appendusage_cost_details, true
+}
+
+// ClearUsageCostDetails clears the value of the "usage_cost_details" field.
+func (m *UsageLogMutation) ClearUsageCostDetails() {
+	m.usage_cost_details = nil
+	m.appendusage_cost_details = nil
+	m.clearedFields[usagelog.FieldUsageCostDetails] = struct{}{}
+}
+
+// UsageCostDetailsCleared returns if the "usage_cost_details" field was cleared in this mutation.
+func (m *UsageLogMutation) UsageCostDetailsCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldUsageCostDetails]
+	return ok
+}
+
+// ResetUsageCostDetails resets all changes to the "usage_cost_details" field.
+func (m *UsageLogMutation) ResetUsageCostDetails() {
+	m.usage_cost_details = nil
+	m.appendusage_cost_details = nil
+	delete(m.clearedFields, usagelog.FieldUsageCostDetails)
+}
+
+// SetUsageMetadata sets the "usage_metadata" field.
+func (m *UsageLogMutation) SetUsageMetadata(value map[string]string) {
+	m.usage_metadata = &value
+}
+
+// UsageMetadata returns the value of the "usage_metadata" field in the mutation.
+func (m *UsageLogMutation) UsageMetadata() (r map[string]string, exists bool) {
+	v := m.usage_metadata
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsageMetadata returns the old "usage_metadata" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldUsageMetadata(ctx context.Context) (v map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsageMetadata is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsageMetadata requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsageMetadata: %w", err)
+	}
+	return oldValue.UsageMetadata, nil
+}
+
+// ClearUsageMetadata clears the value of the "usage_metadata" field.
+func (m *UsageLogMutation) ClearUsageMetadata() {
+	m.usage_metadata = nil
+	m.clearedFields[usagelog.FieldUsageMetadata] = struct{}{}
+}
+
+// UsageMetadataCleared returns if the "usage_metadata" field was cleared in this mutation.
+func (m *UsageLogMutation) UsageMetadataCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldUsageMetadata]
+	return ok
+}
+
+// ResetUsageMetadata resets all changes to the "usage_metadata" field.
+func (m *UsageLogMutation) ResetUsageMetadata() {
+	m.usage_metadata = nil
+	delete(m.clearedFields, usagelog.FieldUsageMetadata)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *UsageLogMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -12421,7 +12673,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 35)
+	fields := make([]string, 0, 39)
 	if m.platform != nil {
 		fields = append(fields, usagelog.FieldPlatform)
 	}
@@ -12524,6 +12776,18 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.reasoning_effort != nil {
 		fields = append(fields, usagelog.FieldReasoningEffort)
 	}
+	if m.usage_attributes != nil {
+		fields = append(fields, usagelog.FieldUsageAttributes)
+	}
+	if m.usage_metrics != nil {
+		fields = append(fields, usagelog.FieldUsageMetrics)
+	}
+	if m.usage_cost_details != nil {
+		fields = append(fields, usagelog.FieldUsageCostDetails)
+	}
+	if m.usage_metadata != nil {
+		fields = append(fields, usagelog.FieldUsageMetadata)
+	}
 	if m.created_at != nil {
 		fields = append(fields, usagelog.FieldCreatedAt)
 	}
@@ -12603,6 +12867,14 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.Endpoint()
 	case usagelog.FieldReasoningEffort:
 		return m.ReasoningEffort()
+	case usagelog.FieldUsageAttributes:
+		return m.UsageAttributes()
+	case usagelog.FieldUsageMetrics:
+		return m.UsageMetrics()
+	case usagelog.FieldUsageCostDetails:
+		return m.UsageCostDetails()
+	case usagelog.FieldUsageMetadata:
+		return m.UsageMetadata()
 	case usagelog.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -12682,6 +12954,14 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldEndpoint(ctx)
 	case usagelog.FieldReasoningEffort:
 		return m.OldReasoningEffort(ctx)
+	case usagelog.FieldUsageAttributes:
+		return m.OldUsageAttributes(ctx)
+	case usagelog.FieldUsageMetrics:
+		return m.OldUsageMetrics(ctx)
+	case usagelog.FieldUsageCostDetails:
+		return m.OldUsageCostDetails(ctx)
+	case usagelog.FieldUsageMetadata:
+		return m.OldUsageMetadata(ctx)
 	case usagelog.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -12930,6 +13210,34 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetReasoningEffort(v)
+		return nil
+	case usagelog.FieldUsageAttributes:
+		v, ok := value.([]sdk.UsageAttribute)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsageAttributes(v)
+		return nil
+	case usagelog.FieldUsageMetrics:
+		v, ok := value.([]sdk.UsageMetric)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsageMetrics(v)
+		return nil
+	case usagelog.FieldUsageCostDetails:
+		v, ok := value.([]sdk.UsageCostDetail)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsageCostDetails(v)
+		return nil
+	case usagelog.FieldUsageMetadata:
+		v, ok := value.(map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsageMetadata(v)
 		return nil
 	case usagelog.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -13270,7 +13578,20 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *UsageLogMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(usagelog.FieldUsageAttributes) {
+		fields = append(fields, usagelog.FieldUsageAttributes)
+	}
+	if m.FieldCleared(usagelog.FieldUsageMetrics) {
+		fields = append(fields, usagelog.FieldUsageMetrics)
+	}
+	if m.FieldCleared(usagelog.FieldUsageCostDetails) {
+		fields = append(fields, usagelog.FieldUsageCostDetails)
+	}
+	if m.FieldCleared(usagelog.FieldUsageMetadata) {
+		fields = append(fields, usagelog.FieldUsageMetadata)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -13283,6 +13604,20 @@ func (m *UsageLogMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *UsageLogMutation) ClearField(name string) error {
+	switch name {
+	case usagelog.FieldUsageAttributes:
+		m.ClearUsageAttributes()
+		return nil
+	case usagelog.FieldUsageMetrics:
+		m.ClearUsageMetrics()
+		return nil
+	case usagelog.FieldUsageCostDetails:
+		m.ClearUsageCostDetails()
+		return nil
+	case usagelog.FieldUsageMetadata:
+		m.ClearUsageMetadata()
+		return nil
+	}
 	return fmt.Errorf("unknown UsageLog nullable field %s", name)
 }
 
@@ -13391,6 +13726,18 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldReasoningEffort:
 		m.ResetReasoningEffort()
+		return nil
+	case usagelog.FieldUsageAttributes:
+		m.ResetUsageAttributes()
+		return nil
+	case usagelog.FieldUsageMetrics:
+		m.ResetUsageMetrics()
+		return nil
+	case usagelog.FieldUsageCostDetails:
+		m.ResetUsageCostDetails()
+		return nil
+	case usagelog.FieldUsageMetadata:
+		m.ResetUsageMetadata()
 		return nil
 	case usagelog.FieldCreatedAt:
 		m.ResetCreatedAt()

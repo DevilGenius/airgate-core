@@ -50,12 +50,19 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	if inst == nil {
 		return nil, false
 	}
+	schedulingModels := schedulingModelsForRequest(requestedPlatform, path, parsed.Model)
+	schedulingModel := ""
+	if len(schedulingModels) > 0 {
+		schedulingModel = schedulingModels[0]
+	}
 
 	return &forwardState{
 		startedAt:         startedAt,
 		requestPath:       path,
 		body:              body,
 		model:             parsed.Model,
+		schedulingModels:  schedulingModels,
+		schedulingModel:   schedulingModel,
 		stream:            parsed.Stream,
 		realtime:          parsed.Stream,
 		sessionID:         parsed.SessionID,

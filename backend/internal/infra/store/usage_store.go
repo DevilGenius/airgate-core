@@ -529,6 +529,10 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		IPAddress:             item.IPAddress,
 		Endpoint:              item.Endpoint,
 		ReasoningEffort:       item.ReasoningEffort,
+		UsageAttributes:       item.UsageAttributes,
+		UsageMetrics:          item.UsageMetrics,
+		UsageCostDetails:      item.UsageCostDetails,
+		UsageMetadata:         item.UsageMetadata,
 		CreatedAt:             item.CreatedAt.Format(time.RFC3339),
 	}
 

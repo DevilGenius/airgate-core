@@ -15,6 +15,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // UsageLogCreate is the builder for creating a UsageLog entity.
@@ -481,6 +482,30 @@ func (ulc *UsageLogCreate) SetNillableReasoningEffort(s *string) *UsageLogCreate
 	if s != nil {
 		ulc.SetReasoningEffort(*s)
 	}
+	return ulc
+}
+
+// SetUsageAttributes sets the "usage_attributes" field.
+func (ulc *UsageLogCreate) SetUsageAttributes(sa []sdk.UsageAttribute) *UsageLogCreate {
+	ulc.mutation.SetUsageAttributes(sa)
+	return ulc
+}
+
+// SetUsageMetrics sets the "usage_metrics" field.
+func (ulc *UsageLogCreate) SetUsageMetrics(sm []sdk.UsageMetric) *UsageLogCreate {
+	ulc.mutation.SetUsageMetrics(sm)
+	return ulc
+}
+
+// SetUsageCostDetails sets the "usage_cost_details" field.
+func (ulc *UsageLogCreate) SetUsageCostDetails(scd []sdk.UsageCostDetail) *UsageLogCreate {
+	ulc.mutation.SetUsageCostDetails(scd)
+	return ulc
+}
+
+// SetUsageMetadata sets the "usage_metadata" field.
+func (ulc *UsageLogCreate) SetUsageMetadata(m map[string]string) *UsageLogCreate {
+	ulc.mutation.SetUsageMetadata(m)
 	return ulc
 }
 
@@ -1016,6 +1041,22 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.ReasoningEffort(); ok {
 		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
 		_node.ReasoningEffort = value
+	}
+	if value, ok := ulc.mutation.UsageAttributes(); ok {
+		_spec.SetField(usagelog.FieldUsageAttributes, field.TypeJSON, value)
+		_node.UsageAttributes = value
+	}
+	if value, ok := ulc.mutation.UsageMetrics(); ok {
+		_spec.SetField(usagelog.FieldUsageMetrics, field.TypeJSON, value)
+		_node.UsageMetrics = value
+	}
+	if value, ok := ulc.mutation.UsageCostDetails(); ok {
+		_spec.SetField(usagelog.FieldUsageCostDetails, field.TypeJSON, value)
+		_node.UsageCostDetails = value
+	}
+	if value, ok := ulc.mutation.UsageMetadata(); ok {
+		_spec.SetField(usagelog.FieldUsageMetadata, field.TypeJSON, value)
+		_node.UsageMetadata = value
 	}
 	if value, ok := ulc.mutation.CreatedAt(); ok {
 		_spec.SetField(usagelog.FieldCreatedAt, field.TypeTime, value)

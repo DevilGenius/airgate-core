@@ -16,11 +16,16 @@ type forwardState struct {
 	requestPath string
 	requestID   string
 
-	body      []byte
-	model     string
-	stream    bool
-	realtime  bool
-	sessionID string
+	body  []byte
+	model string
+	// schedulingModels 是调度层使用的模型候选。协议翻译入口里，客户端传入的
+	// model 可能不是上游真实模型，例如 OpenAI 插件的 /v1/messages 会把
+	// claude-* 映射到 GPT 模型后再调用上游。
+	schedulingModels []string
+	schedulingModel  string
+	stream           bool
+	realtime         bool
+	sessionID        string
 
 	// 推理强度档位快照。
 	reasoningEffort string
@@ -64,4 +69,30 @@ type requestFields struct {
 		Effort string `json:"effort"`
 	} `json:"output_config"`
 	Thinking *struct{} `json:"thinking"`
+}
+
+func (s *forwardState) schedulingModelCandidates() []string {
+	if s == nil {
+		return nil
+	}
+	if len(s.schedulingModels) > 0 {
+		return s.schedulingModels
+	}
+	if s.model == "" {
+		return nil
+	}
+	return []string{s.model}
+}
+
+func (s *forwardState) modelForScheduling() string {
+	if s == nil {
+		return ""
+	}
+	if s.schedulingModel != "" {
+		return s.schedulingModel
+	}
+	if len(s.schedulingModels) > 0 {
+		return s.schedulingModels[0]
+	}
+	return s.model
 }

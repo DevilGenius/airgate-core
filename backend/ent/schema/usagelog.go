@@ -5,6 +5,8 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // UsageLog 使用日志（只追加）
@@ -71,6 +73,11 @@ func (UsageLog) Fields() []ent.Field {
 		field.String("endpoint").Default(""),
 		// 推理强度档位。
 		field.String("reasoning_effort").Default(""),
+		// SDK 原始用量明细：Core 只保存和透出，具体展示由插件前端 slot 负责。
+		field.JSON("usage_attributes", []sdk.UsageAttribute{}).Optional(),
+		field.JSON("usage_metrics", []sdk.UsageMetric{}).Optional(),
+		field.JSON("usage_cost_details", []sdk.UsageCostDetail{}).Optional(),
+		field.JSON("usage_metadata", map[string]string{}).Optional(),
 		field.Time("created_at").Default(timeNow).Immutable(),
 	}
 }

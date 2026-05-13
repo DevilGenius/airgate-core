@@ -198,8 +198,9 @@ func sanitizedMessage(kind sdk.OutcomeKind) string {
 // forwarder 不再关心 MarkOverloaded / MarkDegraded / ReportAccountError 等内部方法。
 func (f *Forwarder) applyOutcome(ctx context.Context, state *forwardState, execution forwardExecution) {
 	reason := judgmentReason(execution)
-	if execution.outcome.Kind.IsAccountFault() && state.model != "" {
-		reason = "[" + state.model + "] " + reason
+	outcomeModel := state.modelForScheduling()
+	if execution.outcome.Kind.IsAccountFault() && outcomeModel != "" {
+		reason = "[" + outcomeModel + "] " + reason
 	}
 	j := scheduler.Judgment{
 		Kind:           execution.outcome.Kind,
@@ -210,7 +211,7 @@ func (f *Forwarder) applyOutcome(ctx context.Context, state *forwardState, execu
 		UpstreamStatus: execution.outcome.Upstream.StatusCode,
 		// Family 让限流冷却落到 (account, family) 维度。撞 gpt-image 4000/min
 		// 时账号上 chat 模型仍可调用，避免单模型限流误伤整账号。
-		Family: scheduler.ModelFamily(state.requestedPlatform, state.model),
+		Family: scheduler.ModelFamily(state.requestedPlatform, outcomeModel),
 	}
 	f.scheduler.Apply(ctx, state.account.ID, j)
 
@@ -317,8 +318,24 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		UserAgent:             c.Request.UserAgent(),
 		IPAddress:             c.ClientIP(),
 		Endpoint:              state.requestPath,
-		ReasoningEffort:       state.reasoningEffort,
+		ReasoningEffort:       resolveReasoningEffort(state.reasoningEffort, usage),
+		UsageAttributes:       usage.Attributes,
+		UsageMetrics:          usage.Metrics,
+		UsageCostDetails:      usage.CostDetails,
+		UsageMetadata:         usage.Metadata,
 	})
+}
+
+func resolveReasoningEffort(fromRequest string, usage *sdk.Usage) string {
+	if fromRequest != "" {
+		return fromRequest
+	}
+	if usage != nil && usage.Metadata != nil {
+		if effort := normalizeReasoningEffort(usage.Metadata["reasoning_effort"]); effort != "" {
+			return effort
+		}
+	}
+	return ""
 }
 
 // writeUpstream 把上游原始响应透传给客户端。

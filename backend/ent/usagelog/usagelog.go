@@ -82,6 +82,14 @@ const (
 	FieldEndpoint = "endpoint"
 	// FieldReasoningEffort holds the string denoting the reasoning_effort field in the database.
 	FieldReasoningEffort = "reasoning_effort"
+	// FieldUsageAttributes holds the string denoting the usage_attributes field in the database.
+	FieldUsageAttributes = "usage_attributes"
+	// FieldUsageMetrics holds the string denoting the usage_metrics field in the database.
+	FieldUsageMetrics = "usage_metrics"
+	// FieldUsageCostDetails holds the string denoting the usage_cost_details field in the database.
+	FieldUsageCostDetails = "usage_cost_details"
+	// FieldUsageMetadata holds the string denoting the usage_metadata field in the database.
+	FieldUsageMetadata = "usage_metadata"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeUser holds the string denoting the user edge name in mutations.
@@ -161,6 +169,10 @@ var Columns = []string{
 	FieldIPAddress,
 	FieldEndpoint,
 	FieldReasoningEffort,
+	FieldUsageAttributes,
+	FieldUsageMetrics,
+	FieldUsageCostDetails,
+	FieldUsageMetadata,
 	FieldCreatedAt,
 }
 

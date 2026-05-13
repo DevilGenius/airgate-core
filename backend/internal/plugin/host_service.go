@@ -1105,10 +1105,14 @@ func (h *HostService) recordHostForwardUsage(
 		ServiceTier:           usageValues.ServiceTier,
 		ImageSize:             usageValues.ImageSize,
 		Endpoint:              req.Path,
-		ReasoningEffort:       hostForwardReasoningEffort(req),
+		ReasoningEffort:       resolveReasoningEffort(hostForwardReasoningEffort(req), usage),
 		Stream:                req.Stream,
 		DurationMs:            duration.Milliseconds(),
 		FirstTokenMs:          usageValues.FirstTokenMs,
+		UsageAttributes:       usage.Attributes,
+		UsageMetrics:          usage.Metrics,
+		UsageCostDetails:      usage.CostDetails,
+		UsageMetadata:         usage.Metadata,
 	}
 	if h.recorder == nil {
 		return 0, nil

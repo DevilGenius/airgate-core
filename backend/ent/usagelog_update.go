@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
@@ -16,6 +17,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // UsageLogUpdate is the builder for updating UsageLog entities.
@@ -682,6 +684,72 @@ func (ulu *UsageLogUpdate) SetNillableReasoningEffort(s *string) *UsageLogUpdate
 	return ulu
 }
 
+// SetUsageAttributes sets the "usage_attributes" field.
+func (ulu *UsageLogUpdate) SetUsageAttributes(sa []sdk.UsageAttribute) *UsageLogUpdate {
+	ulu.mutation.SetUsageAttributes(sa)
+	return ulu
+}
+
+// AppendUsageAttributes appends sa to the "usage_attributes" field.
+func (ulu *UsageLogUpdate) AppendUsageAttributes(sa []sdk.UsageAttribute) *UsageLogUpdate {
+	ulu.mutation.AppendUsageAttributes(sa)
+	return ulu
+}
+
+// ClearUsageAttributes clears the value of the "usage_attributes" field.
+func (ulu *UsageLogUpdate) ClearUsageAttributes() *UsageLogUpdate {
+	ulu.mutation.ClearUsageAttributes()
+	return ulu
+}
+
+// SetUsageMetrics sets the "usage_metrics" field.
+func (ulu *UsageLogUpdate) SetUsageMetrics(sm []sdk.UsageMetric) *UsageLogUpdate {
+	ulu.mutation.SetUsageMetrics(sm)
+	return ulu
+}
+
+// AppendUsageMetrics appends sm to the "usage_metrics" field.
+func (ulu *UsageLogUpdate) AppendUsageMetrics(sm []sdk.UsageMetric) *UsageLogUpdate {
+	ulu.mutation.AppendUsageMetrics(sm)
+	return ulu
+}
+
+// ClearUsageMetrics clears the value of the "usage_metrics" field.
+func (ulu *UsageLogUpdate) ClearUsageMetrics() *UsageLogUpdate {
+	ulu.mutation.ClearUsageMetrics()
+	return ulu
+}
+
+// SetUsageCostDetails sets the "usage_cost_details" field.
+func (ulu *UsageLogUpdate) SetUsageCostDetails(scd []sdk.UsageCostDetail) *UsageLogUpdate {
+	ulu.mutation.SetUsageCostDetails(scd)
+	return ulu
+}
+
+// AppendUsageCostDetails appends scd to the "usage_cost_details" field.
+func (ulu *UsageLogUpdate) AppendUsageCostDetails(scd []sdk.UsageCostDetail) *UsageLogUpdate {
+	ulu.mutation.AppendUsageCostDetails(scd)
+	return ulu
+}
+
+// ClearUsageCostDetails clears the value of the "usage_cost_details" field.
+func (ulu *UsageLogUpdate) ClearUsageCostDetails() *UsageLogUpdate {
+	ulu.mutation.ClearUsageCostDetails()
+	return ulu
+}
+
+// SetUsageMetadata sets the "usage_metadata" field.
+func (ulu *UsageLogUpdate) SetUsageMetadata(m map[string]string) *UsageLogUpdate {
+	ulu.mutation.SetUsageMetadata(m)
+	return ulu
+}
+
+// ClearUsageMetadata clears the value of the "usage_metadata" field.
+func (ulu *UsageLogUpdate) ClearUsageMetadata() *UsageLogUpdate {
+	ulu.mutation.ClearUsageMetadata()
+	return ulu
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (ulu *UsageLogUpdate) SetUserID(id int) *UsageLogUpdate {
 	ulu.mutation.SetUserID(id)
@@ -1012,6 +1080,45 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := ulu.mutation.ReasoningEffort(); ok {
 		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
+	}
+	if value, ok := ulu.mutation.UsageAttributes(); ok {
+		_spec.SetField(usagelog.FieldUsageAttributes, field.TypeJSON, value)
+	}
+	if value, ok := ulu.mutation.AppendedUsageAttributes(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, usagelog.FieldUsageAttributes, value)
+		})
+	}
+	if ulu.mutation.UsageAttributesCleared() {
+		_spec.ClearField(usagelog.FieldUsageAttributes, field.TypeJSON)
+	}
+	if value, ok := ulu.mutation.UsageMetrics(); ok {
+		_spec.SetField(usagelog.FieldUsageMetrics, field.TypeJSON, value)
+	}
+	if value, ok := ulu.mutation.AppendedUsageMetrics(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, usagelog.FieldUsageMetrics, value)
+		})
+	}
+	if ulu.mutation.UsageMetricsCleared() {
+		_spec.ClearField(usagelog.FieldUsageMetrics, field.TypeJSON)
+	}
+	if value, ok := ulu.mutation.UsageCostDetails(); ok {
+		_spec.SetField(usagelog.FieldUsageCostDetails, field.TypeJSON, value)
+	}
+	if value, ok := ulu.mutation.AppendedUsageCostDetails(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, usagelog.FieldUsageCostDetails, value)
+		})
+	}
+	if ulu.mutation.UsageCostDetailsCleared() {
+		_spec.ClearField(usagelog.FieldUsageCostDetails, field.TypeJSON)
+	}
+	if value, ok := ulu.mutation.UsageMetadata(); ok {
+		_spec.SetField(usagelog.FieldUsageMetadata, field.TypeJSON, value)
+	}
+	if ulu.mutation.UsageMetadataCleared() {
+		_spec.ClearField(usagelog.FieldUsageMetadata, field.TypeJSON)
 	}
 	if ulu.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1800,6 +1907,72 @@ func (uluo *UsageLogUpdateOne) SetNillableReasoningEffort(s *string) *UsageLogUp
 	return uluo
 }
 
+// SetUsageAttributes sets the "usage_attributes" field.
+func (uluo *UsageLogUpdateOne) SetUsageAttributes(sa []sdk.UsageAttribute) *UsageLogUpdateOne {
+	uluo.mutation.SetUsageAttributes(sa)
+	return uluo
+}
+
+// AppendUsageAttributes appends sa to the "usage_attributes" field.
+func (uluo *UsageLogUpdateOne) AppendUsageAttributes(sa []sdk.UsageAttribute) *UsageLogUpdateOne {
+	uluo.mutation.AppendUsageAttributes(sa)
+	return uluo
+}
+
+// ClearUsageAttributes clears the value of the "usage_attributes" field.
+func (uluo *UsageLogUpdateOne) ClearUsageAttributes() *UsageLogUpdateOne {
+	uluo.mutation.ClearUsageAttributes()
+	return uluo
+}
+
+// SetUsageMetrics sets the "usage_metrics" field.
+func (uluo *UsageLogUpdateOne) SetUsageMetrics(sm []sdk.UsageMetric) *UsageLogUpdateOne {
+	uluo.mutation.SetUsageMetrics(sm)
+	return uluo
+}
+
+// AppendUsageMetrics appends sm to the "usage_metrics" field.
+func (uluo *UsageLogUpdateOne) AppendUsageMetrics(sm []sdk.UsageMetric) *UsageLogUpdateOne {
+	uluo.mutation.AppendUsageMetrics(sm)
+	return uluo
+}
+
+// ClearUsageMetrics clears the value of the "usage_metrics" field.
+func (uluo *UsageLogUpdateOne) ClearUsageMetrics() *UsageLogUpdateOne {
+	uluo.mutation.ClearUsageMetrics()
+	return uluo
+}
+
+// SetUsageCostDetails sets the "usage_cost_details" field.
+func (uluo *UsageLogUpdateOne) SetUsageCostDetails(scd []sdk.UsageCostDetail) *UsageLogUpdateOne {
+	uluo.mutation.SetUsageCostDetails(scd)
+	return uluo
+}
+
+// AppendUsageCostDetails appends scd to the "usage_cost_details" field.
+func (uluo *UsageLogUpdateOne) AppendUsageCostDetails(scd []sdk.UsageCostDetail) *UsageLogUpdateOne {
+	uluo.mutation.AppendUsageCostDetails(scd)
+	return uluo
+}
+
+// ClearUsageCostDetails clears the value of the "usage_cost_details" field.
+func (uluo *UsageLogUpdateOne) ClearUsageCostDetails() *UsageLogUpdateOne {
+	uluo.mutation.ClearUsageCostDetails()
+	return uluo
+}
+
+// SetUsageMetadata sets the "usage_metadata" field.
+func (uluo *UsageLogUpdateOne) SetUsageMetadata(m map[string]string) *UsageLogUpdateOne {
+	uluo.mutation.SetUsageMetadata(m)
+	return uluo
+}
+
+// ClearUsageMetadata clears the value of the "usage_metadata" field.
+func (uluo *UsageLogUpdateOne) ClearUsageMetadata() *UsageLogUpdateOne {
+	uluo.mutation.ClearUsageMetadata()
+	return uluo
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (uluo *UsageLogUpdateOne) SetUserID(id int) *UsageLogUpdateOne {
 	uluo.mutation.SetUserID(id)
@@ -2160,6 +2333,45 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.ReasoningEffort(); ok {
 		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
+	}
+	if value, ok := uluo.mutation.UsageAttributes(); ok {
+		_spec.SetField(usagelog.FieldUsageAttributes, field.TypeJSON, value)
+	}
+	if value, ok := uluo.mutation.AppendedUsageAttributes(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, usagelog.FieldUsageAttributes, value)
+		})
+	}
+	if uluo.mutation.UsageAttributesCleared() {
+		_spec.ClearField(usagelog.FieldUsageAttributes, field.TypeJSON)
+	}
+	if value, ok := uluo.mutation.UsageMetrics(); ok {
+		_spec.SetField(usagelog.FieldUsageMetrics, field.TypeJSON, value)
+	}
+	if value, ok := uluo.mutation.AppendedUsageMetrics(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, usagelog.FieldUsageMetrics, value)
+		})
+	}
+	if uluo.mutation.UsageMetricsCleared() {
+		_spec.ClearField(usagelog.FieldUsageMetrics, field.TypeJSON)
+	}
+	if value, ok := uluo.mutation.UsageCostDetails(); ok {
+		_spec.SetField(usagelog.FieldUsageCostDetails, field.TypeJSON, value)
+	}
+	if value, ok := uluo.mutation.AppendedUsageCostDetails(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, usagelog.FieldUsageCostDetails, value)
+		})
+	}
+	if uluo.mutation.UsageCostDetailsCleared() {
+		_spec.ClearField(usagelog.FieldUsageCostDetails, field.TypeJSON)
+	}
+	if value, ok := uluo.mutation.UsageMetadata(); ok {
+		_spec.SetField(usagelog.FieldUsageMetadata, field.TypeJSON, value)
+	}
+	if uluo.mutation.UsageMetadataCleared() {
+		_spec.ClearField(usagelog.FieldUsageMetadata, field.TypeJSON)
 	}
 	if uluo.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // UsageLog is the model entity for the UsageLog schema.
@@ -89,6 +91,14 @@ type UsageLog struct {
 	Endpoint string `json:"endpoint,omitempty"`
 	// ReasoningEffort holds the value of the "reasoning_effort" field.
 	ReasoningEffort string `json:"reasoning_effort,omitempty"`
+	// UsageAttributes holds the value of the "usage_attributes" field.
+	UsageAttributes []sdk.UsageAttribute `json:"usage_attributes,omitempty"`
+	// UsageMetrics holds the value of the "usage_metrics" field.
+	UsageMetrics []sdk.UsageMetric `json:"usage_metrics,omitempty"`
+	// UsageCostDetails holds the value of the "usage_cost_details" field.
+	UsageCostDetails []sdk.UsageCostDetail `json:"usage_cost_details,omitempty"`
+	// UsageMetadata holds the value of the "usage_metadata" field.
+	UsageMetadata map[string]string `json:"usage_metadata,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -165,6 +175,8 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case usagelog.FieldUsageAttributes, usagelog.FieldUsageMetrics, usagelog.FieldUsageCostDetails, usagelog.FieldUsageMetadata:
+			values[i] = new([]byte)
 		case usagelog.FieldStream:
 			values[i] = new(sql.NullBool)
 		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldCacheCreationPrice, usagelog.FieldCacheCreation1hPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldCacheCreationCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldBilledCost, usagelog.FieldAccountCost, usagelog.FieldRateMultiplier, usagelog.FieldSellRate, usagelog.FieldAccountRateMultiplier:
@@ -408,6 +420,38 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.ReasoningEffort = value.String
 			}
+		case usagelog.FieldUsageAttributes:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_attributes", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &ul.UsageAttributes); err != nil {
+					return fmt.Errorf("unmarshal field usage_attributes: %w", err)
+				}
+			}
+		case usagelog.FieldUsageMetrics:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_metrics", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &ul.UsageMetrics); err != nil {
+					return fmt.Errorf("unmarshal field usage_metrics: %w", err)
+				}
+			}
+		case usagelog.FieldUsageCostDetails:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_cost_details", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &ul.UsageCostDetails); err != nil {
+					return fmt.Errorf("unmarshal field usage_cost_details: %w", err)
+				}
+			}
+		case usagelog.FieldUsageMetadata:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_metadata", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &ul.UsageMetadata); err != nil {
+					return fmt.Errorf("unmarshal field usage_metadata: %w", err)
+				}
+			}
 		case usagelog.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -599,6 +643,18 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("reasoning_effort=")
 	builder.WriteString(ul.ReasoningEffort)
+	builder.WriteString(", ")
+	builder.WriteString("usage_attributes=")
+	builder.WriteString(fmt.Sprintf("%v", ul.UsageAttributes))
+	builder.WriteString(", ")
+	builder.WriteString("usage_metrics=")
+	builder.WriteString(fmt.Sprintf("%v", ul.UsageMetrics))
+	builder.WriteString(", ")
+	builder.WriteString("usage_cost_details=")
+	builder.WriteString(fmt.Sprintf("%v", ul.UsageCostDetails))
+	builder.WriteString(", ")
+	builder.WriteString("usage_metadata=")
+	builder.WriteString(fmt.Sprintf("%v", ul.UsageMetadata))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(ul.CreatedAt.Format(time.ANSIC))

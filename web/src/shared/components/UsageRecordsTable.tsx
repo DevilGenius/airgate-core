@@ -7,7 +7,7 @@ import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
 
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
-const LEFT_ALIGNED_CONTENT_COLUMNS = new Set(['model']);
+const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>([]);
 const NEW_ROW_MARK_DURATION_MS = 5000;
 
 function cx(...classes: Array<string | false | null | undefined>) {

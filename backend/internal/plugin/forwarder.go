@@ -96,6 +96,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	logger.Debug("forward_request_start",
 		"stream", state.stream,
 		"input_tokens_est", len(state.body),
+		"scheduling_models", state.schedulingModelCandidates(),
 	)
 
 	// 只读元信息快车道：插件本地合成响应，跳过整条账号 / 闸门 / failover 链路。
@@ -155,6 +156,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					continue
 				}
 				attrs := []any{sdk.LogFieldError, err}
+				if models := state.schedulingModelCandidates(); len(models) > 0 {
+					attrs = append(attrs, "scheduling_models", models)
+				}
 				if len(hardExclude) > 0 {
 					attrs = append(attrs, "hard_excluded", hardExclude)
 				}
@@ -240,12 +244,14 @@ func (f *Forwarder) Forward(c *gin.Context) {
 
 		logger.Debug("forward_route_failover_exhausted",
 			"attempts", attempt,
+			"scheduling_models", state.schedulingModelCandidates(),
 		)
 	}
 
 	failAttrs := []any{
 		sdk.LogFieldDurationMs, time.Since(startedAt).Milliseconds(),
 		"attempts", totalAttempts,
+		"scheduling_models", state.schedulingModelCandidates(),
 	}
 	if len(hardExclude) > 0 {
 		failAttrs = append(failAttrs, "tried_accounts", hardExclude)

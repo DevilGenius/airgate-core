@@ -52,6 +52,10 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		IPAddress:             record.IPAddress,
 		Endpoint:              record.Endpoint,
 		ReasoningEffort:       record.ReasoningEffort,
+		UsageAttributes:       record.UsageAttributes,
+		UsageMetrics:          record.UsageMetrics,
+		UsageCostDetails:      record.UsageCostDetails,
+		UsageMetadata:         record.UsageMetadata,
 		CreatedAt:             record.CreatedAt,
 	}
 }
@@ -75,6 +79,9 @@ func toCustomerUsageLogResp(record appusage.LogRecord) dto.CustomerUsageLogResp 
 		DurationMs:        record.DurationMs,
 		FirstTokenMs:      record.FirstTokenMs,
 		Endpoint:          record.Endpoint,
+		UsageAttributes:   record.UsageAttributes,
+		UsageMetrics:      record.UsageMetrics,
+		UsageMetadata:     record.UsageMetadata,
 		CreatedAt:         record.CreatedAt,
 	}
 }

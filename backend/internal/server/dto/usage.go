@@ -1,52 +1,58 @@
 package dto
 
+import sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+
 // UsageLogResp 使用记录响应（reseller / admin scope，包含完整的成本字段）
 type UsageLogResp struct {
-	ID                    int64   `json:"id"`
-	UserID                int64   `json:"user_id"`
-	UserEmail             string  `json:"user_email,omitempty"`
-	APIKeyID              int64   `json:"api_key_id"`
-	APIKeyName            string  `json:"api_key_name,omitempty"`
-	APIKeyHint            string  `json:"api_key_hint,omitempty"`
-	APIKeyDeleted         bool    `json:"api_key_deleted"`
-	AccountID             int64   `json:"account_id"`
-	AccountName           string  `json:"account_name,omitempty"`
-	GroupID               int64   `json:"group_id"`
-	Platform              string  `json:"platform"`
-	Model                 string  `json:"model"`
-	InputTokens           int     `json:"input_tokens"`
-	OutputTokens          int     `json:"output_tokens"`
-	CachedInputTokens     int     `json:"cached_input_tokens"`
-	CacheCreationTokens   int     `json:"cache_creation_tokens"`
-	CacheCreation5mTokens int     `json:"cache_creation_5m_tokens"`
-	CacheCreation1hTokens int     `json:"cache_creation_1h_tokens"`
-	ReasoningOutputTokens int     `json:"reasoning_output_tokens"`
-	InputPrice            float64 `json:"input_price"`
-	OutputPrice           float64 `json:"output_price"`
-	CachedInputPrice      float64 `json:"cached_input_price"`
-	CacheCreationPrice    float64 `json:"cache_creation_price"`
-	CacheCreation1hPrice  float64 `json:"cache_creation_1h_price"`
-	InputCost             float64 `json:"input_cost"`
-	OutputCost            float64 `json:"output_cost"`
-	CachedInputCost       float64 `json:"cached_input_cost"`
-	CacheCreationCost     float64 `json:"cache_creation_cost"`
-	TotalCost             float64 `json:"total_cost"`
-	ActualCost            float64 `json:"actual_cost"`             // 平台真实成本/用户扣费
-	BilledCost            float64 `json:"billed_cost"`             // 客户账面消耗（reseller markup 后的金额）
-	AccountCost           float64 `json:"account_cost"`            // 账号实际成本 = total × account_rate
-	RateMultiplier        float64 `json:"rate_multiplier"`         // 平台计费倍率快照
-	SellRate              float64 `json:"sell_rate"`               // 销售倍率快照
-	AccountRateMultiplier float64 `json:"account_rate_multiplier"` // 账号倍率快照
-	ServiceTier           string  `json:"service_tier,omitempty"`
-	ImageSize             string  `json:"image_size,omitempty"` // 图像生成实际出图尺寸（"WxH"），非图像请求空
-	Stream                bool    `json:"stream"`
-	DurationMs            int64   `json:"duration_ms"`
-	FirstTokenMs          int64   `json:"first_token_ms"`
-	UserAgent             string  `json:"user_agent,omitempty"`
-	IPAddress             string  `json:"ip_address,omitempty"`
-	Endpoint              string  `json:"endpoint,omitempty"`
-	ReasoningEffort       string  `json:"reasoning_effort,omitempty"` // 推理强度档位
-	CreatedAt             string  `json:"created_at"`
+	ID                    int64                 `json:"id"`
+	UserID                int64                 `json:"user_id"`
+	UserEmail             string                `json:"user_email,omitempty"`
+	APIKeyID              int64                 `json:"api_key_id"`
+	APIKeyName            string                `json:"api_key_name,omitempty"`
+	APIKeyHint            string                `json:"api_key_hint,omitempty"`
+	APIKeyDeleted         bool                  `json:"api_key_deleted"`
+	AccountID             int64                 `json:"account_id"`
+	AccountName           string                `json:"account_name,omitempty"`
+	GroupID               int64                 `json:"group_id"`
+	Platform              string                `json:"platform"`
+	Model                 string                `json:"model"`
+	InputTokens           int                   `json:"input_tokens"`
+	OutputTokens          int                   `json:"output_tokens"`
+	CachedInputTokens     int                   `json:"cached_input_tokens"`
+	CacheCreationTokens   int                   `json:"cache_creation_tokens"`
+	CacheCreation5mTokens int                   `json:"cache_creation_5m_tokens"`
+	CacheCreation1hTokens int                   `json:"cache_creation_1h_tokens"`
+	ReasoningOutputTokens int                   `json:"reasoning_output_tokens"`
+	InputPrice            float64               `json:"input_price"`
+	OutputPrice           float64               `json:"output_price"`
+	CachedInputPrice      float64               `json:"cached_input_price"`
+	CacheCreationPrice    float64               `json:"cache_creation_price"`
+	CacheCreation1hPrice  float64               `json:"cache_creation_1h_price"`
+	InputCost             float64               `json:"input_cost"`
+	OutputCost            float64               `json:"output_cost"`
+	CachedInputCost       float64               `json:"cached_input_cost"`
+	CacheCreationCost     float64               `json:"cache_creation_cost"`
+	TotalCost             float64               `json:"total_cost"`
+	ActualCost            float64               `json:"actual_cost"`             // 平台真实成本/用户扣费
+	BilledCost            float64               `json:"billed_cost"`             // 客户账面消耗（reseller markup 后的金额）
+	AccountCost           float64               `json:"account_cost"`            // 账号实际成本 = total × account_rate
+	RateMultiplier        float64               `json:"rate_multiplier"`         // 平台计费倍率快照
+	SellRate              float64               `json:"sell_rate"`               // 销售倍率快照
+	AccountRateMultiplier float64               `json:"account_rate_multiplier"` // 账号倍率快照
+	ServiceTier           string                `json:"service_tier,omitempty"`
+	ImageSize             string                `json:"image_size,omitempty"` // 图像生成实际出图尺寸（"WxH"），非图像请求空
+	Stream                bool                  `json:"stream"`
+	DurationMs            int64                 `json:"duration_ms"`
+	FirstTokenMs          int64                 `json:"first_token_ms"`
+	UserAgent             string                `json:"user_agent,omitempty"`
+	IPAddress             string                `json:"ip_address,omitempty"`
+	Endpoint              string                `json:"endpoint,omitempty"`
+	ReasoningEffort       string                `json:"reasoning_effort,omitempty"` // 推理强度档位
+	UsageAttributes       []sdk.UsageAttribute  `json:"usage_attributes,omitempty"`
+	UsageMetrics          []sdk.UsageMetric     `json:"usage_metrics,omitempty"`
+	UsageCostDetails      []sdk.UsageCostDetail `json:"usage_cost_details,omitempty"`
+	UsageMetadata         map[string]string     `json:"usage_metadata,omitempty"`
+	CreatedAt             string                `json:"created_at"`
 }
 
 // CustomerUsageLogResp 使用记录响应（end customer scope，剥离所有平台真实成本字段）
@@ -54,21 +60,24 @@ type UsageLogResp struct {
 // 当请求来自 end customer（通过 API key 登录拿到的 scoped JWT）时返回此结构，
 // 不暴露 actual_cost / total_cost / 单价 / rate_multiplier 等会泄漏 reseller 毛利的字段。
 type CustomerUsageLogResp struct {
-	ID                int64   `json:"id"`
-	APIKeyID          int64   `json:"api_key_id"`
-	Platform          string  `json:"platform"`
-	Model             string  `json:"model"`
-	InputTokens       int     `json:"input_tokens"`
-	OutputTokens      int     `json:"output_tokens"`
-	CachedInputTokens int     `json:"cached_input_tokens"`
-	BilledCost        float64 `json:"cost"` // 客户视角："本次消耗 = X 美元"
-	ServiceTier       string  `json:"service_tier,omitempty"`
-	ImageSize         string  `json:"image_size,omitempty"` // 图像生成实际出图尺寸（"WxH"），非图像请求空
-	Stream            bool    `json:"stream"`
-	DurationMs        int64   `json:"duration_ms"`
-	FirstTokenMs      int64   `json:"first_token_ms"`
-	Endpoint          string  `json:"endpoint,omitempty"`
-	CreatedAt         string  `json:"created_at"`
+	ID                int64                `json:"id"`
+	APIKeyID          int64                `json:"api_key_id"`
+	Platform          string               `json:"platform"`
+	Model             string               `json:"model"`
+	InputTokens       int                  `json:"input_tokens"`
+	OutputTokens      int                  `json:"output_tokens"`
+	CachedInputTokens int                  `json:"cached_input_tokens"`
+	BilledCost        float64              `json:"cost"` // 客户视角："本次消耗 = X 美元"
+	ServiceTier       string               `json:"service_tier,omitempty"`
+	ImageSize         string               `json:"image_size,omitempty"` // 图像生成实际出图尺寸（"WxH"），非图像请求空
+	Stream            bool                 `json:"stream"`
+	DurationMs        int64                `json:"duration_ms"`
+	FirstTokenMs      int64                `json:"first_token_ms"`
+	Endpoint          string               `json:"endpoint,omitempty"`
+	UsageAttributes   []sdk.UsageAttribute `json:"usage_attributes,omitempty"`
+	UsageMetrics      []sdk.UsageMetric    `json:"usage_metrics,omitempty"`
+	UsageMetadata     map[string]string    `json:"usage_metadata,omitempty"`
+	CreatedAt         string               `json:"created_at"`
 }
 
 // UsageQuery 使用记录查询参数

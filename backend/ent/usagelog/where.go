@@ -1760,6 +1760,46 @@ func ReasoningEffortContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldReasoningEffort, v))
 }
 
+// UsageAttributesIsNil applies the IsNil predicate on the "usage_attributes" field.
+func UsageAttributesIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldUsageAttributes))
+}
+
+// UsageAttributesNotNil applies the NotNil predicate on the "usage_attributes" field.
+func UsageAttributesNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldUsageAttributes))
+}
+
+// UsageMetricsIsNil applies the IsNil predicate on the "usage_metrics" field.
+func UsageMetricsIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldUsageMetrics))
+}
+
+// UsageMetricsNotNil applies the NotNil predicate on the "usage_metrics" field.
+func UsageMetricsNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldUsageMetrics))
+}
+
+// UsageCostDetailsIsNil applies the IsNil predicate on the "usage_cost_details" field.
+func UsageCostDetailsIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldUsageCostDetails))
+}
+
+// UsageCostDetailsNotNil applies the NotNil predicate on the "usage_cost_details" field.
+func UsageCostDetailsNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldUsageCostDetails))
+}
+
+// UsageMetadataIsNil applies the IsNil predicate on the "usage_metadata" field.
+func UsageMetadataIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldUsageMetadata))
+}
+
+// UsageMetadataNotNil applies the NotNil predicate on the "usage_metadata" field.
+func UsageMetadataNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldUsageMetadata))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCreatedAt, v))

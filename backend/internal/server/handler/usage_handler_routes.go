@@ -60,9 +60,14 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		return
 	}
 
+	// 用户视角：剥离账号级别字段（account_cost / account_rate_multiplier），
+	// 仅管理端 AdminUsage 才返回。
 	list := make([]dto.UsageLogResp, 0, len(result.List))
 	for _, item := range result.List {
-		list = append(list, toUsageLogResp(item))
+		resp := toUsageLogResp(item)
+		resp.AccountCost = 0
+		resp.AccountRateMultiplier = 0
+		list = append(list, resp)
 	}
 	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
 }

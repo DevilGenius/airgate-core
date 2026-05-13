@@ -3,6 +3,7 @@ import type {
   AccountSurfaceProps,
   PluginFrontendModule,
   PluginPlatformIconProps,
+  UsageRecordSurfaceProps,
 } from '@doudou-start/airgate-theme/plugin';
 
 function wrapPluginComponent<TProps extends object>(
@@ -26,11 +27,23 @@ function normalizePluginFrontendModule(
     accountEdit: mod.accountEdit
       ? wrapPluginComponent(mod.accountEdit)
       : undefined,
+    accountIdentity: mod.accountIdentity
+      ? wrapPluginComponent(mod.accountIdentity)
+      : undefined,
     platformIcon: mod.platformIcon
       ? wrapPluginComponent(mod.platformIcon)
       : undefined,
     accountUsageWindow: mod.accountUsageWindow
       ? wrapPluginComponent(mod.accountUsageWindow)
+      : undefined,
+    usageModelMeta: mod.usageModelMeta
+      ? wrapPluginComponent(mod.usageModelMeta)
+      : undefined,
+    usageMetricDetail: mod.usageMetricDetail
+      ? wrapPluginComponent(mod.usageMetricDetail)
+      : undefined,
+    usageCostDetail: mod.usageCostDetail
+      ? wrapPluginComponent(mod.usageCostDetail)
       : undefined,
     routes: mod.routes?.map((route) => ({
       ...route,
@@ -253,6 +266,110 @@ export function subscribeUsageWindowChange(listener: () => void): () => void {
 
 export function getUsageWindowVersion(): number {
   return usageWindowVersion;
+}
+
+/** 全局账号身份渲染器注册表：platform → AccountIdentity 组件 */
+const accountIdentityRegistry = new Map<string, ComponentType<AccountSurfaceProps>>();
+const accountIdentityListeners = new Set<() => void>();
+let accountIdentityVersion = 0;
+
+export function registerAccountIdentity(platform: string, component: ComponentType<AccountSurfaceProps>) {
+  accountIdentityRegistry.set(platform.toLowerCase(), component);
+  accountIdentityVersion++;
+  accountIdentityListeners.forEach((fn) => fn());
+}
+
+export function getPluginAccountIdentity(
+  platform: string,
+): ComponentType<AccountSurfaceProps> | undefined {
+  return accountIdentityRegistry.get(platform.toLowerCase());
+}
+
+export function subscribeAccountIdentityChange(listener: () => void): () => void {
+  accountIdentityListeners.add(listener);
+  return () => accountIdentityListeners.delete(listener);
+}
+
+export function getAccountIdentityVersion(): number {
+  return accountIdentityVersion;
+}
+
+/** 全局使用记录计量明细渲染器注册表：platform → UsageMetricDetail 组件 */
+const usageMetricDetailRegistry = new Map<string, ComponentType<UsageRecordSurfaceProps>>();
+const usageMetricDetailListeners = new Set<() => void>();
+let usageMetricDetailVersion = 0;
+
+export function registerUsageMetricDetail(platform: string, component: ComponentType<UsageRecordSurfaceProps>) {
+  usageMetricDetailRegistry.set(platform.toLowerCase(), component);
+  usageMetricDetailVersion++;
+  usageMetricDetailListeners.forEach((fn) => fn());
+}
+
+export function getPluginUsageMetricDetail(
+  platform: string,
+): ComponentType<UsageRecordSurfaceProps> | undefined {
+  return usageMetricDetailRegistry.get(platform.toLowerCase());
+}
+
+export function subscribeUsageMetricDetailChange(listener: () => void): () => void {
+  usageMetricDetailListeners.add(listener);
+  return () => usageMetricDetailListeners.delete(listener);
+}
+
+export function getUsageMetricDetailVersion(): number {
+  return usageMetricDetailVersion;
+}
+
+/** 全局使用记录模型扩展渲染器注册表：platform → UsageModelMeta 组件 */
+const usageModelMetaRegistry = new Map<string, ComponentType<UsageRecordSurfaceProps>>();
+const usageModelMetaListeners = new Set<() => void>();
+let usageModelMetaVersion = 0;
+
+export function registerUsageModelMeta(platform: string, component: ComponentType<UsageRecordSurfaceProps>) {
+  usageModelMetaRegistry.set(platform.toLowerCase(), component);
+  usageModelMetaVersion++;
+  usageModelMetaListeners.forEach((fn) => fn());
+}
+
+export function getPluginUsageModelMeta(
+  platform: string,
+): ComponentType<UsageRecordSurfaceProps> | undefined {
+  return usageModelMetaRegistry.get(platform.toLowerCase());
+}
+
+export function subscribeUsageModelMetaChange(listener: () => void): () => void {
+  usageModelMetaListeners.add(listener);
+  return () => usageModelMetaListeners.delete(listener);
+}
+
+export function getUsageModelMetaVersion(): number {
+  return usageModelMetaVersion;
+}
+
+/** 全局使用记录费用明细渲染器注册表：platform → UsageCostDetail 组件 */
+const usageCostDetailRegistry = new Map<string, ComponentType<UsageRecordSurfaceProps>>();
+const usageCostDetailListeners = new Set<() => void>();
+let usageCostDetailVersion = 0;
+
+export function registerUsageCostDetail(platform: string, component: ComponentType<UsageRecordSurfaceProps>) {
+  usageCostDetailRegistry.set(platform.toLowerCase(), component);
+  usageCostDetailVersion++;
+  usageCostDetailListeners.forEach((fn) => fn());
+}
+
+export function getPluginUsageCostDetail(
+  platform: string,
+): ComponentType<UsageRecordSurfaceProps> | undefined {
+  return usageCostDetailRegistry.get(platform.toLowerCase());
+}
+
+export function subscribeUsageCostDetailChange(listener: () => void): () => void {
+  usageCostDetailListeners.add(listener);
+  return () => usageCostDetailListeners.delete(listener);
+}
+
+export function getUsageCostDetailVersion(): number {
+  return usageCostDetailVersion;
 }
 
 /**

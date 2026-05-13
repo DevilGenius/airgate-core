@@ -272,7 +272,7 @@ export default function UserUsagePage() {
   const list = data?.list ?? [];
   const total = data?.total ?? 0;
 
-  const sharedColumns = useUsageColumns({ customerScope });
+  const sharedColumns = useUsageColumns({ customerScope, adminView: false });
   const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
   const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
   const userSharedColumns = sharedColumns.map((column) => (

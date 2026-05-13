@@ -24,7 +24,14 @@ import { proxiesApi } from '../../shared/api/proxies';
 import { AccountTestModal } from './AccountTestModal';
 import { AccountStatsModal } from './AccountStatsModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import { getPluginUsageWindow, subscribeUsageWindowChange, getUsageWindowVersion } from '../../app/plugin-loader';
+import {
+  getAccountIdentityVersion,
+  getPluginAccountIdentity,
+  getPluginUsageWindow,
+  getUsageWindowVersion,
+  subscribeAccountIdentityChange,
+  subscribeUsageWindowChange,
+} from '../../app/plugin-loader';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { usePagination } from '../../shared/hooks/usePagination';
@@ -389,6 +396,7 @@ export default function AccountsPage() {
   const queryClient = useQueryClient();
   const { platforms, platformName } = usePlatforms();
   const { toast } = useToast();
+  useSyncExternalStore(subscribeAccountIdentityChange, getAccountIdentityVersion);
   useSyncExternalStore(subscribeUsageWindowChange, getUsageWindowVersion);
 
   const applyQuotaRefreshResult = useCallback((
@@ -818,38 +826,28 @@ export default function AccountsPage() {
       width: '96px',
       mobileWidth: '84px',
       render: (row) => {
-        const planType = row.credentials?.plan_type;
-        const subUntil = row.credentials?.subscription_active_until;
-        const subExpired = subUntil ? new Date(subUntil) < new Date() : false;
-        const hasQuotaMetadata = row.platform === 'openai' && row.type === 'oauth' && (
-          planType !== undefined || row.credentials?.email !== undefined || subUntil !== undefined
-        );
-        const rawDisplayPlanType = planType || (hasQuotaMetadata ? 'free' : '');
-        // 订阅过期时降级显示为 free
-        const displayPlanType = (rawDisplayPlanType && subExpired && rawDisplayPlanType.toLowerCase() !== 'free') ? 'free' : rawDisplayPlanType;
-        // 仅未过期的付费订阅 hover 显示过期时间
-        const isPaid = displayPlanType && displayPlanType.toLowerCase() !== 'free';
-        const planTooltip = isPaid && subUntil && !subExpired
-          ? `${t('accounts.expires_at')}: ${new Date(subUntil).toLocaleDateString()}`
-          : undefined;
+        const PluginAccountIdentity = getPluginAccountIdentity(row.platform);
         return (
           <div className="flex w-full min-w-0 flex-col items-center gap-1 text-center">
             <span className="inline-flex max-w-full min-w-0 items-center justify-center gap-1">
               <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" />
               <span className="min-w-0 truncate">{platformName(row.platform)}</span>
             </span>
-            <div className="flex max-w-full items-center justify-center gap-1">
-              {row.type && (
-                <span className="truncate rounded px-1 py-0 text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
-                  {{ oauth: 'OAuth', session_key: 'Session Key', apikey: 'API Key' }[row.type] ?? row.type}
-                </span>
-              )}
-              {displayPlanType && (
-                <span className="cursor-default truncate rounded px-1 py-0 text-[10px] font-medium" title={planTooltip} style={{ background: 'var(--ag-primary)', color: 'var(--ag-text-inverse)', opacity: 0.85 }}>
-                  {displayPlanType.charAt(0).toUpperCase() + displayPlanType.slice(1)}
-                </span>
-              )}
-            </div>
+            {PluginAccountIdentity ? (
+              <PluginAccountIdentity
+                accountId={row.id}
+                accountType={row.type}
+                context={{ account: row, credentials: row.credentials }}
+              />
+            ) : (
+              <div className="flex max-w-full items-center justify-center gap-1">
+                {row.type && (
+                  <span className="truncate rounded px-1 py-0 text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
+                    {{ oauth: 'OAuth', session_key: 'Session Key', apikey: 'API Key' }[row.type] ?? row.type}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         );
       },
@@ -995,8 +993,14 @@ export default function AccountsPage() {
         }
 
         type TodayStats = { requests: number; tokens: number; account_cost: number; user_cost: number };
-        type UsageWindow = { key?: string; label: string; used_percent: number; reset_seconds: number };
-        type UsageWindowRow = { id: string; window?: UsageWindow };
+        type UsageWindow = {
+          key?: string;
+          label: string;
+          used_percent: number;
+          reset_seconds?: number;
+          reset_after_seconds?: number;
+          reset_at?: string;
+        };
         const windows: UsageWindow[] = usage.windows || [];
         const credits: { balance: number; unlimited: boolean } | null = usage.credits || null;
         const todayStats: TodayStats | null = usage.today_stats || null;
@@ -1011,7 +1015,7 @@ export default function AccountsPage() {
           return String(num);
         };
 
-        const hasTodayStats = !!todayStats && (todayStats.requests > 0 || todayStats.tokens > 0);
+        const hasTodayStats = todayStats != null;
         const canRefresh = row.type !== 'apikey';
         if (windows.length === 0 && !credits && !hasTodayStats) {
           return (
@@ -1030,6 +1034,16 @@ export default function AccountsPage() {
           );
         }
 
+        const getResetSeconds = (w: UsageWindow) => {
+          if (typeof w.reset_seconds === 'number') return w.reset_seconds;
+          if (typeof w.reset_after_seconds === 'number') return w.reset_after_seconds;
+          if (w.reset_at) {
+            const delta = Date.parse(w.reset_at) - Date.now();
+            if (Number.isFinite(delta) && delta > 0) return Math.floor(delta / 1000);
+          }
+          return 0;
+        };
+
         const formatReset = (seconds: number) => {
           if (!seconds || seconds <= 0) return '-';
           const d = Math.floor(seconds / 86400);
@@ -1045,56 +1059,6 @@ export default function AccountsPage() {
           if (pct < 80) return 'var(--ag-warning)';
           return 'var(--ag-danger)';
         };
-
-        // 简化 label：取最后一段（如 "GPT-5.3-Codex-Spark" → "Spark"）
-        const shortLabel = (label: string) => {
-          const parts = label.split(/[\s]+/);
-          // 第一部分是时间窗口（如 "5h"、"7d"），后面是模型名
-          const timePart = parts[0];
-          if (parts.length <= 1) return timePart;
-          const modelPart = parts.slice(1).join(' ');
-          const segments = modelPart.split('-');
-          return `${timePart} ${segments[segments.length - 1]}`;
-        };
-        const getWindowSlot = (w: UsageWindow) => {
-          const key = w.key || '';
-          const label = w.label || '';
-          const slot = key.includes(':7d') || key === '7d' || label.startsWith('7d') ? '7d' : '5h';
-          const group = key.startsWith('model:')
-            ? key.replace(/^model:(5h|7d):/, 'model:')
-            : 'base';
-          return { group, slot };
-        };
-        const buildWindowRows = (items: UsageWindow[]): UsageWindowRow[] => {
-          const groups: Array<{ id: string; five?: UsageWindow; seven?: UsageWindow }> = [];
-          const groupMap = new Map<string, { id: string; five?: UsageWindow; seven?: UsageWindow }>();
-
-          for (const item of items) {
-            const { group, slot } = getWindowSlot(item);
-            let bucket = groupMap.get(group);
-            if (!bucket) {
-              bucket = { id: group };
-              groupMap.set(group, bucket);
-              groups.push(bucket);
-            }
-            if (slot === '7d') bucket.seven = item;
-            else bucket.five = item;
-          }
-
-          return groups.flatMap((group) => {
-            const rows: UsageWindowRow[] = [];
-            if (group.five) {
-              rows.push({ id: `${group.id}:5h`, window: group.five });
-            } else if (group.seven) {
-              rows.push({ id: `${group.id}:5h-placeholder` });
-            }
-            if (group.seven) {
-              rows.push({ id: `${group.id}:7d`, window: group.seven });
-            }
-            return rows;
-          });
-        };
-        const windowRows = buildWindowRows(windows);
 
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
         const todayImageCount = row.platform === 'openai' ? (row.today_image_count ?? 0) : 0;
@@ -1196,19 +1160,15 @@ export default function AccountsPage() {
                       />
                     );
                   }
-                  return windowRows.map((item) => {
-                    const w = item.window;
-                    if (!w) {
-                      return <div key={item.id} className="h-5" aria-hidden="true" />;
-                    }
+                  return windows.map((w, index) => {
                     const percent = Math.round(w.used_percent);
                     const barPercent = Math.max(0, Math.min(100, percent));
                     const color = usageColor(w.used_percent);
-                    const resetText = formatReset(w.reset_seconds);
+                    const resetText = formatReset(getResetSeconds(w));
                     return (
-                      <div key={item.id} className="ag-account-usage-window-row">
+                      <div key={w.key || `${w.label}:${index}`} className="ag-account-usage-window-row">
                         <span className="ag-account-usage-window-label text-text-secondary" style={badgeStyle} title={w.label}>
-                          {shortLabel(w.label)}
+                          {w.label}
                         </span>
                         <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
                           <div

@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -88,20 +89,31 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 // pickAccount 调度选号并写到 state.account。失败时返回 error，由调用方决定如何处理
 // （例如主循环可以根据 softExclude 是否非空决定排队等待还是直接写 503）。
 func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs ...int) error {
-	account, err := f.scheduler.SelectAccount(
-		c.Request.Context(),
-		state.requestedPlatform,
-		state.model,
-		state.keyInfo.UserID,
-		state.keyInfo.GroupID,
-		state.sessionID,
-		excludeIDs...,
-	)
-	if err != nil {
-		return err
+	var lastErr error
+	for _, model := range state.schedulingModelCandidates() {
+		account, err := f.scheduler.SelectAccount(
+			c.Request.Context(),
+			state.requestedPlatform,
+			model,
+			state.keyInfo.UserID,
+			state.keyInfo.GroupID,
+			state.sessionID,
+			excludeIDs...,
+		)
+		if err == nil {
+			state.account = account
+			state.schedulingModel = model
+			return nil
+		}
+		lastErr = err
+		if !errors.Is(err, scheduler.ErrNoAvailableAccount) {
+			return err
+		}
 	}
-	state.account = account
-	return nil
+	if lastErr != nil {
+		return lastErr
+	}
+	return scheduler.ErrNoAvailableAccount
 }
 
 // acquireAccountSlot 获取账号级闸门：RPM 配额 + 真实用户消息串行锁 + 账号并发槽。
