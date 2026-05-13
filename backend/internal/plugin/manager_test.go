@@ -4,7 +4,7 @@ import (
 	"os/exec"
 	"testing"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 func TestMatchPluginByPlatformAndPath(t *testing.T) {

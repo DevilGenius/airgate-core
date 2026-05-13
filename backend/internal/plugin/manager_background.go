@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
+	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
 )
 
 // minBackgroundInterval 兜底最小间隔，避免插件声明 0 / 极小间隔时把 Core 打爆。

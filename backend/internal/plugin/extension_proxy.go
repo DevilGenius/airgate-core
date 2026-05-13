@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
-	pb "github.com/DouDOU-start/airgate-sdk/proto"
+	pb "github.com/DouDOU-start/airgate-sdk/protocol/proto"
+	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
 
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 )

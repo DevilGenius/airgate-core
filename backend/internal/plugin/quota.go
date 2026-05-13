@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // checkBalance 执行请求进入业务逻辑前的最后一道准入：余额预检。

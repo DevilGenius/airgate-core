@@ -9,7 +9,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"

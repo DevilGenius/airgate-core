@@ -20,6 +20,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/pluginsource"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
+	"github.com/DouDOU-start/airgate-core/ent/task"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
@@ -91,6 +92,7 @@ func checkColumn(table, column string) error {
 			pluginsource.Table:     pluginsource.ValidColumn,
 			proxy.Table:            proxy.ValidColumn,
 			setting.Table:          setting.ValidColumn,
+			task.Table:             task.ValidColumn,
 			usagelog.Table:         usagelog.ValidColumn,
 			user.Table:             user.ValidColumn,
 			usersubscription.Table: usersubscription.ValidColumn,

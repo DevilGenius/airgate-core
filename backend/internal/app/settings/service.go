@@ -3,7 +3,7 @@ package settings
 import (
 	"context"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Service 提供设置域用例编排。

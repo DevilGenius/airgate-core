@@ -13,9 +13,9 @@ import (
 	goplugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
-	pb "github.com/DouDOU-start/airgate-sdk/proto"
+	pb "github.com/DouDOU-start/airgate-sdk/protocol/proto"
+	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	pluginent "github.com/DouDOU-start/airgate-core/ent/plugin"
@@ -39,8 +39,8 @@ const pluginStartTimeout = 15 * time.Second
 // gRPC 上限配置，避免改一处忘另一处。
 //
 // hostHandle 参数：
-//   - 非 nil 时作为本次 spawn 的 HostService 实现，注册到所有 PluginType 的 GRPCPlugin
-//     的 HostImpl 字段；spawn 后 manager 会调 hostHandle.SetCapabilities 写入权限
+//   - 非 nil 时作为本次 spawn 的 CoreInvokeService 实现，注册到所有 PluginType 的 GRPCPlugin
+//     的 CoreInvokeImpl 字段；spawn 后 manager 会调 hostHandle.SetCapabilities 写入权限
 //   - nil 时（探测式 spawn / 没装 host service 的部署）走软失败路径，插件 ctx.Host()==nil
 func sdkCapabilitiesToStrings(capabilities []sdk.Capability) []string {
 	if len(capabilities) == 0 {
@@ -56,21 +56,21 @@ func sdkCapabilitiesToStrings(capabilities []sdk.Capability) []string {
 func (m *Manager) newPluginClientConfig(cmd *exec.Cmd, forwardOutput bool, hostHandle *pluginHostHandle) *goplugin.ClientConfig {
 	// hostHandle 通过 PluginSet 注入到 GatewayGRPCPlugin / ExtensionGRPCPlugin / MiddlewareGRPCPlugin。
 	// 插件 Dispense 时，sdk-grpc 的 GRPCClient 钩子会通过 GRPCBroker 启一条
-	// 反向 stream 注册 HostService，把 stream id 通过 InitRequest.host_broker_id
+	// 反向 stream 注册 CoreInvokeService，把 stream id 通过 InitRequest.host_broker_id
 	// 透传到插件子进程。hostHandle 为 nil 时，stream 不创建，插件以软失败方式运行。
 	//
 	// 注意：MiddlewareGRPCPlugin 也注册到 PluginSet，让 middleware 类型插件可以被
 	// dispense（与 gateway/extension 平行）。
-	var hostImpl pb.HostServiceServer
+	var hostImpl pb.CoreInvokeServiceServer
 	if hostHandle != nil {
 		hostImpl = hostHandle
 	}
 	cfg := &goplugin.ClientConfig{
 		HandshakeConfig: sdkgrpc.Handshake,
 		Plugins: goplugin.PluginSet{
-			sdkgrpc.PluginKeyGateway:    &sdkgrpc.GatewayGRPCPlugin{HostImpl: hostImpl},
-			sdkgrpc.PluginKeyExtension:  &sdkgrpc.ExtensionGRPCPlugin{HostImpl: hostImpl},
-			sdkgrpc.PluginKeyMiddleware: &sdkgrpc.MiddlewareGRPCPlugin{HostImpl: hostImpl},
+			sdkgrpc.PluginKeyGateway:    &sdkgrpc.GatewayGRPCPlugin{CoreInvokeImpl: hostImpl},
+			sdkgrpc.PluginKeyExtension:  &sdkgrpc.ExtensionGRPCPlugin{CoreInvokeImpl: hostImpl},
+			sdkgrpc.PluginKeyMiddleware: &sdkgrpc.MiddlewareGRPCPlugin{CoreInvokeImpl: hostImpl},
 		},
 		Cmd:              cmd,
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
@@ -379,6 +379,17 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		Priority:           info.Priority,
 		Client:             client,
 		Gateway:            gateway,
+	}
+
+	// 网关插件可以可选暴露 ExtensionService 来接收任务分发。
+	// 是否真的支持任务类型由 GetTaskTypes 决定，这里只做能力探测。
+	if rpc, err := client.Client(); err == nil {
+		if extRaw, err := rpc.Dispense(sdkgrpc.PluginKeyExtension); err == nil {
+			if ext, ok := extRaw.(*sdkgrpc.ExtensionGRPCClient); ok {
+				instance.Extension = ext
+				slog.Info("gateway_plugin_task_support_enabled", sdk.LogFieldPluginID, canonicalName)
+			}
+		}
 	}
 
 	m.mu.Lock()

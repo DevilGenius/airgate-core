@@ -79,7 +79,7 @@ export function EditAccountModal({
     queryFn: () => proxiesApi.list(FETCH_ALL_PARAMS),
   });
 
-  const { Form: PluginAccountForm, pluginId } = usePluginAccountForm(account.platform);
+  const { Form: PluginAccountForm, pluginId } = usePluginAccountForm(account.platform, 'edit');
   const pluginOAuth = createPluginOAuthBridge(pluginId);
   const passwordFieldsCleared = useRef(false);
 

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
+	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	pluginent "github.com/DouDOU-start/airgate-core/ent/plugin"

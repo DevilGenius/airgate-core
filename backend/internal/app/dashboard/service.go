@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Service 提供仪表盘用例编排。

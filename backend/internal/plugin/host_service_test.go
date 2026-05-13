@@ -11,19 +11,19 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/DouDOU-start/airgate-core/ent/enttest"
-	pb "github.com/DouDOU-start/airgate-sdk/proto"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 func TestHostForwardTimeout(t *testing.T) {
 	cases := []struct {
 		name string
-		req  *pb.HostForwardRequest
+		req  hostForwardRequest
 		want time.Duration
 	}{
-		{name: "nil request", req: nil, want: defaultHostForwardTimeout},
-		{name: "chat request", req: &pb.HostForwardRequest{Path: "/v1/chat/completions", Model: "gpt-4o"}, want: defaultHostForwardTimeout},
-		{name: "images API request", req: &pb.HostForwardRequest{Path: "/v1/images/generations", Model: "gpt-4o"}, want: imageHostForwardTimeout},
-		{name: "image model request", req: &pb.HostForwardRequest{Path: "/v1/responses", Model: "gpt-image-2"}, want: imageHostForwardTimeout},
+		{name: "empty request", req: hostForwardRequest{}, want: defaultHostForwardTimeout},
+		{name: "chat request", req: hostForwardRequest{Path: "/v1/chat/completions", Model: "gpt-4o"}, want: defaultHostForwardTimeout},
+		{name: "images API request", req: hostForwardRequest{Path: "/v1/images/generations", Model: "gpt-4o"}, want: imageHostForwardTimeout},
+		{name: "image model request", req: hostForwardRequest{Path: "/v1/responses", Model: "gpt-image-2"}, want: imageHostForwardTimeout},
 	}
 
 	for _, tc := range cases {
@@ -38,15 +38,34 @@ func TestHostForwardTimeout(t *testing.T) {
 func TestHostForwardReasoningEffort(t *testing.T) {
 	t.Parallel()
 
-	req := &pb.HostForwardRequest{
+	req := hostForwardRequest{
 		Body: []byte(`{"model":"gpt-5","reasoning":{"effort":"x-high"}}`),
-		Headers: map[string]*pb.HeaderValues{
-			"Content-Type": {Values: []string{"application/json"}},
+		Headers: map[string]interface{}{
+			"Content-Type": []string{"application/json"},
 		},
 	}
 
 	if got := hostForwardReasoningEffort(req); got != "xhigh" {
 		t.Fatalf("hostForwardReasoningEffort() = %q, want %q", got, "xhigh")
+	}
+}
+
+func TestHostInvokeRequiresDeclaredCapability(t *testing.T) {
+	handle := &pluginHostHandle{pluginName: "test-plugin"}
+	if err := handle.requireMethod(hostMethodTasksCreate); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected unbound capabilities to be denied, got %v", err)
+	}
+
+	handle.SetCapabilities(map[sdk.Capability]bool{})
+	if err := handle.requireMethod(hostMethodTasksCreate); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected empty capabilities to be denied, got %v", err)
+	}
+
+	handle.SetCapabilities(map[sdk.Capability]bool{
+		sdk.CapabilityForHostMethod(hostMethodTasksCreate): true,
+	})
+	if err := handle.requireMethod(hostMethodTasksCreate); err != nil {
+		t.Fatalf("expected declared method capability to pass, got %v", err)
 	}
 }
 

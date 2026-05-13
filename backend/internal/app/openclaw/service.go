@@ -8,7 +8,7 @@ import (
 	"text/template"
 
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Service 提供 OpenClaw 一键接入相关的领域用例。

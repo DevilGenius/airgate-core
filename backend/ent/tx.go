@@ -28,6 +28,8 @@ type Tx struct {
 	Proxy *ProxyClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
+	// Task is the client for interacting with the Task builders.
+	Task *TaskClient
 	// UsageLog is the client for interacting with the UsageLog builders.
 	UsageLog *UsageLogClient
 	// User is the client for interacting with the User builders.
@@ -173,6 +175,7 @@ func (tx *Tx) init() {
 	tx.PluginSource = NewPluginSourceClient(tx.config)
 	tx.Proxy = NewProxyClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
+	tx.Task = NewTaskClient(tx.config)
 	tx.UsageLog = NewUsageLogClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 	tx.UserSubscription = NewUserSubscriptionClient(tx.config)

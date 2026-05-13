@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Service 使用记录用例服务。

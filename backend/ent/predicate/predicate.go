@@ -30,6 +30,9 @@ type Proxy func(*sql.Selector)
 // Setting is the predicate function for setting builders.
 type Setting func(*sql.Selector)
 
+// Task is the predicate function for task builders.
+type Task func(*sql.Selector)
+
 // UsageLog is the predicate function for usagelog builders.
 type UsageLog func(*sql.Selector)
 

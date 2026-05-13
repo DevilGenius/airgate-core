@@ -176,6 +176,11 @@ func (s *Server) StartPlugins(ctx context.Context) {
 			}
 		}
 
+		// 启动统一任务分发器
+		if pluginCtx.Err() == nil {
+			s.pluginMgr.StartTaskDispatcher(pluginCtx)
+		}
+
 		if s.handlers != nil && s.handlers.AccountService != nil && pluginCtx.Err() == nil {
 			s.handlers.AccountService.StartQuotaRefreshLoop(pluginCtx)
 		}

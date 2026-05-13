@@ -10,7 +10,7 @@ import (
 	"io"
 	"log/slog"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // deriveAESKey 从 hex 编码的 secret 中取前 32 字节作为 AES-256 密钥

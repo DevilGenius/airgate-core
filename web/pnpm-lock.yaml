@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@airgate/theme':
-        specifier: file:../../airgate-sdk/frontend
-        version: file:../../airgate-sdk/frontend(react@19.2.5)
+        specifier: file:../../airgate-sdk/theme
+        version: file:../../airgate-sdk/theme(react@19.2.5)
       '@fontsource/geist-mono':
         specifier: ^5.2.7
         version: 5.2.7
@@ -111,8 +111,8 @@ packages:
       react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
       react-dom: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
 
-  '@airgate/theme@file:../../airgate-sdk/frontend':
-    resolution: {directory: ../../airgate-sdk/frontend, type: directory}
+  '@airgate/theme@file:../../airgate-sdk/theme':
+    resolution: {directory: ../../airgate-sdk/theme, type: directory}
     peerDependencies:
       react: ^19.0.0
 
@@ -2157,7 +2157,7 @@ snapshots:
       react-transition-group: 4.4.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       use-sync-external-store: 1.6.0(react@19.2.5)
 
-  '@airgate/theme@file:../../airgate-sdk/frontend(react@19.2.5)':
+  '@airgate/theme@file:../../airgate-sdk/theme(react@19.2.5)':
     dependencies:
       react: 19.2.5
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Recovery 拦截 panic 并写入 500 JSON，替代 gin.Recovery() 以便接入结构化日志。

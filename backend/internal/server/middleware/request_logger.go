@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // CtxKeyRequestID 在 gin.Context 中存放 request_id 的键名。

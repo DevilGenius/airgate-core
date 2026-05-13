@@ -9,8 +9,8 @@ import (
 
 	goplugin "github.com/hashicorp/go-plugin"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
+	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 )
@@ -149,18 +149,9 @@ func (m *Manager) prepareHostHandle(name string) *pluginHostHandle {
 }
 
 // finalizeHostHandle 把插件实际声明的 capability 写入它的 host handle，让后续 RPC 通过校验。
-//
-// 兼容模式（详见 ADR-0001 Decision 4）：sdk_version <= 0.2.x 的存量插件传 nil capability，
-// 此时 handle 内部允许任何 RPC 调用并 log debug，便于审计。
 func (m *Manager) finalizeHostHandle(name string, info sdk.PluginInfo) {
 	handle := m.lookupHostHandle(name)
 	if handle == nil {
-		return
-	}
-	if isLegacySDKVersion(info.SDKVersion) {
-		handle.SetCapabilities(nil) // 兼容模式
-		slog.Info("plugin capability 兼容模式（sdk_version 豁免）",
-			"plugin", name, "sdk_version", info.SDKVersion)
 		return
 	}
 	caps := make(map[sdk.Capability]bool, len(info.Capabilities))
@@ -202,18 +193,6 @@ func (m *Manager) relocateHostHandle(oldName, newName string) {
 	}
 	delete(m.hostHandles, oldName)
 	m.hostHandles[newName] = handle
-}
-
-// isLegacySDKVersion 判断一个插件的 sdk_version 是否需要走兼容模式（豁免 capability 校验）。
-//
-// 规则：sdk_version 字符串以 "0.1." 或 "0.2." 开头视为 legacy；空串也视为 legacy
-// （非常老的版本）。0.3.x 及以上必须显式声明 capability。
-func isLegacySDKVersion(v string) bool {
-	if v == "" {
-		return true
-	}
-	return strings.HasPrefix(v, "0.1.") || strings.HasPrefix(v, "0.2.") ||
-		v == "0.1.0" || v == "0.2.0"
 }
 
 func normalizePluginName(name string) string {

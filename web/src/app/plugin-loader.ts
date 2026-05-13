@@ -1,5 +1,6 @@
 import { createElement, type ComponentType } from 'react';
 import type {
+  AccountSurfaceProps,
   PluginFrontendModule,
   PluginPlatformIconProps,
 } from '@airgate/theme/plugin';
@@ -19,11 +20,17 @@ function normalizePluginFrontendModule(
 
   return {
     ...mod,
-    accountForm: mod.accountForm
-      ? wrapPluginComponent(mod.accountForm)
+    accountCreate: mod.accountCreate
+      ? wrapPluginComponent(mod.accountCreate)
+      : undefined,
+    accountEdit: mod.accountEdit
+      ? wrapPluginComponent(mod.accountEdit)
       : undefined,
     platformIcon: mod.platformIcon
       ? wrapPluginComponent(mod.platformIcon)
+      : undefined,
+    accountUsageWindow: mod.accountUsageWindow
+      ? wrapPluginComponent(mod.accountUsageWindow)
       : undefined,
     routes: mod.routes?.map((route) => ({
       ...route,
@@ -77,6 +84,14 @@ function rewriteBareImports(code: string): string {
     code = code.replace(starPattern, (_match, name: string) => {
       return `const ${name} = window.__airgate_shared["${mod}"];`;
     });
+    // 匹配 import Default, { named } from "react" (混合导入)
+    const mixedPattern = new RegExp(
+      `import\\s+([\\w$]+)\\s*,\\s*\\{([^}]+)\\}\\s*from\\s*["']${mod.replace('/', '\\/')}["'];?`,
+      'g',
+    );
+    code = code.replace(mixedPattern, (_match, defaultName: string, imports: string) => {
+      return `const ${defaultName} = window.__airgate_shared["${mod}"]; const { ${rewriteNamedImportSpecifiers(imports)} } = window.__airgate_shared["${mod}"];`;
+    });
     // 匹配 import React from "react"
     const defaultPattern = new RegExp(
       `import\\s+([\\w$]+)\\s+from\\s*["']${mod.replace('/', '\\/')}["'];?`,
@@ -84,6 +99,14 @@ function rewriteBareImports(code: string): string {
     );
     code = code.replace(defaultPattern, (_match, name: string) => {
       return `const ${name} = window.__airgate_shared["${mod}"];`;
+    });
+    // 匹配 import "react-dom" (纯副作用导入，无变量绑定)
+    const sideEffectPattern = new RegExp(
+      `import\\s*["']${mod.replace('/', '\\/')}["'];?`,
+      'g',
+    );
+    code = code.replace(sideEffectPattern, () => {
+      return `/* side-effect import: ${mod} */`;
     });
   }
   return code;
@@ -103,6 +126,20 @@ async function fetchPluginFrontend(
     const url = `/plugins/${pluginId}/assets/index.js`;
     const resp = await fetch(url);
     if (!resp.ok) return null;
+
+    // Load plugin CSS if available
+    const cssUrl = `/plugins/${pluginId}/assets/index.css`;
+    fetch(cssUrl).then((cssResp) => {
+      if (!cssResp.ok) return;
+      return cssResp.text().then((css) => {
+        const existingStyle = document.getElementById(`plugin-css-${pluginId}`);
+        if (existingStyle) return;
+        const style = document.createElement('style');
+        style.id = `plugin-css-${pluginId}`;
+        style.textContent = css;
+        document.head.appendChild(style);
+      });
+    }).catch(() => {});
 
     let code = await resp.text();
     code = rewriteBareImports(code);
@@ -190,6 +227,32 @@ export function getPluginPlatformIcon(platform: string): ComponentType<PluginPla
 export function onPlatformIconChange(listener: () => void): () => void {
   iconListeners.add(listener);
   return () => iconListeners.delete(listener);
+}
+
+/** 全局用量窗口渲染器注册表：platform → UsageWindow 组件 */
+const usageWindowRegistry = new Map<string, ComponentType<AccountSurfaceProps>>();
+const usageWindowListeners = new Set<() => void>();
+let usageWindowVersion = 0;
+
+export function registerUsageWindow(platform: string, component: ComponentType<AccountSurfaceProps>) {
+  usageWindowRegistry.set(platform.toLowerCase(), component);
+  usageWindowVersion++;
+  usageWindowListeners.forEach((fn) => fn());
+}
+
+export function getPluginUsageWindow(
+  platform: string,
+): ComponentType<AccountSurfaceProps> | undefined {
+  return usageWindowRegistry.get(platform.toLowerCase());
+}
+
+export function subscribeUsageWindowChange(listener: () => void): () => void {
+  usageWindowListeners.add(listener);
+  return () => usageWindowListeners.delete(listener);
+}
+
+export function getUsageWindowVersion(): number {
+  return usageWindowVersion;
 }
 
 /**

@@ -24,6 +24,7 @@ import { proxiesApi } from '../../shared/api/proxies';
 import { AccountTestModal } from './AccountTestModal';
 import { AccountStatsModal } from './AccountStatsModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
+import { getPluginUsageWindow, subscribeUsageWindowChange, getUsageWindowVersion } from '../../app/plugin-loader';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { usePagination } from '../../shared/hooks/usePagination';
@@ -105,19 +106,15 @@ function TableSelectionCheckbox({
 }
 
 function columnAlignClass(align?: AccountTableColumn['align']) {
-  return align === 'center'
-    ? 'text-center'
-    : align === 'right'
-      ? 'text-right'
-      : 'text-center';
+  if (align === 'right') return 'text-right';
+  if (align === 'left') return 'text-left';
+  return 'text-center';
 }
 
 function cellJustifyClass(align?: AccountTableColumn['align']) {
-  return align === 'center'
-    ? 'justify-center'
-    : align === 'right'
-      ? 'justify-end'
-      : 'justify-center';
+  if (align === 'right') return 'justify-end';
+  if (align === 'left') return 'justify-start';
+  return 'justify-center';
 }
 
 const ACCOUNT_SELECTION_COLUMN_STYLE: CSSProperties = {
@@ -392,6 +389,7 @@ export default function AccountsPage() {
   const queryClient = useQueryClient();
   const { platforms, platformName } = usePlatforms();
   const { toast } = useToast();
+  useSyncExternalStore(subscribeUsageWindowChange, getUsageWindowVersion);
 
   const applyQuotaRefreshResult = useCallback((
     id: number,
@@ -477,14 +475,11 @@ export default function AccountsPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [pendingToggleIds, setPendingToggleIds] = useState<Set<number>>(() => new Set());
   const pendingToggleIdsRef = useRef(pendingToggleIds);
+  pendingToggleIdsRef.current = pendingToggleIds;
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
   const clearSelection = () => setSelectedIds([]);
-
-  useEffect(() => {
-    pendingToggleIdsRef.current = pendingToggleIds;
-  }, [pendingToggleIds]);
 
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
   useEffect(() => {
@@ -532,6 +527,8 @@ export default function AccountsPage() {
     queryFn: () => accountsApi.usage(platformFilter || ''),
     refetchInterval: 300_000, // 每 5 分钟刷新
   });
+  const usageDataRef = useRef(usageData);
+  usageDataRef.current = usageData;
 
   // 创建账号
   const createMutation = useCrudMutation({
@@ -959,7 +956,7 @@ export default function AccountsPage() {
       maxWidth: '364px',
       align: 'center' as const,
       render: (row: AccountResp) => {
-        const usage = usageData?.accounts?.[String(row.id)];
+        const usage = usageDataRef.current?.accounts?.[String(row.id)];
 
         // 整个区域可点击刷新
         const handleRefreshClick = async (e: React.MouseEvent) => {
@@ -1186,37 +1183,49 @@ export default function AccountsPage() {
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
-            <div className="ag-account-usage-layout">
+            <div className={todayMetricChips ? 'ag-account-usage-layout' : 'ag-account-usage-layout ag-account-usage-layout--centered'}>
               <div className="ag-account-usage-windows">
-                {windowRows.map((item) => {
-                  const w = item.window;
-                  if (!w) {
-                    return <div key={item.id} className="h-5" aria-hidden="true" />;
+                {(() => {
+                  const PluginUsageWindow = getPluginUsageWindow(row.platform);
+                  if (PluginUsageWindow && windows.length > 0) {
+                    return (
+                      <PluginUsageWindow
+                        accountId={row.id}
+                        accountType={row.type}
+                        context={{ windows }}
+                      />
+                    );
                   }
-                  const percent = Math.round(w.used_percent);
-                  const barPercent = Math.max(0, Math.min(100, percent));
-                  const color = usageColor(w.used_percent);
-                  const resetText = formatReset(w.reset_seconds);
-                  return (
-                    <div key={item.id} className="ag-account-usage-window-row">
-                      <span className="ag-account-usage-window-label text-text-secondary" style={badgeStyle} title={w.label}>
-                        {shortLabel(w.label)}
-                      </span>
-                      <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${barPercent}%`, background: color }}
-                        />
+                  return windowRows.map((item) => {
+                    const w = item.window;
+                    if (!w) {
+                      return <div key={item.id} className="h-5" aria-hidden="true" />;
+                    }
+                    const percent = Math.round(w.used_percent);
+                    const barPercent = Math.max(0, Math.min(100, percent));
+                    const color = usageColor(w.used_percent);
+                    const resetText = formatReset(w.reset_seconds);
+                    return (
+                      <div key={item.id} className="ag-account-usage-window-row">
+                        <span className="ag-account-usage-window-label text-text-secondary" style={badgeStyle} title={w.label}>
+                          {shortLabel(w.label)}
+                        </span>
+                        <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${barPercent}%`, background: color }}
+                          />
+                        </div>
+                        <span className="ag-account-usage-percent" style={{ color }}>
+                          {percent}%
+                        </span>
+                        <span className="ag-account-usage-reset" title={resetText}>
+                          {resetText}
+                        </span>
                       </div>
-                      <span className="ag-account-usage-percent" style={{ color }}>
-                        {percent}%
-                      </span>
-                      <span className="ag-account-usage-reset" title={resetText}>
-                        {resetText}
-                      </span>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
                 {credits && (
                   <div className="flex h-5 items-center gap-1">
                     <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
@@ -1228,8 +1237,12 @@ export default function AccountsPage() {
                   </div>
                 )}
               </div>
-              <span aria-hidden="true" />
-              {todayMetricChips ?? <div className={todayMetricColumnClass} />}
+              {todayMetricChips && (
+                <>
+                  <span aria-hidden="true" />
+                  {todayMetricChips}
+                </>
+              )}
             </div>
           </div>
         );
@@ -1360,7 +1373,6 @@ export default function AccountsPage() {
     t,
     toast,
     toggleMutation.mutate,
-    usageData?.accounts,
   ]);
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;

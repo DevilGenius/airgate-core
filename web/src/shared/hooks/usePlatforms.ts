@@ -4,7 +4,7 @@ import { pluginsApi } from '../api/plugins';
 import { queryKeys } from '../queryKeys';
 import { FETCH_ALL_PARAMS } from '../constants';
 import { useAuth } from '../../app/providers/AuthProvider';
-import { loadPluginFrontend, registerPlatformIcon } from '../../app/plugin-loader';
+import { loadPluginFrontend, registerPlatformIcon, registerUsageWindow } from '../../app/plugin-loader';
 
 /** 从插件 display_name 中提取平台显示名（去掉"网关""Gateway"等后缀） */
 function extractPlatformName(displayName: string): string {
@@ -63,8 +63,8 @@ export function usePlatforms() {
       loadedPlatformIconPlugins.add(key);
       loadPluginFrontend(name)
         .then((mod) => {
-          if (!mod?.platformIcon) return;
-          registerPlatformIcon(platform, mod.platformIcon);
+          if (mod?.platformIcon) registerPlatformIcon(platform, mod.platformIcon);
+          if (mod?.accountUsageWindow) registerUsageWindow(platform, mod.accountUsageWindow);
         })
         .catch(() => {
           loadedPlatformIconPlugins.delete(key);

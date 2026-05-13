@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Service 提供插件管理用例编排。

@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // parseRequest 从 HTTP 请求构造 forwardState。认证 / body 读取 / 插件匹配失败时
@@ -274,6 +275,12 @@ func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest
 // buildHeaders 克隆请求头并附加 X-Airgate-* 系列（分组级 service_tier / 强制 instructions / 插件开关）。
 func buildHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Header {
 	headers := source.Clone()
+	if keyInfo.UserID > 0 {
+		headers.Set("X-Airgate-User-ID", strconv.Itoa(keyInfo.UserID))
+	}
+	if keyInfo.GroupID > 0 {
+		headers.Set("X-Airgate-Group-ID", strconv.Itoa(keyInfo.GroupID))
+	}
 	if keyInfo.GroupServiceTier != "" {
 		headers.Set("X-Airgate-Service-Tier", keyInfo.GroupServiceTier)
 	}

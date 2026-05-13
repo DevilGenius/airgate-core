@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // TestMain 在所有并行测试启动前调一次 gin.SetMode，避免 SetMode 内部变量

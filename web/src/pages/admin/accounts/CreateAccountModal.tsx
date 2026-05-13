@@ -75,7 +75,7 @@ export function CreateAccountModal({
   });
 
   // 加载插件自定义表单组件
-  const { Form: PluginAccountForm, pluginId } = usePluginAccountForm(platform);
+  const { Form: PluginAccountForm, pluginId } = usePluginAccountForm(platform, 'create');
   const pluginOAuth = createPluginOAuthBridge(pluginId);
 
   useEffect(() => {

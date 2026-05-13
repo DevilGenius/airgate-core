@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Service 提供订阅域用例编排。

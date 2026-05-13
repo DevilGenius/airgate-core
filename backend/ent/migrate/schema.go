@@ -202,6 +202,62 @@ var (
 		Columns:    SettingsColumns,
 		PrimaryKey: []*schema.Column{SettingsColumns[0]},
 	}
+	// TasksColumns holds the columns for the "tasks" table.
+	TasksColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "plugin_id", Type: field.TypeString},
+		{Name: "task_type", Type: field.TypeString},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "processing", "retrying", "completed", "failed", "cancelling", "cancelled"}, Default: "pending"},
+		{Name: "stage", Type: field.TypeString, Default: ""},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "input", Type: field.TypeJSON},
+		{Name: "output", Type: field.TypeJSON, Nullable: true},
+		{Name: "attributes", Type: field.TypeJSON, Nullable: true},
+		{Name: "execution", Type: field.TypeJSON, Nullable: true},
+		{Name: "error_type", Type: field.TypeString, Default: ""},
+		{Name: "error_code", Type: field.TypeString, Default: ""},
+		{Name: "error_message", Type: field.TypeString, Default: ""},
+		{Name: "usage_id", Type: field.TypeInt, Nullable: true},
+		{Name: "progress", Type: field.TypeInt, Default: 0},
+		{Name: "priority", Type: field.TypeInt, Default: 0},
+		{Name: "attempts", Type: field.TypeInt, Default: 0},
+		{Name: "max_attempts", Type: field.TypeInt, Default: 3},
+		{Name: "idempotency_key", Type: field.TypeString, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "started_at", Type: field.TypeTime, Nullable: true},
+		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "cancel_requested_at", Type: field.TypeTime, Nullable: true},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+	}
+	// TasksTable holds the schema information for the "tasks" table.
+	TasksTable = &schema.Table{
+		Name:       "tasks",
+		Columns:    TasksColumns,
+		PrimaryKey: []*schema.Column{TasksColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "task_plugin_id_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[1], TasksColumns[3], TasksColumns[19]},
+			},
+			{
+				Name:    "task_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[5], TasksColumns[19]},
+			},
+			{
+				Name:    "task_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[3], TasksColumns[19]},
+			},
+			{
+				Name:    "task_plugin_id_user_id_task_type_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{TasksColumns[1], TasksColumns[5], TasksColumns[2], TasksColumns[18]},
+			},
+		},
+	}
 	// UsageLogsColumns holds the columns for the "usage_logs" table.
 	UsageLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -392,6 +448,7 @@ var (
 		PluginSourcesTable,
 		ProxiesTable,
 		SettingsTable,
+		TasksTable,
 		UsageLogsTable,
 		UsersTable,
 		UserSubscriptionsTable,

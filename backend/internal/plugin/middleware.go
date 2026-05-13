@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // middleware.go：Core 与 middleware 类型插件的对接层。
@@ -156,13 +156,7 @@ func buildMiddlewareEvent(state *forwardState, execution forwardExecution, bag m
 	o := execution.outcome
 	evt.StatusCode = int32(o.Upstream.StatusCode)
 	if u := o.Usage; u != nil {
-		evt.InputTokens = int64(u.InputTokens)
-		evt.OutputTokens = int64(u.OutputTokens)
-		evt.CachedInputTokens = int64(u.CachedInputTokens)
-		evt.FirstTokenMs = u.FirstTokenMs
-		evt.InputCost = u.InputCost
-		evt.OutputCost = u.OutputCost
-		evt.CachedInputCost = u.CachedInputCost
+		evt.Usage = u
 	}
 	if o.Kind != sdk.OutcomeSuccess && o.Kind != sdk.OutcomeUnknown {
 		evt.ErrorKind = o.Kind.String()

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // corePluginContext 核心侧的 PluginContext 实现

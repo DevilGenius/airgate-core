@@ -14,7 +14,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // openAIError 以 OpenAI 兼容格式返回错误，保证 Claude Code 等客户端能识别。
@@ -256,16 +256,17 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 	if actualModel == "" {
 		actualModel = state.model
 	}
+	usageValues := usageSnapshotFromSDK(usage)
 
 	// 三条独立倍率管道：
 	//   billingRate: 平台对 reseller 的计费倍率（group/user 优先级链）
 	//   sellRate:    reseller 对客户的销售倍率（独立 markup 管道）
 	//   accountRate: 账号自身的真实成本系数（"账号计费"统计管道）
 	calcInput := billing.CalculateInput{
-		InputCost:         usage.InputCost,
-		OutputCost:        usage.OutputCost,
-		CachedInputCost:   usage.CachedInputCost,
-		CacheCreationCost: usage.CacheCreationCost,
+		InputCost:         usageValues.InputCost,
+		OutputCost:        usageValues.OutputCost,
+		CachedInputCost:   usageValues.CachedInputCost,
+		CacheCreationCost: usageValues.CacheCreationCost,
 		BillingRate:       billing.ResolveBillingRate(state.keyInfo),
 		SellRate:          state.keyInfo.SellRate,
 		AccountRate:       state.account.RateMultiplier,
@@ -285,18 +286,18 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		GroupID:               state.keyInfo.GroupID,
 		Platform:              state.plugin.Platform,
 		Model:                 actualModel,
-		InputTokens:           usage.InputTokens,
-		OutputTokens:          usage.OutputTokens,
-		CachedInputTokens:     usage.CachedInputTokens,
-		CacheCreationTokens:   usage.CacheCreationTokens,
-		CacheCreation5mTokens: usage.CacheCreation5mTokens,
-		CacheCreation1hTokens: usage.CacheCreation1hTokens,
-		ReasoningOutputTokens: usage.ReasoningOutputTokens,
-		InputPrice:            usage.InputPrice,
-		OutputPrice:           usage.OutputPrice,
-		CachedInputPrice:      usage.CachedInputPrice,
-		CacheCreationPrice:    usage.CacheCreationPrice,
-		CacheCreation1hPrice:  usage.CacheCreation1hPrice,
+		InputTokens:           usageValues.InputTokens,
+		OutputTokens:          usageValues.OutputTokens,
+		CachedInputTokens:     usageValues.CachedInputTokens,
+		CacheCreationTokens:   usageValues.CacheCreationTokens,
+		CacheCreation5mTokens: usageValues.CacheCreation5mTokens,
+		CacheCreation1hTokens: usageValues.CacheCreation1hTokens,
+		ReasoningOutputTokens: usageValues.ReasoningOutputTokens,
+		InputPrice:            usageValues.InputPrice,
+		OutputPrice:           usageValues.OutputPrice,
+		CachedInputPrice:      usageValues.CachedInputPrice,
+		CacheCreationPrice:    usageValues.CacheCreationPrice,
+		CacheCreation1hPrice:  usageValues.CacheCreation1hPrice,
 		InputCost:             calc.InputCost,
 		OutputCost:            calc.OutputCost,
 		CachedInputCost:       calc.CachedInputCost,
@@ -308,11 +309,11 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		RateMultiplier:        calc.RateMultiplier,
 		SellRate:              calc.SellRate,
 		AccountRateMultiplier: calc.AccountRateMultiplier,
-		ServiceTier:           usage.ServiceTier,
-		ImageSize:             usage.ImageSize,
+		ServiceTier:           usageValues.ServiceTier,
+		ImageSize:             usageValues.ImageSize,
 		Stream:                state.stream,
 		DurationMs:            execution.duration.Milliseconds(),
-		FirstTokenMs:          usage.FirstTokenMs,
+		FirstTokenMs:          usageValues.FirstTokenMs,
 		UserAgent:             c.Request.UserAgent(),
 		IPAddress:             c.ClientIP(),
 		Endpoint:              state.requestPath,

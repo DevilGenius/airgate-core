@@ -81,7 +81,7 @@ export function clearPluginAccountFormCache(pluginId?: string) {
 
 onPluginFrontendCacheClear(clearPluginAccountFormCache);
 
-export function usePluginAccountForm(platform: string) {
+export function usePluginAccountForm(platform: string, mode: AccountFormProps['mode'] = 'create') {
   const [Form, setForm] = useState<ComponentType<AccountFormProps> | null>(null);
   const [pluginId, setPluginId] = useState('');
   const loadedRef = useRef('');
@@ -94,8 +94,9 @@ export function usePluginAccountForm(platform: string) {
       return;
     }
     // 跳过重复加载（但 cleanup 时重置，兼容 React 18 Strict Mode double-mount）
-    if (loadedRef.current === platform) return;
-    loadedRef.current = platform;
+    const loadKey = `${platform}:${mode}`;
+    if (loadedRef.current === loadKey) return;
+    loadedRef.current = loadKey;
     let cancelled = false;
 
     getPlatformPluginMap().then((map) => {
@@ -108,15 +109,18 @@ export function usePluginAccountForm(platform: string) {
         setForm(null);
         return;
       }
-      if (pluginFormCache.has(resolvedPluginId)) {
-        const cachedForm = pluginFormCache.get(resolvedPluginId) ?? null;
+      const cacheKey = `${resolvedPluginId}:${mode}`;
+      if (pluginFormCache.has(cacheKey)) {
+        const cachedForm = pluginFormCache.get(cacheKey) ?? null;
         setForm(() => cachedForm);
         return;
       }
       loadPluginFrontend(resolvedPluginId).then((mod) => {
         if (cancelled) return;
-        const form = mod?.accountForm ?? null;
-        pluginFormCache.set(resolvedPluginId, form);
+        const form = mode === 'edit'
+          ? (mod?.accountEdit ?? null)
+          : (mod?.accountCreate ?? null);
+        pluginFormCache.set(cacheKey, form);
         setForm(() => form);
       });
     });
@@ -125,7 +129,7 @@ export function usePluginAccountForm(platform: string) {
       cancelled = true;
       loadedRef.current = ''; // 重置，让 Strict Mode re-mount 时能重新加载
     };
-  }, [platform]);
+  }, [platform, mode]);
 
   return { Form, pluginId };
 }

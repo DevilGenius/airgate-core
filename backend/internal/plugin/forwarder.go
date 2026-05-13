@@ -15,7 +15,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/routing"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // 访问日志富化键的本地别名，避免在大量 c.Set 处重复写出包名。

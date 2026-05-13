@@ -19,14 +19,14 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/routing"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
-	sdk "github.com/DouDOU-start/airgate-sdk"
-	pb "github.com/DouDOU-start/airgate-sdk/proto"
+	pb "github.com/DouDOU-start/airgate-sdk/protocol/proto"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // HostService 是 Core 暴露给插件的反向 gRPC 能力的"底层实现"。
 //
-// 它本身不做权限校验——所有方法都认任何调用者。真正面向插件的实现是
-// pluginHostHandle，它在每个 RPC 入口先做 capability 校验，再委托给本结构。
+// 它本身不做插件 capability 校验。真正面向插件的实现是 pluginHostHandle，
+// 它在 Invoke / InvokeStream 入口按 method 做 capability 校验，再委托给本结构。
 //
 // 设计原则（详见 ADR-0001）：
 //   - 提供通用平台原语层——新增插件应只组合已有 RPC，无需扩 proto；
@@ -47,7 +47,7 @@ type HostService struct {
 // NewHostService 构造 HostService 工厂。
 // 由 server 在创建 Manager + scheduler 之后立即创建并 SetHostService 注入到 Manager。
 //
-// HostService 自身不实现 pb.HostServiceServer—— 用 NewPluginHandle 给每个插件
+// HostService 自身不实现 pb.CoreInvokeServiceServer——用 NewPluginHandle 给每个插件
 // 派生一个 pluginHostHandle 才是真正的 server 实例。
 func NewHostService(
 	db *ent.Client,
@@ -71,7 +71,7 @@ func NewHostService(
 //
 // 调用流程：
 //  1. Manager 在 spawn 插件之前调本方法创建一个 handle，初始 capability = nil（拒绝所有）
-//  2. 把 handle 作为 HostImpl 注入 GatewayGRPCPlugin / ExtensionGRPCPlugin / MiddlewareGRPCPlugin
+//  2. 把 handle 作为 CoreInvokeImpl 注入 GatewayGRPCPlugin / ExtensionGRPCPlugin / MiddlewareGRPCPlugin
 //  3. spawn 完成 → Info() 拿到 capability 列表 → 调 handle.SetCapabilities(...)
 //  4. 之后插件调任何 RPC 都会按当前 capability set 过滤
 //
@@ -85,31 +85,26 @@ func (h *HostService) NewPluginHandle(pluginName string) *pluginHostHandle {
 // pluginHostHandle —— 实际暴露给插件的 server，做 capability 校验后委托到 base
 // ============================================================================
 
-// pluginHostHandle 是一个 per-plugin 的 HostServiceServer。
+// pluginHostHandle 是一个 per-plugin 的 CoreInvokeServiceServer。
 //
 // 持有一个不可变的 base + 一个可变的 capability set（atomic 保护）。每个 RPC 入口先
-// requireCap 再委托。capability set 的写入是 spawn 后由 manager 完成的，写入之后
+// requireMethod 再委托。capability set 的写入是 spawn 后由 manager 完成的，写入之后
 // 在该插件生命周期内通常不再变（OnConfigUpdate 重新走 Init 时会重新创建 handle）。
 type pluginHostHandle struct {
-	pb.UnimplementedHostServiceServer
+	pb.UnimplementedCoreInvokeServiceServer
 
 	base       *HostService
 	pluginName string
 
-	// caps 指针指向一个 map[sdk.Capability]bool。nil = "未授权状态"，所有 RPC 都拒绝。
+	// caps 指针指向一个 map[sdk.Capability]bool。nil = capability 尚未绑定，所有 RPC 都拒绝。
 	// 用 atomic.Pointer 是为了让 SetCapabilities 与 RPC 处理并发安全，无需 mutex。
 	caps atomic.Pointer[map[sdk.Capability]bool]
 }
 
 // SetCapabilities 由 Manager 在 spawn 完成、Info() 拿到 capability 列表后调用。
 //
-// nil caps == 兼容模式（豁免校验），用于 sdk_version <= 0.2.x 的存量插件。
 // 空 set（len=0）== 显式声明"什么都不要"，所有 RPC 都被拒。
 func (h *pluginHostHandle) SetCapabilities(caps map[sdk.Capability]bool) {
-	if caps == nil {
-		h.caps.Store(nil)
-		return
-	}
 	cloned := make(map[sdk.Capability]bool, len(caps))
 	for k, v := range caps {
 		cloned[k] = v
@@ -117,119 +112,303 @@ func (h *pluginHostHandle) SetCapabilities(caps map[sdk.Capability]bool) {
 	h.caps.Store(&cloned)
 }
 
-// requireCap 检查当前插件是否拥有 capability cap。
-//
-// 兼容模式（caps==nil）下放行任何调用并 log debug，便于审计哪些老插件依赖什么能力，
-// 等老插件全部声明 capabilities 后再去掉兼容路径。
-func (h *pluginHostHandle) requireCap(cap sdk.Capability) error {
+func (h *pluginHostHandle) requireMethod(method string) error {
 	caps := h.caps.Load()
 	if caps == nil {
-		// 兼容模式：sdk_version 豁免的老插件
-		slog.Debug("host_service_capability_skipped",
-			sdk.LogFieldPluginID, h.pluginName, "capability", cap)
+		slog.Warn("host_service_capability_unbound",
+			sdk.LogFieldPluginID, h.pluginName, "method", method)
+		return status.Errorf(codes.PermissionDenied,
+			"plugin %q capabilities are not bound", h.pluginName)
+	}
+	if (*caps)[sdk.CapabilityHostInvoke] || (*caps)[sdk.CapabilityForHostMethod(method)] {
 		return nil
 	}
-	if (*caps)[cap] {
-		return nil
-	}
-	// Warn 级别便于运维快速发现"插件代码与声明的 capability 不一致"
-	slog.Warn("host_service_capability_denied",
-		sdk.LogFieldPluginID, h.pluginName, "capability", cap)
+	slog.Warn("host_service_method_denied",
+		sdk.LogFieldPluginID, h.pluginName, "method", method)
 	return status.Errorf(codes.PermissionDenied,
-		"plugin %q lacks capability %q", h.pluginName, cap)
+		"plugin %q lacks host invoke capability for method %q", h.pluginName, method)
 }
 
-func (h *pluginHostHandle) SelectAccount(ctx context.Context, req *pb.HostSelectAccountRequest) (*pb.HostSelectAccountResponse, error) {
-	if err := h.requireCap(sdk.CapabilityHostSelectAccount); err != nil {
+func (h *pluginHostHandle) Invoke(ctx context.Context, req *pb.HostInvokeRequest) (*pb.HostInvokeResponse, error) {
+	if req == nil || req.Method == "" {
+		return nil, status.Error(codes.InvalidArgument, "method 不能为空")
+	}
+	if err := h.requireMethod(req.Method); err != nil {
 		return nil, err
 	}
-	return h.base.selectAccount(ctx, req)
-}
-
-func (h *pluginHostHandle) ProbeForward(ctx context.Context, req *pb.HostProbeForwardRequest) (*pb.HostProbeForwardResponse, error) {
-	if err := h.requireCap(sdk.CapabilityHostProbeForward); err != nil {
+	payload, err := h.base.invoke(ctx, h.pluginName, req.Method, req.Payload, req.IdempotencyKey, req.Metadata)
+	if err != nil {
 		return nil, err
 	}
-	return h.base.probeForward(ctx, req)
-}
-
-func (h *pluginHostHandle) ListGroups(ctx context.Context, req *pb.HostListGroupsRequest) (*pb.HostListGroupsResponse, error) {
-	if err := h.requireCap(sdk.CapabilityHostListGroups); err != nil {
-		return nil, err
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "encode response payload: %v", err)
 	}
-	return h.base.listGroups(ctx, req)
+	return &pb.HostInvokeResponse{
+		Status:   "ok",
+		Payload:  encoded,
+		Metadata: map[string]string{"method": req.Method},
+	}, nil
 }
 
-func (h *pluginHostHandle) ReportAccountResult(ctx context.Context, req *pb.HostReportAccountResultRequest) (*pb.Empty, error) {
-	if err := h.requireCap(sdk.CapabilityHostReportAccountResult); err != nil {
-		return nil, err
-	}
-	return h.base.reportAccountResult(ctx, req)
-}
-
-func (h *pluginHostHandle) Forward(ctx context.Context, req *pb.HostForwardRequest) (*pb.HostForwardResponse, error) {
-	if err := h.requireCap(sdk.CapabilityHostForward); err != nil {
-		return nil, err
-	}
-	return h.base.forward(ctx, req)
-}
-
-func (h *pluginHostHandle) ForwardStream(req *pb.HostForwardRequest, stream pb.HostService_ForwardStreamServer) error {
-	if err := h.requireCap(sdk.CapabilityHostForward); err != nil {
+func (h *pluginHostHandle) InvokeStream(stream pb.CoreInvokeService_InvokeStreamServer) error {
+	first, err := stream.Recv()
+	if err != nil {
 		return err
 	}
-	return h.base.forwardStream(stream.Context(), req, stream)
+	if first.Method == "" {
+		return status.Error(codes.InvalidArgument, "stream 首帧 method 不能为空")
+	}
+	if err := h.requireMethod(first.Method); err != nil {
+		return err
+	}
+	return h.base.invokeStream(stream.Context(), h.pluginName, first, stream)
 }
 
-func (h *pluginHostHandle) ListPlatforms(ctx context.Context, req *pb.HostListPlatformsRequest) (*pb.HostListPlatformsResponse, error) {
-	if err := h.requireCap(sdk.CapabilityHostListPlatforms); err != nil {
-		return nil, err
+const (
+	hostMethodSchedulerSelectAccount = "scheduler.select_account"
+	hostMethodSchedulerReportResult  = "scheduler.report_account_result"
+	hostMethodProbeForward           = "probe.forward"
+	hostMethodGroupsList             = "groups.list"
+	hostMethodGatewayForward         = "gateway.forward"
+	hostMethodPlatformsList          = "platforms.list"
+	hostMethodModelsList             = "models.list"
+	hostMethodUsersGet               = "users.get"
+	hostMethodAssetsStore            = "assets.store"
+	hostMethodAssetsGetURL           = "assets.get_url"
+	hostMethodAssetsGetBytes         = "assets.get_bytes"
+	hostMethodTasksCreate            = "tasks.create"
+	hostMethodTasksUpdate            = "tasks.update"
+	hostMethodTasksGet               = "tasks.get"
+	hostMethodTasksList              = "tasks.list"
+)
+
+func (h *HostService) invoke(
+	ctx context.Context,
+	pluginID, method string,
+	payload []byte,
+	idempotencyKey string,
+	metadata map[string]string,
+) (map[string]interface{}, error) {
+	_ = metadata
+	switch method {
+	case hostMethodSchedulerSelectAccount:
+		var req hostSelectAccountRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.selectAccount(ctx, req)
+	case hostMethodSchedulerReportResult:
+		var req hostReportAccountResultRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.reportAccountResult(ctx, req)
+	case hostMethodProbeForward:
+		var req hostProbeForwardRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.probeForward(ctx, req)
+	case hostMethodGroupsList:
+		return h.listGroups(ctx)
+	case hostMethodGatewayForward:
+		var req hostForwardRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.forward(ctx, req)
+	case hostMethodPlatformsList:
+		return h.listPlatforms(ctx)
+	case hostMethodModelsList:
+		var req hostListModelsRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.listModels(ctx, req)
+	case hostMethodUsersGet:
+		var req hostGetUserInfoRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.getUserInfo(ctx, req)
+	case hostMethodAssetsStore:
+		var req hostStoreAssetRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.storeAsset(ctx, req)
+	case hostMethodAssetsGetURL:
+		var req hostGetAssetURLRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.getAssetURL(ctx, req)
+	case hostMethodAssetsGetBytes:
+		var req hostGetAssetBytesRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.getAssetBytes(ctx, req)
+	case hostMethodTasksCreate:
+		var req hostCreateTaskRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		if idempotencyKey != "" && req.IdempotencyKey == "" {
+			req.IdempotencyKey = idempotencyKey
+		}
+		return h.createTask(ctx, pluginID, req)
+	case hostMethodTasksUpdate:
+		var req hostUpdateTaskRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.updateTask(ctx, pluginID, req)
+	case hostMethodTasksGet:
+		var req hostGetTaskRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.getTask(ctx, req)
+	case hostMethodTasksList:
+		var req hostListTasksRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.listTasks(ctx, req)
+	default:
+		return nil, status.Errorf(codes.Unimplemented, "unknown host method: %s", method)
 	}
-	return h.base.listPlatforms(ctx, req)
 }
 
-func (h *pluginHostHandle) ListModels(ctx context.Context, req *pb.HostListModelsRequest) (*pb.HostListModelsResponse, error) {
-	if err := h.requireCap(sdk.CapabilityHostListModels); err != nil {
-		return nil, err
+func (h *HostService) invokeStream(
+	ctx context.Context,
+	pluginID string,
+	first *pb.HostStreamFrame,
+	stream pb.CoreInvokeService_InvokeStreamServer,
+) error {
+	_ = pluginID
+	switch first.Method {
+	case hostMethodGatewayForward:
+		var req hostForwardRequest
+		if err := decodeHostPayload(first.Payload, &req); err != nil {
+			return err
+		}
+		req.Stream = true
+		return h.forwardStream(ctx, req, stream)
+	default:
+		return status.Errorf(codes.Unimplemented, "unknown host stream method: %s", first.Method)
 	}
-	return h.base.listModels(ctx, req)
 }
 
-func (h *pluginHostHandle) GetUserInfo(ctx context.Context, req *pb.HostGetUserInfoRequest) (*pb.HostGetUserInfoResponse, error) {
-	if err := h.requireCap(sdk.CapabilityHostGetUserInfo); err != nil {
-		return nil, err
+func decodeHostPayload(payload []byte, out interface{}) error {
+	if len(payload) == 0 {
+		return nil
 	}
-	return h.base.getUserInfo(ctx, req)
+	if err := json.Unmarshal(payload, out); err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid payload JSON: %v", err)
+	}
+	return nil
 }
 
-func (h *pluginHostHandle) StoreAsset(ctx context.Context, req *pb.HostStoreAssetRequest) (*pb.HostStoreAssetResponse, error) {
-	if err := h.requireCap(sdk.CapabilityHostAssetStorage); err != nil {
-		return nil, err
-	}
-	return h.base.storeAsset(ctx, req)
+type hostSelectAccountRequest struct {
+	GroupID           int64   `json:"group_id"`
+	Model             string  `json:"model"`
+	SessionID         string  `json:"session_id"`
+	ExcludeAccountIDs []int64 `json:"exclude_account_ids"`
 }
 
-func (h *pluginHostHandle) GetAssetURL(ctx context.Context, req *pb.HostGetAssetURLRequest) (*pb.HostGetAssetURLResponse, error) {
-	if err := h.requireCap(sdk.CapabilityHostAssetStorage); err != nil {
-		return nil, err
-	}
-	return h.base.getAssetURL(ctx, req)
+type hostReportAccountResultRequest struct {
+	AccountID int64  `json:"account_id"`
+	Success   bool   `json:"success"`
+	ErrorMsg  string `json:"error_msg"`
 }
 
-func (h *pluginHostHandle) GetAssetBytes(ctx context.Context, req *pb.HostGetAssetBytesRequest) (*pb.HostGetAssetBytesResponse, error) {
-	if err := h.requireCap(sdk.CapabilityHostAssetStorage); err != nil {
-		return nil, err
-	}
-	return h.base.getAssetBytes(ctx, req)
+type hostProbeForwardRequest struct {
+	GroupID int64  `json:"group_id"`
+	Model   string `json:"model"`
+}
+
+type hostForwardRequest struct {
+	UserID  int64                  `json:"user_id"`
+	GroupID int64                  `json:"group_id"`
+	Model   string                 `json:"model"`
+	Method  string                 `json:"method"`
+	Path    string                 `json:"path"`
+	Headers map[string]interface{} `json:"headers"`
+	Body    interface{}            `json:"body"`
+	Stream  bool                   `json:"stream"`
+}
+
+type hostListModelsRequest struct {
+	Platform string `json:"platform"`
+}
+
+type hostGetUserInfoRequest struct {
+	UserID int64 `json:"user_id"`
+}
+
+type hostStoreAssetRequest struct {
+	UserID        int64  `json:"user_id"`
+	Scope         string `json:"scope"`
+	ContentType   string `json:"content_type"`
+	FileExtension string `json:"file_extension"`
+	Data          []byte `json:"data"`
+}
+
+type hostGetAssetURLRequest struct {
+	ObjectKey string `json:"object_key"`
+}
+
+type hostGetAssetBytesRequest struct {
+	ObjectKey string `json:"object_key"`
+}
+
+type hostCreateTaskRequest struct {
+	PluginID       string                 `json:"plugin_id"`
+	TaskType       string                 `json:"task_type"`
+	UserID         int64                  `json:"user_id"`
+	Input          map[string]interface{} `json:"input"`
+	Attributes     map[string]interface{} `json:"attributes"`
+	Execution      map[string]interface{} `json:"execution"`
+	Priority       int                    `json:"priority"`
+	MaxAttempts    int                    `json:"max_attempts"`
+	IdempotencyKey string                 `json:"idempotency_key"`
+}
+
+type hostUpdateTaskRequest struct {
+	TaskID       int64                  `json:"task_id"`
+	Status       string                 `json:"status"`
+	Progress     *int                   `json:"progress"`
+	Stage        *string                `json:"stage"`
+	Output       map[string]interface{} `json:"output"`
+	Attributes   map[string]interface{} `json:"attributes"`
+	Execution    map[string]interface{} `json:"execution"`
+	ErrorType    string                 `json:"error_type"`
+	ErrorCode    string                 `json:"error_code"`
+	ErrorMessage string                 `json:"error_message"`
+	UsageID      *int                   `json:"usage_id"`
+}
+
+type hostGetTaskRequest struct {
+	TaskID int64 `json:"task_id"`
+}
+
+type hostListTasksRequest struct {
+	UserID   int64  `json:"user_id"`
+	TaskType string `json:"task_type"`
+	Status   string `json:"status"`
+	Limit    int    `json:"limit"`
+	Offset   int    `json:"offset"`
 }
 
 // selectAccount 调度选号：走和真实用户请求完全相同的路径。
-// 内部 worker，由 pluginHostHandle.SelectAccount 在 capability 校验后调用。
-func (h *HostService) selectAccount(ctx context.Context, req *pb.HostSelectAccountRequest) (*pb.HostSelectAccountResponse, error) {
-	if req.GroupId <= 0 {
+func (h *HostService) selectAccount(ctx context.Context, req hostSelectAccountRequest) (map[string]interface{}, error) {
+	if req.GroupID <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "group_id 必须 > 0")
 	}
-	g, err := h.db.Group.Get(ctx, int(req.GroupId))
+	g, err := h.db.Group.Get(ctx, int(req.GroupID))
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, status.Error(codes.NotFound, "分组不存在")
@@ -244,12 +423,12 @@ func (h *HostService) selectAccount(ctx context.Context, req *pb.HostSelectAccou
 		}
 	}
 
-	excludeIDs := make([]int, 0, len(req.ExcludeAccountIds))
-	for _, id := range req.ExcludeAccountIds {
+	excludeIDs := make([]int, 0, len(req.ExcludeAccountIDs))
+	for _, id := range req.ExcludeAccountIDs {
 		excludeIDs = append(excludeIDs, int(id))
 	}
 
-	acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupId), req.SessionId, excludeIDs...)
+	acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupID), req.SessionID, excludeIDs...)
 	if err != nil {
 		// scheduler 自身的"无可用账户"是业务可预期错误，用 NotFound 让插件区分
 		if errors.Is(err, scheduler.ErrNoAvailableAccount) {
@@ -257,10 +436,10 @@ func (h *HostService) selectAccount(ctx context.Context, req *pb.HostSelectAccou
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.HostSelectAccountResponse{
-		AccountId:   int64(acc.ID),
-		AccountName: acc.Name,
-		Platform:    acc.Platform,
+	return map[string]interface{}{
+		"account_id":   int64(acc.ID),
+		"account_name": acc.Name,
+		"platform":     acc.Platform,
 	}, nil
 }
 
@@ -276,22 +455,22 @@ func (h *HostService) selectAccount(ctx context.Context, req *pb.HostSelectAccou
 //
 // 失败语义：所有错误都不通过 gRPC error 返回，而是写入 response.error_kind/msg。
 // 调用方（探测插件）需要把 error_kind 持久化到自己的 group_health_probes 表。
-func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForwardRequest) (*pb.HostProbeForwardResponse, error) {
+func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequest) (map[string]interface{}, error) {
 	start := time.Now()
-	resp := &pb.HostProbeForwardResponse{}
+	resp := map[string]interface{}{}
 
-	if req.GroupId <= 0 {
+	if req.GroupID <= 0 {
 		return errProbeResp("invalid_arg", "group_id 必须 > 0", start), nil
 	}
 
-	g, err := h.db.Group.Get(ctx, int(req.GroupId))
+	g, err := h.db.Group.Get(ctx, int(req.GroupID))
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return errProbeResp("group_not_found", err.Error(), start), nil
 		}
 		return errProbeResp("internal", err.Error(), start), nil
 	}
-	resp.Platform = g.Platform
+	resp["platform"] = g.Platform
 
 	model := req.Model
 	if model == "" {
@@ -302,14 +481,14 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 	if model == "" {
 		return errProbeResp("no_model", fmt.Sprintf("platform %s 没有可用 model", g.Platform), start), nil
 	}
-	resp.Model = model
+	resp["model"] = model
 
 	// 调度选号
-	acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupId), "")
+	acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupID), "")
 	if err != nil {
 		return errProbeResp("no_account", err.Error(), start), nil
 	}
-	resp.AccountId = int64(acc.ID)
+	resp["account_id"] = int64(acc.ID)
 
 	// 加载完整账号 + proxy
 	accFull, err := h.db.Account.Query().
@@ -357,14 +536,14 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 
 	outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
 	latency := time.Since(start)
-	resp.LatencyMs = latency.Milliseconds()
-	resp.StatusCode = int64(outcome.Upstream.StatusCode)
+	resp["latency_ms"] = latency.Milliseconds()
+	resp["status_code"] = int64(outcome.Upstream.StatusCode)
 
 	// 插件自身故障（进程异常等）—— 不经过状态机，仅记录。
 	if fwdErr != nil {
-		resp.Success = false
-		resp.ErrorKind = "plugin_error"
-		resp.ErrorMsg = truncateProbeErr(fwdErr.Error())
+		resp["success"] = false
+		resp["error_kind"] = "plugin_error"
+		resp["error_msg"] = truncateProbeErr(fwdErr.Error())
 		return resp, nil
 	}
 
@@ -382,51 +561,49 @@ func (h *HostService) probeForward(ctx context.Context, req *pb.HostProbeForward
 
 	switch outcome.Kind {
 	case sdk.OutcomeSuccess:
-		resp.Success = true
+		resp["success"] = true
 	case sdk.OutcomeAccountRateLimited:
-		resp.Success = false
-		resp.ErrorKind = "rate_limited"
-		resp.ErrorMsg = truncateProbeErr(outcome.Reason)
+		resp["success"] = false
+		resp["error_kind"] = "rate_limited"
+		resp["error_msg"] = truncateProbeErr(outcome.Reason)
 	case sdk.OutcomeAccountDead:
-		resp.Success = false
-		resp.ErrorKind = "account_error"
-		resp.ErrorMsg = truncateProbeErr(outcome.Reason)
+		resp["success"] = false
+		resp["error_kind"] = "account_error"
+		resp["error_msg"] = truncateProbeErr(outcome.Reason)
 	case sdk.OutcomeUpstreamTransient, sdk.OutcomeStreamAborted:
-		resp.Success = false
-		resp.ErrorKind = "upstream_5xx"
-		resp.ErrorMsg = truncateProbeErr(outcome.Reason)
+		resp["success"] = false
+		resp["error_kind"] = "upstream_5xx"
+		resp["error_msg"] = truncateProbeErr(outcome.Reason)
 	case sdk.OutcomeClientError:
-		resp.Success = false
-		resp.ErrorKind = "client_error"
-		resp.ErrorMsg = truncateProbeErr(outcome.Reason)
+		resp["success"] = false
+		resp["error_kind"] = "client_error"
+		resp["error_msg"] = truncateProbeErr(outcome.Reason)
 	default:
-		resp.Success = false
-		resp.ErrorKind = "unknown"
-		resp.ErrorMsg = truncateProbeErr(outcome.Reason)
+		resp["success"] = false
+		resp["error_kind"] = "unknown"
+		resp["error_msg"] = truncateProbeErr(outcome.Reason)
 	}
 	return resp, nil
 }
 
-// listGroups 列出所有分组。内部 worker，由 pluginHostHandle.ListGroups 委托。
-func (h *HostService) listGroups(ctx context.Context, _ *pb.HostListGroupsRequest) (*pb.HostListGroupsResponse, error) {
+// listGroups 列出所有分组。
+func (h *HostService) listGroups(ctx context.Context) (map[string]interface{}, error) {
 	slog.Debug("host_service_list_groups", "module", "host")
 	groups, err := h.db.Group.Query().All(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	resp := &pb.HostListGroupsResponse{
-		Groups: make([]*pb.HostGroup, 0, len(groups)),
-	}
+	items := make([]map[string]interface{}, 0, len(groups))
 	for _, g := range groups {
-		resp.Groups = append(resp.Groups, &pb.HostGroup{
-			Id:             int64(g.ID),
-			Name:           g.Name,
-			Platform:       g.Platform,
-			IsExclusive:    g.IsExclusive,
-			RateMultiplier: g.RateMultiplier,
+		items = append(items, map[string]interface{}{
+			"id":              int64(g.ID),
+			"name":            g.Name,
+			"platform":        g.Platform,
+			"is_exclusive":    g.IsExclusive,
+			"rate_multiplier": g.RateMultiplier,
 		})
 	}
-	return resp, nil
+	return map[string]interface{}{"groups": items}, nil
 }
 
 // reportAccountResult 把账号调用结果反馈给 scheduler。
@@ -435,29 +612,29 @@ func (h *HostService) listGroups(ctx context.Context, _ *pb.HostListGroupsReques
 // success=true 直接走 Apply(OutcomeSuccess)；success=false 按"上游抖动"上报
 // （由状态机的滚动窗口计数决定是否升级为 disabled），避免探测插件单次失败
 // 就把账号标死。
-func (h *HostService) reportAccountResult(ctx context.Context, req *pb.HostReportAccountResultRequest) (*pb.Empty, error) {
-	if req.AccountId <= 0 {
+func (h *HostService) reportAccountResult(ctx context.Context, req hostReportAccountResultRequest) (map[string]interface{}, error) {
+	if req.AccountID <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "account_id 必须 > 0")
 	}
 	kind := sdk.OutcomeUpstreamTransient
 	if req.Success {
 		kind = sdk.OutcomeSuccess
 	}
-	h.scheduler.Apply(ctx, int(req.AccountId), scheduler.Judgment{
+	h.scheduler.Apply(ctx, int(req.AccountID), scheduler.Judgment{
 		Kind:   kind,
 		Reason: req.ErrorMsg,
 	})
-	return &pb.Empty{}, nil
+	return map[string]interface{}{"ok": true}, nil
 }
 
 // forward 非流式业务转发：调度 → 网关 → 计费 → 记录。
 // 与 probeForward 的区别：走完整计费管线，不跳过 usage_log / 余额扣款。
 // 账号级故障自动 failover，最多 maxHostForwardAttempts 次。
-func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (*pb.HostForwardResponse, error) {
-	if req.UserId <= 0 {
+func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[string]interface{}, error) {
+	if req.UserID <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
 	}
-	if err := h.checkHostForwardBalance(ctx, req.UserId); err != nil {
+	if err := h.checkHostForwardBalance(ctx, req.UserID); err != nil {
 		return nil, err
 	}
 
@@ -506,7 +683,7 @@ func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (
 			headers := hostForwardHeaders(req, route)
 			fwdReq := &sdk.ForwardRequest{
 				Account: hostSDKAccount(accFull),
-				Body:    req.Body,
+				Body:    hostForwardBody(req.Body),
 				Headers: headers,
 				Model:   model,
 				Stream:  false,
@@ -550,20 +727,15 @@ func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (
 				break
 			}
 
-			resp := &pb.HostForwardResponse{
-				StatusCode: int32(outcome.Upstream.StatusCode),
-				Headers:    httpHeadersToProtoHost(outcome.Upstream.Headers),
-				Body:       outcome.Upstream.Body,
+			resp := map[string]interface{}{
+				"status_code": outcome.Upstream.StatusCode,
+				"headers":     httpHeadersToProtoHost(outcome.Upstream.Headers),
+				"body":        string(outcome.Upstream.Body),
 			}
 
 			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
 				h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration)
-				resp.Usage = &pb.HostForwardUsage{
-					InputTokens:  int64(outcome.Usage.InputTokens),
-					OutputTokens: int64(outcome.Usage.OutputTokens),
-					Cost:         outcome.Usage.InputCost + outcome.Usage.OutputCost + outcome.Usage.CachedInputCost + outcome.Usage.CacheCreationCost,
-					Model:        model,
-				}
+				resp["usage"] = outcome.Usage
 			}
 
 			return resp, nil
@@ -576,11 +748,11 @@ func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (
 // forwardStream 流式业务转发。
 // 账号级故障自动 failover：通过 failoverStreamWriter 延迟提交，
 // 成功（< 400）时立即切换到真流式，失败时缓冲数据后丢弃重试。
-func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequest, stream pb.HostService_ForwardStreamServer) error {
-	if req.UserId <= 0 {
+func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest, stream pb.CoreInvokeService_InvokeStreamServer) error {
+	if req.UserID <= 0 {
 		return status.Error(codes.InvalidArgument, "user_id 必须 > 0")
 	}
-	if err := h.checkHostForwardBalance(ctx, req.UserId); err != nil {
+	if err := h.checkHostForwardBalance(ctx, req.UserID); err != nil {
 		return err
 	}
 
@@ -631,7 +803,7 @@ func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequ
 			fw := &failoverStreamWriter{target: sw}
 			fwdReq := &sdk.ForwardRequest{
 				Account: hostSDKAccount(accFull),
-				Body:    req.Body,
+				Body:    hostForwardBody(req.Body),
 				Headers: hostForwardHeaders(req, route),
 				Model:   model,
 				Stream:  true,
@@ -693,18 +865,20 @@ func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequ
 				return hostForwardGenericError()
 			}
 
-			var usage *pb.HostForwardUsage
+			var usage *sdk.Usage
 			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
 				h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration)
-				usage = &pb.HostForwardUsage{
-					InputTokens:  int64(outcome.Usage.InputTokens),
-					OutputTokens: int64(outcome.Usage.OutputTokens),
-					Cost:         outcome.Usage.InputCost + outcome.Usage.OutputCost + outcome.Usage.CachedInputCost + outcome.Usage.CacheCreationCost,
-					Model:        model,
-				}
+				usage = outcome.Usage
 			}
 
-			return stream.Send(&pb.HostForwardChunk{Done: true, Usage: usage})
+			return stream.Send(&pb.HostStreamFrame{
+				Event:  "done",
+				Status: "ok",
+				Payload: mustHostPayload(map[string]interface{}{
+					"usage": usage,
+				}),
+				Done: true,
+			})
 		}
 	}
 
@@ -718,8 +892,8 @@ const (
 	imageHostForwardTimeout   = 300 * time.Second
 )
 
-func hostForwardTimeout(req *pb.HostForwardRequest) time.Duration {
-	if req != nil && requestNeedsImage(req.Path, req.Model) {
+func hostForwardTimeout(req hostForwardRequest) time.Duration {
+	if requestNeedsImage(req.Path, req.Model) {
 		return imageHostForwardTimeout
 	}
 	return defaultHostForwardTimeout
@@ -794,7 +968,7 @@ func (w *failoverStreamWriter) flush() {
 
 // hostStreamWriter 适配 http.ResponseWriter，将流式数据转为 gRPC stream chunks。
 type hostStreamWriter struct {
-	stream     pb.HostService_ForwardStreamServer
+	stream     pb.CoreInvokeService_InvokeStreamServer
 	headerSent bool
 	header     http.Header
 	statusCode int
@@ -813,9 +987,13 @@ func (w *hostStreamWriter) WriteHeader(statusCode int) {
 	}
 	w.statusCode = statusCode
 	w.headerSent = true
-	_ = w.stream.Send(&pb.HostForwardChunk{
-		StatusCode: int32(statusCode),
-		Headers:    httpHeadersToProtoHost(w.header),
+	_ = w.stream.Send(&pb.HostStreamFrame{
+		Event:  "headers",
+		Status: "ok",
+		Payload: mustHostPayload(map[string]interface{}{
+			"status_code": statusCode,
+			"headers":     httpHeadersToProtoHost(w.header),
+		}),
 	})
 }
 
@@ -828,7 +1006,12 @@ func (w *hostStreamWriter) Write(data []byte) (int, error) {
 	}
 	chunk := make([]byte, len(data))
 	copy(chunk, data)
-	if err := w.stream.Send(&pb.HostForwardChunk{Data: chunk}); err != nil {
+	if err := w.stream.Send(&pb.HostStreamFrame{
+		Event: "chunk",
+		Payload: mustHostPayload(map[string]interface{}{
+			"data": string(chunk),
+		}),
+	}); err != nil {
 		return 0, err
 	}
 	return len(data), nil
@@ -840,7 +1023,7 @@ func (w *hostStreamWriter) Flush() {}
 // 与 forwarder.recordUsage 的区别：没有 APIKeyInfo，APIKeyID=0。
 func (h *HostService) recordHostForwardUsage(
 	ctx context.Context,
-	req *pb.HostForwardRequest,
+	req hostForwardRequest,
 	route routing.Candidate,
 	accountID int,
 	platform, model string,
@@ -852,12 +1035,13 @@ func (h *HostService) recordHostForwardUsage(
 	if usage == nil {
 		return
 	}
+	usageValues := usageSnapshotFromSDK(usage)
 
 	calcInput := billing.CalculateInput{
-		InputCost:         usage.InputCost,
-		OutputCost:        usage.OutputCost,
-		CachedInputCost:   usage.CachedInputCost,
-		CacheCreationCost: usage.CacheCreationCost,
+		InputCost:         usageValues.InputCost,
+		OutputCost:        usageValues.OutputCost,
+		CachedInputCost:   usageValues.CachedInputCost,
+		CacheCreationCost: usageValues.CacheCreationCost,
 		BillingRate:       route.EffectiveRate,
 		AccountRate:       accFull.RateMultiplier,
 	}
@@ -874,24 +1058,24 @@ func (h *HostService) recordHostForwardUsage(
 	}
 
 	h.recorder.Record(billing.UsageRecord{
-		UserID:                int(req.UserId),
+		UserID:                int(req.UserID),
 		APIKeyID:              0,
 		AccountID:             accountID,
 		GroupID:               route.GroupID,
 		Platform:              platform,
 		Model:                 actualModel,
-		InputTokens:           usage.InputTokens,
-		OutputTokens:          usage.OutputTokens,
-		CachedInputTokens:     usage.CachedInputTokens,
-		CacheCreationTokens:   usage.CacheCreationTokens,
-		CacheCreation5mTokens: usage.CacheCreation5mTokens,
-		CacheCreation1hTokens: usage.CacheCreation1hTokens,
-		ReasoningOutputTokens: usage.ReasoningOutputTokens,
-		InputPrice:            usage.InputPrice,
-		OutputPrice:           usage.OutputPrice,
-		CachedInputPrice:      usage.CachedInputPrice,
-		CacheCreationPrice:    usage.CacheCreationPrice,
-		CacheCreation1hPrice:  usage.CacheCreation1hPrice,
+		InputTokens:           usageValues.InputTokens,
+		OutputTokens:          usageValues.OutputTokens,
+		CachedInputTokens:     usageValues.CachedInputTokens,
+		CacheCreationTokens:   usageValues.CacheCreationTokens,
+		CacheCreation5mTokens: usageValues.CacheCreation5mTokens,
+		CacheCreation1hTokens: usageValues.CacheCreation1hTokens,
+		ReasoningOutputTokens: usageValues.ReasoningOutputTokens,
+		InputPrice:            usageValues.InputPrice,
+		OutputPrice:           usageValues.OutputPrice,
+		CachedInputPrice:      usageValues.CachedInputPrice,
+		CacheCreationPrice:    usageValues.CacheCreationPrice,
+		CacheCreation1hPrice:  usageValues.CacheCreation1hPrice,
 		InputCost:             calc.InputCost,
 		OutputCost:            calc.OutputCost,
 		CachedInputCost:       calc.CachedInputCost,
@@ -902,21 +1086,21 @@ func (h *HostService) recordHostForwardUsage(
 		AccountCost:           calc.AccountCost,
 		RateMultiplier:        calc.RateMultiplier,
 		AccountRateMultiplier: calc.AccountRateMultiplier,
-		ServiceTier:           usage.ServiceTier,
-		ImageSize:             usage.ImageSize,
+		ServiceTier:           usageValues.ServiceTier,
+		ImageSize:             usageValues.ImageSize,
 		Endpoint:              req.Path,
 		ReasoningEffort:       hostForwardReasoningEffort(req),
 		Stream:                req.Stream,
 		DurationMs:            duration.Milliseconds(),
-		FirstTokenMs:          usage.FirstTokenMs,
+		FirstTokenMs:          usageValues.FirstTokenMs,
 	})
 }
 
 // listPlatforms 列出已加载的网关平台。
-func (h *HostService) listPlatforms(_ context.Context, _ *pb.HostListPlatformsRequest) (*pb.HostListPlatformsResponse, error) {
+func (h *HostService) listPlatforms(_ context.Context) (map[string]interface{}, error) {
 	metas := h.manager.GetAllPluginMeta()
 	seen := make(map[string]struct{}, len(metas))
-	platforms := make([]*pb.HostPlatform, 0, len(metas))
+	platforms := make([]map[string]interface{}, 0, len(metas))
 	for _, m := range metas {
 		if m.Type != "gateway" || m.Platform == "" {
 			continue
@@ -925,66 +1109,58 @@ func (h *HostService) listPlatforms(_ context.Context, _ *pb.HostListPlatformsRe
 			continue
 		}
 		seen[m.Platform] = struct{}{}
-		platforms = append(platforms, &pb.HostPlatform{
-			Name:        m.Platform,
-			DisplayName: m.DisplayName,
+		platforms = append(platforms, map[string]interface{}{
+			"name":         m.Platform,
+			"display_name": m.DisplayName,
 		})
 	}
-	return &pb.HostListPlatformsResponse{Platforms: platforms}, nil
+	return map[string]interface{}{"platforms": platforms}, nil
 }
 
 // listModels 列出指定平台的模型列表。
-func (h *HostService) listModels(_ context.Context, req *pb.HostListModelsRequest) (*pb.HostListModelsResponse, error) {
+func (h *HostService) listModels(_ context.Context, req hostListModelsRequest) (map[string]interface{}, error) {
 	if req.Platform == "" {
 		return nil, status.Error(codes.InvalidArgument, "platform 不能为空")
 	}
 	models := h.manager.GetModels(req.Platform)
-	resp := &pb.HostListModelsResponse{
-		Models: make([]*pb.ModelInfoProto, 0, len(models)),
-	}
+	items := make([]map[string]interface{}, 0, len(models))
 	for _, m := range models {
-		resp.Models = append(resp.Models, &pb.ModelInfoProto{
-			Id:                       m.ID,
-			Name:                     m.Name,
-			InputPrice:               m.InputPrice,
-			OutputPrice:              m.OutputPrice,
-			CachedInputPrice:         m.CachedInputPrice,
-			CacheCreationPrice:       m.CacheCreationPrice,
-			CacheCreation_1HPrice:    m.CacheCreation1hPrice,
-			ContextWindow:            int64(m.ContextWindow),
-			MaxOutputTokens:          int64(m.MaxOutputTokens),
-			InputPricePriority:       m.InputPricePriority,
-			OutputPricePriority:      m.OutputPricePriority,
-			CachedInputPricePriority: m.CachedInputPricePriority,
+		items = append(items, map[string]interface{}{
+			"id":                m.ID,
+			"name":              m.Name,
+			"context_window":    int64(m.ContextWindow),
+			"max_output_tokens": int64(m.MaxOutputTokens),
+			"capabilities":      m.Capabilities,
+			"metadata":          m.Metadata,
 		})
 	}
-	return resp, nil
+	return map[string]interface{}{"models": items}, nil
 }
 
 // getUserInfo 获取用户基本信息。
-func (h *HostService) getUserInfo(ctx context.Context, req *pb.HostGetUserInfoRequest) (*pb.HostGetUserInfoResponse, error) {
-	if req.UserId <= 0 {
+func (h *HostService) getUserInfo(ctx context.Context, req hostGetUserInfoRequest) (map[string]interface{}, error) {
+	if req.UserID <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
 	}
-	u, err := h.db.User.Get(ctx, int(req.UserId))
+	u, err := h.db.User.Get(ctx, int(req.UserID))
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, status.Error(codes.NotFound, "用户不存在")
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.HostGetUserInfoResponse{
-		UserId:   int64(u.ID),
-		Username: u.Username,
-		Email:    u.Email,
-		Role:     string(u.Role),
-		Balance:  u.Balance,
-		Status:   string(u.Status),
+	return map[string]interface{}{
+		"user_id":  int64(u.ID),
+		"username": u.Username,
+		"email":    u.Email,
+		"role":     string(u.Role),
+		"balance":  u.Balance,
+		"status":   string(u.Status),
 	}, nil
 }
 
-func (h *HostService) storeAsset(ctx context.Context, req *pb.HostStoreAssetRequest) (*pb.HostStoreAssetResponse, error) {
-	if req.UserId <= 0 {
+func (h *HostService) storeAsset(ctx context.Context, req hostStoreAssetRequest) (map[string]interface{}, error) {
+	if req.UserID <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
 	}
 	if len(req.Data) == 0 {
@@ -994,20 +1170,20 @@ func (h *HostService) storeAsset(ctx context.Context, req *pb.HostStoreAssetRequ
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	asset, err := storage.store(ctx, req.UserId, req.Scope, req.ContentType, req.FileExtension, req.Data)
+	asset, err := storage.store(ctx, req.UserID, req.Scope, req.ContentType, req.FileExtension, req.Data)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.HostStoreAssetResponse{
-		AssetId:     asset.ID,
-		ObjectKey:   asset.ObjectKey,
-		PublicUrl:   asset.PublicURL,
-		SizeBytes:   asset.SizeBytes,
-		ContentType: asset.ContentType,
+	return map[string]interface{}{
+		"asset_id":     asset.ID,
+		"object_key":   asset.ObjectKey,
+		"public_url":   asset.PublicURL,
+		"size_bytes":   asset.SizeBytes,
+		"content_type": asset.ContentType,
 	}, nil
 }
 
-func (h *HostService) getAssetURL(ctx context.Context, req *pb.HostGetAssetURLRequest) (*pb.HostGetAssetURLResponse, error) {
+func (h *HostService) getAssetURL(ctx context.Context, req hostGetAssetURLRequest) (map[string]interface{}, error) {
 	storage, err := newAssetStorage(ctx, h.db)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -1016,10 +1192,10 @@ func (h *HostService) getAssetURL(ctx context.Context, req *pb.HostGetAssetURLRe
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.HostGetAssetURLResponse{PublicUrl: publicURL}, nil
+	return map[string]interface{}{"public_url": publicURL}, nil
 }
 
-func (h *HostService) getAssetBytes(ctx context.Context, req *pb.HostGetAssetBytesRequest) (*pb.HostGetAssetBytesResponse, error) {
+func (h *HostService) getAssetBytes(ctx context.Context, req hostGetAssetBytesRequest) (map[string]interface{}, error) {
 	storage, err := newAssetStorage(ctx, h.db)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -1028,31 +1204,31 @@ func (h *HostService) getAssetBytes(ctx context.Context, req *pb.HostGetAssetByt
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.HostGetAssetBytesResponse{Data: data, ContentType: contentType}, nil
+	return map[string]interface{}{"data": data, "content_type": contentType}, nil
 }
 
 // protoHeadersToHTTPHost / httpHeadersToProtoHost 是 host_service.go 内部的 header 转换。
 // 与 grpc/gateway_server.go 的同名函数等价，但跨包引用会引入循环依赖。
-func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForwardRequest) ([]routing.Candidate, error) {
-	if req.GroupId > 0 {
-		u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserId))).Only(ctx)
+func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequest) ([]routing.Candidate, error) {
+	if req.GroupID > 0 {
+		u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserID))).Only(ctx)
 		if err != nil {
 			slog.Error("host_forward_user_lookup_failed",
-				sdk.LogFieldUserID, req.UserId, sdk.LogFieldError, err)
+				sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
 			return nil, hostForwardGenericError()
 		}
-		g, err := h.db.Group.Get(ctx, int(req.GroupId))
+		g, err := h.db.Group.Get(ctx, int(req.GroupID))
 		if err != nil {
 			if ent.IsNotFound(err) {
 				return nil, status.Error(codes.NotFound, "分组不存在")
 			}
 			slog.Error("host_forward_group_lookup_failed",
-				sdk.LogFieldGroupID, req.GroupId, sdk.LogFieldError, err)
+				sdk.LogFieldGroupID, req.GroupID, sdk.LogFieldError, err)
 			return nil, hostForwardGenericError()
 		}
 		if !routing.GroupMatchesRequirements(g, hostForwardRequirements(req)) {
 			slog.Warn("host_forward_group_requirement_unmet",
-				sdk.LogFieldGroupID, req.GroupId,
+				sdk.LogFieldGroupID, req.GroupID,
 				sdk.LogFieldModel, req.Model,
 				sdk.LogFieldPath, req.Path,
 			)
@@ -1074,17 +1250,17 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForward
 	if platform == "" {
 		return nil, status.Error(codes.InvalidArgument, "platform 不能为空")
 	}
-	u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserId))).Only(ctx)
+	u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserID))).Only(ctx)
 	if err != nil {
 		slog.Error("host_forward_user_lookup_failed",
-			sdk.LogFieldUserID, req.UserId, sdk.LogFieldError, err)
+			sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
 		return nil, hostForwardGenericError()
 	}
-	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserId), platform, u.GroupRates, hostForwardRequirements(req))
+	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, hostForwardRequirements(req))
 	if err != nil {
 		slog.Error("host_forward_routes_lookup_failed",
 			sdk.LogFieldPlatform, platform,
-			sdk.LogFieldUserID, req.UserId,
+			sdk.LogFieldUserID, req.UserID,
 			sdk.LogFieldError, err,
 		)
 		return nil, hostForwardGenericError()
@@ -1092,25 +1268,19 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForward
 	if len(routes) == 0 {
 		slog.Warn("host_forward_no_eligible_route",
 			sdk.LogFieldPlatform, platform,
-			sdk.LogFieldUserID, req.UserId,
+			sdk.LogFieldUserID, req.UserID,
 		)
 		return nil, hostForwardGenericError()
 	}
 	return routes, nil
 }
 
-func hostForwardRequirements(req *pb.HostForwardRequest) routing.Requirements {
-	if req == nil {
-		return routing.Requirements{}
-	}
+func hostForwardRequirements(req hostForwardRequest) routing.Requirements {
 	return routing.Requirements{NeedsImage: requestNeedsImage(req.Path, req.Model)}
 }
 
-func hostForwardReasoningEffort(req *pb.HostForwardRequest) string {
-	if req == nil {
-		return ""
-	}
-	return parseBody(req.Body, protoHeadersToHTTPHost(req.Headers).Get("Content-Type")).ReasoningEffort
+func hostForwardReasoningEffort(req hostForwardRequest) string {
+	return parseBody(hostForwardBody(req.Body), protoHeadersToHTTPHost(req.Headers).Get("Content-Type")).ReasoningEffort
 }
 
 func (h *HostService) resolveHostModel(platform, model string) string {
@@ -1124,7 +1294,7 @@ func (h *HostService) resolveHostModel(platform, model string) string {
 	return models[0].ID
 }
 
-func hostForwardHeaders(req *pb.HostForwardRequest, route routing.Candidate) http.Header {
+func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.Header {
 	headers := protoHeadersToHTTPHost(req.Headers)
 	headers.Set("X-Forwarded-Path", req.Path)
 	headers.Set("X-Forwarded-Method", req.Method)
@@ -1204,32 +1374,80 @@ func hostForwardInsufficientQuotaError() error {
 	return status.Error(codes.ResourceExhausted, "余额不足")
 }
 
-func protoHeadersToHTTPHost(ph map[string]*pb.HeaderValues) http.Header {
+func protoHeadersToHTTPHost(ph map[string]interface{}) http.Header {
 	h := make(http.Header, len(ph))
 	for k, v := range ph {
-		if v != nil {
-			h[k] = v.Values
+		switch values := v.(type) {
+		case []string:
+			h[k] = append([]string(nil), values...)
+		case []interface{}:
+			for _, item := range values {
+				h.Add(k, fmt.Sprint(item))
+			}
+		case map[string]interface{}:
+			if raw, ok := values["values"]; ok {
+				switch vv := raw.(type) {
+				case []interface{}:
+					for _, item := range vv {
+						h.Add(k, fmt.Sprint(item))
+					}
+				case []string:
+					h[k] = append([]string(nil), vv...)
+				case string:
+					h.Set(k, vv)
+				}
+			}
+		case string:
+			h.Set(k, values)
+		default:
+			if v != nil {
+				h.Set(k, fmt.Sprint(v))
+			}
 		}
 	}
 	return h
 }
 
-func httpHeadersToProtoHost(h http.Header) map[string]*pb.HeaderValues {
-	ph := make(map[string]*pb.HeaderValues, len(h))
+func httpHeadersToProtoHost(h http.Header) map[string]interface{} {
+	ph := make(map[string]interface{}, len(h))
 	for k, v := range h {
-		ph[k] = &pb.HeaderValues{Values: v}
+		ph[k] = append([]string(nil), v...)
 	}
 	return ph
 }
 
+func hostForwardBody(raw interface{}) []byte {
+	switch v := raw.(type) {
+	case nil:
+		return nil
+	case []byte:
+		return v
+	case string:
+		return []byte(v)
+	case json.RawMessage:
+		return []byte(v)
+	default:
+		body, _ := json.Marshal(v)
+		return body
+	}
+}
+
+func mustHostPayload(payload map[string]interface{}) []byte {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return []byte(`{"error":"payload encode failed"}`)
+	}
+	return data
+}
+
 // errProbeResp 构造一个失败的 probe response（不通过 gRPC error 返回，
 // 让插件能拿到 latency_ms 和 error_kind 写入自己的 health 表）。
-func errProbeResp(kind, msg string, start time.Time) *pb.HostProbeForwardResponse {
-	return &pb.HostProbeForwardResponse{
-		Success:   false,
-		ErrorKind: kind,
-		ErrorMsg:  truncateProbeErr(msg),
-		LatencyMs: time.Since(start).Milliseconds(),
+func errProbeResp(kind, msg string, start time.Time) map[string]interface{} {
+	return map[string]interface{}{
+		"success":    false,
+		"error_kind": kind,
+		"error_msg":  truncateProbeErr(msg),
+		"latency_ms": time.Since(start).Milliseconds(),
 	}
 }
 

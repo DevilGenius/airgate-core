@@ -14,15 +14,11 @@ import (
 	"sync"
 	"time"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 )
-
-// reauthRequiredPrefix 与 airgate-openai 插件 ReauthRequiredPrefix 保持一致；
-// 经 gRPC 透传后只能按字符串识别，不能直接 errors.Is。
-const reauthRequiredPrefix = "reauth_required: "
 
 // PluginCatalog 账号域需要的插件能力集合。
 type PluginCatalog interface {
@@ -1073,10 +1069,16 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	quota, err := inst.Gateway.QueryQuota(callCtx, cloneStringMap(item.Credentials))
+	quota, err := s.queryQuotaRefresh(callCtx, inst, item)
 	if err != nil {
-		// 识别插件返回的 reauth_required 前缀（字符串识别，gRPC 不透传 sentinel error）。
-		if strings.Contains(err.Error(), reauthRequiredPrefix) {
+		if errors.Is(err, ErrQuotaRefreshUnsupported) {
+			logger.Warn("account_credential_validation_failed",
+				sdk.LogFieldAccountID, item.ID,
+				sdk.LogFieldPlatform, item.Platform,
+				sdk.LogFieldReason, "quota_refresh_unsupported")
+			return QuotaRefreshResult{}, ErrQuotaRefreshUnsupported
+		}
+		if errors.Is(err, ErrReauthRequired) {
 			logger.Warn("account_credential_validation_failed",
 				sdk.LogFieldAccountID, item.ID,
 				sdk.LogFieldPlatform, item.Platform,
@@ -1091,7 +1093,7 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 	}
 
 	// refresh_warning 是降级信号，不落库；取出后从 Extra 删除，避免写入 credentials。
-	var warning string
+	warning := quota.ReauthWarning
 	if quota.Extra != nil {
 		if w, ok := quota.Extra["refresh_warning"]; ok {
 			warning = w
@@ -1122,7 +1124,7 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 	}
 
 	if probeUsage {
-		// 顺手触发一次用量强制重探测：QueryQuota 只负责刷订阅信息（plan_type / 过期时间），
+		// 顺手触发一次用量强制重探测：账号额度刷新只负责刷订阅信息（plan_type / 过期时间），
 		// 不动用量窗口缓存。用户点"刷新"时如果账号从没探测过，还是看不到 5h/7d 进度条。
 		// 主动调一次 usage/probe 把窗口数据灌进插件内存缓存，下次 usage/accounts 就能读到。
 		// 探测失败不阻断主流程——订阅信息已经成功返回，窗口数据下一个 5 分钟周期还会再试。
@@ -1138,6 +1140,59 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 		SubscriptionActiveUntil: credentials["subscription_active_until"],
 		ReauthWarning:           warning,
 	}, nil
+}
+
+type quotaRefreshRequest struct {
+	ID          int               `json:"id"`
+	Credentials map[string]string `json:"credentials"`
+}
+
+type quotaRefreshResponse struct {
+	ExpiresAt     string            `json:"expires_at"`
+	Extra         map[string]string `json:"extra"`
+	ErrorCode     string            `json:"error_code"`
+	ErrorMessage  string            `json:"error_message"`
+	ReauthWarning string            `json:"reauth_warning"`
+}
+
+func (s *Service) queryQuotaRefresh(ctx context.Context, inst *plugin.PluginInstance, item Account) (quotaRefreshResponse, error) {
+	reqBody, err := json.Marshal(quotaRefreshRequest{
+		ID:          item.ID,
+		Credentials: cloneStringMap(item.Credentials),
+	})
+	if err != nil {
+		return quotaRefreshResponse{}, err
+	}
+
+	statusCode, _, respBody, err := inst.Gateway.HandleHTTPRequest(ctx, "POST", "accounts/quota", "", nil, reqBody)
+	if err != nil {
+		return quotaRefreshResponse{}, err
+	}
+	if statusCode == http.StatusNotFound || statusCode == http.StatusMethodNotAllowed {
+		return quotaRefreshResponse{}, ErrQuotaRefreshUnsupported
+	}
+	if statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden {
+		var resp quotaRefreshResponse
+		_ = json.Unmarshal(respBody, &resp)
+		if resp.ErrorCode == "reauth_required" {
+			return quotaRefreshResponse{}, ErrReauthRequired
+		}
+		return quotaRefreshResponse{}, ErrReauthRequired
+	}
+	if statusCode < http.StatusOK || statusCode >= http.StatusMultipleChoices {
+		return quotaRefreshResponse{}, fmt.Errorf("刷新额度失败: HTTP %d", statusCode)
+	}
+
+	var resp quotaRefreshResponse
+	if len(respBody) > 0 {
+		if err := json.Unmarshal(respBody, &resp); err != nil {
+			return quotaRefreshResponse{}, fmt.Errorf("刷新额度失败: %w", err)
+		}
+	}
+	if resp.ErrorCode == "reauth_required" {
+		return quotaRefreshResponse{}, ErrReauthRequired
+	}
+	return resp, nil
 }
 
 // triggerUsageProbe 调用插件的 usage/probe 路径强制重探测单账号用量窗口。

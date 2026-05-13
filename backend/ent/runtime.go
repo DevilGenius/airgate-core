@@ -14,6 +14,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/schema"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
+	"github.com/DouDOU-start/airgate-core/ent/task"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
@@ -301,6 +302,94 @@ func init() {
 	setting.DefaultUpdatedAt = settingDescUpdatedAt.Default.(func() time.Time)
 	// setting.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	setting.UpdateDefaultUpdatedAt = settingDescUpdatedAt.UpdateDefault.(func() time.Time)
+	taskFields := schema.Task{}.Fields()
+	_ = taskFields
+	// taskDescPluginID is the schema descriptor for plugin_id field.
+	taskDescPluginID := taskFields[0].Descriptor()
+	// task.PluginIDValidator is a validator for the "plugin_id" field. It is called by the builders before save.
+	task.PluginIDValidator = taskDescPluginID.Validators[0].(func(string) error)
+	// taskDescTaskType is the schema descriptor for task_type field.
+	taskDescTaskType := taskFields[1].Descriptor()
+	// task.TaskTypeValidator is a validator for the "task_type" field. It is called by the builders before save.
+	task.TaskTypeValidator = taskDescTaskType.Validators[0].(func(string) error)
+	// taskDescStage is the schema descriptor for stage field.
+	taskDescStage := taskFields[3].Descriptor()
+	// task.DefaultStage holds the default value on creation for the stage field.
+	task.DefaultStage = taskDescStage.Default.(string)
+	// taskDescUserID is the schema descriptor for user_id field.
+	taskDescUserID := taskFields[4].Descriptor()
+	// task.UserIDValidator is a validator for the "user_id" field. It is called by the builders before save.
+	task.UserIDValidator = taskDescUserID.Validators[0].(func(int) error)
+	// taskDescInput is the schema descriptor for input field.
+	taskDescInput := taskFields[5].Descriptor()
+	// task.DefaultInput holds the default value on creation for the input field.
+	task.DefaultInput = taskDescInput.Default.(map[string]interface{})
+	// taskDescOutput is the schema descriptor for output field.
+	taskDescOutput := taskFields[6].Descriptor()
+	// task.DefaultOutput holds the default value on creation for the output field.
+	task.DefaultOutput = taskDescOutput.Default.(map[string]interface{})
+	// taskDescAttributes is the schema descriptor for attributes field.
+	taskDescAttributes := taskFields[7].Descriptor()
+	// task.DefaultAttributes holds the default value on creation for the attributes field.
+	task.DefaultAttributes = taskDescAttributes.Default.(map[string]interface{})
+	// taskDescExecution is the schema descriptor for execution field.
+	taskDescExecution := taskFields[8].Descriptor()
+	// task.DefaultExecution holds the default value on creation for the execution field.
+	task.DefaultExecution = taskDescExecution.Default.(map[string]interface{})
+	// taskDescErrorType is the schema descriptor for error_type field.
+	taskDescErrorType := taskFields[9].Descriptor()
+	// task.DefaultErrorType holds the default value on creation for the error_type field.
+	task.DefaultErrorType = taskDescErrorType.Default.(string)
+	// taskDescErrorCode is the schema descriptor for error_code field.
+	taskDescErrorCode := taskFields[10].Descriptor()
+	// task.DefaultErrorCode holds the default value on creation for the error_code field.
+	task.DefaultErrorCode = taskDescErrorCode.Default.(string)
+	// taskDescErrorMessage is the schema descriptor for error_message field.
+	taskDescErrorMessage := taskFields[11].Descriptor()
+	// task.DefaultErrorMessage holds the default value on creation for the error_message field.
+	task.DefaultErrorMessage = taskDescErrorMessage.Default.(string)
+	// taskDescProgress is the schema descriptor for progress field.
+	taskDescProgress := taskFields[13].Descriptor()
+	// task.DefaultProgress holds the default value on creation for the progress field.
+	task.DefaultProgress = taskDescProgress.Default.(int)
+	// task.ProgressValidator is a validator for the "progress" field. It is called by the builders before save.
+	task.ProgressValidator = func() func(int) error {
+		validators := taskDescProgress.Validators
+		fns := [...]func(int) error{
+			validators[0].(func(int) error),
+			validators[1].(func(int) error),
+		}
+		return func(progress int) error {
+			for _, fn := range fns {
+				if err := fn(progress); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// taskDescPriority is the schema descriptor for priority field.
+	taskDescPriority := taskFields[14].Descriptor()
+	// task.DefaultPriority holds the default value on creation for the priority field.
+	task.DefaultPriority = taskDescPriority.Default.(int)
+	// taskDescAttempts is the schema descriptor for attempts field.
+	taskDescAttempts := taskFields[15].Descriptor()
+	// task.DefaultAttempts holds the default value on creation for the attempts field.
+	task.DefaultAttempts = taskDescAttempts.Default.(int)
+	// taskDescMaxAttempts is the schema descriptor for max_attempts field.
+	taskDescMaxAttempts := taskFields[16].Descriptor()
+	// task.DefaultMaxAttempts holds the default value on creation for the max_attempts field.
+	task.DefaultMaxAttempts = taskDescMaxAttempts.Default.(int)
+	// taskDescCreatedAt is the schema descriptor for created_at field.
+	taskDescCreatedAt := taskFields[18].Descriptor()
+	// task.DefaultCreatedAt holds the default value on creation for the created_at field.
+	task.DefaultCreatedAt = taskDescCreatedAt.Default.(func() time.Time)
+	// taskDescUpdatedAt is the schema descriptor for updated_at field.
+	taskDescUpdatedAt := taskFields[19].Descriptor()
+	// task.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	task.DefaultUpdatedAt = taskDescUpdatedAt.Default.(func() time.Time)
+	// task.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	task.UpdateDefaultUpdatedAt = taskDescUpdatedAt.UpdateDefault.(func() time.Time)
 	usagelogFields := schema.UsageLog{}.Fields()
 	_ = usagelogFields
 	// usagelogDescPlatform is the schema descriptor for platform field.

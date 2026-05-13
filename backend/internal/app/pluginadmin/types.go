@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Manager 定义插件管理服务所需能力。
