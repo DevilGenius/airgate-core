@@ -12,6 +12,8 @@ import (
 
 	goplugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/DouDOU-start/airgate-sdk/protocol/proto"
 	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
@@ -396,7 +398,7 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 						sdk.LogFieldPluginID, canonicalName,
 						"task_types", taskTypes,
 					)
-				} else if err != nil {
+				} else if err != nil && !isOptionalTaskExtensionUnavailable(err) {
 					slog.Debug("gateway_plugin_task_support_unavailable",
 						sdk.LogFieldPluginID, canonicalName,
 						sdk.LogFieldError, err,
@@ -692,4 +694,8 @@ func (m *Manager) StopAll(ctx context.Context) {
 	for _, name := range names {
 		m.stopPlugin(name)
 	}
+}
+
+func isOptionalTaskExtensionUnavailable(err error) bool {
+	return status.Code(err) == codes.Unimplemented
 }
