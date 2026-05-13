@@ -22,6 +22,56 @@ function buildQuotas(q: { daily: string; weekly: string; monthly: string }): Rec
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
+type ImagePrices = {
+  oneK: string;
+  twoK: string;
+  fourK: string;
+};
+
+const IMAGE_PRICE_FIELDS: Array<{ key: keyof ImagePrices; setting: string; label: string }> = [
+  { key: 'oneK', setting: 'image_price_1k', label: '1K' },
+  { key: 'twoK', setting: 'image_price_2k', label: '2K' },
+  { key: 'fourK', setting: 'image_price_4k', label: '4K' },
+];
+
+function parseImagePrices(settings?: Record<string, Record<string, string>>): ImagePrices {
+  const openai = settings?.openai ?? {};
+  return {
+    oneK: openai.image_price_1k ?? '',
+    twoK: openai.image_price_2k ?? '',
+    fourK: openai.image_price_4k ?? '',
+  };
+}
+
+function clonePluginSettings(
+  settings?: Record<string, Record<string, string>>,
+): Record<string, Record<string, string>> {
+  const result: Record<string, Record<string, string>> = {};
+  for (const [plugin, values] of Object.entries(settings ?? {})) {
+    result[plugin] = { ...values };
+  }
+  return result;
+}
+
+function buildOpenAISettings(
+  current: Record<string, string> | undefined,
+  imageEnabled: boolean,
+  prices: ImagePrices,
+): Record<string, string> {
+  const settings: Record<string, string> = { ...(current ?? {}), image_enabled: imageEnabled ? 'true' : 'false' };
+
+  for (const field of IMAGE_PRICE_FIELDS) {
+    delete settings[field.setting];
+    const raw = prices[field.key].trim();
+    if (raw === '') continue;
+    const value = Number(raw);
+    if (Number.isFinite(value) && value >= 0) {
+      settings[field.setting] = raw;
+    }
+  }
+  return settings;
+}
+
 export function GroupFormModal({
   open,
   title,
@@ -58,6 +108,7 @@ export function GroupFormModal({
   const [quotas, setQuotas] = useState(parseQuotas(group?.quotas as Record<string, unknown> | undefined));
   const [claudeCodeOnly, setClaudeCodeOnly] = useState(group?.plugin_settings?.claude?.claude_code_only === 'true');
   const [imageEnabled, setImageEnabled] = useState(group?.plugin_settings?.openai?.image_enabled === 'true');
+  const [imagePrices, setImagePrices] = useState<ImagePrices>(() => parseImagePrices(group?.plugin_settings));
   const [copyFromGroupIds, setCopyFromGroupIds] = useState<number[]>([]);
 
   const { data: copySourceData } = useQuery({
@@ -97,12 +148,15 @@ export function GroupFormModal({
   const handleSubmit = () => {
     if (!isEdit && (!form.name || !form.platform)) return;
 
-    const pluginSettings: Record<string, Record<string, string>> = {};
+    const pluginSettings = clonePluginSettings(group?.plugin_settings);
     if (form.platform === 'claude') {
-      pluginSettings.claude = { claude_code_only: claudeCodeOnly ? 'true' : 'false' };
+      pluginSettings.claude = {
+        ...(pluginSettings.claude ?? {}),
+        claude_code_only: claudeCodeOnly ? 'true' : 'false',
+      };
     }
     if (form.platform === 'openai') {
-      pluginSettings.openai = { image_enabled: imageEnabled ? 'true' : 'false' };
+      pluginSettings.openai = buildOpenAISettings(pluginSettings.openai, imageEnabled, imagePrices);
     }
 
     onSubmit({
@@ -361,10 +415,37 @@ export function GroupFormModal({
         ) : null}
 
         {form.platform === 'openai' ? (
-          <Switch isSelected={imageEnabled} onChange={setImageEnabled}>
-            <Switch.Control><Switch.Thumb /></Switch.Control>
-            <Switch.Content>图片生成</Switch.Content>
-          </Switch>
+          <div className="space-y-3">
+            <Switch isSelected={imageEnabled} onChange={setImageEnabled}>
+              <Switch.Control><Switch.Thumb /></Switch.Control>
+              <Switch.Content>{t('groups.image_generation')}</Switch.Content>
+            </Switch>
+
+            {imageEnabled ? (
+              <div>
+                <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
+                  {t('groups.image_pricing')}
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  {IMAGE_PRICE_FIELDS.map((field) => (
+                    <HeroTextField key={field.key} fullWidth>
+                      <Label>{field.label}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.000001"
+                        value={imagePrices[field.key]}
+                        onChange={(e) =>
+                          setImagePrices((current) => ({ ...current, [field.key]: e.target.value }))
+                        }
+                        placeholder={t('groups.image_price_fallback')}
+                      />
+                    </HeroTextField>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {form.subscription_type === 'subscription' ? (

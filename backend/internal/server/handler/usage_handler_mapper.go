@@ -74,6 +74,7 @@ func toCustomerUsageLogResp(record appusage.LogRecord) dto.CustomerUsageLogResp 
 		Stream:            record.Stream,
 		DurationMs:        record.DurationMs,
 		FirstTokenMs:      record.FirstTokenMs,
+		Endpoint:          record.Endpoint,
 		CreatedAt:         record.CreatedAt,
 	}
 }

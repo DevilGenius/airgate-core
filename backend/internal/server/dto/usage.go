@@ -67,6 +67,7 @@ type CustomerUsageLogResp struct {
 	Stream            bool    `json:"stream"`
 	DurationMs        int64   `json:"duration_ms"`
 	FirstTokenMs      int64   `json:"first_token_ms"`
+	Endpoint          string  `json:"endpoint,omitempty"`
 	CreatedAt         string  `json:"created_at"`
 }
 

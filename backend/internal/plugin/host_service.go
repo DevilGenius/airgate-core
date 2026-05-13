@@ -853,14 +853,18 @@ func (h *HostService) recordHostForwardUsage(
 		return
 	}
 
-	calc := h.calculator.Calculate(billing.CalculateInput{
+	calcInput := billing.CalculateInput{
 		InputCost:         usage.InputCost,
 		OutputCost:        usage.OutputCost,
 		CachedInputCost:   usage.CachedInputCost,
 		CacheCreationCost: usage.CacheCreationCost,
 		BillingRate:       route.EffectiveRate,
 		AccountRate:       accFull.RateMultiplier,
-	})
+	}
+	if override, ok := imageOutputBillingOverride(usage, route.GroupPluginSettings); ok {
+		calcInput.OutputBillingCostOverride = &override
+	}
+	calc := h.calculator.Calculate(calcInput)
 
 	h.scheduler.AddWindowCost(ctx, accountID, calc.AccountCost)
 
@@ -1136,7 +1140,7 @@ func hostForwardHeaders(req *pb.HostForwardRequest, route routing.Candidate) htt
 	}
 	for plugin, kv := range route.GroupPluginSettings {
 		for k, v := range kv {
-			if v == "" {
+			if v == "" || !shouldForwardPluginSetting(plugin, k) {
 				continue
 			}
 			headers.Set("X-Airgate-Plugin-"+canonicalHeaderToken(plugin)+"-"+canonicalHeaderToken(k), v)

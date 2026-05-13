@@ -194,7 +194,7 @@ export default function GroupsPage() {
                 </CommonTable.Row>
               ) : (
                 rows.map((row) => (
-                  <CommonTable.Row id={String(row.id)} key={row.id}>
+                    <CommonTable.Row id={String(row.id)} key={row.id}>
                     <CommonTable.Cell>
                       <span className="inline-flex items-center gap-1.5">
                         <Layers className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
@@ -215,9 +215,11 @@ export default function GroupsPage() {
                       </Chip>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
-                        {row.rate_multiplier}x
-                      </span>
+                      <div className="min-w-0">
+                        <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
+                          {row.rate_multiplier}x
+                        </span>
+                      </div>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       {row.is_exclusive ? (
@@ -304,7 +306,7 @@ export default function GroupsPage() {
                         </Button>
                       </div>
                     </CommonTable.Cell>
-                  </CommonTable.Row>
+                    </CommonTable.Row>
                 ))
               )}
             </CommonTable.Body>
