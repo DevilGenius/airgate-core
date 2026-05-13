@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"strconv"
 	"strings"
 
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
@@ -37,19 +38,10 @@ func usageSnapshotFromSDK(usage *sdk.Usage) usageSnapshot {
 	}
 	snap := usageSnapshot{FirstTokenMs: usage.FirstTokenMs}
 
-	accountCost := usage.AccountCost
-	if accountCost <= 0 {
-		for _, metric := range usage.Metrics {
-			accountCost += metric.AccountCost
-		}
-		for _, detail := range usage.CostDetails {
-			accountCost += detail.AccountCost
-		}
-	}
-	snap.InputCost = accountCost
-
 	for _, metric := range usage.Metrics {
 		key := normalizedUsageKey(metric.Key, metric.Kind, metric.Label)
+		applyUsageCost(&snap, key, metric.AccountCost)
+		applyUsagePrice(&snap, key, metric.Metadata)
 		switch key {
 		case "input_tokens", "input_token", "prompt_tokens", "prompt_token":
 			snap.InputTokens += int(metric.Value)
@@ -66,6 +58,24 @@ func usageSnapshotFromSDK(usage *sdk.Usage) usageSnapshot {
 		case "reasoning_output_tokens", "reasoning_tokens", "reasoning_token":
 			snap.ReasoningOutputTokens += int(metric.Value)
 		}
+	}
+
+	for _, detail := range usage.CostDetails {
+		key := normalizedUsageKey(detail.Key, "", detail.Label)
+		applyUsageCost(&snap, key, detail.AccountCost)
+		applyUsagePrice(&snap, key, detail.Metadata)
+	}
+	if snap.InputCost+snap.OutputCost+snap.CachedInputCost+snap.CacheCreationCost <= 0 {
+		accountCost := usage.AccountCost
+		if accountCost <= 0 {
+			for _, metric := range usage.Metrics {
+				accountCost += metric.AccountCost
+			}
+			for _, detail := range usage.CostDetails {
+				accountCost += detail.AccountCost
+			}
+		}
+		snap.InputCost = accountCost
 	}
 
 	for _, attr := range usage.Attributes {
@@ -92,6 +102,49 @@ func usageSnapshotFromSDK(usage *sdk.Usage) usageSnapshot {
 	}
 
 	return snap
+}
+
+func applyUsageCost(snap *usageSnapshot, key string, cost float64) {
+	if snap == nil || cost <= 0 {
+		return
+	}
+	switch key {
+	case "input", "input_tokens", "input_token", "prompt_tokens", "prompt_token":
+		snap.InputCost += cost
+	case "output", "output_tokens", "output_token", "completion_tokens", "completion_token",
+		"image", "images", "image_generation", "image_tool":
+		snap.OutputCost += cost
+	case "cached_input", "cached_input_tokens", "cached_input_token", "cache_read_tokens", "cache_read_token":
+		snap.CachedInputCost += cost
+	case "cache_creation", "cache_creation_tokens", "cache_creation_token",
+		"cache_creation_5m", "cache_creation_5m_tokens", "cache_creation_5m_token",
+		"cache_creation_1h", "cache_creation_1h_tokens", "cache_creation_1h_token":
+		snap.CacheCreationCost += cost
+	}
+}
+
+func applyUsagePrice(snap *usageSnapshot, key string, metadata map[string]string) {
+	if snap == nil || len(metadata) == 0 {
+		return
+	}
+	price, err := strconv.ParseFloat(strings.TrimSpace(metadata["unit_price"]), 64)
+	if err != nil || price <= 0 {
+		return
+	}
+	switch key {
+	case "input", "input_tokens", "input_token", "prompt_tokens", "prompt_token":
+		snap.InputPrice = price
+	case "output", "output_tokens", "output_token", "completion_tokens", "completion_token",
+		"image", "images", "image_generation", "image_tool":
+		snap.OutputPrice = price
+	case "cached_input", "cached_input_tokens", "cached_input_token", "cache_read_tokens", "cache_read_token":
+		snap.CachedInputPrice = price
+	case "cache_creation", "cache_creation_tokens", "cache_creation_token",
+		"cache_creation_5m", "cache_creation_5m_tokens", "cache_creation_5m_token":
+		snap.CacheCreationPrice = price
+	case "cache_creation_1h", "cache_creation_1h_tokens", "cache_creation_1h_token":
+		snap.CacheCreation1hPrice = price
+	}
 }
 
 func normalizedUsageKey(parts ...string) string {

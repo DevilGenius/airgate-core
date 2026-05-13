@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 const (
@@ -17,10 +17,11 @@ const (
 )
 
 func imageOutputBillingOverride(usage *sdk.Usage, settings map[string]map[string]string) (float64, bool) {
-	if usage == nil || strings.TrimSpace(usage.ImageSize) == "" || usage.OutputCost <= 0 {
+	snap := usageSnapshotFromSDK(usage)
+	if strings.TrimSpace(snap.ImageSize) == "" || snap.OutputCost <= 0 {
 		return 0, false
 	}
-	tier, basePrice, ok := imageTierForSize(usage.ImageSize)
+	tier, basePrice, ok := imageTierForSize(snap.ImageSize)
 	if !ok || basePrice <= 0 {
 		return 0, false
 	}
@@ -28,7 +29,7 @@ func imageOutputBillingOverride(usage *sdk.Usage, settings map[string]map[string
 	if !ok {
 		return 0, false
 	}
-	imageCount := int(math.Round(usage.OutputCost / basePrice))
+	imageCount := int(math.Round(snap.OutputCost / basePrice))
 	if imageCount < 1 {
 		imageCount = 1
 	}

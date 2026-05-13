@@ -4,13 +4,17 @@ import (
 	"math"
 	"testing"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 func TestImageOutputBillingOverride_UsesConfiguredTier(t *testing.T) {
 	usage := &sdk.Usage{
-		OutputCost: 0.40,
-		ImageSize:  "1672x941",
+		Attributes: []sdk.UsageAttribute{
+			{Key: "image_size", Value: "1672x941"},
+		},
+		CostDetails: []sdk.UsageCostDetail{
+			{Key: "images", AccountCost: 0.40},
+		},
 	}
 	settings := map[string]map[string]string{
 		"openai": {
@@ -29,8 +33,12 @@ func TestImageOutputBillingOverride_UsesConfiguredTier(t *testing.T) {
 
 func TestImageOutputBillingOverride_FallsBackWhenTierUnset(t *testing.T) {
 	usage := &sdk.Usage{
-		OutputCost: 0.40,
-		ImageSize:  "3840x2160",
+		Attributes: []sdk.UsageAttribute{
+			{Key: "image_size", Value: "3840x2160"},
+		},
+		CostDetails: []sdk.UsageCostDetail{
+			{Key: "images", AccountCost: 0.40},
+		},
 	}
 	settings := map[string]map[string]string{
 		"openai": {
