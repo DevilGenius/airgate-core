@@ -3,7 +3,7 @@ import type {
   AccountSurfaceProps,
   PluginFrontendModule,
   PluginPlatformIconProps,
-} from '@airgate/theme/plugin';
+} from '@doudou-start/airgate-theme/plugin';
 
 function wrapPluginComponent<TProps extends object>(
   Component: ComponentType<TProps>,

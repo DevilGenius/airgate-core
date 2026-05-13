@@ -1019,7 +1019,7 @@ func (w *hostStreamWriter) Write(data []byte) (int, error) {
 
 func (w *hostStreamWriter) Flush() {}
 
-// recordHostForwardUsage 为 Host.Forward 发起的请求记录 usage_log 并扣费。
+// recordHostForwardUsage 为 Host gateway.forward 调用发起的请求记录 usage_log 并扣费。
 // 与 forwarder.recordUsage 的区别：没有 APIKeyInfo，APIKeyID=0。
 func (h *HostService) recordHostForwardUsage(
 	ctx context.Context,

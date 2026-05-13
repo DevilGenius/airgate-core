@@ -87,15 +87,16 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = 'airgate:sidebar:collapsed';
  *   audience = "all"                     — 所有登录用户可见，按当前角色挂分组
  */
 function pluginPagePath(pluginName: string, pagePath: string) {
-  // airgate-playground 走全屏 /chat 独立布局，不挂在 AppShell 里
-  if (pluginName === 'airgate-playground' && pagePath === '/playground') {
-    return '/chat';
+  // airgate-playground 走全屏独立布局，不挂在 AppShell 里
+  if (pluginName === 'airgate-playground') {
+    if (pagePath === '/playground') return '/chat';
+    if (pagePath === '/studio') return '/studio';
   }
   return `/plugins/${pluginName}${pagePath}`;
 }
 
 function isPlaygroundPluginPath(path: string) {
-  return path === '/chat' || path === '/plugins/playground' || path.includes('/plugins/airgate-playground/');
+  return path === '/chat' || path === '/studio' || path === '/plugins/playground' || path.includes('/plugins/airgate-playground/');
 }
 
 function usePluginMenuItems(isAdmin: boolean): {

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { injectThemeStyle, setTheme, getStoredTheme, type ThemeName } from '@airgate/theme';
+import { injectThemeStyle, setTheme, getStoredTheme, type ThemeName } from '@doudou-start/airgate-theme';
 
 interface ThemeContextValue {
   theme: ThemeName;

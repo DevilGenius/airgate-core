@@ -173,23 +173,17 @@ function ActionButton({
   label,
   onClick,
   danger = false,
-  disabled = false,
-  busy = false,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
   danger?: boolean;
-  disabled?: boolean;
-  busy?: boolean;
 }) {
   return (
     <Button
       size="sm"
       variant="outline"
       className={`ag-bulk-action-button min-w-0 max-w-full shrink-0 items-center gap-1.5 leading-none ${danger ? 'text-danger' : ''}`}
-      isDisabled={disabled}
-      aria-busy={busy}
       onPress={onClick}
     >
       {icon}

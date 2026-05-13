@@ -3,7 +3,7 @@
 # 变量
 BACKEND_DIR := backend
 WEB_DIR := web
-SDK_FRONTEND := ../airgate-sdk/frontend
+SDK_THEME := ../airgate-sdk/theme
 # 插件前端目录。所有插件 dev watch 都输出到自己的 web/dist；core 的
 # servePluginAsset handler 在 dev 模式下从 <plugin>/web/dist 读，prod 模式从
 # data/plugins/<id>/assets 读。这样三个插件的 dev 体验完全一致，没有特例。
@@ -51,7 +51,7 @@ dev: ## 同时启动 SDK watch + 插件 watch + 前后端开发服务器
 	@wait
 
 dev-sdk: ## 启动 SDK 主题 watch 模式（修改 token 自动编译）
-	@cd $(SDK_FRONTEND) && npm run dev
+	@cd $(SDK_THEME) && npm run dev
 
 dev-plugins: ## 启动所有插件前端 watch 模式
 	@echo "启动插件前端 watch（统一输出到 <plugin>/web/dist，core 在 dev 模式下直读）："
@@ -153,6 +153,7 @@ build-plugins: sync-plugins ## 构建插件前端并同步到 core
 
 sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 	@if [ -d $(OPENAI_PLUGIN) ]; then \
+		set -e; \
 		echo "构建并同步 openai 插件前端..."; \
 		(cd $(OPENAI_PLUGIN) && npm run build); \
 		mkdir -p $(OPENAI_ASSETS); \
@@ -162,6 +163,7 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 		echo "跳过 openai 插件前端构建：$(OPENAI_PLUGIN) 不存在"; \
 	fi
 	@if [ -d $(CLAUDE_PLUGIN) ]; then \
+		set -e; \
 		echo "构建并同步 claude 插件前端..."; \
 		(cd $(CLAUDE_PLUGIN) && npm run build); \
 		mkdir -p $(CLAUDE_ASSETS); \
@@ -171,6 +173,7 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 		echo "跳过 claude 插件前端构建：$(CLAUDE_PLUGIN) 不存在"; \
 	fi
 	@if [ -d $(PLAYGROUND_DIR) ]; then \
+		set -e; \
 		echo "构建并同步 playground 插件前端..."; \
 		$(MAKE) -C $(PLAYGROUND_DIR) webdist; \
 		mkdir -p $(PLAYGROUND_ASSETS); \
@@ -180,6 +183,7 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 		echo "跳过 playground 插件前端构建：$(PLAYGROUND_DIR) 不存在"; \
 	fi
 	@if [ -d $(EPAY_PLUGIN) ]; then \
+		set -e; \
 		echo "构建并同步 epay 插件前端..."; \
 		(cd $(EPAY_PLUGIN) && npm run build); \
 		mkdir -p $(EPAY_ASSETS); \
@@ -189,6 +193,7 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 		echo "跳过 epay 插件前端构建：$(EPAY_PLUGIN) 不存在"; \
 	fi
 	@if [ -d $(HEALTH_PLUGIN) ]; then \
+		set -e; \
 		echo "构建并同步 health 插件前端..."; \
 		(cd $(HEALTH_PLUGIN) && npm run build); \
 		mkdir -p $(HEALTH_ASSETS); \
@@ -198,6 +203,7 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 		echo "跳过 health 插件前端构建：$(HEALTH_PLUGIN) 不存在"; \
 	fi
 	@if [ -d $(KIRO_PLUGIN) ]; then \
+		set -e; \
 		echo "构建并同步 kiro 插件前端..."; \
 		(cd $(KIRO_PLUGIN) && npm run build); \
 		mkdir -p $(KIRO_ASSETS); \
@@ -266,15 +272,19 @@ setup-hooks: ## 安装 Git pre-commit hook
 
 # ===================== 依赖安装 =====================
 
-install: setup-hooks ## 安装全部依赖（含 SDK 前端构建、插件前端依赖、首次 webdist 构建）
-	@cd $(SDK_FRONTEND) && npm install && npm run build && echo "SDK 前端构建完成"
+install: setup-hooks ## 安装全部依赖（含 SDK 主题构建、插件前端依赖、首次 webdist 构建）
+	@cd $(SDK_THEME) && npm install && npm run build && echo "SDK 主题构建完成"
 	@cd $(BACKEND_DIR) && $(GO) mod download
 	@rm -rf $(WEB_DIR)/node_modules/.vite
 	@cd $(WEB_DIR) && npm install
-	@for p in $(OPENAI_PLUGIN) $(CLAUDE_PLUGIN) $(PLAYGROUND_PLUGIN) $(EPAY_PLUGIN) $(HEALTH_PLUGIN); do \
+	@for p in $(OPENAI_PLUGIN) $(CLAUDE_PLUGIN) $(PLAYGROUND_PLUGIN) $(EPAY_PLUGIN) $(HEALTH_PLUGIN) $(KIRO_PLUGIN); do \
 		if [ -d $$p ]; then \
 			echo "安装插件前端依赖: $$p"; \
-			cd $$p && npm install && cd - > /dev/null; \
+			if [ -f $$p/pnpm-lock.yaml ] && [ ! -f $$p/package-lock.json ]; then \
+				cd $$p && pnpm install && cd - > /dev/null; \
+			else \
+				cd $$p && npm install && cd - > /dev/null; \
+			fi; \
 		fi; \
 	done
 	@command -v air > /dev/null 2>&1 || (echo "安装 air（热重载工具）..."; $(GO) install github.com/air-verse/air@latest)

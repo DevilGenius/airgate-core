@@ -686,7 +686,7 @@ func (s *Service) ensureAccountsSeeded(ctx context.Context, platform string, mer
 }
 
 // getUpstreamUsage 拿到上游账号的 quota 窗口 / credits（带 5 分钟 TTL 内存缓存）。
-// 返回的 map 结构是 map[accountID]map[string]any，对齐 sdk.AccountUsageInfo 的 JSON 形态。
+// 返回的 map 结构是 map[accountID]map[string]any，对齐插件 usage/accounts 的 JSON 形态。
 // 这一层不包含 today_stats，由调用方单独注入。
 func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[string]any, error) {
 	cacheKey := platform

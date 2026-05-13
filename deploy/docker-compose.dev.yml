@@ -45,7 +45,7 @@ services:
       - -lc
       - >-
         set -e;
-        cd /workspace/airgate-sdk/frontend && npm install && npm run build;
+        cd /workspace/airgate-sdk/theme && npm install && npm run build;
         cd /workspace/airgate-core/web && npm install && npm run build
     restart: "no"
 

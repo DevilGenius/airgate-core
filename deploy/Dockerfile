@@ -8,11 +8,11 @@
 FROM node:22-alpine AS frontend
 WORKDIR /build
 
-# 构建 @airgate/theme（airgate-sdk 前端依赖）
-COPY airgate-sdk/frontend/package*.json ./airgate-sdk/frontend/
-RUN cd airgate-sdk/frontend && npm ci
-COPY airgate-sdk/frontend ./airgate-sdk/frontend
-RUN cd airgate-sdk/frontend && npm run build
+# 构建 @doudou-start/airgate-theme（airgate-sdk 主题依赖）
+COPY airgate-sdk/theme/package*.json ./airgate-sdk/theme/
+RUN cd airgate-sdk/theme && npm ci
+COPY airgate-sdk/theme ./airgate-sdk/theme
+RUN cd airgate-sdk/theme && npm run build
 
 # 构建 Core 前端
 COPY airgate-core/web/package*.json ./airgate-core/web/

@@ -32,4 +32,4 @@ export const PIE_CHART_COLORS = [
 ] as const;
 
 /** 头像颜色池（引用 SDK 装饰色） */
-export { decorativePalette as AVATAR_COLORS } from '@airgate/theme';
+export { decorativePalette as AVATAR_COLORS } from '@doudou-start/airgate-theme';

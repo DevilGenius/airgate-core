@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type ComponentType } from 'react';
-import type { AccountFormProps, PluginOAuthBridge } from '@airgate/theme/plugin';
+import type { AccountFormProps, PluginOAuthBridge } from '@doudou-start/airgate-theme/plugin';
 import { pluginsApi } from '../../../shared/api/plugins';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { loadPluginFrontend, onPluginFrontendCacheClear } from '../../../app/plugin-loader';

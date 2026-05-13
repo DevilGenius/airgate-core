@@ -11,7 +11,7 @@
     "type-check": "tsc -b --noEmit"
   },
   "dependencies": {
-    "@airgate/theme": "file:../../airgate-sdk/theme",
+    "@doudou-start/airgate-theme": "file:../../airgate-sdk/theme",
     "@fontsource/geist-mono": "^5.2.7",
     "@fontsource/geist-sans": "^5.2.5",
     "@heroui/react": "^3.0.3",

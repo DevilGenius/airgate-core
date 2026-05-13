@@ -54,7 +54,7 @@ export default defineConfig({
   ],
   optimizeDeps: {
     // SDK 是 file: 链接，不预打包，确保改 token 后立即生效
-    exclude: ['@airgate/theme'],
+    exclude: ['@doudou-start/airgate-theme'],
   },
   build: {
     rollupOptions: {
@@ -75,7 +75,7 @@ export default defineConfig({
       usePolling: true,
       interval: 1000,
       // 监听 SDK 符号链接目标，token 变更后自动热更新
-      ignored: ['!**/node_modules/@airgate/theme/**'],
+      ignored: ['!**/node_modules/@doudou-start/airgate-theme/**'],
     },
     proxy: {
       '/api': BACKEND,

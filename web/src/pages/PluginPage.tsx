@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams } from '@tanstack/react-router';
-import type { PluginFrontendModule } from '@airgate/theme/plugin';
+import type { PluginFrontendModule } from '@doudou-start/airgate-theme/plugin';
 import { loadPluginFrontend } from '../app/plugin-loader';
 import { ChatPageLoading, PageLoading } from '../shared/components/PageLoading';
 

@@ -234,7 +234,7 @@ Core 不应负责：
 - account/OAuth/import action bridge 类型
 - React helper
 
-`@airgate/theme` 负责设计 token 和 theme/CSS helper。
+`@doudou-start/airgate-theme` 负责设计 token 和 theme/CSS helper。
 
 ### 网关插件
 
@@ -588,7 +588,7 @@ Core task 只保存规范化 task metadata、状态、权限、进度、asset re
 | --- | --- | --- |
 | Phase 0 | 停止边界继续扩张 | 不再新增 broad HostService；新 Host API 必须 versioned capability；task API 强制 ownership；Core 不新增 provider image response 解析 |
 | Phase 1 | 用本文评审新增工作 | 每个变更能回答：属于 Core/Gateway/Provider/SDK/UI 哪一层；capability 是否声明；Host API 是否版本化；ownership 是否由 Core 执行；协议兼容是否保持 |
-| Phase 2 | 拆分 SDK 概念 | 逻辑上区分 `airgate-protocol`、`airgate-sdk-go`、`airgate-plugin-runtime-go`、`airgate-devkit-go`、`@airgate/plugin-ui`、`@airgate/theme` |
+| Phase 2 | 拆分 SDK 概念 | 逻辑上区分 `airgate-protocol`、`airgate-sdk-go`、`airgate-plugin-runtime-go`、`airgate-devkit-go`、`@airgate/plugin-ui`、`@doudou-start/airgate-theme` |
 | Phase 3 | 引入 Core service interface | plugin runtime、registry、asset、model catalog、routing、task、asset service、metering/rating/ledger、frontend shell 有清晰内部边界 |
 | Phase 4 | 以 OpenAI 作为样板 | gateway 不知道 ChatGPT OAuth；provider 不拥有 `/v1/...` route；task lifecycle 由 Core 负责；OpenAI-compatible image sync 语义不回退 |
 | Phase 5 | 迁移 Claude、Kiro、Playground | Claude/Kiro 成为 provider adapter 或复用 gateway；Playground 转为 UI-only 产品插件 |

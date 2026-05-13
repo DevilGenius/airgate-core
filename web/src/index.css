@@ -31,7 +31,7 @@
   --ring-offset-width: 2px;
   --cursor-interactive: pointer;
   --cursor-disabled: not-allowed;
-  --skeleton-animation: none;
+  --skeleton-animation: shimmer;
 
   /* HeroUI radius preset */
   --radius: 0.25rem;
@@ -112,7 +112,7 @@
 
 /* ==========================================================================
    03. Tailwind Theme Bridge
-   主题变量由 @airgate/theme (SDK) 运行时注入
+   主题变量由 @doudou-start/airgate-theme (SDK) 运行时注入
    Token 命名与 SDK createTailwindThemeBridge() 对齐
    ========================================================================== */
 
@@ -699,6 +699,18 @@ input[type="number"]::-webkit-outer-spin-button {
     0 12px 28px color-mix(in oklab, black 24%, transparent) !important;
 }
 
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+
+  .modal__backdrop,
+  .modal__backdrop--opaque,
+  .modal__backdrop--blur,
+  .alert-dialog__backdrop,
+  .alert-dialog__backdrop--opaque,
+  .alert-dialog__backdrop--blur {
+    background: color-mix(in oklab, var(--background) 88%, transparent) !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   .modal__backdrop,
@@ -708,8 +720,6 @@ input[type="number"]::-webkit-outer-spin-button {
   .alert-dialog__backdrop--opaque,
   .alert-dialog__backdrop--blur {
     animation: none;
-    -webkit-backdrop-filter: saturate(125%) blur(10px);
-    backdrop-filter: saturate(125%) blur(10px);
   }
 }
 
@@ -1408,6 +1418,11 @@ input[type="number"]::-webkit-outer-spin-button {
   min-width: 0;
   grid-template-columns: minmax(11.25rem, 1fr) 0.25rem minmax(11.25rem, 1fr);
   align-items: start;
+}
+
+.ag-account-usage-layout--centered {
+  display: flex;
+  justify-content: center;
 }
 
 .ag-account-usage-windows {
@@ -2153,4 +2168,23 @@ input[type="number"]::-webkit-outer-spin-button {
   to {
     transform: translateX(365%);
   }
+}
+
+@keyframes ag-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.ag-shimmer {
+  background: linear-gradient(90deg,
+      var(--surface) 25%,
+      color-mix(in oklab, var(--default) 82%, var(--background) 18%) 50%,
+      var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: ag-shimmer 1.5s infinite;
 }
