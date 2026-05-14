@@ -1,7 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from 'react';
+import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField, Tooltip } from '@heroui/react';
+import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField } from '@heroui/react';
 import {
   Plus,
   Pencil,
@@ -39,8 +39,6 @@ import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
-import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
-import { CommonTable } from '../../shared/components/CommonTable';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { BulkActionsBar } from './accounts/BulkActionsBar';
@@ -68,6 +66,115 @@ interface AccountTableColumn {
 }
 
 const UNGROUPED_GROUP_FILTER = '__ungrouped__';
+type SelectionListener = () => void;
+
+function runAfterInputFrame(work: () => void) {
+  if (typeof window === 'undefined') {
+    startTransition(work);
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    window.setTimeout(() => startTransition(work), 0);
+  });
+}
+
+function useLatestRef<T>(value: T) {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+}
+
+class AccountSelectionStore {
+  private selectedIds = new Set<number>();
+  private version = 0;
+  private listeners = new Set<SelectionListener>();
+  private rowListeners = new Map<number, Set<SelectionListener>>();
+
+  subscribe = (listener: SelectionListener) => {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
+
+  subscribeRow = (id: number, listener: SelectionListener) => {
+    let listeners = this.rowListeners.get(id);
+    if (!listeners) {
+      listeners = new Set();
+      this.rowListeners.set(id, listeners);
+    }
+    listeners.add(listener);
+    return () => {
+      listeners?.delete(listener);
+      if (listeners?.size === 0) {
+        this.rowListeners.delete(id);
+      }
+    };
+  };
+
+  getSnapshot = () => this.version;
+
+  has(id: number) {
+    return this.selectedIds.has(id);
+  }
+
+  getSelectedIds() {
+    return Array.from(this.selectedIds);
+  }
+
+  countVisible(ids: number[]) {
+    let count = 0;
+    for (const id of ids) {
+      if (this.selectedIds.has(id)) count += 1;
+    }
+    return count;
+  }
+
+  setRow(id: number, isSelected: boolean) {
+    const alreadySelected = this.selectedIds.has(id);
+    if (alreadySelected === isSelected) return;
+
+    if (isSelected) {
+      this.selectedIds.add(id);
+    } else {
+      this.selectedIds.delete(id);
+    }
+    this.notify([id]);
+  }
+
+  setRows(ids: number[], isSelected: boolean) {
+    const changedIds: number[] = [];
+    for (const id of ids) {
+      const alreadySelected = this.selectedIds.has(id);
+      if (alreadySelected === isSelected) continue;
+      if (isSelected) {
+        this.selectedIds.add(id);
+      } else {
+        this.selectedIds.delete(id);
+      }
+      changedIds.push(id);
+    }
+    if (changedIds.length > 0) {
+      this.notify(changedIds);
+    }
+  }
+
+  clear() {
+    if (this.selectedIds.size === 0) return;
+    const changedIds = Array.from(this.selectedIds);
+    this.selectedIds.clear();
+    this.notify(changedIds);
+  }
+
+  private notify(changedIds: number[]) {
+    this.version += 1;
+    for (const id of changedIds) {
+      this.rowListeners.get(id)?.forEach((listener) => listener());
+    }
+    this.listeners.forEach((listener) => listener());
+  }
+}
 
 function StatusPill({ status, tooltip }: { status: 'active' | 'disabled'; tooltip?: string }) {
   const { t } = useTranslation();
@@ -78,12 +185,7 @@ function StatusPill({ status, tooltip }: { status: 'active' | 'disabled'; toolti
   );
 
   if (!tooltip) return chip;
-  return (
-    <Tooltip>
-      <Tooltip.Trigger>{chip}</Tooltip.Trigger>
-      <Tooltip.Content className="max-w-[360px] whitespace-pre-wrap">{tooltip}</Tooltip.Content>
-    </Tooltip>
-  );
+  return <span className="inline-flex" title={tooltip}>{chip}</span>;
 }
 
 function TableSelectionCheckbox({
@@ -97,18 +199,23 @@ function TableSelectionCheckbox({
   isSelected: boolean;
   onChange: (isSelected: boolean) => void;
 }) {
+  const checkboxRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = !!isIndeterminate;
+    }
+  }, [isIndeterminate]);
+
   return (
-    <Checkbox
+    <input
+      ref={checkboxRef}
+      type="checkbox"
       aria-label={ariaLabel}
-      isIndeterminate={isIndeterminate}
-      isSelected={isSelected}
-      slot={null}
-      onChange={onChange}
-    >
-      <Checkbox.Control>
-        <Checkbox.Indicator />
-      </Checkbox.Control>
-    </Checkbox>
+      checked={isSelected}
+      className="ag-table-selection-checkbox"
+      onChange={(event) => onChange(event.currentTarget.checked)}
+    />
   );
 }
 
@@ -143,15 +250,20 @@ function columnWidthStyle(column: AccountTableColumn): CSSProperties | undefined
 
 const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
   ariaLabel,
-  isSelected,
+  selectionStore,
   rowId,
   onSelectedChange,
 }: {
   ariaLabel: string;
-  isSelected: boolean;
+  selectionStore: AccountSelectionStore;
   rowId: number;
   onSelectedChange: (id: number, isSelected: boolean) => void;
 }) {
+  const isSelected = useSyncExternalStore(
+    useCallback((listener) => selectionStore.subscribeRow(rowId, listener), [rowId, selectionStore]),
+    useCallback(() => selectionStore.has(rowId), [rowId, selectionStore]),
+    () => false,
+  );
   const handleChange = useCallback((nextSelected: boolean) => {
     onSelectedChange(rowId, nextSelected);
   }, [onSelectedChange, rowId]);
@@ -180,6 +292,266 @@ const AccountTableCellContent = memo(function AccountTableCellContent({
     </div>
   );
 }, (prev, next) => prev.column === next.column && prev.row === next.row);
+
+const AccountSchedulingSwitch = memo(function AccountSchedulingSwitch({
+  ariaLabel,
+  isSelected,
+  rowId,
+  onToggle,
+}: {
+  ariaLabel: string;
+  isSelected: boolean;
+  rowId: number;
+  onToggle: (id: number) => void;
+}) {
+  const handleClick = useCallback(() => {
+    onToggle(rowId);
+  }, [onToggle, rowId]);
+
+  return (
+    <button
+      type="button"
+      aria-checked={isSelected}
+      aria-label={ariaLabel}
+      className="ag-table-scheduling-switch"
+      data-selected={isSelected ? 'true' : 'false'}
+      role="switch"
+      onClick={handleClick}
+    >
+      <span className="ag-table-scheduling-switch-thumb" aria-hidden="true" />
+    </button>
+  );
+}, (prev, next) => (
+  prev.ariaLabel === next.ariaLabel
+  && prev.isSelected === next.isSelected
+  && prev.rowId === next.rowId
+  && prev.onToggle === next.onToggle
+));
+
+const AccountRowActions = memo(function AccountRowActions({
+  row,
+  labels,
+  onEdit,
+  onDelete,
+  onTest,
+  onStats,
+  onRefreshQuota,
+  onClearCooldowns,
+}: {
+  row: AccountResp;
+  labels: {
+    actions: string;
+    clearCooldowns: string;
+    delete: string;
+    edit: string;
+    more: string;
+    refreshQuota: string;
+    stats: string;
+    test: string;
+  };
+  onEdit: (row: AccountResp) => void;
+  onDelete: (row: AccountResp) => void;
+  onTest: (row: AccountResp) => void;
+  onStats: (id: number) => void;
+  onRefreshQuota: (id: number) => void;
+  onClearCooldowns: (id: number) => void;
+}) {
+  return (
+    <div className="ag-table-row-actions ag-account-row-actions mx-auto flex w-[92px] items-center justify-center gap-1">
+      <button
+        type="button"
+        aria-label={labels.edit}
+        className="ag-account-row-action-button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onEdit(row);
+        }}
+      >
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+      <button
+        type="button"
+        aria-label={labels.delete}
+        className="ag-account-row-action-button ag-account-row-action-button--danger"
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete(row);
+        }}
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+      <Dropdown>
+        <Dropdown.Trigger
+          aria-label={labels.more}
+          className="ag-account-row-more-trigger ag-account-row-action-button h-7 w-7 min-w-7"
+        >
+          <MoreHorizontal className="w-3.5 h-3.5" />
+        </Dropdown.Trigger>
+        <Dropdown.Popover placement="bottom end">
+          <Dropdown.Menu
+            aria-label={labels.actions}
+            onAction={(key) => {
+              switch (String(key)) {
+                case 'test':
+                  onTest(row);
+                  break;
+                case 'stats':
+                  onStats(row.id);
+                  break;
+                case 'refresh_quota':
+                  onRefreshQuota(row.id);
+                  break;
+                case 'clear_cooldowns':
+                  onClearCooldowns(row.id);
+                  break;
+              }
+            }}
+          >
+            <Dropdown.Item id="test" textValue={labels.test}>
+              <span className="flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
+                {labels.test}
+              </span>
+            </Dropdown.Item>
+            <Dropdown.Item id="stats" textValue={labels.stats}>
+              <span className="flex items-center gap-2">
+                <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
+                {labels.stats}
+              </span>
+            </Dropdown.Item>
+            {row.type === 'oauth' ? (
+              <Dropdown.Item id="refresh_quota" textValue={labels.refreshQuota}>
+                <span className="flex items-center gap-2">
+                  <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
+                  {labels.refreshQuota}
+                </span>
+              </Dropdown.Item>
+            ) : null}
+            <Dropdown.Item id="clear_cooldowns" textValue={labels.clearCooldowns}>
+              <span className="flex items-center gap-2">
+                <Eraser className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
+                {labels.clearCooldowns}
+              </span>
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
+    </div>
+  );
+}, (prev, next) => (
+  prev.row === next.row
+  && prev.labels === next.labels
+  && prev.onEdit === next.onEdit
+  && prev.onDelete === next.onDelete
+  && prev.onTest === next.onTest
+  && prev.onStats === next.onStats
+  && prev.onRefreshQuota === next.onRefreshQuota
+  && prev.onClearCooldowns === next.onClearCooldowns
+));
+
+const AccountTableRow = memo(function AccountTableRow({
+  columns,
+  row,
+  selectRowAriaLabel,
+  selectionStore,
+  onSelectedChange,
+}: {
+  columns: AccountTableColumn[];
+  row: AccountResp;
+  selectRowAriaLabel: string;
+  selectionStore: AccountSelectionStore;
+  onSelectedChange: (id: number, isSelected: boolean) => void;
+}) {
+  return (
+    <tr data-slot="tr" data-key={row.id}>
+      <td data-slot="td" className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
+        <AccountRowSelectionCell
+          ariaLabel={selectRowAriaLabel}
+          rowId={row.id}
+          selectionStore={selectionStore}
+          onSelectedChange={onSelectedChange}
+        />
+      </td>
+      {columns.map((column) => (
+        <td
+          data-slot="td"
+          key={column.key}
+          style={columnWidthStyle(column)}
+        >
+          <AccountTableCellContent column={column} row={row} />
+        </td>
+      ))}
+    </tr>
+  );
+}, (prev, next) => (
+  prev.columns === next.columns
+  && prev.row === next.row
+  && prev.selectRowAriaLabel === next.selectRowAriaLabel
+  && prev.selectionStore === next.selectionStore
+  && prev.onSelectedChange === next.onSelectedChange
+));
+
+function AccountsTableLoadingRow({ colSpan, minHeight = 220 }: { colSpan: number; minHeight?: number }) {
+  return (
+    <tr data-slot="tr" data-key="loading">
+      <td data-slot="td" colSpan={colSpan}>
+        <div aria-busy="true" aria-live="polite" className="w-full" style={{ minHeight }}>
+          <span className="sr-only">Loading</span>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+const AutoRefreshCountdownLabel = memo(function AutoRefreshCountdownLabel({
+  autoRefresh,
+  label,
+  offLabel,
+  onRefresh,
+}: {
+  autoRefresh: number;
+  label: string;
+  offLabel: string;
+  onRefresh: () => void;
+}) {
+  const labelRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const renderCountdown = (seconds: number) => {
+      if (labelRef.current) {
+        labelRef.current.textContent = autoRefresh ? `${label}${seconds}s` : offLabel;
+      }
+    };
+
+    if (!autoRefresh) {
+      renderCountdown(0);
+      return undefined;
+    }
+
+    let remaining = autoRefresh;
+    renderCountdown(remaining);
+    const timer = window.setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        onRefresh();
+        remaining = autoRefresh;
+      }
+      renderCountdown(remaining);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [autoRefresh, label, offLabel, onRefresh]);
+
+  return (
+    <span ref={labelRef}>
+      {autoRefresh ? `${label}${autoRefresh}s` : offLabel}
+    </span>
+  );
+}, (prev, next) => (
+  prev.autoRefresh === next.autoRefresh
+  && prev.label === next.label
+  && prev.offLabel === next.offLabel
+  && prev.onRefresh === next.onRefresh
+));
 
 // formatCountdown 把剩余毫秒格式化成 "Xd Yh"/"Xh Ym"/"Ym" 样式，
 // 与 sub2api 的"限流中 10h 16m 自动恢复"徽标一致。
@@ -394,7 +766,10 @@ function AccountCapacityChip({ current, max }: { current: number; max: number })
 export default function AccountsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { platforms, platformName } = usePlatforms();
+  const { platforms, platformName: resolvePlatformName } = usePlatforms();
+  const platformNameRef = useLatestRef(resolvePlatformName);
+  const platformName = useCallback((platform: string) => platformNameRef.current(platform), [platformNameRef]);
+  const platformsKey = platforms.join('\u0000');
   const { toast } = useToast();
   useSyncExternalStore(subscribeAccountIdentityChange, getAccountIdentityVersion);
   useSyncExternalStore(subscribeUsageWindowChange, getUsageWindowVersion);
@@ -456,43 +831,46 @@ export default function AccountsPage() {
   // 自动刷新
   const AUTO_REFRESH_OPTIONS = [0, 5, 10, 15, 30];
   const [autoRefresh, setAutoRefresh] = useState(0); // 秒，0=关闭
-  const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    if (!autoRefresh) { setCountdown(0); return; }
-    setCountdown(autoRefresh);
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-          return autoRefresh;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [autoRefresh, queryClient]);
+  const refreshAccounts = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+  }, [queryClient]);
+  const autoRefreshLabel = t('accounts.auto_refresh');
+  const autoRefreshOffLabel = t('accounts.auto_refresh_off');
 
   // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountResp | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<AccountResp | null>(null);
   const [testingAccount, setTestingAccount] = useState<AccountResp | null>(null);
+  const [statsAccountId, setStatsAccountId] = useState<number | null>(null);
 
   // 批量选择状态
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const selectionStoreRef = useRef<AccountSelectionStore | null>(null);
+  if (selectionStoreRef.current === null) {
+    selectionStoreRef.current = new AccountSelectionStore();
+  }
+  const selectionStore = selectionStoreRef.current;
+  const selectionVersion = useSyncExternalStore(
+    selectionStore.subscribe,
+    selectionStore.getSnapshot,
+    selectionStore.getSnapshot,
+  );
+  const selectedIds = useMemo(() => selectionStore.getSelectedIds(), [selectionStore, selectionVersion]);
+  const selectedCount = selectedIds.length;
   const [pendingToggleIds, setPendingToggleIds] = useState<Set<number>>(() => new Set());
   const pendingToggleIdsRef = useRef(pendingToggleIds);
   pendingToggleIdsRef.current = pendingToggleIds;
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
-  const clearSelection = () => setSelectedIds([]);
+  const clearSelection = useCallback(() => {
+    runAfterInputFrame(() => selectionStore.clear());
+  }, [selectionStore]);
 
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
   useEffect(() => {
-    setSelectedIds([]);
-  }, [page, pageSize, keyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter]);
+    selectionStore.clear();
+  }, [groupFilter, keyword, page, pageSize, platformFilter, proxyFilter, selectionStore, stateFilter, typeFilter]);
 
   // 查询账号列表
   const { data, isLoading } = useQuery({
@@ -727,6 +1105,32 @@ export default function AccountsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
+  const toggleSchedulingMutateRef = useLatestRef(toggleMutation.mutate);
+  const refreshQuotaMutateRef = useLatestRef(refreshQuotaMutation.mutate);
+  const clearRateLimitMarkersMutateRef = useLatestRef(clearRateLimitMarkersMutation.mutate);
+  const handleToggleScheduling = useCallback((id: number) => {
+    if (pendingToggleIdsRef.current.has(id)) return;
+    toggleSchedulingMutateRef.current(id);
+  }, [toggleSchedulingMutateRef]);
+  const handleEditAccount = useCallback((row: AccountResp) => {
+    setEditingAccount(row);
+  }, []);
+  const handleDeleteAccount = useCallback((row: AccountResp) => {
+    setDeletingAccount(row);
+  }, []);
+  const handleTestAccount = useCallback((row: AccountResp) => {
+    setTestingAccount(row);
+  }, []);
+  const handleStatsAccount = useCallback((id: number) => {
+    setStatsAccountId(id);
+  }, []);
+  const handleRefreshQuota = useCallback((id: number) => {
+    refreshQuotaMutateRef.current(id);
+  }, [refreshQuotaMutateRef]);
+  const handleClearRateLimitMarkers = useCallback((id: number) => {
+    clearRateLimitMarkersMutateRef.current(id);
+  }, [clearRateLimitMarkersMutateRef]);
+
   // 批量操作通用的结果处理：全部成功 → success toast；部分成功 → warning；全部失败 → error。
   const handleBulkResult = (res: BulkOpResp, okKey: string) => {
     queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
@@ -794,8 +1198,16 @@ export default function AccountsPage() {
     setBulkRefreshTargets(oauthRows);
   };
 
-  // 统计弹窗
-  const [statsAccountId, setStatsAccountId] = useState<number | null>(null);
+  const accountActionLabels = useMemo(() => ({
+    actions: t('common.actions'),
+    clearCooldowns: t('accounts.clear_family_cooldowns'),
+    delete: t('common.delete'),
+    edit: t('common.edit'),
+    more: t('common.more'),
+    refreshQuota: t('accounts.refresh_quota'),
+    stats: t('accounts.view_stats'),
+    test: t('accounts.test_connection'),
+  }), [t]);
 
   // 表格列定义
   const columns = useMemo<AccountTableColumn[]>(() => [
@@ -915,19 +1327,12 @@ export default function AccountsPage() {
       mobileWidth: '72px',
       align: 'center',
       render: (row) => (
-        <Switch
-          aria-label={t('accounts.scheduling')}
+        <AccountSchedulingSwitch
+          ariaLabel={t('accounts.scheduling')}
           isSelected={row.state !== 'disabled'}
-          size="sm"
-          onChange={() => {
-            if (pendingToggleIdsRef.current.has(row.id)) return;
-            toggleMutation.mutate(row.id);
-          }}
-        >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-        </Switch>
+          rowId={row.id}
+          onToggle={handleToggleScheduling}
+        />
       ),
     },
     {
@@ -1242,127 +1647,55 @@ export default function AccountsPage() {
       mobileWidth: '96px',
       align: 'center',
       render: (row) => (
-        <div className="ag-table-row-actions ag-account-row-actions mx-auto flex w-[92px] items-center justify-center gap-1">
-          <Button
-            isIconOnly
-            aria-label={t('common.edit')}
-            size="sm"
-            variant="secondary"
-            className="h-7 w-7 min-w-7"
-            onPress={() => setEditingAccount(row)}
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </Button>
-          <Button
-            isIconOnly
-            aria-label={t('common.delete')}
-            size="sm"
-            variant="danger-soft"
-            className="h-7 w-7 min-w-7 text-danger"
-            onPress={() => setDeletingAccount(row)}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
-          <Dropdown>
-            <Dropdown.Trigger
-              aria-label={t('common.more')}
-              className="ag-account-row-more-trigger button button--icon-only button--sm button--secondary h-7 w-7 min-w-7"
-            >
-              <MoreHorizontal className="w-3.5 h-3.5" />
-            </Dropdown.Trigger>
-            <Dropdown.Popover placement="bottom end">
-              <Dropdown.Menu
-                aria-label={t('common.actions')}
-                onAction={(key) => {
-                  switch (String(key)) {
-                    case 'test':
-                      setTestingAccount(row);
-                      break;
-                    case 'stats':
-                      setStatsAccountId(row.id);
-                      break;
-                    case 'refresh_quota':
-                      refreshQuotaMutation.mutate(row.id);
-                      break;
-                    case 'clear_cooldowns':
-                      clearRateLimitMarkersMutation.mutate(row.id);
-                      break;
-                  }
-                }}
-              >
-                <Dropdown.Item id="test" textValue={t('accounts.test_connection')}>
-                  <span className="flex items-center gap-2">
-                    <Zap className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                    {t('accounts.test_connection')}
-                  </span>
-                </Dropdown.Item>
-                <Dropdown.Item id="stats" textValue={t('accounts.view_stats')}>
-                  <span className="flex items-center gap-2">
-                    <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
-                    {t('accounts.view_stats')}
-                  </span>
-                </Dropdown.Item>
-                {row.type === 'oauth' ? (
-                  <Dropdown.Item id="refresh_quota" textValue={t('accounts.refresh_quota')}>
-                    <span className="flex items-center gap-2">
-                      <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
-                      {t('accounts.refresh_quota')}
-                    </span>
-                  </Dropdown.Item>
-                ) : null}
-                <Dropdown.Item id="clear_cooldowns" textValue={t('accounts.clear_family_cooldowns')}>
-                  <span className="flex items-center gap-2">
-                    <Eraser className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                    {t('accounts.clear_family_cooldowns')}
-                  </span>
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
-        </div>
+        <AccountRowActions
+          row={row}
+          labels={accountActionLabels}
+          onEdit={handleEditAccount}
+          onDelete={handleDeleteAccount}
+          onTest={handleTestAccount}
+          onStats={handleStatsAccount}
+          onRefreshQuota={handleRefreshQuota}
+          onClearCooldowns={handleClearRateLimitMarkers}
+        />
       ),
     },
   ], [
+    accountActionLabels,
     applyQuotaRefreshResult,
-    clearRateLimitMarkersMutation.mutate,
     groupMap,
+    handleClearRateLimitMarkers,
+    handleDeleteAccount,
+    handleEditAccount,
+    handleRefreshQuota,
+    handleStatsAccount,
+    handleTestAccount,
+    handleToggleScheduling,
     platformFilter,
     platformName,
+    platformsKey,
     queryClient,
-    refreshQuotaMutation.mutate,
     t,
     toast,
-    toggleMutation.mutate,
+    usageData?.accounts,
   ]);
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
-  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const visibleRowIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const selectedVisibleCount = useMemo(
-    () => visibleRowIds.filter((id) => selectedIdSet.has(id)).length,
-    [selectedIdSet, visibleRowIds],
+    () => selectionStore.countVisible(visibleRowIds),
+    [selectionStore, selectionVersion, visibleRowIds],
   );
   const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
   const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
   const selectAllAriaLabel = t('common.select_all', 'Select all');
   const selectRowAriaLabel = t('common.select', 'Select');
   const setVisibleRowsSelected = useCallback((isSelected: boolean) => {
-    if (isSelected) {
-      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleRowIds])));
-      return;
-    }
-    const visibleSet = new Set(visibleRowIds);
-    setSelectedIds((prev) => prev.filter((id) => !visibleSet.has(id)));
-  }, [visibleRowIds]);
+    runAfterInputFrame(() => selectionStore.setRows(visibleRowIds, isSelected));
+  }, [selectionStore, visibleRowIds]);
   const setRowSelected = useCallback((id: number, isSelected: boolean) => {
-    setSelectedIds((prev) => {
-      if (isSelected) {
-        return prev.includes(id) ? prev : [...prev, id];
-      }
-      return prev.filter((selectedId) => selectedId !== id);
-    });
-  }, []);
+    runAfterInputFrame(() => selectionStore.setRow(id, isSelected));
+  }, [selectionStore]);
   const typeOptions = useMemo(() => [
     { id: '', label: t('accounts.all_types', '全部类型') },
     { id: 'oauth', label: 'OAuth' },
@@ -1515,7 +1848,7 @@ export default function AccountsPage() {
             size="sm"
             variant="ghost"
             className="h-8 w-8 min-w-8"
-            onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
+            onPress={refreshAccounts}
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -1523,7 +1856,12 @@ export default function AccountsPage() {
             <Dropdown.Trigger
               className={`ag-account-auto-refresh-trigger button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
             >
-              <span>{autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}</span>
+              <AutoRefreshCountdownLabel
+                autoRefresh={autoRefresh}
+                label={autoRefreshLabel}
+                offLabel={autoRefreshOffLabel}
+                onRefresh={refreshAccounts}
+              />
               <ChevronDown className="h-3 w-3 shrink-0" />
             </Dropdown.Trigger>
             <Dropdown.Popover placement="bottom end">
@@ -1581,95 +1919,91 @@ export default function AccountsPage() {
       />
 
       {/* 表格 */}
-      <CommonTable
-        ariaLabel={t('accounts.title', 'Accounts')}
-        className="ag-accounts-table"
-        contentClassName="ag-accounts-table-content"
-        footer={(
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            pageSizeOptions={PAGE_SIZE_OPTIONS}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        )}
-        minWidth="var(--ag-accounts-current-table-width)"
-        scrollOverlay={selectedIds.length > 0 ? (
-          <div onClick={(event) => event.stopPropagation()}>
-            <BulkActionsBar
-              overlay
-              selectedCount={selectedIds.length}
-              onClear={clearSelection}
-              onEdit={() => setShowBulkEditModal(true)}
-              onEnable={handleBulkEnable}
-              onDisable={handleBulkDisable}
-              onRefreshQuota={handleBulkRefresh}
-              onClearRateLimitMarkers={() => bulkClearRateLimitMarkersMutation.mutate(selectedIds)}
-              onDelete={() => setShowBulkDeleteConfirm(true)}
-            />
-          </div>
-        ) : null}
-      >
-            <CommonTable.Header>
-              <CommonTable.Column id="__selection__" className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
-                <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
-                  <TableSelectionCheckbox
-                    ariaLabel={selectAllAriaLabel}
-                    isIndeterminate={someVisibleSelected}
-                    isSelected={allVisibleSelected}
-                    onChange={setVisibleRowsSelected}
-                  />
-                </div>
-              </CommonTable.Column>
-              {columns.map((column) => (
-                <CommonTable.Column
-                  id={column.key}
-                  key={column.key}
-                  className={columnAlignClass(column.align)}
-                  style={columnWidthStyle(column)}
-                >
-                  {column.title}
-                </CommonTable.Column>
-              ))}
-            </CommonTable.Header>
-            <CommonTable.Body>
+      <div className="ag-resource-table ag-accounts-table">
+        <div className="ag-resource-table-scroll" data-slot="wrapper">
+          {selectedCount > 0 ? (
+            <div onClick={(event) => event.stopPropagation()}>
+              <BulkActionsBar
+                overlay
+                selectedCount={selectedCount}
+                onClear={clearSelection}
+                onEdit={() => setShowBulkEditModal(true)}
+                onEnable={handleBulkEnable}
+                onDisable={handleBulkDisable}
+                onRefreshQuota={handleBulkRefresh}
+                onClearRateLimitMarkers={() => bulkClearRateLimitMarkersMutation.mutate(selectedIds)}
+                onDelete={() => setShowBulkDeleteConfirm(true)}
+              />
+            </div>
+          ) : null}
+          <table
+            aria-label={t('accounts.title', 'Accounts')}
+            className="ag-resource-table-content ag-accounts-table-content"
+            data-slot="table"
+            style={{ minWidth: 'var(--ag-accounts-current-table-width)' }}
+          >
+            <thead data-slot="thead">
+              <tr data-slot="tr">
+                <th data-slot="th" scope="col" className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
+                  <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                    <TableSelectionCheckbox
+                      ariaLabel={selectAllAriaLabel}
+                      isIndeterminate={someVisibleSelected}
+                      isSelected={allVisibleSelected}
+                      onChange={setVisibleRowsSelected}
+                    />
+                  </div>
+                </th>
+                {columns.map((column) => (
+                  <th
+                    data-slot="th"
+                    id={column.key}
+                    key={column.key}
+                    scope="col"
+                    className={columnAlignClass(column.align)}
+                    style={columnWidthStyle(column)}
+                  >
+                    {column.title}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody data-slot="tbody">
               {isLoading ? (
-                <TableLoadingRow colSpan={columns.length + 1} />
+                <AccountsTableLoadingRow colSpan={columns.length + 1} />
               ) : rows.length === 0 ? (
-                <CommonTable.Row id="empty">
-                  <CommonTable.Cell colSpan={columns.length + 1}>
+                <tr data-slot="tr" data-key="empty">
+                  <td data-slot="td" colSpan={columns.length + 1}>
                     <EmptyState>
                       <div className="text-sm text-default-500">{t('common.no_data')}</div>
                     </EmptyState>
-                  </CommonTable.Cell>
-                </CommonTable.Row>
+                  </td>
+                </tr>
               ) : (
                 rows.map((row) => (
-                  <CommonTable.Row id={String(row.id)} key={row.id}>
-                    <CommonTable.Cell className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
-                      <AccountRowSelectionCell
-                        ariaLabel={selectRowAriaLabel}
-                        isSelected={selectedIdSet.has(row.id)}
-                        rowId={row.id}
-                        onSelectedChange={setRowSelected}
-                      />
-                    </CommonTable.Cell>
-                    {columns.map((column) => (
-                      <CommonTable.Cell
-                        key={column.key}
-                        style={columnWidthStyle(column)}
-                      >
-                        <AccountTableCellContent column={column} row={row} />
-                      </CommonTable.Cell>
-                    ))}
-                  </CommonTable.Row>
+                  <AccountTableRow
+                    key={row.id}
+                    columns={columns}
+                    row={row}
+                    selectRowAriaLabel={selectRowAriaLabel}
+                    selectionStore={selectionStore}
+                    onSelectedChange={setRowSelected}
+                  />
                 ))
               )}
-            </CommonTable.Body>
-      </CommonTable>
+            </tbody>
+          </table>
+        </div>
+        <TablePaginationFooter
+          page={page}
+          pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          setPage={setPage}
+          setPageSize={setPageSize}
+          total={total}
+          totalPages={totalPages}
+        />
+      </div>
 
       {/* 创建弹窗 */}
       <CreateAccountModal

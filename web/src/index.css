@@ -52,6 +52,8 @@
 
   --overlay: var(--ag-overlay);
   --overlay-foreground: var(--ag-overlay-foreground);
+  --popover: var(--overlay);
+  --popover-foreground: var(--overlay-foreground);
 
   --accent: var(--ag-primary);
   --accent-foreground: var(--ag-primary-foreground);
@@ -129,6 +131,8 @@
   --color-surface-foreground: var(--surface-foreground);
   --color-overlay: var(--overlay);
   --color-overlay-foreground: var(--overlay-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
 
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
@@ -1250,6 +1254,141 @@ input[type="number"]::-webkit-outer-spin-button {
   table-layout: fixed;
 }
 
+.ag-table-selection-checkbox {
+  display: inline-grid;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  place-content: center;
+  appearance: none;
+  border: 1px solid color-mix(in oklab, var(--border) 92%, var(--foreground) 8%);
+  border-radius: 0.25rem;
+  background: var(--field-background);
+  color: var(--accent-foreground);
+  cursor: pointer;
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    box-shadow 80ms ease;
+}
+
+.ag-table-selection-checkbox::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  transform: scale(0);
+  transition: transform 80ms ease;
+  background: currentColor;
+  clip-path: polygon(14% 44%, 0 58%, 38% 96%, 100% 22%, 86% 8%, 38% 66%);
+}
+
+.ag-table-selection-checkbox:checked,
+.ag-table-selection-checkbox:indeterminate {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.ag-table-selection-checkbox:checked::before,
+.ag-table-selection-checkbox:indeterminate::before {
+  transform: scale(1);
+}
+
+.ag-table-selection-checkbox:indeterminate::before {
+  height: 0.125rem;
+  clip-path: none;
+}
+
+.ag-table-selection-checkbox:hover {
+  border-color: color-mix(in oklab, var(--accent) 72%, var(--border) 28%);
+}
+
+.ag-table-selection-checkbox:focus-visible {
+  outline: 1.5px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.ag-table-scheduling-switch {
+  display: inline-flex;
+  width: 2rem;
+  height: 1.125rem;
+  margin: 0;
+  padding: 0.125rem;
+  align-items: center;
+  border: 1px solid color-mix(in oklab, var(--border) 88%, var(--foreground) 12%);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%);
+  cursor: pointer;
+  vertical-align: middle;
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    box-shadow 80ms ease;
+}
+
+.ag-table-scheduling-switch[data-selected="true"] {
+  border-color: color-mix(in oklab, var(--success) 82%, var(--border) 18%);
+  background: var(--success);
+}
+
+.ag-table-scheduling-switch-thumb {
+  display: block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: var(--background);
+  box-shadow: 0 1px 2px color-mix(in oklab, black 18%, transparent);
+  transform: translateX(0);
+  transition: transform 80ms ease;
+}
+
+.ag-table-scheduling-switch[data-selected="true"] .ag-table-scheduling-switch-thumb {
+  transform: translateX(0.875rem);
+  background: var(--success-foreground);
+}
+
+.ag-table-scheduling-switch:hover {
+  border-color: color-mix(in oklab, var(--accent) 52%, var(--border) 48%);
+}
+
+.ag-table-scheduling-switch:focus-visible {
+  outline: 1.5px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.ag-account-row-action-button {
+  border: 1px solid color-mix(in oklab, var(--border) 84%, transparent);
+  border-radius: var(--radius);
+  background: var(--surface-secondary);
+  color: var(--foreground);
+  cursor: pointer;
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease;
+}
+
+.ag-account-row-action-button--danger {
+  background: var(--danger-subtle);
+  color: var(--danger);
+}
+
+.ag-account-row-action-button:hover {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border) 62%);
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-secondary) 90%);
+  color: var(--accent);
+}
+
+.ag-account-row-action-button--danger:hover {
+  border-color: color-mix(in oklab, var(--danger) 38%, var(--border) 62%);
+  background: color-mix(in oklab, var(--danger) 10%, var(--surface-secondary) 90%);
+  color: var(--danger);
+}
+
+.ag-account-row-action-button:focus-visible {
+  outline: 1.5px solid var(--focus);
+  outline-offset: 2px;
+}
+
 @media (max-width: 767px) {
   .ag-accounts-table {
     --ag-accounts-table-width: 1144px;
@@ -1309,7 +1448,7 @@ input[type="number"]::-webkit-outer-spin-button {
   line-height: 1;
 }
 
-.ag-account-row-actions> :where(.button, .dropdown) {
+.ag-account-row-actions> :where(.button, .dropdown, .ag-account-row-action-button) {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1319,6 +1458,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .ag-account-row-actions>.button,
+.ag-account-row-actions>.ag-account-row-action-button,
 .ag-account-row-more-trigger.dropdown__trigger {
   width: 1.75rem !important;
   min-width: 1.75rem !important;
@@ -1328,6 +1468,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .ag-account-row-actions>.button>svg,
+.ag-account-row-actions>.ag-account-row-action-button>svg,
 .ag-account-row-more-trigger.dropdown__trigger>svg {
   width: 0.875rem !important;
   height: 0.875rem !important;
