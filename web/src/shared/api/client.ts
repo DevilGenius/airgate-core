@@ -82,6 +82,9 @@ export function getSessionAPIKey(): string | null {
 
 // 查询参数类型
 type QueryParams = Record<string, any>;
+type RequestOptions = {
+  signal?: AbortSignal;
+};
 
 // 当前浏览器时区（IANA 名，例如 "Asia/Shanghai"、"America/New_York"）。
 // 自动附加到 GET 请求，保证后端按用户本地时区计算"今天 / 7 天"等边界。
@@ -160,10 +163,20 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 // 执行 fetch 请求
+function isAbortError(err: unknown): boolean {
+  return typeof err === 'object'
+    && err !== null
+    && 'name' in err
+    && (err as { name?: unknown }).name === 'AbortError';
+}
+
 async function doFetch(url: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(url, init);
-  } catch {
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw err;
+    }
     throw new ApiError(-1, i18n.t('common.network_error'), 0);
   }
 }
@@ -174,6 +187,7 @@ async function request<T>(
   path: string,
   body?: unknown,
   params?: QueryParams,
+  options?: RequestOptions,
 ): Promise<T> {
   // 过期前 30 分钟自动刷新
   if (accessToken && tokenExpiresWithin(1800)) {
@@ -203,6 +217,7 @@ async function request<T>(
     method,
     headers: buildHeaders(true),
     body: body ? JSON.stringify(body) : undefined,
+    signal: options?.signal,
   });
 
   // 401 时尝试刷新 token 并重试一次
@@ -213,6 +228,7 @@ async function request<T>(
         method,
         headers: buildHeaders(true),
         body: body ? JSON.stringify(body) : undefined,
+        signal: options?.signal,
       });
       return handleResponse<T>(retryRes);
     }
@@ -234,8 +250,8 @@ export class ApiError extends Error {
 }
 
 // 导出快捷方法
-export function get<T>(path: string, params?: QueryParams): Promise<T> {
-  return request<T>('GET', path, undefined, params);
+export function get<T>(path: string, params?: QueryParams, options?: RequestOptions): Promise<T> {
+  return request<T>('GET', path, undefined, params, options);
 }
 
 export function post<T>(path: string, body?: unknown): Promise<T> {

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useMatchRoute, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useIsFetching, useQuery } from '@tanstack/react-query';
@@ -15,6 +15,7 @@ import { effectiveDocUrl } from '../../shared/utils/docUrl';
 import { useIsMobile } from '../../shared/hooks/useMediaQuery';
 import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { TopLoadingLine } from '../../shared/components/PageLoading';
+import { preloadRoutePath } from '../routePreloads';
 import {
   LayoutDashboard,
   Users,
@@ -161,12 +162,16 @@ export function AppShell({ children }: AppShellProps) {
   const site = useSiteSettings();
   const [collapsed, setCollapsed] = usePersistentBoolean(SIDEBAR_COLLAPSED_STORAGE_KEY, false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const menuPreloadTimerRef = useRef<number | null>(null);
   const isMobile = useIsMobile();
   const matchRoute = useMatchRoute();
   const routerPath = useRouterState({ select: (s) => s.location.pathname });
+  const routerStatus = useRouterState({ select: (s) => s.status });
   const blockingFetches = useIsFetching({
-    predicate: (query) => query.state.status === 'pending',
+    predicate: (query) =>
+      query.state.fetchStatus === 'fetching' && query.state.status !== 'pending',
   });
+  const topLoadingActive = routerStatus === 'pending' || blockingFetches > 0;
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -234,6 +239,25 @@ export function AppShell({ children }: AppShellProps) {
     i18n.changeLanguage(nextLang);
     setStoredLanguage(nextLang);
   };
+
+  const cancelMenuItemIntent = useCallback(() => {
+    if (menuPreloadTimerRef.current != null) {
+      window.clearTimeout(menuPreloadTimerRef.current);
+      menuPreloadTimerRef.current = null;
+    }
+  }, []);
+
+  const handleMenuItemIntent = useCallback((path: string) => {
+    cancelMenuItemIntent();
+    menuPreloadTimerRef.current = window.setTimeout(() => {
+      menuPreloadTimerRef.current = null;
+      void preloadRoutePath(path, { deep: false });
+    }, 80);
+  }, [cancelMenuItemIntent]);
+
+  useEffect(() => {
+    return cancelMenuItemIntent;
+  }, [cancelMenuItemIntent]);
 
   const displayName = user?.username || user?.email?.split('@')[0] || site.site_name || 'AirGate';
   const roleLabel = isAdmin ? t('users.role_admin', 'Admin') : t('users.role_user', 'User');
@@ -310,17 +334,27 @@ export function AppShell({ children }: AppShellProps) {
             )}
             <div className="space-y-1">
               {section.items.map((item) => {
-                const isActive = !!matchRoute({ to: item.path, fuzzy: item.path !== '/' });
-                const isExactDashboard = item.path === '/' && !!matchRoute({ to: '/' });
-                const active = item.path === '/' ? isExactDashboard : isActive;
+                const isCurrentActive = item.path === '/'
+                  ? !!matchRoute({ to: '/' })
+                  : !!matchRoute({ to: item.path, fuzzy: true });
+                const isPendingActive = item.path === '/'
+                  ? !!matchRoute({ to: '/', pending: true })
+                  : !!matchRoute({ to: item.path, fuzzy: true, pending: true });
+                const active = routerStatus === 'pending' ? isPendingActive : isCurrentActive;
                 const label = t(item.labelKey, { defaultValue: item.labelKey });
 
                 const link = (
                   <Link
                     key={item.path}
                     to={item.path}
+                    preload="intent"
+                    preloadDelay={80}
                     data-active={active ? 'true' : undefined}
                     className={`ag-sidebar-nav-item group relative flex items-center transition-colors duration-150 ${sidebarCollapsed ? 'mx-auto h-10 w-10 justify-center p-0' : 'px-2 py-1.5'}`}
+                    onBlur={cancelMenuItemIntent}
+                    onFocus={() => handleMenuItemIntent(item.path)}
+                    onPointerEnter={() => handleMenuItemIntent(item.path)}
+                    onPointerLeave={cancelMenuItemIntent}
                   >
                     <span className="flex shrink-0 items-center justify-center">{item.icon}</span>
                     {!sidebarCollapsed && (
@@ -371,7 +405,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="fixed inset-0 flex overflow-hidden bg-bg text-text">
-      <TopLoadingLine active={blockingFetches > 0} />
+      <TopLoadingLine active={topLoadingActive} />
 
       {/* Mobile backdrop */}
       {isMobile && mobileOpen && (

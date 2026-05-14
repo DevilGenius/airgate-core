@@ -1,53 +1,31 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button, Card, ComboBox, Input, ListBox, Select, Switch, Tabs, TextField as HeroTextField } from '@heroui/react';
-import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
-} from 'recharts';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
+import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
 import { Activity, Coins, Hash, DollarSign, Search, RefreshCw } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
-import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../../shared/constants';
+import { PIE_CHART_COLORS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 
+const UsagePieChart = lazy(() =>
+  import('./usage/UsageCharts').then((m) => ({ default: m.UsagePieChart })),
+);
+const UsageTokenTrendChart = lazy(() =>
+  import('./usage/UsageCharts').then((m) => ({ default: m.UsageTokenTrendChart })),
+);
+
 const PIE_COLORS = PIE_CHART_COLORS;
-const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio', 'cacheCumulativeRatio'];
-const TOKEN_TREND_RATIO_KEYS = new Set<keyof typeof USAGE_TOKEN_COLORS>(['cacheRatio', 'cacheCumulativeRatio']);
-
-type PieTooltipPayload = Array<{
-  name?: unknown;
-  payload?: {
-    name?: unknown;
-  };
-}>;
-
-function PieNameTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: PieTooltipPayload;
-}) {
-  const name = payload?.[0]?.payload?.name ?? payload?.[0]?.name;
-  if (!active || name == null || name === '') return null;
-
-  return (
-    <div className="max-w-56 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
-      {String(name)}
-    </div>
-  );
-}
 
 function SectionCard({
   children,
@@ -108,15 +86,6 @@ function StatCard({
   );
 }
 
-/** 格式化时间标签 */
-function fmtTime(timeStr: string): string {
-  if (timeStr.includes(' ')) {
-    return timeStr.split(' ')[1] ?? timeStr;
-  }
-  const parts = timeStr.split('-');
-  return `${parts[1] ?? ''}/${parts[2] ?? ''}`;
-}
-
 // 分组统计 key 映射
 const groupByKeys: Record<string, string> = {
   model: 'usage.by_model',
@@ -134,6 +103,7 @@ const groupByHeaderKeys: Record<string, string> = {
 
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
 const USAGE_AUTO_UPDATE_INTERVAL_MS = 3_000;
+const USAGE_PAGE_ACTIVATION_DELAY_MS = 180;
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
 
 // ==================== 分布饼图卡片 ====================
@@ -189,30 +159,9 @@ function DistributionCard({
     <SectionCard title={title} extra={metricTabs}>
       <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
         <div className="ag-distribution-chart-frame">
-          <PieChart width={176} height={176}>
-            <Pie
-              data={pieData}
-              cx="50%"
-              cy="50%"
-              innerRadius={42}
-              outerRadius={68}
-              dataKey="value"
-              isAnimationActive={false}
-              minAngle={3}
-              stroke="var(--ag-surface)"
-              strokeWidth={2}
-            >
-              {pieData.map((_, i) => (
-                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-              ))}
-            </Pie>
-            <RechartsTooltip
-              animationDuration={0}
-              content={<PieNameTooltip />}
-              cursor={false}
-              isAnimationActive={false}
-            />
-          </PieChart>
+          <Suspense fallback={<div className="h-[176px] w-[176px]" />}>
+            <UsagePieChart data={pieData} />
+          </Suspense>
         </div>
 
         <div className="ag-distribution-table-scroll">
@@ -387,37 +336,6 @@ function TokenTrendCard({
 }) {
   const { t } = useTranslation();
 
-  const chartData = useMemo(() => {
-    let cumulativeCache = 0;
-    let cumulativeTotal = 0;
-
-    return data.map((d) => {
-      const cacheTokens = d.cache_creation + d.cache_read;
-      const totalTokens = d.input_tokens + d.output_tokens + cacheTokens;
-      cumulativeCache += cacheTokens;
-      cumulativeTotal += totalTokens;
-      const cacheRatio = totalTokens > 0
-        ? Math.min(100, Math.max(0, (cacheTokens / totalTokens) * 100))
-        : 0;
-      const cacheCumulativeRatio = cumulativeTotal > 0
-        ? Math.min(100, Math.max(0, (cumulativeCache / cumulativeTotal) * 100))
-        : 0;
-
-      return {
-        time: fmtTime(d.time),
-        rawTime: d.time,
-        input: d.input_tokens,
-        output: d.output_tokens,
-        cacheCreation: d.cache_creation,
-        cacheRead: d.cache_read,
-        cacheRatio,
-        cacheCumulativeRatio,
-        actualCost: d.actual_cost,
-        standardCost: d.standard_cost,
-      };
-    });
-  }, [data]);
-
   const lineLabels: Record<string, string> = {
     input: t('usage.input'),
     output: t('usage.output'),
@@ -440,7 +358,7 @@ function TokenTrendCard({
     </Tabs>
   );
 
-  if (chartData.length === 0) {
+  if (data.length === 0) {
     return (
       <SectionCard title={t('usage.token_trend')} extra={granularityTabs}>
         <div className="flex h-[248px] items-center justify-center text-sm text-text-tertiary 2xl:h-[288px]">
@@ -456,105 +374,9 @@ function TokenTrendCard({
       extra={granularityTabs}
     >
       <div className="h-[248px] 2xl:h-[288px]">
-        <ResponsiveContainer width="100%" height="100%" debounce={80}>
-          <LineChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-          <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-          <XAxis
-            dataKey="time"
-            tick={{ fontSize: 11, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            yAxisId="tokens"
-            tick={{ fontSize: 11, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => fmtNum(v)}
-          />
-          <YAxis
-            yAxisId="ratio"
-            orientation="right"
-            domain={[0, 100]}
-            tick={{ fontSize: 11, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => `${Math.round(v)}%`}
-            width={32}
-          />
-          <RechartsTooltip
-            contentStyle={{
-              background: 'var(--ag-bg-elevated)',
-              border: '1px solid var(--ag-border)',
-              borderRadius: 8,
-              fontSize: 12,
-              padding: '8px 12px',
-            }}
-            labelStyle={{ color: 'var(--ag-text)', fontWeight: 600, marginBottom: 4 }}
-            labelFormatter={(_label, payload) => {
-              if (payload?.[0]?.payload?.rawTime) {
-                return payload[0].payload.rawTime;
-              }
-              return _label;
-            }}
-            formatter={(value, name) => [
-              TOKEN_TREND_RATIO_KEYS.has(String(name) as keyof typeof USAGE_TOKEN_COLORS) ? `${Number(value).toFixed(1)}%` : fmtNum(Number(value)),
-              lineLabels[String(name)] || String(name),
-            ]}
-            content={({ active, payload, label }) => {
-              if (!active || !payload?.length) return null;
-              const d = payload[0]?.payload;
-              const orderedPayload = [...payload].sort((a, b) => {
-                const aIndex = TOKEN_TREND_LINE_ORDER.indexOf(String(a.dataKey) as keyof typeof USAGE_TOKEN_COLORS);
-                const bIndex = TOKEN_TREND_LINE_ORDER.indexOf(String(b.dataKey) as keyof typeof USAGE_TOKEN_COLORS);
-                return (aIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : aIndex) - (bIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : bIndex);
-              });
-              return (
-                <div className="rounded-lg border border-border bg-bg-elevated p-3 text-xs shadow-lg">
-                  <div className="font-semibold text-text mb-2">{d?.rawTime ?? label}</div>
-                  {orderedPayload.map((entry, i) => (
-                    <div key={i} className="flex items-center gap-2 py-0.5">
-                      <div className="w-2.5 h-2.5 rounded-sm" style={{ background: entry.color }} />
-                      <span className="text-text-secondary">{lineLabels[String(entry.dataKey)] || String(entry.dataKey)}:</span>
-                      <span className="font-mono text-text ml-auto">
-                        {TOKEN_TREND_RATIO_KEYS.has(String(entry.dataKey) as keyof typeof USAGE_TOKEN_COLORS) ? `${Number(entry.value).toFixed(1)}%` : fmtNum(Number(entry.value))}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="border-t border-border-subtle mt-2 pt-2 text-text-secondary">
-                    Actual: <CostValue className="font-mono" value={d?.actualCost ?? 0} tone="actual" />
-                    {' | '}
-                    Standard: <CostValue className="font-mono" value={d?.standardCost ?? 0} tone="standard" />
-                  </div>
-                </div>
-              );
-            }}
-          />
-          <Legend
-            height={24}
-            content={() => (
-              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text-tertiary">
-                {TOKEN_TREND_LINE_ORDER.map((key) => (
-                  <span key={key} className="inline-flex items-center gap-1.5">
-                    {TOKEN_TREND_RATIO_KEYS.has(key) ? (
-                      <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: USAGE_TOKEN_COLORS[key] }} />
-                    ) : (
-                      <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
-                    )}
-                    <span>{lineLabels[key]}</span>
-                  </span>
-                ))}
-              </div>
-            )}
-          />
-          <Line yAxisId="tokens" type="monotone" dataKey="input" stroke={USAGE_TOKEN_COLORS.input} strokeWidth={2} dot={false} isAnimationActive={false} />
-          <Line yAxisId="tokens" type="monotone" dataKey="output" stroke={USAGE_TOKEN_COLORS.output} strokeWidth={2} dot={false} isAnimationActive={false} />
-          <Line yAxisId="tokens" type="monotone" dataKey="cacheCreation" stroke={USAGE_TOKEN_COLORS.cacheCreation} strokeWidth={2} dot={false} isAnimationActive={false} />
-          <Line yAxisId="tokens" type="monotone" dataKey="cacheRead" stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2} dot={false} isAnimationActive={false} />
-          <Line yAxisId="ratio" type="monotone" dataKey="cacheRatio" stroke={USAGE_TOKEN_COLORS.cacheRatio} strokeWidth={2} strokeDasharray="5 5" dot={false} isAnimationActive={false} />
-          <Line yAxisId="ratio" type="monotone" dataKey="cacheCumulativeRatio" stroke={USAGE_TOKEN_COLORS.cacheCumulativeRatio} strokeWidth={2} strokeDasharray="5 5" dot={false} isAnimationActive={false} />
-        </LineChart>
-        </ResponsiveContainer>
+        <Suspense fallback={<div className="h-full w-full" />}>
+          <UsageTokenTrendChart data={data} lineLabels={lineLabels} />
+        </Suspense>
       </div>
     </SectionCard>
   );
@@ -572,6 +394,7 @@ export default function UsagePage() {
   const [granularity, setGranularity] = useState<string>('hour');
   const [autoRefresh, setAutoRefresh] = usePersistentBoolean(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, false);
   const { platforms, platformName } = usePlatforms();
+  const pageActive = useDeferredActivation(USAGE_PAGE_ACTIVATION_DELAY_MS);
   const autoRefreshInterval = autoRefresh ? USAGE_AUTO_UPDATE_INTERVAL_MS : false;
 
   useEffect(() => {
@@ -587,7 +410,7 @@ export default function UsagePage() {
   const { data: usersData } = useQuery({
     queryKey: ['admin-users-search', debouncedUserKeyword],
     queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: debouncedUserKeyword }),
-    enabled: debouncedUserKeyword.length > 0,
+    enabled: pageActive && debouncedUserKeyword.length > 0,
   });
   const userOptions = (usersData?.list ?? []).map((u) => ({
     id: String(u.id),
@@ -628,7 +451,8 @@ export default function UsagePage() {
     refetch: refetchUsage,
   } = useQuery({
     queryKey: ['admin-usage', queryParams],
-    queryFn: () => usageApi.adminList(queryParams),
+    queryFn: ({ signal }) => usageApi.adminList(queryParams, { signal }),
+    enabled: pageActive,
     refetchInterval: autoRefreshInterval,
     refetchIntervalInBackground: false,
     refetchOnReconnect: autoRefresh,
@@ -638,7 +462,7 @@ export default function UsagePage() {
 
   const { data: stats, isFetching: isStatsFetching, refetch: refetchStats } = useQuery({
     queryKey: ['admin-usage-stats', filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       usageApi.stats({
         group_by: ADMIN_USAGE_STATS_GROUP_BY,
         start_date: filters.start_date,
@@ -646,7 +470,8 @@ export default function UsagePage() {
         platform: filters.platform,
         model: filters.model,
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
-    }),
+      }, { signal }),
+    enabled: pageActive,
     refetchInterval: autoRefreshInterval,
     refetchIntervalInBackground: false,
     refetchOnReconnect: autoRefresh,
@@ -657,7 +482,7 @@ export default function UsagePage() {
   // Token 趋势
   const { data: trendData, isFetching: isTrendFetching, refetch: refetchTrend } = useQuery({
     queryKey: ['admin-usage-trend', granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       usageApi.trend({
         granularity,
         start_date: filters.start_date,
@@ -665,7 +490,8 @@ export default function UsagePage() {
         platform: filters.platform,
         model: filters.model,
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
-    }),
+      }, { signal }),
+    enabled: pageActive,
     refetchInterval: autoRefreshInterval,
     refetchIntervalInBackground: false,
     refetchOnReconnect: autoRefresh,
@@ -673,9 +499,10 @@ export default function UsagePage() {
     placeholderData: keepPreviousData,
   });
 
-  const isRefreshing = isUsageFetching || isStatsFetching || isTrendFetching;
+  const isRefreshing = pageActive && (isUsageFetching || isStatsFetching || isTrendFetching);
 
   function handleManualRefresh() {
+    if (!pageActive) return;
     void refetchUsage();
     void refetchStats();
     void refetchTrend();
@@ -683,7 +510,7 @@ export default function UsagePage() {
 
   function handleAutoRefreshChange(enabled: boolean) {
     setAutoRefresh(enabled);
-    if (enabled) {
+    if (enabled && pageActive) {
       handleManualRefresh();
     }
   }
@@ -693,39 +520,41 @@ export default function UsagePage() {
     setPage(1);
   }
 
+  const activeStats = pageActive ? stats : undefined;
+
   // 饼图数据
   const modelDistribution: DistributionItem[] = useMemo(
-    () => (stats?.by_model ?? []).map((s) => ({
+    () => (activeStats?.by_model ?? []).map((s) => ({
       name: s.model,
       requests: s.requests,
       tokens: s.tokens,
       totalCost: s.total_cost,
       actualCost: s.actual_cost,
     })),
-    [stats?.by_model],
+    [activeStats?.by_model],
   );
 
   const groupDistribution: DistributionItem[] = useMemo(
-    () => (stats?.by_group ?? []).map((s) => ({
+    () => (activeStats?.by_group ?? []).map((s) => ({
       name: s.name || `#${s.group_id}`,
       requests: s.requests,
       tokens: s.tokens,
       totalCost: s.total_cost,
       actualCost: s.actual_cost,
     })),
-    [stats?.by_group],
+    [activeStats?.by_group],
   );
 
   const groupStatsRows: GroupStatsRow[] = useMemo(() => {
-    if (!stats) return [];
+    if (!activeStats) return [];
     const dataMap: Record<string, GroupStatsRow[]> = {
-      account: stats.by_account?.map((s) => ({ key: s.account_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
-      group: stats.by_group?.map((s) => ({ key: s.group_id, name: s.name || `#${s.group_id}`, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
-      model: stats.by_model?.map((s) => ({ key: s.model, name: s.model, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
-      user: stats.by_user?.map((s) => ({ key: s.user_id, name: s.email, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      account: activeStats.by_account?.map((s) => ({ key: s.account_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      group: activeStats.by_group?.map((s) => ({ key: s.group_id, name: s.name || `#${s.group_id}`, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      model: activeStats.by_model?.map((s) => ({ key: s.model, name: s.model, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      user: activeStats.by_user?.map((s) => ({ key: s.user_id, name: s.email, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
     };
     return dataMap[statsGroupBy] ?? [];
-  }, [stats, statsGroupBy]);
+  }, [activeStats, statsGroupBy]);
 
   const sharedColumns = useUsageColumns();
 
@@ -815,30 +644,30 @@ export default function UsagePage() {
   return (
     <div>
       {/* 聚合统计 */}
-      {stats && (
+      {activeStats && (
         <div className="mb-6 space-y-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
             <StatCard
               title={t('usage.total_requests')}
-              value={stats.total_requests.toLocaleString()}
+              value={activeStats.total_requests.toLocaleString()}
               icon={<Activity className="w-5 h-5" />}
               accentColor="var(--ag-primary)"
             />
             <StatCard
               title={t('usage.total_tokens')}
-              value={fmtNum(stats.total_tokens)}
+              value={fmtNum(activeStats.total_tokens)}
               icon={<Hash className="w-5 h-5" />}
               accentColor="var(--ag-info)"
             />
             <StatCard
               title={t('usage.actual_cost')}
-              value={<CostValue value={stats.total_actual_cost} decimals={4} tone="actual" />}
+              value={<CostValue value={activeStats.total_actual_cost} decimals={4} tone="actual" />}
               icon={<Coins className="w-5 h-5" />}
               accentColor="var(--ag-warning)"
             />
             <StatCard
               title={t('usage.total_cost')}
-              value={<CostValue value={stats.total_cost} decimals={4} tone="standard" />}
+              value={<CostValue value={activeStats.total_cost} decimals={4} tone="standard" />}
               icon={<DollarSign className="w-5 h-5" />}
               accentColor="var(--ag-success)"
             />
@@ -987,7 +816,7 @@ export default function UsagePage() {
         <Button
           isIconOnly
           aria-label={t('common.refresh', 'Refresh')}
-          isDisabled={isRefreshing}
+          isDisabled={!pageActive || isRefreshing}
           size="sm"
           variant="ghost"
           onPress={handleManualRefresh}
@@ -1014,19 +843,19 @@ export default function UsagePage() {
       <UsageRecordsTable
         ariaLabel={t('usage.title', 'Usage')}
         columns={columns}
-        dataVersion={dataUpdatedAt}
+        dataVersion={pageActive ? dataUpdatedAt : undefined}
         emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
         emptyTitle={t('common.no_data')}
-        highlightNewRows={autoRefresh && page === 1}
+        highlightNewRows={pageActive && autoRefresh && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
-        isLoading={isLoading}
+        isLoading={!pageActive || isLoading}
         page={page}
         pageSize={pageSize}
-        rows={data?.list ?? []}
+        rows={pageActive ? data?.list ?? [] : []}
         setPage={setPage}
         setPageSize={setPageSize}
-        suppressHighlight={isPlaceholderData}
-        total={total}
+        suppressHighlight={!pageActive || isPlaceholderData}
+        total={pageActive ? total : 0}
       />
     </div>
   );
