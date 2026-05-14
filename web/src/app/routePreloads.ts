@@ -46,26 +46,12 @@ export const UserKeysPage = lazyWithPreload(() => import('../pages/user/UserKeys
 export const UserUsagePage = lazyWithPreload(() => import('../pages/user/UserUsagePage'));
 
 export const ADMIN_IDLE_PRELOADS = [
-  UsersPage,
-  AccountsPage,
-  GroupsPage,
-  SubscriptionsPage,
-  ProxiesPage,
-  UsagePage,
-  PluginsPage,
-  SettingsPage,
   DashboardPage,
-  UserUsagePage,
-  UserKeysPage,
-  ProfilePage,
   PluginPage,
 ];
 
 export const USER_IDLE_PRELOADS = [
   UserOverviewPage,
-  UserUsagePage,
-  UserKeysPage,
-  ProfilePage,
   PluginPage,
 ];
 
