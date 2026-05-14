@@ -125,20 +125,34 @@ function TooltipDivider() {
 
 const MODEL_META_FAST_COLOR = 'oklch(62% 0.23 303)';
 const MODEL_META_IMAGE_COLOR = 'rgb(148,163,184)';
+const META_CHIP_LOW_COLOR = 'rgb(34,197,94)';
+const META_CHIP_MEDIUM_COLOR = 'rgb(59,130,246)';
+const META_CHIP_HIGH_COLOR = 'rgb(249,115,22)';
+const META_CHIP_XHIGH_COLOR = 'rgb(239,68,68)';
 
 const META_CHIP_EFFORT_COLORS: Record<string, string> = {
-  low: 'rgb(34,197,94)',
-  medium: 'rgb(59,130,246)',
-  high: 'rgb(249,115,22)',
-  xhigh: 'rgb(239,68,68)',
+  low: META_CHIP_LOW_COLOR,
+  medium: META_CHIP_MEDIUM_COLOR,
+  high: META_CHIP_HIGH_COLOR,
+  xhigh: META_CHIP_XHIGH_COLOR,
 };
 
 const MODEL_META_SLOT_WIDTH_CLASS = 'w-[5.5rem]';
 
-function MetaChip({ color, dotColor, label }: { color: string; dotColor?: string; label: string }) {
+function MetaChip({
+  color,
+  dotColor,
+  fastMark,
+  label,
+}: {
+  color: string;
+  dotColor?: string;
+  fastMark?: boolean;
+  label: string;
+}) {
   return (
     <span
-      className={`${MODEL_META_SLOT_WIDTH_CLASS} ${dotColor ? 'ag-usage-image-size-chip' : ''} inline-flex h-4 shrink-0 items-center justify-center truncate rounded px-1.5 text-[12px] font-semibold leading-none whitespace-nowrap`}
+      className={`${MODEL_META_SLOT_WIDTH_CLASS} ${dotColor ? 'ag-usage-image-size-chip' : ''} ${fastMark ? 'ag-usage-fast-marked-chip' : ''} inline-flex h-4 shrink-0 items-center justify-center truncate rounded px-1.5 text-[12px] font-semibold leading-none whitespace-nowrap`}
       style={{
         background: `color-mix(in srgb, ${color} 18%, transparent)`,
         boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 34%, transparent)`,
@@ -153,6 +167,7 @@ function MetaChip({ color, dotColor, label }: { color: string; dotColor?: string
           style={{ backgroundColor: dotColor }}
         />
       ) : null}
+      {fastMark ? <span className="ag-usage-fast-indicator" aria-hidden="true" /> : null}
       {label}
     </span>
   );
@@ -160,15 +175,15 @@ function MetaChip({ color, dotColor, label }: { color: string; dotColor?: string
 
 function getImageSizeDotColor(imageSize: string): string {
   const normalized = imageSize.trim().toLowerCase();
-  if (normalized.includes('4k')) return META_CHIP_EFFORT_COLORS.high;
-  if (normalized.includes('2k')) return META_CHIP_EFFORT_COLORS.medium;
-  if (normalized.includes('1k')) return META_CHIP_EFFORT_COLORS.low;
+  if (normalized.includes('4k')) return META_CHIP_HIGH_COLOR;
+  if (normalized.includes('2k')) return META_CHIP_MEDIUM_COLOR;
+  if (normalized.includes('1k')) return META_CHIP_LOW_COLOR;
 
   const dimensions = normalized.match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) ?? [];
   const maxDimension = Math.max(0, ...dimensions);
-  if (maxDimension >= 3072) return META_CHIP_EFFORT_COLORS.high;
-  if (maxDimension >= 1536) return META_CHIP_EFFORT_COLORS.medium;
-  return META_CHIP_EFFORT_COLORS.low;
+  if (maxDimension >= 3072) return META_CHIP_HIGH_COLOR;
+  if (maxDimension >= 1536) return META_CHIP_MEDIUM_COLOR;
+  return META_CHIP_LOW_COLOR;
 }
 
 const HEROUI_BLUE = 'oklch(62.04% 0.1950 253.83)';
@@ -525,8 +540,9 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
           const reasoningEffort = (row as UsageLogResp).reasoning_effort;
           const hasReasoningEffort = Boolean(reasoningEffort?.trim());
           const isServiceTierFast = getPluginUsageServiceTierFastResolver(row.platform);
-          if (isServiceTierFast?.(metaContext) && !hasReasoningEffort) {
-            return <MetaChip color={MODEL_META_FAST_COLOR} label="fast" />;
+          const showFastMark = Boolean(isServiceTierFast?.(metaContext));
+          if (showFastMark && !hasReasoningEffort) {
+            return <MetaChip color={MODEL_META_FAST_COLOR} fastMark label="fast" />;
           }
 
           if (customerScope) return null;
@@ -535,6 +551,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
           return (
             <MetaChip
               color={META_CHIP_EFFORT_COLORS[reasoningEffort] ?? 'rgb(148,163,184)'}
+              fastMark={showFastMark}
               label={reasoningEffort}
             />
           );

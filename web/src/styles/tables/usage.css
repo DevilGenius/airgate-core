@@ -44,6 +44,9 @@
 }
 
 .ag-usage-model-meta-slot {
+  --ag-usage-fast-indicator-width: 0.45rem;
+  --ag-usage-image-dot-size: 0.375rem;
+  --ag-usage-marker-left: 0.375rem;
   width: 5.5rem !important;
   min-width: 5.5rem !important;
   max-width: 5.5rem !important;
@@ -70,11 +73,26 @@
   font-size: 0.6875rem !important;
 }
 
+.ag-usage-model-meta-slot :where(.ag-usage-fast-marked-chip) {
+  position: relative !important;
+}
+
 .ag-usage-image-size-dot {
-  width: 0.375rem;
-  height: 0.375rem;
+  width: var(--ag-usage-image-dot-size);
+  height: var(--ag-usage-image-dot-size);
   flex: 0 0 auto;
   border-radius: 999px;
+}
+
+.ag-usage-fast-indicator {
+  position: absolute;
+  left: calc(var(--ag-usage-marker-left) + (var(--ag-usage-image-dot-size) - var(--ag-usage-fast-indicator-width)) / 2);
+  top: 50%;
+  width: var(--ag-usage-fast-indicator-width);
+  height: 0.65rem;
+  background: rgb(234, 179, 8);
+  clip-path: polygon(55% 0, 10% 55%, 42% 55%, 30% 100%, 90% 38%, 56% 38%);
+  transform: translateY(-50%);
 }
 
 .ag-usage-model-meta-slot > :where(div) {
