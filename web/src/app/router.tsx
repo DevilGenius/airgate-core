@@ -316,16 +316,14 @@ const chatRoute = createRoute({
     </Suspense>
   ),
 });
-// /studio: 创作中心，独立路由。
+// /studio: 创作中心（airgate-studio 插件），独立全屏布局。
 const studioRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/studio',
   beforeLoad: chatBeforeLoad,
   component: () => (
     <Suspense fallback={<ChatPageLoading />}>
-      <ChatShell>
-        <PluginPage pluginNameOverride="airgate-playground" subPathOverride="/studio" />
-      </ChatShell>
+      <PluginPage pluginNameOverride="airgate-studio" subPathOverride="/studio" />
     </Suspense>
   ),
 });

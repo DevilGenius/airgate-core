@@ -87,15 +87,12 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = 'airgate:sidebar:collapsed';
  *   audience = "all"                     — 所有登录用户可见，按当前角色挂分组
  */
 function pluginPagePath(pluginName: string, pagePath: string) {
-  // airgate-playground 走全屏独立布局，不挂在 AppShell 里
-  if (pluginName === 'airgate-playground') {
-    if (pagePath === '/playground') return '/chat';
-    if (pagePath === '/studio') return '/studio';
-  }
+  if (pluginName === 'airgate-playground' && pagePath === '/playground') return '/chat';
+  if (pluginName === 'airgate-studio' && pagePath === '/studio') return '/studio';
   return `/plugins/${pluginName}${pagePath}`;
 }
 
-function isPlaygroundPluginPath(path: string) {
+function isStandalonePluginPath(path: string) {
   return path === '/chat' || path === '/studio' || path === '/plugins/playground' || path.includes('/plugins/airgate-playground/');
 }
 
@@ -207,7 +204,7 @@ export function AppShell({ children }: AppShellProps) {
     const pluginUserItemsMerged = pluginUserItems.map((item, i) =>
       i === 0 ? { path: item.path, labelKey: item.labelKey, icon: item.icon } : item,
     );
-    const apiKeyPluginItems = pluginUserItemsMerged.filter((item) => isPlaygroundPluginPath(item.path));
+    const apiKeyPluginItems = pluginUserItemsMerged.filter((item) => isStandalonePluginPath(item.path));
     const menuItems = isAPIKeySession
       ? [...apiKeyMenuItems, ...apiKeyPluginItems]
       : isAdmin
