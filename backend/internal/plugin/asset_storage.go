@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -19,6 +20,11 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
+)
+
+const (
+	maxAssetDownloadSize = 50 << 20
+	assetDownloadTimeout = 60 * time.Second
 )
 
 const DefaultAssetStorageDir = "data/assets"
@@ -221,6 +227,70 @@ func cleanAssetExtension(ext string) string {
 		}
 	}
 	return ext
+}
+
+func (s *assetStorage) storeFromURL(ctx context.Context, userID int64, scope, sourceURL string) (*storedAsset, error) {
+	parsed, err := url.Parse(sourceURL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return nil, fmt.Errorf("invalid source URL: must be http or https")
+	}
+
+	dlCtx, cancel := context.WithTimeout(ctx, assetDownloadTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(dlCtx, http.MethodGet, sourceURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build download request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("download asset: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download asset: HTTP %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxAssetDownloadSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("read asset body: %w", err)
+	}
+	if int64(len(data)) > maxAssetDownloadSize {
+		return nil, fmt.Errorf("asset exceeds %d bytes size limit", maxAssetDownloadSize)
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" || !strings.Contains(ct, "/") {
+		ct = "application/octet-stream"
+	}
+	if i := strings.Index(ct, ";"); i > 0 {
+		ct = strings.TrimSpace(ct[:i])
+	}
+	ext := extensionForContentType(ct)
+
+	return s.store(ctx, userID, scope, ct, ext, data)
+}
+
+func extensionForContentType(ct string) string {
+	switch strings.ToLower(ct) {
+	case "image/jpeg":
+		return ".jpg"
+	case "image/png":
+		return ".png"
+	case "image/webp":
+		return ".webp"
+	case "image/gif":
+		return ".gif"
+	case "image/svg+xml":
+		return ".svg"
+	case "video/mp4":
+		return ".mp4"
+	case "audio/mpeg":
+		return ".mp3"
+	default:
+		return ".bin"
+	}
 }
 
 func contentTypeForAssetKey(objectKey string) string {

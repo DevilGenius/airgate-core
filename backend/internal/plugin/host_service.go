@@ -176,6 +176,7 @@ const (
 	hostMethodModelsList             = "models.list"
 	hostMethodUsersGet               = "users.get"
 	hostMethodAssetsStore            = "assets.store"
+	hostMethodAssetsStoreURL         = "assets.store_url"
 	hostMethodAssetsGetURL           = "assets.get_url"
 	hostMethodAssetsGetBytes         = "assets.get_bytes"
 	hostMethodTasksCreate            = "tasks.create"
@@ -239,6 +240,12 @@ func (h *HostService) invoke(
 			return nil, err
 		}
 		return h.storeAsset(ctx, req)
+	case hostMethodAssetsStoreURL:
+		var req hostStoreAssetFromURLRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.storeAssetFromURL(ctx, req)
 	case hostMethodAssetsGetURL:
 		var req hostGetAssetURLRequest
 		if err := decodeHostPayload(payload, &req); err != nil {
@@ -356,6 +363,12 @@ type hostStoreAssetRequest struct {
 	ContentType   string `json:"content_type"`
 	FileExtension string `json:"file_extension"`
 	Data          []byte `json:"data"`
+}
+
+type hostStoreAssetFromURLRequest struct {
+	UserID    int64  `json:"user_id"`
+	Scope     string `json:"scope"`
+	SourceURL string `json:"source_url"`
 }
 
 type hostGetAssetURLRequest struct {
@@ -1206,6 +1219,30 @@ func (h *HostService) storeAsset(ctx context.Context, req hostStoreAssetRequest)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	asset, err := storage.store(ctx, req.UserID, req.Scope, req.ContentType, req.FileExtension, req.Data)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return map[string]interface{}{
+		"asset_id":     asset.ID,
+		"object_key":   asset.ObjectKey,
+		"public_url":   asset.PublicURL,
+		"size_bytes":   asset.SizeBytes,
+		"content_type": asset.ContentType,
+	}, nil
+}
+
+func (h *HostService) storeAssetFromURL(ctx context.Context, req hostStoreAssetFromURLRequest) (map[string]interface{}, error) {
+	if req.UserID <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
+	}
+	if req.SourceURL == "" {
+		return nil, status.Error(codes.InvalidArgument, "source_url is required")
+	}
+	storage, err := newAssetStorage(ctx, h.db)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	asset, err := storage.storeFromURL(ctx, req.UserID, req.Scope, req.SourceURL)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
