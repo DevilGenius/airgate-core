@@ -273,61 +273,63 @@ export default function UserUsagePage() {
   const total = data?.total ?? 0;
 
   const sharedColumns = useUsageColumns({ customerScope, adminView: false });
-  const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
-  const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
-  const userSharedColumns = sharedColumns.map((column) => (
-    column.key === 'created_at'
-      ? { ...column, width: '128px' }
-      : column
-  ));
-  const streamColumn = sharedColumns.find((column) => column.key === 'stream');
-  const timingColumns = sharedColumns.filter((column) => column.key === 'first_token_ms' || column.key === 'duration_ms');
-  const sharedColumnsAfterModel = userSharedColumns
-    .slice(modelColumnIndex + 1)
-    .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream');
-  const endpointColumn: UsageColumnConfig<UsageRow> = {
-    key: 'endpoint',
-    title: t('usage.endpoint', '端点'),
-    width: '180px',
-    hideOnMobile: true,
-    render: (row) => {
-      const endpoint = 'endpoint' in row && row.endpoint ? row.endpoint : '-';
+  const columns = useMemo(() => {
+    const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
+    const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
+    const userSharedColumns = sharedColumns.map((column) => (
+      column.key === 'created_at'
+        ? { ...column, width: '128px' }
+        : column
+    ));
+    const streamColumn = sharedColumns.find((column) => column.key === 'stream');
+    const timingColumns = sharedColumns.filter((column) => column.key === 'first_token_ms' || column.key === 'duration_ms');
+    const sharedColumnsAfterModel = userSharedColumns
+      .slice(modelColumnIndex + 1)
+      .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream');
+    const endpointColumn: UsageColumnConfig<UsageRow> = {
+      key: 'endpoint',
+      title: t('usage.endpoint', '端点'),
+      width: '180px',
+      hideOnMobile: true,
+      render: (row) => {
+        const endpoint = 'endpoint' in row && row.endpoint ? row.endpoint : '-';
 
-      return (
-        <span className="block truncate font-mono text-xs leading-tight text-text-secondary" title={endpoint}>
-          {endpoint}
-        </span>
-      );
-    },
-  };
-  const apiKeyColumn: UsageColumnConfig<UsageRow> = {
-    key: 'api_key',
-    title: 'API Key',
-    width: '96px',
-    hideOnMobile: true,
-    render: (row) => {
-      if ('api_key_deleted' in row && row.api_key_deleted) {
-        return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_deleted')}</span>;
-      }
+        return (
+          <span className="block truncate font-mono text-xs leading-tight text-text-secondary" title={endpoint}>
+            {endpoint}
+          </span>
+        );
+      },
+    };
+    const apiKeyColumn: UsageColumnConfig<UsageRow> = {
+      key: 'api_key',
+      title: 'API Key',
+      width: '96px',
+      hideOnMobile: true,
+      render: (row) => {
+        if ('api_key_deleted' in row && row.api_key_deleted) {
+          return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_deleted')}</span>;
+        }
 
-      const name = 'api_key_name' in row && row.api_key_name ? row.api_key_name : '-';
+        const name = 'api_key_name' in row && row.api_key_name ? row.api_key_name : '-';
 
-      return (
-        <span className="block max-w-full truncate text-xs text-text-secondary" title={name}>{name}</span>
-      );
-    },
-  };
-  const columns = modelColumnIndex >= 0
-    ? [
-        ...userSharedColumns.slice(0, timeColumnIndex + 1),
-        apiKeyColumn,
-        ...userSharedColumns.slice(timeColumnIndex + 1, modelColumnIndex + 1),
-        ...(streamColumn ? [streamColumn] : []),
-        ...timingColumns,
-        ...sharedColumnsAfterModel,
-        endpointColumn,
-      ]
-    : [...userSharedColumns, endpointColumn, apiKeyColumn];
+        return (
+          <span className="block max-w-full truncate text-xs text-text-secondary" title={name}>{name}</span>
+        );
+      },
+    };
+    return modelColumnIndex >= 0
+      ? [
+          ...userSharedColumns.slice(0, timeColumnIndex + 1),
+          apiKeyColumn,
+          ...userSharedColumns.slice(timeColumnIndex + 1, modelColumnIndex + 1),
+          ...(streamColumn ? [streamColumn] : []),
+          ...timingColumns,
+          ...sharedColumnsAfterModel,
+          endpointColumn,
+        ]
+      : [...userSharedColumns, endpointColumn, apiKeyColumn];
+  }, [sharedColumns, t]);
 
   return (
     <div>

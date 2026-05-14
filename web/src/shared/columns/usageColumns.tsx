@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
-import { Chip, Tooltip } from '@heroui/react';
+import { useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { Tooltip } from '@heroui/react';
 import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
 import {
   getPluginUsageCostDetail,
@@ -33,25 +33,30 @@ export interface UsageColumnConfig<T extends UsageRow = UsageRow> {
   render: (row: T) => ReactNode;
 }
 
+const RICH_TOOLTIP_TRIGGER_CLASS = 'flex h-full w-full cursor-default items-center justify-center rounded-[var(--radius)] px-1.5 py-0 text-center transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
+const RICH_TOOLTIP_OPEN_DELAY_MS = 140;
+
 function RichTooltip({
   children,
   content,
   placement = 'right',
 }: {
   children: ReactNode;
-  content: ReactNode;
+  content: () => ReactNode;
   placement?: 'left' | 'right';
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <Tooltip delay={0} closeDelay={0}>
-      <Tooltip.Trigger className="flex h-full w-full cursor-default items-center justify-center rounded-[var(--radius)] px-1.5 py-0 text-center transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+    <Tooltip delay={RICH_TOOLTIP_OPEN_DELAY_MS} closeDelay={0} onOpenChange={setIsOpen}>
+      <Tooltip.Trigger className={RICH_TOOLTIP_TRIGGER_CLASS}>
         {children}
       </Tooltip.Trigger>
       <Tooltip.Content
         className="w-[min(21rem,calc(100vw-2rem))] border border-border bg-surface p-0 shadow-lg"
         placement={placement}
       >
-        {content}
+        {isOpen ? content() : null}
       </Tooltip.Content>
     </Tooltip>
   );
@@ -290,6 +295,14 @@ function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
   return ctx;
 }
 
+function buildCostDetailContext(row: UsageLogResp, adminView: boolean) {
+  const ctx = buildUsageRecordContext(row, false);
+  if (!adminView && ctx.record && typeof ctx.record === 'object') {
+    ctx.record = { ...(ctx.record as Record<string, unknown>), account_cost: undefined, account_rate_multiplier: undefined };
+  }
+  return ctx;
+}
+
 function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
   const allMetrics = rowMetrics(row);
   const hasSDKMetrics = (row.usage_metrics?.length ?? 0) > 0;
@@ -331,18 +344,14 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
     render: (raw) => {
       const row = raw as UsageLogResp;
       const PluginUsageCostDetail = getPluginUsageCostDetail(row.platform);
-      const ctx = buildUsageRecordContext(row, false);
-      if (!adminView && ctx.record && typeof ctx.record === 'object') {
-        ctx.record = { ...(ctx.record as Record<string, unknown>), account_cost: undefined, account_rate_multiplier: undefined };
-      }
       return (
         <RichTooltip
           placement="right"
-          content={
+          content={() => (
             PluginUsageCostDetail ? (
               <PluginUsageCostDetail
                 recordId={row.id}
-                context={ctx}
+                context={buildCostDetailContext(row, adminView)}
               />
             ) : (
               <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
@@ -382,7 +391,7 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 )}
               </TooltipPanel>
             )
-          }
+          )}
         >
           <div className="flex w-full flex-col items-center font-mono text-center text-xs">
             {row.sell_rate > 0 && row.billed_cost !== row.actual_cost ? (
@@ -412,11 +421,11 @@ function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
       return (
         <RichTooltip
           placement="right"
-          content={
+          content={() => (
             <TooltipPanel title={t('usage.cost_detail')} subtitle={raw.model}>
               <TooltipRow label={t('usage.cost')} value={`$${cost.toFixed(6)}`} tone="strong" />
             </TooltipPanel>
-          }
+          )}
         >
           <div className="flex w-full flex-col items-center font-mono text-center text-xs">
             <div className="text-[15px] font-semibold leading-none text-text">${cost.toFixed(6)}</div>
@@ -437,13 +446,14 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
   const { t } = useTranslation();
   const customerScope = opts?.customerScope ?? false;
   const adminView = opts?.adminView ?? true;
-  useSyncExternalStore(subscribeUsageMetricDetailChange, getUsageMetricDetailVersion);
-  useSyncExternalStore(subscribeUsageCostDetailChange, getUsageCostDetailVersion);
-  useSyncExternalStore(subscribeUsageModelMetaChange, getUsageModelMetaVersion);
+  const metricDetailVersion = useSyncExternalStore(subscribeUsageMetricDetailChange, getUsageMetricDetailVersion);
+  const costDetailVersion = useSyncExternalStore(subscribeUsageCostDetailChange, getUsageCostDetailVersion);
+  const modelMetaVersion = useSyncExternalStore(subscribeUsageModelMetaChange, getUsageModelMetaVersion);
 
-  const costColumn = customerScope ? buildCustomerCostColumn(t) : buildResellerCostColumn(t, adminView);
+  return useMemo(() => {
+    const costColumn = customerScope ? buildCustomerCostColumn(t) : buildResellerCostColumn(t, adminView);
 
-  return [
+    return [
     {
       key: 'created_at',
       title: t('usage.time'),
@@ -526,7 +536,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         return (
           <RichTooltip
             placement="left"
-            content={
+            content={() => (
               PluginUsageMetricDetail ? (
                 <PluginUsageMetricDetail
                   recordId={row.id}
@@ -535,7 +545,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
               ) : (
                 <GenericMetricDetail row={row} t={t} />
               )
-            }
+            )}
           >
             {tokenSummaryVisible ? (
               <div className="mx-auto grid h-full max-h-[var(--ag-usage-table-row-height)] grid-cols-[minmax(0,8.75rem)_4.75rem] items-center justify-center gap-2 overflow-visible px-1">
@@ -594,15 +604,12 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       width: '72px',
       hideOnMobile: true,
       render: (row) => (
-        <Chip
-          className="px-1.5 text-[13px]"
-          color="default"
-          size="sm"
+        <span
+          className="inline-flex h-6 min-w-0 items-center justify-center rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none text-text-secondary"
           style={row.stream ? STREAM_CHIP_STYLE : undefined}
-          variant="soft"
         >
           {row.stream ? t('usage.type_stream') : t('usage.type_sync')}
-        </Chip>
+        </span>
       ),
     },
     {
@@ -627,5 +634,6 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         </span>
       ),
     },
-  ];
+    ];
+  }, [adminView, costDetailVersion, customerScope, metricDetailVersion, modelMetaVersion, t]);
 }

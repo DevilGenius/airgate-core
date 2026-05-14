@@ -729,87 +729,87 @@ export default function UsagePage() {
 
   const sharedColumns = useUsageColumns();
 
-  // 管理端额外的列（用户、API Key、上游凭证），插入在共享列之前
-  const adminColumns: UsageColumnConfig<UsageLogResp>[] = [
-    {
-      key: 'user_id',
-      title: t('common.user'),
-      width: '160px',
-      render: (row) => {
-        const label = row.user_email || `#${row.user_id}`;
-
-        return (
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0 font-mono text-xs text-text-tertiary">#{row.user_id}</span>
-            <span className="min-w-0 truncate text-[13px] font-medium text-text" title={label}>
-              {label}
-            </span>
-          </div>
-        );
-      },
-    },
-  ];
   const platformOptions = [
     { id: '', label: t('common.all') },
     ...platforms.map((p) => ({ id: p, label: platformName(p) })),
   ];
   const selectedPlatformLabel = platformOptions.find((item) => item.id === (filters.platform || ''))?.label ?? t('common.all');
 
-  // 插入管理列。
-  const modelIdx = sharedColumns.findIndex((c) => c.key === 'model');
-  const streamColumn = sharedColumns.find((column) => column.key === 'stream');
-  const timingColumns = sharedColumns.filter((column) => column.key === 'first_token_ms' || column.key === 'duration_ms');
-  const sharedColumnsAfterModel = sharedColumns
-    .slice(modelIdx + 1)
-    .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream');
-  const endpointColumn: UsageColumnConfig<UsageLogResp> = {
-    key: 'endpoint',
-    title: t('usage.endpoint', '端点'),
-    width: '180px',
-    hideOnMobile: true,
-    render: (row) => (
-      <span className="block truncate font-mono text-xs leading-tight text-text-secondary" title={row.endpoint || '-'}>
-        {row.endpoint || '-'}
-      </span>
-    ),
-  };
-  const apiKeyColumn: UsageColumnConfig<UsageLogResp> = {
-    key: 'api_key',
-    title: 'API Key',
-    width: '124px',
-    hideOnMobile: true,
-    render: (row) => {
-      if (row.api_key_deleted) {
-        return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_deleted')}</span>;
-      }
-      const name = row.api_key_name || '-';
-      return (
-        <span className="block max-w-full truncate text-xs text-text-secondary" title={name}>{name}</span>
-      );
-    },
-  };
-  const accountColumn: UsageColumnConfig<UsageLogResp> = {
-    key: 'account_name',
-    title: t('usage.upstream_credential', '上游凭证'),
-    width: '172px',
-    hideOnMobile: true,
-    render: (row) => {
-      const label = row.account_name || '-';
-      return (
-        <span className="block max-w-full truncate text-xs text-text-secondary" title={label}>{label}</span>
-      );
-    },
-  };
-  const columns: UsageColumnConfig<UsageLogResp>[] = [
-    ...adminColumns,
-    ...sharedColumns.slice(0, modelIdx + 1),
-    ...(streamColumn ? [streamColumn] : []),
-    ...timingColumns,
-    ...sharedColumnsAfterModel,
-    endpointColumn,
-    apiKeyColumn,
-    accountColumn,
-  ];
+  const columns = useMemo(() => {
+    const adminColumns: UsageColumnConfig<UsageLogResp>[] = [
+      {
+        key: 'user_id',
+        title: t('common.user'),
+        width: '160px',
+        render: (row) => {
+          const label = row.user_email || `#${row.user_id}`;
+
+          return (
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="shrink-0 font-mono text-xs text-text-tertiary">#{row.user_id}</span>
+              <span className="min-w-0 truncate text-[13px] font-medium text-text" title={label}>
+                {label}
+              </span>
+            </div>
+          );
+        },
+      },
+    ];
+    const modelIdx = sharedColumns.findIndex((c) => c.key === 'model');
+    const streamColumn = sharedColumns.find((column) => column.key === 'stream');
+    const timingColumns = sharedColumns.filter((column) => column.key === 'first_token_ms' || column.key === 'duration_ms');
+    const sharedColumnsAfterModel = sharedColumns
+      .slice(modelIdx + 1)
+      .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream');
+    const endpointColumn: UsageColumnConfig<UsageLogResp> = {
+      key: 'endpoint',
+      title: t('usage.endpoint', '端点'),
+      width: '180px',
+      hideOnMobile: true,
+      render: (row) => (
+        <span className="block truncate font-mono text-xs leading-tight text-text-secondary" title={row.endpoint || '-'}>
+          {row.endpoint || '-'}
+        </span>
+      ),
+    };
+    const apiKeyColumn: UsageColumnConfig<UsageLogResp> = {
+      key: 'api_key',
+      title: 'API Key',
+      width: '124px',
+      hideOnMobile: true,
+      render: (row) => {
+        if (row.api_key_deleted) {
+          return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_deleted')}</span>;
+        }
+        const name = row.api_key_name || '-';
+        return (
+          <span className="block max-w-full truncate text-xs text-text-secondary" title={name}>{name}</span>
+        );
+      },
+    };
+    const accountColumn: UsageColumnConfig<UsageLogResp> = {
+      key: 'account_name',
+      title: t('usage.upstream_credential', '上游凭证'),
+      width: '172px',
+      hideOnMobile: true,
+      render: (row) => {
+        const label = row.account_name || '-';
+        return (
+          <span className="block max-w-full truncate text-xs text-text-secondary" title={label}>{label}</span>
+        );
+      },
+    };
+    return [
+      ...adminColumns,
+      ...sharedColumns.slice(0, modelIdx + 1),
+      ...(streamColumn ? [streamColumn] : []),
+      ...timingColumns,
+      ...sharedColumnsAfterModel,
+      endpointColumn,
+      apiKeyColumn,
+      accountColumn,
+    ] as UsageColumnConfig<UsageLogResp>[];
+  }, [sharedColumns, t]);
   const total = data?.total ?? 0;
 
   return (

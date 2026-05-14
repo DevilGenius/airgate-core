@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { EmptyState, Table as HeroTable } from '@heroui/react';
 import { Inbox } from 'lucide-react';
 import type { UsageColumnConfig, UsageRow } from '../columns/usageColumns';
@@ -106,6 +106,45 @@ function useNewRowMarkers<T extends UsageRow>({
   return markedRowIds;
 }
 
+const UsageTableRow = memo(function UsageTableRow({
+  columns,
+  isNew,
+  row,
+}: {
+  columns: UsageColumnConfig[];
+  isNew: boolean;
+  row: UsageRow;
+}) {
+  return (
+    <HeroTable.Row
+      id={String(row.id)}
+      className={isNew ? 'ag-usage-table-row--new' : undefined}
+    >
+      {columns.map((column) => {
+        const fullCellContent = FULL_CELL_CONTENT_COLUMNS.has(column.key);
+        const leftAlignedContent = LEFT_ALIGNED_CONTENT_COLUMNS.has(column.key);
+
+        return (
+          <HeroTable.Cell
+            key={column.key}
+            className={cx(getColumnClassName(column.key), leftAlignedContent ? 'text-left' : 'text-center')}
+          >
+            <div
+              className={cx(
+                'flex h-[var(--ag-usage-table-row-height)] w-full items-center overflow-hidden',
+                leftAlignedContent ? 'justify-start text-left' : 'justify-center text-center',
+                fullCellContent ? 'px-1 py-0.5' : 'px-2.5 py-0.5',
+              )}
+            >
+              {column.render(row)}
+            </div>
+          </HeroTable.Cell>
+        );
+      })}
+    </HeroTable.Row>
+  );
+});
+
 export function UsageRecordsTable<T extends UsageRow>({
   ariaLabel,
   columns,
@@ -209,33 +248,12 @@ export function UsageRecordsTable<T extends UsageRow>({
             {isLoading
               ? <TableLoadingRow colSpan={columns.length} />
               : rows.map((row) => (
-                  <HeroTable.Row
-                    id={String(row.id)}
+                  <UsageTableRow
                     key={row.id}
-                    className={markedRowIds.has(String(row.id)) ? 'ag-usage-table-row--new' : undefined}
-                  >
-                    {columns.map((column) => {
-                      const fullCellContent = FULL_CELL_CONTENT_COLUMNS.has(column.key);
-                      const leftAlignedContent = LEFT_ALIGNED_CONTENT_COLUMNS.has(column.key);
-
-                      return (
-                        <HeroTable.Cell
-                          key={column.key}
-                          className={cx(getColumnClassName(column.key), leftAlignedContent ? 'text-left' : 'text-center')}
-                        >
-                          <div
-                            className={cx(
-                              'flex h-[var(--ag-usage-table-row-height)] w-full items-center overflow-hidden',
-                              leftAlignedContent ? 'justify-start text-left' : 'justify-center text-center',
-                              fullCellContent ? 'px-1 py-0.5' : 'px-2.5 py-0.5',
-                            )}
-                          >
-                            {column.render(row)}
-                          </div>
-                        </HeroTable.Cell>
-                      );
-                    })}
-                  </HeroTable.Row>
+                    columns={columns as UsageColumnConfig[]}
+                    isNew={markedRowIds.has(String(row.id))}
+                    row={row}
+                  />
                 ))}
           </HeroTable.Body>
         </HeroTable.Content>
