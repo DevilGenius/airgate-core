@@ -86,6 +86,7 @@ type AccountUsageInfo = {
 type AccountUsageData = { accounts?: Record<string, AccountUsageInfo> };
 type CachedUsageWindow = {
   resetAtMs: number;
+  usedPercent: number;
   window: AccountUsageWindow;
 };
 type AccountUsageWindowCache = Map<string, CachedUsageWindow>;
@@ -112,6 +113,15 @@ function getUsageWindowResetAtMs(window: AccountUsageWindow, now: number) {
   return 0;
 }
 
+function getUsageWindowUsedPercent(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
 function windowWithCachedReset(window: AccountUsageWindow, resetAtMs: number, now: number): AccountUsageWindow {
   if (resetAtMs <= now) {
     return {
@@ -136,37 +146,35 @@ function mergeCachedUsageWindows(data: AccountUsageData | undefined, cache: Acco
   for (const [accountId, usage] of Object.entries(data.accounts)) {
     const rawWindows = Array.isArray(usage?.windows) ? usage.windows : [];
     const mergedWindows: AccountUsageWindow[] = [];
-    const seenWindowKeys = new Set<string>();
 
     for (const window of rawWindows) {
       const cacheKey = getUsageWindowCacheKey(accountId, window);
       const resetAtMs = getUsageWindowResetAtMs(window, now);
       const cached = cache.get(cacheKey);
+      const usedPercent = getUsageWindowUsedPercent(window.used_percent)
+        ?? cached?.usedPercent
+        ?? 0;
       const effectiveResetAtMs = resetAtMs > now
         ? resetAtMs
         : cached && cached.resetAtMs > now
           ? cached.resetAtMs
           : 0;
+      const windowWithCachedUsage = {
+        ...window,
+        used_percent: usedPercent,
+      };
       const nextWindow = effectiveResetAtMs > now
-        ? windowWithCachedReset(window, effectiveResetAtMs, now)
+        ? windowWithCachedReset(windowWithCachedUsage, effectiveResetAtMs, now)
         : {
-            ...window,
+            ...windowWithCachedUsage,
             reset_seconds: Number(window.reset_seconds ?? 0),
           };
 
-      if (effectiveResetAtMs > now) {
-        cache.set(cacheKey, { resetAtMs: effectiveResetAtMs, window: nextWindow });
-        liveCacheKeys.add(cacheKey);
-      }
-      seenWindowKeys.add(cacheKey);
-      mergedWindows.push(nextWindow);
-    }
-
-    for (const [cacheKey, cached] of cache.entries()) {
-      if (!cacheKey.startsWith(`${accountId}:`) || seenWindowKeys.has(cacheKey)) continue;
-      if (cached.resetAtMs <= now) continue;
-      const nextWindow = windowWithCachedReset(cached.window, cached.resetAtMs, now);
-      cache.set(cacheKey, { resetAtMs: cached.resetAtMs, window: nextWindow });
+      cache.set(cacheKey, {
+        resetAtMs: effectiveResetAtMs > now ? effectiveResetAtMs : 0,
+        usedPercent,
+        window: nextWindow,
+      });
       liveCacheKeys.add(cacheKey);
       mergedWindows.push(nextWindow);
     }
@@ -177,8 +185,8 @@ function mergeCachedUsageWindows(data: AccountUsageData | undefined, cache: Acco
     };
   }
 
-  for (const [cacheKey, cached] of cache.entries()) {
-    if (cached.resetAtMs <= now || !liveCacheKeys.has(cacheKey)) {
+  for (const cacheKey of cache.keys()) {
+    if (!liveCacheKeys.has(cacheKey)) {
       cache.delete(cacheKey);
     }
   }
