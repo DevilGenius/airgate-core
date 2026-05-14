@@ -48,10 +48,10 @@ func openAIRateLimitError(c *gin.Context, status int, code, message string, retr
 
 // writeResult 是一次 forward 的终点。按 outcome.Kind 分派响应写入。
 //
-//	系统错误（err != nil）    → 记录判决 + 脱敏错误响应
+//	系统错误（err != nil）    → 记录判决 + 尽量透传插件回传的上游响应
 //	Success                   → 计费 + 透传上游响应
-//	ClientError               → 透传上游响应（客户端能看到原始错误），可选计费
-//	账号级 / 上游抖动 / 流中断 → 脱敏错误响应
+//	ClientError               → 透传插件回传的上游响应，可选计费
+//	账号级 / 上游抖动 / 流中断 → 未触发 failover 或最终失败时，优先透传插件回传的上游响应
 func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution forwardExecution) {
 	ctx := c.Request.Context()
 
@@ -74,15 +74,14 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 			writeUpstream(c, execution.outcome.Upstream)
 		}
 	case sdk.OutcomeClientError:
-		slog.Warn("上游返回客户端错误，脱敏响应给客户端",
+		slog.Warn("上游返回客户端错误，交由 Core 返回上游响应",
 			"plugin", state.plugin.Name,
 			"account_id", state.account.ID,
 			"group_id", state.keyInfo.GroupID,
 			"status_code", execution.outcome.Upstream.StatusCode,
 			"reason", execution.outcome.Reason)
-		if !state.stream {
-			statusCode := sanitizedClientErrorStatus(execution.outcome)
-			openAIError(c, statusCode, "invalid_request_error", "invalid_request", sanitizedClientErrorMessage(execution.outcome))
+		if !state.stream || !c.Writer.Written() {
+			writeClientErrorResponse(c, execution.outcome)
 		}
 		if execution.outcome.Usage != nil {
 			f.recordUsage(c, state, execution)
@@ -103,6 +102,14 @@ func sanitizedClientErrorStatus(outcome sdk.ForwardOutcome) int {
 		return status
 	}
 	return http.StatusBadRequest
+}
+
+func writeClientErrorResponse(c *gin.Context, outcome sdk.ForwardOutcome) {
+	if writeUpstreamIfPresent(c, outcome.Upstream) {
+		return
+	}
+	statusCode := sanitizedClientErrorStatus(outcome)
+	openAIError(c, statusCode, "invalid_request_error", "invalid_request", sanitizedClientErrorMessage(outcome))
 }
 
 func sanitizedClientErrorMessage(outcome sdk.ForwardOutcome) string {
@@ -149,6 +156,9 @@ func extractErrorMessage(body []byte) string {
 // 按 Kind 给出大类说明。流式已写入时 no-op。
 func writeFailureResponse(c *gin.Context, state *forwardState, execution forwardExecution) {
 	if state.stream && c.Writer.Written() {
+		return
+	}
+	if writeUpstreamIfPresent(c, execution.outcome.Upstream) {
 		return
 	}
 	pluginName := ""
@@ -351,6 +361,14 @@ func writeUpstream(c *gin.Context, up sdk.UpstreamResponse) {
 	}
 	c.Writer.WriteHeader(status)
 	_, _ = c.Writer.Write(up.Body)
+}
+
+func writeUpstreamIfPresent(c *gin.Context, up sdk.UpstreamResponse) bool {
+	if up.StatusCode == 0 || len(up.Body) == 0 {
+		return false
+	}
+	writeUpstream(c, up)
+	return true
 }
 
 // updateAccountCredentials 异步 merge 写入账号凭证，保留未变更字段。

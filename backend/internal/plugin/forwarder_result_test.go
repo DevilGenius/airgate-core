@@ -69,6 +69,53 @@ func TestWriteFailureResponse_StreamAfterResponseStarts(t *testing.T) {
 	}
 }
 
+func TestWriteClientErrorResponse_StreamBeforeResponseStarts(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+
+	writeClientErrorResponse(c, sdk.ForwardOutcome{
+		Kind: sdk.OutcomeClientError,
+		Upstream: sdk.UpstreamResponse{
+			StatusCode: http.StatusBadRequest,
+		},
+		Reason: "模型不支持",
+	})
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if body := recorder.Body.String(); !strings.Contains(body, "模型不支持") {
+		t.Fatalf("body = %q, want contain '模型不支持'", body)
+	}
+}
+
+func TestWriteClientErrorResponse_PassesThroughUpstreamBody(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	body := `{"error":{"message":"模型不存在","type":"invalid_request_error","code":"model_not_found"}}`
+
+	writeClientErrorResponse(c, sdk.ForwardOutcome{
+		Kind: sdk.OutcomeClientError,
+		Upstream: sdk.UpstreamResponse{
+			StatusCode: http.StatusBadRequest,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body:       []byte(body),
+		},
+		Reason: "HTTP 400: 模型不存在",
+	})
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if got := recorder.Body.String(); got != body {
+		t.Fatalf("body = %q, want upstream body", got)
+	}
+}
+
 func TestWriteFailureResponse_NonStreamAlwaysWrites(t *testing.T) {
 	t.Parallel()
 
@@ -84,6 +131,34 @@ func TestWriteFailureResponse_NonStreamAlwaysWrites(t *testing.T) {
 	}
 	if body := recorder.Body.String(); !strings.Contains(body, "上游账号不可用") {
 		t.Fatalf("body = %q, want contain '上游账号不可用'", body)
+	}
+}
+
+func TestWriteAllRoutesFailed_PassesThroughLastUpstream(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	body := `{"error":{"message":"上游服务暂不可用"}}`
+	var summary allRoutesFailureSummary
+	summary.recordExecution(forwardExecution{
+		outcome: sdk.ForwardOutcome{
+			Kind: sdk.OutcomeUpstreamTransient,
+			Upstream: sdk.UpstreamResponse{
+				StatusCode: http.StatusBadGateway,
+				Headers:    http.Header{"Content-Type": []string{"application/json"}},
+				Body:       []byte(body),
+			},
+		},
+	})
+
+	writeAllRoutesFailed(c, summary)
+
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadGateway)
+	}
+	if got := recorder.Body.String(); got != body {
+		t.Fatalf("body = %q, want upstream body", got)
 	}
 }
 

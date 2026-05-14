@@ -476,6 +476,60 @@ func TestExtractBodyError(t *testing.T) {
 	}
 }
 
+func TestConnectivityTestErrorMessage(t *testing.T) {
+	cases := []struct {
+		name    string
+		outcome sdk.ForwardOutcome
+		want    string
+	}{
+		{
+			name: "优先透传上游错误体",
+			outcome: sdk.ForwardOutcome{
+				Kind: sdk.OutcomeClientError,
+				Upstream: sdk.UpstreamResponse{
+					StatusCode: http.StatusBadRequest,
+					Body:       []byte(`{"error":{"message":"model not supported"}}`),
+				},
+				Reason: "HTTP 400: fallback reason",
+			},
+			want: "HTTP 400: model not supported",
+		},
+		{
+			name: "客户端错误可用 reason 兜底",
+			outcome: sdk.ForwardOutcome{
+				Kind:     sdk.OutcomeClientError,
+				Upstream: sdk.UpstreamResponse{StatusCode: http.StatusBadRequest},
+				Reason:   "The model is not supported.",
+			},
+			want: "HTTP 400: The model is not supported.",
+		},
+		{
+			name: "空流诊断不直接展示给用户",
+			outcome: sdk.ForwardOutcome{
+				Kind:     sdk.OutcomeUpstreamTransient,
+				Upstream: sdk.UpstreamResponse{StatusCode: http.StatusBadGateway},
+				Reason:   "上游流式响应为空：已收到完成事件但没有文本、工具调用或响应输出",
+			},
+			want: "上游未返回有效响应，请检查测试模型是否被该上游账号支持或查看上游日志",
+		},
+		{
+			name: "账号限流使用统一提示",
+			outcome: sdk.ForwardOutcome{
+				Kind: sdk.OutcomeAccountRateLimited,
+			},
+			want: "上游账号当前被限流，请稍后重试",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := connectivityTestErrorMessage(c.outcome); got != c.want {
+				t.Fatalf("connectivityTestErrorMessage() = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
 func TestPersistRateLimitFromWindows(t *testing.T) {
 	writer := newStubStateWriter()
 	svc := NewService(stubRepository{}, nil, nil, writer)

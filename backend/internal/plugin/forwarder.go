@@ -111,13 +111,18 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	}
 	defer releaseClientQuota()
 
-	routes := routesForAPIKey(state, routing.Requirements{
+	requirements := routing.Requirements{
 		NeedsImage: requestNeedsImage(state.requestPath, state.model),
-	})
+	}
+	routes := routesForAPIKey(state, requirements)
 	if len(routes) == 0 {
 		logger.Warn("forward_no_eligible_route",
 			sdk.LogFieldUserID, state.keyInfo.UserID,
 		)
+		if errResp, ok := apiKeyGroupRequirementError(state.keyInfo, requirements); ok {
+			openAIError(c, errResp.status, errResp.errType, errResp.code, errResp.message)
+			return
+		}
 		openAIError(c, http.StatusServiceUnavailable, "server_error", "no_available_route", "请求暂时无法完成，请稍后重试")
 		return
 	}
@@ -272,9 +277,15 @@ type allRoutesFailureSummary struct {
 	accountDeadSeen       bool
 	upstreamTimeoutSeen   bool
 	upstreamFailureSeen   bool
+	lastUpstream          sdk.UpstreamResponse
+	hasLastUpstream       bool
 }
 
 func (s *allRoutesFailureSummary) recordExecution(execution forwardExecution) {
+	if returnableUpstream(execution.outcome.Upstream) {
+		s.lastUpstream = execution.outcome.Upstream
+		s.hasLastUpstream = true
+	}
 	switch execution.outcome.Kind {
 	case sdk.OutcomeAccountRateLimited:
 		s.rateLimitedSeen = true
@@ -320,6 +331,10 @@ type allRoutesFailureResponse struct {
 }
 
 func writeAllRoutesFailed(c *gin.Context, summary allRoutesFailureSummary) {
+	if summary.hasLastUpstream {
+		writeUpstream(c, summary.lastUpstream)
+		return
+	}
 	response := selectAllRoutesFailureResponse(summary)
 	if response.status == http.StatusTooManyRequests {
 		openAIRateLimitError(c, response.status, response.code, response.message, response.retryAfter)
@@ -383,6 +398,10 @@ func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFa
 	}
 }
 
+func returnableUpstream(up sdk.UpstreamResponse) bool {
+	return up.StatusCode > 0 && len(up.Body) > 0
+}
+
 func isTimeoutFailure(execution forwardExecution) bool {
 	if execution.outcome.Upstream.StatusCode == http.StatusGatewayTimeout {
 		return true
@@ -417,6 +436,37 @@ func apiKeyGroupMatchesRequirements(keyInfo *auth.APIKeyInfo, requirements routi
 		return imageEnabled == requirements.NeedsImage
 	}
 	return true
+}
+
+type groupRequirementError struct {
+	status  int
+	errType string
+	code    string
+	message string
+}
+
+func apiKeyGroupRequirementError(keyInfo *auth.APIKeyInfo, requirements routing.Requirements) (groupRequirementError, bool) {
+	if keyInfo == nil || !strings.EqualFold(keyInfo.GroupPlatform, "openai") {
+		return groupRequirementError{}, false
+	}
+	imageEnabled := pluginSettingEnabledForKey(keyInfo.GroupPluginSettings, "openai", "image_enabled")
+	if requirements.NeedsImage && !imageEnabled {
+		return groupRequirementError{
+			status:  http.StatusForbidden,
+			errType: "invalid_request_error",
+			code:    "image_generation_disabled",
+			message: "当前分组未开启图片生成功能",
+		}, true
+	}
+	if !requirements.NeedsImage && imageEnabled {
+		return groupRequirementError{
+			status:  http.StatusBadRequest,
+			errType: "invalid_request_error",
+			code:    "chat_generation_disabled",
+			message: "当前分组未开启对话功能",
+		}, true
+	}
+	return groupRequirementError{}, false
 }
 
 func pluginSettingEnabledForKey(settings map[string]map[string]string, plugin, key string) bool {

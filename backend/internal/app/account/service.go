@@ -441,10 +441,7 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			if outcome.Kind == sdk.OutcomeSuccess {
 				return nil
 			}
-			msg := outcome.Reason
-			if msg == "" {
-				msg = extractBodyError(outcome.Upstream.Body)
-			}
+			msg := connectivityTestErrorMessage(outcome)
 			if msg == "" && outcome.Upstream.StatusCode > 0 {
 				msg = fmt.Sprintf("upstream returned HTTP %d", outcome.Upstream.StatusCode)
 			}
@@ -454,6 +451,56 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			return errors.New(msg)
 		},
 	}, nil
+}
+
+func connectivityTestErrorMessage(outcome sdk.ForwardOutcome) string {
+	if msg := extractBodyError(outcome.Upstream.Body); msg != "" {
+		return formatConnectivityHTTPMessage(outcome.Upstream.StatusCode, msg)
+	}
+
+	reason := strings.TrimSpace(outcome.Reason)
+	if isConnectivityInternalDiagnostic(reason) {
+		reason = ""
+	}
+
+	switch outcome.Kind {
+	case sdk.OutcomeClientError:
+		if reason == "" {
+			reason = "请求参数或测试模型不被上游接受"
+		}
+		return formatConnectivityHTTPMessage(outcome.Upstream.StatusCode, reason)
+	case sdk.OutcomeAccountRateLimited:
+		if outcome.RetryAfter > 0 {
+			return fmt.Sprintf("上游账号当前被限流，请在 %s 后重试", outcome.RetryAfter)
+		}
+		return "上游账号当前被限流，请稍后重试"
+	case sdk.OutcomeAccountDead:
+		if reason != "" {
+			return "上游账号不可用: " + reason
+		}
+		return "上游账号不可用，请检查凭证或账号状态"
+	case sdk.OutcomeStreamAborted:
+		return "上游响应流中断，请稍后重试或查看上游日志"
+	case sdk.OutcomeUpstreamTransient:
+		if reason != "" {
+			return "上游服务暂不可用: " + reason
+		}
+		return "上游未返回有效响应，请检查测试模型是否被该上游账号支持或查看上游日志"
+	default:
+		return reason
+	}
+}
+
+func formatConnectivityHTTPMessage(statusCode int, msg string) string {
+	if statusCode >= 400 && !strings.HasPrefix(strings.ToUpper(msg), "HTTP ") {
+		return fmt.Sprintf("HTTP %d: %s", statusCode, msg)
+	}
+	return msg
+}
+
+func isConnectivityInternalDiagnostic(reason string) bool {
+	return strings.Contains(reason, "上游流式响应为空") ||
+		strings.Contains(reason, "未收到上游流式完成事件")
 }
 
 // extractBodyError 从上游错误响应 body 中提取人类可读的错误消息。
