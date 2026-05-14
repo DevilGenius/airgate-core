@@ -256,6 +256,48 @@ func TestRoutesForAPIKeyRejectsChatWhenBoundGroupImageEnabled(t *testing.T) {
 	}
 }
 
+func TestAPIKeyGroupRequirementErrorImageDisabled(t *testing.T) {
+	t.Parallel()
+
+	errResp, ok := apiKeyGroupRequirementError(&auth.APIKeyInfo{
+		GroupPlatform:       "openai",
+		GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "false"}},
+	}, routing.Requirements{NeedsImage: true})
+	if !ok {
+		t.Fatal("ok = false, want true")
+	}
+	if errResp.status != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", errResp.status, http.StatusForbidden)
+	}
+	if errResp.code != "image_generation_disabled" {
+		t.Fatalf("code = %q, want image_generation_disabled", errResp.code)
+	}
+	if errResp.message != "当前分组未开启图片生成功能" {
+		t.Fatalf("message = %q", errResp.message)
+	}
+}
+
+func TestAPIKeyGroupRequirementErrorChatDisabled(t *testing.T) {
+	t.Parallel()
+
+	errResp, ok := apiKeyGroupRequirementError(&auth.APIKeyInfo{
+		GroupPlatform:       "openai",
+		GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "true"}},
+	}, routing.Requirements{})
+	if !ok {
+		t.Fatal("ok = false, want true")
+	}
+	if errResp.status != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", errResp.status, http.StatusBadRequest)
+	}
+	if errResp.code != "chat_generation_disabled" {
+		t.Fatalf("code = %q, want chat_generation_disabled", errResp.code)
+	}
+	if errResp.message != "当前分组未开启对话功能" {
+		t.Fatalf("message = %q", errResp.message)
+	}
+}
+
 func TestSelectAllRoutesFailureResponse(t *testing.T) {
 	t.Parallel()
 

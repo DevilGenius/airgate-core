@@ -648,6 +648,8 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 	defer cancel()
 
 	hardExclude := make([]int, 0, maxHostForwardAttempts*len(routes))
+	var lastUpstream sdk.UpstreamResponse
+	hasLastUpstream := false
 	for _, route := range routes {
 		model := h.resolveHostModel(route.Platform, req.Model)
 		if model == "" {
@@ -695,6 +697,10 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
 			duration := time.Since(start)
 			h.applyHostOutcome(ctx, acc.ID, accFull, model, outcome, duration)
+			if returnableUpstream(outcome.Upstream) {
+				lastUpstream = outcome.Upstream
+				hasLastUpstream = true
+			}
 
 			if fwdErr != nil || outcome.Kind.ShouldFailover() {
 				slog.Warn("host_forward_attempt_failed",
@@ -717,6 +723,9 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 					sdk.LogFieldStatus, outcome.Upstream.StatusCode,
 					sdk.LogFieldReason, outcome.Reason,
 				)
+				if returnableUpstream(outcome.Upstream) {
+					return hostForwardPayload(outcome), nil
+				}
 				return nil, hostForwardClientError(outcome)
 			}
 			if outcome.Kind != sdk.OutcomeSuccess {
@@ -726,14 +735,13 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 					"kind", outcome.Kind,
 					sdk.LogFieldReason, outcome.Reason,
 				)
+				if returnableUpstream(outcome.Upstream) {
+					return hostForwardPayload(outcome), nil
+				}
 				break
 			}
 
-			resp := map[string]interface{}{
-				"status_code": outcome.Upstream.StatusCode,
-				"headers":     httpHeadersToProtoHost(outcome.Upstream.Headers),
-				"body":        string(outcome.Upstream.Body),
-			}
+			resp := hostForwardPayload(outcome)
 
 			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
 				if usageID, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration); err != nil {
@@ -752,6 +760,9 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 		}
 	}
 
+	if hasLastUpstream {
+		return hostForwardPayload(sdk.ForwardOutcome{Upstream: lastUpstream}), nil
+	}
 	return nil, hostForwardGenericError()
 }
 
@@ -1398,6 +1409,14 @@ func hostForwardGenericError() error {
 
 func hostForwardClientError(outcome sdk.ForwardOutcome) error {
 	return status.Error(codes.InvalidArgument, sanitizedClientErrorMessage(outcome))
+}
+
+func hostForwardPayload(outcome sdk.ForwardOutcome) map[string]interface{} {
+	return map[string]interface{}{
+		"status_code": outcome.Upstream.StatusCode,
+		"headers":     httpHeadersToProtoHost(outcome.Upstream.Headers),
+		"body":        string(outcome.Upstream.Body),
+	}
 }
 
 func hostForwardInsufficientQuotaError() error {
