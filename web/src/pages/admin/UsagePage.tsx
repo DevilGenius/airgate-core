@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, Card, ComboBox, Input, ListBox, Select, Switch, Tabs, TextField as HeroTextField } from '@heroui/react';
+import { Button, Card, ComboBox, Input, ListBox, Select, Switch, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { usePagination } from '../../shared/hooks/usePagination';
@@ -15,6 +15,7 @@ import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/ty
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
+import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { PIE_CHART_COLORS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 
@@ -388,8 +389,6 @@ export default function UsagePage() {
   const { t } = useTranslation();
   const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.usage');
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
-  const [modelInput, setModelInput] = useState('');
-  const debouncedModel = useDebouncedValue(modelInput.trim(), 250);
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
   const [granularity, setGranularity] = useState<string>('hour');
   const [autoRefresh, setAutoRefresh] = usePersistentBoolean(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, false);
@@ -397,11 +396,11 @@ export default function UsagePage() {
   const pageActive = useDeferredActivation(USAGE_PAGE_ACTIVATION_DELAY_MS);
   const autoRefreshInterval = autoRefresh ? USAGE_AUTO_UPDATE_INTERVAL_MS : false;
 
-  useEffect(() => {
-    const nextModel = debouncedModel || undefined;
-    setFilters((prev) => (prev.model === nextModel ? prev : { ...prev, model: nextModel }));
+  const handleModelChange = useCallback((model: string) => {
+    const nextModel = model || undefined;
     setPage(1);
-  }, [debouncedModel, setPage]);
+    setFilters((prev) => (prev.model === nextModel ? prev : { ...prev, model: nextModel }));
+  }, [setPage]);
 
   // 用户搜索
   const [userKeyword, setUserKeyword] = useState('');
@@ -744,17 +743,12 @@ export default function UsagePage() {
           </Select>
         </div>
         <div className="w-full sm:w-48">
-          <HeroTextField fullWidth>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
-              <Input
-                className="pl-9"
-                placeholder={t('usage.model_placeholder')}
-                value={modelInput}
-                onChange={(e) => setModelInput(e.target.value)}
-              />
-            </div>
-          </HeroTextField>
+          <UsageModelFilterInput
+            ariaLabel={t('usage.model', 'Model')}
+            placeholder={t('usage.model_placeholder')}
+            value={filters.model ?? ''}
+            onModelChange={handleModelChange}
+          />
         </div>
         <div className="w-full sm:w-48">
           <ComboBox

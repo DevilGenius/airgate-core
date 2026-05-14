@@ -75,9 +75,11 @@ export function UsageDateRangeFilter({
               <X className="h-3.5 w-3.5" />
             </Button>
           ) : null}
-          <DateRangePicker.Trigger>
-            <DateRangePicker.TriggerIndicator />
-          </DateRangePicker.Trigger>
+          {!value ? (
+            <DateRangePicker.Trigger className="ag-date-range-trigger">
+              <DateRangePicker.TriggerIndicator />
+            </DateRangePicker.Trigger>
+          ) : null}
         </DateField.Suffix>
       </DateField.Group>
       <DateRangePicker.Popover>
