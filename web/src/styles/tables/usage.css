@@ -1,0 +1,89 @@
+/* 使用记录表格：固定 header / row 高度，避免中英文切换造成尺寸漂移。 */
+
+.ag-usage-records-table {
+  --ag-usage-table-header-height: 2.375rem;
+  --ag-usage-table-row-height: 2.5rem;
+}
+
+.ag-usage-table {
+  table-layout: fixed;
+}
+
+.ag-usage-table :where([data-slot="table-header"] [data-slot="table-row"],
+  [data-slot="thead"] [data-slot="tr"],
+  .table__header .table__row) {
+  height: var(--ag-usage-table-header-height) !important;
+}
+
+.ag-usage-table :where([data-slot="table-column"], [data-slot="th"], .table__column) {
+  overflow: hidden !important;
+  height: var(--ag-usage-table-header-height) !important;
+  min-height: var(--ag-usage-table-header-height) !important;
+  max-height: var(--ag-usage-table-header-height) !important;
+  letter-spacing: 0 !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  text-transform: none !important;
+  white-space: nowrap !important;
+}
+
+.ag-usage-table :where([data-slot="table-column"] > *, [data-slot="th"] > *, .table__column > *) {
+  justify-content: center !important;
+  height: 100%;
+  min-height: 0;
+}
+
+.ag-usage-table :where([data-slot="table-body"] [data-slot="table-row"],
+  [data-slot="tbody"] [data-slot="tr"],
+  .table__body .table__row) {
+  height: var(--ag-usage-table-row-height) !important;
+  min-height: var(--ag-usage-table-row-height) !important;
+  max-height: var(--ag-usage-table-row-height) !important;
+}
+
+.ag-usage-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
+  height: var(--ag-usage-table-row-height) !important;
+  min-height: var(--ag-usage-table-row-height) !important;
+  max-height: var(--ag-usage-table-row-height) !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+}
+
+.ag-usage-table :where([data-slot="table-body"] [data-slot="table-row"]:hover [data-slot="table-cell"],
+  [data-slot="tbody"] [data-slot="tr"]:hover [data-slot="td"],
+  .table__body .table__row:hover .table__cell,
+  .table__body .table__row[data-hovered="true"] .table__cell) {
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
+}
+
+@keyframes ag-usage-row-new-enter {
+  0% {
+    background: color-mix(in oklab, var(--success) 24%, transparent);
+    box-shadow: inset 0 0 0 999px color-mix(in oklab, var(--success) 18%, transparent);
+  }
+
+  100% {
+    background: transparent;
+    box-shadow: inset 0 0 0 999px transparent;
+  }
+}
+
+.ag-usage-table :where(.ag-usage-table-row--new [data-slot="table-cell"],
+  .ag-usage-table-row--new [data-slot="td"],
+  .ag-usage-table-row--new .table__cell) {
+  animation: ag-usage-row-new-enter 1.4s ease-out both;
+}
+
+@media (max-width: 1023px) {
+  .ag-usage-table {
+    min-width: calc(var(--ag-usage-table-min-width) - var(--ag-usage-table-mobile-delta)) !important;
+  }
+
+  .ag-usage-table .ag-usage-col-created_at {
+    width: 92px !important;
+    min-width: 92px !important;
+    max-width: 92px !important;
+  }
+
+}

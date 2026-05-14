@@ -1,0 +1,197 @@
+/* ==========================================================================
+   02. Theme Bridge
+   AirGate --ag-* token 是设计源头；HeroUI 变量只作为 core 内部 UI 实现层使用。
+   ========================================================================== */
+
+:root,
+.light,
+.default,
+.dark,
+[data-theme="light"],
+[data-theme="default"],
+[data-theme="dark"] {
+  /* HeroUI common variables */
+  --white: oklch(100% 0 0);
+  --black: oklch(0% 0 0);
+  --snow: oklch(0.9911 0 0);
+  --eclipse: oklch(0.2103 0.0059 285.89);
+  --spacing: 0.25rem;
+  --border-width: 1px;
+  --field-border-width: 1px;
+  --disabled-opacity: 0.5;
+  --ring-offset-width: 2px;
+  --cursor-interactive: pointer;
+  --cursor-disabled: not-allowed;
+  --skeleton-animation: shimmer;
+
+  /* HeroUI radius preset */
+  --radius: 0.25rem;
+  --field-radius: 0.5rem;
+  --font-geist: var(--ag-font-sans);
+  --font-sans: var(--font-geist);
+  --font-mono: var(--ag-font-mono);
+
+  --background: var(--ag-bg);
+  --foreground: var(--ag-text);
+
+  --surface: var(--ag-surface);
+  --surface-foreground: var(--ag-surface-foreground);
+  --surface-secondary: var(--ag-surface-secondary);
+  --surface-secondary-foreground: var(--ag-surface-secondary-foreground);
+  --surface-tertiary: var(--ag-surface-tertiary);
+  --surface-tertiary-foreground: var(--ag-surface-tertiary-foreground);
+
+  --overlay: var(--ag-overlay);
+  --overlay-foreground: var(--ag-overlay-foreground);
+  --popover: var(--overlay);
+  --popover-foreground: var(--overlay-foreground);
+
+  --accent: var(--ag-primary);
+  --accent-foreground: var(--ag-primary-foreground);
+  --accent-hover: var(--ag-primary-hover);
+  --accent-soft: var(--ag-primary-subtle);
+  --accent-soft-foreground: var(--ag-primary);
+
+  --success: var(--ag-success);
+  --success-foreground: var(--ag-success-foreground);
+  --warning: var(--ag-warning);
+  --warning-foreground: var(--ag-warning-foreground);
+  --danger: var(--ag-danger);
+  --danger-foreground: var(--ag-danger-foreground);
+
+  --default: var(--ag-default-bg);
+  --default-foreground: var(--ag-default-foreground);
+  --muted: var(--ag-muted);
+
+  --field-background: var(--ag-field-background);
+  --field-foreground: var(--ag-field-foreground);
+  --field-placeholder: var(--ag-field-placeholder);
+  --field-border: color-mix(in oklab, var(--border) 88%, transparent);
+
+  --border: var(--ag-border);
+  --separator: var(--ag-border-subtle);
+  --focus: var(--accent);
+  --link: var(--foreground);
+  --scrollbar: var(--ag-scrollbar);
+  --segment: var(--ag-segment);
+  --segment-foreground: var(--ag-segment-foreground);
+
+  --backdrop: rgba(0, 0, 0, 0.5);
+  --surface-shadow:
+    0 2px 4px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.06),
+    0 0 1px 0 rgba(0, 0, 0, 0.06);
+  --overlay-shadow: 0 4px 16px 0 rgba(24, 24, 27, 0.08), 0 8px 24px 0 rgba(24, 24, 27, 0.09);
+  --field-shadow:
+    0 2px 4px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.06),
+    0 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+:root:not([data-theme="dark"]),
+.light,
+.default,
+[data-theme="light"],
+[data-theme="default"] {
+  color-scheme: light;
+}
+
+.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --backdrop: rgba(0, 0, 0, 0.6);
+  --surface-shadow: 0 0 0 0 transparent inset;
+  --overlay-shadow: 0 0 0 0 transparent inset;
+  --field-shadow: 0 0 0 0 transparent inset;
+}
+
+/* ==========================================================================
+   03. Tailwind Theme Bridge
+   主题变量由 @doudou-start/airgate-theme (SDK) 运行时注入
+   Token 命名与 SDK createTailwindThemeBridge() 对齐
+   ========================================================================== */
+
+@theme inline {
+  /* ── HeroUI semantic colors ── */
+  --color-white: var(--white);
+  --color-black: var(--black);
+  --color-snow: var(--snow);
+  --color-eclipse: var(--eclipse);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-overlay: var(--overlay);
+  --color-overlay-foreground: var(--overlay-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent-soft-foreground);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--ag-success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--ag-warning-subtle);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-subtle: var(--ag-danger-subtle);
+
+  --color-default: var(--default);
+  --color-default-foreground: var(--default-foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-separator: var(--separator);
+  --color-focus: var(--focus);
+  --color-link: var(--link);
+  --color-backdrop: var(--backdrop);
+  --color-scrollbar: var(--scrollbar);
+
+  --color-field-background: var(--field-background);
+  --color-field-foreground: var(--field-foreground);
+  --color-field-placeholder: var(--field-placeholder);
+  --color-field-border: var(--field-border);
+
+  --color-segment: var(--segment);
+  --color-segment-foreground: var(--segment-foreground);
+
+  /* ── AirGate compatibility aliases ── */
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-hover);
+  --color-primary-subtle: var(--accent-soft);
+  --color-primary-glow: var(--ag-primary-glow);
+  --color-info: var(--ag-info);
+  --color-info-subtle: var(--ag-info-subtle);
+
+  --color-bg: var(--background);
+  --color-bg-deep: var(--background);
+  --color-bg-elevated: var(--overlay);
+  --color-bg-surface: var(--surface);
+  --color-bg-hover: color-mix(in oklab, var(--default) 82%, var(--background) 18%);
+  --color-bg-active: color-mix(in oklab, var(--default) 72%, var(--foreground) 8%);
+
+  --color-border-subtle: var(--separator);
+  --color-border-focus: var(--focus);
+
+  --color-text: var(--foreground);
+  --color-text-secondary: color-mix(in oklab, var(--foreground) 74%, var(--muted) 26%);
+  --color-text-tertiary: var(--muted);
+  --color-text-inverse: var(--accent-foreground);
+
+  --color-glass: var(--ag-glass);
+  --color-glass-border: var(--ag-glass-border);
+
+  /* ── Font Family ── */
+  --font-sans: var(--font-geist);
+  --font-mono: var(--ag-font-mono);
+
+  /* ── Box Shadow ── */
+  --shadow-sm: var(--surface-shadow);
+  --shadow-md: var(--surface-shadow);
+  --shadow-lg: var(--overlay-shadow);
+  --shadow-glow: var(--ag-shadow-glow);
+}

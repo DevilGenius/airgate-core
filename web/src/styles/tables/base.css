@@ -1,0 +1,269 @@
+/* ==========================================================================
+   10. Tables
+   ========================================================================== */
+
+:where([data-slot="wrapper"]:has(> [data-slot="table"])) {
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--surface-shadow) !important;
+  padding: 0 !important;
+}
+
+:where([data-slot="table"]) {
+  width: 100%;
+}
+
+:where([data-slot="table-column"], [data-slot="th"]) {
+  box-sizing: border-box;
+  height: 2.375rem !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  background: var(--surface-secondary) !important;
+  color: var(--muted) !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0;
+  line-height: 1 !important;
+  padding: 0.625rem 0.75rem !important;
+  text-transform: none;
+  vertical-align: middle !important;
+  white-space: nowrap;
+}
+
+:where([data-slot="table-cell"], [data-slot="td"]) {
+  box-sizing: border-box;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 40%, transparent) !important;
+  color: color-mix(in oklab, var(--foreground) 74%, var(--muted) 26%);
+  font-size: 0.875rem;
+  line-height: 1.25;
+  padding: 0.625rem 0.75rem !important;
+  vertical-align: middle !important;
+}
+
+.ag-plugins-installed-table :where([data-slot="table-column"], [data-slot="th"]),
+.ag-plugins-installed-table :where([data-slot="table-cell"], [data-slot="td"]) {
+  text-align: center !important;
+}
+
+.ag-resource-table,
+.ag-usage-records-table {
+  --ag-table-empty-background: var(--surface-secondary);
+  --ag-table-empty-row-height: 2.75rem;
+}
+
+.ag-resource-table :where([data-slot="table-column"], [data-slot="th"], .table__column),
+.ag-resource-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
+  text-align: center !important;
+}
+
+.ag-resource-table :where([data-slot="table-column"] > *, [data-slot="th"] > *, .table__column > *),
+.ag-resource-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell)> :where(span, div, code) {
+  justify-content: center !important;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.ag-resource-table :where([data-slot="table-body"], [data-slot="tbody"], .table__body),
+.ag-usage-records-table :where([data-slot="table-body"], [data-slot="tbody"], .table__body) {
+  background: var(--ag-table-empty-background) !important;
+}
+
+.ag-resource-table :where([data-slot="table-body"]:empty, [data-slot="tbody"]:empty, .table__body:empty),
+.ag-usage-records-table :where([data-slot="table-body"]:empty, [data-slot="tbody"]:empty, .table__body:empty) {
+  min-height: var(--ag-table-empty-row-height);
+  background: var(--ag-table-empty-background) !important;
+}
+
+.ag-resource-table:has(.empty-state) :where([data-slot="table-column"], [data-slot="th"], .table__column),
+.ag-resource-table:has([aria-busy="true"]) :where([data-slot="table-column"], [data-slot="th"], .table__column),
+.ag-usage-records-table:has(.empty-state) :where([data-slot="table-column"], [data-slot="th"], .table__column),
+.ag-usage-records-table:has([aria-busy="true"]) :where([data-slot="table-column"], [data-slot="th"], .table__column) {
+  border-bottom-color: transparent !important;
+  background: var(--ag-table-empty-background) !important;
+}
+
+.ag-resource-table :where([data-slot="table-body"] [data-slot="table-row"], [data-slot="tbody"] [data-slot="tr"], .table__body .table__row),
+.ag-usage-records-table :where([data-slot="table-body"] [data-slot="table-row"], [data-slot="tbody"] [data-slot="tr"], .table__body .table__row) {
+  background: var(--surface) !important;
+}
+
+.ag-resource-table :where([data-slot="table-row"]:has(.empty-state),
+  [data-slot="tr"]:has(.empty-state),
+  .table__row:has(.empty-state),
+  [data-slot="table-row"]:has([aria-busy="true"]),
+  [data-slot="tr"]:has([aria-busy="true"]),
+  .table__row:has([aria-busy="true"])),
+.ag-usage-records-table :where([data-slot="table-row"]:has(.empty-state),
+  [data-slot="tr"]:has(.empty-state),
+  .table__row:has(.empty-state),
+  [data-slot="table-row"]:has([aria-busy="true"]),
+  [data-slot="tr"]:has([aria-busy="true"]),
+  .table__row:has([aria-busy="true"])) {
+  background: var(--ag-table-empty-background) !important;
+}
+
+.ag-resource-table :where([data-slot="table-row"]:has(.empty-state) [data-slot="table-cell"],
+  [data-slot="tr"]:has(.empty-state) [data-slot="td"],
+  .table__row:has(.empty-state) .table__cell,
+  [data-slot="table-row"]:has([aria-busy="true"]) [data-slot="table-cell"],
+  [data-slot="tr"]:has([aria-busy="true"]) [data-slot="td"],
+  .table__row:has([aria-busy="true"]) .table__cell),
+.ag-usage-records-table :where([data-slot="table-row"]:has(.empty-state) [data-slot="table-cell"],
+  [data-slot="tr"]:has(.empty-state) [data-slot="td"],
+  .table__row:has(.empty-state) .table__cell,
+  [data-slot="table-row"]:has([aria-busy="true"]) [data-slot="table-cell"],
+  [data-slot="tr"]:has([aria-busy="true"]) [data-slot="td"],
+  .table__row:has([aria-busy="true"]) .table__cell) {
+  border-bottom: 0 !important;
+  background: var(--ag-table-empty-background) !important;
+}
+
+.ag-resource-table :where(.empty-state),
+.ag-usage-records-table :where(.empty-state) {
+  display: flex;
+  min-height: var(--ag-table-empty-row-height);
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+:where([data-slot="table-body"] [data-slot="table-row"], [data-slot="tbody"] [data-slot="tr"]) {
+  transition: background-color 0.2s ease;
+}
+
+:where([data-slot="table-body"] [data-slot="table-row"]:hover, [data-slot="tbody"] [data-slot="tr"]:hover) {
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
+}
+
+:where([data-slot="table-body"] [data-slot="table-row"]:last-child [data-slot="table-cell"],
+  [data-slot="tbody"] [data-slot="tr"]:last-child [data-slot="td"]) {
+  border-bottom: 0 !important;
+}
+
+.ag-resource-table-scroll,
+.ag-usage-table-scroll {
+  position: relative;
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.ag-resource-table-content {
+  table-layout: auto;
+}
+
+.ag-table-row-actions {
+  min-height: 1.75rem;
+  line-height: 1;
+}
+
+.ag-table-row-actions > :where(.button, .dropdown) {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem;
+  line-height: 1;
+}
+
+.ag-table-row-actions > .button {
+  height: 1.75rem !important;
+  min-height: 1.75rem !important;
+  gap: 0.25rem !important;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, transparent) !important;
+  border-radius: var(--radius) !important;
+  background: var(--surface-secondary) !important;
+  color: var(--foreground) !important;
+  padding-block: 0 !important;
+  padding-inline: 0.5rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease !important;
+}
+
+.ag-table-row-actions > .button:hover,
+.ag-table-row-actions > .button[data-hovered="true"] {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border) 62%) !important;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-secondary) 90%) !important;
+  color: var(--accent) !important;
+}
+
+.ag-table-row-actions > .button.text-danger,
+.ag-table-row-actions > .button.button--danger-soft {
+  background: var(--danger-subtle) !important;
+  color: var(--danger) !important;
+}
+
+.ag-table-row-actions > .button.text-danger:hover,
+.ag-table-row-actions > .button.text-danger[data-hovered="true"],
+.ag-table-row-actions > .button.button--danger-soft:hover,
+.ag-table-row-actions > .button.button--danger-soft[data-hovered="true"] {
+  border-color: color-mix(in oklab, var(--danger) 38%, var(--border) 62%) !important;
+  background: color-mix(in oklab, var(--danger) 10%, var(--surface-secondary) 90%) !important;
+  color: var(--danger) !important;
+}
+
+.ag-table-row-actions > .button:disabled,
+.ag-table-row-actions > .button[aria-disabled="true"],
+.ag-table-row-actions > .button[data-disabled="true"] {
+  cursor: not-allowed !important;
+  opacity: var(--disabled-opacity) !important;
+}
+
+.ag-table-row-actions > .button.button--icon-only,
+.ag-table-row-more-trigger.dropdown__trigger {
+  width: 1.75rem !important;
+  min-width: 1.75rem !important;
+  height: 1.75rem !important;
+  min-height: 1.75rem !important;
+  padding: 0 !important;
+}
+
+.ag-table-row-more-trigger.dropdown__trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, transparent) !important;
+  border-radius: var(--radius) !important;
+  background: var(--surface-secondary) !important;
+  color: var(--foreground) !important;
+  line-height: 1 !important;
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease !important;
+}
+
+.ag-table-row-more-trigger.dropdown__trigger:hover,
+.ag-table-row-more-trigger.dropdown__trigger[data-hovered="true"],
+.ag-table-row-more-trigger.dropdown__trigger[aria-expanded="true"] {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border) 62%) !important;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-secondary) 90%) !important;
+  color: var(--accent) !important;
+}
+
+.ag-table-row-actions > .button:focus-visible,
+.ag-table-row-more-trigger.dropdown__trigger:focus-visible {
+  outline: 1.5px solid var(--focus) !important;
+  outline-offset: 2px !important;
+}
+
+.ag-table-row-actions > .button > svg,
+.ag-table-row-more-trigger.dropdown__trigger > svg {
+  display: block;
+  flex: 0 0 auto;
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+  margin: 0 !important;
+}

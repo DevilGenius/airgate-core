@@ -1,5 +1,3 @@
-import { Table as HeroTable } from '@heroui/react';
-
 export function TableLoadingRow({
   colSpan,
   minHeight = 220,
@@ -8,12 +6,12 @@ export function TableLoadingRow({
   minHeight?: number;
 }) {
   return (
-    <HeroTable.Row id="loading">
-      <HeroTable.Cell colSpan={colSpan}>
+    <tr data-key="loading" data-slot="tr">
+      <td colSpan={colSpan} data-slot="td">
         <div aria-busy="true" aria-live="polite" className="w-full" style={{ minHeight }}>
           <span className="sr-only">Loading</span>
         </div>
-      </HeroTable.Cell>
-    </HeroTable.Row>
+      </td>
+    </tr>
   );
 }

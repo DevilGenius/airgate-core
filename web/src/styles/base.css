@@ -1,0 +1,83 @@
+/* ==========================================================================
+   04. Global Base
+   ========================================================================== */
+
+/* 亮色主题：干净纯白背景 */
+[data-theme="light"] body {
+  background: var(--background);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--scrollbar) 76%, var(--foreground) 24%);
+}
+
+html {
+  font-size: 16px;
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--foreground);
+  background: var(--background);
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-soft-foreground);
+}
+
+:focus-visible {
+  outline: 1.5px solid var(--focus);
+  outline-offset: var(--ring-offset-width);
+}
+
+:where(.input,
+  .textarea,
+  .date-input-group,
+  .select__trigger,
+  .combo-box__trigger,
+  .search-field__input):focus-visible {
+  outline: none;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.switch {
+  --switch-control-bg-checked: var(--success);
+  --switch-control-bg-checked-hover: color-mix(in oklab, var(--success) 90%, var(--success-foreground) 10%);
+}
+
+.switch[aria-checked="true"] .switch__thumb,
+.switch[data-selected="true"] .switch__thumb {
+  background-color: var(--white);
+  color: var(--success);
+}

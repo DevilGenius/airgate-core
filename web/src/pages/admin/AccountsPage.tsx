@@ -67,6 +67,127 @@ interface AccountTableColumn {
 
 const UNGROUPED_GROUP_FILTER = '__ungrouped__';
 type SelectionListener = () => void;
+type AccountUsageTodayStats = { requests: number; tokens: number; account_cost: number; user_cost: number };
+type AccountUsageCredits = { balance: number; unlimited: boolean };
+type AccountUsageWindow = {
+  key?: string;
+  label: string;
+  used_percent: number;
+  reset_at?: string;
+  reset_after_seconds?: number;
+  reset_seconds?: number;
+};
+type AccountUsageInfo = {
+  windows?: AccountUsageWindow[];
+  credits?: AccountUsageCredits | null;
+  today_stats?: AccountUsageTodayStats | null;
+  updated_at?: string;
+};
+type AccountUsageData = { accounts?: Record<string, AccountUsageInfo> };
+type CachedUsageWindow = {
+  resetAtMs: number;
+  window: AccountUsageWindow;
+};
+type AccountUsageWindowCache = Map<string, CachedUsageWindow>;
+
+function getUsageWindowIdentity(window: AccountUsageWindow) {
+  const key = window.key?.trim();
+  if (key) return key;
+  return window.label.trim();
+}
+
+function getUsageWindowCacheKey(accountId: string, window: AccountUsageWindow) {
+  return `${accountId}:${getUsageWindowIdentity(window)}`;
+}
+
+function getUsageWindowResetAtMs(window: AccountUsageWindow, now: number) {
+  if (window.reset_at) {
+    const parsed = Date.parse(window.reset_at);
+    if (Number.isFinite(parsed) && parsed > now) return parsed;
+  }
+  const resetSeconds = Number(window.reset_seconds ?? 0);
+  if (resetSeconds > 0) return now + resetSeconds * 1000;
+  const resetAfterSeconds = Number(window.reset_after_seconds ?? 0);
+  if (resetAfterSeconds > 0) return now + resetAfterSeconds * 1000;
+  return 0;
+}
+
+function windowWithCachedReset(window: AccountUsageWindow, resetAtMs: number, now: number): AccountUsageWindow {
+  if (resetAtMs <= now) {
+    return {
+      ...window,
+      reset_seconds: 0,
+    };
+  }
+  return {
+    ...window,
+    reset_at: new Date(resetAtMs).toISOString(),
+    reset_seconds: Math.max(0, Math.ceil((resetAtMs - now) / 1000)),
+  };
+}
+
+function mergeCachedUsageWindows(data: AccountUsageData | undefined, cache: AccountUsageWindowCache): AccountUsageData | undefined {
+  if (!data?.accounts) return data;
+
+  const now = Date.now();
+  const accounts: Record<string, AccountUsageInfo> = {};
+  const liveCacheKeys = new Set<string>();
+
+  for (const [accountId, usage] of Object.entries(data.accounts)) {
+    const rawWindows = Array.isArray(usage?.windows) ? usage.windows : [];
+    const mergedWindows: AccountUsageWindow[] = [];
+    const seenWindowKeys = new Set<string>();
+
+    for (const window of rawWindows) {
+      const cacheKey = getUsageWindowCacheKey(accountId, window);
+      const resetAtMs = getUsageWindowResetAtMs(window, now);
+      const cached = cache.get(cacheKey);
+      const effectiveResetAtMs = resetAtMs > now
+        ? resetAtMs
+        : cached && cached.resetAtMs > now
+          ? cached.resetAtMs
+          : 0;
+      const nextWindow = effectiveResetAtMs > now
+        ? windowWithCachedReset(window, effectiveResetAtMs, now)
+        : {
+            ...window,
+            reset_seconds: Number(window.reset_seconds ?? 0),
+          };
+
+      if (effectiveResetAtMs > now) {
+        cache.set(cacheKey, { resetAtMs: effectiveResetAtMs, window: nextWindow });
+        liveCacheKeys.add(cacheKey);
+      }
+      seenWindowKeys.add(cacheKey);
+      mergedWindows.push(nextWindow);
+    }
+
+    for (const [cacheKey, cached] of cache.entries()) {
+      if (!cacheKey.startsWith(`${accountId}:`) || seenWindowKeys.has(cacheKey)) continue;
+      if (cached.resetAtMs <= now) continue;
+      const nextWindow = windowWithCachedReset(cached.window, cached.resetAtMs, now);
+      cache.set(cacheKey, { resetAtMs: cached.resetAtMs, window: nextWindow });
+      liveCacheKeys.add(cacheKey);
+      mergedWindows.push(nextWindow);
+    }
+
+    accounts[accountId] = {
+      ...usage,
+      windows: mergedWindows,
+    };
+  }
+
+  for (const [cacheKey, cached] of cache.entries()) {
+    if (cached.resetAtMs <= now || !liveCacheKeys.has(cacheKey)) {
+      cache.delete(cacheKey);
+    }
+  }
+
+  return {
+    ...data,
+    accounts,
+  };
+}
 
 function runAfterInputFrame(work: () => void) {
   if (typeof window === 'undefined') {
@@ -908,11 +1029,16 @@ export default function AccountsPage() {
   });
 
   // 查询用量窗口
-  const { data: usageData } = useQuery({
+  const usageWindowCacheRef = useRef<AccountUsageWindowCache>(new Map());
+  const { data: rawUsageData } = useQuery({
     queryKey: queryKeys.accountUsage(platformFilter),
     queryFn: () => accountsApi.usage(platformFilter || ''),
     refetchInterval: 300_000, // 每 5 分钟刷新
   });
+  const usageData = useMemo(
+    () => mergeCachedUsageWindows(rawUsageData, usageWindowCacheRef.current),
+    [rawUsageData],
+  );
   const usageDataRef = useRef(usageData);
   usageDataRef.current = usageData;
 
@@ -1397,18 +1523,10 @@ export default function AccountsPage() {
           );
         }
 
-        type TodayStats = { requests: number; tokens: number; account_cost: number; user_cost: number };
-        type UsageWindow = {
-          key?: string;
-          label: string;
-          used_percent: number;
-          reset_seconds?: number;
-          reset_after_seconds?: number;
-          reset_at?: string;
-        };
-        const windows: UsageWindow[] = usage.windows || [];
-        const credits: { balance: number; unlimited: boolean } | null = usage.credits || null;
-        const todayStats: TodayStats | null = usage.today_stats || null;
+        type UsageWindowRow = { id: string; window?: AccountUsageWindow };
+        const windows: AccountUsageWindow[] = usage.windows || [];
+        const credits: AccountUsageCredits | null = usage.credits || null;
+        const todayStats: AccountUsageTodayStats | null = usage.today_stats || null;
 
         // 紧凑数字格式化（和 sub2api 对齐：K / M / B 后缀）
         const formatCompact = (num: number, allowBillions = true) => {
@@ -1439,7 +1557,7 @@ export default function AccountsPage() {
           );
         }
 
-        const getResetSeconds = (w: UsageWindow) => {
+        const getResetSeconds = (w: AccountUsageWindow) => {
           if (typeof w.reset_seconds === 'number') return w.reset_seconds;
           if (typeof w.reset_after_seconds === 'number') return w.reset_after_seconds;
           if (w.reset_at) {
@@ -1464,6 +1582,56 @@ export default function AccountsPage() {
           if (pct < 80) return 'var(--ag-warning)';
           return 'var(--ag-danger)';
         };
+
+        // 简化 label：取最后一段（如 "GPT-5.3-Codex-Spark" → "Spark"）
+        const shortLabel = (label: string) => {
+          const parts = label.split(/[\s]+/);
+          // 第一部分是时间窗口（如 "5h"、"7d"），后面是模型名
+          const timePart = parts[0];
+          if (parts.length <= 1) return timePart;
+          const modelPart = parts.slice(1).join(' ');
+          const segments = modelPart.split('-');
+          return `${timePart} ${segments[segments.length - 1]}`;
+        };
+        const getWindowSlot = (w: AccountUsageWindow) => {
+          const key = w.key || '';
+          const label = w.label || '';
+          const slot = key.includes(':7d') || key === '7d' || label.startsWith('7d') ? '7d' : '5h';
+          const group = key.startsWith('model:')
+            ? key.replace(/^model:(5h|7d):/, 'model:')
+            : 'base';
+          return { group, slot };
+        };
+        const buildWindowRows = (items: AccountUsageWindow[]): UsageWindowRow[] => {
+          const groups: Array<{ id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow }> = [];
+          const groupMap = new Map<string, { id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow }>();
+
+          for (const item of items) {
+            const { group, slot } = getWindowSlot(item);
+            let bucket = groupMap.get(group);
+            if (!bucket) {
+              bucket = { id: group };
+              groupMap.set(group, bucket);
+              groups.push(bucket);
+            }
+            if (slot === '7d') bucket.seven = item;
+            else bucket.five = item;
+          }
+
+          return groups.flatMap((group) => {
+            const rows: UsageWindowRow[] = [];
+            if (group.five) {
+              rows.push({ id: `${group.id}:5h`, window: group.five });
+            } else if (group.seven) {
+              rows.push({ id: `${group.id}:5h-placeholder` });
+            }
+            if (group.seven) {
+              rows.push({ id: `${group.id}:7d`, window: group.seven });
+            }
+            return rows;
+          });
+        };
+        const windowRows = buildWindowRows(windows);
 
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
         const todayImageCount = row.platform === 'openai' ? (row.today_image_count ?? 0) : 0;
@@ -1565,15 +1733,19 @@ export default function AccountsPage() {
                       />
                     );
                   }
-                  return windows.map((w, index) => {
+                  return windowRows.map((item) => {
+                    const w = item.window;
+                    if (!w) {
+                      return <div key={item.id} className="h-5" aria-hidden="true" />;
+                    }
                     const percent = Math.round(w.used_percent);
                     const barPercent = Math.max(0, Math.min(100, percent));
                     const color = usageColor(w.used_percent);
                     const resetText = formatReset(getResetSeconds(w));
                     return (
-                      <div key={w.key || `${w.label}:${index}`} className="ag-account-usage-window-row">
+                      <div key={item.id} className="ag-account-usage-window-row">
                         <span className="ag-account-usage-window-label text-text-secondary" style={badgeStyle} title={w.label}>
-                          {w.label}
+                          {shortLabel(w.label)}
                         </span>
                         <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
                           <div

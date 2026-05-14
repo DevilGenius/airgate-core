@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { EmptyState, Modal, Skeleton, Table as HeroTable, useOverlayState } from '@heroui/react';
+import { EmptyState, Modal, Skeleton, useOverlayState } from '@heroui/react';
 import {
   StatusChip,
 } from '../../../shared/ui';
 import { usersApi } from '../../../shared/api/users';
 import { formatDate } from '../../../shared/utils/format';
 import { getTotalPages } from '../../../shared/utils/pagination';
+import { CommonTable } from '../../../shared/components/CommonTable';
 import { TablePaginationFooter } from '../../../shared/components/TablePaginationFooter';
 import type { UserResp, APIKeyResp } from '../../../shared/types';
 
@@ -50,68 +51,66 @@ export function UserApiKeysModal({ open, user, onClose }: UserApiKeysModalProps)
               <Modal.CloseTrigger />
             </Modal.Header>
             <Modal.Body>
-              <HeroTable variant="primary">
-                <HeroTable.ScrollContainer>
-                  <HeroTable.Content aria-label={t('users.api_keys')}>
-            <HeroTable.Header>
-              <HeroTable.Column id="name" isRowHeader>{t('api_keys.title')}</HeroTable.Column>
-              <HeroTable.Column id="key_prefix">{t('api_keys.key_prefix')}</HeroTable.Column>
-              <HeroTable.Column id="quota_usd">{t('api_keys.quota_used')}</HeroTable.Column>
-              <HeroTable.Column id="status">{t('common.status')}</HeroTable.Column>
-              <HeroTable.Column id="created_at">{t('users.created_at')}</HeroTable.Column>
-            </HeroTable.Header>
-            <HeroTable.Body>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
-                    {Array.from({ length: 5 }).map((__, cellIndex) => (
-                      <HeroTable.Cell key={cellIndex}>
-                        <Skeleton className="h-4 w-24" />
-                      </HeroTable.Cell>
-                    ))}
-                  </HeroTable.Row>
-                ))
-              ) : rows.length === 0 ? (
-                <HeroTable.Row id="empty">
-                  <HeroTable.Cell colSpan={5}>
-                    <EmptyState>
-                      <div className="text-sm text-default-500">{t('common.no_data')}</div>
-                    </EmptyState>
-                  </HeroTable.Cell>
-                </HeroTable.Row>
-              ) : (
-                rows.map((row: APIKeyResp) => (
-                  <HeroTable.Row id={String(row.id)} key={row.id}>
-                    <HeroTable.Cell>{row.name}</HeroTable.Cell>
-                    <HeroTable.Cell>
-                      <span className="font-mono text-xs text-text-secondary">{row.key_prefix}</span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
-                      <span className="font-mono text-xs">
-                        ${row.used_quota.toFixed(2)} / {row.quota_usd > 0 ? `$${row.quota_usd.toFixed(2)}` : '∞'}
-                      </span>
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
-                      <StatusChip status={row.status} />
-                    </HeroTable.Cell>
-                    <HeroTable.Cell>
-                      <span className="text-xs text-text-secondary">{formatDate(row.created_at)}</span>
-                    </HeroTable.Cell>
-                  </HeroTable.Row>
-                ))
-              )}
-            </HeroTable.Body>
-          </HeroTable.Content>
-                </HeroTable.ScrollContainer>
-                <HeroTable.Footer>
+              <CommonTable
+                ariaLabel={t('users.api_keys')}
+                footer={(
                   <TablePaginationFooter
                     page={page}
                     setPage={setPage}
                     total={total}
                     totalPages={totalPages}
                   />
-                </HeroTable.Footer>
-              </HeroTable>
+                )}
+              >
+            <CommonTable.Header>
+              <CommonTable.Column id="name" isRowHeader>{t('api_keys.title')}</CommonTable.Column>
+              <CommonTable.Column id="key_prefix">{t('api_keys.key_prefix')}</CommonTable.Column>
+              <CommonTable.Column id="quota_usd">{t('api_keys.quota_used')}</CommonTable.Column>
+              <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
+              <CommonTable.Column id="created_at">{t('users.created_at')}</CommonTable.Column>
+            </CommonTable.Header>
+            <CommonTable.Body>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <CommonTable.Row id={`loading-${index}`} key={`loading-${index}`}>
+                    {Array.from({ length: 5 }).map((__, cellIndex) => (
+                      <CommonTable.Cell key={cellIndex}>
+                        <Skeleton className="h-4 w-24" />
+                      </CommonTable.Cell>
+                    ))}
+                  </CommonTable.Row>
+                ))
+              ) : rows.length === 0 ? (
+                <CommonTable.Row id="empty">
+                  <CommonTable.Cell colSpan={5}>
+                    <EmptyState>
+                      <div className="text-sm text-default-500">{t('common.no_data')}</div>
+                    </EmptyState>
+                  </CommonTable.Cell>
+                </CommonTable.Row>
+              ) : (
+                rows.map((row: APIKeyResp) => (
+                  <CommonTable.Row id={String(row.id)} key={row.id}>
+                    <CommonTable.Cell>{row.name}</CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="font-mono text-xs text-text-secondary">{row.key_prefix}</span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="font-mono text-xs">
+                        ${row.used_quota.toFixed(2)} / {row.quota_usd > 0 ? `$${row.quota_usd.toFixed(2)}` : '∞'}
+                      </span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <StatusChip status={row.status} />
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="text-xs text-text-secondary">{formatDate(row.created_at)}</span>
+                    </CommonTable.Cell>
+                  </CommonTable.Row>
+                ))
+              )}
+            </CommonTable.Body>
+              </CommonTable>
             </Modal.Body>
           </Modal.Dialog>
         </Modal.Container>

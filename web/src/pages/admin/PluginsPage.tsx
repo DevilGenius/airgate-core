@@ -7,11 +7,12 @@ import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
-import { AlertDialog, Button, Card, Checkbox, Chip, Description, EmptyState, Input, Label, Modal, Skeleton, Spinner, Table as HeroTable, Tabs, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { AlertDialog, Button, Card, Checkbox, Chip, Description, EmptyState, Input, Label, Modal, Skeleton, Spinner, Tabs, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import {
   Trash2, Download, Loader2, RefreshCw,
   Package, User, Tag, Plus, Upload, Github, Settings, Store,
 } from 'lucide-react';
+import { CommonTable } from '../../shared/components/CommonTable';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
 
 // 插件类型 Badge 颜色
@@ -160,41 +161,42 @@ export default function PluginsPage() {
 
       {/* 已安装 Tab */}
       <Tabs.Panel id="installed" className="ag-tabs-panel-flush">
-        <HeroTable variant="primary" className="ag-plugins-installed-table">
-          <HeroTable.ScrollContainer>
-            <HeroTable.Content aria-label={t('plugins.installed_tab', 'Installed plugins')}>
-              <HeroTable.Header>
-                <HeroTable.Column id="name" isRowHeader>{t('common.name')}</HeroTable.Column>
-                <HeroTable.Column id="type">
-                  {t('common.type')} / {t('plugins.platform')}
-                </HeroTable.Column>
-                <HeroTable.Column id="actions">{t('common.actions')}</HeroTable.Column>
-              </HeroTable.Header>
-              <HeroTable.Body>
-                {pluginsLoading ? (
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
-                      {Array.from({ length: 3 }).map((__, cellIndex) => (
-                        <HeroTable.Cell key={cellIndex}>
-                          <Skeleton
-                            className="h-4 w-24"
-                          />
-                        </HeroTable.Cell>
-                      ))}
-                    </HeroTable.Row>
-                  ))
-                ) : installedRows.length === 0 ? (
-                  <HeroTable.Row id="empty">
-                    <HeroTable.Cell colSpan={3}>
-                      <EmptyState>
-                        <div className="text-sm text-default-500">{t('common.no_data')}</div>
-                      </EmptyState>
-                    </HeroTable.Cell>
-                  </HeroTable.Row>
-                ) : (
-                  installedRows.map((row: PluginResp) => (
-                    <HeroTable.Row id={row.name} key={row.name}>
-                      <HeroTable.Cell>
+        <CommonTable
+          ariaLabel={t('plugins.installed_tab', 'Installed plugins')}
+          className="ag-plugins-installed-table"
+        >
+          <CommonTable.Header>
+            <CommonTable.Column id="name" isRowHeader>{t('common.name')}</CommonTable.Column>
+            <CommonTable.Column id="type">
+              {t('common.type')} / {t('plugins.platform')}
+            </CommonTable.Column>
+            <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
+          </CommonTable.Header>
+          <CommonTable.Body>
+            {pluginsLoading ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <CommonTable.Row id={`loading-${index}`} key={`loading-${index}`}>
+                  {Array.from({ length: 3 }).map((__, cellIndex) => (
+                    <CommonTable.Cell key={cellIndex}>
+                      <Skeleton
+                        className="h-4 w-24"
+                      />
+                    </CommonTable.Cell>
+                  ))}
+                </CommonTable.Row>
+              ))
+            ) : installedRows.length === 0 ? (
+              <CommonTable.Row id="empty">
+                <CommonTable.Cell colSpan={3}>
+                  <EmptyState>
+                    <div className="text-sm text-default-500">{t('common.no_data')}</div>
+                  </EmptyState>
+                </CommonTable.Cell>
+              </CommonTable.Row>
+            ) : (
+              installedRows.map((row: PluginResp) => (
+                <CommonTable.Row id={row.name} key={row.name}>
+                  <CommonTable.Cell>
                         <div className="min-w-0 inline-flex items-center gap-2">
                           <div className="text-text font-medium">
                             {row.display_name || row.name}
@@ -205,8 +207,8 @@ export default function PluginsPage() {
                             </span>
                           )}
                         </div>
-                      </HeroTable.Cell>
-                      <HeroTable.Cell>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
                         <div className="flex items-center justify-center gap-2">
                           <Chip color={typeVariant[row.type || 'gateway'] || 'default'} size="sm" variant="soft">
                             {row.type || 'gateway'}
@@ -225,8 +227,8 @@ export default function PluginsPage() {
                             </span>
                           )}
                         </div>
-                      </HeroTable.Cell>
-                      <HeroTable.Cell>
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
                         <div className="ag-table-row-actions flex gap-1 justify-center">
                           {row.config_schema && row.config_schema.length > 0 && (
                             <Button
@@ -265,14 +267,12 @@ export default function PluginsPage() {
                             {t('common.uninstall')}
                           </Button>
                         </div>
-                      </HeroTable.Cell>
-                    </HeroTable.Row>
-                  ))
-                )}
-              </HeroTable.Body>
-            </HeroTable.Content>
-          </HeroTable.ScrollContainer>
-        </HeroTable>
+                  </CommonTable.Cell>
+                </CommonTable.Row>
+              ))
+            )}
+          </CommonTable.Body>
+        </CommonTable>
       </Tabs.Panel>
 
       {/* 插件市场 Tab */}

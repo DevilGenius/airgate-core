@@ -1,0 +1,100 @@
+/* ==========================================================================
+   09. Page-Specific Overrides
+   ========================================================================== */
+
+/* API keys: 表格内容居中 */
+
+.ag-api-keys-table :where([data-slot="table-column"], [data-slot="th"], .table__column),
+.ag-api-keys-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
+  text-align: center !important;
+}
+
+.ag-api-keys-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell)> :where(span, div, code) {
+  justify-content: center;
+  margin-inline: auto;
+}
+
+.ag-elevation-modal.ag-create-key-modal,
+.ag-elevation-modal.modal__dialog--lg.ag-create-key-modal {
+  width: min(45rem, calc(100vw - 2rem)) !important;
+  max-width: min(45rem, calc(100vw - 2rem)) !important;
+}
+
+/* Admin accounts: 添加凭证弹窗布局 */
+
+.ag-elevation-modal.ag-create-account-modal,
+.ag-elevation-modal.modal__dialog--lg.ag-create-account-modal {
+  width: min(58rem, calc(100vw - 2rem)) !important;
+  max-width: min(58rem, calc(100vw - 2rem)) !important;
+  max-height: min(88dvh, 58rem) !important;
+}
+
+.ag-create-account-modal .modal__body {
+  flex: 1 1 auto;
+  overflow-y: auto !important;
+  padding-inline: 0.25rem;
+  padding-bottom: 0.75rem;
+  scroll-padding-bottom: 2rem;
+}
+
+.ag-create-account-modal .modal__footer {
+  flex-shrink: 0;
+}
+
+.ag-create-account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0.25rem 0.25rem 1.25rem;
+}
+
+.ag-create-account-advanced {
+  min-width: 0;
+  border-top: 1px solid var(--separator);
+  padding-top: 1rem;
+}
+
+.ag-create-account-pool-switch {
+  width: max-content;
+  max-width: 100%;
+}
+
+.ag-create-account-groups {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding-top: 0.25rem;
+}
+
+.ag-create-account-group-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.625rem;
+}
+
+.ag-create-account-group-item {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 0.625rem;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  border-radius: var(--field-radius);
+  background: var(--field-background);
+  box-shadow: var(--field-shadow);
+  padding: 0.625rem 0.75rem;
+}
+
+.ag-create-account-group-item:hover {
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%);
+}
+
+.ag-create-account-group-item[data-selected="true"] {
+  border-color: color-mix(in oklab, var(--accent) 72%, var(--border));
+  background: color-mix(in oklab, var(--accent) 8%, var(--field-background));
+}
+
+.ag-create-account-group-item [data-slot="checkbox-content"] {
+  min-width: 0;
+}
