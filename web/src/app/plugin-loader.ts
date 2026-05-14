@@ -137,12 +137,12 @@ async function fetchPluginFrontend(
 ): Promise<PluginFrontendModule | null> {
   try {
     const url = `/plugins/${pluginId}/assets/index.js`;
-    const resp = await fetch(url);
+    const resp = await fetch(url, { cache: 'no-cache' });
     if (!resp.ok) return null;
 
     // Load plugin CSS if available
     const cssUrl = `/plugins/${pluginId}/assets/index.css`;
-    fetch(cssUrl).then((cssResp) => {
+    fetch(cssUrl, { cache: 'no-cache' }).then((cssResp) => {
       if (!cssResp.ok) return;
       return cssResp.text().then((css) => {
         const existingStyle = document.getElementById(`plugin-css-${pluginId}`);

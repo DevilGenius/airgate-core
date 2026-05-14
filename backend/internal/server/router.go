@@ -353,6 +353,7 @@ func servePluginAsset(mgr *plugin.Manager, baseDir string) gin.HandlerFunc {
 		if devDir, ok := mgr.DevWebDistPath(name); ok {
 			full := filepath.Join(devDir, rel)
 			if data, err := os.ReadFile(full); err == nil {
+				c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 				c.Data(http.StatusOK, contentTypeFromExt(rel), data)
 				return
 			}

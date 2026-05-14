@@ -337,13 +337,13 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 }
 
 func resolveReasoningEffort(fromRequest string, usage *sdk.Usage) string {
-	if fromRequest != "" {
-		return fromRequest
-	}
 	if usage != nil && usage.Metadata != nil {
 		if effort := normalizeReasoningEffort(usage.Metadata["reasoning_effort"]); effort != "" {
 			return effort
 		}
+	}
+	if fromRequest != "" {
+		return fromRequest
 	}
 	return ""
 }
