@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Chip, Description, EmptyState, Form, Input, Label, Modal, Skeleton, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Card, Chip, Description, EmptyState, Form, Input, Label, Modal, Skeleton, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usersApi } from '../../shared/api/users';
 import { useToast } from '../../shared/ui';
@@ -10,6 +10,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import type { BalanceLogResp } from '../../shared/types';
 import {
   User,
@@ -437,18 +438,14 @@ function BalanceAlertCard({ threshold, balance }: { threshold: number; balance: 
               <div className="text-sm font-medium text-text">{t('profile.balance_alert_enabled')}</div>
               <p className="mt-0.5 text-xs text-text-tertiary">{t('profile.balance_alert_desc')}</p>
             </div>
-            <Switch
-              aria-label={t('profile.balance_alert_enabled')}
+            <NativeSwitch
+              ariaLabel={t('profile.balance_alert_enabled')}
               isSelected={enabled}
               onChange={(v) => {
                 setEnabled(v);
                 if (!v) mutation.mutate(0);
               }}
-            >
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-            </Switch>
+            />
           </div>
           {enabled && (
             <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">

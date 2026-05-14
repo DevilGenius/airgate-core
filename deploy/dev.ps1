@@ -15,7 +15,7 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 
 $CoreRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $WorkspaceRoot = Resolve-Path (Join-Path $CoreRoot "..")
-$SdkFrontend = Join-Path $WorkspaceRoot "airgate-sdk\frontend"
+$SdkTheme = Join-Path $WorkspaceRoot "airgate-sdk\theme"
 $OpenAIPluginRoot = Join-Path $WorkspaceRoot "airgate-openai"
 $ClaudePluginRoot = Join-Path $WorkspaceRoot "airgate-claude"
 $PlaygroundPluginRoot = Join-Path $WorkspaceRoot "airgate-playground"
@@ -93,8 +93,8 @@ function Assert-Command([string]$Name) {
 }
 
 function Assert-Paths {
-  if (-not (Test-Path $SdkFrontend)) {
-    throw "SDK frontend not found: $SdkFrontend"
+  if (-not (Test-Path $SdkTheme)) {
+    throw "SDK theme not found: $SdkTheme"
   }
   if (-not (Test-Path $WebDir)) {
     throw "Core web not found: $WebDir"
@@ -129,8 +129,8 @@ function Ensure-Dirs {
 function Install-Deps {
   Assert-Command "pnpm"
   Assert-Command "go"
-  Invoke-InDir $SdkFrontend "pnpm install"
-  Invoke-InDir $SdkFrontend "pnpm build"
+  Invoke-InDir $SdkTheme "pnpm install"
+  Invoke-InDir $SdkTheme "pnpm build"
   Invoke-InDir $WebDir "pnpm install --force"
   Invoke-InDir $BackendDir "`$env:GOTOOLCHAIN = 'local'; go mod download"
   foreach ($plugin in $PluginSpecs) {
@@ -284,7 +284,7 @@ function Sync-PluginWebdist($Plugin) {
 function Build-Plugin($Plugin) {
   Ensure-PluginGoWork $Plugin
 
-  $themeTypes = Join-Path $Plugin.WebDir "node_modules\@airgate\theme\dist\index.d.ts"
+  $themeTypes = Join-Path $Plugin.WebDir "node_modules\@doudou-start\airgate-theme\dist\index.d.ts"
   if (-not (Test-Path $themeTypes)) {
     Invoke-InDir $Plugin.WebDir "pnpm install --force"
   }
@@ -298,9 +298,9 @@ function Build-Plugin($Plugin) {
 
 function Build-All {
   Assert-Command "pnpm"
-  Invoke-InDir $SdkFrontend "pnpm build"
+  Invoke-InDir $SdkTheme "pnpm build"
 
-  $themeTypes = Join-Path $WebDir "node_modules\@airgate\theme\dist\index.d.ts"
+  $themeTypes = Join-Path $WebDir "node_modules\@doudou-start\airgate-theme\dist\index.d.ts"
   if (-not (Test-Path $themeTypes)) {
     Invoke-InDir $WebDir "pnpm install --force"
   }

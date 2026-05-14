@@ -6,6 +6,12 @@ import type {
   UsageRecordSurfaceProps,
 } from '@doudou-start/airgate-theme/plugin';
 
+type UsageServiceTierFastResolver = (context?: Record<string, unknown>) => boolean;
+
+type PluginFrontendModuleWithResolvers = PluginFrontendModule & {
+  isUsageServiceTierFast?: UsageServiceTierFastResolver;
+};
+
 function wrapPluginComponent<TProps extends object>(
   Component: ComponentType<TProps>,
 ): ComponentType<TProps> {
@@ -16,7 +22,7 @@ function wrapPluginComponent<TProps extends object>(
 
 function normalizePluginFrontendModule(
   mod: PluginFrontendModule | null,
-): PluginFrontendModule | null {
+): PluginFrontendModuleWithResolvers | null {
   if (!mod) return null;
 
   return {
@@ -54,7 +60,7 @@ function normalizePluginFrontendModule(
 
 // 核心通过 window.__airgate_shared 暴露的共享模块列表
 const SHARED_MODULES = ['react', 'react-dom', 'react/jsx-runtime', 'react-i18next'];
-const pluginFrontendCache = new Map<string, Promise<PluginFrontendModule | null>>();
+const pluginFrontendCache = new Map<string, Promise<PluginFrontendModuleWithResolvers | null>>();
 const pluginFrontendCacheListeners = new Set<(pluginId?: string) => void>();
 
 function rewriteNamedImportSpecifiers(specifiers: string): string {
@@ -134,7 +140,7 @@ function rewriteBareImports(code: string): string {
  */
 async function fetchPluginFrontend(
   pluginId: string,
-): Promise<PluginFrontendModule | null> {
+): Promise<PluginFrontendModuleWithResolvers | null> {
   try {
     const url = `/plugins/${pluginId}/assets/index.js`;
     const resp = await fetch(url, { cache: 'no-cache' });
@@ -190,7 +196,7 @@ async function fetchPluginFrontend(
 
 export function loadPluginFrontend(
   pluginId: string,
-): Promise<PluginFrontendModule | null> {
+): Promise<PluginFrontendModuleWithResolvers | null> {
   const cached = pluginFrontendCache.get(pluginId);
   if (cached) return cached;
 
@@ -344,6 +350,23 @@ export function subscribeUsageModelMetaChange(listener: () => void): () => void 
 
 export function getUsageModelMetaVersion(): number {
   return usageModelMetaVersion;
+}
+
+const usageServiceTierFastRegistry = new Map<string, UsageServiceTierFastResolver>();
+
+export function registerUsageServiceTierFastResolver(
+  platform: string,
+  resolver: UsageServiceTierFastResolver,
+) {
+  usageServiceTierFastRegistry.set(platform.toLowerCase(), resolver);
+  usageModelMetaVersion++;
+  usageModelMetaListeners.forEach((fn) => fn());
+}
+
+export function getPluginUsageServiceTierFastResolver(
+  platform: string,
+): UsageServiceTierFastResolver | undefined {
+  return usageServiceTierFastRegistry.get(platform.toLowerCase());
 }
 
 /** 全局使用记录费用明细渲染器注册表：platform → UsageCostDetail 组件 */

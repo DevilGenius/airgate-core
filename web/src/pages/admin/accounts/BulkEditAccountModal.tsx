@@ -8,7 +8,6 @@ import {
   Input,
   ListBox,
   Select,
-  Switch,
   TextField as HeroTextField,
   useOverlayState,
 } from '@heroui/react';
@@ -19,6 +18,7 @@ import { queryKeys } from '../../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { GroupCheckboxList } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
+import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { BulkUpdateAccountsReq } from '../../../shared/types';
 
 /**
@@ -132,20 +132,16 @@ export function BulkEditAccountModal({
           onToggle={setEnableStatus}
           label={t('accounts.enable_dispatch')}
         >
-          <Switch
+          <NativeSwitch
             isDisabled={!enableStatus}
             isSelected={status === 'active'}
-            onChange={(on) => setStatus(on ? 'active' : 'disabled')}
-          >
-            <Switch.Control>
-              <Switch.Thumb />
-            </Switch.Control>
-            <Switch.Content>
+            label={(
               <span className={enableStatus ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
                 {status === 'active' ? t('common.enabled', '已启用') : t('common.disabled', '已禁用')}
               </span>
-            </Switch.Content>
-          </Switch>
+            )}
+            onChange={(on) => setStatus(on ? 'active' : 'disabled')}
+          />
         </FieldRow>
 
         {/* 优先级 */}

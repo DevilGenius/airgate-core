@@ -39,6 +39,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { BulkActionsBar } from './accounts/BulkActionsBar';
@@ -438,17 +439,11 @@ const AccountSchedulingSwitch = memo(function AccountSchedulingSwitch({
   }, [onToggle, rowId]);
 
   return (
-    <button
-      type="button"
-      aria-checked={isSelected}
-      aria-label={ariaLabel}
-      className="ag-table-scheduling-switch"
-      data-selected={isSelected ? 'true' : 'false'}
-      role="switch"
-      onClick={handleClick}
-    >
-      <span className="ag-table-scheduling-switch-thumb" aria-hidden="true" />
-    </button>
+    <NativeSwitch
+      ariaLabel={ariaLabel}
+      isSelected={isSelected}
+      onChange={handleClick}
+    />
   );
 }, (prev, next) => (
   prev.ariaLabel === next.ariaLabel
@@ -1158,7 +1153,7 @@ export default function AccountsPageContent() {
     onSuccess: () => setDeletingAccount(null),
   });
 
-  // 切换调度状态。这里做乐观更新，避免 Switch 先跳回旧状态再等列表刷新。
+  // 切换调度状态。这里做乐观更新，避免开关先跳回旧状态再等列表刷新。
   const toggleMutation = useMutation({
     mutationFn: (id: number) => accountsApi.toggleScheduling(id),
     onMutate: async (id) => {

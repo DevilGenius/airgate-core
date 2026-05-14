@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Input, Label, Modal, Spinner, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
+import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { UserResp, UpdateUserReq } from '../../../shared/types';
 
 interface EditUserModalProps {
@@ -86,22 +87,15 @@ export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUs
                     onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
                   />
                 </HeroTextField>
-                <Switch
+                <NativeSwitch
                   isSelected={form.status === 'active'}
+                  contentClassName="text-xs"
+                  contentStyle={{ color: form.status === 'active' ? 'var(--ag-success)' : 'var(--ag-text-tertiary)' }}
+                  label={form.status === 'active' ? t('status.enabled') : t('status.disabled')}
                   onChange={(isSelected) =>
                     setForm({ ...form, status: isSelected ? 'active' : 'disabled' })
                   }
-                >
-                  <Switch.Control>
-                    <Switch.Thumb />
-                  </Switch.Control>
-                  <Switch.Content
-                    className="text-xs"
-                    style={{ color: form.status === 'active' ? 'var(--ag-success)' : 'var(--ag-text-tertiary)' }}
-                  >
-                    {form.status === 'active' ? t('status.enabled') : t('status.disabled')}
-                  </Switch.Content>
-                </Switch>
+                />
               </div>
             </Modal.Body>
             <Modal.Footer>

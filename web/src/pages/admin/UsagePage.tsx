@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, Card, ComboBox, Input, ListBox, Select, Switch, Tabs } from '@heroui/react';
+import { Button, Card, ComboBox, Input, ListBox, Select, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { usePagination } from '../../shared/hooks/usePagination';
@@ -18,6 +18,7 @@ import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilt
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { PIE_CHART_COLORS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 
 const UsagePieChart = lazy(() =>
   import('./usage/UsageCharts').then((m) => ({ default: m.UsagePieChart })),
@@ -817,20 +818,13 @@ export default function UsagePage() {
         >
           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
         </Button>
-        <Switch
-          aria-label={t('usage.auto_update')}
+        <NativeSwitch
+          ariaLabel={t('usage.auto_update')}
           className="shrink-0"
           isSelected={autoRefresh}
-          size="sm"
+          label={<span className="text-sm text-text-secondary">{t('usage.auto_update')}</span>}
           onChange={handleAutoRefreshChange}
-        >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-          <Switch.Content>
-            <span className="text-sm text-text-secondary">{t('usage.auto_update')}</span>
-          </Switch.Content>
-        </Switch>
+        />
       </div>
 
       {/* 使用记录表格 */}

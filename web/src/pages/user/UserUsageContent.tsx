@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, Card, ListBox, Meter, Select, Switch } from '@heroui/react';
+import { Button, Card, ListBox, Meter, Select } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { queryKeys } from '../../shared/queryKeys';
@@ -19,6 +19,7 @@ import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { CostValue } from '../../shared/components/CostValue';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
 
 const USAGE_AUTO_UPDATE_INTERVAL_MS = 3_000;
@@ -446,20 +447,13 @@ export default function UserUsageContent() {
         >
           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
         </Button>
-        <Switch
-          aria-label={t('usage.auto_update')}
+        <NativeSwitch
+          ariaLabel={t('usage.auto_update')}
           className="shrink-0"
           isSelected={autoRefresh}
-          size="sm"
+          label={<span className="text-sm text-text-secondary">{t('usage.auto_update')}</span>}
           onChange={handleAutoRefreshChange}
-        >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-          <Switch.Content>
-            <span className="text-sm text-text-secondary">{t('usage.auto_update')}</span>
-          </Switch.Content>
-        </Switch>
+        />
       </div>
 
       {/* 使用记录表格 */}
