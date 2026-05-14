@@ -270,18 +270,14 @@ export default function UserUsageContent() {
 
   const list = data?.list ?? [];
   const total = data?.total ?? 0;
+  const visibleActualCost = customerScope ? (stats?.total_billed_cost ?? 0) : (stats?.total_actual_cost ?? 0);
 
   const sharedColumns = useUsageColumns({ customerScope });
   const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
   const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
-  const userSharedColumns = sharedColumns.map((column) => (
-    column.key === 'created_at'
-      ? { ...column, width: '128px' }
-      : column
-  ));
   const streamColumn = sharedColumns.find((column) => column.key === 'stream');
   const timingColumns = sharedColumns.filter((column) => column.key === 'first_token_ms' || column.key === 'duration_ms');
-  const sharedColumnsAfterModel = userSharedColumns
+  const sharedColumnsAfterModel = sharedColumns
     .slice(modelColumnIndex + 1)
     .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream');
   const endpointColumn: UsageColumnConfig<UsageRow> = {
@@ -318,15 +314,19 @@ export default function UserUsageContent() {
   };
   const columns = modelColumnIndex >= 0
     ? [
-        ...userSharedColumns.slice(0, timeColumnIndex + 1),
-        apiKeyColumn,
-        ...userSharedColumns.slice(timeColumnIndex + 1, modelColumnIndex + 1),
+        ...sharedColumns.slice(0, timeColumnIndex + 1),
+        ...(customerScope ? [] : [apiKeyColumn]),
+        ...sharedColumns.slice(timeColumnIndex + 1, modelColumnIndex + 1),
         ...(streamColumn ? [streamColumn] : []),
         ...timingColumns,
         ...sharedColumnsAfterModel,
         endpointColumn,
       ]
-    : [...userSharedColumns, endpointColumn, apiKeyColumn];
+    : [
+        ...sharedColumns,
+        endpointColumn,
+        ...(customerScope ? [] : [apiKeyColumn]),
+      ];
 
   return (
     <div>
@@ -334,7 +334,7 @@ export default function UserUsageContent() {
       <APIKeyInfoBar />
 
       {/* 概览统计 */}
-      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+      <div className={`mb-6 grid grid-cols-1 gap-3 ${customerScope ? 'md:grid-cols-3 xl:grid-cols-3' : 'md:grid-cols-2 xl:grid-cols-4'} 2xl:gap-4`}>
         <StatCard
           title={t('usage.total_requests')}
           value={(stats?.total_requests ?? 0).toLocaleString()}
@@ -349,16 +349,18 @@ export default function UserUsageContent() {
         />
         <StatCard
           title={t('usage.actual_cost')}
-          value={<CostValue value={stats?.total_actual_cost ?? 0} decimals={4} tone="actual" />}
+          value={<CostValue value={visibleActualCost} decimals={4} tone="actual" />}
           icon={<Coins className="w-5 h-5" />}
           accentColor="var(--ag-warning)"
         />
-        <StatCard
-          title={t('usage.total_cost')}
-          value={<CostValue value={stats?.total_cost ?? 0} decimals={4} tone="standard" />}
-          icon={<DollarSign className="w-5 h-5" />}
-          accentColor="var(--ag-success)"
-        />
+        {!customerScope && (
+          <StatCard
+            title={t('usage.total_cost')}
+            value={<CostValue value={stats?.total_cost ?? 0} decimals={4} tone="standard" />}
+            icon={<DollarSign className="w-5 h-5" />}
+            accentColor="var(--ag-success)"
+          />
+        )}
       </div>
 
       {/* 筛选栏 */}

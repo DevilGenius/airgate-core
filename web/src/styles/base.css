@@ -72,6 +72,13 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .ag-native-switch {
+  --ag-native-switch-track: color-mix(in oklab, var(--default) 82%, var(--background) 18%);
+  --ag-native-switch-track-border: color-mix(in oklab, var(--border) 88%, var(--foreground) 12%);
+  --ag-native-switch-thumb: var(--background);
+  --ag-native-switch-thumb-shadow: color-mix(in oklab, var(--black) 18%, transparent);
+  --ag-native-switch-checked-track: var(--success);
+  --ag-native-switch-checked-track-border: color-mix(in oklab, var(--success) 82%, var(--border) 18%);
+  --ag-native-switch-checked-thumb: var(--white);
   position: relative;
   display: inline-flex;
   max-width: 100%;
@@ -80,6 +87,14 @@ input[type="number"]::-webkit-outer-spin-button {
   cursor: pointer;
   user-select: none;
   vertical-align: middle;
+}
+
+.dark .ag-native-switch,
+[data-theme="dark"] .ag-native-switch {
+  --ag-native-switch-track: color-mix(in oklab, var(--surface-tertiary) 88%, var(--foreground) 12%);
+  --ag-native-switch-track-border: color-mix(in oklab, var(--border) 70%, var(--foreground) 30%);
+  --ag-native-switch-thumb: color-mix(in oklab, var(--white) 92%, var(--surface) 8%);
+  --ag-native-switch-thumb-shadow: color-mix(in oklab, var(--black) 48%, transparent);
 }
 
 .ag-native-switch[data-disabled="true"] {
@@ -106,9 +121,9 @@ input[type="number"]::-webkit-outer-spin-button {
   height: 1.125rem;
   padding: 0.125rem;
   align-items: center;
-  border: 1px solid color-mix(in oklab, var(--border) 88%, var(--foreground) 12%);
+  border: 1px solid var(--ag-native-switch-track-border);
   border-radius: 999px;
-  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%);
+  background: var(--ag-native-switch-track);
   transition:
     background-color 80ms ease,
     border-color 80ms ease,
@@ -120,24 +135,20 @@ input[type="number"]::-webkit-outer-spin-button {
   width: 0.75rem;
   height: 0.75rem;
   border-radius: 999px;
-  background: var(--background);
-  box-shadow: 0 1px 2px color-mix(in oklab, black 18%, transparent);
+  background: var(--ag-native-switch-thumb);
+  box-shadow: 0 1px 2px var(--ag-native-switch-thumb-shadow);
   transform: translateX(0);
   transition: transform 80ms ease;
 }
 
 .ag-native-switch-input:checked + .ag-native-switch-track {
-  border-color: color-mix(in oklab, var(--success) 82%, var(--border) 18%);
-  background: var(--success);
+  border-color: var(--ag-native-switch-checked-track-border);
+  background: var(--ag-native-switch-checked-track);
 }
 
 .ag-native-switch-input:checked + .ag-native-switch-track .ag-native-switch-thumb {
-  background: var(--white);
+  background: var(--ag-native-switch-checked-thumb);
   transform: translateX(0.875rem);
-}
-
-.ag-native-switch:not([data-disabled="true"]):hover .ag-native-switch-track {
-  border-color: color-mix(in oklab, var(--accent) 52%, var(--border) 48%);
 }
 
 .ag-native-switch-input:focus-visible + .ag-native-switch-track {

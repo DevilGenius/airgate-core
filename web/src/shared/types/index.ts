@@ -568,7 +568,7 @@ export interface UsageStatsResp {
   total_tokens: number;
   total_cost: number;
   total_actual_cost: number;
-  /** Reseller scope 才会下发；admin scope omit */
+  /** 客户视角 / reseller scope 的账面费用；admin scope omit */
   total_billed_cost?: number;
   by_model?: ModelStats[];
   by_user?: UserStats[];

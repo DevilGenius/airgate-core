@@ -18,6 +18,7 @@ $WorkspaceRoot = Resolve-Path (Join-Path $CoreRoot "..")
 $SdkTheme = Join-Path $WorkspaceRoot "airgate-sdk\theme"
 $OpenAIPluginRoot = Join-Path $WorkspaceRoot "airgate-openai"
 $ClaudePluginRoot = Join-Path $WorkspaceRoot "airgate-claude"
+$KiroPluginRoot = Join-Path $WorkspaceRoot "airgate-kiro"
 $PlaygroundPluginRoot = Join-Path $WorkspaceRoot "airgate-playground"
 $WebDir = Join-Path $CoreRoot "web"
 $BackendDir = Join-Path $CoreRoot "backend"
@@ -55,6 +56,17 @@ $PluginSpecs = @(
     WatchPidFile = Join-Path $StateDir "gateway-claude-web.pid"
     WatchOut = Join-Path $ClaudePluginRoot "tmp\web-watch.out.log"
     WatchErr = Join-Path $ClaudePluginRoot "tmp\web-watch.err.log"
+  },
+  [pscustomobject]@{
+    Name = "gateway-kiro"
+    Root = $KiroPluginRoot
+    WebDir = Join-Path $KiroPluginRoot "web"
+    BackendDir = Join-Path $KiroPluginRoot "backend"
+    WebDist = Join-Path $KiroPluginRoot "web\dist"
+    EmbedDir = Join-Path $KiroPluginRoot "backend\internal\gateway\webdist"
+    WatchPidFile = Join-Path $StateDir "gateway-kiro-web.pid"
+    WatchOut = Join-Path $KiroPluginRoot "tmp\web-watch.out.log"
+    WatchErr = Join-Path $KiroPluginRoot "tmp\web-watch.err.log"
   },
   [pscustomobject]@{
     Name = "airgate-playground"

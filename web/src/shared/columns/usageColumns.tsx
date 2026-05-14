@@ -465,12 +465,14 @@ function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
           placement="right"
           content={() => (
             <TooltipPanel title={t('usage.cost_detail')} subtitle={raw.model}>
-              <TooltipRow label={t('usage.cost')} value={`$${cost.toFixed(6)}`} tone="strong" />
+              <TooltipRow label={t('usage.cost')} value={<CostValue value={cost} decimals={6} tone="actual" />} tone="strong" />
             </TooltipPanel>
           )}
         >
           <div className="flex w-full flex-col items-center font-mono text-center text-xs">
-            <div className="text-[15px] font-semibold leading-none text-text">${cost.toFixed(6)}</div>
+            <div className="text-[15px] font-semibold leading-none text-text">
+              <CostValue value={cost} decimals={6} tone="warning" />
+            </div>
           </div>
         </RichTooltip>
       );
@@ -508,10 +510,10 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
 
         return (
           <div className="flex min-w-0 items-center gap-1.5 font-mono text-xs" title={fullLabel}>
-            <span className="font-mono text-[13px] font-medium text-text">
+            <span className="shrink-0 font-mono text-[13px] font-medium text-text">
               {timeLabel}
             </span>
-            <span className="hidden text-text-tertiary lg:inline">
+            <span className="hidden shrink-0 text-text-tertiary xl:inline">
               {dateLabel}
             </span>
           </div>
