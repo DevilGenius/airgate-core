@@ -84,7 +84,8 @@ export function EditAccountModal({
   const passwordFieldsCleared = useRef(false);
 
   useEffect(() => {
-    if (!schema || passwordFieldsCleared.current) return;
+    // 插件有自定义表单时，由插件自己控制脱敏展示，不清空 password 字段
+    if (PluginAccountForm || !schema || passwordFieldsCleared.current) return;
     const passwordKeys = getSchemaVisibleFields(schema, accountType)
       .filter((field) => field.type === 'password')
       .map((field) => field.key);
@@ -96,7 +97,7 @@ export function EditAccountModal({
       for (const key of passwordKeys) next[key] = '';
       return next;
     });
-  }, [schema, accountType]);
+  }, [schema, accountType, PluginAccountForm]);
 
   useEffect(() => {
     const selectedType = getSchemaSelectedAccountType(schema, accountType);
