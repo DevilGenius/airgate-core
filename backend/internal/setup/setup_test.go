@@ -21,6 +21,7 @@ func TestEnvDBConfigRequiresCompleteEnvironment(t *testing.T) {
 	cfg := EnvDBConfig()
 	if cfg == nil {
 		t.Fatal("完整数据库环境变量应返回配置")
+		return
 	}
 	if cfg.Host != "db" || cfg.Port != 5432 || cfg.User != "airgate" || cfg.SSLMode != "disable" {
 		t.Fatalf("数据库配置异常: %+v", cfg)
@@ -45,6 +46,7 @@ func TestEnvRedisConfigParsesOptionalDB(t *testing.T) {
 	cfg := EnvRedisConfig()
 	if cfg == nil {
 		t.Fatal("完整 Redis 环境变量应返回配置")
+		return
 	}
 	if cfg.Host != "redis" || cfg.Port != 6379 || cfg.Password != "secret" || cfg.DB != 2 {
 		t.Fatalf("Redis 配置异常: %+v", cfg)
