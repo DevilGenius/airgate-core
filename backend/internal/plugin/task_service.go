@@ -81,21 +81,22 @@ func validateTaskTransition(from, to enttask.Status) error {
 
 func taskToPayload(t *ent.Task) map[string]interface{} {
 	resp := map[string]interface{}{
-		"id":            int64(t.ID),
-		"task_id":       int64(t.ID),
-		"plugin_id":     t.PluginID,
-		"task_type":     t.TaskType,
-		"status":        string(t.Status),
-		"stage":         t.Stage,
-		"user_id":       int64(t.UserID),
-		"error_type":    t.ErrorType,
-		"error_code":    t.ErrorCode,
-		"error_message": t.ErrorMessage,
-		"progress":      t.Progress,
-		"attempts":      t.Attempts,
-		"max_attempts":  t.MaxAttempts,
-		"created_at":    t.CreatedAt.Format(time.RFC3339Nano),
-		"updated_at":    t.UpdatedAt.Format(time.RFC3339Nano),
+		"id":             int64(t.ID),
+		"task_id":        int64(t.ID),
+		"public_task_id": publicTaskID(t),
+		"plugin_id":      t.PluginID,
+		"task_type":      t.TaskType,
+		"status":         string(t.Status),
+		"stage":          t.Stage,
+		"user_id":        int64(t.UserID),
+		"error_type":     t.ErrorType,
+		"error_code":     t.ErrorCode,
+		"error_message":  t.ErrorMessage,
+		"progress":       t.Progress,
+		"attempts":       t.Attempts,
+		"max_attempts":   t.MaxAttempts,
+		"created_at":     t.CreatedAt.Format(time.RFC3339Nano),
+		"updated_at":     t.UpdatedAt.Format(time.RFC3339Nano),
 	}
 	if t.StartedAt != nil {
 		resp["started_at"] = t.StartedAt.Format(time.RFC3339Nano)
@@ -128,6 +129,13 @@ func taskToPayload(t *ent.Task) map[string]interface{} {
 		resp["expires_at"] = t.ExpiresAt.Format(time.RFC3339Nano)
 	}
 	return resp
+}
+
+func publicTaskID(t *ent.Task) string {
+	if t == nil || t.IdempotencyKey == nil {
+		return ""
+	}
+	return *t.IdempotencyKey
 }
 
 func (h *HostService) createTask(ctx context.Context, pluginID string, req hostCreateTaskRequest) (map[string]interface{}, error) {
@@ -261,11 +269,22 @@ func (h *HostService) updateTask(ctx context.Context, pluginID string, req hostU
 	return map[string]interface{}{"task": taskToPayload(updated)}, nil
 }
 
-func (h *HostService) getTask(ctx context.Context, _ string, req hostGetTaskRequest) (map[string]interface{}, error) {
-	query := h.db.Task.Query().
-		Where(
-			enttask.IDEQ(int(req.TaskID)),
-		)
+func (h *HostService) getTask(ctx context.Context, pluginID string, req hostGetTaskRequest) (map[string]interface{}, error) {
+	if req.PluginID != "" {
+		pluginID = req.PluginID
+	}
+	query := h.db.Task.Query()
+	if req.PublicTaskID != "" {
+		query.Where(enttask.IdempotencyKeyEQ(req.PublicTaskID))
+	} else {
+		if req.TaskID <= 0 {
+			return nil, status.Error(codes.InvalidArgument, "task_id is required")
+		}
+		query.Where(enttask.IDEQ(int(req.TaskID)))
+	}
+	if pluginID != "" {
+		query.Where(enttask.PluginIDEQ(pluginID))
+	}
 	if req.UserID > 0 {
 		query.Where(enttask.UserIDEQ(int(req.UserID)))
 	}
