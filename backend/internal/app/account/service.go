@@ -784,13 +784,9 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 			continue
 		}
 
-		// 先给所有活跃账号（包括 apikey）在 merged 里留一个占位 entry，
-		// 这样 enrichTodayStats 能遍历到它们。apikey 账号走不到下面的插件
-		// 调用（没有 OAuth credentials），它们的占位会保持为空 map，
-		// 前端渲染时跳过 windows/credits，只显示 today_stats。
-		//
-		// 只对"支持 OAuth quota 查询"的账号类型发 HTTP 请求：目前判定依据是
-		// item.Type != "apikey" && 有 credentials，与原行为一致。
+		// 所有账号（含 disabled）都给 merged 占位，确保前端能看到用量窗口。
+		// apikey 账号走不到下面的插件调用（没有上游 quota 接口），只显示 today_stats。
+		// disabled 账号也查配额但不参与限流状态推导，避免覆盖手动关闭调度的状态。
 		// 建立 accountID → 是否池子 的查询表，用于后面插件返回 errors
 		// 时判断是否应该跳过 MarkError（池子账号永远不自动标错）
 		poolByID := make(map[int]bool, len(accounts))
@@ -798,15 +794,15 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 			poolByID[item.ID] = item.UpstreamIsPool
 		}
 
+		disabledIDs := make(map[int]bool, len(accounts))
 		reqList := make([]accountUsageRequest, 0, len(accounts))
 		for _, item := range accounts {
-			// 非 active 账号完全跳过（rate_limited / degraded / disabled 都不查配额）
-			if item.State != "active" {
-				continue
-			}
 			key := strconv.Itoa(item.ID)
 			if _, exists := merged[key]; !exists {
 				merged[key] = map[string]any{}
+			}
+			if item.State == "disabled" {
+				disabledIDs[item.ID] = true
 			}
 			// apikey 类型不调插件（没有上游 quota 接口）
 			if item.Type == "apikey" {
@@ -844,13 +840,19 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 			merged[key] = value
 		}
 		// 根据每个账号的 windows 反推限流恢复时间并持久化到 DB。
-		// 这样即便用户还没真正发起过会触发 429 的请求，只要 quota 接口看到
-		// 某个窗口已经 100%，调度器也能提前跳过、UI 也能显示"限流中"徽标。
-		s.persistRateLimitFromWindows(ctx, result.Accounts)
+		// 已 disabled 的账号不参与限流状态推导，避免覆盖手动关闭调度的状态。
+		activeAccounts := make(map[string]any, len(result.Accounts))
+		for key, value := range result.Accounts {
+			id, _ := strconv.Atoi(key)
+			if !disabledIDs[id] {
+				activeAccounts[key] = value
+			}
+		}
+		s.persistRateLimitFromWindows(ctx, activeAccounts)
 
 		for _, item := range result.Errors {
-			// 池账号在巡检里返回的错误只是池暂时不可用，不代表本地账号坏，不自动禁用。
-			if poolByID[item.ID] || s.stateWriter == nil {
+			// 池账号 / 已禁用账号不自动 MarkDisabled（避免覆盖人工关闭的 reason）。
+			if poolByID[item.ID] || disabledIDs[item.ID] || s.stateWriter == nil {
 				continue
 			}
 			s.stateWriter.MarkDisabled(ctx, item.ID, item.Message)
