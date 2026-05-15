@@ -20,6 +20,7 @@ $OpenAIPluginRoot = Join-Path $WorkspaceRoot "airgate-openai"
 $ClaudePluginRoot = Join-Path $WorkspaceRoot "airgate-claude"
 $KiroPluginRoot = Join-Path $WorkspaceRoot "airgate-kiro"
 $PlaygroundPluginRoot = Join-Path $WorkspaceRoot "airgate-playground"
+$StudioPluginRoot = Join-Path $WorkspaceRoot "airgate-studio"
 $WebDir = Join-Path $CoreRoot "web"
 $BackendDir = Join-Path $CoreRoot "backend"
 $WebDist = Join-Path $WebDir "dist"
@@ -78,6 +79,17 @@ $PluginSpecs = @(
     WatchPidFile = Join-Path $StateDir "airgate-playground-web.pid"
     WatchOut = Join-Path $PlaygroundPluginRoot "tmp\web-watch.out.log"
     WatchErr = Join-Path $PlaygroundPluginRoot "tmp\web-watch.err.log"
+  },
+  [pscustomobject]@{
+    Name = "airgate-studio"
+    Root = $StudioPluginRoot
+    WebDir = Join-Path $StudioPluginRoot "web"
+    BackendDir = Join-Path $StudioPluginRoot "backend"
+    WebDist = Join-Path $StudioPluginRoot "web\dist"
+    EmbedDir = Join-Path $StudioPluginRoot "backend\internal\studio\webdist"
+    WatchPidFile = Join-Path $StateDir "airgate-studio-web.pid"
+    WatchOut = Join-Path $StudioPluginRoot "tmp\web-watch.out.log"
+    WatchErr = Join-Path $StudioPluginRoot "tmp\web-watch.err.log"
   }
 )
 
@@ -101,6 +113,17 @@ function Invoke-InDir([string]$Directory, [string]$Command) {
 function Assert-Command([string]$Name) {
   if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
     throw "Missing command: $Name"
+  }
+}
+
+function Invoke-PnpmInstall([string]$Directory, [switch]$Force) {
+  $command = if ($Force) { "pnpm install --force" } else { "pnpm install" }
+  try {
+    Invoke-InDir $Directory $command
+  } catch {
+    Write-Step "pnpm install failed; approving esbuild build script and retrying"
+    Invoke-InDir $Directory "pnpm approve-builds esbuild"
+    Invoke-InDir $Directory $command
   }
 }
 
@@ -141,13 +164,13 @@ function Ensure-Dirs {
 function Install-Deps {
   Assert-Command "pnpm"
   Assert-Command "go"
-  Invoke-InDir $SdkTheme "pnpm install"
+  Invoke-PnpmInstall $SdkTheme
   Invoke-InDir $SdkTheme "pnpm build"
-  Invoke-InDir $WebDir "pnpm install --force"
+  Invoke-PnpmInstall $WebDir -Force
   Invoke-InDir $BackendDir "`$env:GOTOOLCHAIN = 'local'; go mod download"
   foreach ($plugin in $PluginSpecs) {
     Ensure-PluginGoWork $plugin
-    Invoke-InDir $plugin.WebDir "pnpm install --force"
+    Invoke-PnpmInstall $plugin.WebDir -Force
     Invoke-InDir $plugin.BackendDir "`$env:GOTOOLCHAIN = 'local'; go mod download"
   }
 }
@@ -298,7 +321,7 @@ function Build-Plugin($Plugin) {
 
   $themeTypes = Join-Path $Plugin.WebDir "node_modules\@doudou-start\airgate-theme\dist\index.d.ts"
   if (-not (Test-Path $themeTypes)) {
-    Invoke-InDir $Plugin.WebDir "pnpm install --force"
+    Invoke-PnpmInstall $Plugin.WebDir -Force
   }
 
   Invoke-InDir $Plugin.WebDir "pnpm build"
@@ -314,7 +337,7 @@ function Build-All {
 
   $themeTypes = Join-Path $WebDir "node_modules\@doudou-start\airgate-theme\dist\index.d.ts"
   if (-not (Test-Path $themeTypes)) {
-    Invoke-InDir $WebDir "pnpm install --force"
+    Invoke-PnpmInstall $WebDir -Force
   }
 
   Invoke-InDir $WebDir "pnpm build"
