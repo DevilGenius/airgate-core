@@ -48,10 +48,58 @@ func (c *taskTypesCache) set(pluginID string, types []string) {
 }
 
 // StartTaskDispatcher 启动任务分发循环。在 Manager 启动时调用。
+// 启动前先将所有遗留的 processing 任务重置为 retrying，确保服务重启后立即恢复。
 func (m *Manager) StartTaskDispatcher(ctx context.Context) {
+	m.resetProcessingTasks(ctx)
 	go m.taskDispatchLoop(ctx)
 	go m.taskRecoverLoop(ctx)
 	slog.Info("task_dispatcher_started")
+}
+
+// resetProcessingTasks 将服务重启前残留的 processing 任务重置为 retrying/failed，
+// 使 dispatch 循环能立即重新接管。
+func (m *Manager) resetProcessingTasks(ctx context.Context) {
+	if m.hostFactory == nil || m.hostFactory.db == nil {
+		return
+	}
+	db := m.hostFactory.db
+
+	staleTasks, err := db.Task.Query().
+		Where(enttask.StatusEQ(enttask.StatusProcessing)).
+		All(ctx)
+	if err != nil || len(staleTasks) == 0 {
+		return
+	}
+
+	now := time.Now()
+	var recoveredCount, failedCount int
+	for _, st := range staleTasks {
+		if st.Attempts < st.MaxAttempts {
+			if err := db.Task.UpdateOneID(st.ID).
+				SetStatus(enttask.StatusRetrying).
+				SetStage("recovered_on_startup").
+				SetErrorMessage("recovered: service restarted").
+				Exec(ctx); err != nil {
+				slog.Error("task_startup_recover_failed", "task_id", st.ID, sdk.LogFieldError, err)
+			} else {
+				recoveredCount++
+			}
+		} else {
+			if err := db.Task.UpdateOneID(st.ID).
+				SetStatus(enttask.StatusFailed).
+				SetStage("failed").
+				SetErrorMessage(fmt.Sprintf("service restarted after %d attempts", st.MaxAttempts)).
+				SetCompletedAt(now).
+				Exec(ctx); err != nil {
+				slog.Error("task_startup_fail_failed", "task_id", st.ID, sdk.LogFieldError, err)
+			} else {
+				failedCount++
+			}
+		}
+	}
+	if recoveredCount > 0 || failedCount > 0 {
+		slog.Info("task_startup_reset", "recovered", recoveredCount, "failed", failedCount)
+	}
 }
 
 func (m *Manager) taskDispatchLoop(ctx context.Context) {

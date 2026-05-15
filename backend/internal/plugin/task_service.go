@@ -332,3 +332,30 @@ func (h *HostService) listTasks(ctx context.Context, pluginID string, req hostLi
 	}
 	return map[string]interface{}{"tasks": items, "total": total}, nil
 }
+
+func (h *HostService) deleteTask(ctx context.Context, pluginID string, req hostDeleteTaskRequest) (map[string]interface{}, error) {
+	if req.PluginID != "" {
+		pluginID = req.PluginID
+	}
+	query := h.db.Task.Query().Where(
+		enttask.IDEQ(int(req.TaskID)),
+		enttask.PluginIDEQ(pluginID),
+	)
+	if req.UserID > 0 {
+		query.Where(enttask.UserIDEQ(int(req.UserID)))
+	}
+	t, err := query.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, status.Error(codes.NotFound, "task not found")
+		}
+		return nil, status.Errorf(codes.Internal, "get task: %v", err)
+	}
+	if t.Status == enttask.StatusProcessing || t.Status == enttask.StatusPending {
+		return nil, status.Error(codes.FailedPrecondition, "cannot delete a running task")
+	}
+	if err := h.db.Task.DeleteOneID(t.ID).Exec(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "delete task: %v", err)
+	}
+	return map[string]interface{}{"deleted": true}, nil
+}

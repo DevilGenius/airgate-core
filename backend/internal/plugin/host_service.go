@@ -183,6 +183,7 @@ const (
 	hostMethodTasksUpdate            = "tasks.update"
 	hostMethodTasksGet               = "tasks.get"
 	hostMethodTasksList              = "tasks.list"
+	hostMethodTasksDelete            = "tasks.delete"
 )
 
 func (h *HostService) invoke(
@@ -285,6 +286,12 @@ func (h *HostService) invoke(
 			return nil, err
 		}
 		return h.listTasks(ctx, pluginID, req)
+	case hostMethodTasksDelete:
+		var req hostDeleteTaskRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.deleteTask(ctx, pluginID, req)
 	default:
 		return nil, status.Errorf(codes.Unimplemented, "unknown host method: %s", method)
 	}
@@ -418,6 +425,12 @@ type hostListTasksRequest struct {
 	Status   string `json:"status"`
 	Limit    int    `json:"limit"`
 	Offset   int    `json:"offset"`
+}
+
+type hostDeleteTaskRequest struct {
+	PluginID string `json:"plugin_id"`
+	TaskID   int64  `json:"task_id"`
+	UserID   int64  `json:"user_id"`
 }
 
 // selectAccount 调度选号：走和真实用户请求完全相同的路径。
