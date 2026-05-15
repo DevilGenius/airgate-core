@@ -1,7 +1,7 @@
 import { createElement, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Server } from 'lucide-react';
-import { getPluginPlatformIcon, onPlatformIconChange } from '../../../app/plugin-loader';
+import { getPluginPlatformIcon, onPlatformIconChange } from '../../../app/plugin-frontend-registry';
 
 interface PlatformIconProps {
   platform: string;

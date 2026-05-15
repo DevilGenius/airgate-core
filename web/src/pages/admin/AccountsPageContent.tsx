@@ -31,7 +31,7 @@ import {
   getUsageWindowVersion,
   subscribeAccountIdentityChange,
   subscribeUsageWindowChange,
-} from '../../app/plugin-loader';
+} from '../../app/plugin-frontend-registry';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { usePagination } from '../../shared/hooks/usePagination';

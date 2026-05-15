@@ -7,14 +7,13 @@ import {
   getPluginUsageCostDetail,
   getPluginUsageMetricDetail,
   getPluginUsageModelMeta,
-  getPluginUsageServiceTierFastResolver,
   getUsageCostDetailVersion,
   getUsageMetricDetailVersion,
   getUsageModelMetaVersion,
   subscribeUsageCostDetailChange,
   subscribeUsageMetricDetailChange,
   subscribeUsageModelMetaChange,
-} from '../../app/plugin-loader';
+} from '../../app/plugin-frontend-registry';
 import type { UsageLogResp, CustomerUsageLogResp, UsageMetric } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
 import { CostValue } from '../components/CostValue';
@@ -123,7 +122,6 @@ function TooltipDivider() {
   return <div className="my-0.5 border-t border-border" />;
 }
 
-const MODEL_META_FAST_COLOR = 'oklch(62% 0.23 303)';
 const MODEL_META_IMAGE_COLOR = 'rgb(148,163,184)';
 const META_CHIP_LOW_COLOR = 'rgb(34,197,94)';
 const META_CHIP_MEDIUM_COLOR = 'rgb(59,130,246)';
@@ -142,17 +140,15 @@ const MODEL_META_SLOT_WIDTH_CLASS = 'w-[5.5rem]';
 function MetaChip({
   color,
   dotColor,
-  fastMark,
   label,
 }: {
   color: string;
   dotColor?: string;
-  fastMark?: boolean;
   label: string;
 }) {
   return (
     <span
-      className={`${MODEL_META_SLOT_WIDTH_CLASS} ${dotColor ? 'ag-usage-image-size-chip' : ''} ${fastMark ? 'ag-usage-fast-marked-chip' : ''} inline-flex h-4 shrink-0 items-center justify-center truncate rounded px-1.5 text-[12px] font-semibold leading-none whitespace-nowrap`}
+      className={`${MODEL_META_SLOT_WIDTH_CLASS} ${dotColor ? 'ag-usage-image-size-chip' : ''} inline-flex h-4 shrink-0 items-center justify-center truncate rounded px-1.5 text-[12px] font-semibold leading-none whitespace-nowrap`}
       style={{
         background: `color-mix(in srgb, ${color} 18%, transparent)`,
         boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 34%, transparent)`,
@@ -167,7 +163,6 @@ function MetaChip({
           style={{ backgroundColor: dotColor }}
         />
       ) : null}
-      {fastMark ? <span className="ag-usage-fast-indicator" aria-hidden="true" /> : null}
       {label}
     </span>
   );
@@ -540,20 +535,12 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
           }
 
           const reasoningEffort = (row as UsageLogResp).reasoning_effort;
-          const hasReasoningEffort = Boolean(reasoningEffort?.trim());
-          const isServiceTierFast = getPluginUsageServiceTierFastResolver(row.platform);
-          const showFastMark = Boolean(isServiceTierFast?.(metaContext));
-          if (showFastMark && !hasReasoningEffort) {
-            return <MetaChip color={MODEL_META_FAST_COLOR} fastMark label="fast" />;
-          }
-
           if (customerScope) return null;
 
           if (!reasoningEffort) return null;
           return (
             <MetaChip
               color={META_CHIP_EFFORT_COLORS[reasoningEffort] ?? 'rgb(148,163,184)'}
-              fastMark={showFastMark}
               label={reasoningEffort}
             />
           );
