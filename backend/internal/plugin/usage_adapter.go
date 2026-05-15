@@ -40,8 +40,6 @@ func usageSnapshotFromSDK(usage *sdk.Usage) usageSnapshot {
 
 	for _, metric := range usage.Metrics {
 		key := normalizedUsageKey(metric.Key, metric.Kind, metric.Label)
-		applyUsageCost(&snap, key, metric.AccountCost)
-		applyUsagePrice(&snap, key, metric.Metadata)
 		switch key {
 		case "input_tokens", "input_token", "prompt_tokens", "prompt_token":
 			snap.InputTokens += int(metric.Value)
