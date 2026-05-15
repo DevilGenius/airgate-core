@@ -261,14 +261,10 @@ func (h *HostService) updateTask(ctx context.Context, pluginID string, req hostU
 	return map[string]interface{}{"task": taskToPayload(updated)}, nil
 }
 
-func (h *HostService) getTask(ctx context.Context, pluginID string, req hostGetTaskRequest) (map[string]interface{}, error) {
-	if req.PluginID != "" {
-		pluginID = req.PluginID
-	}
+func (h *HostService) getTask(ctx context.Context, _ string, req hostGetTaskRequest) (map[string]interface{}, error) {
 	query := h.db.Task.Query().
 		Where(
 			enttask.IDEQ(int(req.TaskID)),
-			enttask.PluginIDEQ(pluginID),
 		)
 	if req.UserID > 0 {
 		query.Where(enttask.UserIDEQ(int(req.UserID)))
@@ -283,11 +279,8 @@ func (h *HostService) getTask(ctx context.Context, pluginID string, req hostGetT
 	return map[string]interface{}{"task": taskToPayload(t)}, nil
 }
 
-func (h *HostService) listTasks(ctx context.Context, pluginID string, req hostListTasksRequest) (map[string]interface{}, error) {
-	if req.PluginID != "" {
-		pluginID = req.PluginID
-	}
-	query := h.db.Task.Query().Where(enttask.PluginIDEQ(pluginID))
+func (h *HostService) listTasks(ctx context.Context, _ string, req hostListTasksRequest) (map[string]interface{}, error) {
+	query := h.db.Task.Query()
 
 	if req.UserID > 0 {
 		query.Where(enttask.UserIDEQ(int(req.UserID)))

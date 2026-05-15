@@ -182,7 +182,9 @@ func isImageAPIPath(path string) bool {
 	}
 	path = strings.TrimRight(strings.ToLower(path), "/")
 	return strings.HasSuffix(path, "/images/generations") ||
-		strings.HasSuffix(path, "/images/edits")
+		strings.HasSuffix(path, "/images/edits") ||
+		strings.HasSuffix(path, "/images/tasks") ||
+		strings.HasSuffix(path, "/images/tasks/list")
 }
 
 func isImageModel(model string) bool {
@@ -265,6 +267,9 @@ func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest
 	// 插件侧 extractForwardedPath 会优先读取这对 header。
 	headers.Set("X-Forwarded-Path", state.requestPath)
 	headers.Set("X-Forwarded-Method", c.Request.Method)
+	if qs := c.Request.URL.RawQuery; qs != "" {
+		headers.Set("X-Forwarded-Query", qs)
+	}
 
 	req := &sdk.ForwardRequest{
 		Account: buildSDKAccount(state.account),
@@ -284,6 +289,9 @@ func buildHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Header {
 	headers := source.Clone()
 	if keyInfo.UserID > 0 {
 		headers.Set("X-Airgate-User-ID", strconv.Itoa(keyInfo.UserID))
+	}
+	if keyInfo.KeyID > 0 {
+		headers.Set("X-Airgate-API-Key-ID", strconv.Itoa(keyInfo.KeyID))
 	}
 	if keyInfo.GroupID > 0 {
 		headers.Set("X-Airgate-Group-ID", strconv.Itoa(keyInfo.GroupID))

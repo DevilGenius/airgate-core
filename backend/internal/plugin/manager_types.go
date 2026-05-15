@@ -191,6 +191,7 @@ func (m *Manager) relocateHostHandle(oldName, newName string) {
 	if !ok {
 		return
 	}
+	handle.pluginName = newName
 	delete(m.hostHandles, oldName)
 	m.hostHandles[newName] = handle
 }

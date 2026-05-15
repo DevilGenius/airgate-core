@@ -346,14 +346,15 @@ type hostProbeForwardRequest struct {
 }
 
 type hostForwardRequest struct {
-	UserID  int64                  `json:"user_id"`
-	GroupID int64                  `json:"group_id"`
-	Model   string                 `json:"model"`
-	Method  string                 `json:"method"`
-	Path    string                 `json:"path"`
-	Headers map[string]interface{} `json:"headers"`
-	Body    interface{}            `json:"body"`
-	Stream  bool                   `json:"stream"`
+	UserID   int64                  `json:"user_id"`
+	GroupID  int64                  `json:"group_id"`
+	APIKeyID int64                  `json:"api_key_id,omitempty"`
+	Model    string                 `json:"model"`
+	Method   string                 `json:"method"`
+	Path     string                 `json:"path"`
+	Headers  map[string]interface{} `json:"headers"`
+	Body     interface{}            `json:"body"`
+	Stream   bool                   `json:"stream"`
 }
 
 type hostListModelsRequest struct {
@@ -1114,7 +1115,7 @@ func (h *HostService) recordHostForwardUsage(
 
 	record := billing.UsageRecord{
 		UserID:                int(req.UserID),
-		APIKeyID:              0,
+		APIKeyID:              int(req.APIKeyID),
 		AccountID:             accountID,
 		GroupID:               route.GroupID,
 		Platform:              platform,

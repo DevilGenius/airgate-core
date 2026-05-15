@@ -339,9 +339,7 @@ function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
 
 function buildCostDetailContext(row: UsageLogResp, adminView: boolean) {
   const ctx = buildUsageRecordContext(row, false);
-  if (!adminView && ctx.record && typeof ctx.record === 'object') {
-    ctx.record = { ...(ctx.record as Record<string, unknown>), account_cost: undefined, account_rate_multiplier: undefined };
-  }
+  ctx.adminView = adminView;
   return ctx;
 }
 

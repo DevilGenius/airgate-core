@@ -35,10 +35,12 @@ func (f *Forwarder) checkBalance(c *gin.Context, state *forwardState) bool {
 	return true
 }
 
-// isMetadataOnlyPath 只读元信息（/v1/models 等）不打上游、不计费、不需要账号调度。
+// isMetadataOnlyPath 只读元信息（/v1/models、任务查询等）不打上游、不计费、不需要账号调度。
 func isMetadataOnlyPath(path string) bool {
 	switch path {
-	case "/v1/models", "/models":
+	case "/v1/models", "/models",
+		"/v1/images/tasks", "/images/tasks",
+		"/v1/images/tasks/list", "/images/tasks/list":
 		return true
 	}
 	return false
@@ -182,6 +184,9 @@ func (f *Forwarder) forwardMetadataOnly(c *gin.Context, state *forwardState) {
 	}
 	req.Headers.Set("X-Forwarded-Path", state.requestPath)
 	req.Headers.Set("X-Forwarded-Method", c.Request.Method)
+	if qs := c.Request.URL.RawQuery; qs != "" {
+		req.Headers.Set("X-Forwarded-Query", qs)
+	}
 
 	outcome, err := state.plugin.Gateway.Forward(c.Request.Context(), req)
 	if err != nil {
