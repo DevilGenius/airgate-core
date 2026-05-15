@@ -67,6 +67,20 @@ func (m *Manager) GetModels(platform string) []sdk.ModelInfo {
 	return cloneModels(m.modelCache[platform])
 }
 
+// FindPlatformByModel 根据模型 ID 反查所属平台。
+func (m *Manager) FindPlatformByModel(modelID string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for platform, models := range m.modelCache {
+		for _, mi := range models {
+			if mi.ID == modelID {
+				return platform
+			}
+		}
+	}
+	return ""
+}
+
 // GetRoutes 获取指定插件的路由声明。
 func (m *Manager) GetRoutes(pluginName string) []sdk.RouteDefinition {
 	m.mu.RLock()

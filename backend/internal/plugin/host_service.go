@@ -1321,6 +1321,9 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 	}
 
 	platform := protoHeadersToHTTPHost(req.Headers).Get("X-Airgate-Platform")
+	if platform == "" && req.Model != "" {
+		platform = h.manager.FindPlatformByModel(req.Model)
+	}
 	if platform == "" {
 		return nil, status.Error(codes.InvalidArgument, "platform 不能为空")
 	}
