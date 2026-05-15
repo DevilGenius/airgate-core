@@ -7,18 +7,19 @@
 # ---- 阶段 1: 构建前端 ----
 FROM node:22-alpine AS frontend
 WORKDIR /build
+RUN corepack enable && corepack prepare pnpm@11.1.1 --activate
 
 # 构建 @doudou-start/airgate-theme（airgate-sdk 主题依赖）
-COPY airgate-sdk/theme/package*.json ./airgate-sdk/theme/
-RUN cd airgate-sdk/theme && npm ci
+COPY airgate-sdk/theme/package.json airgate-sdk/theme/pnpm-lock.yaml ./airgate-sdk/theme/
+RUN cd airgate-sdk/theme && pnpm install --frozen-lockfile
 COPY airgate-sdk/theme ./airgate-sdk/theme
-RUN cd airgate-sdk/theme && npm run build
+RUN cd airgate-sdk/theme && pnpm build
 
 # 构建 Core 前端
-COPY airgate-core/web/package*.json ./airgate-core/web/
-RUN cd airgate-core/web && npm ci
+COPY airgate-core/web/package.json airgate-core/web/pnpm-lock.yaml airgate-core/web/pnpm-workspace.yaml ./airgate-core/web/
+RUN cd airgate-core/web && pnpm install --frozen-lockfile
 COPY airgate-core/web ./airgate-core/web
-RUN cd airgate-core/web && npm run build
+RUN cd airgate-core/web && pnpm build
 
 # ---- 阶段 2: 构建后端 ----
 FROM golang:1.25-alpine AS backend

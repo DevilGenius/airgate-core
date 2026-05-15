@@ -20,6 +20,9 @@ $OpenAIPluginRoot = Join-Path $WorkspaceRoot "airgate-openai"
 $ClaudePluginRoot = Join-Path $WorkspaceRoot "airgate-claude"
 $KiroPluginRoot = Join-Path $WorkspaceRoot "airgate-kiro"
 $PlaygroundPluginRoot = Join-Path $WorkspaceRoot "airgate-playground"
+$EpayPluginRoot = Join-Path $WorkspaceRoot "airgate-epay"
+$HealthPluginRoot = Join-Path $WorkspaceRoot "airgate-health"
+$StudioPluginRoot = Join-Path $WorkspaceRoot "airgate-studio"
 $WebDir = Join-Path $CoreRoot "web"
 $BackendDir = Join-Path $CoreRoot "backend"
 $WebDist = Join-Path $WebDir "dist"
@@ -78,6 +81,39 @@ $PluginSpecs = @(
     WatchPidFile = Join-Path $StateDir "airgate-playground-web.pid"
     WatchOut = Join-Path $PlaygroundPluginRoot "tmp\web-watch.out.log"
     WatchErr = Join-Path $PlaygroundPluginRoot "tmp\web-watch.err.log"
+  },
+  [pscustomobject]@{
+    Name = "payment-epay"
+    Root = $EpayPluginRoot
+    WebDir = Join-Path $EpayPluginRoot "web"
+    BackendDir = Join-Path $EpayPluginRoot "backend"
+    WebDist = Join-Path $EpayPluginRoot "web\dist"
+    EmbedDir = Join-Path $EpayPluginRoot "backend\internal\payment\webdist"
+    WatchPidFile = Join-Path $StateDir "payment-epay-web.pid"
+    WatchOut = Join-Path $EpayPluginRoot "tmp\web-watch.out.log"
+    WatchErr = Join-Path $EpayPluginRoot "tmp\web-watch.err.log"
+  },
+  [pscustomobject]@{
+    Name = "airgate-health"
+    Root = $HealthPluginRoot
+    WebDir = Join-Path $HealthPluginRoot "web"
+    BackendDir = Join-Path $HealthPluginRoot "backend"
+    WebDist = Join-Path $HealthPluginRoot "web\dist"
+    EmbedDir = Join-Path $HealthPluginRoot "backend\internal\health\webdist"
+    WatchPidFile = Join-Path $StateDir "airgate-health-web.pid"
+    WatchOut = Join-Path $HealthPluginRoot "tmp\web-watch.out.log"
+    WatchErr = Join-Path $HealthPluginRoot "tmp\web-watch.err.log"
+  },
+  [pscustomobject]@{
+    Name = "airgate-studio"
+    Root = $StudioPluginRoot
+    WebDir = Join-Path $StudioPluginRoot "web"
+    BackendDir = Join-Path $StudioPluginRoot "backend"
+    WebDist = Join-Path $StudioPluginRoot "web\dist"
+    EmbedDir = Join-Path $StudioPluginRoot "backend\internal\studio\webdist"
+    WatchPidFile = Join-Path $StateDir "airgate-studio-web.pid"
+    WatchOut = Join-Path $StudioPluginRoot "tmp\web-watch.out.log"
+    WatchErr = Join-Path $StudioPluginRoot "tmp\web-watch.err.log"
   }
 )
 
