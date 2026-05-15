@@ -272,7 +272,7 @@ export default function UserUsageContent() {
   const total = data?.total ?? 0;
   const visibleActualCost = customerScope ? (stats?.total_billed_cost ?? 0) : (stats?.total_actual_cost ?? 0);
 
-  const sharedColumns = useUsageColumns({ customerScope });
+  const sharedColumns = useUsageColumns({ customerScope, adminView: false });
   const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
   const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
   const streamColumn = sharedColumns.find((column) => column.key === 'stream');
