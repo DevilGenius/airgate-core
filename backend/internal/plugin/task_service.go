@@ -207,10 +207,6 @@ func (h *HostService) updateTask(ctx context.Context, pluginID string, req hostU
 		return nil, status.Errorf(codes.Internal, "get task: %v", err)
 	}
 
-	if t.PluginID != pluginID {
-		return nil, status.Error(codes.PermissionDenied, "task belongs to another plugin")
-	}
-
 	update := h.db.Task.UpdateOneID(int(req.TaskID))
 	if req.Status != "" {
 		st, err := validateTaskStatus(req.Status)
