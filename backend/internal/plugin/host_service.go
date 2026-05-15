@@ -406,8 +406,9 @@ type hostUpdateTaskRequest struct {
 }
 
 type hostGetTaskRequest struct {
-	TaskID int64 `json:"task_id"`
-	UserID int64 `json:"user_id"`
+	PluginID string `json:"plugin_id"`
+	TaskID   int64  `json:"task_id"`
+	UserID   int64  `json:"user_id"`
 }
 
 type hostListTasksRequest struct {

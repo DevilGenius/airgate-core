@@ -266,6 +266,9 @@ func (h *HostService) updateTask(ctx context.Context, pluginID string, req hostU
 }
 
 func (h *HostService) getTask(ctx context.Context, pluginID string, req hostGetTaskRequest) (map[string]interface{}, error) {
+	if req.PluginID != "" {
+		pluginID = req.PluginID
+	}
 	query := h.db.Task.Query().
 		Where(
 			enttask.IDEQ(int(req.TaskID)),
