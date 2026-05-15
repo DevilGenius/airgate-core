@@ -158,6 +158,7 @@
     "send_code_failed": "Failed to send verification code",
     "email_required": "Please enter your email",
     "code_required": "Please enter the verification code",
+    "email_verification_required": "Please verify your email before continuing",
     "next_step": "Next",
     "change_email": "Change",
     "apikey_login_hint": "Login with API Key to view usage records for this key only.",
