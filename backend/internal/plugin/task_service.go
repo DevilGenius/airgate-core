@@ -135,8 +135,8 @@ func (h *HostService) createTask(ctx context.Context, pluginID string, req hostC
 	if taskType == "" {
 		return nil, status.Error(codes.InvalidArgument, "task_type is required")
 	}
-	if req.PluginID != "" && req.PluginID != pluginID {
-		return nil, status.Error(codes.PermissionDenied, "task belongs to another plugin")
+	if req.PluginID != "" {
+		pluginID = req.PluginID
 	}
 	if req.UserID <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "user_id must be > 0")
@@ -285,6 +285,9 @@ func (h *HostService) getTask(ctx context.Context, pluginID string, req hostGetT
 }
 
 func (h *HostService) listTasks(ctx context.Context, pluginID string, req hostListTasksRequest) (map[string]interface{}, error) {
+	if req.PluginID != "" {
+		pluginID = req.PluginID
+	}
 	query := h.db.Task.Query().Where(enttask.PluginIDEQ(pluginID))
 
 	if req.UserID > 0 {

@@ -411,6 +411,7 @@ type hostGetTaskRequest struct {
 }
 
 type hostListTasksRequest struct {
+	PluginID string `json:"plugin_id"`
 	UserID   int64  `json:"user_id"`
 	TaskType string `json:"task_type"`
 	Status   string `json:"status"`
