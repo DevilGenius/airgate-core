@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button, ComboBox, Input, ListBox, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
-import { Check, Plus, Trash2, X } from 'lucide-react';
+import { Check, Plus, Search, Trash2, X } from 'lucide-react';
 import { PlatformIcon } from '../../../shared/ui';
 import { groupsApi } from '../../../shared/api/groups';
 import { usersApi } from '../../../shared/api/users';
 import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
+import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
+import { queryKeys } from '../../../shared/queryKeys';
 import type { GroupResp, GroupRateOverrideResp, UserResp } from '../../../shared/types';
 
 interface GroupRateOverridesModalProps {
@@ -22,6 +24,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
   const [newRate, setNewRate] = useState('1');
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingRate, setEditingRate] = useState('');
+  const debouncedEmailQuery = useDebouncedValue(emailQuery.trim(), 250);
 
   const overridesKey = ['group-rate-overrides', group.id] as const;
   const { data: overrides = [], isLoading } = useQuery({
@@ -31,9 +34,13 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
   });
 
   const { data: searchData } = useQuery({
-    queryKey: ['users-search', emailQuery],
-    queryFn: () => usersApi.list({ page: 1, page_size: 10, keyword: emailQuery }),
-    enabled: open && emailQuery.trim().length > 0 && !pickedUser,
+    queryKey: queryKeys.users('group-rate-overrides-search', debouncedEmailQuery),
+    queryFn: () => usersApi.list({
+      page: 1,
+      page_size: 20,
+      keyword: debouncedEmailQuery || undefined,
+    }),
+    enabled: open && !pickedUser,
   });
 
   const setMutation = useCrudMutation({
@@ -59,12 +66,33 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
     () => new Set((overrides as GroupRateOverrideResp[]).map((row) => row.user_id)),
     [overrides],
   );
-  const searchResults = (searchData?.list ?? []).filter((user) => !existingUserIds.has(user.id));
-  const searchOptions = searchResults.map((user) => ({
-    id: String(user.id),
-    label: user.email,
-    description: user.username,
-  }));
+  const searchResults = useMemo(
+    () => (searchData?.list ?? []).filter((user) => !existingUserIds.has(user.id)),
+    [existingUserIds, searchData?.list],
+  );
+  const searchOptions = useMemo(
+    () => searchResults.map((user) => ({
+      id: String(user.id),
+      label: user.email,
+      description: user.username,
+      textValue: `${user.email} ${user.username ?? ''}`,
+    })),
+    [searchResults],
+  );
+  const visibleSearchOptions = useMemo(() => {
+    if (!pickedUser || searchOptions.some((option) => option.id === String(pickedUser.id))) {
+      return searchOptions;
+    }
+    return [
+      {
+        id: String(pickedUser.id),
+        label: pickedUser.email,
+        description: pickedUser.username,
+        textValue: `${pickedUser.email} ${pickedUser.username ?? ''}`,
+      },
+      ...searchOptions,
+    ];
+  }, [pickedUser, searchOptions]);
   const newRateNum = Number(newRate);
   const canAdd = !!pickedUser && Number.isFinite(newRateNum) && newRateNum > 0;
 
@@ -116,32 +144,52 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
         <div className="flex items-start gap-2">
           <div className="flex-1">
             <ComboBox
-              allowsCustomValue
+              aria-label={t('groups.rate_override_search_placeholder')}
+              allowsEmptyCollection
               fullWidth
-              inputValue={pickedUser ? pickedUser.email : emailQuery}
-              items={searchOptions}
+              inputValue={emailQuery}
+              items={visibleSearchOptions}
               menuTrigger="focus"
               selectedKey={pickedUser ? String(pickedUser.id) : null}
               onInputChange={(value) => {
-                setPickedUser(null);
                 setEmailQuery(value);
+                if (pickedUser && value !== pickedUser.email) {
+                  setPickedUser(null);
+                }
               }}
               onSelectionChange={(key) => {
-                const user = searchResults.find((item) => String(item.id) === String(key));
+                const value = key == null ? '' : String(key);
+                if (!value) {
+                  setPickedUser(null);
+                  setEmailQuery('');
+                  return;
+                }
+                const user = searchResults.find((item) => String(item.id) === value)
+                  ?? (pickedUser && String(pickedUser.id) === value ? pickedUser : null);
                 setPickedUser(user ?? null);
-                setEmailQuery('');
+                setEmailQuery(user?.email ?? '');
               }}
             >
-              <ComboBox.InputGroup>
-                <Input placeholder={t('groups.rate_override_search_placeholder') ?? ''} />
-                <ComboBox.Trigger />
+              <ComboBox.InputGroup className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                <Input className="pl-9 pr-10" placeholder={t('groups.rate_override_search_placeholder') ?? ''} />
+                <ComboBox.Trigger
+                  className="ag-combobox-preview-trigger absolute right-1 top-1/2 z-10 h-7 w-7 min-w-0 -translate-y-1/2 p-0 text-text-tertiary hover:text-text"
+                />
               </ComboBox.InputGroup>
               <ComboBox.Popover>
-                <ListBox items={searchOptions}>
+                <ListBox
+                  items={visibleSearchOptions}
+                  renderEmptyState={() => (
+                    <div className="px-3 py-6 text-center text-xs text-text-tertiary">
+                      {debouncedEmailQuery ? t('common.no_data') : t('users.search_placeholder')}
+                    </div>
+                  )}
+                >
                   {(item) => (
-                    <ListBox.Item id={item.id} textValue={item.label}>
+                    <ListBox.Item id={item.id} textValue={item.textValue}>
                       <div className="min-w-0">
-                        <div className="truncate">{item.label}</div>
+                        <div className="truncate text-sm text-text">{item.label}</div>
                         {item.description ? (
                           <div className="truncate text-xs text-text-tertiary">{item.description}</div>
                         ) : null}

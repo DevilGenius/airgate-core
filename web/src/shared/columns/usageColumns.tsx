@@ -7,6 +7,7 @@ import {
   getPluginUsageCostDetail,
   getPluginUsageMetricDetail,
   getPluginUsageModelMeta,
+  getPluginUsageServiceTierFastResolver,
   getUsageCostDetailVersion,
   getUsageMetricDetailVersion,
   getUsageModelMetaVersion,
@@ -122,26 +123,67 @@ function TooltipDivider() {
   return <div className="my-0.5 border-t border-border" />;
 }
 
+const MODEL_META_FAST_COLOR = 'oklch(62% 0.23 303)';
+const MODEL_META_IMAGE_COLOR = 'rgb(148,163,184)';
+const META_CHIP_LOW_COLOR = 'rgb(34,197,94)';
+const META_CHIP_MEDIUM_COLOR = 'rgb(59,130,246)';
+const META_CHIP_HIGH_COLOR = 'rgb(249,115,22)';
+const META_CHIP_XHIGH_COLOR = 'rgb(239,68,68)';
+
 const META_CHIP_EFFORT_COLORS: Record<string, string> = {
-  low: 'rgb(34,197,94)',
-  medium: 'rgb(59,130,246)',
-  high: 'rgb(249,115,22)',
-  xhigh: 'rgb(239,68,68)',
+  low: META_CHIP_LOW_COLOR,
+  medium: META_CHIP_MEDIUM_COLOR,
+  high: META_CHIP_HIGH_COLOR,
+  xhigh: META_CHIP_XHIGH_COLOR,
 };
 
-function MetaChip({ color, label }: { color: string; label: string }) {
+const MODEL_META_SLOT_WIDTH_CLASS = 'w-[5.5rem]';
+
+function MetaChip({
+  color,
+  dotColor,
+  fastMark,
+  label,
+}: {
+  color: string;
+  dotColor?: string;
+  fastMark?: boolean;
+  label: string;
+}) {
   return (
     <span
-      className="inline-flex shrink-0 items-center rounded px-1.5 text-[11px] font-semibold leading-4 whitespace-nowrap"
+      className={`${MODEL_META_SLOT_WIDTH_CLASS} ${dotColor ? 'ag-usage-image-size-chip' : ''} ${fastMark ? 'ag-usage-fast-marked-chip' : ''} inline-flex h-4 shrink-0 items-center justify-center truncate rounded px-1.5 text-[12px] font-semibold leading-none whitespace-nowrap`}
       style={{
         background: `color-mix(in srgb, ${color} 18%, transparent)`,
         boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 34%, transparent)`,
         color,
       }}
+      title={label}
     >
+      {dotColor ? (
+        <span
+          className="ag-usage-image-size-dot"
+          aria-hidden="true"
+          style={{ backgroundColor: dotColor }}
+        />
+      ) : null}
+      {fastMark ? <span className="ag-usage-fast-indicator" aria-hidden="true" /> : null}
       {label}
     </span>
   );
+}
+
+function getImageSizeDotColor(imageSize: string): string {
+  const normalized = imageSize.trim().toLowerCase();
+  if (normalized.includes('4k')) return META_CHIP_HIGH_COLOR;
+  if (normalized.includes('2k')) return META_CHIP_MEDIUM_COLOR;
+  if (normalized.includes('1k')) return META_CHIP_LOW_COLOR;
+
+  const dimensions = normalized.match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) ?? [];
+  const maxDimension = Math.max(0, ...dimensions);
+  if (maxDimension >= 3072) return META_CHIP_HIGH_COLOR;
+  if (maxDimension >= 1536) return META_CHIP_MEDIUM_COLOR;
+  return META_CHIP_LOW_COLOR;
 }
 
 const HEROUI_BLUE = 'oklch(62.04% 0.1950 253.83)';
@@ -423,12 +465,14 @@ function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
           placement="right"
           content={() => (
             <TooltipPanel title={t('usage.cost_detail')} subtitle={raw.model}>
-              <TooltipRow label={t('usage.cost')} value={`$${cost.toFixed(6)}`} tone="strong" />
+              <TooltipRow label={t('usage.cost')} value={<CostValue value={cost} decimals={6} tone="actual" />} tone="strong" />
             </TooltipPanel>
           )}
         >
           <div className="flex w-full flex-col items-center font-mono text-center text-xs">
-            <div className="text-[15px] font-semibold leading-none text-text">${cost.toFixed(6)}</div>
+            <div className="text-[15px] font-semibold leading-none text-text">
+              <CostValue value={cost} decimals={6} tone="warning" />
+            </div>
           </div>
         </RichTooltip>
       );
@@ -466,10 +510,10 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
 
         return (
           <div className="flex min-w-0 items-center gap-1.5 font-mono text-xs" title={fullLabel}>
-            <span className="font-mono text-[13px] font-medium text-text">
+            <span className="shrink-0 font-mono text-[13px] font-medium text-text">
               {timeLabel}
             </span>
-            <span className="hidden text-text-tertiary lg:inline">
+            <span className="hidden shrink-0 text-text-tertiary xl:inline">
               {dateLabel}
             </span>
           </div>
@@ -482,32 +526,49 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       width: '220px',
       render: (row) => {
         const PluginUsageModelMeta = getPluginUsageModelMeta(row.platform);
-
-        let fallbackMeta: ReactNode = null;
-        if (!PluginUsageModelMeta) {
-          const chips: Array<{ label: string; color: string }> = [];
-          if (!customerScope) {
-            const re = (row as UsageLogResp).reasoning_effort;
-            if (re) chips.push({ label: re, color: META_CHIP_EFFORT_COLORS[re] ?? 'rgb(148,163,184)' });
-          }
-          if (row.image_size) chips.push({ label: row.image_size, color: 'rgb(74,222,128)' });
-          if (chips.length) {
-            fallbackMeta = (
-              <div className="flex shrink-0 gap-1">
-                {chips.map((c) => <MetaChip key={c.label} color={c.color} label={c.label} />)}
-              </div>
+        const metaContext = buildUsageRecordContext(row, customerScope);
+        const fallbackMeta = (() => {
+          if (PluginUsageModelMeta) return null;
+          if (row.image_size) {
+            return (
+              <MetaChip
+                color={MODEL_META_IMAGE_COLOR}
+                dotColor={getImageSizeDotColor(row.image_size)}
+                label={row.image_size}
+              />
             );
           }
-        }
+
+          const reasoningEffort = (row as UsageLogResp).reasoning_effort;
+          const hasReasoningEffort = Boolean(reasoningEffort?.trim());
+          const isServiceTierFast = getPluginUsageServiceTierFastResolver(row.platform);
+          const showFastMark = Boolean(isServiceTierFast?.(metaContext));
+          if (showFastMark && !hasReasoningEffort) {
+            return <MetaChip color={MODEL_META_FAST_COLOR} fastMark label="fast" />;
+          }
+
+          if (customerScope) return null;
+
+          if (!reasoningEffort) return null;
+          return (
+            <MetaChip
+              color={META_CHIP_EFFORT_COLORS[reasoningEffort] ?? 'rgb(148,163,184)'}
+              fastMark={showFastMark}
+              label={reasoningEffort}
+            />
+          );
+        })();
 
         return (
-          <div className="flex min-w-0 items-center gap-2">
-            {PluginUsageModelMeta ? (
-              <PluginUsageModelMeta
-                recordId={row.id}
-                context={buildUsageRecordContext(row, customerScope)}
-              />
-            ) : fallbackMeta}
+          <div className="grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2 text-left">
+            <div className={`ag-usage-model-meta-slot ${MODEL_META_SLOT_WIDTH_CLASS} flex h-4 shrink-0 items-center justify-center overflow-hidden`}>
+              {PluginUsageModelMeta ? (
+                <PluginUsageModelMeta
+                  recordId={row.id}
+                  context={metaContext}
+                />
+              ) : fallbackMeta}
+            </div>
             <span className="min-w-0 truncate text-sm font-medium leading-none text-text" title={row.model}>
               {row.model}
             </span>

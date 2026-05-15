@@ -8,6 +8,7 @@ import {
   getTokenRole,
 } from '../../shared/api/client';
 import { usersApi } from '../../shared/api/users';
+import { resetAdminCache } from '../routeGuards';
 
 interface AuthContextType {
   user: UserResp | null;
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         .catch(() => {
           if (!cancelled && authRevisionRef.current === revision && getToken() === token) {
+            resetAdminCache();
             setToken(null);
             setUser(null);
           }
@@ -75,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback((token: string, userData: UserResp) => {
     authRevisionRef.current += 1;
     const revision = authRevisionRef.current;
+    resetAdminCache();
     setToken(token);
     setUser(normalizeSessionUser(userData, token));
     // 登录响应可能不包含全部用户字段（例如 API Key 登录时缺少 quota / expires_at），
@@ -94,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setSessionAPIKey(null);
     setUser(null);
+    resetAdminCache();
     window.location.href = '/login';
   }, []);
 

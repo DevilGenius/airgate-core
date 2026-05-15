@@ -1,5 +1,4 @@
 import { type CSSProperties, type ReactNode } from 'react';
-import { Table as HeroTable } from '@heroui/react';
 
 type RowKey = string | number;
 
@@ -35,64 +34,72 @@ export function CompactDataTable<T>({
   rows,
 }: CompactDataTableProps<T>) {
   return (
-    <HeroTable className={cx('ag-compact-data-table', className)} variant="secondary">
-      <HeroTable.ScrollContainer>
-        <HeroTable.Content
+    <div className={cx('ag-compact-data-table', className)}>
+      <div data-slot="wrapper">
+        <table
           aria-label={ariaLabel}
           className="ag-compact-data-table-content"
+          data-slot="table"
           style={minWidth ? { minWidth } : undefined}
         >
-          <HeroTable.Header>
-            {columns.map((column, index) => (
-              <HeroTable.Column
-                id={column.key}
-                key={column.key}
-                className={column.align === 'end' ? 'text-right' : undefined}
-                isRowHeader={index === 0}
-                style={column.width ? { width: column.width } : undefined}
-              >
-                <span
-                  className={cx(
-                    'ag-compact-data-table-heading',
-                    column.align === 'end' ? 'justify-end text-right' : 'justify-start text-left',
-                  )}
+          <thead data-slot="thead">
+            <tr data-slot="tr">
+              {columns.map((column, index) => (
+                <th
+                  data-row-header={index === 0 || undefined}
+                  data-slot="th"
+                  id={column.key}
+                  key={column.key}
+                  scope="col"
+                  className={column.align === 'end' ? 'text-right' : undefined}
+                  style={column.width ? { width: column.width } : undefined}
                 >
-                  {column.title}
-                </span>
-              </HeroTable.Column>
-            ))}
-          </HeroTable.Header>
-          <HeroTable.Body
-            renderEmptyState={() => (
-              <div className="ag-compact-data-table-empty">{emptyText}</div>
-            )}
-          >
-            {rows.map((row, rowIndex) => {
-              const key = rowKey(row, rowIndex);
+                  <span
+                    className={cx(
+                      'ag-compact-data-table-heading',
+                      column.align === 'end' ? 'justify-end text-right' : 'justify-start text-left',
+                    )}
+                  >
+                    {column.title}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody data-slot="tbody">
+            {rows.length === 0 ? (
+              <tr data-key="empty" data-slot="tr">
+                <td colSpan={columns.length} data-slot="td">
+                  <div className="ag-compact-data-table-empty">{emptyText}</div>
+                </td>
+              </tr>
+            ) : rows.map((row, rowIndex) => {
+                const key = rowKey(row, rowIndex);
 
-              return (
-                <HeroTable.Row id={key} key={key}>
-                  {columns.map((column) => (
-                    <HeroTable.Cell
-                      key={column.key}
-                      className={column.align === 'end' ? 'text-right' : undefined}
-                    >
-                      <div
-                        className={cx(
-                          'ag-compact-data-table-cell',
-                          column.align === 'end' ? 'justify-end text-right' : 'justify-start text-left',
-                        )}
+                return (
+                  <tr data-key={String(key)} data-slot="tr" key={key}>
+                    {columns.map((column) => (
+                      <td
+                        data-slot="td"
+                        key={column.key}
+                        className={column.align === 'end' ? 'text-right' : undefined}
                       >
-                        {column.render(row, rowIndex)}
-                      </div>
-                    </HeroTable.Cell>
-                  ))}
-                </HeroTable.Row>
-              );
-            })}
-          </HeroTable.Body>
-        </HeroTable.Content>
-      </HeroTable.ScrollContainer>
-    </HeroTable>
+                        <div
+                          className={cx(
+                            'ag-compact-data-table-cell',
+                            column.align === 'end' ? 'justify-end text-right' : 'justify-start text-left',
+                          )}
+                        >
+                          {column.render(row, rowIndex)}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

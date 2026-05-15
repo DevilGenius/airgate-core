@@ -108,7 +108,7 @@ type UsageStatsResp struct {
 	TotalTokens     int64          `json:"total_tokens"`
 	TotalCost       float64        `json:"total_cost"`
 	TotalActualCost float64        `json:"total_actual_cost"`
-	TotalBilledCost float64        `json:"total_billed_cost,omitempty"` // 仅 reseller scope 暴露
+	TotalBilledCost float64        `json:"total_billed_cost,omitempty"` // 客户视角 / reseller scope 的账面费用；admin scope omit
 	ByModel         []ModelStats   `json:"by_model,omitempty"`
 	ByUser          []UserStats    `json:"by_user,omitempty"`
 	ByAccount       []AccountStats `json:"by_account,omitempty"`

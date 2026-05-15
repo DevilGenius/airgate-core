@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Form, Input, Label, Switch, TextField as HeroTextField } from '@heroui/react';
+import { Alert, Button, Form, Input, Label, TextField as HeroTextField } from '@heroui/react';
 import { setupApi } from '../../shared/api/setup';
 import {
   ArrowLeft,
@@ -8,6 +8,7 @@ import {
   Plug2,
   ShieldCheck,
 } from 'lucide-react';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import type { TestRedisReq } from '../../shared/types';
 
 function TestResultBanner({ result }: { result: { success: boolean; error_msg?: string } | null }) {
@@ -112,20 +113,16 @@ export default function StepRedis({ data, onChange, onPrev, onNext }: StepRedisP
           />
         </HeroTextField>
       </div>
-      <Switch
+      <NativeSwitch
         isSelected={data.tls || false}
-        onChange={(selected) => update('tls', selected)}
-      >
-        <Switch.Control>
-          <Switch.Thumb />
-        </Switch.Control>
-        <Switch.Content>
+        label={(
           <span className="flex items-center gap-2 text-sm font-medium text-text">
             <ShieldCheck className="w-4 h-4 text-text-tertiary" />
             {t('setup.enable_tls')}
           </span>
-        </Switch.Content>
-      </Switch>
+        )}
+        onChange={(selected) => update('tls', selected)}
+      />
 
       <TestResultBanner result={testResult} />
 

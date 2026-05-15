@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Chip, Description, Input, Label, ListBox, Modal, Select, Spinner, Switch, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Chip, Description, Input, Label, ListBox, Modal, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { ArrowUpDown, Layers, X } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
+import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../../shared/types';
 
 function parseQuotas(quotas?: Record<string, unknown>): { daily: string; weekly: string; monthly: string } {
@@ -305,21 +306,17 @@ export function GroupFormModal({
         </HeroTextField>
 
         <div className="grid grid-cols-2 gap-3">
-          <Switch
+          <NativeSwitch
             isSelected={form.is_exclusive}
+            label={<span className="text-sm text-text">{t('groups.exclusive_hint')}</span>}
             onChange={(selected) => setForm({ ...form, is_exclusive: selected })}
-          >
-            <Switch.Control><Switch.Thumb /></Switch.Control>
-            <Switch.Content>{t('groups.exclusive_hint')}</Switch.Content>
-          </Switch>
+          />
 
-          <Switch
+          <NativeSwitch
             isSelected={form.status_visible}
+            label={<span className="text-sm text-text">{t('groups.status_visible_hint')}</span>}
             onChange={(selected) => setForm({ ...form, status_visible: selected })}
-          >
-            <Switch.Control><Switch.Thumb /></Switch.Control>
-            <Switch.Content>{t('groups.status_visible_hint')}</Switch.Content>
-          </Switch>
+          />
         </div>
 
         <Select
@@ -401,25 +398,27 @@ export function GroupFormModal({
         ) : null}
 
         {form.platform === 'claude' ? (
-          <Switch isSelected={claudeCodeOnly} onChange={setClaudeCodeOnly}>
-            <Switch.Control><Switch.Thumb /></Switch.Control>
-            <Switch.Content>
-              <div>
-                <div className="text-sm">仅 Claude Code 客户端</div>
-                <p className="mt-1 text-[11px] text-text-tertiary">
+          <NativeSwitch
+            isSelected={claudeCodeOnly}
+            label={(
+              <span>
+                <span className="block text-sm">仅 Claude Code 客户端</span>
+                <span className="mt-1 block text-[11px] text-text-tertiary">
                   开启后，本分组的账号只接受官方 Claude CLI 发起的流量；非 CLI 请求返回 403。
-                </p>
-              </div>
-            </Switch.Content>
-          </Switch>
+                </span>
+              </span>
+            )}
+            onChange={setClaudeCodeOnly}
+          />
         ) : null}
 
         {form.platform === 'openai' ? (
           <div className="space-y-3">
-            <Switch isSelected={imageEnabled} onChange={setImageEnabled}>
-              <Switch.Control><Switch.Thumb /></Switch.Control>
-              <Switch.Content>{t('groups.image_generation')}</Switch.Content>
-            </Switch>
+            <NativeSwitch
+              isSelected={imageEnabled}
+              label={<span className="text-sm text-text">{t('groups.image_generation')}</span>}
+              onChange={setImageEnabled}
+            />
 
             {imageEnabled ? (
               <div>

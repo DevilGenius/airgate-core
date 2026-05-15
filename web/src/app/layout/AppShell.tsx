@@ -164,9 +164,11 @@ export function AppShell({ children }: AppShellProps) {
   const isMobile = useIsMobile();
   const matchRoute = useMatchRoute();
   const routerPath = useRouterState({ select: (s) => s.location.pathname });
+  const routerStatus = useRouterState({ select: (s) => s.status });
   const blockingFetches = useIsFetching({
-    predicate: (query) => query.state.status === 'pending',
+    predicate: (query) => query.state.fetchStatus === 'fetching',
   });
+  const topLoadingActive = routerStatus === 'pending' || blockingFetches > 0;
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -310,15 +312,20 @@ export function AppShell({ children }: AppShellProps) {
             )}
             <div className="space-y-1">
               {section.items.map((item) => {
-                const isActive = !!matchRoute({ to: item.path, fuzzy: item.path !== '/' });
-                const isExactDashboard = item.path === '/' && !!matchRoute({ to: '/' });
-                const active = item.path === '/' ? isExactDashboard : isActive;
+                const isCurrentActive = item.path === '/'
+                  ? !!matchRoute({ to: '/' })
+                  : !!matchRoute({ to: item.path, fuzzy: true });
+                const isPendingActive = item.path === '/'
+                  ? !!matchRoute({ to: '/', pending: true })
+                  : !!matchRoute({ to: item.path, fuzzy: true, pending: true });
+                const active = routerStatus === 'pending' ? isPendingActive : isCurrentActive;
                 const label = t(item.labelKey, { defaultValue: item.labelKey });
 
                 const link = (
                   <Link
                     key={item.path}
                     to={item.path}
+                    preload={false}
                     data-active={active ? 'true' : undefined}
                     className={`ag-sidebar-nav-item group relative flex items-center transition-colors duration-150 ${sidebarCollapsed ? 'mx-auto h-10 w-10 justify-center p-0' : 'px-2 py-1.5'}`}
                   >
@@ -371,7 +378,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="fixed inset-0 flex overflow-hidden bg-bg text-text">
-      <TopLoadingLine active={blockingFetches > 0} />
+      <TopLoadingLine active={topLoadingActive} />
 
       {/* Mobile backdrop */}
       {isMobile && mobileOpen && (

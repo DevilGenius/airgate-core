@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField } from '@heroui/react';
+import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField } from '@heroui/react';
 import { usersApi } from '../../shared/api/users';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -12,6 +12,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { getAvatarColor } from '../../shared/utils/avatar';
 import { formatDateTime } from '../../shared/utils/format';
 import { CreateUserModal } from './users/CreateUserModal';
@@ -231,11 +232,13 @@ export default function UsersPage() {
                       <span className="font-mono">${row.balance.toFixed(2)}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <Switch
-                        aria-label={row.status === 'active' ? t('users.disable') : t('users.enable')}
+                      <NativeSwitch
+                        ariaLabel={row.status === 'active' ? t('users.disable') : t('users.enable')}
                         isDisabled={row.role === 'admin'}
                         isSelected={row.status === 'active'}
-                        size="sm"
+                        contentClassName="text-xs"
+                        contentStyle={{ color: row.status === 'active' ? 'var(--ag-success)' : 'var(--ag-text-tertiary)' }}
+                        label={row.status === 'active' ? t('status.enabled') : t('status.disabled')}
                         onChange={(isSelected) => {
                           if (isSelected) {
                             toggleMutation.mutate(row.id);
@@ -243,17 +246,7 @@ export default function UsersPage() {
                             setDisablingUser(row);
                           }
                         }}
-                      >
-                        <Switch.Control>
-                          <Switch.Thumb />
-                        </Switch.Control>
-                        <Switch.Content
-                          className="text-xs"
-                          style={{ color: row.status === 'active' ? 'var(--ag-success)' : 'var(--ag-text-tertiary)' }}
-                        >
-                          {row.status === 'active' ? t('status.enabled') : t('status.disabled')}
-                        </Switch.Content>
-                      </Switch>
+                      />
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <span className="text-xs text-text-secondary">{formatDateTime(row.created_at)}</span>

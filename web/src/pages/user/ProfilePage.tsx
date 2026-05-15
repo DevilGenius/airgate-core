@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Chip, Description, EmptyState, Form, Input, Label, Modal, Skeleton, Switch, Table as HeroTable, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Card, Chip, Description, EmptyState, Form, Input, Label, Modal, Skeleton, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usersApi } from '../../shared/api/users';
 import { useToast } from '../../shared/ui';
@@ -8,7 +8,9 @@ import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { getTotalPages } from '../../shared/utils/pagination';
+import { CommonTable } from '../../shared/components/CommonTable';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import type { BalanceLogResp } from '../../shared/types';
 import {
   User,
@@ -316,65 +318,73 @@ function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; bala
                 <p className="mt-1 font-mono text-lg font-bold">${balance.toFixed(2)}</p>
               </div>
 
-              <HeroTable variant="primary">
-                <HeroTable.ScrollContainer>
-                  <HeroTable.Content aria-label={t('profile.balance_history')}>
-                    <HeroTable.Header>
-                      <HeroTable.Column id="action" isRowHeader style={{ width: 96 }}>
+              <CommonTable
+                ariaLabel={t('profile.balance_history')}
+                footer={(
+                  <TablePaginationFooter
+                    page={page}
+                    setPage={setPage}
+                    total={total}
+                    totalPages={totalPages}
+                  />
+                )}
+              >
+                <CommonTable.Header>
+                  <CommonTable.Column id="action" isRowHeader style={{ width: 96 }}>
                         {t('users.action_type')}
-                      </HeroTable.Column>
-                      <HeroTable.Column id="amount" style={{ whiteSpace: 'nowrap' }}>{t('users.amount')}</HeroTable.Column>
-                      <HeroTable.Column id="balance_change" style={{ whiteSpace: 'nowrap' }}>
+                  </CommonTable.Column>
+                  <CommonTable.Column id="amount" style={{ whiteSpace: 'nowrap' }}>{t('users.amount')}</CommonTable.Column>
+                  <CommonTable.Column id="balance_change" style={{ whiteSpace: 'nowrap' }}>
                         {t('users.before_balance')} → {t('users.after_balance')}
-                      </HeroTable.Column>
-                      <HeroTable.Column id="remark" style={{ minWidth: 100 }}>{t('users.remark')}</HeroTable.Column>
-                      <HeroTable.Column id="created_at" style={{ whiteSpace: 'nowrap' }}>{t('users.created_at')}</HeroTable.Column>
-                    </HeroTable.Header>
-                    <HeroTable.Body>
+                  </CommonTable.Column>
+                  <CommonTable.Column id="remark" style={{ minWidth: 100 }}>{t('users.remark')}</CommonTable.Column>
+                  <CommonTable.Column id="created_at" style={{ whiteSpace: 'nowrap' }}>{t('users.created_at')}</CommonTable.Column>
+                </CommonTable.Header>
+                <CommonTable.Body>
                       {isLoading ? (
                         Array.from({ length: 5 }).map((_, index) => (
-                          <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
+                          <CommonTable.Row id={`loading-${index}`} key={`loading-${index}`}>
                             {Array.from({ length: 5 }).map((__, cellIndex) => (
-                              <HeroTable.Cell key={cellIndex}>
+                              <CommonTable.Cell key={cellIndex}>
                                 <Skeleton className="h-4 w-24" />
-                              </HeroTable.Cell>
+                              </CommonTable.Cell>
                             ))}
-                          </HeroTable.Row>
+                          </CommonTable.Row>
                         ))
                       ) : rows.length === 0 ? (
-                        <HeroTable.Row id="empty">
-                          <HeroTable.Cell colSpan={5}>
+                        <CommonTable.Row id="empty">
+                          <CommonTable.Cell colSpan={5}>
                             <EmptyState>
                               <div className="text-sm text-default-500">{t('common.no_data')}</div>
                             </EmptyState>
-                          </HeroTable.Cell>
-                        </HeroTable.Row>
+                          </CommonTable.Cell>
+                        </CommonTable.Row>
                       ) : (
                         rows.map((row: BalanceLogResp) => (
-                          <HeroTable.Row id={String(row.id)} key={row.id}>
-                            <HeroTable.Cell>
+                          <CommonTable.Row id={String(row.id)} key={row.id}>
+                            <CommonTable.Cell>
                               <Chip color={actionColor(row.action)} size="sm" variant="soft">
                                 {actionLabel(row.action)}
                               </Chip>
-                            </HeroTable.Cell>
-                            <HeroTable.Cell>
+                            </CommonTable.Cell>
+                            <CommonTable.Cell>
                               <span className={`font-mono text-xs font-semibold whitespace-nowrap ${row.action === 'add' ? 'text-success' : row.action === 'subtract' ? 'text-danger' : 'text-info'}`}>
                                 {row.action === 'add' ? '+' : row.action === 'subtract' ? '-' : '='}{row.amount.toFixed(2)}
                               </span>
-                            </HeroTable.Cell>
-                            <HeroTable.Cell>
+                            </CommonTable.Cell>
+                            <CommonTable.Cell>
                               <span className="font-mono text-xs text-text-secondary whitespace-nowrap">
                                 ${row.before_balance.toFixed(2)}
                                 <span className="text-text-tertiary"> → </span>
                                 ${row.after_balance.toFixed(2)}
                               </span>
-                            </HeroTable.Cell>
-                            <HeroTable.Cell>
+                            </CommonTable.Cell>
+                            <CommonTable.Cell>
                               <span className="text-xs text-text-tertiary block max-w-[200px] truncate" title={row.remark || undefined}>
                                 {row.remark || '-'}
                               </span>
-                            </HeroTable.Cell>
-                            <HeroTable.Cell>
+                            </CommonTable.Cell>
+                            <CommonTable.Cell>
                               <span className="text-xs text-text-secondary">
                                 {new Date(row.created_at).toLocaleString('zh-CN', {
                                   day: '2-digit',
@@ -383,22 +393,12 @@ function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; bala
                                   month: '2-digit',
                                 })}
                               </span>
-                            </HeroTable.Cell>
-                          </HeroTable.Row>
+                            </CommonTable.Cell>
+                          </CommonTable.Row>
                         ))
                       )}
-                    </HeroTable.Body>
-                  </HeroTable.Content>
-                </HeroTable.ScrollContainer>
-                <HeroTable.Footer>
-                  <TablePaginationFooter
-                    page={page}
-                    setPage={setPage}
-                    total={total}
-                    totalPages={totalPages}
-                  />
-                </HeroTable.Footer>
-              </HeroTable>
+                </CommonTable.Body>
+              </CommonTable>
             </Modal.Body>
           </Modal.Dialog>
         </Modal.Container>
@@ -438,18 +438,14 @@ function BalanceAlertCard({ threshold, balance }: { threshold: number; balance: 
               <div className="text-sm font-medium text-text">{t('profile.balance_alert_enabled')}</div>
               <p className="mt-0.5 text-xs text-text-tertiary">{t('profile.balance_alert_desc')}</p>
             </div>
-            <Switch
-              aria-label={t('profile.balance_alert_enabled')}
+            <NativeSwitch
+              ariaLabel={t('profile.balance_alert_enabled')}
               isSelected={enabled}
               onChange={(v) => {
                 setEnabled(v);
                 if (!v) mutation.mutate(0);
               }}
-            >
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-            </Switch>
+            />
           </div>
           {enabled && (
             <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">

@@ -1,0 +1,138 @@
+/* 表格分页 */
+
+.ag-table-pagination {
+  display: flex !important;
+  width: 100% !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.625rem !important;
+  padding: 0.375rem 0.75rem !important;
+}
+
+.ag-table-pagination-summary {
+  display: flex !important;
+  min-width: max-content;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.ag-table-pagination-number {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-table-pagination-separator {
+  width: 1px;
+  height: 0.875rem;
+  margin-inline: 0.375rem;
+  background: color-mix(in oklab, var(--border) 80%, transparent);
+}
+
+.ag-table-page-size {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.125rem;
+  margin-left: 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.ag-table-page-size-select {
+  display: inline-flex;
+  width: 2.625rem;
+  min-width: 2.625rem;
+}
+
+.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"]) {
+  display: inline-flex !important;
+  width: 2.625rem !important;
+  min-width: 2.625rem !important;
+  height: 1.25rem !important;
+  min-height: 1.25rem !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.125rem !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--foreground) !important;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1 !important;
+  padding: 0 !important;
+}
+
+.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"]):hover,
+.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"])[data-hovered="true"],
+.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"])[data-focus-visible="true"] {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--accent) !important;
+}
+
+.ag-table-page-size-select :where(.select__value, [data-slot="value"]) {
+  display: inline-flex !important;
+  flex: 0 0 1.625rem;
+  width: 1.625rem;
+  min-width: 1.625rem;
+  height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  padding: 0 !important;
+  text-align: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-table-page-size-select :where(.select__indicator, [data-slot="indicator"]) {
+  position: static !important;
+  inset: auto !important;
+  flex: 0 0 0.625rem;
+  width: 0.625rem !important;
+  height: 0.625rem !important;
+  margin: 0 !important;
+  transform: none !important;
+  color: var(--muted);
+}
+
+.ag-table-pagination .pagination__content {
+  gap: 0.1875rem !important;
+  margin-left: auto;
+}
+
+.ag-table-pagination .pagination__link,
+.ag-table-pagination .pagination__ellipsis {
+  width: 1.625rem !important;
+  min-width: 1.625rem !important;
+  height: 1.625rem !important;
+}
+
+.ag-table-pagination .pagination__link[data-active="true"],
+.ag-table-pagination .pagination__link[aria-current="page"] {
+  --pagination-link-bg: color-mix(in oklab, var(--accent) 14%, var(--background) 86%) !important;
+  --pagination-link-bg-hover: color-mix(in oklab, var(--accent) 18%, var(--background) 82%) !important;
+  --pagination-link-bg-pressed: color-mix(in oklab, var(--accent) 22%, var(--background) 78%) !important;
+  --pagination-link-fg: color-mix(in oklab, var(--accent) 76%, var(--foreground) 24%) !important;
+  background: var(--pagination-link-bg) !important;
+  box-shadow: none !important;
+  color: var(--pagination-link-fg) !important;
+  font-weight: 700;
+}
+
+.ag-table-pagination .pagination__link--nav {
+  gap: 0.375rem !important;
+  width: auto !important;
+  min-width: auto !important;
+  padding-inline: 0.5rem !important;
+}

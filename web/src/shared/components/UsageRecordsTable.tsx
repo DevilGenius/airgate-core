@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { EmptyState, Table as HeroTable } from '@heroui/react';
+import { EmptyState } from '@heroui/react';
 import { Inbox } from 'lucide-react';
 import type { UsageColumnConfig, UsageRow } from '../columns/usageColumns';
 import { getTotalPages } from '../utils/pagination';
@@ -7,7 +7,7 @@ import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
 
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
-const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>([]);
+const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>(['model']);
 const NEW_ROW_MARK_DURATION_MS = 5000;
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -116,8 +116,9 @@ const UsageTableRow = memo(function UsageTableRow({
   row: UsageRow;
 }) {
   return (
-    <HeroTable.Row
-      id={String(row.id)}
+    <tr
+      data-key={String(row.id)}
+      data-slot="tr"
       className={isNew ? 'ag-usage-table-row--new' : undefined}
     >
       {columns.map((column) => {
@@ -125,7 +126,8 @@ const UsageTableRow = memo(function UsageTableRow({
         const leftAlignedContent = LEFT_ALIGNED_CONTENT_COLUMNS.has(column.key);
 
         return (
-          <HeroTable.Cell
+          <td
+            data-slot="td"
             key={column.key}
             className={cx(getColumnClassName(column.key), leftAlignedContent ? 'text-left' : 'text-center')}
           >
@@ -138,10 +140,10 @@ const UsageTableRow = memo(function UsageTableRow({
             >
               {column.render(row)}
             </div>
-          </HeroTable.Cell>
+          </td>
         );
       })}
-    </HeroTable.Row>
+    </tr>
   );
 });
 
@@ -206,47 +208,60 @@ export function UsageRecordsTable<T extends UsageRow>({
     rows,
   });
 
+  const emptyState = (
+    <EmptyState className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 text-center">
+      <div className="flex h-11 w-11 items-center justify-center rounded-[var(--field-radius)] bg-default text-muted shadow-sm">
+        <Inbox className="h-5 w-5" />
+      </div>
+      <div className="space-y-1">
+        <div className="text-sm font-medium text-text">{emptyTitle}</div>
+        {emptyDescription ? (
+          <div className="text-xs text-text-tertiary">{emptyDescription}</div>
+        ) : null}
+      </div>
+    </EmptyState>
+  );
+
   return (
-    <HeroTable className="ag-usage-records-table min-h-[240px]" variant="primary">
-      <HeroTable.ScrollContainer className="ag-usage-table-scroll">
-        <HeroTable.Content
+    <div className="ag-usage-records-table min-h-[240px]">
+      <div className="ag-usage-table-scroll" data-slot="wrapper">
+        <table
           aria-label={ariaLabel}
           className="ag-usage-table"
+          data-slot="table"
           style={tableStyle}
         >
-          <HeroTable.Header>
-            {columns.map((column, index) => (
-              <HeroTable.Column
-                id={column.key}
-                key={column.key}
-                className={cx(
-                  getColumnClassName(column.key),
-                  index === 0 && 'after:hidden',
-                )}
-                isRowHeader={index === 0}
-                style={column.width ? { width: column.width } : undefined}
-              >
-                <ColumnHeader>{column.title}</ColumnHeader>
-              </HeroTable.Column>
-            ))}
-          </HeroTable.Header>
-          <HeroTable.Body
-            renderEmptyState={() => (
-              <EmptyState className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 text-center">
-                <div className="flex h-11 w-11 items-center justify-center rounded-[var(--field-radius)] bg-default text-muted shadow-sm">
-                  <Inbox className="h-5 w-5" />
-                </div>
-                <div className="space-y-1">
-                  <div className="text-sm font-medium text-text">{emptyTitle}</div>
-                  {emptyDescription ? (
-                    <div className="text-xs text-text-tertiary">{emptyDescription}</div>
-                  ) : null}
-                </div>
-              </EmptyState>
-            )}
-          >
+          <thead data-slot="thead">
+            <tr data-slot="tr">
+              {columns.map((column, index) => (
+                <th
+                  data-row-header={index === 0 || undefined}
+                  data-slot="th"
+                  id={column.key}
+                  key={column.key}
+                  scope="col"
+                  className={cx(
+                    getColumnClassName(column.key),
+                    index === 0 && 'after:hidden',
+                  )}
+                  style={column.width ? { width: column.width } : undefined}
+                >
+                  <ColumnHeader>{column.title}</ColumnHeader>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody data-slot="tbody">
             {isLoading
               ? <TableLoadingRow colSpan={columns.length} />
+              : rows.length === 0
+                ? (
+                  <tr data-key="empty" data-slot="tr">
+                    <td colSpan={columns.length} data-slot="td">
+                      {emptyState}
+                    </td>
+                  </tr>
+                )
               : rows.map((row) => (
                   <UsageTableRow
                     key={row.id}
@@ -255,10 +270,10 @@ export function UsageRecordsTable<T extends UsageRow>({
                     row={row}
                   />
                 ))}
-          </HeroTable.Body>
-        </HeroTable.Content>
-      </HeroTable.ScrollContainer>
-      <HeroTable.Footer>
+          </tbody>
+        </table>
+      </div>
+      <div className="table__footer" data-slot="table-footer">
         <TablePaginationFooter
           page={page}
           pageSize={pageSize}
@@ -267,7 +282,7 @@ export function UsageRecordsTable<T extends UsageRow>({
           total={total}
           totalPages={totalPages}
         />
-      </HeroTable.Footer>
-    </HeroTable>
+      </div>
+    </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   registerUsageCostDetail,
   registerUsageModelMeta,
   registerUsageMetricDetail,
+  registerUsageServiceTierFastResolver,
   registerUsageWindow,
 } from '../../app/plugin-loader';
 
@@ -75,6 +76,7 @@ export function usePlatforms() {
           if (mod?.accountIdentity) registerAccountIdentity(platform, mod.accountIdentity);
           if (mod?.accountUsageWindow) registerUsageWindow(platform, mod.accountUsageWindow);
           if (mod?.usageModelMeta) registerUsageModelMeta(platform, mod.usageModelMeta);
+          if (mod?.isUsageServiceTierFast) registerUsageServiceTierFastResolver(platform, mod.isUsageServiceTierFast);
           if (mod?.usageMetricDetail) registerUsageMetricDetail(platform, mod.usageMetricDetail);
           if (mod?.usageCostDetail) registerUsageCostDetail(platform, mod.usageCostDetail);
         })

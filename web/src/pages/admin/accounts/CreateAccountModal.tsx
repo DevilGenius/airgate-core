@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Checkbox, Form, Input, Label, ListBox, Select, Spinner, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Checkbox, Form, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { IdCard, Hash, Gauge } from 'lucide-react';
 import type {
   PluginBatchAccountInput,
@@ -22,6 +22,7 @@ import {
 } from './accountUtils';
 import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
+import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { CreateAccountReq, AccountExportItem } from '../../../shared/types';
 
 const CREATE_ACCOUNT_FORM_ID = 'create-account-form';
@@ -361,16 +362,12 @@ export function CreateAccountModal({
                     </Select>
                   </div>
 
-                  <Switch
+                  <NativeSwitch
                     className="ag-create-account-pool-switch"
                     isSelected={form.upstream_is_pool ?? false}
+                    label={<span className="text-sm text-text">{t('accounts.upstream_is_pool', '池模式')}</span>}
                     onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
-                  >
-                    <Switch.Control>
-                      <Switch.Thumb />
-                    </Switch.Control>
-                    <Switch.Content>{t('accounts.upstream_is_pool', '池模式')}</Switch.Content>
-                  </Switch>
+                  />
 
                   {availableGroups.length > 0 && (
                     <div className="ag-create-account-groups">

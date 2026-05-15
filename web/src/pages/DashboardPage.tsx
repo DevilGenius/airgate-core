@@ -724,7 +724,7 @@ export default function DashboardPage() {
               ))}
             </Tabs.List>
           </Tabs>
-          <Button isIconOnly aria-label={t('common.refresh', 'Refresh')} variant="secondary" onPress={refresh}>
+          <Button isIconOnly aria-label={t('common.refresh', 'Refresh')} size="sm" variant="ghost" onPress={refresh}>
             <RefreshCw className={`h-4 w-4 ${statsQuery.isFetching || trendQuery.isFetching ? 'animate-spin' : ''}`} />
           </Button>
         </div>

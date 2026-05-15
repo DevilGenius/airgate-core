@@ -635,7 +635,7 @@
     "upstream_credential": "上游凭证",
     "detail": "明细",
     "api_key_deleted": "已删除密钥",
-    "model_placeholder": "例如：gpt-4",
+    "model_placeholder": "模型名称",
     "user_id": "用户 ID",
     "search_user": "搜索用户",
     "total_requests": "总请求数",

@@ -5,31 +5,37 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { Suspense, lazy, useEffect } from 'react';
-import type { ComponentType, ElementType, LazyExoticComponent, ReactNode } from 'react';
+import { Suspense, useEffect } from 'react';
+import type { ElementType, ReactNode } from 'react';
 import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
 import { getToken, getTokenRole } from '../shared/api/client';
-import { usersApi } from '../shared/api/users';
-import { setupApi } from '../shared/api/setup';
 import { ChatPageLoading, FullPageLoading, PageLoading } from '../shared/components/PageLoading';
-
-type PreloadableLazyComponent<TProps = Record<string, never>> = LazyExoticComponent<ComponentType<TProps>> & {
-  preload: () => Promise<{ default: ComponentType<TProps> }>;
-};
-
-function lazyWithPreload<TProps>(
-  load: () => Promise<{ default: ComponentType<TProps> }>,
-): PreloadableLazyComponent<TProps> {
-  let promise: Promise<{ default: ComponentType<TProps> }> | undefined;
-  const preload = () => {
-    promise ??= load();
-    return promise;
-  };
-  const Component = lazy(preload) as PreloadableLazyComponent<TProps>;
-  Component.preload = preload;
-  return Component;
-}
+import { checkAdmin, withSetupCheck } from './routeGuards';
+import {
+  AccountsPage,
+  ADMIN_IDLE_PRELOADS,
+  DashboardPage,
+  DocsPage,
+  GroupsPage,
+  lazyWithPreload,
+  LoginPage,
+  PluginPage,
+  PluginsPage,
+  preloadRoutePage,
+  ProfilePage,
+  ProxiesPage,
+  PublicHomePage,
+  SettingsPage,
+  SetupPage,
+  SubscriptionsPage,
+  UsagePage,
+  UserKeysPage,
+  UserOverviewPage,
+  USER_IDLE_PRELOADS,
+  UsersPage,
+  UserUsagePage,
+} from './routePreloads';
 
 function requestIdle(work: () => void) {
   const runtime = globalThis as typeof globalThis & {
@@ -52,40 +58,6 @@ const AppShell = lazyWithPreload<{ children: ReactNode }>(() =>
 const ChatShell = lazyWithPreload<{ children: ReactNode }>(() =>
   import('./layout/ChatShell').then((m) => ({ default: m.ChatShell })),
 );
-const SetupPage = lazyWithPreload(() => import('../pages/SetupPage'));
-const LoginPage = lazyWithPreload(() => import('../pages/LoginPage'));
-const PluginPage = lazyWithPreload(() => import('../pages/PluginPage'));
-const PublicHomePage = lazyWithPreload(() => import('../pages/HomePage'));
-const DocsPage = lazyWithPreload(() => import('../pages/DocsPage'));
-const DashboardPage = lazyWithPreload(() => import('../pages/DashboardPage'));
-const UserOverviewPage = lazyWithPreload(() => import('../pages/user/UserOverviewPage'));
-const UsersPage = lazyWithPreload(() => import('../pages/admin/UsersPage'));
-const AccountsPage = lazyWithPreload(() => import('../pages/admin/AccountsPage'));
-const GroupsPage = lazyWithPreload(() => import('../pages/admin/GroupsPage'));
-const SubscriptionsPage = lazyWithPreload(() => import('../pages/admin/SubscriptionsPage'));
-const ProxiesPage = lazyWithPreload(() => import('../pages/admin/ProxiesPage'));
-const UsagePage = lazyWithPreload(() => import('../pages/admin/UsagePage'));
-const PluginsPage = lazyWithPreload(() => import('../pages/admin/PluginsPage'));
-const SettingsPage = lazyWithPreload(() => import('../pages/admin/SettingsPage'));
-const ProfilePage = lazyWithPreload(() => import('../pages/user/ProfilePage'));
-const UserKeysPage = lazyWithPreload(() => import('../pages/user/UserKeysPage'));
-const UserUsagePage = lazyWithPreload(() => import('../pages/user/UserUsagePage'));
-
-const ADMIN_IDLE_PRELOADS = [
-  DashboardPage,
-  UsersPage,
-  AccountsPage,
-  GroupsPage,
-  UsagePage,
-  SettingsPage,
-];
-
-const USER_IDLE_PRELOADS = [
-  UserOverviewPage,
-  UserKeysPage,
-  UserUsagePage,
-  ProfilePage,
-];
 
 function RoutePreloader() {
   const { user, isAPIKeySession } = useAuth();
@@ -108,7 +80,7 @@ function RoutePreloader() {
       if (cancelled || index >= pages.length) return;
       const page = pages[index++];
       if (!page) return;
-      void page.preload().finally(() => {
+      void preloadRoutePage(page).finally(() => {
         if (!cancelled) cancelIdle = requestIdle(preloadNext);
       });
     };
@@ -121,30 +93,6 @@ function RoutePreloader() {
   }, [hasUser, isAPIKeySession, userRole]);
 
   return null;
-}
-
-// 缓存安装状态，避免每次路由跳转都请求
-let setupChecked = false;
-let needsSetup = false;
-
-async function checkSetup() {
-  if (!setupChecked) {
-    try {
-      const resp = await setupApi.status();
-      needsSetup = resp.needs_setup;
-    } catch {
-      // 请求失败视为未安装
-      needsSetup = true;
-    }
-    setupChecked = true;
-  }
-  return needsSetup;
-}
-
-// 安装完成后调用，重置缓存
-export function resetSetupCache() {
-  setupChecked = false;
-  needsSetup = false;
 }
 
 // 根路由
@@ -160,12 +108,9 @@ const rootRoute = createRootRoute({
 const setupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/setup',
-  beforeLoad: async () => {
-    const needs = await checkSetup();
-    if (!needs) {
-      throw redirect({ to: '/login' });
-    }
-  },
+  beforeLoad: () => withSetupCheck((needs) => {
+    if (!needs) throw redirect({ to: '/login' });
+  }),
   component: () => (
     <Suspense fallback={<FullPageLoading />}>
       <SetupPage />
@@ -177,12 +122,9 @@ const setupRoute = createRoute({
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/home',
-  beforeLoad: async () => {
-    const needs = await checkSetup();
-    if (needs) {
-      throw redirect({ to: '/setup' });
-    }
-  },
+  beforeLoad: () => withSetupCheck((needs) => {
+    if (needs) throw redirect({ to: '/setup' });
+  }),
   component: () => (
     <Suspense fallback={<FullPageLoading />}>
       <PublicHomePage />
@@ -210,12 +152,9 @@ const docsRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  beforeLoad: async () => {
-    const needs = await checkSetup();
-    if (needs) {
-      throw redirect({ to: '/setup' });
-    }
-  },
+  beforeLoad: () => withSetupCheck((needs) => {
+    if (needs) throw redirect({ to: '/setup' });
+  }),
   component: () => (
     <Suspense fallback={<FullPageLoading />}>
       <LoginPage />
@@ -227,15 +166,10 @@ const loginRoute = createRoute({
 const authLayout = createRoute({
   getParentRoute: () => rootRoute,
   id: 'auth',
-  beforeLoad: async () => {
-    const needs = await checkSetup();
-    if (needs) {
-      throw redirect({ to: '/setup' });
-    }
-    if (!getToken()) {
-      throw redirect({ to: '/home' });
-    }
-  },
+  beforeLoad: () => withSetupCheck((needs) => {
+    if (needs) throw redirect({ to: '/setup' });
+    if (!getToken()) throw redirect({ to: '/home' });
+  }),
   component: () => (
     <Suspense fallback={<FullPageLoading />}>
       <AppShell>
@@ -265,14 +199,7 @@ const dashboardRoute = createRoute({ getParentRoute: () => authLayout, path: '/'
 const adminLayout = createRoute({
   getParentRoute: () => authLayout,
   id: 'admin',
-  beforeLoad: async () => {
-    if (getTokenRole() === 'admin') return;
-
-    const user = await usersApi.me();
-    if (user.role !== 'admin') {
-      throw redirect({ to: '/' });
-    }
-  },
+  beforeLoad: () => checkAdmin(),
   component: Outlet,
 });
 
@@ -299,11 +226,10 @@ const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/u
 
 // /chat: 全屏沉浸式 AI 对话页（airgate-playground 插件），独立布局不挂 AppShell。
 // 仍要求登录 + 安装完成；走 ChatShell 极简顶栏。
-const chatBeforeLoad = async () => {
-  const needs = await checkSetup();
+const chatBeforeLoad = () => withSetupCheck((needs) => {
   if (needs) throw redirect({ to: '/setup' });
   if (!getToken()) throw redirect({ to: '/home' });
-};
+});
 const chatRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/chat',
@@ -377,4 +303,8 @@ const routeTree = rootRoute.addChildren([
   ]),
 ]);
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({
+  routeTree,
+  defaultPreload: 'intent',
+  defaultPreloadStaleTime: 0,
+});

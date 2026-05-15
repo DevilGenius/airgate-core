@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Alert, AlertDialog, Button, Card, Form, Input, Label, Modal, Spinner, Switch, Tabs, TextArea, useOverlayState } from '@heroui/react';
+import { Alert, AlertDialog, Button, Card, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
 import { settingsApi } from '../../shared/api/settings';
 import { adminApiKeyApi, type AdminAPIKeyResp } from '../../shared/api/adminApiKey';
 import { defaultLogoUrl } from '../../app/providers/SiteSettingsProvider';
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
 import { SystemUpdatePanel } from './SystemUpdatePanel';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 
 // ==================== 设置 key 定义 ====================
 
@@ -384,36 +385,32 @@ export default function SettingsPage() {
                 <SettingsSection title={t('settings.registration_auth')}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-6">
-                      <Switch
+                      <NativeSwitch
                         isSelected={boolVal('registration_enabled')}
+                        label={(
+                          <>
+                            <span className="text-sm font-medium text-text">{t('settings.registration_enabled')}</span>
+                            <span className="block text-xs text-text-tertiary">{t('settings.registration_enabled_desc')}</span>
+                          </>
+                        )}
                         onChange={(v) => set('registration_enabled', String(v))}
-                      >
-                        <Switch.Control>
-                          <Switch.Thumb />
-                        </Switch.Control>
-                        <Switch.Content>
-                          <span className="text-sm font-medium text-text">{t('settings.registration_enabled')}</span>
-                          <span className="block text-xs text-text-tertiary">{t('settings.registration_enabled_desc')}</span>
-                        </Switch.Content>
-                      </Switch>
-                      <Switch
+                      />
+                      <NativeSwitch
                         isDisabled={!val('smtp_host')}
                         isSelected={boolVal('email_verify_enabled')}
+                        label={(
+                          <>
+                            <span className="text-sm font-medium text-text">{t('settings.email_verify_enabled')}</span>
+                            <span className="block text-xs text-text-tertiary">
+                              {val('smtp_host') ? t('settings.email_verify_enabled_desc') : t('settings.email_verify_no_smtp')}
+                            </span>
+                          </>
+                        )}
                         onChange={(v) => {
                           if (v && !val('smtp_host')) return;
                           set('email_verify_enabled', String(v));
                         }}
-                      >
-                        <Switch.Control>
-                          <Switch.Thumb />
-                        </Switch.Control>
-                        <Switch.Content>
-                          <span className="text-sm font-medium text-text">{t('settings.email_verify_enabled')}</span>
-                          <span className="block text-xs text-text-tertiary">
-                            {val('smtp_host') ? t('settings.email_verify_enabled_desc') : t('settings.email_verify_no_smtp')}
-                          </span>
-                        </Switch.Content>
-                      </Switch>
+                      />
                     </div>
                     <Field className="col-span-1" label={t('settings.email_suffix_whitelist')} hint={t('settings.email_suffix_whitelist_hint')}>
                     <TextArea
@@ -495,18 +492,16 @@ export default function SettingsPage() {
                         <Input value={val('smtp_from_name')} onChange={(e) => set('smtp_from_name', e.target.value)} placeholder="AirGate" />
                       </Field>
                     </div>
-                    <Switch
+                    <NativeSwitch
                       isSelected={boolVal('smtp_use_tls')}
+                      label={(
+                        <>
+                          <span className="text-sm font-medium text-text">{t('settings.smtp_use_tls')}</span>
+                          <span className="block text-xs text-text-tertiary">{t('settings.smtp_use_tls_desc')}</span>
+                        </>
+                      )}
                       onChange={(v) => set('smtp_use_tls', String(v))}
-                    >
-                      <Switch.Control>
-                        <Switch.Thumb />
-                      </Switch.Control>
-                      <Switch.Content>
-                        <span className="text-sm font-medium text-text">{t('settings.smtp_use_tls')}</span>
-                        <span className="block text-xs text-text-tertiary">{t('settings.smtp_use_tls_desc')}</span>
-                      </Switch.Content>
-                    </Switch>
+                    />
                   </Form>
                 </SettingsSection>
 
@@ -1023,19 +1018,17 @@ function StoragePanel({
               placeholder="data/assets"
             />
           </Field>
-          <Switch
+          <NativeSwitch
             className="col-span-1 md:col-span-2"
             isSelected={boolVal('s3_use_ssl')}
+            label={(
+              <>
+                <span className="text-sm font-medium text-text">{t('settings.s3_use_ssl')}</span>
+                <span className="block text-xs text-text-tertiary">{t('settings.s3_use_ssl_desc')}</span>
+              </>
+            )}
             onChange={(v) => set('s3_use_ssl', String(v))}
-          >
-            <Switch.Control>
-              <Switch.Thumb />
-            </Switch.Control>
-            <Switch.Content>
-              <span className="text-sm font-medium text-text">{t('settings.s3_use_ssl')}</span>
-              <span className="block text-xs text-text-tertiary">{t('settings.s3_use_ssl_desc')}</span>
-            </Switch.Content>
-          </Switch>
+          />
         </Form>
         {footer}
       </Card.Content>
@@ -1152,19 +1145,17 @@ function OpenClawPanel({
 
           <SettingsSection title={t('settings.openclaw_basic')}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Switch
+              <NativeSwitch
                 className="col-span-1 md:col-span-2"
                 isSelected={enabled}
+                label={(
+                  <>
+                    <span className="text-sm font-medium text-text">{t('settings.openclaw_enabled')}</span>
+                    <span className="block text-xs text-text-tertiary">{t('settings.openclaw_enabled_desc')}</span>
+                  </>
+                )}
                 onChange={(v) => set('openclaw.enabled', String(v))}
-              >
-                <Switch.Control>
-                  <Switch.Thumb />
-                </Switch.Control>
-                <Switch.Content>
-                  <span className="text-sm font-medium text-text">{t('settings.openclaw_enabled')}</span>
-                  <span className="block text-xs text-text-tertiary">{t('settings.openclaw_enabled_desc')}</span>
-                </Switch.Content>
-              </Switch>
+              />
               <Field label={t('settings.openclaw_provider_name')} hint={t('settings.openclaw_provider_name_hint')}>
                 <Input
                   value={val('openclaw.provider_name')}
@@ -1184,19 +1175,17 @@ function OpenClawPanel({
 
           <SettingsSection title={t('settings.openclaw_memory_search')}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Switch
+              <NativeSwitch
                 className="col-span-1 md:col-span-2"
                 isSelected={boolVal('openclaw.memory_search_enabled')}
+                label={(
+                  <>
+                    <span className="text-sm font-medium text-text">{t('settings.openclaw_memory_search_enabled')}</span>
+                    <span className="block text-xs text-text-tertiary">{t('settings.openclaw_memory_search_enabled_desc')}</span>
+                  </>
+                )}
                 onChange={(v) => set('openclaw.memory_search_enabled', String(v))}
-              >
-                <Switch.Control>
-                  <Switch.Thumb />
-                </Switch.Control>
-                <Switch.Content>
-                  <span className="text-sm font-medium text-text">{t('settings.openclaw_memory_search_enabled')}</span>
-                  <span className="block text-xs text-text-tertiary">{t('settings.openclaw_memory_search_enabled_desc')}</span>
-                </Switch.Content>
-              </Switch>
+              />
               <Field label={t('settings.openclaw_memory_search_model')} hint={t('settings.openclaw_memory_search_model_hint')}>
                 <Input
                   value={val('openclaw.memory_search_model')}

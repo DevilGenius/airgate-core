@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { Alert, Button, Card, Chip } from '@heroui/react';
 import { setupApi } from '../../shared/api/setup';
-import { resetSetupCache } from '../../app/router';
+import { markSetupComplete } from '../../app/routeGuards';
 import {
   Database,
   Server,
@@ -46,13 +46,13 @@ export default function StepFinish({ dbConfig, redisConfig, adminConfig, envDBPr
         .then((resp) => {
           if (!resp.needs_setup) {
             setStatus('done');
-            resetSetupCache();
+            markSetupComplete();
             setTimeout(() => navigate({ to: '/login' }), 1500);
           } else if (attempt < maxAttempts) {
             setTimeout(poll, 2000);
           } else {
             setStatus('done');
-            resetSetupCache();
+            markSetupComplete();
             setTimeout(() => navigate({ to: '/login' }), 1500);
           }
         })
@@ -61,7 +61,7 @@ export default function StepFinish({ dbConfig, redisConfig, adminConfig, envDBPr
             setTimeout(poll, 2000);
           } else {
             setStatus('done');
-            resetSetupCache();
+            markSetupComplete();
             setTimeout(() => navigate({ to: '/login' }), 1500);
           }
         });

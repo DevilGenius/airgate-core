@@ -9,7 +9,6 @@ import {
   Label,
   ListBox,
   Select,
-  Switch,
   TextField as HeroTextField,
   useOverlayState,
 } from '@heroui/react';
@@ -30,6 +29,7 @@ import {
 } from './accountUtils';
 import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
+import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { AccountResp, UpdateAccountReq } from '../../../shared/types';
 
 export function EditAccountModal({
@@ -239,17 +239,13 @@ export function EditAccountModal({
                 ) : null}
 
                 <section className="ag-create-account-advanced space-y-4">
-                  <Switch
+                  <NativeSwitch
                     isSelected={form.state !== 'disabled'}
+                    label={<span className="text-sm text-text">{t('accounts.enable_dispatch')}</span>}
                     onChange={(enabled) =>
                       setForm({ ...form, state: enabled ? 'active' : 'disabled' })
                     }
-                  >
-                    <Switch.Control>
-                      <Switch.Thumb />
-                    </Switch.Control>
-                    <Switch.Content>{t('accounts.enable_dispatch')}</Switch.Content>
-                  </Switch>
+                  />
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <HeroTextField fullWidth>
@@ -328,16 +324,12 @@ export function EditAccountModal({
                     </Select>
                   </div>
 
-                  <Switch
+                  <NativeSwitch
                     className="ag-create-account-pool-switch"
                     isSelected={form.upstream_is_pool ?? false}
+                    label={<span className="text-sm text-text">{t('accounts.upstream_is_pool', '池模式')}</span>}
                     onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
-                  >
-                    <Switch.Control>
-                      <Switch.Thumb />
-                    </Switch.Control>
-                    <Switch.Content>{t('accounts.upstream_is_pool', '池模式')}</Switch.Content>
-                  </Switch>
+                  />
 
                   {availableGroups.length > 0 && (
                     <div className="ag-create-account-groups">

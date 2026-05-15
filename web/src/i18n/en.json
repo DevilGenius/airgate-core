@@ -632,7 +632,7 @@
     "upstream_credential": "Upstream Credential",
     "detail": "Detail",
     "api_key_deleted": "Deleted API Key",
-    "model_placeholder": "e.g. gpt-4",
+    "model_placeholder": "Model name",
     "user_id": "User ID",
     "search_user": "Search user",
     "total_requests": "Total Requests",

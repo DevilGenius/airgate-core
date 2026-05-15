@@ -1,0 +1,191 @@
+/* Analytics card tables keep their compact sizing. */
+
+.ag-compact-data-table {
+  --ag-compact-table-row-height: 2.125rem;
+  --ag-compact-table-header-height: 2rem;
+  --ag-compact-table-heading-font-size: 0.6875rem;
+  --ag-compact-table-body-font-size: 0.75rem;
+  --ag-compact-table-cell-gap: 0.5rem;
+  --ag-compact-table-cell-px: 0.75rem;
+  --ag-compact-table-empty-min-height: 7rem;
+}
+
+.ag-compact-data-table--dense {
+  --ag-compact-table-row-height: 1rem;
+  --ag-compact-table-header-height: 1.125rem;
+  --ag-compact-table-heading-font-size: 0.625rem;
+  --ag-compact-table-body-font-size: 0.6875rem;
+  --ag-compact-table-cell-gap: 0.25rem;
+  --ag-compact-table-cell-px: 0.375rem;
+  --ag-compact-table-empty-min-height: 5rem;
+}
+
+.ag-compact-data-table :where([data-slot="wrapper"]:has(> [data-slot="table"])) {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.ag-compact-data-table :where([data-slot="table"], .table__content) {
+  table-layout: fixed;
+}
+
+.ag-compact-data-table :where([data-slot="thead"] [data-slot="tr"],
+  .table__head .table__row) {
+  height: var(--ag-compact-table-header-height) !important;
+  min-height: var(--ag-compact-table-header-height) !important;
+}
+
+.ag-compact-data-table :where([data-slot="tbody"] [data-slot="tr"],
+  .table__body .table__row) {
+  height: var(--ag-compact-table-row-height) !important;
+  min-height: var(--ag-compact-table-row-height) !important;
+}
+
+.ag-compact-data-table :where([data-slot="table-column"], [data-slot="th"], .table__column) {
+  height: var(--ag-compact-table-header-height) !important;
+  min-height: var(--ag-compact-table-header-height) !important;
+  border-bottom: 1px solid var(--separator) !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+  font-size: var(--ag-compact-table-heading-font-size) !important;
+  letter-spacing: 0 !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  text-transform: none !important;
+}
+
+.ag-compact-data-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
+  height: var(--ag-compact-table-row-height) !important;
+  min-height: var(--ag-compact-table-row-height) !important;
+  border-bottom: 1px solid var(--separator) !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+}
+
+.ag-compact-data-table :where([data-slot="tbody"] [data-slot="tr"]:last-child [data-slot="td"],
+  .table__body .table__row:last-child .table__cell) {
+  border-bottom: 0 !important;
+}
+
+.ag-compact-data-table-heading,
+.ag-compact-data-table-cell {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: var(--ag-compact-table-cell-gap);
+  line-height: 1;
+  padding-inline: var(--ag-compact-table-cell-px);
+}
+
+.ag-compact-data-table-heading {
+  height: var(--ag-compact-table-header-height);
+  font-size: var(--ag-compact-table-heading-font-size);
+  font-weight: 600;
+}
+
+.ag-compact-data-table-cell {
+  overflow: hidden;
+  height: var(--ag-compact-table-row-height);
+  color: color-mix(in oklab, var(--foreground) 74%, var(--muted) 26%);
+  font-size: var(--ag-compact-table-body-font-size);
+}
+
+.ag-compact-data-table-heading :where(span, div),
+.ag-compact-data-table-cell :where(span, div) {
+  line-height: 1;
+}
+
+.ag-compact-data-table-empty {
+  display: flex;
+  min-height: var(--ag-compact-table-empty-min-height);
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+/* Distribution cards keep chart panels short and let dense tables scroll inside. */
+
+.ag-distribution-card-body {
+  min-height: 0;
+}
+
+.ag-distribution-chart-frame {
+  display: flex;
+  width: 11rem;
+  height: 11rem;
+  flex: 0 0 11rem;
+  align-items: center;
+  justify-content: center;
+  margin-inline: auto;
+}
+
+.ag-distribution-table-scroll {
+  min-width: 0;
+  max-height: 11rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+.ag-markdown-table {
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  border-radius: calc(var(--radius) * 2.5);
+  background: var(--surface);
+  box-shadow: var(--surface-shadow);
+}
+
+.ag-markdown-table .table__scroll-container {
+  overflow-x: auto;
+}
+
+.ag-markdown-table .table__content {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ag-markdown-table .table__column {
+  border-bottom: 1px solid var(--border) !important;
+  background: var(--surface-secondary) !important;
+  color: var(--muted) !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.ag-markdown-table .table__cell {
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 40%, transparent);
+}
+
+.ag-markdown-table tbody tr:last-child .table__cell {
+  border-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .ag-distribution-table-scroll .ag-compact-data-table-content {
+    min-width: 100% !important;
+  }
+
+  .ag-table-pagination {
+    align-items: stretch !important;
+    flex-wrap: wrap;
+  }
+
+  .ag-table-pagination-summary {
+    width: 100%;
+  }
+
+  .ag-table-page-size {
+    margin-left: 0;
+  }
+
+  .ag-table-pagination .pagination__content {
+    margin-left: 0;
+  }
+}
