@@ -166,7 +166,10 @@ export function AppShell({ children }: AppShellProps) {
   const routerPath = useRouterState({ select: (s) => s.location.pathname });
   const routerStatus = useRouterState({ select: (s) => s.status });
   const blockingFetches = useIsFetching({
-    predicate: (query) => query.state.fetchStatus === 'fetching',
+    predicate: (query) => (
+      query.state.fetchStatus === 'fetching'
+      && (query.meta as { globalLoading?: boolean } | undefined)?.globalLoading !== false
+    ),
   });
   const topLoadingActive = routerStatus === 'pending' || blockingFetches > 0;
 

@@ -4,16 +4,8 @@ import { pluginsApi } from '../api/plugins';
 import { queryKeys } from '../queryKeys';
 import { FETCH_ALL_PARAMS } from '../constants';
 import { useAuth } from '../../app/providers/AuthProvider';
-import {
-  loadPluginFrontend,
-  registerAccountIdentity,
-  registerPlatformIcon,
-  registerUsageCostDetail,
-  registerUsageModelMeta,
-  registerUsageMetricDetail,
-  registerUsageServiceTierFastResolver,
-  registerUsageWindow,
-} from '../../app/plugin-loader';
+import { loadPluginFrontend } from '../../app/plugin-loader';
+import { registerPluginFrontendModule } from '../../app/plugin-frontend-registry';
 
 /** 从插件 display_name 中提取平台显示名（去掉"网关""Gateway"等后缀） */
 function extractPlatformName(displayName: string): string {
@@ -72,13 +64,7 @@ export function usePlatforms() {
       loadedPlatformFrontendPlugins.add(key);
       loadPluginFrontend(name)
         .then((mod) => {
-          if (mod?.platformIcon) registerPlatformIcon(platform, mod.platformIcon);
-          if (mod?.accountIdentity) registerAccountIdentity(platform, mod.accountIdentity);
-          if (mod?.accountUsageWindow) registerUsageWindow(platform, mod.accountUsageWindow);
-          if (mod?.usageModelMeta) registerUsageModelMeta(platform, mod.usageModelMeta);
-          if (mod?.isUsageServiceTierFast) registerUsageServiceTierFastResolver(platform, mod.isUsageServiceTierFast);
-          if (mod?.usageMetricDetail) registerUsageMetricDetail(platform, mod.usageMetricDetail);
-          if (mod?.usageCostDetail) registerUsageCostDetail(platform, mod.usageCostDetail);
+          if (mod) registerPluginFrontendModule(platform, mod);
         })
         .catch(() => {
           loadedPlatformFrontendPlugins.delete(key);

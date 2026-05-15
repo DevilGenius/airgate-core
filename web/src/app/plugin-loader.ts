@@ -1,16 +1,5 @@
 import { createElement, type ComponentType } from 'react';
-import type {
-  AccountSurfaceProps,
-  PluginFrontendModule,
-  PluginPlatformIconProps,
-  UsageRecordSurfaceProps,
-} from '@doudou-start/airgate-theme/plugin';
-
-type UsageServiceTierFastResolver = (context?: Record<string, unknown>) => boolean;
-
-type PluginFrontendModuleWithResolvers = PluginFrontendModule & {
-  isUsageServiceTierFast?: UsageServiceTierFastResolver;
-};
+import type { PluginFrontendModule } from '@doudou-start/airgate-theme/plugin';
 
 function wrapPluginComponent<TProps extends object>(
   Component: ComponentType<TProps>,
@@ -22,7 +11,7 @@ function wrapPluginComponent<TProps extends object>(
 
 function normalizePluginFrontendModule(
   mod: PluginFrontendModule | null,
-): PluginFrontendModuleWithResolvers | null {
+): PluginFrontendModule | null {
   if (!mod) return null;
 
   return {
@@ -60,7 +49,7 @@ function normalizePluginFrontendModule(
 
 // 核心通过 window.__airgate_shared 暴露的共享模块列表
 const SHARED_MODULES = ['react', 'react-dom', 'react/jsx-runtime', 'react-i18next'];
-const pluginFrontendCache = new Map<string, Promise<PluginFrontendModuleWithResolvers | null>>();
+const pluginFrontendCache = new Map<string, Promise<PluginFrontendModule | null>>();
 const pluginFrontendCacheListeners = new Set<(pluginId?: string) => void>();
 
 function rewriteNamedImportSpecifiers(specifiers: string): string {
@@ -140,7 +129,7 @@ function rewriteBareImports(code: string): string {
  */
 async function fetchPluginFrontend(
   pluginId: string,
-): Promise<PluginFrontendModuleWithResolvers | null> {
+): Promise<PluginFrontendModule | null> {
   try {
     const url = `/plugins/${pluginId}/assets/index.js`;
     const resp = await fetch(url, { cache: 'no-cache' });
@@ -196,7 +185,7 @@ async function fetchPluginFrontend(
 
 export function loadPluginFrontend(
   pluginId: string,
-): Promise<PluginFrontendModuleWithResolvers | null> {
+): Promise<PluginFrontendModule | null> {
   const cached = pluginFrontendCache.get(pluginId);
   if (cached) return cached;
 
@@ -222,177 +211,6 @@ export function onPluginFrontendCacheClear(listener: (pluginId?: string) => void
   return () => {
     pluginFrontendCacheListeners.delete(listener);
   };
-}
-
-/** 全局平台图标注册表：platform → Icon 组件 */
-const platformIconRegistry = new Map<string, ComponentType<PluginPlatformIconProps>>();
-
-/** 图标注册变更监听器 */
-const iconListeners = new Set<() => void>();
-
-/** 注册插件提供的平台图标 */
-export function registerPlatformIcon(platform: string, icon: ComponentType<PluginPlatformIconProps>) {
-  platformIconRegistry.set(platform.toLowerCase(), icon);
-  // 通知所有监听者图标已更新
-  iconListeners.forEach((fn) => fn());
-}
-
-/** 获取插件提供的平台图标 */
-export function getPluginPlatformIcon(platform: string): ComponentType<PluginPlatformIconProps> | undefined {
-  return platformIconRegistry.get(platform.toLowerCase());
-}
-
-/** 订阅图标注册变更，返回取消订阅函数 */
-export function onPlatformIconChange(listener: () => void): () => void {
-  iconListeners.add(listener);
-  return () => iconListeners.delete(listener);
-}
-
-/** 全局用量窗口渲染器注册表：platform → UsageWindow 组件 */
-const usageWindowRegistry = new Map<string, ComponentType<AccountSurfaceProps>>();
-const usageWindowListeners = new Set<() => void>();
-let usageWindowVersion = 0;
-
-export function registerUsageWindow(platform: string, component: ComponentType<AccountSurfaceProps>) {
-  usageWindowRegistry.set(platform.toLowerCase(), component);
-  usageWindowVersion++;
-  usageWindowListeners.forEach((fn) => fn());
-}
-
-export function getPluginUsageWindow(
-  platform: string,
-): ComponentType<AccountSurfaceProps> | undefined {
-  return usageWindowRegistry.get(platform.toLowerCase());
-}
-
-export function subscribeUsageWindowChange(listener: () => void): () => void {
-  usageWindowListeners.add(listener);
-  return () => usageWindowListeners.delete(listener);
-}
-
-export function getUsageWindowVersion(): number {
-  return usageWindowVersion;
-}
-
-/** 全局账号身份渲染器注册表：platform → AccountIdentity 组件 */
-const accountIdentityRegistry = new Map<string, ComponentType<AccountSurfaceProps>>();
-const accountIdentityListeners = new Set<() => void>();
-let accountIdentityVersion = 0;
-
-export function registerAccountIdentity(platform: string, component: ComponentType<AccountSurfaceProps>) {
-  accountIdentityRegistry.set(platform.toLowerCase(), component);
-  accountIdentityVersion++;
-  accountIdentityListeners.forEach((fn) => fn());
-}
-
-export function getPluginAccountIdentity(
-  platform: string,
-): ComponentType<AccountSurfaceProps> | undefined {
-  return accountIdentityRegistry.get(platform.toLowerCase());
-}
-
-export function subscribeAccountIdentityChange(listener: () => void): () => void {
-  accountIdentityListeners.add(listener);
-  return () => accountIdentityListeners.delete(listener);
-}
-
-export function getAccountIdentityVersion(): number {
-  return accountIdentityVersion;
-}
-
-/** 全局使用记录计量明细渲染器注册表：platform → UsageMetricDetail 组件 */
-const usageMetricDetailRegistry = new Map<string, ComponentType<UsageRecordSurfaceProps>>();
-const usageMetricDetailListeners = new Set<() => void>();
-let usageMetricDetailVersion = 0;
-
-export function registerUsageMetricDetail(platform: string, component: ComponentType<UsageRecordSurfaceProps>) {
-  usageMetricDetailRegistry.set(platform.toLowerCase(), component);
-  usageMetricDetailVersion++;
-  usageMetricDetailListeners.forEach((fn) => fn());
-}
-
-export function getPluginUsageMetricDetail(
-  platform: string,
-): ComponentType<UsageRecordSurfaceProps> | undefined {
-  return usageMetricDetailRegistry.get(platform.toLowerCase());
-}
-
-export function subscribeUsageMetricDetailChange(listener: () => void): () => void {
-  usageMetricDetailListeners.add(listener);
-  return () => usageMetricDetailListeners.delete(listener);
-}
-
-export function getUsageMetricDetailVersion(): number {
-  return usageMetricDetailVersion;
-}
-
-/** 全局使用记录模型扩展渲染器注册表：platform → UsageModelMeta 组件 */
-const usageModelMetaRegistry = new Map<string, ComponentType<UsageRecordSurfaceProps>>();
-const usageModelMetaListeners = new Set<() => void>();
-let usageModelMetaVersion = 0;
-
-export function registerUsageModelMeta(platform: string, component: ComponentType<UsageRecordSurfaceProps>) {
-  usageModelMetaRegistry.set(platform.toLowerCase(), component);
-  usageModelMetaVersion++;
-  usageModelMetaListeners.forEach((fn) => fn());
-}
-
-export function getPluginUsageModelMeta(
-  platform: string,
-): ComponentType<UsageRecordSurfaceProps> | undefined {
-  return usageModelMetaRegistry.get(platform.toLowerCase());
-}
-
-export function subscribeUsageModelMetaChange(listener: () => void): () => void {
-  usageModelMetaListeners.add(listener);
-  return () => usageModelMetaListeners.delete(listener);
-}
-
-export function getUsageModelMetaVersion(): number {
-  return usageModelMetaVersion;
-}
-
-const usageServiceTierFastRegistry = new Map<string, UsageServiceTierFastResolver>();
-
-export function registerUsageServiceTierFastResolver(
-  platform: string,
-  resolver: UsageServiceTierFastResolver,
-) {
-  usageServiceTierFastRegistry.set(platform.toLowerCase(), resolver);
-  usageModelMetaVersion++;
-  usageModelMetaListeners.forEach((fn) => fn());
-}
-
-export function getPluginUsageServiceTierFastResolver(
-  platform: string,
-): UsageServiceTierFastResolver | undefined {
-  return usageServiceTierFastRegistry.get(platform.toLowerCase());
-}
-
-/** 全局使用记录费用明细渲染器注册表：platform → UsageCostDetail 组件 */
-const usageCostDetailRegistry = new Map<string, ComponentType<UsageRecordSurfaceProps>>();
-const usageCostDetailListeners = new Set<() => void>();
-let usageCostDetailVersion = 0;
-
-export function registerUsageCostDetail(platform: string, component: ComponentType<UsageRecordSurfaceProps>) {
-  usageCostDetailRegistry.set(platform.toLowerCase(), component);
-  usageCostDetailVersion++;
-  usageCostDetailListeners.forEach((fn) => fn());
-}
-
-export function getPluginUsageCostDetail(
-  platform: string,
-): ComponentType<UsageRecordSurfaceProps> | undefined {
-  return usageCostDetailRegistry.get(platform.toLowerCase());
-}
-
-export function subscribeUsageCostDetailChange(listener: () => void): () => void {
-  usageCostDetailListeners.add(listener);
-  return () => usageCostDetailListeners.delete(listener);
-}
-
-export function getUsageCostDetailVersion(): number {
-  return usageCostDetailVersion;
 }
 
 /**
