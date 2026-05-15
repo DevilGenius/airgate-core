@@ -1036,6 +1036,7 @@ export default function AccountsPageContent() {
   const { data: rawUsageData } = useQuery({
     queryKey: queryKeys.accountUsage(platformFilter),
     queryFn: () => accountsApi.usage(platformFilter || ''),
+    meta: { globalLoading: false },
     refetchInterval: 300_000, // 每 5 分钟刷新
   });
   const usageData = useMemo(
