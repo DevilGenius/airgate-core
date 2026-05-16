@@ -175,11 +175,11 @@ func (p *pluginDSNProvisioner) buildPluginDSN(role, password, schema string) str
 	out["password"] = password
 	// search_path 让 CREATE TABLE foo / SELECT * FROM foo 默认走 plugin schema
 	// 注意 lib/pq 不直接支持 search_path 参数，需要通过 options=-c search_path=...
-	out["options"] = "-c search_path=" + schema
+	out["options"] = "-c search_path=" + quoteSearchPathIdentifier(schema)
 
 	parts := make([]string, 0, len(out))
 	for k, v := range out {
-		parts = append(parts, k+"="+v)
+		parts = append(parts, k+"="+quoteConninfoValue(v))
 	}
 	return strings.Join(parts, " ")
 }
@@ -259,4 +259,26 @@ func quoteIdent(s string) string {
 // quoteString 把字符串包成 PostgreSQL 字符串字面量（单引号 + 内部引号转义）。
 func quoteString(s string) string {
 	return `'` + strings.ReplaceAll(s, `'`, `''`) + `'`
+}
+
+// quoteSearchPathIdentifier quotes a PostgreSQL identifier for use inside the
+// search_path GUC value. Plugin IDs commonly contain "-", so the schema must be
+// quoted there even though it was already quoted in DDL statements.
+func quoteSearchPathIdentifier(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+}
+
+// quoteConninfoValue quotes values for lib/pq keyword/value connection strings.
+// options contains spaces ("-c search_path=..."), so emitting it unquoted makes
+// lib/pq split the value into multiple fields.
+func quoteConninfoValue(s string) string {
+	if s == "" {
+		return "''"
+	}
+	if !strings.ContainsAny(s, " \t\n\r'\\") {
+		return s
+	}
+	escaped := strings.ReplaceAll(s, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+	return "'" + escaped + "'"
 }
