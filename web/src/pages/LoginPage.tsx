@@ -99,11 +99,14 @@ function LoginForm() {
 function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   const { t } = useTranslation();
   const site = useSiteSettings();
+  const settingsReady = site.settings_loaded;
   const needVerify = site.email_verify_enabled;
 
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState('');
   const [verifyCode, setVerifyCode] = useState('');
+  const [verifiedEmail, setVerifiedEmail] = useState('');
+  const [verifiedCode, setVerifiedCode] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -115,6 +118,11 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
 
   const passwordMismatch = confirmPassword !== '' && password !== confirmPassword;
 
+  const resetVerifiedEmail = () => {
+    setVerifiedEmail('');
+    setVerifiedCode('');
+  };
+
   // 倒计时
   useEffect(() => {
     if (countdown <= 0) return;
@@ -124,13 +132,23 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
     return () => window.clearInterval(timer);
   }, [countdown]);
 
+  useEffect(() => {
+    if (settingsReady && needVerify && step === 2 && (!verifiedEmail || !verifiedCode)) {
+      setStep(1);
+    }
+  }, [needVerify, settingsReady, step, verifiedCode, verifiedEmail]);
+
   // 发送验证码
   const handleSendCode = async () => {
-    if (!email) { setError(t('auth.email_required')); return; }
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) { setError(t('auth.email_required')); return; }
     setSendingCode(true);
     setError('');
+    resetVerifiedEmail();
     try {
-      await authApi.sendVerifyCode(email);
+      await authApi.sendVerifyCode(normalizedEmail);
+      setEmail(normalizedEmail);
+      setVerifyCode('');
       setCodeSent(true);
       setCountdown(60);
     } catch (err) {
@@ -143,17 +161,29 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   // 第一步：验证邮箱 → 进入第二步
   const handleStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!settingsReady) return;
+
+    const normalizedEmail = email.trim();
+    const normalizedCode = verifyCode.trim();
+    if (!normalizedEmail) { setError(t('auth.email_required')); return; }
+
     if (!needVerify) {
+      setEmail(normalizedEmail);
       setStep(2);
       return;
     }
-    if (!verifyCode) { setError(t('auth.code_required')); return; }
+    if (!normalizedCode) { setError(t('auth.code_required')); return; }
     setLoading(true);
     setError('');
     try {
-      await authApi.verifyCode(email, verifyCode);
+      await authApi.verifyCode(normalizedEmail, normalizedCode);
+      setEmail(normalizedEmail);
+      setVerifyCode(normalizedCode);
+      setVerifiedEmail(normalizedEmail);
+      setVerifiedCode(normalizedCode);
       setStep(2);
     } catch (err) {
+      resetVerifiedEmail();
       setError(err instanceof ApiError ? err.message : t('auth.register_failed'));
     } finally {
       setLoading(false);
@@ -166,14 +196,21 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
     if (password !== confirmPassword) { setError(t('auth.password_mismatch')); return; }
     if (password.length < 8) { setError(t('auth.password_too_short')); return; }
 
+    const registrationEmail = needVerify ? verifiedEmail : email.trim();
+    if (needVerify && (!verifiedEmail || !verifiedCode || email.trim() !== verifiedEmail)) {
+      setStep(1);
+      setError(t('auth.email_verification_required'));
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
       await authApi.register({
-        email,
+        email: registrationEmail,
         password,
         username: username || undefined,
-        verify_code: needVerify ? verifyCode : undefined,
+        verify_code: needVerify ? verifiedCode : undefined,
       });
       onSuccess();
     } catch (err) {
@@ -182,6 +219,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         if (err.message.includes('验证码')) {
           setStep(1);
           setVerifyCode('');
+          resetVerifiedEmail();
         }
         setError(err.message);
       } else {
@@ -205,7 +243,13 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
               name="email"
               type="email"
               value={email}
-              onChange={(e) => { setEmail(e.target.value); setError(''); }}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError('');
+                setCodeSent(false);
+                setCountdown(0);
+                resetVerifiedEmail();
+              }}
               placeholder={t('auth.email_placeholder')}
               autoComplete="email"
               autoFocus
@@ -223,7 +267,11 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
                   className="pl-9"
                   name="verify_code"
                   value={verifyCode}
-                  onChange={(e) => { setVerifyCode(e.target.value); setError(''); }}
+                  onChange={(e) => {
+                    setVerifyCode(e.target.value);
+                    setError('');
+                    resetVerifiedEmail();
+                  }}
                   placeholder={t('auth.verify_code_placeholder')}
                   maxLength={6}
                   required
@@ -234,7 +282,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
               type="button"
               variant="secondary"
               onPress={handleSendCode}
-              isDisabled={sendingCode || countdown > 0 || !email}
+              isDisabled={sendingCode || countdown > 0 || !email.trim() || !settingsReady}
               className="shrink-0 h-[42px]"
               aria-busy={sendingCode}
             >
@@ -249,7 +297,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
             </Alert.Content>
           </Alert>
         )}
-        <Button type="submit" isDisabled={loading} className="w-full h-11" variant="primary" aria-busy={loading}>
+        <Button type="submit" isDisabled={loading || !settingsReady} className="w-full h-11" variant="primary" aria-busy={loading}>
           <ArrowRight className="w-4 h-4" />
           {t('auth.next_step')}
         </Button>
@@ -263,7 +311,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
       {/* 已验证的邮箱（只读展示） */}
       <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-[10px] border border-glass-border bg-surface text-sm text-text-secondary">
         <Mail className="w-4 h-4 text-text-tertiary shrink-0" />
-        <span className="truncate">{email}</span>
+        <span className="truncate">{needVerify ? verifiedEmail : email}</span>
         <Button
           className="ml-auto shrink-0"
           size="sm"

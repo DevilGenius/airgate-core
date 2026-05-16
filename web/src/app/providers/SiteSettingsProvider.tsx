@@ -16,6 +16,7 @@ interface SiteSettings {
   home_content: string;
   registration_enabled: boolean;
   email_verify_enabled: boolean;
+  settings_loaded: boolean;
 }
 
 const defaults: SiteSettings = {
@@ -29,12 +30,13 @@ const defaults: SiteSettings = {
   home_content: '',
   registration_enabled: true,
   email_verify_enabled: false,
+  settings_loaded: false,
 };
 
 const SiteSettingsContext = createContext<SiteSettings>(defaults);
 
 export function SiteSettingsProvider({ children }: { children: ReactNode }) {
-  const { data } = useQuery({
+  const { data, isPending } = useQuery({
     queryKey: ['site-settings'],
     queryFn: () => settingsApi.getPublic(),
     staleTime: 60_000,
@@ -47,7 +49,8 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     // Boolean 字段从字符串转换
     registration_enabled: data?.registration_enabled !== 'false',
     email_verify_enabled: data?.email_verify_enabled === 'true',
-  }), [data]);
+    settings_loaded: !isPending,
+  }), [data, isPending]);
 
   // 动态设置 favicon（优先自定义 logo，否则使用默认 logo）
   useEffect(() => {

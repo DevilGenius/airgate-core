@@ -1,7 +1,7 @@
 // Package web 用 //go:embed 把构建后的前端 SPA 嵌入二进制。
 //
 // 构建流程依赖（Makefile / Dockerfile / release workflow 都遵循）：
-//  1. cd web && npm run build           生成 web/dist
+//  1. cd web && pnpm build           生成 web/dist
 //  2. rm -rf backend/internal/web/webdist
 //  3. cp -r web/dist backend/internal/web/webdist
 //  4. cd backend && go build ./cmd/server

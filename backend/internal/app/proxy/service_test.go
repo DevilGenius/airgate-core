@@ -2,7 +2,9 @@ package proxy
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"net/http"
 	"testing"
 )
 
@@ -61,6 +63,77 @@ func TestTestUsesConfiguredProber(t *testing.T) {
 	}
 	if !result.Success || result.Latency != 12 {
 		t.Fatalf("Test() result = %+v, want success latency=12", result)
+	}
+}
+
+func TestCreateUpdateDeleteDelegateToRepository(t *testing.T) {
+	service := NewService(proxyStubRepository{
+		create: func(_ context.Context, input CreateInput) (Proxy, error) {
+			if input.Name != "p1" {
+				t.Fatalf("创建输入异常: %+v", input)
+			}
+			return Proxy{ID: 1, Name: input.Name}, nil
+		},
+		update: func(_ context.Context, id int, input UpdateInput) (Proxy, error) {
+			if id != 1 || input.Name == nil || *input.Name != "p2" {
+				t.Fatalf("更新输入异常: id=%d input=%+v", id, input)
+			}
+			return Proxy{ID: id, Name: *input.Name}, nil
+		},
+		delete: func(_ context.Context, id int) error {
+			if id != 1 {
+				t.Fatalf("删除 ID = %d，期望 1", id)
+			}
+			return nil
+		},
+	})
+
+	created, err := service.Create(t.Context(), CreateInput{Name: "p1"})
+	if err != nil || created.ID != 1 {
+		t.Fatalf("创建结果异常: %+v, %v", created, err)
+	}
+	name := "p2"
+	updated, err := service.Update(t.Context(), 1, UpdateInput{Name: &name})
+	if err != nil || updated.Name != "p2" {
+		t.Fatalf("更新结果异常: %+v, %v", updated, err)
+	}
+	if err := service.Delete(t.Context(), 1); err != nil {
+		t.Fatalf("删除失败: %v", err)
+	}
+}
+
+func TestBuildProxyTransportForHTTPProxyWithAuth(t *testing.T) {
+	transport, err := buildProxyTransport(Proxy{
+		Protocol: "http",
+		Address:  "127.0.0.1",
+		Port:     8080,
+		Username: "user",
+		Password: "pass",
+	})
+	if err != nil {
+		t.Fatalf("构建 HTTP 代理失败: %v", err)
+	}
+	if transport.Proxy == nil {
+		t.Fatal("HTTP 代理应设置 Proxy 函数")
+	}
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
+	proxyURL, err := transport.Proxy(req)
+	if err != nil {
+		t.Fatalf("获取代理 URL 失败: %v", err)
+	}
+	if proxyURL.String() != "http://user:pass@127.0.0.1:8080" {
+		t.Fatalf("代理 URL = %q，期望带认证信息", proxyURL.String())
+	}
+	wantAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte("user:pass"))
+	if got := transport.ProxyConnectHeader.Get("Proxy-Authorization"); got != wantAuth {
+		t.Fatalf("代理认证头 = %q，期望 %q", got, wantAuth)
+	}
+}
+
+func TestBuildProxyTransportRejectsUnsupportedProtocol(t *testing.T) {
+	_, err := buildProxyTransport(Proxy{Protocol: "ftp", Address: "127.0.0.1", Port: 21})
+	if err == nil {
+		t.Fatal("不支持的代理协议应返回错误")
 	}
 }
 
