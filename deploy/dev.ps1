@@ -37,7 +37,7 @@ $FrontendOut = Join-Path $WebDir "tmp\frontend.out.log"
 $FrontendErr = Join-Path $WebDir "tmp\frontend.err.log"
 $FrontendDevPort = 80
 
-$PluginSpecs = @(
+$DeclaredPluginSpecs = @(
   [pscustomobject]@{
     Name = "gateway-openai"
     Root = $OpenAIPluginRoot
@@ -116,9 +116,33 @@ $PluginSpecs = @(
     WatchErr = Join-Path $StudioPluginRoot "tmp\web-watch.err.log"
   }
 )
+$PluginSpecs = @()
 
 function Write-Step([string]$Message) {
   Write-Host "==> $Message"
+}
+
+function Get-AvailablePluginSpecs {
+  $available = [System.Collections.Generic.List[object]]::new()
+
+  foreach ($plugin in $DeclaredPluginSpecs) {
+    $missing = @()
+    if (-not (Test-Path $plugin.WebDir)) {
+      $missing += "web: $($plugin.WebDir)"
+    }
+    if (-not (Test-Path $plugin.BackendDir)) {
+      $missing += "backend: $($plugin.BackendDir)"
+    }
+
+    if ($missing.Count -gt 0) {
+      Write-Step "skipping $($plugin.Name); missing $($missing -join '; ')"
+      continue
+    }
+
+    $available.Add($plugin)
+  }
+
+  $available.ToArray()
 }
 
 function Invoke-InDir([string]$Directory, [string]$Command) {
@@ -137,6 +161,17 @@ function Invoke-InDir([string]$Directory, [string]$Command) {
 function Assert-Command([string]$Name) {
   if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
     throw "Missing command: $Name"
+  }
+}
+
+function Invoke-PnpmInstall([string]$Directory, [switch]$Force) {
+  $command = if ($Force) { "pnpm install --force" } else { "pnpm install" }
+  try {
+    Invoke-InDir $Directory $command
+  } catch {
+    Write-Step "pnpm install failed; approving esbuild build script and retrying"
+    Invoke-InDir $Directory "pnpm approve-builds esbuild"
+    Invoke-InDir $Directory $command
   }
 }
 
@@ -177,13 +212,13 @@ function Ensure-Dirs {
 function Install-Deps {
   Assert-Command "pnpm"
   Assert-Command "go"
-  Invoke-InDir $SdkTheme "pnpm install"
+  Invoke-PnpmInstall $SdkTheme
   Invoke-InDir $SdkTheme "pnpm build"
-  Invoke-InDir $WebDir "pnpm install --force"
+  Invoke-PnpmInstall $WebDir -Force
   Invoke-InDir $BackendDir "`$env:GOTOOLCHAIN = 'local'; go mod download"
   foreach ($plugin in $PluginSpecs) {
     Ensure-PluginGoWork $plugin
-    Invoke-InDir $plugin.WebDir "pnpm install --force"
+    Invoke-PnpmInstall $plugin.WebDir -Force
     Invoke-InDir $plugin.BackendDir "`$env:GOTOOLCHAIN = 'local'; go mod download"
   }
 }
@@ -334,7 +369,7 @@ function Build-Plugin($Plugin) {
 
   $themeTypes = Join-Path $Plugin.WebDir "node_modules\@doudou-start\airgate-theme\dist\index.d.ts"
   if (-not (Test-Path $themeTypes)) {
-    Invoke-InDir $Plugin.WebDir "pnpm install --force"
+    Invoke-PnpmInstall $Plugin.WebDir -Force
   }
 
   Invoke-InDir $Plugin.WebDir "pnpm build"
@@ -350,7 +385,7 @@ function Build-All {
 
   $themeTypes = Join-Path $WebDir "node_modules\@doudou-start\airgate-theme\dist\index.d.ts"
   if (-not (Test-Path $themeTypes)) {
-    Invoke-InDir $WebDir "pnpm install --force"
+    Invoke-PnpmInstall $WebDir -Force
   }
 
   Invoke-InDir $WebDir "pnpm build"
@@ -549,6 +584,7 @@ function Show-Status {
   }
 }
 
+$PluginSpecs = Get-AvailablePluginSpecs
 Assert-Paths
 Ensure-Dirs
 

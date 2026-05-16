@@ -176,8 +176,8 @@ function getImageSizeDotColor(imageSize: string): string {
 
   const dimensions = normalized.match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) ?? [];
   const maxDimension = Math.max(0, ...dimensions);
-  if (maxDimension >= 3072) return META_CHIP_HIGH_COLOR;
-  if (maxDimension >= 1536) return META_CHIP_MEDIUM_COLOR;
+  if (maxDimension > 2048) return META_CHIP_HIGH_COLOR;
+  if (maxDimension > 1536) return META_CHIP_MEDIUM_COLOR;
   return META_CHIP_LOW_COLOR;
 }
 
