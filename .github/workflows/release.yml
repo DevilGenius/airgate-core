@@ -15,6 +15,7 @@ permissions:
   packages: write
 
 env:
+  GOPRIVATE: github.com/DouDOU-start/airgate-sdk
   REGISTRY: ghcr.io
   IMAGE_NAME: doudou-start/airgate-core
 
