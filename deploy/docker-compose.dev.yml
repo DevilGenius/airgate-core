@@ -45,7 +45,6 @@ services:
         set -e;
         corepack enable;
         corepack prepare pnpm@11.1.1 --activate;
-        cd /workspace/airgate-sdk/theme && pnpm install --frozen-lockfile && pnpm build;
         cd /workspace/airgate-core/web && pnpm install --frozen-lockfile && pnpm build
     restart: "no"
 

@@ -3,7 +3,6 @@
 # 变量
 BACKEND_DIR := backend
 WEB_DIR := web
-SDK_THEME := ../airgate-sdk/theme
 # 插件前端目录。所有插件 dev watch 都输出到自己的 web/dist；core 的
 # servePluginAsset handler 在 dev 模式下从 <plugin>/web/dist 读，prod 模式从
 # data/plugins/<id>/assets 读。这样三个插件的 dev 体验完全一致，没有特例。
@@ -32,7 +31,7 @@ GO := GOTOOLCHAIN=local go
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X github.com/DouDOU-start/airgate-core/internal/version.Version=$(VERSION)
 
-.PHONY: help dev dev-backend dev-frontend dev-sdk dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-playground dev-plugin-epay dev-plugin-health dev-plugin-kiro dev-plugin-studio \
+.PHONY: help dev dev-backend dev-frontend dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-playground dev-plugin-epay dev-plugin-health dev-plugin-kiro dev-plugin-studio \
         build build-backend build-frontend \
         build-plugins sync-plugins \
         ent lint fmt test clean install ci pre-commit setup-hooks \
@@ -43,17 +42,13 @@ help: ## 显示帮助信息
 
 # ===================== 开发 =====================
 
-dev: ## 同时启动 SDK watch + 插件 watch + 前后端开发服务器
+dev: ## 同时启动插件 watch + 前后端开发服务器
 	@echo "启动开发环境..."
 	@$(MAKE) sync-plugins
-	@$(MAKE) dev-sdk &
 	@$(MAKE) dev-plugins &
 	@$(MAKE) dev-backend &
 	@$(MAKE) dev-frontend
 	@wait
-
-dev-sdk: ## 启动 SDK 主题 watch 模式（修改 token 自动编译）
-	@cd $(SDK_THEME) && pnpm dev
 
 dev-plugins: ## 启动所有插件前端 watch 模式
 	@echo "启动插件前端 watch（统一输出到 <plugin>/web/dist，core 在 dev 模式下直读）："
@@ -293,8 +288,7 @@ setup-hooks: ## 安装 Git pre-commit hook
 
 # ===================== 依赖安装 =====================
 
-install: setup-hooks ## 安装全部依赖（含 SDK 主题构建、插件前端依赖、首次 webdist 构建）
-	@cd $(SDK_THEME) && pnpm install && pnpm build && echo "SDK 主题构建完成"
+install: setup-hooks ## 安装全部依赖（含插件前端依赖、首次 webdist 构建）
 	@cd $(BACKEND_DIR) && $(GO) mod download
 	@rm -rf $(WEB_DIR)/node_modules/.vite
 	@cd $(WEB_DIR) && pnpm install

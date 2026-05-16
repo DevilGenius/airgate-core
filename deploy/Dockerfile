@@ -1,6 +1,6 @@
 # ============================================================
 # AirGate Core — 多阶段构建
-# 构建上下文必须为上级目录（包含 airgate-sdk）:
+# 构建上下文为上级目录:
 #   docker build -f airgate-core/deploy/Dockerfile -t airgate-core ..
 # ============================================================
 
@@ -8,12 +8,6 @@
 FROM node:22-alpine AS frontend
 WORKDIR /build
 RUN corepack enable && corepack prepare pnpm@11.1.1 --activate
-
-# 构建 @doudou-start/airgate-theme（airgate-sdk 主题依赖）
-COPY airgate-sdk/theme/package.json airgate-sdk/theme/pnpm-lock.yaml ./airgate-sdk/theme/
-RUN cd airgate-sdk/theme && pnpm install --frozen-lockfile
-COPY airgate-sdk/theme ./airgate-sdk/theme
-RUN cd airgate-sdk/theme && pnpm build
 
 # 构建 Core 前端
 COPY airgate-core/web/package.json airgate-core/web/pnpm-lock.yaml airgate-core/web/pnpm-workspace.yaml ./airgate-core/web/
@@ -26,13 +20,10 @@ FROM golang:1.25-alpine AS backend
 RUN apk add --no-cache git
 WORKDIR /build
 
-# 生成精简的 go.work（仅包含构建所需的模块，排除 airgate-openai 等）
-COPY airgate-sdk/go.mod airgate-sdk/go.sum ./airgate-sdk/
 COPY airgate-core/backend/go.mod airgate-core/backend/go.sum ./airgate-core/backend/
-RUN go work init ./airgate-sdk ./airgate-core/backend && go mod download -x
+RUN cd airgate-core/backend && go mod download -x
 
 # 拷贝源码
-COPY airgate-sdk ./airgate-sdk
 COPY airgate-core/backend ./airgate-core/backend
 
 # 把上一个阶段的前端产物拷进 //go:embed 目录，让 backend 把 SPA 打进二进制
