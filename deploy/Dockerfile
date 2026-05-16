@@ -19,6 +19,9 @@ RUN cd airgate-core/web && pnpm build
 FROM golang:1.25-alpine AS backend
 RUN apk add --no-cache git
 WORKDIR /build
+ENV GOPRIVATE=github.com/DouDOU-start/airgate-sdk \
+    GONOPROXY=github.com/DouDOU-start/airgate-sdk \
+    GONOSUMDB=github.com/DouDOU-start/airgate-sdk
 
 COPY airgate-core/backend/go.mod airgate-core/backend/go.sum ./airgate-core/backend/
 RUN cd airgate-core/backend && go mod download -x
