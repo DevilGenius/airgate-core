@@ -9,6 +9,7 @@ import (
 	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
 	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
@@ -28,7 +29,7 @@ func NewUsageStore(db *ent.Client) *UsageStore {
 // ListUser 查询用户使用记录。
 func (s *UsageStore) ListUser(ctx context.Context, userID int64, filter appusage.ListFilter) ([]appusage.LogRecord, int64, error) {
 	query := s.db.UsageLog.Query().
-		Where(entusagelog.HasUserWith(entuser.IDEQ(int(userID))))
+		Where(usageUserPredicate(userID))
 	query = applyUsageListFilter(query, filter)
 
 	total, err := query.Count(ctx)
@@ -60,7 +61,7 @@ func (s *UsageStore) ListUser(ctx context.Context, userID int64, filter appusage
 func (s *UsageStore) ListAdmin(ctx context.Context, filter appusage.ListFilter) ([]appusage.LogRecord, int64, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
-		query = query.Where(entusagelog.HasUserWith(entuser.IDEQ(int(*filter.UserID))))
+		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
 	query = applyUsageListFilter(query, filter)
 
@@ -92,7 +93,7 @@ func (s *UsageStore) ListAdmin(ctx context.Context, filter appusage.ListFilter) 
 // SummaryUser 查询用户汇总统计。
 func (s *UsageStore) SummaryUser(ctx context.Context, userID int64, filter appusage.StatsFilter) (appusage.Summary, error) {
 	query := s.db.UsageLog.Query().
-		Where(entusagelog.HasUserWith(entuser.IDEQ(int(userID))))
+		Where(usageUserPredicate(userID))
 	query = applyUsageStatsFilter(query, filter)
 	return scanSummary(ctx, query)
 }
@@ -101,7 +102,7 @@ func (s *UsageStore) SummaryUser(ctx context.Context, userID int64, filter appus
 func (s *UsageStore) SummaryAdmin(ctx context.Context, filter appusage.StatsFilter) (appusage.Summary, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
-		query = query.Where(entusagelog.HasUserWith(entuser.IDEQ(int(*filter.UserID))))
+		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
 	query = applyUsageStatsFilter(query, filter)
 	return scanSummary(ctx, query)
@@ -111,7 +112,7 @@ func (s *UsageStore) SummaryAdmin(ctx context.Context, filter appusage.StatsFilt
 func (s *UsageStore) StatsByModel(ctx context.Context, filter appusage.StatsFilter) ([]appusage.ModelStats, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
-		query = query.Where(entusagelog.HasUserWith(entuser.IDEQ(int(*filter.UserID))))
+		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
 	query = applyUsageStatsFilter(query, filter)
 
@@ -162,20 +163,21 @@ func (s *UsageStore) StatsByModel(ctx context.Context, filter appusage.StatsFilt
 func (s *UsageStore) StatsByUser(ctx context.Context, filter appusage.StatsFilter) ([]appusage.UserStats, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
-		query = query.Where(entusagelog.HasUserWith(entuser.IDEQ(int(*filter.UserID))))
+		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
 	query = applyUsageStatsFilter(query, filter)
 
 	var rows []struct {
-		UserID       int     `json:"user_usage_logs"`
+		UserID       int     `json:"user_id_snapshot"`
 		Count        int     `json:"count"`
 		InputTokens  int64   `json:"input_tokens"`
 		OutputTokens int64   `json:"output_tokens"`
 		TotalCost    float64 `json:"total_cost"`
 		ActualCost   float64 `json:"actual_cost"`
 		BilledCost   float64 `json:"billed_cost"`
+		UserEmail    string  `json:"user_email_snapshot"`
 	}
-	err := query.GroupBy("user_usage_logs").
+	err := query.GroupBy(entusagelog.FieldUserIDSnapshot).
 		Aggregate(
 			ent.Count(),
 			ent.As(ent.Sum(entusagelog.FieldInputTokens), "input_tokens"),
@@ -183,6 +185,7 @@ func (s *UsageStore) StatsByUser(ctx context.Context, filter appusage.StatsFilte
 			ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost"),
 			ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost"),
 			ent.As(ent.Sum(entusagelog.FieldBilledCost), "billed_cost"),
+			ent.As(ent.Max(entusagelog.FieldUserEmailSnapshot), "user_email_snapshot"),
 		).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -210,7 +213,7 @@ func (s *UsageStore) StatsByUser(ctx context.Context, filter appusage.StatsFilte
 	for _, row := range rows {
 		result = append(result, appusage.UserStats{
 			UserID:     int64(row.UserID),
-			Email:      emailMap[row.UserID],
+			Email:      coalesceString(emailMap[row.UserID], row.UserEmail),
 			Requests:   int64(row.Count),
 			Tokens:     row.InputTokens + row.OutputTokens,
 			TotalCost:  row.TotalCost,
@@ -231,7 +234,7 @@ func (s *UsageStore) StatsByUser(ctx context.Context, filter appusage.StatsFilte
 func (s *UsageStore) StatsByAccount(ctx context.Context, filter appusage.StatsFilter) ([]appusage.AccountStats, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
-		query = query.Where(entusagelog.HasUserWith(entuser.IDEQ(int(*filter.UserID))))
+		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
 	query = applyUsageStatsFilter(query, filter)
 
@@ -300,7 +303,7 @@ func (s *UsageStore) StatsByAccount(ctx context.Context, filter appusage.StatsFi
 func (s *UsageStore) StatsByGroup(ctx context.Context, filter appusage.StatsFilter) ([]appusage.GroupStats, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
-		query = query.Where(entusagelog.HasUserWith(entuser.IDEQ(int(*filter.UserID))))
+		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
 	query = applyUsageStatsFilter(query, filter)
 
@@ -369,7 +372,7 @@ func (s *UsageStore) StatsByGroup(ctx context.Context, filter appusage.StatsFilt
 func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilter) ([]appusage.TrendEntry, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
-		query = query.Where(entusagelog.HasUserWith(entuser.IDEQ(int(*filter.UserID))))
+		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
 	query = applyUsageStatsFilter(query, filter.StatsFilter)
 	if filter.StartDate == "" && filter.EndDate == "" && filter.DefaultRecentHours > 0 {
@@ -406,6 +409,21 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 		})
 	}
 	return result, nil
+}
+
+func usageUserPredicate(userID int64) predicate.UsageLog {
+	id := int(userID)
+	return entusagelog.Or(
+		entusagelog.UserIDSnapshotEQ(id),
+		entusagelog.HasUserWith(entuser.IDEQ(id)),
+	)
+}
+
+func coalesceString(primary, fallback string) string {
+	if primary != "" {
+		return primary
+	}
+	return fallback
 }
 
 func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) *ent.UsageLogQuery {
@@ -539,6 +557,10 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 	if item.Edges.User != nil {
 		record.UserID = int64(item.Edges.User.ID)
 		record.UserEmail = item.Edges.User.Email
+	} else {
+		record.UserID = int64(item.UserIDSnapshot)
+		record.UserEmail = item.UserEmailSnapshot
+		record.UserDeleted = record.UserID > 0
 	}
 	record.APIKeyDeleted = item.Edges.APIKey == nil
 	if item.Edges.APIKey != nil {

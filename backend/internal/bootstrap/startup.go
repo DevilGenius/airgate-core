@@ -20,7 +20,50 @@ func RunStartupTasks(db *ent.Client, drv *entsql.Driver, apiKeySecret string) {
 	backfillKeyHints(db, apiKeySecret)
 	backfillResellerMarkupColumns(drv)
 	migrateAccountState(drv)
+	migrateUserHistoryRefs(drv)
 	slog.Info("bootstrap_startup_tasks_done")
+}
+
+// migrateUserHistoryRefs 允许硬删除用户，同时保留历史使用记录和余额流水。
+// 用量/计费聚合依赖 usage_logs 的成本快照字段；这里把历史表的 user 外键改为 SET NULL，
+// 并回填 user_id/user_email 快照，避免删除用户后历史记录丢失归属信息。
+func migrateUserHistoryRefs(drv *entsql.Driver) {
+	if drv == nil {
+		return
+	}
+	ctx := context.Background()
+	statements := []string{
+		`ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS user_id_snapshot integer NOT NULL DEFAULT 0`,
+		`ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS user_email_snapshot text NOT NULL DEFAULT ''`,
+		`UPDATE usage_logs AS ul
+			SET user_id_snapshot = CASE WHEN ul.user_id_snapshot = 0 THEN u.id ELSE ul.user_id_snapshot END,
+				user_email_snapshot = CASE WHEN ul.user_email_snapshot = '' THEN u.email ELSE ul.user_email_snapshot END
+			FROM users AS u
+			WHERE ul.user_usage_logs = u.id`,
+		`ALTER TABLE usage_logs ALTER COLUMN user_usage_logs DROP NOT NULL`,
+		`ALTER TABLE usage_logs DROP CONSTRAINT IF EXISTS usage_logs_users_usage_logs`,
+		`ALTER TABLE usage_logs ADD CONSTRAINT usage_logs_users_usage_logs
+			FOREIGN KEY (user_usage_logs) REFERENCES users(id) ON DELETE SET NULL`,
+		`ALTER TABLE balance_logs ADD COLUMN IF NOT EXISTS user_id_snapshot integer NOT NULL DEFAULT 0`,
+		`ALTER TABLE balance_logs ADD COLUMN IF NOT EXISTS user_email_snapshot text NOT NULL DEFAULT ''`,
+		`UPDATE balance_logs AS bl
+			SET user_id_snapshot = CASE WHEN bl.user_id_snapshot = 0 THEN u.id ELSE bl.user_id_snapshot END,
+				user_email_snapshot = CASE WHEN bl.user_email_snapshot = '' THEN u.email ELSE bl.user_email_snapshot END
+			FROM users AS u
+			WHERE bl.user_balance_logs = u.id`,
+		`ALTER TABLE balance_logs ALTER COLUMN user_balance_logs DROP NOT NULL`,
+		`ALTER TABLE balance_logs DROP CONSTRAINT IF EXISTS balance_logs_users_balance_logs`,
+		`ALTER TABLE balance_logs ADD CONSTRAINT balance_logs_users_balance_logs
+			FOREIGN KEY (user_balance_logs) REFERENCES users(id) ON DELETE SET NULL`,
+	}
+
+	for _, sql := range statements {
+		var r entsql.Result
+		if err := drv.Exec(ctx, sql, []any{}, &r); err != nil {
+			slog.Warn("bootstrap_user_history_refs_migration_failed", "sql", sql, sdk.LogFieldError, err)
+			return
+		}
+	}
 }
 
 // migrateAccountState 把老的 status / rate_limit_reset_at 字段一次性迁移到新的

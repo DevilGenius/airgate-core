@@ -146,8 +146,16 @@ func init() {
 	balancelogDescRemark := balancelogFields[4].Descriptor()
 	// balancelog.DefaultRemark holds the default value on creation for the remark field.
 	balancelog.DefaultRemark = balancelogDescRemark.Default.(string)
+	// balancelogDescUserIDSnapshot is the schema descriptor for user_id_snapshot field.
+	balancelogDescUserIDSnapshot := balancelogFields[5].Descriptor()
+	// balancelog.DefaultUserIDSnapshot holds the default value on creation for the user_id_snapshot field.
+	balancelog.DefaultUserIDSnapshot = balancelogDescUserIDSnapshot.Default.(int)
+	// balancelogDescUserEmailSnapshot is the schema descriptor for user_email_snapshot field.
+	balancelogDescUserEmailSnapshot := balancelogFields[6].Descriptor()
+	// balancelog.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
+	balancelog.DefaultUserEmailSnapshot = balancelogDescUserEmailSnapshot.Default.(string)
 	// balancelogDescCreatedAt is the schema descriptor for created_at field.
-	balancelogDescCreatedAt := balancelogFields[5].Descriptor()
+	balancelogDescCreatedAt := balancelogFields[7].Descriptor()
 	// balancelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	balancelog.DefaultCreatedAt = balancelogDescCreatedAt.Default.(func() time.Time)
 	groupFields := schema.Group{}.Fields()
@@ -528,8 +536,16 @@ func init() {
 	usagelogDescReasoningEffort := usagelogFields[33].Descriptor()
 	// usagelog.DefaultReasoningEffort holds the default value on creation for the reasoning_effort field.
 	usagelog.DefaultReasoningEffort = usagelogDescReasoningEffort.Default.(string)
+	// usagelogDescUserIDSnapshot is the schema descriptor for user_id_snapshot field.
+	usagelogDescUserIDSnapshot := usagelogFields[38].Descriptor()
+	// usagelog.DefaultUserIDSnapshot holds the default value on creation for the user_id_snapshot field.
+	usagelog.DefaultUserIDSnapshot = usagelogDescUserIDSnapshot.Default.(int)
+	// usagelogDescUserEmailSnapshot is the schema descriptor for user_email_snapshot field.
+	usagelogDescUserEmailSnapshot := usagelogFields[39].Descriptor()
+	// usagelog.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
+	usagelog.DefaultUserEmailSnapshot = usagelogDescUserEmailSnapshot.Default.(string)
 	// usagelogDescCreatedAt is the schema descriptor for created_at field.
-	usagelogDescCreatedAt := usagelogFields[38].Descriptor()
+	usagelogDescCreatedAt := usagelogFields[40].Descriptor()
 	// usagelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	usagelog.DefaultCreatedAt = usagelogDescCreatedAt.Default.(func() time.Time)
 	userFields := schema.User{}.Fields()

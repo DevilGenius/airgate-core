@@ -463,6 +463,7 @@ export interface UsageLogResp {
   id: number;
   user_id: number;
   user_email?: string;
+  user_deleted?: boolean;
   api_key_id: number;
   api_key_name?: string;
   api_key_hint?: string;

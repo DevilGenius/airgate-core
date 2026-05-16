@@ -270,6 +270,7 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
 		SetUsageMetrics(rec.UsageMetrics).
 		SetUsageCostDetails(enrichUsageCostDetails(rec)).
 		SetUsageMetadata(rec.UsageMetadata).
+		SetUserIDSnapshot(rec.UserID).
 		SetUserID(rec.UserID).
 		SetAccountID(rec.AccountID).
 		SetGroupID(rec.GroupID)

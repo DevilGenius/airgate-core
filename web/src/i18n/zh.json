@@ -40,6 +40,7 @@
     "confirm": "确认",
     "delete": "删除",
     "edit": "编辑",
+    "add": "添加",
     "create": "创建",
     "search": "搜索",
     "filter": "筛选",
@@ -636,6 +637,7 @@
     "upstream_credential": "上游凭证",
     "detail": "明细",
     "api_key_deleted": "已删除密钥",
+    "user_deleted": "已删除用户",
     "model_placeholder": "模型名称",
     "user_id": "用户 ID",
     "search_user": "搜索用户",
@@ -851,6 +853,7 @@
     "template_vars": "可用变量",
     "smtp_test": "发送测试邮件",
     "smtp_test_prompt": "请输入接收测试邮件的邮箱地址：",
+    "smtp_test_recipient": "收件邮箱",
     "smtp_test_success": "测试邮件已发送，请检查收件箱",
 
     "storage_config": "MinIO / S3 对象存储",

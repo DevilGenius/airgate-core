@@ -78,13 +78,17 @@ func (UsageLog) Fields() []ent.Field {
 		field.JSON("usage_metrics", []sdk.UsageMetric{}).Optional(),
 		field.JSON("usage_cost_details", []sdk.UsageCostDetail{}).Optional(),
 		field.JSON("usage_metadata", map[string]string{}).Optional(),
+		field.Int("user_id_snapshot").Default(0).
+			Comment("用户 ID 快照。用户硬删除后保留历史使用记录与计费归属。"),
+		field.String("user_email_snapshot").Default("").
+			Comment("用户邮箱快照。用户硬删除后后台使用记录仍能展示历史归属。"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 	}
 }
 
 func (UsageLog) Edges() []ent.Edge {
 	return []ent.Edge{
-		edge.From("user", User.Type).Ref("usage_logs").Unique().Required(),
+		edge.From("user", User.Type).Ref("usage_logs").Unique(),
 		edge.From("api_key", APIKey.Type).Ref("usage_logs").Unique(),
 		edge.From("account", Account.Type).Ref("usage_logs").Unique(),
 		edge.From("group", Group.Type).Ref("usage_logs").Unique(),

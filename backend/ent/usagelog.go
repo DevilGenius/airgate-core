@@ -99,6 +99,10 @@ type UsageLog struct {
 	UsageCostDetails []sdk.UsageCostDetail `json:"usage_cost_details,omitempty"`
 	// UsageMetadata holds the value of the "usage_metadata" field.
 	UsageMetadata map[string]string `json:"usage_metadata,omitempty"`
+	// 用户 ID 快照。用户硬删除后保留历史使用记录与计费归属。
+	UserIDSnapshot int `json:"user_id_snapshot,omitempty"`
+	// 用户邮箱快照。用户硬删除后后台使用记录仍能展示历史归属。
+	UserEmailSnapshot string `json:"user_email_snapshot,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -181,9 +185,9 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldCacheCreationPrice, usagelog.FieldCacheCreation1hPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldCacheCreationCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldBilledCost, usagelog.FieldAccountCost, usagelog.FieldRateMultiplier, usagelog.FieldSellRate, usagelog.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs:
+		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldPlatform, usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldImageSize, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldReasoningEffort:
+		case usagelog.FieldPlatform, usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldImageSize, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldReasoningEffort, usagelog.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -452,6 +456,18 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field usage_metadata: %w", err)
 				}
 			}
+		case usagelog.FieldUserIDSnapshot:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field user_id_snapshot", values[i])
+			} else if value.Valid {
+				ul.UserIDSnapshot = int(value.Int64)
+			}
+		case usagelog.FieldUserEmailSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field user_email_snapshot", values[i])
+			} else if value.Valid {
+				ul.UserEmailSnapshot = value.String
+			}
 		case usagelog.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -655,6 +671,12 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("usage_metadata=")
 	builder.WriteString(fmt.Sprintf("%v", ul.UsageMetadata))
+	builder.WriteString(", ")
+	builder.WriteString("user_id_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", ul.UserIDSnapshot))
+	builder.WriteString(", ")
+	builder.WriteString("user_email_snapshot=")
+	builder.WriteString(ul.UserEmailSnapshot)
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(ul.CreatedAt.Format(time.ANSIC))

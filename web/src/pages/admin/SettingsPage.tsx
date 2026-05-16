@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { type FormEvent, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDialog, Button, Card, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
@@ -16,6 +16,7 @@ import {
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
 import { SystemUpdatePanel } from './SystemUpdatePanel';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
+import { CommonModal } from '../../shared/components/CommonModal';
 
 // ==================== 设置 key 定义 ====================
 
@@ -163,6 +164,7 @@ export default function SettingsPage() {
   const [hasChanges, setHasChanges] = useState(false);
   const [emailTplType, setEmailTplType] = useState<'verify' | 'balance_alert'>('verify');
   const [isEmailPreviewOpen, setEmailPreviewOpen] = useState(false);
+  const [isSmtpTestOpen, setSmtpTestOpen] = useState(false);
 
   // 获取所有设置
   const { data: settings, isLoading } = useQuery({
@@ -196,7 +198,10 @@ export default function SettingsPage() {
   // SMTP 测试
   const smtpTestMutation = useMutation({
     mutationFn: (data: TestSMTPReq) => settingsApi.testSMTP(data),
-    onSuccess: () => toast('success', t('settings.smtp_test_success')),
+    onSuccess: () => {
+      setSmtpTestOpen(false);
+      toast('success', t('settings.smtp_test_success'));
+    },
     onError: (err: Error) => toast('error', err.message),
   });
 
@@ -247,8 +252,10 @@ export default function SettingsPage() {
   }
 
   function handleTestSMTP() {
-    const testTo = prompt(t('settings.smtp_test_prompt'));
-    if (!testTo) return;
+    setSmtpTestOpen(true);
+  }
+
+  function submitSmtpTest(testTo: string) {
     smtpTestMutation.mutate({
       host: val('smtp_host'),
       port: Number(val('smtp_port')) || 587,
@@ -581,7 +588,92 @@ export default function SettingsPage() {
 
         {activeTab === 'system' && <SystemUpdatePanel />}
       </div>
+
+      <SmtpTestModal
+        isPending={smtpTestMutation.isPending}
+        open={isSmtpTestOpen}
+        onClose={() => setSmtpTestOpen(false)}
+        onSubmit={submitSmtpTest}
+      />
     </div>
+  );
+}
+
+// ==================== SMTP Test Modal ====================
+
+function SmtpTestModal({
+  isPending,
+  onClose,
+  onSubmit,
+  open,
+}: {
+  isPending: boolean;
+  onClose: () => void;
+  onSubmit: (email: string) => void;
+  open: boolean;
+}) {
+  const { t } = useTranslation();
+  const [email, setEmail] = useState('');
+  const trimmedEmail = email.trim();
+
+  useEffect(() => {
+    if (open) setEmail('');
+  }, [open]);
+
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen && !isPending) onClose();
+    },
+  });
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!trimmedEmail || isPending) return;
+    onSubmit(trimmedEmail);
+  }
+
+  return (
+    <CommonModal
+      description={t('settings.smtp_test_prompt')}
+      footer={(
+        <div className="flex w-full justify-end gap-2">
+          <Button variant="secondary" onPress={onClose} isDisabled={isPending}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            aria-busy={isPending}
+            form="smtp-test-form"
+            isDisabled={isPending || !trimmedEmail}
+            type="submit"
+            variant="primary"
+          >
+            {isPending ? <Spinner size="sm" /> : null}
+            {t('settings.smtp_test')}
+          </Button>
+        </div>
+      )}
+      icon={<Send className="w-4 h-4" />}
+      showCloseTrigger={!isPending}
+      size="sm"
+      state={modalState}
+      surface={false}
+      title={t('settings.smtp_test')}
+    >
+      <Form id="smtp-test-form" className="space-y-4" onSubmit={handleSubmit}>
+        <Field label={t('settings.smtp_test_recipient')}>
+          <Input
+            autoFocus
+            autoComplete="email"
+            disabled={isPending}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="user@example.com"
+            type="text"
+            value={email}
+          />
+        </Field>
+      </Form>
+    </CommonModal>
   );
 }
 

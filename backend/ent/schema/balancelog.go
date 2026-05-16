@@ -22,12 +22,16 @@ func (BalanceLog) Fields() []ent.Field {
 		field.Float("after_balance").
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.String("remark").Default(""),
+		field.Int("user_id_snapshot").Default(0).
+			Comment("用户 ID 快照。用户硬删除后保留余额流水归属。"),
+		field.String("user_email_snapshot").Default("").
+			Comment("用户邮箱快照。用户硬删除后保留余额流水归属。"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 	}
 }
 
 func (BalanceLog) Edges() []ent.Edge {
 	return []ent.Edge{
-		edge.From("user", User.Type).Ref("balance_logs").Unique().Required(),
+		edge.From("user", User.Type).Ref("balance_logs").Unique(),
 	}
 }

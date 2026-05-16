@@ -42,7 +42,7 @@ type CreateUserReq struct {
 	Password       string            `json:"password" binding:"required,min=6"`
 	Username       string            `json:"username"`
 	Role           string            `json:"role" binding:"oneof=admin user"`
-	MaxConcurrency int               `json:"max_concurrency"`
+	MaxConcurrency *int              `json:"max_concurrency" binding:"omitempty,gte=0"`
 	GroupRates     map[int64]float64 `json:"group_rates"`
 }
 

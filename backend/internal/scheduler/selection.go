@@ -253,7 +253,7 @@ func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, m
 func (s *Scheduler) concurrencySchedulability(ctx context.Context, acc *ent.Account) Schedulability {
 	maxConc := acc.MaxConcurrency
 	if maxConc <= 0 {
-		maxConc = 5
+		maxConc = DefaultAccountMaxConcurrency
 	}
 	load := s.getCurrentLoad(ctx, acc.ID)
 	if load >= maxConc {
@@ -305,7 +305,7 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 	for _, acc := range tier {
 		maxConc := acc.MaxConcurrency
 		if maxConc <= 0 {
-			maxConc = 5
+			maxConc = DefaultAccountMaxConcurrency
 		}
 		loadRate := float64(s.getCurrentLoad(ctx, acc.ID)) / float64(maxConc)
 		if loadRate > 1 {

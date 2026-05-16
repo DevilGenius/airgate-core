@@ -90,6 +90,10 @@ const (
 	FieldUsageCostDetails = "usage_cost_details"
 	// FieldUsageMetadata holds the string denoting the usage_metadata field in the database.
 	FieldUsageMetadata = "usage_metadata"
+	// FieldUserIDSnapshot holds the string denoting the user_id_snapshot field in the database.
+	FieldUserIDSnapshot = "user_id_snapshot"
+	// FieldUserEmailSnapshot holds the string denoting the user_email_snapshot field in the database.
+	FieldUserEmailSnapshot = "user_email_snapshot"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeUser holds the string denoting the user edge name in mutations.
@@ -173,6 +177,8 @@ var Columns = []string{
 	FieldUsageMetrics,
 	FieldUsageCostDetails,
 	FieldUsageMetadata,
+	FieldUserIDSnapshot,
+	FieldUserEmailSnapshot,
 	FieldCreatedAt,
 }
 
@@ -269,6 +275,10 @@ var (
 	DefaultEndpoint string
 	// DefaultReasoningEffort holds the default value on creation for the "reasoning_effort" field.
 	DefaultReasoningEffort string
+	// DefaultUserIDSnapshot holds the default value on creation for the "user_id_snapshot" field.
+	DefaultUserIDSnapshot int
+	// DefaultUserEmailSnapshot holds the default value on creation for the "user_email_snapshot" field.
+	DefaultUserEmailSnapshot string
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -449,6 +459,16 @@ func ByEndpoint(opts ...sql.OrderTermOption) OrderOption {
 // ByReasoningEffort orders the results by the reasoning_effort field.
 func ByReasoningEffort(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldReasoningEffort, opts...).ToFunc()
+}
+
+// ByUserIDSnapshot orders the results by the user_id_snapshot field.
+func ByUserIDSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUserIDSnapshot, opts...).ToFunc()
+}
+
+// ByUserEmailSnapshot orders the results by the user_email_snapshot field.
+func ByUserEmailSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUserEmailSnapshot, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

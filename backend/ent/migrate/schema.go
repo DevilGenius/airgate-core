@@ -91,8 +91,10 @@ var (
 		{Name: "before_balance", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "after_balance", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "remark", Type: field.TypeString, Default: ""},
+		{Name: "user_id_snapshot", Type: field.TypeInt, Default: 0},
+		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
 		{Name: "created_at", Type: field.TypeTime},
-		{Name: "user_balance_logs", Type: field.TypeInt},
+		{Name: "user_balance_logs", Type: field.TypeInt, Nullable: true},
 	}
 	// BalanceLogsTable holds the schema information for the "balance_logs" table.
 	BalanceLogsTable = &schema.Table{
@@ -102,9 +104,9 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "balance_logs_users_balance_logs",
-				Columns:    []*schema.Column{BalanceLogsColumns[7]},
+				Columns:    []*schema.Column{BalanceLogsColumns[9]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.SetNull,
 			},
 		},
 	}
@@ -299,11 +301,13 @@ var (
 		{Name: "usage_metrics", Type: field.TypeJSON, Nullable: true},
 		{Name: "usage_cost_details", Type: field.TypeJSON, Nullable: true},
 		{Name: "usage_metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "user_id_snapshot", Type: field.TypeInt, Default: 0},
+		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "api_key_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "account_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "group_usage_logs", Type: field.TypeInt, Nullable: true},
-		{Name: "user_usage_logs", Type: field.TypeInt},
+		{Name: "user_usage_logs", Type: field.TypeInt, Nullable: true},
 	}
 	// UsageLogsTable holds the schema information for the "usage_logs" table.
 	UsageLogsTable = &schema.Table{
@@ -313,27 +317,27 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "usage_logs_api_keys_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[40]},
+				Columns:    []*schema.Column{UsageLogsColumns[42]},
 				RefColumns: []*schema.Column{APIKeysColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_accounts_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[41]},
+				Columns:    []*schema.Column{UsageLogsColumns[43]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_groups_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[42]},
+				Columns:    []*schema.Column{UsageLogsColumns[44]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_users_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[43]},
+				Columns:    []*schema.Column{UsageLogsColumns[45]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.SetNull,
 			},
 		},
 	}

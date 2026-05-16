@@ -183,12 +183,17 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
+	maxConcurrency := defaultUserMaxConcurrency(c.Request.Context(), h.settingsService)
+	if req.MaxConcurrency != nil {
+		maxConcurrency = *req.MaxConcurrency
+	}
+
 	item, err := h.service.Create(c.Request.Context(), appuser.CreateInput{
 		Email:          req.Email,
 		Password:       req.Password,
 		Username:       req.Username,
 		Role:           req.Role,
-		MaxConcurrency: req.MaxConcurrency,
+		MaxConcurrency: maxConcurrency,
 		GroupRates:     req.GroupRates,
 	})
 	if err != nil {

@@ -3125,24 +3125,27 @@ func (m *AccountMutation) ResetEdge(name string) error {
 // BalanceLogMutation represents an operation that mutates the BalanceLog nodes in the graph.
 type BalanceLogMutation struct {
 	config
-	op                Op
-	typ               string
-	id                *int
-	action            *balancelog.Action
-	amount            *float64
-	addamount         *float64
-	before_balance    *float64
-	addbefore_balance *float64
-	after_balance     *float64
-	addafter_balance  *float64
-	remark            *string
-	created_at        *time.Time
-	clearedFields     map[string]struct{}
-	user              *int
-	cleareduser       bool
-	done              bool
-	oldValue          func(context.Context) (*BalanceLog, error)
-	predicates        []predicate.BalanceLog
+	op                  Op
+	typ                 string
+	id                  *int
+	action              *balancelog.Action
+	amount              *float64
+	addamount           *float64
+	before_balance      *float64
+	addbefore_balance   *float64
+	after_balance       *float64
+	addafter_balance    *float64
+	remark              *string
+	user_id_snapshot    *int
+	adduser_id_snapshot *int
+	user_email_snapshot *string
+	created_at          *time.Time
+	clearedFields       map[string]struct{}
+	user                *int
+	cleareduser         bool
+	done                bool
+	oldValue            func(context.Context) (*BalanceLog, error)
+	predicates          []predicate.BalanceLog
 }
 
 var _ ent.Mutation = (*BalanceLogMutation)(nil)
@@ -3483,6 +3486,98 @@ func (m *BalanceLogMutation) ResetRemark() {
 	m.remark = nil
 }
 
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (m *BalanceLogMutation) SetUserIDSnapshot(i int) {
+	m.user_id_snapshot = &i
+	m.adduser_id_snapshot = nil
+}
+
+// UserIDSnapshot returns the value of the "user_id_snapshot" field in the mutation.
+func (m *BalanceLogMutation) UserIDSnapshot() (r int, exists bool) {
+	v := m.user_id_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserIDSnapshot returns the old "user_id_snapshot" field's value of the BalanceLog entity.
+// If the BalanceLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BalanceLogMutation) OldUserIDSnapshot(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserIDSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserIDSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserIDSnapshot: %w", err)
+	}
+	return oldValue.UserIDSnapshot, nil
+}
+
+// AddUserIDSnapshot adds i to the "user_id_snapshot" field.
+func (m *BalanceLogMutation) AddUserIDSnapshot(i int) {
+	if m.adduser_id_snapshot != nil {
+		*m.adduser_id_snapshot += i
+	} else {
+		m.adduser_id_snapshot = &i
+	}
+}
+
+// AddedUserIDSnapshot returns the value that was added to the "user_id_snapshot" field in this mutation.
+func (m *BalanceLogMutation) AddedUserIDSnapshot() (r int, exists bool) {
+	v := m.adduser_id_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUserIDSnapshot resets all changes to the "user_id_snapshot" field.
+func (m *BalanceLogMutation) ResetUserIDSnapshot() {
+	m.user_id_snapshot = nil
+	m.adduser_id_snapshot = nil
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (m *BalanceLogMutation) SetUserEmailSnapshot(s string) {
+	m.user_email_snapshot = &s
+}
+
+// UserEmailSnapshot returns the value of the "user_email_snapshot" field in the mutation.
+func (m *BalanceLogMutation) UserEmailSnapshot() (r string, exists bool) {
+	v := m.user_email_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserEmailSnapshot returns the old "user_email_snapshot" field's value of the BalanceLog entity.
+// If the BalanceLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BalanceLogMutation) OldUserEmailSnapshot(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserEmailSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserEmailSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserEmailSnapshot: %w", err)
+	}
+	return oldValue.UserEmailSnapshot, nil
+}
+
+// ResetUserEmailSnapshot resets all changes to the "user_email_snapshot" field.
+func (m *BalanceLogMutation) ResetUserEmailSnapshot() {
+	m.user_email_snapshot = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *BalanceLogMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -3592,7 +3687,7 @@ func (m *BalanceLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BalanceLogMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 8)
 	if m.action != nil {
 		fields = append(fields, balancelog.FieldAction)
 	}
@@ -3607,6 +3702,12 @@ func (m *BalanceLogMutation) Fields() []string {
 	}
 	if m.remark != nil {
 		fields = append(fields, balancelog.FieldRemark)
+	}
+	if m.user_id_snapshot != nil {
+		fields = append(fields, balancelog.FieldUserIDSnapshot)
+	}
+	if m.user_email_snapshot != nil {
+		fields = append(fields, balancelog.FieldUserEmailSnapshot)
 	}
 	if m.created_at != nil {
 		fields = append(fields, balancelog.FieldCreatedAt)
@@ -3629,6 +3730,10 @@ func (m *BalanceLogMutation) Field(name string) (ent.Value, bool) {
 		return m.AfterBalance()
 	case balancelog.FieldRemark:
 		return m.Remark()
+	case balancelog.FieldUserIDSnapshot:
+		return m.UserIDSnapshot()
+	case balancelog.FieldUserEmailSnapshot:
+		return m.UserEmailSnapshot()
 	case balancelog.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -3650,6 +3755,10 @@ func (m *BalanceLogMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldAfterBalance(ctx)
 	case balancelog.FieldRemark:
 		return m.OldRemark(ctx)
+	case balancelog.FieldUserIDSnapshot:
+		return m.OldUserIDSnapshot(ctx)
+	case balancelog.FieldUserEmailSnapshot:
+		return m.OldUserEmailSnapshot(ctx)
 	case balancelog.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -3696,6 +3805,20 @@ func (m *BalanceLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRemark(v)
 		return nil
+	case balancelog.FieldUserIDSnapshot:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserIDSnapshot(v)
+		return nil
+	case balancelog.FieldUserEmailSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserEmailSnapshot(v)
+		return nil
 	case balancelog.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -3720,6 +3843,9 @@ func (m *BalanceLogMutation) AddedFields() []string {
 	if m.addafter_balance != nil {
 		fields = append(fields, balancelog.FieldAfterBalance)
 	}
+	if m.adduser_id_snapshot != nil {
+		fields = append(fields, balancelog.FieldUserIDSnapshot)
+	}
 	return fields
 }
 
@@ -3734,6 +3860,8 @@ func (m *BalanceLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedBeforeBalance()
 	case balancelog.FieldAfterBalance:
 		return m.AddedAfterBalance()
+	case balancelog.FieldUserIDSnapshot:
+		return m.AddedUserIDSnapshot()
 	}
 	return nil, false
 }
@@ -3763,6 +3891,13 @@ func (m *BalanceLogMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddAfterBalance(v)
+		return nil
+	case balancelog.FieldUserIDSnapshot:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUserIDSnapshot(v)
 		return nil
 	}
 	return fmt.Errorf("unknown BalanceLog numeric field %s", name)
@@ -3805,6 +3940,12 @@ func (m *BalanceLogMutation) ResetField(name string) error {
 		return nil
 	case balancelog.FieldRemark:
 		m.ResetRemark()
+		return nil
+	case balancelog.FieldUserIDSnapshot:
+		m.ResetUserIDSnapshot()
+		return nil
+	case balancelog.FieldUserEmailSnapshot:
+		m.ResetUserEmailSnapshot()
 		return nil
 	case balancelog.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -10366,6 +10507,9 @@ type UsageLogMutation struct {
 	usage_cost_details          *[]sdk.UsageCostDetail
 	appendusage_cost_details    []sdk.UsageCostDetail
 	usage_metadata              *map[string]string
+	user_id_snapshot            *int
+	adduser_id_snapshot         *int
+	user_email_snapshot         *string
 	created_at                  *time.Time
 	clearedFields               map[string]struct{}
 	user                        *int
@@ -12447,6 +12591,98 @@ func (m *UsageLogMutation) ResetUsageMetadata() {
 	delete(m.clearedFields, usagelog.FieldUsageMetadata)
 }
 
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (m *UsageLogMutation) SetUserIDSnapshot(i int) {
+	m.user_id_snapshot = &i
+	m.adduser_id_snapshot = nil
+}
+
+// UserIDSnapshot returns the value of the "user_id_snapshot" field in the mutation.
+func (m *UsageLogMutation) UserIDSnapshot() (r int, exists bool) {
+	v := m.user_id_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserIDSnapshot returns the old "user_id_snapshot" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldUserIDSnapshot(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserIDSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserIDSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserIDSnapshot: %w", err)
+	}
+	return oldValue.UserIDSnapshot, nil
+}
+
+// AddUserIDSnapshot adds i to the "user_id_snapshot" field.
+func (m *UsageLogMutation) AddUserIDSnapshot(i int) {
+	if m.adduser_id_snapshot != nil {
+		*m.adduser_id_snapshot += i
+	} else {
+		m.adduser_id_snapshot = &i
+	}
+}
+
+// AddedUserIDSnapshot returns the value that was added to the "user_id_snapshot" field in this mutation.
+func (m *UsageLogMutation) AddedUserIDSnapshot() (r int, exists bool) {
+	v := m.adduser_id_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUserIDSnapshot resets all changes to the "user_id_snapshot" field.
+func (m *UsageLogMutation) ResetUserIDSnapshot() {
+	m.user_id_snapshot = nil
+	m.adduser_id_snapshot = nil
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (m *UsageLogMutation) SetUserEmailSnapshot(s string) {
+	m.user_email_snapshot = &s
+}
+
+// UserEmailSnapshot returns the value of the "user_email_snapshot" field in the mutation.
+func (m *UsageLogMutation) UserEmailSnapshot() (r string, exists bool) {
+	v := m.user_email_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserEmailSnapshot returns the old "user_email_snapshot" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldUserEmailSnapshot(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserEmailSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserEmailSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserEmailSnapshot: %w", err)
+	}
+	return oldValue.UserEmailSnapshot, nil
+}
+
+// ResetUserEmailSnapshot resets all changes to the "user_email_snapshot" field.
+func (m *UsageLogMutation) ResetUserEmailSnapshot() {
+	m.user_email_snapshot = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *UsageLogMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -12673,7 +12909,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 39)
+	fields := make([]string, 0, 41)
 	if m.platform != nil {
 		fields = append(fields, usagelog.FieldPlatform)
 	}
@@ -12788,6 +13024,12 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.usage_metadata != nil {
 		fields = append(fields, usagelog.FieldUsageMetadata)
 	}
+	if m.user_id_snapshot != nil {
+		fields = append(fields, usagelog.FieldUserIDSnapshot)
+	}
+	if m.user_email_snapshot != nil {
+		fields = append(fields, usagelog.FieldUserEmailSnapshot)
+	}
 	if m.created_at != nil {
 		fields = append(fields, usagelog.FieldCreatedAt)
 	}
@@ -12875,6 +13117,10 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.UsageCostDetails()
 	case usagelog.FieldUsageMetadata:
 		return m.UsageMetadata()
+	case usagelog.FieldUserIDSnapshot:
+		return m.UserIDSnapshot()
+	case usagelog.FieldUserEmailSnapshot:
+		return m.UserEmailSnapshot()
 	case usagelog.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -12962,6 +13208,10 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldUsageCostDetails(ctx)
 	case usagelog.FieldUsageMetadata:
 		return m.OldUsageMetadata(ctx)
+	case usagelog.FieldUserIDSnapshot:
+		return m.OldUserIDSnapshot(ctx)
+	case usagelog.FieldUserEmailSnapshot:
+		return m.OldUserEmailSnapshot(ctx)
 	case usagelog.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -13239,6 +13489,20 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetUsageMetadata(v)
 		return nil
+	case usagelog.FieldUserIDSnapshot:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserIDSnapshot(v)
+		return nil
+	case usagelog.FieldUserEmailSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserEmailSnapshot(v)
+		return nil
 	case usagelog.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -13329,6 +13593,9 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addfirst_token_ms != nil {
 		fields = append(fields, usagelog.FieldFirstTokenMs)
 	}
+	if m.adduser_id_snapshot != nil {
+		fields = append(fields, usagelog.FieldUserIDSnapshot)
+	}
 	return fields
 }
 
@@ -13387,6 +13654,8 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedDurationMs()
 	case usagelog.FieldFirstTokenMs:
 		return m.AddedFirstTokenMs()
+	case usagelog.FieldUserIDSnapshot:
+		return m.AddedUserIDSnapshot()
 	}
 	return nil, false
 }
@@ -13571,6 +13840,13 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddFirstTokenMs(v)
 		return nil
+	case usagelog.FieldUserIDSnapshot:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUserIDSnapshot(v)
+		return nil
 	}
 	return fmt.Errorf("unknown UsageLog numeric field %s", name)
 }
@@ -13738,6 +14014,12 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldUsageMetadata:
 		m.ResetUsageMetadata()
+		return nil
+	case usagelog.FieldUserIDSnapshot:
+		m.ResetUserIDSnapshot()
+		return nil
+	case usagelog.FieldUserEmailSnapshot:
+		m.ResetUserEmailSnapshot()
 		return nil
 	case usagelog.FieldCreatedAt:
 		m.ResetCreatedAt()

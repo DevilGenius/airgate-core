@@ -31,6 +31,7 @@ import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { AccountResp, UpdateAccountReq } from '../../../shared/types';
+import { DEFAULT_ACCOUNT_MAX_CONCURRENCY } from './accountDefaults';
 
 export function EditAccountModal({
   open,
@@ -277,7 +278,7 @@ export function EditAccountModal({
                         <Input
                           className="pl-9"
                           type="number"
-                          value={String(form.max_concurrency ?? 5)}
+                          value={String(form.max_concurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY)}
                           onChange={(event) =>
                             setForm({ ...form, max_concurrency: Number(event.target.value) })
                           }

@@ -509,6 +509,34 @@ func (ulc *UsageLogCreate) SetUsageMetadata(m map[string]string) *UsageLogCreate
 	return ulc
 }
 
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (ulc *UsageLogCreate) SetUserIDSnapshot(i int) *UsageLogCreate {
+	ulc.mutation.SetUserIDSnapshot(i)
+	return ulc
+}
+
+// SetNillableUserIDSnapshot sets the "user_id_snapshot" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableUserIDSnapshot(i *int) *UsageLogCreate {
+	if i != nil {
+		ulc.SetUserIDSnapshot(*i)
+	}
+	return ulc
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (ulc *UsageLogCreate) SetUserEmailSnapshot(s string) *UsageLogCreate {
+	ulc.mutation.SetUserEmailSnapshot(s)
+	return ulc
+}
+
+// SetNillableUserEmailSnapshot sets the "user_email_snapshot" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableUserEmailSnapshot(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetUserEmailSnapshot(*s)
+	}
+	return ulc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (ulc *UsageLogCreate) SetCreatedAt(t time.Time) *UsageLogCreate {
 	ulc.mutation.SetCreatedAt(t)
@@ -526,6 +554,14 @@ func (ulc *UsageLogCreate) SetNillableCreatedAt(t *time.Time) *UsageLogCreate {
 // SetUserID sets the "user" edge to the User entity by ID.
 func (ulc *UsageLogCreate) SetUserID(id int) *UsageLogCreate {
 	ulc.mutation.SetUserID(id)
+	return ulc
+}
+
+// SetNillableUserID sets the "user" edge to the User entity by ID if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableUserID(id *int) *UsageLogCreate {
+	if id != nil {
+		ulc = ulc.SetUserID(*id)
+	}
 	return ulc
 }
 
@@ -754,6 +790,14 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultReasoningEffort
 		ulc.mutation.SetReasoningEffort(v)
 	}
+	if _, ok := ulc.mutation.UserIDSnapshot(); !ok {
+		v := usagelog.DefaultUserIDSnapshot
+		ulc.mutation.SetUserIDSnapshot(v)
+	}
+	if _, ok := ulc.mutation.UserEmailSnapshot(); !ok {
+		v := usagelog.DefaultUserEmailSnapshot
+		ulc.mutation.SetUserEmailSnapshot(v)
+	}
 	if _, ok := ulc.mutation.CreatedAt(); !ok {
 		v := usagelog.DefaultCreatedAt()
 		ulc.mutation.SetCreatedAt(v)
@@ -874,11 +918,14 @@ func (ulc *UsageLogCreate) check() error {
 	if _, ok := ulc.mutation.ReasoningEffort(); !ok {
 		return &ValidationError{Name: "reasoning_effort", err: errors.New(`ent: missing required field "UsageLog.reasoning_effort"`)}
 	}
+	if _, ok := ulc.mutation.UserIDSnapshot(); !ok {
+		return &ValidationError{Name: "user_id_snapshot", err: errors.New(`ent: missing required field "UsageLog.user_id_snapshot"`)}
+	}
+	if _, ok := ulc.mutation.UserEmailSnapshot(); !ok {
+		return &ValidationError{Name: "user_email_snapshot", err: errors.New(`ent: missing required field "UsageLog.user_email_snapshot"`)}
+	}
 	if _, ok := ulc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "UsageLog.created_at"`)}
-	}
-	if _, ok := ulc.mutation.UserID(); !ok {
-		return &ValidationError{Name: "user", err: errors.New(`ent: missing required edge "UsageLog.user"`)}
 	}
 	return nil
 }
@@ -1057,6 +1104,14 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.UsageMetadata(); ok {
 		_spec.SetField(usagelog.FieldUsageMetadata, field.TypeJSON, value)
 		_node.UsageMetadata = value
+	}
+	if value, ok := ulc.mutation.UserIDSnapshot(); ok {
+		_spec.SetField(usagelog.FieldUserIDSnapshot, field.TypeInt, value)
+		_node.UserIDSnapshot = value
+	}
+	if value, ok := ulc.mutation.UserEmailSnapshot(); ok {
+		_spec.SetField(usagelog.FieldUserEmailSnapshot, field.TypeString, value)
+		_node.UserEmailSnapshot = value
 	}
 	if value, ok := ulc.mutation.CreatedAt(); ok {
 		_spec.SetField(usagelog.FieldCreatedAt, field.TypeTime, value)

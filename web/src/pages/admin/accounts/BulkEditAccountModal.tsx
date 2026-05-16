@@ -20,6 +20,7 @@ import { GroupCheckboxList } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { BulkUpdateAccountsReq } from '../../../shared/types';
+import { DEFAULT_ACCOUNT_MAX_CONCURRENCY } from './accountDefaults';
 
 /**
  * 批量编辑弹窗：每个字段前有「启用」开关，只有启用的字段会进入 patch。
@@ -51,7 +52,7 @@ export function BulkEditAccountModal({
   // 字段值
   const [status, setStatus] = useState<'active' | 'disabled'>('active');
   const [priority, setPriority] = useState(50);
-  const [maxConcurrency, setMaxConcurrency] = useState(5);
+  const [maxConcurrency, setMaxConcurrency] = useState(DEFAULT_ACCOUNT_MAX_CONCURRENCY);
   const [rateMultiplier, setRateMultiplier] = useState(1);
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [proxyId, setProxyId] = useState<number | null>(null);

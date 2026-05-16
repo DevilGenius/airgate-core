@@ -750,9 +750,52 @@ func (ulu *UsageLogUpdate) ClearUsageMetadata() *UsageLogUpdate {
 	return ulu
 }
 
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (ulu *UsageLogUpdate) SetUserIDSnapshot(i int) *UsageLogUpdate {
+	ulu.mutation.ResetUserIDSnapshot()
+	ulu.mutation.SetUserIDSnapshot(i)
+	return ulu
+}
+
+// SetNillableUserIDSnapshot sets the "user_id_snapshot" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableUserIDSnapshot(i *int) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetUserIDSnapshot(*i)
+	}
+	return ulu
+}
+
+// AddUserIDSnapshot adds i to the "user_id_snapshot" field.
+func (ulu *UsageLogUpdate) AddUserIDSnapshot(i int) *UsageLogUpdate {
+	ulu.mutation.AddUserIDSnapshot(i)
+	return ulu
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (ulu *UsageLogUpdate) SetUserEmailSnapshot(s string) *UsageLogUpdate {
+	ulu.mutation.SetUserEmailSnapshot(s)
+	return ulu
+}
+
+// SetNillableUserEmailSnapshot sets the "user_email_snapshot" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableUserEmailSnapshot(s *string) *UsageLogUpdate {
+	if s != nil {
+		ulu.SetUserEmailSnapshot(*s)
+	}
+	return ulu
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (ulu *UsageLogUpdate) SetUserID(id int) *UsageLogUpdate {
 	ulu.mutation.SetUserID(id)
+	return ulu
+}
+
+// SetNillableUserID sets the "user" edge to the User entity by ID if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableUserID(id *int) *UsageLogUpdate {
+	if id != nil {
+		ulu = ulu.SetUserID(*id)
+	}
 	return ulu
 }
 
@@ -885,9 +928,6 @@ func (ulu *UsageLogUpdate) check() error {
 		if err := usagelog.ModelValidator(v); err != nil {
 			return &ValidationError{Name: "model", err: fmt.Errorf(`ent: validator failed for field "UsageLog.model": %w`, err)}
 		}
-	}
-	if _, ok := ulu.mutation.UserID(); ulu.mutation.UserCleared() && !ok {
-		return errors.New(`ent: clearing a required unique edge "UsageLog.user"`)
 	}
 	return nil
 }
@@ -1119,6 +1159,15 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if ulu.mutation.UsageMetadataCleared() {
 		_spec.ClearField(usagelog.FieldUsageMetadata, field.TypeJSON)
+	}
+	if value, ok := ulu.mutation.UserIDSnapshot(); ok {
+		_spec.SetField(usagelog.FieldUserIDSnapshot, field.TypeInt, value)
+	}
+	if value, ok := ulu.mutation.AddedUserIDSnapshot(); ok {
+		_spec.AddField(usagelog.FieldUserIDSnapshot, field.TypeInt, value)
+	}
+	if value, ok := ulu.mutation.UserEmailSnapshot(); ok {
+		_spec.SetField(usagelog.FieldUserEmailSnapshot, field.TypeString, value)
 	}
 	if ulu.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1973,9 +2022,52 @@ func (uluo *UsageLogUpdateOne) ClearUsageMetadata() *UsageLogUpdateOne {
 	return uluo
 }
 
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (uluo *UsageLogUpdateOne) SetUserIDSnapshot(i int) *UsageLogUpdateOne {
+	uluo.mutation.ResetUserIDSnapshot()
+	uluo.mutation.SetUserIDSnapshot(i)
+	return uluo
+}
+
+// SetNillableUserIDSnapshot sets the "user_id_snapshot" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableUserIDSnapshot(i *int) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetUserIDSnapshot(*i)
+	}
+	return uluo
+}
+
+// AddUserIDSnapshot adds i to the "user_id_snapshot" field.
+func (uluo *UsageLogUpdateOne) AddUserIDSnapshot(i int) *UsageLogUpdateOne {
+	uluo.mutation.AddUserIDSnapshot(i)
+	return uluo
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (uluo *UsageLogUpdateOne) SetUserEmailSnapshot(s string) *UsageLogUpdateOne {
+	uluo.mutation.SetUserEmailSnapshot(s)
+	return uluo
+}
+
+// SetNillableUserEmailSnapshot sets the "user_email_snapshot" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableUserEmailSnapshot(s *string) *UsageLogUpdateOne {
+	if s != nil {
+		uluo.SetUserEmailSnapshot(*s)
+	}
+	return uluo
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (uluo *UsageLogUpdateOne) SetUserID(id int) *UsageLogUpdateOne {
 	uluo.mutation.SetUserID(id)
+	return uluo
+}
+
+// SetNillableUserID sets the "user" edge to the User entity by ID if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableUserID(id *int) *UsageLogUpdateOne {
+	if id != nil {
+		uluo = uluo.SetUserID(*id)
+	}
 	return uluo
 }
 
@@ -2121,9 +2213,6 @@ func (uluo *UsageLogUpdateOne) check() error {
 		if err := usagelog.ModelValidator(v); err != nil {
 			return &ValidationError{Name: "model", err: fmt.Errorf(`ent: validator failed for field "UsageLog.model": %w`, err)}
 		}
-	}
-	if _, ok := uluo.mutation.UserID(); uluo.mutation.UserCleared() && !ok {
-		return errors.New(`ent: clearing a required unique edge "UsageLog.user"`)
 	}
 	return nil
 }
@@ -2372,6 +2461,15 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if uluo.mutation.UsageMetadataCleared() {
 		_spec.ClearField(usagelog.FieldUsageMetadata, field.TypeJSON)
+	}
+	if value, ok := uluo.mutation.UserIDSnapshot(); ok {
+		_spec.SetField(usagelog.FieldUserIDSnapshot, field.TypeInt, value)
+	}
+	if value, ok := uluo.mutation.AddedUserIDSnapshot(); ok {
+		_spec.AddField(usagelog.FieldUserIDSnapshot, field.TypeInt, value)
+	}
+	if value, ok := uluo.mutation.UserEmailSnapshot(); ok {
+		_spec.SetField(usagelog.FieldUserEmailSnapshot, field.TypeString, value)
 	}
 	if uluo.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -59,6 +59,34 @@ func (blc *BalanceLogCreate) SetNillableRemark(s *string) *BalanceLogCreate {
 	return blc
 }
 
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (blc *BalanceLogCreate) SetUserIDSnapshot(i int) *BalanceLogCreate {
+	blc.mutation.SetUserIDSnapshot(i)
+	return blc
+}
+
+// SetNillableUserIDSnapshot sets the "user_id_snapshot" field if the given value is not nil.
+func (blc *BalanceLogCreate) SetNillableUserIDSnapshot(i *int) *BalanceLogCreate {
+	if i != nil {
+		blc.SetUserIDSnapshot(*i)
+	}
+	return blc
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (blc *BalanceLogCreate) SetUserEmailSnapshot(s string) *BalanceLogCreate {
+	blc.mutation.SetUserEmailSnapshot(s)
+	return blc
+}
+
+// SetNillableUserEmailSnapshot sets the "user_email_snapshot" field if the given value is not nil.
+func (blc *BalanceLogCreate) SetNillableUserEmailSnapshot(s *string) *BalanceLogCreate {
+	if s != nil {
+		blc.SetUserEmailSnapshot(*s)
+	}
+	return blc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (blc *BalanceLogCreate) SetCreatedAt(t time.Time) *BalanceLogCreate {
 	blc.mutation.SetCreatedAt(t)
@@ -76,6 +104,14 @@ func (blc *BalanceLogCreate) SetNillableCreatedAt(t *time.Time) *BalanceLogCreat
 // SetUserID sets the "user" edge to the User entity by ID.
 func (blc *BalanceLogCreate) SetUserID(id int) *BalanceLogCreate {
 	blc.mutation.SetUserID(id)
+	return blc
+}
+
+// SetNillableUserID sets the "user" edge to the User entity by ID if the given value is not nil.
+func (blc *BalanceLogCreate) SetNillableUserID(id *int) *BalanceLogCreate {
+	if id != nil {
+		blc = blc.SetUserID(*id)
+	}
 	return blc
 }
 
@@ -123,6 +159,14 @@ func (blc *BalanceLogCreate) defaults() {
 		v := balancelog.DefaultRemark
 		blc.mutation.SetRemark(v)
 	}
+	if _, ok := blc.mutation.UserIDSnapshot(); !ok {
+		v := balancelog.DefaultUserIDSnapshot
+		blc.mutation.SetUserIDSnapshot(v)
+	}
+	if _, ok := blc.mutation.UserEmailSnapshot(); !ok {
+		v := balancelog.DefaultUserEmailSnapshot
+		blc.mutation.SetUserEmailSnapshot(v)
+	}
 	if _, ok := blc.mutation.CreatedAt(); !ok {
 		v := balancelog.DefaultCreatedAt()
 		blc.mutation.SetCreatedAt(v)
@@ -151,11 +195,14 @@ func (blc *BalanceLogCreate) check() error {
 	if _, ok := blc.mutation.Remark(); !ok {
 		return &ValidationError{Name: "remark", err: errors.New(`ent: missing required field "BalanceLog.remark"`)}
 	}
+	if _, ok := blc.mutation.UserIDSnapshot(); !ok {
+		return &ValidationError{Name: "user_id_snapshot", err: errors.New(`ent: missing required field "BalanceLog.user_id_snapshot"`)}
+	}
+	if _, ok := blc.mutation.UserEmailSnapshot(); !ok {
+		return &ValidationError{Name: "user_email_snapshot", err: errors.New(`ent: missing required field "BalanceLog.user_email_snapshot"`)}
+	}
 	if _, ok := blc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "BalanceLog.created_at"`)}
-	}
-	if _, ok := blc.mutation.UserID(); !ok {
-		return &ValidationError{Name: "user", err: errors.New(`ent: missing required edge "BalanceLog.user"`)}
 	}
 	return nil
 }
@@ -202,6 +249,14 @@ func (blc *BalanceLogCreate) createSpec() (*BalanceLog, *sqlgraph.CreateSpec) {
 	if value, ok := blc.mutation.Remark(); ok {
 		_spec.SetField(balancelog.FieldRemark, field.TypeString, value)
 		_node.Remark = value
+	}
+	if value, ok := blc.mutation.UserIDSnapshot(); ok {
+		_spec.SetField(balancelog.FieldUserIDSnapshot, field.TypeInt, value)
+		_node.UserIDSnapshot = value
+	}
+	if value, ok := blc.mutation.UserEmailSnapshot(); ok {
+		_spec.SetField(balancelog.FieldUserEmailSnapshot, field.TypeString, value)
+		_node.UserEmailSnapshot = value
 	}
 	if value, ok := blc.mutation.CreatedAt(); ok {
 		_spec.SetField(balancelog.FieldCreatedAt, field.TypeTime, value)

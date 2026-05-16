@@ -28,6 +28,10 @@ type BalanceLog struct {
 	AfterBalance float64 `json:"after_balance,omitempty"`
 	// Remark holds the value of the "remark" field.
 	Remark string `json:"remark,omitempty"`
+	// 用户 ID 快照。用户硬删除后保留余额流水归属。
+	UserIDSnapshot int `json:"user_id_snapshot,omitempty"`
+	// 用户邮箱快照。用户硬删除后保留余额流水归属。
+	UserEmailSnapshot string `json:"user_email_snapshot,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -64,9 +68,9 @@ func (*BalanceLog) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case balancelog.FieldAmount, balancelog.FieldBeforeBalance, balancelog.FieldAfterBalance:
 			values[i] = new(sql.NullFloat64)
-		case balancelog.FieldID:
+		case balancelog.FieldID, balancelog.FieldUserIDSnapshot:
 			values[i] = new(sql.NullInt64)
-		case balancelog.FieldAction, balancelog.FieldRemark:
+		case balancelog.FieldAction, balancelog.FieldRemark, balancelog.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
 		case balancelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -122,6 +126,18 @@ func (bl *BalanceLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field remark", values[i])
 			} else if value.Valid {
 				bl.Remark = value.String
+			}
+		case balancelog.FieldUserIDSnapshot:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field user_id_snapshot", values[i])
+			} else if value.Valid {
+				bl.UserIDSnapshot = int(value.Int64)
+			}
+		case balancelog.FieldUserEmailSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field user_email_snapshot", values[i])
+			} else if value.Valid {
+				bl.UserEmailSnapshot = value.String
 			}
 		case balancelog.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -191,6 +207,12 @@ func (bl *BalanceLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("remark=")
 	builder.WriteString(bl.Remark)
+	builder.WriteString(", ")
+	builder.WriteString("user_id_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", bl.UserIDSnapshot))
+	builder.WriteString(", ")
+	builder.WriteString("user_email_snapshot=")
+	builder.WriteString(bl.UserEmailSnapshot)
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(bl.CreatedAt.Format(time.ANSIC))

@@ -25,6 +25,10 @@ const (
 	FieldAfterBalance = "after_balance"
 	// FieldRemark holds the string denoting the remark field in the database.
 	FieldRemark = "remark"
+	// FieldUserIDSnapshot holds the string denoting the user_id_snapshot field in the database.
+	FieldUserIDSnapshot = "user_id_snapshot"
+	// FieldUserEmailSnapshot holds the string denoting the user_email_snapshot field in the database.
+	FieldUserEmailSnapshot = "user_email_snapshot"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeUser holds the string denoting the user edge name in mutations.
@@ -48,6 +52,8 @@ var Columns = []string{
 	FieldBeforeBalance,
 	FieldAfterBalance,
 	FieldRemark,
+	FieldUserIDSnapshot,
+	FieldUserEmailSnapshot,
 	FieldCreatedAt,
 }
 
@@ -75,6 +81,10 @@ func ValidColumn(column string) bool {
 var (
 	// DefaultRemark holds the default value on creation for the "remark" field.
 	DefaultRemark string
+	// DefaultUserIDSnapshot holds the default value on creation for the "user_id_snapshot" field.
+	DefaultUserIDSnapshot int
+	// DefaultUserEmailSnapshot holds the default value on creation for the "user_email_snapshot" field.
+	DefaultUserEmailSnapshot string
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -134,6 +144,16 @@ func ByAfterBalance(opts ...sql.OrderTermOption) OrderOption {
 // ByRemark orders the results by the remark field.
 func ByRemark(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRemark, opts...).ToFunc()
+}
+
+// ByUserIDSnapshot orders the results by the user_id_snapshot field.
+func ByUserIDSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUserIDSnapshot, opts...).ToFunc()
+}
+
+// ByUserEmailSnapshot orders the results by the user_email_snapshot field.
+func ByUserEmailSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUserEmailSnapshot, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

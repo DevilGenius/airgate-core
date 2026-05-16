@@ -7,7 +7,10 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entbalancelog "github.com/DouDOU-start/airgate-core/ent/balancelog"
+	"github.com/DouDOU-start/airgate-core/ent/predicate"
+	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
+	entusersubscription "github.com/DouDOU-start/airgate-core/ent/usersubscription"
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
 )
 
@@ -163,6 +166,8 @@ func (s *UserStore) UpdateBalance(ctx context.Context, id int, update appuser.Ba
 		SetBeforeBalance(update.BeforeBalance).
 		SetAfterBalance(update.AfterBalance).
 		SetRemark(update.Remark).
+		SetUserIDSnapshot(id).
+		SetUserEmailSnapshot(item.Email).
 		SetUserID(id).
 		Save(ctx); err != nil {
 		return appuser.User{}, err
@@ -176,19 +181,73 @@ func (s *UserStore) UpdateBalance(ctx context.Context, id int, update appuser.Ba
 
 // Delete 删除用户。
 func (s *UserStore) Delete(ctx context.Context, id int) error {
-	if err := s.db.User.DeleteOneID(id).Exec(ctx); err != nil {
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	item, err := tx.User.Get(ctx, id)
+	if err != nil {
 		if ent.IsNotFound(err) {
 			return appuser.ErrUserNotFound
 		}
 		return err
 	}
-	return nil
+
+	if _, err := tx.UsageLog.Update().
+		Where(entusagelog.HasAPIKeyWith(entapikey.HasUserWith(entuser.IDEQ(id)))).
+		ClearAPIKey().
+		Save(ctx); err != nil {
+		return err
+	}
+
+	if _, err := tx.UsageLog.Update().
+		Where(entusagelog.HasUserWith(entuser.IDEQ(id))).
+		SetUserIDSnapshot(id).
+		SetUserEmailSnapshot(item.Email).
+		ClearUser().
+		Save(ctx); err != nil {
+		return err
+	}
+
+	if _, err := tx.BalanceLog.Update().
+		Where(entbalancelog.HasUserWith(entuser.IDEQ(id))).
+		SetUserIDSnapshot(id).
+		SetUserEmailSnapshot(item.Email).
+		ClearUser().
+		Save(ctx); err != nil {
+		return err
+	}
+
+	if _, err := tx.APIKey.Delete().
+		Where(entapikey.HasUserWith(entuser.IDEQ(id))).
+		Exec(ctx); err != nil {
+		return err
+	}
+
+	if _, err := tx.UserSubscription.Delete().
+		Where(entusersubscription.HasUserWith(entuser.IDEQ(id))).
+		Exec(ctx); err != nil {
+		return err
+	}
+
+	if err := tx.User.DeleteOneID(id).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appuser.ErrUserNotFound
+		}
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // ListBalanceLogs 查询余额日志。
 func (s *UserStore) ListBalanceLogs(ctx context.Context, userID, page, pageSize int) ([]appuser.BalanceLog, int64, error) {
 	query := s.db.BalanceLog.Query().
-		Where(entbalancelog.HasUserWith(entuser.IDEQ(userID)))
+		Where(balanceUserPredicate(userID))
 
 	total, err := query.Count(ctx)
 	if err != nil {
@@ -217,6 +276,13 @@ func (s *UserStore) ListBalanceLogs(ctx context.Context, userID, page, pageSize 
 		})
 	}
 	return result, int64(total), nil
+}
+
+func balanceUserPredicate(userID int) predicate.BalanceLog {
+	return entbalancelog.Or(
+		entbalancelog.UserIDSnapshotEQ(userID),
+		entbalancelog.HasUserWith(entuser.IDEQ(userID)),
+	)
 }
 
 // GetAPIKeyName 获取 API Key 名称。

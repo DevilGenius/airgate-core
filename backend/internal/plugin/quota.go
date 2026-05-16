@@ -151,7 +151,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 	// 3. 账号并发槽
 	maxConc := state.account.MaxConcurrency
 	if maxConc <= 0 {
-		maxConc = 5
+		maxConc = scheduler.DefaultAccountMaxConcurrency
 	}
 	slotTTL := time.Duration(scheduler.ExtraInt(state.account.Extra, "slot_ttl_seconds")) * time.Second
 

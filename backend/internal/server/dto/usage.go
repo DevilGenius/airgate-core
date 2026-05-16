@@ -7,6 +7,7 @@ type UsageLogResp struct {
 	ID                    int64                 `json:"id"`
 	UserID                int64                 `json:"user_id"`
 	UserEmail             string                `json:"user_email,omitempty"`
+	UserDeleted           bool                  `json:"user_deleted,omitempty"`
 	APIKeyID              int64                 `json:"api_key_id"`
 	APIKeyName            string                `json:"api_key_name,omitempty"`
 	APIKeyHint            string                `json:"api_key_hint,omitempty"`

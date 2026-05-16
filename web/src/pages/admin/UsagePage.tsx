@@ -571,12 +571,13 @@ export default function UsagePage() {
         title: t('common.user'),
         width: '160px',
         render: (row) => {
-          const label = row.user_email || `#${row.user_id}`;
+          const fallbackLabel = row.user_deleted ? t('usage.user_deleted') : `#${row.user_id}`;
+          const label = row.user_email || fallbackLabel;
 
           return (
             <div className="flex min-w-0 items-center gap-1.5">
-              <span className="shrink-0 font-mono text-xs text-text-tertiary">#{row.user_id}</span>
-              <span className="min-w-0 truncate text-[13px] font-medium text-text" title={label}>
+              <span className="shrink-0 font-mono text-xs text-text-tertiary">{row.user_id > 0 ? `#${row.user_id}` : '-'}</span>
+              <span className={`min-w-0 truncate text-[13px] font-medium ${row.user_deleted ? 'text-text-tertiary' : 'text-text'}`} title={label}>
                 {label}
               </span>
             </div>

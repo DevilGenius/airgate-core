@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { Eye, EyeOff, RefreshCw } from 'lucide-react';
@@ -10,24 +10,40 @@ interface CreateUserModalProps {
   onClose: () => void;
   onSubmit: (data: CreateUserReq) => void;
   loading: boolean;
+  defaultMaxConcurrency: number;
 }
 
-const defaultForm: CreateUserReq = {
-  email: '',
-  max_concurrency: 0,
-  password: '',
-  role: 'user',
-  username: '',
-};
+function createDefaultForm(defaultMaxConcurrency: number): CreateUserReq {
+  return {
+    email: '',
+    max_concurrency: defaultMaxConcurrency,
+    password: '',
+    role: 'user',
+    username: '',
+  };
+}
 
-export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUserModalProps) {
+export function CreateUserModal({ open, onClose, onSubmit, loading, defaultMaxConcurrency }: CreateUserModalProps) {
   const { t } = useTranslation();
   const copy = useClipboard();
-  const [form, setForm] = useState<CreateUserReq>(defaultForm);
+  const [form, setForm] = useState<CreateUserReq>(() => createDefaultForm(defaultMaxConcurrency));
   const [showPassword, setShowPassword] = useState(false);
+  const [maxConcurrencyTouched, setMaxConcurrencyTouched] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setForm(createDefaultForm(defaultMaxConcurrency));
+      setMaxConcurrencyTouched(false);
+      return;
+    }
+    if (!maxConcurrencyTouched) {
+      setForm((prev) => ({ ...prev, max_concurrency: defaultMaxConcurrency }));
+    }
+  }, [defaultMaxConcurrency, maxConcurrencyTouched, open]);
 
   const handleClose = () => {
-    setForm(defaultForm);
+    setForm(createDefaultForm(defaultMaxConcurrency));
+    setMaxConcurrencyTouched(false);
     onClose();
   };
 
@@ -119,7 +135,10 @@ export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUser
                     type="number"
                     min="0"
                     value={String(form.max_concurrency ?? 0)}
-                    onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
+                    onChange={(e) => {
+                      setMaxConcurrencyTouched(true);
+                      setForm({ ...form, max_concurrency: Number(e.target.value) });
+                    }}
                   />
                 </HeroTextField>
               </div>

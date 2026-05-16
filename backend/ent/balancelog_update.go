@@ -119,9 +119,52 @@ func (blu *BalanceLogUpdate) SetNillableRemark(s *string) *BalanceLogUpdate {
 	return blu
 }
 
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (blu *BalanceLogUpdate) SetUserIDSnapshot(i int) *BalanceLogUpdate {
+	blu.mutation.ResetUserIDSnapshot()
+	blu.mutation.SetUserIDSnapshot(i)
+	return blu
+}
+
+// SetNillableUserIDSnapshot sets the "user_id_snapshot" field if the given value is not nil.
+func (blu *BalanceLogUpdate) SetNillableUserIDSnapshot(i *int) *BalanceLogUpdate {
+	if i != nil {
+		blu.SetUserIDSnapshot(*i)
+	}
+	return blu
+}
+
+// AddUserIDSnapshot adds i to the "user_id_snapshot" field.
+func (blu *BalanceLogUpdate) AddUserIDSnapshot(i int) *BalanceLogUpdate {
+	blu.mutation.AddUserIDSnapshot(i)
+	return blu
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (blu *BalanceLogUpdate) SetUserEmailSnapshot(s string) *BalanceLogUpdate {
+	blu.mutation.SetUserEmailSnapshot(s)
+	return blu
+}
+
+// SetNillableUserEmailSnapshot sets the "user_email_snapshot" field if the given value is not nil.
+func (blu *BalanceLogUpdate) SetNillableUserEmailSnapshot(s *string) *BalanceLogUpdate {
+	if s != nil {
+		blu.SetUserEmailSnapshot(*s)
+	}
+	return blu
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (blu *BalanceLogUpdate) SetUserID(id int) *BalanceLogUpdate {
 	blu.mutation.SetUserID(id)
+	return blu
+}
+
+// SetNillableUserID sets the "user" edge to the User entity by ID if the given value is not nil.
+func (blu *BalanceLogUpdate) SetNillableUserID(id *int) *BalanceLogUpdate {
+	if id != nil {
+		blu = blu.SetUserID(*id)
+	}
 	return blu
 }
 
@@ -175,9 +218,6 @@ func (blu *BalanceLogUpdate) check() error {
 			return &ValidationError{Name: "action", err: fmt.Errorf(`ent: validator failed for field "BalanceLog.action": %w`, err)}
 		}
 	}
-	if _, ok := blu.mutation.UserID(); blu.mutation.UserCleared() && !ok {
-		return errors.New(`ent: clearing a required unique edge "BalanceLog.user"`)
-	}
 	return nil
 }
 
@@ -216,6 +256,15 @@ func (blu *BalanceLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := blu.mutation.Remark(); ok {
 		_spec.SetField(balancelog.FieldRemark, field.TypeString, value)
+	}
+	if value, ok := blu.mutation.UserIDSnapshot(); ok {
+		_spec.SetField(balancelog.FieldUserIDSnapshot, field.TypeInt, value)
+	}
+	if value, ok := blu.mutation.AddedUserIDSnapshot(); ok {
+		_spec.AddField(balancelog.FieldUserIDSnapshot, field.TypeInt, value)
+	}
+	if value, ok := blu.mutation.UserEmailSnapshot(); ok {
+		_spec.SetField(balancelog.FieldUserEmailSnapshot, field.TypeString, value)
 	}
 	if blu.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -357,9 +406,52 @@ func (bluo *BalanceLogUpdateOne) SetNillableRemark(s *string) *BalanceLogUpdateO
 	return bluo
 }
 
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (bluo *BalanceLogUpdateOne) SetUserIDSnapshot(i int) *BalanceLogUpdateOne {
+	bluo.mutation.ResetUserIDSnapshot()
+	bluo.mutation.SetUserIDSnapshot(i)
+	return bluo
+}
+
+// SetNillableUserIDSnapshot sets the "user_id_snapshot" field if the given value is not nil.
+func (bluo *BalanceLogUpdateOne) SetNillableUserIDSnapshot(i *int) *BalanceLogUpdateOne {
+	if i != nil {
+		bluo.SetUserIDSnapshot(*i)
+	}
+	return bluo
+}
+
+// AddUserIDSnapshot adds i to the "user_id_snapshot" field.
+func (bluo *BalanceLogUpdateOne) AddUserIDSnapshot(i int) *BalanceLogUpdateOne {
+	bluo.mutation.AddUserIDSnapshot(i)
+	return bluo
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (bluo *BalanceLogUpdateOne) SetUserEmailSnapshot(s string) *BalanceLogUpdateOne {
+	bluo.mutation.SetUserEmailSnapshot(s)
+	return bluo
+}
+
+// SetNillableUserEmailSnapshot sets the "user_email_snapshot" field if the given value is not nil.
+func (bluo *BalanceLogUpdateOne) SetNillableUserEmailSnapshot(s *string) *BalanceLogUpdateOne {
+	if s != nil {
+		bluo.SetUserEmailSnapshot(*s)
+	}
+	return bluo
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (bluo *BalanceLogUpdateOne) SetUserID(id int) *BalanceLogUpdateOne {
 	bluo.mutation.SetUserID(id)
+	return bluo
+}
+
+// SetNillableUserID sets the "user" edge to the User entity by ID if the given value is not nil.
+func (bluo *BalanceLogUpdateOne) SetNillableUserID(id *int) *BalanceLogUpdateOne {
+	if id != nil {
+		bluo = bluo.SetUserID(*id)
+	}
 	return bluo
 }
 
@@ -426,9 +518,6 @@ func (bluo *BalanceLogUpdateOne) check() error {
 			return &ValidationError{Name: "action", err: fmt.Errorf(`ent: validator failed for field "BalanceLog.action": %w`, err)}
 		}
 	}
-	if _, ok := bluo.mutation.UserID(); bluo.mutation.UserCleared() && !ok {
-		return errors.New(`ent: clearing a required unique edge "BalanceLog.user"`)
-	}
 	return nil
 }
 
@@ -484,6 +573,15 @@ func (bluo *BalanceLogUpdateOne) sqlSave(ctx context.Context) (_node *BalanceLog
 	}
 	if value, ok := bluo.mutation.Remark(); ok {
 		_spec.SetField(balancelog.FieldRemark, field.TypeString, value)
+	}
+	if value, ok := bluo.mutation.UserIDSnapshot(); ok {
+		_spec.SetField(balancelog.FieldUserIDSnapshot, field.TypeInt, value)
+	}
+	if value, ok := bluo.mutation.AddedUserIDSnapshot(); ok {
+		_spec.AddField(balancelog.FieldUserIDSnapshot, field.TypeInt, value)
+	}
+	if value, ok := bluo.mutation.UserEmailSnapshot(); ok {
+		_spec.SetField(balancelog.FieldUserEmailSnapshot, field.TypeString, value)
 	}
 	if bluo.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{

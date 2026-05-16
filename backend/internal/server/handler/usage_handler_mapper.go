@@ -11,6 +11,7 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		ID:                    record.ID,
 		UserID:                record.UserID,
 		UserEmail:             record.UserEmail,
+		UserDeleted:           record.UserDeleted,
 		APIKeyID:              record.APIKeyID,
 		APIKeyName:            record.APIKeyName,
 		APIKeyHint:            record.APIKeyHint,

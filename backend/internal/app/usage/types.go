@@ -49,6 +49,7 @@ type LogRecord struct {
 	ID                    int64
 	UserID                int64
 	UserEmail             string
+	UserDeleted           bool
 	APIKeyID              int64
 	APIKeyName            string
 	APIKeyHint            string

@@ -40,6 +40,7 @@
     "confirm": "Confirm",
     "delete": "Delete",
     "edit": "Edit",
+    "add": "Add",
     "create": "Create",
     "search": "Search",
     "filter": "Filter",
@@ -633,6 +634,7 @@
     "upstream_credential": "Upstream Credential",
     "detail": "Detail",
     "api_key_deleted": "Deleted API Key",
+    "user_deleted": "Deleted User",
     "model_placeholder": "Model name",
     "user_id": "User ID",
     "search_user": "Search user",
@@ -848,6 +850,7 @@
     "template_vars": "Variables",
     "smtp_test": "Send Test Email",
     "smtp_test_prompt": "Enter the email address to receive the test email:",
+    "smtp_test_recipient": "Recipient Email",
     "smtp_test_success": "Test email sent, please check your inbox",
 
     "storage_config": "MinIO / S3 Object Storage",

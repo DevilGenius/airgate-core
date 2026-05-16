@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField } from '@heroui/react';
 import { usersApi } from '../../shared/api/users';
+import { settingsApi } from '../../shared/api/settings';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
@@ -26,6 +27,14 @@ import {
   Plus, Search, Pencil, MoreHorizontal, RefreshCw,
   Key, Users, PlusCircle, MinusCircle, Clock, Trash2,
 } from 'lucide-react';
+
+const FALLBACK_DEFAULT_USER_MAX_CONCURRENCY = 5;
+
+function defaultUserMaxConcurrency(settings?: Array<{ key: string; value: string }>) {
+  const raw = settings?.find((item) => item.key === 'default_concurrency')?.value;
+  const value = Number.parseInt((raw ?? '').trim(), 10);
+  return Number.isFinite(value) && value > 0 ? value : FALLBACK_DEFAULT_USER_MAX_CONCURRENCY;
+}
 
 export default function UsersPage() {
   const { t } = useTranslation();
@@ -55,6 +64,11 @@ export default function UsersPage() {
         status: statusFilter || undefined,
       }),
     placeholderData: keepPreviousData,
+  });
+
+  const { data: settings } = useQuery({
+    queryKey: queryKeys.settings(),
+    queryFn: settingsApi.list,
   });
 
   const createMutation = useCrudMutation({
@@ -349,6 +363,7 @@ export default function UsersPage() {
         onClose={() => setShowCreateModal(false)}
         onSubmit={(data) => createMutation.mutate(data)}
         loading={createMutation.isPending}
+        defaultMaxConcurrency={defaultUserMaxConcurrency(settings)}
       />
 
       {editingUser && (

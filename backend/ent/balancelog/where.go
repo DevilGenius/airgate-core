@@ -75,6 +75,16 @@ func Remark(v string) predicate.BalanceLog {
 	return predicate.BalanceLog(sql.FieldEQ(FieldRemark, v))
 }
 
+// UserIDSnapshot applies equality check predicate on the "user_id_snapshot" field. It's identical to UserIDSnapshotEQ.
+func UserIDSnapshot(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldUserIDSnapshot, v))
+}
+
+// UserEmailSnapshot applies equality check predicate on the "user_email_snapshot" field. It's identical to UserEmailSnapshotEQ.
+func UserEmailSnapshot(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldUserEmailSnapshot, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.BalanceLog {
 	return predicate.BalanceLog(sql.FieldEQ(FieldCreatedAt, v))
@@ -283,6 +293,111 @@ func RemarkEqualFold(v string) predicate.BalanceLog {
 // RemarkContainsFold applies the ContainsFold predicate on the "remark" field.
 func RemarkContainsFold(v string) predicate.BalanceLog {
 	return predicate.BalanceLog(sql.FieldContainsFold(FieldRemark, v))
+}
+
+// UserIDSnapshotEQ applies the EQ predicate on the "user_id_snapshot" field.
+func UserIDSnapshotEQ(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldUserIDSnapshot, v))
+}
+
+// UserIDSnapshotNEQ applies the NEQ predicate on the "user_id_snapshot" field.
+func UserIDSnapshotNEQ(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNEQ(FieldUserIDSnapshot, v))
+}
+
+// UserIDSnapshotIn applies the In predicate on the "user_id_snapshot" field.
+func UserIDSnapshotIn(vs ...int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldIn(FieldUserIDSnapshot, vs...))
+}
+
+// UserIDSnapshotNotIn applies the NotIn predicate on the "user_id_snapshot" field.
+func UserIDSnapshotNotIn(vs ...int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNotIn(FieldUserIDSnapshot, vs...))
+}
+
+// UserIDSnapshotGT applies the GT predicate on the "user_id_snapshot" field.
+func UserIDSnapshotGT(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGT(FieldUserIDSnapshot, v))
+}
+
+// UserIDSnapshotGTE applies the GTE predicate on the "user_id_snapshot" field.
+func UserIDSnapshotGTE(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGTE(FieldUserIDSnapshot, v))
+}
+
+// UserIDSnapshotLT applies the LT predicate on the "user_id_snapshot" field.
+func UserIDSnapshotLT(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLT(FieldUserIDSnapshot, v))
+}
+
+// UserIDSnapshotLTE applies the LTE predicate on the "user_id_snapshot" field.
+func UserIDSnapshotLTE(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLTE(FieldUserIDSnapshot, v))
+}
+
+// UserEmailSnapshotEQ applies the EQ predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldUserEmailSnapshot, v))
+}
+
+// UserEmailSnapshotNEQ applies the NEQ predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotNEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNEQ(FieldUserEmailSnapshot, v))
+}
+
+// UserEmailSnapshotIn applies the In predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldIn(FieldUserEmailSnapshot, vs...))
+}
+
+// UserEmailSnapshotNotIn applies the NotIn predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotNotIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNotIn(FieldUserEmailSnapshot, vs...))
+}
+
+// UserEmailSnapshotGT applies the GT predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotGT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGT(FieldUserEmailSnapshot, v))
+}
+
+// UserEmailSnapshotGTE applies the GTE predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotGTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGTE(FieldUserEmailSnapshot, v))
+}
+
+// UserEmailSnapshotLT applies the LT predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotLT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLT(FieldUserEmailSnapshot, v))
+}
+
+// UserEmailSnapshotLTE applies the LTE predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotLTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLTE(FieldUserEmailSnapshot, v))
+}
+
+// UserEmailSnapshotContains applies the Contains predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotContains(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContains(FieldUserEmailSnapshot, v))
+}
+
+// UserEmailSnapshotHasPrefix applies the HasPrefix predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotHasPrefix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasPrefix(FieldUserEmailSnapshot, v))
+}
+
+// UserEmailSnapshotHasSuffix applies the HasSuffix predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotHasSuffix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasSuffix(FieldUserEmailSnapshot, v))
+}
+
+// UserEmailSnapshotEqualFold applies the EqualFold predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotEqualFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEqualFold(FieldUserEmailSnapshot, v))
+}
+
+// UserEmailSnapshotContainsFold applies the ContainsFold predicate on the "user_email_snapshot" field.
+func UserEmailSnapshotContainsFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContainsFold(FieldUserEmailSnapshot, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
