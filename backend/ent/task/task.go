@@ -48,6 +48,8 @@ const (
 	FieldAttempts = "attempts"
 	// FieldMaxAttempts holds the string denoting the max_attempts field in the database.
 	FieldMaxAttempts = "max_attempts"
+	// FieldPublicTaskID holds the string denoting the public_task_id field in the database.
+	FieldPublicTaskID = "public_task_id"
 	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
 	FieldIdempotencyKey = "idempotency_key"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -86,6 +88,7 @@ var Columns = []string{
 	FieldPriority,
 	FieldAttempts,
 	FieldMaxAttempts,
+	FieldPublicTaskID,
 	FieldIdempotencyKey,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -248,6 +251,11 @@ func ByAttempts(opts ...sql.OrderTermOption) OrderOption {
 // ByMaxAttempts orders the results by the max_attempts field.
 func ByMaxAttempts(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMaxAttempts, opts...).ToFunc()
+}
+
+// ByPublicTaskID orders the results by the public_task_id field.
+func ByPublicTaskID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPublicTaskID, opts...).ToFunc()
 }
 
 // ByIdempotencyKey orders the results by the idempotency_key field.

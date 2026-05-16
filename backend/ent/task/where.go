@@ -114,6 +114,11 @@ func MaxAttempts(v int) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldMaxAttempts, v))
 }
 
+// PublicTaskID applies equality check predicate on the "public_task_id" field. It's identical to PublicTaskIDEQ.
+func PublicTaskID(v string) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldPublicTaskID, v))
+}
+
 // IdempotencyKey applies equality check predicate on the "idempotency_key" field. It's identical to IdempotencyKeyEQ.
 func IdempotencyKey(v string) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldIdempotencyKey, v))
@@ -837,6 +842,81 @@ func MaxAttemptsLT(v int) predicate.Task {
 // MaxAttemptsLTE applies the LTE predicate on the "max_attempts" field.
 func MaxAttemptsLTE(v int) predicate.Task {
 	return predicate.Task(sql.FieldLTE(FieldMaxAttempts, v))
+}
+
+// PublicTaskIDEQ applies the EQ predicate on the "public_task_id" field.
+func PublicTaskIDEQ(v string) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldPublicTaskID, v))
+}
+
+// PublicTaskIDNEQ applies the NEQ predicate on the "public_task_id" field.
+func PublicTaskIDNEQ(v string) predicate.Task {
+	return predicate.Task(sql.FieldNEQ(FieldPublicTaskID, v))
+}
+
+// PublicTaskIDIn applies the In predicate on the "public_task_id" field.
+func PublicTaskIDIn(vs ...string) predicate.Task {
+	return predicate.Task(sql.FieldIn(FieldPublicTaskID, vs...))
+}
+
+// PublicTaskIDNotIn applies the NotIn predicate on the "public_task_id" field.
+func PublicTaskIDNotIn(vs ...string) predicate.Task {
+	return predicate.Task(sql.FieldNotIn(FieldPublicTaskID, vs...))
+}
+
+// PublicTaskIDGT applies the GT predicate on the "public_task_id" field.
+func PublicTaskIDGT(v string) predicate.Task {
+	return predicate.Task(sql.FieldGT(FieldPublicTaskID, v))
+}
+
+// PublicTaskIDGTE applies the GTE predicate on the "public_task_id" field.
+func PublicTaskIDGTE(v string) predicate.Task {
+	return predicate.Task(sql.FieldGTE(FieldPublicTaskID, v))
+}
+
+// PublicTaskIDLT applies the LT predicate on the "public_task_id" field.
+func PublicTaskIDLT(v string) predicate.Task {
+	return predicate.Task(sql.FieldLT(FieldPublicTaskID, v))
+}
+
+// PublicTaskIDLTE applies the LTE predicate on the "public_task_id" field.
+func PublicTaskIDLTE(v string) predicate.Task {
+	return predicate.Task(sql.FieldLTE(FieldPublicTaskID, v))
+}
+
+// PublicTaskIDContains applies the Contains predicate on the "public_task_id" field.
+func PublicTaskIDContains(v string) predicate.Task {
+	return predicate.Task(sql.FieldContains(FieldPublicTaskID, v))
+}
+
+// PublicTaskIDHasPrefix applies the HasPrefix predicate on the "public_task_id" field.
+func PublicTaskIDHasPrefix(v string) predicate.Task {
+	return predicate.Task(sql.FieldHasPrefix(FieldPublicTaskID, v))
+}
+
+// PublicTaskIDHasSuffix applies the HasSuffix predicate on the "public_task_id" field.
+func PublicTaskIDHasSuffix(v string) predicate.Task {
+	return predicate.Task(sql.FieldHasSuffix(FieldPublicTaskID, v))
+}
+
+// PublicTaskIDIsNil applies the IsNil predicate on the "public_task_id" field.
+func PublicTaskIDIsNil() predicate.Task {
+	return predicate.Task(sql.FieldIsNull(FieldPublicTaskID))
+}
+
+// PublicTaskIDNotNil applies the NotNil predicate on the "public_task_id" field.
+func PublicTaskIDNotNil() predicate.Task {
+	return predicate.Task(sql.FieldNotNull(FieldPublicTaskID))
+}
+
+// PublicTaskIDEqualFold applies the EqualFold predicate on the "public_task_id" field.
+func PublicTaskIDEqualFold(v string) predicate.Task {
+	return predicate.Task(sql.FieldEqualFold(FieldPublicTaskID, v))
+}
+
+// PublicTaskIDContainsFold applies the ContainsFold predicate on the "public_task_id" field.
+func PublicTaskIDContainsFold(v string) predicate.Task {
+	return predicate.Task(sql.FieldContainsFold(FieldPublicTaskID, v))
 }
 
 // IdempotencyKeyEQ applies the EQ predicate on the "idempotency_key" field.

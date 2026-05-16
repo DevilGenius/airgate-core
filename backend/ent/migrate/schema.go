@@ -224,6 +224,7 @@ var (
 		{Name: "priority", Type: field.TypeInt, Default: 0},
 		{Name: "attempts", Type: field.TypeInt, Default: 0},
 		{Name: "max_attempts", Type: field.TypeInt, Default: 3},
+		{Name: "public_task_id", Type: field.TypeString, Nullable: true},
 		{Name: "idempotency_key", Type: field.TypeString, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -241,22 +242,27 @@ var (
 			{
 				Name:    "task_plugin_id_status_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[1], TasksColumns[3], TasksColumns[19]},
+				Columns: []*schema.Column{TasksColumns[1], TasksColumns[3], TasksColumns[20]},
 			},
 			{
 				Name:    "task_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[5], TasksColumns[19]},
+				Columns: []*schema.Column{TasksColumns[5], TasksColumns[20]},
 			},
 			{
 				Name:    "task_status_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[3], TasksColumns[19]},
+				Columns: []*schema.Column{TasksColumns[3], TasksColumns[20]},
+			},
+			{
+				Name:    "task_public_task_id",
+				Unique:  true,
+				Columns: []*schema.Column{TasksColumns[18]},
 			},
 			{
 				Name:    "task_plugin_id_user_id_task_type_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{TasksColumns[1], TasksColumns[5], TasksColumns[2], TasksColumns[18]},
+				Columns: []*schema.Column{TasksColumns[1], TasksColumns[5], TasksColumns[2], TasksColumns[19]},
 			},
 		},
 	}

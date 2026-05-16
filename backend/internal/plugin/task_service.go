@@ -132,10 +132,10 @@ func taskToPayload(t *ent.Task) map[string]interface{} {
 }
 
 func publicTaskID(t *ent.Task) string {
-	if t == nil || t.IdempotencyKey == nil {
+	if t == nil || t.PublicTaskID == nil {
 		return ""
 	}
-	return *t.IdempotencyKey
+	return *t.PublicTaskID
 }
 
 func (h *HostService) createTask(ctx context.Context, pluginID string, req hostCreateTaskRequest) (map[string]interface{}, error) {
@@ -181,6 +181,9 @@ func (h *HostService) createTask(ctx context.Context, pluginID string, req hostC
 		SetMaxAttempts(maxAttempts)
 	if req.IdempotencyKey != "" {
 		create.SetIdempotencyKey(req.IdempotencyKey)
+	}
+	if req.PublicTaskID != "" {
+		create.SetPublicTaskID(req.PublicTaskID)
 	}
 	if req.Attributes != nil {
 		create.SetAttributes(req.Attributes)
@@ -275,7 +278,7 @@ func (h *HostService) getTask(ctx context.Context, pluginID string, req hostGetT
 	}
 	query := h.db.Task.Query()
 	if req.PublicTaskID != "" {
-		query.Where(enttask.IdempotencyKeyEQ(req.PublicTaskID))
+		query.Where(enttask.PublicTaskIDEQ(req.PublicTaskID))
 	} else {
 		if req.TaskID <= 0 {
 			return nil, status.Error(codes.InvalidArgument, "task_id is required")

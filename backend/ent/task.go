@@ -52,6 +52,8 @@ type Task struct {
 	Attempts int `json:"attempts,omitempty"`
 	// MaxAttempts holds the value of the "max_attempts" field.
 	MaxAttempts int `json:"max_attempts,omitempty"`
+	// 对外暴露的任务 ID，全局唯一；不参与幂等语义
+	PublicTaskID *string `json:"public_task_id,omitempty"`
 	// 同一用户、插件、任务类型内的幂等键
 	IdempotencyKey *string `json:"idempotency_key,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -78,7 +80,7 @@ func (*Task) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case task.FieldID, task.FieldUserID, task.FieldUsageID, task.FieldProgress, task.FieldPriority, task.FieldAttempts, task.FieldMaxAttempts:
 			values[i] = new(sql.NullInt64)
-		case task.FieldPluginID, task.FieldTaskType, task.FieldStatus, task.FieldStage, task.FieldErrorType, task.FieldErrorCode, task.FieldErrorMessage, task.FieldIdempotencyKey:
+		case task.FieldPluginID, task.FieldTaskType, task.FieldStatus, task.FieldStage, task.FieldErrorType, task.FieldErrorCode, task.FieldErrorMessage, task.FieldPublicTaskID, task.FieldIdempotencyKey:
 			values[i] = new(sql.NullString)
 		case task.FieldCreatedAt, task.FieldUpdatedAt, task.FieldStartedAt, task.FieldCompletedAt, task.FieldCancelRequestedAt, task.FieldExpiresAt:
 			values[i] = new(sql.NullTime)
@@ -213,6 +215,13 @@ func (t *Task) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field max_attempts", values[i])
 			} else if value.Valid {
 				t.MaxAttempts = int(value.Int64)
+			}
+		case task.FieldPublicTaskID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field public_task_id", values[i])
+			} else if value.Valid {
+				t.PublicTaskID = new(string)
+				*t.PublicTaskID = value.String
 			}
 		case task.FieldIdempotencyKey:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -349,6 +358,11 @@ func (t *Task) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("max_attempts=")
 	builder.WriteString(fmt.Sprintf("%v", t.MaxAttempts))
+	builder.WriteString(", ")
+	if v := t.PublicTaskID; v != nil {
+		builder.WriteString("public_task_id=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	if v := t.IdempotencyKey; v != nil {
 		builder.WriteString("idempotency_key=")

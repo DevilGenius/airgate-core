@@ -396,6 +396,7 @@ type hostCreateTaskRequest struct {
 	Execution      map[string]interface{} `json:"execution"`
 	Priority       int                    `json:"priority"`
 	MaxAttempts    int                    `json:"max_attempts"`
+	PublicTaskID   string                 `json:"public_task_id"`
 	IdempotencyKey string                 `json:"idempotency_key"`
 }
 

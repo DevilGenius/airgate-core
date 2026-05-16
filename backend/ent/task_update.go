@@ -300,6 +300,26 @@ func (tu *TaskUpdate) AddMaxAttempts(i int) *TaskUpdate {
 	return tu
 }
 
+// SetPublicTaskID sets the "public_task_id" field.
+func (tu *TaskUpdate) SetPublicTaskID(s string) *TaskUpdate {
+	tu.mutation.SetPublicTaskID(s)
+	return tu
+}
+
+// SetNillablePublicTaskID sets the "public_task_id" field if the given value is not nil.
+func (tu *TaskUpdate) SetNillablePublicTaskID(s *string) *TaskUpdate {
+	if s != nil {
+		tu.SetPublicTaskID(*s)
+	}
+	return tu
+}
+
+// ClearPublicTaskID clears the value of the "public_task_id" field.
+func (tu *TaskUpdate) ClearPublicTaskID() *TaskUpdate {
+	tu.mutation.ClearPublicTaskID()
+	return tu
+}
+
 // SetIdempotencyKey sets the "idempotency_key" field.
 func (tu *TaskUpdate) SetIdempotencyKey(s string) *TaskUpdate {
 	tu.mutation.SetIdempotencyKey(s)
@@ -569,6 +589,12 @@ func (tu *TaskUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.AddedMaxAttempts(); ok {
 		_spec.AddField(task.FieldMaxAttempts, field.TypeInt, value)
+	}
+	if value, ok := tu.mutation.PublicTaskID(); ok {
+		_spec.SetField(task.FieldPublicTaskID, field.TypeString, value)
+	}
+	if tu.mutation.PublicTaskIDCleared() {
+		_spec.ClearField(task.FieldPublicTaskID, field.TypeString)
 	}
 	if value, ok := tu.mutation.IdempotencyKey(); ok {
 		_spec.SetField(task.FieldIdempotencyKey, field.TypeString, value)
@@ -895,6 +921,26 @@ func (tuo *TaskUpdateOne) AddMaxAttempts(i int) *TaskUpdateOne {
 	return tuo
 }
 
+// SetPublicTaskID sets the "public_task_id" field.
+func (tuo *TaskUpdateOne) SetPublicTaskID(s string) *TaskUpdateOne {
+	tuo.mutation.SetPublicTaskID(s)
+	return tuo
+}
+
+// SetNillablePublicTaskID sets the "public_task_id" field if the given value is not nil.
+func (tuo *TaskUpdateOne) SetNillablePublicTaskID(s *string) *TaskUpdateOne {
+	if s != nil {
+		tuo.SetPublicTaskID(*s)
+	}
+	return tuo
+}
+
+// ClearPublicTaskID clears the value of the "public_task_id" field.
+func (tuo *TaskUpdateOne) ClearPublicTaskID() *TaskUpdateOne {
+	tuo.mutation.ClearPublicTaskID()
+	return tuo
+}
+
 // SetIdempotencyKey sets the "idempotency_key" field.
 func (tuo *TaskUpdateOne) SetIdempotencyKey(s string) *TaskUpdateOne {
 	tuo.mutation.SetIdempotencyKey(s)
@@ -1194,6 +1240,12 @@ func (tuo *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) 
 	}
 	if value, ok := tuo.mutation.AddedMaxAttempts(); ok {
 		_spec.AddField(task.FieldMaxAttempts, field.TypeInt, value)
+	}
+	if value, ok := tuo.mutation.PublicTaskID(); ok {
+		_spec.SetField(task.FieldPublicTaskID, field.TypeString, value)
+	}
+	if tuo.mutation.PublicTaskIDCleared() {
+		_spec.ClearField(task.FieldPublicTaskID, field.TypeString)
 	}
 	if value, ok := tuo.mutation.IdempotencyKey(); ok {
 		_spec.SetField(task.FieldIdempotencyKey, field.TypeString, value)

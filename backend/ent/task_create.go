@@ -202,6 +202,20 @@ func (tc *TaskCreate) SetNillableMaxAttempts(i *int) *TaskCreate {
 	return tc
 }
 
+// SetPublicTaskID sets the "public_task_id" field.
+func (tc *TaskCreate) SetPublicTaskID(s string) *TaskCreate {
+	tc.mutation.SetPublicTaskID(s)
+	return tc
+}
+
+// SetNillablePublicTaskID sets the "public_task_id" field if the given value is not nil.
+func (tc *TaskCreate) SetNillablePublicTaskID(s *string) *TaskCreate {
+	if s != nil {
+		tc.SetPublicTaskID(*s)
+	}
+	return tc
+}
+
 // SetIdempotencyKey sets the "idempotency_key" field.
 func (tc *TaskCreate) SetIdempotencyKey(s string) *TaskCreate {
 	tc.mutation.SetIdempotencyKey(s)
@@ -562,6 +576,10 @@ func (tc *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.MaxAttempts(); ok {
 		_spec.SetField(task.FieldMaxAttempts, field.TypeInt, value)
 		_node.MaxAttempts = value
+	}
+	if value, ok := tc.mutation.PublicTaskID(); ok {
+		_spec.SetField(task.FieldPublicTaskID, field.TypeString, value)
+		_node.PublicTaskID = &value
 	}
 	if value, ok := tc.mutation.IdempotencyKey(); ok {
 		_spec.SetField(task.FieldIdempotencyKey, field.TypeString, value)

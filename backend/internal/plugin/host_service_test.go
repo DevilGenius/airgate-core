@@ -69,6 +69,54 @@ func TestHostInvokeRequiresDeclaredCapability(t *testing.T) {
 	}
 }
 
+func TestTaskPublicIDIsIndependentFromIdempotencyKey(t *testing.T) {
+	ctx := context.Background()
+	db := enttest.Open(t, "sqlite3", "file:task_public_id?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	t.Cleanup(func() { _ = db.Close() })
+
+	host := &HostService{db: db}
+	baseReq := hostCreateTaskRequest{
+		UserID:         42,
+		Input:          map[string]interface{}{"prompt": "test"},
+		IdempotencyKey: "same-idempotency-key",
+	}
+	if _, err := host.createTask(ctx, "gateway-openai", hostCreateTaskRequest{
+		UserID:         baseReq.UserID,
+		TaskType:       "image.generate",
+		Input:          baseReq.Input,
+		PublicTaskID:   "pub-generate",
+		IdempotencyKey: baseReq.IdempotencyKey,
+	}); err != nil {
+		t.Fatalf("create generate task: %v", err)
+	}
+	if _, err := host.createTask(ctx, "gateway-openai", hostCreateTaskRequest{
+		UserID:         baseReq.UserID,
+		TaskType:       "image.edit",
+		Input:          baseReq.Input,
+		PublicTaskID:   "pub-edit",
+		IdempotencyKey: baseReq.IdempotencyKey,
+	}); err != nil {
+		t.Fatalf("create edit task with same idempotency key: %v", err)
+	}
+
+	got, err := host.getTask(ctx, "gateway-openai", hostGetTaskRequest{UserID: baseReq.UserID, PublicTaskID: "pub-edit"})
+	if err != nil {
+		t.Fatalf("get task by public id: %v", err)
+	}
+	task, ok := got["task"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("task payload type = %T", got["task"])
+	}
+	if task["task_type"] != "image.edit" || task["public_task_id"] != "pub-edit" {
+		t.Fatalf("unexpected task payload: %+v", task)
+	}
+
+	_, err = host.getTask(ctx, "gateway-openai", hostGetTaskRequest{UserID: baseReq.UserID, PublicTaskID: baseReq.IdempotencyKey})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("idempotency key should not be usable as public task id, got %v", err)
+	}
+}
+
 func TestCheckHostForwardBalance(t *testing.T) {
 	ctx := context.Background()
 	db := enttest.Open(t, "sqlite3", "file:host_forward_balance?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
