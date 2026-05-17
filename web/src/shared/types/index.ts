@@ -24,6 +24,9 @@ export interface PageReq {
 
 // ==================== Auth ====================
 
+export type UserRole = 'admin' | 'user';
+export type SessionRole = UserRole | 'api_key';
+
 export interface LoginReq {
   email: string;
   password: string;
@@ -58,7 +61,7 @@ export interface UserResp {
   email: string;
   username: string;
   balance: number;
-  role: 'admin' | 'user';
+  role: SessionRole;
   max_concurrency: number;
 
   group_rates?: Record<number, number>;
@@ -89,7 +92,7 @@ export interface CreateUserReq {
   email: string;
   password: string;
   username?: string;
-  role: 'admin' | 'user';
+  role: UserRole;
   max_concurrency?: number;
   group_rates?: Record<number, number>;
 }
@@ -97,7 +100,7 @@ export interface CreateUserReq {
 export interface UpdateUserReq {
   username?: string;
   password?: string;
-  role?: 'admin' | 'user';
+  role?: UserRole;
   max_concurrency?: number;
   group_rates?: Record<number, number>;
   allowed_group_ids?: number[];
