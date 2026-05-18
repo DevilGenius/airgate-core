@@ -137,14 +137,14 @@ export function useAccountTableColumns({
           return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
         }
         const groupNames = row.group_ids.map((gid) => groupMap.get(gid) ?? `#${gid}`);
-        const visibleGroups = groupNames.slice(0, 3);
+        const visibleGroups = groupNames.length > 3 ? groupNames.slice(0, 2) : groupNames.slice(0, 3);
         const hiddenCount = Math.max(0, groupNames.length - visibleGroups.length);
         return (
-          <div className="flex max-h-full min-w-0 max-w-full flex-col items-center justify-center gap-0.5 overflow-hidden" title={groupNames.join('\n')}>
+          <div className="ag-account-group-list" title={groupNames.join('\n')}>
             {visibleGroups.map((name) => (
               <span
                 key={name}
-                className="max-w-full truncate rounded px-1.5 py-0 text-[10px] leading-none"
+                className="ag-account-group-chip"
                 style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}
               >
                 {name}
@@ -152,7 +152,7 @@ export function useAccountTableColumns({
             ))}
             {hiddenCount > 0 ? (
               <span
-                className="max-w-full truncate rounded px-1.5 py-0 text-[10px] font-semibold leading-none"
+                className="ag-account-group-chip ag-account-group-chip--more"
                 style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}
               >
                 +{hiddenCount}
