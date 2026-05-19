@@ -14,6 +14,7 @@ import (
 	entproxy "github.com/DouDOU-start/airgate-core/ent/proxy"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/usagemodel"
 )
 
 // AccountStore 使用 Ent 实现账号仓储。
@@ -371,10 +372,6 @@ func (s *AccountStore) BatchWindowStats(ctx context.Context, accountIDs []int, s
 	return result, nil
 }
 
-// imageModelPrefix 与 app/account/stats.go::isImageModel 保持一致。
-// 改这里时记得同步那边，避免"统计口径"和"列表展示"对不上。
-const imageModelPrefix = "gpt-image"
-
 // BatchImageStats 一次拿"今日生图数"和"累计生图数"两组聚合，
 // 仅算 model 前缀 "gpt-image" 的请求。两条 GROUP BY 查询：
 //
@@ -400,7 +397,7 @@ func (s *AccountStore) BatchImageStats(ctx context.Context, accountIDs []int, to
 	if err := s.db.UsageLog.Query().
 		Where(
 			entusagelog.HasAccountWith(entaccount.IDIn(accountIDs...)),
-			entusagelog.ModelHasPrefix(imageModelPrefix),
+			entusagelog.ModelHasPrefix(usagemodel.ImagePrefix),
 		).
 		GroupBy(entusagelog.AccountColumn).
 		Aggregate(ent.Count()).
@@ -421,7 +418,7 @@ func (s *AccountStore) BatchImageStats(ctx context.Context, accountIDs []int, to
 	if err := s.db.UsageLog.Query().
 		Where(
 			entusagelog.HasAccountWith(entaccount.IDIn(accountIDs...)),
-			entusagelog.ModelHasPrefix(imageModelPrefix),
+			entusagelog.ModelHasPrefix(usagemodel.ImagePrefix),
 			entusagelog.CreatedAtGTE(todayStart),
 		).
 		GroupBy(entusagelog.AccountColumn).

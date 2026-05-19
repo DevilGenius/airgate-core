@@ -271,7 +271,11 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         tone="rose"
         title={t('dashboard.avg_response')}
         value={`${fmtDurationMs(stats.avg_first_token_ms)}/${fmtDurationMs(stats.avg_duration_ms)}`}
-        meta={t('dashboard.image_response_time', { time: fmtDurationMs(stats.avg_image_duration_ms) })}
+        meta={
+          (stats.avg_image_duration_ms ?? 0) > 0
+            ? t('dashboard.image_response_time', { time: fmtDurationMs(stats.avg_image_duration_ms) })
+            : undefined
+        }
       />
     </div>
   );

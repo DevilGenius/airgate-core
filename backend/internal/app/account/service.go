@@ -787,9 +787,7 @@ func (s *Service) GetSingleAccountUsage(ctx context.Context, id int) (map[string
 	}
 
 	if item.Type != "apikey" {
-		queryCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		info, usageErrors, ok := s.fetchSingleAccountUsage(queryCtx, item)
-		cancel()
+		info, usageErrors, ok := s.fetchSingleAccountUsageDedup(ctx, item)
 
 		s.handleSingleAccountUsageErrors(ctx, item, usageErrors)
 		if ok {
@@ -981,6 +979,32 @@ func (s *Service) fetchUpstreamUsage(ctx context.Context, platform string) (map[
 	return merged, nil
 }
 
+// fetchSingleAccountUsageDedup 在 (platform, accountID) 维度上对单账号 probe 做
+// singleflight 合并：前端 useQueries 一次性 fan-out N 个账号刷新时，重复点同一
+// 账号（或后台 batch refresh 正在 flying 时穿透进来的 probe）只会真正打一次插件。
+// 调用方对 ctx 的语义：第一次入队的 goroutine 决定上游请求生命周期，30s 超时
+// 是给 plugin 端的硬上限。后到的并发请求复用其结果，自己的 ctx.Done 仍可早退。
+func (s *Service) fetchSingleAccountUsageDedup(ctx context.Context, item Account) (AccountUsageInfo, []accountUsageError, bool) {
+	type result struct {
+		info        AccountUsageInfo
+		usageErrors []accountUsageError
+		ok          bool
+	}
+	key := "single:" + usageCachePlatformKey(item.Platform) + ":" + strconv.Itoa(item.ID)
+	v, _, _ := s.usageFlight.Do(key, func() (any, error) {
+		queryCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		info, usageErrors, ok := s.fetchSingleAccountUsage(queryCtx, item)
+		return result{info: info, usageErrors: usageErrors, ok: ok}, nil
+	})
+	res, _ := v.(result)
+	// 调用方早退（ctx.Done）时 res 仍是 zero/false，行为与旧版超时一致。
+	if err := ctx.Err(); err != nil {
+		return AccountUsageInfo{}, nil, false
+	}
+	return res.info, res.usageErrors, res.ok
+}
+
 func (s *Service) fetchSingleAccountUsage(ctx context.Context, item Account) (AccountUsageInfo, []accountUsageError, bool) {
 	if s.plugins == nil {
 		return AccountUsageInfo{}, nil, false
@@ -1054,15 +1078,60 @@ func (s *Service) handleSingleAccountUsageErrors(ctx context.Context, item Accou
 	}
 }
 
+// updateSingleAccountUsageCache 把单账号的最新探测结果合并回 platform 与 __all__
+// 两个缓存键。整段 read-modify-write 必须在 usageMu 下原子完成，否则同一 cacheKey
+// 上的并发 merge 会出现"先读取的副本最后写回"，把别人刚写入的其他账号更新丢掉。
+// Redis 写入放到锁外执行，避免网络 IO 阻塞其他缓存读者；Redis 的 last-write-wins
+// 与 setUsageCache 的既有行为一致，不在此处加强。
 func (s *Service) updateSingleAccountUsageCache(ctx context.Context, platform, accountKey string, info AccountUsageInfo) {
-	for _, cacheKey := range usageCacheKeysForInvalidation(platform) {
-		cached, _, ok := s.getUsageCacheForRead(ctx, cacheKey)
+	type pendingWrite struct {
+		cacheKey string
+		snapshot map[string]AccountUsageInfo
+	}
+	var pending []pendingWrite
+
+	s.usageMu.Lock()
+	for _, raw := range usageCacheKeysForInvalidation(platform) {
+		cacheKey := usageCachePlatformKey(raw)
+		entry, ok := s.usageCache[cacheKey]
 		if !ok {
 			continue
 		}
-		next := cloneAccountUsageInfoMap(cached)
+		next := cloneAccountUsageInfoMap(entry.data)
 		next[accountKey] = info
-		s.setUsageCache(ctx, cacheKey, next)
+		s.usageCache[cacheKey] = &usageCacheEntry{data: next, expiresAt: entry.expiresAt}
+		pending = append(pending, pendingWrite{cacheKey: cacheKey, snapshot: next})
+	}
+	s.usageMu.Unlock()
+
+	if s.usageRedis == nil {
+		return
+	}
+	for _, p := range pending {
+		s.writeUsageCacheRedis(ctx, p.cacheKey, p.snapshot)
+	}
+}
+
+// writeUsageCacheRedis 把内存里已经合并好的快照同步到 Redis。
+// 仅负责 Redis 端写入，调用方负责确保 in-memory 状态已经正确更新。
+func (s *Service) writeUsageCacheRedis(ctx context.Context, cacheKey string, accounts map[string]AccountUsageInfo) {
+	if s.usageRedis == nil {
+		return
+	}
+	now := s.now()
+	expiresAt := usageCacheExpiresAt(accounts, now)
+	ttl := expiresAt.Sub(now)
+	if ttl < usageCacheMinimumTTL {
+		ttl = usageCacheMinimumTTL
+		expiresAt = now.Add(ttl)
+	}
+	payload := newAccountUsageCachePayload(accounts, now, expiresAt)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	if err := s.usageRedis.Set(ctx, usageCacheRedisKey(cacheKey), body, ttl).Err(); err != nil {
+		slog.Debug("account_usage_cache_set_failed", "cache_key", cacheKey, sdk.LogFieldError, err)
 	}
 }
 

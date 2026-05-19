@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
@@ -12,6 +11,7 @@ import (
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
 	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/usagemodel"
 )
 
 // DashboardStore 使用 Ent 实现仪表盘仓储。
@@ -94,7 +94,7 @@ func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, five
 	var todayImageDurationMs int64
 	activeUserSet := make(map[int]bool)
 	for _, item := range todayLogs {
-		isImage := isDashboardImageModel(item.Model)
+		isImage := usagemodel.IsImageGen(item.Model)
 		todayRequests++
 		todayTokens += int64(item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens)
 		todayCost += item.ActualCost
@@ -221,8 +221,4 @@ func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (int64, flo
 		return 0, 0, 0, nil
 	}
 	return rows[0].InputSum + rows[0].OutputSum + rows[0].CacheSum + rows[0].CacheCreationSum, rows[0].CostSum, rows[0].StandardCostSum, nil
-}
-
-func isDashboardImageModel(model string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gpt-image")
 }

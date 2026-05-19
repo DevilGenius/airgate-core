@@ -2,17 +2,16 @@ package account
 
 import (
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/usagemodel"
 )
 
 // isImageModel 判断 usage_log.model 是否属于生图家族。
-// 与 scheduler.ModelFamily 的 "gpt-image-*" 规则保持一致 —— 不直接 import scheduler
-// 包是为了避免 stats 这一层依赖调度模块。两边都改时记得同步更新。
+// 转调 usagemodel.IsImageGen，保留本地函数名以最小化对调用方的影响。
 func isImageModel(model string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gpt-image")
+	return usagemodel.IsImageGen(model)
 }
 
 const (
