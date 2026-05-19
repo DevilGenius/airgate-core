@@ -470,14 +470,14 @@ export const AccountRowActions = memo(function AccountRowActions({
       </button>
       <button
         type="button"
-        aria-label={labels.delete}
-        className="ag-account-row-action-button ag-account-row-action-button--danger"
+        aria-label={labels.test}
+        className="ag-account-row-action-button"
         onClick={(event) => {
           event.stopPropagation();
-          onDelete(row);
+          onTest(row);
         }}
       >
-        <Trash2 className="w-3.5 h-3.5" />
+        <Zap className="w-3.5 h-3.5" />
       </button>
       <Dropdown>
         <Dropdown.Trigger
@@ -491,9 +491,6 @@ export const AccountRowActions = memo(function AccountRowActions({
             aria-label={labels.actions}
             onAction={(key) => {
               switch (String(key)) {
-                case 'test':
-                  onTest(row);
-                  break;
                 case 'stats':
                   onStats(row.id);
                   break;
@@ -503,15 +500,12 @@ export const AccountRowActions = memo(function AccountRowActions({
                 case 'clear_cooldowns':
                   onClearCooldowns(row.id);
                   break;
+                case 'delete':
+                  onDelete(row);
+                  break;
               }
             }}
           >
-            <Dropdown.Item id="test" textValue={labels.test}>
-              <span className="flex items-center gap-2">
-                <Zap className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                {labels.test}
-              </span>
-            </Dropdown.Item>
             <Dropdown.Item id="stats" textValue={labels.stats}>
               <span className="flex items-center gap-2">
                 <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
@@ -530,6 +524,12 @@ export const AccountRowActions = memo(function AccountRowActions({
               <span className="flex items-center gap-2">
                 <Eraser className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
                 {labels.clearCooldowns}
+              </span>
+            </Dropdown.Item>
+            <Dropdown.Item id="delete" textValue={labels.delete}>
+              <span className="flex items-center gap-2 text-danger">
+                <Trash2 className="w-3.5 h-3.5" />
+                {labels.delete}
               </span>
             </Dropdown.Item>
           </Dropdown.Menu>
