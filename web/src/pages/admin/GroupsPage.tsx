@@ -4,11 +4,12 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   Plus,
   Pencil,
-  Layers,
   ArrowUpDown,
   Trash2,
   RefreshCw,
   Percent,
+  Image,
+  Text,
 } from 'lucide-react';
 import { AlertDialog, Button, Chip, EmptyState, Label, ListBox, Select, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
@@ -91,6 +92,7 @@ export default function GroupsPage() {
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
   const selectedPlatformLabel = PLATFORM_OPTIONS.find((option) => option.value === platformFilter)?.label ?? t('groups.all_platforms');
+  const isImageGroup = (group: GroupResp) => group.plugin_settings?.openai?.image_enabled === 'true';
 
   return (
     <div>
@@ -197,7 +199,11 @@ export default function GroupsPage() {
                     <CommonTable.Row id={String(row.id)} key={row.id}>
                     <CommonTable.Cell>
                       <span className="inline-flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+                        {isImageGroup(row) ? (
+                          <Image className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
+                        ) : (
+                          <Text className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+                        )}
                         <span style={{ color: 'var(--ag-text)' }} className="font-medium">
                           {row.name}
                         </span>
