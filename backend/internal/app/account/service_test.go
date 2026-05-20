@@ -122,6 +122,89 @@ func TestShouldPersistQuotaExtraAllowsClearingPlanMetadata(t *testing.T) {
 	}
 }
 
+func TestQuotaRefreshCredentialsInjectsProxyURL(t *testing.T) {
+	proxy := &Proxy{Protocol: "http", Address: "10.0.0.1", Port: 7890}
+	proxyWithAuth := &Proxy{Protocol: "socks5", Address: "10.0.0.2", Port: 1080, Username: "u", Password: "p"}
+
+	cases := []struct {
+		name string
+		item Account
+		want map[string]string
+	}{
+		{
+			name: "no proxy, no credentials",
+			item: Account{},
+			want: map[string]string{},
+		},
+		{
+			name: "no proxy, with credentials",
+			item: Account{Credentials: map[string]string{"refresh_token": "rt"}},
+			want: map[string]string{"refresh_token": "rt"},
+		},
+		{
+			name: "proxy bound, empty credentials",
+			item: Account{Proxy: proxy},
+			want: map[string]string{"proxy_url": "http://10.0.0.1:7890"},
+		},
+		{
+			name: "proxy bound, credentials without proxy_url",
+			item: Account{
+				Credentials: map[string]string{"refresh_token": "rt", "session_token": "st"},
+				Proxy:       proxy,
+			},
+			want: map[string]string{
+				"refresh_token": "rt",
+				"session_token": "st",
+				"proxy_url":     "http://10.0.0.1:7890",
+			},
+		},
+		{
+			name: "proxy bound with auth",
+			item: Account{Credentials: map[string]string{"access_token": "at"}, Proxy: proxyWithAuth},
+			want: map[string]string{
+				"access_token": "at",
+				"proxy_url":    "socks5://u:p@10.0.0.2:1080",
+			},
+		},
+		{
+			name: "user-supplied proxy_url overrides bound proxy",
+			item: Account{
+				Credentials: map[string]string{"proxy_url": "http://override:8080", "refresh_token": "rt"},
+				Proxy:       proxy,
+			},
+			want: map[string]string{
+				"proxy_url":     "http://override:8080",
+				"refresh_token": "rt",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := quotaRefreshCredentials(tc.item)
+			if len(got) != len(tc.want) {
+				t.Fatalf("len = %d, want %d (got %v)", len(got), len(tc.want), got)
+			}
+			for k, v := range tc.want {
+				if got[k] != v {
+					t.Errorf("key %q = %q, want %q", k, got[k], v)
+				}
+			}
+		})
+	}
+}
+
+func TestQuotaRefreshCredentialsDoesNotMutateInput(t *testing.T) {
+	original := map[string]string{"refresh_token": "rt"}
+	item := Account{
+		Credentials: original,
+		Proxy:       &Proxy{Protocol: "http", Address: "10.0.0.1", Port: 7890},
+	}
+	_ = quotaRefreshCredentials(item)
+	if _, exists := original["proxy_url"]; exists {
+		t.Fatalf("quotaRefreshCredentials mutated input credentials: %v", original)
+	}
+}
+
 func TestShouldAutoRefreshQuotaSkipsPureAPIKeyAccounts(t *testing.T) {
 	cases := []struct {
 		name string
