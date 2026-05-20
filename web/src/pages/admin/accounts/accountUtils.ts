@@ -1,5 +1,17 @@
 import { useState, useEffect, useRef, type ComponentType } from 'react';
-import type { AccountFormProps, PluginOAuthBridge } from '@doudou-start/airgate-theme/plugin';
+import type {
+  AccountFormProps,
+  PluginOAuthBridge,
+  PluginOAuthBatchExchangeResult,
+  PluginOAuthExchangeResult,
+} from '@doudou-start/airgate-theme/plugin';
+
+/** Session 导入能力尚未沉淀进 SDK；Core 在 bridge 上扩展两个可选字段，
+ *  插件 widget 用相同的 intersection 形态拿到这两个 method。 */
+type OAuthBridgeWithSession = PluginOAuthBridge & {
+  importSession?: (session: string) => Promise<PluginOAuthExchangeResult>;
+  batchImportSession?: (sessions: string[]) => Promise<PluginOAuthBatchExchangeResult[]>;
+};
 import { pluginsApi } from '../../../shared/api/plugins';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { loadPluginFrontend, onPluginFrontendCacheClear } from '../../../app/plugin-loader';
@@ -134,7 +146,7 @@ export function usePluginAccountForm(platform: string, mode: AccountFormProps['m
   return { Form, pluginId };
 }
 
-export function createPluginOAuthBridge(pluginId: string): PluginOAuthBridge | undefined {
+export function createPluginOAuthBridge(pluginId: string): OAuthBridgeWithSession | undefined {
   if (!pluginId) return undefined;
 
   return {
@@ -195,6 +207,37 @@ export function createPluginOAuthBridge(pluginId: string): PluginOAuthBridge | u
           error?: string;
         }>;
       }>(pluginId, 'oauth/batch-import-refresh', { refresh_tokens: refreshTokens, client_id: clientId });
+      return resp.results.map((r) => ({
+        accountType: r.account_type ?? 'oauth',
+        accountName: r.account_name ?? '',
+        credentials: r.credentials ?? {},
+        status: (r.status === 'ok' ? 'ok' : 'failed') as 'ok' | 'failed',
+        error: r.error,
+      }));
+    },
+    // 透传插件的 session 导入能力。当前仅 gateway-openai (v0.2.5+) 实现，
+    // 其它插件 RPC 会返回 404，由 widget 自行判定是否暴露 UI。
+    // SDK PluginOAuthBridge 暂未声明这两个字段，故下方用 type intersection 接住。
+    importSession: async (session: string) => {
+      const result = await pluginsApi.rpc<{
+        account_type: string; account_name: string; credentials: Record<string, string>;
+      }>(pluginId, 'oauth/import-session', { session });
+      return {
+        accountType: result.account_type,
+        accountName: result.account_name,
+        credentials: result.credentials,
+      };
+    },
+    batchImportSession: async (sessions: string[]) => {
+      const resp = await pluginsApi.rpc<{
+        results: Array<{
+          account_type?: string;
+          account_name?: string;
+          credentials?: Record<string, string>;
+          status: string;
+          error?: string;
+        }>;
+      }>(pluginId, 'oauth/batch-import-session', { sessions });
       return resp.results.map((r) => ({
         accountType: r.account_type ?? 'oauth',
         accountName: r.account_name ?? '',
