@@ -14,35 +14,43 @@
   margin-inline: auto;
 }
 
-.ag-api-keys-table .ag-api-key-metric-chips {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips {
   display: inline-grid;
   align-items: center;
   gap: 0.375rem;
   font-family: var(--ag-font-mono);
 }
 
-.ag-api-keys-table .ag-api-key-metric-chips--quota {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--quota {
   width: min(100%, 17.5rem);
   min-width: 17.5rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.ag-api-keys-table .ag-api-key-metric-chips--stack {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--stack {
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
 }
 
-.ag-api-keys-table .ag-api-key-metric-chips--usage {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--usage {
   width: min(100%, 10.25rem);
   min-width: 10.25rem;
 }
 
-.ag-api-keys-table .ag-api-key-metric-chips--markup {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--markup {
   width: min(100%, 10.25rem);
   min-width: 10.25rem;
 }
 
-.ag-api-keys-table .ag-api-key-metric-chip {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--compact-y {
+  gap: 0.25rem;
+}
+
+.ag-groups-table .ag-groups-metric-cell {
+  padding-block: 0.625rem !important;
+}
+
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip {
   display: inline-grid !important;
   width: 100%;
   min-width: 0;
@@ -52,16 +60,16 @@
   gap: 0.375rem;
 }
 
-.ag-api-keys-table .ag-api-key-metric-chips--markup .ag-api-key-metric-chip {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--markup .ag-metric-chip {
   grid-template-columns: 3.25rem minmax(5.25rem, 1fr);
 }
 
-.ag-api-keys-table .ag-api-key-metric-chips--usage .ag-api-key-metric-chip {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--usage .ag-metric-chip {
   grid-template-columns: 3.25rem minmax(5.25rem, 1fr);
 }
 
-.ag-api-keys-table .ag-api-key-metric-chip-label,
-.ag-api-keys-table .ag-api-key-metric-chip-value {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip-label,
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip-value {
   min-width: 0;
   color: var(--ag-text) !important;
   overflow: hidden;
@@ -69,7 +77,7 @@
   white-space: nowrap;
 }
 
-.ag-api-keys-table .ag-api-key-metric-chip-label {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip-label {
   color: var(--ag-text-secondary) !important;
   font-weight: 600;
   letter-spacing: 0;
@@ -77,7 +85,7 @@
   text-align: left;
 }
 
-.ag-api-keys-table .ag-api-key-metric-chip-value {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip-value {
   display: inline-flex;
   min-width: 5.25rem;
   align-items: center;
@@ -89,23 +97,23 @@
   text-overflow: ellipsis;
 }
 
-.ag-api-keys-table .ag-api-key-metric-chip--zero {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip--zero {
   background: var(--ag-default-bg) !important;
 }
 
-.ag-api-keys-table .ag-api-key-metric-dollar--warning {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-dollar--warning {
   color: var(--ag-warning);
 }
 
-.ag-api-keys-table .ag-api-key-metric-dollar--success {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-dollar--success {
   color: var(--ag-success);
 }
 
-.ag-api-keys-table .ag-api-key-metric-dollar--accent {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-dollar--accent {
   color: var(--ag-primary);
 }
 
-.ag-api-keys-table .ag-api-key-metric-infinity {
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-infinity {
   font-weight: 800;
 }
 

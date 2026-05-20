@@ -23,6 +23,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { MetricChips } from '../../shared/components/MetricChips';
 import { GroupFormModal } from './groups/EditGroupModal';
 import { GroupRateOverridesModal } from './groups/GroupRateOverridesModal';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
@@ -86,8 +87,6 @@ export default function GroupsPage() {
     },
   });
 
-  // 格式化费用
-  const formatCost = (v: number) => `$${v.toFixed(2)}`;
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
@@ -166,10 +165,10 @@ export default function GroupsPage() {
               <CommonTable.Column id="is_exclusive" style={{ width: 96 }}>
                 {t('groups.group_type')}
               </CommonTable.Column>
-              <CommonTable.Column id="account_stats" style={{ width: 144 }}>
+              <CommonTable.Column id="account_stats" style={{ width: '10.75rem' }}>
                 {t('groups.account_stats')}
               </CommonTable.Column>
-              <CommonTable.Column id="usage" style={{ width: 128 }}>
+              <CommonTable.Column id="usage" style={{ width: '10.75rem' }}>
                 {t('groups.usage')}
               </CommonTable.Column>
               <CommonTable.Column id="capacity" style={{ width: 128 }}>
@@ -229,36 +228,48 @@ export default function GroupsPage() {
                         <Chip color="default" size="sm" variant="soft">{t('groups.type_public')}</Chip>
                       )}
                     </CommonTable.Cell>
-                    <CommonTable.Cell>
-                      <div className="text-xs leading-none">
-                        <div>
-                          <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.account_available')}: </span>
-                          <span className="font-mono" style={{ color: 'var(--ag-success)' }}>{row.account_active}</span>
-                        </div>
-                        {row.account_error > 0 && (
-                          <div>
-                            <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.account_error')}: </span>
-                            <span className="font-mono" style={{ color: 'var(--ag-danger)' }}>{row.account_error}</span>
-                          </div>
-                        )}
-                        <div>
-                          <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.account_total')}: </span>
-                          <span className="font-mono">{row.account_total}</span>
-                          <span style={{ color: 'var(--ag-text-tertiary)' }}> {t('groups.account_unit')}</span>
-                        </div>
-                      </div>
+                    <CommonTable.Cell className="ag-groups-metric-cell">
+                      <MetricChips
+                        className="ag-metric-chips--stack ag-metric-chips--markup ag-metric-chips--compact-y"
+                        items={[
+                          {
+                            color: 'default' as const,
+                            label: t('groups.account_available'),
+                            value: String(row.account_active),
+                          },
+                          ...(row.account_error > 0 ? [{
+                            color: 'default' as const,
+                            label: t('groups.account_error'),
+                            value: String(row.account_error),
+                          }] : []),
+                          {
+                            color: 'default' as const,
+                            label: t('groups.account_total'),
+                            value: String(row.account_total),
+                          },
+                        ]}
+                      />
                     </CommonTable.Cell>
-                    <CommonTable.Cell>
-                      <div className="text-xs leading-none">
-                        <div>
-                          <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.today_cost')} </span>
-                          <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>{formatCost(row.today_cost)}</span>
-                        </div>
-                        <div>
-                          <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.total_cost')} </span>
-                          <span className="font-mono">{formatCost(row.total_cost)}</span>
-                        </div>
-                      </div>
+                    <CommonTable.Cell className="ag-groups-metric-cell">
+                      <MetricChips
+                        className="ag-metric-chips--stack ag-metric-chips--markup ag-metric-chips--compact-y"
+                        items={[
+                          {
+                            amount: row.today_cost,
+                            color: 'warning' as const,
+                            dollarTone: 'warning',
+                            label: t('groups.today_cost'),
+                            mutedWhenZero: true,
+                          },
+                          {
+                            amount: row.total_cost,
+                            color: 'warning' as const,
+                            dollarTone: 'warning',
+                            label: t('groups.total_cost'),
+                            mutedWhenZero: true,
+                          },
+                        ]}
+                      />
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <div>

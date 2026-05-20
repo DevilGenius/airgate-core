@@ -18,7 +18,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
-import { APIKeyMetricChips } from '../../shared/components/APIKeyMetricChips';
+import { MetricChips } from '../../shared/components/MetricChips';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
 import { CreateKeyModal } from './apikeys/CreateKeyModal';
@@ -209,8 +209,8 @@ export default function APIKeysPage() {
                     <StatusChip status={row.status} />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <APIKeyMetricChips
-                      className="ag-api-key-metric-chips--quota"
+                    <MetricChips
+                      className="ag-metric-chips--quota"
                       items={[
                         {
                           amount: row.used_quota,
@@ -228,8 +228,8 @@ export default function APIKeysPage() {
                     />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <APIKeyMetricChips
-                      className="ag-api-key-metric-chips--stack ag-api-key-metric-chips--usage"
+                    <MetricChips
+                      className="ag-metric-chips--stack ag-metric-chips--usage"
                       items={[
                         {
                           amount: row.today_cost,
