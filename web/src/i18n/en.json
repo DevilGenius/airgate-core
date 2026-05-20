@@ -11,6 +11,7 @@
     "go_dashboard": "Dashboard",
     "view_docs": "Documentation",
     "docs": "Docs",
+    "copyright": "All rights reserved",
     "feature_gateway": "Unified Gateway",
     "feature_gateway_desc": "Single entry point for multiple AI platforms with unified API format and seamless provider switching.",
     "feature_security": "Security",

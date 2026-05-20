@@ -11,6 +11,7 @@
     "go_dashboard": "进入控制台",
     "view_docs": "查看文档",
     "docs": "文档",
+    "copyright": "版权所有",
     "feature_gateway": "统一网关",
     "feature_gateway_desc": "一个入口对接多家 AI 平台，统一 API 格式，无缝切换模型供应商。",
     "feature_security": "安全认证",
