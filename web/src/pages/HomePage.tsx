@@ -144,28 +144,11 @@ export default function HomePage() {
       {/* 联系方式 & 底部 */}
       <footer className="relative z-10 border-t border-[var(--ag-glass-border)] py-8 text-center">
         <div className="flex items-center justify-center gap-4 text-xs text-text-tertiary">
-          <span>{site.site_name || 'AirGate'}</span>
+          <span>© {new Date().getFullYear()} {site.site_name || 'AirGate'} · {t('home.copyright')}</span>
           {site.contact_info && (
             <>
               <span className="w-px h-3 bg-[var(--ag-border)]" />
               <span>{site.contact_info}</span>
-            </>
-          )}
-          <span className="w-px h-3 bg-[var(--ag-border)]" />
-          <HeroLink
-            href={docs.href}
-            {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-            className="hover:text-text transition-colors"
-          >
-            {t('home.docs')}
-          </HeroLink>
-          {showStatusEntry && (
-            <>
-              <span className="w-px h-3 bg-[var(--ag-border)]" />
-              <HeroLink href="/status" className="inline-flex items-center gap-1 hover:text-text transition-colors">
-                <Activity className="w-3 h-3" />
-                {t('nav.status')}
-              </HeroLink>
             </>
           )}
         </div>

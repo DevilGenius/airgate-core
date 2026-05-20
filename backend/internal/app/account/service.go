@@ -1650,7 +1650,10 @@ func (s *Service) GetCredentialsSchema(platform string) CredentialSchema {
 // RefreshQuota 刷新账号额度。
 func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult, error) {
 	logger := sdk.LoggerFromContext(ctx)
-	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
+	// WithProxy: 让 queryQuotaRefresh 能把账号绑定的代理 URL 注入到 credentials
+	// 里给插件使用，否则代理只对真实转发/连通性测试生效，刷额度这条独立心跳
+	// 路径会直连上游 (OpenAI auth / chatgpt.com session 端点)。
+	item, err := s.repo.FindByID(ctx, id, LoadOptions{WithProxy: true})
 	if err != nil {
 		logger.Error("account_lookup_failed",
 			sdk.LogFieldAccountID, id,
@@ -1764,7 +1767,7 @@ type quotaRefreshResponse struct {
 func (s *Service) queryQuotaRefresh(ctx context.Context, inst *plugin.PluginInstance, item Account) (quotaRefreshResponse, error) {
 	reqBody, err := json.Marshal(quotaRefreshRequest{
 		ID:          item.ID,
-		Credentials: cloneStringMap(item.Credentials),
+		Credentials: quotaRefreshCredentials(item),
 	})
 	if err != nil {
 		return quotaRefreshResponse{}, err
@@ -1877,6 +1880,26 @@ func buildProxyURL(proxyInfo *Proxy) string {
 		return fmt.Sprintf("%s://%s:%s@%s:%d", proxyInfo.Protocol, proxyInfo.Username, proxyInfo.Password, proxyInfo.Address, proxyInfo.Port)
 	}
 	return fmt.Sprintf("%s://%s:%d", proxyInfo.Protocol, proxyInfo.Address, proxyInfo.Port)
+}
+
+// quotaRefreshCredentials 克隆账号 credentials 并把绑定 Proxy 拼出来的 URL
+// 写到 "proxy_url" key，让插件 QueryQuota 这条心跳路径也走代理。
+// 真实转发/连通性测试走 sdk.Account.ProxyURL，与本路径独立；这里只补刷额度。
+//
+// 用户手填 credentials["proxy_url"] 时不覆盖——既然用户主动设置了，认为是
+// 有意覆写绑定的代理（也许测试用别的出口）。
+func quotaRefreshCredentials(item Account) map[string]string {
+	creds := cloneStringMap(item.Credentials)
+	if creds == nil {
+		creds = map[string]string{}
+	}
+	if _, exists := creds["proxy_url"]; exists {
+		return creds
+	}
+	if url := buildProxyURL(item.Proxy); url != "" {
+		creds["proxy_url"] = url
+	}
+	return creds
 }
 
 func cloneStringMap(input map[string]string) map[string]string {
