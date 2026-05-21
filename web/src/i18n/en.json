@@ -200,7 +200,7 @@
     "active_users": "{{count}} active users",
     "active_users_label": "Active users: {{count}}",
     "image_suffix": "PIC",
-    "image_response_time": "Image response: {{time}}",
+    "image_response_time": "Image: {{time}}",
     "time_range": "Time Range:",
     "range_today": "Today",
     "range_7d": "7 Days",
