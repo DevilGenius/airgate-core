@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -62,6 +63,8 @@ type AssetStorage struct {
 	localDir      string
 	useS3         bool
 }
+
+var assetRepairInFlight sync.Map
 
 type StoredAsset struct {
 	ID          string
@@ -126,6 +129,10 @@ func NewAssetStorage(ctx context.Context, db *ent.Client) (*AssetStorage, error)
 	return storage, nil
 }
 
+func (s *AssetStorage) LocalPath(objectKey string) (string, error) {
+	return s.localPath(objectKey)
+}
+
 // store 把字节落到存储层（S3 或本地），按 <prefix>/<purpose>/<uid>/<yyyymm>/<id>.<ext>
 // 的稳定规则生成 object_key。purpose 必须是 core 定义的枚举之一，调用方传非法值
 // 应在 host RPC 边界就被拦下，这里二次校验仅作为内防御。
@@ -140,24 +147,18 @@ func (s *AssetStorage) Store(ctx context.Context, userID int64, purpose AssetPur
 	yyyymm := time.Now().UTC().Format("200601")
 	objectKey := path.Join(s.prefix, string(purpose), strconv.FormatInt(userID, 10), yyyymm, id+cleanAssetExtension(ext))
 	if s.useS3 {
-		_, err = s.client.PutObject(ctx, s.bucket, objectKey, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{
-			ContentType:  contentType,
-			CacheControl: "private, max-age=31536000, immutable",
-		})
-		if err != nil {
-			return nil, err
+		if err = s.putS3Bytes(ctx, objectKey, contentType, data); err != nil {
+			slog.Warn("asset_store_s3_failed_fallback_local", "object_key", objectKey, "error", err)
+		} else {
+			publicURL, err := s.remotePublicURL(ctx, objectKey)
+			if err != nil {
+				return nil, err
+			}
+			return &StoredAsset{ID: id, ObjectKey: objectKey, PublicURL: publicURL, ContentType: contentType, SizeBytes: int64(len(data))}, nil
 		}
-	} else {
-		localPath, err := s.localPath(objectKey)
-		if err != nil {
-			return nil, err
-		}
-		if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
-			return nil, err
-		}
-		if err := os.WriteFile(localPath, data, 0o644); err != nil {
-			return nil, err
-		}
+	}
+	if err := s.storeLocalBytes(objectKey, data); err != nil {
+		return nil, err
 	}
 	publicURL, err := s.PublicURL(ctx, objectKey)
 	if err != nil {
@@ -168,29 +169,156 @@ func (s *AssetStorage) Store(ctx context.Context, userID int64, purpose AssetPur
 
 func (s *AssetStorage) PublicURL(ctx context.Context, objectKey string) (string, error) {
 	if !s.useS3 {
-		return "/assets-runtime/" + escapeAssetKey(objectKey), nil
+		return s.localRuntimeURL(objectKey), nil
 	}
-	if s.publicBaseURL != "" {
-		return strings.TrimRight(s.publicBaseURL, "/") + "/" + strings.TrimLeft(objectKey, "/"), nil
+	remoteExists, err := s.objectExistsOnS3(ctx, objectKey)
+	if err == nil && remoteExists {
+		return s.remotePublicURL(ctx, objectKey)
 	}
-	u, err := s.client.PresignedGetObject(ctx, s.bucket, objectKey, s.presignTTL, nil)
-	if err != nil {
-		return "", err
+	localExists, localErr := s.localObjectExists(objectKey)
+	if localErr != nil {
+		return "", localErr
 	}
-	return u.String(), nil
+	if localExists {
+		return s.localRuntimeURL(objectKey), nil
+	}
+	if err != nil && !isS3NotFoundError(err) {
+		slog.Warn("asset_public_url_s3_stat_failed", "object_key", objectKey, "error", err)
+	}
+	return s.remotePublicURL(ctx, objectKey)
 }
 
 func (s *AssetStorage) GetBytes(ctx context.Context, objectKey string) ([]byte, string, error) {
 	if !s.useS3 {
+		return s.getLocalBytes(objectKey)
+	}
+	data, contentType, err := s.getS3Bytes(ctx, objectKey)
+	if err == nil {
+		return data, contentType, nil
+	}
+
+	localData, localContentType, localErr := s.getLocalBytes(objectKey)
+	if localErr != nil {
+		return nil, "", fmt.Errorf("read asset from s3: %w; fallback local: %v", err, localErr)
+	}
+	s.repairS3FromLocal(objectKey, localData, localContentType)
+	return localData, localContentType, nil
+}
+
+// Delete 删除一个资产对象；S3 模式会优先删远端，再删本地镜像与缩略图缓存。
+func (s *AssetStorage) Delete(ctx context.Context, objectKey string) error {
+	if s == nil {
+		return nil
+	}
+	if !s.useS3 {
 		localPath, err := s.localPath(objectKey)
 		if err != nil {
-			return nil, "", err
+			return err
 		}
-		data, err := os.ReadFile(localPath)
-		if err != nil {
-			return nil, "", err
+		if err := os.Remove(localPath); err != nil && !os.IsNotExist(err) {
+			return err
 		}
-		return data, contentTypeForAssetKey(objectKey), nil
+		return removeLocalThumbVariants(localPath)
+	}
+	var firstErr error
+	if err := s.client.RemoveObject(ctx, s.bucket, objectKey, minio.RemoveObjectOptions{}); err != nil && !isS3NotFoundError(err) {
+		firstErr = err
+	}
+	if localPath, err := s.localPath(objectKey); err == nil {
+		if err := os.Remove(localPath); err != nil && !os.IsNotExist(err) && firstErr == nil {
+			firstErr = err
+		}
+		if err := removeLocalThumbVariants(localPath); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+func (s *AssetStorage) localPath(objectKey string) (string, error) {
+	clean := strings.TrimPrefix(path.Clean("/"+objectKey), "/")
+	if clean == "" || clean == "." || strings.HasPrefix(clean, "../") || strings.Contains(clean, "/../") {
+		return "", fmt.Errorf("invalid object key")
+	}
+	return filepath.Join(s.localDir, filepath.FromSlash(clean)), nil
+}
+
+func (s *AssetStorage) localRuntimeURL(objectKey string) string {
+	return "/assets-runtime/" + escapeAssetKey(objectKey)
+}
+
+func (s *AssetStorage) localObjectExists(objectKey string) (bool, error) {
+	localPath, err := s.localPath(objectKey)
+	if err != nil {
+		return false, err
+	}
+	_, err = os.Stat(localPath)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func (s *AssetStorage) getLocalBytes(objectKey string) ([]byte, string, error) {
+	localPath, err := s.localPath(objectKey)
+	if err != nil {
+		return nil, "", err
+	}
+	data, err := os.ReadFile(localPath)
+	if err != nil {
+		return nil, "", err
+	}
+	return data, contentTypeForAssetKey(objectKey), nil
+}
+
+func (s *AssetStorage) storeLocalBytes(objectKey string, data []byte) error {
+	localPath, err := s.localPath(objectKey)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(localPath, data, 0o644)
+}
+
+func (s *AssetStorage) putS3Bytes(ctx context.Context, objectKey, contentType string, data []byte) error {
+	if !s.useS3 || s.client == nil {
+		return fmt.Errorf("s3 storage is not configured")
+	}
+	_, err := s.client.PutObject(ctx, s.bucket, objectKey, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{
+		ContentType:  contentType,
+		CacheControl: "private, max-age=31536000, immutable",
+	})
+	return err
+}
+
+func (s *AssetStorage) putS3File(ctx context.Context, objectKey, contentType, localPath string) error {
+	if !s.useS3 || s.client == nil {
+		return fmt.Errorf("s3 storage is not configured")
+	}
+	f, err := os.Open(localPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	_, err = s.client.PutObject(ctx, s.bucket, objectKey, f, info.Size(), minio.PutObjectOptions{
+		ContentType:  contentType,
+		CacheControl: "private, max-age=31536000, immutable",
+	})
+	return err
+}
+
+func (s *AssetStorage) getS3Bytes(ctx context.Context, objectKey string) ([]byte, string, error) {
+	if !s.useS3 || s.client == nil {
+		return nil, "", fmt.Errorf("s3 storage is not configured")
 	}
 	obj, err := s.client.GetObject(ctx, s.bucket, objectKey, minio.GetObjectOptions{})
 	if err != nil {
@@ -205,34 +333,75 @@ func (s *AssetStorage) GetBytes(ctx context.Context, objectKey string) ([]byte, 
 	if err != nil {
 		return nil, "", err
 	}
-	return data, info.ContentType, nil
+	ct := strings.TrimSpace(info.ContentType)
+	if ct == "" {
+		ct = contentTypeForAssetKey(objectKey)
+	}
+	return data, ct, nil
 }
 
-// Delete 删除一个资产对象；本地模式会顺带清掉同路径下的缩略图缓存。
-func (s *AssetStorage) Delete(ctx context.Context, objectKey string) error {
-	if s == nil {
-		return nil
+func (s *AssetStorage) objectExistsOnS3(ctx context.Context, objectKey string) (bool, error) {
+	if !s.useS3 || s.client == nil {
+		return false, nil
 	}
-	if s.useS3 {
-		return s.client.RemoveObject(ctx, s.bucket, objectKey, minio.RemoveObjectOptions{})
+	_, err := s.client.StatObject(ctx, s.bucket, objectKey, minio.StatObjectOptions{})
+	if err == nil {
+		return true, nil
 	}
+	if isS3NotFoundError(err) {
+		return false, nil
+	}
+	return false, err
+}
 
-	localPath, err := s.localPath(objectKey)
+func (s *AssetStorage) remotePublicURL(ctx context.Context, objectKey string) (string, error) {
+	if !s.useS3 {
+		return s.localRuntimeURL(objectKey), nil
+	}
+	if s.publicBaseURL != "" {
+		return strings.TrimRight(s.publicBaseURL, "/") + "/" + strings.TrimLeft(objectKey, "/"), nil
+	}
+	u, err := s.client.PresignedGetObject(ctx, s.bucket, objectKey, s.presignTTL, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
-	if err := os.Remove(localPath); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return removeLocalThumbVariants(localPath)
+	return u.String(), nil
 }
 
-func (s *AssetStorage) localPath(objectKey string) (string, error) {
-	clean := strings.TrimPrefix(path.Clean("/"+objectKey), "/")
-	if clean == "" || clean == "." || strings.HasPrefix(clean, "../") || strings.Contains(clean, "/../") {
-		return "", fmt.Errorf("invalid object key")
+func (s *AssetStorage) repairS3FromLocal(objectKey string, data []byte, contentType string) {
+	if !s.useS3 || s.client == nil {
+		return
 	}
-	return filepath.Join(s.localDir, filepath.FromSlash(clean)), nil
+	if objectKey == "" || len(data) == 0 {
+		return
+	}
+	if _, loaded := assetRepairInFlight.LoadOrStore(objectKey, struct{}{}); loaded {
+		return
+	}
+	go func() {
+		defer assetRepairInFlight.Delete(objectKey)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		if err := s.putS3Bytes(ctx, objectKey, contentType, data); err != nil {
+			slog.Warn("asset_repair_upload_failed", "object_key", objectKey, "error", err)
+		}
+	}()
+}
+
+func isS3NotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	resp := minio.ToErrorResponse(err)
+	switch resp.StatusCode {
+	case http.StatusNotFound:
+		return true
+	}
+	switch strings.ToLower(resp.Code) {
+	case "nosuchkey", "notfound", "xminionosuchkey":
+		return true
+	}
+	return os.IsNotExist(err)
 }
 
 func newAssetID() (string, error) {
@@ -535,6 +704,14 @@ func (s *AssetStorage) cleanupS3Purpose(ctx context.Context, purpose AssetPurpos
 		if err := s.client.RemoveObject(ctx, s.bucket, obj.Key, minio.RemoveObjectOptions{}); err != nil {
 			slog.Warn("asset_cleanup_remove_failed", "object_key", obj.Key, "error", err)
 			continue
+		}
+		if localPath, err := s.localPath(obj.Key); err == nil {
+			if err := os.Remove(localPath); err != nil && !os.IsNotExist(err) {
+				slog.Warn("asset_cleanup_local_remove_failed", "object_key", obj.Key, "path", localPath, "error", err)
+			}
+			if err := removeLocalThumbVariants(localPath); err != nil {
+				slog.Warn("asset_cleanup_local_thumb_remove_failed", "object_key", obj.Key, "path", localPath, "error", err)
+			}
 		}
 		deleted++
 	}

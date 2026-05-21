@@ -7,6 +7,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -68,6 +69,15 @@ func generateThumbnail(srcPath, dstPath string, width int) ([]byte, error) {
 	}
 	defer func() { _ = src.Close() }()
 
+	return generateThumbnailFromReader(src, dstPath, width)
+}
+
+// generateThumbnailFromBytes 和 generateThumbnail 一致，只是输入来自对象存储/内存。
+func generateThumbnailFromBytes(src []byte, dstPath string, width int) ([]byte, error) {
+	return generateThumbnailFromReader(bytes.NewReader(src), dstPath, width)
+}
+
+func generateThumbnailFromReader(src io.Reader, dstPath string, width int) ([]byte, error) {
 	img, _, err := image.Decode(src)
 	if err != nil {
 		return nil, err
@@ -105,6 +115,9 @@ func generateThumbnail(srcPath, dstPath string, width int) ([]byte, error) {
 	// Write atomically: tmp file then rename so concurrent readers never see a
 	// partial JPEG.
 	tmp := dstPath + ".tmp"
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
+		return nil, err
+	}
 	if err := os.WriteFile(tmp, buf.Bytes(), 0o644); err != nil {
 		return nil, err
 	}

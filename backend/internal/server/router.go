@@ -11,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
@@ -328,34 +327,56 @@ func (s *Server) registerRoutes() {
 //
 // 路径穿越防御：clean 后检查不允许 ".."。
 func (s *Server) handleRuntimeAsset(c *gin.Context) {
-	localDir := plugin.DefaultAssetStorageDir
-	if item, err := s.db.Setting.Query().Where(setting.GroupEQ("storage"), setting.KeyEQ("local_storage_dir")).Only(c.Request.Context()); err == nil && strings.TrimSpace(item.Value) != "" {
-		localDir = strings.TrimSpace(item.Value)
-	}
 	rel := strings.TrimPrefix(path.Clean("/"+c.Param("path")), "/")
 	if rel == "" || rel == "." || strings.HasPrefix(rel, "../") || strings.Contains(rel, "/../") {
 		c.Status(http.StatusBadRequest)
 		return
 	}
+	storage, err := plugin.NewAssetStorage(c.Request.Context(), s.db)
+	if err != nil {
+		slog.Warn("runtime_asset_storage_init_failed", "error", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	localPath, err := storage.LocalPath(rel)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
 	c.Header("Cache-Control", "public, max-age=31536000, immutable")
-	srcPath := filepath.Join(localDir, filepath.FromSlash(rel))
 
 	if width := resolveThumbWidth(c.Query("w")); width > 0 && thumbnailableExt(rel) {
-		cachePath := thumbCachePath(srcPath, width)
+		cachePath := thumbCachePath(localPath, width)
 		if data, err := os.ReadFile(cachePath); err == nil {
 			c.Data(http.StatusOK, "image/jpeg", data)
 			return
 		}
-		data, err := generateThumbnail(srcPath, cachePath, width)
-		if err == nil {
-			c.Data(http.StatusOK, "image/jpeg", data)
+		data, contentType, err := storage.GetBytes(c.Request.Context(), rel)
+		if err != nil {
+			c.Status(http.StatusNotFound)
 			return
 		}
-		// Fall through to original on any thumb failure (decode error, source
-		// missing, source already smaller). Asset URLs stay non-destructive.
+		thumb, thumbErr := generateThumbnailFromBytes(data, cachePath, width)
+		if thumbErr == nil {
+			c.Data(http.StatusOK, "image/jpeg", thumb)
+			return
+		}
+		if contentType == "" || contentType == "application/octet-stream" {
+			contentType = contentTypeFromExt(rel)
+		}
+		c.Data(http.StatusOK, contentType, data)
+		return
 	}
 
-	c.File(srcPath)
+	data, contentType, err := storage.GetBytes(c.Request.Context(), rel)
+	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	if contentType == "" || contentType == "application/octet-stream" {
+		contentType = contentTypeFromExt(rel)
+	}
+	c.Data(http.StatusOK, contentType, data)
 }
 
 func servePluginAsset(mgr *plugin.Manager, baseDir string) gin.HandlerFunc {
@@ -414,6 +435,16 @@ func contentTypeFromExt(name string) string {
 		return "image/svg+xml"
 	case strings.HasSuffix(name, ".png"):
 		return "image/png"
+	case strings.HasSuffix(name, ".jpg"), strings.HasSuffix(name, ".jpeg"):
+		return "image/jpeg"
+	case strings.HasSuffix(name, ".webp"):
+		return "image/webp"
+	case strings.HasSuffix(name, ".gif"):
+		return "image/gif"
+	case strings.HasSuffix(name, ".mp4"):
+		return "video/mp4"
+	case strings.HasSuffix(name, ".mp3"):
+		return "audio/mpeg"
 	case strings.HasSuffix(name, ".woff2"):
 		return "font/woff2"
 	default:

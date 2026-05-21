@@ -157,6 +157,7 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	pluginCtx, cancel := context.WithCancel(ctx)
 	s.pluginStartCancel = cancel
 
+	go plugin.StartAssetMigrationLoop(pluginCtx, s.db)
 	go plugin.StartAssetCleanupLoop(pluginCtx, s.db)
 
 	go func() {
