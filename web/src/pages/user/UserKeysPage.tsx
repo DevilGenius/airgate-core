@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apikeysApi } from '../../shared/api/apikeys';
@@ -17,6 +17,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { MetricChips } from '../../shared/components/MetricChips';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
 import {
@@ -43,6 +44,12 @@ import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
 import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
 
+const GROUP_CHIP_COLOR = 'oklch(62.04% 0.1950 253.83)';
+const GROUP_CHIP_STYLE: CSSProperties = {
+  background: `color-mix(in srgb, ${GROUP_CHIP_COLOR} 18%, transparent)`,
+  boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${GROUP_CHIP_COLOR} 34%, transparent)`,
+  color: GROUP_CHIP_COLOR,
+};
 export default function UserKeysPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -181,7 +188,8 @@ export default function UserKeysPage() {
       const payload: UpdateAPIKeyReq = {
         name: form.name,
         group_id: form.group_id ? Number(form.group_id) : undefined,
-        quota_usd: form.quota_usd ? Number(form.quota_usd) : undefined,
+        // 空字符串显式改为 0 = 无限配额；省略字段只表示不修改旧配额
+        quota_usd: form.quota_usd.trim() ? Number(form.quota_usd) : 0,
         sell_rate: form.sell_rate ? Number(form.sell_rate) : 0,
         // 空字符串显式改为 0 = 关闭并发限制；后端看到 0 会清除旧值
         max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : 0,
@@ -313,9 +321,9 @@ export default function UserKeysPage() {
           <CommonTable.Column id="key_prefix">{t('user_keys.title')}</CommonTable.Column>
           <CommonTable.Column id="group_id">{t('user_keys.group')}</CommonTable.Column>
           <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
-          <CommonTable.Column id="quota">{t('user_keys.quota_label')}</CommonTable.Column>
-          <CommonTable.Column id="markup">{t('user_keys.markup_title', '销售/成本')}</CommonTable.Column>
-          <CommonTable.Column id="usage">{t('api_keys.usage')}</CommonTable.Column>
+          <CommonTable.Column id="quota" style={{ width: '17.5rem' }}>{t('user_keys.quota_label')}</CommonTable.Column>
+          <CommonTable.Column id="markup" style={{ width: '10.75rem' }}>{t('user_keys.markup_title', '销售/成本')}</CommonTable.Column>
+          <CommonTable.Column id="usage" style={{ width: '10.75rem' }}>{t('api_keys.usage')}</CommonTable.Column>
           <CommonTable.Column id="expires_at">{t('user_keys.expires_at')}</CommonTable.Column>
           <CommonTable.Column id="actions" style={{ width: 132 }}>
             {t('common.actions')}
@@ -335,7 +343,8 @@ export default function UserKeysPage() {
           ) : (
             rows.map((row) => {
               const group = row.group_id == null ? null : groupMap.get(row.group_id);
-              const groupName = row.group_id == null
+              const isGroupUnbound = row.group_id == null;
+              const groupName = isGroupUnbound
                 ? t('user_keys.group_unbound')
                 : group?.name || `#${row.group_id}`;
               const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
@@ -363,28 +372,34 @@ export default function UserKeysPage() {
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <div className="space-y-0.5 text-center">
-                      <div>{groupName}</div>
-                      {group && (
-                        <div className="font-mono text-xs text-text-tertiary">
-                          {t('user_keys.group_rate_short', '分组倍率')}:{' '}
-                          {hasOverride && userOverride != null ? (
-                            <span
-                              title={`${t('user_keys.group_rate_default', '分组默认')}: ${group.rate_multiplier.toFixed(2)}`}
-                            >
-                              {userOverride.toFixed(2)}
-                              <span className="ml-1 inline-block rounded bg-amber-500/10 px-1 text-[9px] leading-[14px] text-amber-500 align-middle">
-                                {t('user_keys.user_override_tag', '专属')}
-                              </span>
-                            </span>
-                          ) : (
-                            group.rate_multiplier.toFixed(2)
-                          )}
-                        </div>
-                      )}
-                      {hasSellRate && (
-                        <div className="font-mono text-xs text-text-tertiary">
-                          {t('user_keys.sell_rate_short', '销售倍率')}: {row.sell_rate!.toFixed(2)}
-                        </div>
+                      <div className="flex justify-center">
+                        <span
+                          className="inline-flex h-6 min-w-0 max-w-full items-center justify-center gap-1 rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none text-text-secondary"
+                          style={GROUP_CHIP_STYLE}
+                          title={groupName}
+                        >
+                          {isGroupUnbound ? <AlertTriangle className="h-3 w-3 shrink-0 text-warning" /> : null}
+                          <span className="min-w-0 truncate">{groupName}</span>
+                        </span>
+                      </div>
+                      {(group || hasSellRate) && (
+                        <MetricChips
+                          className="ag-metric-chips--stack ag-metric-chips--markup"
+                          items={[
+                            ...(group ? [{
+                              color: 'default' as const,
+                              label: t('user_keys.group_rate_short', '分组倍率'),
+                              value: hasOverride && userOverride != null
+                                ? `${userOverride.toFixed(2)} ${t('user_keys.user_override_tag', '专属')}`
+                                : group.rate_multiplier.toFixed(2),
+                            }] : []),
+                            ...(hasSellRate ? [{
+                              color: 'default' as const,
+                              label: t('user_keys.sell_rate_short', '销售倍率'),
+                              value: row.sell_rate!.toFixed(2),
+                            }] : []),
+                          ]}
+                        />
                       )}
                     </div>
                   </CommonTable.Cell>
@@ -392,49 +407,68 @@ export default function UserKeysPage() {
                     <StatusChip status={displayStatus} />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <span className="font-mono">
-                      {row.quota_usd > 0 ? (
-                        <>
-                          ${row.used_quota.toFixed(4)} / ${row.quota_usd.toFixed(4)}
-                        </>
-                      ) : (
-                        <span className="text-text-tertiary">{t('user_keys.quota_unlimited_hint')}</span>
-                      )}
-                    </span>
+                    <MetricChips
+                      className="ag-metric-chips--quota"
+                      items={[
+                        {
+                          amount: row.used_quota,
+                          color: 'warning',
+                          highlightDollar: true,
+                          label: t('user_keys.quota_used_short', '已使用'),
+                        },
+                        {
+                          amount: row.quota_usd > 0 ? row.quota_usd : undefined,
+                          color: 'success',
+                          label: t('user_keys.quota_total_short', '总配额'),
+                          value: '∞',
+                        },
+                      ]}
+                    />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    {!row.sell_rate || row.sell_rate <= 0 ? (
-                      <span className="text-text-tertiary text-xs">—</span>
-                    ) : (
-                      <div className="font-mono text-xs space-y-0.5">
-                        <div>
-                          <span className="text-text-tertiary">{t('user_keys.sell_rate_short', '倍率')}: </span>
-                          <span>{row.sell_rate.toFixed(2)}</span>
-                        </div>
-                        <div>
-                          <span className="text-text-tertiary">{t('user_keys.cost_actual', '成本')}: </span>
-                          <span>${(row.used_quota_actual || 0).toFixed(4)}</span>
-                        </div>
-                        <div>
-                          <span className="text-text-tertiary">{t('user_keys.profit', '利润')}: </span>
-                          <span style={{ color: profit > 0 ? 'var(--ag-success)' : undefined }}>
-                            ${profit.toFixed(4)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                    <MetricChips
+                      className="ag-metric-chips--stack ag-metric-chips--markup"
+                      items={[
+                        {
+                          color: 'default',
+                          label: t('user_keys.sell_rate_short', '倍率'),
+                          value: hasSellRate ? row.sell_rate.toFixed(2) : '—',
+                        },
+                        {
+                          amount: row.used_quota_actual || 0,
+                          color: 'default',
+                          dollarTone: 'warning',
+                          label: t('user_keys.cost_actual', '成本'),
+                        },
+                        {
+                          amount: profit,
+                          color: 'default',
+                          dollarTone: 'success',
+                          label: t('user_keys.profit', '利润'),
+                        },
+                      ]}
+                    />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <div className="font-mono text-xs space-y-0.5">
-                      <div>
-                        <span className="text-text-tertiary">{t('api_keys.today')}: </span>
-                        <span style={{ color: 'var(--ag-primary)' }}>${row.today_cost.toFixed(4)}</span>
-                      </div>
-                      <div>
-                        <span className="text-text-tertiary">{t('api_keys.thirty_days')}: </span>
-                        <span>${row.thirty_day_cost.toFixed(4)}</span>
-                      </div>
-                    </div>
+                    <MetricChips
+                      className="ag-metric-chips--stack ag-metric-chips--usage"
+                      items={[
+                        {
+                          amount: row.today_cost,
+                          color: 'warning',
+                          dollarTone: 'warning',
+                          label: t('api_keys.today', '今日'),
+                          mutedWhenZero: true,
+                        },
+                        {
+                          amount: row.thirty_day_cost,
+                          color: 'warning',
+                          dollarTone: 'warning',
+                          label: t('api_keys.thirty_days', '近30天'),
+                          mutedWhenZero: true,
+                        },
+                      ]}
+                    />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     {row.expires_at
