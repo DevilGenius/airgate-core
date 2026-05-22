@@ -10,7 +10,9 @@ import (
 	"entgo.io/ent/dialect/sql/schema"
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/enttest"
+	enttask "github.com/DouDOU-start/airgate-core/ent/task"
 )
 
 func TestAssetStorageCleanupExpiredLocal(t *testing.T) {
@@ -84,15 +86,14 @@ func TestLoadAssetRetentionPolicyDefaultsAndOverrides(t *testing.T) {
 	if got := policy[AssetPurposeGenerated]; got != 7*24*time.Hour {
 		t.Fatalf("generated 默认保留期 = %s，期望 168h", got)
 	}
-	if got := policy[AssetPurposeTaskInput]; got != 30*24*time.Hour {
-		t.Fatalf("task-input 默认保留期 = %s，期望 720h", got)
+	if got := policy[AssetPurposeTaskInput]; got != 7*24*time.Hour {
+		t.Fatalf("task-input 默认保留期 = %s，期望 168h", got)
 	}
 	if _, ok := policy[AssetPurposeUpload]; ok {
 		t.Fatalf("upload 默认不应自动清理")
 	}
 
 	db.Setting.Create().SetGroup("storage").SetKey(settingAssetRetentionGeneratedDays).SetValue("3").SaveX(ctx)
-	db.Setting.Create().SetGroup("storage").SetKey(settingAssetRetentionTaskInputDays).SetValue("0").SaveX(ctx)
 	policy, err = loadAssetRetentionPolicy(ctx, db)
 	if err != nil {
 		t.Fatalf("读取覆盖保留策略失败: %v", err)
@@ -100,9 +101,65 @@ func TestLoadAssetRetentionPolicyDefaultsAndOverrides(t *testing.T) {
 	if got := policy[AssetPurposeGenerated]; got != 3*24*time.Hour {
 		t.Fatalf("generated 覆盖保留期 = %s，期望 72h", got)
 	}
-	if _, ok := policy[AssetPurposeTaskInput]; ok {
-		t.Fatalf("task-input 设置为 0 后不应自动清理")
+	if got := policy[AssetPurposeTaskInput]; got != 3*24*time.Hour {
+		t.Fatalf("task-input 覆盖保留期 = %s，期望 72h", got)
 	}
+}
+
+func TestCleanupExpiredGeneratedTasksDeletesTaskAndAssets(t *testing.T) {
+	ctx := context.Background()
+	db := enttest.Open(t, "sqlite3", "file:cleanup_expired_generated_tasks?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	t.Cleanup(func() { _ = db.Close() })
+	storage := &AssetStorage{
+		localDir: t.TempDir(),
+		prefix:   "airgate",
+		useS3:    false,
+	}
+
+	oldOutput := mustStoreTestAsset(t, storage, ctx, 42, AssetPurposeGenerated)
+	oldInput := mustStoreTestAsset(t, storage, ctx, 42, AssetPurposeTaskInput)
+	newOutput := mustStoreTestAsset(t, storage, ctx, 42, AssetPurposeGenerated)
+	oldCompletedAt := time.Now().Add(-48 * time.Hour)
+	newCompletedAt := time.Now()
+
+	expired := db.Task.Create().
+		SetPluginID(generatedTaskExecutorPluginID).
+		SetTaskType("image.generate").
+		SetUserID(42).
+		SetStatus(enttask.StatusCompleted).
+		SetCompletedAt(oldCompletedAt).
+		SetOutput(map[string]interface{}{
+			"content":           "![image](" + oldOutput.PublicURL + ")",
+			"asset_object_keys": []interface{}{oldOutput.ObjectKey},
+		}).
+		SetAttributes(map[string]interface{}{
+			taskInputAssetObjectKeysField: []interface{}{oldInput.ObjectKey},
+		}).
+		SaveX(ctx)
+	retained := db.Task.Create().
+		SetPluginID(generatedTaskExecutorPluginID).
+		SetTaskType("image.generate").
+		SetUserID(42).
+		SetStatus(enttask.StatusCompleted).
+		SetCompletedAt(newCompletedAt).
+		SetOutput(map[string]interface{}{
+			"content":           "![image](" + newOutput.PublicURL + ")",
+			"asset_object_keys": []interface{}{newOutput.ObjectKey},
+		}).
+		SaveX(ctx)
+
+	deleted, err := cleanupExpiredGeneratedTasks(ctx, db, storage, 24*time.Hour)
+	if err != nil {
+		t.Fatalf("清理过期任务失败: %v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("删除任务数 = %d，期望 1", deleted)
+	}
+	assertTaskMissing(t, db, ctx, expired.ID)
+	assertAssetMissing(t, storage, oldOutput.ObjectKey)
+	assertAssetMissing(t, storage, oldInput.ObjectKey)
+	assertTaskExists(t, db, ctx, retained.ID)
+	assertAssetExists(t, storage, newOutput.ObjectKey)
 }
 
 func mustStoreTestAsset(t *testing.T, storage *AssetStorage, ctx context.Context, userID int64, purpose AssetPurpose) *StoredAsset {
@@ -159,5 +216,19 @@ func assertPathMissing(t *testing.T, path string) {
 	t.Helper()
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("路径应不存在: %s, err=%v", path, err)
+	}
+}
+
+func assertTaskMissing(t *testing.T, db *ent.Client, ctx context.Context, taskID int) {
+	t.Helper()
+	if _, err := db.Task.Get(ctx, taskID); err == nil {
+		t.Fatalf("任务应不存在: %d", taskID)
+	}
+}
+
+func assertTaskExists(t *testing.T, db *ent.Client, ctx context.Context, taskID int) {
+	t.Helper()
+	if _, err := db.Task.Get(ctx, taskID); err != nil {
+		t.Fatalf("任务应存在: %d, err=%v", taskID, err)
 	}
 }

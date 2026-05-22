@@ -20,12 +20,13 @@ import (
 )
 
 // publicGroups 允许公开访问的设置分组。
-var publicGroups = []string{"site", "registration"}
+var publicGroups = []string{"site", "registration", "storage"}
 
-// publicSafeKeys registration 分组中允许公开的 key（不暴露敏感项）。
+// publicSafeKeys 允许公开的 key（不暴露敏感项）。
 var publicSafeKeys = map[string]bool{
-	"registration_enabled": true,
-	"email_verify_enabled": true,
+	"registration_enabled":           true,
+	"email_verify_enabled":           true,
+	"asset_retention_generated_days": true,
 }
 
 // GetPublicSettings 获取公开设置（无需认证）。

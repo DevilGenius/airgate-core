@@ -2,45 +2,40 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
+	enttask "github.com/DouDOU-start/airgate-core/ent/task"
 )
 
 const (
 	assetCleanupInterval   = time.Hour
 	assetCleanupRunTimeout = 10 * time.Minute
+	taskCleanupBatchSize   = 200
 
-	settingAssetRetentionChatDays      = "asset_retention_chat_days"
-	settingAssetRetentionUploadDays    = "asset_retention_upload_days"
+	generatedTaskExecutorPluginID = "gateway-openai"
+
 	settingAssetRetentionGeneratedDays = "asset_retention_generated_days"
-	settingAssetRetentionTaskInputDays = "asset_retention_task_input_days"
-	settingAssetRetentionTempDays      = "asset_retention_temp_days"
 )
 
 const (
 	defaultAssetRetentionGeneratedDays = 7
-	defaultAssetRetentionTaskInputDays = 30
-	defaultAssetRetentionTempDays      = 7
 )
+
+var generatedTaskTypes = []string{"image.generate", "image.edit"}
+
+var terminalTaskStatuses = []enttask.Status{
+	enttask.StatusCompleted,
+	enttask.StatusFailed,
+	enttask.StatusCancelled,
+}
 
 // AssetRetentionPolicy 表示每类资产的自动清理保留期；0 表示永久保留。
 type AssetRetentionPolicy map[AssetPurpose]time.Duration
-
-var assetRetentionSettings = []struct {
-	purpose     AssetPurpose
-	key         string
-	defaultDays int
-}{
-	{AssetPurposeChat, settingAssetRetentionChatDays, 0},
-	{AssetPurposeUpload, settingAssetRetentionUploadDays, 0},
-	{AssetPurposeGenerated, settingAssetRetentionGeneratedDays, defaultAssetRetentionGeneratedDays},
-	{AssetPurposeTaskInput, settingAssetRetentionTaskInputDays, defaultAssetRetentionTaskInputDays},
-	{AssetPurposeTemp, settingAssetRetentionTempDays, defaultAssetRetentionTempDays},
-}
 
 func loadAssetRetentionPolicy(ctx context.Context, db *ent.Client) (AssetRetentionPolicy, error) {
 	items, err := db.Setting.Query().Where(setting.GroupEQ("storage")).All(ctx)
@@ -52,21 +47,21 @@ func loadAssetRetentionPolicy(ctx context.Context, db *ent.Client) (AssetRetenti
 		cfg[item.Key] = item.Value
 	}
 
-	policy := AssetRetentionPolicy{}
-	for _, field := range assetRetentionSettings {
-		days := field.defaultDays
-		if raw, ok := cfg[field.key]; ok {
-			raw = strings.TrimSpace(raw)
-			if raw != "" {
-				days = parseInt(raw)
-			}
+	days := defaultAssetRetentionGeneratedDays
+	if raw, ok := cfg[settingAssetRetentionGeneratedDays]; ok {
+		raw = strings.TrimSpace(raw)
+		if raw != "" {
+			days = parseInt(raw)
 		}
-		if days <= 0 {
-			continue
-		}
-		policy[field.purpose] = time.Duration(days) * 24 * time.Hour
 	}
-	return policy, nil
+	if days <= 0 {
+		return AssetRetentionPolicy{}, nil
+	}
+	retention := time.Duration(days) * 24 * time.Hour
+	return AssetRetentionPolicy{
+		AssetPurposeGenerated: retention,
+		AssetPurposeTaskInput: retention,
+	}, nil
 }
 
 // StartAssetCleanupLoop 启动 Core 侧资产清理循环。
@@ -105,6 +100,7 @@ func runAssetCleanupOnce(parent context.Context, db *ent.Client) {
 	if len(policy) == 0 {
 		return
 	}
+	generatedRetention := policy[AssetPurposeGenerated]
 	storage, err := NewAssetStorage(ctx, db)
 	if err != nil {
 		slog.Warn("asset_cleanup_storage_init_failed", "error", err)
@@ -113,9 +109,105 @@ func runAssetCleanupOnce(parent context.Context, db *ent.Client) {
 	deleted, err := storage.CleanupExpired(ctx, policy)
 	if err != nil {
 		slog.Warn("asset_cleanup_failed", "deleted", deleted, "error", err)
-		return
 	}
 	if deleted > 0 {
 		slog.Info("asset_cleanup_completed", "deleted", deleted)
 	}
+
+	if generatedRetention <= 0 {
+		return
+	}
+	taskDeleted, err := cleanupExpiredGeneratedTasks(ctx, db, storage, generatedRetention)
+	if err != nil {
+		slog.Warn("task_cleanup_failed", "deleted", taskDeleted, "error", err)
+		return
+	}
+	if taskDeleted > 0 {
+		slog.Info("task_cleanup_completed", "deleted", taskDeleted)
+	}
+}
+
+func cleanupExpiredGeneratedTasks(ctx context.Context, db *ent.Client, storage *AssetStorage, retention time.Duration) (int, error) {
+	if db == nil || storage == nil || retention <= 0 {
+		return 0, nil
+	}
+	cutoff := time.Now().Add(-retention)
+	total := 0
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return total, err
+		}
+		tasks, err := db.Task.Query().
+			Where(
+				enttask.PluginIDEQ(generatedTaskExecutorPluginID),
+				enttask.TaskTypeIn(generatedTaskTypes...),
+				enttask.StatusIn(terminalTaskStatuses...),
+				enttask.CompletedAtLTE(cutoff),
+			).
+			Limit(taskCleanupBatchSize).
+			All(ctx)
+		if err != nil {
+			return total, err
+		}
+		if len(tasks) == 0 {
+			break
+		}
+		total += deleteExpiredGeneratedTaskBatch(ctx, db, storage, tasks)
+	}
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return total, err
+		}
+		tasks, err := db.Task.Query().
+			Where(
+				enttask.PluginIDEQ(generatedTaskExecutorPluginID),
+				enttask.TaskTypeIn(generatedTaskTypes...),
+				enttask.StatusIn(terminalTaskStatuses...),
+				enttask.CompletedAtIsNil(),
+				enttask.CreatedAtLTE(cutoff),
+			).
+			Limit(taskCleanupBatchSize).
+			All(ctx)
+		if err != nil {
+			return total, err
+		}
+		if len(tasks) == 0 {
+			break
+		}
+		total += deleteExpiredGeneratedTaskBatch(ctx, db, storage, tasks)
+	}
+
+	return total, nil
+}
+
+func deleteExpiredGeneratedTaskBatch(ctx context.Context, db *ent.Client, storage *AssetStorage, tasks []*ent.Task) int {
+	deleted := 0
+	for _, t := range tasks {
+		if err := deleteExpiredGeneratedTask(ctx, db, storage, t); err != nil {
+			slog.Warn("task_cleanup_delete_failed", "task_id", t.ID, "error", err)
+			continue
+		}
+		deleted++
+	}
+	return deleted
+}
+
+func deleteExpiredGeneratedTask(ctx context.Context, db *ent.Client, storage *AssetStorage, t *ent.Task) error {
+	if t == nil {
+		return nil
+	}
+	for _, objectKey := range collectTaskAssetObjectKeys(t) {
+		if objectKey == "" {
+			continue
+		}
+		if err := storage.Delete(ctx, objectKey); err != nil {
+			return fmt.Errorf("delete task asset %s: %w", objectKey, err)
+		}
+	}
+	if err := db.Task.DeleteOneID(t.ID).Exec(ctx); err != nil && !ent.IsNotFound(err) {
+		return fmt.Errorf("delete task %d: %w", t.ID, err)
+	}
+	return nil
 }
