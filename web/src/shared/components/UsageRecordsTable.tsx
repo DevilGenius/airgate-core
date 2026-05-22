@@ -111,10 +111,16 @@ const UsageTableRow = memo(function UsageTableRow({
   row: UsageRow;
 }) {
   const rowId = String(row.id);
+  // 动画挂在每个 cell 上，会向上冒泡 N 次（N = 列数）。用 ref 锁住，确保 parent 回调只触发一次。
+  const animationEndedRef = useRef(false);
+  useEffect(() => {
+    if (!isNew) animationEndedRef.current = false;
+  }, [isNew]);
   const handleAnimationEnd = (event: AnimationEvent<HTMLTableRowElement>) => {
-    if (event.animationName === NEW_ROW_ANIMATION_NAME) {
-      onNewAnimationEnd(rowId);
-    }
+    if (animationEndedRef.current) return;
+    if (event.animationName !== NEW_ROW_ANIMATION_NAME) return;
+    animationEndedRef.current = true;
+    onNewAnimationEnd(rowId);
   };
 
   return (

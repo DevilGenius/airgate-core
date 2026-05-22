@@ -190,7 +190,7 @@ export default function UserUsageContent() {
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(USER_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, USER_AUTO_REFRESH_OPTIONS);
   const autoRefreshEnabled = autoRefresh > 0;
   const autoRefreshLabel = `${t('usage.auto_update')} `;
-  const autoRefreshOffLabel = t('usage.auto_update_off', '关闭自动更新');
+  const autoRefreshOffLabel = t('usage.auto_update_off');
 
   const handleModelChange = useCallback((model: string) => {
     const nextModel = model || undefined;

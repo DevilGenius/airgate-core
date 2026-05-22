@@ -397,7 +397,7 @@ export default function UsagePage() {
   const pageActive = useDeferredActivation(USAGE_PAGE_ACTIVATION_DELAY_MS);
   const autoRefreshEnabled = autoRefresh > 0;
   const autoRefreshLabel = `${t('usage.auto_update')} `;
-  const autoRefreshOffLabel = t('usage.auto_update_off', '关闭自动更新');
+  const autoRefreshOffLabel = t('usage.auto_update_off');
 
   const handleModelChange = useCallback((model: string) => {
     const nextModel = model || undefined;
