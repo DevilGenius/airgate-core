@@ -155,16 +155,16 @@ export default function GroupsPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1180}
+        minWidth={1120}
       >
             <CommonTable.Header>
-              <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
-              <CommonTable.Column id="platform">{t('groups.platform')}</CommonTable.Column>
-              <CommonTable.Column id="subscription_type">{t('groups.subscription_type')}</CommonTable.Column>
-              <CommonTable.Column id="rate_multiplier" style={{ width: 96 }}>
+              <CommonTable.Column id="name" style={{ width: 160 }}>{t('common.name')}</CommonTable.Column>
+              <CommonTable.Column id="platform" style={{ width: 112 }}>{t('groups.platform')}</CommonTable.Column>
+              <CommonTable.Column id="subscription_type" style={{ width: 88 }}>{t('groups.subscription_type')}</CommonTable.Column>
+              <CommonTable.Column id="rate_multiplier" style={{ width: 80 }}>
                 {t('groups.rate_multiplier')}
               </CommonTable.Column>
-              <CommonTable.Column id="is_exclusive" style={{ width: 96 }}>
+              <CommonTable.Column id="is_exclusive" style={{ width: 76 }}>
                 {t('groups.group_type')}
               </CommonTable.Column>
               <CommonTable.Column id="account_stats" style={{ width: '10.75rem' }}>
@@ -173,10 +173,10 @@ export default function GroupsPage() {
               <CommonTable.Column id="usage" style={{ width: '10.75rem' }}>
                 {t('groups.usage')}
               </CommonTable.Column>
-              <CommonTable.Column id="capacity" style={{ width: 128 }}>
+              <CommonTable.Column id="capacity" style={{ minWidth: 112, width: 112 }}>
                 {t('groups.capacity')}
               </CommonTable.Column>
-              <CommonTable.Column id="sort_weight" style={{ width: 96 }}>
+              <CommonTable.Column id="sort_weight" style={{ width: 72 }}>
                 {t('groups.sort_weight')}
               </CommonTable.Column>
               <CommonTable.Column id="actions" style={{ width: 132 }}>
@@ -198,21 +198,21 @@ export default function GroupsPage() {
                 rows.map((row) => (
                     <CommonTable.Row id={String(row.id)} key={row.id}>
                     <CommonTable.Cell>
-                      <span className="inline-flex items-center gap-1.5">
+                      <span className="inline-flex max-w-[9.5rem] items-center gap-1.5">
                         {isImageGroup(row) ? (
-                          <Image className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
+                          <Image className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ag-primary)' }} />
                         ) : (
-                          <Text className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+                          <Text className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ag-text-tertiary)' }} />
                         )}
-                        <span style={{ color: 'var(--ag-text)' }} className="font-medium">
+                        <span style={{ color: 'var(--ag-text)' }} className="truncate font-medium">
                           {row.name}
                         </span>
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="inline-flex items-center gap-1.5">
-                        <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" />
-                        {platformName(row.platform)}
+                      <span className="inline-flex max-w-[6.5rem] items-center gap-1.5">
+                        <PlatformIcon platform={row.platform} className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{platformName(row.platform)}</span>
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
@@ -236,22 +236,17 @@ export default function GroupsPage() {
                     </CommonTable.Cell>
                     <CommonTable.Cell className="ag-groups-metric-cell">
                       <MetricChips
-                        className="ag-metric-chips--stack ag-metric-chips--markup ag-metric-chips--compact-y"
+                        className="ag-metric-chips--stack ag-metric-chips--markup ag-metric-chips--account-stats ag-metric-chips--compact-y"
                         items={[
                           {
                             color: 'default' as const,
-                            label: t('groups.account_available'),
-                            value: String(row.account_active),
+                            label: `${t('groups.account_available')}/${t('groups.account_total')}`,
+                            value: `${row.account_active}/${row.account_total}`,
                           },
-                          ...(row.account_error > 0 ? [{
-                            color: 'default' as const,
+                          {
+                            color: row.account_error > 0 ? 'danger' as const : 'default' as const,
                             label: t('groups.account_error'),
                             value: String(row.account_error),
-                          }] : []),
-                          {
-                            color: 'default' as const,
-                            label: t('groups.account_total'),
-                            value: String(row.account_total),
                           },
                         ]}
                       />
@@ -278,11 +273,11 @@ export default function GroupsPage() {
                       />
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <div>
+                      <div className="inline-flex min-w-[6.75rem] items-center justify-end whitespace-nowrap font-mono tabular-nums">
                         <span className="font-mono" style={{ color: row.capacity_used > 0 ? 'var(--ag-primary)' : undefined }}>
                           {row.capacity_used}
                         </span>
-                        <span style={{ color: 'var(--ag-text-tertiary)' }}> / </span>
+                        <span className="mx-0.5" style={{ color: 'var(--ag-text-tertiary)' }}>/</span>
                         <span className="font-mono">{row.capacity_total}</span>
                       </div>
                     </CommonTable.Cell>
