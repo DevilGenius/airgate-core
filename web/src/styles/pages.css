@@ -42,6 +42,20 @@
   min-width: 10.25rem;
 }
 
+.ag-groups-table .ag-metric-chips--markup.ag-metric-chips--account-stats .ag-metric-chip {
+  grid-template-columns: minmax(max-content, 1fr) max-content;
+}
+
+.ag-groups-table .ag-metric-chips--markup.ag-metric-chips--account-stats .ag-metric-chip-label,
+.ag-groups-table .ag-metric-chips--markup.ag-metric-chips--account-stats .ag-metric-chip-value {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.ag-groups-table .ag-metric-chips--markup.ag-metric-chips--account-stats .ag-metric-chip-value {
+  min-width: 0;
+}
+
 :is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--compact-y {
   gap: 0.25rem;
 }

@@ -1,6 +1,6 @@
 import { Chip } from '@heroui/react';
 
-type MetricChipColor = 'default' | 'warning' | 'success' | 'accent';
+type MetricChipColor = 'default' | 'warning' | 'success' | 'accent' | 'danger';
 
 export type MetricChipItem = {
   amount?: number;
