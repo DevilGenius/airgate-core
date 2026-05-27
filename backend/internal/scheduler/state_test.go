@@ -24,7 +24,7 @@ func TestStateMachineAccountUnavailableEscalatesAfterThreshold(t *testing.T) {
 	acc := db.Account.Create().
 		SetName("temporary 403").
 		SetPlatform("openai").
-		SetType("apikey").
+		SetType("oauth").
 		SetCredentials(map[string]string{}).
 		SaveX(ctx)
 
@@ -83,7 +83,7 @@ func TestStateMachineSuccessClearsAccountUnavailableCount(t *testing.T) {
 	acc := db.Account.Create().
 		SetName("temporary 403").
 		SetPlatform("openai").
-		SetType("apikey").
+		SetType("oauth").
 		SetCredentials(map[string]string{}).
 		SetExtra(map[string]interface{}{"keep": "value"}).
 		SaveX(ctx)
@@ -106,6 +106,132 @@ func TestStateMachineSuccessClearsAccountUnavailableCount(t *testing.T) {
 	}
 	if fresh.Extra["keep"] != "value" {
 		t.Fatalf("unrelated extra value was not preserved: %+v", fresh.Extra)
+	}
+}
+
+func TestShouldTrackAccountUnavailableOnlyNonPool(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		acc  *ent.Account
+		want bool
+	}{
+		{
+			name: "oauth account",
+			acc:  &ent.Account{Type: "oauth"},
+			want: true,
+		},
+		{
+			name: "oauth pool account",
+			acc:  &ent.Account{Type: "oauth", UpstreamIsPool: true},
+			want: false,
+		},
+		{
+			name: "api key account",
+			acc:  &ent.Account{Type: "apikey"},
+			want: true,
+		},
+		{
+			name: "api key pool account",
+			acc:  &ent.Account{Type: "apikey", UpstreamIsPool: true},
+			want: false,
+		},
+		{
+			name: "nil account",
+			acc:  nil,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := shouldTrackAccountUnavailable(tt.acc); got != tt.want {
+				t.Fatalf("shouldTrackAccountUnavailable() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStateMachineAccountUnavailableTracksNormalAPIKey(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_account_unavailable_api_key")
+	sm := NewStateMachine(db, nil, nil)
+
+	acc := db.Account.Create().
+		SetName("api key").
+		SetPlatform("openai").
+		SetType("apikey").
+		SetCredentials(map[string]string{}).
+		SaveX(ctx)
+
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateDegraded {
+		t.Fatalf("state after api key unavailable = %s, want degraded", fresh.State)
+	}
+	if fresh.StateUntil == nil {
+		t.Fatalf("state_until should be set for normal api key account")
+	}
+	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 1 {
+		t.Fatalf("unavailable count for normal api key account = %d, want 1", got)
+	}
+}
+
+func TestStateMachineAccountUnavailableIgnoredForAPIPool(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_account_unavailable_api_pool")
+	sm := NewStateMachine(db, nil, nil)
+
+	acc := db.Account.Create().
+		SetName("api pool").
+		SetPlatform("openai").
+		SetType("apikey").
+		SetUpstreamIsPool(true).
+		SetCredentials(map[string]string{}).
+		SaveX(ctx)
+
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateActive {
+		t.Fatalf("state after api pool unavailable = %s, want active", fresh.State)
+	}
+	if fresh.StateUntil != nil {
+		t.Fatalf("state_until should remain empty for api pool account")
+	}
+	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 0 {
+		t.Fatalf("unavailable count for api pool account = %d, want 0", got)
+	}
+}
+
+func TestStateMachineAccountUnavailableIgnoredForOAuthPool(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_account_unavailable_oauth_pool")
+	sm := NewStateMachine(db, nil, nil)
+
+	acc := db.Account.Create().
+		SetName("oauth pool").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetUpstreamIsPool(true).
+		SetCredentials(map[string]string{}).
+		SaveX(ctx)
+
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateActive {
+		t.Fatalf("state after oauth pool unavailable = %s, want active", fresh.State)
+	}
+	if fresh.StateUntil != nil {
+		t.Fatalf("state_until should remain empty for oauth pool account")
+	}
+	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 0 {
+		t.Fatalf("unavailable count for oauth pool account = %d, want 0", got)
 	}
 }
 

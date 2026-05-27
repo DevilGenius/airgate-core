@@ -82,7 +82,7 @@ func (sm *StateMachine) notifyCritical() {
 //	Success             → state=active，清 state_until，last_used_at=now
 //	AccountRateLimited  → state=rate_limited，state_until=now+RetryAfter
 //	AccountDead         → state=disabled（凭证失效，需人工介入）
-//	AccountUnavailable  → state=degraded，累计 3 次后升级 disabled
+//	AccountUnavailable  → 非池账号 state=degraded，累计 3 次后升级 disabled
 //	UpstreamTransient   → 非池：**不动状态**（上游抖动不扣账号分，靠 failover 切走就行）；池：state=degraded
 //	ClientError / StreamAborted / Unknown → 不改状态（账号无辜）
 func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
@@ -164,6 +164,16 @@ func (sm *StateMachine) applyAccountUnavailable(ctx context.Context, accountID i
 		return
 	}
 
+	if !shouldTrackAccountUnavailable(existing) {
+		slog.Warn("scheduler_account_unavailable_ignored",
+			sdk.LogFieldAccountID, accountID,
+			"account_type", existing.Type,
+			"is_pool", existing.UpstreamIsPool,
+			sdk.LogFieldReason, reason,
+		)
+		return
+	}
+
 	extra := cloneExtra(existing.Extra)
 	now := time.Now()
 	if existing.State == account.StateDegraded && existing.StateUntil != nil && existing.StateUntil.After(now) && extraInt(extra, accountUnavailableCountExtraKey) > 0 {
@@ -219,6 +229,10 @@ func (sm *StateMachine) applyAccountUnavailable(ctx context.Context, accountID i
 		"until", until,
 		sdk.LogFieldReason, reason,
 	)
+}
+
+func shouldTrackAccountUnavailable(acc *ent.Account) bool {
+	return acc != nil && !acc.UpstreamIsPool
 }
 
 // transitionActive 成功时回到 active：清 state_until、清 reason、清失败计数、更新 last_used_at。
