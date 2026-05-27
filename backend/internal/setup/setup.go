@@ -120,16 +120,17 @@ func NeedsSetup() bool {
 
 	if err := db.PingContext(ctx); err != nil {
 		slog.Warn("db_ping_failed", "stage", "needs_setup", sdk.LogFieldError, err)
-		return true
+		return isSetupBootstrapError(err)
 	}
 
 	// 查询 users 表是否存在管理员记录
 	var count int
 	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&count)
 	if err != nil {
-		// 表不存在或查询失败，视为未安装
+		// 表不存在等初始化状态才视为未安装；权限/连接类异常应让主服务失败退出，
+		// 避免配置已存在的部署误进入安装向导并把 API 请求 fallback 成 HTML 200。
 		slog.Warn("setup_admin_query_failed", "stage", "needs_setup", sdk.LogFieldError, err)
-		return true
+		return isSetupBootstrapError(err)
 	}
 
 	if count == 0 {
@@ -195,6 +196,24 @@ func isDatabaseNotExistError(err error) bool {
 	}
 	// lib/pq 在某些路径下也可能返回非 *pq.Error 的字符串错误
 	return strings.Contains(err.Error(), "does not exist")
+}
+
+func isSetupBootstrapError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if pqErr, ok := err.(*pq.Error); ok {
+		switch pqErr.Code {
+		case "3D000", // invalid_catalog_name: database does not exist
+			"42P01", // undefined_table: users table does not exist
+			"42703": // undefined_column: users.role does not exist
+			return true
+		default:
+			return false
+		}
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "does not exist") || strings.Contains(msg, "no such table")
 }
 
 // createDatabase 连到 PostgreSQL 系统库 `postgres` 执行 CREATE DATABASE。

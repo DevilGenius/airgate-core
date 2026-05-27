@@ -73,6 +73,29 @@ func TestDatabaseNotExistDetection(t *testing.T) {
 	}
 }
 
+func TestSetupBootstrapErrorDetection(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "database missing", err: &pq.Error{Code: "3D000"}, want: true},
+		{name: "users table missing", err: &pq.Error{Code: "42P01"}, want: true},
+		{name: "users role missing", err: &pq.Error{Code: "42703"}, want: true},
+		{name: "permission denied", err: &pq.Error{Code: "42501"}, want: false},
+		{name: "network error", err: errors.New("connection refused"), want: false},
+		{name: "sqlite-style missing table", err: errors.New("no such table: users"), want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isSetupBootstrapError(tt.err); got != tt.want {
+				t.Fatalf("isSetupBootstrapError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestQuoteIdentifierEscapesDoubleQuotes(t *testing.T) {
 	got := quoteIdentifier(`air"gate`)
 	want := `"air""gate"`

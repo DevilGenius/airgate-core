@@ -305,26 +305,46 @@ func migrateUserHistoryRefs(drv *entsql.Driver) {
 	statements := []string{
 		`ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS user_id_snapshot integer NOT NULL DEFAULT 0`,
 		`ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS user_email_snapshot text NOT NULL DEFAULT ''`,
-		`UPDATE usage_logs AS ul
+		`ALTER TABLE balance_logs ADD COLUMN IF NOT EXISTS user_id_snapshot integer NOT NULL DEFAULT 0`,
+		`ALTER TABLE balance_logs ADD COLUMN IF NOT EXISTS user_email_snapshot text NOT NULL DEFAULT ''`,
+	}
+
+	usageFKReady, ok := historyUserRefReady(ctx, drv, "usage_logs", "user_usage_logs", "usage_logs_users_usage_logs")
+	if !ok {
+		return
+	}
+	if !usageFKReady {
+		statements = append(statements,
+			`UPDATE usage_logs AS ul
 			SET user_id_snapshot = CASE WHEN ul.user_id_snapshot = 0 THEN u.id ELSE ul.user_id_snapshot END,
 				user_email_snapshot = CASE WHEN ul.user_email_snapshot = '' THEN u.email ELSE ul.user_email_snapshot END
 			FROM users AS u
-			WHERE ul.user_usage_logs = u.id`,
-		`ALTER TABLE usage_logs ALTER COLUMN user_usage_logs DROP NOT NULL`,
-		`ALTER TABLE usage_logs DROP CONSTRAINT IF EXISTS usage_logs_users_usage_logs`,
-		`ALTER TABLE usage_logs ADD CONSTRAINT usage_logs_users_usage_logs
-			FOREIGN KEY (user_usage_logs) REFERENCES users(id) ON DELETE SET NULL`,
-		`ALTER TABLE balance_logs ADD COLUMN IF NOT EXISTS user_id_snapshot integer NOT NULL DEFAULT 0`,
-		`ALTER TABLE balance_logs ADD COLUMN IF NOT EXISTS user_email_snapshot text NOT NULL DEFAULT ''`,
-		`UPDATE balance_logs AS bl
+			WHERE ul.user_usage_logs = u.id
+				AND (ul.user_id_snapshot = 0 OR ul.user_email_snapshot = '')`,
+			`ALTER TABLE usage_logs ALTER COLUMN user_usage_logs DROP NOT NULL`,
+			`ALTER TABLE usage_logs DROP CONSTRAINT IF EXISTS usage_logs_users_usage_logs`,
+			`ALTER TABLE usage_logs ADD CONSTRAINT usage_logs_users_usage_logs
+			FOREIGN KEY (user_usage_logs) REFERENCES users(id) ON DELETE SET NULL NOT VALID`,
+		)
+	}
+
+	balanceFKReady, ok := historyUserRefReady(ctx, drv, "balance_logs", "user_balance_logs", "balance_logs_users_balance_logs")
+	if !ok {
+		return
+	}
+	if !balanceFKReady {
+		statements = append(statements,
+			`UPDATE balance_logs AS bl
 			SET user_id_snapshot = CASE WHEN bl.user_id_snapshot = 0 THEN u.id ELSE bl.user_id_snapshot END,
 				user_email_snapshot = CASE WHEN bl.user_email_snapshot = '' THEN u.email ELSE bl.user_email_snapshot END
 			FROM users AS u
-			WHERE bl.user_balance_logs = u.id`,
-		`ALTER TABLE balance_logs ALTER COLUMN user_balance_logs DROP NOT NULL`,
-		`ALTER TABLE balance_logs DROP CONSTRAINT IF EXISTS balance_logs_users_balance_logs`,
-		`ALTER TABLE balance_logs ADD CONSTRAINT balance_logs_users_balance_logs
-			FOREIGN KEY (user_balance_logs) REFERENCES users(id) ON DELETE SET NULL`,
+			WHERE bl.user_balance_logs = u.id
+				AND (bl.user_id_snapshot = 0 OR bl.user_email_snapshot = '')`,
+			`ALTER TABLE balance_logs ALTER COLUMN user_balance_logs DROP NOT NULL`,
+			`ALTER TABLE balance_logs DROP CONSTRAINT IF EXISTS balance_logs_users_balance_logs`,
+			`ALTER TABLE balance_logs ADD CONSTRAINT balance_logs_users_balance_logs
+			FOREIGN KEY (user_balance_logs) REFERENCES users(id) ON DELETE SET NULL NOT VALID`,
+		)
 	}
 
 	for _, sql := range statements {
@@ -334,6 +354,62 @@ func migrateUserHistoryRefs(drv *entsql.Driver) {
 			return
 		}
 	}
+}
+
+func historyUserRefReady(ctx context.Context, drv *entsql.Driver, table, column, constraint string) (bool, bool) {
+	nullable, ok := tableColumnNullable(ctx, drv, table, column)
+	if !ok {
+		return false, false
+	}
+	if !nullable {
+		return false, true
+	}
+	return tableForeignKeyOnDeleteSetNull(ctx, drv, table, constraint)
+}
+
+func tableColumnNullable(ctx context.Context, drv *entsql.Driver, table, column string) (bool, bool) {
+	var rows entsql.Rows
+	const checkSQL = `SELECT is_nullable
+		FROM information_schema.columns
+		WHERE table_schema = 'public'
+			AND table_name = $1
+			AND column_name = $2
+		LIMIT 1`
+	if err := drv.Query(ctx, checkSQL, []any{table, column}, &rows); err != nil {
+		slog.Warn("bootstrap_column_nullable_check_failed", "table", table, "column", column, sdk.LogFieldError, err)
+		return false, false
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		slog.Warn("bootstrap_column_nullable_check_missing", "table", table, "column", column)
+		return false, false
+	}
+	var nullable string
+	if err := rows.Scan(&nullable); err != nil {
+		slog.Warn("bootstrap_column_nullable_scan_failed", "table", table, "column", column, sdk.LogFieldError, err)
+		return false, false
+	}
+	return nullable == "YES", true
+}
+
+func tableForeignKeyOnDeleteSetNull(ctx context.Context, drv *entsql.Driver, table, constraint string) (bool, bool) {
+	var rows entsql.Rows
+	const checkSQL = `SELECT 1
+		FROM pg_constraint c
+		JOIN pg_class t ON t.oid = c.conrelid
+		JOIN pg_namespace n ON n.oid = t.relnamespace
+		WHERE n.nspname = 'public'
+			AND t.relname = $1
+			AND c.conname = $2
+			AND c.contype = 'f'
+			AND c.confdeltype = 'n'
+		LIMIT 1`
+	if err := drv.Query(ctx, checkSQL, []any{table, constraint}, &rows); err != nil {
+		slog.Warn("bootstrap_foreign_key_check_failed", "table", table, "constraint", constraint, sdk.LogFieldError, err)
+		return false, false
+	}
+	defer func() { _ = rows.Close() }()
+	return rows.Next(), true
 }
 
 // migrateAccountState 把老的 status / rate_limit_reset_at 字段一次性迁移到新的
