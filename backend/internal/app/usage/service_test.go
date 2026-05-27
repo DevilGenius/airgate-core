@@ -68,12 +68,12 @@ type stubUsageRepository struct {
 	trendEntriesFn   func(context.Context, TrendFilter) ([]TrendEntry, error)
 }
 
-func (s *stubUsageRepository) ListUser(context.Context, int64, ListFilter) ([]LogRecord, int64, error) {
-	return nil, 0, nil
+func (s *stubUsageRepository) ListUser(context.Context, int64, ListFilter) ([]LogRecord, bool, *int64, error) {
+	return nil, false, nil, nil
 }
 
-func (s *stubUsageRepository) ListAdmin(context.Context, ListFilter) ([]LogRecord, int64, error) {
-	return nil, 0, nil
+func (s *stubUsageRepository) ListAdmin(context.Context, ListFilter) ([]LogRecord, bool, *int64, error) {
+	return nil, false, nil, nil
 }
 
 func (s *stubUsageRepository) SummaryUser(ctx context.Context, userID int64, filter StatsFilter) (Summary, error) {
