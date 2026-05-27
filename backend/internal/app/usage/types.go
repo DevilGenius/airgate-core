@@ -1,10 +1,6 @@
 package usage
 
-import (
-	"context"
-
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
-)
+import "context"
 
 // ListFilter 使用记录列表筛选。
 type ListFilter struct {
@@ -92,9 +88,6 @@ type LogRecord struct {
 	IPAddress             string
 	Endpoint              string
 	ReasoningEffort       string
-	UsageAttributes       []sdk.UsageAttribute
-	UsageMetrics          []sdk.UsageMetric
-	UsageCostDetails      []sdk.UsageCostDetail
 	UsageMetadata         map[string]string
 	CreatedAt             string
 }

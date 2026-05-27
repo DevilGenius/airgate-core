@@ -14,7 +14,7 @@ import {
   subscribeUsageMetricDetailChange,
   subscribeUsageModelMetaChange,
 } from '../../app/plugin-frontend-registry';
-import type { UsageLogResp, CustomerUsageLogResp, UsageAttribute, UsageMetric } from '../types';
+import type { UsageLogResp, CustomerUsageLogResp } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
 import { CostValue } from '../components/CostValue';
 
@@ -245,22 +245,8 @@ function normalizeUsageKey(value?: string): string {
   return (value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
 }
 
-function normalizeMetricKey(metric: Pick<UsageMetric, 'key' | 'kind' | 'label'>): string {
-  return normalizeUsageKey(metric.key || metric.kind || metric.label);
-}
-
 function metricNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
-}
-
-function metricMatches(metric: UsageMetric, keys: string[]) {
-  const key = normalizeMetricKey(metric);
-  return keys.includes(key);
-}
-
-function metricValue(metrics: UsageMetric[], keys: string[]): number | undefined {
-  const item = metrics.find((metric) => metricMatches(metric, keys));
-  return item ? metricNumber(item.value) : undefined;
 }
 
 function firstText(...values: unknown[]): string | undefined {
@@ -270,14 +256,6 @@ function firstText(...values: unknown[]): string | undefined {
     if (text) return text;
   }
   return undefined;
-}
-
-function usageAttributeValue(attributes: UsageAttribute[], keys: string[]): string | undefined {
-  const normalizedKeys = new Set(keys.map(normalizeUsageKey));
-  const item = attributes.find((attr) => (
-    normalizedKeys.has(normalizeUsageKey(attr.key || attr.kind || attr.label))
-  ));
-  return firstText(item?.value);
 }
 
 function usageMetadataValue(metadata: Record<string, string>, keys: string[]): string | undefined {
@@ -290,16 +268,31 @@ function usageMetadataValue(metadata: Record<string, string>, keys: string[]): s
   return undefined;
 }
 
-function isTotalMetric(metric: UsageMetric) {
-  return metricMatches(metric, ['total_tokens', 'total_token', 'total']);
+function usageMetadataNumber(metadata: Record<string, string>, keys: string[]): number {
+  const value = usageMetadataValue(metadata, keys);
+  if (!value) return 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function isReasoningMetric(metric: UsageMetric) {
-  return metricMatches(metric, ['reasoning_output_tokens', 'reasoning_tokens', 'reasoning_token']);
+interface MetricDisplay {
+  key: string;
+  label: string;
+  kind: 'token' | 'image';
+  unit: string;
+  value: number;
 }
 
-function isOutputMetric(metric: UsageMetric) {
-  return metricMatches(metric, ['output_tokens', 'output_token', 'completion_tokens', 'completion_token']);
+function isTotalMetric(metric: MetricDisplay) {
+  return metric.key === 'total_tokens';
+}
+
+function isReasoningMetric(metric: MetricDisplay) {
+  return metric.key === 'reasoning_output_tokens';
+}
+
+function isOutputMetric(metric: MetricDisplay) {
+  return metric.key === 'output_tokens';
 }
 
 function isTokenUnit(unit?: string) {
@@ -313,7 +306,7 @@ function formatMetricNumber(value: number): string {
     : value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
-function formatMetricValue(metric: UsageMetric): string {
+function formatMetricValue(metric: MetricDisplay): string {
   const value = metricNumber(metric.value);
   const formatted = formatMetricNumber(value);
   const unit = metric.unit?.trim();
@@ -321,8 +314,8 @@ function formatMetricValue(metric: UsageMetric): string {
   return `${formatted} ${unit}`;
 }
 
-function metricColor(metric: UsageMetric, index: number): string | undefined {
-  const key = normalizeMetricKey(metric);
+function metricColor(metric: MetricDisplay, index: number): string | undefined {
+  const key = metric.key;
   if (key.includes('input') && !key.includes('cached')) return USAGE_TOKEN_COLORS.input;
   if (key.includes('output')) return USAGE_TOKEN_COLORS.output;
   if (key.includes('cache_read') || key.includes('cached_input')) return USAGE_TOKEN_COLORS.cacheRead;
@@ -331,58 +324,44 @@ function metricColor(metric: UsageMetric, index: number): string | undefined {
   return [USAGE_TOKEN_COLORS.input, USAGE_TOKEN_COLORS.output, USAGE_TOKEN_COLORS.cacheRead, USAGE_TOKEN_COLORS.cacheCreation][index % 4];
 }
 
-function legacyMetrics(row: UsageRow): UsageMetric[] {
+function rowMetrics(row: UsageRow): MetricDisplay[] {
   const cacheCreation = (row as UsageLogResp).cache_creation_tokens ?? 0;
-  return [
+  const metrics: MetricDisplay[] = [
     { key: 'input_tokens', label: '输入 Token', kind: 'token', unit: 'token', value: row.input_tokens },
     { key: 'output_tokens', label: '输出 Token', kind: 'token', unit: 'token', value: row.output_tokens },
     { key: 'cached_input_tokens', label: '缓存读取 Token', kind: 'token', unit: 'token', value: row.cached_input_tokens },
     { key: 'cache_creation_tokens', label: '缓存写入 Token', kind: 'token', unit: 'token', value: cacheCreation },
-  ].filter((metric) => metric.value > 0 || metric.key === 'input_tokens' || metric.key === 'output_tokens');
-}
-
-function rowMetrics(row: UsageRow): UsageMetric[] {
-  const metrics = row.usage_metrics ?? [];
-  if (metrics.length > 0) return metrics;
-  return legacyMetrics(row);
+  ];
+  const imageCount = usageMetadataNumber(row.usage_metadata ?? {}, ['images', 'image_count']);
+  if (imageCount > 0) {
+    metrics.push({ key: 'images', label: '图片数量', kind: 'image', unit: 'image', value: imageCount });
+  }
+  return metrics.filter((metric) => metric.value > 0 || metric.key === 'input_tokens' || metric.key === 'output_tokens');
 }
 
 function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
-  const usageCostDetails = !customerScope && 'usage_cost_details' in row
-    ? (row.usage_cost_details ?? [])
-    : [];
-  const usageAttributes = row.usage_attributes ?? [];
-  const usageMetrics = row.usage_metrics ?? [];
   const usageMetadata = row.usage_metadata ?? {};
   const imageSize = firstText(
     row.image_size,
-    usageAttributeValue(usageAttributes, ['image_size', 'resolution', 'size']),
     usageMetadataValue(usageMetadata, ['image_size', 'resolution', 'size']),
   );
   const serviceTier = firstText(
     row.service_tier,
-    usageAttributeValue(usageAttributes, ['service_tier', 'tier']),
     usageMetadataValue(usageMetadata, ['service_tier', 'tier']),
   );
   const reasoningEffort = firstText(
     (row as Partial<UsageLogResp>).reasoning_effort,
-    usageAttributeValue(usageAttributes, ['reasoning_effort', 'reasoning']),
     usageMetadataValue(usageMetadata, ['reasoning_effort', 'reasoning']),
   );
-  const reasoningTokens =
-    (row as Partial<UsageLogResp>).reasoning_output_tokens
-    ?? metricValue(usageMetrics, ['reasoning_output_tokens', 'reasoning_tokens', 'reasoning_token']);
+  const reasoningTokens = (row as Partial<UsageLogResp>).reasoning_output_tokens;
+  const inputTextTokens = usageMetadataNumber(usageMetadata, ['input_text_tokens', 'text_input_tokens', 'text_tokens']);
+  const inputImageTokens = usageMetadataNumber(usageMetadata, ['input_image_tokens', 'image_input_tokens', 'image_tokens']);
+  const images = usageMetadataNumber(usageMetadata, ['images', 'image_count']);
 
   const ctx: Record<string, unknown> = {
     record: row,
     customerScope,
-    usageAttributes,
-    usageMetrics,
-    usageCostDetails,
     usageMetadata,
-    usage_attributes: usageAttributes,
-    usage_metrics: usageMetrics,
-    usage_cost_details: usageCostDetails,
     usage_metadata: usageMetadata,
     // 常用的行级别字段做扁平化，方便插件扩展渲染器直接取值。
     model: row.model,
@@ -398,6 +377,9 @@ function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
   if (typeof reasoningTokens === 'number' && reasoningTokens > 0) {
     ctx.reasoning_output_tokens = reasoningTokens;
   }
+  if (inputTextTokens > 0) ctx.input_text_tokens = inputTextTokens;
+  if (inputImageTokens > 0) ctx.input_image_tokens = inputImageTokens;
+  if (images > 0) ctx.images = images;
 
   return ctx;
 }
@@ -410,20 +392,15 @@ function buildCostDetailContext(row: UsageLogResp, adminView: boolean) {
 
 function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
   const allMetrics = rowMetrics(row);
-  const hasSDKMetrics = (row.usage_metrics?.length ?? 0) > 0;
-  const reasoningTokens = metricValue(allMetrics, ['reasoning_output_tokens', 'reasoning_tokens', 'reasoning_token'])
-    ?? (row as Partial<UsageLogResp>).reasoning_output_tokens
-    ?? 0;
+  const reasoningTokens = (row as Partial<UsageLogResp>).reasoning_output_tokens ?? 0;
   const metrics = allMetrics.filter((metric) => (
     !isTotalMetric(metric)
     && !isReasoningMetric(metric)
-    && (metricNumber(metric.value) > 0 || !hasSDKMetrics || (isOutputMetric(metric) && reasoningTokens > 0))
+    && (metricNumber(metric.value) > 0 || metric.key === 'input_tokens' || metric.key === 'output_tokens' || (isOutputMetric(metric) && reasoningTokens > 0))
   ));
-  const totalMetric = allMetrics.find(isTotalMetric);
   const tokenTotal =
-    totalMetric?.value
-    ?? row.input_tokens + row.output_tokens + row.cached_input_tokens + ((row as UsageLogResp).cache_creation_tokens ?? 0);
-  const shouldShowTokenTotal = !!totalMetric || tokenTotal > 0 || metrics.some((metric) => metric.kind === 'token');
+    row.input_tokens + row.output_tokens + row.cached_input_tokens + ((row as UsageLogResp).cache_creation_tokens ?? 0);
+  const shouldShowTokenTotal = tokenTotal > 0 || metrics.some((metric) => metric.kind === 'token');
 
   return (
     <TooltipPanel title={t('usage.metric_detail', '计量明细')} subtitle={row.model}>
@@ -655,15 +632,13 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       title: t('usage.metrics', '计量'),
       width: '220px',
       render: (row) => {
-        const metrics = rowMetrics(row);
         const PluginUsageMetricDetail = getPluginUsageMetricDetail(row.platform);
-        const inputTokens = metricValue(metrics, ['input_tokens', 'input_token', 'prompt_tokens', 'prompt_token']) ?? row.input_tokens;
-        const outputTokens = metricValue(metrics, ['output_tokens', 'output_token', 'completion_tokens', 'completion_token']) ?? row.output_tokens;
-        const cacheReadTokens = metricValue(metrics, ['cached_input_tokens', 'cached_input_token', 'cache_read_tokens', 'cache_read_token']) ?? row.cached_input_tokens;
-        const cacheCreationTokens = metricValue(metrics, ['cache_creation_tokens', 'cache_creation_token']) ?? ((row as UsageLogResp).cache_creation_tokens ?? 0);
-        const total =
-          metricValue(metrics, ['total_tokens', 'total_token'])
-          ?? inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+        const metrics = rowMetrics(row);
+        const inputTokens = row.input_tokens;
+        const outputTokens = row.output_tokens;
+        const cacheReadTokens = row.cached_input_tokens;
+        const cacheCreationTokens = (row as UsageLogResp).cache_creation_tokens ?? 0;
+        const total = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
         const hasCacheRead = cacheReadTokens > 0;
         const hasCacheWrite = cacheCreationTokens > 0;
         const tokenSummaryVisible = inputTokens > 0 || outputTokens > 0 || hasCacheRead || hasCacheWrite || total > 0;

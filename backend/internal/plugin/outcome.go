@@ -286,6 +286,8 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		calcInput.OutputBillingCostOverride = &override
 	}
 	calc := f.calculator.Calculate(calcInput)
+	reasoningEffort := resolveReasoningEffort(state.reasoningEffort, usage)
+	usageMetadata := usageMetadataFromSDK(usage, usageValues)
 
 	// 窗口费用沿用 account_cost（= total × account_rate），与用户账单解耦。
 	f.scheduler.AddWindowCost(ctx, state.account.ID, calc.AccountCost)
@@ -328,19 +330,14 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		UserAgent:             c.Request.UserAgent(),
 		IPAddress:             c.ClientIP(),
 		Endpoint:              state.requestPath,
-		ReasoningEffort:       resolveReasoningEffort(state.reasoningEffort, usage),
-		UsageAttributes:       usage.Attributes,
-		UsageMetrics:          usage.Metrics,
-		UsageCostDetails:      usage.CostDetails,
-		UsageMetadata:         usage.Metadata,
+		ReasoningEffort:       reasoningEffort,
+		UsageMetadata:         usageMetadata,
 	})
 }
 
 func resolveReasoningEffort(fromRequest string, usage *sdk.Usage) string {
-	if usage != nil && usage.Metadata != nil {
-		if effort := normalizeReasoningEffort(usage.Metadata["reasoning_effort"]); effort != "" {
-			return effort
-		}
+	if usage != nil && usage.ReasoningEffort != "" {
+		return normalizeReasoningEffort(usage.ReasoningEffort)
 	}
 	if fromRequest != "" {
 		return fromRequest

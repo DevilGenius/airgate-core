@@ -9,12 +9,8 @@ import (
 
 func TestImageOutputBillingOverride_UsesConfiguredTier(t *testing.T) {
 	usage := &sdk.Usage{
-		Attributes: []sdk.UsageAttribute{
-			{Key: "image_size", Value: "1672x941"},
-		},
-		CostDetails: []sdk.UsageCostDetail{
-			{Key: "images", AccountCost: 0.40},
-		},
+		ImageSize:  "1672x941",
+		OutputCost: 0.40,
 	}
 	settings := map[string]map[string]string{
 		"openai": {
@@ -33,12 +29,8 @@ func TestImageOutputBillingOverride_UsesConfiguredTier(t *testing.T) {
 
 func TestImageOutputBillingOverride_FallsBackWhenTierUnset(t *testing.T) {
 	usage := &sdk.Usage{
-		Attributes: []sdk.UsageAttribute{
-			{Key: "image_size", Value: "3840x2160"},
-		},
-		CostDetails: []sdk.UsageCostDetail{
-			{Key: "images", AccountCost: 0.40},
-		},
+		ImageSize:  "3840x2160",
+		OutputCost: 0.40,
 	}
 	settings := map[string]map[string]string{
 		"openai": {

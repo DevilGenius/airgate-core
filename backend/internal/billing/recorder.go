@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 const (
@@ -58,9 +57,6 @@ type UsageRecord struct {
 	IPAddress             string
 	Endpoint              string
 	ReasoningEffort       string
-	UsageAttributes       []sdk.UsageAttribute
-	UsageMetrics          []sdk.UsageMetric
-	UsageCostDetails      []sdk.UsageCostDetail
 	UsageMetadata         map[string]string
 }
 
@@ -266,10 +262,6 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
 		SetIPAddress(rec.IPAddress).
 		SetEndpoint(rec.Endpoint).
 		SetReasoningEffort(rec.ReasoningEffort).
-		SetUsageAttributes(rec.UsageAttributes).
-		SetUsageMetrics(rec.UsageMetrics).
-		SetUsageCostDetails(enrichUsageCostDetails(rec)).
-		SetUsageMetadata(rec.UsageMetadata).
 		SetUserIDSnapshot(rec.UserID).
 		SetUserID(rec.UserID).
 		SetAccountID(rec.AccountID).
@@ -277,44 +269,10 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
 	if rec.APIKeyID > 0 {
 		b.SetAPIKeyID(rec.APIKeyID)
 	}
+	if len(rec.UsageMetadata) > 0 {
+		b.SetUsageMetadata(rec.UsageMetadata)
+	}
 	return b
-}
-
-func enrichUsageCostDetails(rec UsageRecord) []sdk.UsageCostDetail {
-	if len(rec.UsageCostDetails) == 0 {
-		return rec.UsageCostDetails
-	}
-
-	items := make([]sdk.UsageCostDetail, len(rec.UsageCostDetails))
-	copy(items, rec.UsageCostDetails)
-
-	var accountCostSum float64
-	for _, item := range items {
-		if item.AccountCost > 0 {
-			accountCostSum += item.AccountCost
-		}
-	}
-
-	for i := range items {
-		accountCost := items[i].AccountCost
-		if accountCost <= 0 {
-			if rec.RateMultiplier > 0 {
-				items[i].BillingMultiplier = rec.RateMultiplier
-			}
-			continue
-		}
-		if accountCostSum > 0 && rec.ActualCost > 0 {
-			items[i].UserCost = rec.ActualCost * accountCost / accountCostSum
-			items[i].BillingMultiplier = items[i].UserCost / accountCost
-			continue
-		}
-		if rec.RateMultiplier > 0 {
-			items[i].BillingMultiplier = rec.RateMultiplier
-			items[i].UserCost = accountCost * rec.RateMultiplier
-		}
-	}
-
-	return items
 }
 
 func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) error {

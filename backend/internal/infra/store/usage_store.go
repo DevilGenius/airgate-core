@@ -21,6 +21,52 @@ type UsageStore struct {
 	db *ent.Client
 }
 
+var usageLogListFields = []string{
+	entusagelog.FieldID,
+	entusagelog.FieldPlatform,
+	entusagelog.FieldModel,
+	entusagelog.FieldInputTokens,
+	entusagelog.FieldOutputTokens,
+	entusagelog.FieldCachedInputTokens,
+	entusagelog.FieldCacheCreationTokens,
+	entusagelog.FieldCacheCreation5mTokens,
+	entusagelog.FieldCacheCreation1hTokens,
+	entusagelog.FieldReasoningOutputTokens,
+	entusagelog.FieldInputPrice,
+	entusagelog.FieldOutputPrice,
+	entusagelog.FieldCachedInputPrice,
+	entusagelog.FieldCacheCreationPrice,
+	entusagelog.FieldCacheCreation1hPrice,
+	entusagelog.FieldInputCost,
+	entusagelog.FieldOutputCost,
+	entusagelog.FieldCachedInputCost,
+	entusagelog.FieldCacheCreationCost,
+	entusagelog.FieldTotalCost,
+	entusagelog.FieldActualCost,
+	entusagelog.FieldBilledCost,
+	entusagelog.FieldAccountCost,
+	entusagelog.FieldRateMultiplier,
+	entusagelog.FieldSellRate,
+	entusagelog.FieldAccountRateMultiplier,
+	entusagelog.FieldServiceTier,
+	entusagelog.FieldImageSize,
+	entusagelog.FieldStream,
+	entusagelog.FieldDurationMs,
+	entusagelog.FieldFirstTokenMs,
+	entusagelog.FieldUserAgent,
+	entusagelog.FieldIPAddress,
+	entusagelog.FieldEndpoint,
+	entusagelog.FieldReasoningEffort,
+	entusagelog.FieldUsageMetadata,
+	entusagelog.FieldUserIDSnapshot,
+	entusagelog.FieldUserEmailSnapshot,
+	entusagelog.FieldCreatedAt,
+	entusagelog.APIKeyColumn,
+	entusagelog.AccountColumn,
+	entusagelog.GroupColumn,
+	entusagelog.UserColumn,
+}
+
 // NewUsageStore 创建使用记录仓储。
 func NewUsageStore(db *ent.Client) *UsageStore {
 	return &UsageStore{db: db}
@@ -38,11 +84,12 @@ func (s *UsageStore) ListUser(ctx context.Context, userID int64, filter appusage
 	}
 
 	logs, err := query.
+		Select(usageLogListFields...).
 		WithUser().
 		WithAPIKey().
 		WithAccount().
 		WithGroup().
-		Offset((filter.Page-1)*filter.PageSize).
+		Offset((filter.Page - 1) * filter.PageSize).
 		Limit(filter.PageSize).
 		Order(ent.Desc(entusagelog.FieldID)).
 		All(ctx)
@@ -71,11 +118,12 @@ func (s *UsageStore) ListAdmin(ctx context.Context, filter appusage.ListFilter) 
 	}
 
 	logs, err := query.
+		Select(usageLogListFields...).
 		WithUser().
 		WithAPIKey().
 		WithAccount().
 		WithGroup().
-		Offset((filter.Page-1)*filter.PageSize).
+		Offset((filter.Page - 1) * filter.PageSize).
 		Limit(filter.PageSize).
 		Order(ent.Desc(entusagelog.FieldID)).
 		All(ctx)
@@ -547,9 +595,6 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		IPAddress:             item.IPAddress,
 		Endpoint:              item.Endpoint,
 		ReasoningEffort:       item.ReasoningEffort,
-		UsageAttributes:       item.UsageAttributes,
-		UsageMetrics:          item.UsageMetrics,
-		UsageCostDetails:      item.UsageCostDetails,
 		UsageMetadata:         item.UsageMetadata,
 		CreatedAt:             item.CreatedAt.Format(time.RFC3339),
 	}

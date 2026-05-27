@@ -1158,6 +1158,8 @@ func (h *HostService) recordHostForwardUsage(
 		calcInput.OutputBillingCostOverride = &override
 	}
 	calc := h.calculator.Calculate(calcInput)
+	reasoningEffort := resolveReasoningEffort(hostForwardReasoningEffort(req), usage)
+	usageMetadata := usageMetadataFromSDK(usage, usageValues)
 
 	h.scheduler.AddWindowCost(ctx, accountID, calc.AccountCost)
 
@@ -1198,14 +1200,11 @@ func (h *HostService) recordHostForwardUsage(
 		ServiceTier:           usageValues.ServiceTier,
 		ImageSize:             usageValues.ImageSize,
 		Endpoint:              req.Path,
-		ReasoningEffort:       resolveReasoningEffort(hostForwardReasoningEffort(req), usage),
+		ReasoningEffort:       reasoningEffort,
 		Stream:                req.Stream,
 		DurationMs:            duration.Milliseconds(),
 		FirstTokenMs:          usageValues.FirstTokenMs,
-		UsageAttributes:       usage.Attributes,
-		UsageMetrics:          usage.Metrics,
-		UsageCostDetails:      usage.CostDetails,
-		UsageMetadata:         usage.Metadata,
+		UsageMetadata:         usageMetadata,
 	}
 	if h.recorder == nil {
 		return 0, nil
