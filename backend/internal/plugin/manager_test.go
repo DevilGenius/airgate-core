@@ -59,6 +59,52 @@ func TestParseGithubRepo(t *testing.T) {
 	}
 }
 
+func TestGithubReleaseAPIURLs(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+		want    []string
+	}{
+		{
+			name:    "latest",
+			version: "",
+			want: []string{
+				"https://api.github.com/repos/acme/airgate-plugin/releases/latest",
+			},
+		},
+		{
+			name:    "plain version tries v-prefixed fallback",
+			version: "1.2.3",
+			want: []string{
+				"https://api.github.com/repos/acme/airgate-plugin/releases/tags/1.2.3",
+				"https://api.github.com/repos/acme/airgate-plugin/releases/tags/v1.2.3",
+			},
+		},
+		{
+			name:    "v-prefixed version tries plain fallback",
+			version: "v1.2.3",
+			want: []string{
+				"https://api.github.com/repos/acme/airgate-plugin/releases/tags/v1.2.3",
+				"https://api.github.com/repos/acme/airgate-plugin/releases/tags/1.2.3",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := githubReleaseAPIURLs("acme", "airgate-plugin", tt.version)
+			if len(got) != len(tt.want) {
+				t.Fatalf("len(got) = %d, want %d: %#v", len(got), len(tt.want), got)
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Fatalf("got[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestGetModelsReturnsClone(t *testing.T) {
 	mgr := &Manager{
 		modelCache: map[string][]sdk.ModelInfo{

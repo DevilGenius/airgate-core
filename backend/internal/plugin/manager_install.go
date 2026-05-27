@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,23 +54,41 @@ func (m *Manager) InstallFromBinary(ctx context.Context, name string, binary []b
 		realName = name
 	}
 
+	targetDir := filepath.Join(m.pluginDir, realName)
+	binaryPath := filepath.Join(targetDir, realName)
+	previousBinary, previousErr := os.ReadFile(binaryPath)
+
 	m.stopPlugin(realName)
 
-	targetDir := filepath.Join(m.pluginDir, realName)
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return fmt.Errorf("创建插件目录失败: %w", err)
 	}
-	binaryPath := filepath.Join(targetDir, realName)
 	if err := os.WriteFile(binaryPath, binary, 0755); err != nil {
 		return fmt.Errorf("写入插件二进制失败: %w", err)
 	}
 
 	canonicalName, err := m.startPlugin(ctx, realName, exec.Command(binaryPath), realName)
 	if err != nil {
+		if previousErr == nil {
+			if restoreErr := m.restorePreviousBinary(ctx, realName, binaryPath, previousBinary); restoreErr != nil {
+				return fmt.Errorf("启动插件失败: %w；恢复旧版本也失败: %v", err, restoreErr)
+			}
+			slog.Warn("新插件启动失败，已恢复旧版本", "name", realName, "error", err)
+		}
 		return fmt.Errorf("启动插件失败: %w", err)
 	}
 
 	slog.Info("插件从二进制安装成功", "name", canonicalName)
+	return nil
+}
+
+func (m *Manager) restorePreviousBinary(ctx context.Context, name, binaryPath string, previousBinary []byte) error {
+	if err := os.WriteFile(binaryPath, previousBinary, 0755); err != nil {
+		return fmt.Errorf("写回旧插件二进制失败: %w", err)
+	}
+	if _, err := m.startPlugin(ctx, name, exec.Command(binaryPath), name); err != nil {
+		return fmt.Errorf("重启旧插件失败: %w", err)
+	}
 	return nil
 }
 
@@ -128,36 +147,16 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 }
 
 // InstallFromGithub 从 GitHub Release 下载并安装插件。
-func (m *Manager) InstallFromGithub(ctx context.Context, repo string) error {
+// version 为空时安装 latest release；非空时按 release tag 安装，可用于回滚到旧版本。
+func (m *Manager) InstallFromGithub(ctx context.Context, repo, version string) error {
 	owner, repoName, err := parseGithubRepo(repo)
 	if err != nil {
 		return err
 	}
 
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repoName)
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-	resp, err := http.DefaultClient.Do(req)
+	release, err := fetchGithubReleaseForInstall(ctx, owner, repoName, version)
 	if err != nil {
-		return fmt.Errorf("请求 GitHub API 失败: %w", err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			slog.Warn("关闭 GitHub API 响应失败", "repo", repo, "error", err)
-		}
-	}()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("仓库 %s/%s 不存在或没有 Release", owner, repoName)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("GitHub API 返回状态码 %d", resp.StatusCode)
-	}
-
-	var release githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return fmt.Errorf("解析 Release 数据失败: %w", err)
+		return err
 	}
 
 	targetOS := runtime.GOOS
@@ -195,6 +194,84 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo string) error {
 	}
 
 	return m.InstallFromBinary(ctx, repoName, binary)
+}
+
+func fetchGithubReleaseForInstall(ctx context.Context, owner, repoName, version string) (githubRelease, error) {
+	var lastStatus int
+	for _, apiURL := range githubReleaseAPIURLs(owner, repoName, version) {
+		release, status, err := fetchGithubReleaseByURL(ctx, apiURL)
+		if err == nil {
+			return release, nil
+		}
+		lastStatus = status
+		if status != http.StatusNotFound {
+			return githubRelease{}, err
+		}
+	}
+
+	if strings.TrimSpace(version) == "" {
+		return githubRelease{}, fmt.Errorf("仓库 %s/%s 不存在或没有 Release", owner, repoName)
+	}
+	if lastStatus == http.StatusNotFound {
+		return githubRelease{}, fmt.Errorf("仓库 %s/%s 不存在或没有 Release %s", owner, repoName, strings.TrimSpace(version))
+	}
+	return githubRelease{}, fmt.Errorf("无法获取仓库 %s/%s 的 Release %s", owner, repoName, strings.TrimSpace(version))
+}
+
+func fetchGithubReleaseByURL(ctx context.Context, apiURL string) (githubRelease, int, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return githubRelease{}, 0, fmt.Errorf("请求 GitHub API 失败: %w", err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("关闭 GitHub API 响应失败", "url", apiURL, "error", err)
+		}
+	}()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return githubRelease{}, resp.StatusCode, fmt.Errorf("GitHub Release 不存在")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return githubRelease{}, resp.StatusCode, fmt.Errorf("GitHub API 返回状态码 %d", resp.StatusCode)
+	}
+
+	var release githubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return githubRelease{}, resp.StatusCode, fmt.Errorf("解析 Release 数据失败: %w", err)
+	}
+	return release, resp.StatusCode, nil
+}
+
+func githubReleaseAPIURLs(owner, repoName, version string) []string {
+	baseURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", owner, repoName)
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return []string{baseURL + "/latest"}
+	}
+
+	tags := []string{version}
+	if strings.HasPrefix(version, "v") {
+		if trimmed := strings.TrimPrefix(version, "v"); trimmed != "" {
+			tags = append(tags, trimmed)
+		}
+	} else {
+		tags = append(tags, "v"+version)
+	}
+
+	urls := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		urls = append(urls, baseURL+"/tags/"+url.PathEscape(tag))
+	}
+	return urls
 }
 
 type githubRelease struct {

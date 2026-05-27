@@ -22,8 +22,8 @@ export const pluginsApi = {
     return upload<void>('/api/v1/admin/plugins/upload', fd);
   },
   // 从 GitHub Release 安装
-  installGithub: (repo: string) =>
-    post<void>('/api/v1/admin/plugins/install-github', { repo }),
+  installGithub: (repo: string, version?: string) =>
+    post<void>('/api/v1/admin/plugins/install-github', { repo, version }),
   // 通用插件 RPC 调用，action 由插件自行定义
   rpc: <T = unknown>(name: string, action: string, body?: unknown) =>
     post<T>(`/api/v1/admin/plugins/${name}/rpc/${action}`, body),

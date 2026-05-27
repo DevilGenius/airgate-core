@@ -130,7 +130,7 @@ func (h *PluginHandler) InstallFromGithub(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.InstallFromGithub(c.Request.Context(), req.Repo); err != nil {
+	if err := h.service.InstallFromGithub(c.Request.Context(), req.Repo, req.Version); err != nil {
 		response.InternalError(c, "从 GitHub 安装失败: "+err.Error())
 		return
 	}

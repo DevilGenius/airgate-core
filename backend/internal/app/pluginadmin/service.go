@@ -101,17 +101,20 @@ func (s *Service) Upload(ctx context.Context, name string, binary []byte) error 
 }
 
 // InstallFromGithub 从 GitHub 安装插件。
-func (s *Service) InstallFromGithub(ctx context.Context, repo string) error {
+func (s *Service) InstallFromGithub(ctx context.Context, repo, version string) error {
 	logger := sdk.LoggerFromContext(ctx)
-	if err := s.manager.InstallFromGithub(ctx, repo); err != nil {
+	version = strings.TrimSpace(version)
+	if err := s.manager.InstallFromGithub(ctx, repo, version); err != nil {
 		logger.Error("plugin_admin_uploaded_failed",
 			"repo", repo,
+			"version", version,
 			"source", "github",
 			sdk.LogFieldError, err)
 		return err
 	}
 	logger.Info("plugin_admin_uploaded",
 		"repo", repo,
+		"version", version,
 		"source", "github")
 	return nil
 }

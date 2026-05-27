@@ -11,10 +11,15 @@ import { AlertDialog, Button, Card, Checkbox, Chip, Description, EmptyState, Inp
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   Trash2, Download, Loader2, RefreshCw,
-  Package, User, Tag, Plus, Upload, Github, Settings, Store,
+  Package, User, Tag, Plus, Upload, Github, Settings, Store, History,
 } from 'lucide-react';
 import { CommonTable } from '../../shared/components/CommonTable';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
+
+type InstallPrefill = {
+  repo: string;
+  version?: string;
+} | null;
 
 // 插件类型 Badge 颜色
 const typeVariant: Record<string, 'accent' | 'success' | 'warning'> = {
@@ -31,6 +36,7 @@ export default function PluginsPage() {
   const [activeTab, setActiveTab] = useState<'installed' | 'marketplace'>('installed');
   const [uninstallTarget, setUninstallTarget] = useState<PluginResp | null>(null);
   const [installOpen, setInstallOpen] = useState(false);
+  const [installPrefill, setInstallPrefill] = useState<InstallPrefill>(null);
   const [configTarget, setConfigTarget] = useState<PluginResp | null>(null);
 
   // 已安装插件列表
@@ -50,7 +56,7 @@ export default function PluginsPage() {
   const [installingRepo, setInstallingRepo] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const marketInstallMutation = useMutation({
-    mutationFn: (repo: string) => pluginsApi.installGithub(repo),
+    mutationFn: ({ repo, version }: { repo: string; version?: string }) => pluginsApi.installGithub(repo, version),
     onSuccess: () => {
       toast('success', t(isUpdating ? 'plugins.update_success' : 'plugins.github_success'));
       // 插件前端模块需要整页重载才能生效
@@ -63,10 +69,15 @@ export default function PluginsPage() {
     },
   });
 
-  function handleMarketInstall(repo: string, update = false) {
+  function handleMarketInstall(repo: string, update = false, version?: string) {
     setInstallingRepo(repo);
     setIsUpdating(update);
-    marketInstallMutation.mutate(repo);
+    marketInstallMutation.mutate({ repo, version });
+  }
+
+  function openVersionInstall(repo: string, version = '') {
+    setInstallPrefill({ repo, version });
+    setInstallOpen(true);
   }
 
   // 强制从 GitHub 同步市场列表（点击右上角刷新按钮时触发）
@@ -152,7 +163,10 @@ export default function PluginsPage() {
             </Button>
             <Button
               variant="primary"
-              onPress={() => setInstallOpen(true)}
+              onPress={() => {
+                setInstallPrefill(null);
+                setInstallOpen(true);
+              }}
             >
               <Plus className="w-4 h-4" />
               {t('plugins.install_plugin')}
@@ -292,6 +306,7 @@ export default function PluginsPage() {
                   plugin={plugin}
                   installing={installingRepo === plugin.github_repo && marketInstallMutation.isPending}
                   onInstall={handleMarketInstall}
+                  onVersionInstall={openVersionInstall}
                 />
               ))}
               {(marketData?.list ?? []).length === 0 && (
@@ -308,9 +323,14 @@ export default function PluginsPage() {
       {/* 安装插件弹窗 */}
       <InstallPluginModal
         open={installOpen}
-        onClose={() => setInstallOpen(false)}
+        prefill={installPrefill}
+        onClose={() => {
+          setInstallOpen(false);
+          setInstallPrefill(null);
+        }}
         onInstalled={() => {
           setInstallOpen(false);
+          setInstallPrefill(null);
           // 插件前端模块需要整页重载才能生效
           window.location.reload();
         }}
@@ -526,10 +546,12 @@ function PluginConfigModal({
 // 安装插件弹窗
 function InstallPluginModal({
   open,
+  prefill,
   onClose,
   onInstalled,
 }: {
   open: boolean;
+  prefill?: InstallPrefill;
   onClose: () => void;
   onInstalled: () => void;
 }) {
@@ -543,6 +565,16 @@ function InstallPluginModal({
   const [dragActive, setDragActive] = useState(false);
   const [pluginName, setPluginName] = useState('');
   const [githubRepo, setGithubRepo] = useState('');
+  const [githubVersion, setGithubVersion] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    if (prefill?.repo) {
+      setInstallTab('github');
+      setGithubRepo(prefill.repo);
+      setGithubVersion(prefill.version || '');
+    }
+  }, [open, prefill]);
 
   // 上传安装
   const uploadMutation = useMutation({
@@ -557,7 +589,7 @@ function InstallPluginModal({
 
   // GitHub 安装
   const githubMutation = useMutation({
-    mutationFn: () => pluginsApi.installGithub(githubRepo),
+    mutationFn: () => pluginsApi.installGithub(githubRepo, githubVersion.trim() || undefined),
     onSuccess: () => {
       toast('success', t('plugins.github_success'));
       resetForm();
@@ -570,6 +602,7 @@ function InstallPluginModal({
     setSelectedFile(null);
     setPluginName('');
     setGithubRepo('');
+    setGithubVersion('');
     dragCounterRef.current = 0;
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
@@ -723,6 +756,15 @@ function InstallPluginModal({
                         required
                       />
                     </HeroTextField>
+                    <HeroTextField fullWidth>
+                      <Label>{t('plugins.github_version')}</Label>
+                      <Input
+                        value={githubVersion}
+                        onChange={(e) => setGithubVersion(e.target.value)}
+                        placeholder={t('plugins.github_version_placeholder')}
+                      />
+                      <Description>{t('plugins.github_version_hint')}</Description>
+                    </HeroTextField>
                     <p className="text-xs text-text-tertiary">
                       {t('plugins.github_hint')}
                     </p>
@@ -766,10 +808,12 @@ function MarketplaceCard({
   plugin,
   installing,
   onInstall,
+  onVersionInstall,
 }: {
   plugin: MarketplacePluginResp;
   installing: boolean;
-  onInstall: (repo: string, update?: boolean) => void;
+  onInstall: (repo: string, update?: boolean, version?: string) => void;
+  onVersionInstall: (repo: string, version?: string) => void;
 }) {
   const { t } = useTranslation();
   const canInstall = !!plugin.github_repo;
@@ -808,7 +852,7 @@ function MarketplaceCard({
         <div className="pt-3 border-t border-border">
           {plugin.installed ? (
             plugin.has_update ? (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   variant="primary"
@@ -823,20 +867,54 @@ function MarketplaceCard({
                     v{plugin.installed_version} → v{plugin.version}
                   </span>
                 )}
+                <Button
+                  className="ml-auto"
+                  size="sm"
+                  variant="secondary"
+                  isDisabled={!canInstall || installing}
+                  onPress={() => plugin.github_repo && onVersionInstall(plugin.github_repo)}
+                >
+                  <History className="w-3.5 h-3.5" />
+                  {t('plugins.version_install')}
+                </Button>
               </div>
             ) : (
-              <Chip color="success" size="sm" variant="soft">{t('plugins.already_installed')}</Chip>
+              <div className="flex flex-wrap items-center gap-2">
+                <Chip color="success" size="sm" variant="soft">{t('plugins.already_installed')}</Chip>
+                <Button
+                  className="ml-auto"
+                  size="sm"
+                  variant="secondary"
+                  isDisabled={!canInstall || installing}
+                  onPress={() => plugin.github_repo && onVersionInstall(plugin.github_repo)}
+                >
+                  <History className="w-3.5 h-3.5" />
+                  {t('plugins.version_install')}
+                </Button>
+              </div>
             )
           ) : (
-            <Button
-              size="sm"
-              isDisabled={!canInstall || installing}
-              variant="primary"
-              onPress={() => plugin.github_repo && onInstall(plugin.github_repo)}
-            >
-              {installing ? <Spinner size="sm" /> : <Download className="w-3.5 h-3.5" />}
-              {t('common.install')}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                isDisabled={!canInstall || installing}
+                variant="primary"
+                onPress={() => plugin.github_repo && onInstall(plugin.github_repo)}
+              >
+                {installing ? <Spinner size="sm" /> : <Download className="w-3.5 h-3.5" />}
+                {t('common.install')}
+              </Button>
+              <Button
+                className="ml-auto"
+                size="sm"
+                variant="secondary"
+                isDisabled={!canInstall || installing}
+                onPress={() => plugin.github_repo && onVersionInstall(plugin.github_repo)}
+              >
+                <History className="w-3.5 h-3.5" />
+                {t('plugins.version_install')}
+              </Button>
+            </div>
           )}
         </div>
       </Card.Content>

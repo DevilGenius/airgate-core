@@ -50,7 +50,8 @@ type FrontendPageResp struct {
 
 // InstallGithubReq 从 GitHub 安装插件请求
 type InstallGithubReq struct {
-	Repo string `json:"repo" binding:"required"` // owner/repo 或完整 GitHub URL
+	Repo    string `json:"repo" binding:"required"` // owner/repo 或完整 GitHub URL
+	Version string `json:"version,omitempty"`       // 可选 release tag，留空安装 latest
 }
 
 // PluginOAuthStartResp 插件 OAuth 授权开始响应

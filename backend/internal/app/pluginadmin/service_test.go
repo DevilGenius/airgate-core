@@ -58,7 +58,7 @@ func (s pluginAdminManagerStub) GetAllPluginMeta() []plugin.PluginMeta {
 	return append([]plugin.PluginMeta(nil), s.allMeta...)
 }
 func (s pluginAdminManagerStub) InstallFromBinary(context.Context, string, []byte) error { return nil }
-func (s pluginAdminManagerStub) InstallFromGithub(context.Context, string) error         { return nil }
+func (s pluginAdminManagerStub) InstallFromGithub(context.Context, string, string) error { return nil }
 func (s pluginAdminManagerStub) Uninstall(context.Context, string) error                 { return nil }
 func (s pluginAdminManagerStub) ReloadDev(context.Context, string) error                 { return nil }
 func (s pluginAdminManagerStub) ReloadInstance(context.Context, string) error            { return nil }
