@@ -346,6 +346,11 @@ var (
 				Columns: []*schema.Column{UsageLogsColumns[2]},
 			},
 			{
+				Name:    "usage_log_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[34]},
+			},
+			{
 				Name:    "usage_log_api_key",
 				Unique:  false,
 				Columns: []*schema.Column{UsageLogsColumns[35]},

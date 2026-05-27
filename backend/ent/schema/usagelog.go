@@ -87,6 +87,8 @@ func (UsageLog) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("model").
 			StorageKey("usage_log_model"),
+		index.Fields("created_at").
+			StorageKey("usage_log_created_at"),
 		index.Edges("api_key").
 			StorageKey("usage_log_api_key"),
 	}

@@ -20,6 +20,7 @@ const (
 // UsageRecord 使用记录
 type UsageRecord struct {
 	UserID                int
+	UserEmail             string
 	APIKeyID              int
 	AccountID             int
 	GroupID               int
@@ -255,6 +256,7 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
 		SetEndpoint(rec.Endpoint).
 		SetReasoningEffort(rec.ReasoningEffort).
 		SetUserIDSnapshot(rec.UserID).
+		SetUserEmailSnapshot(rec.UserEmail).
 		SetUserID(rec.UserID).
 		SetAccountID(rec.AccountID).
 		SetGroupID(rec.GroupID)
