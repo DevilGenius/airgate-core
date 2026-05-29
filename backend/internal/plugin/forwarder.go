@@ -375,13 +375,14 @@ func hasForwardResult(execution forwardExecution) bool {
 }
 
 type allRoutesFailureSummary struct {
-	rateLimitedSeen       bool
-	rateLimitedRetryAfter time.Duration
-	localCapacitySeen     bool
-	accountUnavailable    bool
-	accountDeadSeen       bool
-	upstreamTimeoutSeen   bool
-	upstreamFailureSeen   bool
+	rateLimitedSeen             bool
+	rateLimitedRetryAfter       time.Duration
+	localCapacitySeen           bool
+	continuationAffinityMissing bool
+	accountUnavailable          bool
+	accountDeadSeen             bool
+	upstreamTimeoutSeen         bool
+	upstreamFailureSeen         bool
 }
 
 func (s *allRoutesFailureSummary) recordExecution(execution forwardExecution) {
@@ -415,7 +416,11 @@ func (s *allRoutesFailureSummary) recordRetryAfter(retryAfter time.Duration) {
 	}
 }
 
-func (s *allRoutesFailureSummary) recordPickAccountError(error) {
+func (s *allRoutesFailureSummary) recordPickAccountError(err error) {
+	if errors.Is(err, scheduler.ErrContinuationAffinityMissing) {
+		s.continuationAffinityMissing = true
+		return
+	}
 	s.accountUnavailable = true
 }
 
@@ -441,6 +446,14 @@ func writeAllRoutesFailed(c *gin.Context, summary allRoutesFailureSummary) {
 }
 
 func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFailureResponse {
+	if summary.continuationAffinityMissing {
+		return allRoutesFailureResponse{
+			status:  http.StatusBadRequest,
+			errType: "invalid_request_error",
+			code:    "continuation_affinity_missing",
+			message: "无法定位 previous_response_id 对应的上游会话，请使用同一会话重试或提供完整上下文",
+		}
+	}
 	if summary.rateLimitedSeen {
 		retryAfter := summary.rateLimitedRetryAfter
 		if retryAfter <= 0 {
@@ -624,6 +637,9 @@ func keyInfoForRoute(base *auth.APIKeyInfo, route routing.Candidate) *auth.APIKe
 // 流式已写入 → 不可；err 非 nil（插件自身崩）→ 可；其余由 Kind.ShouldFailover() 决定。
 func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution forwardExecution) bool {
 	if state.stream && c.Writer.Written() {
+		return false
+	}
+	if state.requireContinuationAffinity {
 		return false
 	}
 	if execution.err != nil {

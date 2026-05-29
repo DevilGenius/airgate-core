@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
@@ -21,11 +22,13 @@ type forwardState struct {
 	// schedulingModels 是调度层使用的模型候选。协议翻译入口里，客户端传入的
 	// model 可能不是上游真实模型，例如 OpenAI 插件的 /v1/messages 会把
 	// claude-* 映射到 GPT 模型后再调用上游。
-	schedulingModels []string
-	schedulingModel  string
-	stream           bool
-	realtime         bool
-	sessionID        string
+	schedulingModels            []string
+	schedulingModel             string
+	stream                      bool
+	realtime                    bool
+	sessionID                   string
+	previousResponseID          string
+	requireContinuationAffinity bool
 
 	// 推理强度档位快照。
 	reasoningEffort string
@@ -48,10 +51,14 @@ type forwardExecution struct {
 
 // parsedRequest 从 JSON body 提取的请求元信息。
 type parsedRequest struct {
-	Model           string
-	Stream          bool
-	SessionID       string
-	ReasoningEffort string // 推理强度档位
+	Model              string
+	Stream             bool
+	SessionID          string
+	PromptCacheKey     string
+	PreviousResponseID string
+	HasToolOutput      bool
+	HasToolCallContext bool
+	ReasoningEffort    string // 推理强度档位
 }
 
 // requestFields 一次性 Unmarshal 的 JSON 字段结构。
@@ -61,8 +68,12 @@ type requestFields struct {
 	Metadata struct {
 		UserID string `json:"user_id"`
 	} `json:"metadata"`
-	ReasoningEffort string `json:"reasoning_effort"`
-	Reasoning       *struct {
+	PromptCacheKey     string          `json:"prompt_cache_key"`
+	PreviousResponseID string          `json:"previous_response_id"`
+	Input              json.RawMessage `json:"input"`
+	Messages           json.RawMessage `json:"messages"`
+	ReasoningEffort    string          `json:"reasoning_effort"`
+	Reasoning          *struct {
 		Effort string `json:"effort"`
 	} `json:"reasoning"`
 	OutputConfig *struct {

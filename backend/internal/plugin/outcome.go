@@ -69,6 +69,7 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 
 	switch execution.outcome.Kind {
 	case sdk.OutcomeSuccess:
+		f.bindResponseAffinity(ctx, state, execution)
 		f.recordUsage(c, state, execution)
 		if !state.stream {
 			writeUpstream(c, execution.outcome.Upstream)
@@ -89,6 +90,62 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 	default:
 		writeFailureResponse(c, state, execution)
 	}
+}
+
+const responseIDUsageMetadataKey = "openai.response_id"
+
+func (f *Forwarder) bindResponseAffinity(ctx context.Context, state *forwardState, execution forwardExecution) {
+	if f == nil || f.scheduler == nil || state == nil || state.account == nil || state.keyInfo == nil {
+		return
+	}
+	for _, responseID := range responseIDsFromOutcome(execution.outcome) {
+		f.scheduler.BindResponseAccount(ctx, state.keyInfo.GroupID, state.requestedPlatform, responseID, state.account.ID)
+	}
+}
+
+func responseIDsFromOutcome(outcome sdk.ForwardOutcome) []string {
+	seen := map[string]struct{}{}
+	var ids []string
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" || !strings.HasPrefix(id, "resp_") {
+			return
+		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if outcome.Usage != nil && outcome.Usage.Metadata != nil {
+		add(outcome.Usage.Metadata[responseIDUsageMetadataKey])
+		for _, id := range strings.Split(outcome.Usage.Metadata["openai.response_ids"], ",") {
+			add(id)
+		}
+	}
+	if len(outcome.Upstream.Body) > 0 {
+		for _, id := range responseIDsFromBody(outcome.Upstream.Body) {
+			add(id)
+		}
+	}
+	return ids
+}
+
+func responseIDsFromBody(body []byte) []string {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil
+	}
+	var ids []string
+	if id, ok := payload["id"].(string); ok {
+		ids = append(ids, id)
+	}
+	if response, ok := payload["response"].(map[string]any); ok {
+		if id, ok := response["id"].(string); ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 const (

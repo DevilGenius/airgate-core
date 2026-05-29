@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
@@ -24,6 +25,17 @@ import (
 //
 // excludeIDs 为 failover 时已尝试过的账户。
 func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, userID, groupID int, sessionID string, excludeIDs ...int) (*ent.Account, error) {
+	return s.SelectAccountWithOptions(ctx, platform, model, userID, groupID, sessionID, AccountSelectionOptions{}, excludeIDs...)
+}
+
+type AccountSelectionOptions struct {
+	PreviousResponseID          string
+	RequireContinuationAffinity bool
+}
+
+// SelectAccountWithOptions 在常规调度前优先按 previous_response_id 命中原账号。
+// RequireContinuationAffinity=true 时，请求不是自包含重放，不能安全切换到其它账号。
+func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, model string, userID, groupID int, sessionID string, opts AccountSelectionOptions, excludeIDs ...int) (*ent.Account, error) {
 	candidates, err := s.routeAccounts(ctx, platform, model, groupID)
 	if err != nil {
 		return nil, err
@@ -52,6 +64,23 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 		}
 	}
 
+	if previousResponseID := strings.TrimSpace(opts.PreviousResponseID); previousResponseID != "" && s.responseAffinity != nil {
+		if accountID, found := s.responseAffinity.Get(ctx, groupID, platform, previousResponseID); found {
+			for _, acc := range stickyCandidates {
+				if acc.ID == accountID {
+					s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID)
+					if sessionID != "" {
+						s.sticky.Set(ctx, userID, platform, sessionID, accountID)
+					}
+					return acc, nil
+				}
+			}
+			if opts.RequireContinuationAffinity {
+				return nil, ErrContinuationAffinityMissing
+			}
+		}
+	}
+
 	// 粘性会话优先（可命中 StickyOnly + Normal）
 	if sessionID != "" {
 		if accountID, found := s.sticky.Get(ctx, userID, platform, sessionID); found {
@@ -62,6 +91,9 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 				}
 			}
 		}
+	}
+	if opts.RequireContinuationAffinity {
+		return nil, ErrContinuationAffinityMissing
 	}
 
 	if len(normalCandidates) == 0 {

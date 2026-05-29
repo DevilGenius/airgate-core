@@ -45,6 +45,8 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 
 	path := requestPath(c)
 	parsed := parseBody(body, c.GetHeader("Content-Type"))
+	parsed.PreviousResponseID = firstNonEmpty(parsed.PreviousResponseID, previousResponseIDFromHeaders(c.Request.Header))
+	parsed.SessionID = resolveRequestSessionID(c.Request.Header, parsed)
 	requestedPlatform := requestedPlatform(c, keyInfo)
 	inst := f.matchPlugin(c, keyInfo, requestedPlatform, path)
 	if inst == nil {
@@ -57,19 +59,21 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	}
 
 	return &forwardState{
-		startedAt:         startedAt,
-		requestPath:       path,
-		body:              body,
-		model:             parsed.Model,
-		schedulingModels:  schedulingModels,
-		schedulingModel:   schedulingModel,
-		stream:            parsed.Stream,
-		realtime:          parsed.Stream,
-		sessionID:         parsed.SessionID,
-		reasoningEffort:   parsed.ReasoningEffort,
-		requestedPlatform: requestedPlatform,
-		keyInfo:           keyInfo,
-		plugin:            inst,
+		startedAt:                   startedAt,
+		requestPath:                 path,
+		body:                        body,
+		model:                       parsed.Model,
+		schedulingModels:            schedulingModels,
+		schedulingModel:             schedulingModel,
+		stream:                      parsed.Stream,
+		realtime:                    parsed.Stream,
+		sessionID:                   parsed.SessionID,
+		previousResponseID:          parsed.PreviousResponseID,
+		requireContinuationAffinity: requestRequiresContinuationAffinity(parsed),
+		reasoningEffort:             parsed.ReasoningEffort,
+		requestedPlatform:           requestedPlatform,
+		keyInfo:                     keyInfo,
+		plugin:                      inst,
 	}, true
 }
 
@@ -115,17 +119,186 @@ func parseBody(body []byte, contentType string) parsedRequest {
 	var fields requestFields
 	if json.Unmarshal(body, &fields) == nil {
 		effort := extractAndNormalizeReasoningEffort(fields)
+		signals := analyzeContinuationSignals(fields)
 		return parsedRequest{
-			Model:           fields.Model,
-			Stream:          fields.Stream,
-			SessionID:       fields.Metadata.UserID,
-			ReasoningEffort: effort,
+			Model:              fields.Model,
+			Stream:             fields.Stream,
+			SessionID:          strings.TrimSpace(fields.Metadata.UserID),
+			PromptCacheKey:     strings.TrimSpace(fields.PromptCacheKey),
+			PreviousResponseID: strings.TrimSpace(fields.PreviousResponseID),
+			HasToolOutput:      signals.hasToolOutput,
+			HasToolCallContext: signals.hasToolCallContext,
+			ReasoningEffort:    effort,
 		}
 	}
 	if strings.HasPrefix(contentType, "multipart/") {
 		return parseMultipartFields(body, contentType)
 	}
 	return parsedRequest{}
+}
+
+func resolveRequestSessionID(headers http.Header, parsed parsedRequest) string {
+	if parsed.SessionID != "" {
+		return parsed.SessionID
+	}
+	if headers != nil {
+		if v := firstNonEmpty(headers.Get("session_id"), headers.Get("Session_ID")); v != "" {
+			return v
+		}
+		if v := firstNonEmpty(headers.Get("conversation_id"), headers.Get("Conversation_ID")); v != "" {
+			return "conversation:" + v
+		}
+	}
+	if parsed.PromptCacheKey != "" {
+		return "prompt_cache:" + parsed.PromptCacheKey
+	}
+	return ""
+}
+
+func previousResponseIDFromHeaders(headers http.Header) string {
+	if headers == nil {
+		return ""
+	}
+	return firstNonEmpty(
+		headers.Get("x-openai-previous-response-id"),
+		headers.Get("OpenAI-Previous-Response-ID"),
+		headers.Get("previous_response_id"),
+	)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func requestRequiresContinuationAffinity(parsed parsedRequest) bool {
+	return strings.TrimSpace(parsed.PreviousResponseID) != "" ||
+		(parsed.HasToolOutput && !parsed.HasToolCallContext)
+}
+
+type continuationSignals struct {
+	hasToolOutput      bool
+	hasToolCallContext bool
+}
+
+func analyzeContinuationSignals(fields requestFields) continuationSignals {
+	signals := continuationSignals{}
+	mergeSignals(&signals, analyzeResponsesInputSignals(fields.Input))
+	mergeSignals(&signals, analyzeMessagesSignals(fields.Messages))
+	return signals
+}
+
+func mergeSignals(dst *continuationSignals, src continuationSignals) {
+	if dst == nil {
+		return
+	}
+	dst.hasToolOutput = dst.hasToolOutput || src.hasToolOutput
+	dst.hasToolCallContext = dst.hasToolCallContext || src.hasToolCallContext
+}
+
+func analyzeResponsesInputSignals(raw json.RawMessage) continuationSignals {
+	var signals continuationSignals
+	if len(raw) == 0 {
+		return signals
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return signals
+	}
+	for _, item := range items {
+		itemType, _ := item["type"].(string)
+		switch {
+		case isToolOutputItemType(itemType):
+			signals.hasToolOutput = true
+		case isToolCallContextItemType(itemType):
+			if strings.TrimSpace(asString(item["call_id"])) != "" {
+				signals.hasToolCallContext = true
+			}
+		}
+	}
+	return signals
+}
+
+func analyzeMessagesSignals(raw json.RawMessage) continuationSignals {
+	var signals continuationSignals
+	if len(raw) == 0 {
+		return signals
+	}
+	var messages []map[string]any
+	if err := json.Unmarshal(raw, &messages); err != nil {
+		return signals
+	}
+	for _, msg := range messages {
+		role := strings.ToLower(strings.TrimSpace(asString(msg["role"])))
+		if role == "tool" {
+			signals.hasToolOutput = true
+		}
+		if role == "assistant" {
+			if _, ok := msg["tool_calls"]; ok {
+				signals.hasToolCallContext = true
+			}
+			if _, ok := msg["function_call"]; ok {
+				signals.hasToolCallContext = true
+			}
+		}
+		analyzeMessageContentSignals(msg["content"], &signals)
+	}
+	return signals
+}
+
+func analyzeMessageContentSignals(content any, signals *continuationSignals) {
+	if signals == nil {
+		return
+	}
+	items, ok := content.([]any)
+	if !ok {
+		return
+	}
+	for _, item := range items {
+		itemMap, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		itemType := strings.TrimSpace(asString(itemMap["type"]))
+		switch itemType {
+		case "tool_result":
+			signals.hasToolOutput = true
+		case "tool_use":
+			signals.hasToolCallContext = true
+		}
+	}
+}
+
+func isToolCallContextItemType(itemType string) bool {
+	switch strings.TrimSpace(itemType) {
+	case "tool_call", "function_call", "local_shell_call", "tool_search_call", "custom_tool_call", "mcp_tool_call":
+		return true
+	default:
+		return false
+	}
+}
+
+func isToolOutputItemType(itemType string) bool {
+	switch strings.TrimSpace(itemType) {
+	case "function_call_output", "tool_search_output", "custom_tool_call_output", "mcp_tool_call_output":
+		return true
+	default:
+		return false
+	}
+}
+
+func asString(value any) string {
+	if value == nil {
+		return ""
+	}
+	if s, ok := value.(string); ok {
+		return s
+	}
+	return fmt.Sprint(value)
 }
 
 // extractAndNormalizeReasoningEffort 提取并归一化推理强度档位。

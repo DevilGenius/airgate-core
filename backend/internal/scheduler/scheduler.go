@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	ErrNoAvailableAccount = errors.New("无可用账户")
-	ErrGroupNotFound      = errors.New("分组不存在")
+	ErrNoAvailableAccount          = errors.New("无可用账户")
+	ErrGroupNotFound               = errors.New("分组不存在")
+	ErrContinuationAffinityMissing = errors.New("续链请求无法定位原上游账号")
 )
 
 // dbTimeout 后台 DB 操作超时，防止 goroutine 泄漏。
@@ -36,15 +37,16 @@ type Scheduler struct {
 	db  *ent.Client
 	rdb *redis.Client
 
-	sticky         *StickySession
-	windowCost     *WindowCostChecker
-	rpm            *RPMCounter
-	session        *SessionManager
-	msgQueue       *MessageQueue
-	state          *StateMachine
-	familyCooldown *FamilyCooldown
-	routeCache     *routeCache
-	accountFilters map[string]AccountFilterFunc
+	sticky           *StickySession
+	windowCost       *WindowCostChecker
+	rpm              *RPMCounter
+	session          *SessionManager
+	msgQueue         *MessageQueue
+	state            *StateMachine
+	familyCooldown   *FamilyCooldown
+	routeCache       *routeCache
+	responseAffinity *ResponseAffinity
+	accountFilters   map[string]AccountFilterFunc
 }
 
 // SetAccountFilter 注册平台级账号过滤函数。
@@ -62,19 +64,28 @@ func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 	rc := newRouteCache(routeCacheTTL)
 	fc := NewFamilyCooldown(rdb)
 	s := &Scheduler{
-		db:             db,
-		rdb:            rdb,
-		sticky:         NewStickySession(rdb),
-		windowCost:     NewWindowCostChecker(db, rdb),
-		rpm:            rpm,
-		session:        NewSessionManager(rdb),
-		msgQueue:       NewMessageQueue(rdb, rpm),
-		state:          NewStateMachine(db, rdb, fc),
-		familyCooldown: fc,
-		routeCache:     rc,
+		db:               db,
+		rdb:              rdb,
+		sticky:           NewStickySession(rdb),
+		windowCost:       NewWindowCostChecker(db, rdb),
+		rpm:              rpm,
+		session:          NewSessionManager(rdb),
+		msgQueue:         NewMessageQueue(rdb, rpm),
+		state:            NewStateMachine(db, rdb, fc),
+		familyCooldown:   fc,
+		routeCache:       rc,
+		responseAffinity: NewResponseAffinity(rdb),
 	}
 	s.state.onCriticalTransition = rc.InvalidateAll
 	return s
+}
+
+// BindResponseAccount 记录 Responses response_id 所在账号，用于后续 previous_response_id 续链路由。
+func (s *Scheduler) BindResponseAccount(ctx context.Context, groupID int, platform, responseID string, accountID int) {
+	if s == nil || s.responseAffinity == nil {
+		return
+	}
+	s.responseAffinity.Bind(ctx, groupID, platform, responseID, accountID)
 }
 
 // InvalidateRouteCache 清除指定分组的 route 缓存。admin 改分组 / 增删账号时调用。

@@ -95,13 +95,17 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs ...int) error {
 	var lastErr error
 	for _, model := range state.schedulingModelCandidates() {
-		account, err := f.scheduler.SelectAccount(
+		account, err := f.scheduler.SelectAccountWithOptions(
 			c.Request.Context(),
 			state.requestedPlatform,
 			model,
 			state.keyInfo.UserID,
 			state.keyInfo.GroupID,
 			state.sessionID,
+			scheduler.AccountSelectionOptions{
+				PreviousResponseID:          state.previousResponseID,
+				RequireContinuationAffinity: state.requireContinuationAffinity,
+			},
 			excludeIDs...,
 		)
 		if err == nil {

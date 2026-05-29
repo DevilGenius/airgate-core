@@ -51,6 +51,44 @@ func TestParseBody_StreamTrue(t *testing.T) {
 	}
 }
 
+func TestParseBodyContinuationSignals(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"model":"gpt-5.4","prompt_cache_key":"pcache_1","previous_response_id":"resp_1","input":[{"type":"function_call_output","call_id":"call_1","output":"ok"}]}`)
+	parsed := parseBody(body, "application/json")
+	if parsed.PromptCacheKey != "pcache_1" {
+		t.Fatalf("PromptCacheKey = %q, want pcache_1", parsed.PromptCacheKey)
+	}
+	if parsed.PreviousResponseID != "resp_1" {
+		t.Fatalf("PreviousResponseID = %q, want resp_1", parsed.PreviousResponseID)
+	}
+	if !parsed.HasToolOutput {
+		t.Fatalf("HasToolOutput = false, want true")
+	}
+	if parsed.HasToolCallContext {
+		t.Fatalf("HasToolCallContext = true, want false")
+	}
+	if !requestRequiresContinuationAffinity(parsed) {
+		t.Fatalf("requestRequiresContinuationAffinity = false, want true")
+	}
+}
+
+func TestParseBodyContinuationSignalsWithToolCallContext(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"model":"gpt-5.4","input":[{"type":"function_call","call_id":"call_1","name":"lookup"},{"type":"function_call_output","call_id":"call_1","output":"ok"}]}`)
+	parsed := parseBody(body, "application/json")
+	if !parsed.HasToolOutput {
+		t.Fatalf("HasToolOutput = false, want true")
+	}
+	if !parsed.HasToolCallContext {
+		t.Fatalf("HasToolCallContext = false, want true")
+	}
+	if requestRequiresContinuationAffinity(parsed) {
+		t.Fatalf("requestRequiresContinuationAffinity = true, want false")
+	}
+}
+
 func TestParseBody_MultipartIgnoresFileParts(t *testing.T) {
 	t.Parallel()
 
@@ -376,6 +414,14 @@ func TestSelectAllRoutesFailureResponse(t *testing.T) {
 		wantStatus int
 		wantCode   string
 	}{
+		{
+			name: "continuation affinity missing",
+			summary: allRoutesFailureSummary{
+				continuationAffinityMissing: true,
+			},
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "continuation_affinity_missing",
+		},
 		{
 			name: "upstream rate limited",
 			summary: allRoutesFailureSummary{
