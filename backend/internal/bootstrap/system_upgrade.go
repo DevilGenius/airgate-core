@@ -343,7 +343,7 @@ func sqlDollarTag(sql string) (string, bool) {
 		if ch == '$' {
 			return sql[:i+1], true
 		}
-		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_') {
+		if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') && (ch < '0' || ch > '9') && ch != '_' {
 			return "", false
 		}
 	}
