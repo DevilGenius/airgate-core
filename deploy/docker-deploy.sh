@@ -182,6 +182,11 @@ EOF
   ok "已生成 .env（所有密钥随机，权限 600）"
 fi
 
+if grep -Eq '^AIRGATE_IMAGE=ghcr\.io/DevilGenius/airgate-core[[:space:]]*$' .env; then
+  sed -i -E 's#^AIRGATE_IMAGE=ghcr\.io/DevilGenius/airgate-core[[:space:]]*$#AIRGATE_IMAGE=ghcr.io/devilgenius/airgate-core#' .env
+  ok "已修正 .env 中的 AIRGATE_IMAGE 为小写 GHCR 路径"
+fi
+
 # ---- 完成（注意：本脚本不自动 up -d） ----
 cat <<DONE
 
