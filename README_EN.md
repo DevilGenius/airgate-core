@@ -82,7 +82,7 @@ See [airgate-openai](https://github.com/DevilGenius/airgate-openai) for a comple
 
 | Layer | Tech |
 |---|---|
-| Backend | Go 1.25 · Gin · Ent ORM · PostgreSQL 17 · Redis 8 |
+| Backend | Go 1.26.3 · Gin · Ent ORM · PostgreSQL 17 · Redis 8 |
 | Frontend | React 19 · Vite · TanStack Query · Tailwind CSS |
 | Plugin protocol | hashicorp/go-plugin (gRPC) |
 | Deployment | Docker Compose · GitHub Container Registry · multi-arch (amd64/arm64) |
@@ -304,7 +304,7 @@ docker compose -f deploy/docker-compose.dev.yml up
 
 **B. Run on the host directly**
 
-Requires Go 1.25+, Node 22+, local Postgres + Redis, and the sibling [`airgate-sdk`](https://github.com/DevilGenius/airgate-sdk) repo:
+Requires Go 1.26.3+, Node 22+, local Postgres + Redis, and the sibling [`airgate-sdk`](https://github.com/DevilGenius/airgate-sdk) repo:
 
 ```bash
 git clone https://github.com/DevilGenius/airgate-sdk.git

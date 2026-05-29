@@ -1,6 +1,6 @@
 module github.com/DevilGenius/airgate-core
 
-go 1.25.7
+go 1.26.3
 
 require (
 	entgo.io/ent v0.13.1

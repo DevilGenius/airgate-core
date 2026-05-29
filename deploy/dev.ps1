@@ -249,7 +249,7 @@ function Sync-Webdist {
 function Ensure-PluginGoWork($Plugin) {
   $goWork = Join-Path $Plugin.BackendDir "go.work"
   $desired = @"
-go 1.25.7
+go 1.26.3
 
 use .
 
