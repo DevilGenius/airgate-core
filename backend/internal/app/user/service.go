@@ -6,8 +6,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 const (

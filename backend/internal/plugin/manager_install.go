@@ -16,8 +16,8 @@ import (
 
 	goplugin "github.com/hashicorp/go-plugin"
 
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // Uninstall 卸载插件。

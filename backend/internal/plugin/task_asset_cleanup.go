@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
+	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
 
 func TestReloadRejectsNonDevPlugin(t *testing.T) {

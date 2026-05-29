@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/ent/group"
 )
 
 // Group is the model entity for the Group schema.

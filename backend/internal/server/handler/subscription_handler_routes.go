@@ -3,9 +3,9 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	appsubscription "github.com/DouDOU-start/airgate-core/internal/app/subscription"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	appsubscription "github.com/DevilGenius/airgate-core/internal/app/subscription"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // UserSubscriptions 用户查看自己的订阅列表。

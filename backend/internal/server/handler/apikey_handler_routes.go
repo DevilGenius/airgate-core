@@ -3,9 +3,9 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // ListKeys 查询当前用户的 API 密钥列表。

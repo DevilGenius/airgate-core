@@ -6,9 +6,9 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
+	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
 )
 
 // queryAPIKeyUsage 返回每个 key 的"今日"和"近 30 天"实际成本。

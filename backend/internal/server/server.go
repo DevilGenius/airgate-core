@@ -10,13 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/internal/auth"
-	"github.com/DouDOU-start/airgate-core/internal/billing"
-	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
-	"github.com/DouDOU-start/airgate-core/internal/config"
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
-	"github.com/DouDOU-start/airgate-core/internal/scheduler"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/internal/bootstrap"
+	"github.com/DevilGenius/airgate-core/internal/config"
+	"github.com/DevilGenius/airgate-core/internal/plugin"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
 // Server HTTP 服务器

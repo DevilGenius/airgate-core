@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
+	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
 
 // DynamicRouter 动态路由表

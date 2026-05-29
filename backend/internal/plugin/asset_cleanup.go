@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/setting"
-	enttask "github.com/DouDOU-start/airgate-core/ent/task"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/setting"
+	enttask "github.com/DevilGenius/airgate-core/ent/task"
 )
 
 const (

@@ -13,10 +13,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
-	"github.com/DouDOU-start/airgate-core/internal/auth"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
+	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // publicGroups 允许公开访问的设置分组。

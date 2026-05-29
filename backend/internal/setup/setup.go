@@ -21,12 +21,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/migrate"
-	"github.com/DouDOU-start/airgate-core/internal/config"
-	"github.com/DouDOU-start/airgate-core/internal/infra/store"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/migrate"
+	"github.com/DevilGenius/airgate-core/internal/config"
+	"github.com/DevilGenius/airgate-core/internal/infra/store"
 )
 
 var installMu sync.Mutex

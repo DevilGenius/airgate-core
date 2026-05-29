@@ -14,11 +14,11 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/apikey"
-	entsetting "github.com/DouDOU-start/airgate-core/ent/setting"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/apikey"
+	entsetting "github.com/DevilGenius/airgate-core/ent/setting"
 )
 
 // API Key 缓存。

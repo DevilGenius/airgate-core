@@ -1,8 +1,8 @@
 package handler
 
 import (
-	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 // toUsageLogResp 转换为 reseller / admin 视角的完整响应（包含 actual_cost、billed_cost 等所有字段）。

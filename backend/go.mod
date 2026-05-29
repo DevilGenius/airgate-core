@@ -1,10 +1,10 @@
-module github.com/DouDOU-start/airgate-core
+module github.com/DevilGenius/airgate-core
 
 go 1.25.7
 
 require (
 	entgo.io/ent v0.13.1
-	github.com/DouDOU-start/airgate-sdk v0.2.1
+	github.com/DevilGenius/airgate-sdk v0.2.1
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0

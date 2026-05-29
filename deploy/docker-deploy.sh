@@ -16,7 +16,7 @@
 #
 # 用法：
 #   mkdir airgate && cd airgate
-#   curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/docker-deploy.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/docker-deploy.sh | bash
 #
 # 或带参数：
 #   curl -sSL .../docker-deploy.sh -o docker-deploy.sh
@@ -25,7 +25,7 @@
 # 环境变量覆盖（可选）：
 #   AIRGATE_DIR     安装目录            默认: 当前目录
 #   AIRGATE_PORT    HTTP 端口           默认: 9517
-#   AIRGATE_BRANCH  从 GitHub 拉哪个分支 默认: master
+#   AIRGATE_BRANCH  从 GitHub 拉哪个分支 默认: apex
 #   AIRGATE_TAG     固定镜像版本         默认: latest
 #   NON_INTERACTIVE 跳过所有交互（CI 用） 默认: 0
 #
@@ -65,11 +65,11 @@ BANNER
 # ---- 默认参数 ----
 AIRGATE_DIR="${AIRGATE_DIR:-.}"
 AIRGATE_PORT="${AIRGATE_PORT:-9517}"
-AIRGATE_BRANCH="${AIRGATE_BRANCH:-master}"
+AIRGATE_BRANCH="${AIRGATE_BRANCH:-apex}"
 AIRGATE_TAG="${AIRGATE_TAG:-latest}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
 
-REPO_RAW_URL="https://raw.githubusercontent.com/DouDOU-start/airgate-core/${AIRGATE_BRANCH}/deploy"
+REPO_RAW_URL="https://raw.githubusercontent.com/DevilGenius/airgate-core/${AIRGATE_BRANCH}/deploy"
 
 # ---- 依赖检查 ----
 section "环境检查"
@@ -164,7 +164,7 @@ else
 # 任何修改需要 docker compose up -d 重启生效
 # 数据库 / Redis 密码相关说明见 README.md
 
-AIRGATE_IMAGE=ghcr.io/doudou-start/airgate-core
+AIRGATE_IMAGE=ghcr.io/devilgenius/airgate-core
 AIRGATE_IMAGE_TAG=${AIRGATE_TAG}
 
 PORT=${AIRGATE_PORT}
@@ -206,6 +206,6 @@ ${C_BOLD}常用命令${C_RESET}
   $COMPOSE down                      # 停止
   $COMPOSE pull && $COMPOSE up -d    # 升级镜像
 
-${C_DIM}文档：https://github.com/DouDOU-start/airgate-core${C_RESET}
+${C_DIM}文档：https://github.com/DevilGenius/airgate-core${C_RESET}
 
 DONE

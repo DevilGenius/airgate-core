@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // ListGroupRateOverrides 列出某个分组下所有设置了专属倍率的用户。

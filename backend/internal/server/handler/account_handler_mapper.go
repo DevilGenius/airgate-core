@@ -1,8 +1,8 @@
 package handler
 
 import (
-	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 func toAccountResp(account appaccount.Account) dto.AccountResp {

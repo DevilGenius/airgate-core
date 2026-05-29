@@ -9,10 +9,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	pb "github.com/DouDOU-start/airgate-sdk/protocol/proto"
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
+	pb "github.com/DevilGenius/airgate-sdk/protocol/proto"
+	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
 
-	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
+	"github.com/DevilGenius/airgate-core/internal/server/middleware"
 )
 
 // 请求体大小限制（100MB）

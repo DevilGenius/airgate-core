@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/ent/apikey"
-	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/ent/apikey"
+	"github.com/DevilGenius/airgate-core/internal/auth"
 )
 
 // cc-switch 通用模板兼容端点

@@ -10,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/DouDOU-start/airgate-core/internal/scheduler"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // checkBalance 执行请求进入业务逻辑前的最后一道准入：余额预检。

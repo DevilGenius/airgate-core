@@ -1,8 +1,8 @@
 package handler
 
 import (
-	appproxy "github.com/DouDOU-start/airgate-core/internal/app/proxy"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 func toProxyRespFromDomain(item appproxy.Proxy) dto.ProxyResp {

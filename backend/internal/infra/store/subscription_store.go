@@ -3,10 +3,10 @@ package store
 import (
 	"context"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entuser "github.com/DouDOU-start/airgate-core/ent/user"
-	entusersubscription "github.com/DouDOU-start/airgate-core/ent/usersubscription"
-	appsubscription "github.com/DouDOU-start/airgate-core/internal/app/subscription"
+	"github.com/DevilGenius/airgate-core/ent"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
+	entusersubscription "github.com/DevilGenius/airgate-core/ent/usersubscription"
+	appsubscription "github.com/DevilGenius/airgate-core/internal/app/subscription"
 )
 
 // SubscriptionStore 使用 Ent 实现订阅仓储。

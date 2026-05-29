@@ -5,19 +5,19 @@ package ent
 import (
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent/account"
-	"github.com/DouDOU-start/airgate-core/ent/apikey"
-	"github.com/DouDOU-start/airgate-core/ent/balancelog"
-	"github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/plugin"
-	"github.com/DouDOU-start/airgate-core/ent/pluginsource"
-	"github.com/DouDOU-start/airgate-core/ent/proxy"
-	"github.com/DouDOU-start/airgate-core/ent/schema"
-	"github.com/DouDOU-start/airgate-core/ent/setting"
-	"github.com/DouDOU-start/airgate-core/ent/task"
-	"github.com/DouDOU-start/airgate-core/ent/usagelog"
-	"github.com/DouDOU-start/airgate-core/ent/user"
-	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
+	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/ent/apikey"
+	"github.com/DevilGenius/airgate-core/ent/balancelog"
+	"github.com/DevilGenius/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/ent/plugin"
+	"github.com/DevilGenius/airgate-core/ent/pluginsource"
+	"github.com/DevilGenius/airgate-core/ent/proxy"
+	"github.com/DevilGenius/airgate-core/ent/schema"
+	"github.com/DevilGenius/airgate-core/ent/setting"
+	"github.com/DevilGenius/airgate-core/ent/task"
+	"github.com/DevilGenius/airgate-core/ent/usagelog"
+	"github.com/DevilGenius/airgate-core/ent/user"
+	"github.com/DevilGenius/airgate-core/ent/usersubscription"
 )
 
 // The init function reads all schema descriptors with runtime code

@@ -8,9 +8,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	enttask "github.com/DouDOU-start/airgate-core/ent/task"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/ent"
+	enttask "github.com/DevilGenius/airgate-core/ent/task"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // task_service.go 收敛 Core 内部任务状态机的持久化入口。

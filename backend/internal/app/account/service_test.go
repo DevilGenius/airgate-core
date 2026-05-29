@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
+	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
 
 func TestImportIgnoresEnvironmentScopedIDs(t *testing.T) {

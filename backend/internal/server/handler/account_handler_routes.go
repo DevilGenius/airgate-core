@@ -10,9 +10,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // ListAccounts 查询账号列表。

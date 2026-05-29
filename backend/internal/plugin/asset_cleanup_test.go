@@ -10,9 +10,9 @@ import (
 	"entgo.io/ent/dialect/sql/schema"
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/enttest"
-	enttask "github.com/DouDOU-start/airgate-core/ent/task"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/enttest"
+	enttask "github.com/DevilGenius/airgate-core/ent/task"
 )
 
 func TestAssetStorageCleanupExpiredLocal(t *testing.T) {

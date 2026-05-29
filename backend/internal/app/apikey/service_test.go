@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	corauth "github.com/DouDOU-start/airgate-core/internal/auth"
+	corauth "github.com/DevilGenius/airgate-core/internal/auth"
 )
 
 const testAPIKeySecret = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"

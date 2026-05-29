@@ -10,11 +10,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
-	"github.com/DouDOU-start/airgate-core/internal/auth"
-	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	appauth "github.com/DevilGenius/airgate-core/internal/app/auth"
+	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/infra/mailer"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // Login 用户登录。

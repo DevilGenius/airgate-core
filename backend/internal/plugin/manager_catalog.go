@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	pluginent "github.com/DouDOU-start/airgate-core/ent/plugin"
+	"github.com/DevilGenius/airgate-core/ent"
+	pluginent "github.com/DevilGenius/airgate-core/ent/plugin"
 )
 
 // GetExtensionByName 根据插件名查找 extension 类型插件。

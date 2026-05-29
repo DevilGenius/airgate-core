@@ -8,9 +8,9 @@ import (
 	"net/smtp"
 	"strings"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/internal/infra/store"
+	"github.com/DevilGenius/airgate-core/internal/infra/store"
 )
 
 // Config SMTP 配置。

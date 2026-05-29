@@ -109,7 +109,7 @@ var officialPlugins = []MarketplacePlugin{
 		Description: "OpenAI API 网关插件",
 		Author:      "AirGate",
 		Type:        "gateway",
-		GithubRepo:  "DouDOU-start/airgate-openai",
+		GithubRepo:  "DevilGenius/airgate-openai",
 	},
 	{
 		Name:        "payment-epay",
@@ -117,7 +117,7 @@ var officialPlugins = []MarketplacePlugin{
 		Description: "多渠道支付插件：易支付 / 支付宝官方 / 微信支付官方",
 		Author:      "AirGate",
 		Type:        "extension",
-		GithubRepo:  "DouDOU-start/airgate-epay",
+		GithubRepo:  "DevilGenius/airgate-epay",
 	},
 	{
 		Name:        "airgate-health",
@@ -125,7 +125,7 @@ var officialPlugins = []MarketplacePlugin{
 		Description: "AI 提供商健康监控：主动探测、可用率/延迟聚合、对外公开状态页",
 		Author:      "AirGate",
 		Type:        "extension",
-		GithubRepo:  "DouDOU-start/airgate-health",
+		GithubRepo:  "DevilGenius/airgate-health",
 	},
 	{
 		Name:        "airgate-playground",
@@ -133,7 +133,7 @@ var officialPlugins = []MarketplacePlugin{
 		Description: "AI 对话插件：网页聊天、多模型切换、会话管理",
 		Author:      "AirGate",
 		Type:        "extension",
-		GithubRepo:  "DouDOU-start/airgate-playground",
+		GithubRepo:  "DevilGenius/airgate-playground",
 	},
 	{
 		Name:        "gateway-claude",
@@ -141,7 +141,7 @@ var officialPlugins = []MarketplacePlugin{
 		Description: "Claude Messages API 网关插件：OAuth 授权、TLS 指纹、用量监控",
 		Author:      "AirGate",
 		Type:        "gateway",
-		GithubRepo:  "DouDOU-start/airgate-claude",
+		GithubRepo:  "DevilGenius/airgate-claude",
 	},
 	{
 		Name:        "gateway-kiro",
@@ -149,7 +149,7 @@ var officialPlugins = []MarketplacePlugin{
 		Description: "Kiro (AWS CodeWhisperer) 反代网关，兼容 Anthropic Messages API",
 		Author:      "AirGate",
 		Type:        "gateway",
-		GithubRepo:  "DouDOU-start/airgate-kiro",
+		GithubRepo:  "DevilGenius/airgate-kiro",
 	},
 	{
 		Name:        "airgate-studio",
@@ -157,7 +157,7 @@ var officialPlugins = []MarketplacePlugin{
 		Description: "面向图片、视频、音频等多模态内容生成的统一创作中心",
 		Author:      "AirGate",
 		Type:        "extension",
-		GithubRepo:  "DouDOU-start/airgate-studio",
+		GithubRepo:  "DevilGenius/airgate-studio",
 	},
 }
 

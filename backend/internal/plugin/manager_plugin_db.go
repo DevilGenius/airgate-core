@@ -11,8 +11,8 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	settingent "github.com/DouDOU-start/airgate-core/ent/setting"
+	"github.com/DevilGenius/airgate-core/ent"
+	settingent "github.com/DevilGenius/airgate-core/ent/setting"
 )
 
 // manager_plugin_db.go：为每个插件 provision 独立 schema + 受限 postgres role

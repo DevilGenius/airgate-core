@@ -4,14 +4,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
-	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
-	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
-	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
-	entuser "github.com/DouDOU-start/airgate-core/ent/user"
-	entusersubscription "github.com/DouDOU-start/airgate-core/ent/usersubscription"
-	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
+	"github.com/DevilGenius/airgate-core/ent"
+	entaccount "github.com/DevilGenius/airgate-core/ent/account"
+	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
+	entgroup "github.com/DevilGenius/airgate-core/ent/group"
+	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
+	entusersubscription "github.com/DevilGenius/airgate-core/ent/usersubscription"
+	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
 )
 
 // GroupStore 使用 Ent 实现分组仓储。

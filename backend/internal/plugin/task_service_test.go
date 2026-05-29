@@ -6,7 +6,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	enttask "github.com/DouDOU-start/airgate-core/ent/task"
+	enttask "github.com/DevilGenius/airgate-core/ent/task"
 )
 
 func TestValidateTaskTransition(t *testing.T) {

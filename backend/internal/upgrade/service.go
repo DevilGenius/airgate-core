@@ -18,9 +18,9 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/internal/version"
+	"github.com/DevilGenius/airgate-core/internal/version"
 )
 
 // redisLockKey 全局升级互斥锁。

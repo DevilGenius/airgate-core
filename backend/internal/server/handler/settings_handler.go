@@ -1,7 +1,7 @@
 package handler
 
 import (
-	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
 )
 
 // SettingsHandler 系统设置 Handler。

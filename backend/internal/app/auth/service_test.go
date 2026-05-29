@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	corauth "github.com/DouDOU-start/airgate-core/internal/auth"
+	corauth "github.com/DevilGenius/airgate-core/internal/auth"
 )
 
 func TestRegisterRejectsDuplicateEmail(t *testing.T) {

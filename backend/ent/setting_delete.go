@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	"github.com/DouDOU-start/airgate-core/ent/setting"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
+	"github.com/DevilGenius/airgate-core/ent/setting"
 )
 
 // SettingDelete is the builder for deleting a Setting entity.

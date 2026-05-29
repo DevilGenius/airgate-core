@@ -7,14 +7,14 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqljson"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
-	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	entproxy "github.com/DouDOU-start/airgate-core/ent/proxy"
-	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
-	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
-	"github.com/DouDOU-start/airgate-core/internal/pkg/usagemodel"
+	"github.com/DevilGenius/airgate-core/ent"
+	entaccount "github.com/DevilGenius/airgate-core/ent/account"
+	entgroup "github.com/DevilGenius/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
+	entproxy "github.com/DevilGenius/airgate-core/ent/proxy"
+	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
+	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 )
 
 // AccountStore 使用 Ent 实现账号仓储。

@@ -1,8 +1,8 @@
 package handler
 
 import (
-	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 func toSettingResp(item appsettings.Setting) dto.SettingResp {

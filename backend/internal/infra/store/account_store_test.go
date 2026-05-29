@@ -6,10 +6,10 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/enttest"
-	"github.com/DouDOU-start/airgate-core/ent/migrate"
-	"github.com/DouDOU-start/airgate-core/internal/app/account"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/enttest"
+	"github.com/DevilGenius/airgate-core/ent/migrate"
+	"github.com/DevilGenius/airgate-core/internal/app/account"
 )
 
 func TestAccountStoreKeywordSearchMatchesOAuthEmail(t *testing.T) {

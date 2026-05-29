@@ -11,10 +11,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/ent/account"
-	"github.com/DouDOU-start/airgate-core/internal/billing"
-	"github.com/DouDOU-start/airgate-core/internal/scheduler"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // openAIError 以 OpenAI 兼容格式返回错误，保证 Claude Code 等客户端能识别。

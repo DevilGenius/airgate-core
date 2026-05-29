@@ -10,8 +10,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/plugin"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
+	"github.com/DevilGenius/airgate-core/ent/plugin"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
 )
 
 // PluginQuery is the builder for querying Plugin entities.

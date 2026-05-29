@@ -1,6 +1,6 @@
 [Unit]
 Description=AirGate Core - Pluggable AI Gateway Runtime
-Documentation=https://github.com/DouDOU-start/airgate-core
+Documentation=https://github.com/DevilGenius/airgate-core
 After=network.target postgresql.service redis.service redis-server.service
 Wants=postgresql.service redis.service
 

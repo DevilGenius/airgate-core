@@ -10,11 +10,11 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/DouDOU-start/airgate-core/ent/account"
-	"github.com/DouDOU-start/airgate-core/ent/apikey"
-	"github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/usagelog"
-	"github.com/DouDOU-start/airgate-core/ent/user"
+	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/ent/apikey"
+	"github.com/DevilGenius/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/ent/usagelog"
+	"github.com/DevilGenius/airgate-core/ent/user"
 )
 
 // UsageLog is the model entity for the UsageLog schema.

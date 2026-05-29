@@ -10,7 +10,7 @@ import (
 )
 
 // GithubRepo 仓库标识。
-const GithubRepo = "DouDOU-start/airgate-core"
+const GithubRepo = "DevilGenius/airgate-core"
 
 // githubClient 带 ETag 缓存和短时间内存缓存的 GitHub release 客户端。
 type githubClient struct {

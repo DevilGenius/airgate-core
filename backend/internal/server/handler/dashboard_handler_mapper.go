@@ -1,8 +1,8 @@
 package handler
 
 import (
-	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 func toDashboardStatsResp(item appdashboard.Stats) dto.DashboardStatsResp {

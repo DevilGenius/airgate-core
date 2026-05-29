@@ -159,7 +159,7 @@ function Invoke-InDir([string]$Directory, [string]$Command) {
 }
 
 function Get-GoEnvCommand([string]$Command) {
-  "`$env:GOTOOLCHAIN = 'local'; `$env:GOPRIVATE = 'github.com/DouDOU-start/airgate-sdk'; `$env:GONOPROXY = 'github.com/DouDOU-start/airgate-sdk'; `$env:GONOSUMDB = 'github.com/DouDOU-start/airgate-sdk'; $Command"
+  "`$env:GOTOOLCHAIN = 'local'; `$env:GOPRIVATE = 'github.com/DevilGenius/airgate-sdk'; `$env:GONOPROXY = 'github.com/DevilGenius/airgate-sdk'; `$env:GONOSUMDB = 'github.com/DevilGenius/airgate-sdk'; $Command"
 }
 
 function Assert-Command([string]$Name) {
@@ -253,7 +253,7 @@ go 1.25.7
 
 use .
 
-replace github.com/DouDOU-start/airgate-sdk => ../../airgate-sdk
+replace github.com/DevilGenius/airgate-sdk => ../../airgate-sdk
 "@
 
   if (-not (Test-Path $goWork) -or ((Get-Content -Raw $goWork) -ne $desired)) {
@@ -371,7 +371,7 @@ function Sync-PluginWebdist($Plugin) {
 function Build-Plugin($Plugin) {
   Ensure-PluginGoWork $Plugin
 
-  $themeTypes = Join-Path $Plugin.WebDir "node_modules\@doudou-start\airgate-theme\dist\index.d.ts"
+  $themeTypes = Join-Path $Plugin.WebDir "node_modules\@devilgenius\airgate-theme\dist\index.d.ts"
   if (-not (Test-Path $themeTypes)) {
     Invoke-PnpmInstall $Plugin.WebDir -Force
   }
@@ -387,7 +387,7 @@ function Build-All {
   Assert-Command "pnpm"
   Invoke-InDir $SdkTheme "pnpm build"
 
-  $themeTypes = Join-Path $WebDir "node_modules\@doudou-start\airgate-theme\dist\index.d.ts"
+  $themeTypes = Join-Path $WebDir "node_modules\@devilgenius\airgate-theme\dist\index.d.ts"
   if (-not (Test-Path $themeTypes)) {
     Invoke-PnpmInstall $WebDir -Force
   }

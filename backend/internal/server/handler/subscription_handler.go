@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	appsubscription "github.com/DouDOU-start/airgate-core/internal/app/subscription"
+	appsubscription "github.com/DevilGenius/airgate-core/internal/app/subscription"
 )
 
 // SubscriptionHandler 订阅管理 Handler。

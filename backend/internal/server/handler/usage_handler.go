@@ -3,7 +3,7 @@ package handler
 import (
 	"log/slog"
 
-	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
+	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
 )
 
 // UsageHandler 使用记录 Handler。

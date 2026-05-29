@@ -11,11 +11,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/internal/auth"
-	"github.com/DouDOU-start/airgate-core/internal/routing"
-	"github.com/DouDOU-start/airgate-core/internal/scheduler"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/routing"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestParseBody(t *testing.T) {

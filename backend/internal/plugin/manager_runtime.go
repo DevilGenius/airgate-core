@@ -15,13 +15,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/DouDOU-start/airgate-sdk/protocol/proto"
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	pb "github.com/DevilGenius/airgate-sdk/protocol/proto"
+	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	pluginent "github.com/DouDOU-start/airgate-core/ent/plugin"
-	settingent "github.com/DouDOU-start/airgate-core/ent/setting"
+	"github.com/DevilGenius/airgate-core/ent"
+	pluginent "github.com/DevilGenius/airgate-core/ent/plugin"
+	settingent "github.com/DevilGenius/airgate-core/ent/setting"
 )
 
 // pluginGRPCMaxMessageBytes 是与插件之间 gRPC 单条消息的最大字节数（收/发同值）。

@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
+	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
 )
 
 // APIKeyHandler API 密钥管理 Handler。

@@ -3,10 +3,10 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
-	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"github.com/DevilGenius/airgate-core/internal/server/middleware"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // UserUsage 用户查看自己的使用记录。

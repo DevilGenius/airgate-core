@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	corauth "github.com/DouDOU-start/airgate-core/internal/auth"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	corauth "github.com/DevilGenius/airgate-core/internal/auth"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // Service 提供认证域用例编排。

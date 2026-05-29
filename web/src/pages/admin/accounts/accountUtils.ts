@@ -4,7 +4,7 @@ import type {
   PluginOAuthBridge,
   PluginOAuthBatchExchangeResult,
   PluginOAuthExchangeResult,
-} from '@doudou-start/airgate-theme/plugin';
+} from '@devilgenius/airgate-theme/plugin';
 
 /** Session 导入能力尚未沉淀进 SDK；Core 在 bridge 上扩展两个可选字段，
  *  插件 widget 用相同的 intersection 形态拿到这两个 method。 */

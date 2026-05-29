@@ -7,11 +7,11 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/account"
-	"github.com/DouDOU-start/airgate-core/ent/enttest"
-	"github.com/DouDOU-start/airgate-core/ent/migrate"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/ent/enttest"
+	"github.com/DevilGenius/airgate-core/ent/migrate"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestStateMachineAccountUnavailableEscalatesAfterThreshold(t *testing.T) {

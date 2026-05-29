@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	enttask "github.com/DouDOU-start/airgate-core/ent/task"
-	pb "github.com/DouDOU-start/airgate-sdk/protocol/proto"
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/ent"
+	enttask "github.com/DevilGenius/airgate-core/ent/task"
+	pb "github.com/DevilGenius/airgate-sdk/protocol/proto"
+	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 const (

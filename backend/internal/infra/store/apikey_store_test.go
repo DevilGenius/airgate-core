@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
+	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
 )
 
 // TestAPIKeyStoreListAdminSearchScope 验证 search_scope 控制是否按用户邮箱模糊匹配。

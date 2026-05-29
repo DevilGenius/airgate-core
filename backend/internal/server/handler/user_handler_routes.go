@@ -5,11 +5,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
-	corauth "github.com/DouDOU-start/airgate-core/internal/auth"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
-	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
+	corauth "github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"github.com/DevilGenius/airgate-core/internal/server/middleware"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // GetMe 获取当前登录用户信息。

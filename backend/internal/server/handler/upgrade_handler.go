@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	"github.com/DouDOU-start/airgate-core/internal/upgrade"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
+	"github.com/DevilGenius/airgate-core/internal/upgrade"
 )
 
 // UpgradeHandler 系统更新 Handler。

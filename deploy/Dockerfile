@@ -19,9 +19,9 @@ RUN cd airgate-core/web && pnpm build
 FROM golang:1.25-alpine AS backend
 RUN apk add --no-cache git
 WORKDIR /build
-ENV GOPRIVATE=github.com/DouDOU-start/airgate-sdk \
-    GONOPROXY=github.com/DouDOU-start/airgate-sdk \
-    GONOSUMDB=github.com/DouDOU-start/airgate-sdk
+ENV GOPRIVATE=github.com/DevilGenius/airgate-sdk \
+    GONOPROXY=github.com/DevilGenius/airgate-sdk \
+    GONOSUMDB=github.com/DevilGenius/airgate-sdk
 
 COPY airgate-core/backend/go.mod airgate-core/backend/go.sum ./airgate-core/backend/
 RUN cd airgate-core/backend && go mod download -x
@@ -36,7 +36,7 @@ COPY --from=frontend /build/airgate-core/web/dist/. airgate-core/backend/interna
 # 镜像内的 Version 由 build-arg 注入，与 release workflow 的 git tag 一致
 ARG VERSION=docker
 RUN cd airgate-core/backend && CGO_ENABLED=0 go build -buildvcs=false -trimpath \
-    -ldflags "-X github.com/DouDOU-start/airgate-core/internal/version.Version=${VERSION}" \
+    -ldflags "-X github.com/DevilGenius/airgate-core/internal/version.Version=${VERSION}" \
     -o /server ./cmd/server
 
 # ---- 阶段 3: 运行时 ----

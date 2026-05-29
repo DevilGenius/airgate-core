@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	"github.com/DouDOU-start/airgate-core/ent/user"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
+	"github.com/DevilGenius/airgate-core/ent/user"
 )
 
 // UserDelete is the builder for deleting a User entity.

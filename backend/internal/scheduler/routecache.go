@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 // Route 结果缓存。

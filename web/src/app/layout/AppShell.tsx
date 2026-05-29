@@ -440,7 +440,7 @@ export function AppShell({ children }: AppShellProps) {
             )}
             {/* GitHub */}
             <HeroLink
-              href="https://github.com/DouDOU-start/airgate-core"
+              href="https://github.com/DevilGenius/airgate-core"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="GitHub"

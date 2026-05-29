@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
+	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
 )
 
 func TestUsageStoreListPaginationUsesStableIDOrder(t *testing.T) {

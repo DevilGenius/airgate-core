@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
-	entuser "github.com/DouDOU-start/airgate-core/ent/user"
-	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
+	"github.com/DevilGenius/airgate-core/ent"
+	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
+	appauth "github.com/DevilGenius/airgate-core/internal/app/auth"
 )
 
 // AuthStore 使用 Ent 实现认证仓储。

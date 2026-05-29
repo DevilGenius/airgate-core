@@ -3,7 +3,7 @@ package server
 import (
 	"testing"
 
-	"github.com/DouDOU-start/airgate-core/internal/config"
+	"github.com/DevilGenius/airgate-core/internal/config"
 )
 
 func TestContentTypeFromExt(t *testing.T) {

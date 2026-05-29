@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 // EntSlogLogger 返回一个 ent.Option，用 slog.Debug 输出 ent 自身日志。

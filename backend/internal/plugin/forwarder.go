@@ -9,13 +9,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/internal/auth"
-	"github.com/DouDOU-start/airgate-core/internal/billing"
-	"github.com/DouDOU-start/airgate-core/internal/routing"
-	"github.com/DouDOU-start/airgate-core/internal/scheduler"
-	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/internal/routing"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
+	"github.com/DevilGenius/airgate-core/internal/server/middleware"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // 访问日志富化键的本地别名，避免在大量 c.Set 处重复写出包名。

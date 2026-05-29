@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
 )
 
 // ID filters vertices based on their ID field.

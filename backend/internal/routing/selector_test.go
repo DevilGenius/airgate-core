@@ -6,8 +6,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/DouDOU-start/airgate-core/ent/enttest"
-	"github.com/DouDOU-start/airgate-core/ent/migrate"
+	"github.com/DevilGenius/airgate-core/ent/enttest"
+	"github.com/DevilGenius/airgate-core/ent/migrate"
 )
 
 func TestListEligibleGroups(t *testing.T) {

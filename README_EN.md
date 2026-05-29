@@ -6,9 +6,9 @@
   <p><strong>A pluggable runtime for unified AI gateways</strong></p>
 
   <p>
-    <a href="https://github.com/DouDOU-start/airgate-core/releases"><img src="https://img.shields.io/github/v/release/DouDOU-start/airgate-core?style=flat-square" alt="release" /></a>
-    <a href="https://github.com/DouDOU-start/airgate-core/pkgs/container/airgate-core"><img src="https://img.shields.io/badge/ghcr.io-airgate--core-blue?style=flat-square&logo=docker" alt="ghcr.io" /></a>
-    <a href="https://github.com/DouDOU-start/airgate-core/blob/master/LICENSE"><img src="https://img.shields.io/github/license/DouDOU-start/airgate-core?style=flat-square" alt="license" /></a>
+    <a href="https://github.com/DevilGenius/airgate-core/releases"><img src="https://img.shields.io/github/v/release/DevilGenius/airgate-core?style=flat-square" alt="release" /></a>
+    <a href="https://github.com/DevilGenius/airgate-core/pkgs/container/airgate-core"><img src="https://img.shields.io/badge/ghcr.io-airgate--core-blue?style=flat-square&logo=docker" alt="ghcr.io" /></a>
+    <a href="https://github.com/DevilGenius/airgate-core/blob/apex/LICENSE"><img src="https://img.shields.io/github/license/DevilGenius/airgate-core?style=flat-square" alt="license" /></a>
     <img src="https://img.shields.io/badge/Go-1.25-00ADD8?style=flat-square&logo=go" alt="go" />
     <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react" alt="react" />
   </p>
@@ -42,13 +42,13 @@ Plugins can be **released, installed, uninstalled, and hot-reloaded independentl
 
 | Plugin | Type | Capabilities | Repository |
 |---|---|---|---|
-| **gateway-openai** | gateway | OpenAI Responses / Chat Completions / ChatGPT OAuth / Anthropic protocol translation / WebSocket | [DouDOU-start/airgate-openai](https://github.com/DouDOU-start/airgate-openai) |
-| **gateway-claude** | gateway | Claude Messages API gateway: OAuth authorization, TLS fingerprinting, usage monitoring | [DouDOU-start/airgate-claude](https://github.com/DouDOU-start/airgate-claude) |
-| **gateway-kiro** | gateway | Kiro (AWS CodeWhisperer) reverse proxy gateway compatible with Anthropic Messages API | [DouDOU-start/airgate-kiro](https://github.com/DouDOU-start/airgate-kiro) |
-| **airgate-playground** | extension | AI chat plugin: web chat, multi-model switching, conversation management | [DouDOU-start/airgate-playground](https://github.com/DouDOU-start/airgate-playground) |
-| **airgate-studio** | extension | Unified creation center for multimodal image, video, and audio generation | [DouDOU-start/airgate-studio](https://github.com/DouDOU-start/airgate-studio) |
-| **payment-epay** | extension | Multi-channel payment: EPay (Xunhu/Rainbow) / Alipay Official / WeChat Pay Official, with recharge page, order management, provider configuration | [DouDOU-start/airgate-epay](https://github.com/DouDOU-start/airgate-epay) |
-| **airgate-health** | extension | AI provider health monitoring: active probing, availability/latency aggregation, public status page | [DouDOU-start/airgate-health](https://github.com/DouDOU-start/airgate-health) |
+| **gateway-openai** | gateway | OpenAI Responses / Chat Completions / ChatGPT OAuth / Anthropic protocol translation / WebSocket | [DevilGenius/airgate-openai](https://github.com/DevilGenius/airgate-openai) |
+| **gateway-claude** | gateway | Claude Messages API gateway: OAuth authorization, TLS fingerprinting, usage monitoring | [DevilGenius/airgate-claude](https://github.com/DevilGenius/airgate-claude) |
+| **gateway-kiro** | gateway | Kiro (AWS CodeWhisperer) reverse proxy gateway compatible with Anthropic Messages API | [DevilGenius/airgate-kiro](https://github.com/DevilGenius/airgate-kiro) |
+| **airgate-playground** | extension | AI chat plugin: web chat, multi-model switching, conversation management | [DevilGenius/airgate-playground](https://github.com/DevilGenius/airgate-playground) |
+| **airgate-studio** | extension | Unified creation center for multimodal image, video, and audio generation | [DevilGenius/airgate-studio](https://github.com/DevilGenius/airgate-studio) |
+| **payment-epay** | extension | Multi-channel payment: EPay (Xunhu/Rainbow) / Alipay Official / WeChat Pay Official, with recharge page, order management, provider configuration | [DevilGenius/airgate-epay](https://github.com/DevilGenius/airgate-epay) |
+| **airgate-health** | extension | AI provider health monitoring: active probing, availability/latency aggregation, public status page | [DevilGenius/airgate-health](https://github.com/DevilGenius/airgate-health) |
 
 ### Installing a plugin
 
@@ -64,7 +64,7 @@ The marketplace **periodically syncs** the latest release of each plugin via the
 
 ### Building your own plugin
 
-Pull in [airgate-sdk](https://github.com/DouDOU-start/airgate-sdk) and implement the `GatewayPlugin` interface:
+Pull in [airgate-sdk](https://github.com/DevilGenius/airgate-sdk) and implement the `GatewayPlugin` interface:
 
 ```go
 type GatewayPlugin interface {
@@ -76,7 +76,7 @@ type GatewayPlugin interface {
 }
 ```
 
-See [airgate-openai](https://github.com/DouDOU-start/airgate-openai) for a complete reference, including Makefile, release workflow, and embedded frontend.
+See [airgate-openai](https://github.com/DevilGenius/airgate-openai) for a complete reference, including Makefile, release workflow, and embedded frontend.
 
 ## 🛠 Tech Stack
 
@@ -102,7 +102,7 @@ Pick one. Both are production-ready.
 ### Method 1A: Bare-metal install (systemd; bring your own PostgreSQL + Redis)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | sudo bash
 ```
 
 [install.sh](deploy/install.sh) will:
@@ -132,13 +132,13 @@ After the admin UI is up, go to **Plugin Management → Marketplace** to install
 
 ```bash
 # Upgrade to latest (config and data preserved)
-curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/install.sh | sudo bash -s -- upgrade
+curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | sudo bash -s -- upgrade
 
 # Pin a specific version
-curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/install.sh | sudo bash -s -- -v v0.1.0
+curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | sudo bash -s -- -v v0.1.0
 
 # Uninstall (keeps /etc/airgate-core and /var/lib/airgate-core by default)
-curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/install.sh | sudo bash -s -- uninstall -y
+curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | sudo bash -s -- uninstall -y
 ```
 
 **Common commands**:
@@ -153,7 +153,7 @@ sudo systemctl restart airgate-core   # restart
 
 ```bash
 mkdir airgate && cd airgate
-curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/docker-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/docker-deploy.sh | bash
 
 # Review the generated files, then start
 docker compose up -d
@@ -289,12 +289,12 @@ For development or contributions. Pick one of the two paths:
 
 **A. Fully containerized (recommended, zero host dependencies)**
 
-The host only needs Docker. Clone [`airgate-sdk`](https://github.com/DouDOU-start/airgate-sdk) and [`airgate-core`](https://github.com/DouDOU-start/airgate-core) into a shared parent directory:
+The host only needs Docker. Clone [`airgate-sdk`](https://github.com/DevilGenius/airgate-sdk) and [`airgate-core`](https://github.com/DevilGenius/airgate-core) into a shared parent directory:
 
 ```bash
 mkdir airgate && cd airgate
-git clone https://github.com/DouDOU-start/airgate-sdk.git
-git clone https://github.com/DouDOU-start/airgate-core.git
+git clone https://github.com/DevilGenius/airgate-sdk.git
+git clone https://github.com/DevilGenius/airgate-core.git
 
 cd airgate-core
 docker compose -f deploy/docker-compose.dev.yml up
@@ -304,11 +304,11 @@ docker compose -f deploy/docker-compose.dev.yml up
 
 **B. Run on the host directly**
 
-Requires Go 1.25+, Node 22+, local Postgres + Redis, and the sibling [`airgate-sdk`](https://github.com/DouDOU-start/airgate-sdk) repo:
+Requires Go 1.25+, Node 22+, local Postgres + Redis, and the sibling [`airgate-sdk`](https://github.com/DevilGenius/airgate-sdk) repo:
 
 ```bash
-git clone https://github.com/DouDOU-start/airgate-sdk.git
-git clone https://github.com/DouDOU-start/airgate-core.git
+git clone https://github.com/DevilGenius/airgate-sdk.git
+git clone https://github.com/DevilGenius/airgate-core.git
 cd airgate-core
 
 make install   # Install backend & frontend dependencies
@@ -411,7 +411,7 @@ airgate-core/
 > docker run --rm -v <project>_redis_data:/from    -v $(pwd)/data/redis:/to    alpine cp -a /from/. /to/
 > docker run --rm -v <project>_airgate_plugins:/from -v $(pwd)/data/plugins:/to alpine cp -a /from/. /to/
 > docker run --rm -v <project>_airgate_uploads:/from -v $(pwd)/data/uploads:/to alpine cp -a /from/. /to/
-> curl -O https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/docker-compose.yml
+> curl -O https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/docker-compose.yml
 > docker compose up -d
 > # After verifying everything works, drop the old named volumes
 > docker volume rm <project>_postgres_data <project>_redis_data <project>_airgate_plugins <project>_airgate_uploads
@@ -420,9 +420,9 @@ airgate-core/
 
 ## 🤝 Contributing / Feedback
 
-- Bugs / Features: [Issues](https://github.com/DouDOU-start/airgate-core/issues)
-- Plugin development docs: [airgate-sdk](https://github.com/DouDOU-start/airgate-sdk)
-- Reference plugin implementation: [airgate-openai](https://github.com/DouDOU-start/airgate-openai)
+- Bugs / Features: [Issues](https://github.com/DevilGenius/airgate-core/issues)
+- Plugin development docs: [airgate-sdk](https://github.com/DevilGenius/airgate-sdk)
+- Reference plugin implementation: [airgate-openai](https://github.com/DevilGenius/airgate-openai)
 
 ## 📜 License
 

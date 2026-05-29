@@ -6,7 +6,7 @@ import { IdCard, Hash, Gauge } from 'lucide-react';
 import type {
   PluginBatchAccountInput,
   PluginBatchImportResult,
-} from '@doudou-start/airgate-theme/plugin';
+} from '@devilgenius/airgate-theme/plugin';
 import { accountsApi } from '../../../shared/api/accounts';
 import { groupsApi } from '../../../shared/api/groups';
 import { proxiesApi } from '../../../shared/api/proxies';

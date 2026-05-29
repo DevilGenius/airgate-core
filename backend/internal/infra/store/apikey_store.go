@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
-	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
-	entuser "github.com/DouDOU-start/airgate-core/ent/user"
-	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
+	"github.com/DevilGenius/airgate-core/ent"
+	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
+	entgroup "github.com/DevilGenius/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
+	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
+	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
 )
 
 // APIKeyStore 使用 Ent 实现 API Key 仓储。

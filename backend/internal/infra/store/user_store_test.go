@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entbalancelog "github.com/DouDOU-start/airgate-core/ent/balancelog"
-	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
+	"github.com/DevilGenius/airgate-core/ent"
+	entbalancelog "github.com/DevilGenius/airgate-core/ent/balancelog"
+	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
 )
 
 func TestUserStoreDeleteKeepsUsageAndBillingHistory(t *testing.T) {

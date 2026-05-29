@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
+	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 )
 
 const (

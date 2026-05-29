@@ -1,8 +1,8 @@
 package handler
 
 import (
-	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appauth "github.com/DevilGenius/airgate-core/internal/app/auth"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 // userToResp 将认证域 User 转换为 DTO 响应。

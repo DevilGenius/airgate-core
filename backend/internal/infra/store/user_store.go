@@ -4,14 +4,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
-	entbalancelog "github.com/DouDOU-start/airgate-core/ent/balancelog"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
-	entuser "github.com/DouDOU-start/airgate-core/ent/user"
-	entusersubscription "github.com/DouDOU-start/airgate-core/ent/usersubscription"
-	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
+	"github.com/DevilGenius/airgate-core/ent"
+	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
+	entbalancelog "github.com/DevilGenius/airgate-core/ent/balancelog"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
+	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
+	entusersubscription "github.com/DevilGenius/airgate-core/ent/usersubscription"
+	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
 )
 
 // UserStore 使用 Ent 实现用户仓储。

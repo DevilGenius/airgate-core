@@ -2,7 +2,7 @@
 package handler
 
 import (
-	apppluginadmin "github.com/DouDOU-start/airgate-core/internal/app/pluginadmin"
+	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
 )
 
 // PluginHandler 插件管理 API。

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/ent/account"
 )
 
 // 管理员 / 配额巡检的状态写入口。这些调用不经过 Apply —— 它们是"外部已知事实"

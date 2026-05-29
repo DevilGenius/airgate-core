@@ -29,7 +29,7 @@ GO := GOTOOLCHAIN=local go
 
 # 版本号：默认从 git 派生（dirty 检测），release workflow 通过 -ldflags 注入。
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -X github.com/DouDOU-start/airgate-core/internal/version.Version=$(VERSION)
+LDFLAGS := -X github.com/DevilGenius/airgate-core/internal/version.Version=$(VERSION)
 
 .PHONY: help dev dev-backend dev-frontend dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-playground dev-plugin-epay dev-plugin-health dev-plugin-kiro dev-plugin-studio \
         build build-backend build-frontend \
@@ -266,7 +266,7 @@ lint: ## 代码检查（需要安装 golangci-lint）
 fmt: ## 格式化代码
 	@cd $(BACKEND_DIR) && \
 	if command -v goimports > /dev/null 2>&1; then \
-		goimports -w -local github.com/DouDOU-start .; \
+		goimports -w -local github.com/DevilGenius .; \
 	else \
 		$(GO) fmt ./...; \
 	fi

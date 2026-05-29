@@ -16,7 +16,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/DouDOU-start
+        - github.com/DevilGenius
 
 run:
   exclude-dirs:

@@ -5,12 +5,12 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
-	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
-	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
-	"github.com/DouDOU-start/airgate-core/internal/auth"
-	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
+	"github.com/DevilGenius/airgate-core/ent"
+	appauth "github.com/DevilGenius/airgate-core/internal/app/auth"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
+	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
+	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/infra/mailer"
 )
 
 // AuthHandler 认证相关 Handler。

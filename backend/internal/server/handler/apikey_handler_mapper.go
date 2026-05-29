@@ -1,8 +1,8 @@
 package handler
 
 import (
-	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 func toAPIKeyResp(item appapikey.Key) dto.APIKeyResp {

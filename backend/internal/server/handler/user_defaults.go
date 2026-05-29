@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
 )
 
 const fallbackDefaultUserMaxConcurrency = 5

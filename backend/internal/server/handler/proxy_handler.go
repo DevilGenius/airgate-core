@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	appproxy "github.com/DouDOU-start/airgate-core/internal/app/proxy"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 )
 
 // ProxyHandler 代理管理 Handler。

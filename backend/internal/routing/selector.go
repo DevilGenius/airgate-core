@@ -6,12 +6,12 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/user"
-	"github.com/DouDOU-start/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/ent/user"
+	"github.com/DevilGenius/airgate-core/internal/billing"
 )
 
 type Requirements struct {

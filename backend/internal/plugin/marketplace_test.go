@@ -4,13 +4,13 @@ import "testing"
 
 func TestOfficialPluginsIncludeCorePlugins(t *testing.T) {
 	want := map[string]string{
-		"gateway-openai":     "DouDOU-start/airgate-openai",
-		"gateway-claude":     "DouDOU-start/airgate-claude",
-		"gateway-kiro":       "DouDOU-start/airgate-kiro",
-		"airgate-playground": "DouDOU-start/airgate-playground",
-		"airgate-studio":     "DouDOU-start/airgate-studio",
-		"airgate-health":     "DouDOU-start/airgate-health",
-		"payment-epay":       "DouDOU-start/airgate-epay",
+		"gateway-openai":     "DevilGenius/airgate-openai",
+		"gateway-claude":     "DevilGenius/airgate-claude",
+		"gateway-kiro":       "DevilGenius/airgate-kiro",
+		"airgate-playground": "DevilGenius/airgate-playground",
+		"airgate-studio":     "DevilGenius/airgate-studio",
+		"airgate-health":     "DevilGenius/airgate-health",
+		"payment-epay":       "DevilGenius/airgate-epay",
 	}
 
 	got := make(map[string]MarketplacePlugin, len(officialPlugins))

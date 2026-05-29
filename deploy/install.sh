@@ -3,7 +3,7 @@
 # AirGate Core - 裸金属安装脚本（systemd）
 #
 # 用法：
-#   curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/install.sh | sudo bash
+#   curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | sudo bash
 #
 # 或带子命令：
 #   sudo bash install.sh install    # 安装最新版本（默认动作）
@@ -38,7 +38,8 @@
 set -e
 
 # ---- Constants ----
-GITHUB_REPO="DouDOU-start/airgate-core"
+GITHUB_REPO="${GITHUB_REPO:-DevilGenius/airgate-core}"
+AIRGATE_BRANCH="${AIRGATE_BRANCH:-apex}"
 INSTALL_DIR="/opt/airgate-core"
 CONFIG_DIR="/etc/airgate-core"
 DATA_DIR="/var/lib/airgate-core"
@@ -237,7 +238,7 @@ setup_directories() {
 
 # ---- Install systemd unit ----
 install_service() {
-    local unit_url="https://raw.githubusercontent.com/${GITHUB_REPO}/master/deploy/airgate-core.service"
+    local unit_url="https://raw.githubusercontent.com/${GITHUB_REPO}/${AIRGATE_BRANCH}/deploy/airgate-core.service"
     print_info "下载并安装 systemd unit ..."
     if ! curl -fsSL "$unit_url" -o "/etc/systemd/system/${SERVICE_NAME}.service"; then
         print_error "下载 systemd unit 失败"
@@ -294,7 +295,7 @@ ${BLUE}常用命令${NC}
 
 ${BLUE}卸载${NC}
 
-  curl -sSL https://raw.githubusercontent.com/${GITHUB_REPO}/master/deploy/install.sh | sudo bash -s -- uninstall
+  curl -sSL https://raw.githubusercontent.com/${GITHUB_REPO}/${AIRGATE_BRANCH}/deploy/install.sh | sudo bash -s -- uninstall
 
 DONE
 }

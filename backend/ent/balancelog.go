@@ -9,8 +9,8 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/DouDOU-start/airgate-core/ent/balancelog"
-	"github.com/DouDOU-start/airgate-core/ent/user"
+	"github.com/DevilGenius/airgate-core/ent/balancelog"
+	"github.com/DevilGenius/airgate-core/ent/user"
 )
 
 // BalanceLog is the model entity for the BalanceLog schema.

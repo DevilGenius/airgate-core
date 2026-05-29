@@ -24,7 +24,7 @@ import './index.css';
   'react-dom': ReactDOM,
   'react/jsx-runtime': ReactJSXRuntime,
   'react-i18next': ReactI18next,
-  '@doudou-start/airgate-core/plugin-ui': AirGatePluginUI,
+  '@devilgenius/airgate-core/plugin-ui': AirGatePluginUI,
 };
 
 // PluginAPIBridge 把 core 内的运行时能力暴露到 window.airgate，供插件前端调用。

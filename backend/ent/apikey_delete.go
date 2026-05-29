@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/apikey"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
+	"github.com/DevilGenius/airgate-core/ent/apikey"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
 )
 
 // APIKeyDelete is the builder for deleting a APIKey entity.

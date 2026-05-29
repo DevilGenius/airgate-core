@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // Service 提供仪表盘用例编排。

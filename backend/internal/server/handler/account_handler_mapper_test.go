@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
+	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 )
 
 func TestToAccountExportItemOmitsEnvironmentScopedIDs(t *testing.T) {

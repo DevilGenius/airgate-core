@@ -3,9 +3,9 @@ package store
 import (
 	"context"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entproxy "github.com/DouDOU-start/airgate-core/ent/proxy"
-	appproxy "github.com/DouDOU-start/airgate-core/internal/app/proxy"
+	"github.com/DevilGenius/airgate-core/ent"
+	entproxy "github.com/DevilGenius/airgate-core/ent/proxy"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 )
 
 // ProxyStore 使用 Ent 实现代理仓储。

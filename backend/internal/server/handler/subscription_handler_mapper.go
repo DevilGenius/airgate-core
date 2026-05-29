@@ -3,8 +3,8 @@ package handler
 import (
 	"time"
 
-	appsubscription "github.com/DouDOU-start/airgate-core/internal/app/subscription"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appsubscription "github.com/DevilGenius/airgate-core/internal/app/subscription"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 func toSubscriptionRespFromDomain(item appsubscription.Subscription) dto.SubscriptionResp {

@@ -5,12 +5,12 @@ package enttest
 import (
 	"context"
 
-	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent"
 	// required by schema hooks.
-	_ "github.com/DouDOU-start/airgate-core/ent/runtime"
+	_ "github.com/DevilGenius/airgate-core/ent/runtime"
 
 	"entgo.io/ent/dialect/sql/schema"
-	"github.com/DouDOU-start/airgate-core/ent/migrate"
+	"github.com/DevilGenius/airgate-core/ent/migrate"
 )
 
 type (

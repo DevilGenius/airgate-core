@@ -11,10 +11,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
-	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	"github.com/DouDOU-start/airgate-core/internal/setup"
-	webfs "github.com/DouDOU-start/airgate-core/internal/web"
+	"github.com/DevilGenius/airgate-core/internal/plugin"
+	"github.com/DevilGenius/airgate-core/internal/server/middleware"
+	"github.com/DevilGenius/airgate-core/internal/setup"
+	webfs "github.com/DevilGenius/airgate-core/internal/web"
 )
 
 // registerRoutes 注册所有 API 路由

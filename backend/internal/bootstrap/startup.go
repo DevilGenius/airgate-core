@@ -7,11 +7,11 @@ import (
 
 	entsql "entgo.io/ent/dialect/sql"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/apikey"
-	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/apikey"
+	"github.com/DevilGenius/airgate-core/internal/auth"
 )
 
 // RunStartupTasks 运行启动阶段的整理任务。

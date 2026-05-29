@@ -3,9 +3,9 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // Stats 返回仪表盘统计数据。

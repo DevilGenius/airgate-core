@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 // TestRouteCache_HitMiss 基础命中 / 未命中行为。

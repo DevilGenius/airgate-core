@@ -1,9 +1,9 @@
 package handler
 
 import (
-	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
-	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
+	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 func toUserRespFromDomain(item appuser.User) dto.UserResp {

@@ -3,9 +3,9 @@ package store
 import (
 	"context"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entsetting "github.com/DouDOU-start/airgate-core/ent/setting"
-	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
+	"github.com/DevilGenius/airgate-core/ent"
+	entsetting "github.com/DevilGenius/airgate-core/ent/setting"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
 )
 
 // SettingsStore 使用 Ent 实现设置仓储。

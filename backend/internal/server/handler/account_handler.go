@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
-	"github.com/DouDOU-start/airgate-core/internal/scheduler"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 // AccountHandler 上游账号管理 Handler。

@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	"github.com/DouDOU-start/airgate-core/internal/version"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
+	"github.com/DevilGenius/airgate-core/internal/version"
 )
 
 // VersionHandler 暴露 core 版本信息（管理员可见）。

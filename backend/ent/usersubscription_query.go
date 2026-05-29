@@ -10,10 +10,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	"github.com/DouDOU-start/airgate-core/ent/user"
-	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
+	"github.com/DevilGenius/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
+	"github.com/DevilGenius/airgate-core/ent/user"
+	"github.com/DevilGenius/airgate-core/ent/usersubscription"
 )
 
 // UserSubscriptionQuery is the builder for querying UserSubscription entities.

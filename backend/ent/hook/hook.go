@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 // The APIKeyFunc type is an adapter to allow the use of ordinary

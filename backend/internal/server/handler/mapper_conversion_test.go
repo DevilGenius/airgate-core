@@ -4,16 +4,16 @@ import (
 	"testing"
 	"time"
 
-	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
-	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
-	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
-	apppluginadmin "github.com/DouDOU-start/airgate-core/internal/app/pluginadmin"
-	appproxy "github.com/DouDOU-start/airgate-core/internal/app/proxy"
-	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
-	appsubscription "github.com/DouDOU-start/airgate-core/internal/app/subscription"
-	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
-	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	appauth "github.com/DevilGenius/airgate-core/internal/app/auth"
+	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
+	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
+	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
+	appsubscription "github.com/DevilGenius/airgate-core/internal/app/subscription"
+	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
+	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestUserToRespClonesAllowedGroupIDs(t *testing.T) {

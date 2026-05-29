@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	appopenclaw "github.com/DouDOU-start/airgate-core/internal/app/openclaw"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	appopenclaw "github.com/DevilGenius/airgate-core/internal/app/openclaw"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // loadConfig 读取 openclaw 配置并在 BaseURL 为空时根据当前请求 Host 推导一个兜底值。

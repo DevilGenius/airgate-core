@@ -3,7 +3,7 @@ package billing
 import (
 	"testing"
 
-	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/auth"
 )
 
 func TestResolveBillingRateForGroup_PriorityChain(t *testing.T) {

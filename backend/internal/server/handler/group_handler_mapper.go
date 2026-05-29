@@ -1,8 +1,8 @@
 package handler
 
 import (
-	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 func toGroupRespFromDomain(item appgroup.Group) dto.GroupResp {

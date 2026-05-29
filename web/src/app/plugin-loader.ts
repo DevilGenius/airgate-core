@@ -1,5 +1,5 @@
 import { createElement, type ComponentType } from 'react';
-import type { PluginFrontendModule } from '@doudou-start/airgate-theme/plugin';
+import type { PluginFrontendModule } from '@devilgenius/airgate-theme/plugin';
 
 function wrapPluginComponent<TProps extends object>(
   Component: ComponentType<TProps>,
@@ -53,7 +53,7 @@ const SHARED_MODULES = [
   'react-dom',
   'react/jsx-runtime',
   'react-i18next',
-  '@doudou-start/airgate-core/plugin-ui',
+  '@devilgenius/airgate-core/plugin-ui',
 ];
 const pluginFrontendCache = new Map<string, Promise<PluginFrontendModule | null>>();
 const pluginFrontendCacheListeners = new Set<(pluginId?: string) => void>();

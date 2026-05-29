@@ -1,8 +1,8 @@
 package handler
 
 import (
-	apppluginadmin "github.com/DouDOU-start/airgate-core/internal/app/pluginadmin"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
 
 func toPluginResp(item apppluginadmin.PluginMeta) dto.PluginResp {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
+	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 )
 
 // DashboardHandler 仪表盘 Handler。

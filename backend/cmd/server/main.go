@@ -19,18 +19,18 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/migrate"
-	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
-	"github.com/DouDOU-start/airgate-core/internal/config"
-	"github.com/DouDOU-start/airgate-core/internal/i18n"
-	"github.com/DouDOU-start/airgate-core/internal/infra/store"
-	"github.com/DouDOU-start/airgate-core/internal/server"
-	"github.com/DouDOU-start/airgate-core/internal/setup"
-	"github.com/DouDOU-start/airgate-core/internal/version"
-	webfs "github.com/DouDOU-start/airgate-core/internal/web"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/migrate"
+	"github.com/DevilGenius/airgate-core/internal/bootstrap"
+	"github.com/DevilGenius/airgate-core/internal/config"
+	"github.com/DevilGenius/airgate-core/internal/i18n"
+	"github.com/DevilGenius/airgate-core/internal/infra/store"
+	"github.com/DevilGenius/airgate-core/internal/server"
+	"github.com/DevilGenius/airgate-core/internal/setup"
+	"github.com/DevilGenius/airgate-core/internal/version"
+	webfs "github.com/DevilGenius/airgate-core/internal/web"
 )
 
 func main() {

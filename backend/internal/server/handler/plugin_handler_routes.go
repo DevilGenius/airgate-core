@@ -8,9 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	apppluginadmin "github.com/DouDOU-start/airgate-core/internal/app/pluginadmin"
-	"github.com/DouDOU-start/airgate-core/internal/server/dto"
-	"github.com/DouDOU-start/airgate-core/internal/server/response"
+	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
+	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // ListPlugins 获取已加载的插件列表。

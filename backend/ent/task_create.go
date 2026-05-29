@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/task"
+	"github.com/DevilGenius/airgate-core/ent/task"
 )
 
 // TaskCreate is the builder for creating a Task entity.

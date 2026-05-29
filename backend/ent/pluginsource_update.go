@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/pluginsource"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
+	"github.com/DevilGenius/airgate-core/ent/pluginsource"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
 )
 
 // PluginSourceUpdate is the builder for updating PluginSource entities.

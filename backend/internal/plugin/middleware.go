@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // middleware.go：Core 与 middleware 类型插件的对接层。

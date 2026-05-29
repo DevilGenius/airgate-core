@@ -9,10 +9,10 @@ import (
 
 	goplugin "github.com/hashicorp/go-plugin"
 
-	sdkgrpc "github.com/DouDOU-start/airgate-sdk/runtimego/grpc"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 // PluginInstance 运行中的插件实例。

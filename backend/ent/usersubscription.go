@@ -10,9 +10,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/user"
-	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
+	"github.com/DevilGenius/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/ent/user"
+	"github.com/DevilGenius/airgate-core/ent/usersubscription"
 )
 
 // UserSubscription is the model entity for the UserSubscription schema.

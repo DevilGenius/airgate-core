@@ -12,8 +12,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/DouDOU-start/airgate-core/ent/enttest"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/ent/enttest"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestHostForwardTimeout(t *testing.T) {

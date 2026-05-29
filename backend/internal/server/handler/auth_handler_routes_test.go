@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
+	"github.com/DevilGenius/airgate-core/internal/infra/mailer"
 )
 
 func TestVerifyCodeRejectsInvalidCode(t *testing.T) {

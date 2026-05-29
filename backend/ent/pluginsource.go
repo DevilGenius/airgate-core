@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/DouDOU-start/airgate-core/ent/pluginsource"
+	"github.com/DevilGenius/airgate-core/ent/pluginsource"
 )
 
 // PluginSource is the model entity for the PluginSource schema.

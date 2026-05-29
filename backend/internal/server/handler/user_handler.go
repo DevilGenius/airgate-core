@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"strconv"
 
-	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
-	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
+	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
 )
 
 // UserHandler 用户管理 Handler。

@@ -4,8 +4,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	"github.com/DouDOU-start/airgate-core/internal/pkg/usagemodel"
+	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
+	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 )
 
 // isImageModel 判断 usage_log.model 是否属于生图家族。

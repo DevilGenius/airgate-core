@@ -105,7 +105,7 @@
 
 /* ==========================================================================
    03. Tailwind Theme Bridge
-   主题变量由 @doudou-start/airgate-theme (SDK) 运行时注入
+   主题变量由 @devilgenius/airgate-theme (SDK) 运行时注入
    Token 命名与 SDK createTailwindThemeBridge() 对齐
    ========================================================================== */
 

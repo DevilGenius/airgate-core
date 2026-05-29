@@ -16,10 +16,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/internal/auth"
-	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/server/middleware"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // parseRequest 从 HTTP 请求构造 forwardState。认证 / body 读取 / 插件匹配失败时

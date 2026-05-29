@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/internal/plugin"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // Manager 定义插件管理服务所需能力。

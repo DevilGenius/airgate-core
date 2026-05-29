@@ -11,14 +11,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
-	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
-	entuser "github.com/DouDOU-start/airgate-core/ent/user"
-	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
-	"github.com/DouDOU-start/airgate-core/internal/pkg/usagemodel"
+	"github.com/DevilGenius/airgate-core/ent"
+	entaccount "github.com/DevilGenius/airgate-core/ent/account"
+	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
+	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
+	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
+	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 )
 
 // DashboardStore 使用 Ent 实现仪表盘仓储。

@@ -17,10 +17,10 @@ import (
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
-	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
+	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
+	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
 
 // PluginCatalog 账号域需要的插件能力集合。

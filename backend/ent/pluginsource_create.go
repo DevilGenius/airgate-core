@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/pluginsource"
+	"github.com/DevilGenius/airgate-core/ent/pluginsource"
 )
 
 // PluginSourceCreate is the builder for creating a PluginSource entity.

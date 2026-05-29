@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
+	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
 )
 
 // GroupHandler 分组管理 Handler。

@@ -1,6 +1,6 @@
 package billing
 
-import "github.com/DouDOU-start/airgate-core/internal/auth"
+import "github.com/DevilGenius/airgate-core/internal/auth"
 
 // ResolveBillingRate 决定一次请求该用什么倍率扣 reseller 的真实成本（actual_cost）。
 //

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // Service 提供分组域用例编排。

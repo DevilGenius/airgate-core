@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 func TestExcludeAccountsDoesNotMutateCandidates(t *testing.T) {

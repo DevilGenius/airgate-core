@@ -7,14 +7,14 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 
-	"github.com/DouDOU-start/airgate-core/ent"
-	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
-	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
-	entuser "github.com/DouDOU-start/airgate-core/ent/user"
-	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
-	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
+	"github.com/DevilGenius/airgate-core/ent"
+	entaccount "github.com/DevilGenius/airgate-core/ent/account"
+	entgroup "github.com/DevilGenius/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
+	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
+	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
+	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 )
 
 // UsageStore 使用 Ent 实现使用记录仓储。
