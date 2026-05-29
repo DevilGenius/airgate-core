@@ -85,7 +85,7 @@ function APIKeyInfoBar() {
     setCcsOpen(true);
   }
 
-  // 后端已经把"销售倍率优先、否则分组倍率"折算成单一字段 api_key_rate，
+  // 后端已经把"实际扣费倍率 × 销售倍率"折算成单一字段 api_key_rate，
   // 前端拿不到原始来源，避免通过 DevTools 推断 reseller 定价模型。
   const effectiveRate = user.api_key_rate ?? 0;
 

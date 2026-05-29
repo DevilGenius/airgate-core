@@ -10,8 +10,8 @@ import "github.com/DevilGenius/airgate-core/internal/auth"
 //  3. 1.0                          — 默认
 //
 // 注意：
-//   - APIKey.sell_rate 不在这条链里。它是 reseller 对最终客户的"账面"售价，
-//     与平台真实计费完全独立，由 Calculator 单独处理 BilledCost。
+//   - APIKey.sell_rate 不在这条链里。它是 reseller 对最终客户的"账面"售价倍率，
+//     不影响平台真实计费，由 Calculator 在 actual_cost 基础上单独处理 BilledCost。
 //   - Account.rate_multiplier 不在这条链里。它只服务于 scheduler 内部 window cost
 //     追踪，从用户计费链路完全剥离，调用方需自行计算 windowCost = base × accountRate。
 func ResolveBillingRate(keyInfo *auth.APIKeyInfo) float64 {

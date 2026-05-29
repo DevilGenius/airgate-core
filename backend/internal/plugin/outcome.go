@@ -328,7 +328,7 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 
 	// 三条独立倍率管道：
 	//   billingRate: 平台对 reseller 的计费倍率（group/user 优先级链）
-	//   sellRate:    reseller 对客户的销售倍率（独立 markup 管道）
+	//   sellRate:    reseller 对客户的销售倍率（叠加在 actual_cost 上）
 	//   accountRate: 账号自身的真实成本系数（"账号计费"统计管道）
 	calcInput := billing.CalculateInput{
 		InputCost:         usageValues.InputCost,

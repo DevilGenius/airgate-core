@@ -17,6 +17,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
+	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
 	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/routing"
@@ -1156,7 +1157,7 @@ func (w *hostStreamWriter) Write(data []byte) (int, error) {
 func (w *hostStreamWriter) Flush() {}
 
 // recordHostForwardUsage 为 Host gateway.forward 调用发起的请求记录 usage_log 并扣费。
-// 与 forwarder.recordUsage 的区别：没有 APIKeyInfo，APIKeyID=0。
+// 与 forwarder.recordUsage 的区别：没有 APIKeyInfo，需要按 req.APIKeyID 补销售倍率。
 func (h *HostService) recordHostForwardUsage(
 	ctx context.Context,
 	req hostForwardRequest,
@@ -1173,6 +1174,10 @@ func (h *HostService) recordHostForwardUsage(
 		return 0, nil
 	}
 	usageValues := usageSnapshotFromSDK(usage)
+	sellRate, err := h.hostForwardSellRate(ctx, req)
+	if err != nil {
+		return 0, err
+	}
 
 	calcInput := billing.CalculateInput{
 		InputCost:         usageValues.InputCost,
@@ -1180,6 +1185,7 @@ func (h *HostService) recordHostForwardUsage(
 		CachedInputCost:   usageValues.CachedInputCost,
 		CacheCreationCost: usageValues.CacheCreationCost,
 		BillingRate:       route.EffectiveRate,
+		SellRate:          sellRate,
 		AccountRate:       accFull.RateMultiplier,
 	}
 	if override, ok := imageBillingCostOverride(usage, route.GroupPluginSettings); ok {
@@ -1222,6 +1228,7 @@ func (h *HostService) recordHostForwardUsage(
 		BilledCost:            calc.BilledCost,
 		AccountCost:           calc.AccountCost,
 		RateMultiplier:        calc.RateMultiplier,
+		SellRate:              calc.SellRate,
 		AccountRateMultiplier: calc.AccountRateMultiplier,
 		ServiceTier:           usageValues.ServiceTier,
 		Endpoint:              req.Path,
@@ -1235,6 +1242,22 @@ func (h *HostService) recordHostForwardUsage(
 		return 0, nil
 	}
 	return h.recorder.RecordSync(ctx, record)
+}
+
+func (h *HostService) hostForwardSellRate(ctx context.Context, req hostForwardRequest) (float64, error) {
+	if req.APIKeyID <= 0 {
+		return 0, nil
+	}
+	ak, err := h.db.APIKey.Query().
+		Where(
+			entapikey.IDEQ(int(req.APIKeyID)),
+			entapikey.HasUserWith(user.IDEQ(int(req.UserID))),
+		).
+		Only(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return ak.SellRate, nil
 }
 
 // listPlatforms 列出已加载的网关平台。

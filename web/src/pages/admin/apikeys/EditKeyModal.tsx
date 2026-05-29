@@ -24,7 +24,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     max_concurrency: apiKey.max_concurrency,
     name: apiKey.name,
     quota_usd: apiKey.quota_usd,
-    sell_rate: apiKey.sell_rate,
+    sell_rate: apiKey.sell_rate || 1,
     status: apiKey.status as 'active' | 'disabled',
   });
   const [ipWhitelist, setIpWhitelist] = useState(formatIpList(apiKey.ip_whitelist));
@@ -125,10 +125,10 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
             type="number"
             step="0.01"
             min="0"
-            value={String(form.sell_rate ?? 0)}
+            value={String(form.sell_rate ?? 1)}
             onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
           />
-          <Description>{t('api_keys.sell_rate_hint', '留空或 0 表示按平台原价计费')}</Description>
+          <Description>{t('api_keys.sell_rate_hint', '1.2 表示在实际倍率基础上加价 20%(默认1代表不加价)')}</Description>
         </HeroTextField>
 
         <HeroTextField fullWidth>

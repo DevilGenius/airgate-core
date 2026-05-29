@@ -142,6 +142,9 @@ func TestCreateOwnedBuildsMutationAndReturnsPlainKey(t *testing.T) {
 	if derefString(captured.Name) != "生产 Key" || derefInt(captured.UserID) != 7 || derefInt(captured.GroupID) != 3 {
 		t.Fatalf("基础 mutation 异常: %+v", captured)
 	}
+	if captured.SellRate == nil || *captured.SellRate != 1.2 {
+		t.Fatalf("销售倍率 mutation = %+v，期望 1.2", captured.SellRate)
+	}
 	if !captured.HasIPWhitelist || len(captured.IPWhitelist) != 1 {
 		t.Fatalf("IP 白名单 mutation 异常: %+v", captured)
 	}
@@ -157,6 +160,24 @@ func TestCreateOwnedBuildsMutationAndReturnsPlainKey(t *testing.T) {
 	}
 	if plain != item.PlainKey {
 		t.Fatalf("密文明文 = %q，期望返回的 PlainKey", plain)
+	}
+}
+
+func TestCreateOwnedDefaultsSellRateToOne(t *testing.T) {
+	var captured Mutation
+	service := NewService(apiKeyStubRepository{
+		create: func(_ context.Context, mutation Mutation) (Key, error) {
+			captured = mutation
+			return Key{ID: 10, Name: derefString(mutation.Name), UserID: derefInt(mutation.UserID)}, nil
+		},
+	}, testAPIKeySecret)
+
+	_, err := service.CreateOwned(t.Context(), 7, CreateInput{Name: "默认倍率", GroupID: 3})
+	if err != nil {
+		t.Fatalf("创建 API Key 失败: %v", err)
+	}
+	if captured.SellRate == nil || *captured.SellRate != 1 {
+		t.Fatalf("默认销售倍率 = %+v，期望 1", captured.SellRate)
 	}
 }
 
@@ -202,6 +223,7 @@ func TestRevealOwnedDecryptsKeyAndRejectsLegacyKey(t *testing.T) {
 func TestUpdateOwnedBuildsMutationAndChecksGroup(t *testing.T) {
 	name := "更新后的 Key"
 	groupID := int64(8)
+	sellRate := 0.0
 	clearExpiresAt := ""
 	status := "disabled"
 	var captured Mutation
@@ -226,6 +248,7 @@ func TestUpdateOwnedBuildsMutationAndChecksGroup(t *testing.T) {
 		GroupID:        &groupID,
 		IPBlacklist:    []string{"10.0.0.1"},
 		HasIPBlacklist: true,
+		SellRate:       &sellRate,
 		ExpiresAt:      &clearExpiresAt,
 		Status:         &status,
 	})
@@ -240,6 +263,9 @@ func TestUpdateOwnedBuildsMutationAndChecksGroup(t *testing.T) {
 	}
 	if !captured.HasIPBlacklist || len(captured.IPBlacklist) != 1 || !captured.HasExpiresAt || captured.ExpiresAt != nil {
 		t.Fatalf("列表或过期时间 mutation 异常: %+v", captured)
+	}
+	if captured.SellRate == nil || *captured.SellRate != 1 {
+		t.Fatalf("0 销售倍率应归一为 1，得到 %+v", captured.SellRate)
 	}
 }
 

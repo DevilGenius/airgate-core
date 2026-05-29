@@ -143,6 +143,7 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 	if maxConc < 0 {
 		maxConc = 0
 	}
+	sellRate := normalizeSellRate(input.SellRate)
 	item, err := s.repo.Create(ctx, Mutation{
 		Name:           &input.Name,
 		KeyHint:        stringPtr(buildKeyHint(rawKey)),
@@ -155,7 +156,7 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 		IPBlacklist:    cloneStringSlice(input.IPBlacklist),
 		HasIPBlacklist: input.IPBlacklist != nil,
 		QuotaUSD:       &input.QuotaUSD,
-		SellRate:       &input.SellRate,
+		SellRate:       &sellRate,
 		MaxConcurrency: &maxConc,
 		ExpiresAt:      expiresAt,
 		HasExpiresAt:   hasExpiresAt,
@@ -297,6 +298,12 @@ func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInp
 		return Mutation{}, err
 	}
 
+	var sellRate *float64
+	if input.SellRate != nil {
+		normalized := normalizeSellRate(*input.SellRate)
+		sellRate = &normalized
+	}
+
 	mutation := Mutation{
 		Name:           input.Name,
 		IPWhitelist:    cloneStringSlice(input.IPWhitelist),
@@ -304,7 +311,7 @@ func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInp
 		IPBlacklist:    cloneStringSlice(input.IPBlacklist),
 		HasIPBlacklist: input.HasIPBlacklist,
 		QuotaUSD:       input.QuotaUSD,
-		SellRate:       input.SellRate,
+		SellRate:       sellRate,
 		MaxConcurrency: input.MaxConcurrency,
 		ExpiresAt:      expiresAt,
 		HasExpiresAt:   hasExpiresAt,
@@ -320,6 +327,13 @@ func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInp
 		mutation.GroupID = &groupID
 	}
 	return mutation, nil
+}
+
+func normalizeSellRate(rate float64) float64 {
+	if rate <= 0 {
+		return 1
+	}
+	return rate
 }
 
 func (s *Service) ensureUserCanUseGroup(ctx context.Context, userID, groupID int) error {

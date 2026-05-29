@@ -56,13 +56,13 @@ type UsageLog struct {
 	TotalCost float64 `json:"total_cost,omitempty"`
 	// 平台对 reseller 的真实扣费 = total × billing_rate（group/user）
 	ActualCost float64 `json:"actual_cost,omitempty"`
-	// 账面消耗：reseller 对最终客户的计费金额。sell_rate=0 时等于 actual_cost。永远不参与平台账户/统计。
+	// 账面消耗：reseller 对最终客户的计费金额，按 actual_cost × sell_rate 计算。永远不参与平台余额扣费。
 	BilledCost float64 `json:"billed_cost,omitempty"`
 	// 账号实际成本 = total × account_rate。用于账号管理后台的'账号计费'统计；与用户计费完全独立。
 	AccountCost float64 `json:"account_cost,omitempty"`
 	// 快照：本次请求生效的平台计费倍率（ResolveBillingRate 结果）
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
-	// 快照：本次请求生效的 sell_rate；0 表示该 key 当时未启用 markup
+	// 快照：本次请求生效的 sell_rate；1 表示不加价，0 为历史/无 APIKey 兜底
 	SellRate float64 `json:"sell_rate,omitempty"`
 	// 快照：本次请求生效的 account_rate
 	AccountRateMultiplier float64 `json:"account_rate_multiplier,omitempty"`

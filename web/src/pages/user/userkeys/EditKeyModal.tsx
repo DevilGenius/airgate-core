@@ -118,9 +118,9 @@ export function EditKeyModal({
             type="number"
             value={form.sell_rate}
             onChange={(e) => setForm({ ...form, sell_rate: e.target.value })}
-            placeholder="0"
+            placeholder="1"
           />
-          <Description>{t('user_keys.sell_rate_hint', '留空或 0 表示按平台原价计费')}</Description>
+          <Description>{t('user_keys.sell_rate_hint', '1.2 表示在实际倍率基础上加价 20%(默认1代表不加价)')}</Description>
         </HeroTextField>
         <HeroTextField fullWidth>
           <Label>{t('user_keys.max_concurrency_label', '最大并发数')}</Label>

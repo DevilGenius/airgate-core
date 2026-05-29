@@ -13,7 +13,7 @@ type APIKeyResp struct {
 	QuotaUSD        float64  `json:"quota_usd"`
 	UsedQuota       float64  `json:"used_quota"`        // 账面已用（含 sell_rate markup）
 	UsedQuotaActual float64  `json:"used_quota_actual"` // 真实成本已用（reseller 看板对比用，sum(actual_cost)）
-	SellRate        float64  `json:"sell_rate"`         // 销售倍率，0 表示未启用
+	SellRate        float64  `json:"sell_rate"`         // 销售倍率，1 表示不加价
 	MaxConcurrency  int      `json:"max_concurrency"`   // API Key 级并发上限，0 表示不限制
 	TodayCost       float64  `json:"today_cost"`
 	ThirtyDayCost   float64  `json:"thirty_day_cost"`
@@ -35,7 +35,7 @@ type CreateAPIKeyReq struct {
 	IPWhitelist    []string `json:"ip_whitelist"`
 	IPBlacklist    []string `json:"ip_blacklist"`
 	QuotaUSD       float64  `json:"quota_usd"`
-	SellRate       float64  `json:"sell_rate"`                       // 可选，>0 启用 reseller markup
+	SellRate       float64  `json:"sell_rate"`                       // 可选，默认 1；按 actual_cost 叠加客户侧计费
 	MaxConcurrency int      `json:"max_concurrency" binding:"gte=0"` // 0 表示不限制并发
 	ExpiresAt      *string  `json:"expires_at"`
 }

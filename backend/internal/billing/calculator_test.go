@@ -28,7 +28,7 @@ func TestCalculate_NoMarkup(t *testing.T) {
 	if !almostEqual(res.ActualCost, 0.3) {
 		t.Fatalf("ActualCost = %v, want 0.3", res.ActualCost)
 	}
-	// sell_rate=0 时 billed_cost 必须等于 actual_cost（向后兼容）
+	// sell_rate<=0 时 billed_cost 必须等于 actual_cost（向后兼容）
 	if !almostEqual(res.BilledCost, res.ActualCost) {
 		t.Fatalf("BilledCost = %v, want %v (= ActualCost)", res.BilledCost, res.ActualCost)
 	}
@@ -45,7 +45,7 @@ func TestCalculate_NoMarkup(t *testing.T) {
 }
 
 func TestCalculate_AccountCostIndependent(t *testing.T) {
-	// 三条管道完全独立：account_rate 既不影响 actual_cost 也不影响 billed_cost
+	// account_rate 既不影响 actual_cost 也不影响 billed_cost
 	c := NewCalculator()
 	res := c.Calculate(CalculateInput{
 		InputCost:   1.0,
@@ -58,8 +58,8 @@ func TestCalculate_AccountCostIndependent(t *testing.T) {
 	if !almostEqual(res.ActualCost, 0.6) {
 		t.Fatalf("ActualCost = %v, want 0.6 (total × billing_rate)", res.ActualCost)
 	}
-	if !almostEqual(res.BilledCost, 1.2) {
-		t.Fatalf("BilledCost = %v, want 1.2 (total × sell_rate)", res.BilledCost)
+	if !almostEqual(res.BilledCost, 0.36) {
+		t.Fatalf("BilledCost = %v, want 0.36 (actual × sell_rate)", res.BilledCost)
 	}
 	if !almostEqual(res.AccountCost, 3.0) {
 		t.Fatalf("AccountCost = %v, want 3.0 (total × account_rate)", res.AccountCost)
@@ -88,22 +88,22 @@ func TestCalculate_WithMarkup(t *testing.T) {
 		InputCost:       0.6,
 		OutputCost:      0.3,
 		CachedInputCost: 0.1,
-		BillingRate:     0.3,
-		SellRate:        0.6, // reseller 卖给客户的倍率
+		BillingRate:     1.0,
+		SellRate:        1.2, // reseller 卖给客户的倍率
 	})
 
 	// 平台真实成本：base × billing_rate
-	if !almostEqual(res.ActualCost, 0.3) {
-		t.Fatalf("ActualCost = %v, want 0.3", res.ActualCost)
+	if !almostEqual(res.ActualCost, 1.0) {
+		t.Fatalf("ActualCost = %v, want 1.0", res.ActualCost)
 	}
-	// 客户账面消耗：base × sell_rate（独立计算，与 billing_rate 无关）
-	if !almostEqual(res.BilledCost, 0.6) {
-		t.Fatalf("BilledCost = %v, want 0.6", res.BilledCost)
+	// 客户账面消耗：actual × sell_rate
+	if !almostEqual(res.BilledCost, 1.2) {
+		t.Fatalf("BilledCost = %v, want 1.2", res.BilledCost)
 	}
-	// 利润 = billed - actual = $0.30
+	// 利润 = billed - actual = $0.20
 	profit := res.BilledCost - res.ActualCost
-	if !almostEqual(profit, 0.3) {
-		t.Fatalf("profit = %v, want 0.3", profit)
+	if !almostEqual(profit, 0.2) {
+		t.Fatalf("profit = %v, want 0.2", profit)
 	}
 }
 
@@ -121,16 +121,15 @@ func TestCalculate_ZeroBillingRate_DefaultsToOne(t *testing.T) {
 	}
 }
 
-func TestCalculate_MarkupIndependentOfBillingRate(t *testing.T) {
-	// 关键不变量：sell_rate 完全独立于 billing_rate
-	// 改变 billing_rate 不应改变 billed_cost；改变 sell_rate 不应改变 actual_cost。
+func TestCalculate_MarkupStacksOnBillingRate(t *testing.T) {
+	// 关键不变量：sell_rate 不影响 actual_cost，但 billed_cost 必须叠加 actual_cost。
 	c := NewCalculator()
 
 	base := CalculateInput{
 		InputCost:   1.0,
 		OutputCost:  1.0,
 		BillingRate: 0.3,
-		SellRate:    0.6,
+		SellRate:    1.2,
 	}
 	res1 := c.Calculate(base)
 
@@ -139,8 +138,11 @@ func TestCalculate_MarkupIndependentOfBillingRate(t *testing.T) {
 	base2.BillingRate = 0.5
 	res2 := c.Calculate(base2)
 
-	if !almostEqual(res1.BilledCost, res2.BilledCost) {
-		t.Fatalf("BilledCost should not depend on BillingRate: %v vs %v", res1.BilledCost, res2.BilledCost)
+	if !almostEqual(res1.BilledCost, 0.72) {
+		t.Fatalf("BilledCost = %v, want 0.72", res1.BilledCost)
+	}
+	if !almostEqual(res2.BilledCost, 1.2) {
+		t.Fatalf("BilledCost = %v, want 1.2", res2.BilledCost)
 	}
 	if almostEqual(res1.ActualCost, res2.ActualCost) {
 		t.Fatalf("ActualCost should depend on BillingRate but didn't change")
@@ -148,7 +150,7 @@ func TestCalculate_MarkupIndependentOfBillingRate(t *testing.T) {
 
 	// 改变 sell_rate
 	base3 := base
-	base3.SellRate = 0.9
+	base3.SellRate = 1.5
 	res3 := c.Calculate(base3)
 
 	if !almostEqual(res1.ActualCost, res3.ActualCost) {
@@ -177,8 +179,8 @@ func TestCalculate_BillingCostOverride(t *testing.T) {
 	if !almostEqual(res.ActualCost, 0.08) {
 		t.Fatalf("ActualCost = %v, want 0.08", res.ActualCost)
 	}
-	if !almostEqual(res.BilledCost, 0.08) {
-		t.Fatalf("BilledCost = %v, want 0.08", res.BilledCost)
+	if !almostEqual(res.BilledCost, 0.072) {
+		t.Fatalf("BilledCost = %v, want 0.072", res.BilledCost)
 	}
 	if !almostEqual(res.AccountCost, 0.625) {
 		t.Fatalf("AccountCost = %v, want 0.625", res.AccountCost)

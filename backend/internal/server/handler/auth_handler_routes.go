@@ -105,11 +105,7 @@ func (h *AuthHandler) LoginByAPIKey(c *gin.Context) {
 	if keyInfo, err := h.userService.GetAPIKeyInfo(c.Request.Context(), info.KeyID); err == nil {
 		userResp.APIKeyQuotaUSD = keyInfo.QuotaUSD
 		userResp.APIKeyUsedQuota = keyInfo.UsedQuota
-		if keyInfo.SellRate > 0 {
-			userResp.APIKeyRate = keyInfo.SellRate
-		} else {
-			userResp.APIKeyRate = keyInfo.GroupRate
-		}
+		userResp.APIKeyRate = customerAPIKeyRate(keyInfo.GroupRate, keyInfo.SellRate)
 		if keyInfo.ExpiresAt != nil {
 			userResp.APIKeyExpiresAt = keyInfo.ExpiresAt.Format(time.RFC3339)
 		}

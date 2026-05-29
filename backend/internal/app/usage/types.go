@@ -75,7 +75,7 @@ type LogRecord struct {
 	BilledCost            float64 // 客户账面消耗（reseller 销售管道）
 	AccountCost           float64 // 账号实际成本（账号管理统计专用）
 	RateMultiplier        float64 // 快照：本次生效的平台计费倍率
-	SellRate              float64 // 快照：本次生效的销售倍率（0 表示未启用 markup）
+	SellRate              float64 // 快照：本次生效的销售倍率（1 表示不加价）
 	AccountRateMultiplier float64 // 快照：本次生效的 account_rate
 	ServiceTier           string
 	Stream                bool

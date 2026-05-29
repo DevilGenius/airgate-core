@@ -38,7 +38,7 @@ type APIKey struct {
 	UsedQuota float64 `json:"used_quota,omitempty"`
 	// 真实成本已用：累加 actual_cost。reseller 用于成本核算/利润计算，end customer 不可见。
 	UsedQuotaActual float64 `json:"used_quota_actual,omitempty"`
-	// 销售倍率：>0 时启用 reseller markup, billed_cost = base_cost × sell_rate；=0 表示不加价，billed_cost = actual_cost
+	// 销售倍率：1 表示不加价；billed_cost = actual_cost × sell_rate，不影响余额扣费
 	SellRate float64 `json:"sell_rate,omitempty"`
 	// API Key 级并发上限：同一把 key 同时在途的请求数。0 表示不限制（默认）。达到上限时返回 429 + apikey_concurrency_limit，保护单个客户端不因并发过高被自己打死或耗光上游账号的并发预算。
 	MaxConcurrency int `json:"max_concurrency,omitempty"`

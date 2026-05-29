@@ -12,6 +12,7 @@ import (
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	entusersubscription "github.com/DevilGenius/airgate-core/ent/usersubscription"
 	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
+	"github.com/DevilGenius/airgate-core/internal/billing"
 )
 
 // UserStore 使用 Ent 实现用户仓储。
@@ -298,6 +299,7 @@ func (s *UserStore) GetAPIKeyName(ctx context.Context, keyID int) (string, error
 func (s *UserStore) GetAPIKeyInfo(ctx context.Context, keyID int) (appuser.APIKeyBrief, error) {
 	ak, err := s.db.APIKey.Query().
 		Where(entapikey.IDEQ(keyID)).
+		WithUser().
 		WithGroup().
 		Only(ctx)
 	if err != nil {
@@ -310,8 +312,12 @@ func (s *UserStore) GetAPIKeyInfo(ctx context.Context, keyID int) (appuser.APIKe
 		ExpiresAt: ak.ExpiresAt,
 		SellRate:  ak.SellRate,
 	}
+	var userGroupRates map[int64]float64
+	if u, _ := ak.Edges.UserOrErr(); u != nil {
+		userGroupRates = u.GroupRates
+	}
 	if g, _ := ak.Edges.GroupOrErr(); g != nil {
-		brief.GroupRate = g.RateMultiplier
+		brief.GroupRate = billing.ResolveBillingRateForGroup(userGroupRates, g.ID, g.RateMultiplier)
 		brief.Platform = g.Platform
 	}
 	return brief, nil

@@ -20,7 +20,7 @@ var (
 		{Name: "quota_usd", Type: field.TypeFloat64, Default: 0},
 		{Name: "used_quota", Type: field.TypeFloat64, Default: 0},
 		{Name: "used_quota_actual", Type: field.TypeFloat64, Default: 0},
-		{Name: "sell_rate", Type: field.TypeFloat64, Default: 0},
+		{Name: "sell_rate", Type: field.TypeFloat64, Default: 1},
 		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "disabled"}, Default: "active"},

@@ -22,7 +22,7 @@ const defaultForm: CreateAPIKeyReq = {
   max_concurrency: 0,
   name: '',
   quota_usd: 0,
-  sell_rate: 0,
+  sell_rate: 1,
 };
 
 export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: CreateKeyModalProps) {
@@ -48,7 +48,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
       ip_whitelist: parseIpList(ipWhitelist),
       max_concurrency: form.max_concurrency ?? 0,
       quota_usd: form.quota_usd || undefined,
-      sell_rate: form.sell_rate || undefined,
+      sell_rate: form.sell_rate || 1,
     });
   };
 
@@ -159,10 +159,10 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
                 type="number"
                 step="0.01"
                 min="0"
-                value={String(form.sell_rate ?? 0)}
+                value={String(form.sell_rate ?? 1)}
                 onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
               />
-              <Description>{t('api_keys.sell_rate_hint', '留空或 0 表示按平台原价计费')}</Description>
+              <Description>{t('api_keys.sell_rate_hint', '1.2 表示在实际倍率基础上加价 20%(默认1代表不加价)')}</Description>
             </HeroTextField>
           </div>
 
