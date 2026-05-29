@@ -48,16 +48,44 @@ func TestListDisplaysDevPluginVersionAsDev(t *testing.T) {
 }
 
 func TestListDisplaysTaggedPluginWithShortHash(t *testing.T) {
+	commitSHA := "1234567890abcdef1234567890abcdef12345678"
 	service := NewService(pluginAdminManagerStub{
 		allMeta: []plugin.PluginMeta{{
 			Name:         "gateway-openai",
 			Version:      "0.2.1",
 			BinarySHA256: strings.Repeat("a", 64),
+			CommitSHA:    commitSHA,
 		}},
 	}, pluginMarketplaceStub{})
 
 	items := service.List()
-	if len(items) != 1 || items[0].Version != "0.2.1-aaaaaaa" {
+	if len(items) != 1 || items[0].Version != "0.2.1-1234567" {
+		t.Fatalf("unexpected plugin list: %+v", items)
+	}
+}
+
+func TestListDerivesInstalledCommitFromMatchingMarketplaceAsset(t *testing.T) {
+	assetHash := strings.Repeat("a", 64)
+	commitSHA := "abcdef1234567890abcdef1234567890abcdef12"
+	service := NewService(pluginAdminManagerStub{
+		allMeta: []plugin.PluginMeta{{
+			Name:         "gateway-openai",
+			Version:      "0.2.1",
+			BinarySHA256: assetHash,
+		}},
+	}, pluginMarketplaceStub{
+		listAvailable: func(context.Context) ([]plugin.MarketplacePlugin, error) {
+			return []plugin.MarketplacePlugin{{
+				Name:      "gateway-openai",
+				Version:   "0.2.1",
+				SHA256:    assetHash,
+				CommitSHA: commitSHA,
+			}}, nil
+		},
+	})
+
+	items := service.List()
+	if len(items) != 1 || items[0].Version != "0.2.1-abcdef1" {
 		t.Fatalf("unexpected plugin list: %+v", items)
 	}
 }
@@ -83,6 +111,7 @@ func TestListMarketplaceDoesNotOfferUpdatesForDevPlugin(t *testing.T) {
 func TestListMarketplaceOffersUpdateForSameVersionDifferentHash(t *testing.T) {
 	installedHash := strings.Repeat("a", 64)
 	latestHash := strings.Repeat("b", 64)
+	latestCommit := strings.Repeat("c", 40)
 	service := NewService(pluginAdminManagerStub{
 		allMeta: []plugin.PluginMeta{{
 			Name:         "gateway-openai",
@@ -92,9 +121,10 @@ func TestListMarketplaceOffersUpdateForSameVersionDifferentHash(t *testing.T) {
 	}, pluginMarketplaceStub{
 		listAvailable: func(context.Context) ([]plugin.MarketplacePlugin, error) {
 			return []plugin.MarketplacePlugin{{
-				Name:    "gateway-openai",
-				Version: "0.2.1",
-				SHA256:  "sha256:" + latestHash,
+				Name:      "gateway-openai",
+				Version:   "0.2.1",
+				SHA256:    "sha256:" + latestHash,
+				CommitSHA: latestCommit,
 			}}, nil
 		},
 	})
@@ -106,7 +136,7 @@ func TestListMarketplaceOffersUpdateForSameVersionDifferentHash(t *testing.T) {
 	if len(items) != 1 || !items[0].Installed || !items[0].HasUpdate {
 		t.Fatalf("unexpected marketplace items: %+v", items)
 	}
-	if items[0].Version != "0.2.1" || items[0].DisplayVersion != "0.2.1-bbbbbbb" {
+	if items[0].Version != "0.2.1" || items[0].DisplayVersion != "0.2.1-ccccccc" {
 		t.Fatalf("unexpected market versions: version=%q display=%q", items[0].Version, items[0].DisplayVersion)
 	}
 	if items[0].InstalledVersion != "0.2.1-aaaaaaa" {
@@ -116,6 +146,7 @@ func TestListMarketplaceOffersUpdateForSameVersionDifferentHash(t *testing.T) {
 
 func TestListMarketplaceDoesNotOfferUpdateForSameVersionSameHash(t *testing.T) {
 	hash := strings.Repeat("a", 64)
+	commitSHA := "fedcba9876543210fedcba9876543210fedcba98"
 	service := NewService(pluginAdminManagerStub{
 		allMeta: []plugin.PluginMeta{{
 			Name:         "gateway-openai",
@@ -125,9 +156,10 @@ func TestListMarketplaceDoesNotOfferUpdateForSameVersionSameHash(t *testing.T) {
 	}, pluginMarketplaceStub{
 		listAvailable: func(context.Context) ([]plugin.MarketplacePlugin, error) {
 			return []plugin.MarketplacePlugin{{
-				Name:    "gateway-openai",
-				Version: "0.2.1",
-				SHA256:  hash,
+				Name:      "gateway-openai",
+				Version:   "0.2.1",
+				SHA256:    hash,
+				CommitSHA: commitSHA,
 			}}, nil
 		},
 	})
@@ -138,6 +170,9 @@ func TestListMarketplaceDoesNotOfferUpdateForSameVersionSameHash(t *testing.T) {
 	}
 	if len(items) != 1 || !items[0].Installed || items[0].HasUpdate {
 		t.Fatalf("unexpected marketplace items: %+v", items)
+	}
+	if items[0].InstalledVersion != "0.2.1-fedcba9" || items[0].DisplayVersion != "0.2.1-fedcba9" {
+		t.Fatalf("unexpected versions: installed=%q display=%q", items[0].InstalledVersion, items[0].DisplayVersion)
 	}
 }
 

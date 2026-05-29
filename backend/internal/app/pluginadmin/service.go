@@ -27,12 +27,17 @@ func NewService(manager Manager, marketplace MarketplaceReader) *Service {
 // List 返回运行中的插件列表。
 func (s *Service) List() []PluginMeta {
 	allMeta := s.manager.GetAllPluginMeta()
+	commitLookup := s.releaseCommitLookup(context.Background())
 	result := make([]PluginMeta, 0, len(allMeta))
 	for _, item := range allMeta {
+		commitSHA := item.CommitSHA
+		if commitSHA == "" {
+			commitSHA = commitLookup[releaseCommitKey(item.Name, item.Version, item.BinarySHA256)]
+		}
 		result = append(result, PluginMeta{
 			Name:               item.Name,
 			DisplayName:        item.DisplayName,
-			Version:            installedDisplayVersion(item.Version, item.IsDev, item.BinarySHA256),
+			Version:            installedDisplayVersion(item.Version, item.IsDev, commitSHA, item.BinarySHA256),
 			Author:             item.Author,
 			Type:               item.Type,
 			Platform:           item.Platform,
@@ -43,6 +48,7 @@ func (s *Service) List() []PluginMeta {
 			Metadata:           cloneStringMap(item.Metadata),
 			HasWebAssets:       item.HasWebAssets,
 			IsDev:              item.IsDev,
+			CommitSHA:          commitSHA,
 		})
 	}
 	return result
@@ -199,22 +205,27 @@ func (s *Service) ListMarketplace(ctx context.Context) ([]MarketplacePlugin, err
 			version:      meta.Version,
 			isDev:        meta.IsDev,
 			binarySHA256: meta.BinarySHA256,
+			commitSHA:    meta.CommitSHA,
 		}
 	}
 
 	result := make([]MarketplacePlugin, 0, len(items))
 	for _, item := range items {
 		meta, ok := installed[item.Name]
+		installedCommitSHA := meta.commitSHA
+		if installedCommitSHA == "" {
+			installedCommitSHA = matchingReleaseCommit(item, meta)
+		}
 		result = append(result, MarketplacePlugin{
 			Name:             item.Name,
 			Version:          item.Version,
-			DisplayVersion:   marketplaceDisplayVersion(item.Version, item.SHA256),
+			DisplayVersion:   marketplaceDisplayVersion(item.Version, item.CommitSHA, item.SHA256),
 			Description:      item.Description,
 			Author:           item.Author,
 			Type:             item.Type,
 			GithubRepo:       item.GithubRepo,
 			Installed:        ok,
-			InstalledVersion: installedDisplayVersion(meta.version, meta.isDev, meta.binarySHA256),
+			InstalledVersion: installedDisplayVersion(meta.version, meta.isDev, installedCommitSHA, meta.binarySHA256),
 			HasUpdate:        ok && !meta.isDev && hasPluginUpdate(item, meta),
 		})
 	}
@@ -225,6 +236,7 @@ type installedPlugin struct {
 	version      string
 	isDev        bool
 	binarySHA256 string
+	commitSHA    string
 }
 
 func hasPluginUpdate(item plugin.MarketplacePlugin, installed installedPlugin) bool {
@@ -239,10 +251,13 @@ func hasPluginUpdate(item plugin.MarketplacePlugin, installed installedPlugin) b
 	return latestSHA != "" && installedSHA != "" && latestSHA != installedSHA
 }
 
-func installedDisplayVersion(version string, isDev bool, binarySHA256 string) string {
+func installedDisplayVersion(version string, isDev bool, commitSHA, binarySHA256 string) string {
 	version = normalizeVersionForCompare(version)
 	if isDev || version == "" || version == "dev" {
 		return "dev"
+	}
+	if hash := shortHash(commitSHA); hash != "" {
+		return version + "-" + hash
 	}
 	if hash := shortHash(binarySHA256); hash != "" {
 		return version + "-" + hash
@@ -250,15 +265,57 @@ func installedDisplayVersion(version string, isDev bool, binarySHA256 string) st
 	return version
 }
 
-func marketplaceDisplayVersion(version, assetSHA256 string) string {
+func marketplaceDisplayVersion(version, commitSHA, assetSHA256 string) string {
 	version = normalizeVersionForCompare(version)
 	if version == "" {
 		return ""
+	}
+	if hash := shortHash(commitSHA); hash != "" {
+		return version + "-" + hash
 	}
 	if hash := shortHash(assetSHA256); hash != "" {
 		return version + "-" + hash
 	}
 	return version
+}
+
+func (s *Service) releaseCommitLookup(ctx context.Context) map[string]string {
+	if s.marketplace == nil {
+		return nil
+	}
+	items, err := s.marketplace.ListAvailable(ctx)
+	if err != nil || len(items) == 0 {
+		return nil
+	}
+	result := make(map[string]string, len(items))
+	for _, item := range items {
+		key := releaseCommitKey(item.Name, item.Version, item.SHA256)
+		if key == "" || shortHash(item.CommitSHA) == "" {
+			continue
+		}
+		result[key] = item.CommitSHA
+	}
+	return result
+}
+
+func matchingReleaseCommit(item plugin.MarketplacePlugin, installed installedPlugin) string {
+	if normalizeVersionForCompare(item.Version) != normalizeVersionForCompare(installed.version) {
+		return ""
+	}
+	latestSHA := normalizeSHA256ForCompare(item.SHA256)
+	installedSHA := normalizeSHA256ForCompare(installed.binarySHA256)
+	if latestSHA == "" || installedSHA == "" || latestSHA != installedSHA {
+		return ""
+	}
+	return item.CommitSHA
+}
+
+func releaseCommitKey(name, version, sha256 string) string {
+	sha256 = normalizeSHA256ForCompare(sha256)
+	if sha256 == "" {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(name)) + "\x00" + normalizeVersionForCompare(version) + "\x00" + sha256
 }
 
 func normalizeVersionForCompare(value string) string {

@@ -228,6 +228,7 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 		}
 		if !isDev {
 			meta.BinarySHA256 = m.installedBinarySHA256Locked(inst)
+			meta.CommitSHA = m.readInstallMetadataLocked(inst).CommitSHA
 		}
 		if types, ok := m.accountTypeCache[inst.Platform]; ok {
 			meta.AccountTypes = cloneAccountTypes(types)

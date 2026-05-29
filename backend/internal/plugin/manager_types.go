@@ -103,6 +103,7 @@ type PluginMeta struct {
 	HasWebAssets       bool
 	IsDev              bool
 	BinarySHA256       string
+	CommitSHA          string
 }
 
 // NewManager 创建插件管理器。

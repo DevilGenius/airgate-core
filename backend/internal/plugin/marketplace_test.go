@@ -66,6 +66,16 @@ func TestNormalizeSHA256ParsesChecksumFileContent(t *testing.T) {
 	}
 }
 
+func TestNormalizeGitCommitSHA(t *testing.T) {
+	sha := "ABCDEF1234567890ABCDEF1234567890ABCDEF12"
+	if got := normalizeGitCommitSHA(sha); got != strings.ToLower(sha) {
+		t.Fatalf("normalizeGitCommitSHA() = %q", got)
+	}
+	if got := normalizeGitCommitSHA(strings.Repeat("a", 64)); got != "" {
+		t.Fatalf("normalizeGitCommitSHA() accepted non-commit SHA %q", got)
+	}
+}
+
 func TestResolveReleaseAssetSHA256FetchesChecksumAsset(t *testing.T) {
 	hash := strings.Repeat("c", 64)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

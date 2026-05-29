@@ -43,6 +43,7 @@ type PluginMeta struct {
 	Metadata           map[string]string
 	HasWebAssets       bool
 	IsDev              bool
+	CommitSHA          string
 }
 
 // MarketplacePlugin 市场插件条目。

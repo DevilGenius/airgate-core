@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -27,6 +28,7 @@ type MarketplacePlugin struct {
 	GithubRepo  string `json:"github_repo,omitempty"`
 	DownloadURL string `json:"download_url,omitempty"`
 	SHA256      string `json:"sha256,omitempty"`
+	CommitSHA   string `json:"commit_sha,omitempty"`
 }
 
 // RegistryJSON 插件源注册表结构
@@ -277,6 +279,7 @@ func (m *Marketplace) SyncFromGithub(ctx context.Context) error {
 		if release.TagName != "" {
 			merged.Version = strings.TrimPrefix(release.TagName, "v")
 		}
+		merged.CommitSHA = resolveGithubTagCommitSHA(ctx, entry.GithubRepo, release.TagName, token)
 		if asset := selectReleaseBinaryAsset(release.Assets, runtime.GOOS, runtime.GOARCH); asset != nil {
 			merged.DownloadURL = asset.BrowserDownloadURL
 			merged.SHA256 = resolveReleaseAssetSHA256(ctx, *asset, release.Assets, token)
@@ -340,6 +343,20 @@ type githubReleaseInfo struct {
 	Assets  []githubAsset `json:"assets"`
 }
 
+type githubObjectRef struct {
+	Type string `json:"type"`
+	SHA  string `json:"sha"`
+	URL  string `json:"url"`
+}
+
+type githubRefInfo struct {
+	Object githubObjectRef `json:"object"`
+}
+
+type githubTagInfo struct {
+	Object githubObjectRef `json:"object"`
+}
+
 // fetchLatestRelease 调用 GitHub API 获取仓库最新 release。
 // 若提供 etag，会发送 If-None-Match 条件请求；上游未变更时返回 (nil, "", 304, nil)，**不消耗配额**。
 // 返回值：release 信息、新的 ETag、HTTP 状态码、错误
@@ -380,6 +397,71 @@ func fetchLatestRelease(ctx context.Context, repo, token, etag string) (*githubR
 		return nil, "", resp.StatusCode, fmt.Errorf("解析 release 失败: %w", err)
 	}
 	return &info, resp.Header.Get("ETag"), resp.StatusCode, nil
+}
+
+func resolveGithubTagCommitSHA(ctx context.Context, repo, tagName, token string) string {
+	sha, err := fetchGithubTagCommitSHA(ctx, repo, tagName, token)
+	if err != nil {
+		slog.Debug("plugin_release_commit_resolve_failed", "repo", repo, "tag", tagName, "error", err)
+		return ""
+	}
+	return sha
+}
+
+func fetchGithubTagCommitSHA(ctx context.Context, repo, tagName, token string) (string, error) {
+	repo = strings.TrimSpace(repo)
+	tagName = strings.TrimSpace(tagName)
+	if repo == "" || tagName == "" {
+		return "", nil
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/git/ref/tags/%s", repo, url.PathEscape(tagName))
+	var ref githubRefInfo
+	if err := fetchGithubAPIJSON(ctx, apiURL, token, &ref); err != nil {
+		return "", err
+	}
+
+	switch ref.Object.Type {
+	case "commit":
+		return normalizeGitCommitSHA(ref.Object.SHA), nil
+	case "tag":
+		if ref.Object.URL == "" {
+			return "", nil
+		}
+		var tag githubTagInfo
+		if err := fetchGithubAPIJSON(ctx, ref.Object.URL, token, &tag); err != nil {
+			return "", err
+		}
+		if tag.Object.Type == "commit" {
+			return normalizeGitCommitSHA(tag.Object.SHA), nil
+		}
+	}
+	return "", nil
+}
+
+func fetchGithubAPIJSON(ctx context.Context, apiURL, token string, target any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("请求 GitHub API 失败: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GitHub API 状态码 %d", resp.StatusCode)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+		return fmt.Errorf("解析 GitHub API 响应失败: %w", err)
+	}
+	return nil
 }
 
 func selectReleaseBinaryAsset(assets []githubAsset, goos, goarch string) *githubAsset {
@@ -451,6 +533,17 @@ func normalizeSHA256(value string) string {
 		value = fields[0]
 	}
 	if len(value) != sha256.Size*2 {
+		return ""
+	}
+	if _, err := hex.DecodeString(value); err != nil {
+		return ""
+	}
+	return value
+}
+
+func normalizeGitCommitSHA(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if len(value) != 40 {
 		return ""
 	}
 	if _, err := hex.DecodeString(value); err != nil {

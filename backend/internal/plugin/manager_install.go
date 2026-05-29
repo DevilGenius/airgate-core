@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -48,6 +50,10 @@ func (m *Manager) Uninstall(ctx context.Context, name string) error {
 
 // InstallFromBinary 从二进制数据安装插件。
 func (m *Manager) InstallFromBinary(ctx context.Context, name string, binary []byte) error {
+	return m.installFromBinary(ctx, name, binary, nil)
+}
+
+func (m *Manager) installFromBinary(ctx context.Context, name string, binary []byte, meta *installMetadata) error {
 	realName, err := m.probePluginName(name, binary)
 	if err != nil {
 		slog.Warn("探测插件名称失败，使用传入名称", "name", name, "error", err)
@@ -78,6 +84,7 @@ func (m *Manager) InstallFromBinary(ctx context.Context, name string, binary []b
 		return fmt.Errorf("启动插件失败: %w", err)
 	}
 
+	m.writeInstallMetadata(realName, meta)
 	slog.Info("插件从二进制安装成功", "name", canonicalName)
 	return nil
 }
@@ -185,8 +192,17 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo, version string) e
 	if err != nil {
 		return fmt.Errorf("读取下载内容失败: %w", err)
 	}
+	sum := sha256.Sum256(binary)
+	binarySHA256 := hex.EncodeToString(sum[:])
 
-	return m.InstallFromBinary(ctx, repoName, binary)
+	meta := &installMetadata{
+		GithubRepo:  owner + "/" + repoName,
+		Version:     strings.TrimPrefix(release.TagName, "v"),
+		CommitSHA:   resolveGithubTagCommitSHA(ctx, owner+"/"+repoName, release.TagName, ""),
+		AssetSHA256: binarySHA256,
+	}
+
+	return m.installFromBinary(ctx, repoName, binary, meta)
 }
 
 func fetchGithubReleaseForInstall(ctx context.Context, owner, repoName, version string) (githubRelease, error) {
