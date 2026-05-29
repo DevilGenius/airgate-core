@@ -2,6 +2,8 @@ package server
 
 import (
 	"net/http"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -49,6 +51,20 @@ func (dr *DynamicRouter) Handle(c *gin.Context) {
 		matched := dr.routes[key]
 		dr.mu.RUnlock()
 		if !matched {
+			dr.mu.RLock()
+			allowedMethods := allowedMethodsForPathLocked(dr.routes, path)
+			dr.mu.RUnlock()
+			if len(allowedMethods) > 0 {
+				c.Header("Allow", strings.Join(allowedMethods, ", "))
+				c.JSON(http.StatusMethodNotAllowed, gin.H{
+					"error": gin.H{
+						"message": "Method Not Allowed",
+						"type":    "invalid_request_error",
+						"code":    "method_not_allowed",
+					},
+				})
+				return
+			}
 			c.JSON(http.StatusNotFound, gin.H{"error": "未知的 API 路径"})
 			return
 		}
@@ -83,4 +99,24 @@ func (dr *DynamicRouter) RemoveRoutes(pluginName string, routes []routeEntry) {
 type routeEntry struct {
 	Method string
 	Path   string
+}
+
+func allowedMethodsForPathLocked(routes map[string]bool, path string) []string {
+	seen := make(map[string]struct{})
+	for key, enabled := range routes {
+		if !enabled {
+			continue
+		}
+		method, routePath, ok := strings.Cut(key, " ")
+		if !ok || routePath != path {
+			continue
+		}
+		seen[method] = struct{}{}
+	}
+	methods := make([]string, 0, len(seen))
+	for method := range seen {
+		methods = append(methods, method)
+	}
+	sort.Strings(methods)
+	return methods
 }

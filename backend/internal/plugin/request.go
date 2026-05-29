@@ -45,6 +45,9 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 
 	path := requestPath(c)
 	parsed := parseBody(body, c.GetHeader("Content-Type"))
+	if !validateRequestShape(c, keyInfo, path, parsed) {
+		return nil, false
+	}
 	parsed.PreviousResponseID = firstNonEmpty(parsed.PreviousResponseID, previousResponseIDFromHeaders(c.Request.Header))
 	parsed.SessionID = resolveRequestSessionID(c.Request.Header, parsed)
 	requestedPlatform := requestedPlatform(c, keyInfo)
@@ -106,6 +109,33 @@ func requestPath(c *gin.Context) string {
 		return p
 	}
 	return c.Request.URL.Path
+}
+
+func validateRequestShape(c *gin.Context, keyInfo *auth.APIKeyInfo, path string, parsed parsedRequest) bool {
+	if !isImageSubmitAPIPath(path) {
+		return true
+	}
+	if c.Request.Method != http.MethodPost {
+		c.Header("Allow", http.MethodPost)
+		slog.Info("image_request_method_not_allowed",
+			sdk.LogFieldUserID, keyInfo.UserID,
+			sdk.LogFieldAPIKeyID, keyInfo.KeyID,
+			sdk.LogFieldPath, path,
+			"method", c.Request.Method,
+		)
+		openAIError(c, http.StatusMethodNotAllowed, "invalid_request_error", "method_not_allowed", "Method Not Allowed")
+		return false
+	}
+	if strings.TrimSpace(parsed.Model) == "" {
+		slog.Info("image_request_missing_model",
+			sdk.LogFieldUserID, keyInfo.UserID,
+			sdk.LogFieldAPIKeyID, keyInfo.KeyID,
+			sdk.LogFieldPath, path,
+		)
+		openAIError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request", "model is required")
+		return false
+	}
+	return true
 }
 
 func requestedPlatform(c *gin.Context, keyInfo *auth.APIKeyInfo) string {
@@ -345,29 +375,55 @@ func normalizeReasoningEffort(effort string) string {
 // 对话模型携带 image_generation tool 仍按对话请求路由，避免普通 Responses
 // 工具调用被图片分组开关挡住；只有 Images API 路径和图像专用模型才强制图片分组。
 func requestNeedsImage(path, model string, _ []byte) bool {
-	return isImageAPIPath(path) || isImageModel(model)
+	return isImageSubmitAPIPath(path) || isImageModel(model)
 }
 
 // requestHasImageWorkload 判断请求是否需要更长的图片工作超时。
 // 这里仍保留 Responses API 的 image_generation tool 识别，用于放宽生成链路
 // 的等待时间，但不参与图片分组路由。
 func requestHasImageWorkload(path, model string, body []byte) bool {
-	return isImageAPIPath(path) || isImageModel(model) || hasImageGenerationTool(body)
+	return isImageSubmitAPIPath(path) || isImageModel(model) || hasImageGenerationTool(body)
 }
 
-func isImageAPIPath(path string) bool {
-	if path == "" {
+func isImageSubmitAPIPath(path string) bool {
+	switch path {
+	case "/v1/images/generations", "/images/generations",
+		"/v1/images/edits", "/images/edits":
+		return true
+	}
+	if !strings.Contains(path, "images") && !strings.Contains(path, "Images") && !strings.Contains(path, "IMAGES") {
 		return false
 	}
-	u, err := url.Parse(path)
-	if err == nil {
-		path = u.Path
+	switch normalizeForwardPath(path) {
+	case "/v1/images/generations", "/images/generations",
+		"/v1/images/edits", "/images/edits":
+		return true
+	default:
+		return false
 	}
-	path = strings.TrimRight(strings.ToLower(path), "/")
-	return strings.HasSuffix(path, "/images/generations") ||
-		strings.HasSuffix(path, "/images/edits") ||
-		strings.HasSuffix(path, "/images/tasks") ||
-		strings.HasSuffix(path, "/images/tasks/list")
+}
+
+func normalizeForwardPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	if idx := strings.IndexByte(path, '?'); idx >= 0 {
+		path = path[:idx]
+	}
+	if strings.Contains(path, "://") {
+		if u, err := url.Parse(path); err == nil && u != nil && u.Path != "" {
+			path = u.Path
+		}
+	}
+	path = strings.TrimRight(strings.ToLower(strings.TrimSpace(path)), "/")
+	if path == "" {
+		return "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return path
 }
 
 func isImageModel(model string) bool {

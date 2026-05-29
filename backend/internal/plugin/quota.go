@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -39,6 +40,17 @@ func (f *Forwarder) checkBalance(c *gin.Context, state *forwardState) bool {
 // isMetadataOnlyPath 只读元信息（/v1/models、任务查询等）不打上游、不计费、不需要账号调度。
 func isMetadataOnlyPath(path string) bool {
 	switch path {
+	case "/v1/models", "/models",
+		"/v1/images/tasks", "/images/tasks",
+		"/v1/images/tasks/list", "/images/tasks/list":
+		return true
+	}
+	if !strings.Contains(path, "models") && !strings.Contains(path, "images/tasks") &&
+		!strings.Contains(path, "Models") && !strings.Contains(path, "Images/Tasks") &&
+		!strings.Contains(path, "MODELS") && !strings.Contains(path, "IMAGES/TASKS") {
+		return false
+	}
+	switch normalizeForwardPath(path) {
 	case "/v1/models", "/models",
 		"/v1/images/tasks", "/images/tasks",
 		"/v1/images/tasks/list", "/images/tasks/list":

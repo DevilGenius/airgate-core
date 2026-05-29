@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
+	"github.com/DevilGenius/airgate-core/internal/server/middleware"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -118,6 +120,51 @@ func TestParseBody_MultipartIgnoresFileParts(t *testing.T) {
 	}
 	if !parsed.Stream {
 		t.Fatalf("Stream = false, want true")
+	}
+}
+
+func TestParseRequestRejectsGETImageSubmitBeforeScheduling(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/images/generations", nil)
+	c.Set(middleware.CtxKeyKeyInfo, &auth.APIKeyInfo{UserID: 11, KeyID: 22, GroupPlatform: "openai"})
+
+	state, ok := (&Forwarder{}).parseRequest(c)
+	if ok {
+		t.Fatalf("parseRequest ok = true, want false with state %#v", state)
+	}
+	if recorder.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusMethodNotAllowed)
+	}
+	if allow := recorder.Header().Get("Allow"); allow != http.MethodPost {
+		t.Fatalf("Allow = %q, want POST", allow)
+	}
+	if !strings.Contains(recorder.Body.String(), `"code":"method_not_allowed"`) {
+		t.Fatalf("body = %s, want method_not_allowed error", recorder.Body.String())
+	}
+}
+
+func TestParseRequestRejectsImageSubmitWithoutModelBeforeScheduling(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set(middleware.CtxKeyKeyInfo, &auth.APIKeyInfo{UserID: 11, KeyID: 22, GroupPlatform: "openai"})
+
+	state, ok := (&Forwarder{}).parseRequest(c)
+	if ok {
+		t.Fatalf("parseRequest ok = true, want false with state %#v", state)
+	}
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"code":"invalid_request"`) || !strings.Contains(body, "model is required") {
+		t.Fatalf("body = %s, want invalid_request model error", body)
 	}
 }
 
