@@ -291,10 +291,12 @@ func (m *MessageQueue) EnforceDelay(ctx context.Context, accountID int, baseRPM 
 		}
 	}
 
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-time.After(delay):
+	case <-timer.C:
 		return nil
 	}
 }

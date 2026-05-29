@@ -11,10 +11,13 @@ import (
 )
 
 const (
-	// stickyTTL 粘性会话默认过期时间，和 response_id 亲和缓存保持一致。
-	stickyTTL              = time.Hour
-	stickyMemoryMaxEntries = 65536
+	// stickyTTL 粘性会话默认过期时间，和 response_id 亲和缓存保持一致（3600s）。
+	stickyTTL = 3600 * time.Second
+
+	// stickyMemoryMaxEntries 只是异常流量下的高水位安全阀；正常回收主要靠 TTL。
+	stickyMemoryMaxEntries = 1000000
 	stickyCleanupInterval  = time.Minute
+	stickyCleanupMaxScan   = 4096
 )
 
 type stickyBinding struct {
@@ -134,9 +137,14 @@ func (s *StickySession) cleanupMemory(now time.Time) {
 	if now.Sub(s.lastCleanupTime) < stickyCleanupInterval {
 		return
 	}
+	scanned := 0
 	for key, binding := range s.items {
 		if now.After(binding.expiresAt) {
 			delete(s.items, key)
+		}
+		scanned++
+		if scanned >= stickyCleanupMaxScan {
+			break
 		}
 	}
 	s.lastCleanupTime = now

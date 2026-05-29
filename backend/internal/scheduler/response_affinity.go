@@ -12,9 +12,12 @@ import (
 )
 
 const (
-	responseAffinityTTL              = time.Hour
-	responseAffinityMemoryMaxEntries = 65536
+	responseAffinityTTL = 3600 * time.Second
+
+	// responseAffinityMemoryMaxEntries 只是异常流量下的高水位安全阀；正常回收主要靠 TTL。
+	responseAffinityMemoryMaxEntries = 1000000
 	responseAffinityCleanupInterval  = time.Minute
+	responseAffinityCleanupMaxScan   = 4096
 )
 
 type responseAffinityBinding struct {
@@ -128,9 +131,14 @@ func (a *ResponseAffinity) cleanupMemory(now time.Time) {
 	if now.Sub(a.lastCleanupTime) < responseAffinityCleanupInterval {
 		return
 	}
+	scanned := 0
 	for key, binding := range a.items {
 		if now.After(binding.expiresAt) {
 			delete(a.items, key)
+		}
+		scanned++
+		if scanned >= responseAffinityCleanupMaxScan {
+			break
 		}
 	}
 	a.lastCleanupTime = now

@@ -40,7 +40,11 @@ type devWatcher struct {
 	mu      sync.Mutex
 	plugins map[string]*devWatchEntry // canonicalName → entry
 
-	stop chan struct{}
+	stop      chan struct{}
+	done      chan struct{}
+	closeOnce sync.Once
+	wg        sync.WaitGroup
+	closed    bool
 }
 
 type devWatchEntry struct {
@@ -58,6 +62,7 @@ func newDevWatcher(mgr *Manager) *devWatcher {
 		interval: devWatcherInterval,
 		plugins:  make(map[string]*devWatchEntry),
 		stop:     make(chan struct{}),
+		done:     make(chan struct{}),
 	}
 	go dw.loop()
 	return dw
@@ -71,6 +76,10 @@ func (dw *devWatcher) add(name, srcPath string) {
 	baseline, _ := scanMaxGoMtime(srcPath)
 
 	dw.mu.Lock()
+	if dw.closed {
+		dw.mu.Unlock()
+		return
+	}
 	dw.plugins[name] = &devWatchEntry{srcPath: srcPath, lastMtime: baseline}
 	dw.mu.Unlock()
 
@@ -85,10 +94,28 @@ func (dw *devWatcher) remove(name string) {
 	delete(dw.plugins, name)
 }
 
+// Close 停止 watcher 轮询，并等待已触发的 reload goroutine 结束。
+func (dw *devWatcher) Close() {
+	if dw == nil {
+		return
+	}
+	dw.closeOnce.Do(func() {
+		dw.mu.Lock()
+		dw.closed = true
+		dw.plugins = make(map[string]*devWatchEntry)
+		dw.mu.Unlock()
+
+		close(dw.stop)
+		<-dw.done
+		dw.wg.Wait()
+	})
+}
+
 // loop 每 interval 扫描一次所有注册插件，发现 mtime 增长就触发 reload。
 func (dw *devWatcher) loop() {
 	t := time.NewTicker(dw.interval)
 	defer t.Stop()
+	defer close(dw.done)
 	for {
 		select {
 		case <-dw.stop:
@@ -131,7 +158,11 @@ func (dw *devWatcher) tick() {
 		current.reloading = true
 		dw.mu.Unlock()
 
-		go dw.doReload(name, latest)
+		dw.wg.Add(1)
+		go func() {
+			defer dw.wg.Done()
+			dw.doReload(name, latest)
+		}()
 	}
 }
 

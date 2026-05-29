@@ -23,7 +23,11 @@ import (
 //
 // 关键转移（Active ↔ Disabled）由 state machine 主动调用 InvalidateAll，而
 // RateLimited / Degraded 这种带 state_until 的转移由 TTL 兜底，不另外 invalidate。
-const routeCacheTTL = 3 * time.Second
+const (
+	routeCacheTTL             = 3 * time.Second
+	routeCacheMaxEntries      = 262144
+	routeCacheCleanupInterval = time.Minute
+)
 
 type routeCacheKey struct {
 	groupID  int
@@ -38,15 +42,17 @@ type routeCacheEntry struct {
 
 // routeCache 路由结果缓存。并发安全，所有 method 都是 O(1)。
 type routeCache struct {
-	ttl   time.Duration
-	mu    sync.RWMutex
-	store map[routeCacheKey]routeCacheEntry
+	ttl             time.Duration
+	mu              sync.RWMutex
+	store           map[routeCacheKey]routeCacheEntry
+	lastCleanupTime time.Time
 }
 
 func newRouteCache(ttl time.Duration) *routeCache {
 	return &routeCache{
-		ttl:   ttl,
-		store: make(map[routeCacheKey]routeCacheEntry),
+		ttl:             ttl,
+		store:           make(map[routeCacheKey]routeCacheEntry),
+		lastCleanupTime: time.Now(),
 	}
 }
 
@@ -55,10 +61,16 @@ func (c *routeCache) Get(groupID int, platform string) ([]*ent.Account, map[stri
 	if c == nil {
 		return nil, nil, false
 	}
+	key := routeCacheKey{groupID, platform}
+	now := time.Now()
 	c.mu.RLock()
-	e, ok := c.store[routeCacheKey{groupID, platform}]
+	e, ok := c.store[key]
 	c.mu.RUnlock()
-	if !ok || time.Now().After(e.expiresAt) {
+	if !ok {
+		return nil, nil, false
+	}
+	if now.After(e.expiresAt) {
+		c.deleteExpired(key, e.expiresAt, now)
 		return nil, nil, false
 	}
 	return e.accounts, e.modelRouting, true
@@ -69,13 +81,52 @@ func (c *routeCache) Set(groupID int, platform string, accounts []*ent.Account, 
 	if c == nil {
 		return
 	}
+	now := time.Now()
+	key := routeCacheKey{groupID, platform}
 	c.mu.Lock()
-	c.store[routeCacheKey{groupID, platform}] = routeCacheEntry{
+	c.cleanupExpiredLocked(now)
+	if _, exists := c.store[key]; !exists && len(c.store) >= routeCacheMaxEntries {
+		c.deleteOneExpiredOrArbitraryLocked(now)
+	}
+	c.store[key] = routeCacheEntry{
 		accounts:     accounts,
 		modelRouting: routing,
-		expiresAt:    time.Now().Add(c.ttl),
+		expiresAt:    now.Add(c.ttl),
 	}
 	c.mu.Unlock()
+}
+
+func (c *routeCache) deleteExpired(key routeCacheKey, expiresAt time.Time, now time.Time) {
+	c.mu.Lock()
+	if current, ok := c.store[key]; ok && current.expiresAt.Equal(expiresAt) && now.After(current.expiresAt) {
+		delete(c.store, key)
+	}
+	c.mu.Unlock()
+}
+
+func (c *routeCache) cleanupExpiredLocked(now time.Time) {
+	if now.Sub(c.lastCleanupTime) < routeCacheCleanupInterval && len(c.store) < routeCacheMaxEntries {
+		return
+	}
+	for key, entry := range c.store {
+		if now.After(entry.expiresAt) {
+			delete(c.store, key)
+		}
+	}
+	c.lastCleanupTime = now
+}
+
+func (c *routeCache) deleteOneExpiredOrArbitraryLocked(now time.Time) {
+	for key, entry := range c.store {
+		if now.After(entry.expiresAt) {
+			delete(c.store, key)
+			return
+		}
+	}
+	for key := range c.store {
+		delete(c.store, key)
+		return
+	}
 }
 
 // InvalidateGroup 清除指定分组的所有 platform 缓存。admin 更新分组 / 账号绑定时调用。
@@ -99,5 +150,6 @@ func (c *routeCache) InvalidateAll() {
 	}
 	c.mu.Lock()
 	c.store = make(map[routeCacheKey]routeCacheEntry)
+	c.lastCleanupTime = time.Now()
 	c.mu.Unlock()
 }

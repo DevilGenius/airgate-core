@@ -195,10 +195,13 @@ func startMainServer(cfg *config.Config) {
 	}()
 
 	// 启动时执行非破坏性迁移，补齐缺失表和字段，避免升级后因 schema 落后导致接口报错。
-	if err := db.Schema.Create(context.Background(), migrate.WithDropIndex(false), migrate.WithDropColumn(false)); err != nil {
+	migrationCtx, migrationCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	if err := db.Schema.Create(migrationCtx, migrate.WithDropIndex(false), migrate.WithDropColumn(false)); err != nil {
+		migrationCancel()
 		slog.Error("db_migration_failed", sdk.LogFieldError, err)
 		os.Exit(1)
 	}
+	migrationCancel()
 
 	// 回填历史 API Key 的 key_hint 以及 reseller markup 新列等启动整理任务
 	bootstrap.RunStartupTasks(db, drv, cfg.APIKeySecret())

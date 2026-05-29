@@ -687,6 +687,10 @@ func (m *Manager) stopPlugin(name string) {
 
 // StopAll 停止所有插件。
 func (m *Manager) StopAll(ctx context.Context) {
+	if m.devWatcher != nil {
+		m.devWatcher.Close()
+	}
+
 	m.mu.RLock()
 	names := make([]string, 0, len(m.instances))
 	for name := range m.instances {

@@ -190,7 +190,7 @@ func (s *Server) StartPlugins(ctx context.Context) {
 
 		// 启动插件市场后台同步（默认开启，配置 plugins.marketplace.disabled=true 可关闭）
 		if !s.cfg.Plugins.Marketplace.Disabled && pluginCtx.Err() == nil {
-			s.marketplace.Start(context.Background())
+			s.marketplace.Start(pluginCtx)
 		}
 	}()
 }
@@ -198,6 +198,8 @@ func (s *Server) StartPlugins(ctx context.Context) {
 // Shutdown 优雅关闭服务器
 func (s *Server) Shutdown(ctx context.Context) error {
 	slog.Info("正在关闭服务器...")
+
+	shutdownErr := s.srv.Shutdown(ctx)
 
 	if s.pluginStartCancel != nil {
 		s.pluginStartCancel()
@@ -214,5 +216,5 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// 停止所有插件
 	s.pluginMgr.StopAll(ctx)
 
-	return s.srv.Shutdown(ctx)
+	return shutdownErr
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const defaultSessionIdleTimeout = 30 * time.Minute
+const defaultSessionIdleTimeout = 3600 * time.Second
 
 // SessionManager 账户级会话管理器
 // 基于 Redis ZSET 实现，member=sessionUUID, score=unix timestamp

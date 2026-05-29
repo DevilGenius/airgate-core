@@ -76,9 +76,11 @@ type Marketplace struct {
 	cache   []MarketplacePlugin // 已同步的最新数据
 	etags   map[string]string   // repo -> ETag，用于条件请求避免消耗配额
 
-	stopCh  chan struct{}
-	stopped chan struct{}
-	once    sync.Once
+	stopCh    chan struct{}
+	stopped   chan struct{}
+	once      sync.Once
+	startOnce sync.Once
+	started   bool
 }
 
 // 默认刷新间隔：6 小时
@@ -167,14 +169,24 @@ func (m *Marketplace) ListAvailable(ctx context.Context) ([]MarketplacePlugin, e
 
 // Start 启动后台同步 goroutine。若 entries 中没有任何 GithubRepo 则跳过。
 func (m *Marketplace) Start(ctx context.Context) {
-	go m.run(ctx)
+	m.startOnce.Do(func() {
+		m.mu.Lock()
+		m.started = true
+		m.mu.Unlock()
+		go m.run(ctx)
+	})
 }
 
 // Stop 停止后台同步
 func (m *Marketplace) Stop() {
 	m.once.Do(func() {
 		close(m.stopCh)
-		<-m.stopped
+		m.mu.RLock()
+		started := m.started
+		m.mu.RUnlock()
+		if started {
+			<-m.stopped
+		}
 	})
 }
 
@@ -192,6 +204,8 @@ func (m *Marketplace) run(ctx context.Context) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-m.stopCh:
 			return
 		case <-ticker.C:
