@@ -18,6 +18,7 @@ env:
   GOPRIVATE: github.com/DevilGenius/airgate-sdk
   REGISTRY: ghcr.io
   IMAGE_NAME: devilgenius/airgate-core
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ------------------------------------------------------------

@@ -16,7 +16,7 @@ COPY airgate-core/web ./airgate-core/web
 RUN cd airgate-core/web && pnpm build
 
 # ---- 阶段 2: 构建后端 ----
-FROM golang:1.25-alpine AS backend
+FROM golang:1.26.3-alpine AS backend
 RUN apk add --no-cache git
 WORKDIR /build
 ENV GOPRIVATE=github.com/DevilGenius/airgate-sdk \
