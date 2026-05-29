@@ -27,13 +27,13 @@ jobs:
     name: Build Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.1.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -66,7 +66,7 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - name: Checkout airgate-core
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: airgate-core
 
@@ -192,7 +192,7 @@ jobs:
           - goos: darwin
             goarch: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download frontend artifact
         uses: actions/download-artifact@v4
@@ -206,7 +206,7 @@ jobs:
           mkdir -p backend/internal/web/webdist
           cp -r web/dist/. backend/internal/web/webdist/
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
@@ -249,7 +249,7 @@ jobs:
       - build-binaries
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -348,7 +348,7 @@ jobs:
           fi
 
       - name: Create release with generated changelog
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
