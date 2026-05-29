@@ -15,7 +15,6 @@ func TestOfficialPluginsIncludeCorePlugins(t *testing.T) {
 		"gateway-kiro":       "DevilGenius/airgate-kiro",
 		"airgate-playground": "DevilGenius/airgate-playground",
 		"airgate-studio":     "DevilGenius/airgate-studio",
-		"airgate-health":     "DevilGenius/airgate-health",
 		"payment-epay":       "DevilGenius/airgate-epay",
 	}
 
@@ -89,5 +88,17 @@ func TestResolveReleaseAssetSHA256FetchesChecksumAsset(t *testing.T) {
 	}}, "")
 	if got != hash {
 		t.Fatalf("resolveReleaseAssetSHA256() = %q, want %q", got, hash)
+	}
+}
+
+func TestMarketplaceSyncErrorAllowsPartialSuccess(t *testing.T) {
+	err := marketplaceSyncError(1, 1, context.Canceled)
+	if err != nil {
+		t.Fatalf("marketplaceSyncError() = %v, want nil for partial success", err)
+	}
+
+	err = marketplaceSyncError(0, 1, context.Canceled)
+	if err == nil {
+		t.Fatal("marketplaceSyncError() = nil, want error when all GitHub entries fail")
 	}
 }

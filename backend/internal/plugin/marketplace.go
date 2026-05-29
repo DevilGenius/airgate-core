@@ -123,14 +123,6 @@ var officialPlugins = []MarketplacePlugin{
 		GithubRepo:  "DevilGenius/airgate-epay",
 	},
 	{
-		Name:        "airgate-health",
-		Version:     "0.0.1",
-		Description: "AI 提供商健康监控：主动探测、可用率/延迟聚合、对外公开状态页",
-		Author:      "AirGate",
-		Type:        "extension",
-		GithubRepo:  "DevilGenius/airgate-health",
-	},
-	{
 		Name:        "airgate-playground",
 		Version:     "0.0.1",
 		Description: "AI 对话插件：网页聊天、多模型切换、会话管理",
@@ -238,6 +230,8 @@ func (m *Marketplace) SyncFromGithub(ctx context.Context) error {
 	var lastErr error
 	notModified := 0
 	fetched := 0
+	failed := 0
+	successfulGithub := 0
 
 	for _, entry := range entries {
 		if entry.GithubRepo == "" {
@@ -249,6 +243,7 @@ func (m *Marketplace) SyncFromGithub(ctx context.Context) error {
 		if err != nil {
 			slog.Debug("拉取插件 release 失败", "repo", entry.GithubRepo, "error", err)
 			lastErr = err
+			failed++
 			// 失败时保留上次缓存条目
 			if prev, ok := prevByName[entry.Name]; ok {
 				updated = append(updated, prev)
@@ -264,6 +259,7 @@ func (m *Marketplace) SyncFromGithub(ctx context.Context) error {
 
 		if status == http.StatusNotModified {
 			notModified++
+			successfulGithub++
 			// 复用上次结果，etag 保留
 			if prev, ok := prevByName[entry.Name]; ok {
 				updated = append(updated, prev)
@@ -275,6 +271,7 @@ func (m *Marketplace) SyncFromGithub(ctx context.Context) error {
 		}
 
 		fetched++
+		successfulGithub++
 		merged := entry
 		if release.TagName != "" {
 			merged.Version = strings.TrimPrefix(release.TagName, "v")
@@ -302,8 +299,16 @@ func (m *Marketplace) SyncFromGithub(ctx context.Context) error {
 		"count", len(updated),
 		"fetched", fetched,
 		"not_modified", notModified,
+		"failed", failed,
 	)
-	return lastErr
+	return marketplaceSyncError(successfulGithub, failed, lastErr)
+}
+
+func marketplaceSyncError(successfulGithub, failed int, lastErr error) error {
+	if successfulGithub == 0 && failed > 0 {
+		return lastErr
+	}
+	return nil
 }
 
 // SyncFromURL 从指定 URL 同步插件列表（保留兼容旧接口）
