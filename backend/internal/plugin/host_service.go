@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -754,6 +755,18 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 				return nil, hostForwardGenericError()
 			}
 
+			releaseCapacity, ok := h.acquireHostForwardAccountCapacity(ctx, accFull)
+			if !ok {
+				slog.Info("host_forward_account_capacity_full",
+					sdk.LogFieldGroupID, route.GroupID,
+					sdk.LogFieldAccountID, acc.ID,
+					sdk.LogFieldModel, model,
+					"max_concurrency", hostForwardMaxConcurrency(accFull),
+				)
+				hardExclude = append(hardExclude, acc.ID)
+				continue
+			}
+
 			headers := hostForwardHeaders(req, route)
 			fwdReq := &sdk.ForwardRequest{
 				Account: hostSDKAccount(accFull),
@@ -765,6 +778,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 
 			start := time.Now()
 			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
+			releaseCapacity()
 			duration := time.Since(start)
 			h.applyHostOutcome(ctx, acc.ID, accFull, model, outcome, duration)
 			if returnableUpstream(outcome.Upstream) {
@@ -900,6 +914,18 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 				return hostForwardGenericError()
 			}
 
+			releaseCapacity, ok := h.acquireHostForwardAccountCapacity(ctx, accFull)
+			if !ok {
+				slog.Info("host_forward_stream_account_capacity_full",
+					sdk.LogFieldGroupID, route.GroupID,
+					sdk.LogFieldAccountID, acc.ID,
+					sdk.LogFieldModel, model,
+					"max_concurrency", hostForwardMaxConcurrency(accFull),
+				)
+				hardExclude = append(hardExclude, acc.ID)
+				continue
+			}
+
 			fw := &failoverStreamWriter{target: sw}
 			fwdReq := &sdk.ForwardRequest{
 				Account: hostSDKAccount(accFull),
@@ -912,6 +938,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 
 			start := time.Now()
 			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
+			releaseCapacity()
 			duration := time.Since(start)
 			h.applyHostOutcome(ctx, acc.ID, accFull, model, outcome, duration)
 			if cerr := hostContextError(fwdErr); cerr != nil {
@@ -1498,6 +1525,29 @@ func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.He
 		}
 	}
 	return headers
+}
+
+func (h *HostService) acquireHostForwardAccountCapacity(ctx context.Context, acc *ent.Account) (func(), bool) {
+	if h == nil || h.concurrency == nil || acc == nil {
+		return func() {}, true
+	}
+	requestID := "host-forward-" + uuid.NewString()
+	maxConc := hostForwardMaxConcurrency(acc)
+	slotTTL := time.Duration(scheduler.ExtraInt(acc.Extra, "slot_ttl_seconds")) * time.Second
+	if err := h.concurrency.AcquireSlot(ctx, acc.ID, requestID, maxConc, slotTTL); err != nil {
+		return nil, false
+	}
+	releaseCtx := context.Background()
+	return func() {
+		h.concurrency.ReleaseSlot(releaseCtx, acc.ID, requestID)
+	}, true
+}
+
+func hostForwardMaxConcurrency(acc *ent.Account) int {
+	if acc == nil || acc.MaxConcurrency <= 0 {
+		return scheduler.DefaultAccountMaxConcurrency
+	}
+	return acc.MaxConcurrency
 }
 
 func hostSDKAccount(acc *ent.Account) *sdk.Account {
