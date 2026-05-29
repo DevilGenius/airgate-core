@@ -49,6 +49,7 @@ type PluginMeta struct {
 type MarketplacePlugin struct {
 	Name             string
 	Version          string
+	DisplayVersion   string
 	Description      string
 	Author           string
 	Type             string

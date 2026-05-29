@@ -1,6 +1,12 @@
 package plugin
 
-import "testing"
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 func TestOfficialPluginsIncludeCorePlugins(t *testing.T) {
 	want := map[string]string{
@@ -26,5 +32,52 @@ func TestOfficialPluginsIncludeCorePlugins(t *testing.T) {
 		if p.GithubRepo != repo {
 			t.Fatalf("officialPlugins[%q].GithubRepo = %q, want %q", name, p.GithubRepo, repo)
 		}
+		if p.Version != "0.0.1" {
+			t.Fatalf("officialPlugins[%q].Version = %q, want 0.0.1", name, p.Version)
+		}
+	}
+}
+
+func TestSelectReleaseBinaryAssetSkipsChecksumAssets(t *testing.T) {
+	assets := []githubAsset{
+		{Name: "gateway-openai-linux-amd64.sha256", BrowserDownloadURL: "https://example.test/checksum"},
+		{Name: "gateway-openai-linux-amd64", BrowserDownloadURL: "https://example.test/binary"},
+	}
+
+	got := selectReleaseBinaryAsset(assets, "linux", "amd64")
+	if got == nil || got.BrowserDownloadURL != "https://example.test/binary" {
+		t.Fatalf("selectReleaseBinaryAsset() = %+v", got)
+	}
+}
+
+func TestResolveReleaseAssetSHA256UsesDigest(t *testing.T) {
+	hash := strings.Repeat("a", 64)
+	got := resolveReleaseAssetSHA256(t.Context(), githubAsset{Digest: "sha256:" + hash}, nil, "")
+	if got != hash {
+		t.Fatalf("resolveReleaseAssetSHA256() = %q, want %q", got, hash)
+	}
+}
+
+func TestNormalizeSHA256ParsesChecksumFileContent(t *testing.T) {
+	hash := strings.Repeat("b", 64)
+	got := normalizeSHA256(hash + "  gateway-openai-linux-amd64\n")
+	if got != hash {
+		t.Fatalf("normalizeSHA256() = %q, want %q", got, hash)
+	}
+}
+
+func TestResolveReleaseAssetSHA256FetchesChecksumAsset(t *testing.T) {
+	hash := strings.Repeat("c", 64)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(hash + "  gateway-openai-linux-amd64\n"))
+	}))
+	t.Cleanup(server.Close)
+
+	got := resolveReleaseAssetSHA256(context.Background(), githubAsset{Name: "gateway-openai-linux-amd64"}, []githubAsset{{
+		Name:               "gateway-openai-linux-amd64.sha256",
+		BrowserDownloadURL: server.URL,
+	}}, "")
+	if got != hash {
+		t.Fatalf("resolveReleaseAssetSHA256() = %q, want %q", got, hash)
 	}
 }

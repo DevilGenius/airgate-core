@@ -817,6 +817,7 @@ function MarketplaceCard({
 }) {
   const { t } = useTranslation();
   const canInstall = !!plugin.github_repo;
+  const versionLabel = plugin.display_version || plugin.version;
 
   return (
     <Card variant="default">
@@ -840,7 +841,7 @@ function MarketplaceCard({
           </span>
           <span className="flex items-center gap-1 font-mono">
             <Tag className="w-3 h-3" />
-            v{plugin.version}
+            v{versionLabel}
           </span>
         </div>
         {plugin.github_repo && (
@@ -860,11 +861,11 @@ function MarketplaceCard({
                   onPress={() => plugin.github_repo && onInstall(plugin.github_repo, true)}
                 >
                   {installing ? <Spinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  {t('plugins.update_to', { version: plugin.version })}
+                  {t('plugins.update_to', { version: versionLabel })}
                 </Button>
                 {plugin.installed_version && (
                   <span className="text-xs text-text-tertiary font-mono">
-                    v{plugin.installed_version} → v{plugin.version}
+                    v{plugin.installed_version} → v{versionLabel}
                   </span>
                 )}
                 <Button

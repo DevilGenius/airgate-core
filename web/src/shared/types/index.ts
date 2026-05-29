@@ -680,6 +680,7 @@ export interface PluginResp {
 export interface MarketplacePluginResp {
   name: string;
   version: string;
+  display_version?: string;
   description: string;
   author: string;
   type: string;

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -105,7 +106,7 @@ func NewMarketplace(pluginDir string, opts ...MarketplaceOption) *Marketplace {
 var officialPlugins = []MarketplacePlugin{
 	{
 		Name:        "gateway-openai",
-		Version:     "0.1.0",
+		Version:     "0.0.1",
 		Description: "OpenAI API 网关插件",
 		Author:      "AirGate",
 		Type:        "gateway",
@@ -113,7 +114,7 @@ var officialPlugins = []MarketplacePlugin{
 	},
 	{
 		Name:        "payment-epay",
-		Version:     "0.1.0",
+		Version:     "0.0.1",
 		Description: "多渠道支付插件：易支付 / 支付宝官方 / 微信支付官方",
 		Author:      "AirGate",
 		Type:        "extension",
@@ -121,7 +122,7 @@ var officialPlugins = []MarketplacePlugin{
 	},
 	{
 		Name:        "airgate-health",
-		Version:     "0.1.0",
+		Version:     "0.0.1",
 		Description: "AI 提供商健康监控：主动探测、可用率/延迟聚合、对外公开状态页",
 		Author:      "AirGate",
 		Type:        "extension",
@@ -129,7 +130,7 @@ var officialPlugins = []MarketplacePlugin{
 	},
 	{
 		Name:        "airgate-playground",
-		Version:     "0.1.0",
+		Version:     "0.0.1",
 		Description: "AI 对话插件：网页聊天、多模型切换、会话管理",
 		Author:      "AirGate",
 		Type:        "extension",
@@ -137,7 +138,7 @@ var officialPlugins = []MarketplacePlugin{
 	},
 	{
 		Name:        "gateway-claude",
-		Version:     "0.2.0",
+		Version:     "0.0.1",
 		Description: "Claude Messages API 网关插件：OAuth 授权、TLS 指纹、用量监控",
 		Author:      "AirGate",
 		Type:        "gateway",
@@ -145,7 +146,7 @@ var officialPlugins = []MarketplacePlugin{
 	},
 	{
 		Name:        "gateway-kiro",
-		Version:     "1.0.0",
+		Version:     "0.0.1",
 		Description: "Kiro (AWS CodeWhisperer) 反代网关，兼容 Anthropic Messages API",
 		Author:      "AirGate",
 		Type:        "gateway",
@@ -153,7 +154,7 @@ var officialPlugins = []MarketplacePlugin{
 	},
 	{
 		Name:        "airgate-studio",
-		Version:     "0.1.0",
+		Version:     "0.0.1",
 		Description: "面向图片、视频、音频等多模态内容生成的统一创作中心",
 		Author:      "AirGate",
 		Type:        "extension",
@@ -276,6 +277,10 @@ func (m *Marketplace) SyncFromGithub(ctx context.Context) error {
 		if release.TagName != "" {
 			merged.Version = strings.TrimPrefix(release.TagName, "v")
 		}
+		if asset := selectReleaseBinaryAsset(release.Assets, runtime.GOOS, runtime.GOARCH); asset != nil {
+			merged.DownloadURL = asset.BrowserDownloadURL
+			merged.SHA256 = resolveReleaseAssetSHA256(ctx, *asset, release.Assets, token)
+		}
 		// 描述保持静态值（来自 officialPlugins 或 config），不用 release body：
 		// release notes 描述的是"这一版改了什么"，与"插件是干嘛的"是两回事，
 		// GitHub generate_release_notes 还会自动塞入 "## What's Changed" 标题。
@@ -329,9 +334,10 @@ func (m *Marketplace) SyncFromURL(ctx context.Context, registryURL string) error
 
 // githubReleaseInfo GitHub release API 简化结构
 type githubReleaseInfo struct {
-	TagName string `json:"tag_name"`
-	Name    string `json:"name"`
-	Body    string `json:"body"`
+	TagName string        `json:"tag_name"`
+	Name    string        `json:"name"`
+	Body    string        `json:"body"`
+	Assets  []githubAsset `json:"assets"`
 }
 
 // fetchLatestRelease 调用 GitHub API 获取仓库最新 release。
@@ -374,6 +380,83 @@ func fetchLatestRelease(ctx context.Context, repo, token, etag string) (*githubR
 		return nil, "", resp.StatusCode, fmt.Errorf("解析 release 失败: %w", err)
 	}
 	return &info, resp.Header.Get("ETag"), resp.StatusCode, nil
+}
+
+func selectReleaseBinaryAsset(assets []githubAsset, goos, goarch string) *githubAsset {
+	goos = strings.ToLower(strings.TrimSpace(goos))
+	goarch = strings.ToLower(strings.TrimSpace(goarch))
+	for idx := range assets {
+		name := strings.ToLower(assets[idx].Name)
+		if strings.HasSuffix(name, ".sha256") {
+			continue
+		}
+		if strings.Contains(name, goos) && strings.Contains(name, goarch) {
+			return &assets[idx]
+		}
+	}
+	return nil
+}
+
+func resolveReleaseAssetSHA256(ctx context.Context, asset githubAsset, assets []githubAsset, token string) string {
+	if hash := normalizeSHA256(asset.Digest); hash != "" {
+		return hash
+	}
+
+	checksumName := asset.Name + ".sha256"
+	for idx := range assets {
+		if assets[idx].Name != checksumName || assets[idx].BrowserDownloadURL == "" {
+			continue
+		}
+		body, err := fetchSmallTextAsset(ctx, assets[idx].BrowserDownloadURL, token)
+		if err != nil {
+			slog.Debug("plugin_release_checksum_fetch_failed", "asset", checksumName, "error", err)
+			return ""
+		}
+		return normalizeSHA256(body)
+	}
+	return ""
+}
+
+func fetchSmallTextAsset(ctx context.Context, url, token string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("下载校验文件返回状态码 %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func normalizeSHA256(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.TrimPrefix(value, "sha256:")
+	fields := strings.Fields(value)
+	if len(fields) > 0 {
+		value = fields[0]
+	}
+	if len(value) != sha256.Size*2 {
+		return ""
+	}
+	if _, err := hex.DecodeString(value); err != nil {
+		return ""
+	}
+	return value
 }
 
 // Download 下载插件二进制到本地

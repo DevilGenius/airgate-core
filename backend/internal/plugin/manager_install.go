@@ -161,26 +161,19 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo, version string) e
 
 	targetOS := runtime.GOOS
 	targetArch := runtime.GOARCH
-	var downloadURL string
-	for _, asset := range release.Assets {
-		name := strings.ToLower(asset.Name)
-		if strings.Contains(name, targetOS) && strings.Contains(name, targetArch) {
-			downloadURL = asset.BrowserDownloadURL
-			break
-		}
-	}
-	if downloadURL == "" {
+	asset := selectReleaseBinaryAsset(release.Assets, targetOS, targetArch)
+	if asset == nil || asset.BrowserDownloadURL == "" {
 		return fmt.Errorf("未找到适配 %s/%s 的二进制文件，Release: %s", targetOS, targetArch, release.TagName)
 	}
 
-	dlReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	dlReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, asset.BrowserDownloadURL, nil)
 	dlResp, err := http.DefaultClient.Do(dlReq)
 	if err != nil {
 		return fmt.Errorf("下载插件失败: %w", err)
 	}
 	defer func() {
 		if err := dlResp.Body.Close(); err != nil {
-			slog.Warn("关闭插件下载响应失败", "url", downloadURL, "error", err)
+			slog.Warn("关闭插件下载响应失败", "url", asset.BrowserDownloadURL, "error", err)
 		}
 	}()
 
@@ -282,6 +275,7 @@ type githubRelease struct {
 type githubAsset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
+	Digest             string `json:"digest"`
 }
 
 // parseGithubRepo 解析 GitHub 仓库地址。

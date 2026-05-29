@@ -2,9 +2,11 @@ package pluginadmin
 
 import (
 	"context"
+	"encoding/hex"
 	"strconv"
 	"strings"
 
+	"github.com/DevilGenius/airgate-core/internal/plugin"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -30,7 +32,7 @@ func (s *Service) List() []PluginMeta {
 		result = append(result, PluginMeta{
 			Name:               item.Name,
 			DisplayName:        item.DisplayName,
-			Version:            item.Version,
+			Version:            installedDisplayVersion(item.Version, item.IsDev, item.BinarySHA256),
 			Author:             item.Author,
 			Type:               item.Type,
 			Platform:           item.Platform,
@@ -191,15 +193,12 @@ func (s *Service) ListMarketplace(ctx context.Context) ([]MarketplacePlugin, err
 		return nil, err
 	}
 
-	type installedPlugin struct {
-		version string
-		isDev   bool
-	}
 	installed := make(map[string]installedPlugin)
 	for _, meta := range s.manager.GetAllPluginMeta() {
 		installed[meta.Name] = installedPlugin{
-			version: meta.Version,
-			isDev:   meta.IsDev,
+			version:      meta.Version,
+			isDev:        meta.IsDev,
+			binarySHA256: meta.BinarySHA256,
 		}
 	}
 
@@ -209,16 +208,61 @@ func (s *Service) ListMarketplace(ctx context.Context) ([]MarketplacePlugin, err
 		result = append(result, MarketplacePlugin{
 			Name:             item.Name,
 			Version:          item.Version,
+			DisplayVersion:   marketplaceDisplayVersion(item.Version, item.SHA256),
 			Description:      item.Description,
 			Author:           item.Author,
 			Type:             item.Type,
 			GithubRepo:       item.GithubRepo,
 			Installed:        ok,
-			InstalledVersion: meta.version,
-			HasUpdate:        ok && !meta.isDev && isNewerVersion(item.Version, meta.version),
+			InstalledVersion: installedDisplayVersion(meta.version, meta.isDev, meta.binarySHA256),
+			HasUpdate:        ok && !meta.isDev && hasPluginUpdate(item, meta),
 		})
 	}
 	return result, nil
+}
+
+type installedPlugin struct {
+	version      string
+	isDev        bool
+	binarySHA256 string
+}
+
+func hasPluginUpdate(item plugin.MarketplacePlugin, installed installedPlugin) bool {
+	if isNewerVersion(item.Version, installed.version) {
+		return true
+	}
+	if normalizeVersionForCompare(item.Version) != normalizeVersionForCompare(installed.version) {
+		return false
+	}
+	latestSHA := normalizeSHA256ForCompare(item.SHA256)
+	installedSHA := normalizeSHA256ForCompare(installed.binarySHA256)
+	return latestSHA != "" && installedSHA != "" && latestSHA != installedSHA
+}
+
+func installedDisplayVersion(version string, isDev bool, binarySHA256 string) string {
+	version = normalizeVersionForCompare(version)
+	if isDev || version == "" || version == "dev" {
+		return "dev"
+	}
+	if hash := shortHash(binarySHA256); hash != "" {
+		return version + "-" + hash
+	}
+	return version
+}
+
+func marketplaceDisplayVersion(version, assetSHA256 string) string {
+	version = normalizeVersionForCompare(version)
+	if version == "" {
+		return ""
+	}
+	if hash := shortHash(assetSHA256); hash != "" {
+		return version + "-" + hash
+	}
+	return version
+}
+
+func normalizeVersionForCompare(value string) string {
+	return strings.TrimPrefix(strings.TrimSpace(value), "v")
 }
 
 // isNewerVersion 判断 marketplaceVer 是否比 installedVer 新。
@@ -260,4 +304,41 @@ func isNewerVersion(marketplaceVer, installedVer string) bool {
 		}
 	}
 	return false
+}
+
+func normalizeSHA256ForCompare(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.TrimPrefix(value, "sha256:")
+	fields := strings.Fields(value)
+	if len(fields) > 0 {
+		value = fields[0]
+	}
+	if len(value) != 64 {
+		return ""
+	}
+	if _, err := hex.DecodeString(value); err != nil {
+		return ""
+	}
+	return value
+}
+
+func shortHash(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.TrimPrefix(value, "sha256:")
+	fields := strings.Fields(value)
+	if len(fields) > 0 {
+		value = fields[0]
+	}
+	if len(value) < 7 {
+		return ""
+	}
+	for idx, ch := range value {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') {
+			if idx < 7 {
+				return ""
+			}
+			break
+		}
+	}
+	return value[:7]
 }

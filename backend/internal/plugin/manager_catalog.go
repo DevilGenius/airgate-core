@@ -2,7 +2,11 @@ package plugin
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -222,6 +226,9 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 			Metadata:           cloneMetadata(inst.Metadata),
 			IsDev:              isDev,
 		}
+		if !isDev {
+			meta.BinarySHA256 = m.installedBinarySHA256Locked(inst)
+		}
 		if types, ok := m.accountTypeCache[inst.Platform]; ok {
 			meta.AccountTypes = cloneAccountTypes(types)
 		}
@@ -235,6 +242,33 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 		metas = append(metas, meta)
 	}
 	return metas
+}
+
+func (m *Manager) installedBinarySHA256Locked(inst *PluginInstance) string {
+	if inst == nil || inst.BinaryDir == "" {
+		return ""
+	}
+	binaryPath := filepath.Join(m.pluginDir, inst.BinaryDir, inst.BinaryDir)
+	sum, err := fileSHA256(binaryPath)
+	if err != nil {
+		slog.Debug("plugin_binary_hash_failed", sdk.LogFieldPluginID, inst.Name, "path", binaryPath, sdk.LogFieldError, err)
+		return ""
+	}
+	return sum
+}
+
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 // GetPluginConfig 读取插件的当前配置（来自 DB 持久化）。

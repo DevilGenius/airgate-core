@@ -76,6 +76,7 @@ type PluginOAuthExchangeResp struct {
 type MarketplacePluginResp struct {
 	Name             string `json:"name"`
 	Version          string `json:"version"`
+	DisplayVersion   string `json:"display_version,omitempty"`
 	Description      string `json:"description"`
 	Author           string `json:"author"`
 	Type             string `json:"type"`

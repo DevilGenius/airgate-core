@@ -52,6 +52,7 @@ func toMarketplacePluginResp(item apppluginadmin.MarketplacePlugin) dto.Marketpl
 	return dto.MarketplacePluginResp{
 		Name:             item.Name,
 		Version:          item.Version,
+		DisplayVersion:   item.DisplayVersion,
 		Description:      item.Description,
 		Author:           item.Author,
 		Type:             item.Type,

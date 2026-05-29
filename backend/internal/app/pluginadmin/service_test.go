@@ -2,6 +2,7 @@ package pluginadmin
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/DevilGenius/airgate-core/internal/plugin"
@@ -16,7 +17,7 @@ func TestReloadRejectsNonDevPlugin(t *testing.T) {
 
 func TestListMarketplaceMarksInstalled(t *testing.T) {
 	service := NewService(pluginAdminManagerStub{
-		allMeta: []plugin.PluginMeta{{Name: "gateway-openai"}},
+		allMeta: []plugin.PluginMeta{{Name: "gateway-openai", Version: "0.2.1"}},
 	}, pluginMarketplaceStub{
 		listAvailable: func(context.Context) ([]plugin.MarketplacePlugin, error) {
 			return []plugin.MarketplacePlugin{{Name: "gateway-openai"}, {Name: "gateway-gemini"}}, nil
@@ -30,6 +31,35 @@ func TestListMarketplaceMarksInstalled(t *testing.T) {
 	if len(items) != 2 || !items[0].Installed || items[1].Installed {
 		t.Fatalf("unexpected marketplace items: %+v", items)
 	}
+	if items[0].InstalledVersion != "0.2.1" {
+		t.Fatalf("InstalledVersion = %q, want 0.2.1", items[0].InstalledVersion)
+	}
+}
+
+func TestListDisplaysDevPluginVersionAsDev(t *testing.T) {
+	service := NewService(pluginAdminManagerStub{
+		allMeta: []plugin.PluginMeta{{Name: "gateway-openai", Version: "0.2.1", IsDev: true}},
+	}, pluginMarketplaceStub{})
+
+	items := service.List()
+	if len(items) != 1 || items[0].Version != "dev" {
+		t.Fatalf("unexpected plugin list: %+v", items)
+	}
+}
+
+func TestListDisplaysTaggedPluginWithShortHash(t *testing.T) {
+	service := NewService(pluginAdminManagerStub{
+		allMeta: []plugin.PluginMeta{{
+			Name:         "gateway-openai",
+			Version:      "0.2.1",
+			BinarySHA256: strings.Repeat("a", 64),
+		}},
+	}, pluginMarketplaceStub{})
+
+	items := service.List()
+	if len(items) != 1 || items[0].Version != "0.2.1-aaaaaaa" {
+		t.Fatalf("unexpected plugin list: %+v", items)
+	}
 }
 
 func TestListMarketplaceDoesNotOfferUpdatesForDevPlugin(t *testing.T) {
@@ -38,6 +68,93 @@ func TestListMarketplaceDoesNotOfferUpdatesForDevPlugin(t *testing.T) {
 	}, pluginMarketplaceStub{
 		listAvailable: func(context.Context) ([]plugin.MarketplacePlugin, error) {
 			return []plugin.MarketplacePlugin{{Name: "airgate-playground", Version: "0.1.10"}}, nil
+		},
+	})
+
+	items, err := service.ListMarketplace(t.Context())
+	if err != nil {
+		t.Fatalf("ListMarketplace() error = %v", err)
+	}
+	if len(items) != 1 || !items[0].Installed || items[0].HasUpdate {
+		t.Fatalf("unexpected marketplace items: %+v", items)
+	}
+}
+
+func TestListMarketplaceOffersUpdateForSameVersionDifferentHash(t *testing.T) {
+	installedHash := strings.Repeat("a", 64)
+	latestHash := strings.Repeat("b", 64)
+	service := NewService(pluginAdminManagerStub{
+		allMeta: []plugin.PluginMeta{{
+			Name:         "gateway-openai",
+			Version:      "0.2.1",
+			BinarySHA256: installedHash,
+		}},
+	}, pluginMarketplaceStub{
+		listAvailable: func(context.Context) ([]plugin.MarketplacePlugin, error) {
+			return []plugin.MarketplacePlugin{{
+				Name:    "gateway-openai",
+				Version: "0.2.1",
+				SHA256:  "sha256:" + latestHash,
+			}}, nil
+		},
+	})
+
+	items, err := service.ListMarketplace(t.Context())
+	if err != nil {
+		t.Fatalf("ListMarketplace() error = %v", err)
+	}
+	if len(items) != 1 || !items[0].Installed || !items[0].HasUpdate {
+		t.Fatalf("unexpected marketplace items: %+v", items)
+	}
+	if items[0].Version != "0.2.1" || items[0].DisplayVersion != "0.2.1-bbbbbbb" {
+		t.Fatalf("unexpected market versions: version=%q display=%q", items[0].Version, items[0].DisplayVersion)
+	}
+	if items[0].InstalledVersion != "0.2.1-aaaaaaa" {
+		t.Fatalf("InstalledVersion = %q", items[0].InstalledVersion)
+	}
+}
+
+func TestListMarketplaceDoesNotOfferUpdateForSameVersionSameHash(t *testing.T) {
+	hash := strings.Repeat("a", 64)
+	service := NewService(pluginAdminManagerStub{
+		allMeta: []plugin.PluginMeta{{
+			Name:         "gateway-openai",
+			Version:      "0.2.1",
+			BinarySHA256: hash,
+		}},
+	}, pluginMarketplaceStub{
+		listAvailable: func(context.Context) ([]plugin.MarketplacePlugin, error) {
+			return []plugin.MarketplacePlugin{{
+				Name:    "gateway-openai",
+				Version: "0.2.1",
+				SHA256:  hash,
+			}}, nil
+		},
+	})
+
+	items, err := service.ListMarketplace(t.Context())
+	if err != nil {
+		t.Fatalf("ListMarketplace() error = %v", err)
+	}
+	if len(items) != 1 || !items[0].Installed || items[0].HasUpdate {
+		t.Fatalf("unexpected marketplace items: %+v", items)
+	}
+}
+
+func TestListMarketplaceDoesNotOfferHashUpdateForDifferentVersion(t *testing.T) {
+	service := NewService(pluginAdminManagerStub{
+		allMeta: []plugin.PluginMeta{{
+			Name:         "gateway-openai",
+			Version:      "0.3.0",
+			BinarySHA256: strings.Repeat("a", 64),
+		}},
+	}, pluginMarketplaceStub{
+		listAvailable: func(context.Context) ([]plugin.MarketplacePlugin, error) {
+			return []plugin.MarketplacePlugin{{
+				Name:    "gateway-openai",
+				Version: "0.2.1",
+				SHA256:  strings.Repeat("b", 64),
+			}}, nil
 		},
 	})
 
