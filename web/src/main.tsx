@@ -15,7 +15,6 @@ import { ToastProvider, useToast } from './shared/ui';
 import { DialogTriggerShim } from './shared/components/DialogTriggerShim';
 import { router } from './app/router';
 import './i18n';
-import './index.css';
 
 // 将 React 暴露到全局，供插件前端模块通过 shim 引用
 (window as unknown as Record<string, unknown>).__airgate_shared = {

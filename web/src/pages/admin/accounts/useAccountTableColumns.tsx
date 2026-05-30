@@ -462,12 +462,12 @@ export function useAccountTableColumns({
             </span>
             <span
               className={todayMetricClass}
-              style={todayMetricStyle('var(--ag-warning)')}
+              style={todayMetricStyle('var(--ag-warning)', 'var(--ag-text)')}
               title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
             >
-              <span className="ag-account-usage-metric-label text-text-secondary">{t('accounts.user_cost_short', '消费')}</span>
+              <span className="ag-account-usage-metric-label text-text">{t('accounts.user_cost_short', '消费')}</span>
               <span className="ag-account-usage-metric-value">
-                <span style={{ color: 'var(--ag-warning)' }}>$</span>
+                <span className="text-warning">$</span>
                 <span className="text-text">{todayStats.user_cost.toFixed(2)}</span>
               </span>
             </span>

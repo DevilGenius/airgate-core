@@ -7,7 +7,7 @@ import {
   StatusChip,
 } from '../../../shared/ui';
 import { usersApi } from '../../../shared/api/users';
-import { formatDate } from '../../../shared/utils/format';
+import { formatAPIKeyHint, formatDate } from '../../../shared/utils/format';
 import { getTotalPages } from '../../../shared/utils/pagination';
 import { CommonTable } from '../../../shared/components/CommonTable';
 import { TablePaginationFooter } from '../../../shared/components/TablePaginationFooter';
@@ -95,7 +95,7 @@ export function UserApiKeysModal({ open, user, onClose }: UserApiKeysModalProps)
                   <CommonTable.Row id={String(row.id)} key={row.id}>
                     <CommonTable.Cell>{row.name}</CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="font-mono text-xs text-text-secondary">{row.key_prefix}</span>
+                      <span className="font-mono text-xs text-text-secondary">{formatAPIKeyHint(row.key_prefix)}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <span className="font-mono text-xs">

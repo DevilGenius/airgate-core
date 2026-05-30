@@ -1,0 +1,7 @@
+/* External framework CSS only.
+   Local AirGate styles are linked individually from index.html. */
+
+@import "tailwindcss";
+@import "@heroui/styles";
+@import "@fontsource/fira-code/latin.css";
+@import "@fontsource/geist-sans/latin.css";

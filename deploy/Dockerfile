@@ -7,7 +7,7 @@
 # ---- 阶段 1: 构建前端 ----
 FROM node:22-alpine AS frontend
 WORKDIR /build
-RUN corepack enable && corepack prepare pnpm@11.1.1 --activate
+RUN corepack enable && corepack prepare pnpm@11.5.0 --activate
 
 # 构建 Core 前端
 COPY airgate-core/web/package.json airgate-core/web/pnpm-lock.yaml airgate-core/web/pnpm-workspace.yaml ./airgate-core/web/

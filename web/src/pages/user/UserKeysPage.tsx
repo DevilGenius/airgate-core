@@ -19,6 +19,7 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { GROUP_CHIP_STYLE } from '../../shared/components/groupChipStyle';
+import { formatAPIKeyHint } from '../../shared/utils/format';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
 import {
@@ -28,7 +29,7 @@ import {
   Plus,
   Pencil,
   Trash2,
-  Key,
+  KeyRound,
   Eye,
   Ban,
   CheckCircle,
@@ -315,17 +316,17 @@ export default function UserKeysPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1100}
+        minWidth={1050}
       >
         <CommonTable.Header>
-          <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
-          <CommonTable.Column id="key_prefix">{t('user_keys.title')}</CommonTable.Column>
+          <CommonTable.Column id="name" style={{ minWidth: '12rem', width: '12rem' }}>{t('common.name')}</CommonTable.Column>
+          <CommonTable.Column id="key_prefix" style={{ minWidth: '11rem', width: '11rem' }}>{t('user_keys.title')}</CommonTable.Column>
           <CommonTable.Column id="group_id" style={{ width: '15rem' }}>{t('user_keys.group')}</CommonTable.Column>
-          <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
+          <CommonTable.Column id="status" style={{ width: '5.5rem' }}>{t('common.status')}</CommonTable.Column>
           <CommonTable.Column id="quota" style={{ width: '17.5rem' }}>{t('user_keys.quota_label')}</CommonTable.Column>
           <CommonTable.Column id="markup" style={{ width: '10.75rem' }}>{t('user_keys.markup_title', '销售/成本')}</CommonTable.Column>
-          <CommonTable.Column id="usage" style={{ width: '10.75rem' }}>{t('api_keys.usage')}</CommonTable.Column>
-          <CommonTable.Column id="expires_at">{t('user_keys.expires_at')}</CommonTable.Column>
+          <CommonTable.Column id="usage" style={{ width: '18.5rem' }}>{t('api_keys.usage')}</CommonTable.Column>
+          <CommonTable.Column id="expires_at" style={{ width: '7rem' }}>{t('user_keys.expires_at')}</CommonTable.Column>
           <CommonTable.Column id="actions" style={{ width: 132 }}>
             {t('common.actions')}
           </CommonTable.Column>
@@ -365,16 +366,19 @@ export default function UserKeysPage() {
               const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
               const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
               const displayStatus = isExpired ? 'expired' : row.status;
+              const keyHint = formatAPIKeyHint(row.key_prefix);
 
               return (
                 <CommonTable.Row id={String(row.id)} key={row.id}>
                   <CommonTable.Cell>
-                    <span className="font-medium text-text">{row.name}</span>
+                    <span className="block max-w-[11rem] truncate font-medium text-text" title={row.name}>{row.name}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <span className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono">
-                      <Key className="w-3 h-3 text-text-tertiary" />
-                      {row.key_prefix}...
+                    <span className="ag-api-key-prefix-chip inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono">
+                      <KeyRound className="w-3 h-3 text-text-tertiary" />
+                      <span className="ag-api-key-prefix-text" title={keyHint}>
+                        {keyHint}
+                      </span>
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
@@ -393,7 +397,6 @@ export default function UserKeysPage() {
                             className="ag-api-key-effective-rate-chip"
                             title={`${t('user_keys.effective_rate_short', '综合倍率')} ${formatRateValue(effectiveRate)}`}
                           >
-                            <span>{t('user_keys.effective_rate_chip', '综合')}</span>
                             <span className="ag-api-key-effective-rate-chip-value">{formatRateValue(effectiveRate)}</span>
                           </span>
                         ) : null}
@@ -456,7 +459,7 @@ export default function UserKeysPage() {
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <MetricChips
-                      className="ag-metric-chips--stack ag-metric-chips--usage"
+                      className="ag-metric-chips--usage"
                       items={[
                         {
                           amount: row.today_cost,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Description, Input, Label, ListBox, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
-import { Key } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import { parseIpList } from '../../../shared/utils/ip';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { CommonModal } from '../../../shared/components/CommonModal';
@@ -108,7 +108,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
             <HeroTextField fullWidth isRequired>
               <Label>{t('common.name')}</Label>
               <div className="relative">
-                <Key className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                <KeyRound className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
                 <Input
                   className="pl-9"
                   value={form.name}

@@ -1,0 +1,27 @@
+/* Shared auto-refresh dropdown trigger. */
+
+.ag-auto-refresh-trigger.dropdown__trigger {
+  display: inline-flex !important;
+  box-sizing: border-box;
+  min-width: 7.5rem !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.375rem !important;
+  padding-inline: 0.75rem !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+}
+
+.ag-auto-refresh-trigger.dropdown__trigger > span {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.ag-auto-refresh-trigger.dropdown__trigger > svg {
+  width: 0.75rem !important;
+  height: 0.75rem !important;
+  margin: 0 !important;
+}

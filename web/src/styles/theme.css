@@ -3,6 +3,18 @@
    AirGate --ag-* token 是设计源头；HeroUI 变量只作为 core 内部 UI 实现层使用。
    ========================================================================== */
 
+html:root,
+html.light,
+html.default,
+html.dark,
+html[data-theme="light"],
+html[data-theme="default"],
+html[data-theme="dark"] {
+  --ag-reliable-font-mono: "Fira Code", ui-monospace, "SFMono-Regular", "SF Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, Monaco, "Courier New", monospace;
+  --ag-font-mono: var(--ag-reliable-font-mono);
+  --font-mono: var(--ag-reliable-font-mono);
+}
+
 :root,
 .light,
 .default,

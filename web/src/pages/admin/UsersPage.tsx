@@ -26,7 +26,7 @@ import { UserGroupsModal } from './users/UserGroupsModal';
 import type { UserResp } from '../../shared/types';
 import {
   Plus, Search, Pencil, MoreHorizontal, RefreshCw,
-  Key, Users, PlusCircle, MinusCircle, Clock, Trash2,
+  KeyRound, Users, PlusCircle, MinusCircle, Clock, Trash2,
 } from 'lucide-react';
 
 const FALLBACK_DEFAULT_USER_MAX_CONCURRENCY = 5;
@@ -312,7 +312,7 @@ export default function UsersPage() {
                             >
                               <Dropdown.Item id="api_keys" textValue={t('users.api_keys')}>
                                 <span className="flex items-center gap-2">
-                                  <Key className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
+                                  <KeyRound className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
                                   {t('users.api_keys')}
                                 </span>
                               </Dropdown.Item>

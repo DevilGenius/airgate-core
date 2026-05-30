@@ -244,7 +244,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       <MetricCard
         icon={<Coins className="h-5 w-5" />}
         tone="amber"
-        metaTone="warning"
         title={t('dashboard.today_tokens')}
         value={fmtNum(stats.today_tokens)}
         meta={<CostPair actual={stats.today_cost} standard={stats.today_standard_cost} />}
@@ -252,7 +251,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       <MetricCard
         icon={<Database className="h-5 w-5" />}
         tone="indigo"
-        metaTone="success"
         title={t('dashboard.total_tokens')}
         value={fmtNum(stats.alltime_tokens)}
         meta={<CostPair actual={stats.alltime_cost} standard={stats.alltime_standard_cost} />}

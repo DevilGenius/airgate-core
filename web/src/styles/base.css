@@ -7,26 +7,32 @@
   background: var(--background);
 }
 
-* {
+body,
+#root,
+#root * {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar) transparent;
 }
 
-*::-webkit-scrollbar {
+body::-webkit-scrollbar,
+#root *::-webkit-scrollbar {
   width: 5px;
   height: 5px;
 }
 
-*::-webkit-scrollbar-track {
+body::-webkit-scrollbar-track,
+#root *::-webkit-scrollbar-track {
   background: transparent;
 }
 
-*::-webkit-scrollbar-thumb {
+body::-webkit-scrollbar-thumb,
+#root *::-webkit-scrollbar-thumb {
   background: var(--scrollbar);
   border-radius: 3px;
 }
 
-*::-webkit-scrollbar-thumb:hover {
+body::-webkit-scrollbar-thumb:hover,
+#root *::-webkit-scrollbar-thumb:hover {
   background: color-mix(in oklab, var(--scrollbar) 76%, var(--foreground) 24%);
 }
 
@@ -46,27 +52,44 @@ body {
   letter-spacing: 0;
 }
 
-::selection {
+#root :where(code, pre, kbd, samp, .font-mono),
+.ag-elevation-modal :where(code, pre, kbd, samp, .font-mono) {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+#root ::selection,
+body::selection {
   background: var(--accent-soft);
   color: var(--accent-soft-foreground);
 }
 
-:focus-visible {
+#root :focus-visible,
+.ag-elevation-modal :focus-visible,
+:where(.select__popover, .combo-box__popover, .date-picker__popover, .date-range-picker__popover, .dropdown__popover, .popover) :focus-visible {
   outline: 1.5px solid var(--focus);
   outline-offset: var(--ring-offset-width);
 }
 
-:where(.input,
-  .textarea,
-  .date-input-group,
-  .select__trigger,
-  .combo-box__trigger,
-  .search-field__input):focus-visible {
+#root :where(.input,
+    .textarea,
+    .date-input-group,
+    .select__trigger,
+    .combo-box__trigger,
+    .search-field__input):focus-visible,
+.ag-elevation-modal :where(.input,
+    .textarea,
+    .date-input-group,
+    .select__trigger,
+    .combo-box__trigger,
+    .search-field__input):focus-visible {
   outline: none;
 }
 
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
+#root input[type="number"]::-webkit-inner-spin-button,
+#root input[type="number"]::-webkit-outer-spin-button,
+.ag-elevation-modal input[type="number"]::-webkit-inner-spin-button,
+.ag-elevation-modal input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }

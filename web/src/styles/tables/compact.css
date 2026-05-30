@@ -134,6 +134,9 @@
 }
 
 .ag-markdown-table {
+  --ag-table-row-background: var(--surface);
+  --ag-table-row-alt-background: color-mix(in oklab, var(--surface-secondary) 62%, var(--surface) 38%);
+  --ag-table-row-hover-background: color-mix(in oklab, var(--default) 82%, var(--background) 18%);
   overflow: hidden;
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
   border-radius: calc(var(--radius) * 2.5);

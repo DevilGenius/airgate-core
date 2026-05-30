@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Check, Copy, Plus, Pencil, Trash2, Key, Layers, Eye, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Plus, Pencil, Trash2, KeyRound, Layers, Eye, RefreshCw } from 'lucide-react';
 import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
@@ -13,7 +13,7 @@ import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
-import { formatExpiry } from '../../shared/utils/format';
+import { formatAPIKeyHint, formatExpiry } from '../../shared/utils/format';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
@@ -143,19 +143,19 @@ export default function APIKeysPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1120}
+        minWidth={1070}
       >
         <CommonTable.Header>
           <CommonTable.Column id="id" style={{ width: 72 }}>
             {t('common.id')}
           </CommonTable.Column>
-          <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
-          <CommonTable.Column id="key_prefix">{t('api_keys.key_prefix')}</CommonTable.Column>
+          <CommonTable.Column id="name" style={{ minWidth: '12rem', width: '12rem' }}>{t('common.name')}</CommonTable.Column>
+          <CommonTable.Column id="key_prefix" style={{ minWidth: '11rem', width: '11rem' }}>{t('api_keys.key_prefix')}</CommonTable.Column>
           <CommonTable.Column id="group_id">{t('api_keys.group')}</CommonTable.Column>
-          <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
+          <CommonTable.Column id="status" style={{ width: '5.5rem' }}>{t('common.status')}</CommonTable.Column>
           <CommonTable.Column id="quota" style={{ width: '17.5rem' }}>{t('api_keys.quota_used')}</CommonTable.Column>
-          <CommonTable.Column id="usage" style={{ width: '10.75rem' }}>{t('api_keys.usage')}</CommonTable.Column>
-          <CommonTable.Column id="expires_at">{t('api_keys.expire_time')}</CommonTable.Column>
+          <CommonTable.Column id="usage" style={{ width: '18.5rem' }}>{t('api_keys.usage')}</CommonTable.Column>
+          <CommonTable.Column id="expires_at" style={{ width: '7rem' }}>{t('api_keys.expire_time')}</CommonTable.Column>
           <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
         </CommonTable.Header>
         <CommonTable.Body>
@@ -174,6 +174,7 @@ export default function APIKeysPage() {
               const group = row.group_id == null
                 ? null
                 : groupsData?.list?.find((g: GroupResp) => g.id === row.group_id);
+              const keyHint = formatAPIKeyHint(row.key_prefix);
 
               return (
                 <CommonTable.Row id={String(row.id)} key={row.id}>
@@ -181,14 +182,14 @@ export default function APIKeysPage() {
                     <span className="font-mono">{row.id}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Key className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-                      <span style={{ color: 'var(--ag-text)' }} className="font-medium">{row.name}</span>
+                    <span className="inline-flex max-w-[11rem] items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--ag-text-tertiary)' }} />
+                      <span style={{ color: 'var(--ag-text)' }} className="truncate font-medium" title={row.name}>{row.name}</span>
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <code
-                      className="text-xs px-2 py-0.5 rounded"
+                      className="ag-api-key-prefix-chip text-xs px-2 py-0.5 rounded"
                       style={{
                         fontFamily: 'var(--ag-font-mono)',
                         background: 'var(--ag-bg-surface)',
@@ -196,7 +197,9 @@ export default function APIKeysPage() {
                         border: '1px solid var(--ag-border-subtle)',
                       }}
                     >
-                      {row.key_prefix}...
+                      <span className="ag-api-key-prefix-text" title={keyHint}>
+                        {keyHint}
+                      </span>
                     </code>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
@@ -229,7 +232,7 @@ export default function APIKeysPage() {
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <MetricChips
-                      className="ag-metric-chips--stack ag-metric-chips--usage"
+                      className="ag-metric-chips--usage"
                       items={[
                         {
                           amount: row.today_cost,

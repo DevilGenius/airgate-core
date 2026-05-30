@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Description, Input, Label, ListBox, Modal, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
-import { Key } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import { parseIpList, formatIpList } from '../../../shared/utils/ip';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type { APIKeyResp, UpdateAPIKeyReq, GroupResp } from '../../../shared/types';
@@ -77,7 +77,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
         <HeroTextField fullWidth>
           <Label>{t('common.name')}</Label>
           <div className="relative">
-            <Key className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+            <KeyRound className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
             <Input
               className="pl-9"
               value={form.name ?? ''}

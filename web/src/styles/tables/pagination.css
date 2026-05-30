@@ -51,6 +51,8 @@
   min-width: 2.625rem;
 }
 
+#root .ag-table-page-size-trigger,
+.ag-elevation-modal .ag-table-page-size-trigger,
 .ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"]) {
   display: inline-flex !important;
   width: 2.625rem !important;
@@ -72,14 +74,22 @@
   padding: 0 !important;
 }
 
+#root .ag-table-page-size-trigger:hover,
+#root .ag-table-page-size-trigger[data-hovered="true"],
+#root .ag-table-page-size-trigger[data-focus-visible="true"],
+.ag-elevation-modal .ag-table-page-size-trigger:hover,
+.ag-elevation-modal .ag-table-page-size-trigger[data-hovered="true"],
+.ag-elevation-modal .ag-table-page-size-trigger[data-focus-visible="true"],
 .ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"]):hover,
 .ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"])[data-hovered="true"],
 .ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"])[data-focus-visible="true"] {
-  background: transparent !important;
+  background: color-mix(in oklab, var(--surface) 72%, transparent) !important;
+  border-radius: var(--radius) !important;
   box-shadow: none !important;
   color: var(--accent) !important;
 }
 
+.ag-table-page-size-trigger :where(.select__value, [data-slot="value"]),
 .ag-table-page-size-select :where(.select__value, [data-slot="value"]) {
   display: inline-flex !important;
   flex: 0 0 1.625rem;
@@ -95,6 +105,7 @@
   font-variant-numeric: tabular-nums;
 }
 
+.ag-table-page-size-trigger :where(.select__indicator, [data-slot="indicator"]),
 .ag-table-page-size-select :where(.select__indicator, [data-slot="indicator"]) {
   position: static !important;
   inset: auto !important;
@@ -104,6 +115,44 @@
   margin: 0 !important;
   transform: none !important;
   color: var(--muted);
+}
+
+.ag-table-page-size-popover {
+  min-width: 3.5rem !important;
+  max-width: 4.5rem !important;
+  border: 1px solid color-mix(in oklab, var(--border) 78%, transparent) !important;
+  border-radius: var(--radius) !important;
+  background: var(--overlay) !important;
+  color: var(--overlay-foreground) !important;
+  box-shadow: var(--overlay-shadow) !important;
+}
+
+.ag-table-page-size-list {
+  padding: 0.1875rem !important;
+}
+
+.ag-table-page-size-option {
+  min-height: 1.625rem !important;
+  justify-content: center !important;
+  border-radius: calc(var(--radius) - 1px) !important;
+  color: var(--overlay-foreground) !important;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-table-page-size-option:hover,
+.ag-table-page-size-option[data-hovered="true"],
+.ag-table-page-size-option[data-focused="true"] {
+  background: color-mix(in oklab, var(--accent) 12%, var(--overlay) 88%) !important;
+  color: var(--foreground) !important;
+}
+
+.ag-table-page-size-option[data-selected="true"],
+.ag-table-page-size-option[aria-selected="true"] {
+  background: color-mix(in oklab, var(--accent) 16%, var(--overlay) 84%) !important;
+  color: var(--foreground) !important;
 }
 
 .ag-table-pagination .pagination__content {

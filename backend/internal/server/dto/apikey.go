@@ -5,7 +5,7 @@ type APIKeyResp struct {
 	ID              int64    `json:"id"`
 	Name            string   `json:"name"`
 	Key             string   `json:"key,omitempty"` // 仅创建时返回完整密钥
-	KeyPrefix       string   `json:"key_prefix"`    // sk-xxxx... 前缀展示
+	KeyPrefix       string   `json:"key_prefix"`    // sk-xxxx...xxxx 脱敏展示
 	UserID          int64    `json:"user_id"`
 	GroupID         *int64   `json:"group_id"`
 	GroupRate       float64  `json:"group_rate,omitempty"` // 所属分组对该用户生效的实际扣费倍率

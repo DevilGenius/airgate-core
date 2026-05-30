@@ -1,0 +1,179 @@
+/* ==========================================================================
+   HeroUI Overlays And Popovers
+   ========================================================================== */
+
+/* 弹层容器 */
+
+:where(.modal__container, .alert-dialog__container):has(.ag-elevation-modal) {
+  padding-inline: clamp(1rem, 3vw, 4rem) !important;
+  padding-block: clamp(1rem, 3vh, 3rem) !important;
+}
+
+:where(.modal__backdrop,
+  .modal__backdrop--opaque,
+  .modal__backdrop--blur,
+  .alert-dialog__backdrop,
+  .alert-dialog__backdrop--opaque,
+  .alert-dialog__backdrop--blur):has(.ag-elevation-modal) {
+  background:
+    radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 24rem),
+    radial-gradient(circle at 82% 18%, color-mix(in oklab, white 10%, transparent), transparent 22rem),
+    repeating-linear-gradient(135deg, color-mix(in oklab, white 4%, transparent) 0 1px, transparent 1px 12px),
+    color-mix(in oklab, var(--background) 58%, transparent) !important;
+  -webkit-backdrop-filter: saturate(125%) blur(10px);
+  backdrop-filter: saturate(125%) blur(10px);
+  animation: none;
+}
+
+[data-theme="dark"] :where(.modal__backdrop,
+  .modal__backdrop--opaque,
+  .modal__backdrop--blur,
+  .alert-dialog__backdrop,
+  .alert-dialog__backdrop--opaque,
+  .alert-dialog__backdrop--blur):has(.ag-elevation-modal),
+.dark :where(.modal__backdrop,
+  .modal__backdrop--opaque,
+  .modal__backdrop--blur,
+  .alert-dialog__backdrop,
+  .alert-dialog__backdrop--opaque,
+  .alert-dialog__backdrop--blur):has(.ag-elevation-modal) {
+  background:
+    radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--primary) 11%, transparent), transparent 24rem),
+    radial-gradient(circle at 82% 18%, color-mix(in oklab, white 4%, transparent), transparent 22rem),
+    repeating-linear-gradient(135deg, color-mix(in oklab, white 3%, transparent) 0 1px, transparent 1px 12px),
+    color-mix(in oklab, var(--background) 68%, transparent) !important;
+}
+
+.ag-elevation-modal {
+  position: relative;
+  overflow: hidden;
+  max-height: min(86dvh, 62rem) !important;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
+  border-radius: var(--radius-3xl) !important;
+  background-color: var(--overlay) !important;
+  background-image:
+    linear-gradient(180deg, color-mix(in oklab, white 12%, transparent), transparent 34%),
+    radial-gradient(circle at 16% 0%, color-mix(in oklab, var(--primary) 5%, transparent), transparent 18rem) !important;
+  color: var(--overlay-foreground) !important;
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 32%, transparent) inset,
+    0 12px 28px color-mix(in oklab, black 12%, transparent) !important;
+}
+
+[data-theme="dark"] .ag-elevation-modal,
+.dark .ag-elevation-modal {
+  background-color: var(--overlay) !important;
+  background-image:
+    linear-gradient(180deg, color-mix(in oklab, white 6%, transparent), transparent 34%),
+    radial-gradient(circle at 16% 0%, color-mix(in oklab, var(--primary) 7%, transparent), transparent 18rem) !important;
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 8%, transparent) inset,
+    0 12px 28px color-mix(in oklab, black 24%, transparent) !important;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+
+  :where(.modal__backdrop,
+    .modal__backdrop--opaque,
+    .modal__backdrop--blur,
+    .alert-dialog__backdrop,
+    .alert-dialog__backdrop--opaque,
+    .alert-dialog__backdrop--blur):has(.ag-elevation-modal) {
+    background: color-mix(in oklab, var(--background) 88%, transparent) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  :where(.modal__backdrop,
+    .modal__backdrop--opaque,
+    .modal__backdrop--blur,
+    .alert-dialog__backdrop,
+    .alert-dialog__backdrop--opaque,
+    .alert-dialog__backdrop--blur):has(.ag-elevation-modal) {
+    animation: none;
+  }
+}
+
+.ag-elevation-modal.modal__dialog--md {
+  max-width: min(38rem, calc(100vw - 2rem)) !important;
+}
+
+.ag-elevation-modal.alert-dialog__dialog--md {
+  max-width: min(36rem, calc(100vw - 2rem)) !important;
+}
+
+.ag-elevation-modal.modal__dialog--lg {
+  max-width: min(56rem, calc(100vw - 2rem)) !important;
+}
+
+.ag-elevation-modal .modal__body {
+  min-height: 0;
+  overflow: auto;
+  overflow-x: hidden;
+  padding-inline: 0.25rem;
+  scroll-padding: 0.25rem;
+}
+
+.ag-form-scroll-safe {
+  padding: 0.25rem;
+}
+
+
+/* 下拉和浮层 */
+
+:where(.select__popover,
+  .combo-box__popover,
+  .date-picker__popover,
+  .date-range-picker__popover,
+  .dropdown__popover,
+  .popover) {
+  max-height: min(28rem, calc(100dvh - 6rem)) !important;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
+  border-radius: var(--radius-3xl) !important;
+  background: var(--overlay) !important;
+  color: var(--overlay-foreground) !important;
+  box-shadow: var(--overlay-shadow) !important;
+}
+
+.dropdown__popover {
+  min-width: min(15rem, calc(100vw - 2rem)) !important;
+  max-width: min(24rem, calc(100vw - 2rem)) !important;
+}
+
+:where(.select__popover, .combo-box__popover) {
+  min-width: max(var(--trigger-width), 12rem) !important;
+}
+
+@media (min-width: 96rem) {
+  .ag-elevation-modal.modal__dialog--sm {
+    max-width: min(32rem, calc(100vw - 8rem)) !important;
+  }
+
+  .ag-elevation-modal.modal__dialog--md {
+    max-width: min(44rem, calc(100vw - 8rem)) !important;
+  }
+
+  .ag-elevation-modal.alert-dialog__dialog--sm,
+  .ag-elevation-modal.alert-dialog__dialog--md {
+    max-width: min(38rem, calc(100vw - 8rem)) !important;
+  }
+
+  .ag-elevation-modal.modal__dialog--lg {
+    max-width: min(68rem, calc(100vw - 8rem)) !important;
+  }
+
+  :where(.select__popover,
+    .combo-box__popover,
+    .date-picker__popover,
+    .date-range-picker__popover,
+    .dropdown__popover,
+    .popover) {
+    max-height: min(34rem, calc(100dvh - 8rem)) !important;
+  }
+
+  .dropdown__popover {
+    min-width: 16rem !important;
+  }
+}
+

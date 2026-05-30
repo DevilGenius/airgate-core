@@ -57,14 +57,14 @@ export function TablePaginationFooter({
                 setPage(1);
               }}
             >
-              <Select.Trigger>
+              <Select.Trigger className="ag-table-page-size-trigger">
                 <Select.Value>{selectedPageSize}</Select.Value>
                 <Select.Indicator />
               </Select.Trigger>
-              <Select.Popover>
-                <ListBox items={pageSizeItems}>
+              <Select.Popover className="ag-table-page-size-popover">
+                <ListBox className="ag-table-page-size-list" items={pageSizeItems}>
                   {(item) => (
-                    <ListBox.Item id={item.id} textValue={item.label}>
+                    <ListBox.Item className="ag-table-page-size-option" id={item.id} textValue={item.label}>
                       {item.label}
                     </ListBox.Item>
                   )}

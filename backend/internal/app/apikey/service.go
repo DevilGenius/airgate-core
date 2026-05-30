@@ -375,10 +375,7 @@ func buildKeyHint(rawKey string) string {
 
 func DisplayKeyPrefix(item Key) string {
 	if item.PlainKey != "" {
-		if len(item.PlainKey) > 10 {
-			return item.PlainKey[:10] + "..."
-		}
-		return item.PlainKey
+		return buildKeyHint(item.PlainKey)
 	}
 	if item.KeyHint != "" {
 		return item.KeyHint

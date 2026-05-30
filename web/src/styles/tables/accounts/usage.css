@@ -1,0 +1,155 @@
+/* Account usage window and metric cells. */
+
+.ag-accounts-table .ag-account-usage-cell {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  gap: 0.375rem;
+  border-radius: 0.25rem;
+  padding-block: 0.125rem;
+  font-size: 0.6875rem;
+  line-height: 1;
+}
+
+.ag-accounts-table .ag-account-usage-cell--refreshable {
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+
+.ag-accounts-table .ag-account-usage-cell--refreshable:hover {
+  background: var(--ag-glass-border);
+}
+
+.ag-accounts-table .ag-account-usage-layout {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  grid-template-columns: minmax(0, 1fr) 0.25rem minmax(0, 1fr);
+  align-items: center;
+}
+
+.ag-accounts-table .ag-account-usage-layout--centered {
+  display: flex;
+  justify-content: center;
+}
+
+.ag-accounts-table .ag-account-usage-windows {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.ag-accounts-table .ag-account-usage-windows--expanded {
+  gap: 0.1875rem;
+}
+
+.ag-accounts-table .ag-account-usage-window-row {
+  display: grid;
+  height: 1.25rem;
+  min-width: 0;
+  grid-template-columns: 1.625rem minmax(2.5rem, 1fr) 1.375rem 2.75rem;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.ag-accounts-table .ag-account-usage-window-label {
+  display: inline-flex;
+  box-sizing: border-box;
+  width: 1.625rem !important;
+  min-width: 1.625rem !important;
+  max-width: 1.625rem;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  padding: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-accounts-table .ag-account-usage-bar {
+  height: 0.375rem;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.ag-accounts-table .ag-account-usage-percent,
+.ag-accounts-table .ag-account-usage-reset {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ag-accounts-table .ag-account-usage-reset {
+  display: inline-flex;
+  height: 100%;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--ag-text-secondary);
+}
+
+.ag-accounts-table .ag-account-usage-metrics {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.125rem;
+}
+
+.ag-accounts-table .ag-account-usage-metric {
+  display: inline-grid;
+  height: 1.25rem;
+  min-width: 0;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 0.125rem;
+  border: 1px solid;
+  border-radius: var(--field-radius);
+  padding-inline: 0.125rem;
+  font-size: 0.625rem;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+}
+
+.ag-accounts-table .ag-account-usage-metric-label,
+.ag-accounts-table .ag-account-usage-metric-value {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ag-accounts-table .ag-account-usage-metric-label {
+  text-overflow: ellipsis;
+}
+
+.ag-accounts-table .ag-account-usage-metric-value {
+  justify-self: end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-accounts-table .ag-account-usage-metric-value--solo {
+  grid-column: 1 / -1;
+  justify-self: center;
+  text-align: center;
+}
+

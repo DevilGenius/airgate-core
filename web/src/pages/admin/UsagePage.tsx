@@ -20,6 +20,7 @@ import { PIE_CHART_COLORS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
+import { formatAPIKeyHint } from '../../shared/utils/format';
 
 const UsagePieChart = lazy(() =>
   import('./usage/UsageCharts').then((m) => ({ default: m.UsagePieChart })),
@@ -445,16 +446,19 @@ export default function UsagePage() {
     queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: debouncedAPIKeyKeyword, search_scope: 'api_key' }, { signal }),
     enabled: pageActive && debouncedAPIKeyKeyword.length > 0,
   });
-  const apiKeyOptions = (apiKeysData?.list ?? []).map((key: APIKeyResp) => ({
-    id: String(key.id),
-    label: key.name || key.key_prefix || `#${key.id}`,
-    description: [
-      `#${key.id}`,
-      key.key_prefix,
-      key.user_id ? `User #${key.user_id}` : '',
-    ].filter(Boolean).join(' · '),
-    textValue: `${key.name || ''} ${key.key_prefix || ''} ${key.id || ''}`,
-  }));
+  const apiKeyOptions = (apiKeysData?.list ?? []).map((key: APIKeyResp) => {
+    const keyHint = formatAPIKeyHint(key.key_prefix);
+    return {
+      id: String(key.id),
+      label: key.name || keyHint || `#${key.id}`,
+      description: [
+        `#${key.id}`,
+        keyHint,
+        key.user_id ? `User #${key.user_id}` : '',
+      ].filter(Boolean).join(' · '),
+      textValue: `${key.name || ''} ${keyHint || ''} ${key.id || ''}`,
+    };
+  });
   const visibleAPIKeyOptions = (() => {
     const selectedId = filters.api_key_id ? String(filters.api_key_id) : '';
     if (!selectedId || !selectedAPIKeyLabel || apiKeyOptions.some((option) => option.id === selectedId)) {

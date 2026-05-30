@@ -22,6 +22,13 @@ func TestDisplayKeyPrefixPrefersHint(t *testing.T) {
 	}
 }
 
+func TestDisplayKeyPrefixMasksPlainKey(t *testing.T) {
+	prefix := DisplayKeyPrefix(Key{PlainKey: "sk-aaaabbbbccccdddd"})
+	if prefix != "sk-aaaa...dddd" {
+		t.Fatalf("expected masked plain key, got %q", prefix)
+	}
+}
+
 func TestParseExpiresAtRejectsInvalidFormat(t *testing.T) {
 	value := "2026/04/02"
 	_, _, err := parseExpiresAt(&value)

@@ -107,7 +107,7 @@
   [data-slot="tbody"] [data-slot="tr"]:hover [data-slot="td"],
   .table__body .table__row:hover .table__cell,
   .table__body .table__row[data-hovered="true"] .table__cell) {
-  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
+  background: var(--ag-table-row-hover-background) !important;
 }
 
 @keyframes ag-usage-row-new-enter {

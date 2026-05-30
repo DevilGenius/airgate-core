@@ -1,0 +1,210 @@
+/* ==========================================================================
+   HeroUI Form Controls
+   ========================================================================== */
+
+/* 表单基础控件 */
+
+#root :where(.textfield,
+  .select,
+  .combo-box,
+  .date-picker,
+  .date-field,
+  .date-range-picker),
+.ag-elevation-modal :where(.textfield,
+  .select,
+  .combo-box,
+  .date-picker,
+  .date-field,
+  .date-range-picker) {
+  min-width: 0;
+}
+
+#root :where(.input,
+  .textarea,
+  .date-input-group,
+  .select__trigger,
+  .combo-box__trigger,
+  .search-field__input),
+.ag-elevation-modal :where(.input,
+  .textarea,
+  .date-input-group,
+  .select__trigger,
+  .combo-box__trigger,
+  .search-field__input) {
+  background-color: var(--field-background) !important;
+  border-color: var(--field-border) !important;
+  color: var(--field-foreground) !important;
+  box-shadow: var(--field-shadow) !important;
+}
+
+#root :where(.input:hover,
+  .textarea:hover,
+  .date-input-group:hover,
+  .select__trigger:hover,
+  .combo-box__trigger:hover,
+  .search-field__input:hover,
+  .input[data-hovered="true"],
+  .textarea[data-hovered="true"],
+  .date-input-group[data-hovered="true"],
+  .select__trigger[data-hovered="true"],
+  .combo-box__trigger[data-hovered="true"],
+  .search-field__input[data-hovered="true"]),
+.ag-elevation-modal :where(.input:hover,
+  .textarea:hover,
+  .date-input-group:hover,
+  .select__trigger:hover,
+  .combo-box__trigger:hover,
+  .search-field__input:hover,
+  .input[data-hovered="true"],
+  .textarea[data-hovered="true"],
+  .date-input-group[data-hovered="true"],
+  .select__trigger[data-hovered="true"],
+  .combo-box__trigger[data-hovered="true"],
+  .search-field__input[data-hovered="true"]) {
+  background-color: color-mix(in oklab, var(--field-background) 86%, var(--surface) 14%) !important;
+  border-color: color-mix(in oklab, var(--border) 92%, var(--foreground) 8%) !important;
+}
+
+#root :where(.input:focus,
+  .textarea:focus,
+  .date-input-group:focus-within,
+  .select__trigger:focus-visible,
+  .combo-box__trigger:focus-visible,
+  .search-field__input:focus,
+  .input[data-focused="true"],
+  .textarea[data-focused="true"],
+  .date-input-group[data-focus-within="true"],
+  .select__trigger[data-focus-visible="true"],
+  .combo-box__trigger[data-focus-visible="true"],
+  .search-field__input[data-focused="true"]),
+.ag-elevation-modal :where(.input:focus,
+  .textarea:focus,
+  .date-input-group:focus-within,
+  .select__trigger:focus-visible,
+  .combo-box__trigger:focus-visible,
+  .search-field__input:focus,
+  .input[data-focused="true"],
+  .textarea[data-focused="true"],
+  .date-input-group[data-focus-within="true"],
+  .select__trigger[data-focus-visible="true"],
+  .combo-box__trigger[data-focus-visible="true"],
+  .search-field__input[data-focused="true"]) {
+  background-color: color-mix(in oklab, var(--field-background) 72%, var(--surface) 28%) !important;
+  border-color: var(--focus) !important;
+  box-shadow: var(--field-shadow), 0 0 0 1px var(--focus) !important;
+  outline: none !important;
+}
+
+.ag-combobox-preview-trigger.combo-box__trigger {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.ag-combobox-preview-trigger.combo-box__trigger:hover,
+.ag-combobox-preview-trigger.combo-box__trigger[data-hovered="true"] {
+  background-color: color-mix(in oklab, var(--field-background) 72%, var(--surface) 28%) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.ag-combobox-preview-trigger.combo-box__trigger:focus-visible,
+.ag-combobox-preview-trigger.combo-box__trigger[data-focus-visible="true"] {
+  background-color: color-mix(in oklab, var(--field-background) 72%, var(--surface) 28%) !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 0 1px var(--focus) !important;
+}
+
+.ag-usage-date-range .date-input-group {
+  display: grid !important;
+  grid-template-columns: max-content auto max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.375rem;
+  overflow: hidden;
+}
+
+.ag-usage-date-range :where(.date-field, .date-field__input, .date-input, [data-slot="input"]) {
+  min-width: 0 !important;
+}
+
+.ag-usage-date-range :where(.date-field__input, .date-input, [data-slot="input"]) {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ag-usage-date-range :where(.date-segment, [data-slot="segment"]) {
+  min-width: 0;
+}
+
+.ag-usage-date-range .date-input-group__suffix {
+  display: inline-flex;
+  flex: 0 0 1.625rem;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  width: 1.625rem;
+  min-width: 1.625rem;
+  gap: 0;
+}
+
+.ag-date-range-clear,
+.ag-date-range-trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1.625rem !important;
+  min-width: 1.625rem !important;
+  height: 1.625rem !important;
+  min-height: 1.625rem !important;
+  padding: 0 !important;
+  border-radius: var(--radius) !important;
+  color: var(--muted) !important;
+  line-height: 1 !important;
+}
+
+.ag-date-range-clear:hover,
+.ag-date-range-clear[data-hovered="true"],
+.ag-date-range-trigger:hover,
+.ag-date-range-trigger[data-hovered="true"] {
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
+  color: var(--foreground) !important;
+}
+
+.ag-date-range-clear > svg,
+.ag-date-range-trigger > svg {
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+  margin: 0 !important;
+}
+
+.ag-usage-date-range-popover {
+  box-sizing: border-box;
+  width: var(--trigger-width) !important;
+  max-width: min(var(--trigger-width), calc(100vw - 2rem)) !important;
+}
+
+#root .checkbox__control,
+.ag-elevation-modal .checkbox__control {
+  border: 1px solid var(--field-border);
+  background: var(--field-background);
+  box-shadow: var(--field-shadow);
+}
+
+#root :where(.checkbox:hover, .checkbox[data-hovered="true"]) .checkbox__control,
+.ag-elevation-modal :where(.checkbox:hover, .checkbox[data-hovered="true"]) .checkbox__control {
+  border-color: color-mix(in oklab, var(--border) 92%, var(--foreground) 8%);
+  background: color-mix(in oklab, var(--field-background) 86%, var(--surface) 14%);
+}
+
+#root :where(.checkbox[data-selected="true"], .checkbox[aria-checked="true"], .checkbox[data-indeterminate="true"]) .checkbox__control,
+.ag-elevation-modal :where(.checkbox[data-selected="true"], .checkbox[aria-checked="true"], .checkbox[data-indeterminate="true"]) .checkbox__control {
+  border-color: transparent;
+}
+
+.ag-form-scroll-safe .textfield,
+.ag-form-scroll-safe .select,
+.ag-form-scroll-safe .combo-box,
+.ag-form-scroll-safe .ag-plugin-scope {
+  overflow: visible;
+}
+

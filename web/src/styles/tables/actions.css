@@ -1,0 +1,113 @@
+/* Shared table row action controls. */
+
+.ag-table-row-actions {
+  min-height: 1.75rem;
+  line-height: 1;
+}
+
+.ag-table-row-actions > :where(.button, .dropdown) {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem;
+  line-height: 1;
+}
+
+.ag-table-row-actions > .button {
+  height: 1.75rem !important;
+  min-height: 1.75rem !important;
+  gap: 0.25rem !important;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, transparent) !important;
+  border-radius: var(--radius) !important;
+  background: var(--surface-secondary) !important;
+  color: var(--foreground) !important;
+  padding-block: 0 !important;
+  padding-inline: 0.5rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease !important;
+}
+
+.ag-table-row-actions > .button:hover,
+.ag-table-row-actions > .button[data-hovered="true"] {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border) 62%) !important;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-secondary) 90%) !important;
+  color: var(--accent) !important;
+}
+
+.ag-table-row-actions > .button.text-danger,
+.ag-table-row-actions > .button.button--danger-soft {
+  background: var(--danger-subtle) !important;
+  color: var(--danger) !important;
+}
+
+.ag-table-row-actions > .button.text-danger:hover,
+.ag-table-row-actions > .button.text-danger[data-hovered="true"],
+.ag-table-row-actions > .button.button--danger-soft:hover,
+.ag-table-row-actions > .button.button--danger-soft[data-hovered="true"] {
+  border-color: color-mix(in oklab, var(--danger) 38%, var(--border) 62%) !important;
+  background: color-mix(in oklab, var(--danger) 10%, var(--surface-secondary) 90%) !important;
+  color: var(--danger) !important;
+}
+
+.ag-table-row-actions > .button:disabled,
+.ag-table-row-actions > .button[aria-disabled="true"],
+.ag-table-row-actions > .button[data-disabled="true"] {
+  cursor: not-allowed !important;
+  opacity: var(--disabled-opacity) !important;
+}
+
+.ag-table-row-actions > .button.button--icon-only,
+.ag-table-row-more-trigger.dropdown__trigger {
+  width: 1.75rem !important;
+  min-width: 1.75rem !important;
+  height: 1.75rem !important;
+  min-height: 1.75rem !important;
+  padding: 0 !important;
+}
+
+.ag-table-row-more-trigger.dropdown__trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, transparent) !important;
+  border-radius: var(--radius) !important;
+  background: var(--surface-secondary) !important;
+  color: var(--foreground) !important;
+  line-height: 1 !important;
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease !important;
+}
+
+.ag-table-row-more-trigger.dropdown__trigger:hover,
+.ag-table-row-more-trigger.dropdown__trigger[data-hovered="true"],
+.ag-table-row-more-trigger.dropdown__trigger[aria-expanded="true"] {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border) 62%) !important;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-secondary) 90%) !important;
+  color: var(--accent) !important;
+}
+
+.ag-table-row-actions > .button:focus-visible,
+.ag-table-row-more-trigger.dropdown__trigger:focus-visible {
+  outline: 1.5px solid var(--focus) !important;
+  outline-offset: 2px !important;
+}
+
+.ag-table-row-actions > .button > svg,
+.ag-table-row-more-trigger.dropdown__trigger > svg {
+  display: block;
+  flex: 0 0 auto;
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+  margin: 0 !important;
+}
+

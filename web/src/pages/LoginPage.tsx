@@ -8,7 +8,7 @@ import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { useStatusPageEnabled } from '../shared/hooks/useStatusPageEnabled';
 import { ApiError, setSessionAPIKey } from '../shared/api/client';
-import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Activity } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, KeyRound, Activity } from 'lucide-react';
 
 type TabKey = 'login' | 'register' | 'apikey';
 
@@ -422,7 +422,7 @@ function APIKeyLoginForm() {
       <HeroTextField fullWidth isRequired>
         <Label>API Key</Label>
         <div className="relative">
-          <Key className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+          <KeyRound className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
           <Input
             className="pl-9"
             name="api_key"

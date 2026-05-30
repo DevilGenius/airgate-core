@@ -21,3 +21,9 @@ export function formatDateTime(date: string): string {
 export function formatDate(date: string): string {
   return new Date(date).toLocaleDateString('zh-CN');
 }
+
+export function formatAPIKeyHint(value?: string): string {
+  const key = value?.trim() ?? '';
+  if (!key || !key.startsWith('sk') || key.includes('...') || key.length <= 11) return key;
+  return `${key.slice(0, 7)}...${key.slice(-4)}`;
+}
