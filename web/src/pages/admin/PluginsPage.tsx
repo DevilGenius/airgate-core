@@ -853,23 +853,26 @@ function MarketplaceCard({
         <div className="pt-3 border-t border-border">
           {plugin.installed ? (
             plugin.has_update ? (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Button
+                    className="shrink-0 whitespace-nowrap"
+                    size="sm"
+                    variant="primary"
+                    isDisabled={!canInstall || installing}
+                    onPress={() => plugin.github_repo && onInstall(plugin.github_repo, true)}
+                  >
+                    {installing ? <Spinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    {t('plugins.update')}
+                  </Button>
+                  {plugin.installed_version && (
+                    <span className="min-w-0 truncate text-xs text-text-tertiary font-mono" title={`v${plugin.installed_version} → v${versionLabel}`}>
+                      v{plugin.installed_version} → v{versionLabel}
+                    </span>
+                  )}
+                </div>
                 <Button
-                  size="sm"
-                  variant="primary"
-                  isDisabled={!canInstall || installing}
-                  onPress={() => plugin.github_repo && onInstall(plugin.github_repo, true)}
-                >
-                  {installing ? <Spinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  {t('plugins.update_to', { version: versionLabel })}
-                </Button>
-                {plugin.installed_version && (
-                  <span className="text-xs text-text-tertiary font-mono">
-                    v{plugin.installed_version} → v{versionLabel}
-                  </span>
-                )}
-                <Button
-                  className="ml-auto"
+                  className="shrink-0 whitespace-nowrap"
                   size="sm"
                   variant="secondary"
                   isDisabled={!canInstall || installing}
@@ -880,10 +883,10 @@ function MarketplaceCard({
                 </Button>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                <Chip color="success" size="sm" variant="soft">{t('plugins.already_installed')}</Chip>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                <Chip className="w-max justify-self-start" color="success" size="sm" variant="soft">{t('plugins.already_installed')}</Chip>
                 <Button
-                  className="ml-auto"
+                  className="shrink-0 whitespace-nowrap"
                   size="sm"
                   variant="secondary"
                   isDisabled={!canInstall || installing}
@@ -895,8 +898,9 @@ function MarketplaceCard({
               </div>
             )
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               <Button
+                className="w-max shrink-0 whitespace-nowrap"
                 size="sm"
                 isDisabled={!canInstall || installing}
                 variant="primary"
@@ -906,7 +910,7 @@ function MarketplaceCard({
                 {t('common.install')}
               </Button>
               <Button
-                className="ml-auto"
+                className="shrink-0 whitespace-nowrap"
                 size="sm"
                 variant="secondary"
                 isDisabled={!canInstall || installing}

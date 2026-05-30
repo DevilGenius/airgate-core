@@ -29,7 +29,7 @@ function toDateValue(value?: string): DateValue | null {
 
 export function UsageDateRangeFilter({
   clearLabel = 'Clear',
-  className = 'w-full sm:w-64',
+  className = 'w-full sm:w-72',
   endDate,
   label,
   onChange,
@@ -82,7 +82,7 @@ export function UsageDateRangeFilter({
           ) : null}
         </DateField.Suffix>
       </DateField.Group>
-      <DateRangePicker.Popover>
+      <DateRangePicker.Popover className="ag-usage-date-range-popover">
         <RangeCalendar aria-label={label}>
           <RangeCalendar.Header>
             <RangeCalendar.YearPickerTrigger>

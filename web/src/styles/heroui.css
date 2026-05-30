@@ -432,6 +432,12 @@
   margin: 0 !important;
 }
 
+.ag-usage-date-range-popover {
+  box-sizing: border-box;
+  width: var(--trigger-width) !important;
+  max-width: min(var(--trigger-width), calc(100vw - 2rem)) !important;
+}
+
 .checkbox__control {
   border: 1px solid var(--field-border);
   background: var(--field-background);

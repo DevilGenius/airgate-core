@@ -728,6 +728,7 @@
     "config_success": "Configuration saved",
     "config": "Config",
     "already_installed": "Installed",
+    "update": "Update",
     "update_to": "Update to v{{version}}",
     "update_success": "Plugin updated",
     "install_plugin": "Install Plugin",

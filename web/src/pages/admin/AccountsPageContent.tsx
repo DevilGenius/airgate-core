@@ -764,6 +764,7 @@ export default function AccountsPageContent() {
             isRefreshing={isAccountsFetching}
           />
           <Button
+            className="hidden sm:inline-flex"
             variant="secondary"
             onPress={() => importInputRef.current?.click()}
             isDisabled={importMutation.isPending}
@@ -773,6 +774,7 @@ export default function AccountsPageContent() {
             {t('accounts.import')}
           </Button>
           <Button
+            className="hidden sm:inline-flex"
             variant="secondary"
             onPress={() => exportMutation.mutate()}
             isDisabled={exportMutation.isPending}
