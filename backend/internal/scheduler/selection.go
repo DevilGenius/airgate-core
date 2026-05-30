@@ -53,21 +53,31 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 	now := time.Now()
 	normalCandidates := make([]*ent.Account, 0, len(candidates))
 	stickyCandidates := make([]*ent.Account, 0, len(candidates))
+	var hardAffinityCandidates []*ent.Account
+	if opts.RequireContinuationAffinity {
+		hardAffinityCandidates = make([]*ent.Account, 0, len(candidates))
+	}
 	for _, acc := range candidates {
-		switch s.checkSchedulability(ctx, acc, model, now) {
+		result := s.checkSchedulabilityResult(ctx, acc, model, now, opts.RequireContinuationAffinity)
+		switch result.normal {
 		case Normal:
 			normalCandidates = append(normalCandidates, acc)
 			stickyCandidates = append(stickyCandidates, acc)
 		case StickyOnly:
 			stickyCandidates = append(stickyCandidates, acc)
-		case NotSchedulable:
-			// 跳过
+		}
+		if opts.RequireContinuationAffinity && result.hardAffinity != NotSchedulable {
+			hardAffinityCandidates = append(hardAffinityCandidates, acc)
 		}
 	}
 
 	if previousResponseID := strings.TrimSpace(opts.PreviousResponseID); previousResponseID != "" && s.responseAffinity != nil {
 		if accountID, found := s.responseAffinity.Get(ctx, groupID, platform, previousResponseID); found {
-			if acc := findAccountByID(stickyCandidates, accountID); acc != nil {
+			affinityCandidates := stickyCandidates
+			if opts.RequireContinuationAffinity {
+				affinityCandidates = hardAffinityCandidates
+			}
+			if acc := findAccountByID(affinityCandidates, accountID); acc != nil {
 				s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID)
 				if sessionID != "" {
 					s.sticky.Set(ctx, userID, platform, sessionID, accountID)
@@ -85,7 +95,7 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 	if sessionID != "" {
 		if accountID, found := s.sticky.Get(ctx, userID, platform, sessionID); found {
 			if opts.RequireContinuationAffinity {
-				if acc := findAccountByID(stickyCandidates, accountID); acc != nil {
+				if acc := findAccountByID(hardAffinityCandidates, accountID); acc != nil {
 					s.sticky.Set(ctx, userID, platform, sessionID, accountID)
 					return acc, nil
 				}
@@ -308,42 +318,77 @@ func matchModelRouting(routing map[string][]int64, model string) []int64 {
 // model 用于推导请求所属的家族（gpt-image / chat 各算一个池），仅当该家族正在
 // 冷却时才把账号当作 NotSchedulable —— 别的家族不受影响。
 func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, model string, now time.Time) Schedulability {
+	return s.checkSchedulabilityResult(ctx, acc, model, now, false).normal
+}
+
+type schedulabilityResult struct {
+	normal       Schedulability
+	hardAffinity Schedulability
+}
+
+// checkHardAffinitySchedulability 用于 previous_response_id / continuation session 这类硬亲和。
+// 它只放宽滑动窗口费用的硬上限：该容量会随时间窗口滚动自动降回阈值内。
+// 不放宽 disabled / rate_limited / family cooldown / RPM / 并发 / session 等保护。
+func (s *Scheduler) checkHardAffinitySchedulability(ctx context.Context, acc *ent.Account, model string, now time.Time) Schedulability {
+	return s.checkSchedulabilityResult(ctx, acc, model, now, true).hardAffinity
+}
+
+func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Account, model string, now time.Time, needHardAffinity bool) schedulabilityResult {
 	base := SchedulabilityOf(acc, now)
 	if base == NotSchedulable {
-		return NotSchedulable
+		return schedulabilityResult{normal: NotSchedulable, hardAffinity: NotSchedulable}
 	}
-	worst := base
+	result := schedulabilityResult{normal: base, hardAffinity: base}
 
 	// 家族级冷却：撞过这个 family 的账号在冷却期内对该 family 不可调度，
 	// 但对其它 family 仍可用。Redis 不可用时退化为不冷却，不阻断主链路。
 	if family := ModelFamily(acc.Platform, model); family != "" && s.familyCooldown != nil {
 		if _, inCooldown := s.familyCooldown.Until(ctx, acc.ID, family); inCooldown {
-			return NotSchedulable
+			return schedulabilityResult{normal: NotSchedulable, hardAffinity: NotSchedulable}
 		}
 	}
 
-	if sched := s.concurrencySchedulability(ctx, acc); sched > worst {
-		worst = sched
+	if sched := s.concurrencySchedulability(ctx, acc); sched > result.normal {
+		result.normal = sched
+		result.hardAffinity = sched
 	}
-	if worst == NotSchedulable {
-		return worst
+	if result.normal == NotSchedulable {
+		return result
 	}
-	if sched := s.windowCost.GetSchedulability(ctx, acc.ID, acc.Extra); sched > worst {
-		worst = sched
+
+	if sched := s.windowCost.GetSchedulability(ctx, acc.ID, acc.Extra); sched > result.normal {
+		result.normal = sched
+		hardAffinitySched := sched
+		if needHardAffinity && hardAffinitySched == NotSchedulable {
+			hardAffinitySched = StickyOnly
+		}
+		if hardAffinitySched > result.hardAffinity {
+			result.hardAffinity = hardAffinitySched
+		}
 	}
-	if worst == NotSchedulable {
-		return worst
+	if result.normal == NotSchedulable && (!needHardAffinity || result.hardAffinity == NotSchedulable) {
+		return result
 	}
-	if sched := s.rpm.GetSchedulability(ctx, acc.ID, ExtraInt(acc.Extra, "max_rpm")); sched > worst {
-		worst = sched
+
+	rpmSched := s.rpm.GetSchedulability(ctx, acc.ID, ExtraInt(acc.Extra, "max_rpm"))
+	if result.normal != NotSchedulable && rpmSched > result.normal {
+		result.normal = rpmSched
 	}
-	if worst == NotSchedulable {
-		return worst
+	if rpmSched > result.hardAffinity {
+		result.hardAffinity = rpmSched
 	}
-	if sched := s.session.GetSchedulability(ctx, acc.ID, acc.Extra); sched > worst {
-		worst = sched
+	if result.normal == NotSchedulable && (!needHardAffinity || result.hardAffinity == NotSchedulable) {
+		return result
 	}
-	return worst
+
+	sessionSched := s.session.GetSchedulability(ctx, acc.ID, acc.Extra)
+	if result.normal != NotSchedulable && sessionSched > result.normal {
+		result.normal = sessionSched
+	}
+	if sessionSched > result.hardAffinity {
+		result.hardAffinity = sessionSched
+	}
+	return result
 }
 
 // concurrencySchedulability 根据当前并发用量返回调度约束：
@@ -443,6 +488,9 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 // 僵尸 slot 把账号一直标满（下次 acquire 会清理它们，但 selection 不能等）。
 // key 必须与 concurrency.go 的 concurrencyKey 保持一致（`concurrency:v2:<id>`）。
 func (s *Scheduler) getCurrentLoad(ctx context.Context, accountID int) int {
+	if s.currentLoad != nil {
+		return s.currentLoad(ctx, accountID)
+	}
 	if s.rdb == nil {
 		return 0
 	}

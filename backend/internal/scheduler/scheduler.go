@@ -27,6 +27,30 @@ const dbTimeout = 10 * time.Second
 // （如 OpenAI 平台按 capability 区分生图/对话账号）。
 type AccountFilterFunc func(candidates []*ent.Account, model string) []*ent.Account
 
+type windowCostTracker interface {
+	GetSchedulability(ctx context.Context, accountID int, extra map[string]interface{}) Schedulability
+	AddCost(ctx context.Context, accountID int, cost float64)
+}
+
+type rpmTracker interface {
+	IncrementRPM(ctx context.Context, accountID int) (int, error)
+	TryIncrementRPM(ctx context.Context, accountID int, maxRPM int) (bool, error)
+	DecrementRPM(ctx context.Context, accountID int)
+	GetSchedulability(ctx context.Context, accountID int, maxRPM int) Schedulability
+}
+
+type sessionTracker interface {
+	RefreshSession(ctx context.Context, accountID int, sessionUUID string, idleTimeout time.Duration) error
+	RegisterSession(ctx context.Context, accountID int, sessionUUID string, maxSessions int, idleTimeout time.Duration) (bool, error)
+	GetSchedulability(ctx context.Context, accountID int, extra map[string]interface{}) Schedulability
+}
+
+type familyCooldownTracker interface {
+	Until(ctx context.Context, accountID int, family string) (time.Time, bool)
+	List(ctx context.Context, accountID int) []FamilyCooldownEntry
+	ClearAccount(ctx context.Context, accountID int) int
+}
+
 // Scheduler 账户调度器。
 //
 // 两层职责清晰分离：
@@ -39,15 +63,16 @@ type Scheduler struct {
 	rdb *redis.Client
 
 	sticky           *StickySession
-	windowCost       *WindowCostChecker
-	rpm              *RPMCounter
-	session          *SessionManager
+	windowCost       windowCostTracker
+	rpm              rpmTracker
+	session          sessionTracker
 	msgQueue         *MessageQueue
 	state            *StateMachine
-	familyCooldown   *FamilyCooldown
+	familyCooldown   familyCooldownTracker
 	routeCache       *routeCache
 	responseAffinity *ResponseAffinity
 	accountFilters   map[string]AccountFilterFunc
+	currentLoad      func(ctx context.Context, accountID int) int
 }
 
 // SetAccountFilter 注册平台级账号过滤函数。

@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/account"
 )
 
 func TestExcludeAccountsDoesNotMutateCandidates(t *testing.T) {
@@ -66,6 +68,199 @@ func TestContinuationBlockedErrorDistinguishesCapacityFromMissingAffinity(t *tes
 	}
 	if err := continuationBlockedError(candidates, 2); !errors.Is(err, ErrContinuationAffinityMissing) {
 		t.Fatalf("continuationBlockedError(missing) = %v, want ErrContinuationAffinityMissing", err)
+	}
+}
+
+func TestHardAffinityAllowsWindowCostOverflow(t *testing.T) {
+	ctx := context.Background()
+	s := newSelectionTestScheduler(NotSchedulable)
+	now := time.Now()
+	acc := newSelectionTestAccount(10)
+
+	if got := s.checkSchedulability(ctx, acc, "gpt-4.1", now); got != NotSchedulable {
+		t.Fatalf("checkSchedulability() = %v, want NotSchedulable", got)
+	}
+	if got := s.checkHardAffinitySchedulability(ctx, acc, "gpt-4.1", now); got != StickyOnly {
+		t.Fatalf("checkHardAffinitySchedulability() = %v, want StickyOnly", got)
+	}
+}
+
+func TestSelectAccountHardPreviousResponseAllowsWindowCostOverflow(t *testing.T) {
+	ctx := context.Background()
+	s := newSelectionTestScheduler(NotSchedulable)
+	groupID := 7
+	acc := newSelectionTestAccount(10)
+	s.routeCache.Set(groupID, "openai", []*ent.Account{acc}, nil)
+
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_1", acc.ID)
+	if _, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+		PreviousResponseID: "resp_1",
+	}); !errors.Is(err, ErrNoAvailableAccount) {
+		t.Fatalf("soft previous response err = %v, want ErrNoAvailableAccount", err)
+	}
+
+	windowCost := s.windowCost.(*stubWindowCostTracker)
+	windowCost.calls = 0
+	selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+		PreviousResponseID:          "resp_1",
+		RequireContinuationAffinity: true,
+	})
+	if err != nil {
+		t.Fatalf("hard previous response returned error: %v", err)
+	}
+	if selected.ID != acc.ID {
+		t.Fatalf("selected account ID = %d, want %d", selected.ID, acc.ID)
+	}
+	if windowCost.calls != 1 {
+		t.Fatalf("window cost checks = %d, want 1", windowCost.calls)
+	}
+}
+
+func TestHardAffinityDoesNotBypassNonWindowConstraints(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name      string
+		configure func(s *Scheduler, acc *ent.Account)
+	}{
+		{
+			name: "rpm limit",
+			configure: func(s *Scheduler, _ *ent.Account) {
+				s.rpm.(*stubRPMTracker).sched = NotSchedulable
+			},
+		},
+		{
+			name: "session limit",
+			configure: func(s *Scheduler, _ *ent.Account) {
+				s.session.(*stubSessionTracker).sched = NotSchedulable
+			},
+		},
+		{
+			name: "concurrency limit",
+			configure: func(s *Scheduler, acc *ent.Account) {
+				acc.MaxConcurrency = 1
+				s.currentLoad = func(context.Context, int) int { return 1 }
+			},
+		},
+		{
+			name: "disabled account",
+			configure: func(_ *Scheduler, acc *ent.Account) {
+				acc.State = account.StateDisabled
+			},
+		},
+		{
+			name: "family cooldown",
+			configure: func(s *Scheduler, _ *ent.Account) {
+				s.familyCooldown = stubFamilyCooldownTracker{inCooldown: true}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			s := newSelectionTestScheduler(NotSchedulable)
+			groupID := 7
+			acc := newSelectionTestAccount(10)
+			tt.configure(s, acc)
+			s.routeCache.Set(groupID, "openai", []*ent.Account{acc}, nil)
+			s.BindResponseAccount(ctx, groupID, "openai", "resp_blocked", acc.ID)
+
+			_, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+				PreviousResponseID:          "resp_blocked",
+				RequireContinuationAffinity: true,
+			})
+			if !errors.Is(err, ErrContinuationCapacityExceeded) {
+				t.Fatalf("SelectAccountWithOptions() error = %v, want ErrContinuationCapacityExceeded", err)
+			}
+		})
+	}
+}
+
+type stubWindowCostTracker struct {
+	sched Schedulability
+	calls int
+}
+
+func (s *stubWindowCostTracker) GetSchedulability(context.Context, int, map[string]interface{}) Schedulability {
+	s.calls++
+	return s.sched
+}
+
+func (s *stubWindowCostTracker) AddCost(context.Context, int, float64) {}
+
+type stubRPMTracker struct {
+	sched Schedulability
+}
+
+func (s *stubRPMTracker) IncrementRPM(context.Context, int) (int, error) {
+	return 0, nil
+}
+
+func (s *stubRPMTracker) TryIncrementRPM(context.Context, int, int) (bool, error) {
+	return true, nil
+}
+
+func (s *stubRPMTracker) DecrementRPM(context.Context, int) {}
+
+func (s *stubRPMTracker) GetSchedulability(context.Context, int, int) Schedulability {
+	return s.sched
+}
+
+type stubSessionTracker struct {
+	sched Schedulability
+}
+
+func (s *stubSessionTracker) RefreshSession(context.Context, int, string, time.Duration) error {
+	return nil
+}
+
+func (s *stubSessionTracker) RegisterSession(context.Context, int, string, int, time.Duration) (bool, error) {
+	return true, nil
+}
+
+func (s *stubSessionTracker) GetSchedulability(context.Context, int, map[string]interface{}) Schedulability {
+	return s.sched
+}
+
+type stubFamilyCooldownTracker struct {
+	inCooldown bool
+}
+
+func (s stubFamilyCooldownTracker) Until(context.Context, int, string) (time.Time, bool) {
+	if !s.inCooldown {
+		return time.Time{}, false
+	}
+	return time.Now().Add(time.Minute), true
+}
+
+func (s stubFamilyCooldownTracker) List(context.Context, int) []FamilyCooldownEntry {
+	return nil
+}
+
+func (s stubFamilyCooldownTracker) ClearAccount(context.Context, int) int {
+	return 0
+}
+
+func newSelectionTestScheduler(windowCostSched Schedulability) *Scheduler {
+	return &Scheduler{
+		sticky:           NewStickySession(nil),
+		windowCost:       &stubWindowCostTracker{sched: windowCostSched},
+		rpm:              &stubRPMTracker{sched: Normal},
+		session:          &stubSessionTracker{sched: Normal},
+		routeCache:       newRouteCache(time.Minute),
+		responseAffinity: NewResponseAffinity(nil),
+	}
+}
+
+func newSelectionTestAccount(id int) *ent.Account {
+	return &ent.Account{
+		ID:             id,
+		Name:           "selection test",
+		Platform:       "openai",
+		State:          account.StateActive,
+		MaxConcurrency: DefaultAccountMaxConcurrency,
+		Extra:          map[string]interface{}{},
 	}
 }
 
