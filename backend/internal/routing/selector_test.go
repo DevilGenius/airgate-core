@@ -4,15 +4,13 @@ import (
 	"context"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
-
-	"github.com/DevilGenius/airgate-core/ent/enttest"
 	"github.com/DevilGenius/airgate-core/ent/migrate"
+	"github.com/DevilGenius/airgate-core/internal/testdb"
 )
 
 func TestListEligibleGroups(t *testing.T) {
 	ctx := context.Background()
-	db := enttest.Open(t, "sqlite3", "file:route_selector?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(migrate.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "route_selector", migrate.WithGlobalUniqueID(false))
 	t.Cleanup(func() {
 		if err := db.Close(); err != nil {
 			t.Fatalf("close db: %v", err)
@@ -78,7 +76,7 @@ func TestListEligibleGroups(t *testing.T) {
 
 func TestListEligibleGroupsFiltersImageDisabledOpenAIGroups(t *testing.T) {
 	ctx := context.Background()
-	db := enttest.Open(t, "sqlite3", "file:route_selector_image?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(migrate.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "route_selector_image", migrate.WithGlobalUniqueID(false))
 	t.Cleanup(func() {
 		if err := db.Close(); err != nil {
 			t.Fatalf("close db: %v", err)

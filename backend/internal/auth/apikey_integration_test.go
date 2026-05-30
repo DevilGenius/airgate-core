@@ -5,13 +5,12 @@ import (
 	"testing"
 
 	"entgo.io/ent/dialect/sql/schema"
-	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/DevilGenius/airgate-core/ent/enttest"
+	"github.com/DevilGenius/airgate-core/internal/testdb"
 )
 
 func TestValidateAPIKeyIncludesUserEmail(t *testing.T) {
-	db := enttest.Open(t, "sqlite3", "file:apikey_validate?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "apikey_validate", schema.WithGlobalUniqueID(false))
 	defer func() {
 		if err := db.Close(); err != nil {
 			t.Fatalf("close db: %v", err)

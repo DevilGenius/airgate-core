@@ -4,12 +4,10 @@ import (
 	"context"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/DevilGenius/airgate-core/ent"
-	"github.com/DevilGenius/airgate-core/ent/enttest"
 	"github.com/DevilGenius/airgate-core/ent/migrate"
 	"github.com/DevilGenius/airgate-core/internal/app/account"
+	"github.com/DevilGenius/airgate-core/internal/testdb"
 )
 
 func TestAccountStoreKeywordSearchMatchesOAuthEmail(t *testing.T) {
@@ -167,5 +165,5 @@ func TestAccountStoreCredentialStringFilterMatchesPluginDeclaredPlan(t *testing.
 
 func enttestOpen(t *testing.T) *ent.Client {
 	t.Helper()
-	return enttest.Open(t, "sqlite3", "file:account_store?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(migrate.WithGlobalUniqueID(false)))
+	return testdb.OpenMemoryEnt(t, "account_store", migrate.WithGlobalUniqueID(false))
 }

@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql/schema"
-	_ "github.com/mattn/go-sqlite3"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/DevilGenius/airgate-core/ent/enttest"
+	"github.com/DevilGenius/airgate-core/internal/testdb"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -82,7 +81,7 @@ func TestHostInvokeRequiresDeclaredCapability(t *testing.T) {
 
 func TestHostDeleteAssetLocal(t *testing.T) {
 	ctx := context.Background()
-	db := enttest.Open(t, "sqlite3", "file:host_delete_asset?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "host_delete_asset", schema.WithGlobalUniqueID(false))
 	t.Cleanup(func() { _ = db.Close() })
 
 	db.Setting.Create().SetGroup("storage").SetKey("local_storage_dir").SetValue(t.TempDir()).SaveX(ctx)
@@ -102,7 +101,7 @@ func TestHostDeleteAssetLocal(t *testing.T) {
 
 func TestDeleteTaskDeletesAssociatedAssets(t *testing.T) {
 	ctx := context.Background()
-	db := enttest.Open(t, "sqlite3", "file:delete_task_assets?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "delete_task_assets", schema.WithGlobalUniqueID(false))
 	t.Cleanup(func() { _ = db.Close() })
 
 	db.Setting.Create().SetGroup("storage").SetKey("local_storage_dir").SetValue(t.TempDir()).SaveX(ctx)
@@ -165,7 +164,7 @@ func TestDeleteTaskDeletesAssociatedAssets(t *testing.T) {
 
 func TestTaskPublicIDIsIndependentFromIdempotencyKey(t *testing.T) {
 	ctx := context.Background()
-	db := enttest.Open(t, "sqlite3", "file:task_public_id?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "task_public_id", schema.WithGlobalUniqueID(false))
 	t.Cleanup(func() { _ = db.Close() })
 
 	host := &HostService{db: db}
@@ -213,7 +212,7 @@ func TestTaskPublicIDIsIndependentFromIdempotencyKey(t *testing.T) {
 
 func TestListTasksFiltersByPluginID(t *testing.T) {
 	ctx := context.Background()
-	db := enttest.Open(t, "sqlite3", "file:list_tasks_plugin_id?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "list_tasks_plugin_id", schema.WithGlobalUniqueID(false))
 	t.Cleanup(func() { _ = db.Close() })
 
 	host := &HostService{db: db}
@@ -249,7 +248,7 @@ func TestListTasksFiltersByPluginID(t *testing.T) {
 
 func TestListTasksStripsHeavyInputFields(t *testing.T) {
 	ctx := context.Background()
-	db := enttest.Open(t, "sqlite3", "file:list_tasks_slim?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "list_tasks_slim", schema.WithGlobalUniqueID(false))
 	t.Cleanup(func() { _ = db.Close() })
 
 	host := &HostService{db: db}
@@ -307,7 +306,7 @@ func TestListTasksStripsHeavyInputFields(t *testing.T) {
 
 func TestCreateTaskNormalizesLargeInputDataURIs(t *testing.T) {
 	ctx := context.Background()
-	db := enttest.Open(t, "sqlite3", "file:create_task_normalize?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "create_task_normalize", schema.WithGlobalUniqueID(false))
 	t.Cleanup(func() { _ = db.Close() })
 
 	// 让 NewAssetStorage 落到测试临时目录，而不是默认 data/assets。
@@ -365,7 +364,7 @@ func TestCreateTaskNormalizesLargeInputDataURIs(t *testing.T) {
 
 func TestCheckHostForwardBalance(t *testing.T) {
 	ctx := context.Background()
-	db := enttest.Open(t, "sqlite3", "file:host_forward_balance?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "host_forward_balance", schema.WithGlobalUniqueID(false))
 	t.Cleanup(func() { _ = db.Close() })
 
 	zeroBalanceUser := db.User.Create().SetEmail("zero@example.com").SetPasswordHash("hash").SetBalance(0).SaveX(ctx)

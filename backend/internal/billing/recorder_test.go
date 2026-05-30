@@ -5,14 +5,13 @@ import (
 	"testing"
 
 	"entgo.io/ent/dialect/sql/schema"
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/DevilGenius/airgate-core/ent"
-	"github.com/DevilGenius/airgate-core/ent/enttest"
+	"github.com/DevilGenius/airgate-core/internal/testdb"
 )
 
 func TestRecordSyncPersistsUserEmailSnapshot(t *testing.T) {
-	db := enttest.Open(t, "sqlite3", "file:billing_recorder?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, "billing_recorder", schema.WithGlobalUniqueID(false))
 	defer func() {
 		if err := db.Close(); err != nil {
 			t.Fatalf("close db: %v", err)

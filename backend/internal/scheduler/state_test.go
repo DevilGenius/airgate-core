@@ -5,12 +5,10 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
-	"github.com/DevilGenius/airgate-core/ent/enttest"
 	"github.com/DevilGenius/airgate-core/ent/migrate"
+	"github.com/DevilGenius/airgate-core/internal/testdb"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -237,7 +235,7 @@ func TestStateMachineAccountUnavailableIgnoredForOAuthPool(t *testing.T) {
 
 func openStateMachineTestDB(t *testing.T, name string) *ent.Client {
 	t.Helper()
-	db := enttest.Open(t, "sqlite3", "file:"+name+"?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(migrate.WithGlobalUniqueID(false)))
+	db := testdb.OpenMemoryEnt(t, name, migrate.WithGlobalUniqueID(false))
 	t.Cleanup(func() {
 		if err := db.Close(); err != nil {
 			t.Fatalf("close db: %v", err)
