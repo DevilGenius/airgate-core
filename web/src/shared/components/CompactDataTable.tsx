@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode } from 'react';
+import { memo, type CSSProperties, type ReactNode } from 'react';
 
 type RowKey = string | number;
 
@@ -24,7 +24,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
 }
 
-export function CompactDataTable<T>({
+function CompactDataTableComponent<T>({
   ariaLabel,
   className,
   columns,
@@ -103,3 +103,5 @@ export function CompactDataTable<T>({
     </div>
   );
 }
+
+export const CompactDataTable = memo(CompactDataTableComponent) as typeof CompactDataTableComponent;

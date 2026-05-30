@@ -195,6 +195,13 @@ const STREAM_CHIP_STYLE: CSSProperties = {
   boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${HEROUI_BLUE} 34%, transparent)`,
   color: HEROUI_BLUE,
 };
+const USAGE_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+  hour: '2-digit',
+  hour12: false,
+  minute: '2-digit',
+  second: '2-digit',
+});
+const USAGE_DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN');
 
 /** 单行 token 数据行：固定宽度图标 + 右对齐等宽数字 */
 function TokenRow({
@@ -539,8 +546,8 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       width: '142px',
       render: (row) => {
         const date = new Date(row.created_at);
-        const timeLabel = date.toLocaleTimeString('zh-CN', { hour12: false });
-        const dateLabel = date.toLocaleDateString('zh-CN');
+        const timeLabel = USAGE_TIME_FORMATTER.format(date);
+        const dateLabel = USAGE_DATE_FORMATTER.format(date);
         const fullLabel = `${dateLabel} ${timeLabel}`;
 
         return (

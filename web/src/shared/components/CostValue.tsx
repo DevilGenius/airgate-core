@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 
 type CostTone = 'actual' | 'default' | 'standard' | 'success' | 'warning';
 
@@ -17,7 +17,7 @@ function formatCost(value: number | null | undefined, decimals?: number): string
   return `$${amount.toFixed(2)}`;
 }
 
-export function CostValue({
+export const CostValue = memo(function CostValue({
   className = '',
   decimals,
   tone = 'default',
@@ -37,9 +37,9 @@ export function CostValue({
       <span className="text-text">{amount}</span>
     </span>
   );
-}
+});
 
-export function CostPair({
+export const CostPair = memo(function CostPair({
   actual,
   className = '',
   separator = '/',
@@ -57,4 +57,4 @@ export function CostPair({
       <CostValue value={standard} tone="standard" />
     </span>
   );
-}
+});
