@@ -999,6 +999,8 @@
     "group_unbound_hint": "This API key is currently not bound to any group, so usage configuration cannot be generated. Please ask an administrator to bind it to a group first.",
     "group_rate_short": "Group Rate",
     "group_sell_rate_short": "Group Rate x Sell Rate",
+    "effective_rate_short": "Effective Rate",
+    "effective_rate_chip": "Rate",
     "group_rate_default": "Group default",
     "user_override_tag": "override",
     "markup_title": "Sales/Cost",

@@ -355,6 +355,8 @@ export interface APIKeyResp {
   key_prefix: string;
   user_id: number;
   group_id: number | null;
+  /** 所属分组对该用户生效的实际扣费倍率 */
+  group_rate?: number;
   ip_whitelist?: string[];
   ip_blacklist?: string[];
   quota_usd: number;

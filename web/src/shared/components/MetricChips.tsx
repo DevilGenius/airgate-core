@@ -1,3 +1,4 @@
+import type { ClipboardEvent } from 'react';
 import { Chip } from '@heroui/react';
 
 type MetricChipColor = 'default' | 'warning' | 'success' | 'accent' | 'danger';
@@ -22,7 +23,26 @@ function formatMetricTitleValue(item: MetricChipItem) {
   return item.value ?? '';
 }
 
-function MetricChip({ amount, color, decimals, dollarTone, highlightDollar, label, mutedWhenZero, value }: MetricChipItem) {
+type MetricChipProps = MetricChipItem & {
+  copyText: string;
+};
+
+function getSelectedCopyItems(root: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed) return [];
+
+  return Array.from(root.querySelectorAll<HTMLElement>('[data-metric-copy-text]'))
+    .filter((element) => {
+      for (let index = 0; index < selection.rangeCount; index += 1) {
+        if (selection.getRangeAt(index).intersectsNode(element)) return true;
+      }
+      return false;
+    })
+    .map((element) => element.dataset.metricCopyText)
+    .filter((text): text is string => Boolean(text));
+}
+
+function MetricChip({ amount, color, copyText, decimals, dollarTone, highlightDollar, label, mutedWhenZero, value }: MetricChipProps) {
   const amountText = amount == null ? null : formatMoneyAmount(amount, decimals);
   const isMutedZero = mutedWhenZero && amount === 0;
   const chipClassName = [
@@ -37,16 +57,18 @@ function MetricChip({ amount, color, decimals, dollarTone, highlightDollar, labe
 
   return (
     <Chip className={chipClassName} color={isMutedZero ? 'default' : color} size="sm" variant="soft">
-      <span className="ag-metric-chip-label">{label}</span>
-      <span className="ag-metric-chip-value">
-        {amountText == null ? (
-          value === '∞' ? <span className="ag-metric-infinity">{value}</span> : value
-        ) : (
-          <>
-            <span className={dollarClassName}>$</span>
-            <span>{amountText}</span>
-          </>
-        )}
+      <span className="ag-metric-chip-content" data-metric-copy-text={copyText}>
+        <span className="ag-metric-chip-label">{label}</span>
+        <span className="ag-metric-chip-value">
+          {amountText == null ? (
+            value === '∞' ? <span className="ag-metric-infinity">{value}</span> : value
+          ) : (
+            <>
+              <span className={dollarClassName}>$</span>
+              <span>{amountText}</span>
+            </>
+          )}
+        </span>
       </span>
     </Chip>
   );
@@ -62,11 +84,18 @@ export function MetricChips({
   const title = items
     .map((item) => `${item.label} ${formatMetricTitleValue(item)}`)
     .join(' / ');
+  const handleCopy = (event: ClipboardEvent<HTMLDivElement>) => {
+    const copyItems = getSelectedCopyItems(event.currentTarget);
+    if (copyItems.length === 0) return;
+
+    event.clipboardData.setData('text/plain', copyItems.join(' / '));
+    event.preventDefault();
+  };
 
   return (
-    <div className={`ag-metric-chips ${className ?? ''}`} title={title}>
+    <div className={`ag-metric-chips ${className ?? ''}`} onCopy={handleCopy} title={title}>
       {items.map((item, idx) => (
-        <MetricChip key={`${idx}-${item.label}`} {...item} />
+        <MetricChip key={`${idx}-${item.label}`} {...item} copyText={`${item.label} ${formatMetricTitleValue(item)}`} />
       ))}
     </div>
   );

@@ -12,6 +12,7 @@ func toAPIKeyResp(item appapikey.Key) dto.APIKeyResp {
 		Key:             item.PlainKey,
 		KeyPrefix:       appapikey.DisplayKeyPrefix(item),
 		UserID:          int64(item.UserID),
+		GroupRate:       item.GroupRate,
 		IPWhitelist:     item.IPWhitelist,
 		IPBlacklist:     item.IPBlacklist,
 		QuotaUSD:        item.QuotaUSD,

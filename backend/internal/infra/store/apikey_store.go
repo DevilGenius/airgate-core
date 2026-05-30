@@ -13,6 +13,7 @@ import (
 	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
+	"github.com/DevilGenius/airgate-core/internal/billing"
 )
 
 // APIKeyStore 使用 Ent 实现 API Key 仓储。
@@ -343,6 +344,11 @@ func mapAPIKey(item *ent.APIKey) appapikey.Key {
 	if item.Edges.Group != nil {
 		groupID := item.Edges.Group.ID
 		result.GroupID = &groupID
+		var userGroupRates map[int64]float64
+		if item.Edges.User != nil {
+			userGroupRates = item.Edges.User.GroupRates
+		}
+		result.GroupRate = billing.ResolveBillingRateForGroup(userGroupRates, item.Edges.Group.ID, item.Edges.Group.RateMultiplier)
 	}
 	return result
 }

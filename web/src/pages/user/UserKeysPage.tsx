@@ -315,12 +315,12 @@ export default function UserKeysPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1040}
+        minWidth={1100}
       >
         <CommonTable.Header>
           <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
           <CommonTable.Column id="key_prefix">{t('user_keys.title')}</CommonTable.Column>
-          <CommonTable.Column id="group_id">{t('user_keys.group')}</CommonTable.Column>
+          <CommonTable.Column id="group_id" style={{ width: '15rem' }}>{t('user_keys.group')}</CommonTable.Column>
           <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
           <CommonTable.Column id="quota" style={{ width: '17.5rem' }}>{t('user_keys.quota_label')}</CommonTable.Column>
           <CommonTable.Column id="markup" style={{ width: '10.75rem' }}>{t('user_keys.markup_title', '销售/成本')}</CommonTable.Column>
@@ -350,14 +350,18 @@ export default function UserKeysPage() {
                 : group?.name || `#${row.group_id}`;
               const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
               const userOverride = row.group_id == null ? undefined : user?.group_rates?.[row.group_id];
-              const hasOverride =
+              const hasUserOverride =
                 typeof userOverride === 'number' &&
                 Number.isFinite(userOverride) &&
-                userOverride > 0 &&
-                group != null &&
-                userOverride !== group.rate_multiplier;
-              const groupRate = hasOverride && userOverride != null ? userOverride : group?.rate_multiplier;
+                userOverride > 0;
+              const responseGroupRate =
+                typeof row.group_rate === 'number' && Number.isFinite(row.group_rate) && row.group_rate > 0
+                  ? row.group_rate
+                  : undefined;
+              const groupRate = responseGroupRate ?? (hasUserOverride ? userOverride : group?.rate_multiplier);
+              const hasGroupRate = typeof groupRate === 'number' && Number.isFinite(groupRate) && groupRate > 0;
               const sellRate = hasSellRate && row.sell_rate != null ? row.sell_rate : 1;
+              const effectiveRate = hasGroupRate ? groupRate * sellRate : undefined;
               const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
               const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
               const displayStatus = isExpired ? 'expired' : row.status;
@@ -374,28 +378,38 @@ export default function UserKeysPage() {
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <div className="space-y-0.5 text-center">
-                      <div className="flex justify-center">
+                    <div className="ag-api-key-group-stack">
+                      <div className="ag-api-key-group-line">
                         <span
-                          className="inline-flex h-6 min-w-0 max-w-full items-center justify-center gap-1 rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none text-text-secondary"
+                          className="ag-api-key-group-name-chip inline-flex h-6 min-w-0 max-w-full items-center justify-center gap-1 rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none text-text-secondary"
                           style={GROUP_CHIP_STYLE}
                           title={groupName}
                         >
                           {isGroupUnbound ? <AlertTriangle className="h-3 w-3 shrink-0 text-warning" /> : null}
                           <span className="min-w-0 truncate">{groupName}</span>
                         </span>
+                        {hasGroupRate ? (
+                          <span
+                            className="ag-api-key-effective-rate-chip"
+                            title={`${t('user_keys.effective_rate_short', '综合倍率')} ${formatRateValue(effectiveRate)}`}
+                          >
+                            <span>{t('user_keys.effective_rate_chip', '综合')}</span>
+                            <span className="ag-api-key-effective-rate-chip-value">{formatRateValue(effectiveRate)}</span>
+                          </span>
+                        ) : null}
                       </div>
-                      {(group || hasSellRate) && (
-                        <MetricChips
-                          className="ag-metric-chips--stack ag-metric-chips--markup"
-                          items={[
-                            {
-                              color: 'default' as const,
-                              label: t('user_keys.group_sell_rate_short', '分组倍率x销售倍率'),
-                              value: `${formatRateValue(groupRate)}x${formatRateValue(sellRate)}`,
-                            },
-                          ]}
-                        />
+                      {(hasGroupRate || hasSellRate) && (
+                        <div
+                          className="ag-api-key-rate-row"
+                          title={`${t('user_keys.group_sell_rate_short', '分组倍率x销售倍率')} ${formatRateValue(groupRate)}x${formatRateValue(sellRate)}`}
+                        >
+                          <span className="ag-api-key-rate-label">
+                            {t('user_keys.group_sell_rate_short', '分组倍率x销售倍率')}
+                          </span>
+                          <span className="ag-api-key-rate-value">
+                            {formatRateValue(groupRate)}x{formatRateValue(sellRate)}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </CommonTable.Cell>

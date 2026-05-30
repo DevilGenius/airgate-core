@@ -17,6 +17,7 @@ type Key struct {
 	PlainKey        string
 	UserID          int
 	GroupID         *int
+	GroupRate       float64 // 所属分组对该用户生效的实际扣费倍率（未绑定分组时为 0）
 	IPWhitelist     []string
 	IPBlacklist     []string
 	QuotaUSD        float64
