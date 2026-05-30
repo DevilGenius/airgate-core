@@ -33,7 +33,6 @@ import {
   Sun,
   Moon,
   Menu,
-  ShieldCheck,
   BookOpen,
   MessageCircle,
   Github,
@@ -116,7 +115,9 @@ function usePluginMenuItems(isAdmin: boolean, isAPIKeySession: boolean): {
     let firstAdmin = true;
     let firstUser = true;
 
-    for (const p of data.list) {
+    const sortedPlugins = [...data.list].sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const p of sortedPlugins) {
       if (!p.frontend_pages?.length) continue;
       for (const page of p.frontend_pages) {
         const audience = page.audience || 'admin';
@@ -240,6 +241,10 @@ export function AppShell({ children }: AppShellProps) {
   const roleLabel = user?.role === 'api_key'
     ? 'API Key'
     : isAdmin ? t('users.role_admin', 'Admin') : t('users.role_user', 'User');
+  const balanceValue = typeof user?.balance === 'number' && Number.isFinite(user.balance)
+    ? user.balance
+    : null;
+  const balanceText = balanceValue === null ? '' : `$${balanceValue.toFixed(4)}`;
   useEffect(() => {
     document.title = site.site_name || 'AirGate';
   }, [site.site_name]);
@@ -495,6 +500,17 @@ export function AppShell({ children }: AppShellProps) {
             <div className="mx-1.5 hidden h-6 w-px bg-border sm:block" />
 
             <div className="hidden items-center gap-2.5 pl-1 sm:flex">
+              {!isAPIKeySession && balanceValue !== null && (
+                <div
+                  className="flex h-7 items-center rounded-[calc(var(--radius)-2px)] bg-success-subtle px-2.5 text-text"
+                  title={`${t('user_overview.balance', 'Balance')}: ${balanceText}`}
+                >
+                  <span className="font-mono text-sm font-bold tabular-nums">
+                    <span className="text-success">$</span>
+                    {balanceValue.toFixed(4)}
+                  </span>
+                </div>
+              )}
               {!isAPIKeySession && (
                 <div className="hidden text-right md:block">
                   <p className="text-sm font-medium leading-tight text-text">
@@ -503,15 +519,6 @@ export function AppShell({ children }: AppShellProps) {
                   <p className="text-xs leading-tight text-text-tertiary">
                     {user?.email}
                   </p>
-                </div>
-              )}
-              {isAdmin ? (
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)] text-primary">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-              ) : (
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)] text-sm font-bold text-primary">
-                  {(user?.username || user?.email || 'U').charAt(0).toUpperCase()}
                 </div>
               )}
             </div>

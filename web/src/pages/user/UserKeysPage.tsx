@@ -45,6 +45,12 @@ import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
 import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
 
+function formatRateValue(rate: number | null | undefined) {
+  if (typeof rate !== 'number' || !Number.isFinite(rate)) return '—';
+  const fixed = rate.toFixed(2);
+  return fixed.endsWith('00') ? rate.toFixed(1) : fixed.replace(/0$/, '');
+}
+
 export default function UserKeysPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -350,6 +356,8 @@ export default function UserKeysPage() {
                 userOverride > 0 &&
                 group != null &&
                 userOverride !== group.rate_multiplier;
+              const groupRate = hasOverride && userOverride != null ? userOverride : group?.rate_multiplier;
+              const sellRate = hasSellRate && row.sell_rate != null ? row.sell_rate : 1;
               const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
               const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
               const displayStatus = isExpired ? 'expired' : row.status;
@@ -381,18 +389,11 @@ export default function UserKeysPage() {
                         <MetricChips
                           className="ag-metric-chips--stack ag-metric-chips--markup"
                           items={[
-                            ...(group ? [{
+                            {
                               color: 'default' as const,
-                              label: t('user_keys.group_rate_short', '分组倍率'),
-                              value: hasOverride && userOverride != null
-                                ? `${userOverride.toFixed(2)} ${t('user_keys.user_override_tag', '专属')}`
-                                : group.rate_multiplier.toFixed(2),
-                            }] : []),
-                            ...(hasSellRate ? [{
-                              color: 'default' as const,
-                              label: t('user_keys.sell_rate_short', '销售倍率'),
-                              value: row.sell_rate!.toFixed(2),
-                            }] : []),
+                              label: t('user_keys.group_sell_rate_short', '分组倍率x销售倍率'),
+                              value: `${formatRateValue(groupRate)}x${formatRateValue(sellRate)}`,
+                            },
                           ]}
                         />
                       )}
@@ -424,11 +425,6 @@ export default function UserKeysPage() {
                     <MetricChips
                       className="ag-metric-chips--stack ag-metric-chips--markup"
                       items={[
-                        {
-                          color: 'default',
-                          label: t('user_keys.sell_rate_short', '倍率'),
-                          value: hasSellRate ? row.sell_rate.toFixed(2) : '—',
-                        },
                         {
                           amount: row.used_quota_actual || 0,
                           color: 'default',

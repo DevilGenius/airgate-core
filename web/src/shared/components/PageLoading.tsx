@@ -26,7 +26,7 @@ export function FullPageLoading() {
 
 export function ChatPageLoading() {
   return (
-    <div className="h-full min-h-0 bg-bg text-text">
+    <div data-full-bleed className="h-full min-h-0 bg-bg text-text">
       <TopLoadingLine />
     </div>
   );

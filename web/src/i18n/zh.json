@@ -129,12 +129,16 @@
     "back_to_console": "返回控制台"
   },
 
-  "plugin_shell": {
-    "breadcrumbs": "面包屑",
-    "console": "控制台",
-    "workspace": "插件工作区",
-    "plugin_workbench": "{{name}}插件工作台",
-    "playground_title": "AI 对话"
+  "plugin_pages": {
+    "studio": {
+      "title": "创作中心"
+    },
+    "payment_epay": {
+      "recharge": "充值",
+      "orders": "充值记录",
+      "admin_orders": "支付订单",
+      "providers": "支付服务商"
+    }
   },
 
   "auth": {
@@ -997,6 +1001,7 @@
     "group_unbound": "未绑定分组",
     "group_unbound_hint": "该 API 密钥当前未绑定分组，暂时无法生成使用配置。请联系管理员重新绑定分组后再试。",
     "group_rate_short": "分组倍率",
+    "group_sell_rate_short": "分组倍率x销售倍率",
     "group_rate_default": "分组默认",
     "user_override_tag": "专属",
     "markup_title": "销售/成本",
@@ -1066,6 +1071,10 @@
   "playground": {
     "title": "AI 对话",
     "workflow_title": "创作中心",
+    "studio_landing_subtitle": "输入提示词，AI 为你生成图片",
+    "studio_tab_inspiration": "灵感",
+    "studio_tab_create": "创作",
+    "studio_use_template": "使用",
     "studio_created_at": "创建于",
     "studio_asset_expiring": "还有 {{time}} 过期，请尽快保存",
     "studio_asset_expired": "已过期，请立即保存",

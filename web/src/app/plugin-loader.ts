@@ -53,7 +53,6 @@ const SHARED_MODULES = [
   'react-dom',
   'react/jsx-runtime',
   'react-i18next',
-  '@devilgenius/airgate-core/plugin-ui',
 ];
 const pluginFrontendCache = new Map<string, Promise<PluginFrontendModule | null>>();
 const pluginFrontendCacheListeners = new Set<(pluginId?: string) => void>();

@@ -129,12 +129,16 @@
     "back_to_console": "Back to Console"
   },
 
-  "plugin_shell": {
-    "breadcrumbs": "Breadcrumbs",
-    "console": "Console",
-    "workspace": "Plugin workspace",
-    "plugin_workbench": "{{name}} plugin workbench",
-    "playground_title": "AI Chat"
+  "plugin_pages": {
+    "studio": {
+      "title": "Creative Studio"
+    },
+    "payment_epay": {
+      "recharge": "Recharge",
+      "orders": "Recharge Records",
+      "admin_orders": "Payment Orders",
+      "providers": "Payment Providers"
+    }
   },
 
   "auth": {
@@ -994,6 +998,7 @@
     "group_unbound": "Unbound Group",
     "group_unbound_hint": "This API key is currently not bound to any group, so usage configuration cannot be generated. Please ask an administrator to bind it to a group first.",
     "group_rate_short": "Group Rate",
+    "group_sell_rate_short": "Group Rate x Sell Rate",
     "group_rate_default": "Group default",
     "user_override_tag": "override",
     "markup_title": "Sales/Cost",
@@ -1063,6 +1068,10 @@
   "playground": {
     "title": "AI Chat",
     "workflow_title": "Creative Studio",
+    "studio_landing_subtitle": "Enter a prompt and let AI generate images for you",
+    "studio_tab_inspiration": "Inspiration",
+    "studio_tab_create": "Create",
+    "studio_use_template": "Use",
     "studio_created_at": "Created",
     "studio_asset_expiring": "Expires in {{time}}. Save it soon.",
     "studio_asset_expired": "Expired. Save a local copy now.",

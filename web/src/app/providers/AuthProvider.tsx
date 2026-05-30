@@ -27,6 +27,8 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
+const USER_BALANCE_EVENT = 'airgate:user-balance-updated';
+
 function normalizeSessionUser(user: UserResp, token = getToken()): UserResp {
   const role = getTokenRole(token);
   const apiKeyID = getTokenAPIKeyID(token);
@@ -73,6 +75,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const handleUserBalanceUpdate = (event: Event) => {
+      const balance = (event as CustomEvent<{ balance?: unknown }>).detail?.balance;
+      if (typeof balance !== 'number' || !Number.isFinite(balance)) return;
+
+      setUser((current) => (
+        current ? { ...current, balance } : current
+      ));
+    };
+
+    window.addEventListener(USER_BALANCE_EVENT, handleUserBalanceUpdate);
+    return () => window.removeEventListener(USER_BALANCE_EVENT, handleUserBalanceUpdate);
   }, []);
 
   const login = useCallback((token: string, userData: UserResp) => {
