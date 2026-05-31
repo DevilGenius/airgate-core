@@ -8,6 +8,8 @@
   --ag-compact-table-cell-gap: 0.5rem;
   --ag-compact-table-cell-px: 0.75rem;
   --ag-compact-table-empty-min-height: 7rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .ag-compact-data-table--dense {
@@ -20,6 +22,12 @@
   --ag-compact-table-empty-min-height: 5rem;
 }
 
+.ag-compact-data-table > :where([data-slot="wrapper"]) {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
 .ag-compact-data-table :where([data-slot="wrapper"]:has(> [data-slot="table"])) {
   border: 0 !important;
   border-radius: 0 !important;
@@ -28,6 +36,7 @@
 }
 
 .ag-compact-data-table :where([data-slot="table"], .table__content) {
+  width: 100%;
   table-layout: fixed;
 }
 
@@ -113,6 +122,7 @@
 
 .ag-distribution-card-body {
   min-height: 0;
+  align-items: center;
 }
 
 .ag-distribution-chart-frame {
@@ -126,6 +136,7 @@
 }
 
 .ag-distribution-table-scroll {
+  width: 100%;
   min-width: 0;
   max-height: 11rem;
   overflow-y: auto;
