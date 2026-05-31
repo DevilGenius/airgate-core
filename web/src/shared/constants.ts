@@ -9,12 +9,13 @@ export const FETCH_ALL_PARAMS = { page: 1, page_size: 100 } as const;
 
 /** 使用记录 Token 指标色，表格与趋势图共用 */
 export const USAGE_TOKEN_COLORS = {
-  input: '#10b981',
-  output: '#0ea5e9',
-  cacheCreation: '#f59e0b',
-  cacheRead: 'var(--ag-muted)',
-  cacheRatio: '#c084fc',
-  cacheCumulativeRatio: 'var(--success)',
+  input: 'var(--ag-usage-token-input)',
+  output: 'var(--ag-usage-token-output)',
+  reasoning: 'var(--ag-usage-token-reasoning)',
+  cacheCreation: 'var(--ag-usage-token-cache-creation)',
+  cacheRead: 'var(--ag-usage-token-cache-read)',
+  cacheRatio: 'var(--ag-usage-token-cache-ratio)',
+  cacheCumulativeRatio: 'var(--ag-usage-token-cache-cumulative-ratio)',
 } as const;
 
 /** 饼图专用低饱和调色板，避免分布图在黑色主题下过于刺眼 */

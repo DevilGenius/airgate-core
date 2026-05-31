@@ -33,6 +33,7 @@ $BackendPidFile = Join-Path $StateDir "backend.pid"
 $FrontendPidFile = Join-Path $StateDir "frontend.pid"
 $BackendOut = Join-Path $BackendDir "tmp\backend.out.log"
 $BackendErr = Join-Path $BackendDir "tmp\backend.err.log"
+$BackendDevExe = Join-Path $BackendDir "tmp\airgate-core-dev.exe"
 $FrontendOut = Join-Path $WebDir "tmp\frontend.out.log"
 $FrontendErr = Join-Path $WebDir "tmp\frontend.err.log"
 $FrontendDevPort = 80
@@ -160,6 +161,13 @@ function Invoke-InDir([string]$Directory, [string]$Command) {
 
 function Get-GoEnvCommand([string]$Command) {
   "`$env:GOTOOLCHAIN = 'local'; `$env:GOPRIVATE = 'github.com/DevilGenius/airgate-sdk'; `$env:GONOPROXY = 'github.com/DevilGenius/airgate-sdk'; `$env:GONOSUMDB = 'github.com/DevilGenius/airgate-sdk'; $Command"
+}
+
+function Set-GoEnvVars {
+  $env:GOTOOLCHAIN = "local"
+  $env:GOPRIVATE = "github.com/DevilGenius/airgate-sdk"
+  $env:GONOPROXY = "github.com/DevilGenius/airgate-sdk"
+  $env:GONOSUMDB = "github.com/DevilGenius/airgate-sdk"
 }
 
 function Assert-Command([string]$Name) {
@@ -400,64 +408,264 @@ function Build-All {
   }
 }
 
-function Get-ChildProcessIds([int]$RootProcessId) {
-  $all = Get-CimInstance Win32_Process
-  $result = New-Object System.Collections.Generic.List[int]
-
-  function Add-Children([int]$ParentId) {
-    $children = $all | Where-Object { $_.ParentProcessId -eq $ParentId }
-    foreach ($child in $children) {
-      Add-Children ([int]$child.ProcessId)
-      $result.Add([int]$child.ProcessId)
+function Build-BackendDevBinary {
+  Write-Step "building backend dev binary"
+  Push-Location $BackendDir
+  try {
+    Set-GoEnvVars
+    & go build -o $BackendDevExe ./cmd/server
+    if ($LASTEXITCODE -ne 0) {
+      throw "Command failed with exit code ${LASTEXITCODE}: go build -o $BackendDevExe ./cmd/server"
     }
-  }
-
-  Add-Children $RootProcessId
-  $result.Add($RootProcessId)
-  $result | Select-Object -Unique
-}
-
-function Stop-ProcessTree([int]$RootProcessId) {
-  if (-not (Get-Process -Id $RootProcessId -ErrorAction SilentlyContinue)) {
-    return
-  }
-
-  $ids = Get-ChildProcessIds $RootProcessId
-  foreach ($id in $ids) {
-    Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+  } finally {
+    Pop-Location
   }
 }
 
-function Stop-FromPidFile([string]$Name, [string]$PidFile) {
+function Get-ProcessStartTimeUtc([int]$ProcessId) {
+  $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+  if (-not $proc) {
+    return $null
+  }
+
+  try {
+    $proc.StartTime.ToUniversalTime()
+  } catch {
+    $null
+  }
+}
+
+function Get-ProcessSnapshot([int]$ProcessId) {
+  $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+  if (-not $proc) {
+    return $null
+  }
+
+  $startTime = $null
+  try {
+    $startTime = $proc.StartTime.ToUniversalTime()
+  } catch {
+  }
+
+  $path = ""
+  try {
+    $path = [string]$proc.Path
+  } catch {
+  }
+
+  [pscustomobject]@{
+    pid = $ProcessId
+    processName = [string]$proc.ProcessName
+    processPath = $path
+    startTimeUtc = $startTime
+    startTimeTicks = if ($startTime) { $startTime.Ticks } else { $null }
+  }
+}
+
+function Write-PidFile([string]$PidFile, [int]$ProcessId, [string]$Role) {
+  $snapshot = Get-ProcessSnapshot $ProcessId
+  $state = [pscustomobject]@{
+    pid = $ProcessId
+    role = $Role
+    processName = if ($snapshot) { $snapshot.processName } else { $null }
+    processPath = if ($snapshot) { $snapshot.processPath } else { $null }
+    startTimeUtc = if ($snapshot -and $snapshot.startTimeUtc) { $snapshot.startTimeUtc.ToString("O") } else { $null }
+    startTimeTicks = if ($snapshot) { $snapshot.startTimeTicks } else { $null }
+  }
+
+  $state | ConvertTo-Json -Compress | Set-Content -Path $PidFile
+}
+
+function Read-PidFile([string]$PidFile) {
   if (-not (Test-Path $PidFile)) {
-    Write-Step "$Name pid file not found"
-    return
+    return $null
   }
 
   $raw = (Get-Content -Raw $PidFile).Trim()
   if ($raw -match "^\d+$") {
-    Write-Step "stopping $Name pid $raw"
-    Stop-ProcessTree ([int]$raw)
+    return [pscustomobject]@{
+      pid = [int]$raw
+      role = $null
+      startTimeUtc = $null
+      legacy = $true
+    }
+  }
+
+  try {
+    $state = $raw | ConvertFrom-Json
+    if ($null -eq $state.pid -or -not ([string]$state.pid -match "^\d+$")) {
+      return $null
+    }
+
+    [pscustomobject]@{
+      pid = [int]$state.pid
+      role = [string]$state.role
+      processName = [string]$state.processName
+      processPath = [string]$state.processPath
+      startTimeUtc = [string]$state.startTimeUtc
+      startTimeTicks = if ($null -ne $state.startTimeTicks -and [string]$state.startTimeTicks -match "^\d+$") { [int64]$state.startTimeTicks } else { $null }
+      legacy = $false
+    }
+  } catch {
+    $null
+  }
+}
+
+function Test-PidStateMatchesProcess($State) {
+  if ($null -eq $State -or -not (Get-Process -Id $State.pid -ErrorAction SilentlyContinue)) {
+    return $false
+  }
+
+  if ($State.legacy) {
+    return $false
+  }
+
+  if ([string]::IsNullOrWhiteSpace($State.startTimeUtc)) {
+    if ($null -eq $State.startTimeTicks) {
+      return $false
+    }
+  }
+
+  $actual = Get-ProcessSnapshot $State.pid
+  if (-not $actual) {
+    return $false
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($State.processName) -and $actual.processName -ne $State.processName) {
+    return $false
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($State.processPath) -and -not [string]::IsNullOrWhiteSpace($actual.processPath)) {
+    if ($actual.processPath -ne $State.processPath) {
+      return $false
+    }
+  }
+
+  if ($null -ne $State.startTimeTicks -and $null -ne $actual.startTimeTicks) {
+    return [math]::Abs($actual.startTimeTicks - $State.startTimeTicks) -le ([timespan]::FromSeconds(10).Ticks)
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($State.startTimeUtc) -and $actual.startTimeUtc) {
+    try {
+      $expected = ([datetime]$State.startTimeUtc).ToUniversalTime()
+      return [math]::Abs(($actual.startTimeUtc - $expected).TotalSeconds) -le 10
+    } catch {
+      return $false
+    }
+  }
+
+  $false
+}
+
+function Stop-ProcessId([int]$ProcessId, [switch]$Tree) {
+  if ($ProcessId -eq $PID) {
+    Write-Step "refusing to stop current shell pid $ProcessId"
+    return
+  }
+  if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) {
+    return
+  }
+
+  if ($Tree) {
+    & taskkill.exe /PID $ProcessId /T /F 2>$null | Out-Null
+  } else {
+    Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+  }
+
+  try {
+    Wait-Process -Id $ProcessId -Timeout 3 -ErrorAction SilentlyContinue
+  } catch {
+  }
+
+  if (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) {
+    Write-Step "pid $ProcessId did not exit within timeout"
+  }
+}
+
+function Stop-FromPidFile([string]$Name, [string]$PidFile, [switch]$Tree, [int[]]$FallbackPorts = @(), [string[]]$FallbackProcessNames = @()) {
+  if (-not (Test-Path $PidFile)) {
+    if ($FallbackPorts.Count -gt 0) {
+      Write-Step "$Name pid file not found; stopping matching listener ports instead"
+      Stop-PortListeners $FallbackPorts -ExpectedProcessNames $FallbackProcessNames
+    } else {
+      Write-Step "$Name pid file not found"
+    }
+    return
+  }
+
+  $state = Read-PidFile $PidFile
+  if (-not $state) {
+    Write-Step "$Name pid file is invalid; removing $PidFile"
+    Remove-Item -Force $PidFile -ErrorAction SilentlyContinue
+    return
+  }
+
+  if ($state.legacy -and $FallbackPorts.Count -gt 0) {
+    Write-Step "$Name pid file is legacy; stopping matching listener ports instead"
+    Stop-PortListeners $FallbackPorts -ExpectedProcessNames $FallbackProcessNames
+    Remove-Item -Force $PidFile -ErrorAction SilentlyContinue
+    return
+  }
+
+  if ($state.legacy) {
+    Write-Step "$Name pid file is legacy and cannot be safely validated; removing pid file only"
+    Remove-Item -Force $PidFile -ErrorAction SilentlyContinue
+    return
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($state.role) -and $state.role -ne $Name) {
+    if ($FallbackPorts.Count -gt 0) {
+      Write-Step "$Name pid file role mismatch ($($state.role)); stopping matching listener ports instead"
+      Stop-PortListeners $FallbackPorts -ExpectedProcessNames $FallbackProcessNames
+    } else {
+      Write-Step "$Name pid file role mismatch ($($state.role)); removing pid file only"
+    }
+    Remove-Item -Force $PidFile -ErrorAction SilentlyContinue
+    return
+  }
+
+  if (Test-PidStateMatchesProcess $state) {
+    Write-Step "stopping $Name pid $($state.pid)"
+    Stop-ProcessId $state.pid -Tree:$Tree
+  } else {
+    if ($FallbackPorts.Count -gt 0) {
+      Write-Step "$Name pid $($state.pid) is stale or reused; stopping matching listener ports instead"
+      Stop-PortListeners $FallbackPorts -ExpectedProcessNames $FallbackProcessNames
+    } else {
+      Write-Step "$Name pid $($state.pid) is stale or reused; removing pid file only"
+    }
   }
   Remove-Item -Force $PidFile -ErrorAction SilentlyContinue
 }
 
-function Stop-PortListeners([int[]]$Ports) {
+function Stop-PortListeners([int[]]$Ports, [string[]]$ExpectedProcessNames = @()) {
   foreach ($port in $Ports) {
     $listeners = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     foreach ($listener in $listeners) {
-      Write-Step "force stopping listener on port $port pid $($listener.OwningProcess)"
-      Stop-ProcessTree ([int]$listener.OwningProcess)
+      $listenerPid = [int]$listener.OwningProcess
+      if ($listenerPid -le 0 -or $listenerPid -eq $PID) {
+        continue
+      }
+
+      $proc = Get-Process -Id $listenerPid -ErrorAction SilentlyContinue
+      if ($ExpectedProcessNames.Count -gt 0 -and (-not $proc -or $ExpectedProcessNames -notcontains $proc.ProcessName)) {
+        $processName = if ($proc) { $proc.ProcessName } else { "unknown" }
+        Write-Step "skipping listener on port $port pid $listenerPid process $processName"
+        continue
+      }
+
+      Write-Step "force stopping listener on port $port pid $listenerPid"
+      Stop-ProcessId $listenerPid -Tree
     }
   }
 }
 
 function Stop-Dev {
   foreach ($plugin in $PluginSpecs) {
-    Stop-FromPidFile "$($plugin.Name) web watch" $plugin.WatchPidFile
+    Stop-FromPidFile "$($plugin.Name) web watch" $plugin.WatchPidFile -Tree
   }
-  Stop-FromPidFile "frontend" $FrontendPidFile
-  Stop-FromPidFile "backend" $BackendPidFile
+  Stop-FromPidFile "frontend" $FrontendPidFile -Tree -FallbackPorts @($FrontendDevPort) -FallbackProcessNames @("node")
+  Stop-FromPidFile "backend" $BackendPidFile -Tree -FallbackPorts @(9517) -FallbackProcessNames @("airgate-core-dev", "server")
 
   if ($ForcePortStop) {
     Stop-PortListeners @($FrontendDevPort, 9517)
@@ -489,7 +697,7 @@ function Start-PluginWatchers {
       -RedirectStandardOutput $plugin.WatchOut `
       -RedirectStandardError $plugin.WatchErr `
       -PassThru
-    Set-Content -Path $plugin.WatchPidFile -Value $watch.Id
+    Write-PidFile $plugin.WatchPidFile $watch.Id "$($plugin.Name) web watch"
     Write-Step "$($plugin.Name) web watch starting, pid $($watch.Id), logs: $($plugin.WatchOut)"
   }
 }
@@ -518,19 +726,20 @@ function Start-Dev {
   }
 
   $configFile = Write-DevConfig
-  $configArg = $configFile.Replace("'", "''")
+  $configArg = "`"$configFile`""
   Remove-Item -Force $BackendOut, $BackendErr, $FrontendOut, $FrontendErr -ErrorAction SilentlyContinue
+  Build-BackendDevBinary
   Start-PluginWatchers
 
   $backend = Start-Process `
-    -FilePath "pwsh" `
-    -ArgumentList @("-NoLogo", "-NoProfile", "-Command", (Get-GoEnvCommand "go run ./cmd/server --config '$configArg'")) `
+    -FilePath $BackendDevExe `
+    -ArgumentList @("--config", $configArg) `
     -WorkingDirectory $BackendDir `
     -WindowStyle Hidden `
     -RedirectStandardOutput $BackendOut `
     -RedirectStandardError $BackendErr `
     -PassThru
-  Set-Content -Path $BackendPidFile -Value $backend.Id
+  Write-PidFile $BackendPidFile $backend.Id "backend"
 
   $frontend = Start-Process `
     -FilePath "pwsh" `
@@ -540,7 +749,7 @@ function Start-Dev {
     -RedirectStandardOutput $FrontendOut `
     -RedirectStandardError $FrontendErr `
     -PassThru
-  Set-Content -Path $FrontendPidFile -Value $frontend.Id
+  Write-PidFile $FrontendPidFile $frontend.Id "frontend"
 
   Write-Step "backend starting, pid $($backend.Id), logs: $BackendOut"
   Write-Step "frontend starting, pid $($frontend.Id), logs: $FrontendOut"
@@ -582,7 +791,8 @@ function Show-Status {
   Write-Host "Backend log:  $BackendOut"
   Write-Host "Frontend log: $FrontendOut"
   foreach ($plugin in $PluginSpecs) {
-    $watchPid = if (Test-Path $plugin.WatchPidFile) { (Get-Content -Raw $plugin.WatchPidFile).Trim() } else { "" }
+    $watchState = Read-PidFile $plugin.WatchPidFile
+    $watchPid = if ($watchState) { $watchState.pid } else { "" }
     $devLoaded = if (Test-Path (Join-Path $plugin.WebDist "index.js")) { "web dist ok" } else { "web dist missing" }
     Write-Host "$($plugin.Name): $devLoaded, watch pid $watchPid, log: $($plugin.WatchOut)"
   }

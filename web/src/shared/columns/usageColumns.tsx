@@ -85,11 +85,13 @@ function TooltipPanel({
 function TooltipRow({
   color,
   label,
+  strong,
   tone,
   value,
 }: {
   color?: string;
   label: ReactNode;
+  strong?: boolean;
   tone?: 'accent' | 'info' | 'strong' | 'success' | 'warning';
   value: ReactNode;
 }) {
@@ -109,7 +111,7 @@ function TooltipRow({
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,max-content)] items-center gap-3 rounded-[var(--radius)] bg-surface px-2 py-1 text-xs">
       <span className="min-w-0 truncate text-text-tertiary">{label}</span>
       <span
-        className={`min-w-0 max-w-[12rem] justify-self-end truncate text-right font-mono font-medium ${toneClass}`}
+        className={`min-w-0 max-w-[12rem] justify-self-end truncate text-right font-mono ${strong ? 'font-semibold' : 'font-medium'} ${toneClass}`}
         style={color ? { color } : undefined}
       >
         {value}
@@ -322,12 +324,13 @@ function formatMetricValue(metric: MetricDisplay): string {
 }
 
 function metricColor(metric: MetricDisplay, index: number): string | undefined {
-  const key = metric.key;
+  const key = normalizeUsageKey(metric.key);
+  if (key.includes('reasoning')) return USAGE_TOKEN_COLORS.reasoning;
   if (key.includes('input') && !key.includes('cached')) return USAGE_TOKEN_COLORS.input;
   if (key.includes('output')) return USAGE_TOKEN_COLORS.output;
   if (key.includes('cache_read') || key.includes('cached_input')) return USAGE_TOKEN_COLORS.cacheRead;
   if (key.includes('cache_creation')) return USAGE_TOKEN_COLORS.cacheCreation;
-  if (metric.kind === 'image') return 'var(--ag-success)';
+  if (metric.kind === 'image') return 'var(--ag-text)';
   return [USAGE_TOKEN_COLORS.input, USAGE_TOKEN_COLORS.output, USAGE_TOKEN_COLORS.cacheRead, USAGE_TOKEN_COLORS.cacheCreation][index % 4];
 }
 
@@ -337,7 +340,7 @@ function rowMetrics(row: UsageRow): MetricDisplay[] {
     { key: 'input_tokens', label: '输入 Token', kind: 'token', unit: 'token', value: row.input_tokens },
     { key: 'output_tokens', label: '输出 Token', kind: 'token', unit: 'token', value: row.output_tokens },
     { key: 'cached_input_tokens', label: '缓存读取 Token', kind: 'token', unit: 'token', value: row.cached_input_tokens },
-    { key: 'cache_creation_tokens', label: '缓存写入 Token', kind: 'token', unit: 'token', value: cacheCreation },
+    { key: 'cache_creation_tokens', label: '缓存创建 Token', kind: 'token', unit: 'token', value: cacheCreation },
   ];
   const imageCount = usageMetadataNumber(row.usage_metadata ?? {}, ['openai.image.count']);
   if (imageCount > 0) {
@@ -399,7 +402,7 @@ function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
           label={metric.label || metric.key || t('usage.metric', '计量')}
           value={isOutputMetric(metric) && reasoningTokens > 0 ? (
             <span className="inline-flex min-w-0 max-w-full items-baseline justify-end gap-1">
-              <span className="min-w-0 truncate text-text-tertiary">(推理 {formatMetricNumber(reasoningTokens)})</span>
+              <span className="min-w-0 truncate" style={{ color: USAGE_TOKEN_COLORS.reasoning }}>(推理 {formatMetricNumber(reasoningTokens)})</span>
               <span className="shrink-0">{formatMetricValue(metric)}</span>
             </span>
           ) : formatMetricValue(metric)}
@@ -409,7 +412,7 @@ function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
       {shouldShowTokenTotal && (
         <>
           <TooltipDivider />
-          <TooltipRow label={t('usage.total_tokens')} value={Number(tokenTotal).toLocaleString()} tone="strong" />
+          <TooltipRow label={t('usage.total_tokens')} value={Number(tokenTotal).toLocaleString()} tone="strong" strong />
         </>
       )}
     </TooltipPanel>
@@ -445,7 +448,7 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                   <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
                 )}
                 {row.cache_creation_price > 0 && (
-                  <TooltipRow label={t('usage.cache_creation_unit_price', '缓存写入单价')} value={`$${row.cache_creation_price.toFixed(4)} / 1M Token`} />
+                  <TooltipRow label={t('usage.cache_creation_unit_price', '缓存创建单价')} value={`$${row.cache_creation_price.toFixed(4)} / 1M Token`} />
                 )}
                 {row.cached_input_cost > 0 && (
                   <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
@@ -526,7 +529,8 @@ function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
  * 使用记录表格的共享列定义。
  * 管理端和用户端共用，管理端额外在前面插入 user / api_key / account 列。
  *
- * customerScope=true 时切换为 end customer 视角的成本列，避免读取后端剥离过的字段。
+ * customerScope=true 只切换 end customer 视角的成本列，避免读取后端剥离过的字段。
+ * token 计量列和 tooltip 使用同一套可展示字段渲染，保留调用方传入的 scope 语义。
  */
 export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: boolean }): UsageColumnConfig<UsageRow>[] {
   const { t } = useTranslation();

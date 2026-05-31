@@ -88,6 +88,14 @@ html[data-theme="dark"] {
   --segment: var(--ag-segment);
   --segment-foreground: var(--ag-segment-foreground);
 
+  --ag-usage-token-input: #10b981;
+  --ag-usage-token-output: #0ea5e9;
+  --ag-usage-token-reasoning: var(--ag-text-secondary);
+  --ag-usage-token-cache-creation: #f59e0b;
+  --ag-usage-token-cache-read: var(--ag-muted);
+  --ag-usage-token-cache-ratio: #c084fc;
+  --ag-usage-token-cache-cumulative-ratio: var(--success);
+
   --backdrop: rgba(0, 0, 0, 0.5);
   --surface-shadow:
     0 2px 4px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.06),
