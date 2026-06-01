@@ -105,8 +105,14 @@ func writeUnauthenticated(c *gin.Context) {
 }
 
 func requestPath(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
 	if p := c.Param("path"); p != "" {
 		return p
+	}
+	if c.Request == nil || c.Request.URL == nil {
+		return ""
 	}
 	return c.Request.URL.Path
 }
