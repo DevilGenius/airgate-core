@@ -92,6 +92,58 @@ func TestParseBodyContinuationSignalsWithToolCallContext(t *testing.T) {
 	}
 }
 
+func TestParseBodyEncryptedContentRequiresContinuationAffinity(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"model":"gpt-5.4","input":[{"type":"reasoning","id":"rs_1","encrypted_content":"sealed"}]}`)
+	parsed := parseBody(body, "application/json")
+	if !parsed.HasEncryptedContent {
+		t.Fatalf("HasEncryptedContent = false, want true")
+	}
+	if !requestRequiresContinuationAffinity(parsed) {
+		t.Fatalf("requestRequiresContinuationAffinity = false, want true")
+	}
+}
+
+func TestParseBodyEncryptedContentSingleObjectRequiresContinuationAffinity(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"model":"gpt-5.4","input":{"type":"reasoning","id":"rs_1","encrypted_content":"sealed"}}`)
+	parsed := parseBody(body, "application/json")
+	if !parsed.HasEncryptedContent {
+		t.Fatalf("HasEncryptedContent = false, want true")
+	}
+	if !requestRequiresContinuationAffinity(parsed) {
+		t.Fatalf("requestRequiresContinuationAffinity = false, want true")
+	}
+}
+
+func TestParseBodyEncryptedContentIncludeDoesNotRequireContinuationAffinity(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"model":"gpt-5.4","include":["reasoning.encrypted_content"],"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}]}`)
+	parsed := parseBody(body, "application/json")
+	if parsed.HasEncryptedContent {
+		t.Fatalf("HasEncryptedContent = true, want false")
+	}
+	if requestRequiresContinuationAffinity(parsed) {
+		t.Fatalf("requestRequiresContinuationAffinity = true, want false")
+	}
+}
+
+func TestParseBodyEncryptedContentNonReasoningItemDoesNotRequireContinuationAffinity(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"model":"gpt-5.4","input":[{"type":"message","encrypted_content":"extension","content":[{"type":"input_text","text":"hi"}]}]}`)
+	parsed := parseBody(body, "application/json")
+	if parsed.HasEncryptedContent {
+		t.Fatalf("HasEncryptedContent = true, want false")
+	}
+	if requestRequiresContinuationAffinity(parsed) {
+		t.Fatalf("requestRequiresContinuationAffinity = true, want false")
+	}
+}
+
 func TestParseBody_MultipartIgnoresFileParts(t *testing.T) {
 	t.Parallel()
 

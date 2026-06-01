@@ -157,14 +157,15 @@ func parseBody(body []byte, contentType string) parsedRequest {
 		effort := extractAndNormalizeReasoningEffort(fields)
 		signals := analyzeContinuationSignals(fields)
 		return parsedRequest{
-			Model:              fields.Model,
-			Stream:             fields.Stream,
-			SessionID:          strings.TrimSpace(fields.Metadata.UserID),
-			PromptCacheKey:     strings.TrimSpace(fields.PromptCacheKey),
-			PreviousResponseID: strings.TrimSpace(fields.PreviousResponseID),
-			HasToolOutput:      signals.hasToolOutput,
-			HasToolCallContext: signals.hasToolCallContext,
-			ReasoningEffort:    effort,
+			Model:               fields.Model,
+			Stream:              fields.Stream,
+			SessionID:           strings.TrimSpace(fields.Metadata.UserID),
+			PromptCacheKey:      strings.TrimSpace(fields.PromptCacheKey),
+			PreviousResponseID:  strings.TrimSpace(fields.PreviousResponseID),
+			HasToolOutput:       signals.hasToolOutput,
+			HasToolCallContext:  signals.hasToolCallContext,
+			HasEncryptedContent: signals.hasEncryptedContent,
+			ReasoningEffort:     effort,
 		}
 	}
 	if strings.HasPrefix(contentType, "multipart/") {
@@ -213,12 +214,14 @@ func firstNonEmpty(values ...string) string {
 
 func requestRequiresContinuationAffinity(parsed parsedRequest) bool {
 	return strings.TrimSpace(parsed.PreviousResponseID) != "" ||
+		parsed.HasEncryptedContent ||
 		(parsed.HasToolOutput && !parsed.HasToolCallContext)
 }
 
 type continuationSignals struct {
-	hasToolOutput      bool
-	hasToolCallContext bool
+	hasToolOutput       bool
+	hasToolCallContext  bool
+	hasEncryptedContent bool
 }
 
 func analyzeContinuationSignals(fields requestFields) continuationSignals {
@@ -234,6 +237,7 @@ func mergeSignals(dst *continuationSignals, src continuationSignals) {
 	}
 	dst.hasToolOutput = dst.hasToolOutput || src.hasToolOutput
 	dst.hasToolCallContext = dst.hasToolCallContext || src.hasToolCallContext
+	dst.hasEncryptedContent = dst.hasEncryptedContent || src.hasEncryptedContent
 }
 
 func analyzeResponsesInputSignals(raw json.RawMessage) continuationSignals {
@@ -241,22 +245,38 @@ func analyzeResponsesInputSignals(raw json.RawMessage) continuationSignals {
 	if len(raw) == 0 {
 		return signals
 	}
+
 	var items []map[string]any
-	if err := json.Unmarshal(raw, &items); err != nil {
+	if err := json.Unmarshal(raw, &items); err == nil {
+		for _, item := range items {
+			analyzeResponsesInputItemSignals(item, &signals)
+		}
 		return signals
 	}
-	for _, item := range items {
-		itemType, _ := item["type"].(string)
-		switch {
-		case isToolOutputItemType(itemType):
-			signals.hasToolOutput = true
-		case isToolCallContextItemType(itemType):
-			if strings.TrimSpace(asString(item["call_id"])) != "" {
-				signals.hasToolCallContext = true
-			}
-		}
+
+	var item map[string]any
+	if err := json.Unmarshal(raw, &item); err == nil {
+		analyzeResponsesInputItemSignals(item, &signals)
 	}
 	return signals
+}
+
+func analyzeResponsesInputItemSignals(item map[string]any, signals *continuationSignals) {
+	if signals == nil {
+		return
+	}
+	itemType, _ := item["type"].(string)
+	if isReasoningItemWithEncryptedContent(itemType, item) {
+		signals.hasEncryptedContent = true
+	}
+	switch {
+	case isToolOutputItemType(itemType):
+		signals.hasToolOutput = true
+	case isToolCallContextItemType(itemType):
+		if strings.TrimSpace(asString(item["call_id"])) != "" {
+			signals.hasToolCallContext = true
+		}
+	}
 }
 
 func analyzeMessagesSignals(raw json.RawMessage) continuationSignals {
@@ -270,6 +290,9 @@ func analyzeMessagesSignals(raw json.RawMessage) continuationSignals {
 	}
 	for _, msg := range messages {
 		role := strings.ToLower(strings.TrimSpace(asString(msg["role"])))
+		if isReasoningItemWithEncryptedContent(asString(msg["type"]), msg) {
+			signals.hasEncryptedContent = true
+		}
 		if role == "tool" {
 			signals.hasToolOutput = true
 		}
@@ -284,6 +307,13 @@ func analyzeMessagesSignals(raw json.RawMessage) continuationSignals {
 		analyzeMessageContentSignals(msg["content"], &signals)
 	}
 	return signals
+}
+
+func isReasoningItemWithEncryptedContent(itemType string, item map[string]any) bool {
+	if strings.TrimSpace(itemType) != "reasoning" {
+		return false
+	}
+	return strings.TrimSpace(asString(item["encrypted_content"])) != ""
 }
 
 func analyzeMessageContentSignals(content any, signals *continuationSignals) {
@@ -301,6 +331,10 @@ func analyzeMessageContentSignals(content any, signals *continuationSignals) {
 		}
 		itemType := strings.TrimSpace(asString(itemMap["type"]))
 		switch itemType {
+		case "reasoning":
+			if isReasoningItemWithEncryptedContent(itemType, itemMap) {
+				signals.hasEncryptedContent = true
+			}
 		case "tool_result":
 			signals.hasToolOutput = true
 		case "tool_use":

@@ -51,14 +51,15 @@ type forwardExecution struct {
 
 // parsedRequest 从 JSON body 提取的请求元信息。
 type parsedRequest struct {
-	Model              string
-	Stream             bool
-	SessionID          string
-	PromptCacheKey     string
-	PreviousResponseID string
-	HasToolOutput      bool
-	HasToolCallContext bool
-	ReasoningEffort    string // 推理强度档位
+	Model               string
+	Stream              bool
+	SessionID           string
+	PromptCacheKey      string
+	PreviousResponseID  string
+	HasToolOutput       bool
+	HasToolCallContext  bool
+	HasEncryptedContent bool
+	ReasoningEffort     string // 推理强度档位
 }
 
 // requestFields 一次性 Unmarshal 的 JSON 字段结构。
