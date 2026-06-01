@@ -17,8 +17,11 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
+const shouldRetryHeader = "X-Should-Retry"
+
 // openAIError 以 OpenAI 兼容格式返回错误，保证 Claude Code 等客户端能识别。
 func openAIError(c *gin.Context, status int, errType, code, message string) {
+	maybeDisableAutomaticRetry(c, status)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"message": message,
@@ -44,6 +47,16 @@ func openAIRateLimitError(c *gin.Context, status int, code, message string, retr
 		c.Writer.Header().Set("Retry-After-Ms", strconv.FormatInt(retryAfter.Milliseconds(), 10))
 	}
 	openAIError(c, status, "rate_limit_error", code, message)
+}
+
+func maybeDisableAutomaticRetry(c *gin.Context, status int) {
+	if c == nil || status < http.StatusInternalServerError {
+		return
+	}
+	if !isImageSubmitAPIPath(requestPath(c)) {
+		return
+	}
+	c.Writer.Header().Set(shouldRetryHeader, "false")
 }
 
 // writeResult 是一次 forward 的终点。按 outcome.Kind 分派响应写入。

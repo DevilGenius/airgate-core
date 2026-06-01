@@ -167,6 +167,7 @@ func TestWriteAllRoutesFailed_SanitizesUpstreamBody(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
 	body := `{"error":{"message":"upstream secret request ID 349f8894"}}`
 	var summary allRoutesFailureSummary
 	summary.recordExecution(forwardExecution{
@@ -192,6 +193,25 @@ func TestWriteAllRoutesFailed_SanitizesUpstreamBody(t *testing.T) {
 	}
 	if !strings.Contains(got, "上游服务暂不可用") {
 		t.Fatalf("body = %q, want contain sanitized upstream message", got)
+	}
+	if got := recorder.Header().Get(shouldRetryHeader); got != "false" {
+		t.Fatalf("%s = %q, want false", shouldRetryHeader, got)
+	}
+}
+
+func TestWriteAllRoutesFailed_NonImageFailureLeavesRetryHeaderUnset(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+	writeAllRoutesFailed(c, allRoutesFailureSummary{
+		upstreamFailureSeen: true,
+	})
+
+	if got := recorder.Header().Get(shouldRetryHeader); got != "" {
+		t.Fatalf("%s = %q, want empty", shouldRetryHeader, got)
 	}
 }
 

@@ -130,6 +130,8 @@ const META_CHIP_MEDIUM_COLOR = 'rgb(59,130,246)';
 const META_CHIP_HIGH_COLOR = 'rgb(249,115,22)';
 const META_CHIP_XHIGH_COLOR = 'rgb(239,68,68)';
 const META_CHIP_SERVICE_TIER_COLOR = 'rgb(168,85,247)';
+const IMAGE_TIER_1K_MAX_PIXELS = 1536 * 1024;
+const IMAGE_TIER_2K_MAX_PIXELS = 2048 * 2048;
 
 const META_CHIP_EFFORT_COLORS: Record<string, string> = {
   low: META_CHIP_LOW_COLOR,
@@ -178,9 +180,12 @@ function getImageSizeDotColor(imageSize: string): string {
   if (normalized.includes('1k')) return META_CHIP_LOW_COLOR;
 
   const dimensions = normalized.match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) ?? [];
-  const maxDimension = Math.max(0, ...dimensions);
-  if (maxDimension > 2048) return META_CHIP_HIGH_COLOR;
-  if (maxDimension > 1536) return META_CHIP_MEDIUM_COLOR;
+  const [width, height] = dimensions;
+  if (width && height) {
+    const pixels = width * height;
+    if (pixels > IMAGE_TIER_2K_MAX_PIXELS) return META_CHIP_HIGH_COLOR;
+    if (pixels > IMAGE_TIER_1K_MAX_PIXELS) return META_CHIP_MEDIUM_COLOR;
+  }
   return META_CHIP_LOW_COLOR;
 }
 

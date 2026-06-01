@@ -13,6 +13,9 @@ const (
 	imagePrice1KKey = "image_price_1k"
 	imagePrice2KKey = "image_price_2k"
 	imagePrice4KKey = "image_price_4k"
+
+	imageTier1KMaxPixels = 1536 * 1024
+	imageTier2KMaxPixels = 2048 * 2048
 )
 
 func imageBillingCostOverride(usage *sdk.Usage, settings map[string]map[string]string) (float64, bool) {
@@ -88,14 +91,11 @@ func imageTierForSize(size string) (tier string, basePrice float64, ok bool) {
 	if !ok {
 		return "", 0, false
 	}
-	longest := width
-	if height > longest {
-		longest = height
-	}
+	totalPixels := width * height
 	switch {
-	case longest <= 1536:
+	case totalPixels <= imageTier1KMaxPixels:
 		return "1k", 0.10, true
-	case longest <= 2048:
+	case totalPixels <= imageTier2KMaxPixels:
 		return "2k", 0.20, true
 	default:
 		return "4k", 0.40, true

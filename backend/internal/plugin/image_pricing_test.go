@@ -110,6 +110,8 @@ func TestImageTierForSize(t *testing.T) {
 	}{
 		{size: "1024x1024", wantTier: "1k", wantPrice: 0.10},
 		{size: "1672x941", wantTier: "2k", wantPrice: 0.20},
+		{size: "2560x1440", wantTier: "2k", wantPrice: 0.20},
+		{size: "2048x2048", wantTier: "2k", wantPrice: 0.20},
 		{size: "3840x2160", wantTier: "4k", wantPrice: 0.40},
 	}
 
