@@ -91,6 +91,8 @@ html[data-theme="dark"] {
   --ag-usage-token-input: #10b981;
   --ag-usage-token-output: #0ea5e9;
   --ag-usage-token-reasoning: var(--ag-text-secondary);
+  --ag-usage-token-image-input-text: var(--ag-usage-token-reasoning);
+  --ag-usage-token-image-input-value: var(--ag-text-secondary);
   --ag-usage-token-cache-creation: #f59e0b;
   --ag-usage-token-cache-read: var(--ag-muted);
   --ag-usage-token-cache-ratio: #c084fc;

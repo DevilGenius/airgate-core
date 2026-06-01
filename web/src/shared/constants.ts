@@ -12,6 +12,8 @@ export const USAGE_TOKEN_COLORS = {
   input: 'var(--ag-usage-token-input)',
   output: 'var(--ag-usage-token-output)',
   reasoning: 'var(--ag-usage-token-reasoning)',
+  imageInputText: 'var(--ag-usage-token-image-input-text)',
+  imageInputValue: 'var(--ag-usage-token-image-input-value)',
   cacheCreation: 'var(--ag-usage-token-cache-creation)',
   cacheRead: 'var(--ag-usage-token-cache-read)',
   cacheRatio: 'var(--ag-usage-token-cache-ratio)',
