@@ -213,8 +213,10 @@ func firstNonEmpty(values ...string) string {
 }
 
 func requestRequiresContinuationAffinity(parsed parsedRequest) bool {
-	return strings.TrimSpace(parsed.PreviousResponseID) != "" ||
-		parsed.HasEncryptedContent ||
+	// previous_response_id alone is a soft sticky hint: if the local affinity
+	// cache has expired, the scheduler can still fall back to session sticky or
+	// normal routing and let the upstream decide whether the anchor is usable.
+	return parsed.HasEncryptedContent ||
 		(parsed.HasToolOutput && !parsed.HasToolCallContext)
 }
 

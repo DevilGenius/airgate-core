@@ -92,6 +92,19 @@ func TestParseBodyContinuationSignalsWithToolCallContext(t *testing.T) {
 	}
 }
 
+func TestParseBodyPreviousResponseIDOnlyDoesNotRequireContinuationAffinity(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}]}`)
+	parsed := parseBody(body, "application/json")
+	if parsed.PreviousResponseID != "resp_old" {
+		t.Fatalf("PreviousResponseID = %q, want resp_old", parsed.PreviousResponseID)
+	}
+	if requestRequiresContinuationAffinity(parsed) {
+		t.Fatalf("requestRequiresContinuationAffinity = true, want false")
+	}
+}
+
 func TestParseBodyEncryptedContentRequiresContinuationAffinity(t *testing.T) {
 	t.Parallel()
 
