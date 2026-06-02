@@ -157,6 +157,64 @@ func TestParseBodyEncryptedContentNonReasoningItemDoesNotRequireContinuationAffi
 	}
 }
 
+func TestRecoverContinuationAffinityMissingDropsPreviousResponseAndEncryptedContent(t *testing.T) {
+	t.Parallel()
+
+	state := &forwardState{
+		body:                        []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"reasoning","id":"rs_1","encrypted_content":"sealed"},{"type":"message","role":"user","content":[{"type":"input_text","text":"continue"}]}]}`),
+		previousResponseID:          "resp_old",
+		requireContinuationAffinity: true,
+	}
+
+	recovered, err := recoverContinuationAffinityMissing(state)
+	if err != nil {
+		t.Fatalf("recoverContinuationAffinityMissing error: %v", err)
+	}
+	if !recovered {
+		t.Fatalf("recovered = false, want true")
+	}
+	if state.previousResponseID != "" {
+		t.Fatalf("previousResponseID = %q, want empty", state.previousResponseID)
+	}
+	if state.requireContinuationAffinity {
+		t.Fatalf("requireContinuationAffinity = true, want false")
+	}
+	body := string(state.body)
+	if strings.Contains(body, "previous_response_id") {
+		t.Fatalf("body still contains previous_response_id: %s", body)
+	}
+	if strings.Contains(body, "encrypted_content") {
+		t.Fatalf("body still contains encrypted_content: %s", body)
+	}
+	if !strings.Contains(body, "continue") {
+		t.Fatalf("body lost user message: %s", body)
+	}
+}
+
+func TestRecoverContinuationAffinityMissingKeepsFunctionCallOutputWithoutContextHard(t *testing.T) {
+	t.Parallel()
+
+	state := &forwardState{
+		body:                        []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"function_call_output","call_id":"call_1","output":"ok"}]}`),
+		previousResponseID:          "resp_old",
+		requireContinuationAffinity: true,
+	}
+
+	recovered, err := recoverContinuationAffinityMissing(state)
+	if err != nil {
+		t.Fatalf("recoverContinuationAffinityMissing error: %v", err)
+	}
+	if recovered {
+		t.Fatalf("recovered = true, want false")
+	}
+	if state.previousResponseID != "resp_old" {
+		t.Fatalf("previousResponseID = %q, want resp_old", state.previousResponseID)
+	}
+	if !state.requireContinuationAffinity {
+		t.Fatalf("requireContinuationAffinity = false, want true")
+	}
+}
+
 func TestParseBody_MultipartIgnoresFileParts(t *testing.T) {
 	t.Parallel()
 
@@ -408,6 +466,30 @@ func TestBuildPluginRequestOmitsWriterForNonStreamImagesRequest(t *testing.T) {
 	}
 	if req.Writer != nil {
 		t.Fatalf("Writer = %T, want nil", req.Writer)
+	}
+}
+
+func TestBuildPluginRequestRemovesPreviousResponseHeadersAfterRecovery(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	c.Request.Header.Set("x-openai-previous-response-id", "resp_header")
+	c.Request.Header.Set("OpenAI-Previous-Response-ID", "resp_header")
+	c.Request.Header.Set("previous_response_id", "resp_header")
+	state := &forwardState{
+		requestPath:                 "/v1/responses",
+		keyInfo:                     &auth.APIKeyInfo{},
+		account:                     &ent.Account{},
+		continuationRecoveryApplied: true,
+	}
+
+	req := buildPluginRequest(c, state)
+	for _, header := range []string{"x-openai-previous-response-id", "OpenAI-Previous-Response-ID", "previous_response_id"} {
+		if got := req.Headers.Get(header); got != "" {
+			t.Fatalf("%s = %q, want empty", header, got)
+		}
 	}
 }
 

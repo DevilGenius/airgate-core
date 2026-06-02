@@ -584,6 +584,9 @@ func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, platfo
 // buildPluginRequest 组装给插件的 sdk.ForwardRequest。流式场景会带上 Writer。
 func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest {
 	headers := buildHeaders(c.Request.Header, state.keyInfo)
+	if state.continuationRecoveryApplied {
+		removePreviousResponseIDHeaders(headers)
+	}
 	// 路径和方法显式塞进 header：sdk.ForwardRequest 里没有这两字段，
 	// 插件侧 extractForwardedPath 会优先读取这对 header。
 	headers.Set("X-Forwarded-Path", state.requestPath)
@@ -603,6 +606,12 @@ func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest
 		req.Writer = c.Writer
 	}
 	return req
+}
+
+func removePreviousResponseIDHeaders(headers http.Header) {
+	headers.Del("x-openai-previous-response-id")
+	headers.Del("OpenAI-Previous-Response-ID")
+	headers.Del("previous_response_id")
 }
 
 // buildHeaders 克隆请求头并附加 X-Airgate-* 系列（分组级 service_tier / 强制 instructions / 插件开关）。

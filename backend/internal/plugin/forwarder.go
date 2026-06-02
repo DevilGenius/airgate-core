@@ -173,6 +173,20 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					)
 					return
 				}
+				if errors.Is(err, scheduler.ErrContinuationAffinityMissing) {
+					recovered, recoverErr := recoverContinuationAffinityMissing(state)
+					if recoverErr != nil {
+						logger.Warn("continuation_affinity_recovery_failed",
+							sdk.LogFieldError, recoverErr,
+						)
+					}
+					if recovered {
+						logger.Warn("continuation_affinity_missing_recovery_retry",
+							"action", "drop_previous_response_id_full_context",
+						)
+						continue
+					}
+				}
 				failureSummary.recordPickAccountError(err)
 				if len(softExclude) > 0 && time.Now().Before(queueDeadline) {
 					softExclude = softExclude[:0]

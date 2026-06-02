@@ -29,6 +29,7 @@ type forwardState struct {
 	sessionID                   string
 	previousResponseID          string
 	requireContinuationAffinity bool
+	continuationRecoveryApplied bool
 
 	// 推理强度档位快照。
 	reasoningEffort string
