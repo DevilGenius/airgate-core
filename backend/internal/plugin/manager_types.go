@@ -68,6 +68,7 @@ type Manager struct {
 
 	mu        sync.RWMutex
 	instances map[string]*PluginInstance
+	stopping  map[string]chan struct{}
 	aliases   map[string]string
 	devPaths  map[string]string
 
@@ -119,6 +120,7 @@ func NewManager(pluginDir, logLevel, coreDSN string, db *ent.Client) *Manager {
 		db:                db,
 		hostHandles:       make(map[string]*pluginHostHandle),
 		instances:         make(map[string]*PluginInstance),
+		stopping:          make(map[string]chan struct{}),
 		aliases:           make(map[string]string),
 		devPaths:          make(map[string]string),
 		modelCache:        make(map[string][]sdk.ModelInfo),

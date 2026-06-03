@@ -15,10 +15,11 @@ export const pluginsApi = {
   // 强制从 GitHub 同步市场列表
   refreshMarketplace: () => post<void>('/api/v1/admin/marketplace/refresh'),
   // 上传安装插件
-  upload: (file: File, name?: string) => {
+  upload: (file: File, name?: string, sha256?: string) => {
     const fd = new FormData();
     fd.append('file', file);
     if (name) fd.append('name', name);
+    if (sha256) fd.append('sha256', sha256);
     return upload<void>('/api/v1/admin/plugins/upload', fd);
   },
   // 从 GitHub Release 安装

@@ -20,13 +20,28 @@ const maxExtensionBodySize = 100 << 20
 
 // 禁止插件设置的响应头（安全黑名单）
 var blockedResponseHeaders = map[string]bool{
-	"transfer-encoding":   true,
-	"content-length":      true,
-	"connection":          true,
-	"keep-alive":          true,
-	"upgrade":             true,
-	"proxy-authenticate":  true,
-	"proxy-authorization": true,
+	"transfer-encoding":                   true,
+	"content-length":                      true,
+	"connection":                          true,
+	"keep-alive":                          true,
+	"upgrade":                             true,
+	"proxy-authenticate":                  true,
+	"proxy-authorization":                 true,
+	"set-cookie":                          true,
+	"set-cookie2":                         true,
+	"location":                            true,
+	"content-security-policy":             true,
+	"content-security-policy-report-only": true,
+	"clear-site-data":                     true,
+	"cross-origin-embedder-policy":        true,
+	"cross-origin-opener-policy":          true,
+	"cross-origin-resource-policy":        true,
+	"permissions-policy":                  true,
+	"referrer-policy":                     true,
+	"report-to":                           true,
+	"nel":                                 true,
+	"server":                              true,
+	"x-powered-by":                        true,
 }
 
 // ExtensionProxy 将 HTTP 请求代理到 extension 类型插件

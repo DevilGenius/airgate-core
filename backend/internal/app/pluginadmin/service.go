@@ -3,6 +3,7 @@ package pluginadmin
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -92,10 +93,14 @@ func (s *Service) UpdateConfig(ctx context.Context, name string, config map[stri
 }
 
 // Upload 从二进制安装插件。
-func (s *Service) Upload(ctx context.Context, name string, binary []byte) error {
+func (s *Service) Upload(ctx context.Context, name string, binary []byte, expectedSHA256 string) error {
 	logger := sdk.LoggerFromContext(ctx)
 	copied := append([]byte(nil), binary...)
-	if err := s.manager.InstallFromBinary(ctx, name, copied); err != nil {
+	expectedSHA256 = normalizeSHA256ForCompare(expectedSHA256)
+	if expectedSHA256 == "" {
+		return fmt.Errorf("请提供有效的 SHA256 校验和")
+	}
+	if err := s.manager.InstallFromBinaryWithSHA256(ctx, name, copied, expectedSHA256); err != nil {
 		logger.Error("plugin_admin_uploaded_failed",
 			sdk.LogFieldPluginID, name,
 			"size_bytes", len(copied),

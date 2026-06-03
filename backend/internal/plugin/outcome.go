@@ -415,9 +415,17 @@ func resolveReasoningEffort(fromRequest string, usage *sdk.Usage) string {
 // writeUpstream 把上游原始响应透传给客户端。
 func writeUpstream(c *gin.Context, up sdk.UpstreamResponse) {
 	for k, vals := range up.Headers {
+		if blockedResponseHeaders[strings.ToLower(k)] {
+			continue
+		}
 		for _, v := range vals {
 			c.Writer.Header().Set(k, v)
 		}
+	}
+	c.Writer.Header().Set("X-Content-Type-Options", "nosniff")
+	if isUnsafeUpstreamContentType(c.Writer.Header().Get("Content-Type")) {
+		openAIError(c, http.StatusBadGateway, "server_error", "unsafe_upstream_response", "上游返回了不安全的响应类型")
+		return
 	}
 	status := up.StatusCode
 	if status == 0 {
@@ -425,6 +433,22 @@ func writeUpstream(c *gin.Context, up sdk.UpstreamResponse) {
 	}
 	c.Writer.WriteHeader(status)
 	_, _ = c.Writer.Write(up.Body)
+}
+
+func isUnsafeUpstreamContentType(contentType string) bool {
+	mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+	switch mediaType {
+	case "text/html",
+		"application/xhtml+xml",
+		"image/svg+xml",
+		"application/javascript",
+		"text/javascript",
+		"application/ecmascript",
+		"text/ecmascript":
+		return true
+	default:
+		return false
+	}
 }
 
 func writeUpstreamIfPresent(c *gin.Context, up sdk.UpstreamResponse) bool {

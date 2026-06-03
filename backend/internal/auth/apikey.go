@@ -27,12 +27,12 @@ import (
 //   - 命中：零 DB 查询，O(1) 内存访问
 //   - 未命中：1 次 DB 查询 + 写缓存
 //
-// TTL 设短（默认 5s）是个折衷：key 被禁用 / 配额耗尽 / 过期等动态变化能快速传播到
-// 网关。运维手动禁用 key 后最多 5s 用户会看到 401，可接受。
+// TTL 设短（默认 1s）是个折衷：key 被禁用 / 配额耗尽 / 过期等动态变化能快速传播到
+// 网关。运维手动禁用 key 后最多 1s 用户会看到 401，可接受。
 //
 // 失败结果（invalid / expired / quota / group_unbound）同样缓存——避免被拒的 key
 // 反复打 DB 制造压力。
-const apiKeyCacheTTL = 5 * time.Second
+const apiKeyCacheTTL = time.Second
 
 type apiKeyCacheEntry struct {
 	info      *APIKeyInfo // 成功结果；失败时为 nil

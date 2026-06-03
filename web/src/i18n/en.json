@@ -742,6 +742,8 @@
     "upload_hint": "Click to select a plugin binary file",
     "plugin_name": "Plugin Name",
     "plugin_name_hint": "Leave empty to use filename",
+    "plugin_sha256": "SHA256 Checksum",
+    "plugin_sha256_hint": "Paste the SHA256 provided by the publisher",
     "github_repo": "Repository",
     "github_repo_placeholder": "owner/repo",
     "github_version": "Release Version",

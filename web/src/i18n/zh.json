@@ -745,6 +745,8 @@
     "upload_hint": "点击选择插件二进制文件",
     "plugin_name": "插件名称",
     "plugin_name_hint": "留空则使用文件名",
+    "plugin_sha256": "SHA256 校验和",
+    "plugin_sha256_hint": "粘贴发布方提供的 SHA256",
     "github_repo": "仓库地址",
     "github_repo_placeholder": "owner/repo",
     "github_version": "Release 版本",

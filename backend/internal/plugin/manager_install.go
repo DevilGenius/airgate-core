@@ -53,6 +53,19 @@ func (m *Manager) InstallFromBinary(ctx context.Context, name string, binary []b
 	return m.installFromBinary(ctx, name, binary, nil)
 }
 
+// InstallFromBinaryWithSHA256 从二进制数据安装插件，并在执行前校验预期 SHA256。
+func (m *Manager) InstallFromBinaryWithSHA256(ctx context.Context, name string, binary []byte, expectedSHA256 string) error {
+	expectedSHA256 = normalizeSHA256(expectedSHA256)
+	if expectedSHA256 == "" {
+		return fmt.Errorf("无效的 SHA256 校验和")
+	}
+	actualSHA256 := calcBinarySHA256(binary)
+	if actualSHA256 != expectedSHA256 {
+		return fmt.Errorf("插件二进制 SHA256 校验失败: expected %s, got %s", expectedSHA256, actualSHA256)
+	}
+	return m.installFromBinary(ctx, name, binary, &installMetadata{AssetSHA256: actualSHA256})
+}
+
 func (m *Manager) installFromBinary(ctx context.Context, name string, binary []byte, meta *installMetadata) error {
 	realName, err := m.probePluginName(name, binary)
 	if err != nil {
@@ -192,8 +205,14 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo, version string) e
 	if err != nil {
 		return fmt.Errorf("读取下载内容失败: %w", err)
 	}
-	sum := sha256.Sum256(binary)
-	binarySHA256 := hex.EncodeToString(sum[:])
+	binarySHA256 := calcBinarySHA256(binary)
+	expectedSHA256 := resolveReleaseAssetSHA256(ctx, *asset, release.Assets, "")
+	if expectedSHA256 == "" {
+		return fmt.Errorf("插件 Release 缺少 SHA256 校验信息")
+	}
+	if expectedSHA256 != binarySHA256 {
+		return fmt.Errorf("插件二进制 SHA256 校验失败: expected %s, got %s", expectedSHA256, binarySHA256)
+	}
 
 	meta := &installMetadata{
 		GithubRepo:  owner + "/" + repoName,
@@ -203,6 +222,11 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo, version string) e
 	}
 
 	return m.installFromBinary(ctx, repoName, binary, meta)
+}
+
+func calcBinarySHA256(binary []byte) string {
+	sum := sha256.Sum256(binary)
+	return hex.EncodeToString(sum[:])
 }
 
 func fetchGithubReleaseForInstall(ctx context.Context, owner, repoName, version string) (githubRelease, error) {

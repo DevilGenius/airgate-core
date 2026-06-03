@@ -23,7 +23,13 @@ function writeBrowserStorage(kind: 'localStorage' | 'sessionStorage', key: strin
   }
 }
 
-let accessToken: string | null = readBrowserStorage('localStorage', 'token');
+const sessionAccessToken = readBrowserStorage('sessionStorage', 'token');
+const legacyAccessToken = readBrowserStorage('localStorage', 'token');
+let accessToken: string | null = sessionAccessToken ?? legacyAccessToken;
+if (legacyAccessToken) {
+  if (!sessionAccessToken) writeBrowserStorage('sessionStorage', 'token', legacyAccessToken);
+  writeBrowserStorage('localStorage', 'token', null);
+}
 
 interface TokenClaims {
   role?: string;
@@ -33,7 +39,8 @@ interface TokenClaims {
 
 export function setToken(token: string | null) {
   accessToken = token;
-  writeBrowserStorage('localStorage', 'token', token);
+  writeBrowserStorage('sessionStorage', 'token', token);
+  writeBrowserStorage('localStorage', 'token', null);
 }
 
 export function getToken(): string | null {

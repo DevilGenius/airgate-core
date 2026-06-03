@@ -12,6 +12,7 @@ import (
 type Manager interface {
 	GetAllPluginMeta() []plugin.PluginMeta
 	InstallFromBinary(context.Context, string, []byte) error
+	InstallFromBinaryWithSHA256(context.Context, string, []byte, string) error
 	InstallFromGithub(context.Context, string, string) error
 	Uninstall(context.Context, string) error
 	ReloadDev(context.Context, string) error

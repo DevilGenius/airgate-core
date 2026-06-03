@@ -114,7 +114,7 @@ func (h *PluginHandler) UploadPlugin(c *gin.Context) {
 		name = strings.TrimSuffix(file.Filename, ".exe")
 	}
 
-	if err := h.service.Upload(c.Request.Context(), name, binary); err != nil {
+	if err := h.service.Upload(c.Request.Context(), name, binary, c.PostForm("sha256")); err != nil {
 		response.InternalError(c, "安装插件失败: "+err.Error())
 		return
 	}

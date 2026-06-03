@@ -564,6 +564,7 @@ function InstallPluginModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [pluginName, setPluginName] = useState('');
+  const [uploadSHA256, setUploadSHA256] = useState('');
   const [githubRepo, setGithubRepo] = useState('');
   const [githubVersion, setGithubVersion] = useState('');
 
@@ -578,7 +579,7 @@ function InstallPluginModal({
 
   // 上传安装
   const uploadMutation = useMutation({
-    mutationFn: () => pluginsApi.upload(selectedFile!, pluginName || undefined),
+    mutationFn: () => pluginsApi.upload(selectedFile!, pluginName || undefined, uploadSHA256.trim()),
     onSuccess: () => {
       toast('success', t('plugins.upload_success'));
       resetForm();
@@ -601,6 +602,7 @@ function InstallPluginModal({
   function resetForm() {
     setSelectedFile(null);
     setPluginName('');
+    setUploadSHA256('');
     setGithubRepo('');
     setGithubVersion('');
     dragCounterRef.current = 0;
@@ -742,6 +744,15 @@ function InstallPluginModal({
                         placeholder={t('plugins.plugin_name_hint')}
                       />
                     </HeroTextField>
+                    <HeroTextField fullWidth isRequired>
+                      <Label>{t('plugins.plugin_sha256')}</Label>
+                      <Input
+                        value={uploadSHA256}
+                        onChange={(e) => setUploadSHA256(e.target.value)}
+                        placeholder={t('plugins.plugin_sha256_hint')}
+                        required
+                      />
+                    </HeroTextField>
                   </div>
                 </Tabs.Panel>
 
@@ -778,7 +789,7 @@ function InstallPluginModal({
               </Button>
               {installTab === 'upload' ? (
                 <Button
-                  isDisabled={!selectedFile || uploadMutation.isPending}
+                  isDisabled={!selectedFile || !uploadSHA256.trim() || uploadMutation.isPending}
                   variant="primary"
                   onPress={() => uploadMutation.mutate()}
                 >

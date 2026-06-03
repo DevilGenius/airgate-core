@@ -258,6 +258,10 @@ func (m *Manager) IsDev(name string) bool {
 }
 
 func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string) (string, error) {
+	if err := m.waitForPluginStop(ctx, requestedName); err != nil {
+		return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+	}
+
 	// 在 spawn 之前先用 requestedName 占位创建 host handle。
 	// canonical name 可能在 Info() 之后才确定；spawn 完成后会用 canonicalName 重新注册 handle。
 	hostHandle := m.prepareHostHandle(requestedName)
@@ -331,6 +335,11 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		client.Kill()
 		m.removeHostHandle(requestedName)
 		return "", fmt.Errorf("插件未提供有效的 ID/name")
+	}
+	if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
+		client.Kill()
+		m.removeHostHandle(requestedName)
+		return "", fmt.Errorf("等待旧插件停止失败: %w", err)
 	}
 
 	// canonicalName 可能与 requestedName 不同，把 host handle 从临时占位 key 改名到正式 key
@@ -458,6 +467,11 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 		m.removeHostHandle(requestedName)
 		return "", fmt.Errorf("插件未提供有效的 ID/name")
 	}
+	if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
+		client.Kill()
+		m.removeHostHandle(requestedName)
+		return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+	}
 
 	m.relocateHostHandle(requestedName, canonicalName)
 	m.finalizeHostHandle(canonicalName, info)
@@ -560,6 +574,11 @@ func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Cl
 		m.removeHostHandle(requestedName)
 		return "", fmt.Errorf("插件未提供有效的 ID/name")
 	}
+	if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
+		client.Kill()
+		m.removeHostHandle(requestedName)
+		return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+	}
 
 	m.relocateHostHandle(requestedName, canonicalName)
 	m.finalizeHostHandle(canonicalName, info)
@@ -636,8 +655,20 @@ func (m *Manager) stopPlugin(name string) {
 	resolvedName := m.resolveNameLocked(name)
 	inst, ok := m.instances[resolvedName]
 	if !ok {
+		wait := m.stopping[resolvedName]
+		if wait == nil {
+			wait = m.stopping[normalizePluginName(name)]
+		}
 		m.mu.Unlock()
+		if wait != nil {
+			<-wait
+		}
 		return
+	}
+	stopKeys := pluginStopKeys(name, resolvedName, inst)
+	stopDone := make(chan struct{})
+	for _, key := range stopKeys {
+		m.stopping[key] = stopDone
 	}
 	delete(m.instances, resolvedName)
 	delete(m.modelCache, inst.Platform)
@@ -648,6 +679,7 @@ func (m *Manager) stopPlugin(name string) {
 	delete(m.hostHandles, inst.Name)
 	m.unregisterAliasesLocked(inst.Name, inst.SourceName, inst.BinaryDir)
 	m.mu.Unlock()
+	defer m.finishPluginStop(stopKeys, stopDone)
 
 	// 摘掉 dev watcher 上的注册（ReloadDev 内部会再 add 回来）
 	if m.devWatcher != nil {
@@ -683,6 +715,62 @@ func (m *Manager) stopPlugin(name string) {
 	}
 
 	slog.Info("plugin_runtime_stopped", sdk.LogFieldPluginID, inst.Name)
+}
+
+func (m *Manager) waitForPluginStop(ctx context.Context, name string) error {
+	key := normalizePluginName(name)
+	if key == "" {
+		return nil
+	}
+	for {
+		m.mu.RLock()
+		resolvedName := m.resolveNameLocked(key)
+		wait := m.stopping[resolvedName]
+		if wait == nil {
+			wait = m.stopping[key]
+		}
+		m.mu.RUnlock()
+		if wait == nil {
+			return nil
+		}
+		select {
+		case <-wait:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (m *Manager) finishPluginStop(keys []string, done chan struct{}) {
+	m.mu.Lock()
+	for _, key := range keys {
+		if m.stopping[key] == done {
+			delete(m.stopping, key)
+		}
+	}
+	m.mu.Unlock()
+	close(done)
+}
+
+func pluginStopKeys(requestedName, resolvedName string, inst *PluginInstance) []string {
+	seen := map[string]struct{}{}
+	names := []string{requestedName, resolvedName}
+	if inst != nil {
+		names = append(names, inst.Name, inst.SourceName, inst.BinaryDir)
+	}
+	keys := make([]string, 0, len(names))
+	for _, name := range names {
+		key := normalizePluginName(name)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 // StopAll 停止所有插件。
