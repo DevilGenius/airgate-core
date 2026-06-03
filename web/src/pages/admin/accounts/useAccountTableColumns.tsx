@@ -420,7 +420,7 @@ export function useAccountTableColumns({
           ? (
             <span className="inline-flex min-w-0 items-center">
               <span className="truncate">{t('accounts.today_access_count', '访问')}</span>
-              <span aria-hidden="true" className="px-px text-text">/</span>
+              <span aria-hidden="true" className="px-px opacity-80">/</span>
               <span>{t('accounts.image_count_inline_label', '图').trim()}</span>
             </span>
           )
@@ -429,8 +429,8 @@ export function useAccountTableColumns({
           ? (
             <span className="inline-flex min-w-0 items-center justify-end">
               <span>{accessRequestsText}</span>
-              <span aria-hidden="true" className="px-px text-text">/</span>
-              <span className="text-text">{accessImageText}</span>
+              <span aria-hidden="true" className="px-px opacity-80">/</span>
+              <span>{accessImageText}</span>
             </span>
           )
           : accessText;
@@ -465,21 +465,21 @@ export function useAccountTableColumns({
               style={todayMetricStyle('var(--ag-warning)', 'var(--ag-text)')}
               title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
             >
-              <span className="ag-account-usage-metric-label text-text">{t('accounts.user_cost_short', '消费')}</span>
+              <span className="ag-account-usage-metric-label">{t('accounts.user_cost_short', '消费')}</span>
               <span className="ag-account-usage-metric-value">
-                <span className="text-warning">$</span>
-                <span className="text-text">{todayStats.user_cost.toFixed(2)}</span>
+                <span style={{ color: 'var(--ag-warning)' }}>$</span>
+                <span>{todayStats.user_cost.toFixed(2)}</span>
               </span>
             </span>
             <span
               className={todayMetricClass}
-              style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
+              style={todayMetricStyle('var(--ag-success)', 'var(--ag-text)')}
               title={t('accounts.window_account_cost', '账号成本（上游计费）')}
             >
-              <span className="ag-account-usage-metric-label text-text-secondary">{t('accounts.account_cost_short', '成本')}</span>
+              <span className="ag-account-usage-metric-label">{t('accounts.account_cost_short', '成本')}</span>
               <span className="ag-account-usage-metric-value">
                 <span style={{ color: 'var(--ag-success)' }}>$</span>
-                <span className="text-text">{todayStats.account_cost.toFixed(2)}</span>
+                <span>{todayStats.account_cost.toFixed(2)}</span>
               </span>
             </span>
           </div>
