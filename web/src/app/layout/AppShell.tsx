@@ -20,11 +20,10 @@ import {
   Users,
   IdCard,
   LayoutList,
-  KeyRound,
+  UserRoundKey,
   CreditCard,
   Globe,
-  ChartNoAxesCombined,
-  ReceiptText,
+  ListOrdered,
   Puzzle,
   Settings,
   UserRoundCog,
@@ -59,7 +58,7 @@ const adminMenuItems: MenuItem[] = [
   { path: '/admin/groups', labelKey: 'nav.groups', icon: <LayoutList className="h-5 w-5" /> },
   { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="h-5 w-5" /> },
   { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="h-5 w-5" /> },
-  { path: '/admin/usage', labelKey: 'nav.usage', icon: <ChartNoAxesCombined className="h-5 w-5" /> },
+  { path: '/admin/usage', labelKey: 'nav.usage', icon: <Activity className="h-5 w-5" /> },
   { path: '/admin/plugins', labelKey: 'nav.plugins', icon: <Puzzle className="h-5 w-5" />, sectionKey: 'nav.system' },
   { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" /> },
 ];
@@ -67,13 +66,13 @@ const adminMenuItems: MenuItem[] = [
 const userMenuItems: MenuItem[] = [
   { path: '/', labelKey: 'nav.my_overview', icon: <LayoutDashboard className="h-5 w-5" />, sectionKey: 'nav.personal' },
   { path: '/profile', labelKey: 'nav.profile', icon: <UserRoundCog className="h-5 w-5" /> },
-  { path: '/keys', labelKey: 'nav.my_keys', icon: <KeyRound className="h-5 w-5" /> },
-  { path: '/usage', labelKey: 'nav.my_usage', icon: <ReceiptText className="h-5 w-5" /> },
+  { path: '/keys', labelKey: 'nav.my_keys', icon: <UserRoundKey className="h-5 w-5" /> },
+  { path: '/usage', labelKey: 'nav.my_usage', icon: <ListOrdered className="h-5 w-5" /> },
 ];
 
 // API Key 登录只能看使用记录
 const apiKeyMenuItems: MenuItem[] = [
-  { path: '/usage', labelKey: 'nav.my_usage', icon: <ReceiptText className="h-5 w-5" />, sectionKey: 'nav.personal' },
+  { path: '/usage', labelKey: 'nav.my_usage', icon: <ListOrdered className="h-5 w-5" />, sectionKey: 'nav.personal' },
 ];
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'airgate:sidebar:collapsed';
