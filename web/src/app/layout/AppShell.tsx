@@ -19,7 +19,7 @@ import {
   LayoutDashboard,
   Users,
   IdCard,
-  FolderTree,
+  LayoutList,
   KeyRound,
   CreditCard,
   Globe,
@@ -35,7 +35,6 @@ import {
   Menu,
   BookOpen,
   MessageCircle,
-  Github,
   Activity,
   HelpCircle,
   ChevronLeft,
@@ -57,7 +56,7 @@ const adminMenuItems: MenuItem[] = [
   { path: '/', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="h-5 w-5" />, sectionKey: 'nav.overview' },
   { path: '/admin/users', labelKey: 'nav.users', icon: <Users className="h-5 w-5" />, sectionKey: 'nav.management' },
   { path: '/admin/accounts', labelKey: 'nav.accounts', icon: <IdCard className="h-5 w-5" /> },
-  { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="h-5 w-5" /> },
+  { path: '/admin/groups', labelKey: 'nav.groups', icon: <LayoutList className="h-5 w-5" /> },
   { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="h-5 w-5" /> },
   { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="h-5 w-5" /> },
   { path: '/admin/usage', labelKey: 'nav.usage', icon: <ChartNoAxesCombined className="h-5 w-5" /> },
@@ -443,16 +442,6 @@ export function AppShell({ children }: AppShellProps) {
                 <Activity className="h-5 w-5" />
               </HeroLink>
             )}
-            {/* GitHub */}
-            <HeroLink
-              href="https://github.com/DevilGenius/airgate-core"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="GitHub"
-              className="hidden h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text sm:flex"
-            >
-              <Github className="h-5 w-5" />
-            </HeroLink>
             {/* Docs：未配置外部链接时回退到内置 /docs */}
             {(() => {
               const docs = effectiveDocUrl(site.doc_url);

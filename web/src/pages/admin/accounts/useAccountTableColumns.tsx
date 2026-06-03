@@ -217,9 +217,9 @@ export function useAccountTableColumns({
     {
       key: 'usage_window',
       title: t('accounts.usage_window'),
-      width: '364px',
+      width: '396px',
       mobileWidth: '364px',
-      maxWidth: '364px',
+      maxWidth: '396px',
       align: 'center',
       render: (row: AccountResp) => {
         const usage = usageDataRef.current?.accounts?.[String(row.id)];
@@ -550,7 +550,7 @@ export function useAccountTableColumns({
     {
       key: 'last_used_at',
       title: t('accounts.last_used'),
-      width: '120px',
+      width: '88px',
       mobileWidth: '88px',
       align: 'center',
       render: (row) => {

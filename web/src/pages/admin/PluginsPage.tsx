@@ -11,7 +11,7 @@ import { AlertDialog, Button, Card, Checkbox, Chip, Description, EmptyState, Inp
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   Trash2, Download, Loader2, RefreshCw,
-  Package, User, Tag, Plus, Upload, Github, Settings, Store, History,
+  Package, User, Tag, Plus, Upload, Settings, Store, History,
 } from 'lucide-react';
 import { CommonTable } from '../../shared/components/CommonTable';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
@@ -647,7 +647,7 @@ function InstallPluginModal({
 
   const installTabs = [
     { key: 'upload' as const, label: t('plugins.upload_tab'), icon: <Upload className="w-3.5 h-3.5" /> },
-    { key: 'github' as const, label: t('plugins.github_tab'), icon: <Github className="w-3.5 h-3.5" /> },
+    { key: 'github' as const, label: t('plugins.github_tab'), icon: null },
   ];
   const modalState = useOverlayState({
     isOpen: open,
@@ -846,7 +846,6 @@ function MarketplaceCard({
         </div>
         {plugin.github_repo && (
           <div className="flex items-center gap-1 text-xs text-text-tertiary mb-3 font-mono">
-            <Github className="w-3 h-3" />
             {plugin.github_repo}
           </div>
         )}

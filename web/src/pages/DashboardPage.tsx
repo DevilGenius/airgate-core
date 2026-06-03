@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Card, ComboBox, Input, Label, ListBox, Select, Skeleton, Tabs } from '@heroui/react';
@@ -17,14 +17,14 @@ import {
 } from 'recharts';
 import {
   Activity,
+  Astroid,
   CalendarDays,
   Clock,
-  Coins,
-  Database,
   KeyRound,
-  Monitor,
   RefreshCw,
   Search,
+  Sigma,
+  ToggleRight,
   Users,
   Zap,
 } from 'lucide-react';
@@ -74,15 +74,23 @@ const RANGE_PRESETS = ['today', '7d', '30d', '90d'] as const;
 type MetricTone = 'blue' | 'violet' | 'emerald' | 'teal' | 'amber' | 'indigo' | 'purple' | 'rose';
 type MetaTone = 'default' | 'success' | 'warning' | 'danger' | 'accent';
 
-const METRIC_TONE_ACCENTS: Record<MetricTone, string> = {
-  amber: 'var(--ag-warning)',
-  blue: 'var(--ag-primary)',
-  emerald: 'var(--ag-success)',
-  indigo: '#6366f1',
-  purple: '#a855f7',
-  rose: '#f43f5e',
-  teal: '#14b8a6',
-  violet: '#8b5cf6',
+const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
+  amber: 'bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
+  blue: 'bg-blue-100 text-blue-600 ring-blue-200 dark:bg-blue-400/15 dark:text-blue-300 dark:ring-blue-400/25',
+  emerald: '',
+  indigo: 'bg-indigo-100 text-indigo-600 ring-indigo-200 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-indigo-400/25',
+  purple: 'bg-purple-100 text-purple-600 ring-purple-200 dark:bg-purple-400/15 dark:text-purple-300 dark:ring-purple-400/25',
+  rose: 'bg-rose-100 text-rose-600 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/25',
+  teal: 'bg-teal-100 text-teal-600 ring-teal-200 dark:bg-teal-400/15 dark:text-teal-300 dark:ring-teal-400/25',
+  violet: 'bg-violet-100 text-violet-600 ring-violet-200 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/25',
+};
+
+const METRIC_TONE_STYLES: Partial<Record<MetricTone, CSSProperties>> = {
+  emerald: {
+    background: 'color-mix(in srgb, var(--ag-success) 14%, #ffffff)',
+    boxShadow: '0 0 0 1px color-mix(in srgb, var(--ag-success) 24%, #ffffff), var(--shadow-sm)',
+    color: 'var(--ag-success)',
+  },
 };
 
 const META_TONE_CLASSES: Record<MetaTone, string> = {
@@ -164,8 +172,6 @@ function MetricCard({
   value: ReactNode;
   valueSuffix?: string;
 }) {
-  const accentColor = METRIC_TONE_ACCENTS[tone];
-
   return (
     <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
       <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
@@ -180,12 +186,8 @@ function MetricCard({
           </div>
         </div>
         <span
-          className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex"
-          style={{
-            background: `color-mix(in srgb, ${accentColor} 14%, transparent)`,
-            color: accentColor,
-            borderColor: `color-mix(in srgb, ${accentColor} 24%, transparent)`,
-          }}
+          className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES[tone]}`}
+          style={METRIC_TONE_STYLES[tone]}
         >
           {icon}
         </span>
@@ -229,15 +231,15 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         meta={t('dashboard.api_keys_enabled', { count: stats.enabled_api_keys })}
       />
       <MetricCard
-        icon={<Monitor className="h-5 w-5" />}
-        tone="violet"
+        icon={<ToggleRight className="h-5 w-5" />}
+        tone="emerald"
         title={t('dashboard.accounts')}
         value={stats.total_accounts}
         meta={t('dashboard.accounts_status', { enabled: stats.enabled_accounts, errors: stats.error_accounts })}
       />
       <MetricCard
         icon={<Activity className="h-5 w-5" />}
-        tone="emerald"
+        tone="violet"
         title={t('dashboard.today_requests')}
         value={`${fmtNum(todayTextRequests)}/${fmtNum(todayImageRequests)}`}
         valueSuffix={t('dashboard.image_suffix')}
@@ -251,14 +253,14 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         meta={`${t('dashboard.total_count', { count: stats.total_users })}  ${t('dashboard.active_users_label', { count: stats.active_users })}`}
       />
       <MetricCard
-        icon={<Coins className="h-5 w-5" />}
+        icon={<Astroid className="h-5 w-5" />}
         tone="amber"
         title={t('dashboard.today_tokens')}
         value={fmtNum(stats.today_tokens)}
         meta={<CostPair actual={stats.today_cost} standard={stats.today_standard_cost} />}
       />
       <MetricCard
-        icon={<Database className="h-5 w-5" />}
+        icon={<Sigma className="h-5 w-5" />}
         tone="indigo"
         title={t('dashboard.total_tokens')}
         value={fmtNum(stats.alltime_tokens)}
@@ -266,7 +268,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       />
       <MetricCard
         icon={<Zap className="h-5 w-5" />}
-        tone="purple"
+        tone="amber"
         metaTone="accent"
         title={t('dashboard.performance')}
         value={Math.round(stats.rpm ?? 0)}

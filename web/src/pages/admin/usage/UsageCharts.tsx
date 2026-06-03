@@ -179,7 +179,14 @@ export function UsageTokenTrendChart({
               return (aIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : aIndex) - (bIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : bIndex);
             });
             return (
-              <div className="rounded-lg border border-border bg-bg-elevated p-3 text-xs shadow-lg">
+              <div
+                className="rounded-lg p-3 text-xs shadow-lg"
+                style={{
+                  background: 'var(--ag-surface)',
+                  border: '1px solid var(--ag-border)',
+                  color: 'var(--ag-text)',
+                }}
+              >
                 <div className="font-semibold text-text mb-2">{d?.rawTime ?? label}</div>
                 {orderedPayload.map((entry, i) => (
                   <div key={i} className="flex items-center gap-2 py-0.5">

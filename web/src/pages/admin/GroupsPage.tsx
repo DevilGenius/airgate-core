@@ -9,7 +9,7 @@ import {
   RefreshCw,
   Percent,
   Image,
-  Text,
+  Type,
 } from 'lucide-react';
 import { AlertDialog, Button, Chip, EmptyState, Label, ListBox, Select, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
@@ -202,7 +202,7 @@ export default function GroupsPage() {
                         {isImageGroup(row) ? (
                           <Image className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ag-primary)' }} />
                         ) : (
-                          <Text className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ag-text-tertiary)' }} />
+                          <Type className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ag-text-tertiary)' }} />
                         )}
                         <span style={{ color: 'var(--ag-text)' }} className="truncate font-medium">
                           {row.name}
