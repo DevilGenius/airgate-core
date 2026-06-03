@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, EmptyState, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField } from '@heroui/react';
 import {
   Plus,
@@ -22,13 +22,14 @@ import {
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
+import { usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { AccountTypeFilterSelect } from './accounts/AccountTypeFilterSelect';
@@ -61,11 +62,25 @@ import {
   useLatestRef,
   type AccountTypeFilterOption,
   type AccountUsageData,
-  type AccountUsageInfo,
   type AccountUsageWindowCache,
 } from './accounts/AccountPageSupport';
 
 const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.auto_refresh';
+const ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.capacity_auto_refresh';
+const ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS = 1 / 3;
+const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
+
+if (typeof window !== 'undefined') {
+  try {
+    const storedAutoRefresh = Number(window.localStorage.getItem(ACCOUNT_AUTO_REFRESH_STORAGE_KEY));
+    if (storedAutoRefresh > 0 && storedAutoRefresh < 1) {
+      window.localStorage.setItem(ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY, 'true');
+      window.localStorage.setItem(ACCOUNT_AUTO_REFRESH_STORAGE_KEY, '0');
+    }
+  } catch {
+    // Storage can be unavailable in restricted browser modes.
+  }
+}
 
 export default function AccountsPageContent() {
   const { t } = useTranslation();
@@ -132,12 +147,30 @@ export default function AccountsPageContent() {
   const [proxyFilter, setProxyFilter] = useState('');
 
   // 自动刷新
-  const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ACCOUNT_AUTO_REFRESH_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS); // 秒，0=关闭
+  const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ACCOUNT_AUTO_REFRESH_STORAGE_KEY, 0, ACCOUNT_AUTO_REFRESH_OPTIONS); // 秒，0=关闭
+  const [capacityAutoRefresh, setCapacityAutoRefresh] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem(ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const refreshAccounts = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.accounts() }, { cancelRefetch: false });
   }, [queryClient]);
   const autoRefreshLabel = t('accounts.auto_refresh');
   const autoRefreshOffLabel = t('accounts.auto_refresh_off');
+  const capacityAutoRefreshLabel = t('accounts.capacity_auto_refresh');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY, String(capacityAutoRefresh));
+    } catch {
+      // Storage can be unavailable in restricted browser modes.
+    }
+  }, [capacityAutoRefresh]);
 
   // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -193,6 +226,36 @@ export default function AccountsPageContent() {
     placeholderData: keepPreviousData,
   });
   const rows = data?.list ?? [];
+  const visibleAccountIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const visibleAccountIdsKey = useMemo(() => visibleAccountIds.join(','), [visibleAccountIds]);
+  const accountCapacityQueryKey = useMemo(
+    () => queryKeys.accountCapacity(visibleAccountIdsKey),
+    [visibleAccountIdsKey],
+  );
+  const { data: capacityData } = useQuery({
+    queryKey: accountCapacityQueryKey,
+    queryFn: () => accountsApi.capacity(visibleAccountIds),
+    enabled: visibleAccountIds.length > 0,
+    meta: { globalLoading: false },
+    refetchInterval: capacityAutoRefresh ? ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS * 1000 : false,
+    refetchIntervalInBackground: false,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+  const rowsWithCapacity = useMemo(() => {
+    const counts = capacityData?.accounts;
+    if (!counts) return rows;
+    return rows.map((row) => {
+      const nextCount = counts[String(row.id)];
+      if (typeof nextCount !== 'number' || nextCount === row.current_concurrency) {
+        return row;
+      }
+      return {
+        ...row,
+        current_concurrency: nextCount,
+      };
+    });
+  }, [capacityData?.accounts, rows]);
 
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
@@ -213,72 +276,28 @@ export default function AccountsPageContent() {
 
   // 查询用量窗口
   const usageWindowCacheRef = useRef<AccountUsageWindowCache>(new Map());
-  const { data: rawUsageData } = useQuery({
-    queryKey: queryKeys.accountUsage(platformFilter),
-    queryFn: () => accountsApi.usage(platformFilter || ''),
+  const accountUsageQueryKey = useMemo(
+    () => queryKeys.accountUsage(platformFilter, visibleAccountIdsKey),
+    [platformFilter, visibleAccountIdsKey],
+  );
+  const { data: rawUsageData, isFetching: isUsageFetching } = useQuery({
+    queryKey: accountUsageQueryKey,
+    queryFn: () => accountsApi.usage(platformFilter || '', visibleAccountIds),
+    enabled: visibleAccountIds.length > 0,
     meta: { globalLoading: false },
-    refetchInterval: 300_000,
+    refetchInterval: (query) => (query.state.data?.refreshing ? 1_500 : 300_000),
     refetchIntervalInBackground: false,
   });
-  const singleUsageResults = useQueries({
-    queries: rows.map((row) => ({
-      queryKey: queryKeys.accountUsage(platformFilter, 'account', row.id),
-      queryFn: ({ signal }: { signal?: AbortSignal }) =>
-        accountsApi.usageOne(row.id, { signal }) as Promise<AccountUsageInfo>,
-      enabled: row.type !== 'apikey',
-      meta: { globalLoading: false },
-      staleTime: 300_000,
-      gcTime: 10 * 60_000,
-      refetchOnWindowFocus: false,
-    })),
-    combine: (results) => results.map((query) => ({
-      data: query.data as AccountUsageInfo | undefined,
-    })),
-  });
-  const rawUsageWithSingleAccounts = useMemo<AccountUsageData | undefined>(() => {
-    const accounts: Record<string, AccountUsageInfo> = { ...(rawUsageData?.accounts ?? {}) };
-    let hasSingleAccount = false;
-    const hasUpstreamUsage = (usage: AccountUsageInfo | undefined) =>
-      Boolean((Array.isArray(usage?.windows) && usage.windows.length > 0) || usage?.credits);
-    const updatedAtMs = (usage: AccountUsageInfo | undefined) => {
-      if (!usage?.updated_at) return 0;
-      const parsed = Date.parse(usage.updated_at);
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
-
-    rows.forEach((row, index) => {
-      const singleUsage = singleUsageResults[index]?.data;
-      if (!singleUsage) return;
-      const accountKey = String(row.id);
-      const existingUsage = accounts[accountKey];
-      const singleHasUpstream = hasUpstreamUsage(singleUsage);
-
-      if (!existingUsage) {
-        accounts[accountKey] = singleUsage;
-      } else if (!singleHasUpstream) {
-        accounts[accountKey] = {
-          ...existingUsage,
-          today_stats: singleUsage.today_stats ?? existingUsage.today_stats,
-        };
-      } else if (!hasUpstreamUsage(existingUsage) || updatedAtMs(singleUsage) >= updatedAtMs(existingUsage)) {
-        accounts[accountKey] = {
-          ...existingUsage,
-          ...singleUsage,
-          today_stats: singleUsage.today_stats ?? existingUsage.today_stats,
-        };
-      }
-      hasSingleAccount = true;
-    });
-
-    if (!rawUsageData && !hasSingleAccount) return undefined;
-    return {
-      ...rawUsageData,
-      accounts,
-    };
-  }, [rawUsageData, rows, singleUsageResults]);
+  const refreshAccountUsage = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: accountUsageQueryKey }, { cancelRefetch: false });
+  }, [accountUsageQueryKey, queryClient]);
+  const refreshAccountOverview = useCallback(() => {
+    refreshAccounts();
+    refreshAccountUsage();
+  }, [refreshAccountUsage, refreshAccounts]);
   const usageData = useMemo(
-    () => mergeCachedUsageWindows(rawUsageWithSingleAccounts, usageWindowCacheRef.current),
-    [rawUsageWithSingleAccounts],
+    () => mergeCachedUsageWindows(rawUsageData as AccountUsageData | undefined, usageWindowCacheRef.current),
+    [rawUsageData],
   );
   const usageDataRef = useRef(usageData);
   usageDataRef.current = usageData;
@@ -584,7 +603,7 @@ export default function AccountsPageContent() {
   });
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
-  const visibleRowIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const visibleRowIds = useMemo(() => rowsWithCapacity.map((row) => row.id), [rowsWithCapacity]);
   const selectedVisibleCount = useMemo(
     () => selectionStore.countVisible(visibleRowIds),
     [selectionStore, selectionVersion, visibleRowIds],
@@ -755,14 +774,26 @@ export default function AccountsPageContent() {
         <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 xl:ml-auto xl:justify-end">
           <AutoRefreshControl
             value={autoRefresh}
-            options={ADMIN_AUTO_REFRESH_OPTIONS}
+            options={ACCOUNT_AUTO_REFRESH_OPTIONS}
             label={autoRefreshLabel}
             offLabel={autoRefreshOffLabel}
+            afterRefresh={(
+              <NativeSwitch
+                ariaLabel={capacityAutoRefreshLabel}
+                className="h-8 shrink-0"
+                contentClassName="whitespace-nowrap text-text-secondary"
+                isSelected={capacityAutoRefresh}
+                label={capacityAutoRefreshLabel}
+                onChange={setCapacityAutoRefresh}
+              />
+            )}
             ariaLabel={t('accounts.auto_refresh')}
             refreshAriaLabel={t('common.refresh')}
             onChange={setAutoRefresh}
+            onAutoRefresh={refreshAccountOverview}
             onRefresh={refreshAccounts}
             isRefreshing={isAccountsFetching}
+            isAutoRefreshing={isAccountsFetching || isUsageFetching}
           />
           <Button
             className="hidden sm:inline-flex"
@@ -861,7 +892,7 @@ export default function AccountsPageContent() {
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
+                rowsWithCapacity.map((row) => (
                   <AccountTableRow
                     key={row.id}
                     columns={columns}

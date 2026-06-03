@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button, Dropdown } from '@heroui/react';
 import { Check, ChevronDown, RefreshCw } from 'lucide-react';
 import { normalizeAutoRefresh, type AutoRefreshOptions } from '../hooks/usePersistentAutoRefresh';
@@ -8,6 +8,8 @@ interface AutoRefreshControlProps {
   options: AutoRefreshOptions;
   label: string;
   offLabel: string;
+  fastLabel?: string;
+  afterRefresh?: ReactNode;
   ariaLabel: string;
   refreshAriaLabel: string;
   onChange: (value: number) => void;
@@ -62,6 +64,14 @@ function useAutoRefreshCountdown({
     };
 
     const documentHidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    const tickMs = seconds < 1 ? 100 : 1000;
+    const updateRemaining = (msLeft: number) => {
+      if (seconds < 1) {
+        setRemainingSeconds(seconds);
+      } else {
+        setRemainingSeconds(Math.max(1, Math.ceil(msLeft / 1000)));
+      }
+    };
 
     const scheduleNextTick = () => {
       if (disposed) return;
@@ -73,8 +83,8 @@ function useAutoRefreshCountdown({
       }
 
       const msLeft = Math.max(0, nextRefreshAt - Date.now());
-      setRemainingSeconds(Math.max(1, Math.ceil(msLeft / 1000)));
-      timeoutId = window.setTimeout(runTick, Math.min(1000, msLeft));
+      updateRemaining(msLeft);
+      timeoutId = window.setTimeout(runTick, Math.min(tickMs, msLeft));
     };
 
     const runTick = () => {
@@ -83,7 +93,7 @@ function useAutoRefreshCountdown({
       const now = Date.now();
       if (now >= nextRefreshAt) {
         if (isRefreshingRef.current) {
-          nextRefreshAt = now + 1000;
+          nextRefreshAt = now + intervalMs;
         } else {
           void onRefreshRef.current();
           nextRefreshAt = Date.now() + intervalMs;
@@ -117,11 +127,27 @@ function useAutoRefreshCountdown({
   return remainingSeconds;
 }
 
+function formatAutoRefreshSeconds(seconds: number) {
+  if (Number.isInteger(seconds)) {
+    return `${seconds}s`;
+  }
+  return `${seconds.toFixed(1).replace(/\.0$/, '')}s`;
+}
+
+function formatAutoRefreshOption(label: string, seconds: number, fastLabel?: string) {
+  if (seconds > 0 && seconds < 1) {
+    return `${label}${fastLabel ?? formatAutoRefreshSeconds(seconds)}`;
+  }
+  return `${label}${formatAutoRefreshSeconds(seconds)}`;
+}
+
 export const AutoRefreshControl = memo(function AutoRefreshControl({
   value,
   options,
   label,
   offLabel,
+  fastLabel,
+  afterRefresh,
   ariaLabel,
   refreshAriaLabel,
   onChange,
@@ -142,8 +168,10 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
     seconds: value,
   });
   const selectedKeys = useMemo(() => new Set([`auto_${value}`]), [value]);
-  const currentLabel = enabled ? `${label}${remainingSeconds}s` : offLabel;
-  const optionLabel = (seconds: number) => (seconds === 0 ? offLabel : `${label}${seconds}s`);
+  const currentLabel = enabled
+    ? formatAutoRefreshOption(label, value < 1 ? value : remainingSeconds, fastLabel)
+    : offLabel;
+  const optionLabel = (seconds: number) => (seconds === 0 ? offLabel : formatAutoRefreshOption(label, seconds, fastLabel));
   const handleRefresh = useCallback(() => {
     void onRefresh();
     if (enabled) {
@@ -164,6 +192,7 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
       >
         <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
       </Button>
+      {afterRefresh}
       <Dropdown>
         <Dropdown.Trigger
           className={`ag-auto-refresh-trigger button button--sm ${enabled ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}

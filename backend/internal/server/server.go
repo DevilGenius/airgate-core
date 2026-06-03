@@ -57,7 +57,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	sched := scheduler.NewScheduler(db, rdb)
 	concurrency := scheduler.NewConcurrencyManager(rdb)
 	calculator := billing.NewCalculator()
-	recorder := billing.NewRecorder(db, 0)
+	recorder := billing.NewRecorder(db, 0, rdb)
 
 	// 插件系统组件
 	pluginDir := cfg.Plugins.Dir

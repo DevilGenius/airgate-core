@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-const accountUsageCacheVersion = 2
-
 type AccountUsageWindow struct {
 	Key               string  `json:"key,omitempty"`
 	Label             string  `json:"label,omitempty"`
@@ -46,23 +44,21 @@ type accountUsagePluginResponse struct {
 }
 
 type accountUsageCachePayload struct {
-	Version   int                         `json:"version"`
-	FetchedAt string                      `json:"fetched_at"`
-	ExpiresAt string                      `json:"expires_at,omitempty"`
-	Accounts  map[string]AccountUsageInfo `json:"accounts"`
+	FetchedAt string           `json:"fetched_at"`
+	ExpiresAt string           `json:"expires_at,omitempty"`
+	Info      AccountUsageInfo `json:"info"`
 }
 
-func newAccountUsageCachePayload(accounts map[string]AccountUsageInfo, now, expiresAt time.Time) accountUsageCachePayload {
+func newAccountUsageCachePayload(info AccountUsageInfo, now, expiresAt time.Time) accountUsageCachePayload {
 	return accountUsageCachePayload{
-		Version:   accountUsageCacheVersion,
 		FetchedAt: now.UTC().Format(time.RFC3339),
 		ExpiresAt: expiresAt.UTC().Format(time.RFC3339),
-		Accounts:  accounts,
+		Info:      info,
 	}
 }
 
 func (p accountUsageCachePayload) valid() bool {
-	return p.Version == accountUsageCacheVersion && p.Accounts != nil
+	return p.FetchedAt != ""
 }
 
 func (p accountUsageCachePayload) cacheExpiresAt(now time.Time) time.Time {
@@ -71,7 +67,24 @@ func (p accountUsageCachePayload) cacheExpiresAt(now time.Time) time.Time {
 			return parsed
 		}
 	}
-	return usageCacheExpiresAt(p.Accounts, now)
+	return accountUsageInfoExpiresAt(p.Info, now)
+}
+
+func accountUsageInfoExpiresAt(info AccountUsageInfo, now time.Time) time.Time {
+	expiresAt := now.Add(usageCacheMaxTTL)
+	for _, window := range info.Windows {
+		resetAt, ok := accountUsageWindowResetAt(window, now)
+		if !ok {
+			continue
+		}
+		if !resetAt.After(now) {
+			return now
+		}
+		if resetAt.Before(expiresAt) {
+			expiresAt = resetAt
+		}
+	}
+	return expiresAt
 }
 
 func usageCacheExpiresAt(accounts map[string]AccountUsageInfo, now time.Time) time.Time {

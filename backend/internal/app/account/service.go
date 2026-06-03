@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +20,7 @@ import (
 
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
+	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
@@ -49,6 +51,25 @@ const usageCacheMaxTTL = 5 * time.Hour
 const usageCacheMinimumTTL = time.Second
 
 const autoQuotaRefreshInterval = 6 * time.Hour
+
+type accountProfileCachePayload struct {
+	ID             int     `json:"id"`
+	Name           string  `json:"name"`
+	Platform       string  `json:"platform"`
+	Type           string  `json:"type"`
+	State          string  `json:"state"`
+	StateUntil     string  `json:"state_until,omitempty"`
+	Priority       int     `json:"priority"`
+	MaxConcurrency int     `json:"max_concurrency"`
+	RateMultiplier float64 `json:"rate_multiplier"`
+	ErrorMsg       string  `json:"error_msg,omitempty"`
+	UpstreamIsPool bool    `json:"upstream_is_pool"`
+	LastUsedAt     string  `json:"last_used_at,omitempty"`
+	GroupIDs       []int64 `json:"group_ids,omitempty"`
+	ProxyID        *int    `json:"proxy_id,omitempty"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
+}
 
 // StateWriter 管理员巡检场景下对账号状态的写入口。
 // 由 scheduler 包实现；让 account service 不直接依赖 scheduler。
@@ -199,22 +220,33 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 
 	// 生图请求计数：今日 + 累计。BatchImageStats 失败不阻断主响应（运维路径优先稳定）。
 	if len(openaiIDs) > 0 {
-		todayStart := timezone.StartOfDay(s.now().In(time.Local))
-		if imageStats, err := s.repo.BatchImageStats(ctx, openaiIDs, todayStart); err == nil {
-			for index := range accounts {
-				if accounts[index].Platform != "openai" {
-					continue
-				}
-				if entry, ok := imageStats[accounts[index].ID]; ok {
-					stats := entry
-					accounts[index].ImageStats = &stats
-				} else {
-					// 没记录：显式给个零值结构，让前端拿到 today=0/total=0 而不是 nil（区分"没数据"和"非 openai"）
-					accounts[index].ImageStats = &AccountImageStats{}
+		day := accountcache.Day(s.now())
+		imageStats, missingIDs := s.loadImageStatsCache(ctx, day, openaiIDs)
+		if len(missingIDs) > 0 {
+			todayStart := timezone.StartOfDay(s.now().In(time.Local))
+			if fallback, err := s.repo.BatchImageStats(ctx, missingIDs, todayStart); err == nil {
+				for _, id := range missingIDs {
+					stats := fallback[id]
+					imageStats[id] = stats
+					s.writeImageStatsCache(ctx, day, id, stats)
 				}
 			}
 		}
+		for index := range accounts {
+			if accounts[index].Platform != "openai" {
+				continue
+			}
+			if entry, ok := imageStats[accounts[index].ID]; ok {
+				stats := entry
+				accounts[index].ImageStats = &stats
+			} else {
+				// 没记录：显式给个零值结构，让前端拿到 today=0/total=0 而不是 nil（区分"没数据"和"非 openai"）
+				accounts[index].ImageStats = &AccountImageStats{}
+			}
+		}
 	}
+
+	s.cacheAccountProfiles(ctx, accounts)
 
 	return ListResult{
 		List:     accounts,
@@ -222,6 +254,26 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 		Page:     page,
 		PageSize: pageSize,
 	}, nil
+}
+
+// GetCapacity 查询当前账号并发容量。只读取调度器 Redis 运行态，不访问账号 DB。
+func (s *Service) GetCapacity(ctx context.Context, accountIDs []int) map[int]int {
+	accountIDs = normalizeAccountIDs(accountIDs)
+	result := make(map[int]int, len(accountIDs))
+	if len(accountIDs) == 0 {
+		return result
+	}
+	if s.concurrency == nil {
+		for _, id := range accountIDs {
+			result[id] = 0
+		}
+		return result
+	}
+	counts := s.concurrency.GetCurrentCounts(ctx, accountIDs)
+	for _, id := range accountIDs {
+		result[id] = counts[id]
+	}
+	return result
 }
 
 // Create 创建账号。
@@ -241,6 +293,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 		sdk.LogFieldPlatform, account.Platform,
 		"type", account.Type,
 		"name", account.Name)
+	s.cacheAccountProfiles(ctx, []Account{account})
 	s.InvalidateUsageCache("") // 新账号创建后清除用量缓存
 	return account, err
 }
@@ -296,6 +349,7 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 	if input.Type != nil || input.Credentials != nil || input.State != nil {
 		s.InvalidateUsageCache(updated.Platform)
 	}
+	s.cacheAccountProfiles(ctx, []Account{updated})
 	return updated, err
 }
 
@@ -311,6 +365,7 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 		return err
 	}
 	logger.Info("account_deleted", sdk.LogFieldAccountID, id)
+	s.deleteAccountCacheKeys([]int{id})
 	s.InvalidateUsageCache("")
 	return err
 }
@@ -340,6 +395,12 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 		}
 		result.appendSuccess(id)
 	}
+	if len(result.SuccessIDs) > 0 {
+		accounts, err := s.repo.ListAll(ctx, ListFilter{IDs: result.SuccessIDs})
+		if err == nil {
+			s.cacheAccountProfiles(ctx, accounts)
+		}
+	}
 	return result
 }
 
@@ -354,6 +415,7 @@ func (s *Service) BulkDelete(ctx context.Context, ids []int) BulkResult {
 		result.appendSuccess(id)
 	}
 	if result.Success > 0 {
+		s.deleteAccountCacheKeys(result.SuccessIDs)
 		s.InvalidateUsageCache("")
 	}
 	return result
@@ -742,40 +804,49 @@ type accountUsageRequest struct {
 	Credentials map[string]string `json:"credentials"`
 }
 
-// GetAccountUsage 查询账号当前用量视图。
+// GetAccountUsage 查询当前页账号的用量视图。
 //
-// 分层缓存策略（重要）：
-//   - 上游 quota 数据（windows / credits）耗时（要调各平台 API），5 分钟内存缓存
-//   - today_stats 是本地 usage_logs 聚合，**每次请求重新查询**，不进缓存
-//
-// 如果把 today_stats 和 upstream 数据一起缓存，刚写入的 usage_log 最多要等 5 分钟
-// 才会在账号列表里显示，和"实时监控"的预期不符。
-func (s *Service) GetAccountUsage(ctx context.Context, platform string) (map[string]any, bool, error) {
-	base, refreshing, err := s.getUpstreamUsage(ctx, platform)
-	if err != nil {
-		return nil, false, err
+// 账号页必须传入当前页 ids；这里不再按平台全量扫描账号。读取路径只批量取这些
+// ids 的 Redis usage/today 统计，缓存缺失时后台批量刷新缺失账号。
+func (s *Service) GetAccountUsage(ctx context.Context, platform string, accountIDs []int) (map[string]any, bool, error) {
+	accountIDs = normalizeAccountIDs(accountIDs)
+	if len(accountIDs) == 0 {
+		return map[string]any{}, false, nil
 	}
 
-	// 浅克隆一份：后续把 today_stats 注入克隆体，避免污染缓存里那份"纯上游数据"。
-	// 深度无需——我们只给外层 map 和每个 account map 加一个字段，不会动 windows / credits。
-	result := cloneMergedShallow(base)
+	accounts, missingProfileIDs := s.loadAccountProfilesForUsage(ctx, platform, accountIDs)
+	if len(missingProfileIDs) > 0 {
+		fallback, err := s.repo.ListAll(ctx, ListFilter{Platform: platform, IDs: missingProfileIDs})
+		if err != nil {
+			return nil, false, err
+		}
+		s.cacheAccountProfiles(ctx, fallback)
+		accounts = append(accounts, fallback...)
+	}
 
-	// 每次调用都重新 seed 所有账号到 result。
-	// 原因：上游缓存里只有"上次 populate 时发起过 quota 查询的账号"，error/disabled
-	// 的账号不在上游调用里，不会出现在缓存里，enrichTodayStats 也遍历不到它们，
-	// 前端就看不到今日统计。这一步 DB 开销很小（单列 + 平台索引），但保证用量数据
-	// 对所有状态的账号都能持续显示（包括 error/disabled，便于事后排查）。
-	s.ensureAccountsSeeded(ctx, platform, result)
+	result := make(map[string]any, len(accounts))
+	infos, missingAccounts := s.getUsageInfosForAccounts(ctx, platform, accounts)
+	for _, item := range accounts {
+		key := strconv.Itoa(item.ID)
+		if info, ok := infos[item.ID]; ok {
+			result[key] = accountUsageInfoToMap(info)
+			continue
+		}
+		result[key] = map[string]any{}
+	}
 
 	s.enrichTodayStats(ctx, result)
+	refreshKey := usageCacheAccountsRefreshKey(platform, missingAccounts)
+	refreshing := len(missingAccounts) > 0 || (refreshKey != "" && s.isUsageRefreshRunning(refreshKey))
+	if len(missingAccounts) > 0 {
+		s.ensureUsageCacheRefreshForAccounts(platform, missingAccounts)
+	}
 	return result, refreshing, nil
 }
 
 // GetSingleAccountUsage 查询单个账号当前用量视图。
 //
-// 批量 usage 接口只负责快速返回已有缓存并在后台刷新；账号列表页再对当前页账号
-// 并发调用这个接口。这样某个账号探测完成后能单独更新，不需要等整个平台所有账号
-// 都查询完，也不需要前端短轮询后台刷新状态。
+// 自动刷新路径使用批量 ids 接口；这个接口保留给手动单账号刷新和未来按需查询。
 func (s *Service) GetSingleAccountUsage(ctx context.Context, id int) (map[string]any, error) {
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
 	if err != nil {
@@ -784,25 +855,18 @@ func (s *Service) GetSingleAccountUsage(ctx context.Context, id int) (map[string
 
 	key := strconv.Itoa(item.ID)
 	accountUsage := map[string]any{}
-	var cachedInfo AccountUsageInfo
 	var hasCachedInfo bool
-	if cached, _, ok := s.getUsageCacheForRead(ctx, item.Platform); ok {
-		if info, exists := cached[key]; exists {
-			cachedInfo = info
-			hasCachedInfo = true
-			accountUsage = accountUsageInfoToMap(cachedInfo)
-		}
+	if info, ok := s.getUsageInfoForAccount(ctx, item.ID); ok {
+		hasCachedInfo = true
+		accountUsage = accountUsageInfoToMap(info)
 	}
 
-	if item.Type != "apikey" {
+	if item.Type != "apikey" && !hasCachedInfo {
 		info, usageErrors, ok := s.fetchSingleAccountUsageDedup(ctx, item)
 
 		s.handleSingleAccountUsageErrors(ctx, item, usageErrors)
 		if ok {
 			normalized := normalizeAccountUsageInfo(info)
-			if hasCachedInfo {
-				normalized = mergeAccountUsageInfo(cachedInfo, normalized, s.now())
-			}
 			accountUsage = accountUsageInfoToMap(normalized)
 			s.updateSingleAccountUsageCache(ctx, item.Platform, key, normalized)
 			if item.State != "disabled" {
@@ -819,48 +883,6 @@ func (s *Service) GetSingleAccountUsage(ctx context.Context, id int) (map[string
 	return map[string]any{}, nil
 }
 
-// ensureAccountsSeeded 确保所有账号（不论 status）都在 merged 里有占位条目。
-//
-// 历史上这里只 seed status=active 账号，导致 error / disabled 账号在前端
-// 用量列直接显示"-"。但"用量数据"本身是历史维度的统计（usage_logs 聚合、
-// 上游 quota 快照），和当前能否调度无关——账号即便暂时不可调度，运维也
-// 需要看到它之前的消耗画像来定位问题（是不是 quota 打满导致的限流 / 封号）。
-// 因此对所有账号都 seed 占位，enrichTodayStats 会把今日聚合写进来；上游
-// quota 窗口由 getUpstreamUsage 决定要不要刷新。
-//
-// 不按 plugin meta 的 platform 列表去遍历 —— 那样会在插件尚未加载 / 加载失败
-// 时漏 seed（进而导致前端的 usage_window 整列因为 accounts map 空而被隐藏）。
-// 直接 ListAll 最稳，单次查询，DB 开销微不足道。
-func (s *Service) ensureAccountsSeeded(ctx context.Context, platform string, merged map[string]any) {
-	accounts, err := s.repo.ListAll(ctx, ListFilter{Platform: platform})
-	if err != nil {
-		return
-	}
-	for _, item := range accounts {
-		key := strconv.Itoa(item.ID)
-		if _, exists := merged[key]; !exists {
-			merged[key] = map[string]any{}
-		}
-	}
-}
-
-// getUpstreamUsage 拿到上游账号的 quota 窗口 / credits（Redis KV 缓存到最近 reset，最长 5h）。
-// 返回的 map 结构是 map[accountID]map[string]any，对齐 core 规范化后的 usage/accounts JSON 形态。
-// 这一层不包含 today_stats，由调用方单独注入。
-func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[string]any, bool, error) {
-	cacheKey := usageCachePlatformKey(platform)
-	if cached, fresh, ok := s.getUsageCacheForRead(ctx, cacheKey); ok {
-		refreshing := !fresh || s.isUsageRefreshRunning(cacheKey)
-		if !fresh {
-			s.ensureUsageCacheRefresh(platform)
-		}
-		return accountUsageInfosToMap(cached), refreshing, nil
-	}
-
-	s.ensureUsageCacheRefresh(platform)
-	return map[string]any{}, true, nil
-}
-
 // fetchUpstreamUsageDedup 用 singleflight 合并同一 platform 的并发上游探测。
 // 注意：成功后返回的 map 在并发调用之间共享，调用方禁止就地修改。
 func (s *Service) fetchUpstreamUsageDedup(ctx context.Context, platform string) (map[string]AccountUsageInfo, error) {
@@ -874,63 +896,52 @@ func (s *Service) fetchUpstreamUsageDedup(ctx context.Context, platform string) 
 }
 
 func (s *Service) fetchUpstreamUsage(ctx context.Context, platform string) (map[string]AccountUsageInfo, error) {
-	type platformQuery struct {
-		platform string
-		inst     *plugin.PluginInstance
+	accounts, err := s.repo.ListAll(ctx, ListFilter{Platform: platform})
+	if err != nil {
+		return nil, err
 	}
+	return s.fetchUpstreamUsageForAccounts(ctx, accounts)
+}
 
-	var queries []platformQuery
-	if s.plugins == nil {
-		return map[string]AccountUsageInfo{}, nil
-	}
-	if platform != "" {
-		inst := s.plugins.GetPluginByPlatform(platform)
-		if inst != nil {
-			queries = append(queries, platformQuery{platform: platform, inst: inst})
-		}
-	} else {
-		for _, meta := range s.plugins.GetAllPluginMeta() {
-			if meta.Platform == "" {
-				continue
-			}
-			inst := s.plugins.GetPluginByPlatform(meta.Platform)
-			if inst != nil {
-				queries = append(queries, platformQuery{platform: meta.Platform, inst: inst})
-			}
-		}
-	}
-
+func (s *Service) fetchUpstreamUsageForAccounts(ctx context.Context, accounts []Account) (map[string]AccountUsageInfo, error) {
 	merged := make(map[string]AccountUsageInfo)
-	for _, query := range queries {
-		accounts, err := s.repo.ListByPlatform(ctx, query.platform)
-		if err != nil || len(accounts) == 0 {
+	for _, item := range accounts {
+		if item.Type != "apikey" && item.ID > 0 {
+			merged[strconv.Itoa(item.ID)] = AccountUsageInfo{}
+		}
+	}
+	if s.plugins == nil || len(accounts) == 0 {
+		return merged, nil
+	}
+
+	accountsByPlatform := make(map[string][]Account)
+	for _, item := range accounts {
+		if item.Platform == "" || item.Type == "apikey" {
+			continue
+		}
+		accountsByPlatform[item.Platform] = append(accountsByPlatform[item.Platform], item)
+	}
+
+	for platform, platformAccounts := range accountsByPlatform {
+		inst := s.plugins.GetPluginByPlatform(platform)
+		if inst == nil || inst.Gateway == nil {
 			continue
 		}
 
-		// 所有账号（含 disabled）都给 merged 占位，确保前端能看到用量窗口。
-		// apikey 账号走不到下面的插件调用（没有上游 quota 接口），只显示 today_stats。
-		// disabled 账号也查配额但不参与限流状态推导，避免覆盖手动关闭调度的状态。
 		// 建立 accountID → 是否池子 的查询表，用于后面插件返回 errors
 		// 时判断是否应该跳过 MarkError（池子账号永远不自动标错）
-		poolByID := make(map[int]bool, len(accounts))
-		for _, item := range accounts {
+		poolByID := make(map[int]bool, len(platformAccounts))
+		for _, item := range platformAccounts {
 			poolByID[item.ID] = item.UpstreamIsPool
 		}
 
-		disabledIDs := make(map[int]bool, len(accounts))
-		allowedIDs := make(map[string]struct{}, len(accounts))
-		reqList := make([]accountUsageRequest, 0, len(accounts))
-		for _, item := range accounts {
+		disabledIDs := make(map[int]bool, len(platformAccounts))
+		allowedIDs := make(map[string]struct{}, len(platformAccounts))
+		reqList := make([]accountUsageRequest, 0, len(platformAccounts))
+		for _, item := range platformAccounts {
 			key := strconv.Itoa(item.ID)
-			if _, exists := merged[key]; !exists {
-				merged[key] = AccountUsageInfo{}
-			}
 			if item.State == "disabled" {
 				disabledIDs[item.ID] = true
-			}
-			// apikey 类型不调插件（没有上游 quota 接口）
-			if item.Type == "apikey" {
-				continue
 			}
 			allowedIDs[key] = struct{}{}
 			reqList = append(reqList, accountUsageRequest{
@@ -943,7 +954,7 @@ func (s *Service) fetchUpstreamUsage(ctx context.Context, platform string) (map[
 		}
 
 		body, _ := json.Marshal(reqList)
-		status, _, respBody, err := query.inst.Gateway.HandleHTTPRequest(ctx, "POST", "usage/accounts", "", nil, body)
+		status, _, respBody, err := inst.Gateway.HandleHTTPRequest(ctx, "POST", "usage/accounts", "", nil, body)
 		if err != nil || status != http.StatusOK {
 			continue
 		}
@@ -953,8 +964,6 @@ func (s *Service) fetchUpstreamUsage(ctx context.Context, platform string) (map[
 			continue
 		}
 
-		// 插件返回的 OAuth 账号会覆盖掉占位的空 map（插件响应里有完整的
-		// windows / credits）；apikey 账号的占位保持原样。
 		normalizedAccounts := make(map[string]AccountUsageInfo, len(result.Accounts))
 		for key, value := range result.Accounts {
 			if _, ok := allowedIDs[key]; !ok {
@@ -991,8 +1000,8 @@ func (s *Service) fetchUpstreamUsage(ctx context.Context, platform string) (map[
 }
 
 // fetchSingleAccountUsageDedup 在 (platform, accountID) 维度上对单账号 probe 做
-// singleflight 合并：前端 useQueries 一次性 fan-out N 个账号刷新时，重复点同一
-// 账号（或后台 batch refresh 正在 flying 时穿透进来的 probe）只会真正打一次插件。
+// singleflight 合并：重复点同一账号（或后台 batch refresh 正在 flying 时穿透进来的
+// probe）只会真正打一次插件。
 // 调用方对 ctx 的语义：第一次入队的 goroutine 决定上游请求生命周期，30s 超时
 // 是给 plugin 端的硬上限。后到的并发请求复用其结果，自己的 ctx.Done 仍可早退。
 func (s *Service) fetchSingleAccountUsageDedup(ctx context.Context, item Account) (AccountUsageInfo, []accountUsageError, bool) {
@@ -1089,69 +1098,37 @@ func (s *Service) handleSingleAccountUsageErrors(ctx context.Context, item Accou
 	}
 }
 
-// updateSingleAccountUsageCache 把单账号的最新探测结果合并回 platform 与 __all__
-// 两个缓存键。整段 read-modify-write 必须在 usageMu 下原子完成，否则同一 cacheKey
-// 上的并发 merge 会出现"先读取的副本最后写回"，把别人刚写入的其他账号更新丢掉。
-// Redis 写入放到锁外执行，避免网络 IO 阻塞其他缓存读者；Redis 的 last-write-wins
-// 与 setUsageCache 的既有行为一致，不在此处加强。
+// updateSingleAccountUsageCache 把单账号最新探测结果写入单账号 Redis key。
 func (s *Service) updateSingleAccountUsageCache(ctx context.Context, platform, accountKey string, info AccountUsageInfo) {
-	type pendingWrite struct {
-		cacheKey string
-		snapshot map[string]AccountUsageInfo
-	}
-	var pending []pendingWrite
-	now := s.now()
-
-	s.usageMu.Lock()
-	for _, raw := range usageCacheKeysForInvalidation(platform) {
-		cacheKey := usageCachePlatformKey(raw)
-		entry, ok := s.usageCache[cacheKey]
-		if !ok {
-			continue
-		}
-		next := cloneAccountUsageInfoMap(entry.data)
-		if existing, ok := next[accountKey]; ok {
-			next[accountKey] = mergeAccountUsageInfo(existing, info, now)
-		} else {
-			next[accountKey] = info
-		}
-		expiresAt := usageCacheExpiresAt(next, now)
-		if expiresAt.Sub(now) < usageCacheMinimumTTL {
-			expiresAt = now.Add(usageCacheMinimumTTL)
-		}
-		s.usageCache[cacheKey] = &usageCacheEntry{data: next, expiresAt: expiresAt}
-		pending = append(pending, pendingWrite{cacheKey: cacheKey, snapshot: next})
-	}
-	s.usageMu.Unlock()
-
-	if s.usageRedis == nil {
+	accountID, err := strconv.Atoi(accountKey)
+	if err != nil || accountID <= 0 {
 		return
 	}
-	for _, p := range pending {
-		s.writeUsageCacheRedis(ctx, p.cacheKey, p.snapshot)
+	now := s.now()
+	if existing, ok := s.getUsageInfoForAccount(ctx, accountID); ok {
+		info = mergeAccountUsageInfo(existing, info, now)
 	}
+	s.mergeUsageMemoryCache(platform, accountKey, info, now)
+	s.writeUsageInfoCache(ctx, accountID, info, now)
 }
 
-// writeUsageCacheRedis 把内存里已经合并好的快照同步到 Redis。
-// 仅负责 Redis 端写入，调用方负责确保 in-memory 状态已经正确更新。
-func (s *Service) writeUsageCacheRedis(ctx context.Context, cacheKey string, accounts map[string]AccountUsageInfo) {
+func (s *Service) writeUsageInfoCache(ctx context.Context, accountID int, info AccountUsageInfo, now time.Time) {
 	if s.usageRedis == nil {
 		return
 	}
-	now := s.now()
-	expiresAt := usageCacheExpiresAt(accounts, now)
+	expiresAt := accountUsageInfoExpiresAt(info, now)
 	ttl := expiresAt.Sub(now)
 	if ttl < usageCacheMinimumTTL {
 		ttl = usageCacheMinimumTTL
 		expiresAt = now.Add(ttl)
 	}
-	payload := newAccountUsageCachePayload(accounts, now, expiresAt)
+	payload := newAccountUsageCachePayload(info, now, expiresAt)
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return
 	}
-	if err := s.usageRedis.Set(ctx, usageCacheRedisKey(cacheKey), body, ttl).Err(); err != nil {
-		slog.Debug("account_usage_cache_set_failed", "cache_key", cacheKey, sdk.LogFieldError, err)
+	if err := s.usageRedis.Set(ctx, accountcache.UsageKey(accountID), body, ttl).Err(); err != nil {
+		slog.Debug("account_usage_cache_set_failed", sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
 	}
 }
 
@@ -1171,61 +1148,155 @@ func usageCachePlatformKey(platform string) string {
 	return platform
 }
 
+func normalizeAccountIDs(ids []int) []int {
+	if len(ids) == 0 {
+		return nil
+	}
+	seen := make(map[int]struct{}, len(ids))
+	result := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
+}
+
+func filterRefreshableUsageAccounts(accounts []Account) []Account {
+	result := make([]Account, 0, len(accounts))
+	for _, item := range accounts {
+		if item.Type == "apikey" {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func accountIDsFromAccounts(accounts []Account) []int {
+	ids := make([]int, 0, len(accounts))
+	for _, item := range accounts {
+		if item.ID > 0 {
+			ids = append(ids, item.ID)
+		}
+	}
+	return normalizeAccountIDs(ids)
+}
+
+func usageCacheAccountsRefreshKey(platform string, accounts []Account) string {
+	return usageCacheAccountIDsRefreshKey(platform, accountIDsFromAccounts(filterRefreshableUsageAccounts(accounts)))
+}
+
+func usageCacheAccountIDsRefreshKey(platform string, ids []int) string {
+	ids = normalizeAccountIDs(ids)
+	if len(ids) == 0 {
+		return ""
+	}
+	sort.Ints(ids)
+	parts := make([]string, 0, len(ids))
+	for _, id := range ids {
+		parts = append(parts, strconv.Itoa(id))
+	}
+	return usageCachePlatformKey(platform) + ":accounts:" + strings.Join(parts, ",")
+}
+
 func usageCacheKeysForInvalidation(platform string) []string {
 	key := usageCachePlatformKey(platform)
 	if key == "__all__" {
 		return []string{"__all__"}
 	}
-	return []string{key, "__all__"}
+	return []string{key}
 }
 
-func usageCacheRedisKey(cacheKey string) string {
-	return "ag:account_usage:" + usageCachePlatformKey(cacheKey)
-}
-
-func (s *Service) getUsageCacheForRead(ctx context.Context, cacheKey string) (map[string]AccountUsageInfo, bool, bool) {
-	cacheKey = usageCachePlatformKey(cacheKey)
-	if accounts, expiresAt, ok := s.getUsageCacheFromRedis(ctx, cacheKey); ok {
-		s.setUsageMemoryCache(cacheKey, accounts, expiresAt)
-		return accounts, true, true
-	}
-
-	now := s.now()
-	s.usageMu.RLock()
-	entry, ok := s.usageCache[cacheKey]
-	if ok {
-		data := entry.data
-		fresh := now.Before(entry.expiresAt)
-		s.usageMu.RUnlock()
-		return data, fresh, true
-	}
-	s.usageMu.RUnlock()
-	return nil, false, false
-}
-
-func (s *Service) getUsageCacheFromRedis(ctx context.Context, cacheKey string) (map[string]AccountUsageInfo, time.Time, bool) {
+func (s *Service) getUsageInfoForAccount(ctx context.Context, accountID int) (AccountUsageInfo, bool) {
 	if s.usageRedis == nil {
-		return nil, time.Time{}, false
+		return AccountUsageInfo{}, false
 	}
-	raw, err := s.usageRedis.Get(ctx, usageCacheRedisKey(cacheKey)).Bytes()
+	raw, err := s.usageRedis.Get(ctx, accountcache.UsageKey(accountID)).Bytes()
 	if err != nil {
 		if !errors.Is(err, redis.Nil) {
-			slog.Debug("account_usage_cache_get_failed", "cache_key", cacheKey, sdk.LogFieldError, err)
+			slog.Debug("account_usage_cache_get_failed", sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
 		}
-		return nil, time.Time{}, false
+		return AccountUsageInfo{}, false
 	}
 	var payload accountUsageCachePayload
 	if err := json.Unmarshal(raw, &payload); err != nil || !payload.valid() {
-		s.deleteUsageCacheKeys([]string{cacheKey})
-		return nil, time.Time{}, false
+		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
+		return AccountUsageInfo{}, false
 	}
 	now := s.now()
 	expiresAt := payload.cacheExpiresAt(now)
 	if !expiresAt.After(now) {
-		s.deleteUsageCacheKeys([]string{cacheKey})
-		return nil, time.Time{}, false
+		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
+		return AccountUsageInfo{}, false
 	}
-	return payload.Accounts, expiresAt, true
+	return payload.Info, true
+}
+
+func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string, accounts []Account) (map[int]AccountUsageInfo, []Account) {
+	result := make(map[int]AccountUsageInfo, len(accounts))
+	if len(accounts) == 0 {
+		return result, nil
+	}
+	missingAccounts := make([]Account, 0)
+	if s.usageRedis == nil {
+		if memory, fresh, ok := s.getUsageMemoryCache(platform); ok {
+			for _, item := range accounts {
+				info, exists := memory[strconv.Itoa(item.ID)]
+				if !exists {
+					if item.Type != "apikey" {
+						missingAccounts = append(missingAccounts, item)
+					}
+					continue
+				}
+				result[item.ID] = info
+				if !fresh && item.Type != "apikey" {
+					missingAccounts = append(missingAccounts, item)
+				}
+			}
+			return result, missingAccounts
+		}
+		return result, filterRefreshableUsageAccounts(accounts)
+	}
+	pipe := s.usageRedis.Pipeline()
+	cmds := make(map[int]*redis.StringCmd, len(accounts))
+	for _, item := range accounts {
+		cmds[item.ID] = pipe.Get(ctx, accountcache.UsageKey(item.ID))
+	}
+	_, _ = pipe.Exec(ctx)
+	for _, item := range accounts {
+		cmd := cmds[item.ID]
+		raw, err := cmd.Bytes()
+		if err != nil {
+			if item.Type != "apikey" {
+				missingAccounts = append(missingAccounts, item)
+			}
+			continue
+		}
+		var payload accountUsageCachePayload
+		if err := json.Unmarshal(raw, &payload); err != nil || !payload.valid() {
+			_ = s.usageRedis.Del(ctx, accountcache.UsageKey(item.ID)).Err()
+			if item.Type != "apikey" {
+				missingAccounts = append(missingAccounts, item)
+			}
+			continue
+		}
+		expiresAt := payload.cacheExpiresAt(s.now())
+		if !expiresAt.After(s.now()) {
+			_ = s.usageRedis.Del(ctx, accountcache.UsageKey(item.ID)).Err()
+			if item.Type != "apikey" {
+				missingAccounts = append(missingAccounts, item)
+			}
+			continue
+		}
+		result[item.ID] = payload.Info
+	}
+	return result, missingAccounts
 }
 
 func (s *Service) setUsageCache(ctx context.Context, cacheKey string, accounts map[string]AccountUsageInfo) {
@@ -1233,22 +1304,13 @@ func (s *Service) setUsageCache(ctx context.Context, cacheKey string, accounts m
 	now := s.now()
 	accounts = s.mergeUsageCacheAccounts(cacheKey, accounts, now)
 	expiresAt := usageCacheExpiresAt(accounts, now)
-	ttl := expiresAt.Sub(now)
-	if ttl < usageCacheMinimumTTL {
-		ttl = usageCacheMinimumTTL
-		expiresAt = now.Add(ttl)
-	}
 	s.setUsageMemoryCache(cacheKey, accounts, expiresAt)
-	if s.usageRedis == nil {
-		return
-	}
-	payload := newAccountUsageCachePayload(accounts, now, expiresAt)
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return
-	}
-	if err := s.usageRedis.Set(ctx, usageCacheRedisKey(cacheKey), body, ttl).Err(); err != nil {
-		slog.Debug("account_usage_cache_set_failed", "cache_key", cacheKey, sdk.LogFieldError, err)
+	for key, info := range accounts {
+		accountID, err := strconv.Atoi(key)
+		if err != nil || accountID <= 0 {
+			continue
+		}
+		s.writeUsageInfoCache(ctx, accountID, info, now)
 	}
 }
 
@@ -1277,22 +1339,63 @@ func (s *Service) setUsageMemoryCache(cacheKey string, accounts map[string]Accou
 	s.usageMu.Unlock()
 }
 
-func (s *Service) deleteUsageCacheKeys(keys []string) {
-	if s.usageRedis == nil || len(keys) == 0 {
-		return
+func (s *Service) getUsageMemoryCache(cacheKey string) (map[string]AccountUsageInfo, bool, bool) {
+	cacheKey = usageCachePlatformKey(cacheKey)
+	now := s.now()
+	s.usageMu.RLock()
+	entry, ok := s.usageCache[cacheKey]
+	if !ok {
+		s.usageMu.RUnlock()
+		return nil, false, false
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	redisKeys := make([]string, 0, len(keys))
-	for _, key := range keys {
-		if key == "__all__" {
-			redisKeys = append(redisKeys, usageCacheRedisKey(key))
+	data := entry.data
+	fresh := now.Before(entry.expiresAt)
+	s.usageMu.RUnlock()
+	return data, fresh, true
+}
+
+func (s *Service) mergeUsageMemoryCache(platform, accountKey string, info AccountUsageInfo, now time.Time) {
+	s.usageMu.Lock()
+	defer s.usageMu.Unlock()
+	for _, raw := range usageCacheKeysForInvalidation(platform) {
+		cacheKey := usageCachePlatformKey(raw)
+		entry, ok := s.usageCache[cacheKey]
+		if !ok {
 			continue
 		}
-		redisKeys = append(redisKeys, usageCacheRedisKey(key))
+		next := cloneAccountUsageInfoMap(entry.data)
+		if existing, ok := next[accountKey]; ok {
+			next[accountKey] = mergeAccountUsageInfo(existing, info, now)
+		} else {
+			next[accountKey] = info
+		}
+		s.usageCache[cacheKey] = &usageCacheEntry{data: next, expiresAt: usageCacheExpiresAt(next, now)}
 	}
-	if len(redisKeys) > 0 {
+}
+
+func (s *Service) deleteUsageCacheKeys(keys []string) {
+	if len(keys) == 0 {
+		return
+	}
+	if s.usageRedis == nil {
+		return
+	}
+	for _, key := range keys {
+		if key == "__all__" {
+			s.deleteAllUsageCacheKeys()
+			continue
+		}
+		accounts, err := s.repo.ListAll(context.Background(), ListFilter{Platform: key})
+		if err != nil || len(accounts) == 0 {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		redisKeys := make([]string, 0, len(accounts))
+		for _, item := range accounts {
+			redisKeys = append(redisKeys, accountcache.UsageKey(item.ID))
+		}
 		_ = s.usageRedis.Del(ctx, redisKeys...).Err()
+		cancel()
 	}
 }
 
@@ -1304,7 +1407,7 @@ func (s *Service) deleteAllUsageCacheKeys() {
 	defer cancel()
 	var cursor uint64
 	for {
-		keys, next, err := s.usageRedis.Scan(ctx, cursor, "ag:account_usage:*", 50).Result()
+		keys, next, err := s.usageRedis.Scan(ctx, cursor, accountcache.UsagePattern(), 50).Result()
 		if err != nil {
 			return
 		}
@@ -1324,6 +1427,10 @@ func (s *Service) refreshUsageCacheAsync(platform string) {
 
 func (s *Service) ensureUsageCacheRefresh(platform string) {
 	s.startUsageCacheRefresh(platform, false)
+}
+
+func (s *Service) ensureUsageCacheRefreshForAccounts(platform string, accounts []Account) {
+	s.startUsageCacheRefreshForAccountIDs(platform, accountIDsFromAccounts(filterRefreshableUsageAccounts(accounts)), false)
 }
 
 func (s *Service) startUsageCacheRefresh(platform string, queueIfRunning bool) {
@@ -1350,6 +1457,27 @@ func (s *Service) isUsageRefreshRunning(cacheKey string) bool {
 	return running
 }
 
+func (s *Service) startUsageCacheRefreshForAccountIDs(platform string, accountIDs []int, queueIfRunning bool) {
+	accountIDs = normalizeAccountIDs(accountIDs)
+	cacheKey := usageCacheAccountIDsRefreshKey(platform, accountIDs)
+	if cacheKey == "" {
+		return
+	}
+
+	s.usageRefreshMu.Lock()
+	if _, running := s.usageRefreshRunning[cacheKey]; running {
+		if queueIfRunning {
+			s.usageRefreshPending[cacheKey] = true
+		}
+		s.usageRefreshMu.Unlock()
+		return
+	}
+	s.usageRefreshRunning[cacheKey] = struct{}{}
+	s.usageRefreshMu.Unlock()
+
+	go s.runUsageCacheRefreshAccountIDsLoop(platform, cacheKey, append([]int(nil), accountIDs...))
+}
+
 func (s *Service) runUsageCacheRefreshLoop(platform, cacheKey string) {
 	// 兜底：任何一次 fetch panic 都不能让该 platform 的 refresh 永久卡死。
 	// 必须先解除 running/pending 标记，再 recover；否则下次 refreshUsageCacheAsync
@@ -1371,6 +1499,48 @@ func (s *Service) runUsageCacheRefreshLoop(platform, cacheKey string) {
 		if err == nil {
 			s.setUsageCache(ctx, cacheKey, accounts)
 		} else {
+			slog.Debug("account_usage_cache_refresh_failed",
+				sdk.LogFieldPlatform, platform,
+				sdk.LogFieldError, err)
+		}
+		cancel()
+
+		s.usageRefreshMu.Lock()
+		if s.usageRefreshPending[cacheKey] {
+			delete(s.usageRefreshPending, cacheKey)
+			s.usageRefreshMu.Unlock()
+			continue
+		}
+		delete(s.usageRefreshRunning, cacheKey)
+		s.usageRefreshMu.Unlock()
+		return
+	}
+}
+
+func (s *Service) runUsageCacheRefreshAccountIDsLoop(platform, cacheKey string, accountIDs []int) {
+	defer func() {
+		s.usageRefreshMu.Lock()
+		delete(s.usageRefreshRunning, cacheKey)
+		delete(s.usageRefreshPending, cacheKey)
+		s.usageRefreshMu.Unlock()
+		if r := recover(); r != nil {
+			slog.Error("account_usage_cache_refresh_panic",
+				sdk.LogFieldPlatform, platform,
+				"panic", r)
+		}
+	}()
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		accounts, err := s.repo.ListAll(ctx, ListFilter{Platform: platform, IDs: accountIDs})
+		if err == nil {
+			var usage map[string]AccountUsageInfo
+			usage, err = s.fetchUpstreamUsageForAccounts(ctx, accounts)
+			if err == nil {
+				s.setUsageCache(ctx, platform, usage)
+				s.cacheAccountProfiles(ctx, accounts)
+			}
+		}
+		if err != nil {
 			slog.Debug("account_usage_cache_refresh_failed",
 				sdk.LogFieldPlatform, platform,
 				sdk.LogFieldError, err)
@@ -1549,12 +1719,20 @@ func (s *Service) enrichTodayStats(ctx context.Context, merged map[string]any) {
 		return
 	}
 
-	// 今天 00:00（服务器本地时区；time.Local 与 usage_logs.created_at 存储时区一致）
-	todayStart := timezone.StartOfDay(s.now().In(time.Local))
-
-	statsMap, err := s.repo.BatchWindowStats(ctx, accountIDs, todayStart)
-	if err != nil {
-		return
+	now := s.now()
+	day := accountcache.Day(now)
+	statsMap, missingIDs := s.loadTodayStatsCache(ctx, day, accountIDs)
+	if len(missingIDs) > 0 {
+		// 今天 00:00（服务器本地时区；time.Local 与 usage_logs.created_at 存储时区一致）
+		todayStart := timezone.StartOfDay(now.In(time.Local))
+		fallback, err := s.repo.BatchWindowStats(ctx, missingIDs, todayStart)
+		if err == nil {
+			for _, accountID := range missingIDs {
+				stats := fallback[accountID]
+				statsMap[accountID] = stats
+				s.writeTodayStatsCache(ctx, day, accountID, stats)
+			}
+		}
 	}
 
 	for accountID, accountMap := range accountMaps {
@@ -1569,6 +1747,251 @@ func (s *Service) enrichTodayStats(ctx context.Context, merged map[string]any) {
 			"account_cost": stats.AccountCost,
 			"user_cost":    stats.UserCost,
 		}
+	}
+}
+
+func (s *Service) loadTodayStatsCache(ctx context.Context, day string, accountIDs []int) (map[int]AccountWindowStats, []int) {
+	result := make(map[int]AccountWindowStats, len(accountIDs))
+	if s.usageRedis == nil || len(accountIDs) == 0 {
+		return result, accountIDs
+	}
+	pipe := s.usageRedis.Pipeline()
+	cmds := make(map[int]*redis.MapStringStringCmd, len(accountIDs))
+	for _, accountID := range accountIDs {
+		cmds[accountID] = pipe.HGetAll(ctx, accountcache.TodayStatsKey(day, accountID))
+	}
+	_, _ = pipe.Exec(ctx)
+	missing := make([]int, 0)
+	for _, accountID := range accountIDs {
+		values, err := cmds[accountID].Result()
+		if err != nil || len(values) == 0 {
+			missing = append(missing, accountID)
+			continue
+		}
+		stats, ok := parseCachedTodayStats(values)
+		if !ok {
+			missing = append(missing, accountID)
+			continue
+		}
+		result[accountID] = stats
+	}
+	return result, missing
+}
+
+func parseCachedTodayStats(values map[string]string) (AccountWindowStats, bool) {
+	requests, _ := strconv.ParseInt(values["requests"], 10, 64)
+	tokens, _ := strconv.ParseInt(values["tokens"], 10, 64)
+	accountCost, _ := strconv.ParseFloat(values["account_cost"], 64)
+	userCost, _ := strconv.ParseFloat(values["user_cost"], 64)
+	return AccountWindowStats{
+		Requests:    requests,
+		Tokens:      tokens,
+		AccountCost: accountCost,
+		UserCost:    userCost,
+	}, true
+}
+
+func (s *Service) writeTodayStatsCache(ctx context.Context, day string, accountID int, stats AccountWindowStats) {
+	if s.usageRedis == nil {
+		return
+	}
+	key := accountcache.TodayStatsKey(day, accountID)
+	pipe := s.usageRedis.Pipeline()
+	pipe.HSet(ctx, key, map[string]any{
+		"requests":     stats.Requests,
+		"tokens":       stats.Tokens,
+		"account_cost": stats.AccountCost,
+		"user_cost":    stats.UserCost,
+		"updated_at":   s.now().UTC().Format(time.RFC3339),
+	})
+	pipe.Expire(ctx, key, accountcache.TodayStatsTTL)
+	_, _ = pipe.Exec(ctx)
+}
+
+func (s *Service) loadImageStatsCache(ctx context.Context, day string, accountIDs []int) (map[int]AccountImageStats, []int) {
+	result := make(map[int]AccountImageStats, len(accountIDs))
+	if s.usageRedis == nil || len(accountIDs) == 0 {
+		return result, accountIDs
+	}
+	pipe := s.usageRedis.Pipeline()
+	totalCmds := make(map[int]*redis.StringCmd, len(accountIDs))
+	todayCmds := make(map[int]*redis.StringCmd, len(accountIDs))
+	for _, accountID := range accountIDs {
+		totalCmds[accountID] = pipe.Get(ctx, accountcache.ImageTotalKey(accountID))
+		todayCmds[accountID] = pipe.Get(ctx, accountcache.ImageTodayKey(day, accountID))
+	}
+	_, _ = pipe.Exec(ctx)
+	missing := make([]int, 0)
+	for _, accountID := range accountIDs {
+		total, totalErr := totalCmds[accountID].Int64()
+		today, todayErr := todayCmds[accountID].Int64()
+		if totalErr != nil || todayErr != nil {
+			missing = append(missing, accountID)
+			continue
+		}
+		result[accountID] = AccountImageStats{TodayCount: today, TotalCount: total}
+	}
+	return result, missing
+}
+
+func (s *Service) writeImageStatsCache(ctx context.Context, day string, accountID int, stats AccountImageStats) {
+	if s.usageRedis == nil {
+		return
+	}
+	pipe := s.usageRedis.Pipeline()
+	pipe.Set(ctx, accountcache.ImageTotalKey(accountID), stats.TotalCount, accountcache.ImageTotalTTL)
+	pipe.Set(ctx, accountcache.ImageTodayKey(day, accountID), stats.TodayCount, accountcache.TodayStatsTTL)
+	_, _ = pipe.Exec(ctx)
+}
+
+func (s *Service) loadAccountProfilesForUsage(ctx context.Context, platform string, accountIDs []int) ([]Account, []int) {
+	if s.usageRedis == nil || len(accountIDs) == 0 {
+		return nil, accountIDs
+	}
+	pipe := s.usageRedis.Pipeline()
+	cmds := make(map[int]*redis.StringCmd, len(accountIDs))
+	for _, accountID := range accountIDs {
+		cmds[accountID] = pipe.Get(ctx, accountcache.ProfileKey(accountID))
+	}
+	_, _ = pipe.Exec(ctx)
+
+	accounts := make([]Account, 0, len(accountIDs))
+	missing := make([]int, 0)
+	for _, accountID := range accountIDs {
+		raw, err := cmds[accountID].Bytes()
+		if err != nil {
+			missing = append(missing, accountID)
+			continue
+		}
+		var payload accountProfileCachePayload
+		if err := json.Unmarshal(raw, &payload); err != nil || payload.ID != accountID {
+			_ = s.usageRedis.Del(ctx, accountcache.ProfileKey(accountID)).Err()
+			missing = append(missing, accountID)
+			continue
+		}
+		account, ok := accountProfileCacheToAccount(payload)
+		if !ok || (platform != "" && account.Platform != platform) {
+			missing = append(missing, accountID)
+			continue
+		}
+		accounts = append(accounts, account)
+	}
+	return accounts, missing
+}
+
+func (s *Service) cacheAccountProfiles(ctx context.Context, accounts []Account) {
+	if s.usageRedis == nil || len(accounts) == 0 {
+		return
+	}
+	pipe := s.usageRedis.Pipeline()
+	for _, item := range accounts {
+		payload := accountProfileCacheFromAccount(item)
+		body, err := json.Marshal(payload)
+		if err != nil {
+			continue
+		}
+		pipe.Set(ctx, accountcache.ProfileKey(item.ID), body, accountcache.ProfileTTL)
+		if item.Platform != "" {
+			pipe.SAdd(ctx, accountcache.PlatformKey(item.Platform), item.ID)
+			pipe.Expire(ctx, accountcache.PlatformKey(item.Platform), accountcache.ProfileTTL)
+		}
+	}
+	_, _ = pipe.Exec(ctx)
+}
+
+func accountProfileCacheFromAccount(item Account) accountProfileCachePayload {
+	payload := accountProfileCachePayload{
+		ID:             item.ID,
+		Name:           item.Name,
+		Platform:       item.Platform,
+		Type:           item.Type,
+		State:          item.State,
+		Priority:       item.Priority,
+		MaxConcurrency: item.MaxConcurrency,
+		RateMultiplier: item.RateMultiplier,
+		ErrorMsg:       item.ErrorMsg,
+		UpstreamIsPool: item.UpstreamIsPool,
+		GroupIDs:       item.GroupIDs,
+		CreatedAt:      item.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:      item.UpdatedAt.UTC().Format(time.RFC3339),
+	}
+	if item.StateUntil != nil {
+		payload.StateUntil = item.StateUntil.UTC().Format(time.RFC3339)
+	}
+	if item.LastUsedAt != nil {
+		payload.LastUsedAt = item.LastUsedAt.UTC().Format(time.RFC3339)
+	}
+	if item.Proxy != nil {
+		proxyID := item.Proxy.ID
+		payload.ProxyID = &proxyID
+	}
+	return payload
+}
+
+func accountProfileCacheToAccount(payload accountProfileCachePayload) (Account, bool) {
+	if payload.ID <= 0 {
+		return Account{}, false
+	}
+	account := Account{
+		ID:                 payload.ID,
+		Name:               payload.Name,
+		Platform:           payload.Platform,
+		Type:               payload.Type,
+		Credentials:        map[string]string{},
+		State:              payload.State,
+		Priority:           payload.Priority,
+		MaxConcurrency:     payload.MaxConcurrency,
+		RateMultiplier:     payload.RateMultiplier,
+		ErrorMsg:           payload.ErrorMsg,
+		UpstreamIsPool:     payload.UpstreamIsPool,
+		GroupIDs:           append([]int64(nil), payload.GroupIDs...),
+		CreatedAt:          parseAccountProfileCacheTime(payload.CreatedAt),
+		UpdatedAt:          parseAccountProfileCacheTime(payload.UpdatedAt),
+		CurrentConcurrency: 0,
+	}
+	if payload.StateUntil != "" {
+		parsed := parseAccountProfileCacheTime(payload.StateUntil)
+		account.StateUntil = &parsed
+	}
+	if payload.LastUsedAt != "" {
+		parsed := parseAccountProfileCacheTime(payload.LastUsedAt)
+		account.LastUsedAt = &parsed
+	}
+	if payload.ProxyID != nil {
+		account.Proxy = &Proxy{ID: *payload.ProxyID}
+	}
+	return account, true
+}
+
+func parseAccountProfileCacheTime(raw string) time.Time {
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed
+	}
+	return time.Time{}
+}
+
+func (s *Service) deleteAccountCacheKeys(accountIDs []int) {
+	if s.usageRedis == nil || len(accountIDs) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	day := accountcache.Day(s.now())
+	keys := make([]string, 0, len(accountIDs)*5)
+	for _, id := range accountIDs {
+		if id <= 0 {
+			continue
+		}
+		keys = append(keys,
+			accountcache.ProfileKey(id),
+			accountcache.UsageKey(id),
+			accountcache.TodayStatsKey(day, id),
+			accountcache.ImageTotalKey(id),
+			accountcache.ImageTodayKey(day, id),
+		)
+	}
+	if len(keys) > 0 {
+		_ = s.usageRedis.Del(ctx, keys...).Err()
 	}
 }
 

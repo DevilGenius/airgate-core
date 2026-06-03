@@ -114,6 +114,7 @@ func (s *Server) registerRoutes() {
 		// 账号管理
 		adminGroup.GET("/accounts", handlers.Account.ListAccounts)
 		adminGroup.GET("/accounts/usage", handlers.Account.GetAccountUsage)
+		adminGroup.GET("/accounts/capacity", handlers.Account.GetAccountCapacity)
 		adminGroup.GET("/accounts/export", handlers.Account.ExportAccounts)
 		adminGroup.POST("/accounts/import", handlers.Account.ImportAccounts)
 		adminGroup.POST("/accounts/bulk-update", handlers.Account.BulkUpdateAccounts)

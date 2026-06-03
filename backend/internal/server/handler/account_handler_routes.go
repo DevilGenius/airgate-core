@@ -478,7 +478,7 @@ func (h *AccountHandler) GetAccountModels(c *gin.Context) {
 
 // GetAccountUsage 获取账号额度信息。
 func (h *AccountHandler) GetAccountUsage(c *gin.Context) {
-	usage, refreshing, err := h.service.GetAccountUsage(c.Request.Context(), c.Query("platform"))
+	usage, refreshing, err := h.service.GetAccountUsage(c.Request.Context(), c.Query("platform"), parseIDList(c.Query("ids")))
 	if err != nil {
 		httpCode, message := h.handleError("查询账号额度失败", "查询失败", err)
 		response.Error(c, httpCode, httpCode, message)
@@ -488,6 +488,14 @@ func (h *AccountHandler) GetAccountUsage(c *gin.Context) {
 	response.Success(c, map[string]any{
 		"accounts":   usage,
 		"refreshing": refreshing,
+	})
+}
+
+// GetAccountCapacity 获取账号当前并发容量。
+func (h *AccountHandler) GetAccountCapacity(c *gin.Context) {
+	counts := h.service.GetCapacity(c.Request.Context(), parseIDList(c.Query("ids")))
+	response.Success(c, map[string]any{
+		"accounts": counts,
 	})
 }
 

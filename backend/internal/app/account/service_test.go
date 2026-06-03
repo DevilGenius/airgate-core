@@ -614,7 +614,10 @@ func TestGetAccountUsage_NoCacheReturnsSeededStatsWhileRefreshing(t *testing.T) 
 				if filter.Platform != "openai" {
 					t.Fatalf("Platform = %q, want openai", filter.Platform)
 				}
-				return []Account{{ID: 55, Platform: "openai", Type: "apikey"}}, nil
+				if len(filter.IDs) != 1 || filter.IDs[0] != 55 {
+					t.Fatalf("IDs = %v, want [55]", filter.IDs)
+				}
+				return []Account{{ID: 55, Platform: "openai", Type: "oauth"}}, nil
 			},
 		},
 		byStart: map[int64]map[int]AccountWindowStats{
@@ -626,7 +629,7 @@ func TestGetAccountUsage_NoCacheReturnsSeededStatsWhileRefreshing(t *testing.T) 
 	svc := NewService(repo, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 
-	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai")
+	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai", []int{55})
 	if err != nil {
 		t.Fatalf("GetAccountUsage returned error: %v", err)
 	}
@@ -671,7 +674,7 @@ func TestGetAccountUsage_ExpiredMemoryCacheReturnsStaleWindowsAndRefreshes(t *te
 		},
 	}, now.Add(-time.Second))
 
-	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai")
+	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai", []int{42})
 	if err != nil {
 		t.Fatalf("GetAccountUsage returned error: %v", err)
 	}

@@ -41,10 +41,18 @@ export const accountsApi = {
   models: (id: number) => get<ModelInfo[]>(`/api/v1/admin/accounts/${id}/models`),
   // 测试连接 URL（SSE 流式，前端用 fetch 消费）
   testUrl: (id: number) => `/api/v1/admin/accounts/${id}/test`,
-  // 获取指定平台账号的用量窗口（core 规范化插件返回契约后输出）
-  usage: (platform: string) =>
-    get<{ accounts: Record<string, any>; refreshing?: boolean }>('/api/v1/admin/accounts/usage', { platform }),
-  // 获取单个账号用量窗口。账号页会对当前页账号并发查询，单个账号返回后即可刷新对应行。
+  // 获取当前页账号的用量窗口（core 规范化插件返回契约后输出）
+  usage: (platform: string, ids: number[]) =>
+    get<{ accounts: Record<string, any>; refreshing?: boolean }>('/api/v1/admin/accounts/usage', {
+      platform: platform || undefined,
+      ids: ids.join(','),
+    }),
+  // 获取当前页账号并发容量。只返回 Redis 运行态 current_concurrency。
+  capacity: (ids: number[]) =>
+    get<{ accounts: Record<string, number> }>('/api/v1/admin/accounts/capacity', {
+      ids: ids.join(','),
+    }),
+  // 获取单个账号用量窗口。保留给手动单账号刷新等按需场景，账号页自动刷新走批量 ids 接口。
   usageOne: (id: number, options?: { signal?: AbortSignal }) =>
     get<Record<string, any>>(`/api/v1/admin/accounts/${id}/usage`, undefined, options),
   credentialsSchema: (platform: string) =>

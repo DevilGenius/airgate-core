@@ -7,7 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
+	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 )
 
 const (
@@ -62,6 +66,7 @@ type UsageRecord struct {
 // 每 100 条或每 5 秒 flush 一次
 type Recorder struct {
 	db      *ent.Client
+	rdb     *redis.Client
 	ch      chan UsageRecord
 	stopCh  chan struct{}
 	stopped chan struct{}
@@ -69,12 +74,17 @@ type Recorder struct {
 }
 
 // NewRecorder 创建使用量记录器
-func NewRecorder(db *ent.Client, bufferSize int) *Recorder {
+func NewRecorder(db *ent.Client, bufferSize int, rdb ...*redis.Client) *Recorder {
 	if bufferSize <= 0 {
 		bufferSize = defaultBufferSize
 	}
+	var cache *redis.Client
+	if len(rdb) > 0 {
+		cache = rdb[0]
+	}
 	return &Recorder{
 		db:      db,
+		rdb:     cache,
 		ch:      make(chan UsageRecord, bufferSize),
 		stopCh:  make(chan struct{}),
 		stopped: make(chan struct{}),
@@ -114,6 +124,7 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("提交事务失败: %w", err)
 	}
+	r.updateAccountStatsCache(ctx, []UsageRecord{record})
 	return log.ID, nil
 }
 
@@ -220,7 +231,48 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("提交事务失败: %w", err)
 	}
+	r.updateAccountStatsCache(ctx, batch)
 	return nil
+}
+
+func (r *Recorder) updateAccountStatsCache(ctx context.Context, batch []UsageRecord) {
+	if r.rdb == nil || len(batch) == 0 {
+		return
+	}
+	now := time.Now()
+	day := accountcache.Day(now)
+	pipe := r.rdb.Pipeline()
+	for _, rec := range batch {
+		if rec.AccountID <= 0 {
+			continue
+		}
+		tokens := rec.InputTokens + rec.OutputTokens + rec.CachedInputTokens + rec.CacheCreationTokens
+		todayKey := accountcache.TodayStatsKey(day, rec.AccountID)
+		pipe.HIncrBy(ctx, todayKey, "requests", 1)
+		if tokens != 0 {
+			pipe.HIncrBy(ctx, todayKey, "tokens", int64(tokens))
+		}
+		if rec.AccountCost != 0 {
+			pipe.HIncrByFloat(ctx, todayKey, "account_cost", rec.AccountCost)
+		}
+		if rec.ActualCost != 0 {
+			pipe.HIncrByFloat(ctx, todayKey, "user_cost", rec.ActualCost)
+		}
+		pipe.HSet(ctx, todayKey, "updated_at", now.UTC().Format(time.RFC3339))
+		pipe.Expire(ctx, todayKey, accountcache.TodayStatsTTL)
+
+		if usagemodel.IsImageGen(rec.Model) {
+			totalKey := accountcache.ImageTotalKey(rec.AccountID)
+			todayImageKey := accountcache.ImageTodayKey(day, rec.AccountID)
+			pipe.Incr(ctx, totalKey)
+			pipe.Expire(ctx, totalKey, accountcache.ImageTotalTTL)
+			pipe.Incr(ctx, todayImageKey)
+			pipe.Expire(ctx, todayImageKey, accountcache.TodayStatsTTL)
+		}
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		slog.Debug("account_stats_cache_update_failed", "count", len(batch), "error", err)
+	}
 }
 
 func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
