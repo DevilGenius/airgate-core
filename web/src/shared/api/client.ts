@@ -4,6 +4,10 @@ import i18n from '../../i18n';
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 // Token 管理
+const TOKEN_STORAGE_KEY = 'token';
+const TOKEN_STORAGE_MODE_KEY = 'token_storage_mode';
+const TOKEN_STORAGE_MODE_LOCAL = 'local';
+
 function readBrowserStorage(kind: 'localStorage' | 'sessionStorage', key: string): string | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -23,8 +27,33 @@ function writeBrowserStorage(kind: 'localStorage' | 'sessionStorage', key: strin
   }
 }
 
-let accessToken: string | null = readBrowserStorage('sessionStorage', 'token');
-writeBrowserStorage('localStorage', 'token', null);
+function readInitialToken(): { token: string | null; remember: boolean } {
+  const sessionToken = readBrowserStorage('sessionStorage', TOKEN_STORAGE_KEY);
+  const localMode = readBrowserStorage('localStorage', TOKEN_STORAGE_MODE_KEY) === TOKEN_STORAGE_MODE_LOCAL;
+  const localToken = localMode ? readBrowserStorage('localStorage', TOKEN_STORAGE_KEY) : null;
+
+  if (sessionToken) {
+    const remember = localMode && localToken === sessionToken;
+    if (!remember) {
+      writeBrowserStorage('localStorage', TOKEN_STORAGE_KEY, null);
+      writeBrowserStorage('localStorage', TOKEN_STORAGE_MODE_KEY, null);
+    }
+    return { token: sessionToken, remember };
+  }
+
+  if (localToken) {
+    writeBrowserStorage('sessionStorage', TOKEN_STORAGE_KEY, localToken);
+    return { token: localToken, remember: true };
+  }
+
+  writeBrowserStorage('localStorage', TOKEN_STORAGE_KEY, null);
+  writeBrowserStorage('localStorage', TOKEN_STORAGE_MODE_KEY, null);
+  return { token: null, remember: false };
+}
+
+const initialToken = readInitialToken();
+let accessToken: string | null = initialToken.token;
+let rememberAccessToken = initialToken.remember;
 
 interface TokenClaims {
   role?: string;
@@ -32,10 +61,12 @@ interface TokenClaims {
   exp?: number;
 }
 
-export function setToken(token: string | null) {
+export function setToken(token: string | null, options?: { remember?: boolean }) {
   accessToken = token;
-  writeBrowserStorage('sessionStorage', 'token', token);
-  writeBrowserStorage('localStorage', 'token', null);
+  rememberAccessToken = token ? (options?.remember ?? rememberAccessToken) : false;
+  writeBrowserStorage('sessionStorage', TOKEN_STORAGE_KEY, token);
+  writeBrowserStorage('localStorage', TOKEN_STORAGE_KEY, rememberAccessToken ? token : null);
+  writeBrowserStorage('localStorage', TOKEN_STORAGE_MODE_KEY, rememberAccessToken ? TOKEN_STORAGE_MODE_LOCAL : null);
 }
 
 export function getToken(): string | null {

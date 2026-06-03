@@ -12,6 +12,29 @@ import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, KeyRound, Activit
 
 type TabKey = 'login' | 'register' | 'apikey';
 
+function RememberLoginCheckbox({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="inline-flex w-fit cursor-pointer select-none items-center gap-2 text-sm leading-none text-text-secondary">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+        className="h-4 w-4"
+        style={{ accentColor: 'var(--ag-text)' }}
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
 /* ==================== 登录表单 ==================== */
 
 function LoginForm() {
@@ -21,6 +44,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberLogin, setRememberLogin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,7 +55,7 @@ function LoginForm() {
 
     try {
       const resp = await authApi.login({ email, password });
-      login(resp.token, resp.user);
+      login(resp.token, resp.user, { remember: rememberLogin });
       navigate({ to: '/' });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -86,6 +110,11 @@ function LoginForm() {
           </Alert.Content>
         </Alert>
       )}
+      <RememberLoginCheckbox
+        checked={rememberLogin}
+        label={t('auth.remember_login')}
+        onChange={setRememberLogin}
+      />
       <Button type="submit" isDisabled={loading} className="w-full h-11" variant="primary" aria-busy={loading}>
         <ArrowRight className="w-4 h-4" />
         {t('common.login')}
@@ -392,6 +421,7 @@ function APIKeyLoginForm() {
   const { t } = useTranslation();
 
   const [apiKey, setApiKey] = useState('');
+  const [rememberLogin, setRememberLogin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -404,7 +434,7 @@ function APIKeyLoginForm() {
       const resp = await authApi.loginByAPIKey({ key: apiKey });
       // 把用户输入的原文 Key 暂存到 sessionStorage，供 CCS 导入等需要原文的功能使用。
       setSessionAPIKey(apiKey);
-      login(resp.token, { ...resp.user, api_key_id: resp.api_key_id, api_key_name: resp.api_key_name });
+      login(resp.token, { ...resp.user, api_key_id: resp.api_key_id, api_key_name: resp.api_key_name }, { remember: rememberLogin });
       navigate({ to: '/' });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -444,6 +474,11 @@ function APIKeyLoginForm() {
           </Alert.Content>
         </Alert>
       )}
+      <RememberLoginCheckbox
+        checked={rememberLogin}
+        label={t('auth.remember_login')}
+        onChange={setRememberLogin}
+      />
       <Button type="submit" isDisabled={loading} className="w-full h-11" variant="primary" aria-busy={loading}>
         <ArrowRight className="w-4 h-4" />
         {t('common.login')}

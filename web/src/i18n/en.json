@@ -180,6 +180,7 @@
     "apikey_unlimited": "Unlimited",
     "apikey_expires": "Expires",
     "apikey_never": "Never",
+    "remember_login": "Remember login",
     "apikey_rate": "Rate"
   },
 

@@ -180,6 +180,7 @@
     "apikey_unlimited": "不限",
     "apikey_expires": "到期时间",
     "apikey_never": "永不过期",
+    "remember_login": "记住登录",
     "apikey_rate": "倍率"
   },
 

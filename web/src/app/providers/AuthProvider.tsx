@@ -15,7 +15,7 @@ interface AuthContextType {
   loading: boolean;
   /** 是否为 API Key 登录 */
   isAPIKeySession: boolean;
-  login: (token: string, user: UserResp) => void;
+  login: (token: string, user: UserResp, options?: { remember?: boolean }) => void;
   logout: () => void;
 }
 
@@ -91,11 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(USER_BALANCE_EVENT, handleUserBalanceUpdate);
   }, []);
 
-  const login = useCallback((token: string, userData: UserResp) => {
+  const login = useCallback((token: string, userData: UserResp, options?: { remember?: boolean }) => {
     authRevisionRef.current += 1;
     const revision = authRevisionRef.current;
     resetAdminCache();
-    setToken(token);
+    setToken(token, { remember: options?.remember === true });
     setUser(normalizeSessionUser(userData, token));
     // 登录响应可能不包含全部用户字段（例如 API Key 登录时缺少 quota / expires_at），
     // 异步用 /me 拉一次完整数据补齐，避免首屏额度等信息显示不准。
