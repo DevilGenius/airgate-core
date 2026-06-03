@@ -4,6 +4,11 @@
 
 /* API keys: 表格内容居中 */
 
+.ag-api-keys-page {
+  width: 100%;
+  max-width: none;
+}
+
 .ag-api-keys-table .ag-resource-table-content {
   table-layout: fixed;
 }

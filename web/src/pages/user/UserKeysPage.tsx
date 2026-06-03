@@ -280,7 +280,7 @@ export default function UserKeysPage() {
   });
 
   return (
-    <div className="p-6">
+    <div className="ag-api-keys-page">
       <div className="flex justify-end mb-5">
         <div className="flex items-center gap-2 ml-auto">
           <Button
@@ -316,7 +316,7 @@ export default function UserKeysPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1050}
+        minWidth={1070}
       >
         <CommonTable.Header>
           <CommonTable.Column id="name" style={{ minWidth: '12rem', width: '12rem' }}>{t('common.name')}</CommonTable.Column>

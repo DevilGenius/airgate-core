@@ -112,7 +112,7 @@ export default function APIKeysPage() {
   });
 
   return (
-    <div>
+    <div className="ag-api-keys-page">
       <div className="flex justify-end mb-5">
         <div className="flex items-center gap-2 ml-auto">
           <Button
