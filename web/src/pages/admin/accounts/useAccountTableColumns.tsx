@@ -91,7 +91,7 @@ export function useAccountTableColumns({
               {row.name}
             </span>
             {email && (
-              <span className="max-w-full truncate text-[11px]" style={{ color: 'var(--ag-text-tertiary)' }} title={email}>
+              <span className="max-w-full truncate text-[11px]" style={{ color: 'var(--ag-text)' }} title={email}>
                 {email}
               </span>
             )}

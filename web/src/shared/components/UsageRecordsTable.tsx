@@ -9,6 +9,8 @@ import { TablePaginationFooter } from './TablePaginationFooter';
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
 const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>(['model']);
 const NEW_ROW_ANIMATION_NAME = 'ag-usage-row-new-enter';
+const USAGE_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+const DEFAULT_USAGE_PAGE_SIZE = USAGE_PAGE_SIZE_OPTIONS[0];
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -194,6 +196,11 @@ export function UsageRecordsTable<T extends UsageRow>({
   totalExact?: boolean;
 }) {
   const totalPages = getTotalPages(total, pageSize);
+  useEffect(() => {
+    if (!USAGE_PAGE_SIZE_OPTIONS.some((option) => option === pageSize)) {
+      setPageSize(DEFAULT_USAGE_PAGE_SIZE);
+    }
+  }, [pageSize, setPageSize]);
   const tableMinWidth = useMemo(
     () => Math.max(760, columns.reduce((sum, column) => sum + parseColumnWidth(column.width), 0) + 24),
     [columns],
@@ -291,6 +298,7 @@ export function UsageRecordsTable<T extends UsageRow>({
         <TablePaginationFooter
           page={page}
           pageSize={pageSize}
+          pageSizeOptions={USAGE_PAGE_SIZE_OPTIONS}
           setPage={setPage}
           setPageSize={setPageSize}
           total={total}

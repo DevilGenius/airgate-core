@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { injectThemeStyle, setTheme, getStoredTheme, type ThemeName } from '@devilgenius/airgate-theme';
 
+const RELIABLE_SANS_FONT = '"AirGate CJK Punctuation", "Fira Code", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 const RELIABLE_MONO_FONT = '"Fira Code", ui-monospace, "SFMono-Regular", "SF Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, Monaco, "Courier New", monospace';
 
 interface ThemeContextValue {
@@ -15,15 +16,23 @@ function syncHeroUIThemeClass(theme: ThemeName) {
   document.documentElement.classList.toggle('dark', theme === 'dark');
 }
 
-function applyReliableMonoFont() {
+function applyReliableFonts() {
+  document.documentElement.style.setProperty('--ag-font-sans', RELIABLE_SANS_FONT);
+  document.documentElement.style.setProperty('--font-geist', RELIABLE_SANS_FONT);
+  document.documentElement.style.setProperty('--font-sans', RELIABLE_SANS_FONT);
   document.documentElement.style.setProperty('--ag-font-mono', RELIABLE_MONO_FONT);
   document.documentElement.style.setProperty('--font-mono', RELIABLE_MONO_FONT);
   const themeStyle = document.getElementById('ag-theme-vars');
   if (themeStyle?.textContent) {
-    themeStyle.textContent = themeStyle.textContent.replace(
-      /--ag-font-mono:\s*[^;]+;/g,
-      `--ag-font-mono: ${RELIABLE_MONO_FONT};`,
-    );
+    themeStyle.textContent = themeStyle.textContent
+      .replace(
+        /--ag-font-sans:\s*[^;]+;/g,
+        `--ag-font-sans: ${RELIABLE_SANS_FONT};`,
+      )
+      .replace(
+        /--ag-font-mono:\s*[^;]+;/g,
+        `--ag-font-mono: ${RELIABLE_MONO_FONT};`,
+      );
   }
 }
 
@@ -33,14 +42,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // 初始化：注入 AirGate CSS 变量。
   useEffect(() => {
     injectThemeStyle();
-    applyReliableMonoFont();
+    applyReliableFonts();
   }, []);
 
   // 主题变化时同步 AirGate data-theme 与 HeroUI light/dark class。
   useEffect(() => {
     setTheme(theme);
     syncHeroUIThemeClass(theme);
-    applyReliableMonoFont();
+    applyReliableFonts();
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
