@@ -48,6 +48,7 @@ type sessionTracker interface {
 type familyCooldownTracker interface {
 	Until(ctx context.Context, accountID int, family string) (time.Time, bool)
 	List(ctx context.Context, accountID int) []FamilyCooldownEntry
+	ListBatch(ctx context.Context, accountIDs []int) map[int][]FamilyCooldownEntry
 	ClearAccount(ctx context.Context, accountID int) int
 }
 
@@ -243,6 +244,14 @@ func (s *Scheduler) ListFamilyCooldowns(ctx context.Context, accountID int) []Fa
 		return nil
 	}
 	return s.familyCooldown.List(ctx, accountID)
+}
+
+// ListFamilyCooldownsBatch 批量返回多个账号当前生效中的所有家族级限流冷却。
+func (s *Scheduler) ListFamilyCooldownsBatch(ctx context.Context, accountIDs []int) map[int][]FamilyCooldownEntry {
+	if s.familyCooldown == nil {
+		return nil
+	}
+	return s.familyCooldown.ListBatch(ctx, accountIDs)
 }
 
 // ClearFamilyCooldowns 清除指定账号当前所有家族级限流冷却。

@@ -35,6 +35,28 @@ func (h *AccountHandler) familyCooldownsFor(ctx context.Context, accountID int) 
 		return nil
 	}
 	entries := h.scheduler.ListFamilyCooldowns(ctx, accountID)
+	return familyCooldownDTOs(entries)
+}
+
+// familyCooldownsForAccounts 批量拉取当前页账号的 Redis 家族冷却，避免账号列表自动刷新时逐行访问 Redis。
+func (h *AccountHandler) familyCooldownsForAccounts(ctx context.Context, accountIDs []int) map[int][]dto.FamilyCooldownDTO {
+	if h.scheduler == nil || len(accountIDs) == 0 {
+		return nil
+	}
+	entriesByAccount := h.scheduler.ListFamilyCooldownsBatch(ctx, accountIDs)
+	if len(entriesByAccount) == 0 {
+		return nil
+	}
+	out := make(map[int][]dto.FamilyCooldownDTO, len(entriesByAccount))
+	for accountID, entries := range entriesByAccount {
+		if dtos := familyCooldownDTOs(entries); len(dtos) > 0 {
+			out[accountID] = dtos
+		}
+	}
+	return out
+}
+
+func familyCooldownDTOs(entries []scheduler.FamilyCooldownEntry) []dto.FamilyCooldownDTO {
 	if len(entries) == 0 {
 		return nil
 	}

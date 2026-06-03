@@ -238,6 +238,10 @@ func (s stubFamilyCooldownTracker) List(context.Context, int) []FamilyCooldownEn
 	return nil
 }
 
+func (s stubFamilyCooldownTracker) ListBatch(context.Context, []int) map[int][]FamilyCooldownEntry {
+	return nil
+}
+
 func (s stubFamilyCooldownTracker) ClearAccount(context.Context, int) int {
 	return 0
 }

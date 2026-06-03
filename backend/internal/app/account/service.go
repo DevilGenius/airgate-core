@@ -1,6 +1,7 @@
 package account
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1265,16 +1266,20 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 		}
 		return result, filterRefreshableUsageAccounts(accounts)
 	}
-	pipe := s.usageRedis.Pipeline()
-	cmds := make(map[int]*redis.StringCmd, len(accounts))
+	keys := make([]string, 0, len(accounts))
+	ordered := make([]Account, 0, len(accounts))
 	for _, item := range accounts {
-		cmds[item.ID] = pipe.Get(ctx, accountcache.UsageKey(item.ID))
+		keys = append(keys, accountcache.UsageKey(item.ID))
+		ordered = append(ordered, item)
 	}
-	_, _ = pipe.Exec(ctx)
-	for _, item := range accounts {
-		cmd := cmds[item.ID]
-		raw, err := cmd.Bytes()
-		if err != nil {
+	values, err := s.usageRedis.MGet(ctx, keys...).Result()
+	if err != nil {
+		return result, filterRefreshableUsageAccounts(accounts)
+	}
+	staleKeys := make([]string, 0)
+	for index, item := range ordered {
+		raw, ok := redisValueBytes(values[index])
+		if !ok {
 			if item.Type != "apikey" {
 				missingAccounts = append(missingAccounts, item)
 			}
@@ -1282,7 +1287,7 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 		}
 		var payload accountUsageCachePayload
 		if err := json.Unmarshal(raw, &payload); err != nil || !payload.valid() {
-			_ = s.usageRedis.Del(ctx, accountcache.UsageKey(item.ID)).Err()
+			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
 			if item.Type != "apikey" {
 				missingAccounts = append(missingAccounts, item)
 			}
@@ -1290,13 +1295,16 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 		}
 		expiresAt := payload.cacheExpiresAt(s.now())
 		if !expiresAt.After(s.now()) {
-			_ = s.usageRedis.Del(ctx, accountcache.UsageKey(item.ID)).Err()
+			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
 			if item.Type != "apikey" {
 				missingAccounts = append(missingAccounts, item)
 			}
 			continue
 		}
 		result[item.ID] = payload.Info
+	}
+	if len(staleKeys) > 0 {
+		_ = s.usageRedis.Del(ctx, staleKeys...).Err()
 	}
 	return result, missingAccounts
 }
@@ -1819,19 +1827,22 @@ func (s *Service) loadImageStatsCache(ctx context.Context, day string, accountID
 	if s.usageRedis == nil || len(accountIDs) == 0 {
 		return result, accountIDs
 	}
-	pipe := s.usageRedis.Pipeline()
-	totalCmds := make(map[int]*redis.StringCmd, len(accountIDs))
-	todayCmds := make(map[int]*redis.StringCmd, len(accountIDs))
+	totalKeys := make([]string, 0, len(accountIDs))
+	todayKeys := make([]string, 0, len(accountIDs))
 	for _, accountID := range accountIDs {
-		totalCmds[accountID] = pipe.Get(ctx, accountcache.ImageTotalKey(accountID))
-		todayCmds[accountID] = pipe.Get(ctx, accountcache.ImageTodayKey(day, accountID))
+		totalKeys = append(totalKeys, accountcache.ImageTotalKey(accountID))
+		todayKeys = append(todayKeys, accountcache.ImageTodayKey(day, accountID))
 	}
-	_, _ = pipe.Exec(ctx)
+	totalValues, totalErr := s.usageRedis.MGet(ctx, totalKeys...).Result()
+	todayValues, todayErr := s.usageRedis.MGet(ctx, todayKeys...).Result()
+	if totalErr != nil || todayErr != nil {
+		return result, accountIDs
+	}
 	missing := make([]int, 0)
-	for _, accountID := range accountIDs {
-		total, totalErr := totalCmds[accountID].Int64()
-		today, todayErr := todayCmds[accountID].Int64()
-		if totalErr != nil || todayErr != nil {
+	for index, accountID := range accountIDs {
+		total, totalOK := redisValueInt64(totalValues[index])
+		today, todayOK := redisValueInt64(todayValues[index])
+		if !totalOK || !todayOK {
 			missing = append(missing, accountID)
 			continue
 		}
@@ -1854,24 +1865,27 @@ func (s *Service) loadAccountProfilesForUsage(ctx context.Context, platform stri
 	if s.usageRedis == nil || len(accountIDs) == 0 {
 		return nil, accountIDs
 	}
-	pipe := s.usageRedis.Pipeline()
-	cmds := make(map[int]*redis.StringCmd, len(accountIDs))
+	keys := make([]string, 0, len(accountIDs))
 	for _, accountID := range accountIDs {
-		cmds[accountID] = pipe.Get(ctx, accountcache.ProfileKey(accountID))
+		keys = append(keys, accountcache.ProfileKey(accountID))
 	}
-	_, _ = pipe.Exec(ctx)
+	values, err := s.usageRedis.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, accountIDs
+	}
 
 	accounts := make([]Account, 0, len(accountIDs))
 	missing := make([]int, 0)
-	for _, accountID := range accountIDs {
-		raw, err := cmds[accountID].Bytes()
-		if err != nil {
+	staleKeys := make([]string, 0)
+	for index, accountID := range accountIDs {
+		raw, ok := redisValueBytes(values[index])
+		if !ok {
 			missing = append(missing, accountID)
 			continue
 		}
 		payload, ok := decodeAccountProfileCache(raw, accountID)
 		if !ok {
-			_ = s.usageRedis.Del(ctx, accountcache.ProfileKey(accountID)).Err()
+			staleKeys = append(staleKeys, accountcache.ProfileKey(accountID))
 			missing = append(missing, accountID)
 			continue
 		}
@@ -1882,6 +1896,9 @@ func (s *Service) loadAccountProfilesForUsage(ctx context.Context, platform stri
 		}
 		accounts = append(accounts, account)
 	}
+	if len(staleKeys) > 0 {
+		_ = s.usageRedis.Del(ctx, staleKeys...).Err()
+	}
 	return accounts, missing
 }
 
@@ -1889,42 +1906,60 @@ func (s *Service) cacheAccountProfiles(ctx context.Context, accounts []Account) 
 	if s.usageRedis == nil || len(accounts) == 0 {
 		return
 	}
-	readPipe := s.usageRedis.Pipeline()
-	oldCmds := make(map[int]*redis.StringCmd, len(accounts))
+	validAccounts := make([]Account, 0, len(accounts))
+	keys := make([]string, 0, len(accounts))
 	for _, item := range accounts {
 		if item.ID <= 0 {
 			continue
 		}
-		oldCmds[item.ID] = readPipe.Get(ctx, accountcache.ProfileKey(item.ID))
+		validAccounts = append(validAccounts, item)
+		keys = append(keys, accountcache.ProfileKey(item.ID))
 	}
-	if len(oldCmds) > 0 {
-		_, _ = readPipe.Exec(ctx)
+	if len(validAccounts) == 0 {
+		return
+	}
+
+	oldRaw := make(map[int][]byte, len(validAccounts))
+	oldPayloads := make(map[int]accountProfileCachePayload, len(validAccounts))
+	if values, err := s.usageRedis.MGet(ctx, keys...).Result(); err == nil {
+		for index, item := range validAccounts {
+			raw, ok := redisValueBytes(values[index])
+			if !ok {
+				continue
+			}
+			oldRaw[item.ID] = raw
+			if payload, ok := decodeAccountProfileCache(raw, item.ID); ok {
+				oldPayloads[item.ID] = payload
+			}
+		}
 	}
 
 	pipe := s.usageRedis.Pipeline()
-	for _, item := range accounts {
-		if item.ID <= 0 {
-			continue
-		}
+	writes := 0
+	for _, item := range validAccounts {
 		payload := accountProfileCacheFromAccount(item)
 		body, err := json.Marshal(payload)
 		if err != nil {
 			continue
 		}
-		if oldCmd := oldCmds[item.ID]; oldCmd != nil {
-			if raw, err := oldCmd.Bytes(); err == nil {
-				if oldPayload, ok := decodeAccountProfileCache(raw, item.ID); ok && oldPayload.Platform != "" && oldPayload.Platform != item.Platform {
-					pipe.SRem(ctx, accountcache.PlatformKey(oldPayload.Platform), item.ID)
-				}
-			}
+		if raw, ok := oldRaw[item.ID]; ok && bytes.Equal(raw, body) {
+			continue
+		}
+		if oldPayload, ok := oldPayloads[item.ID]; ok && oldPayload.Platform != "" && oldPayload.Platform != item.Platform {
+			pipe.SRem(ctx, accountcache.PlatformKey(oldPayload.Platform), item.ID)
+			writes++
 		}
 		pipe.Set(ctx, accountcache.ProfileKey(item.ID), body, accountcache.ProfileTTL)
+		writes++
 		if item.Platform != "" {
 			pipe.SAdd(ctx, accountcache.PlatformKey(item.Platform), item.ID)
 			pipe.Expire(ctx, accountcache.PlatformKey(item.Platform), accountcache.ProfileTTL)
+			writes += 2
 		}
 	}
-	_, _ = pipe.Exec(ctx)
+	if writes > 0 {
+		_, _ = pipe.Exec(ctx)
+	}
 }
 
 func decodeAccountProfileCache(raw []byte, accountID int) (accountProfileCachePayload, bool) {
@@ -2004,6 +2039,32 @@ func parseAccountProfileCacheTime(raw string) time.Time {
 		return parsed
 	}
 	return time.Time{}
+}
+
+func redisValueBytes(value any) ([]byte, bool) {
+	switch v := value.(type) {
+	case string:
+		return []byte(v), true
+	case []byte:
+		return v, true
+	default:
+		return nil, false
+	}
+}
+
+func redisValueInt64(value any) (int64, bool) {
+	switch v := value.(type) {
+	case int64:
+		return v, true
+	case string:
+		n, err := strconv.ParseInt(v, 10, 64)
+		return n, err == nil
+	case []byte:
+		n, err := strconv.ParseInt(string(v), 10, 64)
+		return n, err == nil
+	default:
+		return 0, false
+	}
 }
 
 func (s *Service) deleteAccountCacheKeys(accountIDs []int) {

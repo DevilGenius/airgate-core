@@ -43,12 +43,16 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 		return
 	}
 
+	accountIDs := make([]int, 0, len(result.List))
+	for _, item := range result.List {
+		accountIDs = append(accountIDs, item.ID)
+	}
+	familyCooldowns := h.familyCooldownsForAccounts(c.Request.Context(), accountIDs)
+
 	list := make([]dto.AccountResp, 0, len(result.List))
 	for _, item := range result.List {
 		resp := toAccountResp(item)
-		// 家族冷却落 Redis、不在 DB，handler 层叠加：N 次 Redis SCAN（每账号 0~3 个 key），
-		// page_size=20 默认下额外 RTT 可忽略；scheduler 不可用时直接为空，不影响主响应。
-		resp.FamilyCooldowns = h.familyCooldownsFor(c.Request.Context(), item.ID)
+		resp.FamilyCooldowns = familyCooldowns[item.ID]
 		list = append(list, resp)
 	}
 
