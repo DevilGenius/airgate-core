@@ -247,18 +247,18 @@ func (r *Recorder) updateAccountStatsCache(ctx context.Context, batch []UsageRec
 			continue
 		}
 		tokens := rec.InputTokens + rec.OutputTokens + rec.CachedInputTokens + rec.CacheCreationTokens
-		todayKey := accountcache.TodayStatsKey(day, rec.AccountID)
-		pipe.HIncrBy(ctx, todayKey, "requests", 1)
+		todayKey := accountcache.TodayStatsKey(day)
+		pipe.HIncrBy(ctx, todayKey, accountcache.TodayStatsField(rec.AccountID, "requests"), 1)
 		if tokens != 0 {
-			pipe.HIncrBy(ctx, todayKey, "tokens", int64(tokens))
+			pipe.HIncrBy(ctx, todayKey, accountcache.TodayStatsField(rec.AccountID, "tokens"), int64(tokens))
 		}
 		if rec.AccountCost != 0 {
-			pipe.HIncrByFloat(ctx, todayKey, "account_cost", rec.AccountCost)
+			pipe.HIncrByFloat(ctx, todayKey, accountcache.TodayStatsField(rec.AccountID, "account_cost"), rec.AccountCost)
 		}
 		if rec.ActualCost != 0 {
-			pipe.HIncrByFloat(ctx, todayKey, "user_cost", rec.ActualCost)
+			pipe.HIncrByFloat(ctx, todayKey, accountcache.TodayStatsField(rec.AccountID, "user_cost"), rec.ActualCost)
 		}
-		pipe.HSet(ctx, todayKey, "updated_at", now.UTC().Format(time.RFC3339))
+		pipe.HSet(ctx, todayKey, accountcache.TodayStatsField(rec.AccountID, "updated_at"), now.UTC().Format(time.RFC3339))
 		pipe.Expire(ctx, todayKey, accountcache.TodayStatsTTL)
 
 		if usagemodel.IsImageGen(rec.Model) {

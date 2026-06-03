@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -15,6 +14,8 @@ var ErrConcurrencyLimit = errors.New("并发槽位已满")
 const (
 	// defaultSlotTTL 单个请求槽位的默认过期时间，防止异常未释放
 	defaultSlotTTL = 5 * time.Minute
+	// concurrencyZeroCountTTL 缓存空槽位读数，避免容量刷新对空账号反复回落到 ZCARD。
+	concurrencyZeroCountTTL = 30 * time.Second
 )
 
 // acquireSlotScript 是 account / apikey / user 三种并发槽共用的原子 Lua 脚本。
@@ -72,6 +73,7 @@ var releaseSlotScript = redis.NewScript(`
 	local countKey = KEYS[2]
 	local requestID = ARGV[1]
 	local fallbackTTL = tonumber(ARGV[2])
+	local zeroTTL = tonumber(ARGV[3])
 
 	local removed = redis.call('ZREM', slotKey, requestID)
 	local current = redis.call('ZCARD', slotKey)
@@ -82,9 +84,36 @@ var releaseSlotScript = redis.NewScript(`
 		end
 		redis.call('SET', countKey, current, 'EX', ttl)
 	else
-		redis.call('DEL', countKey)
+		redis.call('SET', countKey, 0, 'EX', zeroTTL)
 	end
 	return removed
+`)
+
+var backfillConcurrencyCountsScript = redis.NewScript(`
+	local now = tonumber(ARGV[1])
+	local slotTTL = tonumber(ARGV[2])
+	local zeroTTL = tonumber(ARGV[3])
+	local staleBefore = now - slotTTL
+	local out = {}
+
+	for index = 1, #KEYS, 2 do
+		local slotKey = KEYS[index]
+		local countKey = KEYS[index + 1]
+		redis.call('ZREMRANGEBYSCORE', slotKey, '-inf', staleBefore)
+		local current = redis.call('ZCARD', slotKey)
+		if current > 0 then
+			local ttl = redis.call('TTL', slotKey)
+			if ttl == false or ttl <= 0 then
+				ttl = slotTTL
+			end
+			redis.call('SET', countKey, current, 'EX', ttl)
+		else
+			redis.call('SET', countKey, 0, 'EX', zeroTTL)
+		end
+		table.insert(out, current)
+	end
+
+	return out
 `)
 
 // ConcurrencyManager 分布式并发槽位管理。
@@ -161,7 +190,11 @@ func (cm *ConcurrencyManager) releaseSlotByKey(ctx context.Context, key, countKe
 	if cm.rdb == nil {
 		return
 	}
-	_, _ = releaseSlotScript.Run(ctx, cm.rdb, []string{key, countKey}, requestID, int(defaultSlotTTL.Seconds())).Result()
+	_, _ = releaseSlotScript.Run(ctx, cm.rdb, []string{key, countKey},
+		requestID,
+		int(defaultSlotTTL.Seconds()),
+		int(concurrencyZeroCountTTL.Seconds()),
+	).Result()
 }
 
 // AcquireSlot 获取账号级并发槽位。
@@ -206,41 +239,78 @@ func (cm *ConcurrencyManager) GetCurrentCount(ctx context.Context, accountID int
 	if cm.rdb == nil {
 		return 0
 	}
-	n, err := cm.rdb.Get(ctx, concurrencyCountKey(accountID)).Int()
-	if err != nil {
-		return 0
+	counts := loadConcurrencyCounts(ctx, cm.rdb, []int{accountID})
+	return counts[accountID]
+}
+
+func loadConcurrencyCounts(ctx context.Context, rdb *redis.Client, accountIDs []int) map[int]int {
+	result := make(map[int]int, len(accountIDs))
+	if rdb == nil || len(accountIDs) == 0 {
+		return result
 	}
-	return n
+	ids := uniqueAccountIDs(accountIDs)
+	if len(ids) == 0 {
+		return result
+	}
+	keys := make([]string, 0, len(ids))
+	for _, id := range ids {
+		keys = append(keys, concurrencyCountKey(id))
+	}
+	values, err := rdb.MGet(ctx, keys...).Result()
+	if err != nil {
+		return result
+	}
+	missingIDs := make([]int, 0)
+	for index, value := range values {
+		count, ok := redisIntValue(value)
+		if !ok {
+			missingIDs = append(missingIDs, ids[index])
+			continue
+		}
+		if count > 0 {
+			result[ids[index]] = count
+		}
+	}
+	if len(missingIDs) > 0 {
+		backfillConcurrencyCounts(ctx, rdb, missingIDs, result)
+	}
+	return result
+}
+
+func backfillConcurrencyCounts(ctx context.Context, rdb *redis.Client, accountIDs []int, result map[int]int) {
+	if rdb == nil || len(accountIDs) == 0 {
+		return
+	}
+	keys := make([]string, 0, len(accountIDs)*2)
+	for _, id := range accountIDs {
+		keys = append(keys, concurrencyKey(id), concurrencyCountKey(id))
+	}
+	raw, err := backfillConcurrencyCountsScript.Run(ctx, rdb, keys,
+		time.Now().Unix(),
+		int(defaultSlotTTL.Seconds()),
+		int(concurrencyZeroCountTTL.Seconds()),
+	).Result()
+	if err != nil {
+		return
+	}
+	values, ok := raw.([]interface{})
+	if !ok {
+		return
+	}
+	for index, value := range values {
+		if index >= len(accountIDs) {
+			break
+		}
+		count, ok := redisIntValue(value)
+		if ok && count > 0 {
+			result[accountIDs[index]] = count
+		}
+	}
 }
 
 // GetCurrentCounts 批量获取多个账户的当前并发数。
 // 容量刷新只做一次 MGET；不能按账号执行 ZCOUNT，否则 100 行页面 0.5s 刷新会放大成
 // 200 次/s Redis 命令。
 func (cm *ConcurrencyManager) GetCurrentCounts(ctx context.Context, accountIDs []int) map[int]int {
-	result := make(map[int]int, len(accountIDs))
-	if cm.rdb == nil || len(accountIDs) == 0 {
-		return result
-	}
-	keys := make([]string, 0, len(accountIDs))
-	for _, id := range accountIDs {
-		keys = append(keys, concurrencyCountKey(id))
-	}
-	values, err := cm.rdb.MGet(ctx, keys...).Result()
-	if err != nil {
-		return result
-	}
-	for index, value := range values {
-		if value == nil {
-			continue
-		}
-		raw, ok := value.(string)
-		if !ok {
-			continue
-		}
-		count, err := strconv.Atoi(raw)
-		if err == nil && count > 0 {
-			result[accountIDs[index]] = count
-		}
-	}
-	return result
+	return loadConcurrencyCounts(ctx, cm.rdb, accountIDs)
 }

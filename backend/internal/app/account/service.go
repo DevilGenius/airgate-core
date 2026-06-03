@@ -1771,20 +1771,22 @@ func (s *Service) loadTodayStatsCache(ctx context.Context, day string, accountID
 	if s.usageRedis == nil || len(accountIDs) == 0 {
 		return result, accountIDs
 	}
-	pipe := s.usageRedis.Pipeline()
-	cmds := make(map[int]*redis.MapStringStringCmd, len(accountIDs))
+	fields := make([]string, 0, len(accountIDs)*5)
 	for _, accountID := range accountIDs {
-		cmds[accountID] = pipe.HGetAll(ctx, accountcache.TodayStatsKey(day, accountID))
+		fields = append(fields, accountcache.TodayStatsFields(accountID)...)
 	}
-	_, _ = pipe.Exec(ctx)
+	values, err := s.usageRedis.HMGet(ctx, accountcache.TodayStatsKey(day), fields...).Result()
+	if err != nil {
+		return result, accountIDs
+	}
 	missing := make([]int, 0)
-	for _, accountID := range accountIDs {
-		values, err := cmds[accountID].Result()
-		if err != nil || len(values) == 0 {
+	for index, accountID := range accountIDs {
+		offset := index * 5
+		if offset+4 >= len(values) || values[offset] == nil {
 			missing = append(missing, accountID)
 			continue
 		}
-		stats, ok := parseCachedTodayStats(values)
+		stats, ok := parseCachedTodayStats(values[offset : offset+5])
 		if !ok {
 			missing = append(missing, accountID)
 			continue
@@ -1794,11 +1796,14 @@ func (s *Service) loadTodayStatsCache(ctx context.Context, day string, accountID
 	return result, missing
 }
 
-func parseCachedTodayStats(values map[string]string) (AccountWindowStats, bool) {
-	requests, _ := strconv.ParseInt(values["requests"], 10, 64)
-	tokens, _ := strconv.ParseInt(values["tokens"], 10, 64)
-	accountCost, _ := strconv.ParseFloat(values["account_cost"], 64)
-	userCost, _ := strconv.ParseFloat(values["user_cost"], 64)
+func parseCachedTodayStats(values []any) (AccountWindowStats, bool) {
+	if len(values) < 4 || values[0] == nil {
+		return AccountWindowStats{}, false
+	}
+	requests, _ := redisValueInt64(values[0])
+	tokens, _ := redisValueInt64(values[1])
+	accountCost, _ := redisValueFloat64(values[2])
+	userCost, _ := redisValueFloat64(values[3])
 	return AccountWindowStats{
 		Requests:    requests,
 		Tokens:      tokens,
@@ -1811,13 +1816,13 @@ func (s *Service) writeTodayStatsCache(ctx context.Context, day string, accountI
 	if s.usageRedis == nil {
 		return
 	}
-	key := accountcache.TodayStatsKey(day, accountID)
+	key := accountcache.TodayStatsKey(day)
 	pipe := s.usageRedis.Pipeline()
-	pipe.HSetNX(ctx, key, "requests", stats.Requests)
-	pipe.HSetNX(ctx, key, "tokens", stats.Tokens)
-	pipe.HSetNX(ctx, key, "account_cost", stats.AccountCost)
-	pipe.HSetNX(ctx, key, "user_cost", stats.UserCost)
-	pipe.HSetNX(ctx, key, "updated_at", s.now().UTC().Format(time.RFC3339))
+	pipe.HSetNX(ctx, key, accountcache.TodayStatsField(accountID, "requests"), stats.Requests)
+	pipe.HSetNX(ctx, key, accountcache.TodayStatsField(accountID, "tokens"), stats.Tokens)
+	pipe.HSetNX(ctx, key, accountcache.TodayStatsField(accountID, "account_cost"), stats.AccountCost)
+	pipe.HSetNX(ctx, key, accountcache.TodayStatsField(accountID, "user_cost"), stats.UserCost)
+	pipe.HSetNX(ctx, key, accountcache.TodayStatsField(accountID, "updated_at"), s.now().UTC().Format(time.RFC3339))
 	pipe.Expire(ctx, key, accountcache.TodayStatsTTL)
 	_, _ = pipe.Exec(ctx)
 }
@@ -2056,11 +2061,34 @@ func redisValueInt64(value any) (int64, bool) {
 	switch v := value.(type) {
 	case int64:
 		return v, true
+	case int:
+		return int64(v), true
 	case string:
 		n, err := strconv.ParseInt(v, 10, 64)
 		return n, err == nil
 	case []byte:
 		n, err := strconv.ParseInt(string(v), 10, 64)
+		return n, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func redisValueFloat64(value any) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case string:
+		n, err := strconv.ParseFloat(v, 64)
+		return n, err == nil
+	case []byte:
+		n, err := strconv.ParseFloat(string(v), 64)
 		return n, err == nil
 	default:
 		return 0, false
@@ -2089,7 +2117,8 @@ func (s *Service) deleteAccountCacheKeys(accountIDs []int) {
 	_, _ = readPipe.Exec(ctx)
 
 	day := accountcache.Day(s.now())
-	keys := make([]string, 0, len(validIDs)*5)
+	keys := make([]string, 0, len(validIDs)*4)
+	todayStatsFields := make([]string, 0, len(validIDs)*5)
 	pipe := s.usageRedis.Pipeline()
 	for _, id := range validIDs {
 		if raw, err := profileCmds[id].Bytes(); err == nil {
@@ -2100,13 +2129,16 @@ func (s *Service) deleteAccountCacheKeys(accountIDs []int) {
 		keys = append(keys,
 			accountcache.ProfileKey(id),
 			accountcache.UsageKey(id),
-			accountcache.TodayStatsKey(day, id),
 			accountcache.ImageTotalKey(id),
 			accountcache.ImageTodayKey(day, id),
 		)
+		todayStatsFields = append(todayStatsFields, accountcache.TodayStatsFields(id)...)
 	}
 	if len(keys) > 0 {
 		pipe.Del(ctx, keys...)
+	}
+	if len(todayStatsFields) > 0 {
+		pipe.HDel(ctx, accountcache.TodayStatsKey(day), todayStatsFields...)
 	}
 	_, _ = pipe.Exec(ctx)
 }

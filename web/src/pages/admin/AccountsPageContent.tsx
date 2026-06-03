@@ -70,6 +70,17 @@ const ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.capaci
 const ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS = 0.5;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 
+function sameCapacityAccounts(
+  previous: Record<string, number> | undefined,
+  next: Record<string, number>,
+) {
+  if (!previous) return false;
+  const previousKeys = Object.keys(previous);
+  const nextKeys = Object.keys(next);
+  if (previousKeys.length !== nextKeys.length) return false;
+  return nextKeys.every((key) => previous[key] === next[key]);
+}
+
 if (typeof window !== 'undefined') {
   try {
     const storedAutoRefresh = Number(window.localStorage.getItem(ACCOUNT_AUTO_REFRESH_STORAGE_KEY));
@@ -156,9 +167,6 @@ export default function AccountsPageContent() {
       return false;
     }
   });
-  const refreshAccounts = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() }, { cancelRefetch: false });
-  }, [queryClient]);
   const autoRefreshLabel = t('accounts.auto_refresh');
   const autoRefreshOffLabel = t('accounts.auto_refresh_off');
   const capacityAutoRefreshLabel = t('accounts.capacity_auto_refresh');
@@ -207,9 +215,17 @@ export default function AccountsPageContent() {
     selectionStore.clear();
   }, [groupFilter, keyword, page, pageSize, platformFilter, proxyFilter, selectionStore, stateFilter, typeFilter]);
 
+  const accountListQueryKey = useMemo(
+    () => queryKeys.accounts(page, pageSize, debouncedKeyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter),
+    [debouncedKeyword, groupFilter, page, pageSize, platformFilter, proxyFilter, stateFilter, typeFilter],
+  );
+  const refreshAccounts = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: accountListQueryKey }, { cancelRefetch: false });
+  }, [accountListQueryKey, queryClient]);
+
   // 查询账号列表
   const { data, isLoading, isFetching: isAccountsFetching } = useQuery({
-    queryKey: queryKeys.accounts(page, pageSize, debouncedKeyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter),
+    queryKey: accountListQueryKey,
     queryFn: () =>
       accountsApi.list({
         page,
@@ -228,20 +244,55 @@ export default function AccountsPageContent() {
   const rows = data?.list ?? [];
   const visibleAccountIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const visibleAccountIdsKey = useMemo(() => visibleAccountIds.join(','), [visibleAccountIds]);
-  const accountCapacityQueryKey = useMemo(
-    () => queryKeys.accountCapacity(visibleAccountIdsKey),
-    [visibleAccountIdsKey],
-  );
-  const { data: capacityData } = useQuery({
-    queryKey: accountCapacityQueryKey,
-    queryFn: () => accountsApi.capacity(visibleAccountIds),
-    enabled: visibleAccountIds.length > 0,
-    meta: { globalLoading: false },
-    refetchInterval: capacityAutoRefresh ? ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS * 1000 : false,
-    refetchIntervalInBackground: false,
-    staleTime: 0,
-    refetchOnWindowFocus: false,
-  });
+  const visibleAccountIdsRef = useRef<number[]>(visibleAccountIds);
+  useEffect(() => {
+    visibleAccountIdsRef.current = visibleAccountIds;
+  }, [visibleAccountIds, visibleAccountIdsKey]);
+
+  const [capacityData, setCapacityData] = useState<{ accounts: Record<string, number> } | undefined>();
+  const capacityRefreshInFlightRef = useRef(false);
+  const applyCapacityData = useCallback((nextData: { accounts: Record<string, number> }) => {
+    setCapacityData((previous) => (
+      sameCapacityAccounts(previous?.accounts, nextData.accounts) ? previous : nextData
+    ));
+    const counts = nextData.accounts;
+    if (!counts) return;
+    queryClient.setQueryData<PagedData<AccountResp>>(accountListQueryKey, (old) => {
+      if (!old?.list?.length) return old;
+      let changed = false;
+      const list = old.list.map((row) => {
+        const nextCount = counts[String(row.id)];
+        if (typeof nextCount !== 'number' || nextCount === row.current_concurrency) {
+          return row;
+        }
+        changed = true;
+        return {
+          ...row,
+          current_concurrency: nextCount,
+        };
+      });
+      return changed ? { ...old, list } : old;
+    });
+  }, [accountListQueryKey, queryClient]);
+  const refreshVisibleCapacity = useCallback(async () => {
+    const ids = visibleAccountIdsRef.current;
+    if (ids.length === 0 || capacityRefreshInFlightRef.current) return;
+    capacityRefreshInFlightRef.current = true;
+    try {
+      const nextData = await accountsApi.capacity(ids);
+      applyCapacityData(nextData);
+    } finally {
+      capacityRefreshInFlightRef.current = false;
+    }
+  }, [applyCapacityData]);
+  useEffect(() => {
+    if (!capacityAutoRefresh || typeof window === 'undefined') return undefined;
+    void refreshVisibleCapacity();
+    const intervalId = window.setInterval(() => {
+      void refreshVisibleCapacity();
+    }, ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [capacityAutoRefresh, refreshVisibleCapacity, visibleAccountIdsKey]);
   const rowsWithCapacity = useMemo(() => {
     const counts = capacityData?.accounts;
     if (!counts) return rows;
@@ -285,10 +336,11 @@ export default function AccountsPageContent() {
     queryFn: () => accountsApi.usage(platformFilter || '', visibleAccountIds),
     enabled: visibleAccountIds.length > 0,
     meta: { globalLoading: false },
-    refetchInterval: (query) => (query.state.data?.refreshing ? 1_500 : 300_000),
+    refetchInterval: false,
     refetchIntervalInBackground: false,
   });
   const refreshAccountUsage = useCallback(() => {
+    if (visibleAccountIdsRef.current.length === 0) return;
     queryClient.invalidateQueries({ queryKey: accountUsageQueryKey }, { cancelRefetch: false });
   }, [accountUsageQueryKey, queryClient]);
   const refreshAccountOverview = useCallback(() => {
@@ -791,7 +843,7 @@ export default function AccountsPageContent() {
             refreshAriaLabel={t('common.refresh')}
             onChange={setAutoRefresh}
             onAutoRefresh={refreshAccountOverview}
-            onRefresh={refreshAccounts}
+            onRefresh={refreshAccountOverview}
             isRefreshing={isAccountsFetching}
             isAutoRefreshing={isAccountsFetching || isUsageFetching}
           />

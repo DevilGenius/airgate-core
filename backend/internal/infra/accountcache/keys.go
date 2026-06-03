@@ -27,8 +27,22 @@ func UsagePattern() string {
 	return "ag:account:usage:*"
 }
 
-func TodayStatsKey(day string, accountID int) string {
-	return fmt.Sprintf("ag:account:stats:today:%s:%d", day, accountID)
+func TodayStatsKey(day string) string {
+	return fmt.Sprintf("ag:account:stats:today:%s", day)
+}
+
+func TodayStatsField(accountID int, field string) string {
+	return fmt.Sprintf("%d:%s", accountID, field)
+}
+
+func TodayStatsFields(accountID int) []string {
+	return []string{
+		TodayStatsField(accountID, "requests"),
+		TodayStatsField(accountID, "tokens"),
+		TodayStatsField(accountID, "account_cost"),
+		TodayStatsField(accountID, "user_cost"),
+		TodayStatsField(accountID, "updated_at"),
+	}
 }
 
 func ImageTotalKey(accountID int) string {

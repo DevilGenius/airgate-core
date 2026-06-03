@@ -61,6 +61,21 @@ end
 return 1
 `
 
+var listFamilyCooldownsScript = redis.NewScript(`
+	local now = tonumber(ARGV[1])
+	local result = {}
+	for i, key in ipairs(KEYS) do
+		redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
+		local members = redis.call('ZRANGEBYSCORE', key, '(' .. now, '+inf', 'WITHSCORES')
+		for j = 1, #members, 2 do
+			table.insert(result, i)
+			table.insert(result, members[j])
+			table.insert(result, members[j + 1])
+		end
+	end
+	return result
+`)
+
 // NewFamilyCooldown 构造家族冷却管理器。rdb=nil 时所有方法 no-op。
 func NewFamilyCooldown(rdb *redis.Client) *FamilyCooldown {
 	return &FamilyCooldown{rdb: rdb}
@@ -115,6 +130,33 @@ func (fc *FamilyCooldown) Until(ctx context.Context, accountID int, family strin
 	return time.Now().Add(ttl), true
 }
 
+// InCooldownBatch 批量判断一组账号是否处于同一 family 冷却中。调度主链路只需要 bool，
+// 因此用 MGET 原因 key 是否存在代替逐账号 TTL。
+func (fc *FamilyCooldown) InCooldownBatch(ctx context.Context, accountIDs []int, family string) map[int]bool {
+	result := make(map[int]bool, len(accountIDs))
+	if fc == nil || fc.rdb == nil || family == "" {
+		return result
+	}
+	ids := uniqueAccountIDs(accountIDs)
+	if len(ids) == 0 {
+		return result
+	}
+	keys := make([]string, 0, len(ids))
+	for _, accountID := range ids {
+		keys = append(keys, familyCooldownReasonKey(accountID, family))
+	}
+	values, err := fc.rdb.MGet(ctx, keys...).Result()
+	if err != nil {
+		return result
+	}
+	for index, value := range values {
+		if value != nil {
+			result[ids[index]] = true
+		}
+	}
+	return result
+}
+
 // Clear 清除指定家族的冷却。管理员强制解封 / 测试场景使用。
 // 业务正常路径不需要主动清，TTL 到期自动清掉。
 func (fc *FamilyCooldown) Clear(ctx context.Context, accountID int, family string) {
@@ -165,8 +207,8 @@ func (fc *FamilyCooldown) List(ctx context.Context, accountID int) []FamilyCoold
 
 // ListBatch 批量列出多个账号当前所有家族冷却。
 //
-// 冷却展示走账号索引 ZSET，不扫描 Redis keyspace。账号列表自动刷新时，当前页 100 个账号
-// 会变成 100 个 ZRANGEBYSCORE 管道命令，而不是 100 次 SCAN 全库游标遍历。
+// 冷却展示走账号索引 ZSET，不扫描 Redis keyspace。账号列表自动刷新时，当前页账号
+// 会由单个 Lua 脚本批量读取，避免按行放大 Redis 命令数。
 func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[int][]FamilyCooldownEntry {
 	if fc == nil || fc.rdb == nil {
 		return nil
@@ -176,18 +218,17 @@ func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[i
 		return nil
 	}
 	now := time.Now()
-	minScore := fmt.Sprintf("(%d", now.UnixMilli())
-
-	readPipe := fc.rdb.Pipeline()
-	rangeCmds := make(map[int]*redis.ZSliceCmd, len(ids))
+	indexKeys := make([]string, 0, len(ids))
 	for _, accountID := range ids {
-		rangeCmds[accountID] = readPipe.ZRangeByScoreWithScores(ctx, familyCooldownIndexKey(accountID), &redis.ZRangeBy{
-			Min: minScore,
-			Max: "+inf",
-		})
+		indexKeys = append(indexKeys, familyCooldownIndexKey(accountID))
 	}
-	if _, err := readPipe.Exec(ctx); err != nil && err != redis.Nil {
-		return nil
+	raw, err := listFamilyCooldownsScript.Run(ctx, fc.rdb, indexKeys, now.UnixMilli()).Result()
+	if err != nil {
+		return map[int][]FamilyCooldownEntry{}
+	}
+	values, ok := raw.([]interface{})
+	if !ok {
+		return map[int][]FamilyCooldownEntry{}
 	}
 
 	type pendingReason struct {
@@ -199,27 +240,30 @@ func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[i
 	result := make(map[int][]FamilyCooldownEntry)
 	pending := make([]pendingReason, 0)
 	reasonPipe := fc.rdb.Pipeline()
-	for accountID, cmd := range rangeCmds {
-		items, err := cmd.Result()
-		if err != nil {
+	for index := 0; index+2 < len(values); index += 3 {
+		rawKeyIndex, ok := redisIntValue(values[index])
+		if !ok || rawKeyIndex <= 0 || rawKeyIndex > len(ids) {
 			continue
 		}
-		for _, item := range items {
-			family, ok := item.Member.(string)
-			if !ok || family == "" {
-				continue
-			}
-			until := time.UnixMilli(int64(item.Score))
-			if !until.After(now) {
-				continue
-			}
-			pending = append(pending, pendingReason{
-				accountID: accountID,
-				family:    family,
-				until:     until,
-				cmd:       reasonPipe.Get(ctx, familyCooldownReasonKey(accountID, family)),
-			})
+		family, ok := values[index+1].(string)
+		if !ok || family == "" {
+			continue
 		}
+		score, ok := redisFloatValue(values[index+2])
+		if !ok {
+			continue
+		}
+		until := time.UnixMilli(int64(score))
+		if !until.After(now) {
+			continue
+		}
+		accountID := ids[rawKeyIndex-1]
+		pending = append(pending, pendingReason{
+			accountID: accountID,
+			family:    family,
+			until:     until,
+			cmd:       reasonPipe.Get(ctx, familyCooldownReasonKey(accountID, family)),
+		})
 	}
 	if len(pending) == 0 {
 		return result

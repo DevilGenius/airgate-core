@@ -3,9 +3,12 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 const (
@@ -26,12 +29,22 @@ func NewRPMCounter(rdb *redis.Client) *RPMCounter {
 
 // getMinuteKey 使用 Redis 服务器时间生成分钟粒度的 Redis key，避免分布式时钟偏差
 func (r *RPMCounter) getMinuteKey(ctx context.Context, accountID int) string {
+	return rpmMinuteKey(accountID, r.currentMinute(ctx))
+}
+
+func (r *RPMCounter) currentMinute(ctx context.Context) int64 {
+	if r.rdb == nil {
+		return time.Now().Unix() / 60
+	}
 	t, err := r.rdb.Time(ctx).Result()
 	if err != nil {
 		// fallback to local time
 		t = time.Now()
 	}
-	minute := t.Unix() / 60
+	return t.Unix() / 60
+}
+
+func rpmMinuteKey(accountID int, minute int64) string {
 	return fmt.Sprintf("ag:rpm:%d:%d", accountID, minute)
 }
 
@@ -136,6 +149,55 @@ func (r *RPMCounter) GetSchedulability(ctx context.Context, accountID int, maxRP
 		return Normal // fail-open
 	}
 
+	return rpmSchedulability(current, maxRPM)
+}
+
+// GetSchedulabilityBatch 批量读取候选账号当前分钟 RPM。一次 SelectAccount 只需要一次 TIME
+// 和一次 MGET，避免按候选账号数放大 Redis 命令。
+func (r *RPMCounter) GetSchedulabilityBatch(ctx context.Context, accounts []*ent.Account) map[int]Schedulability {
+	result := make(map[int]Schedulability, len(accounts))
+	if r == nil || r.rdb == nil || len(accounts) == 0 {
+		return result
+	}
+	type rpmCheck struct {
+		accountID int
+		maxRPM    int
+	}
+	checks := make([]rpmCheck, 0, len(accounts))
+	for _, acc := range accounts {
+		if acc == nil {
+			continue
+		}
+		maxRPM := ExtraInt(acc.Extra, "max_rpm")
+		if maxRPM <= 0 {
+			continue
+		}
+		checks = append(checks, rpmCheck{accountID: acc.ID, maxRPM: maxRPM})
+	}
+	if len(checks) == 0 {
+		return result
+	}
+
+	minute := r.currentMinute(ctx)
+	keys := make([]string, 0, len(checks))
+	for _, check := range checks {
+		keys = append(keys, rpmMinuteKey(check.accountID, minute))
+	}
+	values, err := r.rdb.MGet(ctx, keys...).Result()
+	if err != nil {
+		return result
+	}
+	for index, value := range values {
+		current, _ := redisIntValue(value)
+		result[checks[index].accountID] = rpmSchedulability(current, checks[index].maxRPM)
+	}
+	return result
+}
+
+func rpmSchedulability(current int, maxRPM int) Schedulability {
+	if maxRPM <= 0 {
+		return Normal
+	}
 	ratio := float64(current) / float64(maxRPM)
 	if ratio >= 1.0 {
 		return NotSchedulable
@@ -144,4 +206,21 @@ func (r *RPMCounter) GetSchedulability(ctx context.Context, accountID int, maxRP
 		return StickyOnly
 	}
 	return Normal
+}
+
+func redisIntValue(value any) (int, bool) {
+	switch v := value.(type) {
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	case string:
+		n, err := strconv.Atoi(v)
+		return n, err == nil
+	case []byte:
+		n, err := strconv.Atoi(string(v))
+		return n, err == nil
+	default:
+		return 0, false
+	}
 }

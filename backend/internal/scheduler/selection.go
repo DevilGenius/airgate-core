@@ -50,6 +50,8 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 	}
 
 	now := time.Now()
+	snapshot := s.newSelectionSnapshot(ctx, candidates, model, now)
+	snapshot.loadSchedulability(ctx, s, s.deferredConstraintCandidates(ctx, candidates, model, now, snapshot))
 	normalCandidates := make([]*ent.Account, 0, len(candidates))
 	stickyCandidates := make([]*ent.Account, 0, len(candidates))
 	var hardAffinityCandidates []*ent.Account
@@ -57,7 +59,7 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		hardAffinityCandidates = make([]*ent.Account, 0, len(candidates))
 	}
 	for _, acc := range candidates {
-		result := s.checkSchedulabilityResult(ctx, acc, model, now, opts.RequireContinuationAffinity)
+		result := s.checkSchedulabilityResult(ctx, acc, model, now, opts.RequireContinuationAffinity, snapshot)
 		switch result.normal {
 		case Normal:
 			normalCandidates = append(normalCandidates, acc)
@@ -114,7 +116,7 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		if len(stickyCandidates) == 0 {
 			return nil, ErrNoAvailableAccount
 		}
-		selected := s.selectByLoadBalance(ctx, stickyCandidates, now)
+		selected := s.selectByLoadBalance(ctx, stickyCandidates, now, snapshot)
 		if selected == nil {
 			return nil, ErrNoAvailableAccount
 		}
@@ -123,14 +125,14 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 			sdk.LogFieldPlatform, platform,
 			sdk.LogFieldModel, model,
 		)
-		return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, stickyCandidates, now)
+		return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, stickyCandidates, now, snapshot)
 	}
 
-	selected := s.selectByLoadBalance(ctx, normalCandidates, now)
+	selected := s.selectByLoadBalance(ctx, normalCandidates, now, snapshot)
 	if selected == nil {
 		return nil, ErrNoAvailableAccount
 	}
-	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalCandidates, now)
+	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalCandidates, now, snapshot)
 }
 
 func continuationBlockedError(candidates []*ent.Account, accountID int) error {
@@ -195,7 +197,7 @@ func excludeAccounts(candidates []*ent.Account, excludeIDs []int) []*ent.Account
 }
 
 // maybeRegisterSession 有 sessionID 时登记会话；session 数超限换一个候选重试。
-func (s *Scheduler) maybeRegisterSession(ctx context.Context, selected *ent.Account, userID int, platform, sessionID string, pool []*ent.Account, now time.Time) (*ent.Account, error) {
+func (s *Scheduler) maybeRegisterSession(ctx context.Context, selected *ent.Account, userID int, platform, sessionID string, pool []*ent.Account, now time.Time, snapshot *selectionSnapshot) (*ent.Account, error) {
 	if sessionID == "" {
 		return selected, nil
 	}
@@ -212,7 +214,7 @@ func (s *Scheduler) maybeRegisterSession(ctx context.Context, selected *ent.Acco
 	if len(retry) == 0 {
 		return nil, ErrNoAvailableAccount
 	}
-	selected = s.selectByLoadBalance(ctx, retry, now)
+	selected = s.selectByLoadBalance(ctx, retry, now, snapshot)
 	if selected == nil || !s.RegisterSession(ctx, selected.ID, sessionID, selected.Extra) {
 		return nil, ErrNoAvailableAccount
 	}
@@ -317,7 +319,7 @@ func matchModelRouting(routing map[string][]int64, model string) []int64 {
 // model 用于推导请求所属的家族（gpt-image / chat 各算一个池），仅当该家族正在
 // 冷却时才把账号当作 NotSchedulable —— 别的家族不受影响。
 func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, model string, now time.Time) Schedulability {
-	return s.checkSchedulabilityResult(ctx, acc, model, now, false).normal
+	return s.checkSchedulabilityResult(ctx, acc, model, now, false, nil).normal
 }
 
 type schedulabilityResult struct {
@@ -329,10 +331,10 @@ type schedulabilityResult struct {
 // 它只放宽滑动窗口费用的硬上限：该容量会随时间窗口滚动自动降回阈值内。
 // 不放宽 disabled / rate_limited / family cooldown / RPM / 并发 / session 等保护。
 func (s *Scheduler) checkHardAffinitySchedulability(ctx context.Context, acc *ent.Account, model string, now time.Time) Schedulability {
-	return s.checkSchedulabilityResult(ctx, acc, model, now, true).hardAffinity
+	return s.checkSchedulabilityResult(ctx, acc, model, now, true, nil).hardAffinity
 }
 
-func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Account, model string, now time.Time, needHardAffinity bool) schedulabilityResult {
+func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Account, model string, now time.Time, needHardAffinity bool, snapshot *selectionSnapshot) schedulabilityResult {
 	base := SchedulabilityOf(acc, now)
 	if base == NotSchedulable {
 		return schedulabilityResult{normal: NotSchedulable, hardAffinity: NotSchedulable}
@@ -342,12 +344,16 @@ func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Acco
 	// 家族级冷却：撞过这个 family 的账号在冷却期内对该 family 不可调度，
 	// 但对其它 family 仍可用。Redis 不可用时退化为不冷却，不阻断主链路。
 	if family := ModelFamily(acc.Platform, model); family != "" && s.familyCooldown != nil {
-		if _, inCooldown := s.familyCooldown.Until(ctx, acc.ID, family); inCooldown {
+		inCooldown, fromSnapshot := snapshot.inFamilyCooldown(acc.ID)
+		if !fromSnapshot {
+			_, inCooldown = s.familyCooldown.Until(ctx, acc.ID, family)
+		}
+		if inCooldown {
 			return schedulabilityResult{normal: NotSchedulable, hardAffinity: NotSchedulable}
 		}
 	}
 
-	if sched := s.concurrencySchedulability(ctx, acc); sched > result.normal {
+	if sched := s.concurrencySchedulability(ctx, acc, snapshot); sched > result.normal {
 		result.normal = sched
 		result.hardAffinity = sched
 	}
@@ -355,9 +361,13 @@ func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Acco
 		return result
 	}
 
-	if sched := s.windowCost.GetSchedulability(ctx, acc.ID, acc.Extra); sched > result.normal {
-		result.normal = sched
-		hardAffinitySched := sched
+	windowSched, fromSnapshot := snapshot.windowCostSchedulability(acc.ID)
+	if !fromSnapshot {
+		windowSched = s.windowCost.GetSchedulability(ctx, acc.ID, acc.Extra)
+	}
+	if windowSched > result.normal {
+		result.normal = windowSched
+		hardAffinitySched := windowSched
 		if needHardAffinity && hardAffinitySched == NotSchedulable {
 			hardAffinitySched = StickyOnly
 		}
@@ -369,7 +379,10 @@ func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Acco
 		return result
 	}
 
-	rpmSched := s.rpm.GetSchedulability(ctx, acc.ID, ExtraInt(acc.Extra, "max_rpm"))
+	rpmSched, fromSnapshot := snapshot.rpmSchedulability(acc.ID)
+	if !fromSnapshot {
+		rpmSched = s.rpm.GetSchedulability(ctx, acc.ID, ExtraInt(acc.Extra, "max_rpm"))
+	}
 	if result.normal != NotSchedulable && rpmSched > result.normal {
 		result.normal = rpmSched
 	}
@@ -380,7 +393,10 @@ func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Acco
 		return result
 	}
 
-	sessionSched := s.session.GetSchedulability(ctx, acc.ID, acc.Extra)
+	sessionSched, fromSnapshot := snapshot.sessionSchedulability(acc.ID)
+	if !fromSnapshot {
+		sessionSched = s.session.GetSchedulability(ctx, acc.ID, acc.Extra)
+	}
 	if result.normal != NotSchedulable && sessionSched > result.normal {
 		result.normal = sessionSched
 	}
@@ -397,12 +413,12 @@ func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Acco
 //	否则         → Normal
 //
 // 存在 TOCTOU（这里看没满、下一瞬 acquireSlot 却满）：forwarder 会 failover 到下一个账号兜底。
-func (s *Scheduler) concurrencySchedulability(ctx context.Context, acc *ent.Account) Schedulability {
+func (s *Scheduler) concurrencySchedulability(ctx context.Context, acc *ent.Account, snapshot *selectionSnapshot) Schedulability {
 	maxConc := acc.MaxConcurrency
 	if maxConc <= 0 {
 		maxConc = DefaultAccountMaxConcurrency
 	}
-	load := s.getCurrentLoad(ctx, acc.ID)
+	load := snapshot.currentLoad(s, ctx, acc.ID)
 	if load >= maxConc {
 		return NotSchedulable
 	}
@@ -417,7 +433,7 @@ func (s *Scheduler) concurrencySchedulability(ctx context.Context, acc *ent.Acco
 //
 // 低优先级账号只有在高优先级全部被 checkSchedulability 过滤掉后才能被选中。
 // 同层内从 top-N 随机选一个，避免高并发下全部命中同一账号。
-func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.Account, now time.Time) *ent.Account {
+func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.Account, now time.Time, snapshot *selectionSnapshot) *ent.Account {
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -454,7 +470,7 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 		if maxConc <= 0 {
 			maxConc = DefaultAccountMaxConcurrency
 		}
-		loadRate := float64(s.getCurrentLoad(ctx, acc.ID)) / float64(maxConc)
+		loadRate := float64(snapshot.currentLoad(s, ctx, acc.ID)) / float64(maxConc)
 		if loadRate > 1 {
 			loadRate = 1
 		}
@@ -491,9 +507,6 @@ func (s *Scheduler) getCurrentLoad(ctx context.Context, accountID int) int {
 	if s.rdb == nil {
 		return 0
 	}
-	n, err := s.rdb.Get(ctx, concurrencyCountKey(accountID)).Int()
-	if err != nil {
-		return 0
-	}
-	return n
+	counts := loadConcurrencyCounts(ctx, s.rdb, []int{accountID})
+	return counts[accountID]
 }

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 const defaultSessionIdleTimeout = 3600 * time.Second
@@ -95,6 +97,20 @@ var getActiveSessionCountScript = redis.NewScript(`
 
 	redis.call('ZREMRANGEBYSCORE', key, '-inf', expireBefore)
 	return redis.call('ZCARD', key)
+`)
+
+var getActiveSessionCountsScript = redis.NewScript(`
+	local now = redis.call('TIME')
+	local nowSec = tonumber(now[1])
+	local result = {}
+
+	for i, key in ipairs(KEYS) do
+		local idleTimeout = tonumber(ARGV[i])
+		local expireBefore = nowSec - idleTimeout
+		redis.call('ZREMRANGEBYSCORE', key, '-inf', expireBefore)
+		result[i] = redis.call('ZCARD', key)
+	end
+	return result
 `)
 
 // RegisterSession 注册会话，返回是否允许
@@ -188,4 +204,64 @@ func (s *SessionManager) GetSchedulability(ctx context.Context, accountID int, e
 		return StickyOnly // 会话已满，仅允许已有会话
 	}
 	return Normal
+}
+
+// GetSchedulabilityBatch 批量检查候选账号的 session 数限制。Redis 侧用单个 Lua
+// 脚本循环 key，避免候选账号数放大成 N 条 EVAL。
+func (s *SessionManager) GetSchedulabilityBatch(ctx context.Context, accounts []*ent.Account) map[int]Schedulability {
+	result := make(map[int]Schedulability, len(accounts))
+	if s == nil || s.rdb == nil || len(accounts) == 0 {
+		return result
+	}
+	type sessionCheck struct {
+		accountID   int
+		maxSessions int
+	}
+	checks := make([]sessionCheck, 0, len(accounts))
+	keys := make([]string, 0, len(accounts))
+	args := make([]interface{}, 0, len(accounts))
+	for _, acc := range accounts {
+		if acc == nil {
+			continue
+		}
+		maxSessions := ExtraInt(acc.Extra, "max_sessions")
+		if maxSessions <= 0 {
+			continue
+		}
+		idleTimeout := time.Duration(ExtraInt(acc.Extra, "session_idle_timeout")) * time.Second
+		if idleTimeout <= 0 {
+			idleTimeout = defaultSessionIdleTimeout
+		}
+		checks = append(checks, sessionCheck{
+			accountID:   acc.ID,
+			maxSessions: maxSessions,
+		})
+		keys = append(keys, sessionLimitKey(acc.ID))
+		args = append(args, int(idleTimeout.Seconds()))
+	}
+	if len(checks) == 0 {
+		return result
+	}
+
+	raw, err := getActiveSessionCountsScript.Run(ctx, s.rdb, keys, args...).Result()
+	if err != nil {
+		return result
+	}
+	values, ok := raw.([]interface{})
+	if !ok {
+		return result
+	}
+	for index, value := range values {
+		if index >= len(checks) {
+			break
+		}
+		count, ok := redisIntValue(value)
+		if !ok {
+			continue
+		}
+		if count >= checks[index].maxSessions {
+			result[checks[index].accountID] = StickyOnly
+		}
+	}
+	return result
 }
