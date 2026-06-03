@@ -521,7 +521,12 @@ export default function UsagePage() {
     placeholderData: keepPreviousData,
   });
 
-  const { data: stats, isFetching: isStatsFetching, refetch: refetchStats } = useQuery({
+  const {
+    data: stats,
+    isFetching: isStatsFetching,
+    isPlaceholderData: isStatsPlaceholderData,
+    refetch: refetchStats,
+  } = useQuery({
     queryKey: ['admin-usage-stats', filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id],
     queryFn: ({ signal }) =>
       usageApi.stats({
@@ -736,6 +741,7 @@ export default function UsagePage() {
   }, [sharedColumns, t]);
   const total = data?.total ?? 0;
   const canUseCursor = pageActive && !isPlaceholderData;
+  const summaryTotal = activeStats && !isStatsPlaceholderData ? activeStats.total_requests : undefined;
 
   return (
     <div>
@@ -905,6 +911,8 @@ export default function UsagePage() {
         rows={pageActive ? data?.list ?? [] : []}
         setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
         setPageSize={setPageSize}
+        summaryTotal={summaryTotal}
+        summaryTotalExact={summaryTotal != null ? true : undefined}
         suppressHighlight={!pageActive || isPlaceholderData}
         total={pageActive ? total : 0}
         totalExact={canUseCursor ? data?.total_exact : true}

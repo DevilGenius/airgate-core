@@ -20,6 +20,8 @@ interface TablePaginationFooterProps {
   pageSizeOptions?: readonly number[];
   setPage: (page: number) => void;
   setPageSize?: (pageSize: number) => void;
+  summaryTotal?: number;
+  summaryTotalExact?: boolean;
   total: number;
   totalExact?: boolean;
   totalPages: number;
@@ -49,6 +51,8 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
   pageSizeOptions = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS,
   setPage,
   setPageSize,
+  summaryTotal,
+  summaryTotalExact,
   total,
   totalExact = true,
   totalPages,
@@ -68,6 +72,8 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
   const canGoNext = visiblePage < safeTotalPages;
   const showPageSize = pageSize != null && setPageSize != null;
   const selectedPageSize = displayPageSize == null ? '' : String(displayPageSize);
+  const visibleTotal = summaryTotal ?? total;
+  const visibleTotalExact = summaryTotalExact ?? totalExact;
   const pageSizeItems = useMemo(
     () => pageSizeOptions.map((size) => ({ id: String(size), label: String(size) })),
     [pageSizeOptions],
@@ -185,8 +191,8 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
   return (
     <Pagination className="ag-table-pagination" size="sm">
       <Pagination.Summary className="ag-table-pagination-summary">
-        <span>{totalExact ? '共' : '至少'}</span>
-        <span className="ag-table-pagination-number">{total.toLocaleString()}</span>
+        <span>{visibleTotalExact ? '共' : '至少'}</span>
+        <span className="ag-table-pagination-number">{visibleTotal.toLocaleString()}</span>
         <span>条</span>
         <span className="ag-table-pagination-separator" aria-hidden="true" />
         <span>第</span>

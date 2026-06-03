@@ -288,6 +288,7 @@ export default function UserUsageContent() {
 
   const list = data?.list ?? [];
   const total = data?.total ?? 0;
+  const summaryTotal = stats?.total_requests;
   const canUseCursor = !isPlaceholderData;
   const visibleActualCost = customerScope ? (stats?.total_billed_cost ?? 0) : (stats?.total_actual_cost ?? 0);
 
@@ -489,6 +490,8 @@ export default function UserUsageContent() {
         rows={list}
         setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
         setPageSize={setPageSize}
+        summaryTotal={summaryTotal}
+        summaryTotalExact={summaryTotal != null ? true : undefined}
         suppressHighlight={isPlaceholderData}
         total={total}
         totalExact={canUseCursor ? data?.total_exact : true}

@@ -174,6 +174,8 @@ export function UsageRecordsTable<T extends UsageRow>({
   rows,
   setPage,
   setPageSize,
+  summaryTotal,
+  summaryTotalExact,
   total,
   totalExact,
 }: {
@@ -192,6 +194,8 @@ export function UsageRecordsTable<T extends UsageRow>({
   rows: T[];
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
+  summaryTotal?: number;
+  summaryTotalExact?: boolean;
   total: number;
   totalExact?: boolean;
 }) {
@@ -301,6 +305,8 @@ export function UsageRecordsTable<T extends UsageRow>({
           pageSizeOptions={USAGE_PAGE_SIZE_OPTIONS}
           setPage={setPage}
           setPageSize={setPageSize}
+          summaryTotal={summaryTotal}
+          summaryTotalExact={summaryTotalExact}
           total={total}
           hasMore={hasMore}
           totalExact={totalExact}
