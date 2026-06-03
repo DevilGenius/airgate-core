@@ -220,6 +220,7 @@ func (s pluginAdminManagerStub) Uninstall(context.Context, string) error        
 func (s pluginAdminManagerStub) ReloadDev(context.Context, string) error                 { return nil }
 func (s pluginAdminManagerStub) ReloadInstance(context.Context, string) error            { return nil }
 func (s pluginAdminManagerStub) IsDev(string) bool                                       { return false }
+func (s pluginAdminManagerStub) IsLoading() bool                                         { return false }
 func (s pluginAdminManagerStub) GetInstance(string) *plugin.PluginInstance               { return nil }
 func (s pluginAdminManagerStub) GetPluginConfig(context.Context, string) (map[string]string, error) {
 	return nil, nil

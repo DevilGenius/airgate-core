@@ -69,6 +69,7 @@ type Manager struct {
 	mu        sync.RWMutex
 	instances map[string]*PluginInstance
 	stopping  map[string]chan struct{}
+	loading   bool
 	aliases   map[string]string
 	devPaths  map[string]string
 
@@ -85,6 +86,20 @@ type Manager struct {
 // 会拿到 host_broker_id=0，需要重启才能恢复 host 通路。
 func (m *Manager) SetHostService(factory *HostService) {
 	m.hostFactory = factory
+}
+
+// SetLoading 记录启动阶段插件是否仍在后台加载。
+func (m *Manager) SetLoading(loading bool) {
+	m.mu.Lock()
+	m.loading = loading
+	m.mu.Unlock()
+}
+
+// IsLoading 返回启动阶段插件后台加载状态。
+func (m *Manager) IsLoading() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.loading
 }
 
 // PluginMeta 插件运行时元信息。

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useMatchRoute, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useIsFetching, useQuery } from '@tanstack/react-query';
@@ -81,6 +81,8 @@ const apiKeyMenuItems: MenuItem[] = [
 ];
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'airgate:sidebar:collapsed';
+const PLUGIN_MENU_LOADING_POLL_MS = 1_000;
+const PLUGIN_MENU_LOADING_TIMEOUT_MS = 60_000;
 
 /**
  * 拉取插件菜单：所有登录用户均可调用 /plugins/menu，再按 page.audience 过滤显示。
@@ -107,11 +109,24 @@ function usePluginMenuItems(isAdmin: boolean, isAPIKeySession: boolean): {
   userItems: MenuItem[];
   healthInstalled: boolean;
 } {
+  const loadingStartedAtRef = useRef<number | null>(null);
   const { data } = useQuery({
     queryKey: queryKeys.pluginsMenu(),
     queryFn: () => pluginsApi.menu(),
     enabled: !isAPIKeySession,
     staleTime: 60_000,
+    refetchInterval: (query) => {
+      if (!query.state.data?.loading) {
+        loadingStartedAtRef.current = null;
+        return false;
+      }
+      const now = Date.now();
+      loadingStartedAtRef.current ??= now;
+      return now - loadingStartedAtRef.current < PLUGIN_MENU_LOADING_TIMEOUT_MS
+        ? PLUGIN_MENU_LOADING_POLL_MS
+        : false;
+    },
+    meta: { globalLoading: false },
   });
 
   return useMemo(() => {

@@ -3,11 +3,15 @@ import type {
   PluginResp, MarketplacePluginResp, PageReq, PagedData,
 } from '../types';
 
+export type PluginMenuResp = PagedData<PluginResp> & {
+  loading?: boolean;
+};
+
 export const pluginsApi = {
   list: (params?: PageReq) =>
     get<PagedData<PluginResp>>('/api/v1/admin/plugins', params),
   // 普通用户可访问的精简插件菜单（仅 name + frontend_pages，用于侧边栏）
-  menu: () => get<PagedData<PluginResp>>('/api/v1/plugins/menu'),
+  menu: () => get<PluginMenuResp>('/api/v1/plugins/menu'),
   uninstall: (name: string) => post<void>(`/api/v1/admin/plugins/${name}/uninstall`),
   reload: (name: string) => post<void>(`/api/v1/admin/plugins/${name}/reload`),
   marketplace: (params?: PageReq) =>

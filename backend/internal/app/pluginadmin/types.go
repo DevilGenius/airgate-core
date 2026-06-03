@@ -18,6 +18,7 @@ type Manager interface {
 	ReloadDev(context.Context, string) error
 	ReloadInstance(context.Context, string) error
 	IsDev(string) bool
+	IsLoading() bool
 	GetInstance(string) *plugin.PluginInstance
 	GetPluginConfig(context.Context, string) (map[string]string, error)
 	UpdatePluginConfig(context.Context, string, map[string]string) error

@@ -160,7 +160,10 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	go plugin.StartAssetMigrationLoop(pluginCtx, s.db)
 	go plugin.StartAssetCleanupLoop(pluginCtx, s.db)
 
+	s.pluginMgr.SetLoading(true)
 	go func() {
+		defer s.pluginMgr.SetLoading(false)
+
 		// 加载已编译的插件。后台执行，避免坏插件阻塞 core 监听端口。
 		if err := s.pluginMgr.LoadAll(pluginCtx); err != nil {
 			slog.Error("加载插件失败（不影响核心服务）", "error", err)

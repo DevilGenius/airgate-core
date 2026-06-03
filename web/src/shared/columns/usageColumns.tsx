@@ -138,6 +138,7 @@ const META_CHIP_EFFORT_COLORS: Record<string, string> = {
   medium: META_CHIP_MEDIUM_COLOR,
   high: META_CHIP_HIGH_COLOR,
   xhigh: META_CHIP_XHIGH_COLOR,
+  max: META_CHIP_XHIGH_COLOR,
 };
 
 const MODEL_META_SLOT_WIDTH_CLASS = 'w-[5.5rem]';
@@ -309,6 +310,10 @@ function isOutputMetric(metric: MetricDisplay) {
   return metric.key === 'output_tokens';
 }
 
+function isCacheCreationMetric(metric: MetricDisplay) {
+  return metric.key === 'cache_creation_tokens';
+}
+
 function isTokenUnit(unit?: string) {
   const normalized = normalizeUsageKey(unit);
   return normalized === 'token' || normalized === 'tokens';
@@ -337,6 +342,41 @@ function metricColor(metric: MetricDisplay, index: number): string | undefined {
   if (key.includes('cache_creation')) return USAGE_TOKEN_COLORS.cacheCreation;
   if (metric.kind === 'image') return 'var(--ag-text)';
   return [USAGE_TOKEN_COLORS.input, USAGE_TOKEN_COLORS.output, USAGE_TOKEN_COLORS.cacheRead, USAGE_TOKEN_COLORS.cacheCreation][index % 4];
+}
+
+function cacheCreationBreakdownValue(row: UsageRow, total: number): ReactNode {
+  const metadata = row.usage_metadata ?? {};
+  const cacheCreation5m = usageMetadataNumber(metadata, ['claude.cache_creation_5m_tokens']);
+  const cacheCreation1h = usageMetadataNumber(metadata, ['claude.cache_creation_1h_tokens']);
+  const parts: Array<[string, number]> = [];
+  if (cacheCreation5m > 0) parts.push(['5m', cacheCreation5m]);
+  if (cacheCreation1h > 0) parts.push(['1h', cacheCreation1h]);
+
+  if (parts.length === 0) return formatMetricNumber(total);
+
+  return (
+    <span className="inline-flex min-w-0 max-w-full items-baseline justify-end gap-1">
+      <span className="min-w-0 truncate" style={{ color: USAGE_TOKEN_COLORS.cacheRead }}>
+        ({parts.map(([label, value]) => `${label} ${formatMetricNumber(value)}`).join(',')})
+      </span>
+      <span className="shrink-0">{formatMetricNumber(total)}</span>
+    </span>
+  );
+}
+
+function metricTooltipValue(row: UsageRow, metric: MetricDisplay, reasoningTokens: number): ReactNode {
+  if (isCacheCreationMetric(metric)) return cacheCreationBreakdownValue(row, metricNumber(metric.value));
+
+  if (isOutputMetric(metric) && reasoningTokens > 0) {
+    return (
+      <span className="inline-flex min-w-0 max-w-full items-baseline justify-end gap-1">
+        <span className="min-w-0 truncate" style={{ color: USAGE_TOKEN_COLORS.reasoning }}>(推理 {formatMetricNumber(reasoningTokens)})</span>
+        <span className="shrink-0">{formatMetricValue(metric)}</span>
+      </span>
+    );
+  }
+
+  return formatMetricValue(metric);
 }
 
 function rowMetrics(row: UsageRow): MetricDisplay[] {
@@ -405,12 +445,7 @@ function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
         <TooltipRow
           key={metric.key || `${metric.label}:${index}`}
           label={metric.label || metric.key || t('usage.metric', '计量')}
-          value={isOutputMetric(metric) && reasoningTokens > 0 ? (
-            <span className="inline-flex min-w-0 max-w-full items-baseline justify-end gap-1">
-              <span className="min-w-0 truncate" style={{ color: USAGE_TOKEN_COLORS.reasoning }}>(推理 {formatMetricNumber(reasoningTokens)})</span>
-              <span className="shrink-0">{formatMetricValue(metric)}</span>
-            </span>
-          ) : formatMetricValue(metric)}
+          value={metricTooltipValue(row, metric, reasoningTokens)}
           color={metricColor(metric, index)}
         />
       ))}

@@ -55,6 +55,11 @@ func (s *Service) List() []PluginMeta {
 	return result
 }
 
+// IsLoading 返回启动阶段插件是否仍在后台加载。
+func (s *Service) IsLoading() bool {
+	return s.manager.IsLoading()
+}
+
 func cloneStringMap(input map[string]string) map[string]string {
 	if len(input) == 0 {
 		return nil

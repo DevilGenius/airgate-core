@@ -20,7 +20,9 @@ func (h *PluginHandler) ListPlugins(c *gin.Context) {
 	for _, item := range list {
 		resp = append(resp, toPluginResp(item))
 	}
-	response.Success(c, response.PagedData(resp, int64(len(resp)), 1, len(resp)))
+	data := response.PagedData(resp, int64(len(resp)), 1, len(resp))
+	data["loading"] = h.service.IsLoading()
+	response.Success(c, data)
 }
 
 // GetPluginConfig 读取插件已持久化的配置（用于编辑配置 UI 回显）。
@@ -83,7 +85,9 @@ func (h *PluginHandler) ListPluginMenu(c *gin.Context) {
 		}
 		resp = append(resp, menuItem)
 	}
-	response.Success(c, response.PagedData(resp, int64(len(resp)), 1, len(resp)))
+	data := response.PagedData(resp, int64(len(resp)), 1, len(resp))
+	data["loading"] = h.service.IsLoading()
+	response.Success(c, data)
 }
 
 // UploadPlugin 上传安装插件。
