@@ -2,9 +2,61 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import http from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 
 const BACKEND = 'http://localhost:9517';
 const backendUrl = new URL(BACKEND);
+const PLUGIN_INDEX_CSS_RE = /^\/plugins\/[^/]+\/assets\/index\.css(?:[?#].*)?$/;
+
+function proxyOptionalPluginCss(
+  req: IncomingMessage,
+  res: ServerResponse,
+  next: () => void,
+) {
+  if (
+    !req.url ||
+    !PLUGIN_INDEX_CSS_RE.test(req.url) ||
+    (req.method !== 'GET' && req.method !== 'HEAD')
+  ) {
+    next();
+    return;
+  }
+
+  const headers = { ...req.headers, host: backendUrl.host };
+  const proxyReq = http.request(
+    {
+      hostname: backendUrl.hostname,
+      port: backendUrl.port,
+      path: req.url,
+      method: req.method,
+      headers,
+    },
+    (proxyRes) => {
+      if (proxyRes.statusCode === 404) {
+        proxyRes.resume();
+        res.writeHead(200, {
+          'content-type': 'text/css; charset=utf-8',
+          'cache-control': 'no-cache, no-store, must-revalidate',
+        });
+        res.end();
+        return;
+      }
+
+      res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+      if (req.method === 'HEAD') {
+        proxyRes.resume();
+        res.end();
+        return;
+      }
+      proxyRes.pipe(res);
+    },
+  );
+  proxyReq.on('error', () => {
+    res.writeHead(502);
+    res.end('Backend unavailable');
+  });
+  req.pipe(proxyReq);
+}
 
 export default defineConfig({
   plugins: [
@@ -13,6 +65,8 @@ export default defineConfig({
     {
       name: 'api-key-proxy',
       configureServer(server) {
+        server.middlewares.use(proxyOptionalPluginCss);
+
         // 携带 Bearer token 的请求一律代理到后端（API Key 调用），支持 SSE 流式
         server.middlewares.use((req, res, next) => {
           const auth = req.headers.authorization;

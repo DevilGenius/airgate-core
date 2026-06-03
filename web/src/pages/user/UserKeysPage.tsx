@@ -19,7 +19,7 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { GROUP_CHIP_STYLE } from '../../shared/components/groupChipStyle';
-import { formatAPIKeyHint } from '../../shared/utils/format';
+import { dateInputToLocalStartRFC3339, formatAPIKeyHint, formatDateInputValue, formatExpiry } from '../../shared/utils/format';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
 import {
@@ -162,7 +162,7 @@ export default function UserKeysPage() {
       quota_usd: key.quota_usd ? String(key.quota_usd) : '',
       sell_rate: key.sell_rate > 0 ? String(key.sell_rate) : '1',
       max_concurrency: key.max_concurrency ? String(key.max_concurrency) : '',
-      expires_at: key.expires_at ? key.expires_at.slice(0, 10) : '',
+      expires_at: formatDateInputValue(key.expires_at),
     });
     setModalOpen(true);
   }
@@ -184,7 +184,7 @@ export default function UserKeysPage() {
     }
 
     // 后端要求 RFC3339 格式；空字符串表示显式清除过期时间
-    const expiresAt = form.expires_at ? `${form.expires_at}T23:59:59Z` : '';
+    const expiresAt = dateInputToLocalStartRFC3339(form.expires_at);
 
     if (editingKey) {
       const payload: UpdateAPIKeyReq = {
@@ -479,9 +479,7 @@ export default function UserKeysPage() {
                     />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    {row.expires_at
-                      ? new Date(row.expires_at).toLocaleDateString('zh-CN')
-                      : t('user_keys.never_expire')}
+                    {formatExpiry(row.expires_at, t('user_keys.never_expire'))}
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <div className="ag-table-row-actions flex items-center justify-center gap-0.5">

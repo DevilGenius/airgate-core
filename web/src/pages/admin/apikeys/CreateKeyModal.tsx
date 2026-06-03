@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Description, Input, Label, ListBox, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { KeyRound } from 'lucide-react';
 import { parseIpList } from '../../../shared/utils/ip';
+import { dateInputToLocalStartRFC3339, formatDateInputValue } from '../../../shared/utils/format';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
@@ -182,8 +183,8 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
             <CommonDatePicker
               description={t('api_keys.expire_hint')}
               label={t('api_keys.expire_time')}
-              value={form.expires_at ? form.expires_at.split('T')[0] : ''}
-              onChange={(value) => setForm({ ...form, expires_at: value ? `${value}T23:59:59Z` : '' })}
+              value={formatDateInputValue(form.expires_at)}
+              onChange={(value) => setForm({ ...form, expires_at: dateInputToLocalStartRFC3339(value) })}
             />
 
             <HeroTextField fullWidth>

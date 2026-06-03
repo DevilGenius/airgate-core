@@ -167,6 +167,34 @@
   height: 1.625rem !important;
 }
 
+.ag-table-pagination button.pagination__link {
+  appearance: none;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pagination-link-bg, transparent);
+  color: var(--pagination-link-fg, var(--foreground));
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  outline: none;
+  user-select: none;
+}
+
+.ag-table-pagination button.pagination__link:hover {
+  background: var(--pagination-link-bg-hover, color-mix(in oklab, var(--surface) 78%, transparent));
+}
+
+.ag-table-pagination button.pagination__link:active {
+  background: var(--pagination-link-bg-pressed, color-mix(in oklab, var(--surface) 88%, transparent));
+}
+
+.ag-table-pagination button.pagination__link[aria-disabled="true"] {
+  cursor: default;
+  opacity: 1;
+}
+
 .ag-table-pagination .pagination__link[data-active="true"],
 .ag-table-pagination .pagination__link[aria-current="page"] {
   --pagination-link-bg: color-mix(in oklab, var(--accent) 14%, var(--background) 86%) !important;
@@ -174,9 +202,16 @@
   --pagination-link-bg-pressed: color-mix(in oklab, var(--accent) 22%, var(--background) 78%) !important;
   --pagination-link-fg: color-mix(in oklab, var(--accent) 76%, var(--foreground) 24%) !important;
   background: var(--pagination-link-bg) !important;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, transparent) !important;
+  border-radius: var(--radius) !important;
   box-shadow: none !important;
   color: var(--pagination-link-fg) !important;
   font-weight: 700;
+}
+
+.ag-table-pagination .pagination__link[data-active="true"]:hover,
+.ag-table-pagination .pagination__link[aria-current="page"]:hover {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border) 62%) !important;
 }
 
 .ag-table-pagination .pagination__link--nav {

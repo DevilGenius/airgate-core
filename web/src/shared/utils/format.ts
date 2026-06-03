@@ -6,6 +6,23 @@ export function formatExpiry(date?: string, neverLabel?: string): string {
   return new Date(date).toLocaleDateString('zh-CN');
 }
 
+export function formatDateInputValue(date?: string): string {
+  if (!date) return '';
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function dateInputToLocalStartRFC3339(value?: string): string {
+  if (!value) return '';
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return '';
+  return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString().replace('.000Z', 'Z');
+}
+
 /** 格式化日期时间 (yyyy/M/d HH:mm) */
 export function formatDateTime(date: string): string {
   return new Date(date).toLocaleString('zh-CN', {

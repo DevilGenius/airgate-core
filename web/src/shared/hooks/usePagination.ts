@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { startTransition, useCallback, useEffect, useState, type SetStateAction } from 'react';
 
 const PAGE_SIZE_STORAGE_PREFIX = 'airgate:pagination:page-size:';
 
@@ -30,15 +30,25 @@ export function usePagination(defaultPageSize = 20, storageKey?: string) {
   const [pageSize, setPageSize] = useState(() => readStoredPageSize(storageKey, defaultPageSize));
 
   useEffect(() => {
-    setPageSize(readStoredPageSize(storageKey, defaultPageSize));
-    setPage(1);
+    startTransition(() => {
+      setPageSize(readStoredPageSize(storageKey, defaultPageSize));
+      setPage(1);
+    });
   }, [defaultPageSize, storageKey]);
 
+  const handlePageChange = useCallback((nextPage: SetStateAction<number>) => {
+    startTransition(() => {
+      setPage(nextPage);
+    });
+  }, []);
+
   const handlePageSizeChange = useCallback((size: number) => {
-    setPageSize(size);
     writeStoredPageSize(storageKey, size);
-    setPage(1);
+    startTransition(() => {
+      setPageSize(size);
+      setPage(1);
+    });
   }, [storageKey]);
 
-  return { page, setPage, pageSize, setPageSize: handlePageSizeChange };
+  return { page, setPage: handlePageChange, pageSize, setPageSize: handlePageSizeChange };
 }

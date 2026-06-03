@@ -1,17 +1,17 @@
-import { useState } from 'react';
+import { startTransition, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField } from '@heroui/react';
+import { AlertDialog, Button, Chip, Dropdown, EmptyState, Label, ListBox, Select, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { usersApi } from '../../shared/api/users';
 import { settingsApi } from '../../shared/api/settings';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
-import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
@@ -25,7 +25,7 @@ import { BalanceHistoryModal } from './users/BalanceHistoryModal';
 import { UserGroupsModal } from './users/UserGroupsModal';
 import type { UserResp } from '../../shared/types';
 import {
-  Plus, Search, Pencil, MoreHorizontal, RefreshCw,
+  Plus, Pencil, MoreHorizontal, RefreshCw,
   KeyRound, Users, PlusCircle, MinusCircle, Clock, Trash2,
 } from 'lucide-react';
 
@@ -43,7 +43,6 @@ export default function UsersPage() {
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.users');
   const [keyword, setKeyword] = useState('');
-  const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
   const [statusFilter, setStatusFilter] = useState('');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -56,12 +55,12 @@ export default function UsersPage() {
   const [groupsUser, setGroupsUser] = useState<UserResp | null>(null);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: queryKeys.users(page, pageSize, debouncedKeyword, statusFilter),
+    queryKey: queryKeys.users(page, pageSize, keyword, statusFilter),
     queryFn: () =>
       usersApi.list({
         page,
         page_size: pageSize,
-        keyword: debouncedKeyword || undefined,
+        keyword: keyword || undefined,
         status: statusFilter || undefined,
       }),
     placeholderData: keepPreviousData,
@@ -118,22 +117,23 @@ export default function UsersPage() {
     { id: 'disabled', label: t('status.disabled') },
   ];
   const selectedStatusLabel = statusOptions.find((item) => item.id === statusFilter)?.label ?? t('users.all_status');
+  const handleKeywordChange = useCallback((nextKeyword: string) => {
+    startTransition(() => {
+      setKeyword(nextKeyword);
+      setPage(1);
+    });
+  }, [setPage]);
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
         <div className="w-full sm:w-48">
-          <HeroTextField fullWidth aria-label={t('users.search_placeholder')}>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
-              <Input
-                className="pl-9"
-                placeholder={t('users.search_placeholder')}
-                value={keyword}
-                onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-              />
-            </div>
-          </HeroTextField>
+          <SearchFilterInput
+            ariaLabel={t('users.search_placeholder')}
+            placeholder={t('users.search_placeholder')}
+            value={keyword}
+            onSearchChange={handleKeywordChange}
+          />
         </div>
         <div className="w-full sm:w-48">
           <Select

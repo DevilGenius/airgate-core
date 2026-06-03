@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { startTransition, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Check, Copy, Plus, Pencil, Trash2, KeyRound, Layers, Eye, RefreshCw } from 'lucide-react';
@@ -16,6 +16,7 @@ import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { formatAPIKeyHint, formatExpiry } from '../../shared/utils/format';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { MetricChips } from '../../shared/components/MetricChips';
@@ -30,6 +31,7 @@ export default function APIKeysPage() {
   const copy = useClipboard();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
+  const [keyword, setKeyword] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
   const [deletingKey, setDeletingKey] = useState<APIKeyResp | null>(null);
@@ -42,8 +44,13 @@ export default function APIKeysPage() {
   } = useCopyFeedback();
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: queryKeys.apikeys(page, pageSize),
-    queryFn: () => apikeysApi.list({ page, page_size: pageSize }),
+    queryKey: queryKeys.apikeys(page, pageSize, keyword),
+    queryFn: ({ signal }) => apikeysApi.adminList({
+      page,
+      page_size: pageSize,
+      keyword: keyword || undefined,
+      search_scope: 'api_key',
+    }, { signal }),
     placeholderData: keepPreviousData,
   });
 
@@ -93,6 +100,12 @@ export default function APIKeysPage() {
     resetRevealedKeyCopied();
     setRevealedKey(null);
   };
+  const handleKeywordChange = useCallback((nextKeyword: string) => {
+    startTransition(() => {
+      setKeyword(nextKeyword);
+      setPage(1);
+    });
+  }, [setPage]);
   const handleCopyRevealedKey = async () => {
     if (await copy(revealedKey ?? '')) {
       showRevealedKeyCopied();
@@ -113,7 +126,15 @@ export default function APIKeysPage() {
 
   return (
     <div className="ag-api-keys-page">
-      <div className="flex justify-end mb-5">
+      <div className="mb-5 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+        <div className="w-full sm:w-56">
+          <SearchFilterInput
+            ariaLabel={t('usage.search_api_key', '搜索 API Key')}
+            placeholder={t('usage.search_api_key', '搜索 API Key')}
+            value={keyword}
+            onSearchChange={handleKeywordChange}
+          />
+        </div>
         <div className="flex items-center gap-2 ml-auto">
           <Button
             isIconOnly

@@ -4,6 +4,7 @@ import { Button, Description, Input, Label, ListBox, Modal, Select, Spinner, Tex
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { KeyRound } from 'lucide-react';
 import { parseIpList, formatIpList } from '../../../shared/utils/ip';
+import { dateInputToLocalStartRFC3339, formatDateInputValue } from '../../../shared/utils/format';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type { APIKeyResp, UpdateAPIKeyReq, GroupResp } from '../../../shared/types';
 
@@ -146,8 +147,8 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
         <CommonDatePicker
           description={t('api_keys.expire_hint')}
           label={t('api_keys.expire_time')}
-          value={form.expires_at ? form.expires_at.split('T')[0] : ''}
-          onChange={(value) => setForm({ ...form, expires_at: value ? `${value}T23:59:59Z` : '' })}
+          value={formatDateInputValue(form.expires_at)}
+          onChange={(value) => setForm({ ...form, expires_at: dateInputToLocalStartRFC3339(value) })}
         />
 
         <Select

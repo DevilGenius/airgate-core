@@ -1,21 +1,21 @@
-import { lazy, Suspense, useCallback, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { lazy, startTransition, Suspense, useCallback, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Card, ComboBox, Input, ListBox, Select, Tabs } from '@heroui/react';
+import { Card, ListBox, Select, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
-import { Activity, DollarSign, Search, Sigma } from 'lucide-react';
+import { Activity, DollarSign, Sigma } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
+import { SearchFilterComboBox } from '../../shared/components/SearchFilterComboBox';
 import { PIE_CHART_COLORS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
@@ -422,18 +422,19 @@ export default function UsagePage() {
 
   const handleModelChange = useCallback((model: string) => {
     const nextModel = model || undefined;
-    resetCursorPagination();
-    setFilters((prev) => (prev.model === nextModel ? prev : { ...prev, model: nextModel }));
+    startTransition(() => {
+      resetCursorPagination();
+      setFilters((prev) => (prev.model === nextModel ? prev : { ...prev, model: nextModel }));
+    });
   }, [resetCursorPagination]);
 
   // 用户搜索
-  const [userKeyword, setUserKeyword] = useState('');
-  const debouncedUserKeyword = useDebouncedValue(userKeyword.trim(), 250);
+  const [userSearchKeyword, setUserSearchKeyword] = useState('');
   const [selectedUserLabel, setSelectedUserLabel] = useState('');
   const { data: usersData } = useQuery({
-    queryKey: ['admin-users-search', debouncedUserKeyword],
-    queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: debouncedUserKeyword }),
-    enabled: pageActive && debouncedUserKeyword.length > 0,
+    queryKey: ['admin-users-search', userSearchKeyword],
+    queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: userSearchKeyword }),
+    enabled: pageActive && userSearchKeyword.length > 0,
   });
   const userOptions = (usersData?.list ?? []).map((u) => ({
     id: String(u.id),
@@ -458,13 +459,12 @@ export default function UsagePage() {
   })();
 
   // API Key 搜索：防抖 + 服务端分页，只取前 20 条候选，避免全量加载大量 key。
-  const [apiKeyKeyword, setAPIKeyKeyword] = useState('');
-  const debouncedAPIKeyKeyword = useDebouncedValue(apiKeyKeyword.trim(), 250);
+  const [apiKeySearchKeyword, setAPIKeySearchKeyword] = useState('');
   const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState('');
   const { data: apiKeysData } = useQuery({
-    queryKey: ['admin-api-keys-search', 'api_key', debouncedAPIKeyKeyword],
-    queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: debouncedAPIKeyKeyword, search_scope: 'api_key' }, { signal }),
-    enabled: pageActive && debouncedAPIKeyKeyword.length > 0,
+    queryKey: ['admin-api-keys-search', 'api_key', apiKeySearchKeyword],
+    queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: apiKeySearchKeyword, search_scope: 'api_key' }, { signal }),
+    enabled: pageActive && apiKeySearchKeyword.length > 0,
   });
   const apiKeyOptions = (apiKeysData?.list ?? []).map((key: APIKeyResp) => {
     const keyHint = formatAPIKeyHint(key.key_prefix);
@@ -575,13 +575,37 @@ export default function UsagePage() {
     void refetchUsage({ cancelRefetch: false });
   }, [pageActive, refetchUsage]);
 
-  function updateFilter(key: keyof UsageQuery, value: string) {
+  const updateFilter = useCallback((key: keyof UsageQuery, value: string) => {
     const nextValue = (key === 'user_id' || key === 'api_key_id')
       ? (value ? Number(value) : undefined)
       : value || undefined;
-    setFilters((prev) => ({ ...prev, [key]: nextValue }));
-    resetCursorPagination();
-  }
+    startTransition(() => {
+      setFilters((prev) => ({ ...prev, [key]: nextValue }));
+      resetCursorPagination();
+    });
+  }, [resetCursorPagination]);
+
+  const handleUserSearchChange = useCallback((value: string) => {
+    startTransition(() => {
+      setUserSearchKeyword(value);
+    });
+  }, []);
+
+  const handleUserSelectionChange = useCallback((value: string, label: string) => {
+    updateFilter('user_id', value);
+    setSelectedUserLabel(label);
+  }, [updateFilter]);
+
+  const handleAPIKeySearchChange = useCallback((value: string) => {
+    startTransition(() => {
+      setAPIKeySearchKeyword(value);
+    });
+  }, []);
+
+  const handleAPIKeySelectionChange = useCallback((value: string, label: string) => {
+    updateFilter('api_key_id', value);
+    setSelectedAPIKeyLabel(label);
+  }, [updateFilter]);
 
   const activeStats = pageActive ? stats : undefined;
 
@@ -824,118 +848,30 @@ export default function UsagePage() {
           />
         </div>
         <div className="w-full sm:w-48">
-          <ComboBox
-            aria-label={t('usage.search_user')}
-            allowsEmptyCollection
-            fullWidth
-            inputValue={userKeyword}
+          <SearchFilterComboBox
+            ariaLabel={t('usage.search_user')}
             items={visibleUserOptions}
-            menuTrigger="focus"
             selectedKey={filters.user_id ? String(filters.user_id) : null}
-            onInputChange={(value) => {
-              setUserKeyword(value);
-              if (!value) {
-                setSelectedUserLabel('');
-                updateFilter('user_id', '');
-                return;
-              }
-              if (filters.user_id && value !== selectedUserLabel) {
-                setSelectedUserLabel('');
-                updateFilter('user_id', '');
-              }
-            }}
-            onSelectionChange={(key) => {
-              const value = key == null ? '' : String(key);
-              updateFilter('user_id', value);
-              const option = visibleUserOptions.find((item) => item.id === value);
-              const label = option?.label ? String(option.label) : '';
-              setSelectedUserLabel(label);
-              setUserKeyword(label);
-            }}
-          >
-            <ComboBox.InputGroup className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-              <Input className="pl-9" placeholder={t('usage.search_user')} />
-            </ComboBox.InputGroup>
-            <ComboBox.Popover>
-              <ListBox
-                items={visibleUserOptions}
-                renderEmptyState={() => (
-                  <div className="px-3 py-6 text-center text-xs text-text-tertiary">
-                    {userKeyword.trim() ? t('common.no_data') : t('usage.search_user')}
-                  </div>
-                )}
-              >
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.textValue}>
-                    <div className="min-w-0">
-                      <div className="truncate">{item.label}</div>
-                      {item.description ? (
-                        <div className="truncate text-xs text-text-tertiary">{item.description}</div>
-                      ) : null}
-                    </div>
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </ComboBox.Popover>
-          </ComboBox>
+            selectedLabel={selectedUserLabel}
+            placeholder={t('usage.search_user')}
+            emptyPrompt={t('usage.search_user')}
+            noDataLabel={t('common.no_data')}
+            onSearchChange={handleUserSearchChange}
+            onSelectionChange={handleUserSelectionChange}
+          />
         </div>
         <div className="w-full sm:w-48">
-          <ComboBox
-            aria-label={t('usage.search_api_key', '搜索 API Key')}
-            allowsEmptyCollection
-            fullWidth
-            inputValue={apiKeyKeyword}
+          <SearchFilterComboBox
+            ariaLabel={t('usage.search_api_key', '搜索 API Key')}
             items={visibleAPIKeyOptions}
-            menuTrigger="focus"
             selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
-            onInputChange={(value) => {
-              setAPIKeyKeyword(value);
-              if (!value) {
-                setSelectedAPIKeyLabel('');
-                updateFilter('api_key_id', '');
-                return;
-              }
-              if (filters.api_key_id && value !== selectedAPIKeyLabel) {
-                setSelectedAPIKeyLabel('');
-                updateFilter('api_key_id', '');
-              }
-            }}
-            onSelectionChange={(key) => {
-              const value = key == null ? '' : String(key);
-              updateFilter('api_key_id', value);
-              const option = visibleAPIKeyOptions.find((item) => item.id === value);
-              const label = option?.label ? String(option.label) : '';
-              setSelectedAPIKeyLabel(label);
-              setAPIKeyKeyword(label);
-            }}
-          >
-            <ComboBox.InputGroup className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-              <Input className="pl-9" placeholder={t('usage.search_api_key', '搜索 API Key')} />
-            </ComboBox.InputGroup>
-            <ComboBox.Popover>
-              <ListBox
-                items={visibleAPIKeyOptions}
-                renderEmptyState={() => (
-                  <div className="px-3 py-6 text-center text-xs text-text-tertiary">
-                    {apiKeyKeyword.trim() ? t('common.no_data') : t('usage.search_api_key', '搜索 API Key')}
-                  </div>
-                )}
-              >
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.textValue}>
-                    <div className="min-w-0">
-                      <div className="truncate">{item.label}</div>
-                      {item.description ? (
-                        <div className="truncate text-xs text-text-tertiary">{item.description}</div>
-                      ) : null}
-                    </div>
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </ComboBox.Popover>
-          </ComboBox>
+            selectedLabel={selectedAPIKeyLabel}
+            placeholder={t('usage.search_api_key', '搜索 API Key')}
+            emptyPrompt={t('usage.search_api_key', '搜索 API Key')}
+            noDataLabel={t('common.no_data')}
+            onSearchChange={handleAPIKeySearchChange}
+            onSelectionChange={handleAPIKeySelectionChange}
+          />
         </div>
         <AutoRefreshControl
           value={autoRefresh}
