@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Card, ComboBox, Input, ListBox, Select, Tabs } from '@heroui/react';
@@ -9,7 +9,7 @@ import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
-import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
+import { Activity, DollarSign, Search, Sigma } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
@@ -30,6 +30,30 @@ const UsageTokenTrendChart = lazy(() =>
 );
 
 const PIE_COLORS = PIE_CHART_COLORS;
+
+type MetricTone = 'violet' | 'amber' | 'indigo' | 'emerald' | 'stream';
+const STREAM_BLUE = 'oklch(62.04% 0.1950 253.83)';
+
+const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
+  amber: 'bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
+  emerald: '',
+  indigo: 'bg-indigo-100 text-indigo-600 ring-indigo-200 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-indigo-400/25',
+  stream: '',
+  violet: 'bg-violet-100 text-violet-600 ring-violet-200 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/25',
+};
+
+const METRIC_TONE_STYLES: Partial<Record<MetricTone, CSSProperties>> = {
+  emerald: {
+    background: 'color-mix(in srgb, var(--ag-success) 18%, var(--ag-surface))',
+    boxShadow: '0 0 0 1px color-mix(in srgb, var(--ag-success) 34%, var(--ag-border)), var(--shadow-sm)',
+    color: 'var(--ag-success)',
+  },
+  stream: {
+    background: `color-mix(in srgb, ${STREAM_BLUE} 18%, transparent)`,
+    boxShadow: `0 0 0 1px color-mix(in srgb, ${STREAM_BLUE} 34%, transparent), var(--shadow-sm)`,
+    color: STREAM_BLUE,
+  },
+};
 
 function SectionCard({
   children,
@@ -56,13 +80,13 @@ function SectionCard({
 }
 
 function StatCard({
-  accentColor,
   icon,
+  tone,
   title,
   value,
 }: {
-  accentColor: string;
   icon: ReactNode;
+  tone: MetricTone;
   title: string;
   value: ReactNode;
 }) {
@@ -75,16 +99,12 @@ function StatCard({
             <div className="min-w-0 truncate font-mono text-[22px] font-semibold leading-none text-text 2xl:text-2xl">{value}</div>
           </div>
         </div>
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:h-11 2xl:w-11"
-          style={{
-            background: `color-mix(in srgb, ${accentColor} 14%, transparent)`,
-            color: accentColor,
-            borderColor: `color-mix(in srgb, ${accentColor} 24%, transparent)`,
-          }}
+        <span
+          className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES[tone]}`}
+          style={METRIC_TONE_STYLES[tone]}
         >
           {icon}
-        </div>
+        </span>
       </Card.Content>
     </Card>
   );
@@ -703,25 +723,25 @@ export default function UsagePage() {
               title={t('usage.total_requests')}
               value={activeStats.total_requests.toLocaleString()}
               icon={<Activity className="w-5 h-5" />}
-              accentColor="var(--ag-primary)"
+              tone="violet"
             />
             <StatCard
               title={t('usage.total_tokens')}
               value={fmtNum(activeStats.total_tokens)}
-              icon={<Hash className="w-5 h-5" />}
-              accentColor="var(--ag-info)"
+              icon={<Sigma className="w-5 h-5" />}
+              tone="stream"
             />
             <StatCard
               title={t('usage.actual_cost')}
               value={<CostValue value={activeStats.total_actual_cost} decimals={4} tone="actual" />}
-              icon={<Coins className="w-5 h-5" />}
-              accentColor="var(--ag-warning)"
+              icon={<DollarSign className="w-5 h-5" />}
+              tone="amber"
             />
             <StatCard
               title={t('usage.total_cost')}
               value={<CostValue value={activeStats.total_cost} decimals={4} tone="standard" />}
               icon={<DollarSign className="w-5 h-5" />}
-              accentColor="var(--ag-success)"
+              tone="emerald"
             />
           </div>
 

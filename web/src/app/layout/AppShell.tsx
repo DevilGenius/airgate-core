@@ -22,9 +22,13 @@ import {
   LayoutList,
   UserRoundKey,
   CreditCard,
+  Wallet,
   Globe,
+  ListChecks,
   ListOrdered,
   Puzzle,
+  Wrench,
+  Palette,
   Settings,
   UserRoundCog,
   LogOut,
@@ -34,6 +38,7 @@ import {
   Menu,
   BookOpen,
   MessageCircle,
+  MessageSquareMore,
   Activity,
   HelpCircle,
   ChevronLeft,
@@ -59,7 +64,7 @@ const adminMenuItems: MenuItem[] = [
   { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="h-5 w-5" /> },
   { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="h-5 w-5" /> },
   { path: '/admin/usage', labelKey: 'nav.usage', icon: <Activity className="h-5 w-5" /> },
-  { path: '/admin/plugins', labelKey: 'nav.plugins', icon: <Puzzle className="h-5 w-5" />, sectionKey: 'nav.system' },
+  { path: '/admin/plugins', labelKey: 'nav.plugins', icon: <Wrench className="h-5 w-5" />, sectionKey: 'nav.system' },
   { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" /> },
 ];
 
@@ -87,6 +92,14 @@ function pluginPagePath(pluginName: string, pagePath: string) {
   if (pluginName === 'airgate-playground' && pagePath === '/playground') return '/chat';
   if (pluginName === 'airgate-studio' && pagePath === '/studio') return '/studio';
   return `/plugins/${pluginName}${pagePath}`;
+}
+
+function pluginMenuIcon(pluginName: string, pagePath: string): ReactNode {
+  if (pluginName === 'airgate-playground' && pagePath === '/playground') return <MessageSquareMore className="h-5 w-5" />;
+  if (pluginName === 'airgate-studio' && pagePath === '/studio') return <Palette className="h-5 w-5" />;
+  if (pluginName === 'payment-epay' && pagePath === '/recharge') return <Wallet className="h-5 w-5" />;
+  if (pluginName === 'payment-epay' && pagePath === '/orders') return <ListChecks className="h-5 w-5" />;
+  return <Puzzle className="h-5 w-5" />;
 }
 
 function usePluginMenuItems(isAdmin: boolean, isAPIKeySession: boolean): {
@@ -127,7 +140,7 @@ function usePluginMenuItems(isAdmin: boolean, isAPIKeySession: boolean): {
         const item: MenuItem = {
           path: pluginPagePath(p.name, page.path),
           labelKey: page.title,
-          icon: <Puzzle className="h-5 w-5" />,
+          icon: pluginMenuIcon(p.name, page.path),
         };
 
         if (showInAdmin) {
