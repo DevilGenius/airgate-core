@@ -24,7 +24,7 @@ import (
 )
 
 // redisLockKey 全局升级互斥锁。
-const redisLockKey = "airgate:upgrade:lock"
+const redisLockKey = "ag:upgrade:lock"
 const redisLockTTL = 10 * time.Minute
 
 // Service 升级服务，对外暴露 Info / Status / Run 三个能力。

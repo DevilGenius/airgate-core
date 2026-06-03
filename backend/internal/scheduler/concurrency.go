@@ -33,10 +33,9 @@ const (
 //	ARGV[3] = requestID
 //	ARGV[4] = slotTTL 秒（既是单个 slot 的存活上限，也是整 key 的兜底 TTL）
 //
-// 注：三类槽用不同前缀的 key 隔离（concurrency:v2:<id> / concurrency:v2:apikey:<id> /
-// concurrency:v2:user:<id>），所以同一个脚本可以服务三方而不互相干扰。
-// v2 前缀是为了和旧的 SET 数据区分——升级后旧 key 继续按自己的 TTL 自然消亡，
-// 新 key 从零开始，不会因为 Redis type mismatch (WRONGTYPE) 冲突。
+// 注：三类槽用不同前缀的 key 隔离（ag:concurrency:<id> /
+// ag:concurrency:apikey:<id> / ag:concurrency:user:<id>），
+// 所以同一个脚本可以服务三方而不互相干扰。
 var acquireSlotScript = redis.NewScript(`
 	local now = tonumber(ARGV[1])
 	local max = tonumber(ARGV[2])
@@ -56,8 +55,8 @@ var acquireSlotScript = redis.NewScript(`
 	return 0
 `)
 
-// ConcurrencyManager 分布式并发槽位管理
-// 基于 Redis SET 实现，每个账户一个 SET，成员为 request_id
+// ConcurrencyManager 分布式并发槽位管理。
+// 基于 Redis ZSET 实现，每个账户/API Key/用户一个 ZSET，成员为 request_id。
 type ConcurrencyManager struct {
 	rdb *redis.Client
 }
@@ -68,21 +67,19 @@ func NewConcurrencyManager(rdb *redis.Client) *ConcurrencyManager {
 }
 
 // concurrencyKey 生成账号级 Redis Key。
-// v2 前缀：旧版用 SET 实现无法清理僵尸 slot，升级后新 key 用 ZSET + 成员级
-// 时间戳；旧 key 继续按自己的 TTL 自然消亡，不冲突。
 func concurrencyKey(accountID int) string {
-	return fmt.Sprintf("concurrency:v2:%d", accountID)
+	return fmt.Sprintf("ag:concurrency:%d", accountID)
 }
 
 // apiKeyConcurrencyKey 生成 API Key 级 Redis Key。
 func apiKeyConcurrencyKey(keyID int) string {
-	return fmt.Sprintf("concurrency:v2:apikey:%d", keyID)
+	return fmt.Sprintf("ag:concurrency:apikey:%d", keyID)
 }
 
 // userConcurrencyKey 生成用户级 Redis Key。
 // 用户 A 下的所有 API Key 共享同一个 ZSET，实现"用户总并发"语义。
 func userConcurrencyKey(userID int) string {
-	return fmt.Sprintf("concurrency:v2:user:%d", userID)
+	return fmt.Sprintf("ag:concurrency:user:%d", userID)
 }
 
 // acquireSlotByKey 通用并发槽获取：给定 Redis key 和上限，原子性的

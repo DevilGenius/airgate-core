@@ -32,7 +32,7 @@ func (r *RPMCounter) getMinuteKey(ctx context.Context, accountID int) string {
 		t = time.Now()
 	}
 	minute := t.Unix() / 60
-	return fmt.Sprintf("rpm:%d:%d", accountID, minute)
+	return fmt.Sprintf("ag:rpm:%d:%d", accountID, minute)
 }
 
 // IncrementRPM 原子递增当前分钟的请求计数，返回递增后的值

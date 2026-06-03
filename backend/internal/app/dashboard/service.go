@@ -35,10 +35,10 @@ func NewService(repo Repository, rdb ...*redis.Client) *Service {
 }
 
 const (
-	trendCacheTTL   = 15 * time.Second
-	trendLockTTL    = 5 * time.Second
-	trendLockWait   = 1 * time.Second
-	trendCacheV1Key = "airgate:dashboard:v1:trend"
+	trendCacheTTL       = 15 * time.Second
+	trendLockTTL        = 5 * time.Second
+	trendLockWait       = 1 * time.Second
+	trendCacheKeyPrefix = "ag:dashboard:trend"
 )
 
 var trendLockReleaseScript = redis.NewScript(`
@@ -168,7 +168,7 @@ func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *tim
 func trendCacheKey(query TrendQuery, loc *time.Location, startTime, endTime time.Time) string {
 	const trendBucketSeconds = 15
 	return fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d:%s:%s:%s",
-		trendCacheV1Key,
+		trendCacheKeyPrefix,
 		loc.String(),
 		query.Range,
 		query.UserID,

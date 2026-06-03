@@ -32,11 +32,11 @@ func NewService(repo Repository, rdb ...*redis.Client) *Service {
 }
 
 const (
-	usageStatsCacheTTL = 10 * time.Second
-	usageTrendCacheTTL = 15 * time.Second
-	usageCacheLockTTL  = 5 * time.Second
-	usageCacheLockWait = 1 * time.Second
-	usageCacheV1Key    = "airgate:usage:v1"
+	usageStatsCacheTTL  = 10 * time.Second
+	usageTrendCacheTTL  = 15 * time.Second
+	usageCacheLockTTL   = 5 * time.Second
+	usageCacheLockWait  = 1 * time.Second
+	usageCacheKeyPrefix = "ag:usage"
 )
 
 var usageCacheLockReleaseScript = redis.NewScript(`
@@ -275,7 +275,7 @@ func usageCacheKey(kind string, payload any) string {
 		raw = []byte(fmt.Sprintf("%#v", payload))
 	}
 	sum := sha256.Sum256(raw)
-	return fmt.Sprintf("%s:%s:%s", usageCacheV1Key, kind, hex.EncodeToString(sum[:]))
+	return fmt.Sprintf("%s:%s:%s", usageCacheKeyPrefix, kind, hex.EncodeToString(sum[:]))
 }
 
 func usageCachedResult[T any](ctx context.Context, rdb *redis.Client, key string, ttl time.Duration, loader func(context.Context) (T, error)) (T, error) {

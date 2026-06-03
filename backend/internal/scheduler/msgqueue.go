@@ -36,12 +36,12 @@ func NewMessageQueue(rdb *redis.Client, rpm *RPMCounter) *MessageQueue {
 
 // msgQueueLockKey 锁 key
 func msgQueueLockKey(accountID int) string {
-	return fmt.Sprintf("umq:{%d}:lock", accountID)
+	return fmt.Sprintf("ag:message_queue:{%d}:lock", accountID)
 }
 
 // msgQueueLastKey 上次完成时间 key
 func msgQueueLastKey(accountID int) string {
-	return fmt.Sprintf("umq:{%d}:last", accountID)
+	return fmt.Sprintf("ag:message_queue:{%d}:last", accountID)
 }
 
 // acquireLockScript 可重入锁获取 Lua 脚本
@@ -81,7 +81,7 @@ var releaseLockScript = redis.NewScript(`
 
 // waitersCounterKey 等待队列计数 key。
 func waitersCounterKey(accountID int) string {
-	return fmt.Sprintf("umq:{%d}:waiters", accountID)
+	return fmt.Sprintf("ag:message_queue:{%d}:waiters", accountID)
 }
 
 var registerWaiterScript = redis.NewScript(`

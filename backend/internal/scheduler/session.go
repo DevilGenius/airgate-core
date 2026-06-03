@@ -23,11 +23,11 @@ func NewSessionManager(rdb *redis.Client) *SessionManager {
 
 // sessionLimitKey 生成 Redis key
 func sessionLimitKey(accountID int) string {
-	return fmt.Sprintf("session_limit:account:%d", accountID)
+	return fmt.Sprintf("ag:session_limit:%d", accountID)
 }
 
 // registerSessionScript Lua 脚本：原子注册会话
-// KEYS[1] = session_limit:account:{accountID}
+// KEYS[1] = ag:session_limit:{accountID}
 // ARGV[1] = sessionUUID
 // ARGV[2] = maxSessions
 // ARGV[3] = idleTimeoutSeconds

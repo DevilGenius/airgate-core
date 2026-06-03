@@ -35,7 +35,7 @@ func NewWindowCostChecker(db *ent.Client, rdb *redis.Client) *WindowCostChecker 
 
 // windowCostKey 生成 Redis 缓存键
 func windowCostKey(accountID int) string {
-	return fmt.Sprintf("window_cost:account:%d", accountID)
+	return fmt.Sprintf("ag:window_cost:%d", accountID)
 }
 
 // GetSchedulability 检查账户窗口费用调度状态

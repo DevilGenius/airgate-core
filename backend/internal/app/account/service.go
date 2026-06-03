@@ -1180,7 +1180,7 @@ func usageCacheKeysForInvalidation(platform string) []string {
 }
 
 func usageCacheRedisKey(cacheKey string) string {
-	return "airgate:account_usage:v1:" + usageCachePlatformKey(cacheKey)
+	return "ag:account_usage:" + usageCachePlatformKey(cacheKey)
 }
 
 func (s *Service) getUsageCacheForRead(ctx context.Context, cacheKey string) (map[string]AccountUsageInfo, bool, bool) {
@@ -1304,7 +1304,7 @@ func (s *Service) deleteAllUsageCacheKeys() {
 	defer cancel()
 	var cursor uint64
 	for {
-		keys, next, err := s.usageRedis.Scan(ctx, cursor, "airgate:account_usage:v1:*", 50).Result()
+		keys, next, err := s.usageRedis.Scan(ctx, cursor, "ag:account_usage:*", 50).Result()
 		if err != nil {
 			return
 		}

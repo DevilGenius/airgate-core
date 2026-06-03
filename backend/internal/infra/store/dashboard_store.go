@@ -298,7 +298,7 @@ func sqlStringLiteral(value string) string {
 }
 
 func dashboardStatsCacheKey(userID int, todayStart time.Time) string {
-	return fmt.Sprintf("airgate:dashboard:v1:stats:%d:%d", userID, todayStart.UTC().Unix())
+	return fmt.Sprintf("ag:dashboard:stats:%d:%d", userID, todayStart.UTC().Unix())
 }
 
 func (s *DashboardStore) loadStatsSnapshotCache(ctx context.Context, userID int, todayStart time.Time) (appdashboard.StatsSnapshot, bool) {
@@ -475,5 +475,5 @@ func (s *DashboardStore) waitForStatsSnapshotCache(ctx context.Context, userID i
 }
 
 func dashboardStatsLockKey(userID int, todayStart time.Time) string {
-	return fmt.Sprintf("airgate:dashboard:v1:stats:lock:%d:%d", userID, todayStart.UTC().Unix())
+	return fmt.Sprintf("ag:dashboard:stats:lock:%d:%d", userID, todayStart.UTC().Unix())
 }

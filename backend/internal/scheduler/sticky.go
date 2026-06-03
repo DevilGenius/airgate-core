@@ -47,9 +47,9 @@ func NewStickySession(rdb *redis.Client) *StickySession {
 }
 
 // stickyKey 生成 Redis Key
-// 格式：sticky:{user_id}:{platform}:{session_id}
+// 格式：ag:sticky:{user_id}:{platform}:{session_id}
 func stickyKey(userID int, platform, sessionID string) string {
-	return fmt.Sprintf("sticky:%d:%s:%s", userID, platform, sessionID)
+	return fmt.Sprintf("ag:sticky:%d:%s:%s", userID, platform, sessionID)
 }
 
 // Get 获取粘性会话绑定的账户 ID

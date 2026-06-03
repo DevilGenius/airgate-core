@@ -486,7 +486,7 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 //
 // 用 ZCount + score > (now - slotTTL) 只计算未过期的 slot，避免 release 异常的
 // 僵尸 slot 把账号一直标满（下次 acquire 会清理它们，但 selection 不能等）。
-// key 必须与 concurrency.go 的 concurrencyKey 保持一致（`concurrency:v2:<id>`）。
+// key 必须与 concurrency.go 的 concurrencyKey 保持一致（`ag:concurrency:<id>`）。
 func (s *Scheduler) getCurrentLoad(ctx context.Context, accountID int) int {
 	if s.currentLoad != nil {
 		return s.currentLoad(ctx, accountID)

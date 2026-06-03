@@ -345,7 +345,7 @@ func loadAPIKeyCacheFromRedis(ctx context.Context, hash string) (*APIKeyInfo, er
 }
 
 func apiKeyRedisCacheKey(hash string) string {
-	return "airgate:auth:v1:apikey:" + hash
+	return "ag:auth:api_key:" + hash
 }
 
 func apiKeyCacheErrorCode(err error) string {
@@ -413,7 +413,7 @@ func deleteAllAPIKeyRedisCache() {
 	defer cancel()
 	var cursor uint64
 	for {
-		keys, next, err := apiKeyRedis.Scan(ctx, cursor, "airgate:auth:v1:apikey:*", 100).Result()
+		keys, next, err := apiKeyRedis.Scan(ctx, cursor, "ag:auth:api_key:*", 100).Result()
 		if err != nil {
 			return
 		}
