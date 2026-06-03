@@ -160,7 +160,8 @@ export function GroupCheckboxList({
 
   if (groups.length === 0) return null;
 
-  const selectedGroups = groups.filter((g) => selectedIds.includes(g.id));
+  const selectedIdSet = new Set(selectedIds);
+  const selectedGroups = groups.filter((g) => selectedIdSet.has(g.id));
   const selectedLabel = selectedGroups.length === 0
     ? t('accounts.select_groups')
     : selectedGroups.map((g) => g.name).join('、');

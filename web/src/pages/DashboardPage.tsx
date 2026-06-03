@@ -601,10 +601,11 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
     if (topUsers.length === 0) return [];
     const timeSet = new Set<string>();
     topUsers.forEach((user) => user.trend.forEach((point) => timeSet.add(point.time)));
+    const trendByUser = topUsers.map((user) => new Map(user.trend.map((point) => [point.time, point.tokens])));
     return Array.from(timeSet).sort().map((time) => {
       const row: Record<string, number | string> = { time: fmtTime(time) };
-      topUsers.forEach((user) => {
-        row[user.email] = user.trend.find((point) => point.time === time)?.tokens ?? 0;
+      topUsers.forEach((user, index) => {
+        row[user.email] = trendByUser[index]?.get(time) ?? 0;
       });
       return row;
     });

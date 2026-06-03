@@ -86,6 +86,7 @@ export default function APIKeysPage() {
   });
 
   const rows = data?.list ?? [];
+  const groupById = new Map((groupsData?.list ?? []).map((group: GroupResp) => [group.id, group]));
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
   const closeRevealedKeyModal = () => {
@@ -173,7 +174,7 @@ export default function APIKeysPage() {
             rows.map((row: APIKeyResp) => {
               const group = row.group_id == null
                 ? null
-                : groupsData?.list?.find((g: GroupResp) => g.id === row.group_id);
+                : groupById.get(row.group_id);
               const keyHint = formatAPIKeyHint(row.key_prefix);
 
               return (

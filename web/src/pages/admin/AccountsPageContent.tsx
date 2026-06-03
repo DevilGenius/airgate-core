@@ -549,7 +549,8 @@ export default function AccountsPageContent() {
 
   // 批量刷新令牌：只有 OAuth 类型账号支持，预先过滤后开进度弹窗
   const handleBulkRefresh = () => {
-    const selectedRows = (data?.list ?? []).filter((a) => selectedIds.includes(a.id));
+    const selectedIdSet = new Set(selectedIds);
+    const selectedRows = (data?.list ?? []).filter((a) => selectedIdSet.has(a.id));
     const oauthRows = selectedRows
       .filter((a) => a.type === 'oauth')
       .map((a) => ({ id: a.id, name: a.name }));

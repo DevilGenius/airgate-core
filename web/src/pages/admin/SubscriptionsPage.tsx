@@ -102,6 +102,8 @@ export default function SubscriptionsPage() {
     onSuccess: () => setAdjustingSub(null),
   });
 
+  const userById = new Map((usersData?.list ?? []).map((user: UserResp) => [user.id, user]));
+
   // 格式化日期
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('zh-CN', {
@@ -113,7 +115,7 @@ export default function SubscriptionsPage() {
 
   // 查找用户邮箱
   const getUserEmail = (userId: number) => {
-    const user = usersData?.list?.find((u: UserResp) => u.id === userId);
+    const user = userById.get(userId);
     return user ? user.email : `${t('subscriptions.user')} #${userId}`;
   };
 

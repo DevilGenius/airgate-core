@@ -124,6 +124,8 @@ export function GroupFormModal({
     ...platforms.map((platform) => ({ id: platform, label: platform })),
   ];
   const selectedPlatformLabel = platformOptions.find((item) => item.id === form.platform)?.label ?? t('groups.select_platform');
+  const copyFromGroupIdSet = new Set(copyFromGroupIds);
+  const copySourceGroupById = new Map(copySourceGroups.map((group) => [group.id, group]));
   const copyAccountOptions = [
     {
       id: '',
@@ -134,7 +136,7 @@ export function GroupFormModal({
           : t('groups.copy_accounts_placeholder'),
     },
     ...copySourceGroups
-      .filter((copyGroup) => !copyFromGroupIds.includes(copyGroup.id))
+      .filter((copyGroup) => !copyFromGroupIdSet.has(copyGroup.id))
       .map((copyGroup) => ({
         id: String(copyGroup.id),
         label: `${copyGroup.name} (${t('groups.copy_accounts_count', { count: copyGroup.account_total })})`,
@@ -250,7 +252,7 @@ export function GroupFormModal({
             {copyFromGroupIds.length > 0 ? (
               <div className="mb-2 flex flex-wrap gap-1.5">
                 {copyFromGroupIds.map((groupId) => {
-                  const sourceGroup = copySourceGroups.find((item) => item.id === groupId);
+                  const sourceGroup = copySourceGroupById.get(groupId);
                   return (
                     <Chip key={groupId} color="accent" size="sm" variant="soft">
                       {sourceGroup ? sourceGroup.name : `#${groupId}`}
