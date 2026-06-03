@@ -275,6 +275,7 @@ func usageCacheKey(kind string, payload any) string {
 		raw = []byte(fmt.Sprintf("%#v", payload))
 	}
 	sum := sha256.Sum256(raw)
+	kind = strings.ReplaceAll(kind, "-", ":")
 	return fmt.Sprintf("%s:%s:%s", usageCacheKeyPrefix, kind, hex.EncodeToString(sum[:]))
 }
 

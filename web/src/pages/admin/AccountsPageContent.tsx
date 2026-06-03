@@ -67,7 +67,7 @@ import {
 
 const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.auto_refresh';
 const ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.capacity_auto_refresh';
-const ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS = 1 / 3;
+const ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS = 0.5;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 
 if (typeof window !== 'undefined') {

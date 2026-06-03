@@ -54,7 +54,7 @@ func NewFamilyCooldown(rdb *redis.Client) *FamilyCooldown {
 
 // familyCooldownKey 生成账号和模型家族维度的 Redis Key。
 func familyCooldownKey(accountID int, family string) string {
-	return fmt.Sprintf("ag:family-cooldown:%d:%s", accountID, family)
+	return fmt.Sprintf("ag:cooldown:family:%d:%s", accountID, family)
 }
 
 // Mark 把 (account, family) 写入冷却，TTL = until - now（最少 1ms）。
@@ -132,7 +132,7 @@ type FamilyCooldownEntry struct {
 
 // List 列出指定账号当前所有家族冷却。供后台账号管理页展示用。
 //
-// 实现：用 SCAN 走一遍 `ag:family-cooldown:<acc>:*` 模式，对每个 key 取 TTL + GET 拿原因。
+// 实现：用 SCAN 走一遍 `ag:cooldown:family:<acc>:*` 模式，对每个 key 取 TTL + GET 拿原因。
 // 一个账号通常只有 0~3 个家族在冷却，COUNT=32 一轮就回。Redis 不可用 / 报错时返回部分结果，
 // 后台只用来展示，不要求完整。
 func (fc *FamilyCooldown) List(ctx context.Context, accountID int) []FamilyCooldownEntry {

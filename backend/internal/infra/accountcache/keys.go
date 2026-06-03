@@ -28,15 +28,15 @@ func UsagePattern() string {
 }
 
 func TodayStatsKey(day string, accountID int) string {
-	return fmt.Sprintf("ag:account:today:%s:%d", day, accountID)
+	return fmt.Sprintf("ag:account:stats:today:%s:%d", day, accountID)
 }
 
 func ImageTotalKey(accountID int) string {
-	return fmt.Sprintf("ag:account:image:%d", accountID)
+	return fmt.Sprintf("ag:account:image:total:%d", accountID)
 }
 
 func ImageTodayKey(day string, accountID int) string {
-	return fmt.Sprintf("ag:account:image:%s:%d", day, accountID)
+	return fmt.Sprintf("ag:account:image:today:%s:%d", day, accountID)
 }
 
 func PlatformKey(platform string) string {

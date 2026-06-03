@@ -20,6 +20,8 @@ const (
 // acquireSlotScript 是 account / apikey / user 三种并发槽共用的原子 Lua 脚本。
 //
 // 用 ZSET 存储，score = 加入时的 unix 时间戳，member = requestID。
+// 同时维护一个短 TTL 的 count key，展示/容量刷新路径用 MGET 读取，避免对账号列表
+// 每行执行 ZCOUNT。
 // 每次 acquire 前顺手用 ZREMRANGEBYSCORE 把"超过 slotTTL 还没 release 的
 // 僵尸 slot" 清理掉——彻底解决因进程 panic / OOM / 重启导致 Release 没跑
 // 从而 slot 永远泄漏的历史坑（旧实现用 SET + EXPIRE 整 key，key 的 TTL 又
@@ -28,15 +30,18 @@ const (
 // 参数：
 //
 //	KEYS[1] = 槽位 key
+//	KEYS[2] = count key
 //	ARGV[1] = 当前 unix 秒
 //	ARGV[2] = max_concurrency
 //	ARGV[3] = requestID
 //	ARGV[4] = slotTTL 秒（既是单个 slot 的存活上限，也是整 key 的兜底 TTL）
 //
-// 注：三类槽用不同前缀的 key 隔离（ag:concurrency:<id> /
+// 注：三类槽用不同前缀的 key 隔离（ag:concurrency:account:<id> /
 // ag:concurrency:apikey:<id> / ag:concurrency:user:<id>），
 // 所以同一个脚本可以服务三方而不互相干扰。
 var acquireSlotScript = redis.NewScript(`
+	local slotKey = KEYS[1]
+	local countKey = KEYS[2]
 	local now = tonumber(ARGV[1])
 	local max = tonumber(ARGV[2])
 	local requestID = ARGV[3]
@@ -44,15 +49,42 @@ var acquireSlotScript = redis.NewScript(`
 	local staleBefore = now - ttl
 
 	-- 清理僵尸 slot：score 早于 (now - ttl) 视为泄漏
-	redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', staleBefore)
+	redis.call('ZREMRANGEBYSCORE', slotKey, '-inf', staleBefore)
 
-	local current = redis.call('ZCARD', KEYS[1])
+	local current = redis.call('ZCARD', slotKey)
 	if current < max then
-		redis.call('ZADD', KEYS[1], now, requestID)
-		redis.call('EXPIRE', KEYS[1], ttl)
+		redis.call('ZADD', slotKey, now, requestID)
+		redis.call('EXPIRE', slotKey, ttl)
+		current = redis.call('ZCARD', slotKey)
+		redis.call('SET', countKey, current, 'EX', ttl)
 		return 1
 	end
+	if current > 0 then
+		redis.call('SET', countKey, current, 'EX', ttl)
+	else
+		redis.call('DEL', countKey)
+	end
 	return 0
+`)
+
+var releaseSlotScript = redis.NewScript(`
+	local slotKey = KEYS[1]
+	local countKey = KEYS[2]
+	local requestID = ARGV[1]
+	local fallbackTTL = tonumber(ARGV[2])
+
+	local removed = redis.call('ZREM', slotKey, requestID)
+	local current = redis.call('ZCARD', slotKey)
+	if current > 0 then
+		local ttl = redis.call('TTL', slotKey)
+		if ttl == false or ttl <= 0 then
+			ttl = fallbackTTL
+		end
+		redis.call('SET', countKey, current, 'EX', ttl)
+	else
+		redis.call('DEL', countKey)
+	end
+	return removed
 `)
 
 // ConcurrencyManager 分布式并发槽位管理。
@@ -68,12 +100,20 @@ func NewConcurrencyManager(rdb *redis.Client) *ConcurrencyManager {
 
 // concurrencyKey 生成账号级 Redis Key。
 func concurrencyKey(accountID int) string {
-	return fmt.Sprintf("ag:concurrency:%d", accountID)
+	return fmt.Sprintf("ag:concurrency:account:%d", accountID)
+}
+
+func concurrencyCountKey(accountID int) string {
+	return fmt.Sprintf("ag:concurrency:account:%d:count", accountID)
 }
 
 // apiKeyConcurrencyKey 生成 API Key 级 Redis Key。
 func apiKeyConcurrencyKey(keyID int) string {
 	return fmt.Sprintf("ag:concurrency:apikey:%d", keyID)
+}
+
+func apiKeyConcurrencyCountKey(keyID int) string {
+	return fmt.Sprintf("ag:concurrency:apikey:%d:count", keyID)
 }
 
 // userConcurrencyKey 生成用户级 Redis Key。
@@ -82,11 +122,15 @@ func userConcurrencyKey(userID int) string {
 	return fmt.Sprintf("ag:concurrency:user:%d", userID)
 }
 
+func userConcurrencyCountKey(userID int) string {
+	return fmt.Sprintf("ag:concurrency:user:%d:count", userID)
+}
+
 // acquireSlotByKey 通用并发槽获取：给定 Redis key 和上限，原子性的
 // 清理僵尸 slot + 检查上限 + ZADD 加入新 slot（score = 当前时间）。
 // maxConcurrency <= 0 时视为不限制，直接放行。
 // Redis 不可用时也直接放行，避免影响主链路可用性。
-func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, requestID string, maxConcurrency int, slotTTL time.Duration) error {
+func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKey, requestID string, maxConcurrency int, slotTTL time.Duration) error {
 	if cm.rdb == nil || maxConcurrency <= 0 {
 		return nil
 	}
@@ -95,7 +139,7 @@ func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, request
 	}
 
 	now := time.Now().Unix()
-	result, err := acquireSlotScript.Run(ctx, cm.rdb, []string{key},
+	result, err := acquireSlotScript.Run(ctx, cm.rdb, []string{key, countKey},
 		now,
 		maxConcurrency,
 		requestID,
@@ -113,86 +157,89 @@ func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, request
 	return nil
 }
 
+func (cm *ConcurrencyManager) releaseSlotByKey(ctx context.Context, key, countKey, requestID string) {
+	if cm.rdb == nil {
+		return
+	}
+	_, _ = releaseSlotScript.Run(ctx, cm.rdb, []string{key, countKey}, requestID, int(defaultSlotTTL.Seconds())).Result()
+}
+
 // AcquireSlot 获取账号级并发槽位。
 // 检查当前 SET 大小 < maxConcurrency，若未满则 SADD。
 // slotTTL 为槽位过期时间，<= 0 时使用默认值（5 分钟）。
 func (cm *ConcurrencyManager) AcquireSlot(ctx context.Context, accountID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
-	return cm.acquireSlotByKey(ctx, concurrencyKey(accountID), requestID, maxConcurrency, slotTTL)
+	return cm.acquireSlotByKey(ctx, concurrencyKey(accountID), concurrencyCountKey(accountID), requestID, maxConcurrency, slotTTL)
 }
 
 // ReleaseSlot 释放账号级并发槽位
 func (cm *ConcurrencyManager) ReleaseSlot(ctx context.Context, accountID int, requestID string) {
-	if cm.rdb == nil {
-		return
-	}
-
-	key := concurrencyKey(accountID)
-	cm.rdb.ZRem(ctx, key, requestID)
+	cm.releaseSlotByKey(ctx, concurrencyKey(accountID), concurrencyCountKey(accountID), requestID)
 }
 
 // AcquireAPIKeySlot 获取 API Key 级并发槽位。
 // maxConcurrency <= 0 时直接放行（表示该 key 不限制并发）。
 // 与账号级并发独立，两层闸门各自计数，调用方需要分别 release。
 func (cm *ConcurrencyManager) AcquireAPIKeySlot(ctx context.Context, keyID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
-	return cm.acquireSlotByKey(ctx, apiKeyConcurrencyKey(keyID), requestID, maxConcurrency, slotTTL)
+	return cm.acquireSlotByKey(ctx, apiKeyConcurrencyKey(keyID), apiKeyConcurrencyCountKey(keyID), requestID, maxConcurrency, slotTTL)
 }
 
 // ReleaseAPIKeySlot 释放 API Key 级并发槽位
 func (cm *ConcurrencyManager) ReleaseAPIKeySlot(ctx context.Context, keyID int, requestID string) {
-	if cm.rdb == nil {
-		return
-	}
-	cm.rdb.ZRem(ctx, apiKeyConcurrencyKey(keyID), requestID)
+	cm.releaseSlotByKey(ctx, apiKeyConcurrencyKey(keyID), apiKeyConcurrencyCountKey(keyID), requestID)
 }
 
 // AcquireUserSlot 获取用户级并发槽位。
 // maxConcurrency <= 0 时直接放行（表示该用户不限制总并发）。
 // 与 apikey / 账号 两级槽位独立，调用方需要分别 release。
 func (cm *ConcurrencyManager) AcquireUserSlot(ctx context.Context, userID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
-	return cm.acquireSlotByKey(ctx, userConcurrencyKey(userID), requestID, maxConcurrency, slotTTL)
+	return cm.acquireSlotByKey(ctx, userConcurrencyKey(userID), userConcurrencyCountKey(userID), requestID, maxConcurrency, slotTTL)
 }
 
 // ReleaseUserSlot 释放用户级并发槽位
 func (cm *ConcurrencyManager) ReleaseUserSlot(ctx context.Context, userID int, requestID string) {
-	if cm.rdb == nil {
-		return
-	}
-	cm.rdb.ZRem(ctx, userConcurrencyKey(userID), requestID)
+	cm.releaseSlotByKey(ctx, userConcurrencyKey(userID), userConcurrencyCountKey(userID), requestID)
 }
 
 // GetCurrentCount 获取账户当前并发数。
-// 用 ZCount 只统计"未过期的 slot"（score >= now - defaultSlotTTL），
-// 展示层不把僵尸 slot 算进去，即使 acquire 还没来得及清理它们。
+// 读 acquire/release 写入的短 TTL count key，避免展示路径执行 ZCOUNT。
 func (cm *ConcurrencyManager) GetCurrentCount(ctx context.Context, accountID int) int {
 	if cm.rdb == nil {
 		return 0
 	}
-	cutoff := time.Now().Add(-defaultSlotTTL).Unix()
-	min := "(" + strconv.FormatInt(cutoff, 10) // 开区间：严格大于 cutoff
-	n, err := cm.rdb.ZCount(ctx, concurrencyKey(accountID), min, "+inf").Result()
+	n, err := cm.rdb.Get(ctx, concurrencyCountKey(accountID)).Int()
 	if err != nil {
 		return 0
 	}
-	return int(n)
+	return n
 }
 
-// GetCurrentCounts 批量获取多个账户的当前并发数
+// GetCurrentCounts 批量获取多个账户的当前并发数。
+// 容量刷新只做一次 MGET；不能按账号执行 ZCOUNT，否则 100 行页面 0.5s 刷新会放大成
+// 200 次/s Redis 命令。
 func (cm *ConcurrencyManager) GetCurrentCounts(ctx context.Context, accountIDs []int) map[int]int {
 	result := make(map[int]int, len(accountIDs))
-	if cm.rdb == nil {
+	if cm.rdb == nil || len(accountIDs) == 0 {
 		return result
 	}
-	cutoff := time.Now().Add(-defaultSlotTTL).Unix()
-	min := "(" + strconv.FormatInt(cutoff, 10)
-	pipe := cm.rdb.Pipeline()
-	cmds := make(map[int]*redis.IntCmd, len(accountIDs))
+	keys := make([]string, 0, len(accountIDs))
 	for _, id := range accountIDs {
-		cmds[id] = pipe.ZCount(ctx, concurrencyKey(id), min, "+inf")
+		keys = append(keys, concurrencyCountKey(id))
 	}
-	_, _ = pipe.Exec(ctx)
-	for id, cmd := range cmds {
-		if n, err := cmd.Result(); err == nil {
-			result[id] = int(n)
+	values, err := cm.rdb.MGet(ctx, keys...).Result()
+	if err != nil {
+		return result
+	}
+	for index, value := range values {
+		if value == nil {
+			continue
+		}
+		raw, ok := value.(string)
+		if !ok {
+			continue
+		}
+		count, err := strconv.Atoi(raw)
+		if err == nil && count > 0 {
+			result[accountIDs[index]] = count
 		}
 	}
 	return result

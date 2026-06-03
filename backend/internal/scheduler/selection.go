@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -482,11 +481,9 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 	return items[rand.Intn(topN)].acc
 }
 
-// getCurrentLoad 从 Redis ZSET 读账号当前"有效"并发数（过滤僵尸 slot）。
+// getCurrentLoad 读取 acquire/release 维护的账号并发 count key。
 //
-// 用 ZCount + score > (now - slotTTL) 只计算未过期的 slot，避免 release 异常的
-// 僵尸 slot 把账号一直标满（下次 acquire 会清理它们，但 selection 不能等）。
-// key 必须与 concurrency.go 的 concurrencyKey 保持一致（`ag:concurrency:<id>`）。
+// count key 与 slot key 使用相同短 TTL；请求异常未 release 时，count 最晚随 TTL 过期。
 func (s *Scheduler) getCurrentLoad(ctx context.Context, accountID int) int {
 	if s.currentLoad != nil {
 		return s.currentLoad(ctx, accountID)
@@ -494,11 +491,9 @@ func (s *Scheduler) getCurrentLoad(ctx context.Context, accountID int) int {
 	if s.rdb == nil {
 		return 0
 	}
-	cutoff := time.Now().Add(-defaultSlotTTL).Unix()
-	min := "(" + strconv.FormatInt(cutoff, 10) // 开区间：严格 > cutoff
-	n, err := s.rdb.ZCount(ctx, concurrencyKey(accountID), min, "+inf").Result()
+	n, err := s.rdb.Get(ctx, concurrencyCountKey(accountID)).Int()
 	if err != nil {
 		return 0
 	}
-	return int(n)
+	return n
 }

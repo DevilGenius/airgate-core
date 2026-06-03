@@ -45,7 +45,7 @@ func NewResponseAffinity(rdb *redis.Client) *ResponseAffinity {
 }
 
 func responseAffinityKey(groupID int, platform, responseID string) string {
-	return fmt.Sprintf("ag:response_affinity:%d:%s:%s", groupID, strings.TrimSpace(platform), strings.TrimSpace(responseID))
+	return fmt.Sprintf("ag:affinity:response:%d:%s:%s", groupID, strings.TrimSpace(platform), strings.TrimSpace(responseID))
 }
 
 func (a *ResponseAffinity) Bind(ctx context.Context, groupID int, platform, responseID string, accountID int) {

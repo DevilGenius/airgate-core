@@ -852,6 +852,7 @@ func (s *Service) GetSingleAccountUsage(ctx context.Context, id int) (map[string
 	if err != nil {
 		return nil, err
 	}
+	s.cacheAccountProfiles(ctx, []Account{item})
 
 	key := strconv.Itoa(item.ID)
 	accountUsage := map[string]any{}
@@ -900,6 +901,7 @@ func (s *Service) fetchUpstreamUsage(ctx context.Context, platform string) (map[
 	if err != nil {
 		return nil, err
 	}
+	s.cacheAccountProfiles(ctx, accounts)
 	return s.fetchUpstreamUsageForAccounts(ctx, accounts)
 }
 
@@ -1380,22 +1382,28 @@ func (s *Service) deleteUsageCacheKeys(keys []string) {
 	if s.usageRedis == nil {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 	for _, key := range keys {
 		if key == "__all__" {
 			s.deleteAllUsageCacheKeys()
 			continue
 		}
-		accounts, err := s.repo.ListAll(context.Background(), ListFilter{Platform: key})
-		if err != nil || len(accounts) == 0 {
+		members, err := s.usageRedis.SMembers(ctx, accountcache.PlatformKey(key)).Result()
+		if err != nil || len(members) == 0 {
 			continue
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		redisKeys := make([]string, 0, len(accounts))
-		for _, item := range accounts {
-			redisKeys = append(redisKeys, accountcache.UsageKey(item.ID))
+		redisKeys := make([]string, 0, len(members))
+		for _, member := range members {
+			id, err := strconv.Atoi(member)
+			if err != nil || id <= 0 {
+				continue
+			}
+			redisKeys = append(redisKeys, accountcache.UsageKey(id))
 		}
-		_ = s.usageRedis.Del(ctx, redisKeys...).Err()
-		cancel()
+		if len(redisKeys) > 0 {
+			_ = s.usageRedis.Del(ctx, redisKeys...).Err()
+		}
 	}
 }
 
@@ -1797,13 +1805,11 @@ func (s *Service) writeTodayStatsCache(ctx context.Context, day string, accountI
 	}
 	key := accountcache.TodayStatsKey(day, accountID)
 	pipe := s.usageRedis.Pipeline()
-	pipe.HSet(ctx, key, map[string]any{
-		"requests":     stats.Requests,
-		"tokens":       stats.Tokens,
-		"account_cost": stats.AccountCost,
-		"user_cost":    stats.UserCost,
-		"updated_at":   s.now().UTC().Format(time.RFC3339),
-	})
+	pipe.HSetNX(ctx, key, "requests", stats.Requests)
+	pipe.HSetNX(ctx, key, "tokens", stats.Tokens)
+	pipe.HSetNX(ctx, key, "account_cost", stats.AccountCost)
+	pipe.HSetNX(ctx, key, "user_cost", stats.UserCost)
+	pipe.HSetNX(ctx, key, "updated_at", s.now().UTC().Format(time.RFC3339))
 	pipe.Expire(ctx, key, accountcache.TodayStatsTTL)
 	_, _ = pipe.Exec(ctx)
 }
@@ -1863,8 +1869,8 @@ func (s *Service) loadAccountProfilesForUsage(ctx context.Context, platform stri
 			missing = append(missing, accountID)
 			continue
 		}
-		var payload accountProfileCachePayload
-		if err := json.Unmarshal(raw, &payload); err != nil || payload.ID != accountID {
+		payload, ok := decodeAccountProfileCache(raw, accountID)
+		if !ok {
 			_ = s.usageRedis.Del(ctx, accountcache.ProfileKey(accountID)).Err()
 			missing = append(missing, accountID)
 			continue
@@ -1883,12 +1889,34 @@ func (s *Service) cacheAccountProfiles(ctx context.Context, accounts []Account) 
 	if s.usageRedis == nil || len(accounts) == 0 {
 		return
 	}
+	readPipe := s.usageRedis.Pipeline()
+	oldCmds := make(map[int]*redis.StringCmd, len(accounts))
+	for _, item := range accounts {
+		if item.ID <= 0 {
+			continue
+		}
+		oldCmds[item.ID] = readPipe.Get(ctx, accountcache.ProfileKey(item.ID))
+	}
+	if len(oldCmds) > 0 {
+		_, _ = readPipe.Exec(ctx)
+	}
+
 	pipe := s.usageRedis.Pipeline()
 	for _, item := range accounts {
+		if item.ID <= 0 {
+			continue
+		}
 		payload := accountProfileCacheFromAccount(item)
 		body, err := json.Marshal(payload)
 		if err != nil {
 			continue
+		}
+		if oldCmd := oldCmds[item.ID]; oldCmd != nil {
+			if raw, err := oldCmd.Bytes(); err == nil {
+				if oldPayload, ok := decodeAccountProfileCache(raw, item.ID); ok && oldPayload.Platform != "" && oldPayload.Platform != item.Platform {
+					pipe.SRem(ctx, accountcache.PlatformKey(oldPayload.Platform), item.ID)
+				}
+			}
 		}
 		pipe.Set(ctx, accountcache.ProfileKey(item.ID), body, accountcache.ProfileTTL)
 		if item.Platform != "" {
@@ -1897,6 +1925,14 @@ func (s *Service) cacheAccountProfiles(ctx context.Context, accounts []Account) 
 		}
 	}
 	_, _ = pipe.Exec(ctx)
+}
+
+func decodeAccountProfileCache(raw []byte, accountID int) (accountProfileCachePayload, bool) {
+	var payload accountProfileCachePayload
+	if err := json.Unmarshal(raw, &payload); err != nil || payload.ID != accountID {
+		return accountProfileCachePayload{}, false
+	}
+	return payload, true
 }
 
 func accountProfileCacheFromAccount(item Account) accountProfileCachePayload {
@@ -1976,11 +2012,29 @@ func (s *Service) deleteAccountCacheKeys(accountIDs []int) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	day := accountcache.Day(s.now())
-	keys := make([]string, 0, len(accountIDs)*5)
+	profileCmds := make(map[int]*redis.StringCmd, len(accountIDs))
+	validIDs := make([]int, 0, len(accountIDs))
+	readPipe := s.usageRedis.Pipeline()
 	for _, id := range accountIDs {
 		if id <= 0 {
 			continue
+		}
+		validIDs = append(validIDs, id)
+		profileCmds[id] = readPipe.Get(ctx, accountcache.ProfileKey(id))
+	}
+	if len(validIDs) == 0 {
+		return
+	}
+	_, _ = readPipe.Exec(ctx)
+
+	day := accountcache.Day(s.now())
+	keys := make([]string, 0, len(validIDs)*5)
+	pipe := s.usageRedis.Pipeline()
+	for _, id := range validIDs {
+		if raw, err := profileCmds[id].Bytes(); err == nil {
+			if payload, ok := decodeAccountProfileCache(raw, id); ok && payload.Platform != "" {
+				pipe.SRem(ctx, accountcache.PlatformKey(payload.Platform), id)
+			}
 		}
 		keys = append(keys,
 			accountcache.ProfileKey(id),
@@ -1991,8 +2045,9 @@ func (s *Service) deleteAccountCacheKeys(accountIDs []int) {
 		)
 	}
 	if len(keys) > 0 {
-		_ = s.usageRedis.Del(ctx, keys...).Err()
+		pipe.Del(ctx, keys...)
 	}
+	_, _ = pipe.Exec(ctx)
 }
 
 // GetCredentialsSchema 获取指定平台凭证字段 schema。
