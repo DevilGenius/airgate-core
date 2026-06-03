@@ -203,8 +203,8 @@ func startMainServer(cfg *config.Config) {
 	}
 	migrationCancel()
 
-	// 回填历史 API Key 的 key_hint 以及 reseller markup 新列等启动整理任务
-	bootstrap.RunStartupTasks(db, drv, cfg.APIKeySecret())
+	// 执行版本化系统升级 SQL。
+	bootstrap.RunSystemUpgrades(drv)
 
 	// 初始化 Redis
 	rdb := redis.NewClient(&redis.Options{

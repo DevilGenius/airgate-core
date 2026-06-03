@@ -34,7 +34,8 @@ type systemUpgrade struct {
 	SQL         string
 }
 
-func runSystemUpgrades(drv *entsql.Driver) {
+// RunSystemUpgrades applies versioned SQL upgrades that are embedded with the binary.
+func RunSystemUpgrades(drv *entsql.Driver) {
 	if drv == nil {
 		return
 	}
