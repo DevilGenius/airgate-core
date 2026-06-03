@@ -14,7 +14,7 @@ import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
   ShieldCheck, Copy, Trash2, KeyRound, Download, Database,
 } from 'lucide-react';
-import type { SettingItem, TestSMTPReq } from '../../shared/types';
+import type { SettingItem, TestSMTPReq, TestNotificationReq } from '../../shared/types';
 import { SystemUpdatePanel } from './SystemUpdatePanel';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { CommonModal } from '../../shared/components/CommonModal';
@@ -40,6 +40,12 @@ const SMTP_KEYS = [
   'smtp_from_email', 'smtp_from_name', 'smtp_use_tls',
   'email_template_subject', 'email_template_body',
   'balance_alert_email_subject', 'balance_alert_email_body',
+] as const;
+
+const NOTIFICATION_KEYS = [
+  'notification_webhook_url',
+  'notification_webhook_secret',
+  'notification_webhook_body',
 ] as const;
 
 const STORAGE_KEYS = [
@@ -86,14 +92,20 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
   </div>
 </div>`;
 
+const DEFAULT_NOTIFICATION_BODY = `{
+  "title": "{{title}}",
+  "content": "{{content}}"
+}`;
+
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'security' | 'smtp' | 'storage' | 'system';
+type TabKey = 'site' | 'security' | 'smtp' | 'notification' | 'storage' | 'system';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
   { key: 'security', labelKey: 'settings.tab_security', icon: ShieldCheck },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
+  { key: 'notification', labelKey: 'settings.tab_notification', icon: Send },
   { key: 'storage', labelKey: 'settings.tab_storage', icon: Database },
   { key: 'system', labelKey: 'settings.tab_system', icon: Download },
 ];
@@ -104,12 +116,14 @@ type SaveTabKey = Exclude<TabKey, 'security' | 'system'>;
 const TAB_GROUP: Record<SaveTabKey, string> = {
   site: 'site',
   smtp: 'smtp',
+  notification: 'notification',
   storage: 'storage',
 };
 
 const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
   site: SITE_KEYS,
   smtp: SMTP_KEYS,
+  notification: NOTIFICATION_KEYS,
   storage: STORAGE_KEYS,
 };
 
@@ -166,6 +180,15 @@ export default function SettingsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
+  // 消息通知测试
+  const notificationTestMutation = useMutation({
+    mutationFn: (data: TestNotificationReq) => settingsApi.testNotification(data),
+    onSuccess: () => {
+      toast('success', t('settings.notification_test_success'));
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
   function set(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
@@ -173,6 +196,10 @@ export default function SettingsPage() {
 
   function val(key: string): string {
     return values[key] ?? '';
+  }
+
+  function valOrDefault(key: string, fallback: string): string {
+    return Object.prototype.hasOwnProperty.call(values, key) ? (values[key] ?? '') : fallback;
   }
 
   function boolVal(key: string): boolean {
@@ -201,7 +228,9 @@ export default function SettingsPage() {
     const keys = TAB_KEYS[tab];
     return keys.map((key) => ({
       key,
-      value: values[key] ?? '',
+      value: tab === 'notification' && key === 'notification_webhook_body'
+        ? valOrDefault(key, DEFAULT_NOTIFICATION_BODY)
+        : values[key] ?? '',
       group,
     }));
   }
@@ -225,6 +254,18 @@ export default function SettingsPage() {
       use_tls: boolVal('smtp_use_tls'),
       from: val('smtp_from_email'),
       to: testTo,
+    });
+  }
+
+  function notificationBody(): string {
+    return valOrDefault('notification_webhook_body', DEFAULT_NOTIFICATION_BODY);
+  }
+
+  function handleTestNotification() {
+    notificationTestMutation.mutate({
+      webhook_url: val('notification_webhook_url'),
+      secret: val('notification_webhook_secret'),
+      body: notificationBody(),
     });
   }
 
@@ -282,6 +323,16 @@ export default function SettingsPage() {
         {t('settings.template_reset')}
       </Button>
     </>,
+  );
+  const notificationSaveAction = renderSaveAction(
+    <Button
+      size="sm"
+      variant="ghost"
+      onPress={() => set('notification_webhook_body', DEFAULT_NOTIFICATION_BODY)}
+    >
+      <RotateCcw className="w-3.5 h-3.5" />
+      {t('settings.template_reset')}
+    </Button>,
   );
 
   return (
@@ -531,6 +582,17 @@ export default function SettingsPage() {
               {smtpSaveAction}
             </Card.Content>
           </Card>
+        )}
+
+        {activeTab === 'notification' && (
+          <NotificationPanel
+            body={notificationBody()}
+            footer={notificationSaveAction}
+            isTesting={notificationTestMutation.isPending}
+            onTest={handleTestNotification}
+            set={set}
+            val={val}
+          />
         )}
 
         {activeTab === 'storage' && (
@@ -974,6 +1036,105 @@ function EmailTemplateEditor({
         </Modal>
       ) : null}
     </>
+  );
+}
+
+// ==================== Notification Panel ====================
+
+function NotificationPanel({
+  body,
+  footer,
+  isTesting,
+  onTest,
+  set,
+  val,
+}: {
+  body: string;
+  footer?: React.ReactNode;
+  isTesting: boolean;
+  onTest: () => void;
+  set: (key: string, value: string) => void;
+  val: (key: string) => string;
+}) {
+  const { t } = useTranslation();
+  const variables = ['title', 'content'];
+  const canTest = val('notification_webhook_url').trim() !== '' && body.trim() !== '';
+
+  return (
+    <Card>
+      <Card.Header className="justify-between gap-3">
+        <Card.Title>{t('settings.notification_config')}</Card.Title>
+        <Button
+          aria-busy={isTesting}
+          isDisabled={!canTest || isTesting}
+          onPress={onTest}
+          size="sm"
+          variant="secondary"
+        >
+          <Send className="w-3.5 h-3.5" />
+          {t('settings.notification_test')}
+        </Button>
+      </Card.Header>
+      <Card.Content>
+        <div className="ag-settings-section-stack">
+          <SettingsSection
+            description={t('settings.notification_webhook_desc')}
+            title={t('settings.notification_webhook')}
+          >
+            <Form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={(e) => e.preventDefault()}>
+              <Field
+                className="col-span-1 md:col-span-2"
+                hint={t('settings.notification_webhook_url_hint')}
+                label={t('settings.notification_webhook_url')}
+              >
+                <Input
+                  onChange={(e) => set('notification_webhook_url', e.target.value)}
+                  placeholder="https://example.com/webhook"
+                  value={val('notification_webhook_url')}
+                />
+              </Field>
+              <Field
+                className="col-span-1 md:col-span-2"
+                hint={t('settings.notification_webhook_secret_hint')}
+                label={t('settings.notification_webhook_secret')}
+              >
+                <Input
+                  autoComplete="off"
+                  name="notification_webhook_secret"
+                  onChange={(e) => set('notification_webhook_secret', e.target.value)}
+                  type="password"
+                  value={val('notification_webhook_secret')}
+                />
+              </Field>
+            </Form>
+          </SettingsSection>
+
+          <SettingsSection
+            description={t('settings.notification_body_desc')}
+            title={t('settings.notification_body')}
+          >
+            <div className="space-y-4">
+              <div className="text-[11px] text-text-tertiary space-x-3">
+                <span>{t('settings.template_vars')}:</span>
+                {variables.map((name) => (
+                  <code key={name} className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{`{{${name}}}`}</code>
+                ))}
+              </div>
+              <Field label={t('settings.notification_body')} hint={t('settings.notification_body_hint')}>
+                <TextArea
+                  aria-label={t('settings.notification_body')}
+                  className="h-80 w-full font-mono text-xs leading-5"
+                  onChange={(e) => set('notification_webhook_body', e.target.value)}
+                  placeholder={DEFAULT_NOTIFICATION_BODY}
+                  value={body}
+                />
+              </Field>
+            </div>
+          </SettingsSection>
+        </div>
+        {footer}
+      </Card.Content>
+    </Card>
   );
 }
 

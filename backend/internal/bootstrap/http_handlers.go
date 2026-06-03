@@ -17,6 +17,7 @@ import (
 	appauth "github.com/DevilGenius/airgate-core/internal/app/auth"
 	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
+	appnotification "github.com/DevilGenius/airgate-core/internal/app/notification"
 	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
 	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
@@ -86,6 +87,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	pluginAdminService := apppluginadmin.NewService(dep.PluginMgr, dep.Marketplace)
 	settingsStore := store.NewSettingsStore(dep.DB)
 	settingsService := appsettings.NewService(settingsStore)
+	notificationService := appnotification.NewService(settingsService)
 	userStore := store.NewUserStore(dep.DB)
 	userService := appuser.NewService(userStore)
 
@@ -107,7 +109,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Subscription:   handler.NewSubscriptionHandler(subscriptionService),
 		Usage:          handler.NewUsageHandler(usageService),
 		Proxy:          handler.NewProxyHandler(proxyService),
-		Settings:       handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret()),
+		Settings:       handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret(), notificationService),
 		Dashboard:      handler.NewDashboardHandler(dashboardService),
 		Plugin:         handler.NewPluginHandler(pluginAdminService),
 		Version:        handler.NewVersionHandler(),

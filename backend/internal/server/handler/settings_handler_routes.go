@@ -173,6 +173,28 @@ func (h *SettingsHandler) TestSMTP(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+// TestNotification 测试消息通知 webhook。
+func (h *SettingsHandler) TestNotification(c *gin.Context) {
+	var req dto.TestNotificationReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	if h.notificationService == nil {
+		response.InternalError(c, "消息通知服务未初始化")
+		return
+	}
+
+	if err := h.notificationService.Test(c.Request.Context(), req.WebhookURL, req.Secret, req.Body); err != nil {
+		slog.Error("notification_test_failed", "error", err)
+		response.BadRequest(c, fmt.Sprintf("Webhook send failed: %v", err))
+		return
+	}
+
+	response.Success(c, nil)
+}
+
 // UploadFile 上传站点级静态资源（logo / favicon 等）。
 //
 // 注意：这里**有意**保持本地磁盘存储，不接入 asset storage 抽象 / R2。理由：

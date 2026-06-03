@@ -184,6 +184,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/settings", handlers.Settings.GetSettings)
 		adminGroup.PUT("/settings", handlers.Settings.UpdateSettings)
 		adminGroup.POST("/settings/test-smtp", handlers.Settings.TestSMTP)
+		adminGroup.POST("/settings/test-notification", handlers.Settings.TestNotification)
 		adminGroup.POST("/settings/upload", handlers.Settings.UploadFile)
 
 		// 管理员 API Key

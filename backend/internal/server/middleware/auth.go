@@ -214,11 +214,15 @@ func extractBearerToken(c *gin.Context) string {
 	return ""
 }
 
-// HasAPIKey 检查请求是否携带 API Key（Authorization: Bearer 或 x-api-key）
+// HasAPIKey 检查请求是否携带网关 API Key。
+// 注意：浏览器管理后台也使用 Authorization: Bearer <JWT>。NoRoute 里只应把明确
+// 的 sk-* API Key 或 x-api-key 当作网关请求，否则新/未知后台 API 会被误送进
+// APIKeyAuth，返回 401 后导致前端清空登录态。
 func HasAPIKey(c *gin.Context) bool {
-	auth := c.GetHeader("Authorization")
-	if len(auth) > 7 && strings.EqualFold(auth[:7], "Bearer ") {
-		return true
+	header := c.GetHeader("Authorization")
+	if len(header) > 7 && strings.EqualFold(header[:7], "Bearer ") {
+		token := strings.TrimSpace(header[7:])
+		return strings.HasPrefix(token, "sk-")
 	}
 	return c.GetHeader("x-api-key") != ""
 }

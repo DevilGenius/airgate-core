@@ -720,6 +720,12 @@ export interface TestSMTPReq {
   to: string;
 }
 
+export interface TestNotificationReq {
+  webhook_url: string;
+  secret: string;
+  body: string;
+}
+
 // ==================== Dashboard ====================
 
 export interface DashboardStatsResp {
