@@ -4,6 +4,10 @@
 
 /* 弹层容器 */
 
+.ag-toast-region[data-slot="toast-region"] {
+  top: calc(env(safe-area-inset-top, 0px) + 5rem) !important;
+}
+
 :where(.modal__container, .alert-dialog__container):has(.ag-elevation-modal) {
   padding-inline: clamp(1rem, 3vw, 4rem) !important;
   padding-block: clamp(1rem, 3vh, 3rem) !important;
@@ -174,6 +178,13 @@
 
   .dropdown__popover {
     min-width: 16rem !important;
+  }
+}
+
+@media (max-width: 48rem) {
+
+  .ag-toast-region[data-slot="toast-region"] {
+    top: calc(env(safe-area-inset-top, 0px) + 4rem) !important;
   }
 }
 

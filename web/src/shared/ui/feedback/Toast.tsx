@@ -31,7 +31,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
-      <HeroToastProvider maxVisibleToasts={4} placement="top end" width={420} />
+      <HeroToastProvider className="ag-toast-region" maxVisibleToasts={4} placement="top end" width={420} />
     </>
   );
 }
