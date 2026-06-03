@@ -769,7 +769,6 @@
     "tab_smtp": "Email (SMTP)",
     "tab_storage": "Object Storage",
     "tab_security": "User Management",
-    "tab_openclaw": "OpenClaw",
     "tab_system": "System Update",
 
     "system_update_title": "System Update",
@@ -900,29 +899,7 @@
     "asset_retention_section": "Task asset retention",
     "asset_retention_section_hint": "This section only controls the Studio task lifecycle. Expired terminal tasks and their related inputs/outputs are cleaned together; leave blank to use the default, 0 means keep forever.",
     "asset_retention_generated_days": "Studio task retention (days)",
-    "asset_retention_generated_days_hint": "Studio generation tasks, generated images, and task inputs are cleaned together. Leave blank to use the default; set 0 to disable auto cleanup. Default is 7 days.",
-
-    "openclaw_quickstart": "One-line install command",
-    "openclaw_quickstart_desc": "Pick the command for your OS. Both scripts generate openclaw.json (~/.openclaw/ on Unix, %USERPROFILE%\\.openclaw\\ on Windows) with interactive model selection.",
-    "openclaw_install_tab_unix": "Linux / macOS",
-    "openclaw_install_tab_windows": "Windows",
-    "openclaw_copy_command": "Copy command",
-    "openclaw_base_url_missing_hint": "Neither openclaw.base_url nor api_base_url is set; the preview uses the current browser URL. The script will fall back to the request Host at runtime, but setting it explicitly avoids misdetection behind reverse proxies.",
-    "openclaw_basic": "Basics",
-    "openclaw_enabled": "Enable OpenClaw integration",
-    "openclaw_enabled_desc": "When disabled, the public /openclaw/* routes return 404 and users cannot install via the one-line command.",
-    "openclaw_provider_name": "Provider name",
-    "openclaw_provider_name_hint": "Key name written into openclaw.json. agents.defaults.model.primary will use <name>/<model>. Default: airgate.",
-    "openclaw_base_url": "Site base URL",
-    "openclaw_base_url_hint": "Leave blank to fall back to api_base_url, then to the request Host. /v1 is appended automatically when writing the config.",
-    "openclaw_memory_search": "Memory search (optional)",
-    "openclaw_memory_search_enabled": "Enable memorySearch",
-    "openclaw_memory_search_enabled_desc": "When enabled, the generated openclaw.json includes agents.defaults.memorySearch pointing at this site's embedding model.",
-    "openclaw_memory_search_model": "Embedding model",
-    "openclaw_memory_search_model_hint": "Embedding model name openclaw uses for memory search. Must match a model id served by this site's /v1/models.",
-    "openclaw_models_preset": "Model preset list",
-    "openclaw_models_preset_desc": "JSON array. Fields match openclaw.json provider.models[] exactly; the extra 'label' field is shown to users by the install script.",
-    "openclaw_models_not_array": "Preset must be a JSON array"
+    "asset_retention_generated_days_hint": "Studio generation tasks, generated images, and task inputs are cleaned together. Leave blank to use the default; set 0 to disable auto cleanup. Default is 7 days."
   },
 
   "docs": {

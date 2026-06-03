@@ -17,7 +17,6 @@ import (
 	appauth "github.com/DevilGenius/airgate-core/internal/app/auth"
 	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
-	appopenclaw "github.com/DevilGenius/airgate-core/internal/app/openclaw"
 	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
 	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
@@ -59,7 +58,6 @@ type HTTPHandlers struct {
 	Settings     *handler.SettingsHandler
 	Dashboard    *handler.DashboardHandler
 	Plugin       *handler.PluginHandler
-	OpenClaw     *handler.OpenClawHandler
 	Version      *handler.VersionHandler
 	Upgrade      *handler.UpgradeHandler
 
@@ -88,7 +86,6 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	pluginAdminService := apppluginadmin.NewService(dep.PluginMgr, dep.Marketplace)
 	settingsStore := store.NewSettingsStore(dep.DB)
 	settingsService := appsettings.NewService(settingsStore)
-	openclawService := appopenclaw.NewService(settingsService)
 	userStore := store.NewUserStore(dep.DB)
 	userService := appuser.NewService(userStore)
 
@@ -113,7 +110,6 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Settings:       handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret()),
 		Dashboard:      handler.NewDashboardHandler(dashboardService),
 		Plugin:         handler.NewPluginHandler(pluginAdminService),
-		OpenClaw:       handler.NewOpenClawHandler(openclawService),
 		Version:        handler.NewVersionHandler(),
 		Upgrade:        handler.NewUpgradeHandler(upgradeService),
 		AccountService: accountService,
