@@ -331,18 +331,55 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary
 // Update 更新账号。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Account, error) {
 	logger := sdk.LoggerFromContext(ctx)
-	updated, err := s.repo.Update(ctx, id, input)
+	repoInput := input
+	manualState, routeManualState, err := s.routedManualState(input.State)
+	if err != nil {
+		return Account{}, err
+	}
+	if routeManualState {
+		repoInput.State = nil
+	}
+
+	var updated Account
+	if hasUpdateInputChanges(repoInput) {
+		updated, err = s.repo.Update(ctx, id, repoInput)
+	} else {
+		updated, err = s.repo.FindByID(ctx, id, LoadOptions{WithGroups: true, WithProxy: true})
+	}
 	if err != nil {
 		logger.Error("account_credential_persist_failed",
 			sdk.LogFieldAccountID, id,
 			sdk.LogFieldError, err)
 		return updated, err
 	}
+
+	if routeManualState {
+		if err := s.applyManualState(ctx, id, manualState); err != nil {
+			logger.Error("account_manual_state_failed",
+				sdk.LogFieldAccountID, id,
+				"state", manualState,
+				sdk.LogFieldError, err)
+			return updated, err
+		}
+		if reloaded, reloadErr := s.repo.FindByID(ctx, id, LoadOptions{WithGroups: true, WithProxy: true}); reloadErr == nil {
+			updated = reloaded
+		} else {
+			logger.Warn("account_reload_after_manual_state_failed",
+				sdk.LogFieldAccountID, id,
+				sdk.LogFieldError, reloadErr)
+			updated.State = manualState
+		}
+	}
+
 	switch {
 	case input.State != nil:
+		state := strings.TrimSpace(*input.State)
+		if routeManualState {
+			state = manualState
+		}
 		logger.Info("account_status_changed",
 			sdk.LogFieldAccountID, id,
-			"state", *input.State)
+			"state", state)
 	case input.MaxConcurrency != nil || input.RateMultiplier != nil:
 		logger.Info("account_quota_updated",
 			sdk.LogFieldAccountID, id)
@@ -375,6 +412,7 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 // group_ids 为整体替换：若提供则覆盖账号原有分组，未提供则不触碰。
 func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkResult {
 	result := BulkResult{Results: make([]BulkResultItem, 0, len(input.IDs))}
+	mutated := false
 	for _, id := range input.IDs {
 		patch := UpdateInput{
 			State:          input.State,
@@ -390,17 +428,49 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			patch.GroupIDs = input.GroupIDs
 			patch.HasGroupIDs = true
 		}
-		if _, err := s.repo.Update(ctx, id, patch); err != nil {
+
+		manualState, routeManualState, err := s.routedManualState(patch.State)
+		if err != nil {
 			result.appendFailure(id, err)
 			continue
 		}
+		if routeManualState {
+			patch.State = nil
+		}
+		patchHasChanges := hasUpdateInputChanges(patch)
+		if !routeManualState && !patchHasChanges {
+			if _, err := s.repo.FindByID(ctx, id, LoadOptions{}); err != nil {
+				result.appendFailure(id, err)
+				continue
+			}
+			result.appendSuccess(id)
+			continue
+		}
+
+		if patchHasChanges {
+			if _, err := s.repo.Update(ctx, id, patch); err != nil {
+				result.appendFailure(id, err)
+				continue
+			}
+			mutated = true
+		}
+		if routeManualState {
+			if err := s.applyManualState(ctx, id, manualState); err != nil {
+				result.appendFailure(id, err)
+				continue
+			}
+			mutated = true
+		}
 		result.appendSuccess(id)
 	}
-	if len(result.SuccessIDs) > 0 {
+	if mutated && len(result.SuccessIDs) > 0 {
 		accounts, err := s.repo.ListAll(ctx, ListFilter{IDs: result.SuccessIDs})
 		if err == nil {
 			s.cacheAccountProfiles(ctx, accounts)
 		}
+	}
+	if result.Success > 0 && input.State != nil {
+		s.InvalidateUsageCache("")
 	}
 	return result
 }
@@ -432,6 +502,50 @@ func (r *BulkResult) appendFailure(id int, err error) {
 	r.Failed++
 	r.FailedIDs = append(r.FailedIDs, id)
 	r.Results = append(r.Results, BulkResultItem{ID: id, Success: false, Error: err.Error()})
+}
+
+func hasUpdateInputChanges(input UpdateInput) bool {
+	return input.Name != nil ||
+		input.Type != nil ||
+		input.Credentials != nil ||
+		input.State != nil ||
+		input.Priority != nil ||
+		input.MaxConcurrency != nil ||
+		input.RateMultiplier != nil ||
+		input.UpstreamIsPool != nil ||
+		input.HasGroupIDs ||
+		input.HasProxyID ||
+		input.HasExtra
+}
+
+func (s *Service) routedManualState(state *string) (string, bool, error) {
+	value, ok, err := normalizeManualState(state)
+	if err != nil || !ok || s.stateWriter == nil {
+		return value, false, err
+	}
+	return value, true, nil
+}
+
+func normalizeManualState(state *string) (string, bool, error) {
+	if state == nil {
+		return "", false, nil
+	}
+	value := strings.ToLower(strings.TrimSpace(*state))
+	if value == "active" || value == "disabled" {
+		return value, true, nil
+	}
+	return value, false, ErrInvalidState
+}
+
+func (s *Service) applyManualState(ctx context.Context, id int, state string) error {
+	switch state {
+	case "active":
+		return s.stateWriter.ManualRecover(ctx, id)
+	case "disabled":
+		return s.stateWriter.ManualDisable(ctx, id, "手动关闭")
+	default:
+		return nil
+	}
 }
 
 // ToggleScheduling 快速切换账号调度状态。active ↔ disabled。

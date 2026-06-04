@@ -56,7 +56,7 @@ func (s *Scheduler) MarkRateLimited(ctx context.Context, accountID int, until ti
 
 // ClearRateLimited 配额巡检发现已恢复时清限流态回到 active。
 func (s *Scheduler) ClearRateLimited(ctx context.Context, accountID int) {
-	s.state.transitionActive(ctx, accountID)
+	s.state.transitionActive(ctx, accountID, true)
 }
 
 // ClearRateLimitMarkers 清除账号上的临时限流标记，不会恢复手动禁用的账号。
@@ -69,7 +69,7 @@ func (s *Scheduler) ClearRateLimitMarkers(ctx context.Context, accountID int) in
 		return cleared
 	}
 	if item.State == account.StateRateLimited || item.State == account.StateDegraded {
-		s.state.transitionActive(ctx, accountID)
+		s.state.transitionActive(ctx, accountID, true)
 		cleared++
 	}
 	return cleared

@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -305,6 +306,7 @@ func TestListKeepsUnknownOAuthPlanFilterExact(t *testing.T) {
 
 type stubRepository struct {
 	create   func(context.Context, CreateInput) (Account, error)
+	update   func(context.Context, int, UpdateInput) (Account, error)
 	findByID func(context.Context, int, LoadOptions) (Account, error)
 	list     func(context.Context, ListFilter) ([]Account, int64, error)
 	listAll  func(context.Context, ListFilter) ([]Account, error)
@@ -337,8 +339,11 @@ func (s stubRepository) Create(ctx context.Context, input CreateInput) (Account,
 	return s.create(ctx, input)
 }
 
-func (s stubRepository) Update(context.Context, int, UpdateInput) (Account, error) {
-	return Account{}, nil
+func (s stubRepository) Update(ctx context.Context, id int, input UpdateInput) (Account, error) {
+	if s.update != nil {
+		return s.update(ctx, id, input)
+	}
+	return Account{ID: id}, nil
 }
 
 func (s stubRepository) Delete(context.Context, int) error { return nil }
@@ -374,6 +379,7 @@ type stubStateWriter struct {
 	cleared        map[int]bool
 	markersCleared map[int]int
 	disabled       map[int]string
+	recovered      map[int]bool
 }
 
 func newStubStateWriter() *stubStateWriter {
@@ -382,6 +388,7 @@ func newStubStateWriter() *stubStateWriter {
 		cleared:        map[int]bool{},
 		markersCleared: map[int]int{},
 		disabled:       map[int]string{},
+		recovered:      map[int]bool{},
 	}
 }
 
@@ -403,7 +410,8 @@ func (s *stubStateWriter) MarkDisabled(_ context.Context, accountID int, reason 
 	s.disabled[accountID] = reason
 }
 
-func (s *stubStateWriter) ManualRecover(_ context.Context, _ int) error {
+func (s *stubStateWriter) ManualRecover(_ context.Context, accountID int) error {
+	s.recovered[accountID] = true
 	return nil
 }
 
@@ -422,6 +430,179 @@ func (s stubPluginCatalog) GetModels(string) []sdk.ModelInfo                  { 
 func (s stubPluginCatalog) GetAccountTypes(string) []sdk.AccountType          { return nil }
 func (s stubPluginCatalog) GetCredentialFields(string) []sdk.CredentialField  { return nil }
 func (s stubPluginCatalog) GetAllPluginMeta() []plugin.PluginMeta             { return s.metas }
+
+func TestUpdateRoutesManualStateThroughStateWriter(t *testing.T) {
+	state := " Disabled "
+	name := "renamed"
+	updateCalled := false
+	writer := newStubStateWriter()
+	service := NewService(stubRepository{
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			updateCalled = true
+			if id != 42 {
+				t.Fatalf("id = %d, want 42", id)
+			}
+			if input.State != nil {
+				t.Fatalf("repo.Update received State = %q, want nil", *input.State)
+			}
+			if input.Name == nil || *input.Name != name {
+				t.Fatalf("repo.Update Name = %v, want %q", input.Name, name)
+			}
+			return Account{ID: id, Platform: "openai", State: "active"}, nil
+		},
+		findByID: func(_ context.Context, id int, opts LoadOptions) (Account, error) {
+			if id != 42 {
+				t.Fatalf("id = %d, want 42", id)
+			}
+			if !opts.WithGroups || !opts.WithProxy {
+				t.Fatalf("reload opts = %+v, want groups and proxy", opts)
+			}
+			return Account{ID: id, Platform: "openai", State: "disabled"}, nil
+		},
+	}, nil, nil, writer)
+
+	updated, err := service.Update(t.Context(), 42, UpdateInput{Name: &name, State: &state})
+	if err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+	if !updateCalled {
+		t.Fatalf("repo.Update should be called for non-state fields")
+	}
+	if got := writer.disabled[42]; got != "手动关闭" {
+		t.Fatalf("ManualDisable reason = %q, want 手动关闭", got)
+	}
+	if updated.State != "disabled" {
+		t.Fatalf("updated.State = %q, want disabled", updated.State)
+	}
+}
+
+func TestUpdateRejectsBlankState(t *testing.T) {
+	state := "  "
+	service := NewService(stubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called for blank state: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, newStubStateWriter())
+
+	_, err := service.Update(t.Context(), 7, UpdateInput{State: &state})
+	if !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("Update error = %v, want ErrInvalidState", err)
+	}
+}
+
+func TestUpdateStateOnlyUsesManualRecover(t *testing.T) {
+	state := "active"
+	writer := newStubStateWriter()
+	service := NewService(stubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called for state-only manual update: %+v", input)
+			return Account{}, nil
+		},
+		findByID: func(_ context.Context, id int, _ LoadOptions) (Account, error) {
+			return Account{ID: id, Platform: "openai", State: "active"}, nil
+		},
+	}, nil, nil, writer)
+
+	if _, err := service.Update(t.Context(), 7, UpdateInput{State: &state}); err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+	if !writer.recovered[7] {
+		t.Fatalf("ManualRecover should be called for account 7")
+	}
+}
+
+func TestBulkUpdateRoutesManualStateThroughStateWriter(t *testing.T) {
+	state := "disabled"
+	priority := 3
+	var updateIDs []int
+	writer := newStubStateWriter()
+	service := NewService(stubRepository{
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			updateIDs = append(updateIDs, id)
+			if input.State != nil {
+				t.Fatalf("repo.Update received State = %q, want nil", *input.State)
+			}
+			if input.Priority == nil || *input.Priority != priority {
+				t.Fatalf("repo.Update Priority = %v, want %d", input.Priority, priority)
+			}
+			return Account{ID: id, Platform: "openai"}, nil
+		},
+		listAll: func(_ context.Context, filter ListFilter) ([]Account, error) {
+			return []Account{
+				{ID: filter.IDs[0], Platform: "openai", State: "disabled"},
+				{ID: filter.IDs[1], Platform: "openai", State: "disabled"},
+			}, nil
+		},
+	}, nil, nil, writer)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs:      []int{11, 12},
+		State:    &state,
+		Priority: &priority,
+	})
+
+	if result.Success != 2 || result.Failed != 0 {
+		t.Fatalf("BulkUpdate result = %+v, want 2 success", result)
+	}
+	if len(updateIDs) != 2 || updateIDs[0] != 11 || updateIDs[1] != 12 {
+		t.Fatalf("repo.Update IDs = %v, want [11 12]", updateIDs)
+	}
+	if got := writer.disabled[11]; got != "手动关闭" {
+		t.Fatalf("ManualDisable account 11 reason = %q, want 手动关闭", got)
+	}
+	if got := writer.disabled[12]; got != "手动关闭" {
+		t.Fatalf("ManualDisable account 12 reason = %q, want 手动关闭", got)
+	}
+}
+
+func TestBulkUpdateNoopValidatesWithoutUpdate(t *testing.T) {
+	var findIDs []int
+	service := NewService(stubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called for noop bulk update: %+v", input)
+			return Account{}, nil
+		},
+		findByID: func(_ context.Context, id int, _ LoadOptions) (Account, error) {
+			findIDs = append(findIDs, id)
+			return Account{ID: id, Platform: "openai"}, nil
+		},
+		listAll: func(_ context.Context, filter ListFilter) ([]Account, error) {
+			t.Fatalf("repo.ListAll should not be called for noop bulk update: %+v", filter)
+			return nil, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{IDs: []int{21, 22}})
+
+	if result.Success != 2 || result.Failed != 0 {
+		t.Fatalf("BulkUpdate result = %+v, want 2 success", result)
+	}
+	if len(findIDs) != 2 || findIDs[0] != 21 || findIDs[1] != 22 {
+		t.Fatalf("FindByID IDs = %v, want [21 22]", findIDs)
+	}
+}
+
+func TestBulkUpdateRejectsInvalidState(t *testing.T) {
+	state := "degraded"
+	service := NewService(stubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called for invalid state: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, newStubStateWriter())
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{IDs: []int{31, 32}, State: &state})
+
+	if result.Success != 0 || result.Failed != 2 {
+		t.Fatalf("BulkUpdate result = %+v, want 2 failures", result)
+	}
+	for _, item := range result.Results {
+		if item.Success || item.Error != ErrInvalidState.Error() {
+			t.Fatalf("result item = %+v, want ErrInvalidState failure", item)
+		}
+	}
+}
 
 type windowStatsStub struct {
 	stubRepository

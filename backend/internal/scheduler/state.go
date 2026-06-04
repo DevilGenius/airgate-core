@@ -88,7 +88,7 @@ func (sm *StateMachine) notifyCritical() {
 func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 	switch j.Kind {
 	case sdk.OutcomeSuccess:
-		sm.transitionActive(ctx, accountID)
+		sm.transitionActive(ctx, accountID, false)
 
 	case sdk.OutcomeAccountRateLimited:
 		dur := j.RetryAfter
@@ -164,6 +164,32 @@ func (sm *StateMachine) applyAccountUnavailable(ctx context.Context, accountID i
 		return
 	}
 
+	now := time.Now()
+	if existing.State == account.StateDisabled {
+		slog.Warn("scheduler_account_unavailable_ignored_disabled",
+			sdk.LogFieldAccountID, accountID,
+			sdk.LogFieldReason, reason,
+		)
+		return
+	}
+	if existing.State == account.StateRateLimited && existing.StateUntil != nil && existing.StateUntil.After(now) {
+		slog.Warn("scheduler_account_unavailable_ignored_rate_limited",
+			sdk.LogFieldAccountID, accountID,
+			"until", existing.StateUntil,
+			sdk.LogFieldReason, reason,
+		)
+		return
+	}
+	if existing.State == account.StateRateLimited {
+		slog.Debug("scheduler_account_unavailable_expired_rate_limit_as_active",
+			sdk.LogFieldAccountID, accountID,
+			"until", existing.StateUntil,
+			sdk.LogFieldReason, reason,
+		)
+		existing.State = account.StateActive
+		existing.StateUntil = nil
+	}
+
 	if !shouldTrackAccountUnavailable(existing) {
 		slog.Warn("scheduler_account_unavailable_ignored",
 			sdk.LogFieldAccountID, accountID,
@@ -175,7 +201,6 @@ func (sm *StateMachine) applyAccountUnavailable(ctx context.Context, accountID i
 	}
 
 	extra := cloneExtra(existing.Extra)
-	now := time.Now()
 	if existing.State == account.StateDegraded && existing.StateUntil != nil && existing.StateUntil.After(now) && extraInt(extra, accountUnavailableCountExtraKey) > 0 {
 		slog.Warn("scheduler_account_unavailable_degraded_skip_count",
 			sdk.LogFieldAccountID, accountID,
@@ -239,7 +264,10 @@ func shouldTrackAccountUnavailable(acc *ent.Account) bool {
 //
 // disabled 状态受保护：只有管理员操作（ManualRecover / ToggleScheduling）才能解除，
 // forwarder 的 Success 判决不会覆盖它——防止在飞请求的成功回调把手动禁用的账号重新激活。
-func (sm *StateMachine) transitionActive(ctx context.Context, accountID int) {
+//
+// force=false 时，未到期的 rate_limited / degraded 也受保护：成功判决只更新 last_used_at，
+// 不提前结束完整冷却窗口。force=true 仅给管理员/配额巡检的显式清除入口使用。
+func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, force bool) {
 	now := time.Now()
 	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
@@ -251,9 +279,34 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int) {
 	}
 
 	if prevState == account.StateDisabled {
-		_ = sm.db.Account.UpdateOneID(accountID).
+		err := sm.db.Account.UpdateOneID(accountID).
 			SetLastUsedAt(now).
 			Exec(dbCtx)
+		if err != nil {
+			slog.Debug("scheduler_state_success_ignored_disabled_touch_failed",
+				sdk.LogFieldAccountID, accountID,
+				sdk.LogFieldError, err,
+			)
+		} else {
+			slog.Debug("scheduler_state_success_ignored_disabled",
+				sdk.LogFieldAccountID, accountID,
+			)
+		}
+		return
+	}
+
+	if !force && isUnexpiredTemporaryState(existing, now) {
+		upd := sm.db.Account.UpdateOneID(accountID).
+			SetLastUsedAt(now)
+		if extraInt(existing.Extra, accountUnavailableCountExtraKey) > 0 {
+			extra := cloneExtra(existing.Extra)
+			delete(extra, accountUnavailableCountExtraKey)
+			upd = upd.SetExtra(extra)
+		}
+		if err := upd.Exec(dbCtx); err != nil {
+			slog.Warn("scheduler_state_active_touch_failed",
+				sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
+		}
 		return
 	}
 
@@ -286,6 +339,30 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
+	if newState != account.StateDisabled {
+		existing, err := sm.db.Account.Get(dbCtx, accountID)
+		if err == nil {
+			if existing.State == account.StateDisabled {
+				slog.Info("scheduler_state_transition_ignored_disabled",
+					sdk.LogFieldAccountID, accountID,
+					"target_state", newState,
+					sdk.LogFieldReason, reason,
+				)
+				return
+			}
+			if newState == account.StateDegraded && existing.State == account.StateRateLimited &&
+				existing.StateUntil != nil && existing.StateUntil.After(time.Now()) {
+				slog.Info("scheduler_state_transition_ignored_rate_limited",
+					sdk.LogFieldAccountID, accountID,
+					"target_state", newState,
+					"until", existing.StateUntil,
+					sdk.LogFieldReason, reason,
+				)
+				return
+			}
+		}
+	}
+
 	upd := sm.db.Account.UpdateOneID(accountID).
 		SetState(newState).
 		SetErrorMsg(truncateReason(reason))
@@ -315,6 +392,13 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 	if newState == account.StateDisabled {
 		sm.notifyCritical()
 	}
+}
+
+func isUnexpiredTemporaryState(acc *ent.Account, now time.Time) bool {
+	if acc == nil || acc.StateUntil == nil || !acc.StateUntil.After(now) {
+		return false
+	}
+	return acc.State == account.StateRateLimited || acc.State == account.StateDegraded
 }
 
 // SchedulabilityOf 根据当前状态 + 到期时间判断账号是否可调度。

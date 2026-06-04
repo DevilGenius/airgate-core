@@ -87,6 +87,7 @@ func TestStateMachineSuccessClearsAccountUnavailableCount(t *testing.T) {
 		SaveX(ctx)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+	expireAccountDegradedWindow(ctx, db, acc.ID)
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeSuccess})
 
 	fresh := db.Account.GetX(ctx, acc.ID)
@@ -104,6 +105,188 @@ func TestStateMachineSuccessClearsAccountUnavailableCount(t *testing.T) {
 	}
 	if fresh.Extra["keep"] != "value" {
 		t.Fatalf("unrelated extra value was not preserved: %+v", fresh.Extra)
+	}
+}
+
+func TestStateMachineSuccessDoesNotClearUnexpiredTemporaryStates(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("degraded", func(t *testing.T) {
+		db := openStateMachineTestDB(t, "scheduler_success_preserves_degraded")
+		sm := NewStateMachine(db, nil, nil)
+
+		acc := db.Account.Create().
+			SetName("temporary 403").
+			SetPlatform("openai").
+			SetType("oauth").
+			SetCredentials(map[string]string{}).
+			SaveX(ctx)
+
+		sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+		before := db.Account.GetX(ctx, acc.ID)
+		if before.State != account.StateDegraded || before.StateUntil == nil {
+			t.Fatalf("state before success = %s until %v, want degraded with state_until", before.State, before.StateUntil)
+		}
+
+		sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeSuccess})
+
+		fresh := db.Account.GetX(ctx, acc.ID)
+		if fresh.State != account.StateDegraded {
+			t.Fatalf("state after success during degraded window = %s, want degraded", fresh.State)
+		}
+		if fresh.StateUntil == nil || !fresh.StateUntil.Equal(*before.StateUntil) {
+			t.Fatalf("state_until after success = %v, want %v", fresh.StateUntil, before.StateUntil)
+		}
+		if fresh.LastUsedAt == nil {
+			t.Fatalf("last_used_at should be updated after success")
+		}
+	})
+
+	t.Run("rate_limited", func(t *testing.T) {
+		db := openStateMachineTestDB(t, "scheduler_success_preserves_rate_limited")
+		sm := NewStateMachine(db, nil, nil)
+
+		acc := db.Account.Create().
+			SetName("temporary 429").
+			SetPlatform("openai").
+			SetType("oauth").
+			SetCredentials(map[string]string{}).
+			SaveX(ctx)
+
+		sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountRateLimited, RetryAfter: time.Minute, Reason: "HTTP 429"})
+		before := db.Account.GetX(ctx, acc.ID)
+		if before.State != account.StateRateLimited || before.StateUntil == nil {
+			t.Fatalf("state before success = %s until %v, want rate_limited with state_until", before.State, before.StateUntil)
+		}
+
+		sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeSuccess})
+
+		fresh := db.Account.GetX(ctx, acc.ID)
+		if fresh.State != account.StateRateLimited {
+			t.Fatalf("state after success during rate limit window = %s, want rate_limited", fresh.State)
+		}
+		if fresh.StateUntil == nil || !fresh.StateUntil.Equal(*before.StateUntil) {
+			t.Fatalf("state_until after success = %v, want %v", fresh.StateUntil, before.StateUntil)
+		}
+		if fresh.LastUsedAt == nil {
+			t.Fatalf("last_used_at should be updated after success")
+		}
+	})
+}
+
+func TestStateMachineDisabledIsNotOverwrittenByLateJudgments(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name string
+		j    Judgment
+	}{
+		{
+			name: "success",
+			j:    Judgment{Kind: sdk.OutcomeSuccess},
+		},
+		{
+			name: "account rate limited",
+			j:    Judgment{Kind: sdk.OutcomeAccountRateLimited, RetryAfter: time.Minute, Reason: "HTTP 429"},
+		},
+		{
+			name: "account unavailable",
+			j:    Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"},
+		},
+		{
+			name: "pool transient degraded",
+			j:    Judgment{Kind: sdk.OutcomeUpstreamTransient, IsPool: true, Reason: "HTTP 502"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := openStateMachineTestDB(t, "scheduler_disabled_guard_"+tt.name)
+			sm := NewStateMachine(db, nil, nil)
+
+			acc := db.Account.Create().
+				SetName("manual disabled").
+				SetPlatform("openai").
+				SetType("oauth").
+				SetCredentials(map[string]string{}).
+				SetState(account.StateDisabled).
+				SetErrorMsg("manual").
+				SaveX(ctx)
+
+			sm.Apply(ctx, acc.ID, tt.j)
+
+			fresh := db.Account.GetX(ctx, acc.ID)
+			if fresh.State != account.StateDisabled {
+				t.Fatalf("state after %s = %s, want disabled", tt.name, fresh.State)
+			}
+			if fresh.StateUntil != nil {
+				t.Fatalf("state_until after %s = %v, want nil", tt.name, fresh.StateUntil)
+			}
+			if fresh.ErrorMsg != "manual" {
+				t.Fatalf("error_msg after %s = %q, want manual", tt.name, fresh.ErrorMsg)
+			}
+		})
+	}
+}
+
+func TestStateMachineDegradedDoesNotLoosenUnexpiredRateLimit(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_degraded_preserves_rate_limited")
+	sm := NewStateMachine(db, nil, nil)
+
+	acc := db.Account.Create().
+		SetName("temporary 429").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{}).
+		SaveX(ctx)
+
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountRateLimited, RetryAfter: time.Minute, Reason: "HTTP 429"})
+	before := db.Account.GetX(ctx, acc.ID)
+	if before.State != account.StateRateLimited || before.StateUntil == nil {
+		t.Fatalf("state before degraded = %s until %v, want rate_limited with state_until", before.State, before.StateUntil)
+	}
+
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeUpstreamTransient, IsPool: true, Reason: "HTTP 502"})
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateRateLimited {
+		t.Fatalf("state after degraded judgment = %s, want rate_limited", fresh.State)
+	}
+	if fresh.StateUntil == nil || !fresh.StateUntil.Equal(*before.StateUntil) {
+		t.Fatalf("state_until after degraded judgment = %v, want %v", fresh.StateUntil, before.StateUntil)
+	}
+}
+
+func TestStateMachineAccountUnavailableTreatsExpiredRateLimitAsActive(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_unavailable_after_expired_rate_limit")
+	sm := NewStateMachine(db, nil, nil)
+
+	acc := db.Account.Create().
+		SetName("expired 429").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{}).
+		SetState(account.StateRateLimited).
+		SetStateUntil(time.Now().Add(-time.Second)).
+		SetErrorMsg("HTTP 429").
+		SaveX(ctx)
+
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateDegraded {
+		t.Fatalf("state after unavailable on expired rate limit = %s, want degraded", fresh.State)
+	}
+	if fresh.StateUntil == nil || !fresh.StateUntil.After(time.Now()) {
+		t.Fatalf("state_until after unavailable = %v, want future time", fresh.StateUntil)
+	}
+	if fresh.ErrorMsg != "HTTP 403" {
+		t.Fatalf("error_msg after unavailable = %q, want HTTP 403", fresh.ErrorMsg)
+	}
+	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 1 {
+		t.Fatalf("unavailable count = %d, want 1", got)
 	}
 }
 
