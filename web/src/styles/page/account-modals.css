@@ -34,9 +34,27 @@
   padding-top: 1rem;
 }
 
-.ag-create-account-pool-switch {
+.ag-account-switch-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  gap: 0.875rem 1.5rem;
+  align-items: center;
+}
+
+.ag-create-account-pool-switch,
+.ag-account-option-switch {
   width: max-content;
   max-width: 100%;
+}
+
+.ag-account-option-switch {
+  min-height: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .ag-account-switch-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .ag-create-account-groups {

@@ -348,21 +348,23 @@ export function EditAccountModal({
                     </Select>
                   </div>
 
-                  <NativeSwitch
-                    className="ag-create-account-pool-switch"
-                    isSelected={form.upstream_is_pool ?? false}
-                    label={<span className="text-sm text-text">{t('accounts.upstream_is_pool', '池模式')}</span>}
-                    onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
-                  />
+                  <div className="ag-account-switch-row">
+                    <NativeSwitch
+                      className="ag-account-option-switch"
+                      isSelected={form.upstream_is_pool ?? false}
+                      label={<span className="text-sm text-text">{t('accounts.upstream_is_pool', '池模式')}</span>}
+                      onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
+                    />
 
-                  <NativeSwitch
-                    className="ag-create-account-pool-switch"
-                    isSelected={getAccountMessageLockEnabled(form.extra)}
-                    label={<span className="text-sm text-text">{t('accounts.message_lock')}</span>}
-                    onChange={(checked) =>
-                      setForm({ ...form, extra: setAccountMessageLockEnabled(form.extra, checked) })
-                    }
-                  />
+                    <NativeSwitch
+                      className="ag-account-option-switch"
+                      isSelected={getAccountMessageLockEnabled(form.extra)}
+                      label={<span className="text-sm text-text">{t('accounts.message_lock')}</span>}
+                      onChange={(checked) =>
+                        setForm({ ...form, extra: setAccountMessageLockEnabled(form.extra, checked) })
+                      }
+                    />
+                  </div>
 
                   {availableGroups.length > 0 && (
                     <div className="ag-create-account-groups">
