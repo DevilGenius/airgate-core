@@ -227,6 +227,53 @@ func TestSelectAccountHardPreviousResponseAllowsWindowCostOverflow(t *testing.T)
 	}
 }
 
+func TestSelectAccountHardPreviousResponseAllowsTemporaryCooldownProbe(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name      string
+		configure func(s *Scheduler, acc *ent.Account)
+	}{
+		{
+			name: "account rate limited",
+			configure: func(_ *Scheduler, acc *ent.Account) {
+				until := time.Now().Add(time.Minute)
+				acc.State = account.StateRateLimited
+				acc.StateUntil = &until
+			},
+		},
+		{
+			name: "family cooldown",
+			configure: func(s *Scheduler, _ *ent.Account) {
+				s.familyCooldown = stubFamilyCooldownTracker{inCooldown: true}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			s := newSelectionTestScheduler(Normal)
+			groupID := 7
+			acc := newSelectionTestAccount(10)
+			tt.configure(s, acc)
+			s.routeCache.Set(groupID, "openai", []*ent.Account{acc}, nil)
+			s.BindResponseAccount(ctx, groupID, "openai", "resp_probe", acc.ID)
+
+			selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+				PreviousResponseID:          "resp_probe",
+				RequireContinuationAffinity: true,
+			})
+			if err != nil {
+				t.Fatalf("SelectAccountWithOptions() returned error: %v", err)
+			}
+			if selected.ID != acc.ID {
+				t.Fatalf("selected account ID = %d, want %d", selected.ID, acc.ID)
+			}
+		})
+	}
+}
+
 func TestSoftPreviousResponseAffinityRequiresHighestPriority(t *testing.T) {
 	ctx := context.Background()
 	s := newSelectionTestScheduler(Normal)
@@ -287,12 +334,6 @@ func TestHardAffinityDoesNotBypassNonWindowConstraints(t *testing.T) {
 			name: "disabled account",
 			configure: func(_ *Scheduler, acc *ent.Account) {
 				acc.State = account.StateDisabled
-			},
-		},
-		{
-			name: "family cooldown",
-			configure: func(s *Scheduler, _ *ent.Account) {
-				s.familyCooldown = stubFamilyCooldownTracker{inCooldown: true}
 			},
 		},
 	}

@@ -29,7 +29,7 @@ type batchSchedulabilityTracker interface {
 }
 
 func (s *Scheduler) newSelectionSnapshot(ctx context.Context, candidates []*ent.Account, model string, now time.Time) *selectionSnapshot {
-	runtimeCandidates := schedulableBaseCandidates(candidates, now)
+	runtimeCandidates := runtimeConstraintCandidates(candidates, now)
 	snap := &selectionSnapshot{
 		loads:    s.selectionCurrentLoads(ctx, runtimeCandidates),
 		hasLoads: true,
@@ -109,6 +109,23 @@ func (s *Scheduler) deferredConstraintCandidates(ctx context.Context, candidates
 	return out
 }
 
+func runtimeConstraintCandidates(candidates []*ent.Account, now time.Time) []*ent.Account {
+	if len(candidates) == 0 {
+		return nil
+	}
+	out := make([]*ent.Account, 0, len(candidates))
+	for _, acc := range candidates {
+		if acc == nil {
+			continue
+		}
+		if hardAffinityBaseSchedulability(acc, now) == NotSchedulable {
+			continue
+		}
+		out = append(out, acc)
+	}
+	return out
+}
+
 func schedulableBaseCandidates(candidates []*ent.Account, now time.Time) []*ent.Account {
 	if len(candidates) == 0 {
 		return nil
@@ -172,19 +189,31 @@ func (snap *selectionSnapshot) windowCostSchedulability(accountID int) (Schedula
 	if snap == nil || !snap.hasWindowCost {
 		return Normal, false
 	}
-	return snap.windowCost[accountID], true
+	sched, ok := snap.windowCost[accountID]
+	if !ok {
+		return Normal, false
+	}
+	return sched, true
 }
 
 func (snap *selectionSnapshot) rpmSchedulability(accountID int) (Schedulability, bool) {
 	if snap == nil || !snap.hasRPM {
 		return Normal, false
 	}
-	return snap.rpm[accountID], true
+	sched, ok := snap.rpm[accountID]
+	if !ok {
+		return Normal, false
+	}
+	return sched, true
 }
 
 func (snap *selectionSnapshot) sessionSchedulability(accountID int) (Schedulability, bool) {
 	if snap == nil || !snap.hasSession {
 		return Normal, false
 	}
-	return snap.session[accountID], true
+	sched, ok := snap.session[accountID]
+	if !ok {
+		return Normal, false
+	}
+	return sched, true
 }

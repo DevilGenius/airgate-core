@@ -356,18 +356,22 @@ type schedulabilityResult struct {
 }
 
 // checkHardAffinitySchedulability 用于 previous_response_id / continuation session 这类硬亲和。
-// 它只放宽滑动窗口费用的硬上限：该容量会随时间窗口滚动自动降回阈值内。
-// 不放宽 disabled / rate_limited / family cooldown / RPM / 并发 / session 等保护。
+// 它放宽滑动窗口费用和临时冷却类限制，让原续链账号有机会由上游确认。
+// 不放宽 disabled / RPM / 并发 / session 等本地保护。
 func (s *Scheduler) checkHardAffinitySchedulability(ctx context.Context, acc *ent.Account, model string, now time.Time) Schedulability {
 	return s.checkSchedulabilityResult(ctx, acc, model, now, true, nil).hardAffinity
 }
 
 func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Account, model string, now time.Time, needHardAffinity bool, snapshot *selectionSnapshot) schedulabilityResult {
 	base := SchedulabilityOf(acc, now)
-	if base == NotSchedulable {
+	hardBase := base
+	if needHardAffinity {
+		hardBase = hardAffinityBaseSchedulability(acc, now)
+	}
+	if base == NotSchedulable && (!needHardAffinity || hardBase == NotSchedulable) {
 		return schedulabilityResult{normal: NotSchedulable, hardAffinity: NotSchedulable}
 	}
-	result := schedulabilityResult{normal: base, hardAffinity: base}
+	result := schedulabilityResult{normal: base, hardAffinity: hardBase}
 
 	// 家族级冷却：撞过这个 family 的账号在冷却期内对该 family 不可调度，
 	// 但对其它 family 仍可用。Redis 不可用时退化为不冷却，不阻断主链路。
@@ -377,15 +381,26 @@ func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Acco
 			_, inCooldown = s.familyCooldown.Until(ctx, acc.ID, family)
 		}
 		if inCooldown {
-			return schedulabilityResult{normal: NotSchedulable, hardAffinity: NotSchedulable}
+			result.normal = NotSchedulable
+			if needHardAffinity && result.hardAffinity != NotSchedulable {
+				result.hardAffinity = maxSchedulability(result.hardAffinity, StickyOnly)
+			} else {
+				result.hardAffinity = NotSchedulable
+			}
+		}
+		if result.normal == NotSchedulable && (!needHardAffinity || result.hardAffinity == NotSchedulable) {
+			return result
 		}
 	}
 
-	if sched := s.concurrencySchedulability(ctx, acc, snapshot); sched > result.normal {
+	sched := s.concurrencySchedulability(ctx, acc, snapshot)
+	if sched > result.normal {
 		result.normal = sched
+	}
+	if sched > result.hardAffinity {
 		result.hardAffinity = sched
 	}
-	if result.normal == NotSchedulable {
+	if result.normal == NotSchedulable && (!needHardAffinity || result.hardAffinity == NotSchedulable) {
 		return result
 	}
 
@@ -432,6 +447,37 @@ func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Acco
 		result.hardAffinity = sessionSched
 	}
 	return result
+}
+
+func hardAffinityBaseSchedulability(acc *ent.Account, now time.Time) Schedulability {
+	if acc == nil {
+		return NotSchedulable
+	}
+	switch acc.State {
+	case account.StateActive:
+		return Normal
+	case account.StateDisabled:
+		return NotSchedulable
+	case account.StateRateLimited:
+		if acc.StateUntil != nil && acc.StateUntil.After(now) {
+			return StickyOnly
+		}
+		return Normal
+	case account.StateDegraded:
+		if acc.StateUntil != nil && acc.StateUntil.After(now) {
+			return StickyOnly
+		}
+		return Normal
+	default:
+		return NotSchedulable
+	}
+}
+
+func maxSchedulability(a, b Schedulability) Schedulability {
+	if b > a {
+		return b
+	}
+	return a
 }
 
 // concurrencySchedulability 根据当前并发用量返回调度约束：
