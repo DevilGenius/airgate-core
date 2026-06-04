@@ -914,14 +914,15 @@ func parseOpenAIModelsResponse(body []byte) []Model {
 }
 
 // InvalidateUsageCache 清除指定平台的用量缓存（创建/删除账号后调用）。
-// platform 为空时清理所有账号用量缓存；platform 非空时同时清理该平台和 all 视图。
+// platform 为空时清理所有账号用量缓存；platform 非空时清理该平台账号 Redis key，
+// 并同时清理内存缓存中的平台视图和 all 视图。
 func (s *Service) InvalidateUsageCache(platform string) {
-	keys := usageCacheKeysForInvalidation(platform)
+	memoryKeys := usageMemoryCacheKeysForPlatform(platform)
 	s.usageMu.Lock()
 	if platform == "" {
 		s.usageCache = make(map[string]*usageCacheEntry)
 	} else {
-		for _, key := range keys {
+		for _, key := range memoryKeys {
 			delete(s.usageCache, key)
 		}
 	}
@@ -931,7 +932,7 @@ func (s *Service) InvalidateUsageCache(platform string) {
 		s.deleteAllUsageCacheKeys()
 		return
 	}
-	s.deleteUsageCacheKeys(keys)
+	s.deleteUsageCacheKeys(usageRedisCacheKeysForInvalidation(platform))
 }
 
 type accountUsageRequest struct {
@@ -1359,12 +1360,16 @@ func usageCacheAccountIDsRefreshKey(platform string, ids []int) string {
 	return usageCachePlatformKey(platform) + ":accounts:" + strings.Join(parts, ",")
 }
 
-func usageCacheKeysForInvalidation(platform string) []string {
+func usageMemoryCacheKeysForPlatform(platform string) []string {
 	key := usageCachePlatformKey(platform)
 	if key == "__all__" {
 		return []string{"__all__"}
 	}
-	return []string{key}
+	return []string{key, "__all__"}
+}
+
+func usageRedisCacheKeysForInvalidation(platform string) []string {
+	return []string{usageCachePlatformKey(platform)}
 }
 
 func (s *Service) getUsageInfoForAccount(ctx context.Context, accountID int) (AccountUsageInfo, bool) {
@@ -1534,7 +1539,7 @@ func (s *Service) getUsageMemoryCache(cacheKey string) (map[string]AccountUsageI
 func (s *Service) mergeUsageMemoryCache(platform, accountKey string, info AccountUsageInfo, now time.Time) {
 	s.usageMu.Lock()
 	defer s.usageMu.Unlock()
-	for _, raw := range usageCacheKeysForInvalidation(platform) {
+	for _, raw := range usageMemoryCacheKeysForPlatform(platform) {
 		cacheKey := usageCachePlatformKey(raw)
 		entry, ok := s.usageCache[cacheKey]
 		if !ok {

@@ -1,6 +1,7 @@
 package account
 
 import (
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -230,6 +231,10 @@ func mergeAccountUsageInfo(existing, incoming AccountUsageInfo, now time.Time) A
 // 让窗口在合并后顺序不依赖上游本次返回的顺序，避免 UI 在两次刷新之间出现 5h/7d 调换的视觉抖动。
 func sortAccountUsageWindows(windows []AccountUsageWindow) {
 	sort.SliceStable(windows, func(i, j int) bool {
+		oi, oj := usageWindowSortOrder(windows[i]), usageWindowSortOrder(windows[j])
+		if oi != oj {
+			return oi < oj
+		}
 		si, sj := slotSortRank(windows[i].Slot), slotSortRank(windows[j].Slot)
 		if si != sj {
 			return si < sj
@@ -242,6 +247,13 @@ func sortAccountUsageWindows(windows []AccountUsageWindow) {
 		}
 		return windows[i].Label < windows[j].Label
 	})
+}
+
+func usageWindowSortOrder(window AccountUsageWindow) int {
+	if window.SortOrder != 0 {
+		return window.SortOrder
+	}
+	return math.MaxInt
 }
 
 func slotSortRank(slot string) int {

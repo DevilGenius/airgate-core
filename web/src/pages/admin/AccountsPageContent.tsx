@@ -333,8 +333,6 @@ export default function AccountsPageContent() {
     () => mergeCachedUsageWindows(rawUsageData as AccountUsageData | undefined, usageWindowCacheRef.current),
     [rawUsageData],
   );
-  const usageDataRef = useRef(usageData);
-  usageDataRef.current = usageData;
 
   // 创建账号
   const createMutation = useCrudMutation({

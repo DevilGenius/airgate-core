@@ -169,6 +169,26 @@ func TestMergeAccountUsageInfoStableSortByDuration(t *testing.T) {
 	}
 }
 
+func TestMergeAccountUsageInfoStableSortUsesSortOrderFirst(t *testing.T) {
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	incoming := AccountUsageInfo{
+		Windows: []AccountUsageWindow{
+			{Key: "5h", Slot: "5h", Label: "5h", UsedPercent: 33, SortOrder: 20},
+			{Key: "monthly", Slot: "monthly", Label: "monthly", UsedPercent: 11, SortOrder: 10},
+			{Key: "7d", Slot: "7d", Label: "7d", UsedPercent: 22},
+		},
+	}
+
+	merged := mergeAccountUsageInfo(AccountUsageInfo{}, incoming, now)
+	got := []string{merged.Windows[0].Slot, merged.Windows[1].Slot, merged.Windows[2].Slot}
+	want := []string{"monthly", "5h", "7d"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("window[%d] slot = %q, want %q (full order %v)", i, got[i], want[i], got)
+		}
+	}
+}
+
 func TestMergeAccountUsageWindowCarriesMissingFieldsAndReset(t *testing.T) {
 	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
 	existing := AccountUsageWindow{
