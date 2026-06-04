@@ -37,6 +37,7 @@ $BackendDevExe = Join-Path $BackendDir "tmp\airgate-core-dev.exe"
 $FrontendOut = Join-Path $WebDir "tmp\frontend.out.log"
 $FrontendErr = Join-Path $WebDir "tmp\frontend.err.log"
 $FrontendDevPort = 80
+$LocalUnusedLintRan = $false
 
 $DeclaredPluginSpecs = @(
   [pscustomobject]@{
@@ -168,6 +169,26 @@ function Set-GoEnvVars {
   $env:GOPRIVATE = "github.com/DevilGenius/airgate-sdk"
   $env:GONOPROXY = "github.com/DevilGenius/airgate-sdk"
   $env:GONOSUMDB = "github.com/DevilGenius/airgate-sdk"
+}
+
+function Invoke-CoreUnusedLint {
+  if ($script:LocalUnusedLintRan) {
+    return
+  }
+
+  Write-Step "checking Go unused/staticcheck"
+  Assert-Command "go"
+  Push-Location $CoreRoot
+  try {
+    Set-GoEnvVars
+    & go run ./backend/cmd/local-lint -unused
+    if ($LASTEXITCODE -ne 0) {
+      throw "Command failed with exit code ${LASTEXITCODE}: go run ./backend/cmd/local-lint -unused"
+    }
+    $script:LocalUnusedLintRan = $true
+  } finally {
+    Pop-Location
+  }
 }
 
 function Assert-Command([string]$Name) {
@@ -393,6 +414,7 @@ function Build-Plugin($Plugin) {
 
 function Build-All {
   Assert-Command "pnpm"
+  Invoke-CoreUnusedLint
   Invoke-InDir $SdkTheme "pnpm build"
 
   $themeTypes = Join-Path $WebDir "node_modules\@devilgenius\airgate-theme\dist\index.d.ts"
@@ -409,6 +431,7 @@ function Build-All {
 }
 
 function Build-BackendDevBinary {
+  Invoke-CoreUnusedLint
   Write-Step "building backend dev binary"
   Push-Location $BackendDir
   try {
