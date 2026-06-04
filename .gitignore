@@ -38,6 +38,7 @@ Thumbs.db
 
 # Runtime
 .dev/
+.tools/
 backend/config.yaml
 backend/config.docker.yaml
 web/tmp/

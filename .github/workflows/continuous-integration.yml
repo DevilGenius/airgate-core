@@ -35,8 +35,5 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-
       - name: Run CI checks
         run: make ci

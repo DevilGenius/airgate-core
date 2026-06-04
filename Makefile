@@ -26,6 +26,15 @@ STUDIO_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-studio/assets
 BINARY := $(BACKEND_DIR)/server
 WEBDIST := $(BACKEND_DIR)/internal/web/webdist
 GO := GOTOOLCHAIN=local go
+GOLANGCI_LINT_VERSION := v2.12.2
+TOOLS_DIR := $(CURDIR)/.tools
+TOOLS_BIN := $(TOOLS_DIR)/bin
+ifeq ($(OS),Windows_NT)
+GOLANGCI_LINT_EXE := golangci-lint.exe
+else
+GOLANGCI_LINT_EXE := golangci-lint
+endif
+GOLANGCI_LINT := $(TOOLS_BIN)/$(GOLANGCI_LINT_EXE)
 
 # 版本号：默认从 git 派生（dirty 检测），release workflow 通过 -ldflags 注入。
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -34,7 +43,7 @@ LDFLAGS := -X github.com/DevilGenius/airgate-core/internal/version.Version=$(VER
 .PHONY: help dev dev-backend dev-frontend dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-playground dev-plugin-epay dev-plugin-health dev-plugin-kiro dev-plugin-studio \
         build build-backend build-frontend \
         build-plugins sync-plugins \
-        ent lint fmt test clean install ci pre-commit setup-hooks \
+        ent lint lint-unused lint-tools fmt test clean install ci pre-commit setup-hooks \
         docker-build docker-rebuild docker-up docker-down docker-restart docker-dev
 
 help: ## 显示帮助信息
@@ -253,15 +262,19 @@ ent: ## 生成 Ent ORM 代码
 
 # ===================== 质量检查 =====================
 
-lint: ## 代码检查（需要安装 golangci-lint）
-	@if ! command -v golangci-lint > /dev/null 2>&1; then \
-		echo "错误: 未安装 golangci-lint，请执行: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"; \
-		exit 1; \
-	fi
-	@cd $(BACKEND_DIR) && golangci-lint run ./...
+lint-tools: ## 安装本地 lint 工具（版本与 CI 固定一致）
+	@mkdir -p $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+lint: lint-tools ## 代码检查
+	@cd $(BACKEND_DIR) && $(GOLANGCI_LINT) run ./...
 	@cd $(WEB_DIR) && pnpm exec tsc -b --noEmit
 	@cd $(WEB_DIR) && pnpm lint
 	@echo "代码检查通过"
+
+lint-unused: lint-tools ## 仅检查 Go 未使用代码和 staticcheck
+	@cd $(BACKEND_DIR) && $(GOLANGCI_LINT) run --enable-only=unused,staticcheck ./...
+	@echo "Go unused/staticcheck 检查通过"
 
 fmt: ## 格式化代码
 	@cd $(BACKEND_DIR) && \
