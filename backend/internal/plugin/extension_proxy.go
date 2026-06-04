@@ -42,6 +42,7 @@ var blockedResponseHeaders = map[string]bool{
 	"nel":                                 true,
 	"server":                              true,
 	"x-powered-by":                        true,
+	"x-airgate-image-retry-used":          true,
 }
 
 // ExtensionProxy 将 HTTP 请求代理到 extension 类型插件

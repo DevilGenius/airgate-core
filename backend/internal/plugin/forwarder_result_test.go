@@ -144,6 +144,33 @@ func TestWriteClientErrorResponse_PassesThroughUpstreamBody(t *testing.T) {
 	}
 }
 
+func TestWriteClientErrorResponse_FiltersInternalImageRetryHeader(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+
+	writeClientErrorResponse(c, sdk.ForwardOutcome{
+		Kind: sdk.OutcomeClientError,
+		Upstream: sdk.UpstreamResponse{
+			StatusCode: http.StatusBadRequest,
+			Headers: http.Header{
+				"Content-Type":        []string{"application/json"},
+				imageRetryUsedHeader:  []string{"true"},
+				"X-Upstream-Debug-OK": []string{"kept"},
+			},
+			Body: []byte(`{"error":{"message":"bad image request"}}`),
+		},
+	})
+
+	if got := recorder.Header().Get(imageRetryUsedHeader); got != "" {
+		t.Fatalf("%s = %q, want empty", imageRetryUsedHeader, got)
+	}
+	if got := recorder.Header().Get("X-Upstream-Debug-OK"); got != "kept" {
+		t.Fatalf("X-Upstream-Debug-OK = %q, want kept", got)
+	}
+}
+
 func TestWriteFailureResponse_NonStreamAlwaysWrites(t *testing.T) {
 	t.Parallel()
 
