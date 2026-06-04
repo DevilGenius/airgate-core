@@ -328,7 +328,7 @@
     "select_platform": "Select platform",
     "credentials": "Account Details",
     "priority": "Priority",
-    "priority_hint": "Priority (0-999, higher = preferred)",
+    "priority_hint": "Priority (-999 to 999, higher = preferred; negative values are fallback-only)",
     "concurrency": "Concurrency",
     "rate_multiplier": "Rate Multiplier",
     "upstream_is_pool": "Pool mode",

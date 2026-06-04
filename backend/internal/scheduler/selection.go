@@ -115,12 +115,13 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		return nil, ErrContinuationAffinityMissing
 	}
 
-	if len(normalCandidates) == 0 {
+	normalSelectionCandidates, stickySelectionCandidates := prioritySelectionCandidates(normalCandidates, stickyCandidates)
+	if len(normalSelectionCandidates) == 0 {
 		// 没有 Normal 但可能有 StickyOnly 兜底（如 degraded 账号）
-		if len(stickyCandidates) == 0 {
+		if len(stickySelectionCandidates) == 0 {
 			return nil, ErrNoAvailableAccount
 		}
-		selected := s.selectByLoadBalance(ctx, stickyCandidates, now, snapshot)
+		selected := s.selectByLoadBalance(ctx, stickySelectionCandidates, now, snapshot)
 		if selected == nil {
 			return nil, ErrNoAvailableAccount
 		}
@@ -129,14 +130,14 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 			sdk.LogFieldPlatform, platform,
 			sdk.LogFieldModel, model,
 		)
-		return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, stickyCandidates, now, snapshot)
+		return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, stickySelectionCandidates, now, snapshot)
 	}
 
-	selected := s.selectByLoadBalance(ctx, normalCandidates, now, snapshot)
+	selected := s.selectByLoadBalance(ctx, normalSelectionCandidates, now, snapshot)
 	if selected == nil {
 		return nil, ErrNoAvailableAccount
 	}
-	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalCandidates, now, snapshot)
+	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalSelectionCandidates, now, snapshot)
 }
 
 func continuationBlockedError(candidates []*ent.Account, accountID int) error {
@@ -159,10 +160,33 @@ func findAccountByID(candidates []*ent.Account, accountID int) *ent.Account {
 }
 
 func softStickyCandidates(normalCandidates, stickyCandidates []*ent.Account) []*ent.Account {
-	if len(normalCandidates) > 0 {
-		return normalCandidates
+	normalPool, stickyPool := prioritySelectionCandidates(normalCandidates, stickyCandidates)
+	if len(normalPool) > 0 {
+		return normalPool
 	}
-	return stickyCandidates
+	return stickyPool
+}
+
+func prioritySelectionCandidates(normalCandidates, stickyCandidates []*ent.Account) ([]*ent.Account, []*ent.Account) {
+	normalNonNegative := filterPriorityCandidates(normalCandidates, false)
+	stickyNonNegative := filterPriorityCandidates(stickyCandidates, false)
+	if len(normalNonNegative) > 0 || len(stickyNonNegative) > 0 {
+		return normalNonNegative, stickyNonNegative
+	}
+	return filterPriorityCandidates(normalCandidates, true), filterPriorityCandidates(stickyCandidates, true)
+}
+
+func filterPriorityCandidates(candidates []*ent.Account, negative bool) []*ent.Account {
+	filtered := make([]*ent.Account, 0, len(candidates))
+	for _, acc := range candidates {
+		if acc == nil {
+			continue
+		}
+		if (acc.Priority < 0) == negative {
+			filtered = append(filtered, acc)
+		}
+	}
+	return filtered
 }
 
 func selectSoftStickyAccount(candidates []*ent.Account, accountID int) *ent.Account {
@@ -436,6 +460,7 @@ func (s *Scheduler) concurrencySchedulability(ctx context.Context, acc *ent.Acco
 // 同层内按 (1-load)*100 + lru_score 打分做加权随机。
 //
 // 低优先级账号只有在高优先级全部被 checkSchedulability 过滤掉后才能被选中。
+// 负优先级沿用同一规则：只要有 >=0 的可调度账号，就不会进入负优先级兜底层。
 // 同层内从 top-N 随机选一个，避免高并发下全部命中同一账号。
 func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.Account, now time.Time, snapshot *selectionSnapshot) *ent.Account {
 	if len(candidates) == 0 {

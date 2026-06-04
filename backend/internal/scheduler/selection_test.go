@@ -59,6 +59,117 @@ func TestSoftStickyPrefersNormalPriorityPool(t *testing.T) {
 	}
 }
 
+func TestSoftStickyKeepsNegativeFallbackBehindNonNegativeStickyOnly(t *testing.T) {
+	t.Parallel()
+
+	normalCandidates := []*ent.Account{{ID: 1, Priority: -1}}
+	stickyCandidates := []*ent.Account{
+		{ID: 1, Priority: -1},
+		{ID: 2, Priority: 0},
+	}
+
+	pool := softStickyCandidates(normalCandidates, stickyCandidates)
+	if got := selectSoftStickyAccount(pool, 1); got != nil {
+		t.Fatalf("negative fallback sticky account selected while non-negative StickyOnly exists: %+v", got)
+	}
+	if got := selectSoftStickyAccount(pool, 2); got == nil || got.ID != 2 {
+		t.Fatalf("non-negative StickyOnly sticky account = %+v, want account 2", got)
+	}
+}
+
+func TestSelectByLoadBalanceUsesNegativePriorityAsFallback(t *testing.T) {
+	t.Parallel()
+
+	s := newSelectionTestScheduler(Normal)
+	now := time.Now()
+
+	selected := s.selectByLoadBalance(context.Background(), []*ent.Account{
+		{ID: 1, Priority: -1},
+		{ID: 2, Priority: 0},
+		{ID: 3, Priority: -2},
+	}, now, nil)
+	if selected == nil || selected.ID != 2 {
+		t.Fatalf("selected account = %+v, want priority 0 account", selected)
+	}
+
+	selected = s.selectByLoadBalance(context.Background(), []*ent.Account{
+		{ID: 1, Priority: -2},
+		{ID: 2, Priority: -1},
+	}, now, nil)
+	if selected == nil || selected.ID != 2 {
+		t.Fatalf("selected account = %+v, want priority -1 account", selected)
+	}
+}
+
+func TestSelectAccountKeepsNegativeFallbackBehindNonNegativeStickyOnly(t *testing.T) {
+	ctx := context.Background()
+	s := newSelectionTestScheduler(Normal)
+	groupID := 7
+	primary := newSelectionTestAccount(10)
+	primary.Priority = 0
+	primary.MaxConcurrency = 10
+	fallback := newSelectionTestAccount(20)
+	fallback.Priority = -1
+	fallback.MaxConcurrency = 10
+	s.routeCache.Set(groupID, "openai", []*ent.Account{fallback, primary}, nil)
+
+	s.currentLoad = func(_ context.Context, accountID int) int {
+		if accountID == primary.ID {
+			return 8
+		}
+		return 0
+	}
+	selected, err := s.SelectAccount(ctx, "openai", "gpt-4.1", 1, groupID, "")
+	if err != nil {
+		t.Fatalf("SelectAccount() with StickyOnly primary returned error: %v", err)
+	}
+	if selected.ID != primary.ID {
+		t.Fatalf("selected account ID = %d, want StickyOnly non-negative account %d", selected.ID, primary.ID)
+	}
+
+	s.currentLoad = func(_ context.Context, accountID int) int {
+		if accountID == primary.ID {
+			return 10
+		}
+		return 0
+	}
+	selected, err = s.SelectAccount(ctx, "openai", "gpt-4.1", 1, groupID, "")
+	if err != nil {
+		t.Fatalf("SelectAccount() with full primary returned error: %v", err)
+	}
+	if selected.ID != fallback.ID {
+		t.Fatalf("selected account ID = %d, want negative fallback account %d", selected.ID, fallback.ID)
+	}
+}
+
+func TestSelectAccountRoutesNegativePriorityOnlyAfterNonNegativeUnavailable(t *testing.T) {
+	ctx := context.Background()
+	s := newSelectionTestScheduler(Normal)
+	groupID := 7
+	primary := newSelectionTestAccount(10)
+	primary.Priority = 0
+	fallback := newSelectionTestAccount(20)
+	fallback.Priority = -1
+	s.routeCache.Set(groupID, "openai", []*ent.Account{fallback, primary}, nil)
+
+	selected, err := s.SelectAccount(ctx, "openai", "gpt-4.1", 1, groupID, "")
+	if err != nil {
+		t.Fatalf("SelectAccount() returned error: %v", err)
+	}
+	if selected.ID != primary.ID {
+		t.Fatalf("selected account ID = %d, want non-negative account %d", selected.ID, primary.ID)
+	}
+
+	primary.State = account.StateDisabled
+	selected, err = s.SelectAccount(ctx, "openai", "gpt-4.1", 1, groupID, "")
+	if err != nil {
+		t.Fatalf("SelectAccount() with disabled primary returned error: %v", err)
+	}
+	if selected.ID != fallback.ID {
+		t.Fatalf("selected account ID = %d, want negative fallback account %d", selected.ID, fallback.ID)
+	}
+}
+
 func TestContinuationBlockedErrorDistinguishesCapacityFromMissingAffinity(t *testing.T) {
 	t.Parallel()
 

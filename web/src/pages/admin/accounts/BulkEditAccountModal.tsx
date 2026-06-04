@@ -20,7 +20,13 @@ import { GroupCheckboxList } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { BulkUpdateAccountsReq } from '../../../shared/types';
-import { DEFAULT_ACCOUNT_MAX_CONCURRENCY } from './accountDefaults';
+import {
+  clampAccountPriority,
+  ACCOUNT_PRIORITY_MAX,
+  ACCOUNT_PRIORITY_MIN,
+  DEFAULT_ACCOUNT_MAX_CONCURRENCY,
+  DEFAULT_ACCOUNT_PRIORITY,
+} from './accountDefaults';
 
 /**
  * 批量编辑弹窗：每个字段前有「启用」开关，只有启用的字段会进入 patch。
@@ -51,7 +57,7 @@ export function BulkEditAccountModal({
 
   // 字段值
   const [status, setStatus] = useState<'active' | 'disabled'>('active');
-  const [priority, setPriority] = useState(50);
+  const [priority, setPriority] = useState(DEFAULT_ACCOUNT_PRIORITY);
   const [maxConcurrency, setMaxConcurrency] = useState(DEFAULT_ACCOUNT_MAX_CONCURRENCY);
   const [rateMultiplier, setRateMultiplier] = useState(1);
   const [groupIds, setGroupIds] = useState<number[]>([]);
@@ -157,14 +163,14 @@ export function BulkEditAccountModal({
               <Input
                 className="pl-9"
                 type="number"
-                min={0}
-                max={999}
+                min={ACCOUNT_PRIORITY_MIN}
+                max={ACCOUNT_PRIORITY_MAX}
                 step={1}
                 value={String(priority)}
                 disabled={!enablePriority}
                 onChange={(e) => {
                   const v = Math.round(Number(e.target.value));
-                  setPriority(Math.max(0, Math.min(999, v)));
+                  setPriority(clampAccountPriority(v));
                 }}
               />
             </div>

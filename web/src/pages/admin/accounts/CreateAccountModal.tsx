@@ -24,7 +24,13 @@ import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { CreateAccountReq, AccountExportItem } from '../../../shared/types';
-import { DEFAULT_ACCOUNT_MAX_CONCURRENCY } from './accountDefaults';
+import {
+  clampAccountPriority,
+  ACCOUNT_PRIORITY_MAX,
+  ACCOUNT_PRIORITY_MIN,
+  DEFAULT_ACCOUNT_MAX_CONCURRENCY,
+  DEFAULT_ACCOUNT_PRIORITY,
+} from './accountDefaults';
 
 const CREATE_ACCOUNT_FORM_ID = 'create-account-form';
 
@@ -49,7 +55,7 @@ export function CreateAccountModal({
   const [accountType, setAccountType] = useState('');
   const [form, setForm] = useState<Omit<CreateAccountReq, 'platform' | 'credentials' | 'type'>>({
     name: '',
-    priority: 50,
+    priority: DEFAULT_ACCOUNT_PRIORITY,
     max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY,
     rate_multiplier: 1,
   });
@@ -92,7 +98,7 @@ export function CreateAccountModal({
     if (open) return;
     setPlatform('');
     setAccountType('');
-    setForm({ name: '', priority: 50, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
+    setForm({ name: '', priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
     setCredentials({});
     setGroupIds([]);
     setBatchMode(false);
@@ -122,7 +128,7 @@ export function CreateAccountModal({
       platform,
       type: a.type || 'oauth',
       credentials: a.credentials,
-      priority: form.priority ?? 50,
+      priority: form.priority ?? DEFAULT_ACCOUNT_PRIORITY,
       max_concurrency: form.max_concurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY,
       rate_multiplier: form.rate_multiplier ?? 1,
       group_ids: groupIds.length ? groupIds : undefined,
@@ -152,7 +158,7 @@ export function CreateAccountModal({
   const handleClose = () => {
     setPlatform('');
     setAccountType('');
-    setForm({ name: '', priority: 50, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
+    setForm({ name: '', priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
     setCredentials({});
     setGroupIds([]);
     setBatchMode(false);
@@ -297,13 +303,13 @@ export function CreateAccountModal({
                         <Input
                           className="pl-9"
                           type="number"
-                          min={0}
-                          max={999}
+                          min={ACCOUNT_PRIORITY_MIN}
+                          max={ACCOUNT_PRIORITY_MAX}
                           step={1}
-                          value={String(form.priority ?? 50)}
+                          value={String(form.priority ?? DEFAULT_ACCOUNT_PRIORITY)}
                           onChange={(e) => {
                             const v = Math.round(Number(e.target.value));
-                            setForm({ ...form, priority: Math.max(0, Math.min(999, v)) });
+                            setForm({ ...form, priority: clampAccountPriority(v) });
                           }}
                         />
                       </div>

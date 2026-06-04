@@ -32,7 +32,7 @@ func (Account) Fields() []ent.Field {
 		field.Time("state_until").Optional().Nillable().
 			Comment("state 的到期时间：rate_limited / degraded 到期自动恢复 active；disabled 无到期"),
 
-		field.Int("priority").Default(50).Min(0).Max(999),
+		field.Int("priority").Default(50).Min(-999).Max(999),
 		field.Int("max_concurrency").Default(10),
 		field.Float("rate_multiplier").Default(1.0),
 		field.String("error_msg").Default("").

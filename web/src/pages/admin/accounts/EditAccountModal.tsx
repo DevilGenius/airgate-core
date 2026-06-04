@@ -31,7 +31,13 @@ import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { AccountResp, UpdateAccountReq } from '../../../shared/types';
-import { DEFAULT_ACCOUNT_MAX_CONCURRENCY } from './accountDefaults';
+import {
+  clampAccountPriority,
+  ACCOUNT_PRIORITY_MAX,
+  ACCOUNT_PRIORITY_MIN,
+  DEFAULT_ACCOUNT_MAX_CONCURRENCY,
+  DEFAULT_ACCOUNT_PRIORITY,
+} from './accountDefaults';
 
 export function EditAccountModal({
   open,
@@ -256,15 +262,15 @@ export function EditAccountModal({
                         <Input
                           className="pl-9"
                           type="number"
-                          min={0}
-                          max={999}
+                          min={ACCOUNT_PRIORITY_MIN}
+                          max={ACCOUNT_PRIORITY_MAX}
                           step={1}
-                          value={String(form.priority ?? 50)}
+                          value={String(form.priority ?? DEFAULT_ACCOUNT_PRIORITY)}
                           onChange={(event) => {
                             const value = Math.round(Number(event.target.value));
                             setForm({
                               ...form,
-                              priority: Math.max(0, Math.min(999, value)),
+                              priority: clampAccountPriority(value),
                             });
                           }}
                         />
