@@ -810,7 +810,7 @@ func TestGetAccountUsage_NoCacheReturnsSeededStatsWhileRefreshing(t *testing.T) 
 	svc := NewService(repo, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 
-	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai", []int{55})
+	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai", []int{55}, false)
 	if err != nil {
 		t.Fatalf("GetAccountUsage returned error: %v", err)
 	}
@@ -855,7 +855,7 @@ func TestGetAccountUsage_ExpiredMemoryCacheReturnsStaleWindowsAndRefreshes(t *te
 		},
 	}, now.Add(-time.Second))
 
-	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai", []int{42})
+	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai", []int{42}, false)
 	if err != nil {
 		t.Fatalf("GetAccountUsage returned error: %v", err)
 	}
@@ -869,6 +869,37 @@ func TestGetAccountUsage_ExpiredMemoryCacheReturnsStaleWindowsAndRefreshes(t *te
 	}
 	if got := windows[0].(map[string]any)["used_percent"]; got != float64(27) {
 		t.Fatalf("used_percent = %v, want 27", got)
+	}
+}
+
+func TestGetAccountUsage_EmptyMemoryCacheRefreshes(t *testing.T) {
+	now := time.Date(2026, 4, 14, 15, 30, 0, 0, time.Local)
+	repo := &windowStatsStub{
+		stubRepository: stubRepository{
+			listAll: func(_ context.Context, filter ListFilter) ([]Account, error) {
+				if len(filter.IDs) != 1 || filter.IDs[0] != 77 {
+					t.Fatalf("IDs = %v, want [77]", filter.IDs)
+				}
+				return []Account{{ID: 77, Platform: "openai", Type: "oauth"}}, nil
+			},
+		},
+		byStart: map[int64]map[int]AccountWindowStats{},
+	}
+	svc := NewService(repo, nil, nil, nil)
+	svc.now = func() time.Time { return now }
+	svc.setUsageMemoryCache("openai", map[string]AccountUsageInfo{
+		"77": {},
+	}, now.Add(time.Hour))
+
+	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai", []int{77}, false)
+	if err != nil {
+		t.Fatalf("GetAccountUsage returned error: %v", err)
+	}
+	if !refreshing {
+		t.Fatalf("expected empty cache to report refreshing")
+	}
+	if _, ok := usage["77"].(map[string]any); !ok {
+		t.Fatalf("expected seeded account 77, got %#v", usage["77"])
 	}
 }
 

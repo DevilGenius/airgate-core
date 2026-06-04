@@ -42,10 +42,11 @@ export const accountsApi = {
   // 测试连接 URL（SSE 流式，前端用 fetch 消费）
   testUrl: (id: number) => `/api/v1/admin/accounts/${id}/test`,
   // 获取当前页账号的用量窗口（core 规范化插件返回契约后输出）
-  usage: (platform: string, ids: number[]) =>
+  usage: (platform: string, ids: number[], options?: { refresh?: boolean }) =>
     get<{ accounts: Record<string, any>; refreshing?: boolean }>('/api/v1/admin/accounts/usage', {
       platform: platform || undefined,
       ids: ids.join(','),
+      refresh: options?.refresh ? 'true' : undefined,
     }),
   // 获取当前页账号并发容量。只返回 Redis 运行态 current_concurrency。
   capacity: (ids: number[]) =>

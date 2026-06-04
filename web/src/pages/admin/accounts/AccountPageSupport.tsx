@@ -98,6 +98,50 @@ function getUsageWindowUsedPercent(value: unknown) {
   return undefined;
 }
 
+function normalizeUsageWindowSortToken(value?: string) {
+  return value?.trim().toLowerCase().replace(/_/g, '-') || '';
+}
+
+function usageWindowSlotSortRank(window: AccountUsageWindow) {
+  switch (normalizeUsageWindowSortToken(window.slot)) {
+    case '5h':
+      return 0;
+    case '7d':
+      return 1;
+    case 'monthly':
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+function usageWindowSortOrder(window: AccountUsageWindow) {
+  const value = Number(window.sort_order);
+  return Number.isFinite(value) && value !== 0 ? value : Number.MAX_SAFE_INTEGER;
+}
+
+function sortUsageWindows(windows: AccountUsageWindow[]) {
+  return [...windows].sort((left, right) => {
+    const leftOrder = usageWindowSortOrder(left);
+    const rightOrder = usageWindowSortOrder(right);
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+
+    const leftSlot = usageWindowSlotSortRank(left);
+    const rightSlot = usageWindowSlotSortRank(right);
+    if (leftSlot !== rightSlot) return leftSlot - rightSlot;
+
+    const leftGroup = left.group || '';
+    const rightGroup = right.group || '';
+    if (leftGroup !== rightGroup) return leftGroup.localeCompare(rightGroup);
+
+    const leftKey = left.key || '';
+    const rightKey = right.key || '';
+    if (leftKey !== rightKey) return leftKey.localeCompare(rightKey);
+
+    return (left.label || '').localeCompare(right.label || '');
+  });
+}
+
 function windowWithCachedReset(window: AccountUsageWindow, resetAtMs: number, now: number): AccountUsageWindow {
   if (resetAtMs <= now) {
     return {
@@ -155,9 +199,32 @@ export function mergeCachedUsageWindows(data: AccountUsageData | undefined, cach
       mergedWindows.push(nextWindow);
     }
 
+    if (data.refreshing) {
+      for (const [cacheKey, cached] of cache.entries()) {
+        if (!cacheKey.startsWith(`${accountId}:`) || liveCacheKeys.has(cacheKey)) {
+          continue;
+        }
+        if (cached.resetAtMs > 0 && cached.resetAtMs <= now) {
+          continue;
+        }
+        const nextWindow = cached.resetAtMs > now
+          ? windowWithCachedReset(cached.window, cached.resetAtMs, now)
+          : {
+              ...cached.window,
+              used_percent: cached.usedPercent,
+            };
+        cache.set(cacheKey, {
+          ...cached,
+          window: nextWindow,
+        });
+        liveCacheKeys.add(cacheKey);
+        mergedWindows.push(nextWindow);
+      }
+    }
+
     accounts[accountId] = {
       ...usage,
-      windows: mergedWindows,
+      windows: sortUsageWindows(mergedWindows),
     };
   }
 

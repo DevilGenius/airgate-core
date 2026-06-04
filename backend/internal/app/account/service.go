@@ -943,7 +943,7 @@ type accountUsageRequest struct {
 //
 // 账号页必须传入当前页 ids；这里不再按平台全量扫描账号。读取路径只批量取这些
 // ids 的 Redis usage/today 统计，缓存缺失时后台批量刷新缺失账号。
-func (s *Service) GetAccountUsage(ctx context.Context, platform string, accountIDs []int) (map[string]any, bool, error) {
+func (s *Service) GetAccountUsage(ctx context.Context, platform string, accountIDs []int, refresh bool) (map[string]any, bool, error) {
 	accountIDs = normalizeAccountIDs(accountIDs)
 	if len(accountIDs) == 0 {
 		return map[string]any{}, false, nil
@@ -971,10 +971,19 @@ func (s *Service) GetAccountUsage(ctx context.Context, platform string, accountI
 	}
 
 	s.enrichTodayStats(ctx, result)
-	refreshKey := usageCacheAccountsRefreshKey(platform, missingAccounts)
-	refreshing := len(missingAccounts) > 0 || (refreshKey != "" && s.isUsageRefreshRunning(refreshKey))
-	if len(missingAccounts) > 0 {
-		s.ensureUsageCacheRefreshForAccounts(platform, missingAccounts)
+	missingRefreshKey := usageCacheAccountsRefreshKey(platform, missingAccounts)
+	pageRefreshAccounts := filterRefreshableUsageAccounts(accounts)
+	pageRefreshKey := usageCacheAccountsRefreshKey(platform, pageRefreshAccounts)
+	missingRefreshRunning := missingRefreshKey != "" && s.isUsageRefreshRunning(missingRefreshKey)
+	pageRefreshRunning := pageRefreshKey != "" && s.isUsageRefreshRunning(pageRefreshKey)
+	refreshAccounts := missingAccounts
+	if refresh {
+		refreshAccounts = pageRefreshAccounts
+	}
+	refreshing := len(missingAccounts) > 0 || missingRefreshRunning || pageRefreshRunning
+	if len(refreshAccounts) > 0 && (refresh || !pageRefreshRunning) {
+		s.ensureUsageCacheRefreshForAccounts(platform, refreshAccounts)
+		refreshing = true
 	}
 	return result, refreshing, nil
 }
@@ -1253,6 +1262,10 @@ func (s *Service) writeUsageInfoCache(ctx context.Context, accountID int, info A
 	if s.usageRedis == nil {
 		return
 	}
+	if !accountUsageInfoHasData(info) {
+		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
+		return
+	}
 	expiresAt := accountUsageInfoExpiresAt(info, now)
 	ttl := expiresAt.Sub(now)
 	if ttl < usageCacheMinimumTTL {
@@ -1275,6 +1288,10 @@ func cloneAccountUsageInfoMap(src map[string]AccountUsageInfo) map[string]Accoun
 		dst[key] = value
 	}
 	return dst
+}
+
+func accountUsageInfoHasData(info AccountUsageInfo) bool {
+	return len(info.Windows) > 0 || info.Credits != nil
 }
 
 func usageCachePlatformKey(platform string) string {
@@ -1372,6 +1389,10 @@ func (s *Service) getUsageInfoForAccount(ctx context.Context, accountID int) (Ac
 		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
 		return AccountUsageInfo{}, false
 	}
+	if !accountUsageInfoHasData(payload.Info) {
+		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
+		return AccountUsageInfo{}, false
+	}
 	return payload.Info, true
 }
 
@@ -1389,6 +1410,10 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 					if item.Type != "apikey" {
 						missingAccounts = append(missingAccounts, item)
 					}
+					continue
+				}
+				if !accountUsageInfoHasData(info) && item.Type != "apikey" {
+					missingAccounts = append(missingAccounts, item)
 					continue
 				}
 				result[item.ID] = info
@@ -1427,6 +1452,11 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 			}
 			continue
 		}
+		if !accountUsageInfoHasData(payload.Info) && item.Type != "apikey" {
+			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
+			missingAccounts = append(missingAccounts, item)
+			continue
+		}
 		expiresAt := payload.cacheExpiresAt(s.now())
 		if !expiresAt.After(s.now()) {
 			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
@@ -1453,6 +1483,9 @@ func (s *Service) setUsageCache(ctx context.Context, cacheKey string, accounts m
 		accountID, err := strconv.Atoi(key)
 		if err != nil || accountID <= 0 {
 			continue
+		}
+		if existing, ok := s.getUsageInfoForAccount(ctx, accountID); ok {
+			info = mergeAccountUsageInfo(existing, info, now)
 		}
 		s.writeUsageInfoCache(ctx, accountID, info, now)
 	}

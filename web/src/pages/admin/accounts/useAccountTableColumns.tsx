@@ -1,4 +1,4 @@
-import { useMemo, useRef, type CSSProperties, type MouseEvent } from 'react';
+import { useMemo, type CSSProperties, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
@@ -62,8 +62,6 @@ export function useAccountTableColumns({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const usageDataRef = useRef(usageData);
-  usageDataRef.current = usageData;
   const resetNow = useUsageResetClock(Boolean(usageData?.accounts));
 
   const accountActionLabels = useMemo(() => ({
@@ -222,7 +220,7 @@ export function useAccountTableColumns({
       maxWidth: '396px',
       align: 'center',
       render: (row: AccountResp) => {
-        const usage = usageDataRef.current?.accounts?.[String(row.id)];
+        const usage = usageData?.accounts?.[String(row.id)];
 
         const handleRefreshClick = async (event: MouseEvent<HTMLElement>) => {
           event.stopPropagation();

@@ -68,6 +68,7 @@ import {
 const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.auto_refresh';
 const ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.capacity_auto_refresh';
 const ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS = 0.5;
+const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 
 if (typeof window !== 'undefined') {
@@ -208,12 +209,9 @@ export default function AccountsPageContent() {
     () => queryKeys.accounts(page, pageSize, debouncedKeyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter),
     [debouncedKeyword, groupFilter, page, pageSize, platformFilter, proxyFilter, stateFilter, typeFilter],
   );
-  const refreshAccounts = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: accountListQueryKey }, { cancelRefetch: false });
-  }, [accountListQueryKey, queryClient]);
 
   // 查询账号列表
-  const { data, isLoading, isFetching: isAccountsFetching } = useQuery({
+  const { data, isLoading, isFetching: isAccountsFetching, refetch: refetchAccounts } = useQuery({
     queryKey: accountListQueryKey,
     queryFn: () =>
       accountsApi.list({
@@ -230,6 +228,9 @@ export default function AccountsPageContent() {
     meta: { globalLoading: false },
     placeholderData: keepPreviousData,
   });
+  const refreshAccounts = useCallback(() => {
+    void refetchAccounts({ cancelRefetch: false });
+  }, [refetchAccounts]);
   const rows = data?.list ?? [];
   const visibleAccountIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const visibleAccountIdsKey = useMemo(() => visibleAccountIds.join(','), [visibleAccountIds]);
@@ -300,21 +301,33 @@ export default function AccountsPageContent() {
     () => queryKeys.accountUsage(platformFilter, visibleAccountIdsKey),
     [platformFilter, visibleAccountIdsKey],
   );
-  const { data: rawUsageData, isFetching: isUsageFetching } = useQuery({
+  const forceUsageRefreshRef = useRef(false);
+  const { data: rawUsageData, isFetching: isUsageFetching, refetch: refetchAccountUsage } = useQuery({
     queryKey: accountUsageQueryKey,
-    queryFn: () => accountsApi.usage(platformFilter || '', visibleAccountIds),
+    queryFn: () => {
+      const forceRefresh = forceUsageRefreshRef.current;
+      forceUsageRefreshRef.current = false;
+      return accountsApi.usage(platformFilter || '', visibleAccountIds, { refresh: forceRefresh });
+    },
     enabled: visibleAccountIds.length > 0,
     meta: { globalLoading: false },
-    refetchInterval: false,
+    refetchInterval: (query) => (
+      query.state.data?.refreshing ? ACCOUNT_USAGE_REFRESHING_POLL_MS : false
+    ),
     refetchIntervalInBackground: false,
   });
-  const refreshAccountUsage = useCallback(() => {
+  const refreshAccountUsage = useCallback((options?: { refresh?: boolean }) => {
     if (visibleAccountIdsRef.current.length === 0) return;
-    queryClient.invalidateQueries({ queryKey: accountUsageQueryKey }, { cancelRefetch: false });
-  }, [accountUsageQueryKey, queryClient]);
+    forceUsageRefreshRef.current = Boolean(options?.refresh);
+    void refetchAccountUsage({ cancelRefetch: true }).finally(() => {
+      if (options?.refresh) {
+        forceUsageRefreshRef.current = false;
+      }
+    });
+  }, [refetchAccountUsage]);
   const refreshAccountOverview = useCallback(() => {
     refreshAccounts();
-    refreshAccountUsage();
+    refreshAccountUsage({ refresh: true });
   }, [refreshAccountUsage, refreshAccounts]);
   const usageData = useMemo(
     () => mergeCachedUsageWindows(rawUsageData as AccountUsageData | undefined, usageWindowCacheRef.current),

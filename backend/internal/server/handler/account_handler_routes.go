@@ -484,7 +484,7 @@ func (h *AccountHandler) GetAccountModels(c *gin.Context) {
 
 // GetAccountUsage 获取账号额度信息。
 func (h *AccountHandler) GetAccountUsage(c *gin.Context) {
-	usage, refreshing, err := h.service.GetAccountUsage(c.Request.Context(), c.Query("platform"), parseIDList(c.Query("ids")))
+	usage, refreshing, err := h.service.GetAccountUsage(c.Request.Context(), c.Query("platform"), parseIDList(c.Query("ids")), parseOptionalBool(c.Query("refresh")))
 	if err != nil {
 		httpCode, message := h.handleError("查询账号额度失败", "查询失败", err)
 		response.Error(c, httpCode, httpCode, message)
