@@ -227,9 +227,31 @@ func TestSelectAccountHardPreviousResponseAllowsWindowCostOverflow(t *testing.T)
 	}
 }
 
-func TestSelectAccountHardPreviousResponseAllowsTemporaryCooldownProbe(t *testing.T) {
+func TestSelectAccountHardPreviousResponseAllowsDegradedProbe(t *testing.T) {
 	ctx := context.Background()
+	s := newSelectionTestScheduler(Normal)
+	groupID := 7
+	acc := newSelectionTestAccount(10)
+	until := time.Now().Add(time.Minute)
+	acc.State = account.StateDegraded
+	acc.StateUntil = &until
+	s.routeCache.Set(groupID, "openai", []*ent.Account{acc}, nil)
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_probe", acc.ID)
 
+	selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+		PreviousResponseID:          "resp_probe",
+		RequireContinuationAffinity: true,
+	})
+	if err != nil {
+		t.Fatalf("SelectAccountWithOptions() returned error: %v", err)
+	}
+	if selected.ID != acc.ID {
+		t.Fatalf("selected account ID = %d, want %d", selected.ID, acc.ID)
+	}
+}
+
+func TestSelectAccountHardPreviousResponseBlocksKnownCooldown(t *testing.T) {
+	ctx := context.Background()
 	tests := []struct {
 		name      string
 		configure func(s *Scheduler, acc *ent.Account)
@@ -258,17 +280,14 @@ func TestSelectAccountHardPreviousResponseAllowsTemporaryCooldownProbe(t *testin
 			acc := newSelectionTestAccount(10)
 			tt.configure(s, acc)
 			s.routeCache.Set(groupID, "openai", []*ent.Account{acc}, nil)
-			s.BindResponseAccount(ctx, groupID, "openai", "resp_probe", acc.ID)
+			s.BindResponseAccount(ctx, groupID, "openai", "resp_blocked", acc.ID)
 
-			selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
-				PreviousResponseID:          "resp_probe",
+			_, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+				PreviousResponseID:          "resp_blocked",
 				RequireContinuationAffinity: true,
 			})
-			if err != nil {
-				t.Fatalf("SelectAccountWithOptions() returned error: %v", err)
-			}
-			if selected.ID != acc.ID {
-				t.Fatalf("selected account ID = %d, want %d", selected.ID, acc.ID)
+			if !errors.Is(err, ErrContinuationCapacityExceeded) {
+				t.Fatalf("SelectAccountWithOptions() error = %v, want ErrContinuationCapacityExceeded", err)
 			}
 		})
 	}

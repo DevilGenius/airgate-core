@@ -356,7 +356,8 @@ type schedulabilityResult struct {
 }
 
 // checkHardAffinitySchedulability 用于 previous_response_id / continuation session 这类硬亲和。
-// 它放宽滑动窗口费用和临时冷却类限制，让原续链账号有机会由上游确认。
+// 它放宽滑动窗口费用和 degraded 兜底，让原续链账号有机会由上游确认。
+// 已知本地冷却态不再探测原账号，交给上层恢复为换账号尝试。
 // 不放宽 disabled / RPM / 并发 / session 等本地保护。
 func (s *Scheduler) checkHardAffinitySchedulability(ctx context.Context, acc *ent.Account, model string, now time.Time) Schedulability {
 	return s.checkSchedulabilityResult(ctx, acc, model, now, true, nil).hardAffinity
@@ -382,11 +383,7 @@ func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Acco
 		}
 		if inCooldown {
 			result.normal = NotSchedulable
-			if needHardAffinity && result.hardAffinity != NotSchedulable {
-				result.hardAffinity = maxSchedulability(result.hardAffinity, StickyOnly)
-			} else {
-				result.hardAffinity = NotSchedulable
-			}
+			result.hardAffinity = NotSchedulable
 		}
 		if result.normal == NotSchedulable && (!needHardAffinity || result.hardAffinity == NotSchedulable) {
 			return result
@@ -460,7 +457,7 @@ func hardAffinityBaseSchedulability(acc *ent.Account, now time.Time) Schedulabil
 		return NotSchedulable
 	case account.StateRateLimited:
 		if acc.StateUntil != nil && acc.StateUntil.After(now) {
-			return StickyOnly
+			return NotSchedulable
 		}
 		return Normal
 	case account.StateDegraded:
@@ -471,13 +468,6 @@ func hardAffinityBaseSchedulability(acc *ent.Account, now time.Time) Schedulabil
 	default:
 		return NotSchedulable
 	}
-}
-
-func maxSchedulability(a, b Schedulability) Schedulability {
-	if b > a {
-		return b
-	}
-	return a
 }
 
 // concurrencySchedulability 根据当前并发用量返回调度约束：
