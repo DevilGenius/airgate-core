@@ -173,40 +173,20 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					)
 					return
 				}
-				if errors.Is(err, scheduler.ErrContinuationAffinityMissing) {
-					recovered, recoverErr := recoverContinuationAffinityMissing(state)
+				if handled, recovered, recoverErr := recoverContinuationPickAccountError(state, err); handled {
 					if recoverErr != nil {
-						logger.Warn("continuation_affinity_recovery_failed",
+						logger.Warn("continuation_recovery_failed",
 							sdk.LogFieldError, recoverErr,
 						)
 					}
 					if recovered {
-						logger.Warn("continuation_affinity_missing_recovery_retry",
+						logger.Warn("continuation_recovery_retry",
 							"action", "drop_previous_response_id_full_context",
 						)
 						continue
 					}
 					failureSummary.recordPickAccountError(err)
-					logger.Warn("continuation_affinity_recovery_unavailable",
-						"action", "end_current_route",
-					)
-					break
-				}
-				if errors.Is(err, scheduler.ErrPreviousResponseAffinitySkip) {
-					recovered, recoverErr := recoverContinuationAffinityMissing(state)
-					if recoverErr != nil {
-						logger.Warn("previous_response_affinity_recovery_failed",
-							sdk.LogFieldError, recoverErr,
-						)
-					}
-					if recovered {
-						logger.Warn("previous_response_affinity_priority_recovery_retry",
-							"action", "drop_previous_response_id_full_context",
-						)
-						continue
-					}
-					failureSummary.recordPickAccountError(err)
-					logger.Warn("previous_response_affinity_recovery_unavailable",
+					logger.Warn("continuation_recovery_unavailable",
 						"action", "end_current_route",
 					)
 					break
@@ -391,6 +371,20 @@ func canceledRequestStatus(err error) int {
 	}
 }
 
+func recoverContinuationPickAccountError(state *forwardState, err error) (handled bool, recovered bool, recoverErr error) {
+	if !isRecoverableContinuationPickAccountError(err) {
+		return false, false, nil
+	}
+	recovered, recoverErr = recoverContinuationAffinityMissing(state)
+	return true, recovered, recoverErr
+}
+
+func isRecoverableContinuationPickAccountError(err error) bool {
+	return errors.Is(err, scheduler.ErrContinuationCapacityExceeded) ||
+		errors.Is(err, scheduler.ErrContinuationAffinityMissing) ||
+		errors.Is(err, scheduler.ErrPreviousResponseAffinitySkip)
+}
+
 func markCanceledRequest(c *gin.Context, status int) {
 	if c == nil || status == 0 || c.Writer.Written() {
 		return
@@ -419,6 +413,7 @@ type allRoutesFailureSummary struct {
 	rateLimitedSeen             bool
 	rateLimitedRetryAfter       time.Duration
 	localCapacitySeen           bool
+	continuationUnavailable     bool
 	continuationAffinityMissing bool
 	accountUnavailable          bool
 	accountDeadSeen             bool
@@ -459,7 +454,7 @@ func (s *allRoutesFailureSummary) recordRetryAfter(retryAfter time.Duration) {
 
 func (s *allRoutesFailureSummary) recordPickAccountError(err error) {
 	if errors.Is(err, scheduler.ErrContinuationCapacityExceeded) {
-		s.localCapacitySeen = true
+		s.continuationUnavailable = true
 		return
 	}
 	if errors.Is(err, scheduler.ErrContinuationAffinityMissing) {
@@ -510,6 +505,15 @@ func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFa
 			code:       "all_routes_rate_limited",
 			message:    "上游账号当前被限流，请稍后重试",
 			retryAfter: retryAfter,
+		}
+	}
+	if summary.continuationUnavailable {
+		return allRoutesFailureResponse{
+			status:     http.StatusTooManyRequests,
+			errType:    "rate_limit_error",
+			code:       "continuation_unavailable",
+			message:    "续链上下文暂不可用，请稍后重试或提供完整上下文",
+			retryAfter: allRoutesFailedDefaultRetryAfter,
 		}
 	}
 	if summary.localCapacitySeen {

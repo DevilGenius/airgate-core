@@ -682,6 +682,15 @@ func TestSelectAllRoutesFailureResponse(t *testing.T) {
 			wantCode:   "all_routes_rate_limited",
 		},
 		{
+			name: "continuation unavailable",
+			summary: allRoutesFailureSummary{
+				continuationUnavailable: true,
+				upstreamFailureSeen:     true,
+			},
+			wantStatus: http.StatusTooManyRequests,
+			wantCode:   "continuation_unavailable",
+		},
+		{
 			name: "local capacity exhausted",
 			summary: allRoutesFailureSummary{
 				localCapacitySeen:   true,
@@ -757,8 +766,11 @@ func TestAllRoutesFailureSummaryRecordsContinuationCapacity(t *testing.T) {
 	summary := allRoutesFailureSummary{}
 	summary.recordPickAccountError(scheduler.ErrContinuationCapacityExceeded)
 
-	if !summary.localCapacitySeen {
-		t.Fatalf("localCapacitySeen = false, want true")
+	if !summary.continuationUnavailable {
+		t.Fatalf("continuationUnavailable = false, want true")
+	}
+	if summary.localCapacitySeen {
+		t.Fatalf("localCapacitySeen = true, want false")
 	}
 	if summary.continuationAffinityMissing {
 		t.Fatalf("continuationAffinityMissing = true, want false")
@@ -767,7 +779,61 @@ func TestAllRoutesFailureSummaryRecordsContinuationCapacity(t *testing.T) {
 	if response.status != http.StatusTooManyRequests {
 		t.Fatalf("status = %d, want %d", response.status, http.StatusTooManyRequests)
 	}
-	if response.code != "all_routes_capacity_exhausted" {
-		t.Fatalf("code = %q, want all_routes_capacity_exhausted", response.code)
+	if response.code != "continuation_unavailable" {
+		t.Fatalf("code = %q, want continuation_unavailable", response.code)
+	}
+}
+
+func TestRecoverContinuationPickAccountErrorHandlesCapacityWhenSafe(t *testing.T) {
+	t.Parallel()
+
+	state := &forwardState{
+		body:                        []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"continue"}]}]}`),
+		previousResponseID:          "resp_old",
+		requireContinuationAffinity: true,
+	}
+
+	handled, recovered, err := recoverContinuationPickAccountError(state, scheduler.ErrContinuationCapacityExceeded)
+	if err != nil {
+		t.Fatalf("recoverContinuationPickAccountError error: %v", err)
+	}
+	if !handled {
+		t.Fatalf("handled = false, want true")
+	}
+	if !recovered {
+		t.Fatalf("recovered = false, want true")
+	}
+	if state.previousResponseID != "" {
+		t.Fatalf("previousResponseID = %q, want empty", state.previousResponseID)
+	}
+	if state.requireContinuationAffinity {
+		t.Fatalf("requireContinuationAffinity = true, want false")
+	}
+}
+
+func TestRecoverContinuationPickAccountErrorKeepsUnsafeCapacityHard(t *testing.T) {
+	t.Parallel()
+
+	state := &forwardState{
+		body:                        []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"function_call_output","call_id":"call_1","output":"ok"}]}`),
+		previousResponseID:          "resp_old",
+		requireContinuationAffinity: true,
+	}
+
+	handled, recovered, err := recoverContinuationPickAccountError(state, scheduler.ErrContinuationCapacityExceeded)
+	if err != nil {
+		t.Fatalf("recoverContinuationPickAccountError error: %v", err)
+	}
+	if !handled {
+		t.Fatalf("handled = false, want true")
+	}
+	if recovered {
+		t.Fatalf("recovered = true, want false")
+	}
+	if state.previousResponseID != "resp_old" {
+		t.Fatalf("previousResponseID = %q, want resp_old", state.previousResponseID)
+	}
+	if !state.requireContinuationAffinity {
+		t.Fatalf("requireContinuationAffinity = false, want true")
 	}
 }
