@@ -189,9 +189,23 @@ func (s *Scheduler) RegisterSession(ctx context.Context, accountID int, sessionI
 }
 
 // defaultMsgLockWait msg lock 的默认 wait timeout。
-// 号池大 / 每账号并发小的场景下，占用中的账号不如快速跳过让其它账号接住。
-// 通过 account.extra.msg_lock_wait_seconds 可调整（例如号池小时设大）。
+// 消息锁默认关闭；仅 account.extra.msg_lock_enabled=true 时启用。
+// 通过 account.extra.msg_lock_wait_seconds 可调整等待时长。
 const defaultMsgLockWait = 3 * time.Second
+
+// MessageLockEnabled 返回账号是否显式启用真实用户消息串行锁。
+func MessageLockEnabled(extra map[string]interface{}) bool {
+	return ExtraBool(extra, "msg_lock_enabled")
+}
+
+// MessageLockMaxWaiters 返回账号消息锁实际生效的排队上限。
+func MessageLockMaxWaiters(extra map[string]interface{}) int {
+	maxWaiters := ExtraInt(extra, "msg_lock_max_waiters")
+	if maxWaiters <= 0 {
+		return defaultMaxWaiters
+	}
+	return maxWaiters
+}
 
 // AcquireMessageLock 真实用户消息的账号级串行锁。
 // wait timeout：extra.msg_lock_wait_seconds > 0 时用配置值，否则用 defaultMsgLockWait。
@@ -205,10 +219,7 @@ func (s *Scheduler) AcquireMessageLock(ctx context.Context, accountID int, reque
 	if waitSec := ExtraInt(extra, "msg_lock_wait_seconds"); waitSec > 0 {
 		wait = time.Duration(waitSec) * time.Second
 	}
-	maxWaiters := ExtraInt(extra, "msg_lock_max_waiters")
-	if maxWaiters <= 0 {
-		maxWaiters = defaultMaxWaiters
-	}
+	maxWaiters := MessageLockMaxWaiters(extra)
 	return s.msgQueue.WaitAcquire(ctx, accountID, requestID, lockTTL, wait, maxWaiters)
 }
 

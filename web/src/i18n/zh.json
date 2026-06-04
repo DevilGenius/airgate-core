@@ -332,6 +332,7 @@
     "concurrency": "并发数",
     "rate_multiplier": "费率倍率",
     "upstream_is_pool": "池模式",
+    "message_lock": "消息锁",
     "proxy": "代理",
     "proxy_id": "代理 ID",
     "proxy_hint": "留空表示不使用代理",

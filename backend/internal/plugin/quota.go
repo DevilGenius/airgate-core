@@ -136,12 +136,12 @@ func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs 
 	return scheduler.ErrNoAvailableAccount
 }
 
-// acquireAccountSlot 获取账号级闸门：RPM 配额 + 账号并发槽 + 真实用户消息串行锁。
+// acquireAccountSlot 获取账号级闸门：RPM 配额 + 账号并发槽 + 可选真实用户消息串行锁。
 // 返回 release func 与 ok 标记。ok=false 表示当前账号暂不可用（RPM 已满 / 并发已满），
 // 调用方应把本账号加入 excludeIDs 并 failover 到下一个账号。失败时不写客户端响应——
 // 由主循环在 failover 全部用尽时兜底写 503。
 //
-// 账号并发槽先于消息锁占用：等待真实用户消息锁 / RPM 均摊延迟的请求也属于该账号压力，
+// 账号并发槽先于可选消息锁占用：显式启用消息锁时，排队请求也属于该账号压力，
 // 需要反映到账号管理页容量，并让后续调度能看到高优先级账号已接近满载。
 //
 // 每次 failover attempt 都要重新 acquire。release 顺序和 acquire 顺序相反。
@@ -175,9 +175,9 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 		f.concurrency.ReleaseSlot(releaseCtx, state.account.ID, state.requestID)
 	}
 
-	// 3. 消息锁 + 均摊延迟（仅真实用户消息）
+	// 3. 可选消息锁 + 均摊延迟（仅显式启用且为真实用户消息）
 	releaseMsgLock := func() {}
-	if scheduler.IsRealUserMessage(state.body) {
+	if scheduler.MessageLockEnabled(state.account.Extra) && scheduler.IsRealUserMessage(state.body) {
 		acquired, err := f.scheduler.AcquireMessageLock(ctx, state.account.ID, state.requestID, state.account.Extra)
 		if err != nil {
 			releaseAccountSlot()
@@ -193,7 +193,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 			f.scheduler.DecrementRPM(releaseCtx, state.account.ID)
 			slog.Info("账号消息锁排队已满，尝试 failover",
 				"account_id", state.account.ID,
-				"max_waiters", scheduler.ExtraInt(state.account.Extra, "msg_lock_max_waiters"),
+				"max_waiters", scheduler.MessageLockMaxWaiters(state.account.Extra),
 			)
 			return nil, false
 		}

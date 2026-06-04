@@ -28,6 +28,7 @@ import {
   DEFAULT_ACCOUNT_PRIORITY,
   isAccountPriorityDraft,
   parseAccountPriorityInput,
+  setAccountMessageLockEnabled,
 } from './accountDefaults';
 
 /**
@@ -56,6 +57,7 @@ export function BulkEditAccountModal({
   const [enableRateMultiplier, setEnableRateMultiplier] = useState(false);
   const [enableGroups, setEnableGroups] = useState(false);
   const [enableProxy, setEnableProxy] = useState(false);
+  const [enableMessageLock, setEnableMessageLock] = useState(false);
 
   // 字段值
   const [status, setStatus] = useState<'active' | 'disabled'>('active');
@@ -65,6 +67,7 @@ export function BulkEditAccountModal({
   const [rateMultiplier, setRateMultiplier] = useState(1);
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [proxyId, setProxyId] = useState<number | null>(null);
+  const [messageLockEnabled, setMessageLockEnabled] = useState(false);
 
   const { data: groupsData } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -82,7 +85,8 @@ export function BulkEditAccountModal({
     enableConcurrency ||
     enableRateMultiplier ||
     enableGroups ||
-    enableProxy;
+    enableProxy ||
+    enableMessageLock;
   const canSubmit = hasAnyField && (!enableProxy || proxyId != null);
 
   const handleSubmit = () => {
@@ -95,6 +99,9 @@ export function BulkEditAccountModal({
     if (enableRateMultiplier) patch.rate_multiplier = rateMultiplier;
     if (enableGroups) patch.group_ids = groupIds;
     if (enableProxy && proxyId != null) patch.proxy_id = proxyId;
+    if (enableMessageLock) {
+      patch.extra = setAccountMessageLockEnabled(undefined, messageLockEnabled);
+    }
     onSubmit(patch);
   };
   const proxyOptions = [
@@ -280,6 +287,23 @@ export function BulkEditAccountModal({
               </ListBox>
             </Select.Popover>
           </Select>
+        </FieldRow>
+
+        <FieldRow
+          enabled={enableMessageLock}
+          onToggle={setEnableMessageLock}
+          label={t('accounts.message_lock')}
+        >
+          <NativeSwitch
+            isDisabled={!enableMessageLock}
+            isSelected={messageLockEnabled}
+            label={(
+              <span className={enableMessageLock ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
+                {messageLockEnabled ? t('common.enabled', '已启用') : t('common.disabled', '已禁用')}
+              </span>
+            )}
+            onChange={setMessageLockEnabled}
+          />
         </FieldRow>
       </Form>
     </CommonModal>

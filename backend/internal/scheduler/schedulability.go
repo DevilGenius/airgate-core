@@ -1,5 +1,10 @@
 package scheduler
 
+import (
+	"strconv"
+	"strings"
+)
+
 // Schedulability 账户调度状态（三态）
 type Schedulability int
 
@@ -55,5 +60,28 @@ func ExtraInt(extra map[string]interface{}, key string) int {
 		return int(val)
 	default:
 		return 0
+	}
+}
+
+// ExtraBool 从 account.Extra 中安全提取 bool 值。
+func ExtraBool(extra map[string]interface{}, key string) bool {
+	v, ok := extra[key]
+	if !ok {
+		return false
+	}
+	switch val := v.(type) {
+	case bool:
+		return val
+	case string:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(val))
+		return err == nil && parsed
+	case int:
+		return val != 0
+	case int64:
+		return val != 0
+	case float64:
+		return val != 0
+	default:
+		return false
 	}
 }

@@ -267,6 +267,8 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		HasGroupIDs:    req.GroupIDs != nil,
 		ProxyID:        req.ProxyID,
 		HasProxyID:     req.ProxyID != nil,
+		Extra:          req.Extra,
+		HasExtra:       req.Extra != nil,
 	})
 	response.Success(c, toBulkOpResp(result))
 }

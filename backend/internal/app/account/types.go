@@ -167,6 +167,8 @@ type BulkUpdateInput struct {
 	HasGroupIDs    bool
 	ProxyID        *int64
 	HasProxyID     bool
+	Extra          map[string]any
+	HasExtra       bool
 }
 
 // BulkResultItem 批量操作单条结果。

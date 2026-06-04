@@ -211,6 +211,7 @@ export interface BulkUpdateAccountsReq {
   rate_multiplier?: number;
   group_ids?: number[];
   proxy_id?: number;
+  extra?: Record<string, unknown>;
 }
 
 // 批量操作单条结果

@@ -37,8 +37,10 @@ import {
   commitAccountPriorityInput,
   DEFAULT_ACCOUNT_MAX_CONCURRENCY,
   DEFAULT_ACCOUNT_PRIORITY,
+  getAccountMessageLockEnabled,
   isAccountPriorityDraft,
   parseAccountPriorityInput,
+  setAccountMessageLockEnabled,
 } from './accountDefaults';
 
 export function EditAccountModal({
@@ -351,6 +353,15 @@ export function EditAccountModal({
                     isSelected={form.upstream_is_pool ?? false}
                     label={<span className="text-sm text-text">{t('accounts.upstream_is_pool', '池模式')}</span>}
                     onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
+                  />
+
+                  <NativeSwitch
+                    className="ag-create-account-pool-switch"
+                    isSelected={getAccountMessageLockEnabled(form.extra)}
+                    label={<span className="text-sm text-text">{t('accounts.message_lock')}</span>}
+                    onChange={(checked) =>
+                      setForm({ ...form, extra: setAccountMessageLockEnabled(form.extra, checked) })
+                    }
                   />
 
                   {availableGroups.length > 0 && (

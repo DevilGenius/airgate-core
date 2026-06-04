@@ -428,6 +428,15 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			patch.GroupIDs = input.GroupIDs
 			patch.HasGroupIDs = true
 		}
+		if input.HasExtra {
+			existing, err := s.repo.FindByID(ctx, id, LoadOptions{})
+			if err != nil {
+				result.appendFailure(id, err)
+				continue
+			}
+			patch.Extra = mergeAnyMap(existing.Extra, input.Extra)
+			patch.HasExtra = true
+		}
 
 		manualState, routeManualState, err := s.routedManualState(patch.State)
 		if err != nil {
@@ -516,6 +525,17 @@ func hasUpdateInputChanges(input UpdateInput) bool {
 		input.HasGroupIDs ||
 		input.HasProxyID ||
 		input.HasExtra
+}
+
+func mergeAnyMap(base, patch map[string]any) map[string]any {
+	merged := make(map[string]any, len(base)+len(patch))
+	for key, value := range base {
+		merged[key] = value
+	}
+	for key, value := range patch {
+		merged[key] = value
+	}
+	return merged
 }
 
 func (s *Service) routedManualState(state *string) (string, bool, error) {

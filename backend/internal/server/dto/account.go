@@ -118,13 +118,14 @@ type ImportAccountsResp struct {
 
 // BulkUpdateAccountsReq 批量更新账号请求。
 type BulkUpdateAccountsReq struct {
-	AccountIDs     []int    `json:"account_ids" binding:"required,min=1"`
-	State          *string  `json:"state" binding:"omitempty,oneof=active disabled"`
-	Priority       *int     `json:"priority"`
-	MaxConcurrency *int     `json:"max_concurrency"`
-	RateMultiplier *float64 `json:"rate_multiplier"`
-	GroupIDs       []int64  `json:"group_ids"`
-	ProxyID        *int64   `json:"proxy_id"`
+	AccountIDs     []int          `json:"account_ids" binding:"required,min=1"`
+	State          *string        `json:"state" binding:"omitempty,oneof=active disabled"`
+	Priority       *int           `json:"priority"`
+	MaxConcurrency *int           `json:"max_concurrency"`
+	RateMultiplier *float64       `json:"rate_multiplier"`
+	GroupIDs       []int64        `json:"group_ids"`
+	ProxyID        *int64         `json:"proxy_id"`
+	Extra          map[string]any `json:"extra,omitempty"`
 }
 
 // BulkAccountIDsReq 仅携带账号 ID 列表的批量请求（用于删除、刷新令牌等）。
