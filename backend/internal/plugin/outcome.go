@@ -50,7 +50,7 @@ func openAIRateLimitError(c *gin.Context, status int, code, message string, retr
 }
 
 func maybeDisableAutomaticRetry(c *gin.Context, status int) {
-	if c == nil || status < http.StatusInternalServerError {
+	if c == nil || (status != http.StatusTooManyRequests && status < http.StatusInternalServerError) {
 		return
 	}
 	if !isImageSubmitAPIPath(requestPath(c)) {

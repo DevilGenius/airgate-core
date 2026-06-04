@@ -523,6 +523,55 @@ func TestBuildPluginRequestOmitsWriterForNonStreamImagesRequest(t *testing.T) {
 	}
 }
 
+func TestBuildPluginRequestMarksImageRetryUsed(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	state := &forwardState{
+		requestPath:    "/v1/images/generations",
+		imageRetryUsed: true,
+		keyInfo:        &auth.APIKeyInfo{},
+		account:        &ent.Account{},
+	}
+
+	req := buildPluginRequest(c, state)
+	if got := req.Headers.Get(imageRetryUsedHeader); got != "true" {
+		t.Fatalf("%s = %q, want true", imageRetryUsedHeader, got)
+	}
+}
+
+func TestCanFailoverImagesOnlyAllowsSingle429Retry(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	f := &Forwarder{}
+	base := &forwardState{requestPath: "/v1/images/generations"}
+
+	if !f.canFailover(c, base, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountRateLimited}}) {
+		t.Fatal("image 429 should allow one failover")
+	}
+	used := &forwardState{requestPath: "/v1/images/generations", imageRetryUsed: true}
+	if f.canFailover(c, used, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountRateLimited}}) {
+		t.Fatal("image 429 should not failover after retry budget is used")
+	}
+	pluginUsed := &forwardState{requestPath: "/v1/images/generations"}
+	if f.canFailover(c, pluginUsed, forwardExecution{outcome: sdk.ForwardOutcome{
+		Kind: sdk.OutcomeAccountRateLimited,
+		Upstream: sdk.UpstreamResponse{Headers: http.Header{
+			imageRetryUsedHeader: []string{"true"},
+		}},
+	}}) {
+		t.Fatal("image 429 should not failover after plugin fallback consumed retry budget")
+	}
+	if f.canFailover(c, base, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient}}) {
+		t.Fatal("image non-429 failure should not use core failover")
+	}
+}
+
 func TestBuildPluginRequestRemovesPreviousResponseHeadersAfterRecovery(t *testing.T) {
 	t.Parallel()
 

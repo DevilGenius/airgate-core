@@ -587,6 +587,9 @@ func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest
 	if state.continuationRecoveryApplied {
 		removePreviousResponseIDHeaders(headers)
 	}
+	if state.imageRetryUsed && isImageSubmitAPIPath(state.requestPath) {
+		headers.Set(imageRetryUsedHeader, "true")
+	}
 	// 路径和方法显式塞进 header：sdk.ForwardRequest 里没有这两字段，
 	// 插件侧 extractForwardedPath 会优先读取这对 header。
 	headers.Set("X-Forwarded-Path", state.requestPath)

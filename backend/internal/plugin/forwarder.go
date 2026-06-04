@@ -70,6 +70,8 @@ const queueMaxPollInterval = 2 * time.Second
 // 499 是 nginx 风格的 Client Closed Request，仅用于本地日志和状态归类。
 const statusClientClosedRequest = 499
 
+const imageRetryUsedHeader = "X-Airgate-Image-Retry-Used"
+
 // allRoutesFailedDefaultRetryAfter 客户端最终被拒时，若没有任何上游 RetryAfter 可参考
 // （比如 max_concurrency 打满、所有账号都在冷却但 state_until 没回填到这一层），
 // 给客户端一个保守的退避建议。1s 既能避免雪崩，又比 60s 更贴合"瞬时打满"的真实恢复节奏。
@@ -305,6 +307,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				attemptLogger.Warn("forward_attempt_failed", attrs...)
 				releaseAccountSlot()
 				f.applyOutcome(ctx, state, execution)
+				if isImageSubmitAPIPath(state.requestPath) {
+					state.imageRetryUsed = true
+				}
 
 				if execution.outcome.Kind.IsAccountFault() {
 					hardExclude = append(hardExclude, accountID)
@@ -691,10 +696,20 @@ func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution f
 	if state.requireContinuationAffinity {
 		return false
 	}
+	if isImageSubmitAPIPath(state.requestPath) {
+		if state.imageRetryUsed || imageRetryUsedByPlugin(execution.outcome) {
+			return false
+		}
+		return execution.outcome.Kind == sdk.OutcomeAccountRateLimited
+	}
 	if execution.err != nil {
 		return true
 	}
 	return execution.outcome.Kind.ShouldFailover()
+}
+
+func imageRetryUsedByPlugin(outcome sdk.ForwardOutcome) bool {
+	return strings.EqualFold(outcome.Upstream.Headers.Get(imageRetryUsedHeader), "true")
 }
 
 // callPlugin 把请求发给插件。
