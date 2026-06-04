@@ -126,23 +126,6 @@ func runtimeConstraintCandidates(candidates []*ent.Account, now time.Time) []*en
 	return out
 }
 
-func schedulableBaseCandidates(candidates []*ent.Account, now time.Time) []*ent.Account {
-	if len(candidates) == 0 {
-		return nil
-	}
-	out := make([]*ent.Account, 0, len(candidates))
-	for _, acc := range candidates {
-		if acc == nil {
-			continue
-		}
-		if SchedulabilityOf(acc, now) == NotSchedulable {
-			continue
-		}
-		out = append(out, acc)
-	}
-	return out
-}
-
 func (s *Scheduler) selectionCurrentLoads(ctx context.Context, candidates []*ent.Account) map[int]int {
 	ids := accountIDsFromCandidates(candidates)
 	result := make(map[int]int, len(ids))
