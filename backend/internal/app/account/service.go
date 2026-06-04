@@ -51,6 +51,10 @@ const usageCacheMaxTTL = 5 * time.Hour
 
 const usageCacheMinimumTTL = time.Second
 
+const usageAccountsProbeBatchSize = 10
+
+const usageCacheWriteTimeout = 5 * time.Second
+
 const autoQuotaRefreshInterval = 6 * time.Hour
 
 type accountProfileCachePayload struct {
@@ -1053,7 +1057,7 @@ func (s *Service) fetchUpstreamUsage(ctx context.Context, platform string) (map[
 func (s *Service) fetchUpstreamUsageForAccounts(ctx context.Context, accounts []Account) (map[string]AccountUsageInfo, error) {
 	merged := make(map[string]AccountUsageInfo)
 	for _, item := range accounts {
-		if item.Type != "apikey" && item.ID > 0 {
+		if isRefreshableUsageAccount(item) && item.ID > 0 {
 			merged[strconv.Itoa(item.ID)] = AccountUsageInfo{}
 		}
 	}
@@ -1063,7 +1067,7 @@ func (s *Service) fetchUpstreamUsageForAccounts(ctx context.Context, accounts []
 
 	accountsByPlatform := make(map[string][]Account)
 	for _, item := range accounts {
-		if item.Platform == "" || item.Type == "apikey" {
+		if item.Platform == "" || !isRefreshableUsageAccount(item) {
 			continue
 		}
 		accountsByPlatform[item.Platform] = append(accountsByPlatform[item.Platform], item)
@@ -1100,46 +1104,71 @@ func (s *Service) fetchUpstreamUsageForAccounts(ctx context.Context, accounts []
 			continue
 		}
 
-		body, _ := json.Marshal(reqList)
-		status, _, respBody, err := inst.Gateway.HandleHTTPRequest(ctx, "POST", "usage/accounts", "", nil, body)
-		if err != nil || status != http.StatusOK {
-			continue
-		}
-
-		var result accountUsagePluginResponse
-		if err := json.Unmarshal(respBody, &result); err != nil {
-			continue
-		}
-
-		normalizedAccounts := make(map[string]AccountUsageInfo, len(result.Accounts))
-		for key, value := range result.Accounts {
-			if _, ok := allowedIDs[key]; !ok {
+		for start := 0; start < len(reqList); start += usageAccountsProbeBatchSize {
+			end := start + usageAccountsProbeBatchSize
+			if end > len(reqList) {
+				end = len(reqList)
+			}
+			batch := reqList[start:end]
+			body, _ := json.Marshal(batch)
+			startedAt := time.Now()
+			status, _, respBody, err := inst.Gateway.HandleHTTPRequest(ctx, "POST", "usage/accounts", "", nil, body)
+			if err != nil || status != http.StatusOK {
+				slog.Debug("account_usage_probe_batch_failed",
+					sdk.LogFieldPlatform, platform,
+					"account_count", len(batch),
+					sdk.LogFieldStatus, status,
+					sdk.LogFieldDurationMs, time.Since(startedAt).Milliseconds(),
+					sdk.LogFieldError, err)
+				if ctx.Err() != nil {
+					break
+				}
 				continue
 			}
-			normalized := normalizeAccountUsageInfo(value)
-			merged[key] = normalized
-			normalizedAccounts[key] = normalized
-		}
-		// 根据每个账号的 windows 反推限流恢复时间并持久化到 DB。
-		// 已 disabled 的账号不参与限流状态推导，避免覆盖手动关闭调度的状态。
-		activeAccounts := make(map[string]any, len(normalizedAccounts))
-		for key, value := range normalizedAccounts {
-			id, _ := strconv.Atoi(key)
-			if !disabledIDs[id] {
-				activeAccounts[key] = accountUsageInfoToMap(value)
-			}
-		}
-		s.persistRateLimitFromWindows(ctx, activeAccounts)
 
-		for _, item := range result.Errors {
-			if _, ok := poolByID[item.ID]; !ok {
+			var result accountUsagePluginResponse
+			if err := json.Unmarshal(respBody, &result); err != nil {
+				slog.Debug("account_usage_probe_batch_parse_failed",
+					sdk.LogFieldPlatform, platform,
+					"account_count", len(batch),
+					sdk.LogFieldDurationMs, time.Since(startedAt).Milliseconds(),
+					sdk.LogFieldError, err)
 				continue
 			}
-			// 池账号 / 已禁用账号不自动 MarkDisabled（避免覆盖人工关闭的 reason）。
-			if poolByID[item.ID] || disabledIDs[item.ID] || s.stateWriter == nil {
-				continue
+
+			normalizedAccounts := make(map[string]AccountUsageInfo, len(result.Accounts))
+			for key, value := range result.Accounts {
+				if _, ok := allowedIDs[key]; !ok {
+					continue
+				}
+				normalized := normalizeAccountUsageInfo(value)
+				merged[key] = normalized
+				normalizedAccounts[key] = normalized
 			}
-			s.stateWriter.MarkDisabled(ctx, item.ID, item.Message)
+			// 根据每个账号的 windows 反推限流恢复时间并持久化到 DB。
+			// 已 disabled 的账号不参与限流状态推导，避免覆盖手动关闭调度的状态。
+			activeAccounts := make(map[string]any, len(normalizedAccounts))
+			for key, value := range normalizedAccounts {
+				id, _ := strconv.Atoi(key)
+				if !disabledIDs[id] {
+					activeAccounts[key] = accountUsageInfoToMap(value)
+				}
+			}
+			s.persistRateLimitFromWindows(ctx, activeAccounts)
+
+			for _, item := range result.Errors {
+				if _, ok := poolByID[item.ID]; !ok {
+					continue
+				}
+				// 池账号 / 已禁用账号不自动 MarkDisabled（避免覆盖人工关闭的 reason）。
+				if poolByID[item.ID] || disabledIDs[item.ID] || s.stateWriter == nil {
+					continue
+				}
+				s.stateWriter.MarkDisabled(ctx, item.ID, item.Message)
+			}
+		}
+		if ctx.Err() != nil {
+			break
 		}
 	}
 
@@ -1325,12 +1354,16 @@ func normalizeAccountIDs(ids []int) []int {
 func filterRefreshableUsageAccounts(accounts []Account) []Account {
 	result := make([]Account, 0, len(accounts))
 	for _, item := range accounts {
-		if item.Type == "apikey" {
+		if !isRefreshableUsageAccount(item) {
 			continue
 		}
 		result = append(result, item)
 	}
 	return result
+}
+
+func isRefreshableUsageAccount(item Account) bool {
+	return item.Type != "apikey" && strings.TrimSpace(strings.ToLower(item.State)) != "disabled"
 }
 
 func accountIDsFromAccounts(accounts []Account) []int {
@@ -1412,17 +1445,17 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 			for _, item := range accounts {
 				info, exists := memory[strconv.Itoa(item.ID)]
 				if !exists {
-					if item.Type != "apikey" {
+					if isRefreshableUsageAccount(item) {
 						missingAccounts = append(missingAccounts, item)
 					}
 					continue
 				}
-				if !accountUsageInfoHasData(info) && item.Type != "apikey" {
+				if !accountUsageInfoHasData(info) && isRefreshableUsageAccount(item) {
 					missingAccounts = append(missingAccounts, item)
 					continue
 				}
 				result[item.ID] = info
-				if !fresh && item.Type != "apikey" {
+				if !fresh && isRefreshableUsageAccount(item) {
 					missingAccounts = append(missingAccounts, item)
 				}
 			}
@@ -1444,7 +1477,7 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 	for index, item := range ordered {
 		raw, ok := redisValueBytes(values[index])
 		if !ok {
-			if item.Type != "apikey" {
+			if isRefreshableUsageAccount(item) {
 				missingAccounts = append(missingAccounts, item)
 			}
 			continue
@@ -1452,12 +1485,12 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 		var payload accountUsageCachePayload
 		if err := json.Unmarshal(raw, &payload); err != nil || !payload.valid() {
 			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
-			if item.Type != "apikey" {
+			if isRefreshableUsageAccount(item) {
 				missingAccounts = append(missingAccounts, item)
 			}
 			continue
 		}
-		if !accountUsageInfoHasData(payload.Info) && item.Type != "apikey" {
+		if !accountUsageInfoHasData(payload.Info) && isRefreshableUsageAccount(item) {
 			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
 			missingAccounts = append(missingAccounts, item)
 			continue
@@ -1465,7 +1498,7 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 		expiresAt := payload.cacheExpiresAt(s.now())
 		if !expiresAt.After(s.now()) {
 			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
-			if item.Type != "apikey" {
+			if isRefreshableUsageAccount(item) {
 				missingAccounts = append(missingAccounts, item)
 			}
 			continue
@@ -1678,16 +1711,18 @@ func (s *Service) runUsageCacheRefreshLoop(platform, cacheKey string) {
 		}
 	}()
 	for {
-		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-		accounts, err := s.fetchUpstreamUsageDedup(ctx, platform)
+		fetchCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		accounts, err := s.fetchUpstreamUsageDedup(fetchCtx, platform)
+		cancel()
 		if err == nil {
-			s.setUsageCache(ctx, cacheKey, accounts)
+			writeCtx, writeCancel := context.WithTimeout(context.Background(), usageCacheWriteTimeout)
+			s.setUsageCache(writeCtx, cacheKey, accounts)
+			writeCancel()
 		} else {
 			slog.Debug("account_usage_cache_refresh_failed",
 				sdk.LogFieldPlatform, platform,
 				sdk.LogFieldError, err)
 		}
-		cancel()
 
 		s.usageRefreshMu.Lock()
 		if s.usageRefreshPending[cacheKey] {
@@ -1714,22 +1749,24 @@ func (s *Service) runUsageCacheRefreshAccountIDsLoop(platform, cacheKey string, 
 		}
 	}()
 	for {
-		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-		accounts, err := s.repo.ListAll(ctx, ListFilter{Platform: platform, IDs: accountIDs})
+		fetchCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		accounts, err := s.repo.ListAll(fetchCtx, ListFilter{Platform: platform, IDs: accountIDs})
+		var usage map[string]AccountUsageInfo
 		if err == nil {
-			var usage map[string]AccountUsageInfo
-			usage, err = s.fetchUpstreamUsageForAccounts(ctx, accounts)
-			if err == nil {
-				s.setUsageCache(ctx, platform, usage)
-				s.cacheAccountProfiles(ctx, accounts)
-			}
+			usage, err = s.fetchUpstreamUsageForAccounts(fetchCtx, accounts)
+		}
+		cancel()
+		if err == nil {
+			writeCtx, writeCancel := context.WithTimeout(context.Background(), usageCacheWriteTimeout)
+			s.setUsageCache(writeCtx, platform, usage)
+			s.cacheAccountProfiles(writeCtx, accounts)
+			writeCancel()
 		}
 		if err != nil {
 			slog.Debug("account_usage_cache_refresh_failed",
 				sdk.LogFieldPlatform, platform,
 				sdk.LogFieldError, err)
 		}
-		cancel()
 
 		s.usageRefreshMu.Lock()
 		if s.usageRefreshPending[cacheKey] {
