@@ -191,6 +191,60 @@ func TestRecoverContinuationAffinityMissingDropsPreviousResponseAndEncryptedCont
 	}
 }
 
+func TestRecoverContinuationAffinityMissingDropsPreviousResponseOnly(t *testing.T) {
+	t.Parallel()
+
+	state := &forwardState{
+		body:               []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"continue with full context"}]}]}`),
+		previousResponseID: "resp_old",
+	}
+
+	recovered, err := recoverContinuationAffinityMissing(state)
+	if err != nil {
+		t.Fatalf("recoverContinuationAffinityMissing error: %v", err)
+	}
+	if !recovered {
+		t.Fatalf("recovered = false, want true")
+	}
+	if state.previousResponseID != "" {
+		t.Fatalf("previousResponseID = %q, want empty", state.previousResponseID)
+	}
+	body := string(state.body)
+	if strings.Contains(body, "previous_response_id") {
+		t.Fatalf("body still contains previous_response_id: %s", body)
+	}
+	if !strings.Contains(body, "continue with full context") {
+		t.Fatalf("body lost full context message: %s", body)
+	}
+}
+
+func TestRecoverContinuationAffinityMissingHandlesHeaderOnlyPreviousResponse(t *testing.T) {
+	t.Parallel()
+
+	originalBody := []byte(`{"model":"gpt-5.4","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"continue with full context"}]}]}`)
+	state := &forwardState{
+		body:               originalBody,
+		previousResponseID: "resp_header",
+	}
+
+	recovered, err := recoverContinuationAffinityMissing(state)
+	if err != nil {
+		t.Fatalf("recoverContinuationAffinityMissing error: %v", err)
+	}
+	if !recovered {
+		t.Fatalf("recovered = false, want true")
+	}
+	if state.previousResponseID != "" {
+		t.Fatalf("previousResponseID = %q, want empty", state.previousResponseID)
+	}
+	if !state.continuationRecoveryApplied {
+		t.Fatalf("continuationRecoveryApplied = false, want true")
+	}
+	if string(state.body) != string(originalBody) {
+		t.Fatalf("body = %s, want unchanged %s", state.body, originalBody)
+	}
+}
+
 func TestRecoverContinuationAffinityMissingKeepsFunctionCallOutputWithoutContextHard(t *testing.T) {
 	t.Parallel()
 

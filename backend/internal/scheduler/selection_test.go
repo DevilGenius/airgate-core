@@ -95,8 +95,8 @@ func TestSelectAccountHardPreviousResponseAllowsWindowCostOverflow(t *testing.T)
 	s.BindResponseAccount(ctx, groupID, "openai", "resp_1", acc.ID)
 	if _, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
 		PreviousResponseID: "resp_1",
-	}); !errors.Is(err, ErrNoAvailableAccount) {
-		t.Fatalf("soft previous response err = %v, want ErrNoAvailableAccount", err)
+	}); !errors.Is(err, ErrPreviousResponseAffinitySkip) {
+		t.Fatalf("soft previous response err = %v, want ErrPreviousResponseAffinitySkip", err)
 	}
 
 	windowCost := s.windowCost.(*stubWindowCostTracker)
@@ -113,6 +113,36 @@ func TestSelectAccountHardPreviousResponseAllowsWindowCostOverflow(t *testing.T)
 	}
 	if windowCost.calls != 1 {
 		t.Fatalf("window cost checks = %d, want 1", windowCost.calls)
+	}
+}
+
+func TestSoftPreviousResponseAffinityRequiresHighestPriority(t *testing.T) {
+	ctx := context.Background()
+	s := newSelectionTestScheduler(Normal)
+	groupID := 7
+	low := newSelectionTestAccount(10)
+	low.Priority = 10
+	high := newSelectionTestAccount(20)
+	high.Priority = 20
+	s.routeCache.Set(groupID, "openai", []*ent.Account{low, high}, nil)
+
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_low", low.ID)
+	_, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+		PreviousResponseID: "resp_low",
+	})
+	if !errors.Is(err, ErrPreviousResponseAffinitySkip) {
+		t.Fatalf("SelectAccountWithOptions(low affinity) error = %v, want ErrPreviousResponseAffinitySkip", err)
+	}
+
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_high", high.ID)
+	selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+		PreviousResponseID: "resp_high",
+	})
+	if err != nil {
+		t.Fatalf("SelectAccountWithOptions(high affinity) returned error: %v", err)
+	}
+	if selected.ID != high.ID {
+		t.Fatalf("selected account ID = %d, want %d", selected.ID, high.ID)
 	}
 }
 

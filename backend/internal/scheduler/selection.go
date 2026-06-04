@@ -74,20 +74,24 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 
 	if previousResponseID := strings.TrimSpace(opts.PreviousResponseID); previousResponseID != "" && s.responseAffinity != nil {
 		if accountID, found := s.responseAffinity.Get(ctx, groupID, platform, previousResponseID); found {
-			affinityCandidates := stickyCandidates
 			if opts.RequireContinuationAffinity {
-				affinityCandidates = hardAffinityCandidates
+				if acc := findAccountByID(hardAffinityCandidates, accountID); acc != nil {
+					s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID)
+					if sessionID != "" {
+						s.sticky.Set(ctx, userID, platform, sessionID, accountID)
+					}
+					return acc, nil
+				}
+				return nil, continuationBlockedError(candidates, accountID)
 			}
-			if acc := findAccountByID(affinityCandidates, accountID); acc != nil {
+			if acc := selectSoftStickyAccount(softStickyCandidates(normalCandidates, stickyCandidates), accountID); acc != nil {
 				s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID)
 				if sessionID != "" {
 					s.sticky.Set(ctx, userID, platform, sessionID, accountID)
 				}
 				return acc, nil
 			}
-			if opts.RequireContinuationAffinity {
-				return nil, continuationBlockedError(candidates, accountID)
-			}
+			return nil, ErrPreviousResponseAffinitySkip
 		}
 	}
 

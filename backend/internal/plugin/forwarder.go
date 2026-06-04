@@ -186,6 +186,30 @@ func (f *Forwarder) Forward(c *gin.Context) {
 						)
 						continue
 					}
+					failureSummary.recordPickAccountError(err)
+					logger.Warn("continuation_affinity_recovery_unavailable",
+						"action", "end_current_route",
+					)
+					break
+				}
+				if errors.Is(err, scheduler.ErrPreviousResponseAffinitySkip) {
+					recovered, recoverErr := recoverContinuationAffinityMissing(state)
+					if recoverErr != nil {
+						logger.Warn("previous_response_affinity_recovery_failed",
+							sdk.LogFieldError, recoverErr,
+						)
+					}
+					if recovered {
+						logger.Warn("previous_response_affinity_priority_recovery_retry",
+							"action", "drop_previous_response_id_full_context",
+						)
+						continue
+					}
+					failureSummary.recordPickAccountError(err)
+					logger.Warn("previous_response_affinity_recovery_unavailable",
+						"action", "end_current_route",
+					)
+					break
 				}
 				failureSummary.recordPickAccountError(err)
 				if len(softExclude) > 0 && time.Now().Before(queueDeadline) {

@@ -10,10 +10,13 @@ func recoverContinuationAffinityMissing(state *forwardState) (bool, error) {
 		return false, nil
 	}
 	nextBody, parsed, changed, err := buildContinuationRecoveryBody(state.body)
-	if err != nil || !changed {
+	if err != nil {
 		return false, err
 	}
 	if requestRequiresContinuationAffinity(parsed) {
+		return false, nil
+	}
+	if !changed && strings.TrimSpace(state.previousResponseID) == "" {
 		return false, nil
 	}
 

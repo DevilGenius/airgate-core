@@ -17,6 +17,7 @@ var (
 	ErrGroupNotFound                = errors.New("分组不存在")
 	ErrContinuationAffinityMissing  = errors.New("续链请求无法定位原上游账号")
 	ErrContinuationCapacityExceeded = errors.New("续链请求原上游账号容量不足")
+	ErrPreviousResponseAffinitySkip = errors.New("previous_response_id 命中账号不在当前最高优先级可用层")
 )
 
 // dbTimeout 后台 DB 操作超时，防止 goroutine 泄漏。
