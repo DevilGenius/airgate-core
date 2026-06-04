@@ -70,17 +70,6 @@ const ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.capaci
 const ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS = 0.5;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 
-function sameCapacityAccounts(
-  previous: Record<string, number> | undefined,
-  next: Record<string, number>,
-) {
-  if (!previous) return false;
-  const previousKeys = Object.keys(previous);
-  const nextKeys = Object.keys(next);
-  if (previousKeys.length !== nextKeys.length) return false;
-  return nextKeys.every((key) => previous[key] === next[key]);
-}
-
 if (typeof window !== 'undefined') {
   try {
     const storedAutoRefresh = Number(window.localStorage.getItem(ACCOUNT_AUTO_REFRESH_STORAGE_KEY));
@@ -249,52 +238,32 @@ export default function AccountsPageContent() {
     visibleAccountIdsRef.current = visibleAccountIds;
   }, [visibleAccountIds, visibleAccountIdsKey]);
 
-  const [capacityData, setCapacityData] = useState<{ accounts: Record<string, number> } | undefined>();
-  const capacityRefreshInFlightRef = useRef(false);
+  const [capacityAccounts, setCapacityAccounts] = useState<Record<string, number> | undefined>();
   const applyCapacityData = useCallback((nextData: { accounts: Record<string, number> }) => {
-    setCapacityData((previous) => (
-      sameCapacityAccounts(previous?.accounts, nextData.accounts) ? previous : nextData
-    ));
-    const counts = nextData.accounts;
-    if (!counts) return;
-    queryClient.setQueryData<PagedData<AccountResp>>(accountListQueryKey, (old) => {
-      if (!old?.list?.length) return old;
-      let changed = false;
-      const list = old.list.map((row) => {
-        const nextCount = counts[String(row.id)];
-        if (typeof nextCount !== 'number' || nextCount === row.current_concurrency) {
-          return row;
-        }
-        changed = true;
-        return {
-          ...row,
-          current_concurrency: nextCount,
-        };
-      });
-      return changed ? { ...old, list } : old;
-    });
-  }, [accountListQueryKey, queryClient]);
+    setCapacityAccounts({ ...nextData.accounts });
+  }, []);
   const refreshVisibleCapacity = useCallback(async () => {
     const ids = visibleAccountIdsRef.current;
-    if (ids.length === 0 || capacityRefreshInFlightRef.current) return;
-    capacityRefreshInFlightRef.current = true;
+    if (ids.length === 0) return;
     try {
       const nextData = await accountsApi.capacity(ids);
       applyCapacityData(nextData);
-    } finally {
-      capacityRefreshInFlightRef.current = false;
+    } catch {
+      // Ignore transient refresh errors; the next tick will retry.
     }
   }, [applyCapacityData]);
   useEffect(() => {
-    if (!capacityAutoRefresh || typeof window === 'undefined') return undefined;
+    if (!capacityAutoRefresh || typeof window === 'undefined' || visibleAccountIds.length === 0) {
+      return undefined;
+    }
     void refreshVisibleCapacity();
     const intervalId = window.setInterval(() => {
       void refreshVisibleCapacity();
     }, ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS * 1000);
     return () => window.clearInterval(intervalId);
-  }, [capacityAutoRefresh, refreshVisibleCapacity, visibleAccountIdsKey]);
+  }, [capacityAutoRefresh, refreshVisibleCapacity, visibleAccountIds.length, visibleAccountIdsKey]);
   const rowsWithCapacity = useMemo(() => {
-    const counts = capacityData?.accounts;
+    const counts = capacityAccounts;
     if (!counts) return rows;
     return rows.map((row) => {
       const nextCount = counts[String(row.id)];
@@ -306,7 +275,7 @@ export default function AccountsPageContent() {
         current_concurrency: nextCount,
       };
     });
-  }, [capacityData?.accounts, rows]);
+  }, [capacityAccounts, rows]);
 
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
