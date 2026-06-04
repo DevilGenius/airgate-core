@@ -1555,10 +1555,6 @@ func (s *Service) refreshUsageCacheAsync(platform string) {
 	s.startUsageCacheRefresh(platform, true)
 }
 
-func (s *Service) ensureUsageCacheRefresh(platform string) {
-	s.startUsageCacheRefresh(platform, false)
-}
-
 func (s *Service) ensureUsageCacheRefreshForAccounts(platform string, accounts []Account) {
 	s.startUsageCacheRefreshForAccountIDs(platform, accountIDsFromAccounts(filterRefreshableUsageAccounts(accounts)), false)
 }

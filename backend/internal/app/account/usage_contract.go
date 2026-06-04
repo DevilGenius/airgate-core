@@ -402,14 +402,6 @@ func inferUsageWindowKey(group, slot, label string) string {
 	return group + ":" + slot
 }
 
-func accountUsageInfosToMap(accounts map[string]AccountUsageInfo) map[string]any {
-	out := make(map[string]any, len(accounts))
-	for id, info := range accounts {
-		out[id] = accountUsageInfoToMap(info)
-	}
-	return out
-}
-
 func accountUsageInfoToMap(info AccountUsageInfo) map[string]any {
 	out := make(map[string]any, 3)
 	if info.UpdatedAt != "" {
