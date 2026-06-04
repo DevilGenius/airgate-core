@@ -111,10 +111,6 @@ func (s *StickySession) getMemory(key string) (int, bool) {
 	return binding.accountID, true
 }
 
-func (s *StickySession) setMemory(key string, accountID int) {
-	s.setMemoryWithRedisRefreshAfter(key, accountID, time.Now().Add(stickyRedisRefreshMin))
-}
-
 func (s *StickySession) setMemoryRefreshDue(key string, accountID int) {
 	s.setMemoryWithRedisRefreshAfter(key, accountID, time.Now())
 }
