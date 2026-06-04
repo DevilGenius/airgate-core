@@ -18,11 +18,13 @@ const (
 	stickyMemoryMaxEntries = 1000000
 	stickyCleanupInterval  = time.Minute
 	stickyCleanupMaxScan   = 4096
+	stickyRedisRefreshMin  = time.Minute
 )
 
 type stickyBinding struct {
-	accountID int
-	expiresAt time.Time
+	accountID         int
+	expiresAt         time.Time
+	redisRefreshAfter time.Time
 }
 
 // StickySession 粘性会话管理
@@ -74,7 +76,7 @@ func (s *StickySession) Get(ctx context.Context, userID int, platform, sessionID
 	if err != nil {
 		return 0, false
 	}
-	s.setMemory(key, id)
+	s.setMemoryRefreshDue(key, id)
 	return id, true
 }
 
@@ -84,8 +86,8 @@ func (s *StickySession) Set(ctx context.Context, userID int, platform, sessionID
 		return
 	}
 	key := stickyKey(userID, platform, sessionID)
-	s.setMemory(key, accountID)
-	if s.rdb != nil {
+	shouldRefreshRedis := s.refreshMemory(key, accountID)
+	if s.rdb != nil && shouldRefreshRedis {
 		s.rdb.Set(ctx, key, strconv.Itoa(accountID), s.ttl)
 	}
 }
@@ -110,19 +112,54 @@ func (s *StickySession) getMemory(key string) (int, bool) {
 }
 
 func (s *StickySession) setMemory(key string, accountID int) {
+	s.setMemoryWithRedisRefreshAfter(key, accountID, time.Now().Add(stickyRedisRefreshMin))
+}
+
+func (s *StickySession) setMemoryRefreshDue(key string, accountID int) {
+	s.setMemoryWithRedisRefreshAfter(key, accountID, time.Now())
+}
+
+func (s *StickySession) setMemoryWithRedisRefreshAfter(key string, accountID int, redisRefreshAfter time.Time) {
 	if key == "" || accountID <= 0 {
 		return
 	}
-	s.cleanupMemory(time.Now())
+	now := time.Now()
+	if redisRefreshAfter.IsZero() {
+		redisRefreshAfter = now
+	}
+	s.cleanupMemory(now)
 	s.mu.Lock()
 	if len(s.items) >= stickyMemoryMaxEntries {
-		deleteOneExpiredOrArbitrarySticky(s.items, time.Now())
+		deleteOneExpiredOrArbitrarySticky(s.items, now)
 	}
 	s.items[key] = stickyBinding{
-		accountID: accountID,
-		expiresAt: time.Now().Add(s.ttl),
+		accountID:         accountID,
+		expiresAt:         now.Add(s.ttl),
+		redisRefreshAfter: redisRefreshAfter,
 	}
 	s.mu.Unlock()
+}
+
+func (s *StickySession) refreshMemory(key string, accountID int) bool {
+	if key == "" || accountID <= 0 {
+		return false
+	}
+	now := time.Now()
+	s.cleanupMemory(now)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.items) >= stickyMemoryMaxEntries {
+		deleteOneExpiredOrArbitrarySticky(s.items, now)
+	}
+	binding, ok := s.items[key]
+	shouldRefreshRedis := !ok || binding.accountID != accountID || now.After(binding.expiresAt) || !now.Before(binding.redisRefreshAfter)
+	if shouldRefreshRedis {
+		binding.redisRefreshAfter = now.Add(stickyRedisRefreshMin)
+	}
+	binding.accountID = accountID
+	binding.expiresAt = now.Add(s.ttl)
+	s.items[key] = binding
+	return shouldRefreshRedis
 }
 
 func (s *StickySession) cleanupMemory(now time.Time) {

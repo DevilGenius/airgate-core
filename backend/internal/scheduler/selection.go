@@ -50,8 +50,13 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 	}
 
 	now := time.Now()
-	snapshot := s.newSelectionSnapshot(ctx, candidates, model, now)
-	snapshot.loadSchedulability(ctx, s, s.deferredConstraintCandidates(ctx, candidates, model, now, snapshot))
+	if previousResponseID := strings.TrimSpace(opts.PreviousResponseID); previousResponseID != "" && s.responseAffinity != nil {
+		if selected, handled, err := s.selectPreviousResponseAffinity(ctx, platform, model, userID, groupID, sessionID, candidates, opts, previousResponseID, now); handled {
+			return selected, err
+		}
+	}
+
+	snapshot := s.loadedSelectionSnapshot(ctx, candidates, model, now)
 	normalCandidates := make([]*ent.Account, 0, len(candidates))
 	stickyCandidates := make([]*ent.Account, 0, len(candidates))
 	var hardAffinityCandidates []*ent.Account
@@ -69,29 +74,6 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		}
 		if opts.RequireContinuationAffinity && result.hardAffinity != NotSchedulable {
 			hardAffinityCandidates = append(hardAffinityCandidates, acc)
-		}
-	}
-
-	if previousResponseID := strings.TrimSpace(opts.PreviousResponseID); previousResponseID != "" && s.responseAffinity != nil {
-		if accountID, found := s.responseAffinity.Get(ctx, groupID, platform, previousResponseID); found {
-			if opts.RequireContinuationAffinity {
-				if acc := findAccountByID(hardAffinityCandidates, accountID); acc != nil {
-					s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID)
-					if sessionID != "" {
-						s.sticky.Set(ctx, userID, platform, sessionID, accountID)
-					}
-					return acc, nil
-				}
-				return nil, continuationBlockedError(candidates, accountID)
-			}
-			if acc := selectSoftStickyAccount(softStickyCandidates(normalCandidates, stickyCandidates), accountID); acc != nil {
-				s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID)
-				if sessionID != "" {
-					s.sticky.Set(ctx, userID, platform, sessionID, accountID)
-				}
-				return acc, nil
-			}
-			return nil, ErrPreviousResponseAffinitySkip
 		}
 	}
 
@@ -138,6 +120,133 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		return nil, ErrNoAvailableAccount
 	}
 	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalSelectionCandidates, now, snapshot)
+}
+
+func (s *Scheduler) selectPreviousResponseAffinity(
+	ctx context.Context,
+	platform string,
+	model string,
+	userID int,
+	groupID int,
+	sessionID string,
+	candidates []*ent.Account,
+	opts AccountSelectionOptions,
+	previousResponseID string,
+	now time.Time,
+) (*ent.Account, bool, error) {
+	accountID, found := s.responseAffinity.Get(ctx, groupID, platform, previousResponseID)
+	if !found {
+		return nil, false, nil
+	}
+	acc := findAccountByID(candidates, accountID)
+	if acc == nil {
+		if opts.RequireContinuationAffinity {
+			return nil, true, ErrContinuationAffinityMissing
+		}
+		return nil, true, ErrPreviousResponseAffinitySkip
+	}
+
+	result := s.checkSchedulabilityForAccount(ctx, acc, model, now, opts.RequireContinuationAffinity)
+	if opts.RequireContinuationAffinity {
+		if result.hardAffinity != NotSchedulable {
+			s.refreshPreviousResponseAffinity(ctx, groupID, platform, previousResponseID, accountID, userID, sessionID)
+			return acc, true, nil
+		}
+		return nil, true, continuationBlockedError(candidates, accountID)
+	}
+	if result.normal == NotSchedulable {
+		return nil, true, ErrPreviousResponseAffinitySkip
+	}
+	if s.softPreviousResponseAffinityAllowed(ctx, candidates, acc, result.normal, model, now) {
+		s.refreshPreviousResponseAffinity(ctx, groupID, platform, previousResponseID, accountID, userID, sessionID)
+		return acc, true, nil
+	}
+	// 被当前最高优先级可用层阻挡时直接交给 forwarder 恢复：删除 previous_response_id
+	// 后重新进入正常调度。这里不复用快路径的局部 snapshot，避免跨恢复路径传递易过期状态。
+	return nil, true, ErrPreviousResponseAffinitySkip
+}
+
+func (s *Scheduler) refreshPreviousResponseAffinity(ctx context.Context, groupID int, platform, previousResponseID string, accountID int, userID int, sessionID string) {
+	s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID)
+	if sessionID != "" {
+		s.sticky.Set(ctx, userID, platform, sessionID, accountID)
+	}
+}
+
+func (s *Scheduler) checkSchedulabilityForAccount(ctx context.Context, acc *ent.Account, model string, now time.Time, needHardAffinity bool) schedulabilityResult {
+	snapshot := s.loadedSelectionSnapshot(ctx, []*ent.Account{acc}, model, now)
+	return s.checkSchedulabilityResult(ctx, acc, model, now, needHardAffinity, snapshot)
+}
+
+func (s *Scheduler) softPreviousResponseAffinityAllowed(ctx context.Context, candidates []*ent.Account, affinity *ent.Account, affinitySched Schedulability, model string, now time.Time) bool {
+	competitors := softAffinityCompetitors(candidates, affinity, affinitySched)
+	if len(competitors) == 0 {
+		return true
+	}
+	snapshot := s.loadedSelectionSnapshot(ctx, competitors, model, now)
+	for _, acc := range competitors {
+		result := s.checkSchedulabilityResult(ctx, acc, model, now, false, snapshot)
+		if softAffinityCompetitorBlocks(affinity, affinitySched, acc, result.normal) {
+			return false
+		}
+	}
+	return true
+}
+
+// softAffinityCompetitors 只保留可能阻挡 soft affinity 的账号：
+//   - affinity >= 0 且 Normal：非负、更高优先级账号
+//   - affinity >= 0 且 StickyOnly：非负账号；同级或低级 StickyOnly 后续不会阻挡
+//   - affinity < 0 且 Normal：所有非负账号，以及更高优先级的负数账号
+//   - affinity < 0 且 StickyOnly：所有非负和负数账号；负数 Normal 即使优先级更低也会阻挡
+//
+// 最终是否阻挡由 softAffinityCompetitorBlocks 按实际 schedulability 判断。
+func softAffinityCompetitors(candidates []*ent.Account, affinity *ent.Account, affinitySched Schedulability) []*ent.Account {
+	if affinity == nil {
+		return nil
+	}
+	out := make([]*ent.Account, 0, len(candidates))
+	for _, acc := range candidates {
+		if acc == nil || acc.ID == affinity.ID {
+			continue
+		}
+		if affinity.Priority >= 0 {
+			if acc.Priority < 0 {
+				continue
+			}
+			if affinitySched == Normal && acc.Priority <= affinity.Priority {
+				continue
+			}
+			out = append(out, acc)
+			continue
+		}
+		if affinitySched == Normal && acc.Priority < 0 && acc.Priority <= affinity.Priority {
+			continue
+		}
+		out = append(out, acc)
+	}
+	return out
+}
+
+func softAffinityCompetitorBlocks(affinity *ent.Account, affinitySched Schedulability, competitor *ent.Account, competitorSched Schedulability) bool {
+	if affinity == nil || competitor == nil || competitorSched == NotSchedulable {
+		return false
+	}
+	if affinity.Priority >= 0 {
+		if competitor.Priority < 0 {
+			return false
+		}
+		if affinitySched == Normal {
+			return competitorSched == Normal && competitor.Priority > affinity.Priority
+		}
+		return competitorSched == Normal || (competitorSched == StickyOnly && competitor.Priority > affinity.Priority)
+	}
+	if competitor.Priority >= 0 {
+		return competitorSched == Normal || competitorSched == StickyOnly
+	}
+	if affinitySched == Normal {
+		return competitorSched == Normal && competitor.Priority > affinity.Priority
+	}
+	return competitorSched == Normal || (competitorSched == StickyOnly && competitor.Priority > affinity.Priority)
 }
 
 func continuationBlockedError(candidates []*ent.Account, accountID int) error {

@@ -323,6 +323,62 @@ func TestSoftPreviousResponseAffinityRequiresHighestPriority(t *testing.T) {
 	}
 }
 
+func TestSoftPreviousResponseAffinityFastPathSkipsLowerPriorityCapacityChecks(t *testing.T) {
+	ctx := context.Background()
+	s := newSelectionTestScheduler(Normal)
+	groupID := 7
+	low := newSelectionTestAccount(10)
+	low.Priority = 10
+	fallback := newSelectionTestAccount(15)
+	fallback.Priority = -1
+	high := newSelectionTestAccount(20)
+	high.Priority = 20
+	s.routeCache.Set(groupID, "openai", []*ent.Account{low, fallback, high}, nil)
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_high", high.ID)
+
+	windowCost := s.windowCost.(*stubWindowCostTracker)
+	windowCost.calls = 0
+	selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+		PreviousResponseID: "resp_high",
+	})
+	if err != nil {
+		t.Fatalf("SelectAccountWithOptions() returned error: %v", err)
+	}
+	if selected.ID != high.ID {
+		t.Fatalf("selected account ID = %d, want %d", selected.ID, high.ID)
+	}
+	if windowCost.calls != 1 {
+		t.Fatalf("window cost checks = %d, want 1", windowCost.calls)
+	}
+}
+
+func TestHardPreviousResponseAffinityFastPathSkipsUnrelatedCapacityChecks(t *testing.T) {
+	ctx := context.Background()
+	s := newSelectionTestScheduler(NotSchedulable)
+	groupID := 7
+	affinity := newSelectionTestAccount(10)
+	other := newSelectionTestAccount(20)
+	other.Priority = 100
+	s.routeCache.Set(groupID, "openai", []*ent.Account{other, affinity}, nil)
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_affinity", affinity.ID)
+
+	windowCost := s.windowCost.(*stubWindowCostTracker)
+	windowCost.calls = 0
+	selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+		PreviousResponseID:          "resp_affinity",
+		RequireContinuationAffinity: true,
+	})
+	if err != nil {
+		t.Fatalf("SelectAccountWithOptions() returned error: %v", err)
+	}
+	if selected.ID != affinity.ID {
+		t.Fatalf("selected account ID = %d, want %d", selected.ID, affinity.ID)
+	}
+	if windowCost.calls != 1 {
+		t.Fatalf("window cost checks = %d, want 1", windowCost.calls)
+	}
+}
+
 func TestHardAffinityDoesNotBypassNonWindowConstraints(t *testing.T) {
 	ctx := context.Background()
 

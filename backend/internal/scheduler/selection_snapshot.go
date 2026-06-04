@@ -62,6 +62,12 @@ func (s *Scheduler) newSelectionSnapshot(ctx context.Context, candidates []*ent.
 	return snap
 }
 
+func (s *Scheduler) loadedSelectionSnapshot(ctx context.Context, candidates []*ent.Account, model string, now time.Time) *selectionSnapshot {
+	snapshot := s.newSelectionSnapshot(ctx, candidates, model, now)
+	snapshot.loadSchedulability(ctx, s, s.deferredConstraintCandidates(ctx, candidates, model, now, snapshot))
+	return snapshot
+}
+
 func (snap *selectionSnapshot) loadSchedulability(ctx context.Context, s *Scheduler, candidates []*ent.Account) {
 	if snap == nil {
 		return

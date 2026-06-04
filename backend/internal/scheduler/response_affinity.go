@@ -18,11 +18,13 @@ const (
 	responseAffinityMemoryMaxEntries = 1000000
 	responseAffinityCleanupInterval  = time.Minute
 	responseAffinityCleanupMaxScan   = 4096
+	responseAffinityRedisRefreshMin  = time.Minute
 )
 
 type responseAffinityBinding struct {
-	accountID int
-	expiresAt time.Time
+	accountID         int
+	expiresAt         time.Time
+	redisRefreshAfter time.Time
 }
 
 // ResponseAffinity 保存 OpenAI Responses response_id 到上游账号的绑定。
@@ -78,12 +80,19 @@ func (a *ResponseAffinity) Get(ctx context.Context, groupID int, platform, respo
 	if err != nil || accountID <= 0 {
 		return 0, false
 	}
-	a.setMemory(key, accountID)
+	a.setMemoryRefreshDue(key, accountID)
 	return accountID, true
 }
 
 func (a *ResponseAffinity) Refresh(ctx context.Context, groupID int, platform, responseID string, accountID int) {
-	a.Bind(ctx, groupID, platform, responseID, accountID)
+	if a == nil || groupID <= 0 || strings.TrimSpace(platform) == "" || strings.TrimSpace(responseID) == "" || accountID <= 0 {
+		return
+	}
+	key := responseAffinityKey(groupID, platform, responseID)
+	shouldRefreshRedis := a.refreshMemory(key, accountID)
+	if a.rdb != nil && shouldRefreshRedis {
+		a.rdb.Set(ctx, key, strconv.Itoa(accountID), a.ttl)
+	}
 }
 
 func (a *ResponseAffinity) getMemory(key string) (int, bool) {
@@ -103,20 +112,54 @@ func (a *ResponseAffinity) getMemory(key string) (int, bool) {
 }
 
 func (a *ResponseAffinity) setMemory(key string, accountID int) {
+	a.setMemoryWithRedisRefreshAfter(key, accountID, time.Now().Add(responseAffinityRedisRefreshMin))
+}
+
+func (a *ResponseAffinity) setMemoryRefreshDue(key string, accountID int) {
+	a.setMemoryWithRedisRefreshAfter(key, accountID, time.Now())
+}
+
+func (a *ResponseAffinity) setMemoryWithRedisRefreshAfter(key string, accountID int, redisRefreshAfter time.Time) {
 	if key == "" || accountID <= 0 {
 		return
 	}
 	now := time.Now()
+	if redisRefreshAfter.IsZero() {
+		redisRefreshAfter = now
+	}
 	a.cleanupMemory(now)
 	a.mu.Lock()
 	if len(a.items) >= responseAffinityMemoryMaxEntries {
 		deleteOneExpiredOrArbitraryResponseAffinity(a.items, now)
 	}
 	a.items[key] = responseAffinityBinding{
-		accountID: accountID,
-		expiresAt: now.Add(a.ttl),
+		accountID:         accountID,
+		expiresAt:         now.Add(a.ttl),
+		redisRefreshAfter: redisRefreshAfter,
 	}
 	a.mu.Unlock()
+}
+
+func (a *ResponseAffinity) refreshMemory(key string, accountID int) bool {
+	if key == "" || accountID <= 0 {
+		return false
+	}
+	now := time.Now()
+	a.cleanupMemory(now)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if len(a.items) >= responseAffinityMemoryMaxEntries {
+		deleteOneExpiredOrArbitraryResponseAffinity(a.items, now)
+	}
+	binding, ok := a.items[key]
+	shouldRefreshRedis := !ok || binding.accountID != accountID || now.After(binding.expiresAt) || !now.Before(binding.redisRefreshAfter)
+	if shouldRefreshRedis {
+		binding.redisRefreshAfter = now.Add(responseAffinityRedisRefreshMin)
+	}
+	binding.accountID = accountID
+	binding.expiresAt = now.Add(a.ttl)
+	a.items[key] = binding
+	return shouldRefreshRedis
 }
 
 func (a *ResponseAffinity) cleanupMemory(now time.Time) {
