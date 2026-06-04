@@ -25,11 +25,13 @@ import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { CreateAccountReq, AccountExportItem } from '../../../shared/types';
 import {
-  clampAccountPriority,
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
+  commitAccountPriorityInput,
   DEFAULT_ACCOUNT_MAX_CONCURRENCY,
   DEFAULT_ACCOUNT_PRIORITY,
+  isAccountPriorityDraft,
+  parseAccountPriorityInput,
 } from './accountDefaults';
 
 const CREATE_ACCOUNT_FORM_ID = 'create-account-form';
@@ -62,6 +64,7 @@ export function CreateAccountModal({
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [batchMode, setBatchMode] = useState(false);
+  const [priorityInput, setPriorityInput] = useState(String(DEFAULT_ACCOUNT_PRIORITY));
 
   // 根据平台获取凭证字段定义
   const { data: schema } = useQuery({
@@ -99,6 +102,7 @@ export function CreateAccountModal({
     setPlatform('');
     setAccountType('');
     setForm({ name: '', priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
+    setPriorityInput(String(DEFAULT_ACCOUNT_PRIORITY));
     setCredentials({});
     setGroupIds([]);
     setBatchMode(false);
@@ -123,12 +127,13 @@ export function CreateAccountModal({
   ): Promise<PluginBatchImportResult> => {
     if (!onBatchImport) return { imported: 0, failed: accounts.length };
     const prefix = form.name.trim();
+    const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
     const toImport: AccountExportItem[] = accounts.map((a, i) => ({
       name: prefix ? `${prefix}${i + 1}` : a.name || `Claude Code ${i + 1}`,
       platform,
       type: a.type || 'oauth',
       credentials: a.credentials,
-      priority: form.priority ?? DEFAULT_ACCOUNT_PRIORITY,
+      priority,
       max_concurrency: form.max_concurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY,
       rate_multiplier: form.rate_multiplier ?? 1,
       group_ids: groupIds.length ? groupIds : undefined,
@@ -145,8 +150,10 @@ export function CreateAccountModal({
 
   const handleSubmit = () => {
     if (loading || batchMode || !platform || !form.name) return;
+    const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
     onSubmit({
       ...form,
+      priority,
       platform,
       type: accountType || undefined,
       credentials,
@@ -159,10 +166,24 @@ export function CreateAccountModal({
     setPlatform('');
     setAccountType('');
     setForm({ name: '', priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
+    setPriorityInput(String(DEFAULT_ACCOUNT_PRIORITY));
     setCredentials({});
     setGroupIds([]);
     setBatchMode(false);
     onClose();
+  };
+  const handlePriorityChange = (value: string) => {
+    if (!isAccountPriorityDraft(value)) return;
+    setPriorityInput(value);
+    const priority = parseAccountPriorityInput(value);
+    if (priority != null) {
+      setForm((prev) => ({ ...prev, priority }));
+    }
+  };
+  const commitPriorityChange = () => {
+    const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
+    setPriorityInput(String(priority));
+    setForm((prev) => ({ ...prev, priority }));
   };
   const platformOptions = [
     { id: '', label: t('accounts.select_platform') },
@@ -302,15 +323,15 @@ export function CreateAccountModal({
                         <Hash className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
                         <Input
                           className="pl-9"
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="-?[0-9]*"
                           min={ACCOUNT_PRIORITY_MIN}
                           max={ACCOUNT_PRIORITY_MAX}
                           step={1}
-                          value={String(form.priority ?? DEFAULT_ACCOUNT_PRIORITY)}
-                          onChange={(e) => {
-                            const v = Math.round(Number(e.target.value));
-                            setForm({ ...form, priority: clampAccountPriority(v) });
-                          }}
+                          value={priorityInput}
+                          onBlur={commitPriorityChange}
+                          onChange={(e) => handlePriorityChange(e.target.value)}
                         />
                       </div>
                     </HeroTextField>

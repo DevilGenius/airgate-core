@@ -21,11 +21,13 @@ import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { BulkUpdateAccountsReq } from '../../../shared/types';
 import {
-  clampAccountPriority,
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
+  commitAccountPriorityInput,
   DEFAULT_ACCOUNT_MAX_CONCURRENCY,
   DEFAULT_ACCOUNT_PRIORITY,
+  isAccountPriorityDraft,
+  parseAccountPriorityInput,
 } from './accountDefaults';
 
 /**
@@ -58,6 +60,7 @@ export function BulkEditAccountModal({
   // 字段值
   const [status, setStatus] = useState<'active' | 'disabled'>('active');
   const [priority, setPriority] = useState(DEFAULT_ACCOUNT_PRIORITY);
+  const [priorityInput, setPriorityInput] = useState(String(DEFAULT_ACCOUNT_PRIORITY));
   const [maxConcurrency, setMaxConcurrency] = useState(DEFAULT_ACCOUNT_MAX_CONCURRENCY);
   const [rateMultiplier, setRateMultiplier] = useState(1);
   const [groupIds, setGroupIds] = useState<number[]>([]);
@@ -87,7 +90,7 @@ export function BulkEditAccountModal({
 
     const patch: Omit<BulkUpdateAccountsReq, 'account_ids'> = {};
     if (enableStatus) patch.state = status;
-    if (enablePriority) patch.priority = priority;
+    if (enablePriority) patch.priority = commitAccountPriorityInput(priorityInput, priority);
     if (enableConcurrency) patch.max_concurrency = maxConcurrency;
     if (enableRateMultiplier) patch.rate_multiplier = rateMultiplier;
     if (enableGroups) patch.group_ids = groupIds;
@@ -110,6 +113,19 @@ export function BulkEditAccountModal({
       if (!nextOpen) onClose();
     },
   });
+  const handlePriorityChange = (value: string) => {
+    if (!isAccountPriorityDraft(value)) return;
+    setPriorityInput(value);
+    const nextPriority = parseAccountPriorityInput(value);
+    if (nextPriority != null) {
+      setPriority(nextPriority);
+    }
+  };
+  const commitPriorityChange = () => {
+    const nextPriority = commitAccountPriorityInput(priorityInput, priority);
+    setPriority(nextPriority);
+    setPriorityInput(String(nextPriority));
+  };
 
   return (
     <CommonModal
@@ -162,16 +178,16 @@ export function BulkEditAccountModal({
               <Hash className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
               <Input
                 className="pl-9"
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="-?[0-9]*"
                 min={ACCOUNT_PRIORITY_MIN}
                 max={ACCOUNT_PRIORITY_MAX}
                 step={1}
-                value={String(priority)}
+                value={priorityInput}
                 disabled={!enablePriority}
-                onChange={(e) => {
-                  const v = Math.round(Number(e.target.value));
-                  setPriority(clampAccountPriority(v));
-                }}
+                onBlur={commitPriorityChange}
+                onChange={(e) => handlePriorityChange(e.target.value)}
               />
             </div>
           </HeroTextField>

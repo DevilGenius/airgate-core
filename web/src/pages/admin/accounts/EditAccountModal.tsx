@@ -32,11 +32,13 @@ import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { AccountResp, UpdateAccountReq } from '../../../shared/types';
 import {
-  clampAccountPriority,
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
+  commitAccountPriorityInput,
   DEFAULT_ACCOUNT_MAX_CONCURRENCY,
   DEFAULT_ACCOUNT_PRIORITY,
+  isAccountPriorityDraft,
+  parseAccountPriorityInput,
 } from './accountDefaults';
 
 export function EditAccountModal({
@@ -70,6 +72,7 @@ export function EditAccountModal({
   const origCredentials = useRef(account.credentials);
   const [credentials, setCredentials] = useState<Record<string, string>>(account.credentials);
   const [groupIds, setGroupIds] = useState<number[]>(account.group_ids ?? []);
+  const [priorityInput, setPriorityInput] = useState(String(account.priority ?? DEFAULT_ACCOUNT_PRIORITY));
 
   const { data: schema } = useQuery({
     queryKey: queryKeys.credentialsSchema(account.platform),
@@ -125,6 +128,7 @@ export function EditAccountModal({
   };
 
   const handleSubmit = () => {
+    const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
     const merged = { ...credentials };
     const passwordKeys = new Set(
       getSchemaVisibleFields(schema, accountType)
@@ -138,11 +142,25 @@ export function EditAccountModal({
 
     onSubmit({
       ...form,
+      priority,
       type: accountType || undefined,
       credentials: merged,
       extra: form.extra,
       group_ids: groupIds,
     });
+  };
+  const handlePriorityChange = (value: string) => {
+    if (!isAccountPriorityDraft(value)) return;
+    setPriorityInput(value);
+    const priority = parseAccountPriorityInput(value);
+    if (priority != null) {
+      setForm((prev) => ({ ...prev, priority }));
+    }
+  };
+  const commitPriorityChange = () => {
+    const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
+    setPriorityInput(String(priority));
+    setForm((prev) => ({ ...prev, priority }));
   };
 
   const proxyOptions = [
@@ -261,18 +279,15 @@ export function EditAccountModal({
                         <Hash className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
                         <Input
                           className="pl-9"
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="-?[0-9]*"
                           min={ACCOUNT_PRIORITY_MIN}
                           max={ACCOUNT_PRIORITY_MAX}
                           step={1}
-                          value={String(form.priority ?? DEFAULT_ACCOUNT_PRIORITY)}
-                          onChange={(event) => {
-                            const value = Math.round(Number(event.target.value));
-                            setForm({
-                              ...form,
-                              priority: clampAccountPriority(value),
-                            });
-                          }}
+                          value={priorityInput}
+                          onBlur={commitPriorityChange}
+                          onChange={(event) => handlePriorityChange(event.target.value)}
                         />
                       </div>
                     </HeroTextField>
