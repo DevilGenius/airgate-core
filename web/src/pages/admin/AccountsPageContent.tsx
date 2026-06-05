@@ -809,7 +809,7 @@ export default function AccountsPageContent() {
             options={ACCOUNT_AUTO_REFRESH_OPTIONS}
             label={autoRefreshLabel}
             offLabel={autoRefreshOffLabel}
-            afterRefresh={(
+            beforeRefresh={(
               <NativeSwitch
                 ariaLabel={capacityAutoRefreshLabel}
                 className="h-8 shrink-0"
@@ -819,6 +819,7 @@ export default function AccountsPageContent() {
                 onChange={setCapacityAutoRefresh}
               />
             )}
+            triggerClassName="ag-auto-refresh-trigger--account-fixed"
             ariaLabel={t('accounts.auto_refresh')}
             refreshAriaLabel={t('common.refresh')}
             onChange={setAutoRefresh}

@@ -30,7 +30,6 @@ html[data-theme="dark"] {
   --ag-reliable-font-mono: "Fira Code", ui-monospace, "SFMono-Regular", "SF Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, Monaco, "Courier New", monospace;
   --ag-font-sans: var(--ag-reliable-font-sans);
   --ag-font-mono: var(--ag-reliable-font-mono);
-  --font-geist: var(--ag-reliable-font-sans);
   --font-sans: var(--ag-reliable-font-sans);
   --font-mono: var(--ag-reliable-font-mono);
 }
@@ -59,8 +58,7 @@ html[data-theme="dark"] {
   /* HeroUI radius preset */
   --radius: 0.25rem;
   --field-radius: 0.5rem;
-  --font-geist: var(--ag-font-sans);
-  --font-sans: var(--font-geist);
+  --font-sans: var(--ag-font-sans);
   --font-mono: var(--ag-font-mono);
 
   --background: var(--ag-bg);
@@ -228,7 +226,7 @@ html[data-theme="dark"] {
   --color-glass-border: var(--ag-glass-border);
 
   /* ── Font Family ── */
-  --font-sans: var(--font-geist);
+  --font-sans: var(--ag-font-sans);
   --font-mono: var(--ag-font-mono);
 
   /* ── Box Shadow ── */

@@ -1,4 +1,4 @@
-import { lazy, startTransition, Suspense, useCallback, useMemo, useState, type CSSProperties, type Key, type ReactNode } from 'react';
+import { lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties, type Key, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Card, Dropdown, ListBox, Select, Tabs } from '@heroui/react';
@@ -128,6 +128,7 @@ const groupByHeaderKeys: Record<string, string> = {
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
 const USAGE_PAGE_ACTIVATION_DELAY_MS = 180;
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
+const ADMIN_USAGE_COLUMN_STORAGE_KEY = 'airgate.admin.usage.columns';
 const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
   'user_id',
   'created_at',
@@ -147,6 +148,28 @@ const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
 function compactText(value: string | undefined, fallback = '-') {
   const trimmed = value?.trim();
   return trimmed || fallback;
+}
+
+function readAdminUsageColumnKeys() {
+  if (typeof window === 'undefined') return new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
+  try {
+    const raw = window.localStorage.getItem(ADMIN_USAGE_COLUMN_STORAGE_KEY);
+    if (!raw) return new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
+    const keys = parsed.filter((key): key is string => typeof key === 'string' && key.length > 0);
+    return keys.length > 0 ? new Set(keys) : new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
+  } catch {
+    return new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
+  }
+}
+
+function writeAdminUsageColumnKeys(keys: Set<string>) {
+  try {
+    window.localStorage.setItem(ADMIN_USAGE_COLUMN_STORAGE_KEY, JSON.stringify(Array.from(keys)));
+  } catch {
+    // localStorage may be unavailable in restricted browser modes.
+  }
 }
 
 function displayUserAgent(value: string | undefined) {
@@ -448,7 +471,7 @@ export default function UsagePage() {
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
   const [granularity, setGranularity] = useState<string>('hour');
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<Set<string>>(
-    () => new Set(ADMIN_USAGE_DEFAULT_COLUMN_KEYS),
+    readAdminUsageColumnKeys,
   );
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS);
   const { platforms, platformName } = usePlatforms();
@@ -738,7 +761,7 @@ export default function UsagePage() {
     const apiKeyColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'api_key',
       title: 'API Key',
-      width: '124px',
+      width: '112px',
       hideOnMobile: true,
       render: (row) => {
         if (row.api_key_deleted) {
@@ -834,6 +857,26 @@ export default function UsagePage() {
     () => new Set(columnOptions.map((option) => option.key).filter((key) => selectedColumnKeys.has(key))),
     [columnOptions, selectedColumnKeys],
   );
+
+  useEffect(() => {
+    const validKeys = new Set(columnOptions.map((option) => option.key));
+    setSelectedColumnKeys((current) => {
+      const next = new Set(Array.from(current).filter((key) => validKeys.has(key)));
+      if (next.size === 0) {
+        for (const key of ADMIN_USAGE_DEFAULT_COLUMN_KEYS) {
+          if (validKeys.has(key)) next.add(key);
+        }
+      }
+      if (next.size === current.size && Array.from(next).every((key) => current.has(key))) {
+        return current;
+      }
+      return next;
+    });
+  }, [columnOptions]);
+
+  useEffect(() => {
+    writeAdminUsageColumnKeys(selectedColumnKeys);
+  }, [selectedColumnKeys]);
 
   const columns = useMemo(() => {
     const visible = allColumns.filter((column) => selectedVisibleColumnKeys.has(column.key));

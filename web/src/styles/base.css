@@ -58,6 +58,11 @@ body {
   font-feature-settings: "liga" 0, "calt" 0;
 }
 
+#root :where(code, pre, kbd, samp, .font-mono):where(:not(.font-thin):not(.font-extralight):not(.font-light):not(.font-normal):not(.font-medium):not(.font-semibold):not(.font-bold):not(.font-extrabold):not(.font-black)),
+.ag-elevation-modal :where(code, pre, kbd, samp, .font-mono):where(:not(.font-thin):not(.font-extralight):not(.font-light):not(.font-normal):not(.font-medium):not(.font-semibold):not(.font-bold):not(.font-extrabold):not(.font-black)) {
+  font-weight: 500;
+}
+
 #root ::selection,
 body::selection {
   background: var(--accent-soft);

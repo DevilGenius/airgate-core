@@ -18,7 +18,6 @@ function syncHeroUIThemeClass(theme: ThemeName) {
 
 function applyReliableFonts() {
   document.documentElement.style.setProperty('--ag-font-sans', RELIABLE_SANS_FONT);
-  document.documentElement.style.setProperty('--font-geist', RELIABLE_SANS_FONT);
   document.documentElement.style.setProperty('--font-sans', RELIABLE_SANS_FONT);
   document.documentElement.style.setProperty('--ag-font-mono', RELIABLE_MONO_FONT);
   document.documentElement.style.setProperty('--font-mono', RELIABLE_MONO_FONT);

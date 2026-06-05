@@ -9,7 +9,9 @@ interface AutoRefreshControlProps {
   label: string;
   offLabel: string;
   fastLabel?: string;
+  beforeRefresh?: ReactNode;
   afterRefresh?: ReactNode;
+  triggerClassName?: string;
   ariaLabel: string;
   refreshAriaLabel: string;
   onChange: (value: number) => void;
@@ -147,7 +149,9 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   label,
   offLabel,
   fastLabel,
+  beforeRefresh,
   afterRefresh,
+  triggerClassName,
   ariaLabel,
   refreshAriaLabel,
   onChange,
@@ -181,6 +185,7 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
 
   return (
     <>
+      {beforeRefresh}
       <Button
         isIconOnly
         aria-label={refreshAriaLabel}
@@ -195,7 +200,11 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
       {afterRefresh}
       <Dropdown>
         <Dropdown.Trigger
-          className={`ag-auto-refresh-trigger button button--sm ${enabled ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
+          className={[
+            'ag-auto-refresh-trigger button button--sm h-8 min-w-[7.5rem] whitespace-nowrap px-3',
+            enabled ? 'button--secondary' : 'button--ghost',
+            triggerClassName,
+          ].filter(Boolean).join(' ')}
         >
           <span>{currentLabel}</span>
           <ChevronDown className="h-3 w-3 shrink-0" />

@@ -14,9 +14,6 @@ importers:
       '@fontsource/fira-code':
         specifier: ^5.2.7
         version: 5.2.7
-      '@fontsource/geist-sans':
-        specifier: ^5.2.5
-        version: 5.2.5
       '@heroui/react':
         specifier: ^3.1.0
         version: 3.1.0(@react-spectrum/provider@3.11.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(tailwindcss@4.3.0)
@@ -401,9 +398,6 @@ packages:
 
   '@fontsource/fira-code@5.2.7':
     resolution: {integrity: sha512-tnB9NNund9TwIym8/7DMJe573nlPEQb+fKUV5GL8TBYXjIhDvL0D7mgmNVNQUPhXp+R7RylQeiBdkA4EbOHPGQ==}
-
-  '@fontsource/geist-sans@5.2.5':
-    resolution: {integrity: sha512-anllOHyJbElRs9fV15TeDRqAeb1IKm4bSknPl6ZMoyPTx1BBy7logudcUwpNjmQLkzn4Q0JGQLRCUKJYoyST6A==}
 
   '@formatjs/ecma402-abstract@2.3.6':
     resolution: {integrity: sha512-HJnTFeRM2kVFVr5gr5kH1XP6K0JcJtE7Lzvtr3FS/so5f1kpsqqqxy5JF+FRaO6H2qmcMfAUIox7AJteieRtVw==}
@@ -2411,8 +2405,6 @@ snapshots:
       levn: 0.4.1
 
   '@fontsource/fira-code@5.2.7': {}
-
-  '@fontsource/geist-sans@5.2.5': {}
 
   '@formatjs/ecma402-abstract@2.3.6':
     dependencies:
