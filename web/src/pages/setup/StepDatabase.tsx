@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Form, Input, Label, ListBox, Select, TextField as HeroTextField } from '@heroui/react';
+import { Alert, Button, Form, Input, Label, TextField as HeroTextField } from '@heroui/react';
+import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { setupApi } from '../../shared/api/setup';
 import {
   ArrowRight,
@@ -128,26 +129,17 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
             required
           />
         </HeroTextField>
-        <Select
-          fullWidth
-          selectedKey={data.sslmode || 'disable'}
-          onSelectionChange={(key) => update('sslmode', String(key ?? 'disable'))}
-        >
+        <div className="space-y-1.5">
           <Label>{t('setup.ssl_mode')}</Label>
-          <Select.Trigger>
-            <Select.Value>{data.sslmode || 'disable'}</Select.Value>
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox items={sslOptions}>
-              {(item) => (
-                <ListBox.Item id={item.id} textValue={item.label}>
-                  {item.label}
-                </ListBox.Item>
-              )}
-            </ListBox>
-          </Select.Popover>
-        </Select>
+          <SimpleSelect
+            ariaLabel={t('setup.ssl_mode')}
+          fullWidth
+            items={sslOptions.map((item) => ({ key: item.id, label: item.label }))}
+          selectedKey={data.sslmode || 'disable'}
+            selectedLabel={data.sslmode || 'disable'}
+            onSelectionChange={(key) => update('sslmode', key || 'disable')}
+          />
+        </div>
       </div>
 
       <TestResultBanner result={testResult} />

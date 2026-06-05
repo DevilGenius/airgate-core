@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, ComboBox, Input, ListBox, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Input, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
-import { Check, Plus, Search, Trash2, X } from 'lucide-react';
+import { Check, Plus, Trash2, X } from 'lucide-react';
 import { PlatformIcon } from '../../../shared/ui';
 import { groupsApi } from '../../../shared/api/groups';
 import { usersApi } from '../../../shared/api/users';
 import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { queryKeys } from '../../../shared/queryKeys';
+import { SearchFilterComboBox } from '../../../shared/components/SearchFilterComboBox';
 import type { GroupResp, GroupRateOverrideResp, UserResp } from '../../../shared/types';
 
 interface GroupRateOverridesModalProps {
@@ -145,22 +146,22 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
         </p>
         <div className="flex items-start gap-2">
           <div className="flex-1">
-            <ComboBox
-              aria-label={t('groups.rate_override_search_placeholder')}
-              allowsEmptyCollection
-              fullWidth
-              inputValue={emailQuery}
+            <SearchFilterComboBox
+              ariaLabel={t('groups.rate_override_search_placeholder')}
+              debounceMs={0}
+              emptyPrompt={t('users.search_placeholder')}
               items={visibleSearchOptions}
-              menuTrigger="focus"
+              noDataLabel={t('common.no_data')}
+              placeholder={t('groups.rate_override_search_placeholder') ?? ''}
               selectedKey={pickedUser ? String(pickedUser.id) : null}
-              onInputChange={(value) => {
+              selectedLabel={pickedUser?.email ?? ''}
+              onSearchChange={(value) => {
                 setEmailQuery(value);
                 if (pickedUser && value !== pickedUser.email) {
                   setPickedUser(null);
                 }
               }}
-              onSelectionChange={(key) => {
-                const value = key == null ? '' : String(key);
+              onSelectionChange={(value) => {
                 if (!value) {
                   setPickedUser(null);
                   setEmailQuery('');
@@ -171,36 +172,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
                 setPickedUser(user ?? null);
                 setEmailQuery(user?.email ?? '');
               }}
-            >
-              <ComboBox.InputGroup className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-                <Input className="pl-9 pr-10" placeholder={t('groups.rate_override_search_placeholder') ?? ''} />
-                <ComboBox.Trigger
-                  className="ag-combobox-preview-trigger absolute right-1 top-1/2 z-10 h-7 w-7 min-w-0 -translate-y-1/2 p-0 text-text-tertiary hover:text-text"
-                />
-              </ComboBox.InputGroup>
-              <ComboBox.Popover>
-                <ListBox
-                  items={visibleSearchOptions}
-                  renderEmptyState={() => (
-                    <div className="px-3 py-6 text-center text-xs text-text-tertiary">
-                      {debouncedEmailQuery ? t('common.no_data') : t('users.search_placeholder')}
-                    </div>
-                  )}
-                >
-                  {(item) => (
-                    <ListBox.Item id={item.id} textValue={item.textValue}>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm text-text">{item.label}</div>
-                        {item.description ? (
-                          <div className="truncate text-xs text-text-tertiary">{item.description}</div>
-                        ) : null}
-                      </div>
-                    </ListBox.Item>
-                  )}
-                </ListBox>
-              </ComboBox.Popover>
-            </ComboBox>
+            />
           </div>
           <HeroTextField className="w-24" fullWidth>
             <Input

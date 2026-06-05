@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, Card, ListBox, Meter, Select } from '@heroui/react';
+import { Button, Card, Meter } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { queryKeys } from '../../shared/queryKeys';
@@ -19,6 +19,7 @@ import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilt
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
+import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
 import { USER_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 
@@ -400,57 +401,29 @@ export default function UserUsageContent() {
               />
             </div>
             <div className="w-full sm:w-48">
-              <Select
-                aria-label={t('usage.platform')}
+              <SimpleSelect
+                ariaLabel={t('usage.platform')}
                 fullWidth
+                items={platformOptions.map((item) => ({ key: item.id, label: item.label }))}
                 selectedKey={filters.platform || ''}
-                onSelectionChange={(key) => updateFilter('platform', key == null ? '' : String(key))}
-              >
-                <Select.Trigger>
-                  <Select.Value>
-                    {filters.platform ? selectedPlatformLabel : (
-                      <span className="text-text-tertiary">{t('usage.platform')}</span>
-                    )}
-                  </Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={platformOptions}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
+                selectedLabel={filters.platform ? selectedPlatformLabel : (
+                  <span className="text-text-tertiary">{t('usage.platform')}</span>
+                )}
+                onSelectionChange={(key) => updateFilter('platform', key)}
+              />
             </div>
             {!customerScope && (
               <div className="w-full sm:w-48">
-                <Select
-                  aria-label="API Key"
+                <SimpleSelect
+                  ariaLabel="API Key"
                   fullWidth
+                  items={apiKeyOptions.map((item) => ({ key: item.id, label: item.label }))}
                   selectedKey={String(filters.api_key_id ?? '')}
-                  onSelectionChange={(key) => updateFilter('api_key_id', key == null ? '' : String(key))}
-                >
-                  <Select.Trigger>
-                    <Select.Value>
-                      {filters.api_key_id ? selectedApiKeyLabel : (
-                        <span className="text-text-tertiary">API Key</span>
-                      )}
-                    </Select.Value>
-                    <Select.Indicator />
-                  </Select.Trigger>
-                  <Select.Popover>
-                    <ListBox items={apiKeyOptions}>
-                      {(item) => (
-                        <ListBox.Item id={item.id} textValue={item.label}>
-                          {item.label}
-                        </ListBox.Item>
-                      )}
-                    </ListBox>
-                  </Select.Popover>
-                </Select>
+                  selectedLabel={filters.api_key_id ? selectedApiKeyLabel : (
+                    <span className="text-text-tertiary">API Key</span>
+                  )}
+                  onSelectionChange={(key) => updateFilter('api_key_id', key)}
+                />
               </div>
             )}
             <div className="w-full sm:w-48">

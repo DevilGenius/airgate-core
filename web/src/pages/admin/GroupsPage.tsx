@@ -11,7 +11,7 @@ import {
   Image,
   Type,
 } from 'lucide-react';
-import { AlertDialog, Button, Chip, EmptyState, Label, ListBox, Select, Spinner } from '@heroui/react';
+import { AlertDialog, Button, Chip, EmptyState, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { PlatformIcon } from '../../shared/ui';
 import { groupsApi } from '../../shared/api/groups';
@@ -25,6 +25,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { MetricChips } from '../../shared/components/MetricChips';
+import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { GroupFormModal } from './groups/EditGroupModal';
 import { GroupRateOverridesModal } from './groups/GroupRateOverridesModal';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
@@ -101,29 +102,17 @@ export default function GroupsPage() {
         <div className="ag-page-toolbar-filters">
           <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-48">
-              <Select
+              <SimpleSelect
+                ariaLabel={t('groups.platform')}
                 fullWidth
+                items={PLATFORM_OPTIONS.map((item) => ({ key: item.value, label: item.label }))}
                 selectedKey={platformFilter}
+                selectedLabel={selectedPlatformLabel}
                 onSelectionChange={(key) => {
-                  setPlatformFilter(key == null ? '' : String(key));
+                  setPlatformFilter(key);
                   setPage(1);
                 }}
-              >
-                <Label className="sr-only">{t('groups.platform')}</Label>
-                <Select.Trigger>
-                  <Select.Value>{selectedPlatformLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={PLATFORM_OPTIONS}>
-                    {(item) => (
-                      <ListBox.Item id={item.value} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
+              />
             </div>
           </div>
         </div>

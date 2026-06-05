@@ -13,6 +13,8 @@ interface ToolbarMenuProps {
 
 interface ToolbarMenuItemProps {
   children: ReactNode;
+  className?: string;
+  isDisabled?: boolean;
   isSelected?: boolean;
   onSelect: () => void;
   role?: 'menuitem' | 'menuitemcheckbox' | 'menuitemradio';
@@ -81,6 +83,8 @@ export const ToolbarMenu = memo(function ToolbarMenu({
 
 export const ToolbarMenuItem = memo(function ToolbarMenuItem({
   children,
+  className,
+  isDisabled = false,
   isSelected = false,
   onSelect,
   role = 'menuitem',
@@ -89,7 +93,9 @@ export const ToolbarMenuItem = memo(function ToolbarMenuItem({
     <button
       type="button"
       aria-checked={role === 'menuitem' ? undefined : isSelected}
-      className="ag-toolbar-menu-item"
+      aria-disabled={isDisabled || undefined}
+      className={['ag-toolbar-menu-item', className].filter(Boolean).join(' ')}
+      disabled={isDisabled}
       role={role}
       onClick={onSelect}
     >

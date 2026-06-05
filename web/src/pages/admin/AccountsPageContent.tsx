@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, EmptyState, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField } from '@heroui/react';
+import { AlertDialog, Button, EmptyState, Input, Label, Spinner, TextField as HeroTextField } from '@heroui/react';
 import {
   Plus,
   Search,
@@ -30,6 +30,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
+import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { AccountTypeFilterSelect } from './accounts/AccountTypeFilterSelect';
@@ -769,34 +770,17 @@ export default function AccountsPageContent() {
                     }}
                   />
                 ) : (
-                  <Select
+                  <SimpleSelect
                     aria-label={filter.label}
                     fullWidth
+                    items={filter.options.map((item) => ({ key: item.id, label: item.label }))}
                     selectedKey={filter.value}
+                    selectedLabel={filter.selectedLabel}
                     onSelectionChange={(key) => {
-                      const nextValue = key == null ? '' : String(key);
-                      filter.setValue(nextValue);
+                      filter.setValue(key);
                       setPage(1);
                     }}
-                  >
-                    <Label className="sr-only">{filter.label}</Label>
-                    <Select.Trigger>
-                      <Select.Value>{filter.selectedLabel}</Select.Value>
-                      <Select.Indicator />
-                    </Select.Trigger>
-                    <Select.Popover>
-                      <ListBox items={filter.options}>
-                        {(item) => (
-                          <ListBox.Item
-                            id={item.id}
-                            textValue={item.label}
-                          >
-                            {item.label}
-                          </ListBox.Item>
-                        )}
-                      </ListBox>
-                    </Select.Popover>
-                  </Select>
+                  />
                 )}
               </div>
             ))}

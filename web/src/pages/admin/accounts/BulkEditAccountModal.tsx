@@ -6,8 +6,6 @@ import {
   Checkbox,
   Form,
   Input,
-  ListBox,
-  Select,
   TextField as HeroTextField,
   useOverlayState,
 } from '@heroui/react';
@@ -19,6 +17,7 @@ import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { GroupCheckboxList } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
+import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import type { BulkUpdateAccountsReq } from '../../../shared/types';
 import {
   ACCOUNT_PRIORITY_MAX,
@@ -259,34 +258,19 @@ export function BulkEditAccountModal({
           onToggle={setEnableProxy}
           label={t('accounts.proxy')}
         >
-          <Select
+          <SimpleSelect
             fullWidth
-            aria-label={t('accounts.proxy')}
+            ariaLabel={t('accounts.proxy')}
+            items={proxyOptions.map((item) => ({
+              key: item.id,
+              label: item.label,
+              description: item.endpoint,
+            }))}
             selectedKey={proxyId == null ? '' : String(proxyId)}
             isDisabled={!enableProxy}
-            onSelectionChange={(key) => setProxyId(key == null || key === '' ? null : Number(key))}
-          >
-            <Select.Trigger>
-              <Select.Value>
-                <span className="block min-w-0 truncate">{selectedProxyLabel}</span>
-              </Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={proxyOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-text">{item.label}</div>
-                      {item.endpoint ? (
-                        <div className="truncate text-xs text-text-tertiary">{item.endpoint}</div>
-                      ) : null}
-                    </div>
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+            selectedLabel={<span className="block min-w-0 truncate">{selectedProxyLabel}</span>}
+            onSelectionChange={(key) => setProxyId(key === '' ? null : Number(key))}
+          />
         </FieldRow>
 
         <FieldRow

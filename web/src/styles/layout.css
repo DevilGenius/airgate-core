@@ -100,6 +100,10 @@
   gap: 0.75rem;
 }
 
+.ag-page-toolbar-filter-row > * {
+  min-width: 0;
+}
+
 .ag-page-toolbar-actions {
   display: flex;
   flex-shrink: 0;
@@ -215,15 +219,8 @@
 
 .ag-toolbar-menu-list {
   display: flex;
-  max-height: min(22rem, calc(100vh - 10rem));
   flex-direction: column;
   gap: 0.125rem;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-.ag-column-visibility-menu .ag-toolbar-menu-list {
-  max-height: none;
   overflow: visible;
 }
 
@@ -300,6 +297,10 @@
   .ag-page-toolbar-filter-row {
     flex-flow: row wrap;
     align-items: center;
+  }
+
+  .ag-page-toolbar-filter-row > * {
+    flex-shrink: 0;
   }
 }
 

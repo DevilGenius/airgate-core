@@ -7,8 +7,6 @@ import {
   Form,
   Input,
   Label,
-  ListBox,
-  Select,
   TextField as HeroTextField,
   useOverlayState,
 } from '@heroui/react';
@@ -30,6 +28,7 @@ import {
 import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
+import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import type { AccountResp, UpdateAccountReq } from '../../../shared/types';
 import {
   ACCOUNT_PRIORITY_MAX,
@@ -321,31 +320,22 @@ export function EditAccountModal({
                       />
                     </HeroTextField>
 
-                    <Select
+                    <div className="space-y-1.5">
+                      <Label>{t('accounts.proxy')}</Label>
+                      <SimpleSelect
+                        ariaLabel={t('accounts.proxy')}
                       fullWidth
+                        items={proxyOptions.map((item) => ({ key: item.id, label: item.label }))}
                       selectedKey={form.proxy_id == null ? '' : String(form.proxy_id)}
+                        selectedLabel={selectedProxyLabel}
                       onSelectionChange={(key) =>
                         setForm({
                           ...form,
                           proxy_id: key ? Number(key) : null,
                         })
                       }
-                    >
-                      <Label>{t('accounts.proxy')}</Label>
-                      <Select.Trigger>
-                        <Select.Value>{selectedProxyLabel}</Select.Value>
-                        <Select.Indicator />
-                      </Select.Trigger>
-                      <Select.Popover>
-                        <ListBox items={proxyOptions}>
-                          {(item) => (
-                            <ListBox.Item id={item.id} textValue={item.label}>
-                              {item.label}
-                            </ListBox.Item>
-                          )}
-                        </ListBox>
-                      </Select.Popover>
-                    </Select>
+                      />
+                    </div>
                   </div>
 
                   <div className="ag-account-switch-row">

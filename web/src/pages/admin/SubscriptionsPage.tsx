@@ -9,7 +9,7 @@ import {
   User,
   RefreshCw,
 } from 'lucide-react';
-import { Button, EmptyState, Label, ListBox, Select } from '@heroui/react';
+import { Button, EmptyState } from '@heroui/react';
 import {
   StatusChip,
 } from '../../shared/ui';
@@ -24,6 +24,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { AssignModal } from './subscriptions/AssignModal';
 import { BulkAssignModal } from './subscriptions/BulkAssignModal';
 import { AdjustModal } from './subscriptions/AdjustModal';
@@ -131,29 +132,17 @@ export default function SubscriptionsPage() {
         <div className="ag-page-toolbar-filters">
           <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-48">
-              <Select
+              <SimpleSelect
+                ariaLabel={t('common.status')}
                 fullWidth
+                items={STATUS_OPTIONS.map((item) => ({ key: item.value, label: item.label }))}
                 selectedKey={statusFilter}
+                selectedLabel={selectedStatusLabel}
                 onSelectionChange={(key) => {
-                  setStatusFilter(key == null ? '' : String(key));
+                  setStatusFilter(key);
                   setPage(1);
                 }}
-              >
-                <Label className="sr-only">{t('common.status')}</Label>
-                <Select.Trigger>
-                  <Select.Value>{selectedStatusLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={STATUS_OPTIONS}>
-                    {(item) => (
-                      <ListBox.Item id={item.value} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
+              />
             </div>
           </div>
         </div>

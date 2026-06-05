@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Input, Label, ListBox, Modal, Select, Spinner, useOverlayState } from '@heroui/react';
+import { Button, Checkbox, Input, Label, Modal, Spinner, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Search, User } from 'lucide-react';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
+import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import type {
   BulkAssignReq,
   GroupResp,
@@ -146,29 +147,17 @@ export function BulkAssignModal({
                   </div>
                 </div>
 
-                <Select
-                  fullWidth
-                  isRequired
-                  selectedKey={groupId ? String(groupId) : null}
-                  onSelectionChange={(key) => setGroupId(key == null ? 0 : Number(key))}
-                >
+                <div className="space-y-1.5">
                   <Label>{t('subscriptions.group')}</Label>
-                  <Select.Trigger>
-                    <Select.Value>
-                      {selectedGroupLabel ?? <span className="text-text-tertiary">{t('subscriptions.select_group')}</span>}
-                    </Select.Value>
-                    <Select.Indicator />
-                  </Select.Trigger>
-                  <Select.Popover>
-                    <ListBox items={groupOptions}>
-                      {(item) => (
-                        <ListBox.Item id={item.id} textValue={item.label}>
-                          {item.label}
-                        </ListBox.Item>
-                      )}
-                    </ListBox>
-                  </Select.Popover>
-                </Select>
+                  <SimpleSelect
+                    ariaLabel={t('subscriptions.group')}
+                  fullWidth
+                    items={groupOptions.map((item) => ({ key: item.id, label: item.label }))}
+                  selectedKey={groupId ? String(groupId) : null}
+                    selectedLabel={selectedGroupLabel ?? <span className="text-text-tertiary">{t('subscriptions.select_group')}</span>}
+                    onSelectionChange={(key) => setGroupId(Number(key))}
+                  />
+                </div>
 
                 <CommonDatePicker
                   isRequired

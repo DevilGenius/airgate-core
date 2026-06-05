@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Checkbox, Form, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Checkbox, Form, Input, Label, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { IdCard, Hash, Gauge } from 'lucide-react';
 import type {
   PluginBatchAccountInput,
@@ -23,6 +23,7 @@ import {
 import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
+import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import type { CreateAccountReq, AccountExportItem } from '../../../shared/types';
 import {
   ACCOUNT_PRIORITY_MAX,
@@ -250,27 +251,17 @@ export function CreateAccountModal({
       >
                 <section className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Select
-                      fullWidth
-                      isRequired
-                      selectedKey={platform}
-                      onSelectionChange={(key) => handlePlatformChange(key == null ? '' : String(key))}
-                    >
+                    <div className="space-y-1.5">
                       <Label>{t('accounts.platform')}</Label>
-                      <Select.Trigger>
-                        <Select.Value>{selectedPlatformLabel}</Select.Value>
-                        <Select.Indicator />
-                      </Select.Trigger>
-                      <Select.Popover>
-                        <ListBox items={platformOptions}>
-                          {(item) => (
-                            <ListBox.Item id={item.id} textValue={item.label}>
-                              {item.label}
-                            </ListBox.Item>
-                          )}
-                        </ListBox>
-                      </Select.Popover>
-                    </Select>
+                      <SimpleSelect
+                        ariaLabel={t('accounts.platform')}
+                      fullWidth
+                        items={platformOptions.map((item) => ({ key: item.id, label: item.label }))}
+                      selectedKey={platform}
+                        selectedLabel={selectedPlatformLabel}
+                        onSelectionChange={handlePlatformChange}
+                      />
+                    </div>
 
                     <HeroTextField fullWidth isRequired={!batchMode}>
                       <Label>{t('common.name')}</Label>
@@ -365,31 +356,22 @@ export function CreateAccountModal({
                       />
                     </HeroTextField>
 
-                    <Select
+                    <div className="space-y-1.5">
+                      <Label>{t('accounts.proxy')}</Label>
+                      <SimpleSelect
+                        ariaLabel={t('accounts.proxy')}
                       fullWidth
+                        items={proxyOptions.map((item) => ({ key: item.id, label: item.label }))}
                       selectedKey={form.proxy_id == null ? '' : String(form.proxy_id)}
+                        selectedLabel={selectedProxyLabel}
                       onSelectionChange={(key) =>
                         setForm({
                           ...form,
                           proxy_id: key ? Number(key) : undefined,
                         })
                       }
-                    >
-                      <Label>{t('accounts.proxy')}</Label>
-                      <Select.Trigger>
-                        <Select.Value>{selectedProxyLabel}</Select.Value>
-                        <Select.Indicator />
-                      </Select.Trigger>
-                      <Select.Popover>
-                        <ListBox items={proxyOptions}>
-                          {(item) => (
-                            <ListBox.Item id={item.id} textValue={item.label}>
-                              {item.label}
-                            </ListBox.Item>
-                          )}
-                        </ListBox>
-                      </Select.Popover>
-                    </Select>
+                      />
+                    </div>
                   </div>
 
                   <div className="ag-account-switch-row">

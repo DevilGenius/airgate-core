@@ -1,12 +1,13 @@
 import { type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, Input, Label, ListBox, Popover, Select, TextArea, TextField as HeroTextField } from '@heroui/react';
+import { Checkbox, Input, Label, ListBox, Popover, TextArea, TextField as HeroTextField } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
 import {
   getSchemaAccountTypes,
   getSchemaSelectedAccountType,
   getSchemaVisibleFields,
 } from './accountUtils';
+import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import type { CredentialField, CredentialSchemaResp } from '../../../shared/types';
 
 // ==================== 凭证字段渲染 ====================
@@ -98,26 +99,17 @@ export function SchemaCredentialsForm({
 
       {accountTypes.length > 0 && mode === 'create' && (
         <>
-          <Select
-            fullWidth
-            selectedKey={selectedType?.key ?? ''}
-            onSelectionChange={(key) => onAccountTypeChange(key == null ? '' : String(key))}
-          >
+          <div className="space-y-1.5">
             <Label>{t('common.type')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedType?.label ?? ''}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={accountTypes}>
-                {(item) => (
-                  <ListBox.Item id={item.key} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+            <SimpleSelect
+              ariaLabel={t('common.type')}
+            fullWidth
+              items={accountTypes.map((item) => ({ key: item.key, label: item.label }))}
+            selectedKey={selectedType?.key ?? ''}
+              selectedLabel={selectedType?.label ?? ''}
+              onSelectionChange={onAccountTypeChange}
+            />
+          </div>
           {selectedType?.description && (
             <p className="text-xs text-text-tertiary -mt-2">
               {selectedType.description}

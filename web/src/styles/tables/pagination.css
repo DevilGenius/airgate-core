@@ -45,7 +45,8 @@
   line-height: 1;
 }
 
-.ag-table-page-size-select {
+.ag-table-page-size-select,
+.ag-table-page-size-select.ag-simple-select {
   display: inline-flex;
   width: 2.625rem;
   min-width: 2.625rem;
@@ -53,7 +54,7 @@
 
 #root .ag-table-page-size-trigger,
 .ag-elevation-modal .ag-table-page-size-trigger,
-.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"]) {
+.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"], .ag-simple-select-trigger) {
   display: inline-flex !important;
   width: 2.625rem !important;
   min-width: 2.625rem !important;
@@ -80,17 +81,18 @@
 .ag-elevation-modal .ag-table-page-size-trigger:hover,
 .ag-elevation-modal .ag-table-page-size-trigger[data-hovered="true"],
 .ag-elevation-modal .ag-table-page-size-trigger[data-focus-visible="true"],
-.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"]):hover,
-.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"])[data-hovered="true"],
-.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"])[data-focus-visible="true"] {
+.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"], .ag-simple-select-trigger):hover,
+.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"], .ag-simple-select-trigger)[data-hovered="true"],
+.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"], .ag-simple-select-trigger)[data-focus-visible="true"],
+.ag-table-page-size-select :where(.select__trigger, [data-slot="trigger"], .ag-simple-select-trigger)[data-open="true"] {
   background: color-mix(in oklab, var(--surface) 72%, transparent) !important;
   border-radius: var(--radius) !important;
   box-shadow: none !important;
   color: var(--accent) !important;
 }
 
-.ag-table-page-size-trigger :where(.select__value, [data-slot="value"]),
-.ag-table-page-size-select :where(.select__value, [data-slot="value"]) {
+.ag-table-page-size-trigger :where(.select__value, [data-slot="value"], .ag-toolbar-menu-trigger-label),
+.ag-table-page-size-select :where(.select__value, [data-slot="value"], .ag-toolbar-menu-trigger-label) {
   display: inline-flex !important;
   flex: 0 0 1.625rem;
   width: 1.625rem;
@@ -105,8 +107,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.ag-table-page-size-trigger :where(.select__indicator, [data-slot="indicator"]),
-.ag-table-page-size-select :where(.select__indicator, [data-slot="indicator"]) {
+.ag-table-page-size-trigger :where(.select__indicator, [data-slot="indicator"], .ag-toolbar-menu-caret),
+.ag-table-page-size-select :where(.select__indicator, [data-slot="indicator"], .ag-toolbar-menu-caret) {
   position: static !important;
   inset: auto !important;
   flex: 0 0 0.625rem;
@@ -117,7 +119,9 @@
   color: var(--muted);
 }
 
-.ag-table-page-size-popover {
+.ag-table-page-size-popover,
+.ag-table-page-size-select .ag-toolbar-menu-popover {
+  width: 3.5rem !important;
   min-width: 3.5rem !important;
   max-width: 4.5rem !important;
   border: 1px solid color-mix(in oklab, var(--border) 78%, transparent) !important;
@@ -127,12 +131,15 @@
   box-shadow: var(--overlay-shadow) !important;
 }
 
-.ag-table-page-size-list {
+.ag-table-page-size-list,
+.ag-table-page-size-select .ag-toolbar-menu-list {
   padding: 0.1875rem !important;
 }
 
 .ag-table-page-size-option {
+  min-width: 3rem !important;
   min-height: 1.625rem !important;
+  grid-template-columns: minmax(0, 1fr) !important;
   justify-content: center !important;
   border-radius: calc(var(--radius) - 1px) !important;
   color: var(--overlay-foreground) !important;
@@ -140,6 +147,10 @@
   font-size: 0.75rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.ag-table-page-size-option .ag-toolbar-menu-item-check {
+  display: none !important;
 }
 
 .ag-table-page-size-option:hover,

@@ -6,11 +6,11 @@ import {
   useMemo,
   useRef,
   useState,
-  type Key,
   type PointerEvent,
 } from 'react';
 import { flushSync } from 'react-dom';
-import { ListBox, Pagination, Select } from '@heroui/react';
+import { Pagination } from '@heroui/react';
+import { SimpleSelect } from './SimpleSelect';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getPaginationItems } from '../utils/pagination';
 
 interface TablePaginationFooterProps {
@@ -164,8 +164,8 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
     handleClickPageChange(nextPage);
   }, [handleClickPageChange]);
 
-  const handlePageSizeChange = useCallback((key: Key | null) => {
-    if (!setPageSize || key == null) return;
+  const handlePageSizeChange = useCallback((key: string) => {
+    if (!setPageSize) return;
     const nextPageSize = Number(key);
     if (!Number.isFinite(nextPageSize) || nextPageSize <= 0) return;
 
@@ -203,26 +203,17 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
         {showPageSize ? (
           <div className="ag-table-page-size">
             <span>每页</span>
-            <Select
-              aria-label="每页数量"
+            <SimpleSelect
+              ariaLabel="每页数量"
               className="ag-table-page-size-select"
+              items={pageSizeItems.map((item) => ({ key: item.id, label: item.label }))}
               selectedKey={selectedPageSize}
+              selectedLabel={selectedPageSize}
+              triggerClassName="ag-table-page-size-trigger"
+              popoverClassName="ag-table-page-size-list"
+              itemClassName="ag-table-page-size-option"
               onSelectionChange={handlePageSizeChange}
-            >
-              <Select.Trigger className="ag-table-page-size-trigger">
-                <Select.Value>{selectedPageSize}</Select.Value>
-                <Select.Indicator />
-              </Select.Trigger>
-              <Select.Popover className="ag-table-page-size-popover">
-                <ListBox className="ag-table-page-size-list" items={pageSizeItems}>
-                  {(item) => (
-                    <ListBox.Item className="ag-table-page-size-option" id={item.id} textValue={item.label}>
-                      {item.label}
-                    </ListBox.Item>
-                  )}
-                </ListBox>
-              </Select.Popover>
-            </Select>
+            />
             <span>条</span>
           </div>
         ) : null}

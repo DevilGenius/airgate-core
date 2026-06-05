@@ -1,7 +1,7 @@
 import { startTransition, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Chip, Dropdown, EmptyState, Label, ListBox, Select, Spinner } from '@heroui/react';
+import { AlertDialog, Button, Chip, Dropdown, EmptyState, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { usersApi } from '../../shared/api/users';
 import { settingsApi } from '../../shared/api/settings';
@@ -15,6 +15,7 @@ import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
+import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { getAvatarColor } from '../../shared/utils/avatar';
 import { formatDateTime } from '../../shared/utils/format';
 import { CreateUserModal } from './users/CreateUserModal';
@@ -138,29 +139,17 @@ export default function UsersPage() {
               />
             </div>
             <div className="w-full sm:w-48">
-              <Select
+              <SimpleSelect
+                ariaLabel={t('common.status')}
                 fullWidth
+                items={statusOptions.map((item) => ({ key: item.id, label: item.label }))}
                 selectedKey={statusFilter}
+                selectedLabel={selectedStatusLabel}
                 onSelectionChange={(key) => {
-                  setStatusFilter(key == null ? '' : String(key));
+                  setStatusFilter(key);
                   setPage(1);
                 }}
-              >
-                <Label className="sr-only">{t('common.status')}</Label>
-                <Select.Trigger>
-                  <Select.Value>{selectedStatusLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={statusOptions}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
+              />
             </div>
           </div>
         </div>

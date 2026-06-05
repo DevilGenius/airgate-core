@@ -1,7 +1,7 @@
 import { lazy, memo, startTransition, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Card, ListBox, Select, Tabs } from '@heroui/react';
+import { Card, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
@@ -20,6 +20,7 @@ import { PIE_CHART_COLORS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMenu';
+import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { formatAPIKeyHint } from '../../shared/utils/format';
 
@@ -696,9 +697,7 @@ export default function UsagePage() {
   }, [resetCursorPagination]);
 
   const handleUserSearchChange = useCallback((value: string) => {
-    startTransition(() => {
-      setUserSearchKeyword(value);
-    });
+    setUserSearchKeyword(value);
   }, []);
 
   const handleUserSelectionChange = useCallback((value: string, label: string) => {
@@ -707,9 +706,7 @@ export default function UsagePage() {
   }, [updateFilter]);
 
   const handleAPIKeySearchChange = useCallback((value: string) => {
-    startTransition(() => {
-      setAPIKeySearchKeyword(value);
-    });
+    setAPIKeySearchKeyword(value);
   }, []);
 
   const handleAPIKeySelectionChange = useCallback((value: string, label: string) => {
@@ -1025,30 +1022,16 @@ export default function UsagePage() {
               />
             </div>
             <div className="w-full sm:w-48">
-              <Select
-                aria-label={t('usage.platform')}
+              <SimpleSelect
+                ariaLabel={t('usage.platform')}
                 fullWidth
+                items={platformOptions.map((item) => ({ key: item.id, label: item.label }))}
                 selectedKey={filters.platform || ''}
-                onSelectionChange={(key) => updateFilter('platform', key == null ? '' : String(key))}
-              >
-                <Select.Trigger>
-                  <Select.Value>
-                    {filters.platform ? selectedPlatformLabel : (
-                      <span className="text-text-tertiary">{t('usage.platform')}</span>
-                    )}
-                  </Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={platformOptions}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
+                selectedLabel={filters.platform ? selectedPlatformLabel : (
+                  <span className="text-text-tertiary">{t('usage.platform')}</span>
+                )}
+                onSelectionChange={(key) => updateFilter('platform', key)}
+              />
             </div>
             <div className="w-full sm:w-48">
               <UsageModelFilterInput

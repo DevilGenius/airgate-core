@@ -1,7 +1,7 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Card, ComboBox, Input, Label, ListBox, Select, Skeleton, Tabs } from '@heroui/react';
+import { Alert, Button, Card, Skeleton, Tabs } from '@heroui/react';
 import {
   CartesianGrid,
   Cell,
@@ -22,7 +22,6 @@ import {
   Clock,
   KeyRound,
   RefreshCw,
-  Search,
   Sigma,
   ToggleRight,
   Users,
@@ -36,6 +35,8 @@ import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
 import { useDebouncedValue } from '../shared/hooks/useDebouncedValue';
 import { CostPair, CostValue } from '../shared/components/CostValue';
+import { SimpleSelect } from '../shared/components/SimpleSelect';
+import { SearchFilterComboBox } from '../shared/components/SearchFilterComboBox';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
 const PIE_COLORS = PIE_CHART_COLORS;
@@ -766,95 +767,53 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.filter_user')}</span>
             <div className="w-full sm:w-48">
-              <ComboBox
-                aria-label={t('dashboard.filter_user')}
-                allowsEmptyCollection
-                fullWidth
-                inputValue={userKeyword}
+              <SearchFilterComboBox
+                ariaLabel={t('dashboard.filter_user')}
+                emptyPrompt={t('dashboard.filter_user')}
                 items={visibleUserOptions}
-                menuTrigger="focus"
+                noDataLabel={t('common.no_data')}
+                placeholder={t('dashboard.all_users')}
                 selectedKey={selectedUserId ? String(selectedUserId) : null}
-                onInputChange={(value) => {
+                selectedLabel={selectedUserLabel}
+                onSearchChange={(value) => {
                   setUserKeyword(value);
                   if (!value.trim()) {
                     setSelectedUserId(undefined);
                     setSelectedUserLabel('');
-                    return;
-                  }
-                  if (selectedUserId && value !== selectedUserLabel) {
-                    setSelectedUserId(undefined);
-                    setSelectedUserLabel('');
                   }
                 }}
-                onSelectionChange={(key) => {
-                  const value = key == null ? '' : String(key);
+                onSelectionChange={(value, label) => {
                   if (!value) {
                     setSelectedUserId(undefined);
                     setSelectedUserLabel('');
                     setUserKeyword('');
                     return;
                   }
-                  const option = visibleUserOptions.find((item) => item.id === value);
-                  const label = option?.label ? String(option.label) : '';
                   setSelectedUserId(Number(value));
                   setSelectedUserLabel(label);
                   setUserKeyword(label);
                 }}
-              >
-                <ComboBox.InputGroup className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-                  <Input className="pl-9" placeholder={t('dashboard.all_users')} />
-                </ComboBox.InputGroup>
-                <ComboBox.Popover>
-                  <ListBox
-                    items={visibleUserOptions}
-                    renderEmptyState={() => (
-                      <div className="px-3 py-6 text-center text-xs text-text-tertiary">
-                        {userKeyword.trim() ? t('common.no_data') : t('dashboard.filter_user')}
-                      </div>
-                    )}
-                  >
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.textValue}>
-                        <div className="min-w-0">
-                          <div className="truncate">{item.label}</div>
-                          {item.description ? (
-                            <div className="truncate text-xs text-text-tertiary">{item.description}</div>
-                          ) : null}
-                        </div>
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </ComboBox.Popover>
-              </ComboBox>
+              />
             </div>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.granularity')}</span>
             <div className="w-full sm:w-48">
-              <Select
+              <SimpleSelect
+                ariaLabel={t('dashboard.granularity')}
                 fullWidth
                 isDisabled={range === 'today'}
+                items={granularityOptions.map((item) => ({ key: item.id, label: item.label }))}
                 selectedKey={selectedGranularity}
+                selectedLabel={(
+                  <span className="inline-flex min-w-0 items-center gap-2">
+                    <CalendarDays className="h-4 w-4 shrink-0 text-text" />
+                    <span className="min-w-0 truncate">{selectedGranularityLabel}</span>
+                  </span>
+                )}
                 onSelectionChange={(key) => setGranularity(key as Granularity)}
-              >
-                <Label className="sr-only">{t('dashboard.granularity')}</Label>
-                <Select.Trigger>
-                  <CalendarDays className="mr-2 h-4 w-4 text-text" />
-                  <Select.Value>{selectedGranularityLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={granularityOptions}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
+              />
             </div>
           </div>
         </div>

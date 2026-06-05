@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Label, ListBox, Modal, Select, Spinner, useOverlayState } from '@heroui/react';
+import { Button, Label, Modal, Spinner, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
+import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import type {
   SubscriptionResp,
   AdjustSubscriptionReq,
@@ -56,28 +57,19 @@ export function AdjustModal({
                   onChange={(value) => setForm({ ...form, expires_at: value ? `${value}T23:59:59Z` : undefined })}
                 />
 
-                <Select
-                  fullWidth
-                  selectedKey={form.status ?? 'active'}
-                  onSelectionChange={(key) =>
-                    setForm({ ...form, status: (key ?? 'active') as 'active' | 'suspended' })
-                  }
-                >
+                <div className="space-y-1.5">
                   <Label>{t('common.status')}</Label>
-                  <Select.Trigger>
-                    <Select.Value>{selectedStatusLabel}</Select.Value>
-                    <Select.Indicator />
-                  </Select.Trigger>
-                  <Select.Popover>
-                    <ListBox items={statusOptions}>
-                      {(item) => (
-                        <ListBox.Item id={item.id} textValue={item.label}>
-                          {item.label}
-                        </ListBox.Item>
-                      )}
-                    </ListBox>
-                  </Select.Popover>
-                </Select>
+                  <SimpleSelect
+                    ariaLabel={t('common.status')}
+                  fullWidth
+                    items={statusOptions.map((item) => ({ key: item.id, label: item.label }))}
+                  selectedKey={form.status ?? 'active'}
+                    selectedLabel={selectedStatusLabel}
+                  onSelectionChange={(key) =>
+                    setForm({ ...form, status: (key || 'active') as 'active' | 'suspended' })
+                  }
+                  />
+                </div>
               </div>
             </Modal.Body>
             <Modal.Footer>

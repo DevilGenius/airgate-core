@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Chip, Label, ListBox, Select, useOverlayState } from '@heroui/react';
+import { Button, Chip, Label, useOverlayState } from '@heroui/react';
 import { Play, RotateCcw, Copy, Check, X } from 'lucide-react';
 import { accountsApi } from '../../shared/api/accounts';
 import { getToken } from '../../shared/api/client';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { CommonModal } from '../../shared/components/CommonModal';
+import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import type { AccountResp, ModelInfo } from '../../shared/types';
 
 type TestStatus = 'idle' | 'connecting' | 'streaming' | 'success' | 'error';
@@ -351,27 +352,18 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
                 </div>
 
                 {/* 模型选择 */}
-                <Select
-                  fullWidth
-                  selectedKey={selectedModel}
-                  onSelectionChange={(key) => setSelectedModel(key == null ? '' : String(key))}
-                  isDisabled={isRunning}
-                >
+                <div className="space-y-1.5">
                   <Label>{t('accounts.select_model')}</Label>
-                  <Select.Trigger>
-                    <Select.Value>{selectedModelLabel}</Select.Value>
-                    <Select.Indicator />
-                  </Select.Trigger>
-                  <Select.Popover>
-                    <ListBox items={modelOptions}>
-                      {(item) => (
-                        <ListBox.Item id={item.id} textValue={item.label}>
-                          {item.label}
-                        </ListBox.Item>
-                      )}
-                    </ListBox>
-                  </Select.Popover>
-                </Select>
+                  <SimpleSelect
+                    ariaLabel={t('accounts.select_model')}
+                  fullWidth
+                    items={modelOptions.map((item) => ({ key: item.id, label: item.label }))}
+                  selectedKey={selectedModel}
+                    selectedLabel={selectedModelLabel}
+                    onSelectionChange={setSelectedModel}
+                  isDisabled={isRunning}
+                  />
+                </div>
 
                 {/* 终端输出区域 */}
                 <div className="relative group">

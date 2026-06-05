@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Description, Input, Label, ListBox, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Description, Input, Label, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { KeyRound } from 'lucide-react';
 import { parseIpList } from '../../../shared/utils/ip';
 import { dateInputToLocalStartRFC3339, formatDateInputValue } from '../../../shared/utils/format';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
+import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import type { CreateAPIKeyReq, GroupResp } from '../../../shared/types';
 
 interface CreateKeyModalProps {
@@ -120,27 +121,17 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
               </div>
             </HeroTextField>
 
-            <Select
-              fullWidth
-              isRequired
-              selectedKey={form.group_id ? String(form.group_id) : null}
-              onSelectionChange={(key) => setForm({ ...form, group_id: key == null ? 0 : Number(key) })}
-            >
+            <div className="space-y-1.5">
               <Label>{t('api_keys.group')}</Label>
-              <Select.Trigger>
-                <Select.Value>{selectedGroupLabel}</Select.Value>
-                <Select.Indicator />
-              </Select.Trigger>
-              <Select.Popover>
-                <ListBox items={groupOptions}>
-                  {(item) => (
-                    <ListBox.Item id={item.id} textValue={item.textValue}>
-                      {item.label}
-                    </ListBox.Item>
-                  )}
-                </ListBox>
-              </Select.Popover>
-            </Select>
+              <SimpleSelect
+                ariaLabel={t('api_keys.group')}
+              fullWidth
+                items={groupOptions.map((item) => ({ key: item.id, label: item.label }))}
+              selectedKey={form.group_id ? String(form.group_id) : null}
+                selectedLabel={selectedGroupLabel}
+                onSelectionChange={(key) => setForm({ ...form, group_id: Number(key) })}
+              />
+            </div>
 
             <HeroTextField fullWidth>
               <Label>{t('api_keys.quota_label')}</Label>

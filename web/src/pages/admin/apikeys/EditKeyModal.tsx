@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Description, Input, Label, ListBox, Modal, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Description, Input, Label, Modal, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { KeyRound } from 'lucide-react';
 import { parseIpList, formatIpList } from '../../../shared/utils/ip';
 import { dateInputToLocalStartRFC3339, formatDateInputValue } from '../../../shared/utils/format';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
+import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import type { APIKeyResp, UpdateAPIKeyReq, GroupResp } from '../../../shared/types';
 
 interface EditKeyModalProps {
@@ -87,26 +88,17 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
           </div>
         </HeroTextField>
 
-        <Select
-          fullWidth
-          selectedKey={String(groupId)}
-          onSelectionChange={(key) => setGroupId(key == null ? 0 : Number(key))}
-        >
+        <div className="space-y-1.5">
           <Label>{t('api_keys.group')}</Label>
-          <Select.Trigger>
-            <Select.Value>{selectedGroupLabel}</Select.Value>
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox items={groupOptions}>
-              {(item) => (
-                <ListBox.Item id={item.id} textValue={item.label}>
-                  {item.label}
-                </ListBox.Item>
-              )}
-            </ListBox>
-          </Select.Popover>
-        </Select>
+          <SimpleSelect
+            ariaLabel={t('api_keys.group')}
+          fullWidth
+            items={groupOptions.map((item) => ({ key: item.id, label: item.label }))}
+          selectedKey={String(groupId)}
+            selectedLabel={selectedGroupLabel}
+            onSelectionChange={(key) => setGroupId(Number(key))}
+          />
+        </div>
 
         <HeroTextField fullWidth>
           <Label>{t('api_keys.quota_label')}</Label>
@@ -151,28 +143,19 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
           onChange={(value) => setForm({ ...form, expires_at: dateInputToLocalStartRFC3339(value) })}
         />
 
-        <Select
+        <div className="space-y-1.5">
+          <Label>{t('common.status')}</Label>
+          <SimpleSelect
+            ariaLabel={t('common.status')}
           fullWidth
+            items={statusOptions.map((item) => ({ key: item.id, label: item.label }))}
           selectedKey={form.status ?? 'active'}
           onSelectionChange={(key) =>
-            setForm({ ...form, status: (key ?? 'active') as 'active' | 'disabled' })
+            setForm({ ...form, status: (key || 'active') as 'active' | 'disabled' })
           }
-        >
-          <Label>{t('common.status')}</Label>
-          <Select.Trigger>
-            <Select.Value>{selectedStatusLabel}</Select.Value>
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox items={statusOptions}>
-              {(item) => (
-                <ListBox.Item id={item.id} textValue={item.label}>
-                  {item.label}
-                </ListBox.Item>
-              )}
-            </ListBox>
-          </Select.Popover>
-        </Select>
+            selectedLabel={selectedStatusLabel}
+          />
+        </div>
 
         <HeroTextField fullWidth>
           <Label>{t('api_keys.ip_whitelist')}</Label>

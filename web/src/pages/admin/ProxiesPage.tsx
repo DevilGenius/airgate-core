@@ -6,7 +6,7 @@ import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { AlertDialog, Button, Chip, EmptyState, Form, Input, Label, ListBox, Modal, Select, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { AlertDialog, Button, Chip, EmptyState, Form, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { StatusChip } from '../../shared/ui';
 import { Plus, Pencil, Trash2, Zap, RefreshCw } from 'lucide-react';
@@ -15,6 +15,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { SimpleSelect } from '../../shared/components/SimpleSelect';
 
 // 代理表单数据
 interface ProxyForm {
@@ -314,32 +315,22 @@ export default function ProxiesPage() {
                       required
                     />
                   </HeroTextField>
-                  <Select
+                  <div className="space-y-1.5">
+                    <Label>{t('proxies.protocol')}</Label>
+                    <SimpleSelect
+                      ariaLabel={t('proxies.protocol')}
                     fullWidth
-                    isRequired
+                      items={protocolOptions.map((item) => ({ key: item.id, label: item.label }))}
                     selectedKey={form.protocol}
+                      selectedLabel={selectedProtocolLabel}
                     onSelectionChange={(key) =>
                       setForm({
                         ...form,
-                        protocol: (key ?? 'http') as 'http' | 'socks5',
+                        protocol: (key || 'http') as 'http' | 'socks5',
                       })
                     }
-                  >
-                    <Label>{t('proxies.protocol')}</Label>
-                    <Select.Trigger>
-                      <Select.Value>{selectedProtocolLabel}</Select.Value>
-                      <Select.Indicator />
-                    </Select.Trigger>
-                    <Select.Popover>
-                      <ListBox items={protocolOptions}>
-                        {(item) => (
-                          <ListBox.Item id={item.id} textValue={item.label}>
-                            {item.label}
-                          </ListBox.Item>
-                        )}
-                      </ListBox>
-                    </Select.Popover>
-                  </Select>
+                    />
+                  </div>
                   <HeroTextField fullWidth isRequired>
                     <Label>{t('proxies.address')}</Label>
                     <Input

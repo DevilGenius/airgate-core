@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Chip, Description, Input, Label, ListBox, Modal, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Chip, Description, Input, Label, Modal, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { ArrowUpDown, Layers, X } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
+import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../../shared/types';
 
 function parseQuotas(quotas?: Record<string, unknown>): { daily: string; weekly: string; monthly: string } {
@@ -218,30 +219,20 @@ export function GroupFormModal({
             <Input value={form.platform} disabled />
           </HeroTextField>
         ) : (
-          <Select
+          <div className="space-y-1.5">
+            <Label>{t('groups.platform')}</Label>
+            <SimpleSelect
+              ariaLabel={t('groups.platform')}
             fullWidth
-            isRequired
+              items={platformOptions.map((item) => ({ key: item.id, label: item.label }))}
             selectedKey={form.platform}
+              selectedLabel={selectedPlatformLabel}
             onSelectionChange={(key) => {
-              setForm({ ...form, platform: key == null ? '' : String(key) });
+              setForm({ ...form, platform: key });
               setCopyFromGroupIds([]);
             }}
-          >
-            <Label>{t('groups.platform')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedPlatformLabel}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={platformOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+            />
+          </div>
         )}
 
         {!isEdit ? (
@@ -270,31 +261,20 @@ export function GroupFormModal({
                 })}
               </div>
             ) : null}
-            <Select
+            <SimpleSelect
               fullWidth
               isDisabled={!form.platform}
+              ariaLabel={t('groups.copy_accounts_title')}
+              items={copyAccountOptions.map((item) => ({ key: item.id, label: item.label }))}
               selectedKey=""
+              selectedLabel={copyAccountOptions[0]?.label}
               onSelectionChange={(key) => {
                 const value = Number(key);
                 if (value && !copyFromGroupIds.includes(value)) {
                   setCopyFromGroupIds([...copyFromGroupIds, value]);
                 }
               }}
-            >
-              <Select.Trigger>
-                <Select.Value>{copyAccountOptions[0]?.label}</Select.Value>
-                <Select.Indicator />
-              </Select.Trigger>
-              <Select.Popover>
-                <ListBox items={copyAccountOptions}>
-                  {(item) => (
-                    <ListBox.Item id={item.id} textValue={item.label}>
-                      {item.label}
-                    </ListBox.Item>
-                  )}
-                </ListBox>
-              </Select.Popover>
-            </Select>
+            />
             <p className="mt-1 text-[11px] text-text-tertiary">{t('groups.copy_accounts_hint')}</p>
           </div>
         ) : null}
@@ -323,28 +303,19 @@ export function GroupFormModal({
           />
         </div>
 
-        <Select
-          fullWidth
-          selectedKey={form.subscription_type}
-          onSelectionChange={(key) =>
-            setForm({ ...form, subscription_type: (key ?? 'standard') as 'standard' | 'subscription' })
-          }
-        >
+        <div className="space-y-1.5">
           <Label>{t('groups.subscription_type')}</Label>
-          <Select.Trigger>
-            <Select.Value>{selectedSubscriptionTypeLabel}</Select.Value>
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox items={subscriptionTypeOptions}>
-              {(item) => (
-                <ListBox.Item id={item.id} textValue={item.label}>
-                  {item.label}
-                </ListBox.Item>
-              )}
-            </ListBox>
-          </Select.Popover>
-        </Select>
+          <SimpleSelect
+            ariaLabel={t('groups.subscription_type')}
+          fullWidth
+            items={subscriptionTypeOptions.map((item) => ({ key: item.id, label: item.label }))}
+          selectedKey={form.subscription_type}
+            selectedLabel={selectedSubscriptionTypeLabel}
+          onSelectionChange={(key) =>
+            setForm({ ...form, subscription_type: (key || 'standard') as 'standard' | 'subscription' })
+          }
+          />
+        </div>
 
         <HeroTextField fullWidth>
           <Label>{t('groups.sort_weight')}</Label>

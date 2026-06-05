@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Description, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Description, Input, Label, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
+import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import type { KeyForm } from './types';
 
@@ -81,27 +82,17 @@ export function EditKeyModal({
             required
           />
         </HeroTextField>
-        <Select
-          fullWidth
-          isRequired
-          selectedKey={form.group_id || null}
-          onSelectionChange={(key) => setForm({ ...form, group_id: key == null ? '' : String(key) })}
-        >
+        <div className="space-y-1.5">
           <Label>{t('user_keys.group')}</Label>
-          <Select.Trigger>
-            <Select.Value>{selectedGroupLabel}</Select.Value>
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox items={groupItems}>
-              {(item) => (
-                <ListBox.Item id={item.id} textValue={item.textValue}>
-                  {item.label}
-                </ListBox.Item>
-              )}
-            </ListBox>
-          </Select.Popover>
-        </Select>
+          <SimpleSelect
+            ariaLabel={t('user_keys.group')}
+          fullWidth
+            items={groupItems.map((item) => ({ key: item.id, label: item.label }))}
+          selectedKey={form.group_id || null}
+            selectedLabel={selectedGroupLabel}
+            onSelectionChange={(key) => setForm({ ...form, group_id: key })}
+          />
+        </div>
         <HeroTextField fullWidth>
           <Label>{t('user_keys.quota_label')}</Label>
           <Input
