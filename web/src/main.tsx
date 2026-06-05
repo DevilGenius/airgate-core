@@ -5,7 +5,7 @@ import * as ReactI18next from 'react-i18next';
 import { StrictMode, useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useTranslation } from 'react-i18next';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { AlertDialog, Button, I18nProvider } from '@heroui/react';
 import { AuthProvider } from './app/providers/AuthProvider';
@@ -13,6 +13,7 @@ import { ThemeProvider } from './app/providers/ThemeProvider';
 import { SiteSettingsProvider } from './app/providers/SiteSettingsProvider';
 import { ToastProvider, useToast } from './shared/ui';
 import { DialogTriggerShim } from './shared/components/DialogTriggerShim';
+import { isAuthExpiredError, onAuthExpired, setToken } from './shared/api/client';
 import { router } from './app/router';
 import './i18n';
 
@@ -36,6 +37,28 @@ import './i18n';
 // 必须在 ToastProvider 内渲染，否则 useToast 拿到的是默认 noop。
 type ConfirmOptions = { title?: string; danger?: boolean };
 type ConfirmRequest = ConfirmOptions & { message: string; resolve: (ok: boolean) => void };
+
+let authRedirectScheduled = false;
+
+function redirectToLoginOnAuthExpired() {
+  if (authRedirectScheduled || typeof window === 'undefined') return;
+  authRedirectScheduled = true;
+  setToken(null);
+  if (window.location.pathname !== '/login') {
+    window.location.assign('/login');
+  }
+}
+
+function handleGlobalQueryError(error: unknown) {
+  if (isAuthExpiredError(error)) {
+    redirectToLoginOnAuthExpired();
+  }
+}
+
+function AuthExpiredBridge() {
+  useEffect(() => onAuthExpired(redirectToLoginOnAuthExpired), []);
+  return null;
+}
 
 function AppProviders() {
   const { i18n } = useTranslation();
@@ -119,6 +142,12 @@ function PluginAPIBridge() {
 }
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: handleGlobalQueryError,
+  }),
+  mutationCache: new MutationCache({
+    onError: handleGlobalQueryError,
+  }),
   defaultOptions: {
     queries: {
       retry: 1,
@@ -136,6 +165,7 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <PluginAPIBridge />
+          <AuthExpiredBridge />
           <AppProviders />
         </ToastProvider>
       </QueryClientProvider>

@@ -16,7 +16,7 @@ import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { PlatformIcon } from '../../shared/ui';
 import { groupsApi } from '../../shared/api/groups';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import { usePagination } from '../../shared/hooks/usePagination';
+import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
@@ -24,6 +24,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { TablePage } from '../../shared/components/TablePage';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { GroupFormModal } from './groups/EditGroupModal';
@@ -39,8 +40,8 @@ export default function GroupsPage() {
     ...platforms.map((p) => ({ value: p, label: platformName(p) })),
   ];
   // 筛选状态
-  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.groups');
-  const [platformFilter, setPlatformFilter] = useState('');
+  const { page, setPage, pageSize, setPageSize } = useUrlPagination(DEFAULT_PAGE_SIZE, 'admin.groups');
+  const [platformFilter, setPlatformFilter] = useUrlQueryParam('platform');
 
   // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -49,7 +50,7 @@ export default function GroupsPage() {
   const [rateOverrideGroup, setRateOverrideGroup] = useState<GroupResp | null>(null);
 
   // 查询分组列表
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: queryKeys.groups(page, pageSize, platformFilter),
     queryFn: () =>
       groupsApi.list({
@@ -96,11 +97,9 @@ export default function GroupsPage() {
   const isImageGroup = (group: GroupResp) => group.plugin_settings?.openai?.image_enabled === 'true';
 
   return (
-    <div>
-      {/* 筛选 */}
-      <div className="ag-page-toolbar">
-        <div className="ag-page-toolbar-filters">
-          <div className="ag-page-toolbar-filter-row">
+    <TablePage
+      toolbar={(
+        <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-48">
               <SimpleSelect
                 ariaLabel={t('groups.platform')}
@@ -114,9 +113,10 @@ export default function GroupsPage() {
                 }}
               />
             </div>
-          </div>
         </div>
-        <div className="ag-page-toolbar-actions">
+      )}
+      actions={(
+        <>
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}
@@ -131,24 +131,26 @@ export default function GroupsPage() {
             <Plus className="w-4 h-4" />
             {t('groups.create')}
           </Button>
-        </div>
-      </div>
+        </>
+      )}
+      footer={(
+        <TablePaginationFooter
+          page={page}
+          pageSize={pageSize}
+          setPage={setPage}
+          setPageSize={setPageSize}
+          total={total}
+          totalPages={totalPages}
+        />
+      )}
+      isFetching={isFetching && !isLoading}
+    >
 
       {/* 表格 */}
       <CommonTable
         ariaLabel={t('groups.title', 'Groups')}
         className="ag-groups-table"
         contentClassName="ag-groups-table-content"
-        footer={(
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        )}
         minWidth={1120}
       >
             <CommonTable.Header>
@@ -389,6 +391,6 @@ export default function GroupsPage() {
           </AlertDialog.Container>
         </AlertDialog.Backdrop>
       </AlertDialog>
-    </div>
+    </TablePage>
   );
 }

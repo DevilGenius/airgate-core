@@ -1,11 +1,16 @@
 import type { ApiResponse, SessionRole } from '../types';
 import i18n from '../../i18n';
+import { STORAGE_KEYS } from '../storageKeys';
+import { initializeFrontendCache } from '../utils/frontendCache';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const AUTH_EXPIRED_EVENT = 'ag:web:auth:expired';
+
+initializeFrontendCache();
 
 // Token 管理
-const TOKEN_STORAGE_KEY = 'token';
-const TOKEN_STORAGE_MODE_KEY = 'token_storage_mode';
+const TOKEN_STORAGE_KEY = STORAGE_KEYS.auth.token;
+const TOKEN_STORAGE_MODE_KEY = STORAGE_KEYS.auth.tokenMode;
 const TOKEN_STORAGE_MODE_LOCAL = 'local';
 
 function readBrowserStorage(kind: 'localStorage' | 'sessionStorage', key: string): string | null {
@@ -55,6 +60,14 @@ const initialToken = readInitialToken();
 let accessToken: string | null = initialToken.token;
 let rememberAccessToken = initialToken.remember;
 
+let authExpiredBroadcasted = false;
+
+function broadcastAuthExpired() {
+  if (authExpiredBroadcasted || typeof window === 'undefined') return;
+  authExpiredBroadcasted = true;
+  window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+}
+
 interface TokenClaims {
   role?: string;
   api_key_id?: number;
@@ -64,6 +77,9 @@ interface TokenClaims {
 export function setToken(token: string | null, options?: { remember?: boolean }) {
   accessToken = token;
   rememberAccessToken = token ? (options?.remember ?? rememberAccessToken) : false;
+  if (token) {
+    authExpiredBroadcasted = false;
+  }
   writeBrowserStorage('sessionStorage', TOKEN_STORAGE_KEY, token);
   writeBrowserStorage('localStorage', TOKEN_STORAGE_KEY, rememberAccessToken ? token : null);
   writeBrowserStorage('localStorage', TOKEN_STORAGE_MODE_KEY, rememberAccessToken ? TOKEN_STORAGE_MODE_LOCAL : null);
@@ -103,7 +119,7 @@ export function getTokenAPIKeyID(token = accessToken): number | null {
 
 // API Key 登录场景下用户输入的原文 Key，仅保留在 sessionStorage 内，
 // 退出登录或关闭浏览器即清除。供 CCS 导入等需要原文 Key 的客户端功能使用。
-const API_KEY_SECRET_STORAGE = 'apikey_session_secret';
+const API_KEY_SECRET_STORAGE = STORAGE_KEYS.auth.apiKeySecret;
 
 export function setSessionAPIKey(key: string | null) {
   writeBrowserStorage('sessionStorage', API_KEY_SECRET_STORAGE, key);
@@ -187,7 +203,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
   if (json.code !== 0) {
     if (res.status === 401 && accessToken) {
       setToken(null);
-      window.location.href = '/login';
+      broadcastAuthExpired();
     }
     throw new ApiError(json.code, json.message, res.status);
   }
@@ -280,6 +296,18 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+export function isAuthExpiredError(error: unknown): boolean {
+  return error instanceof ApiError && error.httpStatus === 401;
+}
+
+export function onAuthExpired(listener: () => void) {
+  if (typeof window === 'undefined') return () => {};
+
+  const handler = () => listener();
+  window.addEventListener(AUTH_EXPIRED_EVENT, handler);
+  return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handler);
 }
 
 // 导出快捷方法

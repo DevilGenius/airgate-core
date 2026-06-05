@@ -16,8 +16,9 @@ import type { MenuItem, MenuSection } from './menuModel';
 import { isMenuItemActive } from './navigationUtils';
 import type { ShellIdentity } from './useShellIdentity';
 import { useMenuNavigation } from './useMenuNavigation';
+import { STORAGE_KEYS } from '../../shared/storageKeys';
 
-export const SIDEBAR_COLLAPSED_STORAGE_KEY = 'airgate:sidebar:collapsed';
+export const SIDEBAR_COLLAPSED_STORAGE_KEY = STORAGE_KEYS.layout.sidebarCollapsed;
 
 interface AppSidebarProps {
   collapsed: boolean;

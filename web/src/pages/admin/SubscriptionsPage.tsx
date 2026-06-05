@@ -16,7 +16,7 @@ import {
 import { subscriptionsApi } from '../../shared/api/subscriptions';
 import { groupsApi } from '../../shared/api/groups';
 import { usersApi } from '../../shared/api/users';
-import { usePagination } from '../../shared/hooks/usePagination';
+import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
@@ -25,6 +25,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
+import { TablePage } from '../../shared/components/TablePage';
 import { AssignModal } from './subscriptions/AssignModal';
 import { BulkAssignModal } from './subscriptions/BulkAssignModal';
 import { AdjustModal } from './subscriptions/AdjustModal';
@@ -47,8 +48,8 @@ export default function SubscriptionsPage() {
   ];
 
   // 筛选状态
-  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.subscriptions');
-  const [statusFilter, setStatusFilter] = useState('');
+  const { page, setPage, pageSize, setPageSize } = useUrlPagination(DEFAULT_PAGE_SIZE, 'admin.subscriptions');
+  const [statusFilter, setStatusFilter] = useUrlQueryParam('status');
 
   // 弹窗状态
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -56,7 +57,7 @@ export default function SubscriptionsPage() {
   const [adjustingSub, setAdjustingSub] = useState<SubscriptionResp | null>(null);
 
   // 查询订阅列表
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: queryKeys.subscriptions(page, pageSize, statusFilter),
     queryFn: () =>
       subscriptionsApi.adminList({
@@ -126,11 +127,9 @@ export default function SubscriptionsPage() {
   const selectedStatusLabel = STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label ?? t('subscriptions.all_status');
 
   return (
-    <div>
-      {/* 筛选 */}
-      <div className="ag-page-toolbar">
-        <div className="ag-page-toolbar-filters">
-          <div className="ag-page-toolbar-filter-row">
+    <TablePage
+      toolbar={(
+        <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-48">
               <SimpleSelect
                 ariaLabel={t('common.status')}
@@ -144,9 +143,10 @@ export default function SubscriptionsPage() {
                 }}
               />
             </div>
-          </div>
         </div>
-        <div className="ag-page-toolbar-actions">
+      )}
+      actions={(
+        <>
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}
@@ -173,21 +173,23 @@ export default function SubscriptionsPage() {
             <Plus className="w-4 h-4" />
             {t('subscriptions.assign')}
           </Button>
-        </div>
-      </div>
+        </>
+      )}
+      footer={(
+        <TablePaginationFooter
+          page={page}
+          pageSize={pageSize}
+          setPage={setPage}
+          setPageSize={setPageSize}
+          total={total}
+          totalPages={totalPages}
+        />
+      )}
+      isFetching={isFetching && !isLoading}
+    >
 
       <CommonTable
         ariaLabel={t('subscriptions.title', 'Subscriptions')}
-        footer={(
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        )}
         minWidth={920}
       >
             <CommonTable.Header>
@@ -289,6 +291,6 @@ export default function SubscriptionsPage() {
           loading={adjustMutation.isPending}
         />
       )}
-    </div>
+    </TablePage>
   );
 }

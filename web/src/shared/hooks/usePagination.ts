@@ -1,12 +1,11 @@
 import { startTransition, useCallback, useEffect, useState, type SetStateAction } from 'react';
-
-const PAGE_SIZE_STORAGE_PREFIX = 'airgate:pagination:page-size:';
+import { storagePageSizeKey } from '../storageKeys';
 
 function readStoredPageSize(storageKey: string | undefined, fallback: number) {
   if (!storageKey || typeof window === 'undefined') return fallback;
 
   try {
-    const raw = window.localStorage.getItem(`${PAGE_SIZE_STORAGE_PREFIX}${storageKey}`);
+    const raw = window.localStorage.getItem(storagePageSizeKey(storageKey));
     if (raw == null) return fallback;
     const parsed = Number(raw);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -19,7 +18,7 @@ function writeStoredPageSize(storageKey: string | undefined, pageSize: number) {
   if (!storageKey || typeof window === 'undefined') return;
 
   try {
-    window.localStorage.setItem(`${PAGE_SIZE_STORAGE_PREFIX}${storageKey}`, String(pageSize));
+    window.localStorage.setItem(storagePageSizeKey(storageKey), String(pageSize));
   } catch {
     // localStorage may be unavailable in private mode; pagination should still work.
   }

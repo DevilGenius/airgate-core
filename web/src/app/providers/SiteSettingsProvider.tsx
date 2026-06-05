@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { settingsApi } from '../../shared/api/settings';
 import defaultLogoUrl from '../../assets/logo.svg';
+import { STORAGE_KEYS } from '../../shared/storageKeys';
 
 export { defaultLogoUrl };
 
@@ -35,7 +36,40 @@ const defaults: SiteSettings = {
 
 const SiteSettingsContext = createContext<SiteSettings>(defaults);
 
+function normalizeSiteSettings(data?: Record<string, string>, settingsLoaded = false): SiteSettings {
+  return {
+    ...defaults,
+    ...data,
+    registration_enabled: data?.registration_enabled !== 'false',
+    email_verify_enabled: data?.email_verify_enabled === 'true',
+    settings_loaded: settingsLoaded,
+  };
+}
+
+function readCachedSiteSettings(): SiteSettings {
+  if (typeof window === 'undefined') return defaults;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.settings.publicSite);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return defaults;
+    return normalizeSiteSettings(parsed as Record<string, string>, false);
+  } catch {
+    return defaults;
+  }
+}
+
+function writeCachedSiteSettings(data: Record<string, string> | undefined) {
+  if (!data || typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.settings.publicSite, JSON.stringify(data));
+  } catch {
+    // Storage can be unavailable in restricted browser modes.
+  }
+}
+
 export function SiteSettingsProvider({ children }: { children: ReactNode }) {
+  const [cachedSiteSettings] = useState(readCachedSiteSettings);
   const { data, isPending } = useQuery({
     queryKey: ['site-settings'],
     queryFn: () => settingsApi.getPublic(),
@@ -43,14 +77,14 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     refetchOnWindowFocus: true,
   });
 
-  const value: SiteSettings = useMemo(() => ({
-    ...defaults,
-    ...data,
-    // Boolean 字段从字符串转换
-    registration_enabled: data?.registration_enabled !== 'false',
-    email_verify_enabled: data?.email_verify_enabled === 'true',
-    settings_loaded: !isPending,
-  }), [data, isPending]);
+  const value = useMemo(
+    () => (data ? normalizeSiteSettings(data, true) : { ...cachedSiteSettings, settings_loaded: !isPending }),
+    [cachedSiteSettings, data, isPending],
+  );
+
+  useEffect(() => {
+    writeCachedSiteSettings(data);
+  }, [data]);
 
   // 动态设置 favicon（优先自定义 logo，否则使用默认 logo）
   useEffect(() => {
@@ -62,7 +96,12 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
       document.head.appendChild(link);
     }
     link.href = logoHref;
-  }, [value.site_logo]);
+    if (value.site_name) {
+      document.title = value.site_subtitle
+        ? `${value.site_name} - ${value.site_subtitle}`
+        : value.site_name;
+    }
+  }, [value.site_logo, value.site_name, value.site_subtitle]);
 
   return (
     <SiteSettingsContext.Provider value={value}>

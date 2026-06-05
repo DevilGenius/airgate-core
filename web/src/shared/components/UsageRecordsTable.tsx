@@ -3,6 +3,7 @@ import { EmptyState } from '@heroui/react';
 import { Inbox } from 'lucide-react';
 import type { UsageColumnConfig, UsageRow } from '../columns/usageColumns';
 import { getTotalPages } from '../utils/pagination';
+import { MobileRecordList } from './MobileRecordList';
 import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
 
@@ -168,6 +169,7 @@ export function UsageRecordsTable<T extends UsageRow>({
   highlightResetKey,
   hasMore,
   isLoading,
+  footer,
   suppressHighlight = false,
   page,
   pageSize,
@@ -184,6 +186,7 @@ export function UsageRecordsTable<T extends UsageRow>({
   dataVersion?: number;
   emptyDescription?: string;
   emptyTitle: string;
+  footer?: ReactNode | false;
   highlightNewRows?: boolean;
   highlightResetKey?: string;
   hasMore?: boolean;
@@ -231,6 +234,23 @@ export function UsageRecordsTable<T extends UsageRow>({
     resetKey: highlightResetKey,
     rows,
   });
+  const mobileColumns = useMemo(
+    () => columns.filter((column) => !column.hideOnMobile),
+    [columns],
+  );
+  const mobileItems = useMemo(() => {
+    const [primaryColumn, ...fieldColumns] = mobileColumns;
+    if (!primaryColumn) return [];
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: primaryColumn.render(row),
+      fields: fieldColumns.map((column) => ({
+        label: column.title,
+        value: column.render(row),
+      })),
+    }));
+  }, [mobileColumns, rows]);
 
   const emptyState = (
     <EmptyState className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 text-center">
@@ -246,9 +266,25 @@ export function UsageRecordsTable<T extends UsageRow>({
     </EmptyState>
   );
 
+  const paginationFooter = footer === undefined ? (
+    <TablePaginationFooter
+      page={page}
+      pageSize={pageSize}
+      pageSizeOptions={USAGE_PAGE_SIZE_OPTIONS}
+      setPage={setPage}
+      setPageSize={setPageSize}
+      summaryTotal={summaryTotal}
+      summaryTotalExact={summaryTotalExact}
+      total={total}
+      hasMore={hasMore}
+      totalExact={totalExact}
+      totalPages={totalPages}
+    />
+  ) : footer;
+
   return (
     <div className="ag-usage-records-table min-h-[240px]">
-      <div className="ag-usage-table-scroll" data-slot="wrapper">
+      <div className="ag-usage-table-scroll ag-usage-table-desktop" data-slot="wrapper">
         <table
           aria-label={ariaLabel}
           className="ag-usage-table"
@@ -298,21 +334,19 @@ export function UsageRecordsTable<T extends UsageRow>({
           </tbody>
         </table>
       </div>
-      <div className="table__footer" data-slot="table-footer">
-        <TablePaginationFooter
-          page={page}
-          pageSize={pageSize}
-          pageSizeOptions={USAGE_PAGE_SIZE_OPTIONS}
-          setPage={setPage}
-          setPageSize={setPageSize}
-          summaryTotal={summaryTotal}
-          summaryTotalExact={summaryTotalExact}
-          total={total}
-          hasMore={hasMore}
-          totalExact={totalExact}
-          totalPages={totalPages}
+      <div className="ag-usage-table-mobile">
+        <MobileRecordList
+          emptyDescription={emptyDescription}
+          emptyTitle={emptyTitle}
+          isLoading={isLoading}
+          items={mobileItems}
         />
       </div>
+      {paginationFooter ? (
+        <div className="table__footer" data-slot="table-footer">
+          {paginationFooter}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -599,7 +599,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
             <span className="shrink-0 font-mono text-[13px] font-medium text-text">
               {timeLabel}
             </span>
-            <span className="hidden shrink-0 text-text-tertiary xl:inline">
+            <span className="hidden shrink-0 font-light text-text-tertiary xl:inline">
               {dateLabel}
             </span>
           </div>

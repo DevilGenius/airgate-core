@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, EmptyState, Input, Label, Spinner, TextField as HeroTextField } from '@heroui/react';
+import { AlertDialog, Button, EmptyState, Input, Spinner, TextField as HeroTextField } from '@heroui/react';
 import {
   Plus,
   Search,
@@ -21,7 +21,7 @@ import {
 } from '../../app/plugin-frontend-registry';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
-import { usePagination } from '../../shared/hooks/usePagination';
+import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
@@ -31,6 +31,8 @@ import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
+import { TablePage } from '../../shared/components/TablePage';
+import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { AccountTypeFilterSelect } from './accounts/AccountTypeFilterSelect';
@@ -66,23 +68,11 @@ import {
   type AccountUsageWindowCache,
 } from './accounts/AccountPageSupport';
 
-const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.auto_refresh';
-const ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.capacity_auto_refresh';
+const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsAutoRefresh;
+const ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsCapacityRefresh;
 const ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS = 0.5;
 const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
-
-if (typeof window !== 'undefined') {
-  try {
-    const storedAutoRefresh = Number(window.localStorage.getItem(ACCOUNT_AUTO_REFRESH_STORAGE_KEY));
-    if (storedAutoRefresh > 0 && storedAutoRefresh < 1) {
-      window.localStorage.setItem(ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY, 'true');
-      window.localStorage.setItem(ACCOUNT_AUTO_REFRESH_STORAGE_KEY, '0');
-    }
-  } catch {
-    // Storage can be unavailable in restricted browser modes.
-  }
-}
 
 export default function AccountsPageContent() {
   const { t } = useTranslation();
@@ -139,14 +129,14 @@ export default function AccountsPageContent() {
   ];
 
   // 筛选状态
-  const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.accounts');
-  const [keyword, setKeyword] = useState('');
+  const { page, setPage, pageSize, setPageSize } = useUrlPagination(20, 'admin.accounts');
+  const [keyword, setKeyword] = useUrlQueryParam('q');
   const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
-  const [platformFilter, setPlatformFilter] = useState('');
-  const [stateFilter, setStateFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [groupFilter, setGroupFilter] = useState('');
-  const [proxyFilter, setProxyFilter] = useState('');
+  const [platformFilter, setPlatformFilter] = useUrlQueryParam('platform');
+  const [stateFilter, setStateFilter] = useUrlQueryParam('state');
+  const [typeFilter, setTypeFilter] = useUrlQueryParam('type');
+  const [groupFilter, setGroupFilter] = useUrlQueryParam('group');
+  const [proxyFilter, setProxyFilter] = useUrlQueryParam('proxy');
 
   // 自动刷新
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ACCOUNT_AUTO_REFRESH_STORAGE_KEY, 0, ACCOUNT_AUTO_REFRESH_OPTIONS); // 秒，0=关闭
@@ -212,7 +202,13 @@ export default function AccountsPageContent() {
   );
 
   // 查询账号列表
-  const { data, isLoading, isFetching: isAccountsFetching, refetch: refetchAccounts } = useQuery({
+  const {
+    data,
+    isLoading,
+    isFetching: isAccountsFetching,
+    isPlaceholderData: isAccountsPlaceholderData,
+    refetch: refetchAccounts,
+  } = useQuery({
     queryKey: accountListQueryKey,
     queryFn: () =>
       accountsApi.list({
@@ -735,9 +731,8 @@ export default function AccountsPageContent() {
     },
   ];
   return (
-    <div>
-      <div className="ag-page-toolbar">
-        <div className="ag-page-toolbar-filters">
+    <TablePage
+      toolbar={(
           <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-48">
               <HeroTextField fullWidth aria-label={t('accounts.search_placeholder', '搜索账号名称...')}>
@@ -771,7 +766,7 @@ export default function AccountsPageContent() {
                   />
                 ) : (
                   <SimpleSelect
-                    aria-label={filter.label}
+                    ariaLabel={filter.label}
                     fullWidth
                     items={filter.options.map((item) => ({ key: item.id, label: item.label }))}
                     selectedKey={filter.value}
@@ -785,9 +780,9 @@ export default function AccountsPageContent() {
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="ag-page-toolbar-actions">
+      )}
+      actions={(
+        <>
           <AutoRefreshControl
             value={autoRefresh}
             options={ACCOUNT_AUTO_REFRESH_OPTIONS}
@@ -837,8 +832,21 @@ export default function AccountsPageContent() {
             <Plus className="h-4 w-4" />
             {t('accounts.create')}
           </Button>
-        </div>
-      </div>
+        </>
+      )}
+      footer={(
+        <TablePaginationFooter
+          page={page}
+          pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          setPage={setPage}
+          setPageSize={setPageSize}
+          total={total}
+          totalPages={totalPages}
+        />
+      )}
+      isFetching={isAccountsPlaceholderData && isAccountsFetching && !isLoading}
+    >
       {/* 隐藏的文件选择器（供导入按钮触发） */}
       <input
         ref={importInputRef}
@@ -924,15 +932,6 @@ export default function AccountsPageContent() {
             </tbody>
           </table>
         </div>
-        <TablePaginationFooter
-          page={page}
-          pageSize={pageSize}
-          pageSizeOptions={PAGE_SIZE_OPTIONS}
-          setPage={setPage}
-          setPageSize={setPageSize}
-          total={total}
-          totalPages={totalPages}
-        />
       </div>
 
       {/* 创建弹窗 */}
@@ -1076,6 +1075,6 @@ export default function AccountsPageContent() {
           onClose={() => setStatsAccountId(null)}
         />
       )}
-    </div>
+    </TablePage>
   );
 }

@@ -5,7 +5,7 @@ import { AlertDialog, Button, Chip, Dropdown, EmptyState, Spinner } from '@herou
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { usersApi } from '../../shared/api/users';
 import { settingsApi } from '../../shared/api/settings';
-import { usePagination } from '../../shared/hooks/usePagination';
+import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
@@ -14,6 +14,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { TablePage } from '../../shared/components/TablePage';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { getAvatarColor } from '../../shared/utils/avatar';
@@ -42,9 +43,9 @@ export default function UsersPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.users');
-  const [keyword, setKeyword] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const { page, setPage, pageSize, setPageSize } = useUrlPagination(DEFAULT_PAGE_SIZE, 'admin.users');
+  const [keyword, setKeyword] = useUrlQueryParam('q');
+  const [statusFilter, setStatusFilter] = useUrlQueryParam('status');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserResp | null>(null);
@@ -126,10 +127,9 @@ export default function UsersPage() {
   }, [setPage]);
 
   return (
-    <div>
-      <div className="ag-page-toolbar">
-        <div className="ag-page-toolbar-filters">
-          <div className="ag-page-toolbar-filter-row">
+    <TablePage
+      toolbar={(
+        <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-48">
               <SearchFilterInput
                 ariaLabel={t('users.search_placeholder')}
@@ -151,9 +151,10 @@ export default function UsersPage() {
                 }}
               />
             </div>
-          </div>
         </div>
-        <div className="ag-page-toolbar-actions">
+      )}
+      actions={(
+        <>
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}
@@ -169,21 +170,23 @@ export default function UsersPage() {
             <Plus className="w-4 h-4" />
             {t('users.create')}
           </Button>
-        </div>
-      </div>
+        </>
+      )}
+      footer={(
+        <TablePaginationFooter
+          page={page}
+          pageSize={pageSize}
+          setPage={setPage}
+          setPageSize={setPageSize}
+          total={total}
+          totalPages={totalPages}
+        />
+      )}
+      isFetching={isFetching && !isLoading}
+    >
 
       <CommonTable
         ariaLabel={t('users.title', 'Users')}
-        footer={(
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        )}
         minWidth={980}
       >
             <CommonTable.Header>
@@ -466,6 +469,6 @@ export default function UsersPage() {
           }}
         />
       )}
-    </div>
+    </TablePage>
   );
 }

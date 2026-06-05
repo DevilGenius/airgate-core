@@ -2,11 +2,12 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import zh from './zh.json';
 import en from './en.json';
+import { STORAGE_KEYS } from '../shared/storageKeys';
 
 export function getStoredLanguage() {
   if (typeof window === 'undefined') return 'zh';
   try {
-    return window.localStorage.getItem('lang') || 'zh';
+    return window.localStorage.getItem(STORAGE_KEYS.i18n.language) || 'zh';
   } catch {
     return 'zh';
   }
@@ -15,7 +16,7 @@ export function getStoredLanguage() {
 export function setStoredLanguage(lang: string) {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem('lang', lang);
+    window.localStorage.setItem(STORAGE_KEYS.i18n.language, lang);
   } catch {
     // Language switching should keep working when storage is unavailable.
   }

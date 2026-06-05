@@ -2,10 +2,13 @@ import type {
   ComponentPropsWithoutRef,
   CSSProperties,
   HTMLAttributes,
+  ReactElement,
   ReactNode,
   TdHTMLAttributes,
   ThHTMLAttributes,
 } from 'react';
+import { Children, isValidElement } from 'react';
+import { MobileRecordList, type MobileRecordItem } from './MobileRecordList';
 
 type NativeTableProps = ComponentPropsWithoutRef<'table'>;
 
@@ -20,6 +23,7 @@ interface CommonTableProps {
   contentStyle?: CSSProperties;
   footer?: ReactNode;
   minWidth?: number | string;
+  mobileCards?: boolean;
   scrollClassName?: string;
   scrollOverlay?: ReactNode;
 }
@@ -45,6 +49,7 @@ function CommonTableRoot({
   contentStyle,
   footer,
   minWidth,
+  mobileCards = true,
   scrollClassName,
   scrollOverlay,
 }: CommonTableProps) {
@@ -55,9 +60,17 @@ function CommonTableRoot({
         ...contentStyle,
       };
 
+  const mobileItems = mobileCards ? buildMobileItems(children) : [];
   return (
     <div className={cx('ag-resource-table', className)}>
-      <div className={cx('ag-resource-table-scroll', scrollClassName)} data-slot="wrapper">
+      <div
+        className={cx(
+          'ag-resource-table-scroll',
+          mobileItems.length > 0 && 'ag-resource-table-desktop',
+          scrollClassName,
+        )}
+        data-slot="wrapper"
+      >
         {scrollOverlay}
         <table
           {...contentProps}
@@ -69,6 +82,11 @@ function CommonTableRoot({
           {children}
         </table>
       </div>
+      {mobileItems.length > 0 ? (
+        <div className="ag-resource-table-mobile">
+          <MobileRecordList emptyTitle="暂无数据" items={mobileItems} />
+        </div>
+      ) : null}
       {footer ? (
         <div className="table__footer" data-slot="table-footer">
           {footer}
@@ -76,6 +94,60 @@ function CommonTableRoot({
       ) : null}
     </div>
   );
+}
+
+function elementChildren(element: ReactElement<{ children?: ReactNode }>) {
+  return Children.toArray(element.props.children);
+}
+
+function isComponentElement<P extends { children?: ReactNode }>(
+  value: ReactNode,
+  component: unknown,
+): value is ReactElement<P> {
+  return isValidElement(value) && value.type === component;
+}
+
+function textValue(value: ReactNode): string {
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return value.map(textValue).join('');
+  if (isValidElement<{ children?: ReactNode }>(value)) return textValue(value.props.children);
+  return '';
+}
+
+function buildMobileItems(children: ReactNode): MobileRecordItem[] {
+  const sections = Children.toArray(children);
+  const header = sections.find((child) => isComponentElement(child, CommonTableHeader));
+  const body = sections.find((child) => isComponentElement(child, CommonTableBody));
+  if (!header || !body) return [];
+
+  const labels = elementChildren(header).map((column) => {
+    if (!isComponentElement(column, CommonTableColumn)) return '';
+    return textValue(column.props.children).trim();
+  });
+  if (labels.length === 0) return [];
+
+  const items: MobileRecordItem[] = [];
+  for (const row of elementChildren(body)) {
+    if (!isComponentElement<CommonTableRowProps>(row, CommonTableRow)) continue;
+
+    const cells = elementChildren(row)
+      .filter((cell): cell is ReactElement<TdHTMLAttributes<HTMLTableCellElement>> => isComponentElement(cell, CommonTableCell));
+    if (cells.length < 2) continue;
+
+    const [firstCell, ...restCells] = cells;
+    if (!firstCell) continue;
+
+    items.push({
+      id: row.props.id ?? textValue(firstCell.props.children),
+      title: firstCell.props.children,
+      fields: restCells.map((cell, index) => ({
+        label: labels[index + 1] || '',
+        value: cell.props.children,
+      })).filter((field) => field.label),
+    });
+  }
+
+  return items;
 }
 
 function CommonTableHeader({ children, ...props }: HTMLAttributes<HTMLTableSectionElement>) {

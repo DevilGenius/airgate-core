@@ -121,6 +121,9 @@
 
 .ag-table-page-size-popover,
 .ag-table-page-size-select .ag-toolbar-menu-popover {
+  top: auto !important;
+  bottom: calc(100% + 0.375rem) !important;
+  z-index: 120 !important;
   width: 3.5rem !important;
   min-width: 3.5rem !important;
   max-width: 4.5rem !important;

@@ -9,7 +9,7 @@ import {
 } from '../../shared/ui';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { groupsApi } from '../../shared/api/groups';
-import { usePagination } from '../../shared/hooks/usePagination';
+import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
@@ -19,6 +19,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { TablePage } from '../../shared/components/TablePage';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
@@ -30,8 +31,8 @@ export default function APIKeysPage() {
   const { t } = useTranslation();
   const copy = useClipboard();
 
-  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
-  const [keyword, setKeyword] = useState('');
+  const { page, setPage, pageSize, setPageSize } = useUrlPagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
+  const [keyword, setKeyword] = useUrlQueryParam('q');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
   const [deletingKey, setDeletingKey] = useState<APIKeyResp | null>(null);
@@ -43,7 +44,7 @@ export default function APIKeysPage() {
     resetCopied: resetRevealedKeyCopied,
   } = useCopyFeedback();
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: queryKeys.apikeys(page, pageSize, keyword),
     queryFn: ({ signal }) => apikeysApi.adminList({
       page,
@@ -125,10 +126,10 @@ export default function APIKeysPage() {
   });
 
   return (
-    <div className="ag-api-keys-page">
-      <div className="ag-page-toolbar">
-        <div className="ag-page-toolbar-filters">
-          <div className="ag-page-toolbar-filter-row">
+    <TablePage
+      className="ag-api-keys-page"
+      toolbar={(
+        <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-56">
               <SearchFilterInput
                 ariaLabel={t('usage.search_api_key', '搜索 API Key')}
@@ -137,9 +138,10 @@ export default function APIKeysPage() {
                 onSearchChange={handleKeywordChange}
               />
             </div>
-          </div>
         </div>
-        <div className="ag-page-toolbar-actions">
+      )}
+      actions={(
+        <>
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}
@@ -154,22 +156,24 @@ export default function APIKeysPage() {
             <Plus className="w-4 h-4" />
             {t('api_keys.create')}
           </Button>
-        </div>
-      </div>
+        </>
+      )}
+      footer={(
+        <TablePaginationFooter
+          page={page}
+          pageSize={pageSize}
+          setPage={setPage}
+          setPageSize={setPageSize}
+          total={total}
+          totalPages={totalPages}
+        />
+      )}
+      isFetching={isFetching && !isLoading}
+    >
 
       <CommonTable
         ariaLabel={t('api_keys.title', 'API keys')}
         className="ag-api-keys-table"
-        footer={(
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        )}
         minWidth={1070}
       >
         <CommonTable.Header>
@@ -454,6 +458,6 @@ export default function APIKeysPage() {
           </AlertDialog.Container>
         </AlertDialog.Backdrop>
       </AlertDialog>
-    </div>
+    </TablePage>
   );
 }

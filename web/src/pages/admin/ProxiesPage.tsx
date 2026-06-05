@@ -5,7 +5,7 @@ import { proxiesApi } from '../../shared/api/proxies';
 import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
-import { usePagination } from '../../shared/hooks/usePagination';
+import { useUrlPagination } from '../../shared/hooks/useUrlTableState';
 import { AlertDialog, Button, Chip, EmptyState, Form, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { StatusChip } from '../../shared/ui';
@@ -16,6 +16,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
+import { TablePage } from '../../shared/components/TablePage';
 
 // 代理表单数据
 interface ProxyForm {
@@ -40,7 +41,7 @@ export default function ProxiesPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
 
-  const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.proxies');
+  const { page, setPage, pageSize, setPageSize } = useUrlPagination(20, 'admin.proxies');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProxy, setEditingProxy] = useState<ProxyResp | null>(null);
   const [form, setForm] = useState<ProxyForm>(emptyForm);
@@ -48,7 +49,7 @@ export default function ProxiesPage() {
   const [testingId, setTestingId] = useState<number | null>(null);
 
   // 查询代理列表
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: queryKeys.proxies(page, pageSize),
     queryFn: () => proxiesApi.list({ page, page_size: pageSize }),
     placeholderData: keepPreviousData,
@@ -175,9 +176,9 @@ export default function ProxiesPage() {
   });
 
   return (
-    <div>
-      <div className="ag-page-toolbar ag-page-toolbar--actions-only">
-        <div className="ag-page-toolbar-actions">
+    <TablePage
+      actions={(
+        <>
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}
@@ -192,21 +193,23 @@ export default function ProxiesPage() {
             <Plus className="w-4 h-4" />
             {t('proxies.create')}
           </Button>
-        </div>
-      </div>
+        </>
+      )}
+      footer={(
+        <TablePaginationFooter
+          page={page}
+          pageSize={pageSize}
+          setPage={setPage}
+          setPageSize={setPageSize}
+          total={total}
+          totalPages={totalPages}
+        />
+      )}
+      isFetching={isFetching && !isLoading}
+    >
 
       <CommonTable
         ariaLabel={t('proxies.title', 'Proxies')}
-        footer={(
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        )}
         minWidth={860}
       >
             <CommonTable.Header>
@@ -420,6 +423,6 @@ export default function ProxiesPage() {
           </AlertDialog.Container>
         </AlertDialog.Backdrop>
       </AlertDialog>
-    </div>
+    </TablePage>
   );
 }

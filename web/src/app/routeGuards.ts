@@ -2,9 +2,10 @@ import { redirect } from '@tanstack/react-router';
 import { getToken, getTokenRole } from '../shared/api/client';
 import { setupApi } from '../shared/api/setup';
 import { usersApi } from '../shared/api/users';
+import { STORAGE_KEYS } from '../shared/storageKeys';
 
 // 缓存安装状态，避免每次路由跳转都请求 /setup/status。
-const SETUP_COMPLETE_STORAGE_KEY = 'airgate:setup:complete';
+const SETUP_COMPLETE_STORAGE_KEY = STORAGE_KEYS.setup.complete;
 
 function readSetupCompleteCache(): boolean {
   if (typeof window === 'undefined') return false;

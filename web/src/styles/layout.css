@@ -329,7 +329,8 @@
   gap: 1.25rem;
 }
 
-.ag-main:has([data-full-bleed]) {
+.ag-main:has([data-full-bleed]),
+.ag-main:has([data-full-bleed]) .ag-main-scroll {
   overflow: hidden;
 }
 
@@ -343,6 +344,173 @@
   width: 100%;
   height: 100%;
   min-height: 0;
+}
+
+.ag-page-footer-container {
+  position: relative;
+  z-index: 80;
+  overflow: visible;
+  flex-shrink: 0;
+  border-top: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  background: color-mix(in oklab, var(--background) 92%, transparent);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
+  backdrop-filter: saturate(160%) blur(16px);
+}
+
+.ag-table-page {
+  min-width: 0;
+}
+
+.ag-table-page-content {
+  min-width: 0;
+  transition: opacity 150ms ease;
+}
+
+.ag-table-page-content--fetching {
+  pointer-events: none;
+  opacity: 0.62;
+}
+
+.ag-table-page-mobile {
+  display: none;
+}
+
+.ag-mobile-record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ag-mobile-record-card {
+  min-width: 0;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  border-radius: var(--field-radius);
+  background: var(--surface);
+  box-shadow: var(--surface-shadow);
+  padding: 0.875rem;
+}
+
+.ag-mobile-record-card--loading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ag-mobile-record-head {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ag-mobile-record-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-mobile-record-description {
+  margin-top: 0.125rem;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-mobile-record-meta {
+  flex: 0 0 auto;
+}
+
+.ag-mobile-record-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem 0.75rem;
+  margin-top: 0.875rem;
+}
+
+.ag-mobile-record-field {
+  min-width: 0;
+}
+
+.ag-mobile-record-field dt {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1rem;
+}
+
+.ag-mobile-record-field dd {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  margin: 0.125rem 0 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-mobile-record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.875rem;
+}
+
+.ag-table-page-footer {
+  padding: 0.625rem 1rem;
+}
+
+@media (min-width: 768px) {
+  .ag-table-page-footer {
+    padding-inline: 1.25rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .ag-table-page-desktop {
+    display: none;
+  }
+
+  .ag-table-page-mobile {
+    display: block;
+  }
+}
+
+.ag-usage-table-mobile {
+  display: none;
+}
+
+.ag-resource-table-mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .ag-usage-table-desktop {
+    display: none;
+  }
+
+  .ag-usage-table-mobile {
+    display: block;
+  }
+
+  .ag-resource-table-desktop {
+    display: none;
+  }
+
+  .ag-resource-table-mobile {
+    display: block;
+  }
 }
 
 /* ==========================================================================

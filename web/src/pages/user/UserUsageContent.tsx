@@ -15,6 +15,8 @@ import { useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '
 import { getSessionAPIKey } from '../../shared/api/client';
 import { CcsImportModal } from './userkeys/CcsImportModal';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
+import { TablePage } from '../../shared/components/TablePage';
+import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { CostValue } from '../../shared/components/CostValue';
@@ -22,8 +24,10 @@ import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
 import { USER_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
+import { STORAGE_KEYS } from '../../shared/storageKeys';
+import { getTotalPages } from '../../shared/utils/pagination';
 
-const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.user.usage.auto_update';
+const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.userUsageAutoRefresh;
 
 type MetricTone = 'violet' | 'amber' | 'indigo' | 'emerald' | 'stream';
 const STREAM_BLUE = 'oklch(62.04% 0.1950 253.83)';
@@ -289,6 +293,7 @@ export default function UserUsageContent() {
 
   const list = data?.list ?? [];
   const total = data?.total ?? 0;
+  const totalPages = getTotalPages(total, pageSize);
   const summaryTotal = stats?.total_requests;
   const canUseCursor = !isPlaceholderData;
   const visibleActualCost = customerScope ? (stats?.total_billed_cost ?? 0) : (stats?.total_actual_cost ?? 0);
@@ -384,6 +389,24 @@ export default function UserUsageContent() {
         )}
       </div>
 
+      <TablePage
+        footer={(
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={[20, 50, 100]}
+            setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
+            setPageSize={setPageSize}
+            summaryTotal={summaryTotal}
+            summaryTotalExact={summaryTotal != null ? true : undefined}
+            total={total}
+            hasMore={canUseCursor ? data?.has_more : false}
+            totalExact={canUseCursor ? data?.total_exact : true}
+            totalPages={totalPages}
+          />
+        )}
+        isFetching={isPlaceholderData && isUsageFetching && !isLoading}
+      >
       {/* 筛选栏 */}
       <div className="ag-page-toolbar">
         <div className="ag-page-toolbar-filters">
@@ -462,6 +485,7 @@ export default function UserUsageContent() {
         dataVersion={dataUpdatedAt}
         emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
         emptyTitle={t('common.no_data')}
+        footer={false}
         highlightNewRows={autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
         hasMore={canUseCursor ? data?.has_more : false}
@@ -477,6 +501,7 @@ export default function UserUsageContent() {
         total={total}
         totalExact={canUseCursor ? data?.total_exact : true}
       />
+      </TablePage>
     </div>
   );
 }

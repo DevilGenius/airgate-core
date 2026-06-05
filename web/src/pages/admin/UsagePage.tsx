@@ -12,6 +12,8 @@ import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/co
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
+import { TablePage } from '../../shared/components/TablePage';
+import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { SearchFilterComboBox } from '../../shared/components/SearchFilterComboBox';
@@ -22,6 +24,8 @@ import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMen
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { formatAPIKeyHint } from '../../shared/utils/format';
+import { STORAGE_KEYS } from '../../shared/storageKeys';
+import { getTotalPages } from '../../shared/utils/pagination';
 
 const UsagePieChart = lazy(() =>
   import('./usage/UsageCharts').then((m) => ({ default: m.UsagePieChart })),
@@ -171,8 +175,8 @@ const groupByHeaderKeys: Record<string, string> = {
 };
 
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
-const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
-const ADMIN_USAGE_COLUMN_STORAGE_KEY = 'airgate.admin.usage.columns';
+const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageAutoRefresh;
+const ADMIN_USAGE_COLUMN_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageColumns;
 const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
   'user_id',
   'created_at',
@@ -934,6 +938,7 @@ export default function UsagePage() {
   }, []);
 
   const total = data?.total ?? 0;
+  const totalPages = getTotalPages(total, pageSize);
   const canUseCursor = !isPlaceholderData;
   const summaryTotal = activeStats && !isStatsPlaceholderData ? activeStats.total_requests : undefined;
 
@@ -999,6 +1004,24 @@ export default function UsagePage() {
         </div>
       )}
 
+      <TablePage
+        footer={(
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={[20, 50, 100]}
+            setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
+            setPageSize={setPageSize}
+            summaryTotal={summaryTotal}
+            summaryTotalExact={summaryTotal != null ? true : undefined}
+            total={total}
+            hasMore={canUseCursor ? data?.has_more : false}
+            totalExact={canUseCursor ? data?.total_exact : true}
+            totalPages={totalPages}
+          />
+        )}
+        isFetching={isPlaceholderData && isUsageFetching && !isLoading}
+      >
       {/* 筛选栏 */}
       <div className="ag-page-toolbar">
         <div className="ag-page-toolbar-filters">
@@ -1100,6 +1123,7 @@ export default function UsagePage() {
         dataVersion={dataUpdatedAt}
         emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
         emptyTitle={t('common.no_data')}
+        footer={false}
         highlightNewRows={autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
         hasMore={canUseCursor ? data?.has_more : false}
@@ -1115,6 +1139,7 @@ export default function UsagePage() {
         total={total}
         totalExact={canUseCursor ? data?.total_exact : true}
       />
+      </TablePage>
     </div>
   );
 }

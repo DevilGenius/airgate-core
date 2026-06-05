@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apikeysApi } from '../../shared/api/apikeys';
-import { usePagination } from '../../shared/hooks/usePagination';
+import { useUrlPagination } from '../../shared/hooks/useUrlTableState';
 import { groupsApi } from '../../shared/api/groups';
 import { useToast } from '../../shared/ui';
 import { Alert, AlertDialog, Button, Dropdown, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
@@ -17,6 +17,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { TablePage } from '../../shared/components/TablePage';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { GROUP_CHIP_STYLE } from '../../shared/components/groupChipStyle';
 import { dateInputToLocalStartRFC3339, formatAPIKeyHint, formatDateInputValue, formatExpiry } from '../../shared/utils/format';
@@ -59,7 +60,7 @@ export default function UserKeysPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'user.keys');
+  const { page, setPage, pageSize, setPageSize } = useUrlPagination(DEFAULT_PAGE_SIZE, 'user.keys');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
   const [form, setForm] = useState<KeyForm>(emptyForm);
@@ -75,7 +76,7 @@ export default function UserKeysPage() {
   } = useCopyFeedback();
 
   // 密钥列表
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: queryKeys.userKeys(page, pageSize),
     queryFn: () => apikeysApi.list({ page, page_size: pageSize }),
     placeholderData: keepPreviousData,
@@ -280,9 +281,10 @@ export default function UserKeysPage() {
   });
 
   return (
-    <div className="ag-api-keys-page">
-      <div className="ag-page-toolbar ag-page-toolbar--actions-only">
-        <div className="ag-page-toolbar-actions">
+    <TablePage
+      className="ag-api-keys-page"
+      actions={(
+        <>
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}
@@ -302,22 +304,24 @@ export default function UserKeysPage() {
             <Plus className="w-4 h-4" />
             {hasAvailableGroups ? t('user_keys.create') : t('user_keys.create_disabled_no_groups')}
           </Button>
-        </div>
-      </div>
+        </>
+      )}
+      footer={(
+        <TablePaginationFooter
+          page={page}
+          pageSize={pageSize}
+          setPage={setPage}
+          setPageSize={setPageSize}
+          total={total}
+          totalPages={totalPages}
+        />
+      )}
+      isFetching={isFetching && !isLoading}
+    >
 
       <CommonTable
         ariaLabel={t('user_keys.title', 'API keys')}
         className="ag-api-keys-table"
-        footer={(
-          <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            totalPages={totalPages}
-          />
-        )}
         minWidth={1070}
       >
         <CommonTable.Header>
@@ -693,6 +697,6 @@ export default function UserKeysPage() {
           </AlertDialog.Container>
         </AlertDialog.Backdrop>
       </AlertDialog>
-    </div>
+    </TablePage>
   );
 }
