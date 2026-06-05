@@ -1,4 +1,5 @@
-import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { Input } from '@heroui/react';
 import { Search } from 'lucide-react';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -14,7 +15,9 @@ interface SearchFilterComboBoxProps {
   ariaLabel: string;
   debounceMs?: number;
   emptyPrompt: string;
+  isLoading?: boolean;
   items: SearchFilterComboBoxOption[];
+  loadingLabel?: string;
   noDataLabel: string;
   onSearchChange: (value: string) => void;
   onSelectionChange: (value: string, label: string) => void;
@@ -25,9 +28,11 @@ interface SearchFilterComboBoxProps {
 
 export const SearchFilterComboBox = memo(function SearchFilterComboBox({
   ariaLabel,
-  debounceMs = 120,
+  debounceMs = 0,
   emptyPrompt,
+  isLoading = false,
   items,
+  loadingLabel = 'Loading...',
   noDataLabel,
   onSearchChange,
   onSelectionChange,
@@ -87,10 +92,18 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
     onSearchChange(debouncedValue);
   }, [debouncedValue, onSearchChange]);
 
-  const openDropdown = () => {
+  const openDropdown = useCallback(() => {
+    if (isOpen) return;
     document.dispatchEvent(new CustomEvent('ag-search-combobox-open', { detail: comboBoxId }));
-    setIsOpen(true);
-  };
+    flushSync(() => {
+      setIsOpen(true);
+    });
+  }, [comboBoxId, isOpen]);
+
+  const handleInputPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    openDropdown();
+  }, [openDropdown]);
 
   const handleInputChange = (value: string) => {
     setInputValue(value);
@@ -104,7 +117,15 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
     if (selectedKey && value !== selectedLabel) {
       onSelectionChange('', '');
     }
+    if (debounceMs <= 0) {
+      const nextSearch = value.trim();
+      if (nextSearch !== lastEmittedValueRef.current) {
+        lastEmittedValueRef.current = nextSearch;
+        onSearchChange(nextSearch);
+      }
+    }
   };
+
   const handleSelect = (value: string) => {
     const option = items.find((item) => item.id === value);
     const label = option?.label ? String(option.label) : '';
@@ -115,9 +136,11 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
     onSearchChange(label.trim());
   };
 
+  const emptyStateLabel = isLoading && inputValue.trim() ? loadingLabel : (inputValue.trim() ? noDataLabel : emptyPrompt);
+
   return (
     <div ref={rootRef} className="ag-search-combobox" data-open={isOpen ? 'true' : undefined}>
-      <div className="relative">
+      <div className="relative" onPointerDownCapture={handleInputPointerDown}>
         <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
         <Input
           aria-label={ariaLabel}
@@ -128,33 +151,39 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
           onFocus={openDropdown}
         />
       </div>
-      {isOpen ? (
-        <div className="ag-search-combobox-popover">
-          <div className="ag-search-combobox-list" role="listbox" aria-label={ariaLabel}>
-            {items.length === 0 ? (
-              <div className="ag-search-combobox-empty">
-                {inputValue.trim() ? noDataLabel : emptyPrompt}
-              </div>
-            ) : (
-              items.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-selected={selectedKey === item.id}
-                  className="ag-search-combobox-item"
-                  role="option"
-                  onClick={() => handleSelect(item.id)}
-                >
-                  <span className="ag-search-combobox-item-label">{item.label}</span>
-                  {item.description ? (
-                    <span className="ag-search-combobox-item-description">{item.description}</span>
-                  ) : null}
-                </button>
-              ))
-            )}
-          </div>
+      <div className="ag-search-combobox-popover" hidden={!isOpen}>
+        <div className="ag-search-combobox-list" role="listbox" aria-label={ariaLabel}>
+          {items.length === 0 ? (
+            <div className="ag-search-combobox-empty">
+              {emptyStateLabel}
+            </div>
+          ) : (
+            items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-selected={selectedKey === item.id}
+                className="ag-search-combobox-item"
+                role="option"
+                onClick={(event) => {
+                  if (event.detail !== 0) return;
+                  handleSelect(item.id);
+                }}
+                onPointerDown={(event) => {
+                  if (event.button !== 0) return;
+                  event.preventDefault();
+                  handleSelect(item.id);
+                }}
+              >
+                <span className="ag-search-combobox-item-label">{item.label}</span>
+                {item.description ? (
+                  <span className="ag-search-combobox-item-description">{item.description}</span>
+                ) : null}
+              </button>
+            ))
+          )}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 });

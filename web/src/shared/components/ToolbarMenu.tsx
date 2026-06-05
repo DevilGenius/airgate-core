@@ -1,4 +1,5 @@
-import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { Check, ChevronDown } from 'lucide-react';
 
 interface ToolbarMenuProps {
@@ -33,11 +34,28 @@ export const ToolbarMenu = memo(function ToolbarMenu({
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const close = useCallback(() => setIsOpen(false), []);
+  const toggleOpen = useCallback(() => {
+    flushSync(() => {
+      setIsOpen((open) => !open);
+    });
+  }, []);
+
+  const handleTriggerPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (disabled || event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.focus({ preventScroll: true });
+    toggleOpen();
+  }, [disabled, toggleOpen]);
+
+  const handleTriggerClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (disabled || event.detail !== 0) return;
+    toggleOpen();
+  }, [disabled, toggleOpen]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
 
-    const handlePointerDown = (event: MouseEvent) => {
+    const handlePointerDown = (event: PointerEvent) => {
       const root = rootRef.current;
       if (!root || !(event.target instanceof Node) || root.contains(event.target)) return;
       close();
@@ -46,10 +64,10 @@ export const ToolbarMenu = memo(function ToolbarMenu({
       if (event.key === 'Escape') close();
     };
 
-    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [close, isOpen]);
@@ -64,7 +82,8 @@ export const ToolbarMenu = memo(function ToolbarMenu({
         className={['ag-toolbar-menu-trigger', className].filter(Boolean).join(' ')}
         data-open={isOpen ? 'true' : undefined}
         disabled={disabled}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={handleTriggerClick}
+        onPointerDown={handleTriggerPointerDown}
       >
         {icon}
         <span className="ag-toolbar-menu-trigger-label">{label}</span>
@@ -89,6 +108,17 @@ export const ToolbarMenuItem = memo(function ToolbarMenuItem({
   onSelect,
   role = 'menuitem',
 }: ToolbarMenuItemProps) {
+  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (isDisabled || event.button !== 0) return;
+    event.preventDefault();
+    onSelect();
+  }, [isDisabled, onSelect]);
+
+  const handleClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (isDisabled || event.detail !== 0) return;
+    onSelect();
+  }, [isDisabled, onSelect]);
+
   return (
     <button
       type="button"
@@ -97,7 +127,8 @@ export const ToolbarMenuItem = memo(function ToolbarMenuItem({
       className={['ag-toolbar-menu-item', className].filter(Boolean).join(' ')}
       disabled={isDisabled}
       role={role}
-      onClick={onSelect}
+      onClick={handleClick}
+      onPointerDown={handlePointerDown}
     >
       <span className="ag-toolbar-menu-item-label">{children}</span>
       <span className="ag-toolbar-menu-item-check">

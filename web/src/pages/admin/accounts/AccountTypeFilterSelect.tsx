@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
@@ -39,6 +40,38 @@ export function AccountTypeFilterSelect({
     closeMenu();
   }, [closeMenu, onSelect]);
 
+  const toggleTypeMenu = useCallback(() => {
+    flushSync(() => {
+      setIsTypeMenuOpen((open) => {
+        if (open) setIsOAuthPlanMenuOpen(false);
+        return !open;
+      });
+    });
+  }, []);
+
+  const handleTriggerPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.focus({ preventScroll: true });
+    toggleTypeMenu();
+  }, [toggleTypeMenu]);
+
+  const handleTriggerClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (event.detail !== 0) return;
+    toggleTypeMenu();
+  }, [toggleTypeMenu]);
+
+  const handleItemPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>, value: string) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    selectTypeFilter(value);
+  }, [selectTypeFilter]);
+
+  const handleItemClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>, value: string) => {
+    if (event.detail !== 0) return;
+    selectTypeFilter(value);
+  }, [selectTypeFilter]);
+
   useEffect(() => {
     if (!isTypeMenuOpen) return;
 
@@ -67,12 +100,8 @@ export function AccountTypeFilterSelect({
         aria-haspopup="menu"
         aria-expanded={isTypeMenuOpen}
         className="select__trigger select__trigger--full-width ag-account-type-trigger"
-        onClick={() => {
-          setIsTypeMenuOpen((open) => {
-            if (open) setIsOAuthPlanMenuOpen(false);
-            return !open;
-          });
-        }}
+        onClick={handleTriggerClick}
+        onPointerDown={handleTriggerPointerDown}
       >
         <span className="select__value ag-account-type-trigger-value">{selectedNode}</span>
         <ChevronDown
@@ -88,7 +117,8 @@ export function AccountTypeFilterSelect({
             className="ag-account-type-menu-item"
             onPointerEnter={() => setIsOAuthPlanMenuOpen(false)}
             onFocus={() => setIsOAuthPlanMenuOpen(false)}
-            onClick={() => selectTypeFilter('')}
+            onClick={(event) => handleItemClick(event, '')}
+            onPointerDown={(event) => handleItemPointerDown(event, '')}
           >
             {typeOptions[0]?.label ?? t('accounts.all_types', '全部类型')}
           </button>
@@ -102,7 +132,8 @@ export function AccountTypeFilterSelect({
               role="menuitem"
               className="ag-account-type-menu-item"
               onFocus={() => setIsOAuthPlanMenuOpen(true)}
-              onClick={() => selectTypeFilter('oauth')}
+              onClick={(event) => handleItemClick(event, 'oauth')}
+              onPointerDown={(event) => handleItemPointerDown(event, 'oauth')}
             >
               <span className="truncate">OAuth</span>
               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
@@ -118,7 +149,8 @@ export function AccountTypeFilterSelect({
                         type="button"
                         role="menuitem"
                         className="ag-account-type-submenu-item"
-                        onClick={() => selectTypeFilter(plan.id)}
+                        onClick={(event) => handleItemClick(event, plan.id)}
+                        onPointerDown={(event) => handleItemPointerDown(event, plan.id)}
                       >
                         {renderAccountTypeFilterOption(plan, false)}
                       </button>
@@ -138,7 +170,8 @@ export function AccountTypeFilterSelect({
             className="ag-account-type-menu-item"
             onPointerEnter={() => setIsOAuthPlanMenuOpen(false)}
             onFocus={() => setIsOAuthPlanMenuOpen(false)}
-            onClick={() => selectTypeFilter('apikey')}
+            onClick={(event) => handleItemClick(event, 'apikey')}
+            onPointerDown={(event) => handleItemPointerDown(event, 'apikey')}
           >
             API Key
           </button>

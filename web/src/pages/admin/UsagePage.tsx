@@ -537,12 +537,13 @@ export default function UsagePage() {
   // 用户搜索
   const [userSearchKeyword, setUserSearchKeyword] = useState('');
   const [selectedUserLabel, setSelectedUserLabel] = useState('');
-  const { data: usersData } = useQuery({
+  const userSearchActive = userSearchKeyword.trim().length > 0;
+  const { data: usersData, isFetching: isUsersFetching } = useQuery({
     queryKey: ['admin-users-search', userSearchKeyword],
     queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: userSearchKeyword }),
-    enabled: pageActive && userSearchKeyword.length > 0,
+    enabled: pageActive && userSearchActive,
   });
-  const userOptions = (usersData?.list ?? []).map((u) => ({
+  const userOptions = (userSearchActive ? (usersData?.list ?? []) : []).map((u) => ({
     id: String(u.id),
     label: u.username || u.email,
     description: u.username ? u.email : undefined,
@@ -567,12 +568,13 @@ export default function UsagePage() {
   // API Key 搜索：防抖 + 服务端分页，只取前 20 条候选，避免全量加载大量 key。
   const [apiKeySearchKeyword, setAPIKeySearchKeyword] = useState('');
   const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState('');
-  const { data: apiKeysData } = useQuery({
+  const apiKeySearchActive = apiKeySearchKeyword.trim().length > 0;
+  const { data: apiKeysData, isFetching: isAPIKeysFetching } = useQuery({
     queryKey: ['admin-api-keys-search', 'api_key', apiKeySearchKeyword],
     queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: apiKeySearchKeyword, search_scope: 'api_key' }, { signal }),
-    enabled: pageActive && apiKeySearchKeyword.length > 0,
+    enabled: pageActive && apiKeySearchActive,
   });
-  const apiKeyOptions = (apiKeysData?.list ?? []).map((key: APIKeyResp) => {
+  const apiKeyOptions = (apiKeySearchActive ? (apiKeysData?.list ?? []) : []).map((key: APIKeyResp) => {
     const keyHint = formatAPIKeyHint(key.key_prefix);
     return {
       id: String(key.id),
@@ -1044,7 +1046,9 @@ export default function UsagePage() {
             <div className="w-full sm:w-48">
               <SearchFilterComboBox
                 ariaLabel={t('usage.search_user')}
+                isLoading={isUsersFetching}
                 items={visibleUserOptions}
+                loadingLabel={t('common.loading')}
                 selectedKey={filters.user_id ? String(filters.user_id) : null}
                 selectedLabel={selectedUserLabel}
                 placeholder={t('usage.search_user')}
@@ -1057,7 +1061,9 @@ export default function UsagePage() {
             <div className="w-full sm:w-48">
               <SearchFilterComboBox
                 ariaLabel={t('usage.search_api_key', '搜索 API Key')}
+                isLoading={isAPIKeysFetching}
                 items={visibleAPIKeyOptions}
+                loadingLabel={t('common.loading')}
                 selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
                 selectedLabel={selectedAPIKeyLabel}
                 placeholder={t('usage.search_api_key', '搜索 API Key')}

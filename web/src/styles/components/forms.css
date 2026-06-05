@@ -212,6 +212,12 @@
   box-shadow: var(--overlay-shadow);
   color: var(--overlay-foreground);
   padding: 0.25rem;
+  animation: none !important;
+  transition: none !important;
+}
+
+.ag-search-combobox-popover[hidden] {
+  display: none !important;
 }
 
 .ag-search-combobox-list {

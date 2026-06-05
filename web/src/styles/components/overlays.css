@@ -137,6 +137,8 @@
   background: var(--overlay) !important;
   color: var(--overlay-foreground) !important;
   box-shadow: var(--overlay-shadow) !important;
+  animation: none !important;
+  transition: none !important;
 }
 
 :where(.date-picker__popover,
