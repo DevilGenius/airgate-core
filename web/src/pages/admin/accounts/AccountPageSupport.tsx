@@ -779,8 +779,11 @@ export function useUsageResetClock(enabled: boolean): number {
 export function AccountStatusCell({ row }: { row: AccountResp }) {
   const { t } = useTranslation();
   const hasLiveCooldown = accountHasLiveCooldown(row, Date.now());
-  const tickingNow = useCooldownClock(hasLiveCooldown);
-  const now = hasLiveCooldown ? tickingNow : Date.now();
+  const [isCooldownHovered, setIsCooldownHovered] = useState(false);
+  const hoverNowRef = useRef<number | null>(null);
+  const tickingNow = useCooldownClock(hasLiveCooldown && !isCooldownHovered);
+  const liveNow = hasLiveCooldown ? tickingNow : Date.now();
+  const now = isCooldownHovered && hoverNowRef.current != null ? hoverNowRef.current : liveNow;
   const untilMs = row.state_until ? Date.parse(row.state_until) : 0;
   const remainingMs = untilMs - now;
   const hasCountdown = untilMs > 0 && remainingMs > 0;
@@ -800,6 +803,19 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
       {label}
     </span>
   );
+
+  const freezeCooldownHoverProps = hasLiveCooldown
+    ? {
+      onMouseEnter: () => {
+        hoverNowRef.current = liveNow;
+        setIsCooldownHovered(true);
+      },
+      onMouseLeave: () => {
+        hoverNowRef.current = null;
+        setIsCooldownHovered(false);
+      },
+    }
+    : undefined;
 
   // 主 state 徽标
   let mainBadge: ReactElement;
@@ -835,7 +851,12 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   }
 
   if (liveFamilyCooldowns.length === 0) {
-    return mainBadge;
+    if (!freezeCooldownHoverProps) return mainBadge;
+    return (
+      <span className="inline-flex max-w-full" {...freezeCooldownHoverProps}>
+        {mainBadge}
+      </span>
+    );
   }
 
   // tooltip 多行：每个家族 + 剩余时间，rate-limit 原因截断到 80 字符避免过宽
@@ -854,7 +875,10 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   );
 
   return (
-    <div className="flex w-full max-w-full flex-wrap items-center justify-center gap-1 text-center">
+    <div
+      className="flex w-full max-w-full flex-wrap items-center justify-center gap-1 text-center"
+      {...freezeCooldownHoverProps}
+    >
       {mainBadge}
       {pill(
         familyLabel,
@@ -913,4 +937,3 @@ export function AccountCapacityChip({ current, max }: { current: number; max: nu
     </span>
   );
 }
-

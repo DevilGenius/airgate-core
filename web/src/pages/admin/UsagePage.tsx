@@ -1,14 +1,14 @@
-import { lazy, startTransition, Suspense, useCallback, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { lazy, startTransition, Suspense, useCallback, useMemo, useState, type CSSProperties, type Key, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Card, ListBox, Select, Tabs } from '@heroui/react';
+import { Card, Dropdown, ListBox, Select, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
-import { Activity, DollarSign, Sigma } from 'lucide-react';
+import { Activity, Check, Columns3, DollarSign, Sigma } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
@@ -128,6 +128,40 @@ const groupByHeaderKeys: Record<string, string> = {
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
 const USAGE_PAGE_ACTIVATION_DELAY_MS = 180;
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
+const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
+  'user_id',
+  'created_at',
+  'model',
+  'stream',
+  'first_token_ms',
+  'duration_ms',
+  'tokens',
+  'cost',
+  'endpoint',
+  'api_key',
+  'account_name',
+  'user_agent',
+  'ip_address',
+] as const;
+
+function compactText(value: string | undefined, fallback = '-') {
+  const trimmed = value?.trim();
+  return trimmed || fallback;
+}
+
+function displayUserAgent(value: string | undefined) {
+  const raw = compactText(value);
+  if (raw === '-') return raw;
+
+  const display = raw
+    .replace(/^Mozilla\/5\.0\s*(?:\([^)]*\)\s*)?/i, '')
+    .replace(/^AppleWebKit\/[\d.]+\s*(?:\([^)]*\)\s*)?/i, '')
+    .replace(/\s+AppleWebKit\/[\d.]+\s*(?:\([^)]*\)\s*)?/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return display || raw;
+}
 
 // ==================== 分布饼图卡片 ====================
 
@@ -413,6 +447,9 @@ export default function UsagePage() {
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
   const [granularity, setGranularity] = useState<string>('hour');
+  const [selectedColumnKeys, setSelectedColumnKeys] = useState<Set<string>>(
+    () => new Set(ADMIN_USAGE_DEFAULT_COLUMN_KEYS),
+  );
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS);
   const { platforms, platformName } = usePlatforms();
   const pageActive = useDeferredActivation(USAGE_PAGE_ACTIVATION_DELAY_MS);
@@ -656,7 +693,7 @@ export default function UsagePage() {
   ];
   const selectedPlatformLabel = platformOptions.find((item) => item.id === (filters.platform || ''))?.label ?? t('common.all');
 
-  const columns = useMemo(() => {
+  const allColumns = useMemo(() => {
     const adminColumns: UsageColumnConfig<UsageLogResp>[] = [
       {
         key: 'user_id',
@@ -680,9 +717,13 @@ export default function UsagePage() {
     const modelIdx = sharedColumns.findIndex((c) => c.key === 'model');
     const streamColumn = sharedColumns.find((column) => column.key === 'stream');
     const timingColumns = sharedColumns.filter((column) => column.key === 'first_token_ms' || column.key === 'duration_ms');
+    const leadingSharedColumns = sharedColumns
+      .slice(0, modelIdx + 1)
+      .map((column) => (column.key === 'model' ? { ...column, width: '260px' } : column));
     const sharedColumnsAfterModel = sharedColumns
       .slice(modelIdx + 1)
-      .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream');
+      .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream')
+      .map((column) => (column.key === 'cost' ? { ...column, width: '120px' } : column));
     const endpointColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'endpoint',
       title: t('usage.endpoint', '端点'),
@@ -728,17 +769,89 @@ export default function UsagePage() {
         );
       },
     };
+    const userAgentColumn: UsageColumnConfig<UsageLogResp> = {
+      key: 'user_agent',
+      title: t('usage.user_agent', 'User-Agent'),
+      width: '260px',
+      hideOnMobile: true,
+      render: (row) => {
+        const rawUserAgent = compactText(row.user_agent);
+        const userAgent = displayUserAgent(row.user_agent);
+        return (
+          <span
+            className="block w-full min-w-0 max-w-full overflow-hidden text-left font-mono text-[11px] leading-tight text-text-secondary"
+            style={{
+              display: '-webkit-box',
+              overflowWrap: 'anywhere',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 2,
+              whiteSpace: 'normal',
+            }}
+            title={rawUserAgent}
+          >
+            {userAgent}
+          </span>
+        );
+      },
+    };
+    const ipAddressColumn: UsageColumnConfig<UsageLogResp> = {
+      key: 'ip_address',
+      title: t('usage.ip_address', 'IP'),
+      width: '128px',
+      hideOnMobile: true,
+      render: (row) => {
+        const ipAddress = compactText(row.ip_address);
+        return (
+          <span className="block max-w-full truncate font-mono text-xs leading-tight text-text-secondary" title={ipAddress}>
+            {ipAddress}
+          </span>
+        );
+      },
+    };
     return [
       ...adminColumns,
-      ...sharedColumns.slice(0, modelIdx + 1),
+      ...leadingSharedColumns,
       ...(streamColumn ? [streamColumn] : []),
       ...timingColumns,
       ...sharedColumnsAfterModel,
       endpointColumn,
       apiKeyColumn,
       accountColumn,
+      userAgentColumn,
+      ipAddressColumn,
     ] as UsageColumnConfig<UsageLogResp>[];
   }, [sharedColumns, t]);
+
+  const columnOptions = useMemo(
+    () => allColumns.map((column) => ({
+      key: column.key,
+      label: typeof column.title === 'string' ? column.title : column.key,
+    })),
+    [allColumns],
+  );
+
+  const selectedVisibleColumnKeys = useMemo(
+    () => new Set(columnOptions.map((option) => option.key).filter((key) => selectedColumnKeys.has(key))),
+    [columnOptions, selectedColumnKeys],
+  );
+
+  const columns = useMemo(() => {
+    const visible = allColumns.filter((column) => selectedVisibleColumnKeys.has(column.key));
+    return visible.length > 0 ? visible : allColumns.slice(0, 1);
+  }, [allColumns, selectedVisibleColumnKeys]);
+
+  const selectedColumnCount = columns.length;
+  const handleColumnSelectionChange = useCallback((keys: 'all' | Set<Key>) => {
+    if (keys === 'all') {
+      setSelectedColumnKeys(new Set(columnOptions.map((option) => option.key)));
+      return;
+    }
+
+    const next = new Set(Array.from(keys).map(String));
+    if (next.size === 0) return;
+    setSelectedColumnKeys(next);
+  }, [columnOptions]);
+
   const total = data?.total ?? 0;
   const canUseCursor = pageActive && !isPlaceholderData;
   const summaryTotal = activeStats && !isStatsPlaceholderData ? activeStats.total_requests : undefined;
@@ -893,6 +1006,35 @@ export default function UsagePage() {
           isRefreshing={isRefreshing}
           isDisabled={!pageActive}
         />
+        <div className="w-full sm:ml-auto sm:flex sm:w-auto sm:justify-end">
+          <Dropdown>
+            <Dropdown.Trigger
+              className="button button--sm button--ghost inline-flex h-8 min-w-[8.5rem] items-center justify-center gap-2 whitespace-nowrap px-3"
+            >
+              <Columns3 className="h-4 w-4 shrink-0" />
+              <span className="leading-none">{t('usage.column_visibility', '列显示')} {selectedColumnCount}/{columnOptions.length}</span>
+            </Dropdown.Trigger>
+            <Dropdown.Popover placement="bottom end">
+              <Dropdown.Menu
+                aria-label={t('usage.column_visibility', '列显示')}
+                selectedKeys={selectedVisibleColumnKeys}
+                selectionMode="multiple"
+                onSelectionChange={handleColumnSelectionChange}
+              >
+                {columnOptions.map((option) => (
+                  <Dropdown.Item key={option.key} id={option.key} textValue={option.label}>
+                    <span className="grid min-w-[10rem] grid-cols-[minmax(0,1fr)_1rem] items-center gap-3">
+                      <span className="min-w-0 truncate text-left">{option.label}</span>
+                      <span className="flex h-4 w-4 items-center justify-center">
+                        {selectedVisibleColumnKeys.has(option.key) ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+                      </span>
+                    </span>
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
+        </div>
       </div>
 
       {/* 使用记录表格 */}
