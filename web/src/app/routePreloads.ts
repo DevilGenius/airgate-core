@@ -3,6 +3,7 @@ import type { ComponentType, LazyExoticComponent } from 'react';
 
 export type RoutePreloadModule<TProps = Record<string, never>> = {
   default: ComponentType<TProps>;
+  preloadAccountsPageContent?: () => Promise<unknown>;
   preloadUserUsageContent?: () => Promise<unknown>;
 };
 
@@ -45,16 +46,6 @@ export const ProfilePage = lazyWithPreload(() => import('../pages/user/ProfilePa
 export const UserKeysPage = lazyWithPreload(() => import('../pages/user/UserKeysPage'));
 export const UserUsagePage = lazyWithPreload(() => import('../pages/user/UserUsagePage'));
 
-export const ADMIN_IDLE_PRELOADS = [
-  DashboardPage,
-  PluginPage,
-];
-
-export const USER_IDLE_PRELOADS = [
-  UserOverviewPage,
-  PluginPage,
-];
-
 const ROUTE_PRELOADS = new Map<string, AnyPreloadableLazyComponent[]>([
   ['/', [DashboardPage, UserOverviewPage]],
   ['/home', [PublicHomePage]],
@@ -86,7 +77,12 @@ export function preloadRoutePage(
   options: { deep?: boolean } = {},
 ) {
   return page.preload().then((module) => (
-    options.deep === false ? undefined : module.preloadUserUsageContent?.()
+    options.deep === false
+      ? undefined
+      : Promise.all([
+        module.preloadAccountsPageContent?.(),
+        module.preloadUserUsageContent?.(),
+      ]).then(() => undefined)
   ));
 }
 

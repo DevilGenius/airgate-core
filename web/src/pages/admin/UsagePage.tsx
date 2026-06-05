@@ -7,7 +7,6 @@ import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
 import { Activity, Columns3, DollarSign, Sigma } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
@@ -172,7 +171,6 @@ const groupByHeaderKeys: Record<string, string> = {
 };
 
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
-const USAGE_PAGE_ACTIVATION_DELAY_MS = 180;
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
 const ADMIN_USAGE_COLUMN_STORAGE_KEY = 'airgate.admin.usage.columns';
 const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
@@ -521,7 +519,6 @@ export default function UsagePage() {
   );
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS);
   const { platforms, platformName } = usePlatforms();
-  const pageActive = useDeferredActivation(USAGE_PAGE_ACTIVATION_DELAY_MS);
   const autoRefreshEnabled = autoRefresh > 0;
   const autoRefreshLabel = `${t('usage.auto_update')} `;
   const autoRefreshOffLabel = t('usage.auto_update_off');
@@ -541,7 +538,7 @@ export default function UsagePage() {
   const { data: usersData, isFetching: isUsersFetching } = useQuery({
     queryKey: ['admin-users-search', userSearchKeyword],
     queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: userSearchKeyword }),
-    enabled: pageActive && userSearchActive,
+    enabled: userSearchActive,
   });
   const userOptions = (userSearchActive ? (usersData?.list ?? []) : []).map((u) => ({
     id: String(u.id),
@@ -572,7 +569,7 @@ export default function UsagePage() {
   const { data: apiKeysData, isFetching: isAPIKeysFetching } = useQuery({
     queryKey: ['admin-api-keys-search', 'api_key', apiKeySearchKeyword],
     queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: apiKeySearchKeyword, search_scope: 'api_key' }, { signal }),
-    enabled: pageActive && apiKeySearchActive,
+    enabled: apiKeySearchActive,
   });
   const apiKeyOptions = (apiKeySearchActive ? (apiKeysData?.list ?? []) : []).map((key: APIKeyResp) => {
     const keyHint = formatAPIKeyHint(key.key_prefix);
@@ -623,7 +620,6 @@ export default function UsagePage() {
     queryKey: ['admin-usage', queryParams],
     queryFn: ({ signal }) => usageApi.adminList(queryParams, { signal }),
     meta: { globalLoading: false },
-    enabled: pageActive,
     refetchOnReconnect: autoRefreshEnabled,
     refetchOnWindowFocus: autoRefreshEnabled,
     placeholderData: keepPreviousData,
@@ -647,7 +643,6 @@ export default function UsagePage() {
         api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
       }, { signal }),
     meta: { globalLoading: false },
-    enabled: pageActive,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
@@ -667,26 +662,23 @@ export default function UsagePage() {
         api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
       }, { signal }),
     meta: { globalLoading: false },
-    enabled: pageActive,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 
-  const isRefreshing = pageActive && (isUsageFetching || isStatsFetching || isTrendFetching);
-  const isUsageTableRefreshing = pageActive && isUsageFetching;
+  const isRefreshing = isUsageFetching || isStatsFetching || isTrendFetching;
+  const isUsageTableRefreshing = isUsageFetching;
 
   const handleManualRefresh = useCallback(() => {
-    if (!pageActive) return;
     void refetchUsage({ cancelRefetch: false });
     void refetchStats({ cancelRefetch: false });
     void refetchTrend({ cancelRefetch: false });
-  }, [pageActive, refetchStats, refetchTrend, refetchUsage]);
+  }, [refetchStats, refetchTrend, refetchUsage]);
 
   const handleAutoRefresh = useCallback(() => {
-    if (!pageActive) return;
     void refetchUsage({ cancelRefetch: false });
-  }, [pageActive, refetchUsage]);
+  }, [refetchUsage]);
 
   const updateFilter = useCallback((key: keyof UsageQuery, value: string) => {
     const nextValue = (key === 'user_id' || key === 'api_key_id')
@@ -716,7 +708,7 @@ export default function UsagePage() {
     setSelectedAPIKeyLabel(label);
   }, [updateFilter]);
 
-  const activeStats = pageActive ? stats : undefined;
+  const activeStats = stats;
 
   // 饼图数据
   const modelDistribution: DistributionItem[] = useMemo(
@@ -942,7 +934,7 @@ export default function UsagePage() {
   }, []);
 
   const total = data?.total ?? 0;
-  const canUseCursor = pageActive && !isPlaceholderData;
+  const canUseCursor = !isPlaceholderData;
   const summaryTotal = activeStats && !isStatsPlaceholderData ? activeStats.total_requests : undefined;
 
   return (
@@ -1090,7 +1082,6 @@ export default function UsagePage() {
             onRefresh={handleManualRefresh}
             isAutoRefreshing={isUsageTableRefreshing}
             isRefreshing={isRefreshing}
-            isDisabled={!pageActive}
           />
           <ColumnVisibilityMenu
             label={t('usage.column_visibility', '列显示')}
@@ -1106,22 +1097,22 @@ export default function UsagePage() {
       <UsageRecordsTable
         ariaLabel={t('usage.title', 'Usage')}
         columns={columns}
-        dataVersion={pageActive ? dataUpdatedAt : undefined}
+        dataVersion={dataUpdatedAt}
         emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
         emptyTitle={t('common.no_data')}
-        highlightNewRows={pageActive && autoRefreshEnabled && page === 1}
+        highlightNewRows={autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
         hasMore={canUseCursor ? data?.has_more : false}
-        isLoading={!pageActive || isLoading}
+        isLoading={isLoading}
         page={page}
         pageSize={pageSize}
-        rows={pageActive ? data?.list ?? [] : []}
+        rows={data?.list ?? []}
         setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
         setPageSize={setPageSize}
         summaryTotal={summaryTotal}
         summaryTotalExact={summaryTotal != null ? true : undefined}
-        suppressHighlight={!pageActive || isPlaceholderData}
-        total={pageActive ? total : 0}
+        suppressHighlight={isPlaceholderData}
+        total={total}
         totalExact={canUseCursor ? data?.total_exact : true}
       />
     </div>

@@ -1,6 +1,5 @@
 import { lazy, Suspense, type ComponentType } from 'react';
 import { PageLoading } from '../../shared/components/PageLoading';
-import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
 
 type AccountsPageContentModule = {
   default: ComponentType;
@@ -13,8 +12,11 @@ function loadAccountsPageContent() {
   return accountsPageContentPromise;
 }
 
+export function preloadAccountsPageContent() {
+  return loadAccountsPageContent();
+}
+
 const AccountsPageContent = lazy(loadAccountsPageContent);
-const ACCOUNTS_PAGE_ACTIVATION_DELAY_MS = 180;
 
 function AccountsPagePlaceholder() {
   return (
@@ -26,12 +28,6 @@ function AccountsPagePlaceholder() {
 }
 
 export default function AccountsPage() {
-  const active = useDeferredActivation(ACCOUNTS_PAGE_ACTIVATION_DELAY_MS);
-
-  if (!active) {
-    return <AccountsPagePlaceholder />;
-  }
-
   return (
     <Suspense fallback={<AccountsPagePlaceholder />}>
       <AccountsPageContent />

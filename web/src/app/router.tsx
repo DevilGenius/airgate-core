@@ -5,8 +5,8 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { Suspense, useEffect } from 'react';
-import type { ElementType, ReactNode } from 'react';
+import { Suspense } from 'react';
+import type { ElementType } from 'react';
 import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
 import { getToken, getTokenRole } from '../shared/api/client';
@@ -14,7 +14,6 @@ import { FullPageLoading, PageLoading } from '../shared/components/PageLoading';
 import { checkAdmin, withSetupCheck } from './routeGuards';
 import {
   AccountsPage,
-  ADMIN_IDLE_PRELOADS,
   DashboardPage,
   DocsPage,
   GroupsPage,
@@ -22,7 +21,6 @@ import {
   LoginPage,
   PluginPage,
   PluginsPage,
-  preloadRoutePage,
   ProfilePage,
   ProxiesPage,
   PublicHomePage,
@@ -32,65 +30,13 @@ import {
   UsagePage,
   UserKeysPage,
   UserOverviewPage,
-  USER_IDLE_PRELOADS,
   UsersPage,
   UserUsagePage,
 } from './routePreloads';
 
-function requestIdle(work: () => void) {
-  const runtime = globalThis as typeof globalThis & {
-    cancelIdleCallback?: (id: number) => void;
-    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-  };
-
-  if (runtime.requestIdleCallback) {
-    const id = runtime.requestIdleCallback(work, { timeout: 2500 });
-    return () => runtime.cancelIdleCallback?.(id);
-  }
-
-  const id = globalThis.setTimeout(work, 500);
-  return () => globalThis.clearTimeout(id);
-}
-
-const AppShell = lazyWithPreload<{ children: ReactNode }>(() =>
+const AppShell = lazyWithPreload(() =>
   import('./layout/AppShell').then((m) => ({ default: m.AppShell })),
 );
-
-function RoutePreloader() {
-  const { user, isAPIKeySession } = useAuth();
-  const hasUser = Boolean(user);
-  const userRole = user?.role;
-
-  useEffect(() => {
-    if (!hasUser) return;
-
-    const pages = isAPIKeySession
-      ? [UserUsagePage]
-      : userRole === 'admin'
-        ? ADMIN_IDLE_PRELOADS
-        : USER_IDLE_PRELOADS;
-    let index = 0;
-    let cancelIdle = () => {};
-    let cancelled = false;
-
-    const preloadNext = () => {
-      if (cancelled || index >= pages.length) return;
-      const page = pages[index++];
-      if (!page) return;
-      void preloadRoutePage(page).finally(() => {
-        if (!cancelled) cancelIdle = requestIdle(preloadNext);
-      });
-    };
-
-    cancelIdle = requestIdle(preloadNext);
-    return () => {
-      cancelled = true;
-      cancelIdle();
-    };
-  }, [hasUser, isAPIKeySession, userRole]);
-
-  return null;
-}
 
 // 根路由
 const rootRoute = createRootRoute({
@@ -169,10 +115,7 @@ const authLayout = createRoute({
   }),
   component: () => (
     <Suspense fallback={<FullPageLoading />}>
-      <AppShell>
-        <RoutePreloader />
-        <Outlet />
-      </AppShell>
+      <AppShell />
     </Suspense>
   ),
 });

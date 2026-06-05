@@ -1,5 +1,4 @@
 import { lazy, Suspense, type ComponentType } from 'react';
-import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
 import { PageLoading } from '../../shared/components/PageLoading';
 
 type UserUsageContentModule = {
@@ -18,7 +17,6 @@ export function preloadUserUsageContent() {
 }
 
 const UserUsageContent = lazy(loadUserUsageContent);
-const USER_USAGE_PAGE_ACTIVATION_DELAY_MS = 180;
 
 function UserUsagePagePlaceholder() {
   return (
@@ -30,12 +28,6 @@ function UserUsagePagePlaceholder() {
 }
 
 export default function UserUsagePage() {
-  const active = useDeferredActivation(USER_USAGE_PAGE_ACTIVATION_DELAY_MS);
-
-  if (!active) {
-    return <UserUsagePagePlaceholder />;
-  }
-
   return (
     <Suspense fallback={<UserUsagePagePlaceholder />}>
       <UserUsageContent />
