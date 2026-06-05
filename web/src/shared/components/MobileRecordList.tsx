@@ -2,6 +2,7 @@ import { memo, type ReactNode } from 'react';
 import { TableEmptyState } from './TablePage';
 
 export interface MobileRecordField {
+  className?: string;
   label: ReactNode;
   value: ReactNode;
 }
@@ -60,7 +61,7 @@ export const MobileRecordList = memo(function MobileRecordList({
           {item.fields?.length ? (
             <dl className="ag-mobile-record-fields">
               {item.fields.map((field, index) => (
-                <div className="ag-mobile-record-field" key={index}>
+                <div className={['ag-mobile-record-field', field.className].filter(Boolean).join(' ')} key={index}>
                   <dt>{field.label}</dt>
                   <dd>{field.value}</dd>
                 </div>

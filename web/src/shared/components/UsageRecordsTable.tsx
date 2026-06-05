@@ -239,13 +239,25 @@ export function UsageRecordsTable<T extends UsageRow>({
     [columns],
   );
   const mobileItems = useMemo(() => {
-    const [primaryColumn, ...fieldColumns] = mobileColumns;
+    const primaryColumn = mobileColumns.find((column) => !FULL_CELL_CONTENT_COLUMNS.has(column.key)) ?? mobileColumns[0];
     if (!primaryColumn) return [];
+    const fieldColumns = mobileColumns.filter((column) => column !== primaryColumn);
+    const compactSummaryCount = fieldColumns.filter((column) => FULL_CELL_CONTENT_COLUMNS.has(column.key)).length;
+    const firstCompactSummaryIndex = fieldColumns.findIndex((column) => FULL_CELL_CONTENT_COLUMNS.has(column.key));
+    const wideBeforeCompactSummaryColumn = compactSummaryCount > 1
+      && firstCompactSummaryIndex > 0
+      && firstCompactSummaryIndex % 2 === 1
+      ? fieldColumns[firstCompactSummaryIndex - 1]
+      : undefined;
 
     return rows.map((row) => ({
       id: row.id,
       title: primaryColumn.render(row),
       fields: fieldColumns.map((column) => ({
+        className: [
+          column.key === 'tokens' && 'ag-mobile-record-field--tokens',
+          column === wideBeforeCompactSummaryColumn && 'ag-mobile-record-field--wide',
+        ].filter(Boolean).join(' ') || undefined,
         label: column.title,
         value: column.render(row),
       })),

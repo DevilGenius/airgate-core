@@ -146,25 +146,37 @@ const MODEL_META_SLOT_WIDTH_CLASS = 'w-[5.5rem]';
 function MetaChip({
   color,
   dotColor,
+  imageTier,
   label,
 }: {
   color: string;
   dotColor?: string;
+  imageTier?: 'high' | 'low' | 'medium';
   label: string;
 }) {
+  const style = {
+    '--ag-usage-meta-chip-color': color,
+    '--ag-usage-meta-chip-dot-color': dotColor ?? color,
+    background: `color-mix(in srgb, ${color} 18%, transparent)`,
+    boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 34%, transparent)`,
+    color,
+  } as CSSProperties;
+
   return (
     <span
-      className={`${MODEL_META_SLOT_WIDTH_CLASS} ${dotColor ? 'ag-usage-image-size-chip' : ''} inline-flex h-4 shrink-0 items-center justify-center truncate rounded px-1.5 text-[12px] font-semibold leading-none whitespace-nowrap`}
-      style={{
-        background: `color-mix(in srgb, ${color} 18%, transparent)`,
-        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 34%, transparent)`,
-        color,
-      }}
+      className={[
+        'ag-usage-meta-chip',
+        dotColor && 'ag-usage-meta-chip--image',
+        imageTier && `ag-usage-meta-chip--image-${imageTier}`,
+        MODEL_META_SLOT_WIDTH_CLASS,
+        'inline-flex h-4 shrink-0 items-center justify-center truncate rounded px-1.5 text-[12px] font-semibold leading-none whitespace-nowrap',
+      ].filter(Boolean).join(' ')}
+      style={style}
       title={label}
     >
       {dotColor ? (
         <span
-          className="ag-usage-image-size-dot"
+          className="ag-usage-meta-chip-dot"
           aria-hidden="true"
           style={{ backgroundColor: dotColor }}
         />
@@ -174,19 +186,26 @@ function MetaChip({
   );
 }
 
-function getImageSizeDotColor(imageSize: string): string {
+function getImageSizeTier(imageSize: string): 'high' | 'low' | 'medium' {
   const normalized = imageSize.trim().toLowerCase();
-  if (normalized.includes('4k')) return META_CHIP_HIGH_COLOR;
-  if (normalized.includes('2k')) return META_CHIP_MEDIUM_COLOR;
-  if (normalized.includes('1k')) return META_CHIP_LOW_COLOR;
+  if (normalized.includes('4k')) return 'high';
+  if (normalized.includes('2k')) return 'medium';
+  if (normalized.includes('1k')) return 'low';
 
   const dimensions = normalized.match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) ?? [];
   const [width, height] = dimensions;
   if (width && height) {
     const pixels = width * height;
-    if (pixels > IMAGE_TIER_2K_MAX_PIXELS) return META_CHIP_HIGH_COLOR;
-    if (pixels > IMAGE_TIER_1K_MAX_PIXELS) return META_CHIP_MEDIUM_COLOR;
+    if (pixels > IMAGE_TIER_2K_MAX_PIXELS) return 'high';
+    if (pixels > IMAGE_TIER_1K_MAX_PIXELS) return 'medium';
   }
+  return 'low';
+}
+
+function getImageSizeDotColor(imageSize: string): string {
+  const tier = getImageSizeTier(imageSize);
+  if (tier === 'high') return META_CHIP_HIGH_COLOR;
+  if (tier === 'medium') return META_CHIP_MEDIUM_COLOR;
   return META_CHIP_LOW_COLOR;
 }
 
@@ -617,10 +636,12 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
           if (PluginUsageModelMeta) return null;
           const imageSize = usageMetadataValue(row.usage_metadata ?? {}, ['openai.image.size']) ?? '';
           if (imageSize) {
+            const imageTier = getImageSizeTier(imageSize);
             return (
               <MetaChip
                 color={MODEL_META_IMAGE_COLOR}
                 dotColor={getImageSizeDotColor(imageSize)}
+                imageTier={imageTier}
                 label={imageSize}
               />
             );
@@ -647,7 +668,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         })();
 
         return (
-          <div className="grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2 text-left">
+          <div className="ag-usage-model-cell grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2 text-left">
             <div className={`ag-usage-model-meta-slot ${MODEL_META_SLOT_WIDTH_CLASS} flex h-4 shrink-0 items-center justify-center overflow-hidden`}>
               {PluginUsageModelMeta ? (
                 <PluginUsageModelMeta
@@ -694,7 +715,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
             )}
           >
             {tokenSummaryVisible ? (
-              <div className="mx-auto grid h-full max-h-[var(--ag-usage-table-row-height)] grid-cols-[minmax(0,8.75rem)_4.75rem] items-center justify-center gap-2 overflow-visible px-1">
+              <div className="ag-usage-token-summary mx-auto grid h-full max-h-[var(--ag-usage-table-row-height)] grid-cols-[minmax(0,8.75rem)_4.75rem] items-center justify-center gap-2 overflow-visible px-1">
                 <div className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-px">
                   <TokenRow
                     color={USAGE_TOKEN_COLORS.input}
