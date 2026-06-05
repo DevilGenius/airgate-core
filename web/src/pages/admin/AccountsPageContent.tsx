@@ -735,9 +735,9 @@ export default function AccountsPageContent() {
   ];
   return (
     <div>
-      <div className="mb-5 flex min-h-12 flex-col gap-3 xl:flex-row xl:items-start">
-        <div className="min-w-0 flex-1">
-          <div className="flex min-h-12 flex-col flex-wrap items-stretch gap-3 sm:flex-row sm:items-center">
+      <div className="ag-page-toolbar">
+        <div className="ag-page-toolbar-filters">
+          <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-48">
               <HeroTextField fullWidth aria-label={t('accounts.search_placeholder', '搜索账号名称...')}>
                 <div className="relative">
@@ -803,7 +803,7 @@ export default function AccountsPageContent() {
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 xl:ml-auto xl:justify-end">
+        <div className="ag-page-toolbar-actions">
           <AutoRefreshControl
             value={autoRefresh}
             options={ACCOUNT_AUTO_REFRESH_OPTIONS}
@@ -812,13 +812,14 @@ export default function AccountsPageContent() {
             beforeRefresh={(
               <NativeSwitch
                 ariaLabel={capacityAutoRefreshLabel}
-                className="h-8 shrink-0"
+                className="ag-page-toolbar-switch"
                 contentClassName="whitespace-nowrap text-text-secondary"
                 isSelected={capacityAutoRefresh}
                 label={capacityAutoRefreshLabel}
                 onChange={setCapacityAutoRefresh}
               />
             )}
+            refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
             triggerClassName="ag-auto-refresh-trigger--account-fixed"
             ariaLabel={t('accounts.auto_refresh')}
             refreshAriaLabel={t('common.refresh')}
@@ -829,7 +830,7 @@ export default function AccountsPageContent() {
             isAutoRefreshing={isAccountsFetching || isUsageFetching}
           />
           <Button
-            className="hidden sm:inline-flex"
+            className="ag-page-toolbar-button hidden sm:inline-flex"
             variant="secondary"
             onPress={() => importInputRef.current?.click()}
             isDisabled={importMutation.isPending}
@@ -839,7 +840,7 @@ export default function AccountsPageContent() {
             {t('accounts.import')}
           </Button>
           <Button
-            className="hidden sm:inline-flex"
+            className="ag-page-toolbar-button hidden sm:inline-flex"
             variant="secondary"
             onPress={() => exportMutation.mutate()}
             isDisabled={exportMutation.isPending}
@@ -848,7 +849,7 @@ export default function AccountsPageContent() {
             <Download className="h-4 w-4" />
             {t('accounts.export')}
           </Button>
-          <Button variant="primary" onPress={() => setShowCreateModal(true)}>
+          <Button className="ag-page-toolbar-button" variant="primary" onPress={() => setShowCreateModal(true)}>
             <Plus className="h-4 w-4" />
             {t('accounts.create')}
           </Button>

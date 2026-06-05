@@ -126,55 +126,57 @@ export default function UsersPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-48">
-          <SearchFilterInput
-            ariaLabel={t('users.search_placeholder')}
-            placeholder={t('users.search_placeholder')}
-            value={keyword}
-            onSearchChange={handleKeywordChange}
-          />
+      <div className="ag-page-toolbar">
+        <div className="ag-page-toolbar-filters">
+          <div className="ag-page-toolbar-filter-row">
+            <div className="w-full sm:w-48">
+              <SearchFilterInput
+                ariaLabel={t('users.search_placeholder')}
+                placeholder={t('users.search_placeholder')}
+                value={keyword}
+                onSearchChange={handleKeywordChange}
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <Select
+                fullWidth
+                selectedKey={statusFilter}
+                onSelectionChange={(key) => {
+                  setStatusFilter(key == null ? '' : String(key));
+                  setPage(1);
+                }}
+              >
+                <Label className="sr-only">{t('common.status')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedStatusLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={statusOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+            </div>
+          </div>
         </div>
-        <div className="w-full sm:w-48">
-          <Select
-            fullWidth
-            selectedKey={statusFilter}
-            onSelectionChange={(key) => {
-              setStatusFilter(key == null ? '' : String(key));
-              setPage(1);
-            }}
+        <div className="ag-page-toolbar-actions">
+          <Button
+            isIconOnly
+            aria-label={t('common.refresh', 'Refresh')}
+            className="ag-page-toolbar-button"
+            isDisabled={isFetching}
+            size="sm"
+            variant="ghost"
+            onPress={() => refetch()}
           >
-            <Label className="sr-only">{t('common.status')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedStatusLabel}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={statusOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2 sm:ml-auto">
-          {isFetching ? (
-            <RefreshCw className="w-4 h-4 text-text-tertiary animate-spin" />
-          ) : (
-            <Button
-              isIconOnly
-              aria-label={t('common.refresh', 'Refresh')}
-              size="sm"
-              variant="ghost"
-              onPress={() => refetch()}
-            >
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-          )}
-          <Button variant="primary" onPress={() => setShowCreateModal(true)}>
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+          </Button>
+          <Button className="ag-page-toolbar-button" variant="primary" onPress={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4" />
             {t('users.create')}
           </Button>

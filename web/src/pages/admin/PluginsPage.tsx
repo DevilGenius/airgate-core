@@ -135,25 +135,30 @@ export default function PluginsPage() {
       >
         {/* Tab 切换 + 操作按钮 */}
         <div className="ag-page-toolbar">
-          <Tabs.ListContainer className="ag-page-tabs w-full sm:w-auto">
-            <Tabs.List>
-              {tabs.map((tab, index) => {
-                const Icon = tab.icon;
-                return (
-                  <Tabs.Tab key={tab.key} id={tab.key}>
-                    {index > 0 ? <Tabs.Separator /> : null}
-                    <Tabs.Indicator />
-                    <Icon className="w-4 h-4" />
-                    {tab.label}
-                  </Tabs.Tab>
-                );
-              })}
-            </Tabs.List>
-          </Tabs.ListContainer>
-          <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="ag-page-toolbar-filters">
+            <div className="ag-page-toolbar-filter-row">
+              <Tabs.ListContainer className="ag-page-tabs w-full sm:w-auto">
+                <Tabs.List>
+                  {tabs.map((tab, index) => {
+                    const Icon = tab.icon;
+                    return (
+                      <Tabs.Tab key={tab.key} id={tab.key}>
+                        {index > 0 ? <Tabs.Separator /> : null}
+                        <Tabs.Indicator />
+                        <Icon className="w-4 h-4" />
+                        {tab.label}
+                      </Tabs.Tab>
+                    );
+                  })}
+                </Tabs.List>
+              </Tabs.ListContainer>
+            </div>
+          </div>
+          <div className="ag-page-toolbar-actions">
             <Button
               isIconOnly
               aria-label={t('common.refresh', 'Refresh')}
+              className="ag-page-toolbar-button"
               isDisabled={refreshMarketMutation.isPending}
               size="md"
               variant="ghost"
@@ -162,6 +167,7 @@ export default function PluginsPage() {
               <RefreshCw className={`w-4 h-4 ${refreshMarketMutation.isPending ? 'animate-spin' : ''}`} />
             </Button>
             <Button
+              className="ag-page-toolbar-button"
               variant="primary"
               onPress={() => {
                 setInstallPrefill(null);

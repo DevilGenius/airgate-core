@@ -97,43 +97,48 @@ export default function GroupsPage() {
   return (
     <div>
       {/* 筛选 */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-48">
-          <Select
-            fullWidth
-            selectedKey={platformFilter}
-            onSelectionChange={(key) => {
-              setPlatformFilter(key == null ? '' : String(key));
-              setPage(1);
-            }}
-          >
-            <Label className="sr-only">{t('groups.platform')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedPlatformLabel}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={PLATFORM_OPTIONS}>
-                {(item) => (
-                  <ListBox.Item id={item.value} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+      <div className="ag-page-toolbar">
+        <div className="ag-page-toolbar-filters">
+          <div className="ag-page-toolbar-filter-row">
+            <div className="w-full sm:w-48">
+              <Select
+                fullWidth
+                selectedKey={platformFilter}
+                onSelectionChange={(key) => {
+                  setPlatformFilter(key == null ? '' : String(key));
+                  setPage(1);
+                }}
+              >
+                <Label className="sr-only">{t('groups.platform')}</Label>
+                <Select.Trigger>
+                  <Select.Value>{selectedPlatformLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={PLATFORM_OPTIONS}>
+                    {(item) => (
+                      <ListBox.Item id={item.value} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2 sm:ml-auto">
+        <div className="ag-page-toolbar-actions">
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}
+            className="ag-page-toolbar-button"
             size="sm"
             variant="ghost"
             onPress={() => refetch()}
           >
             <RefreshCw className="w-4 h-4" />
           </Button>
-          <Button variant="primary" onPress={() => setShowCreateModal(true)}>
+          <Button className="ag-page-toolbar-button" variant="primary" onPress={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4" />
             {t('groups.create')}
           </Button>

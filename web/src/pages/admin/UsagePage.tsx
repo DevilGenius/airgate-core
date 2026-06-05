@@ -1,14 +1,14 @@
-import { lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties, type Key, type ReactNode } from 'react';
+import { lazy, memo, startTransition, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Card, Dropdown, ListBox, Select, Tabs } from '@heroui/react';
+import { Card, ListBox, Select, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
-import { Activity, Check, Columns3, DollarSign, Sigma } from 'lucide-react';
+import { Activity, Columns3, DollarSign, Sigma } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
@@ -19,6 +19,7 @@ import { SearchFilterComboBox } from '../../shared/components/SearchFilterComboB
 import { PIE_CHART_COLORS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
+import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMenu';
 import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { formatAPIKeyHint } from '../../shared/utils/format';
 
@@ -32,6 +33,11 @@ const UsageTokenTrendChart = lazy(() =>
 const PIE_COLORS = PIE_CHART_COLORS;
 
 type MetricTone = 'violet' | 'amber' | 'indigo' | 'emerald' | 'stream';
+interface ColumnVisibilityOption {
+  key: string;
+  label: string;
+}
+
 const STREAM_BLUE = 'oklch(62.04% 0.1950 253.83)';
 
 const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
@@ -109,6 +115,45 @@ function StatCard({
     </Card>
   );
 }
+
+const ColumnVisibilityMenu = memo(function ColumnVisibilityMenu({
+  label,
+  onToggle,
+  options,
+  selectedCount,
+  selectedKeys,
+}: {
+  label: string;
+  onToggle: (key: string) => void;
+  options: ColumnVisibilityOption[];
+  selectedCount: number;
+  selectedKeys: Set<string>;
+}) {
+  return (
+    <ToolbarMenu
+      ariaLabel={label}
+      className="ag-page-toolbar-button button button--sm button--secondary inline-flex min-w-[8.5rem] items-center justify-center gap-2 whitespace-nowrap px-3"
+      icon={<Columns3 className="h-4 w-4 shrink-0" aria-hidden="true" />}
+      label={`${label} ${selectedCount}/${options.length}`}
+      rootClassName="ag-column-visibility-menu"
+    >
+      {() => (
+        <>
+          {options.map((option) => (
+            <ToolbarMenuItem
+              key={option.key}
+              isSelected={selectedKeys.has(option.key)}
+              role="menuitemcheckbox"
+              onSelect={() => onToggle(option.key)}
+            >
+              {option.label}
+            </ToolbarMenuItem>
+          ))}
+        </>
+      )}
+    </ToolbarMenu>
+  );
+});
 
 // 分组统计 key 映射
 const groupByKeys: Record<string, string> = {
@@ -884,16 +929,18 @@ export default function UsagePage() {
   }, [allColumns, selectedVisibleColumnKeys]);
 
   const selectedColumnCount = columns.length;
-  const handleColumnSelectionChange = useCallback((keys: 'all' | Set<Key>) => {
-    if (keys === 'all') {
-      setSelectedColumnKeys(new Set(columnOptions.map((option) => option.key)));
-      return;
-    }
-
-    const next = new Set(Array.from(keys).map(String));
-    if (next.size === 0) return;
-    setSelectedColumnKeys(next);
-  }, [columnOptions]);
+  const handleColumnToggle = useCallback((key: string) => {
+    setSelectedColumnKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        if (next.size <= 1) return current;
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
 
   const total = data?.total ?? 0;
   const canUseCursor = pageActive && !isPlaceholderData;
@@ -962,121 +1009,107 @@ export default function UsagePage() {
       )}
 
       {/* 筛选栏 */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-72">
-          <UsageDateRangeFilter
-            clearLabel={t('common.clear')}
-            endDate={filters.end_date}
-            label={t('usage.time_range')}
-            startDate={filters.start_date}
-            onChange={(startDate, endDate) => {
-              resetCursorPagination();
-              setFilters((prev) => ({ ...prev, start_date: startDate, end_date: endDate }));
-            }}
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <Select
-            aria-label={t('usage.platform')}
-            fullWidth
-            selectedKey={filters.platform || ''}
-            onSelectionChange={(key) => updateFilter('platform', key == null ? '' : String(key))}
-          >
-            <Select.Trigger>
-              <Select.Value>
-                {filters.platform ? selectedPlatformLabel : (
-                  <span className="text-text-tertiary">{t('usage.platform')}</span>
-                )}
-              </Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={platformOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
-        <div className="w-full sm:w-48">
-          <UsageModelFilterInput
-            ariaLabel={t('usage.model', 'Model')}
-            placeholder={t('usage.model_placeholder')}
-            value={filters.model ?? ''}
-            onModelChange={handleModelChange}
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <SearchFilterComboBox
-            ariaLabel={t('usage.search_user')}
-            items={visibleUserOptions}
-            selectedKey={filters.user_id ? String(filters.user_id) : null}
-            selectedLabel={selectedUserLabel}
-            placeholder={t('usage.search_user')}
-            emptyPrompt={t('usage.search_user')}
-            noDataLabel={t('common.no_data')}
-            onSearchChange={handleUserSearchChange}
-            onSelectionChange={handleUserSelectionChange}
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <SearchFilterComboBox
-            ariaLabel={t('usage.search_api_key', '搜索 API Key')}
-            items={visibleAPIKeyOptions}
-            selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
-            selectedLabel={selectedAPIKeyLabel}
-            placeholder={t('usage.search_api_key', '搜索 API Key')}
-            emptyPrompt={t('usage.search_api_key', '搜索 API Key')}
-            noDataLabel={t('common.no_data')}
-            onSearchChange={handleAPIKeySearchChange}
-            onSelectionChange={handleAPIKeySelectionChange}
-          />
-        </div>
-        <AutoRefreshControl
-          value={autoRefresh}
-          options={ADMIN_AUTO_REFRESH_OPTIONS}
-          label={autoRefreshLabel}
-          offLabel={autoRefreshOffLabel}
-          ariaLabel={t('usage.auto_update')}
-          refreshAriaLabel={t('common.refresh', 'Refresh')}
-          onChange={setAutoRefresh}
-          onAutoRefresh={handleAutoRefresh}
-          onRefresh={handleManualRefresh}
-          isAutoRefreshing={isUsageTableRefreshing}
-          isRefreshing={isRefreshing}
-          isDisabled={!pageActive}
-        />
-        <div className="w-full sm:ml-auto sm:flex sm:w-auto sm:justify-end">
-          <Dropdown>
-            <Dropdown.Trigger
-              className="button button--sm button--ghost inline-flex h-8 min-w-[8.5rem] items-center justify-center gap-2 whitespace-nowrap px-3"
-            >
-              <Columns3 className="h-4 w-4 shrink-0" />
-              <span className="leading-none">{t('usage.column_visibility', '列显示')} {selectedColumnCount}/{columnOptions.length}</span>
-            </Dropdown.Trigger>
-            <Dropdown.Popover placement="bottom end">
-              <Dropdown.Menu
-                aria-label={t('usage.column_visibility', '列显示')}
-                selectedKeys={selectedVisibleColumnKeys}
-                selectionMode="multiple"
-                onSelectionChange={handleColumnSelectionChange}
+      <div className="ag-page-toolbar">
+        <div className="ag-page-toolbar-filters">
+          <div className="ag-page-toolbar-filter-row">
+            <div className="w-full sm:w-72">
+              <UsageDateRangeFilter
+                clearLabel={t('common.clear')}
+                endDate={filters.end_date}
+                label={t('usage.time_range')}
+                startDate={filters.start_date}
+                onChange={(startDate, endDate) => {
+                  resetCursorPagination();
+                  setFilters((prev) => ({ ...prev, start_date: startDate, end_date: endDate }));
+                }}
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <Select
+                aria-label={t('usage.platform')}
+                fullWidth
+                selectedKey={filters.platform || ''}
+                onSelectionChange={(key) => updateFilter('platform', key == null ? '' : String(key))}
               >
-                {columnOptions.map((option) => (
-                  <Dropdown.Item key={option.key} id={option.key} textValue={option.label}>
-                    <span className="grid min-w-[10rem] grid-cols-[minmax(0,1fr)_1rem] items-center gap-3">
-                      <span className="min-w-0 truncate text-left">{option.label}</span>
-                      <span className="flex h-4 w-4 items-center justify-center">
-                        {selectedVisibleColumnKeys.has(option.key) ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
-                      </span>
-                    </span>
-                  </Dropdown.Item>
-                ))}
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
+                <Select.Trigger>
+                  <Select.Value>
+                    {filters.platform ? selectedPlatformLabel : (
+                      <span className="text-text-tertiary">{t('usage.platform')}</span>
+                    )}
+                  </Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={platformOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+            </div>
+            <div className="w-full sm:w-48">
+              <UsageModelFilterInput
+                ariaLabel={t('usage.model', 'Model')}
+                placeholder={t('usage.model_placeholder')}
+                value={filters.model ?? ''}
+                onModelChange={handleModelChange}
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <SearchFilterComboBox
+                ariaLabel={t('usage.search_user')}
+                items={visibleUserOptions}
+                selectedKey={filters.user_id ? String(filters.user_id) : null}
+                selectedLabel={selectedUserLabel}
+                placeholder={t('usage.search_user')}
+                emptyPrompt={t('usage.search_user')}
+                noDataLabel={t('common.no_data')}
+                onSearchChange={handleUserSearchChange}
+                onSelectionChange={handleUserSelectionChange}
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <SearchFilterComboBox
+                ariaLabel={t('usage.search_api_key', '搜索 API Key')}
+                items={visibleAPIKeyOptions}
+                selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
+                selectedLabel={selectedAPIKeyLabel}
+                placeholder={t('usage.search_api_key', '搜索 API Key')}
+                emptyPrompt={t('usage.search_api_key', '搜索 API Key')}
+                noDataLabel={t('common.no_data')}
+                onSearchChange={handleAPIKeySearchChange}
+                onSelectionChange={handleAPIKeySelectionChange}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="ag-page-toolbar-actions">
+          <AutoRefreshControl
+            value={autoRefresh}
+            options={ADMIN_AUTO_REFRESH_OPTIONS}
+            label={autoRefreshLabel}
+            offLabel={autoRefreshOffLabel}
+            refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
+            triggerClassName="ag-auto-refresh-trigger--toolbar-fixed"
+            ariaLabel={t('usage.auto_update')}
+            refreshAriaLabel={t('common.refresh', 'Refresh')}
+            onChange={setAutoRefresh}
+            onAutoRefresh={handleAutoRefresh}
+            onRefresh={handleManualRefresh}
+            isAutoRefreshing={isUsageTableRefreshing}
+            isRefreshing={isRefreshing}
+            isDisabled={!pageActive}
+          />
+          <ColumnVisibilityMenu
+            label={t('usage.column_visibility', '列显示')}
+            options={columnOptions}
+            selectedCount={selectedColumnCount}
+            selectedKeys={selectedVisibleColumnKeys}
+            onToggle={handleColumnToggle}
+          />
         </div>
       </div>
 

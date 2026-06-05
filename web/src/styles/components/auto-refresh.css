@@ -1,6 +1,6 @@
 /* Shared auto-refresh dropdown trigger. */
 
-.ag-auto-refresh-trigger.dropdown__trigger {
+.ag-auto-refresh-trigger {
   display: inline-flex !important;
   box-sizing: border-box;
   min-width: 7.5rem !important;
@@ -14,18 +14,57 @@
   vertical-align: middle !important;
 }
 
-.ag-auto-refresh-trigger--account-fixed.dropdown__trigger {
-  width: 10rem !important;
-  min-width: 10rem !important;
+.ag-auto-refresh-trigger.ag-toolbar-menu-trigger {
+  border: 1px solid color-mix(in oklab, var(--border) 84%, transparent) !important;
+  background: var(--surface-secondary) !important;
+  color: var(--foreground) !important;
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease !important;
 }
 
-.ag-auto-refresh-trigger.dropdown__trigger > span {
+.ag-auto-refresh-trigger.ag-toolbar-menu-trigger:hover,
+.ag-auto-refresh-trigger.ag-toolbar-menu-trigger[data-open="true"] {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border) 62%) !important;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-secondary) 90%) !important;
+  color: var(--accent) !important;
+}
+
+.ag-auto-refresh-trigger.ag-toolbar-menu-trigger:focus-visible {
+  outline: 1.5px solid var(--focus) !important;
+  outline-offset: 2px !important;
+}
+
+.ag-auto-refresh-trigger--account-fixed {
+  width: 11rem !important;
+  min-width: 11rem !important;
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+}
+
+.ag-auto-refresh-trigger--toolbar-fixed {
+  width: 11rem !important;
+  min-width: 11rem !important;
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+}
+
+.ag-auto-refresh-refresh--toolbar.button {
+  width: 2.5rem !important;
+  min-width: 2.5rem !important;
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  padding: 0 !important;
+}
+
+.ag-auto-refresh-trigger > .ag-toolbar-menu-trigger-label {
   display: inline-flex;
   align-items: center;
   line-height: 1;
 }
 
-.ag-auto-refresh-trigger.dropdown__trigger > svg {
+.ag-auto-refresh-trigger > .ag-toolbar-menu-caret {
   width: 0.75rem !important;
   height: 0.75rem !important;
   margin: 0 !important;

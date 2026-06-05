@@ -1,7 +1,8 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Button, Dropdown } from '@heroui/react';
-import { Check, ChevronDown, RefreshCw } from 'lucide-react';
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Button } from '@heroui/react';
+import { RefreshCw } from 'lucide-react';
 import { normalizeAutoRefresh, type AutoRefreshOptions } from '../hooks/usePersistentAutoRefresh';
+import { ToolbarMenu, ToolbarMenuItem } from './ToolbarMenu';
 
 interface AutoRefreshControlProps {
   value: number;
@@ -11,6 +12,7 @@ interface AutoRefreshControlProps {
   fastLabel?: string;
   beforeRefresh?: ReactNode;
   afterRefresh?: ReactNode;
+  refreshButtonClassName?: string;
   triggerClassName?: string;
   ariaLabel: string;
   refreshAriaLabel: string;
@@ -22,22 +24,28 @@ interface AutoRefreshControlProps {
   isDisabled?: boolean;
 }
 
-function useAutoRefreshCountdown({
+function useAutoRefreshTimer({
   active,
   isRefreshing,
+  onDisplaySecondsChange,
   onRefresh,
   resetKey,
   seconds,
 }: {
   active: boolean;
   isRefreshing: boolean;
+  onDisplaySecondsChange?: (seconds: number) => void;
   onRefresh: () => void | Promise<unknown>;
   resetKey: number;
   seconds: number;
 }) {
-  const [remainingSeconds, setRemainingSeconds] = useState(seconds);
+  const onDisplaySecondsChangeRef = useRef(onDisplaySecondsChange);
   const onRefreshRef = useRef(onRefresh);
   const isRefreshingRef = useRef(isRefreshing);
+
+  useEffect(() => {
+    onDisplaySecondsChangeRef.current = onDisplaySecondsChange;
+  }, [onDisplaySecondsChange]);
 
   useEffect(() => {
     onRefreshRef.current = onRefresh;
@@ -49,7 +57,6 @@ function useAutoRefreshCountdown({
 
   useEffect(() => {
     if (!active || seconds <= 0 || typeof window === 'undefined') {
-      setRemainingSeconds(seconds);
       return undefined;
     }
 
@@ -57,6 +64,7 @@ function useAutoRefreshCountdown({
     let disposed = false;
     let timeoutId: number | undefined;
     let nextRefreshAt = Date.now() + intervalMs;
+    const tickMs = seconds < 1 ? 100 : 1000;
 
     const clearTimer = () => {
       if (timeoutId !== undefined) {
@@ -66,26 +74,23 @@ function useAutoRefreshCountdown({
     };
 
     const documentHidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
-    const tickMs = seconds < 1 ? 100 : 1000;
-    const updateRemaining = (msLeft: number) => {
-      if (seconds < 1) {
-        setRemainingSeconds(seconds);
-      } else {
-        setRemainingSeconds(Math.max(1, Math.ceil(msLeft / 1000)));
-      }
+    const updateDisplay = (msLeft: number) => {
+      const handler = onDisplaySecondsChangeRef.current;
+      if (!handler) return;
+      handler(seconds < 1 ? seconds : Math.max(1, Math.ceil(msLeft / 1000)));
     };
 
-    const scheduleNextTick = () => {
+    const scheduleNextRefresh = () => {
       if (disposed) return;
       clearTimer();
 
       if (documentHidden()) {
-        setRemainingSeconds(seconds);
+        updateDisplay(intervalMs);
         return;
       }
 
       const msLeft = Math.max(0, nextRefreshAt - Date.now());
-      updateRemaining(msLeft);
+      updateDisplay(msLeft);
       timeoutId = window.setTimeout(runTick, Math.min(tickMs, msLeft));
     };
 
@@ -102,21 +107,19 @@ function useAutoRefreshCountdown({
         }
       }
 
-      scheduleNextTick();
+      scheduleNextRefresh();
     };
 
     const handleVisibilityChange = () => {
       if (documentHidden()) {
         clearTimer();
-        setRemainingSeconds(seconds);
         return;
       }
       nextRefreshAt = Date.now() + intervalMs;
-      scheduleNextTick();
+      scheduleNextRefresh();
     };
 
-    setRemainingSeconds(seconds);
-    scheduleNextTick();
+    scheduleNextRefresh();
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
@@ -125,8 +128,6 @@ function useAutoRefreshCountdown({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [active, resetKey, seconds]);
-
-  return remainingSeconds;
 }
 
 function formatAutoRefreshSeconds(seconds: number) {
@@ -151,6 +152,7 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   fastLabel,
   beforeRefresh,
   afterRefresh,
+  refreshButtonClassName,
   triggerClassName,
   ariaLabel,
   refreshAriaLabel,
@@ -164,17 +166,34 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   const enabled = value > 0;
   const [manualRefreshVersion, setManualRefreshVersion] = useState(0);
   const autoRefreshHandler = onAutoRefresh ?? onRefresh;
-  const remainingSeconds = useAutoRefreshCountdown({
+  const labelRef = useRef<HTMLSpanElement | null>(null);
+  const currentLabel = enabled ? formatAutoRefreshOption(label, value, fastLabel) : offLabel;
+  const updateDisplayLabel = useCallback((displaySeconds: number) => {
+    const element = labelRef.current;
+    if (!element) return;
+    element.textContent = enabled ? formatAutoRefreshOption(label, displaySeconds, fastLabel) : offLabel;
+  }, [enabled, fastLabel, label, offLabel]);
+  const setLabelElement = useCallback((element: HTMLSpanElement | null) => {
+    labelRef.current = element;
+    if (element) {
+      element.textContent = currentLabel;
+    }
+  }, [currentLabel]);
+
+  useEffect(() => {
+    if (labelRef.current) {
+      labelRef.current.textContent = currentLabel;
+    }
+  }, [currentLabel]);
+
+  useAutoRefreshTimer({
     active: enabled && !isDisabled,
     isRefreshing: isAutoRefreshing ?? isRefreshing,
+    onDisplaySecondsChange: updateDisplayLabel,
     onRefresh: autoRefreshHandler,
     resetKey: manualRefreshVersion,
     seconds: value,
   });
-  const selectedKeys = useMemo(() => new Set([`auto_${value}`]), [value]);
-  const currentLabel = enabled
-    ? formatAutoRefreshOption(label, value < 1 ? value : remainingSeconds, fastLabel)
-    : offLabel;
   const optionLabel = (seconds: number) => (seconds === 0 ? offLabel : formatAutoRefreshOption(label, seconds, fastLabel));
   const handleRefresh = useCallback(() => {
     void onRefresh();
@@ -192,46 +211,43 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
         isDisabled={isDisabled || isRefreshing}
         size="sm"
         variant="ghost"
-        className="h-8 w-8 min-w-8"
+        className={['h-8 w-8 min-w-8', refreshButtonClassName].filter(Boolean).join(' ')}
         onPress={handleRefresh}
       >
         <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
       </Button>
       {afterRefresh}
-      <Dropdown>
-        <Dropdown.Trigger
-          className={[
-            'ag-auto-refresh-trigger button button--sm h-8 min-w-[7.5rem] whitespace-nowrap px-3',
-            enabled ? 'button--secondary' : 'button--ghost',
-            triggerClassName,
-          ].filter(Boolean).join(' ')}
-        >
-          <span>{currentLabel}</span>
-          <ChevronDown className="h-3 w-3 shrink-0" />
-        </Dropdown.Trigger>
-        <Dropdown.Popover placement="bottom end">
-          <Dropdown.Menu
-            aria-label={ariaLabel}
-            selectedKeys={selectedKeys}
-            selectionMode="single"
-            onAction={(key) => {
-              onChange(normalizeAutoRefresh(String(key).replace('auto_', ''), options));
-            }}
-          >
+      <ToolbarMenu
+        ariaLabel={ariaLabel}
+        label={<span ref={setLabelElement} />}
+        className={[
+          'ag-auto-refresh-trigger button button--sm h-8 min-w-[7.5rem] whitespace-nowrap px-3',
+          enabled ? 'button--secondary' : 'button--ghost',
+          triggerClassName,
+        ].filter(Boolean).join(' ')}
+        disabled={isDisabled}
+      >
+        {(close) => (
+          <>
             {options.map((seconds) => {
               const itemLabel = optionLabel(seconds);
               return (
-                <Dropdown.Item key={`auto_${seconds}`} id={`auto_${seconds}`} textValue={itemLabel}>
-                  <span className="flex items-center justify-between gap-6">
-                    <span>{itemLabel}</span>
-                    {value === seconds ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
-                  </span>
-                </Dropdown.Item>
+                <ToolbarMenuItem
+                  key={`auto_${seconds}`}
+                  isSelected={value === seconds}
+                  role="menuitemradio"
+                  onSelect={() => {
+                    onChange(normalizeAutoRefresh(seconds, options));
+                    close();
+                  }}
+                >
+                  {itemLabel}
+                </ToolbarMenuItem>
               );
             })}
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
+          </>
+        )}
+      </ToolbarMenu>
     </>
   );
 });

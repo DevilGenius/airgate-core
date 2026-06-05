@@ -126,26 +126,31 @@ export default function APIKeysPage() {
 
   return (
     <div className="ag-api-keys-page">
-      <div className="mb-5 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-        <div className="w-full sm:w-56">
-          <SearchFilterInput
-            ariaLabel={t('usage.search_api_key', '搜索 API Key')}
-            placeholder={t('usage.search_api_key', '搜索 API Key')}
-            value={keyword}
-            onSearchChange={handleKeywordChange}
-          />
+      <div className="ag-page-toolbar">
+        <div className="ag-page-toolbar-filters">
+          <div className="ag-page-toolbar-filter-row">
+            <div className="w-full sm:w-56">
+              <SearchFilterInput
+                ariaLabel={t('usage.search_api_key', '搜索 API Key')}
+                placeholder={t('usage.search_api_key', '搜索 API Key')}
+                value={keyword}
+                onSearchChange={handleKeywordChange}
+              />
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="ag-page-toolbar-actions">
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}
+            className="ag-page-toolbar-button"
             size="md"
             variant="ghost"
             onPress={() => refetch()}
           >
             <RefreshCw className="w-4 h-4" />
           </Button>
-          <Button variant="primary" onPress={() => setShowCreateModal(true)}>
+          <Button className="ag-page-toolbar-button" variant="primary" onPress={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4" />
             {t('api_keys.create')}
           </Button>

@@ -84,11 +84,240 @@
 
 .ag-page-toolbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 0.75rem;
   margin-bottom: 1.25rem;
+}
+
+.ag-page-toolbar-filters {
+  min-width: 0;
+}
+
+.ag-page-toolbar-filter-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.ag-page-toolbar-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+.ag-page-toolbar-filter-row :where(.input,
+  .select__trigger,
+  .combo-box__trigger,
+  .date-input-group,
+  .search-field__input,
+  .ag-account-type-trigger),
+.ag-page-toolbar-actions :where(.button, .dropdown__trigger, .ag-toolbar-menu-trigger) {
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+}
+
+.ag-page-toolbar-filter-row :where(.input,
+  .select__trigger,
+  .combo-box__trigger,
+  .date-input-group,
+  .search-field__input,
+  .ag-account-type-trigger),
+.ag-page-toolbar-actions :where(.button, .dropdown__trigger, .ag-toolbar-menu-trigger, .ag-native-switch) {
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.ag-page-toolbar-button.button {
+  align-items: center !important;
+  gap: 0.5rem !important;
+  padding-block: 0 !important;
+  white-space: nowrap !important;
+}
+
+.ag-page-toolbar-button.dropdown__trigger,
+.ag-page-toolbar-button.ag-toolbar-menu-trigger {
+  border: 1px solid color-mix(in oklab, var(--border) 84%, transparent) !important;
+  background: var(--surface-secondary) !important;
+  color: var(--foreground) !important;
+  transition:
+    background-color 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease !important;
+}
+
+.ag-page-toolbar-button.dropdown__trigger:hover,
+.ag-page-toolbar-button.dropdown__trigger[data-hovered="true"],
+.ag-page-toolbar-button.dropdown__trigger[aria-expanded="true"],
+.ag-page-toolbar-button.ag-toolbar-menu-trigger:hover,
+.ag-page-toolbar-button.ag-toolbar-menu-trigger[data-open="true"] {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border) 62%) !important;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-secondary) 90%) !important;
+  color: var(--accent) !important;
+}
+
+.ag-page-toolbar-button.ag-toolbar-menu-trigger:focus-visible {
+  outline: 1.5px solid var(--focus) !important;
+  outline-offset: 2px !important;
+}
+
+.ag-toolbar-menu {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.ag-toolbar-menu-trigger {
+  appearance: none;
+  box-sizing: border-box;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ag-toolbar-menu-trigger:disabled {
+  cursor: not-allowed;
+  opacity: var(--disabled-opacity);
+}
+
+.ag-toolbar-menu-trigger-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  line-height: 1;
+}
+
+.ag-toolbar-menu-caret {
+  flex: 0 0 auto;
+  width: 0.75rem !important;
+  height: 0.75rem !important;
+  margin: 0 !important;
+}
+
+.ag-toolbar-menu-popover {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 0.375rem);
+  right: 0;
+  width: 100%;
+  min-width: 100%;
+  max-width: min(18rem, calc(100vw - 2rem));
+  border: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
+  border-radius: var(--field-radius);
+  background: var(--overlay);
+  box-shadow: var(--overlay-shadow);
+  color: var(--overlay-foreground);
+  padding: 0.25rem;
+}
+
+.ag-toolbar-menu-list {
+  display: flex;
+  max-height: min(22rem, calc(100vh - 10rem));
+  flex-direction: column;
+  gap: 0.125rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.ag-column-visibility-menu .ag-toolbar-menu-list {
+  max-height: none;
+  overflow: visible;
+}
+
+.ag-toolbar-menu-item {
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 10rem;
+  min-height: 2rem;
+  grid-template-columns: minmax(0, 1fr) 1rem;
+  align-items: center;
+  gap: 0.75rem;
+  border: 0;
+  border-radius: calc(var(--field-radius) - 0.125rem);
+  background: transparent;
+  color: var(--overlay-foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  padding: 0.5rem 0.625rem;
+  text-align: left;
+  transition:
+    background-color 80ms ease,
+    color 80ms ease;
+}
+
+.ag-toolbar-menu-item:hover,
+.ag-toolbar-menu-item:focus-visible {
+  background: color-mix(in oklab, var(--accent) 12%, var(--overlay) 88%);
+  color: var(--foreground);
+}
+
+.ag-toolbar-menu-item:focus-visible {
+  outline: none;
+}
+
+.ag-toolbar-menu-item-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-toolbar-menu-item-check {
+  display: inline-flex;
+  width: 1rem;
+  height: 1rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.ag-page-toolbar-switch {
+  height: 2.5rem;
+  flex: 0 0 auto;
+  align-items: center;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ag-page-toolbar-switch .ag-native-switch-content {
+  line-height: 1;
+}
+
+.ag-page-toolbar--actions-only {
+  align-items: flex-end;
+}
+
+.ag-page-toolbar--actions-only .ag-page-toolbar-actions {
+  margin-left: auto;
+}
+
+@media (min-width: 640px) {
+  .ag-page-toolbar-filter-row {
+    flex-flow: row wrap;
+    align-items: center;
+  }
+}
+
+@media (min-width: 1280px) {
+  .ag-page-toolbar {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .ag-page-toolbar-filters {
+    flex: 1 1 auto;
+  }
+
+  .ag-page-toolbar-actions {
+    margin-left: auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
 }
 
 .ag-page-body {

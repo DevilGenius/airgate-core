@@ -203,4 +203,3 @@
   .table__body .table__row[data-hovered="true"] .table__cell) {
   background: var(--ag-table-row-hover-background) !important;
 }
-

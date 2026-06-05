@@ -281,11 +281,12 @@ export default function UserKeysPage() {
 
   return (
     <div className="ag-api-keys-page">
-      <div className="flex justify-end mb-5">
-        <div className="flex items-center gap-2 ml-auto">
+      <div className="ag-page-toolbar ag-page-toolbar--actions-only">
+        <div className="ag-page-toolbar-actions">
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}
+            className="ag-page-toolbar-button"
             size="md"
             variant="ghost"
             onPress={() => refetch()}
@@ -293,6 +294,7 @@ export default function UserKeysPage() {
             <RefreshCw className="w-4 h-4" />
           </Button>
           <Button
+            className="ag-page-toolbar-button"
             isDisabled={!hasAvailableGroups}
             variant="primary"
             onPress={openCreate}

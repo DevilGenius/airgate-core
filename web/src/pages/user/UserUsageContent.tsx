@@ -384,94 +384,102 @@ export default function UserUsageContent() {
       </div>
 
       {/* 筛选栏 */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-72">
-          <UsageDateRangeFilter
-            clearLabel={t('common.clear')}
-            endDate={filters.end_date}
-            label={t('usage.time_range')}
-            startDate={filters.start_date}
-            onChange={(startDate, endDate) => {
-              resetCursorPagination();
-              setFilters((prev) => ({ ...prev, start_date: startDate, end_date: endDate }));
-            }}
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <Select
-            aria-label={t('usage.platform')}
-            fullWidth
-            selectedKey={filters.platform || ''}
-            onSelectionChange={(key) => updateFilter('platform', key == null ? '' : String(key))}
-          >
-            <Select.Trigger>
-              <Select.Value>
-                {filters.platform ? selectedPlatformLabel : (
-                  <span className="text-text-tertiary">{t('usage.platform')}</span>
-                )}
-              </Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={platformOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
-        {!customerScope && (
-          <div className="w-full sm:w-48">
-            <Select
-              aria-label="API Key"
-              fullWidth
-              selectedKey={String(filters.api_key_id ?? '')}
-              onSelectionChange={(key) => updateFilter('api_key_id', key == null ? '' : String(key))}
-            >
-              <Select.Trigger>
-                <Select.Value>
-                  {filters.api_key_id ? selectedApiKeyLabel : (
-                    <span className="text-text-tertiary">API Key</span>
-                  )}
-                </Select.Value>
-                <Select.Indicator />
-              </Select.Trigger>
-              <Select.Popover>
-                <ListBox items={apiKeyOptions}>
-                  {(item) => (
-                    <ListBox.Item id={item.id} textValue={item.label}>
-                      {item.label}
-                    </ListBox.Item>
-                  )}
-                </ListBox>
-              </Select.Popover>
-            </Select>
+      <div className="ag-page-toolbar">
+        <div className="ag-page-toolbar-filters">
+          <div className="ag-page-toolbar-filter-row">
+            <div className="w-full sm:w-72">
+              <UsageDateRangeFilter
+                clearLabel={t('common.clear')}
+                endDate={filters.end_date}
+                label={t('usage.time_range')}
+                startDate={filters.start_date}
+                onChange={(startDate, endDate) => {
+                  resetCursorPagination();
+                  setFilters((prev) => ({ ...prev, start_date: startDate, end_date: endDate }));
+                }}
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <Select
+                aria-label={t('usage.platform')}
+                fullWidth
+                selectedKey={filters.platform || ''}
+                onSelectionChange={(key) => updateFilter('platform', key == null ? '' : String(key))}
+              >
+                <Select.Trigger>
+                  <Select.Value>
+                    {filters.platform ? selectedPlatformLabel : (
+                      <span className="text-text-tertiary">{t('usage.platform')}</span>
+                    )}
+                  </Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={platformOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+            </div>
+            {!customerScope && (
+              <div className="w-full sm:w-48">
+                <Select
+                  aria-label="API Key"
+                  fullWidth
+                  selectedKey={String(filters.api_key_id ?? '')}
+                  onSelectionChange={(key) => updateFilter('api_key_id', key == null ? '' : String(key))}
+                >
+                  <Select.Trigger>
+                    <Select.Value>
+                      {filters.api_key_id ? selectedApiKeyLabel : (
+                        <span className="text-text-tertiary">API Key</span>
+                      )}
+                    </Select.Value>
+                    <Select.Indicator />
+                  </Select.Trigger>
+                  <Select.Popover>
+                    <ListBox items={apiKeyOptions}>
+                      {(item) => (
+                        <ListBox.Item id={item.id} textValue={item.label}>
+                          {item.label}
+                        </ListBox.Item>
+                      )}
+                    </ListBox>
+                  </Select.Popover>
+                </Select>
+              </div>
+            )}
+            <div className="w-full sm:w-48">
+              <UsageModelFilterInput
+                ariaLabel={t('usage.model', 'Model')}
+                placeholder={t('usage.model_placeholder')}
+                value={filters.model ?? ''}
+                onModelChange={handleModelChange}
+              />
+            </div>
           </div>
-        )}
-        <div className="w-full sm:w-48">
-          <UsageModelFilterInput
-            ariaLabel={t('usage.model', 'Model')}
-            placeholder={t('usage.model_placeholder')}
-            value={filters.model ?? ''}
-            onModelChange={handleModelChange}
+        </div>
+        <div className="ag-page-toolbar-actions">
+          <AutoRefreshControl
+            value={autoRefresh}
+            options={USER_AUTO_REFRESH_OPTIONS}
+            label={autoRefreshLabel}
+            offLabel={autoRefreshOffLabel}
+            refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
+            triggerClassName="ag-auto-refresh-trigger--toolbar-fixed"
+            ariaLabel={t('usage.auto_update')}
+            refreshAriaLabel={t('common.refresh', 'Refresh')}
+            onChange={setAutoRefresh}
+            onAutoRefresh={handleAutoRefresh}
+            onRefresh={handleManualRefresh}
+            isAutoRefreshing={isUsageTableRefreshing}
+            isRefreshing={isRefreshing}
           />
         </div>
-        <AutoRefreshControl
-          value={autoRefresh}
-          options={USER_AUTO_REFRESH_OPTIONS}
-          label={autoRefreshLabel}
-          offLabel={autoRefreshOffLabel}
-          ariaLabel={t('usage.auto_update')}
-          refreshAriaLabel={t('common.refresh', 'Refresh')}
-          onChange={setAutoRefresh}
-          onAutoRefresh={handleAutoRefresh}
-          onRefresh={handleManualRefresh}
-          isAutoRefreshing={isUsageTableRefreshing}
-          isRefreshing={isRefreshing}
-        />
       </div>
 
       {/* 使用记录表格 */}
