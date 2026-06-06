@@ -11,6 +11,7 @@ import { formatAPIKeyHint, formatDate } from '../../../shared/utils/format';
 import { getTotalPages } from '../../../shared/utils/pagination';
 import { CommonTable } from '../../../shared/components/CommonTable';
 import { TablePaginationFooter } from '../../../shared/components/TablePaginationFooter';
+import { DEFAULT_PAGE_SIZE } from '../../../shared/constants';
 import type { UserResp, APIKeyResp } from '../../../shared/types';
 
 interface UserApiKeysModalProps {
@@ -22,16 +23,17 @@ interface UserApiKeysModalProps {
 export function UserApiKeysModal({ open, user, onClose }: UserApiKeysModalProps) {
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
+  const pageSize = DEFAULT_PAGE_SIZE;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['user-api-keys', user.id, page],
-    queryFn: () => usersApi.apiKeys(user.id, { page, page_size: 10 }),
+    queryKey: ['user-api-keys', user.id, page, pageSize],
+    queryFn: () => usersApi.apiKeys(user.id, { page, page_size: pageSize }),
     enabled: open,
   });
 
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
-  const totalPages = getTotalPages(total, 10);
+  const totalPages = getTotalPages(total, pageSize);
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {

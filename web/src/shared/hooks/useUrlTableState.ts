@@ -1,6 +1,7 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useRouterState } from '@tanstack/react-router';
 import { storagePageSizeKey } from '../storageKeys';
+import { normalizePaginationPageSize } from '../utils/pagination';
 
 type UrlPrimitive = string | number | boolean | null | undefined;
 type UrlUpdates = Record<string, UrlPrimitive>;
@@ -20,8 +21,7 @@ function readStoredPageSize(storageKey: string | undefined, fallback: number) {
 
   try {
     const raw = window.localStorage.getItem(storagePageSizeKey(storageKey));
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+    return normalizePaginationPageSize(raw, fallback);
   } catch {
     return fallback;
   }
@@ -90,14 +90,15 @@ export function useUrlQueryParam(key: string, defaultValue = '') {
 export function useUrlPagination(defaultPageSize = 20, storageKey?: string) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const searchStr = useRouterState({ select: (state) => state.location.searchStr });
+  const safeDefaultPageSize = normalizePaginationPageSize(defaultPageSize);
   const snapshot = useMemo(() => {
     const params = new URLSearchParams(getSearchString(searchStr));
-    const storedPageSize = readStoredPageSize(storageKey, defaultPageSize);
+    const storedPageSize = readStoredPageSize(storageKey, safeDefaultPageSize);
     return {
       page: readPositiveInt(params, 'page', 1),
-      pageSize: readPositiveInt(params, 'page_size', storedPageSize),
+      pageSize: normalizePaginationPageSize(params.get('page_size'), storedPageSize),
     };
-  }, [defaultPageSize, searchStr, storageKey]);
+  }, [safeDefaultPageSize, searchStr, storageKey]);
 
   const [page, setPageState] = useState(snapshot.page);
   const [pageSize, setPageSizeState] = useState(snapshot.pageSize);
@@ -122,9 +123,7 @@ export function useUrlPagination(defaultPageSize = 20, storageKey?: string) {
   }, [pathname]);
 
   const setPageSize = useCallback((nextPageSize: number) => {
-    const safePageSize = Number.isFinite(nextPageSize) && nextPageSize > 0
-      ? Math.floor(nextPageSize)
-      : defaultPageSize;
+    const safePageSize = normalizePaginationPageSize(nextPageSize, safeDefaultPageSize);
     writeStoredPageSize(storageKey, safePageSize);
     pageRef.current = 1;
     startTransition(() => {
@@ -132,10 +131,10 @@ export function useUrlPagination(defaultPageSize = 20, storageKey?: string) {
       setPageSizeState(safePageSize);
       applySearchUpdates(pathname, {
         page: null,
-        page_size: safePageSize === defaultPageSize ? null : safePageSize,
+        page_size: safePageSize === safeDefaultPageSize ? null : safePageSize,
       });
     });
-  }, [defaultPageSize, pathname, storageKey]);
+  }, [pathname, safeDefaultPageSize, storageKey]);
 
   return { page, pageSize, setPage, setPageSize };
 }

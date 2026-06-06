@@ -22,7 +22,7 @@ import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterI
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
-import { FETCH_ALL_PARAMS } from '../../shared/constants';
+import { FETCH_ALL_PARAMS, PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { USER_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
@@ -394,7 +394,7 @@ export default function UserUsageContent() {
           <TablePaginationFooter
             page={page}
             pageSize={pageSize}
-            pageSizeOptions={[20, 50, 100]}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
             setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
             setPageSize={setPageSize}
             summaryTotal={summaryTotal}

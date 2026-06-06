@@ -1,6 +1,20 @@
-export const DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+export const DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+export const DEFAULT_PAGINATION_PAGE_SIZE = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS[0];
 
 export type PaginationItem = number | '...';
+
+export function normalizePaginationPageSize(
+  value: unknown,
+  fallback = DEFAULT_PAGINATION_PAGE_SIZE,
+  options: readonly number[] = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS,
+): number {
+  const safeFallback = options.includes(fallback) ? fallback : DEFAULT_PAGINATION_PAGE_SIZE;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) return safeFallback;
+
+  const size = Math.floor(parsed);
+  return options.includes(size) ? size : safeFallback;
+}
 
 export function getTotalPages(total: number, pageSize: number): number {
   return Math.max(1, Math.ceil(total / pageSize));

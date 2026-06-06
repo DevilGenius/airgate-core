@@ -7,6 +7,7 @@ import { usersApi } from '../../../shared/api/users';
 import { getTotalPages } from '../../../shared/utils/pagination';
 import { CommonTable } from '../../../shared/components/CommonTable';
 import { TablePaginationFooter } from '../../../shared/components/TablePaginationFooter';
+import { DEFAULT_PAGE_SIZE } from '../../../shared/constants';
 import type { UserResp, BalanceLogResp } from '../../../shared/types';
 
 interface BalanceHistoryModalProps {
@@ -18,10 +19,11 @@ interface BalanceHistoryModalProps {
 export function BalanceHistoryModal({ open, user, onClose }: BalanceHistoryModalProps) {
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
+  const pageSize = DEFAULT_PAGE_SIZE;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['user-balance-history', user.id, page],
-    queryFn: () => usersApi.balanceHistory(user.id, { page, page_size: 10 }),
+    queryKey: ['user-balance-history', user.id, page, pageSize],
+    queryFn: () => usersApi.balanceHistory(user.id, { page, page_size: pageSize }),
     enabled: open,
   });
 
@@ -44,7 +46,7 @@ export function BalanceHistoryModal({ open, user, onClose }: BalanceHistoryModal
 
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
-  const totalPages = getTotalPages(total, 10);
+  const totalPages = getTotalPages(total, pageSize);
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {

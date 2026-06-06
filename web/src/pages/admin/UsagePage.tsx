@@ -17,7 +17,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { SearchFilterComboBox } from '../../shared/components/SearchFilterComboBox';
-import { PIE_CHART_COLORS } from '../../shared/constants';
+import { PAGE_SIZE_OPTIONS, PIE_CHART_COLORS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMenu';
@@ -1009,7 +1009,7 @@ export default function UsagePage() {
           <TablePaginationFooter
             page={page}
             pageSize={pageSize}
-            pageSizeOptions={[20, 50, 100]}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
             setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
             setPageSize={setPageSize}
             summaryTotal={summaryTotal}

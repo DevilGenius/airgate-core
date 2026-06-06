@@ -1,8 +1,13 @@
+import {
+  DEFAULT_PAGINATION_PAGE_SIZE,
+  DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS,
+} from './utils/pagination';
+
 /** 默认分页大小 */
-export const DEFAULT_PAGE_SIZE = 20;
+export const DEFAULT_PAGE_SIZE = DEFAULT_PAGINATION_PAGE_SIZE;
 
 /** 分页大小选项 */
-export const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+export const PAGE_SIZE_OPTIONS = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS;
 
 /** 全量拉取参数（用于下拉选择等场景） */
 export const FETCH_ALL_PARAMS = { page: 1, page_size: 100 } as const;

@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type Animation
 import { EmptyState } from '@heroui/react';
 import { Inbox } from 'lucide-react';
 import type { UsageColumnConfig, UsageRow } from '../columns/usageColumns';
-import { getTotalPages } from '../utils/pagination';
+import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getTotalPages } from '../utils/pagination';
 import { MobileRecordList } from './MobileRecordList';
 import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
@@ -10,7 +10,7 @@ import { TablePaginationFooter } from './TablePaginationFooter';
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
 const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>(['model', 'user_agent']);
 const NEW_ROW_ANIMATION_NAME = 'ag-usage-row-new-enter';
-const USAGE_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+const USAGE_PAGE_SIZE_OPTIONS = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS;
 const DEFAULT_USAGE_PAGE_SIZE = USAGE_PAGE_SIZE_OPTIONS[0];
 type UsageMobileLayout = 'default' | 'usageGrid' | 'usageGridWithUser';
 
