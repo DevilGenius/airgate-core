@@ -523,26 +523,7 @@ func TestBuildPluginRequestOmitsWriterForNonStreamImagesRequest(t *testing.T) {
 	}
 }
 
-func TestBuildPluginRequestMarksImageRetryUsed(t *testing.T) {
-	t.Parallel()
-
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
-	state := &forwardState{
-		requestPath:    "/v1/images/generations",
-		imageRetryUsed: true,
-		keyInfo:        &auth.APIKeyInfo{},
-		account:        &ent.Account{},
-	}
-
-	req := buildPluginRequest(c, state)
-	if got := req.Headers.Get(imageRetryUsedHeader); got != "true" {
-		t.Fatalf("%s = %q, want true", imageRetryUsedHeader, got)
-	}
-}
-
-func TestCanFailoverImagesOnlyAllowsSingle429Retry(t *testing.T) {
+func TestCanFailoverImagesAllowsRepeated429Failover(t *testing.T) {
 	t.Parallel()
 
 	recorder := httptest.NewRecorder()
@@ -552,23 +533,27 @@ func TestCanFailoverImagesOnlyAllowsSingle429Retry(t *testing.T) {
 	base := &forwardState{requestPath: "/v1/images/generations"}
 
 	if !f.canFailover(c, base, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountRateLimited}}) {
-		t.Fatal("image 429 should allow one failover")
-	}
-	used := &forwardState{requestPath: "/v1/images/generations", imageRetryUsed: true}
-	if f.canFailover(c, used, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountRateLimited}}) {
-		t.Fatal("image 429 should not failover after retry budget is used")
-	}
-	pluginUsed := &forwardState{requestPath: "/v1/images/generations"}
-	if f.canFailover(c, pluginUsed, forwardExecution{outcome: sdk.ForwardOutcome{
-		Kind: sdk.OutcomeAccountRateLimited,
-		Upstream: sdk.UpstreamResponse{Headers: http.Header{
-			imageRetryUsedHeader: []string{"true"},
-		}},
-	}}) {
-		t.Fatal("image 429 should not failover after plugin fallback consumed retry budget")
+		t.Fatal("image 429 should allow failover")
 	}
 	if f.canFailover(c, base, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient}}) {
 		t.Fatal("image non-429 failure should not use core failover")
+	}
+}
+
+func TestCanStartForwardAttemptImagesExhaustAccounts(t *testing.T) {
+	t.Parallel()
+
+	image := &forwardState{requestPath: "/v1/images/generations"}
+	if !canStartForwardAttempt(image, maxFailoverAttempts+5) {
+		t.Fatal("image submit attempts should continue past the default failover cap")
+	}
+
+	chat := &forwardState{requestPath: "/v1/chat/completions"}
+	if !canStartForwardAttempt(chat, maxFailoverAttempts-1) {
+		t.Fatal("non-image attempts below the cap should continue")
+	}
+	if canStartForwardAttempt(chat, maxFailoverAttempts) {
+		t.Fatal("non-image attempts should stop at the default failover cap")
 	}
 }
 

@@ -55,7 +55,7 @@ func NewForwarder(
 	}
 }
 
-// maxFailoverAttempts 最大 failover 次数（账号级失败后切换新账号上游调用的上限）。
+// maxFailoverAttempts 非图片 429 场景的最大 failover 次数。
 const maxFailoverAttempts = 3
 
 // queueWaitTimeout 所有账号 slot 都被占满时，请求最多排队等多久再放弃。
@@ -70,14 +70,13 @@ const queueMaxPollInterval = 2 * time.Second
 // 499 是 nginx 风格的 Client Closed Request，仅用于本地日志和状态归类。
 const statusClientClosedRequest = 499
 
-const imageRetryUsedHeader = "X-Airgate-Image-Retry-Used"
-
 // allRoutesFailedDefaultRetryAfter 客户端最终被拒时，若没有任何上游 RetryAfter 可参考
 // （比如 max_concurrency 打满、所有账号都在冷却但 state_until 没回填到这一层），
 // 给客户端一个保守的退避建议。1s 既能避免雪崩，又比 60s 更贴合"瞬时打满"的真实恢复节奏。
 const allRoutesFailedDefaultRetryAfter = time.Second
 
-// Forward 入口。失败时自动 failover 到其它账号，最多 maxFailoverAttempts 次。
+// Forward 入口。失败时自动 failover 到其它账号；普通请求最多 maxFailoverAttempts 次，
+// 图片提交接口遇到账号 429 时会持续换号直到没有可用账号。
 //
 // Middleware：OnForwardBegin 只在首次 attempt 调用（避免 failover 污染审计计数），
 // OnForwardEnd 在最终一次 attempt（成功或放弃）触发，LIFO 降序。Begin DENY 会拒绝请求。
@@ -152,7 +151,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		queueDeadline := time.Now().Add(queueWaitTimeout)
 		queuePollDelay := queuePollInterval
 
-		for attempt < maxFailoverAttempts {
+		for canStartForwardAttempt(state, attempt) {
 			if status := canceledRequestStatus(ctx.Err()); status != 0 {
 				markCanceledRequest(c, status)
 				logger.Debug("forward_request_canceled",
@@ -307,9 +306,6 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				attemptLogger.Warn("forward_attempt_failed", attrs...)
 				releaseAccountSlot()
 				f.applyOutcome(ctx, state, execution)
-				if isImageSubmitAPIPath(state.requestPath) {
-					state.imageRetryUsed = true
-				}
 
 				if execution.outcome.Kind.IsAccountFault() {
 					hardExclude = append(hardExclude, accountID)
@@ -688,7 +684,8 @@ func keyInfoForRoute(base *auth.APIKeyInfo, route routing.Candidate) *auth.APIKe
 }
 
 // canFailover 是否允许换账号重试。
-// 流式已写入 → 不可；err 非 nil（插件自身崩）→ 可；其余由 Kind.ShouldFailover() 决定。
+// 图片提交只对账号 429 做 Core 级换号；其它请求里，流式已写入 → 不可，
+// err 非 nil（插件自身崩）→ 可；其余由 Kind.ShouldFailover() 决定。
 func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution forwardExecution) bool {
 	if state.stream && c.Writer.Written() {
 		return false
@@ -697,9 +694,6 @@ func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution f
 		return false
 	}
 	if isImageSubmitAPIPath(state.requestPath) {
-		if state.imageRetryUsed || imageRetryUsedByPlugin(execution.outcome) {
-			return false
-		}
 		return execution.outcome.Kind == sdk.OutcomeAccountRateLimited
 	}
 	if execution.err != nil {
@@ -708,8 +702,11 @@ func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution f
 	return execution.outcome.Kind.ShouldFailover()
 }
 
-func imageRetryUsedByPlugin(outcome sdk.ForwardOutcome) bool {
-	return strings.EqualFold(outcome.Upstream.Headers.Get(imageRetryUsedHeader), "true")
+func canStartForwardAttempt(state *forwardState, attempt int) bool {
+	if state != nil && isImageSubmitAPIPath(state.requestPath) {
+		return true
+	}
+	return attempt < maxFailoverAttempts
 }
 
 // callPlugin 把请求发给插件。
