@@ -575,20 +575,30 @@ export default function LoginPage() {
 
           {/* Tab 切换 */}
           <Tabs
-            className="mb-6 w-full"
+            className="ag-segmented-tabs ag-segmented-tabs-compact ag-login-tabs mb-6 w-full"
             selectedKey={activeTab}
             onSelectionChange={(key) => {
               setActiveTab(key as TabKey);
               setRegisterSuccess(false);
             }}
-            variant="secondary"
           >
             <Tabs.List className="w-full">
-              <Tabs.Tab id="login">{t('common.login')}</Tabs.Tab>
+              <Tabs.Tab id="login">
+                <Tabs.Indicator />
+                <span>{t('common.login')}</span>
+              </Tabs.Tab>
               {site.registration_enabled ? (
-                <Tabs.Tab id="register">{t('common.register')}</Tabs.Tab>
+                <Tabs.Tab id="register">
+                  <Tabs.Separator />
+                  <Tabs.Indicator />
+                  <span>{t('common.register')}</span>
+                </Tabs.Tab>
               ) : null}
-              <Tabs.Tab id="apikey">API Key</Tabs.Tab>
+              <Tabs.Tab id="apikey">
+                <Tabs.Separator />
+                <Tabs.Indicator />
+                <span>API Key</span>
+              </Tabs.Tab>
             </Tabs.List>
           </Tabs>
 

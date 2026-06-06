@@ -59,6 +59,17 @@
   flex: 0 0 auto;
 }
 
+.ag-login-tabs :where(.tabs__list, [data-slot="tabs-list"]) {
+  width: 100%;
+  max-width: none;
+}
+
+.ag-login-tabs :where(.tabs__tab, [data-slot="tabs-tab"]) {
+  min-width: 0;
+  flex: 1 1 0;
+  justify-content: center;
+}
+
 .ag-page-tabs :where(.tabs__tab > svg),
 .ag-segmented-tabs :where(.tabs__tab > svg) {
   flex: none;
@@ -170,4 +181,3 @@
     margin-right: 0;
   }
 }
-

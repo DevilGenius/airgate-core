@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Chip, Tabs, useOverlayState } from '@heroui/react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -45,6 +45,7 @@ function PieNameTooltip({
 
 // 预设时间范围
 type RangePreset = '7d' | '30d' | '90d' | 'custom';
+const RANGE_PRESETS = ['7d', '30d', '90d', 'custom'] as const;
 
 // 按浏览器本地时区拼出 YYYY-MM-DD（不要用 toISOString，那是 UTC，会跨日）。
 function localDateStr(d: Date): string {
@@ -105,11 +106,19 @@ export function AccountStatsModal({
     }
     return getPresetDates(preset);
   }, [preset, customStart, customEnd]);
+  const queryKey = useMemo(
+    () => ['account-stats', accountId, queryParams.start_date ?? '', queryParams.end_date ?? ''] as const,
+    [accountId, queryParams.end_date, queryParams.start_date],
+  );
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['account-stats', accountId, queryParams],
+  const { data, isFetching, isLoading } = useQuery({
+    queryKey,
     queryFn: () => accountsApi.stats(accountId, queryParams),
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   });
+  const initialLoading = isLoading && !data;
+  const isRefreshing = isFetching && !initialLoading;
   const modalState = useOverlayState({
     isOpen: true,
     onOpenChange: (open) => {
@@ -125,48 +134,138 @@ export function AccountStatsModal({
       state={modalState}
       title={t('accounts.view_stats')}
     >
-              {/* 时间范围选择器 */}
-              <div className="flex items-center gap-2 mb-4 flex-wrap">
-                <Tabs
-                  selectedKey={preset}
-                  onSelectionChange={(key) => setPreset(key as RangePreset)}
-                  variant="secondary"
-                >
-                  <Tabs.List>
-                    {(['7d', '30d', '90d', 'custom'] as const).map((p) => (
-                      <Tabs.Tab key={p} id={p} className="whitespace-nowrap">
-                        {t(`accounts.stats_range_${p}`)}
-                      </Tabs.Tab>
-                    ))}
-                  </Tabs.List>
-                </Tabs>
-                {preset === 'custom' && (
-                  <div className="ml-2 grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-[minmax(10rem,1fr)_auto_minmax(10rem,1fr)] sm:items-end">
-                    <CommonDatePicker
-                      className="w-full sm:w-40"
-                      label={t('accounts.stats_start_date')}
-                      value={customStart}
-                      onChange={setCustomStart}
-                    />
-                    <span className="text-text-tertiary text-xs">—</span>
-                    <CommonDatePicker
-                      className="w-full sm:w-40"
-                      label={t('accounts.stats_end_date')}
-                      value={customEnd}
-                      onChange={setCustomEnd}
-                    />
-                  </div>
-                )}
-              </div>
+      <div className="space-y-4" aria-busy={isFetching}>
+        <AccountStatsRangeControls
+          customEnd={customEnd}
+          customStart={customStart}
+          isRefreshing={isRefreshing}
+          preset={preset}
+          onCustomEndChange={setCustomEnd}
+          onCustomStartChange={setCustomStart}
+          onPresetChange={setPreset}
+        />
 
-              {isLoading ? (
-                <div className="flex items-center justify-center py-16 text-text-tertiary text-sm">
-                  {t('common.loading')}
-                </div>
-              ) : data ? (
-                <StatsContent data={data} lifetimeImageCount={lifetimeImageCount} />
-              ) : null}
+        <div className="min-h-[560px]">
+          {data ? (
+            <StatsContent data={data} lifetimeImageCount={lifetimeImageCount} />
+          ) : (
+            <AccountStatsSkeleton />
+          )}
+        </div>
+      </div>
     </CommonModal>
+  );
+}
+
+function AccountStatsRangeControls({
+  customEnd,
+  customStart,
+  isRefreshing,
+  onCustomEndChange,
+  onCustomStartChange,
+  onPresetChange,
+  preset,
+}: {
+  customEnd: string;
+  customStart: string;
+  isRefreshing: boolean;
+  onCustomEndChange: (value: string) => void;
+  onCustomStartChange: (value: string) => void;
+  onPresetChange: (value: RangePreset) => void;
+  preset: RangePreset;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex min-h-[2rem] flex-wrap items-center gap-2">
+      <Tabs
+        className="ag-segmented-tabs ag-segmented-tabs-compact ag-segmented-tabs-auto"
+        selectedKey={preset}
+        onSelectionChange={(key) => onPresetChange(key as RangePreset)}
+      >
+        <Tabs.List>
+          {RANGE_PRESETS.map((item, index) => (
+            <Tabs.Tab key={item} id={item} className="whitespace-nowrap">
+              {index > 0 ? <Tabs.Separator /> : null}
+              <Tabs.Indicator />
+              <span>{t(`accounts.stats_range_${item}`)}</span>
+            </Tabs.Tab>
+          ))}
+        </Tabs.List>
+      </Tabs>
+
+      {preset === 'custom' && (
+        <div className="grid w-full grid-cols-1 gap-2 sm:ml-2 sm:w-auto sm:grid-cols-[minmax(10rem,1fr)_auto_minmax(10rem,1fr)] sm:items-end">
+          <CommonDatePicker
+            className="w-full sm:w-40"
+            label={t('accounts.stats_start_date')}
+            value={customStart}
+            onChange={onCustomStartChange}
+          />
+          <span className="text-xs text-text-tertiary">—</span>
+          <CommonDatePicker
+            className="w-full sm:w-40"
+            label={t('accounts.stats_end_date')}
+            value={customEnd}
+            onChange={onCustomEndChange}
+          />
+        </div>
+      )}
+
+      <span className="sr-only" aria-live="polite">
+        {isRefreshing ? t('common.loading') : ''}
+      </span>
+    </div>
+  );
+}
+
+function SkeletonBlock({ className }: { className: string }) {
+  return <div className={`ag-shimmer ${className}`} />;
+}
+
+function AccountStatsSkeleton() {
+  return (
+    <div className="space-y-5" aria-hidden="true">
+      <div className="rounded-lg border border-border-subtle p-4">
+        <div className="flex items-center gap-3">
+          <SkeletonBlock className="h-10 w-10 rounded-lg" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <SkeletonBlock className="h-4 w-40 rounded" />
+            <SkeletonBlock className="h-3 w-64 max-w-full rounded" />
+          </div>
+          <SkeletonBlock className="h-6 w-16 rounded-[var(--radius)]" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div className="rounded-lg border border-border-subtle p-3.5" key={index}>
+            <div className="mb-3 flex items-start justify-between">
+              <SkeletonBlock className="h-3 w-20 rounded" />
+              <SkeletonBlock className="h-7 w-7 rounded-md" />
+            </div>
+            <SkeletonBlock className="h-6 w-24 rounded" />
+            <SkeletonBlock className="mt-2 h-3 w-28 rounded" />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        {Array.from({ length: 6 }, (_, index) => (
+          <div className="space-y-3 rounded-lg border border-border-subtle p-3.5" key={index}>
+            <SkeletonBlock className="h-4 w-24 rounded" />
+            <SkeletonBlock className="h-3 w-full rounded" />
+            <SkeletonBlock className="h-3 w-5/6 rounded" />
+            <SkeletonBlock className="h-3 w-2/3 rounded" />
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-lg border border-border-subtle p-4">
+        <SkeletonBlock className="mb-3 h-4 w-32 rounded" />
+        <SkeletonBlock className="h-[260px] w-full rounded" />
+      </div>
+    </div>
   );
 }
 
