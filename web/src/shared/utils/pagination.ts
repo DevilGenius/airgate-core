@@ -5,7 +5,7 @@ export type PaginationItem = number | '...';
 
 export function normalizePaginationPageSize(
   value: unknown,
-  fallback = DEFAULT_PAGINATION_PAGE_SIZE,
+  fallback: number = DEFAULT_PAGINATION_PAGE_SIZE,
   options: readonly number[] = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS,
 ): number {
   const safeFallback = options.includes(fallback) ? fallback : DEFAULT_PAGINATION_PAGE_SIZE;
