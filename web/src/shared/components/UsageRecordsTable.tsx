@@ -242,6 +242,20 @@ export function UsageRecordsTable<T extends UsageRow>({
     return columns.filter((column) => !column.hideOnMobile);
   }, [columns, mobileLayout]);
   const mobileItems = useMemo(() => {
+    const mobileNewRowProps = (row: T, className?: string) => {
+      const rowId = String(row.id);
+      const isNew = markedRowIds.has(rowId);
+      return {
+        className: cx(className, isNew && 'ag-mobile-record-card--new'),
+        onAnimationEnd: isNew
+          ? (event: AnimationEvent<HTMLElement>) => {
+              if (event.animationName !== NEW_ROW_ANIMATION_NAME) return;
+              clearMarkedRowId(rowId);
+            }
+          : undefined,
+      };
+    };
+
     if (mobileLayout === 'usageGrid' || mobileLayout === 'usageGridWithUser') {
       const showUserInHeader = mobileLayout === 'usageGridWithUser';
       const columnByKey = new Map(mobileColumns.map((column) => [column.key, column]));
@@ -251,10 +265,11 @@ export function UsageRecordsTable<T extends UsageRow>({
         .map((key) => columnByKey.get(key))
         .filter((column): column is UsageColumnConfig<T> => Boolean(column));
       const hasAPIKeyColumn = Boolean(columnByKey.get('api_key'));
+      const hasTokensColumn = Boolean(columnByKey.get('tokens'));
 
       if (userColumn || timeColumn || fieldColumns.length > 0) {
         return rows.map((row) => ({
-          className: 'ag-mobile-record-card--usage-grid',
+          ...mobileNewRowProps(row, 'ag-mobile-record-card--usage-grid'),
           id: row.id,
           title: showUserInHeader
             ? userColumn?.render(row) ?? timeColumn?.render(row) ?? '-'
@@ -264,6 +279,7 @@ export function UsageRecordsTable<T extends UsageRow>({
             className: [
               `ag-mobile-record-field--usage-${column.key}`,
               column.key === 'model' && !hasAPIKeyColumn && 'ag-mobile-record-field--usage-model-primary',
+              column.key === 'cost' && !hasTokensColumn && 'ag-mobile-record-field--usage-cost-primary',
               column.key === 'tokens' && 'ag-mobile-record-field--tokens',
             ].filter(Boolean).join(' '),
             label: column.title,
@@ -285,6 +301,7 @@ export function UsageRecordsTable<T extends UsageRow>({
       : undefined;
 
     return rows.map((row) => ({
+      ...mobileNewRowProps(row),
       id: row.id,
       title: primaryColumn.render(row),
       fields: fieldColumns.map((column) => ({
@@ -296,7 +313,7 @@ export function UsageRecordsTable<T extends UsageRow>({
         value: column.render(row),
       })),
     }));
-  }, [mobileColumns, mobileLayout, rows]);
+  }, [clearMarkedRowId, markedRowIds, mobileColumns, mobileLayout, rows]);
 
   const emptyState = (
     <EmptyState className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 text-center">

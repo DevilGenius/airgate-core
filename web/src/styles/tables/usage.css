@@ -144,6 +144,10 @@
   grid-row: 2;
 }
 
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-cost-primary {
+  grid-column: 1;
+}
+
 .ag-usage-table-mobile .ag-mobile-record-title .ag-usage-model-cell,
 .ag-usage-table-mobile .ag-mobile-record-field .ag-usage-model-cell {
   grid-template-columns: 3rem minmax(0, 1fr) !important;
@@ -259,6 +263,10 @@
 .ag-usage-table :where(.ag-usage-table-row--new [data-slot="table-cell"],
   .ag-usage-table-row--new [data-slot="td"],
   .ag-usage-table-row--new .table__cell) {
+  animation: ag-usage-row-new-enter 1.4s ease-out both;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--new {
   animation: ag-usage-row-new-enter 1.4s ease-out both;
 }
 

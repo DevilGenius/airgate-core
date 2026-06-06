@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from 'react';
+import { memo, type AnimationEventHandler, type ReactNode } from 'react';
 import { TableEmptyState } from './TablePage';
 
 export interface MobileRecordField {
@@ -9,6 +9,7 @@ export interface MobileRecordField {
 
 export interface MobileRecordItem {
   className?: string;
+  onAnimationEnd?: AnimationEventHandler<HTMLElement>;
   id: string | number;
   title: ReactNode;
   description?: ReactNode;
@@ -51,7 +52,11 @@ export const MobileRecordList = memo(function MobileRecordList({
   return (
     <div className="ag-mobile-record-list">
       {items.map((item) => (
-        <article className={['ag-mobile-record-card', item.className].filter(Boolean).join(' ')} key={item.id}>
+        <article
+          className={['ag-mobile-record-card', item.className].filter(Boolean).join(' ')}
+          key={item.id}
+          onAnimationEnd={item.onAnimationEnd}
+        >
           <div className="ag-mobile-record-head">
             <div className="min-w-0">
               <div className="ag-mobile-record-title">{item.title}</div>
