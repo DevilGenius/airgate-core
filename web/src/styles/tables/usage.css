@@ -100,6 +100,50 @@
   display: none !important;
 }
 
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-head {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  justify-content: stretch;
+  gap: 0.625rem 0.75rem;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-meta {
+  min-width: 0;
+  justify-self: stretch;
+  overflow: hidden;
+  text-align: left;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-meta > * {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-api_key {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-model {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-model-primary {
+  grid-column: 1;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-tokens {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-cost {
+  grid-column: 2;
+  grid-row: 2;
+}
+
 .ag-usage-table-mobile .ag-mobile-record-title .ag-usage-model-cell,
 .ag-usage-table-mobile .ag-mobile-record-field .ag-usage-model-cell {
   grid-template-columns: 3rem minmax(0, 1fr) !important;

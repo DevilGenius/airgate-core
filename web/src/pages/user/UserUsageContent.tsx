@@ -490,6 +490,7 @@ export default function UserUsageContent() {
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
         hasMore={canUseCursor ? data?.has_more : false}
         isLoading={isLoading}
+        mobileLayout="usageGrid"
         page={page}
         pageSize={pageSize}
         rows={list}

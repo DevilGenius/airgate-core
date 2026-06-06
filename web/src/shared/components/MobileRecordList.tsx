@@ -8,6 +8,7 @@ export interface MobileRecordField {
 }
 
 export interface MobileRecordItem {
+  className?: string;
   id: string | number;
   title: ReactNode;
   description?: ReactNode;
@@ -50,7 +51,7 @@ export const MobileRecordList = memo(function MobileRecordList({
   return (
     <div className="ag-mobile-record-list">
       {items.map((item) => (
-        <article className="ag-mobile-record-card" key={item.id}>
+        <article className={['ag-mobile-record-card', item.className].filter(Boolean).join(' ')} key={item.id}>
           <div className="ag-mobile-record-head">
             <div className="min-w-0">
               <div className="ag-mobile-record-title">{item.title}</div>

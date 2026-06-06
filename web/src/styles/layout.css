@@ -470,6 +470,7 @@
 }
 
 .ag-mobile-record-field--tokens .ag-usage-token-summary {
+  align-items: start !important;
   grid-template-columns: minmax(0, 1fr) auto !important;
   width: 100%;
   max-width: 100%;
@@ -482,6 +483,7 @@
 
 .ag-mobile-record-field--tokens .ag-usage-token-summary > :first-child {
   min-width: 0;
+  align-self: start;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   gap: 0.125rem 0.25rem !important;
 }
@@ -514,6 +516,7 @@
 .ag-mobile-record-field--tokens .ag-usage-token-summary > :last-child {
   width: auto !important;
   min-width: 2.75rem;
+  align-self: start;
   text-align: right;
   font-size: 0.8125rem;
 }

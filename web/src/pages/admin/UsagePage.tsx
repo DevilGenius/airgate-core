@@ -1128,6 +1128,7 @@ export default function UsagePage() {
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
         hasMore={canUseCursor ? data?.has_more : false}
         isLoading={isLoading}
+        mobileLayout="usageGridWithUser"
         page={page}
         pageSize={pageSize}
         rows={data?.list ?? []}

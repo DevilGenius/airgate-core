@@ -12,6 +12,7 @@ const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>(['model', 'user_agent']);
 const NEW_ROW_ANIMATION_NAME = 'ag-usage-row-new-enter';
 const USAGE_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const DEFAULT_USAGE_PAGE_SIZE = USAGE_PAGE_SIZE_OPTIONS[0];
+type UsageMobileLayout = 'default' | 'usageGrid' | 'usageGridWithUser';
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -180,6 +181,7 @@ export function UsageRecordsTable<T extends UsageRow>({
   summaryTotalExact,
   total,
   totalExact,
+  mobileLayout = 'default',
 }: {
   ariaLabel: string;
   columns: UsageColumnConfig<T>[];
@@ -201,6 +203,7 @@ export function UsageRecordsTable<T extends UsageRow>({
   summaryTotalExact?: boolean;
   total: number;
   totalExact?: boolean;
+  mobileLayout?: UsageMobileLayout;
 }) {
   const totalPages = getTotalPages(total, pageSize);
   useEffect(() => {
@@ -234,11 +237,42 @@ export function UsageRecordsTable<T extends UsageRow>({
     resetKey: highlightResetKey,
     rows,
   });
-  const mobileColumns = useMemo(
-    () => columns.filter((column) => !column.hideOnMobile),
-    [columns],
-  );
+  const mobileColumns = useMemo(() => {
+    if (mobileLayout === 'usageGrid' || mobileLayout === 'usageGridWithUser') return columns;
+    return columns.filter((column) => !column.hideOnMobile);
+  }, [columns, mobileLayout]);
   const mobileItems = useMemo(() => {
+    if (mobileLayout === 'usageGrid' || mobileLayout === 'usageGridWithUser') {
+      const showUserInHeader = mobileLayout === 'usageGridWithUser';
+      const columnByKey = new Map(mobileColumns.map((column) => [column.key, column]));
+      const userColumn = columnByKey.get('user_id');
+      const timeColumn = columnByKey.get('created_at');
+      const fieldColumns = ['api_key', 'model', 'tokens', 'cost']
+        .map((key) => columnByKey.get(key))
+        .filter((column): column is UsageColumnConfig<T> => Boolean(column));
+      const hasAPIKeyColumn = Boolean(columnByKey.get('api_key'));
+
+      if (userColumn || timeColumn || fieldColumns.length > 0) {
+        return rows.map((row) => ({
+          className: 'ag-mobile-record-card--usage-grid',
+          id: row.id,
+          title: showUserInHeader
+            ? userColumn?.render(row) ?? timeColumn?.render(row) ?? '-'
+            : timeColumn?.render(row) ?? '-',
+          meta: showUserInHeader && userColumn && timeColumn ? timeColumn.render(row) : undefined,
+          fields: fieldColumns.map((column) => ({
+            className: [
+              `ag-mobile-record-field--usage-${column.key}`,
+              column.key === 'model' && !hasAPIKeyColumn && 'ag-mobile-record-field--usage-model-primary',
+              column.key === 'tokens' && 'ag-mobile-record-field--tokens',
+            ].filter(Boolean).join(' '),
+            label: column.title,
+            value: column.render(row),
+          })),
+        }));
+      }
+    }
+
     const primaryColumn = mobileColumns.find((column) => !FULL_CELL_CONTENT_COLUMNS.has(column.key)) ?? mobileColumns[0];
     if (!primaryColumn) return [];
     const fieldColumns = mobileColumns.filter((column) => column !== primaryColumn);
@@ -262,7 +296,7 @@ export function UsageRecordsTable<T extends UsageRow>({
         value: column.render(row),
       })),
     }));
-  }, [mobileColumns, rows]);
+  }, [mobileColumns, mobileLayout, rows]);
 
   const emptyState = (
     <EmptyState className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 text-center">
