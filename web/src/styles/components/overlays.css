@@ -4,12 +4,21 @@
 
 /* 弹层容器 */
 
+:root {
+  --ag-modal-sm-width: 36rem;
+  --ag-modal-md-width: 52rem;
+  --ag-modal-lg-width: 68rem;
+  --ag-modal-xl-width: 76rem;
+  --ag-alert-dialog-sm-width: 30rem;
+  --ag-alert-dialog-md-width: 34rem;
+}
+
 .ag-toast-region[data-slot="toast-region"] {
   top: calc(env(safe-area-inset-top, 0px) + 5rem) !important;
 }
 
 :where(.modal__container, .alert-dialog__container):has(.ag-elevation-modal) {
-  padding-inline: clamp(1rem, 3vw, 4rem) !important;
+  padding-inline: clamp(0.75rem, 2.5vw, 3rem) !important;
   padding-block: clamp(1rem, 3vh, 3rem) !important;
 }
 
@@ -50,6 +59,9 @@
 
 .ag-elevation-modal {
   position: relative;
+  box-sizing: border-box;
+  width: min(var(--ag-modal-width, var(--ag-modal-md-width)), 100%) !important;
+  max-width: min(var(--ag-modal-width, var(--ag-modal-md-width)), calc(100vw - clamp(1.5rem, 5vw, 6rem))) !important;
   overflow: hidden;
   max-height: min(86dvh, 62rem) !important;
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
@@ -99,16 +111,33 @@
   }
 }
 
-.ag-elevation-modal.modal__dialog--md {
-  max-width: min(38rem, calc(100vw - 2rem)) !important;
+.ag-elevation-modal.modal__dialog--sm {
+  --ag-modal-width: var(--ag-modal-sm-width);
 }
 
-.ag-elevation-modal.alert-dialog__dialog--md {
-  max-width: min(36rem, calc(100vw - 2rem)) !important;
+.ag-elevation-modal.modal__dialog--md {
+  --ag-modal-width: var(--ag-modal-md-width);
 }
 
 .ag-elevation-modal.modal__dialog--lg {
-  max-width: min(56rem, calc(100vw - 2rem)) !important;
+  --ag-modal-width: var(--ag-modal-lg-width);
+}
+
+.ag-elevation-modal.modal__dialog--xl,
+.ag-elevation-modal.ag-modal-xwide {
+  --ag-modal-width: var(--ag-modal-xl-width);
+}
+
+.ag-elevation-modal.ag-modal-wide {
+  --ag-modal-width: var(--ag-modal-lg-width);
+}
+
+.ag-elevation-modal.alert-dialog__dialog--sm {
+  --ag-modal-width: var(--ag-alert-dialog-sm-width);
+}
+
+.ag-elevation-modal.alert-dialog__dialog--md {
+  --ag-modal-width: var(--ag-alert-dialog-md-width);
 }
 
 .ag-elevation-modal .ag-modal-header {
@@ -260,21 +289,10 @@
 }
 
 @media (min-width: 96rem) {
-  .ag-elevation-modal.modal__dialog--sm {
-    max-width: min(32rem, calc(100vw - 8rem)) !important;
-  }
-
-  .ag-elevation-modal.modal__dialog--md {
-    max-width: min(44rem, calc(100vw - 8rem)) !important;
-  }
-
-  .ag-elevation-modal.alert-dialog__dialog--sm,
-  .ag-elevation-modal.alert-dialog__dialog--md {
-    max-width: min(38rem, calc(100vw - 8rem)) !important;
-  }
-
-  .ag-elevation-modal.modal__dialog--lg {
-    max-width: min(68rem, calc(100vw - 8rem)) !important;
+  :root {
+    --ag-modal-md-width: 56rem;
+    --ag-modal-lg-width: 76rem;
+    --ag-modal-xl-width: 86rem;
   }
 
   :where(.date-picker__popover,

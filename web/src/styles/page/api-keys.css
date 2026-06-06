@@ -204,14 +204,12 @@
 
 .ag-elevation-modal.ag-create-key-modal,
 .ag-elevation-modal.modal__dialog--lg.ag-create-key-modal {
-  width: min(45rem, calc(100vw - 2rem)) !important;
-  max-width: min(45rem, calc(100vw - 2rem)) !important;
+  --ag-modal-width: var(--ag-modal-md-width);
 }
 
 .ag-elevation-modal.ag-user-api-keys-modal,
 .ag-elevation-modal.modal__dialog--md.ag-user-api-keys-modal {
-  width: min(64rem, 100%) !important;
-  max-width: min(64rem, calc(100vw - 2rem)) !important;
+  --ag-modal-width: var(--ag-modal-lg-width);
 }
 
 .ag-user-api-keys-table .ag-resource-table-content {

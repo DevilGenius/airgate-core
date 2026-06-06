@@ -4,8 +4,7 @@
 
 .ag-elevation-modal.ag-create-account-modal,
 .ag-elevation-modal.modal__dialog--lg.ag-create-account-modal {
-  width: min(58rem, calc(100vw - 2rem)) !important;
-  max-width: min(58rem, calc(100vw - 2rem)) !important;
+  --ag-modal-width: var(--ag-modal-lg-width);
   max-height: min(88dvh, 58rem) !important;
 }
 
@@ -97,3 +96,31 @@
   min-width: 0;
 }
 
+/* Account test modal. */
+
+.ag-account-test-modal {
+  --ag-modal-width: var(--ag-modal-md-width);
+  overflow: visible !important;
+}
+
+.ag-account-test-modal .modal__body {
+  overflow: visible !important;
+  padding-bottom: 0.75rem;
+}
+
+.ag-account-test-model-select .ag-toolbar-menu-popover {
+  z-index: 130;
+  max-height: min(18rem, calc(100dvh - 18rem));
+  overflow: hidden;
+}
+
+.ag-account-test-model-select .ag-toolbar-menu-list {
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.125rem;
+}
+
+.ag-account-test-model-select .ag-toolbar-menu-item {
+  min-height: 2.25rem;
+}

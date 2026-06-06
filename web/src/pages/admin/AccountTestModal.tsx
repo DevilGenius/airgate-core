@@ -309,7 +309,7 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
 
   return (
     <CommonModal
-      dialogStyle={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
+      className="ag-account-test-modal"
       footer={(
         <div className="flex w-full justify-end gap-2">
           <Button variant="secondary" onPress={handleClose}>
@@ -356,12 +356,13 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
                   <Label>{t('accounts.select_model')}</Label>
                   <SimpleSelect
                     ariaLabel={t('accounts.select_model')}
-                  fullWidth
+                    className="ag-account-test-model-select"
+                    fullWidth
                     items={modelOptions.map((item) => ({ key: item.id, label: item.label }))}
-                  selectedKey={selectedModel}
+                    selectedKey={selectedModel}
                     selectedLabel={selectedModelLabel}
                     onSelectionChange={setSelectedModel}
-                  isDisabled={isRunning}
+                    isDisabled={isRunning}
                   />
                 </div>
 
