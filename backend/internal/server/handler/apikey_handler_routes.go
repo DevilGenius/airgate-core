@@ -202,6 +202,24 @@ func (h *APIKeyHandler) AdminUpdateKey(c *gin.Context) {
 	response.Success(c, toAPIKeyResp(item))
 }
 
+// AdminResetKeyUsage 管理员重置 API Key 累计用量。
+func (h *APIKeyHandler) AdminResetKeyUsage(c *gin.Context) {
+	id, err := parseKeyID(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的密钥 ID")
+		return
+	}
+
+	item, err := h.service.ResetUsageAdmin(c.Request.Context(), id)
+	if err != nil {
+		httpCode, message := h.handleError("管理员重置 API 密钥用量失败", "重置失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	response.Success(c, toAPIKeyResp(item))
+}
+
 // RevealKey 查看 API 密钥原文。
 func (h *APIKeyHandler) RevealKey(c *gin.Context) {
 	userID, ok := currentUserID(c)

@@ -23,4 +23,6 @@ export const apikeysApi = {
     get<PagedData<APIKeyResp>>('/api/v1/admin/api-keys', params, options),
   adminUpdate: (id: number, data: UpdateAPIKeyReq) =>
     put<void>(`/api/v1/admin/api-keys/${id}`, data),
+  adminResetUsage: (id: number) =>
+    post<APIKeyResp>(`/api/v1/admin/api-keys/${id}/reset-usage`),
 };

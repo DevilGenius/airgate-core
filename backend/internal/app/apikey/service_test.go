@@ -301,16 +301,38 @@ func TestUpdateAdminDoesNotCheckGroupAccess(t *testing.T) {
 	}
 }
 
+func TestResetUsageAdminResetsRepositoryUsage(t *testing.T) {
+	var capturedID int
+	service := NewService(apiKeyStubRepository{
+		resetUsageAdmin: func(_ context.Context, id int) (Key, error) {
+			capturedID = id
+			return Key{ID: id, UserID: 42, KeyHash: "hash-reset"}, nil
+		},
+	}, testAPIKeySecret)
+
+	item, err := service.ResetUsageAdmin(t.Context(), 15)
+	if err != nil {
+		t.Fatalf("管理员重置 API Key 用量失败: %v", err)
+	}
+	if capturedID != 15 {
+		t.Fatalf("重置 ID = %d，期望 15", capturedID)
+	}
+	if item.ID != 15 || item.UserID != 42 {
+		t.Fatalf("重置结果异常: %+v", item)
+	}
+}
+
 type apiKeyStubRepository struct {
-	listByUser  func(context.Context, int, ListFilter) ([]Key, int64, error)
-	listAdmin   func(context.Context, ListFilter) ([]Key, int64, error)
-	keyUsage    func(context.Context, []int, time.Time) (map[int]float64, map[int]float64, error)
-	groupAccess func(context.Context, int, int) (GroupAccess, error)
-	create      func(context.Context, Mutation) (Key, error)
-	updateOwned func(context.Context, int, int, Mutation) (Key, error)
-	updateAdmin func(context.Context, int, Mutation) (Key, error)
-	deleteOwned func(context.Context, int, int) error
-	findOwned   func(context.Context, int, int) (Key, error)
+	listByUser      func(context.Context, int, ListFilter) ([]Key, int64, error)
+	listAdmin       func(context.Context, ListFilter) ([]Key, int64, error)
+	keyUsage        func(context.Context, []int, time.Time) (map[int]float64, map[int]float64, error)
+	groupAccess     func(context.Context, int, int) (GroupAccess, error)
+	create          func(context.Context, Mutation) (Key, error)
+	updateOwned     func(context.Context, int, int, Mutation) (Key, error)
+	updateAdmin     func(context.Context, int, Mutation) (Key, error)
+	resetUsageAdmin func(context.Context, int) (Key, error)
+	deleteOwned     func(context.Context, int, int) error
+	findOwned       func(context.Context, int, int) (Key, error)
 }
 
 func (s apiKeyStubRepository) ListByUser(ctx context.Context, userID int, filter ListFilter) ([]Key, int64, error) {
@@ -360,6 +382,13 @@ func (s apiKeyStubRepository) UpdateAdmin(ctx context.Context, id int, mutation 
 		return Key{}, nil
 	}
 	return s.updateAdmin(ctx, id, mutation)
+}
+
+func (s apiKeyStubRepository) ResetUsageAdmin(ctx context.Context, id int) (Key, error) {
+	if s.resetUsageAdmin == nil {
+		return Key{}, nil
+	}
+	return s.resetUsageAdmin(ctx, id)
 }
 
 func (s apiKeyStubRepository) DeleteOwned(ctx context.Context, userID, id int) error {

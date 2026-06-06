@@ -113,6 +113,7 @@ type Repository interface {
 	Create(context.Context, Mutation) (Key, error)
 	UpdateOwned(context.Context, int, int, Mutation) (Key, error)
 	UpdateAdmin(context.Context, int, Mutation) (Key, error)
+	ResetUsageAdmin(context.Context, int) (Key, error)
 	DeleteOwned(context.Context, int, int) error
 	FindOwned(context.Context, int, int) (Key, error)
 }

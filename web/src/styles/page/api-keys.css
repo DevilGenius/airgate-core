@@ -207,3 +207,50 @@
   width: min(45rem, calc(100vw - 2rem)) !important;
   max-width: min(45rem, calc(100vw - 2rem)) !important;
 }
+
+.ag-elevation-modal.ag-user-api-keys-modal,
+.ag-elevation-modal.modal__dialog--md.ag-user-api-keys-modal {
+  width: min(64rem, 100%) !important;
+  max-width: min(64rem, calc(100vw - 2rem)) !important;
+}
+
+.ag-user-api-keys-table .ag-resource-table-content {
+  table-layout: fixed;
+}
+
+.ag-user-api-keys-table :where([data-slot="th"], [data-slot="td"]) {
+  overflow: hidden;
+}
+
+.ag-user-api-keys-table :where([data-slot="th"]:nth-child(1), [data-slot="td"]:nth-child(1)) {
+  width: 22%;
+}
+
+.ag-user-api-keys-table :where([data-slot="th"]:nth-child(2), [data-slot="td"]:nth-child(2)) {
+  width: 18%;
+}
+
+.ag-user-api-keys-table :where([data-slot="th"]:nth-child(3), [data-slot="td"]:nth-child(3)) {
+  width: 20%;
+}
+
+.ag-user-api-keys-table :where([data-slot="th"]:nth-child(4), [data-slot="td"]:nth-child(4)) {
+  width: 11%;
+}
+
+.ag-user-api-keys-table :where([data-slot="th"]:nth-child(5), [data-slot="td"]:nth-child(5)) {
+  width: 19%;
+}
+
+.ag-user-api-keys-table :where([data-slot="th"]:nth-child(6), [data-slot="td"]:nth-child(6)) {
+  width: 10%;
+}
+
+.ag-user-api-keys-table :where([data-slot="td"] > span) {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

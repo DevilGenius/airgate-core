@@ -221,6 +221,26 @@ func (s *Service) UpdateAdmin(ctx context.Context, id int, input UpdateInput) (K
 	return updated, nil
 }
 
+// ResetUsageAdmin 管理员重置 API Key 累计用量。
+func (s *Service) ResetUsageAdmin(ctx context.Context, id int) (Key, error) {
+	logger := sdk.LoggerFromContext(ctx)
+	updated, err := s.repo.ResetUsageAdmin(ctx, id)
+	if err != nil {
+		logger.Error("api_key_usage_reset_failed",
+			sdk.LogFieldAPIKeyID, id,
+			sdk.LogFieldReason, "admin",
+			sdk.LogFieldError, err,
+		)
+		return Key{}, err
+	}
+	auth.InvalidateAPIKeyHashCache(updated.KeyHash)
+	logger.Info("api_key_usage_reset",
+		sdk.LogFieldUserID, updated.UserID,
+		sdk.LogFieldAPIKeyID, id,
+	)
+	return updated, nil
+}
+
 // DeleteOwned 删除当前用户的 API Key。
 func (s *Service) DeleteOwned(ctx context.Context, userID, id int) error {
 	logger := sdk.LoggerFromContext(ctx)

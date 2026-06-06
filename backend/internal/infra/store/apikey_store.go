@@ -165,6 +165,20 @@ func (s *APIKeyStore) UpdateAdmin(ctx context.Context, id int, mutation appapike
 	return s.updateByID(ctx, id, mutation)
 }
 
+// ResetUsageAdmin 管理员重置 API Key 累计用量。
+func (s *APIKeyStore) ResetUsageAdmin(ctx context.Context, id int) (appapikey.Key, error) {
+	if err := s.db.APIKey.UpdateOneID(id).
+		SetUsedQuota(0).
+		SetUsedQuotaActual(0).
+		Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appapikey.Key{}, appapikey.ErrKeyNotFound
+		}
+		return appapikey.Key{}, err
+	}
+	return s.loadByID(ctx, id)
+}
+
 // DeleteOwned 删除当前用户 API Key。
 func (s *APIKeyStore) DeleteOwned(ctx context.Context, userID, id int) error {
 	exists, err := s.db.APIKey.Query().

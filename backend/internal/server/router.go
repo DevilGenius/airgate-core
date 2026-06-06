@@ -148,6 +148,7 @@ func (s *Server) registerRoutes() {
 		// API 密钥管理（管理员）
 		adminGroup.GET("/api-keys", handlers.APIKey.AdminListKeys)
 		adminGroup.PUT("/api-keys/:id", handlers.APIKey.AdminUpdateKey)
+		adminGroup.POST("/api-keys/:id/reset-usage", handlers.APIKey.AdminResetKeyUsage)
 
 		// 订阅管理
 		adminGroup.GET("/subscriptions", handlers.Subscription.AdminListSubscriptions)

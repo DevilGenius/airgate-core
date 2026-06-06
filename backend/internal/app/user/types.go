@@ -111,22 +111,23 @@ type APIKeyBrief struct {
 }
 
 type APIKey struct {
-	ID            int
-	Name          string
-	KeyHint       string
-	KeyHash       string
-	UserID        int
-	GroupID       *int
-	IPWhitelist   []string
-	IPBlacklist   []string
-	QuotaUSD      float64
-	UsedQuota     float64
-	TodayCost     float64
-	ThirtyDayCost float64
-	ExpiresAt     *time.Time
-	Status        string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID              int
+	Name            string
+	KeyHint         string
+	KeyHash         string
+	UserID          int
+	GroupID         *int
+	IPWhitelist     []string
+	IPBlacklist     []string
+	QuotaUSD        float64
+	UsedQuota       float64
+	UsedQuotaActual float64
+	TodayCost       float64
+	ThirtyDayCost   float64
+	ExpiresAt       *time.Time
+	Status          string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // APIKeyList API Key 分页结果。

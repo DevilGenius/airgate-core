@@ -405,6 +405,19 @@ func InvalidateAPIKeyCache(key string) {
 	}
 }
 
+// InvalidateAPIKeyHashCache 清除指定 key hash 的缓存。
+func InvalidateAPIKeyHashCache(hash string) {
+	if hash == "" {
+		return
+	}
+	apiKeyCache.Delete(hash)
+	if apiKeyRedis != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		defer cancel()
+		_, _ = apiKeyRedis.Del(ctx, apiKeyRedisCacheKey(hash)).Result()
+	}
+}
+
 func deleteAllAPIKeyRedisCache() {
 	if apiKeyRedis == nil {
 		return
