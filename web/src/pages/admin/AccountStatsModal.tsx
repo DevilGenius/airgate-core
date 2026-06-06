@@ -128,6 +128,7 @@ export function AccountStatsModal({
 
   return (
     <CommonModal
+      className="ag-account-stats-modal"
       dialogStyle={{ maxWidth: '880px', width: 'min(100%, calc(100vw - 2rem))' }}
       icon={<Activity className="size-5" />}
       size="lg"
@@ -195,16 +196,18 @@ function AccountStatsRangeControls({
       </Tabs>
 
       {preset === 'custom' && (
-        <div className="grid w-full grid-cols-1 gap-2 sm:ml-2 sm:w-auto sm:grid-cols-[minmax(10rem,1fr)_auto_minmax(10rem,1fr)] sm:items-end">
+        <div className="ag-account-stats-date-range grid w-full grid-cols-1 gap-2 sm:ml-2 sm:w-auto sm:grid-cols-[minmax(13.5rem,1fr)_auto_minmax(13.5rem,1fr)] sm:items-end">
           <CommonDatePicker
-            className="w-full sm:w-40"
+            className="w-full sm:w-56"
+            hideLabel
             label={t('accounts.stats_start_date')}
             value={customStart}
             onChange={onCustomStartChange}
           />
-          <span className="text-xs text-text-tertiary">—</span>
+          <span className="hidden h-10 items-center text-xs text-text-tertiary sm:inline-flex">—</span>
           <CommonDatePicker
-            className="w-full sm:w-40"
+            className="w-full sm:w-56"
+            hideLabel
             label={t('accounts.stats_end_date')}
             value={customEnd}
             onChange={onCustomEndChange}
@@ -563,16 +566,16 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
   return (
     <div className="rounded-lg border border-border-subtle p-4">
       <h4 className="text-xs font-semibold text-text mb-3">{t('accounts.stats_model_distribution')}</h4>
-      <div className="flex flex-col gap-4 xl:flex-row">
+      <div className="ag-distribution-card-body ag-account-stats-model-distribution grid items-start gap-3 xl:grid-cols-[176px_minmax(0,1fr)]">
         {/* 饼图 */}
-        <div className="w-48 h-48 flex-shrink-0">
-          <PieChart width={192} height={192}>
+        <div className="ag-distribution-chart-frame">
+          <PieChart width={176} height={176}>
             <Pie
               data={pieData}
               cx="50%"
               cy="50%"
-              innerRadius={35}
-              outerRadius={70}
+              innerRadius={42}
+              outerRadius={68}
               dataKey="value"
               isAnimationActive={false}
               minAngle={3}
@@ -593,21 +596,23 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
         </div>
 
         {/* 模型表格 */}
-        <div className="flex-1 overflow-x-auto">
+        <div className="ag-distribution-table-scroll">
           <CompactDataTable
             ariaLabel={t('accounts.stats_model')}
+            className="ag-compact-data-table--dense ag-account-stats-model-table"
             emptyText={t('common.no_data')}
-            minWidth={520}
+            minWidth={440}
             rowKey={(row) => row.model}
             rows={models}
             columns={[
               {
                 key: 'model',
                 title: t('accounts.stats_model'),
-                width: '30%',
+                width: '34%',
                 render: (row, index) => (
                   <>
-                    <span className="w-2 h-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                    <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
                     <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
                   </>
                 ),
@@ -616,28 +621,28 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
                 align: 'end',
                 key: 'requests',
                 title: t('accounts.stats_requests'),
-                width: '16%',
+                width: '15%',
                 render: (row) => <span className="truncate font-mono text-text-secondary">{row.count.toLocaleString()}</span>,
               },
               {
                 align: 'end',
                 key: 'tokens',
                 title: 'Token',
-                width: '18%',
+                width: '17%',
                 render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.input_tokens + row.output_tokens)}</span>,
               },
               {
                 align: 'end',
                 key: 'actual',
                 title: t('accounts.stats_actual'),
-                width: '18%',
+                width: '17%',
                 render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actual_cost, 2)}</span>,
               },
               {
                 align: 'end',
                 key: 'standard',
                 title: t('accounts.stats_standard'),
-                width: '18%',
+                width: '17%',
                 render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.total_cost, 2)}</span>,
               },
             ]}

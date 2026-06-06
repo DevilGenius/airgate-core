@@ -70,6 +70,10 @@
   color: var(--danger);
 }
 
+.ag-accounts-table .ag-account-row-action-button--stats {
+  color: var(--ag-primary);
+}
+
 .ag-accounts-table .ag-account-row-action-button:hover {
   border-color: color-mix(in oklab, var(--accent) 38%, var(--border) 62%);
   background: color-mix(in oklab, var(--accent) 10%, var(--surface-secondary) 90%);

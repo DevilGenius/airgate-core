@@ -5,7 +5,7 @@
 .ag-accounts-table {
   --ag-accounts-table-header-height: 2.25rem;
   --ag-accounts-table-row-height: 3rem;
-  --ag-accounts-table-width: 1458px;
+  --ag-accounts-table-width: 1478px;
   --ag-accounts-current-table-width: var(--ag-accounts-table-width);
   --ag-accounts-selection-column-width: 36px;
 }
@@ -49,8 +49,8 @@
 
 @media (max-width: 767px) {
   .ag-accounts-table {
-    --ag-accounts-table-width: 1144px;
-    --ag-accounts-current-table-width: 1144px;
+    --ag-accounts-table-width: 1172px;
+    --ag-accounts-current-table-width: 1172px;
     --ag-accounts-selection-column-width: 32px;
     --ag-accounts-col-name-width: 112px;
     --ag-accounts-col-platform-width: 84px;
@@ -61,7 +61,7 @@
     --ag-accounts-col-rate_multiplier-width: 72px;
     --ag-accounts-col-usage_window-width: 364px;
     --ag-accounts-col-last_used_at-width: 88px;
-    --ag-accounts-col-actions-width: 96px;
+    --ag-accounts-col-actions-width: 124px;
   }
 
   .ag-accounts-table .ag-account-capacity {

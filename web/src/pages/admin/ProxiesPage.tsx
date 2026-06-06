@@ -210,18 +210,20 @@ export default function ProxiesPage() {
 
       <CommonTable
         ariaLabel={t('proxies.title', 'Proxies')}
-        minWidth={860}
+        className="ag-proxies-table"
+        contentClassName="ag-proxies-table-content"
+        minWidth={980}
       >
             <CommonTable.Header>
-              <CommonTable.Column id="id" style={{ width: 72 }}>
+              <CommonTable.Column id="id" style={{ width: 64 }}>
                 {t('common.id')}
               </CommonTable.Column>
-              <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
-              <CommonTable.Column id="protocol">{t('proxies.protocol')}</CommonTable.Column>
-              <CommonTable.Column id="endpoint">{t('proxies.address')}</CommonTable.Column>
-              <CommonTable.Column id="username">{t('proxies.username')}</CommonTable.Column>
-              <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
-              <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
+              <CommonTable.Column id="name" style={{ width: 152 }}>{t('common.name')}</CommonTable.Column>
+              <CommonTable.Column id="protocol" style={{ width: 96 }}>{t('proxies.protocol')}</CommonTable.Column>
+              <CommonTable.Column id="endpoint" style={{ width: 224 }}>{t('proxies.address')}</CommonTable.Column>
+              <CommonTable.Column id="username" style={{ width: 144 }}>{t('proxies.username')}</CommonTable.Column>
+              <CommonTable.Column id="status" style={{ width: 96 }}>{t('common.status')}</CommonTable.Column>
+              <CommonTable.Column id="actions" style={{ width: 204 }}>{t('common.actions')}</CommonTable.Column>
             </CommonTable.Header>
             <CommonTable.Body>
               {isLoading ? (
@@ -241,7 +243,9 @@ export default function ProxiesPage() {
                       <span className="font-mono text-text-tertiary">{row.id}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="text-text">{row.name}</span>
+                      <span className="block max-w-full truncate text-text" title={row.name}>
+                        {row.name}
+                      </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <Chip color={row.protocol === 'http' ? 'accent' : 'warning'} size="sm" variant="soft">
@@ -249,12 +253,14 @@ export default function ProxiesPage() {
                       </Chip>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="font-mono">
+                      <span className="block max-w-full truncate font-mono" title={`${row.address}:${row.port}`}>
                         {row.address}:{row.port}
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="text-text-secondary">{row.username || '-'}</span>
+                      <span className="block max-w-full truncate text-text-secondary" title={row.username || '-'}>
+                        {row.username || '-'}
+                      </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <StatusChip status={row.status} />

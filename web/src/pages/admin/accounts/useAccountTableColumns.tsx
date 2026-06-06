@@ -575,8 +575,8 @@ export function useAccountTableColumns({
     {
       key: 'actions',
       title: t('common.actions'),
-      width: '116px',
-      mobileWidth: '96px',
+      width: '136px',
+      mobileWidth: '124px',
       align: 'center',
       render: (row) => (
         <AccountRowActions

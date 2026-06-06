@@ -190,18 +190,20 @@ export default function SubscriptionsPage() {
 
       <CommonTable
         ariaLabel={t('subscriptions.title', 'Subscriptions')}
+        className="ag-subscriptions-table"
+        contentClassName="ag-subscriptions-table-content"
         minWidth={920}
       >
             <CommonTable.Header>
-              <CommonTable.Column id="id" style={{ width: 72 }}>
+              <CommonTable.Column id="id" style={{ width: 64 }}>
                 {t('common.id')}
               </CommonTable.Column>
-              <CommonTable.Column id="user_id">{t('subscriptions.user')}</CommonTable.Column>
-              <CommonTable.Column id="group_name">{t('subscriptions.group')}</CommonTable.Column>
-              <CommonTable.Column id="effective_at">{t('subscriptions.effective_time')}</CommonTable.Column>
-              <CommonTable.Column id="expires_at">{t('subscriptions.expire_time')}</CommonTable.Column>
-              <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
-              <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
+              <CommonTable.Column id="user_id" style={{ width: 240 }}>{t('subscriptions.user')}</CommonTable.Column>
+              <CommonTable.Column id="group_name" style={{ width: 160 }}>{t('subscriptions.group')}</CommonTable.Column>
+              <CommonTable.Column id="effective_at" style={{ width: 120 }}>{t('subscriptions.effective_time')}</CommonTable.Column>
+              <CommonTable.Column id="expires_at" style={{ width: 120 }}>{t('subscriptions.expire_time')}</CommonTable.Column>
+              <CommonTable.Column id="status" style={{ width: 96 }}>{t('common.status')}</CommonTable.Column>
+              <CommonTable.Column id="actions" style={{ width: 120 }}>{t('common.actions')}</CommonTable.Column>
             </CommonTable.Header>
             <CommonTable.Body>
               {isLoading ? (
@@ -221,15 +223,19 @@ export default function SubscriptionsPage() {
                       <span className="font-mono">{row.id}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="inline-flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5 text-text-tertiary" />
-                        {getUserEmail(row.user_id)}
+                      <span className="inline-flex max-w-full min-w-0 items-center justify-center gap-1.5">
+                        <User className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
+                        <span className="min-w-0 truncate" title={getUserEmail(row.user_id)}>
+                          {getUserEmail(row.user_id)}
+                        </span>
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="inline-flex items-center gap-1.5">
-                        <Layers className="h-3.5 w-3.5 text-text-tertiary" />
-                        <span className="font-medium text-text">{row.group_name}</span>
+                      <span className="inline-flex max-w-full min-w-0 items-center justify-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
+                        <span className="min-w-0 truncate font-medium text-text" title={row.group_name}>
+                          {row.group_name}
+                        </span>
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>

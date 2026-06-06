@@ -6,11 +6,16 @@ import { useMemo } from 'react';
 interface CommonDatePickerProps {
   className?: string;
   description?: string;
+  hideLabel?: boolean;
   isRequired?: boolean;
   label: string;
   name?: string;
   onChange: (value: string) => void;
   value?: string;
+}
+
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(' ');
 }
 
 function toDateValue(value?: string): DateValue | null {
@@ -25,6 +30,7 @@ function toDateValue(value?: string): DateValue | null {
 export function CommonDatePicker({
   className = 'w-full',
   description,
+  hideLabel,
   isRequired,
   label,
   name,
@@ -35,25 +41,25 @@ export function CommonDatePicker({
 
   return (
     <DatePicker
-      className={className}
+      className={cx('ag-common-date-picker', className)}
       isRequired={isRequired}
       name={name}
       value={dateValue}
       onChange={(nextValue) => onChange(nextValue?.toString() ?? '')}
     >
-      <Label>{label}</Label>
-      <DateField.Group fullWidth>
-        <DateField.Input>
+      <Label className={cx('ag-common-date-picker-label', hideLabel ? 'sr-only' : null)}>{label}</Label>
+      <DateField.Group className="ag-common-date-picker-group" fullWidth>
+        <DateField.Input className="ag-common-date-picker-input">
           {(segment) => <DateField.Segment segment={segment} />}
         </DateField.Input>
-        <DateField.Suffix>
-          <DatePicker.Trigger>
+        <DateField.Suffix className="ag-common-date-picker-suffix">
+          <DatePicker.Trigger className="ag-common-date-picker-trigger">
             <DatePicker.TriggerIndicator />
           </DatePicker.Trigger>
         </DateField.Suffix>
       </DateField.Group>
       {description ? <Description>{description}</Description> : null}
-      <DatePicker.Popover>
+      <DatePicker.Popover className="ag-common-date-picker-popover">
         <Calendar aria-label={label}>
           <Calendar.Header>
             <Calendar.YearPickerTrigger>

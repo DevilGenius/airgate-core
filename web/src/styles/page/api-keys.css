@@ -9,7 +9,10 @@
   max-width: none;
 }
 
-.ag-api-keys-table .ag-resource-table-content {
+:is(.ag-api-keys-table,
+  .ag-groups-table,
+  .ag-subscriptions-table,
+  .ag-proxies-table) .ag-resource-table-content {
   table-layout: fixed;
 }
 
@@ -22,12 +25,26 @@
   --ag-api-key-rate-value-width: calc(var(--ag-api-key-rate-width) - var(--ag-api-key-rate-label-width) - var(--ag-api-key-rate-column-gap));
 }
 
+:is(.ag-groups-table,
+  .ag-subscriptions-table,
+  .ag-proxies-table) {
+  --ag-api-keys-table-header-height: 2.25rem;
+  --ag-api-keys-table-row-height: 3rem;
+}
+
 .ag-api-keys-table :where([data-slot="thead"] [data-slot="tr"],
+  .table__header .table__row),
+:is(.ag-groups-table,
+  .ag-subscriptions-table,
+  .ag-proxies-table) :where([data-slot="thead"] [data-slot="tr"],
   .table__header .table__row) {
   height: var(--ag-api-keys-table-header-height) !important;
 }
 
-.ag-api-keys-table :where([data-slot="table-column"], [data-slot="th"], .table__column) {
+:is(.ag-api-keys-table,
+  .ag-groups-table,
+  .ag-subscriptions-table,
+  .ag-proxies-table) :where([data-slot="table-column"], [data-slot="th"], .table__column) {
   height: var(--ag-api-keys-table-header-height) !important;
   min-height: var(--ag-api-keys-table-header-height) !important;
   max-height: var(--ag-api-keys-table-header-height) !important;
@@ -36,24 +53,40 @@
 }
 
 .ag-api-keys-table :where([data-slot="tbody"] [data-slot="tr"],
+  .table__body .table__row),
+:is(.ag-groups-table,
+  .ag-subscriptions-table,
+  .ag-proxies-table) :where([data-slot="tbody"] [data-slot="tr"],
   .table__body .table__row) {
   height: var(--ag-api-keys-table-row-height) !important;
   min-height: var(--ag-api-keys-table-row-height) !important;
 }
 
-.ag-api-keys-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
+:is(.ag-api-keys-table,
+  .ag-groups-table,
+  .ag-subscriptions-table,
+  .ag-proxies-table) :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
   height: var(--ag-api-keys-table-row-height) !important;
   min-height: var(--ag-api-keys-table-row-height) !important;
   line-height: 1 !important;
   padding: 0 !important;
 }
 
-.ag-api-keys-table :where([data-slot="table-column"], [data-slot="th"], .table__column),
-.ag-api-keys-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
+:is(.ag-api-keys-table,
+  .ag-groups-table,
+  .ag-subscriptions-table,
+  .ag-proxies-table) :where([data-slot="table-column"], [data-slot="th"], .table__column),
+:is(.ag-api-keys-table,
+  .ag-groups-table,
+  .ag-subscriptions-table,
+  .ag-proxies-table) :where([data-slot="table-cell"], [data-slot="td"], .table__cell) {
   text-align: center !important;
 }
 
-.ag-api-keys-table :where([data-slot="table-cell"], [data-slot="td"], .table__cell)> :where(span, div, code) {
+:is(.ag-api-keys-table,
+  .ag-groups-table,
+  .ag-subscriptions-table,
+  .ag-proxies-table) :where([data-slot="table-cell"], [data-slot="td"], .table__cell)> :where(span, div, code) {
   justify-content: center;
   margin-inline: auto;
 }
@@ -174,5 +207,3 @@
   width: min(45rem, calc(100vw - 2rem)) !important;
   max-width: min(45rem, calc(100vw - 2rem)) !important;
 }
-
-

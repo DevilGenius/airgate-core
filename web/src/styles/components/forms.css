@@ -294,6 +294,68 @@
   box-shadow: 0 0 0 1px var(--focus) !important;
 }
 
+.ag-common-date-picker {
+  min-width: 0;
+  gap: 0.375rem;
+}
+
+.ag-common-date-picker-label.label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-common-date-picker-group.date-input-group {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 2.5rem;
+  height: 2.5rem;
+}
+
+.ag-common-date-picker-input.date-input-group__input {
+  min-width: 0;
+  overflow: hidden;
+  padding-right: 0.5rem;
+}
+
+.ag-common-date-picker-input :where(.date-input-group__segment, [data-slot="date-input-group-segment"]) {
+  min-width: 0;
+}
+
+.ag-common-date-picker-suffix.date-input-group__suffix {
+  display: inline-flex;
+  flex: 0 0 2rem;
+  width: 2rem;
+  min-width: 2rem;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.25rem;
+}
+
+.ag-common-date-picker-trigger.date-picker__trigger {
+  width: 1.75rem !important;
+  min-width: 1.75rem !important;
+  height: 1.75rem !important;
+  min-height: 1.75rem !important;
+  justify-content: center;
+  padding: 0 !important;
+}
+
+.ag-common-date-picker-popover.date-picker__popover {
+  z-index: 130 !important;
+  width: max(var(--trigger-width, 0px), 18rem) !important;
+  min-width: max(var(--trigger-width, 0px), 18rem) !important;
+  max-width: min(20rem, calc(100vw - 2rem)) !important;
+}
+
 .ag-usage-date-range .date-input-group {
   display: grid !important;
   grid-template-columns: max-content auto max-content minmax(0, 1fr);

@@ -35,8 +35,6 @@ export function CommonModal({
   description,
   dialogStyle,
   footer,
-  icon,
-  iconClassName,
   placement = 'auto',
   scroll = 'inside',
   showCloseTrigger = true,
@@ -52,15 +50,19 @@ export function CommonModal({
       <Modal.Backdrop>
         <Modal.Container placement={placement} scroll={scroll} size={size}>
           <Modal.Dialog className={cx('ag-elevation-modal', className)} style={dialogStyle}>
-            {showCloseTrigger ? <Modal.CloseTrigger /> : null}
-            <Modal.Header>
-              {icon ? (
-                <Modal.Icon className={cx('bg-accent-soft text-accent-soft-foreground', iconClassName)}>
-                  {icon}
-                </Modal.Icon>
-              ) : null}
-              <Modal.Heading>{title}</Modal.Heading>
-              {description ? <p className="mt-1.5 text-sm leading-5 text-muted">{description}</p> : null}
+            {showCloseTrigger ? <Modal.CloseTrigger className="ag-modal-close-trigger" /> : null}
+            <Modal.Header
+              className={cx(
+                'ag-modal-header',
+                showCloseTrigger ? 'ag-modal-header--with-close' : null,
+              )}
+            >
+              <div className="ag-modal-title-row">
+                <div className="ag-modal-title-copy">
+                  <Modal.Heading className="ag-modal-heading">{title}</Modal.Heading>
+                  {description ? <p className="ag-modal-description">{description}</p> : null}
+                </div>
+              </div>
             </Modal.Header>
             <Modal.Body className={cx('p-6', bodyClassName)}>
               {surface ? (

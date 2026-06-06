@@ -10,8 +10,9 @@ import {
   Percent,
   Image,
   Type,
+  MoreHorizontal,
 } from 'lucide-react';
-import { AlertDialog, Button, Chip, EmptyState, Spinner } from '@heroui/react';
+import { AlertDialog, Button, Chip, Dropdown, EmptyState, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { PlatformIcon } from '../../shared/ui';
 import { groupsApi } from '../../shared/api/groups';
@@ -151,31 +152,31 @@ export default function GroupsPage() {
         ariaLabel={t('groups.title', 'Groups')}
         className="ag-groups-table"
         contentClassName="ag-groups-table-content"
-        minWidth={1120}
+        minWidth={1064}
       >
             <CommonTable.Header>
-              <CommonTable.Column id="name" style={{ width: 160 }}>{t('common.name')}</CommonTable.Column>
-              <CommonTable.Column id="platform" style={{ width: 112 }}>{t('groups.platform')}</CommonTable.Column>
-              <CommonTable.Column id="subscription_type" style={{ width: 88 }}>{t('groups.subscription_type')}</CommonTable.Column>
-              <CommonTable.Column id="rate_multiplier" style={{ width: 80 }}>
+              <CommonTable.Column id="name" style={{ width: 144 }}>{t('common.name')}</CommonTable.Column>
+              <CommonTable.Column id="platform" style={{ width: 104 }}>{t('groups.platform')}</CommonTable.Column>
+              <CommonTable.Column id="subscription_type" style={{ width: 84 }}>{t('groups.subscription_type')}</CommonTable.Column>
+              <CommonTable.Column id="rate_multiplier" style={{ width: 72 }}>
                 {t('groups.rate_multiplier')}
               </CommonTable.Column>
-              <CommonTable.Column id="is_exclusive" style={{ width: 76 }}>
+              <CommonTable.Column id="is_exclusive" style={{ width: 72 }}>
                 {t('groups.group_type')}
               </CommonTable.Column>
-              <CommonTable.Column id="account_stats" style={{ width: '10.75rem' }}>
+              <CommonTable.Column id="account_stats" style={{ width: '10.25rem' }}>
                 {t('groups.account_stats')}
               </CommonTable.Column>
-              <CommonTable.Column id="usage" style={{ width: '10.75rem' }}>
+              <CommonTable.Column id="usage" style={{ width: '10.25rem' }}>
                 {t('groups.usage')}
               </CommonTable.Column>
-              <CommonTable.Column id="capacity" style={{ minWidth: 112, width: 112 }}>
+              <CommonTable.Column id="capacity" style={{ width: 100 }}>
                 {t('groups.capacity')}
               </CommonTable.Column>
-              <CommonTable.Column id="sort_weight" style={{ width: 72 }}>
+              <CommonTable.Column id="sort_weight" style={{ width: 64 }}>
                 {t('groups.sort_weight')}
               </CommonTable.Column>
-              <CommonTable.Column id="actions" style={{ width: 132 }}>
+              <CommonTable.Column id="actions" style={{ width: 96 }}>
                 {t('common.actions')}
               </CommonTable.Column>
             </CommonTable.Header>
@@ -303,16 +304,29 @@ export default function GroupsPage() {
                         >
                           <Percent className="w-3.5 h-3.5" />
                         </Button>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="danger-soft"
-                          className="text-danger"
-                          aria-label={t('common.delete')}
-                          onPress={() => setDeletingGroup(row)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        <Dropdown>
+                          <Dropdown.Trigger
+                            aria-label={t('common.more')}
+                            className="ag-table-row-more-trigger button button--icon-only button--sm button--secondary"
+                          >
+                            <MoreHorizontal className="w-3.5 h-3.5" />
+                          </Dropdown.Trigger>
+                          <Dropdown.Popover placement="bottom end">
+                            <Dropdown.Menu
+                              aria-label={t('common.actions')}
+                              onAction={(key) => {
+                                if (String(key) === 'delete') setDeletingGroup(row);
+                              }}
+                            >
+                              <Dropdown.Item id="delete" className="text-danger" textValue={t('common.delete')}>
+                                <span className="flex items-center gap-2">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  {t('common.delete')}
+                                </span>
+                              </Dropdown.Item>
+                            </Dropdown.Menu>
+                          </Dropdown.Popover>
+                        </Dropdown>
                       </div>
                     </CommonTable.Cell>
                     </CommonTable.Row>

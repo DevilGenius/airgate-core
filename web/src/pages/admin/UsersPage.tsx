@@ -27,8 +27,9 @@ import { BalanceHistoryModal } from './users/BalanceHistoryModal';
 import { UserGroupsModal } from './users/UserGroupsModal';
 import type { UserResp } from '../../shared/types';
 import {
-  Plus, Pencil, MoreHorizontal, RefreshCw,
+  Plus, Pencil, RefreshCw,
   KeyRound, Users, PlusCircle, MinusCircle, Clock, Trash2,
+  MoreHorizontal,
 } from 'lucide-react';
 
 const FALLBACK_DEFAULT_USER_MAX_CONCURRENCY = 5;
@@ -187,7 +188,7 @@ export default function UsersPage() {
 
       <CommonTable
         ariaLabel={t('users.title', 'Users')}
-        minWidth={980}
+        minWidth={1180}
       >
             <CommonTable.Header>
               <CommonTable.Column id="id" style={{ width: 72 }}>
@@ -199,7 +200,7 @@ export default function UsersPage() {
               <CommonTable.Column id="balance">{t('users.balance')}</CommonTable.Column>
               <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
               <CommonTable.Column id="created_at">{t('users.created_at')}</CommonTable.Column>
-              <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
+              <CommonTable.Column id="actions" style={{ width: 224 }}>{t('common.actions')}</CommonTable.Column>
             </CommonTable.Header>
             <CommonTable.Body>
               {isLoading ? (
@@ -271,80 +272,76 @@ export default function UsersPage() {
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
-                        <Dropdown>
-                          <Dropdown.Trigger
-                            aria-label={t('common.more')}
-                            className="ag-table-row-more-trigger button button--icon-only button--sm button--secondary"
-                          >
-                            <MoreHorizontal className="w-3.5 h-3.5" />
-                          </Dropdown.Trigger>
-                          <Dropdown.Popover placement="bottom end">
-                            <Dropdown.Menu
-                              aria-label={t('common.actions')}
-                              onAction={(key) => {
-                                switch (String(key)) {
-                                  case 'api_keys':
-                                    setApiKeysUser(row);
-                                    break;
-                                  case 'groups':
-                                    setGroupsUser(row);
-                                    break;
-                                  case 'topup':
-                                    setBalanceUser({ user: row, defaultAction: 'add' });
-                                    break;
-                                  case 'refund':
-                                    setBalanceUser({ user: row, defaultAction: 'subtract' });
-                                    break;
-                                  case 'balance_history':
-                                    setBalanceHistoryUser(row);
-                                    break;
-                                  case 'delete':
-                                    setDeletingUser(row);
-                                    break;
-                                }
-                              }}
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="secondary"
+                          aria-label={t('users.api_keys')}
+                          onPress={() => setApiKeysUser(row)}
+                        >
+                          <KeyRound className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
+                        </Button>
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="secondary"
+                          aria-label={t('users.groups')}
+                          onPress={() => setGroupsUser(row)}
+                        >
+                          <Users className="w-3.5 h-3.5" style={{ color: 'var(--ag-info)' }} />
+                        </Button>
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="secondary"
+                          aria-label={t('users.topup')}
+                          onPress={() => setBalanceUser({ user: row, defaultAction: 'add' })}
+                        >
+                          <PlusCircle className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
+                        </Button>
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="secondary"
+                          aria-label={t('users.refund')}
+                          onPress={() => setBalanceUser({ user: row, defaultAction: 'subtract' })}
+                        >
+                          <MinusCircle className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
+                        </Button>
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="secondary"
+                          aria-label={t('users.balance_history')}
+                          onPress={() => setBalanceHistoryUser(row)}
+                        >
+                          <Clock className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+                        </Button>
+                        {row.role !== 'admin' ? (
+                          <Dropdown>
+                            <Dropdown.Trigger
+                              aria-label={t('common.more')}
+                              className="ag-table-row-more-trigger button button--icon-only button--sm button--secondary"
                             >
-                              <Dropdown.Item id="api_keys" textValue={t('users.api_keys')}>
-                                <span className="flex items-center gap-2">
-                                  <KeyRound className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
-                                  {t('users.api_keys')}
-                                </span>
-                              </Dropdown.Item>
-                              <Dropdown.Item id="groups" textValue={t('users.groups')}>
-                                <span className="flex items-center gap-2">
-                                  <Users className="w-3.5 h-3.5" style={{ color: 'var(--ag-info)' }} />
-                                  {t('users.groups')}
-                                </span>
-                              </Dropdown.Item>
-                              <Dropdown.Item id="topup" textValue={t('users.topup')}>
-                                <span className="flex items-center gap-2">
-                                  <PlusCircle className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
-                                  {t('users.topup')}
-                                </span>
-                              </Dropdown.Item>
-                              <Dropdown.Item id="refund" textValue={t('users.refund')}>
-                                <span className="flex items-center gap-2">
-                                  <MinusCircle className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                                  {t('users.refund')}
-                                </span>
-                              </Dropdown.Item>
-                              <Dropdown.Item id="balance_history" textValue={t('users.balance_history')}>
-                                <span className="flex items-center gap-2">
-                                  <Clock className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-                                  {t('users.balance_history')}
-                                </span>
-                              </Dropdown.Item>
-                              {row.role !== 'admin' ? (
+                              <MoreHorizontal className="w-3.5 h-3.5" />
+                            </Dropdown.Trigger>
+                            <Dropdown.Popover placement="bottom end">
+                              <Dropdown.Menu
+                                aria-label={t('common.actions')}
+                                onAction={(key) => {
+                                  if (String(key) === 'delete') setDeletingUser(row);
+                                }}
+                              >
                                 <Dropdown.Item id="delete" className="text-danger" textValue={t('common.delete')}>
                                   <span className="flex items-center gap-2">
                                     <Trash2 className="w-3.5 h-3.5" />
                                     {t('common.delete')}
                                   </span>
                                 </Dropdown.Item>
-                              ) : null}
-                            </Dropdown.Menu>
-                          </Dropdown.Popover>
-                        </Dropdown>
+                              </Dropdown.Menu>
+                            </Dropdown.Popover>
+                          </Dropdown>
+                        ) : null}
                       </div>
                     </CommonTable.Cell>
                   </CommonTable.Row>

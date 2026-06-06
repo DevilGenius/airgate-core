@@ -502,10 +502,10 @@ export default function UserKeysPage() {
                         isIconOnly
                         size="sm"
                         variant="secondary"
-                        aria-label={t('user_keys.use_key')}
-                        onPress={() => openUseKeyModal(row)}
+                        aria-label={t('common.edit')}
+                        onPress={() => openEdit(row)}
                       >
-                        <Terminal className="w-3.5 h-3.5" />
+                        <Pencil className="w-3.5 h-3.5" />
                       </Button>
                       <Dropdown>
                         <Dropdown.Trigger
@@ -528,8 +528,8 @@ export default function UserKeysPage() {
                                     status: row.status === 'active' ? 'disabled' : 'active',
                                   });
                                   break;
-                                case 'edit':
-                                  openEdit(row);
+                                case 'use_key':
+                                  openUseKeyModal(row);
                                   break;
                                 case 'delete':
                                   setDeleteTarget(row);
@@ -554,10 +554,10 @@ export default function UserKeysPage() {
                                 {row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
                               </span>
                             </Dropdown.Item>
-                            <Dropdown.Item id="edit" textValue={t('common.edit')}>
+                            <Dropdown.Item id="use_key" textValue={t('user_keys.use_key')}>
                               <span className="flex items-center gap-2">
-                                <Pencil className="w-3.5 h-3.5" />
-                                {t('common.edit')}
+                                <Terminal className="w-3.5 h-3.5" />
+                                {t('user_keys.use_key')}
                               </span>
                             </Dropdown.Item>
                             <Dropdown.Item id="delete" className="text-danger" textValue={t('common.delete')}>

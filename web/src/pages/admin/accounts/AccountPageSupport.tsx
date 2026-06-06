@@ -523,7 +523,7 @@ export const AccountRowActions = memo(function AccountRowActions({
   onClearCooldowns: (id: number) => void;
 }) {
   return (
-    <div className="ag-table-row-actions ag-account-row-actions mx-auto flex w-[92px] items-center justify-center gap-1">
+    <div className="ag-table-row-actions ag-account-row-actions mx-auto flex w-[124px] items-center justify-center gap-1">
       <button
         type="button"
         aria-label={labels.edit}
@@ -546,6 +546,17 @@ export const AccountRowActions = memo(function AccountRowActions({
       >
         <Zap className="w-3.5 h-3.5" />
       </button>
+      <button
+        type="button"
+        aria-label={labels.stats}
+        className="ag-account-row-action-button ag-account-row-action-button--stats"
+        onClick={(event) => {
+          event.stopPropagation();
+          onStats(row.id);
+        }}
+      >
+        <BarChart3 className="w-3.5 h-3.5" />
+      </button>
       <Dropdown>
         <Dropdown.Trigger
           aria-label={labels.more}
@@ -558,9 +569,6 @@ export const AccountRowActions = memo(function AccountRowActions({
             aria-label={labels.actions}
             onAction={(key) => {
               switch (String(key)) {
-                case 'stats':
-                  onStats(row.id);
-                  break;
                 case 'refresh_quota':
                   onRefreshQuota(row.id);
                   break;
@@ -573,12 +581,6 @@ export const AccountRowActions = memo(function AccountRowActions({
               }
             }}
           >
-            <Dropdown.Item id="stats" textValue={labels.stats}>
-              <span className="flex items-center gap-2">
-                <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
-                {labels.stats}
-              </span>
-            </Dropdown.Item>
             {row.type === 'oauth' ? (
               <Dropdown.Item id="refresh_quota" textValue={labels.refreshQuota}>
                 <span className="flex items-center gap-2">
