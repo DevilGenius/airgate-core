@@ -183,16 +183,16 @@
   padding: 0 !important;
 }
 
-.ag-accounts-table-content :where([data-slot="table-body"] [data-slot="table-row"]:has(.ag-account-usage-windows--expanded),
-  [data-slot="tbody"] [data-slot="tr"]:has(.ag-account-usage-windows--expanded),
-  .table__body .table__row:has(.ag-account-usage-windows--expanded)) {
+.ag-accounts-table-content :where([data-slot="table-body"] [data-slot="table-row"][data-usage-expanded="true"],
+  [data-slot="tbody"] [data-slot="tr"][data-usage-expanded="true"],
+  .table__body .table__row[data-usage-expanded="true"]) {
   height: 6rem !important;
   min-height: 6rem !important;
 }
 
-.ag-accounts-table-content :where([data-slot="table-body"] [data-slot="table-row"]:has(.ag-account-usage-windows--expanded) [data-slot="table-cell"],
-  [data-slot="tbody"] [data-slot="tr"]:has(.ag-account-usage-windows--expanded) [data-slot="td"],
-  .table__body .table__row:has(.ag-account-usage-windows--expanded) .table__cell) {
+.ag-accounts-table-content :where([data-slot="table-body"] [data-slot="table-row"][data-usage-expanded="true"] [data-slot="table-cell"],
+  [data-slot="tbody"] [data-slot="tr"][data-usage-expanded="true"] [data-slot="td"],
+  .table__body .table__row[data-usage-expanded="true"] .table__cell) {
   height: 6rem !important;
   min-height: 6rem !important;
 }

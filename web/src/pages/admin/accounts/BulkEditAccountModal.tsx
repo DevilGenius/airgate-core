@@ -135,6 +135,7 @@ export function BulkEditAccountModal({
 
   return (
     <CommonModal
+      className="ag-account-page-modal"
       dialogStyle={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
       footer={(
         <div className="flex w-full justify-end gap-2">

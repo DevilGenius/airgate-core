@@ -309,7 +309,7 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
 
   return (
     <CommonModal
-      className="ag-account-test-modal"
+      className="ag-account-page-modal ag-account-test-modal"
       footer={(
         <div className="flex w-full justify-end gap-2">
           <Button variant="secondary" onPress={handleClose}>

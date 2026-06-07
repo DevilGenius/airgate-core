@@ -123,6 +123,7 @@ function sameCapacitySnapshot(left: Record<string, number> | undefined, right: R
 const AccountsTableSection = memo(function AccountsTableSection({
   allVisibleSelected,
   columns,
+  expandedUsageRowIds,
   isLoading,
   onBulkClearRateLimitMarkers,
   onBulkDelete,
@@ -144,6 +145,7 @@ const AccountsTableSection = memo(function AccountsTableSection({
 }: {
   allVisibleSelected: boolean;
   columns: AccountTableColumn[];
+  expandedUsageRowIds: ReadonlySet<number>;
   isLoading: boolean;
   onBulkClearRateLimitMarkers: () => void;
   onBulkDelete: () => void;
@@ -229,6 +231,7 @@ const AccountsTableSection = memo(function AccountsTableSection({
                 <AccountTableRow
                   key={row.id}
                   columns={columns}
+                  isUsageExpanded={expandedUsageRowIds.has(row.id)}
                   row={row}
                   selectRowAriaLabel={selectRowAriaLabel}
                   selectionStore={selectionStore}
@@ -510,6 +513,19 @@ export default function AccountsPageContent() {
     () => mergeCachedUsageWindows(rawUsageData as AccountUsageData | undefined, usageWindowCacheRef.current),
     [rawUsageData],
   );
+  const expandedUsageRowIds = useMemo(() => {
+    const usageAccounts = usageData?.accounts;
+    if (!usageAccounts) return new Set<number>();
+
+    const nextExpandedIds = new Set<number>();
+    for (const accountId of visibleAccountIds) {
+      const windows = usageAccounts[String(accountId)]?.windows;
+      if (Array.isArray(windows) && windows.length > 2) {
+        nextExpandedIds.add(accountId);
+      }
+    }
+    return nextExpandedIds;
+  }, [usageData?.accounts, visibleAccountIds]);
 
   // 创建账号
   const createMutation = useCrudMutation({
@@ -1058,6 +1074,7 @@ export default function AccountsPageContent() {
       <AccountsTableSection
         allVisibleSelected={allVisibleSelected}
         columns={columns}
+        expandedUsageRowIds={expandedUsageRowIds}
         isLoading={isLoading}
         onBulkClearRateLimitMarkers={handleBulkClearRateLimitMarkers}
         onBulkDelete={handleBulkDelete}
@@ -1125,7 +1142,7 @@ export default function AccountsPageContent() {
           <DialogTriggerShim />
           <AlertDialog.Backdrop>
             <AlertDialog.Container placement="center" size="sm">
-              <AlertDialog.Dialog className="ag-elevation-modal">
+              <AlertDialog.Dialog className="ag-elevation-modal ag-account-page-modal">
                 <AlertDialog.Header>
                   <AlertDialog.Icon status="danger" />
                   <AlertDialog.Heading>{t('accounts.delete_title')}</AlertDialog.Heading>
@@ -1170,7 +1187,7 @@ export default function AccountsPageContent() {
           <DialogTriggerShim />
           <AlertDialog.Backdrop>
             <AlertDialog.Container placement="center" size="sm">
-              <AlertDialog.Dialog className="ag-elevation-modal">
+              <AlertDialog.Dialog className="ag-elevation-modal ag-account-page-modal">
                 <AlertDialog.Header>
                   <AlertDialog.Icon status="danger" />
                   <AlertDialog.Heading>{t('accounts.bulk_delete_title')}</AlertDialog.Heading>

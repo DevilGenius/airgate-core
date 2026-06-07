@@ -2,6 +2,19 @@
 
 /* Admin accounts: 添加凭证弹窗布局 */
 
+:where(.modal__backdrop,
+  .modal__backdrop--opaque,
+  .modal__backdrop--blur,
+  .alert-dialog__backdrop,
+  .alert-dialog__backdrop--opaque,
+  .alert-dialog__backdrop--blur,
+  .modal__container,
+  .alert-dialog__container):has(.ag-account-page-modal):is([data-entering="true"], [data-exiting="true"]) {
+  animation: none;
+  transition: none;
+  will-change: auto;
+}
+
 .ag-elevation-modal.ag-create-account-modal,
 .ag-elevation-modal.modal__dialog--lg.ag-create-account-modal {
   --ag-modal-width: var(--ag-modal-lg-width);

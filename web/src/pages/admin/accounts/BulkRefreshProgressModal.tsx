@@ -187,6 +187,7 @@ export function BulkRefreshProgressModal({
 
   return (
     <CommonModal
+      className="ag-account-page-modal"
       dialogStyle={{ maxWidth: '520px', width: 'min(100%, calc(100vw - 2rem))' }}
       footer={(
         <Button variant={finished ? 'primary' : 'secondary'} onPress={handleClose}>

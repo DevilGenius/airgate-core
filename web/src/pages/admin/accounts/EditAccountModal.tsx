@@ -193,7 +193,7 @@ export function EditAccountModal({
 
   return (
     <CommonModal
-      className="ag-create-account-modal"
+      className="ag-account-page-modal ag-create-account-modal"
       footer={(
         <div className="flex w-full justify-end gap-2">
           <Button variant="secondary" onPress={onClose}>

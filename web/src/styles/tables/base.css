@@ -2,7 +2,7 @@
    10. Tables
    ========================================================================== */
 
-:where(.ag-resource-table, .ag-usage-records-table) :where([data-slot="wrapper"]:has(> [data-slot="table"])) {
+:where(.ag-resource-table, .ag-usage-records-table) :where([data-slot="wrapper"]) {
   --ag-table-row-background: var(--surface);
   --ag-table-row-alt-background: color-mix(in oklab, var(--surface-secondary) 62%, var(--surface) 38%);
   --ag-table-row-hover-background: color-mix(in oklab, var(--default) 82%, var(--background) 18%);
@@ -79,46 +79,38 @@
   background: var(--ag-table-empty-background) !important;
 }
 
-.ag-resource-table:has(.empty-state) :where([data-slot="table-column"], [data-slot="th"], .table__column),
-.ag-resource-table:has([aria-busy="true"]) :where([data-slot="table-column"], [data-slot="th"], .table__column),
-.ag-usage-records-table:has(.empty-state) :where([data-slot="table-column"], [data-slot="th"], .table__column),
-.ag-usage-records-table:has([aria-busy="true"]) :where([data-slot="table-column"], [data-slot="th"], .table__column) {
-  border-bottom-color: transparent !important;
-  background: var(--ag-table-empty-background) !important;
-}
-
 .ag-resource-table :where([data-slot="table-body"] [data-slot="table-row"], [data-slot="tbody"] [data-slot="tr"], .table__body .table__row),
 .ag-usage-records-table :where([data-slot="table-body"] [data-slot="table-row"], [data-slot="tbody"] [data-slot="tr"], .table__body .table__row) {
   background: var(--ag-table-row-background) !important;
 }
 
-.ag-resource-table :where([data-slot="table-row"]:has(.empty-state),
-  [data-slot="tr"]:has(.empty-state),
-  .table__row:has(.empty-state),
-  [data-slot="table-row"]:has([aria-busy="true"]),
-  [data-slot="tr"]:has([aria-busy="true"]),
-  .table__row:has([aria-busy="true"])),
-.ag-usage-records-table :where([data-slot="table-row"]:has(.empty-state),
-  [data-slot="tr"]:has(.empty-state),
-  .table__row:has(.empty-state),
-  [data-slot="table-row"]:has([aria-busy="true"]),
-  [data-slot="tr"]:has([aria-busy="true"]),
-  .table__row:has([aria-busy="true"])) {
+.ag-resource-table :where([data-slot="table-row"][data-key="empty"],
+  [data-slot="tr"][data-key="empty"],
+  .table__row[data-key="empty"],
+  [data-slot="table-row"][data-key^="loading"],
+  [data-slot="tr"][data-key^="loading"],
+  .table__row[data-key^="loading"]),
+.ag-usage-records-table :where([data-slot="table-row"][data-key="empty"],
+  [data-slot="tr"][data-key="empty"],
+  .table__row[data-key="empty"],
+  [data-slot="table-row"][data-key^="loading"],
+  [data-slot="tr"][data-key^="loading"],
+  .table__row[data-key^="loading"]) {
   background: var(--ag-table-empty-background) !important;
 }
 
-.ag-resource-table :where([data-slot="table-row"]:has(.empty-state) [data-slot="table-cell"],
-  [data-slot="tr"]:has(.empty-state) [data-slot="td"],
-  .table__row:has(.empty-state) .table__cell,
-  [data-slot="table-row"]:has([aria-busy="true"]) [data-slot="table-cell"],
-  [data-slot="tr"]:has([aria-busy="true"]) [data-slot="td"],
-  .table__row:has([aria-busy="true"]) .table__cell),
-.ag-usage-records-table :where([data-slot="table-row"]:has(.empty-state) [data-slot="table-cell"],
-  [data-slot="tr"]:has(.empty-state) [data-slot="td"],
-  .table__row:has(.empty-state) .table__cell,
-  [data-slot="table-row"]:has([aria-busy="true"]) [data-slot="table-cell"],
-  [data-slot="tr"]:has([aria-busy="true"]) [data-slot="td"],
-  .table__row:has([aria-busy="true"]) .table__cell) {
+.ag-resource-table :where([data-slot="table-row"][data-key="empty"] [data-slot="table-cell"],
+  [data-slot="tr"][data-key="empty"] [data-slot="td"],
+  .table__row[data-key="empty"] .table__cell,
+  [data-slot="table-row"][data-key^="loading"] [data-slot="table-cell"],
+  [data-slot="tr"][data-key^="loading"] [data-slot="td"],
+  .table__row[data-key^="loading"] .table__cell),
+.ag-usage-records-table :where([data-slot="table-row"][data-key="empty"] [data-slot="table-cell"],
+  [data-slot="tr"][data-key="empty"] [data-slot="td"],
+  .table__row[data-key="empty"] .table__cell,
+  [data-slot="table-row"][data-key^="loading"] [data-slot="table-cell"],
+  [data-slot="tr"][data-key^="loading"] [data-slot="td"],
+  .table__row[data-key^="loading"] .table__cell) {
   border-bottom: 0 !important;
   background: var(--ag-table-empty-background) !important;
 }
@@ -140,21 +132,21 @@
 :where(.ag-resource-table, .ag-usage-records-table) :where([data-slot="table-body"] [data-slot="table-row"],
   [data-slot="tbody"] [data-slot="tr"],
   tbody tr,
-  .table__body .table__row):not(:has(.empty-state)):not(:has([aria-busy="true"])):nth-child(odd) {
+  .table__body .table__row):not([data-key="empty"]):not([data-key^="loading"]):nth-child(odd) {
   background: var(--ag-table-row-background) !important;
 }
 
 :where(.ag-resource-table, .ag-usage-records-table) :where([data-slot="table-body"] [data-slot="table-row"],
   [data-slot="tbody"] [data-slot="tr"],
   tbody tr,
-  .table__body .table__row):not(:has(.empty-state)):not(:has([aria-busy="true"])):nth-child(even) {
+  .table__body .table__row):not([data-key="empty"]):not([data-key^="loading"]):nth-child(even) {
   background: var(--ag-table-row-alt-background) !important;
 }
 
 :where(.ag-resource-table, .ag-usage-records-table) :where([data-slot="table-body"] [data-slot="table-row"],
   [data-slot="tbody"] [data-slot="tr"],
   tbody tr,
-  .table__body .table__row):not(:has(.empty-state)):not(:has([aria-busy="true"])):nth-child(odd)
+  .table__body .table__row):not([data-key="empty"]):not([data-key^="loading"]):nth-child(odd)
   :where([data-slot="table-cell"], [data-slot="td"], td, .table__cell) {
   background: var(--ag-table-row-background) !important;
 }
@@ -162,7 +154,7 @@
 :where(.ag-resource-table, .ag-usage-records-table) :where([data-slot="table-body"] [data-slot="table-row"],
   [data-slot="tbody"] [data-slot="tr"],
   tbody tr,
-  .table__body .table__row):not(:has(.empty-state)):not(:has([aria-busy="true"])):nth-child(even)
+  .table__body .table__row):not([data-key="empty"]):not([data-key^="loading"]):nth-child(even)
   :where([data-slot="table-cell"], [data-slot="td"], td, .table__cell) {
   background: var(--ag-table-row-alt-background) !important;
 }
@@ -197,4 +189,3 @@
 .ag-resource-table-content {
   table-layout: auto;
 }
-

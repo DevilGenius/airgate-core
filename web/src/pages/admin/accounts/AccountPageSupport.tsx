@@ -1,6 +1,7 @@
-import { memo, startTransition, useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from 'react';
+import { memo, startTransition, useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Chip, Dropdown } from '@heroui/react';
+import { Chip } from '@heroui/react';
 import { BarChart3, Eraser, MoreHorizontal, Pencil, RefreshCw, Trash2, Zap } from 'lucide-react';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { AccountResp } from '../../../shared/types';
@@ -624,53 +625,13 @@ export const AccountRowActions = memo(function AccountRowActions({
       >
         <BarChart3 className="w-3.5 h-3.5" />
       </button>
-      <Dropdown>
-        <Dropdown.Trigger
-          aria-label={labels.more}
-          className="ag-account-row-more-trigger ag-account-row-action-button h-7 w-7 min-w-7"
-        >
-          <MoreHorizontal className="w-3.5 h-3.5" />
-        </Dropdown.Trigger>
-        <Dropdown.Popover placement="bottom end">
-          <Dropdown.Menu
-            aria-label={labels.actions}
-            onAction={(key) => {
-              switch (String(key)) {
-                case 'refresh_quota':
-                  onRefreshQuota(row.id);
-                  break;
-                case 'clear_cooldowns':
-                  onClearCooldowns(row.id);
-                  break;
-                case 'delete':
-                  onDelete(row);
-                  break;
-              }
-            }}
-          >
-            {row.type === 'oauth' ? (
-              <Dropdown.Item id="refresh_quota" textValue={labels.refreshQuota}>
-                <span className="flex items-center gap-2">
-                  <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
-                  {labels.refreshQuota}
-                </span>
-              </Dropdown.Item>
-            ) : null}
-            <Dropdown.Item id="clear_cooldowns" textValue={labels.clearCooldowns}>
-              <span className="flex items-center gap-2">
-                <Eraser className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                {labels.clearCooldowns}
-              </span>
-            </Dropdown.Item>
-            <Dropdown.Item id="delete" textValue={labels.delete}>
-              <span className="flex items-center gap-2 text-danger">
-                <Trash2 className="w-3.5 h-3.5" />
-                {labels.delete}
-              </span>
-            </Dropdown.Item>
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
+      <AccountRowOverflowMenu
+        row={row}
+        labels={labels}
+        onDelete={onDelete}
+        onRefreshQuota={onRefreshQuota}
+        onClearCooldowns={onClearCooldowns}
+      />
     </div>
   );
 }, (prev, next) => (
@@ -684,21 +645,187 @@ export const AccountRowActions = memo(function AccountRowActions({
   && prev.onClearCooldowns === next.onClearCooldowns
 ));
 
+type AccountRowMenuPosition = {
+  bottom?: number;
+  right: number;
+  top?: number;
+};
+
+function getAccountRowMenuPosition(trigger: HTMLElement, itemCount: number): AccountRowMenuPosition {
+  const rect = trigger.getBoundingClientRect();
+  const gap = 6;
+  const edge = 8;
+  const estimatedMenuHeight = 8 + itemCount * 34;
+  const right = Math.max(edge, window.innerWidth - rect.right);
+  const top = rect.bottom + gap;
+
+  if (top + estimatedMenuHeight > window.innerHeight - edge) {
+    return {
+      bottom: Math.max(edge, window.innerHeight - rect.top + gap),
+      right,
+    };
+  }
+
+  return {
+    right,
+    top,
+  };
+}
+
+const AccountRowOverflowMenu = memo(function AccountRowOverflowMenu({
+  row,
+  labels,
+  onDelete,
+  onRefreshQuota,
+  onClearCooldowns,
+}: {
+  row: AccountResp;
+  labels: {
+    actions: string;
+    clearCooldowns: string;
+    delete: string;
+    more: string;
+    refreshQuota: string;
+  };
+  onDelete: (row: AccountResp) => void;
+  onRefreshQuota: (id: number) => void;
+  onClearCooldowns: (id: number) => void;
+}) {
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState<AccountRowMenuPosition | null>(null);
+  const isOpen = position !== null;
+
+  const close = useCallback(() => {
+    setPosition(null);
+  }, []);
+
+  const openFromTrigger = useCallback((trigger: HTMLElement) => {
+    const itemCount = row.type === 'oauth' ? 3 : 2;
+    setPosition(getAccountRowMenuPosition(trigger, itemCount));
+  }, [row.type]);
+
+  const toggleMenu = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (isOpen) {
+      close();
+      return;
+    }
+    openFromTrigger(event.currentTarget);
+  }, [close, isOpen, openFromTrigger]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      close();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [close, isOpen]);
+
+  const runAction = useCallback((action: () => void) => (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    close();
+    action();
+  }, [close]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        aria-label={labels.more}
+        className="ag-account-row-more-trigger ag-account-row-action-button"
+        onClick={toggleMenu}
+      >
+        <MoreHorizontal className="w-3.5 h-3.5" />
+      </button>
+      {isOpen && position && typeof document !== 'undefined' ? createPortal(
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label={labels.actions}
+          className="ag-account-row-menu"
+          style={position}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {row.type === 'oauth' ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="ag-account-row-menu-item"
+              onClick={runAction(() => onRefreshQuota(row.id))}
+            >
+              <RefreshCw className="w-3.5 h-3.5 ag-account-row-menu-icon ag-account-row-menu-icon--success" />
+              <span>{labels.refreshQuota}</span>
+            </button>
+          ) : null}
+          <button
+            type="button"
+            role="menuitem"
+            className="ag-account-row-menu-item"
+            onClick={runAction(() => onClearCooldowns(row.id))}
+          >
+            <Eraser className="w-3.5 h-3.5 ag-account-row-menu-icon ag-account-row-menu-icon--warning" />
+            <span>{labels.clearCooldowns}</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="ag-account-row-menu-item ag-account-row-menu-item--danger"
+            onClick={runAction(() => onDelete(row))}
+          >
+            <Trash2 className="w-3.5 h-3.5 ag-account-row-menu-icon" />
+            <span>{labels.delete}</span>
+          </button>
+        </div>,
+        document.body,
+      ) : null}
+    </>
+  );
+}, (prev, next) => (
+  prev.row === next.row
+  && prev.labels === next.labels
+  && prev.onDelete === next.onDelete
+  && prev.onRefreshQuota === next.onRefreshQuota
+  && prev.onClearCooldowns === next.onClearCooldowns
+));
+
 export const AccountTableRow = memo(function AccountTableRow({
   columns,
+  isUsageExpanded,
   row,
   selectRowAriaLabel,
   selectionStore,
   onSelectedChange,
 }: {
   columns: AccountTableColumn[];
+  isUsageExpanded: boolean;
   row: AccountResp;
   selectRowAriaLabel: string;
   selectionStore: AccountSelectionStore;
   onSelectedChange: (id: number, isSelected: boolean) => void;
 }) {
   return (
-    <tr data-slot="tr" data-key={row.id}>
+    <tr data-slot="tr" data-key={row.id} data-usage-expanded={isUsageExpanded ? 'true' : undefined}>
       <td data-slot="td" className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
         <AccountRowSelectionCell
           ariaLabel={selectRowAriaLabel}
@@ -720,6 +847,7 @@ export const AccountTableRow = memo(function AccountTableRow({
   );
 }, (prev, next) => (
   prev.columns === next.columns
+  && prev.isUsageExpanded === next.isUsageExpanded
   && prev.row === next.row
   && prev.selectRowAriaLabel === next.selectRowAriaLabel
   && prev.selectionStore === next.selectionStore
