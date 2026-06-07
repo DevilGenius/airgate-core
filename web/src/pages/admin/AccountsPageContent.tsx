@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, EmptyState, Input, Spinner, TextField as HeroTextField } from '@heroui/react';
@@ -64,6 +64,7 @@ import {
   runAfterInputFrame,
   useLatestRef,
   type AccountTypeFilterOption,
+  type AccountTableColumn,
   type AccountUsageData,
   type AccountUsageWindowCache,
 } from './accounts/AccountPageSupport';
@@ -73,6 +74,137 @@ const ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsC
 const ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS = 0.5;
 const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
+
+function sameCapacitySnapshot(left: Record<string, number> | undefined, right: Record<string, number>) {
+  if (!left) return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return rightKeys.every((key) => left[key] === right[key]);
+}
+
+const AccountsTableSection = memo(function AccountsTableSection({
+  allVisibleSelected,
+  columns,
+  isLoading,
+  onBulkClearRateLimitMarkers,
+  onBulkDelete,
+  onBulkDisable,
+  onBulkEdit,
+  onBulkEnable,
+  onBulkRefresh,
+  onClearSelection,
+  onRowSelected,
+  onVisibleRowsSelected,
+  rows,
+  selectAllAriaLabel,
+  selectedCount,
+  selectionStore,
+  selectRowAriaLabel,
+  someVisibleSelected,
+  tableAriaLabel,
+  tableEmptyText,
+}: {
+  allVisibleSelected: boolean;
+  columns: AccountTableColumn[];
+  isLoading: boolean;
+  onBulkClearRateLimitMarkers: () => void;
+  onBulkDelete: () => void;
+  onBulkDisable: () => void;
+  onBulkEdit: () => void;
+  onBulkEnable: () => void;
+  onBulkRefresh: () => void;
+  onClearSelection: () => void;
+  onRowSelected: (id: number, isSelected: boolean) => void;
+  onVisibleRowsSelected: (isSelected: boolean) => void;
+  rows: AccountResp[];
+  selectAllAriaLabel: string;
+  selectedCount: number;
+  selectionStore: AccountSelectionStore;
+  selectRowAriaLabel: string;
+  someVisibleSelected: boolean;
+  tableAriaLabel: string;
+  tableEmptyText: string;
+}) {
+  return (
+    <div className="ag-resource-table ag-accounts-table">
+      <div className="ag-resource-table-scroll" data-slot="wrapper">
+        {selectedCount > 0 ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <BulkActionsBar
+              overlay
+              selectedCount={selectedCount}
+              onClear={onClearSelection}
+              onEdit={onBulkEdit}
+              onEnable={onBulkEnable}
+              onDisable={onBulkDisable}
+              onRefreshQuota={onBulkRefresh}
+              onClearRateLimitMarkers={onBulkClearRateLimitMarkers}
+              onDelete={onBulkDelete}
+            />
+          </div>
+        ) : null}
+        <table
+          aria-label={tableAriaLabel}
+          className="ag-resource-table-content ag-accounts-table-content"
+          data-slot="table"
+          style={{ minWidth: 'var(--ag-accounts-current-table-width)' }}
+        >
+          <thead data-slot="thead">
+            <tr data-slot="tr">
+              <th data-slot="th" scope="col" className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
+                <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                  <TableSelectionCheckbox
+                    ariaLabel={selectAllAriaLabel}
+                    isIndeterminate={someVisibleSelected}
+                    isSelected={allVisibleSelected}
+                    onChange={onVisibleRowsSelected}
+                  />
+                </div>
+              </th>
+              {columns.map((column) => (
+                <th
+                  data-slot="th"
+                  id={column.key}
+                  key={column.key}
+                  scope="col"
+                  className={columnAlignClass(column.align)}
+                  style={columnWidthStyle(column)}
+                >
+                  {column.title}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody data-slot="tbody">
+            {isLoading ? (
+              <AccountsTableLoadingRow colSpan={columns.length + 1} />
+            ) : rows.length === 0 ? (
+              <tr data-slot="tr" data-key="empty">
+                <td data-slot="td" colSpan={columns.length + 1}>
+                  <EmptyState>
+                    <div className="text-sm text-default-500">{tableEmptyText}</div>
+                  </EmptyState>
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => (
+                <AccountTableRow
+                  key={row.id}
+                  columns={columns}
+                  row={row}
+                  selectRowAriaLabel={selectRowAriaLabel}
+                  selectionStore={selectionStore}
+                  onSelectedChange={onRowSelected}
+                />
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+});
 
 export default function AccountsPageContent() {
   const { t } = useTranslation();
@@ -238,14 +370,16 @@ export default function AccountsPageContent() {
 
   const [capacityAccounts, setCapacityAccounts] = useState<Record<string, number> | undefined>();
   const applyCapacityData = useCallback((nextData: { accounts: Record<string, number> }) => {
-    setCapacityAccounts({ ...nextData.accounts });
+    setCapacityAccounts((prev) => (
+      sameCapacitySnapshot(prev, nextData.accounts) ? prev : { ...nextData.accounts }
+    ));
   }, []);
   const refreshVisibleCapacity = useCallback(async () => {
     const ids = visibleAccountIdsRef.current;
     if (ids.length === 0) return;
     try {
       const nextData = await accountsApi.capacity(ids);
-      applyCapacityData(nextData);
+      runAfterInputFrame(() => applyCapacityData(nextData));
     } catch {
       // Ignore transient refresh errors; the next tick will retry.
     }
@@ -590,13 +724,30 @@ export default function AccountsPageContent() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  const handleBulkEnable = () =>
-    bulkUpdateMutation.mutate({ account_ids: selectedIds, state: 'active' });
-  const handleBulkDisable = () =>
-    bulkUpdateMutation.mutate({ account_ids: selectedIds, state: 'disabled' });
+  const bulkUpdateMutateRef = useLatestRef(bulkUpdateMutation.mutate);
+  const bulkDeleteMutateRef = useLatestRef(bulkDeleteMutation.mutate);
+  const bulkClearRateLimitMarkersMutateRef = useLatestRef(bulkClearRateLimitMarkersMutation.mutate);
+  const handleBulkEnable = useCallback(() => {
+    bulkUpdateMutateRef.current({ account_ids: selectedIds, state: 'active' });
+  }, [bulkUpdateMutateRef, selectedIds]);
+  const handleBulkDisable = useCallback(() => {
+    bulkUpdateMutateRef.current({ account_ids: selectedIds, state: 'disabled' });
+  }, [bulkUpdateMutateRef, selectedIds]);
+  const handleBulkEdit = useCallback(() => {
+    setShowBulkEditModal(true);
+  }, []);
+  const handleBulkDelete = useCallback(() => {
+    setShowBulkDeleteConfirm(true);
+  }, []);
+  const handleBulkDeleteConfirm = useCallback(() => {
+    bulkDeleteMutateRef.current(selectedIds);
+  }, [bulkDeleteMutateRef, selectedIds]);
+  const handleBulkClearRateLimitMarkers = useCallback(() => {
+    bulkClearRateLimitMarkersMutateRef.current(selectedIds);
+  }, [bulkClearRateLimitMarkersMutateRef, selectedIds]);
 
   // 批量刷新令牌：只有 OAuth 类型账号支持，预先过滤后开进度弹窗
-  const handleBulkRefresh = () => {
+  const handleBulkRefresh = useCallback(() => {
     const selectedIdSet = new Set(selectedIds);
     const selectedRows = (data?.list ?? []).filter((a) => selectedIdSet.has(a.id));
     const oauthRows = selectedRows
@@ -613,7 +764,7 @@ export default function AccountsPageContent() {
       }));
     }
     setBulkRefreshTargets(oauthRows);
-  };
+  }, [data?.list, selectedIds, t, toast]);
 
   const columns = useAccountTableColumns({
     applyQuotaRefreshResult,
@@ -628,6 +779,7 @@ export default function AccountsPageContent() {
     platformFilter,
     platformName,
     platformsKey,
+    rows,
     usageData,
   });
   const total = data?.total ?? 0;
@@ -857,103 +1009,51 @@ export default function AccountsPageContent() {
       />
 
       {/* 表格 */}
-      <div className="ag-resource-table ag-accounts-table">
-        <div className="ag-resource-table-scroll" data-slot="wrapper">
-          {selectedCount > 0 ? (
-            <div onClick={(event) => event.stopPropagation()}>
-              <BulkActionsBar
-                overlay
-                selectedCount={selectedCount}
-                onClear={clearSelection}
-                onEdit={() => setShowBulkEditModal(true)}
-                onEnable={handleBulkEnable}
-                onDisable={handleBulkDisable}
-                onRefreshQuota={handleBulkRefresh}
-                onClearRateLimitMarkers={() => bulkClearRateLimitMarkersMutation.mutate(selectedIds)}
-                onDelete={() => setShowBulkDeleteConfirm(true)}
-              />
-            </div>
-          ) : null}
-          <table
-            aria-label={t('accounts.title', 'Accounts')}
-            className="ag-resource-table-content ag-accounts-table-content"
-            data-slot="table"
-            style={{ minWidth: 'var(--ag-accounts-current-table-width)' }}
-          >
-            <thead data-slot="thead">
-              <tr data-slot="tr">
-                <th data-slot="th" scope="col" className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
-                  <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
-                    <TableSelectionCheckbox
-                      ariaLabel={selectAllAriaLabel}
-                      isIndeterminate={someVisibleSelected}
-                      isSelected={allVisibleSelected}
-                      onChange={setVisibleRowsSelected}
-                    />
-                  </div>
-                </th>
-                {columns.map((column) => (
-                  <th
-                    data-slot="th"
-                    id={column.key}
-                    key={column.key}
-                    scope="col"
-                    className={columnAlignClass(column.align)}
-                    style={columnWidthStyle(column)}
-                  >
-                    {column.title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody data-slot="tbody">
-              {isLoading ? (
-                <AccountsTableLoadingRow colSpan={columns.length + 1} />
-              ) : rows.length === 0 ? (
-                <tr data-slot="tr" data-key="empty">
-                  <td data-slot="td" colSpan={columns.length + 1}>
-                    <EmptyState>
-                      <div className="text-sm text-default-500">{t('common.no_data')}</div>
-                    </EmptyState>
-                  </td>
-                </tr>
-              ) : (
-                rowsWithCapacity.map((row) => (
-                  <AccountTableRow
-                    key={row.id}
-                    columns={columns}
-                    row={row}
-                    selectRowAriaLabel={selectRowAriaLabel}
-                    selectionStore={selectionStore}
-                    onSelectedChange={setRowSelected}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <AccountsTableSection
+        allVisibleSelected={allVisibleSelected}
+        columns={columns}
+        isLoading={isLoading}
+        onBulkClearRateLimitMarkers={handleBulkClearRateLimitMarkers}
+        onBulkDelete={handleBulkDelete}
+        onBulkDisable={handleBulkDisable}
+        onBulkEdit={handleBulkEdit}
+        onBulkEnable={handleBulkEnable}
+        onBulkRefresh={handleBulkRefresh}
+        onClearSelection={clearSelection}
+        onRowSelected={setRowSelected}
+        onVisibleRowsSelected={setVisibleRowsSelected}
+        rows={rowsWithCapacity}
+        selectAllAriaLabel={selectAllAriaLabel}
+        selectedCount={selectedCount}
+        selectionStore={selectionStore}
+        selectRowAriaLabel={selectRowAriaLabel}
+        someVisibleSelected={someVisibleSelected}
+        tableAriaLabel={t('accounts.title', 'Accounts')}
+        tableEmptyText={t('common.no_data')}
+      />
 
       {/* 创建弹窗 */}
-      <CreateAccountModal
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSubmit={(data) => createMutation.mutate(data)}
-        onBatchImport={async (accounts) => {
-          const res = await accountsApi.import(accounts);
-          queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-          queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
-          if (res.failed > 0) {
-            toast('warning', t('accounts.import_partial', { imported: res.imported, failed: res.failed }));
-          } else {
-            toast('success', t('accounts.import_success', { count: res.imported }));
-          }
-          setShowCreateModal(false);
-          return { imported: res.imported, failed: res.failed };
-        }}
-        loading={createMutation.isPending}
-        platforms={platforms}
-      />
+      {showCreateModal ? (
+        <CreateAccountModal
+          open
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={(data) => createMutation.mutate(data)}
+          onBatchImport={async (accounts) => {
+            const res = await accountsApi.import(accounts);
+            queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+            queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
+            if (res.failed > 0) {
+              toast('warning', t('accounts.import_partial', { imported: res.imported, failed: res.failed }));
+            } else {
+              toast('success', t('accounts.import_success', { count: res.imported }));
+            }
+            setShowCreateModal(false);
+            return { imported: res.imported, failed: res.failed };
+          }}
+          loading={createMutation.isPending}
+          platforms={platforms}
+        />
+      ) : null}
 
       {/* 编辑弹窗 */}
       {editingAccount && (
@@ -969,80 +1069,86 @@ export default function AccountsPageContent() {
       )}
 
       {/* 删除确认 */}
-      <AlertDialog
-        isOpen={!!deletingAccount}
-        onOpenChange={(open) => {
-          if (!open) setDeletingAccount(null);
-        }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('accounts.delete_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('accounts.delete_confirm', { name: deletingAccount?.name })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeletingAccount(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deletingAccount && deleteMutation.mutate(deletingAccount.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+      {deletingAccount ? (
+        <AlertDialog
+          isOpen
+          onOpenChange={(open) => {
+            if (!open) setDeletingAccount(null);
+          }}
+        >
+          <DialogTriggerShim />
+          <AlertDialog.Backdrop>
+            <AlertDialog.Container placement="center" size="sm">
+              <AlertDialog.Dialog className="ag-elevation-modal">
+                <AlertDialog.Header>
+                  <AlertDialog.Icon status="danger" />
+                  <AlertDialog.Heading>{t('accounts.delete_title')}</AlertDialog.Heading>
+                </AlertDialog.Header>
+                <AlertDialog.Body>{t('accounts.delete_confirm', { name: deletingAccount.name })}</AlertDialog.Body>
+                <AlertDialog.Footer>
+                  <Button variant="secondary" onPress={() => setDeletingAccount(null)}>
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
+                    aria-busy={deleteMutation.isPending}
+                    isDisabled={deleteMutation.isPending}
+                    variant="danger"
+                    onPress={() => deleteMutation.mutate(deletingAccount.id)}
+                  >
+                    {deleteMutation.isPending ? <Spinner size="sm" /> : null}
+                    {t('common.confirm')}
+                  </Button>
+                </AlertDialog.Footer>
+              </AlertDialog.Dialog>
+            </AlertDialog.Container>
+          </AlertDialog.Backdrop>
+        </AlertDialog>
+      ) : null}
 
       {/* 批量编辑弹窗 */}
-      <BulkEditAccountModal
-        open={showBulkEditModal}
-        count={selectedIds.length}
-        onClose={() => setShowBulkEditModal(false)}
-        onSubmit={(patch) =>
-          bulkUpdateMutation.mutate({ account_ids: selectedIds, ...patch })
-        }
-        loading={bulkUpdateMutation.isPending}
-      />
+      {showBulkEditModal ? (
+        <BulkEditAccountModal
+          open
+          count={selectedIds.length}
+          onClose={() => setShowBulkEditModal(false)}
+          onSubmit={(patch) =>
+            bulkUpdateMutation.mutate({ account_ids: selectedIds, ...patch })
+          }
+          loading={bulkUpdateMutation.isPending}
+        />
+      ) : null}
 
       {/* 批量删除确认 */}
-      <AlertDialog isOpen={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('accounts.bulk_delete_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('accounts.bulk_delete_confirm', { count: selectedIds.length })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setShowBulkDeleteConfirm(false)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={bulkDeleteMutation.isPending}
-                  isDisabled={bulkDeleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => bulkDeleteMutation.mutate(selectedIds)}
-                >
-                  {bulkDeleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+      {showBulkDeleteConfirm ? (
+        <AlertDialog isOpen onOpenChange={setShowBulkDeleteConfirm}>
+          <DialogTriggerShim />
+          <AlertDialog.Backdrop>
+            <AlertDialog.Container placement="center" size="sm">
+              <AlertDialog.Dialog className="ag-elevation-modal">
+                <AlertDialog.Header>
+                  <AlertDialog.Icon status="danger" />
+                  <AlertDialog.Heading>{t('accounts.bulk_delete_title')}</AlertDialog.Heading>
+                </AlertDialog.Header>
+                <AlertDialog.Body>{t('accounts.bulk_delete_confirm', { count: selectedIds.length })}</AlertDialog.Body>
+                <AlertDialog.Footer>
+                  <Button variant="secondary" onPress={() => setShowBulkDeleteConfirm(false)}>
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
+                    aria-busy={bulkDeleteMutation.isPending}
+                    isDisabled={bulkDeleteMutation.isPending}
+                    variant="danger"
+                    onPress={handleBulkDeleteConfirm}
+                  >
+                    {bulkDeleteMutation.isPending ? <Spinner size="sm" /> : null}
+                    {t('common.confirm')}
+                  </Button>
+                </AlertDialog.Footer>
+              </AlertDialog.Dialog>
+            </AlertDialog.Container>
+          </AlertDialog.Backdrop>
+        </AlertDialog>
+      ) : null}
 
       {/* 批量刷新令牌进度弹窗 */}
       {bulkRefreshTargets && (
@@ -1059,11 +1165,13 @@ export default function AccountsPageContent() {
       )}
 
       {/* 测试连接 */}
-      <AccountTestModal
-        open={!!testingAccount}
-        account={testingAccount}
-        onClose={() => setTestingAccount(null)}
-      />
+      {testingAccount ? (
+        <AccountTestModal
+          open
+          account={testingAccount}
+          onClose={() => setTestingAccount(null)}
+        />
+      ) : null}
 
       {/* 账号统计 */}
       {statsAccountId !== null && (

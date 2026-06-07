@@ -16,6 +16,7 @@ import {
   type AccountTableColumn,
   type AccountUsageCredits,
   type AccountUsageData,
+  type AccountUsageInfo,
   type AccountUsageTodayStats,
   type AccountUsageWindow,
 } from './AccountPageSupport';
@@ -27,6 +28,238 @@ const ACCOUNT_GROUP_CARD_STYLE: CSSProperties = {
   border: '1px solid var(--ag-glass-border)',
   color: 'var(--ag-text-secondary)',
 };
+
+type PreparedUsageWindowRow = {
+  barPercent: number;
+  color: string;
+  id: string;
+  label: string;
+  percent: number;
+  resetText: string;
+  title: string;
+};
+
+type PreparedUsageView = {
+  accessImageText: string;
+  accessRequestsText: string;
+  accessText: string;
+  canRefresh: boolean;
+  credits: AccountUsageCredits | null;
+  hasContent: boolean;
+  hasTodayStats: boolean;
+  hideAccessLabel: boolean;
+  missing: boolean;
+  showImageCount: boolean;
+  todayStats: AccountUsageTodayStats | null;
+  windowRows: PreparedUsageWindowRow[];
+  windowsClassName: string;
+};
+
+type AccountRowRenderMeta = {
+  groupNames: string[];
+  hiddenGroupCount: number;
+  lastUsedRelative: string;
+  lastUsedTitle: string;
+  usage: PreparedUsageView;
+  visibleGroups: string[];
+};
+
+type UsageWindowRow = { id: string; window: AccountUsageWindow };
+
+function toFiniteNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatCompact(num: number, allowBillions = true) {
+  if (!num) return '0';
+  const abs = Math.abs(num);
+  if (allowBillions && abs >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
+  if (abs >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+  return String(num);
+}
+
+function getResetSeconds(w: AccountUsageWindow, resetNow: number) {
+  if (w.reset_at) {
+    const delta = Date.parse(w.reset_at) - resetNow;
+    if (Number.isFinite(delta)) return Math.max(0, Math.floor(delta / 1000));
+  }
+  if (typeof w.reset_seconds === 'number') return w.reset_seconds;
+  if (typeof w.reset_after_seconds === 'number') return w.reset_after_seconds;
+  return 0;
+}
+
+function formatReset(seconds: number) {
+  if (!seconds || seconds <= 0) return '-';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) {
+    if (h > 0 || m === 0) return `${d}d${h}h`;
+    return `${d}d${m}m`;
+  }
+  if (h > 0) return m > 0 ? `${h}h${m}m` : `${h}h`;
+  return `${m}m`;
+}
+
+function usageColor(pct: number) {
+  if (pct < 50) return 'var(--ag-success)';
+  if (pct < 80) return 'var(--ag-warning)';
+  return 'var(--ag-danger)';
+}
+
+function normalizeWindowToken(value?: string) {
+  return value?.trim().toLowerCase().replace(/_/g, '-') || '';
+}
+
+function getWindowSlot(w: AccountUsageWindow) {
+  const key = w.key || '';
+  const label = w.label || '';
+  const normalizedKey = normalizeWindowToken(key);
+  const normalizedLabel = normalizeWindowToken(label);
+  const slot = normalizeWindowToken(w.slot)
+    || (normalizedKey.includes(':7d') || normalizedKey === '7d' || normalizedLabel.startsWith('7d') ? '7d'
+      : normalizedKey === 'monthly' || normalizedKey.includes('monthly') || normalizedLabel.includes('monthly') ? 'monthly'
+        : '5h');
+  const group = w.group?.trim()
+    || (key.startsWith('model:') ? key.replace(/^model:(5h|7d):/, 'model:') : 'base');
+  return { group, slot };
+}
+
+function getWindowGroupLabel(group: string, slot: string, label: string) {
+  const labelParts = label.trim().split(/\s+/);
+  if (labelParts.length > 1 && normalizeWindowToken(labelParts[0]) === slot) {
+    return labelParts.slice(1).join(' ');
+  }
+  const rawGroup = group.replace(/^model:/, '').trim();
+  if (!rawGroup || rawGroup === 'base') return '';
+  const parts = rawGroup.split(/[-\s:]+/).filter(Boolean);
+  return parts[parts.length - 1] ?? rawGroup;
+}
+
+function getWindowDisplay(w: AccountUsageWindow) {
+  const { group, slot } = getWindowSlot(w);
+  const explicitLabel = w.display_label?.trim();
+  const fallbackLabel = explicitLabel || slot || w.label;
+  if (group !== 'base' && slot) {
+    const groupLabel = getWindowGroupLabel(group, slot, w.label || '');
+    if (groupLabel && (!explicitLabel || normalizeWindowToken(explicitLabel) === slot)) {
+      return {
+        label: `${slot}${groupLabel.charAt(0).toUpperCase()}`,
+        title: `${slot} ${groupLabel}`,
+      };
+    }
+  }
+  return {
+    label: fallbackLabel,
+    title: w.label || fallbackLabel,
+  };
+}
+
+function buildWindowRows(items: AccountUsageWindow[]): UsageWindowRow[] {
+  const groups: Array<{ id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow; other: AccountUsageWindow[] }> = [];
+  const groupMap = new Map<string, { id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow; other: AccountUsageWindow[] }>();
+
+  for (const item of items) {
+    const { group, slot } = getWindowSlot(item);
+    let bucket = groupMap.get(group);
+    if (!bucket) {
+      bucket = { id: group, other: [] };
+      groupMap.set(group, bucket);
+      groups.push(bucket);
+    }
+    if (slot === '7d') bucket.seven = item;
+    else if (slot === '5h') bucket.five = item;
+    else bucket.other.push(item);
+  }
+
+  return groups.flatMap((group) => {
+    const rows: UsageWindowRow[] = [];
+    if (group.five) {
+      rows.push({ id: `${group.id}:5h`, window: group.five });
+    }
+    if (group.seven) {
+      rows.push({ id: `${group.id}:7d`, window: group.seven });
+    }
+    for (const window of group.other) {
+      const { slot } = getWindowSlot(window);
+      rows.push({ id: `${group.id}:${window.key || slot}:${rows.length}`, window });
+    }
+    return rows;
+  });
+}
+
+function prepareUsageView(row: AccountResp, usage: AccountUsageInfo | undefined, resetNow: number): PreparedUsageView {
+  const missing = !usage;
+  const windows: AccountUsageWindow[] = Array.isArray(usage?.windows) ? usage.windows : [];
+  const credits: AccountUsageCredits | null = usage?.credits || null;
+  const todayStatsRaw = usage?.today_stats || null;
+  const todayStats: AccountUsageTodayStats | null = todayStatsRaw
+    ? {
+        requests: toFiniteNumber(todayStatsRaw.requests),
+        tokens: toFiniteNumber(todayStatsRaw.tokens),
+        account_cost: toFiniteNumber(todayStatsRaw.account_cost),
+        user_cost: toFiniteNumber(todayStatsRaw.user_cost),
+      }
+    : null;
+  const windowRows = buildWindowRows(windows).map((item) => {
+    const percent = Math.round(item.window.used_percent);
+    const display = getWindowDisplay(item.window);
+    const color = usageColor(item.window.used_percent);
+    return {
+      barPercent: Math.max(0, Math.min(100, percent)),
+      color,
+      id: item.id,
+      label: display.label,
+      percent,
+      resetText: formatReset(getResetSeconds(item.window, resetNow)),
+      title: display.title,
+    };
+  });
+  const hasTodayStats = todayStats != null;
+  const showImageCount = row.platform === 'openai';
+  const todayImageCount = showImageCount ? (row.today_image_count ?? 0) : 0;
+  const accessRequestsText = formatCompact(todayStats?.requests ?? 0, false);
+  const accessImageText = formatCompact(todayImageCount, false);
+  const accessText = showImageCount ? `${accessRequestsText}/${accessImageText}` : accessRequestsText;
+  return {
+    accessImageText,
+    accessRequestsText,
+    accessText,
+    canRefresh: row.type !== 'apikey',
+    credits,
+    hasContent: windowRows.length > 0 || Boolean(credits) || hasTodayStats,
+    hasTodayStats,
+    hideAccessLabel: showImageCount && accessText.length > '100/100'.length,
+    missing,
+    showImageCount,
+    todayStats,
+    windowRows,
+    windowsClassName: windowRows.length > 2
+      ? 'ag-account-usage-windows ag-account-usage-windows--expanded'
+      : 'ag-account-usage-windows',
+  };
+}
+
+function prepareLastUsed(lastUsedAt: string | undefined, now: number, t: (key: string, options?: Record<string, unknown>) => string) {
+  if (!lastUsedAt) return { relative: '', title: '' };
+  const parsed = new Date(lastUsedAt);
+  const diff = now - parsed.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  let relative: string;
+  if (seconds < 60) relative = t('accounts.just_now');
+  else if (minutes < 60) relative = t('accounts.minutes_ago', { n: minutes });
+  else if (hours < 24) relative = t('accounts.hours_ago', { n: hours });
+  else relative = t('accounts.days_ago', { n: days });
+  return {
+    relative,
+    title: parsed.toLocaleString(),
+  };
+}
 
 type UseAccountTableColumnsArgs = {
   applyQuotaRefreshResult: (id: number, result: QuotaRefreshResult) => void;
@@ -41,6 +274,7 @@ type UseAccountTableColumnsArgs = {
   platformFilter: string;
   platformName: (platform: string) => string;
   platformsKey: string;
+  rows: AccountResp[];
   usageData: AccountUsageData | undefined;
 };
 
@@ -57,12 +291,36 @@ export function useAccountTableColumns({
   platformFilter,
   platformName,
   platformsKey,
+  rows,
   usageData,
 }: UseAccountTableColumnsArgs): AccountTableColumn[] {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const resetNow = useUsageResetClock(Boolean(usageData?.accounts));
+
+  const rowMetaById = useMemo(() => {
+    const now = Date.now();
+    const usageAccounts: Record<string, AccountUsageInfo> = usageData?.accounts ?? {};
+    const nextMeta = new Map<number, AccountRowRenderMeta>();
+
+    for (const row of rows) {
+      const groupNames = (row.group_ids ?? []).map((gid) => groupMap.get(gid) ?? `#${gid}`);
+      const visibleGroups = groupNames.length > 3 ? groupNames.slice(0, 2) : groupNames.slice(0, 3);
+      const lastUsed = prepareLastUsed(row.last_used_at, now, t);
+
+      nextMeta.set(row.id, {
+        groupNames,
+        hiddenGroupCount: Math.max(0, groupNames.length - visibleGroups.length),
+        lastUsedRelative: lastUsed.relative,
+        lastUsedTitle: lastUsed.title,
+        usage: prepareUsageView(row, usageAccounts[String(row.id)], resetNow),
+        visibleGroups,
+      });
+    }
+
+    return nextMeta;
+  }, [groupMap, resetNow, rows, t, usageData?.accounts]);
 
   const accountActionLabels = useMemo(() => ({
     actions: t('common.actions'),
@@ -136,29 +394,27 @@ export function useAccountTableColumns({
       mobileWidth: '80px',
       align: 'center',
       render: (row) => {
-        if (!row.group_ids || row.group_ids.length === 0) {
+        const meta = rowMetaById.get(row.id);
+        if (!meta || meta.groupNames.length === 0) {
           return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
         }
-        const groupNames = row.group_ids.map((gid) => groupMap.get(gid) ?? `#${gid}`);
-        const visibleGroups = groupNames.length > 3 ? groupNames.slice(0, 2) : groupNames.slice(0, 3);
-        const hiddenCount = Math.max(0, groupNames.length - visibleGroups.length);
         return (
-          <div className="ag-account-group-list" title={groupNames.join('\n')}>
-            {visibleGroups.map((name) => (
+          <div className="ag-account-group-list" title={meta.groupNames.join('\n')}>
+            {meta.visibleGroups.map((name, index) => (
               <span
-                key={name}
+                key={`${name}:${index}`}
                 className="ag-account-group-chip"
                 style={ACCOUNT_GROUP_CARD_STYLE}
               >
                 {name}
               </span>
             ))}
-            {hiddenCount > 0 ? (
+            {meta.hiddenGroupCount > 0 ? (
               <span
                 className="ag-account-group-chip ag-account-group-chip--more"
                 style={ACCOUNT_GROUP_CARD_STYLE}
               >
-                +{hiddenCount}
+                +{meta.hiddenGroupCount}
               </span>
             ) : null}
           </div>
@@ -220,7 +476,10 @@ export function useAccountTableColumns({
       maxWidth: '396px',
       align: 'center',
       render: (row: AccountResp) => {
-        const usage = usageData?.accounts?.[String(row.id)];
+        const prepared = rowMetaById.get(row.id)?.usage;
+        if (!prepared) {
+          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+        }
 
         const handleRefreshClick = async (event: MouseEvent<HTMLElement>) => {
           event.stopPropagation();
@@ -241,180 +500,42 @@ export function useAccountTableColumns({
           target.style.pointerEvents = '';
         };
 
-        if (!usage) {
-          return (
-            <div
-              className="flex items-center gap-1 cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]"
-              title={t('accounts.refresh_usage', '点击刷新用量')}
-              onClick={handleRefreshClick}
-            >
-              <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
-              <RefreshCw size={11} style={{ color: 'var(--ag-text-tertiary)' }} />
-            </div>
-          );
-        }
-
-        type UsageWindowRow = { id: string; window: AccountUsageWindow };
-        const windows: AccountUsageWindow[] = Array.isArray(usage.windows) ? usage.windows : [];
-        const credits: AccountUsageCredits | null = usage.credits || null;
-        const todayStatsRaw = usage.today_stats || null;
-        const toFiniteNumber = (value: unknown) => {
-          const parsed = Number(value);
-          return Number.isFinite(parsed) ? parsed : 0;
-        };
-        const todayStats: AccountUsageTodayStats | null = todayStatsRaw
-          ? {
-              requests: toFiniteNumber(todayStatsRaw.requests),
-              tokens: toFiniteNumber(todayStatsRaw.tokens),
-              account_cost: toFiniteNumber(todayStatsRaw.account_cost),
-              user_cost: toFiniteNumber(todayStatsRaw.user_cost),
-            }
-          : null;
-
-        const formatCompact = (num: number, allowBillions = true) => {
-          if (!num) return '0';
-          const abs = Math.abs(num);
-          if (allowBillions && abs >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
-          if (abs >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-          if (abs >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
-          return String(num);
-        };
-
-        const hasTodayStats = todayStats != null;
-        const canRefresh = row.type !== 'apikey';
-        if (windows.length === 0 && !credits && !hasTodayStats) {
+        if (prepared.missing) {
           return (
             <div
               className={
-                canRefresh
+                prepared.canRefresh
                   ? 'flex items-center gap-1 cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
                   : 'flex items-center gap-1 rounded px-1 py-0.5'
               }
-              title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
-              onClick={canRefresh ? handleRefreshClick : undefined}
+              title={prepared.canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
+              onClick={prepared.canRefresh ? handleRefreshClick : undefined}
             >
               <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
-              {canRefresh && <RefreshCw size={11} style={{ color: 'var(--ag-text-tertiary)' }} />}
+              {prepared.canRefresh && <RefreshCw size={11} style={{ color: 'var(--ag-text-tertiary)' }} />}
             </div>
           );
         }
 
-        const getResetSeconds = (w: AccountUsageWindow) => {
-          if (w.reset_at) {
-            const delta = Date.parse(w.reset_at) - resetNow;
-            if (Number.isFinite(delta)) return Math.max(0, Math.floor(delta / 1000));
-          }
-          if (typeof w.reset_seconds === 'number') return w.reset_seconds;
-          if (typeof w.reset_after_seconds === 'number') return w.reset_after_seconds;
-          return 0;
-        };
-
-        const formatReset = (seconds: number) => {
-          if (!seconds || seconds <= 0) return '-';
-          const d = Math.floor(seconds / 86400);
-          const h = Math.floor((seconds % 86400) / 3600);
-          const m = Math.floor((seconds % 3600) / 60);
-          if (d > 0) {
-            if (h > 0 || m === 0) return `${d}d${h}h`;
-            return `${d}d${m}m`;
-          }
-          if (h > 0) return m > 0 ? `${h}h${m}m` : `${h}h`;
-          return `${m}m`;
-        };
-
-        const usageColor = (pct: number) => {
-          if (pct < 50) return 'var(--ag-success)';
-          if (pct < 80) return 'var(--ag-warning)';
-          return 'var(--ag-danger)';
-        };
-
-        const normalizeWindowToken = (value?: string) => value?.trim().toLowerCase().replace(/_/g, '-') || '';
-        const getWindowSlot = (w: AccountUsageWindow) => {
-          const key = w.key || '';
-          const label = w.label || '';
-          const normalizedKey = normalizeWindowToken(key);
-          const normalizedLabel = normalizeWindowToken(label);
-          const slot = normalizeWindowToken(w.slot)
-            || (normalizedKey.includes(':7d') || normalizedKey === '7d' || normalizedLabel.startsWith('7d') ? '7d'
-              : normalizedKey === 'monthly' || normalizedKey.includes('monthly') || normalizedLabel.includes('monthly') ? 'monthly'
-                : '5h');
-          const group = w.group?.trim()
-            || (key.startsWith('model:') ? key.replace(/^model:(5h|7d):/, 'model:') : 'base');
-          return { group, slot };
-        };
-        const getWindowGroupLabel = (group: string, slot: string, label: string) => {
-          const labelParts = label.trim().split(/\s+/);
-          if (labelParts.length > 1 && normalizeWindowToken(labelParts[0]) === slot) {
-            return labelParts.slice(1).join(' ');
-          }
-          const rawGroup = group.replace(/^model:/, '').trim();
-          if (!rawGroup || rawGroup === 'base') return '';
-          const parts = rawGroup.split(/[-\s:]+/).filter(Boolean);
-          return parts[parts.length - 1] ?? rawGroup;
-        };
-        const getWindowDisplay = (w: AccountUsageWindow) => {
-          const { group, slot } = getWindowSlot(w);
-          const explicitLabel = w.display_label?.trim();
-          const fallbackLabel = explicitLabel || slot || w.label;
-          if (group !== 'base' && slot) {
-            const groupLabel = getWindowGroupLabel(group, slot, w.label || '');
-            if (groupLabel && (!explicitLabel || normalizeWindowToken(explicitLabel) === slot)) {
-              return {
-                label: `${slot}${groupLabel.charAt(0).toUpperCase()}`,
-                title: `${slot} ${groupLabel}`,
-              };
-            }
-          }
-          return {
-            label: fallbackLabel,
-            title: w.label || fallbackLabel,
-          };
-        };
-        const buildWindowRows = (items: AccountUsageWindow[]): UsageWindowRow[] => {
-          const groups: Array<{ id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow; other: AccountUsageWindow[] }> = [];
-          const groupMap = new Map<string, { id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow; other: AccountUsageWindow[] }>();
-
-          for (const item of items) {
-            const { group, slot } = getWindowSlot(item);
-            let bucket = groupMap.get(group);
-            if (!bucket) {
-              bucket = { id: group, other: [] };
-              groupMap.set(group, bucket);
-              groups.push(bucket);
-            }
-            if (slot === '7d') bucket.seven = item;
-            else if (slot === '5h') bucket.five = item;
-            else bucket.other.push(item);
-          }
-
-          return groups.flatMap((group) => {
-            const rows: UsageWindowRow[] = [];
-            if (group.five) {
-              rows.push({ id: `${group.id}:5h`, window: group.five });
-            }
-            if (group.seven) {
-              rows.push({ id: `${group.id}:7d`, window: group.seven });
-            }
-            for (const window of group.other) {
-              const { slot } = getWindowSlot(window);
-              rows.push({ id: `${group.id}:${window.key || slot}:${rows.length}`, window });
-            }
-            return rows;
-          });
-        };
-        const windowRows = buildWindowRows(windows);
-        const windowsClassName = windowRows.length > 2
-          ? 'ag-account-usage-windows ag-account-usage-windows--expanded'
-          : 'ag-account-usage-windows';
+        if (!prepared.hasContent) {
+          return (
+            <div
+              className={
+                prepared.canRefresh
+                  ? 'flex items-center gap-1 cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
+                  : 'flex items-center gap-1 rounded px-1 py-0.5'
+              }
+              title={prepared.canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
+              onClick={prepared.canRefresh ? handleRefreshClick : undefined}
+            >
+              <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
+              {prepared.canRefresh && <RefreshCw size={11} style={{ color: 'var(--ag-text-tertiary)' }} />}
+            </div>
+          );
+        }
 
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
-        const todayImageCount = row.platform === 'openai' ? (row.today_image_count ?? 0) : 0;
-        const showImageCount = row.platform === 'openai';
-        const accessRequestsText = formatCompact(todayStats?.requests ?? 0, false);
-        const accessImageText = formatCompact(todayImageCount, false);
-        const accessText = showImageCount ? `${accessRequestsText}/${accessImageText}` : accessRequestsText;
-        const hideAccessLabel = showImageCount && accessText.length > '100/100'.length;
-        const accessLabel = showImageCount
+        const accessLabel = prepared.showImageCount
           ? (
             <span className="inline-flex min-w-0 items-center">
               <span className="truncate">{t('accounts.today_access_count', '访问')}</span>
@@ -423,15 +544,15 @@ export function useAccountTableColumns({
             </span>
           )
           : t('accounts.today_access_count', '访问');
-        const accessValue = showImageCount
+        const accessValue = prepared.showImageCount
           ? (
             <span className="inline-flex min-w-0 items-center justify-end">
-              <span>{accessRequestsText}</span>
+              <span>{prepared.accessRequestsText}</span>
               <span aria-hidden="true" className="px-px opacity-80">/</span>
-              <span>{accessImageText}</span>
+              <span>{prepared.accessImageText}</span>
             </span>
           )
-          : accessText;
+          : prepared.accessText;
         const todayMetricClass = 'ag-account-usage-metric';
         const todayMetricStyle = (color: string, foreground = color) => ({
           background: `color-mix(in srgb, ${color} 10%, transparent)`,
@@ -439,7 +560,8 @@ export function useAccountTableColumns({
           color: foreground,
         });
         const todayMetricColumnClass = 'ag-account-usage-metrics';
-        const todayMetricChips = hasTodayStats && todayStats ? (
+        const todayStats = prepared.todayStats;
+        const todayMetricChips = prepared.hasTodayStats && todayStats ? (
           <div
             className={todayMetricColumnClass}
             title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
@@ -447,12 +569,12 @@ export function useAccountTableColumns({
             <span
               className={todayMetricClass}
               style={todayMetricStyle('var(--ag-info)')}
-              title={showImageCount ? t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）') : undefined}
+              title={prepared.showImageCount ? t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）') : undefined}
             >
-              {hideAccessLabel ? null : (
+              {prepared.hideAccessLabel ? null : (
                 <span className="ag-account-usage-metric-label text-text-secondary">{accessLabel}</span>
               )}
-              <span className={`ag-account-usage-metric-value ${hideAccessLabel ? 'ag-account-usage-metric-value--solo' : ''}`}>{accessValue}</span>
+              <span className={`ag-account-usage-metric-value ${prepared.hideAccessLabel ? 'ag-account-usage-metric-value--solo' : ''}`}>{accessValue}</span>
             </span>
             <span className={todayMetricClass} style={todayMetricStyle('var(--ag-primary)')}>
               <span className="ag-account-usage-metric-label text-text-secondary">Token</span>
@@ -486,50 +608,42 @@ export function useAccountTableColumns({
         return (
           <div
             className={
-              canRefresh
+              prepared.canRefresh
                 ? 'ag-account-usage-cell ag-account-usage-cell--refreshable'
                 : 'ag-account-usage-cell'
             }
             style={{ fontFamily: 'var(--ag-font-mono)' }}
-            title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
-            onClick={canRefresh ? handleRefreshClick : undefined}
+            title={prepared.canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
+            onClick={prepared.canRefresh ? handleRefreshClick : undefined}
           >
             <div className={todayMetricChips ? 'ag-account-usage-layout' : 'ag-account-usage-layout ag-account-usage-layout--centered'}>
-              <div className={windowsClassName}>
-                {windowRows.map((item) => {
-                  const w = item.window;
-                  const percent = Math.round(w.used_percent);
-                  const barPercent = Math.max(0, Math.min(100, percent));
-                  const color = usageColor(w.used_percent);
-                  const resetText = formatReset(getResetSeconds(w));
-                  const display = getWindowDisplay(w);
-                  return (
-                    <div key={item.id} className="ag-account-usage-window-row">
-                      <span className="ag-account-usage-window-label text-text-secondary" style={badgeStyle} title={display.title}>
-                        {display.label}
-                      </span>
-                      <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${barPercent}%`, background: color }}
-                        />
-                      </div>
-                      <span className="ag-account-usage-percent" style={{ color }}>
-                        {percent}%
-                      </span>
-                      <span className="ag-account-usage-reset" title={resetText}>
-                        {resetText}
-                      </span>
+              <div className={prepared.windowsClassName}>
+                {prepared.windowRows.map((item) => (
+                  <div key={item.id} className="ag-account-usage-window-row">
+                    <span className="ag-account-usage-window-label text-text-secondary" style={badgeStyle} title={item.title}>
+                      {item.label}
+                    </span>
+                    <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${item.barPercent}%`, background: item.color }}
+                      />
                     </div>
-                  );
-                })}
-                {credits && (
+                    <span className="ag-account-usage-percent" style={{ color: item.color }}>
+                      {item.percent}%
+                    </span>
+                    <span className="ag-account-usage-reset" title={item.resetText}>
+                      {item.resetText}
+                    </span>
+                  </div>
+                ))}
+                {prepared.credits && (
                   <div className="flex h-5 items-center gap-1">
                     <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
                       $
                     </span>
-                    <span style={{ color: credits.unlimited ? 'var(--ag-success)' : credits.balance > 0 ? 'var(--ag-text)' : 'var(--ag-danger)' }}>
-                      {credits.unlimited ? '∞' : `$${Number(credits.balance).toFixed(2)}`}
+                    <span style={{ color: prepared.credits.unlimited ? 'var(--ag-success)' : prepared.credits.balance > 0 ? 'var(--ag-text)' : 'var(--ag-danger)' }}>
+                      {prepared.credits.unlimited ? '∞' : `$${Number(prepared.credits.balance).toFixed(2)}`}
                     </span>
                   </div>
                 )}
@@ -552,22 +666,13 @@ export function useAccountTableColumns({
       mobileWidth: '88px',
       align: 'center',
       render: (row) => {
-        if (!row.last_used_at) {
+        const meta = rowMetaById.get(row.id);
+        if (!meta?.lastUsedRelative) {
           return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
         }
-        const diff = Date.now() - new Date(row.last_used_at).getTime();
-        const seconds = Math.floor(diff / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-        let relative: string;
-        if (seconds < 60) relative = t('accounts.just_now');
-        else if (minutes < 60) relative = t('accounts.minutes_ago', { n: minutes });
-        else if (hours < 24) relative = t('accounts.hours_ago', { n: hours });
-        else relative = t('accounts.days_ago', { n: days });
         return (
-          <span className="text-xs" style={{ color: 'var(--ag-text-secondary)' }} title={new Date(row.last_used_at).toLocaleString()}>
-            {relative}
+          <span className="text-xs" style={{ color: 'var(--ag-text-secondary)' }} title={meta.lastUsedTitle}>
+            {meta.lastUsedRelative}
           </span>
         );
       },
@@ -594,7 +699,6 @@ export function useAccountTableColumns({
   ], [
     accountActionLabels,
     applyQuotaRefreshResult,
-    groupMap,
     onClearRateLimitMarkers,
     onDeleteAccount,
     onEditAccount,
@@ -606,9 +710,8 @@ export function useAccountTableColumns({
     platformName,
     platformsKey,
     queryClient,
-    resetNow,
+    rowMetaById,
     t,
     toast,
-    usageData?.accounts,
   ]);
 }

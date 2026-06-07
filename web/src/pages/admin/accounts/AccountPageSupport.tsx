@@ -162,6 +162,19 @@ export function mergeCachedUsageWindows(data: AccountUsageData | undefined, cach
   const now = Date.now();
   const accounts: Record<string, AccountUsageInfo> = {};
   const liveCacheKeys = new Set<string>();
+  const cachedWindowsByAccount = new Map<string, Array<[string, CachedUsageWindow]>>();
+
+  for (const entry of cache.entries()) {
+    const accountIdEnd = entry[0].indexOf(':');
+    if (accountIdEnd <= 0) continue;
+    const accountId = entry[0].slice(0, accountIdEnd);
+    const cachedWindows = cachedWindowsByAccount.get(accountId);
+    if (cachedWindows) {
+      cachedWindows.push(entry);
+    } else {
+      cachedWindowsByAccount.set(accountId, [entry]);
+    }
+  }
 
   for (const [accountId, usage] of Object.entries(data.accounts)) {
     const rawWindows = Array.isArray(usage?.windows) ? usage.windows : [];
@@ -199,8 +212,8 @@ export function mergeCachedUsageWindows(data: AccountUsageData | undefined, cach
       mergedWindows.push(nextWindow);
     }
 
-    for (const [cacheKey, cached] of cache.entries()) {
-      if (!cacheKey.startsWith(`${accountId}:`) || liveCacheKeys.has(cacheKey)) {
+    for (const [cacheKey, cached] of cachedWindowsByAccount.get(accountId) ?? []) {
+      if (liveCacheKeys.has(cacheKey)) {
         continue;
       }
       if (cached.resetAtMs <= now) {
@@ -456,7 +469,68 @@ const AccountTableCellContent = memo(function AccountTableCellContent({
       {column.render(row)}
     </div>
   );
-}, (prev, next) => prev.column === next.column && prev.row === next.row);
+}, (prev, next) => (
+  prev.column === next.column
+  && accountTableCellRowsEqual(prev.column.key, prev.row, next.row)
+));
+
+function sameAccountExceptCapacity(left: AccountResp, right: AccountResp) {
+  return left.id === right.id
+    && left.name === right.name
+    && left.platform === right.platform
+    && left.type === right.type
+    && left.credentials === right.credentials
+    && left.state === right.state
+    && left.state_until === right.state_until
+    && left.priority === right.priority
+    && left.max_concurrency === right.max_concurrency
+    && left.proxy_id === right.proxy_id
+    && left.rate_multiplier === right.rate_multiplier
+    && left.error_msg === right.error_msg
+    && left.upstream_is_pool === right.upstream_is_pool
+    && left.extra === right.extra
+    && left.last_used_at === right.last_used_at
+    && left.group_ids === right.group_ids
+    && left.family_cooldowns === right.family_cooldowns
+    && left.today_image_count === right.today_image_count
+    && left.total_image_count === right.total_image_count
+    && left.created_at === right.created_at
+    && left.updated_at === right.updated_at;
+}
+
+function accountTableCellRowsEqual(columnKey: string, left: AccountResp, right: AccountResp) {
+  if (left === right) return true;
+
+  switch (columnKey) {
+    case 'name':
+      return left.name === right.name
+        && left.credentials?.email === right.credentials?.email;
+    case 'platform':
+    case 'actions':
+      return sameAccountExceptCapacity(left, right);
+    case 'groups':
+      return left.id === right.id
+        && left.group_ids === right.group_ids;
+    case 'capacity':
+      return left.current_concurrency === right.current_concurrency
+        && left.max_concurrency === right.max_concurrency;
+    case 'status':
+      return left.state === right.state
+        && left.state_until === right.state_until
+        && left.error_msg === right.error_msg
+        && left.family_cooldowns === right.family_cooldowns;
+    case 'scheduling':
+      return left.id === right.id
+        && left.state === right.state;
+    case 'rate_multiplier':
+      return left.rate_multiplier === right.rate_multiplier;
+    case 'usage_window':
+    case 'last_used_at':
+      return left.id === right.id;
+    default:
+      return false;
+  }
+}
 
 export const AccountSchedulingSwitch = memo(function AccountSchedulingSwitch({
   ariaLabel,
