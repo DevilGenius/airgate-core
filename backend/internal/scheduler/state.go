@@ -3,12 +3,14 @@ package scheduler
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -55,6 +57,7 @@ type StateMachine struct {
 	db             *ent.Client
 	rdb            *redis.Client
 	familyCooldown *FamilyCooldown
+	monitor        monitoring.Recorder
 
 	// onCriticalTransition Active ↔ Disabled 转移后的回调（由 Scheduler 注入）。
 	// 用来清 route 缓存，让下次 SelectAccount 立刻看到新状态；
@@ -112,6 +115,7 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 				"until", until,
 				sdk.LogFieldReason, j.Reason,
 			)
+			sm.recordAccountStateEvent(ctx, accountID, account.StateRateLimited, &until, j.Reason, j)
 			return
 		}
 		sm.transition(ctx, accountID, account.StateRateLimited, &until, j.Reason)
@@ -126,7 +130,7 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		sm.transition(ctx, accountID, account.StateDisabled, nil, j.Reason)
 
 	case sdk.OutcomeAccountUnavailable:
-		sm.applyAccountUnavailable(ctx, accountID, j.Reason)
+		sm.applyAccountUnavailable(ctx, accountID, j.Reason, j)
 
 	case sdk.OutcomeUpstreamTransient:
 		// 按定义，UpstreamTransient 是"上游侧瞬时故障"（SSE 提前断流、网络抖动、上游 5xx 等），
@@ -153,7 +157,7 @@ func (sm *StateMachine) applyDegraded(ctx context.Context, accountID int, reason
 	sm.transition(ctx, accountID, account.StateDegraded, &until, reason)
 }
 
-func (sm *StateMachine) applyAccountUnavailable(ctx context.Context, accountID int, reason string) {
+func (sm *StateMachine) applyAccountUnavailable(ctx context.Context, accountID int, reason string, j Judgment) {
 	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
@@ -232,6 +236,7 @@ func (sm *StateMachine) applyAccountUnavailable(ctx context.Context, accountID i
 			"count", count,
 			sdk.LogFieldReason, reason,
 		)
+		sm.recordAccountStateEvent(ctx, accountID, account.StateDisabled, nil, reason, j)
 		sm.notifyCritical()
 		return
 	}
@@ -254,6 +259,7 @@ func (sm *StateMachine) applyAccountUnavailable(ctx context.Context, accountID i
 		"until", until,
 		sdk.LogFieldReason, reason,
 	)
+	sm.recordAccountStateEvent(ctx, accountID, account.StateDegraded, &until, reason, j)
 }
 
 func shouldTrackAccountUnavailable(acc *ent.Account) bool {
@@ -330,6 +336,7 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 		return
 	}
 	if prevState != account.StateActive {
+		sm.resolveAccountEvents(ctx, accountID)
 		sm.notifyCritical()
 	}
 }
@@ -386,12 +393,71 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 		"until", stateUntil,
 		sdk.LogFieldReason, reason,
 	)
+	sm.recordAccountStateEvent(ctx, accountID, newState, stateUntil, reason, Judgment{})
 
 	// Disabled 是关键转移：缓存里还挂着 active 的快照会让调度器反复选它、白白浪费 failover。
 	// RateLimited / Degraded 有 state_until，缓存 3s 陈旧期可接受。
 	if newState == account.StateDisabled {
 		sm.notifyCritical()
 	}
+}
+
+func (sm *StateMachine) recordAccountStateEvent(ctx context.Context, accountID int, state account.State, stateUntil *time.Time, reason string, j Judgment) {
+	if sm == nil || sm.monitor == nil || accountID <= 0 {
+		return
+	}
+	severity := monitoring.SeverityWarning
+	if state == account.StateDisabled {
+		severity = monitoring.SeverityCritical
+	}
+	errorCode := "account_" + string(state)
+	input := monitoring.EventInput{
+		Kind:        monitoring.KindUpstreamAccountError,
+		Severity:    severity,
+		Source:      monitoring.SourceScheduler,
+		SubjectType: monitoring.SubjectAccount,
+		SubjectID:   strconv.Itoa(accountID),
+		AccountID:   &accountID,
+		ErrorCode:   errorCode,
+		ErrorType:   string(state),
+		Title:       "Upstream account " + string(state),
+		Message:     reason,
+		Detail: map[string]interface{}{
+			"state":              string(state),
+			"reason":             reason,
+			"outcome_kind":       j.Kind.String(),
+			"duration_ms":        j.Duration.Milliseconds(),
+			"family":             j.Family,
+			"upstream_status":    j.UpstreamStatus,
+			"state_until":        timePtrRFC3339(stateUntil),
+			"is_pool":            j.IsPool,
+			"retry_after_ms":     j.RetryAfter.Milliseconds(),
+			"monitor_event_hint": "scheduler_account_state",
+		},
+	}
+	if stateUntil != nil {
+		input.AutoResolveAt = stateUntil
+	}
+	sm.monitor.Record(ctx, input)
+}
+
+func (sm *StateMachine) resolveAccountEvents(ctx context.Context, accountID int) {
+	if sm == nil || sm.monitor == nil || accountID <= 0 {
+		return
+	}
+	sm.monitor.ResolveBySubject(ctx, monitoring.ResolveQuery{
+		Kind:        monitoring.KindUpstreamAccountError,
+		SubjectType: monitoring.SubjectAccount,
+		SubjectID:   strconv.Itoa(accountID),
+		AccountID:   &accountID,
+	})
+}
+
+func timePtrRFC3339(value *time.Time) string {
+	if value == nil || value.IsZero() {
+		return ""
+	}
+	return value.Format(time.RFC3339)
 }
 
 func isUnexpiredTemporaryState(acc *ent.Account, now time.Time) bool {

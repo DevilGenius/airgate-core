@@ -12,6 +12,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
@@ -34,6 +35,7 @@ type Forwarder struct {
 	concurrency *scheduler.ConcurrencyManager
 	calculator  *billing.Calculator
 	recorder    *billing.Recorder
+	monitor     monitoring.Recorder
 }
 
 // NewForwarder 创建转发器。
@@ -53,6 +55,14 @@ func NewForwarder(
 		calculator:  calculator,
 		recorder:    recorder,
 	}
+}
+
+// SetMonitorRecorder injects the best-effort monitor event recorder.
+func (f *Forwarder) SetMonitorRecorder(recorder monitoring.Recorder) {
+	if f == nil {
+		return
+	}
+	f.monitor = recorder
 }
 
 // maxFailoverAttempts 非图片 429 场景的最大 failover 次数。
@@ -126,9 +136,11 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			sdk.LogFieldUserID, state.keyInfo.UserID,
 		)
 		if errResp, ok := apiKeyGroupRequirementError(state.keyInfo, requirements); ok {
+			f.recordAPIRequestError(c, state, errResp.status, errResp.code, errResp.message, monitoring.SeverityError)
 			openAIError(c, errResp.status, errResp.errType, errResp.code, errResp.message)
 			return
 		}
+		f.recordAPIRequestError(c, state, http.StatusServiceUnavailable, "no_available_route", "no eligible route", monitoring.SeverityError)
 		openAIError(c, http.StatusServiceUnavailable, "server_error", "no_available_route", "请求暂时无法完成，请稍后重试")
 		return
 	}
@@ -356,7 +368,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	}
 	logger.Error("forward_request_failed", failAttrs...)
 
-	writeAllRoutesFailed(c, failureSummary)
+	response := selectAllRoutesFailureResponse(failureSummary)
+	f.recordAPIRequestError(c, state, response.status, response.code, response.message, monitoring.SeverityError)
+	writeAllRoutesFailedResponse(c, response)
 }
 
 func canceledRequestStatus(err error) int {
@@ -478,7 +492,10 @@ type allRoutesFailureResponse struct {
 }
 
 func writeAllRoutesFailed(c *gin.Context, summary allRoutesFailureSummary) {
-	response := selectAllRoutesFailureResponse(summary)
+	writeAllRoutesFailedResponse(c, selectAllRoutesFailureResponse(summary))
+}
+
+func writeAllRoutesFailedResponse(c *gin.Context, response allRoutesFailureResponse) {
 	if response.status == http.StatusTooManyRequests {
 		openAIRateLimitError(c, response.status, response.code, response.message, response.retryAfter)
 		return

@@ -29,6 +29,7 @@ func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 
 	err := upd.Exec(dbCtx)
 	if err == nil {
+		s.state.resolveAccountEvents(ctx, accountID)
 		s.routeCache.InvalidateAll()
 	}
 	return err

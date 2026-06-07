@@ -10,6 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/monitoring"
 )
 
 var (
@@ -75,6 +76,14 @@ type Scheduler struct {
 	responseAffinity *ResponseAffinity
 	accountFilters   map[string]AccountFilterFunc
 	currentLoad      func(ctx context.Context, accountID int) int
+}
+
+// SetMonitorRecorder injects the best-effort monitor event recorder.
+func (s *Scheduler) SetMonitorRecorder(recorder monitoring.Recorder) {
+	if s == nil || s.state == nil {
+		return
+	}
+	s.state.monitor = recorder
 }
 
 // SetAccountFilter 注册平台级账号过滤函数。

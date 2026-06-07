@@ -72,6 +72,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		appmonitor.WithRedis(rdb),
 		appmonitor.WithNotifier(monitorNotificationService),
 	)
+	sched.SetMonitorRecorder(monitorService)
 
 	// 插件系统组件
 	pluginDir := cfg.Plugins.Dir
@@ -83,6 +84,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	// 替代旧的 admin HTTP API + admin_api_key 模式。必须在加载任何插件之前注入。
 	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched, concurrency, calculator, recorder))
 	forwarder := plugin.NewForwarder(db, pluginMgr, sched, concurrency, calculator, recorder)
+	forwarder.SetMonitorRecorder(monitorService)
 
 	marketOpts := []plugin.MarketplaceOption{
 		plugin.WithGithubToken(cfg.Plugins.Marketplace.GithubToken),
@@ -124,6 +126,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Concurrency: concurrency,
 		Scheduler:   sched,
 	})
+	if s.handlers.AccountService != nil {
+		s.handlers.AccountService.SetMonitorRecorder(monitorService)
+	}
 
 	// 注册路由
 	s.registerRoutes()

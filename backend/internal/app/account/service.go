@@ -22,6 +22,7 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
+	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
@@ -100,6 +101,7 @@ type Service struct {
 	plugins     PluginCatalog
 	concurrency ConcurrencyReader
 	stateWriter StateWriter
+	monitor     monitoring.Recorder
 	now         func() time.Time
 
 	usageMu    sync.RWMutex
@@ -130,6 +132,14 @@ func NewService(repo Repository, plugins PluginCatalog, concurrency ConcurrencyR
 // SetUsageCacheRedis enables the cross-process account usage cache.
 func (s *Service) SetUsageCacheRedis(rdb *redis.Client) {
 	s.usageRedis = rdb
+}
+
+// SetMonitorRecorder injects the best-effort monitor event recorder.
+func (s *Service) SetMonitorRecorder(recorder monitoring.Recorder) {
+	if s == nil {
+		return
+	}
+	s.monitor = recorder
 }
 
 // StartQuotaRefreshLoop periodically refreshes OAuth account plan metadata written into credentials.
@@ -677,11 +687,13 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			req.Writer = writer
 			outcome, forwardErr := inst.Gateway.Forward(runCtx, &req)
 			if forwardErr != nil {
+				s.recordConnectivityTestFailure(runCtx, item, modelID, "plugin_forward_error", forwardErr)
 				return forwardErr
 			}
 			// 测试路径严格判定：只有 OutcomeSuccess 算通过；任何其它 Kind 都报告失败。
 			// 这是管理员工具，失败原因要保留真实上游诊断，方便直接排查账号态 / 上游态问题。
 			if outcome.Kind == sdk.OutcomeSuccess {
+				s.resolveAccountMonitorEvents(runCtx, item.ID)
 				return nil
 			}
 			msg := connectivityTestErrorMessage(outcome)
@@ -691,7 +703,9 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			if msg == "" {
 				msg = fmt.Sprintf("plugin returned %s", outcome.Kind)
 			}
-			return errors.New(msg)
+			err := errors.New(msg)
+			s.recordConnectivityTestFailure(runCtx, item, modelID, outcome.Kind.String(), err)
+			return err
 		},
 	}, nil
 }
@@ -2384,12 +2398,14 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 				sdk.LogFieldAccountID, item.ID,
 				sdk.LogFieldPlatform, item.Platform,
 				sdk.LogFieldReason, "reauth_required")
+			s.recordQuotaRefreshFailure(ctx, item, "reauth_required", err, monitoring.SeverityCritical)
 			return QuotaRefreshResult{}, ErrReauthRequired
 		}
 		logger.Error("account_credential_validation_failed",
 			sdk.LogFieldAccountID, item.ID,
 			sdk.LogFieldPlatform, item.Platform,
 			sdk.LogFieldError, err)
+		s.recordQuotaRefreshFailure(ctx, item, "quota_refresh_failed", err, monitoring.SeverityError)
 		return QuotaRefreshResult{}, fmt.Errorf("刷新额度失败: %w", err)
 	}
 
@@ -2433,6 +2449,7 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 	if s.stateWriter != nil {
 		s.stateWriter.ClearRateLimitMarkers(ctx, item.ID)
 	}
+	s.resolveAccountMonitorEvents(ctx, item.ID)
 
 	return QuotaRefreshResult{
 		PlanType:                credentials["plan_type"],
