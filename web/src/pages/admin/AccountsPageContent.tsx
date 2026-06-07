@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, EmptyState, Input, Spinner, TextField as HeroTextField } from '@heroui/react';
@@ -74,6 +74,43 @@ const ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsC
 const ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS = 0.5;
 const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
+
+function useAccountModalRootIsolation(isActive: boolean) {
+  useLayoutEffect(() => {
+    if (!isActive || typeof document === 'undefined' || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const root = document.getElementById('root');
+    if (!root) return undefined;
+
+    const hadTopLayer = root.hasAttribute('data-react-aria-top-layer');
+    const previousAriaHidden = root.getAttribute('aria-hidden');
+    root.setAttribute('data-react-aria-top-layer', 'true');
+
+    let frameId = 0;
+    const applyAriaHidden = () => {
+      if (root.contains(document.activeElement)) {
+        frameId = window.requestAnimationFrame(applyAriaHidden);
+        return;
+      }
+      root.setAttribute('aria-hidden', 'true');
+    };
+    frameId = window.requestAnimationFrame(applyAriaHidden);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      if (!hadTopLayer) {
+        root.removeAttribute('data-react-aria-top-layer');
+      }
+      if (previousAriaHidden == null) {
+        root.removeAttribute('aria-hidden');
+      } else {
+        root.setAttribute('aria-hidden', previousAriaHidden);
+      }
+    };
+  }, [isActive]);
+}
 
 function sameCapacitySnapshot(left: Record<string, number> | undefined, right: Record<string, number>) {
   if (!left) return false;
@@ -319,6 +356,15 @@ export default function AccountsPageContent() {
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
+  const isAnyAccountModalOpen = showCreateModal
+    || editingAccount !== null
+    || deletingAccount !== null
+    || showBulkEditModal
+    || showBulkDeleteConfirm
+    || bulkRefreshTargets !== null
+    || testingAccount !== null
+    || statsAccountId !== null;
+  useAccountModalRootIsolation(isAnyAccountModalOpen);
   const clearSelection = useCallback(() => {
     runAfterInputFrame(() => selectionStore.clear());
   }, [selectionStore]);
