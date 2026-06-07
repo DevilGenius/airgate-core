@@ -946,6 +946,7 @@ export default function AccountsPageContent() {
   ];
   return (
     <TablePage
+      className="ag-accounts-page"
       toolbar={(
           <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-48">

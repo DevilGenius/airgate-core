@@ -379,6 +379,7 @@ export default function UserUsageContent() {
       </div>
 
       <TablePage
+        className="ag-usage-page"
         footer={(
           <TablePaginationFooter
             page={page}

@@ -163,6 +163,44 @@
   color: var(--ag-warning);
 }
 
+.ag-accounts-page {
+  --ag-accounts-toolbar-font-size: 0.875rem;
+  --ag-accounts-toolbar-line-height: 1.25rem;
+}
+
+.ag-accounts-page .ag-page-toolbar {
+  font-size: var(--ag-accounts-toolbar-font-size);
+  line-height: var(--ag-accounts-toolbar-line-height);
+}
+
+.ag-accounts-page .ag-page-toolbar :where(.input,
+  .ag-simple-select-trigger,
+  .button,
+  .ag-auto-refresh-trigger,
+  .ag-toolbar-menu-trigger-label,
+  .ag-toolbar-menu-item,
+  .ag-toolbar-menu-item-label,
+  .ag-simple-select-option-label,
+  .ag-native-switch-content,
+  .ag-account-type-trigger,
+  .ag-account-type-trigger-value,
+  .ag-account-type-menu-item,
+  .ag-account-type-submenu-item,
+  .ag-account-type-submenu-loading) {
+  font-size: var(--ag-accounts-toolbar-font-size);
+}
+
+.ag-accounts-page .ag-page-toolbar :where(.ag-toolbar-menu-trigger-label,
+  .ag-toolbar-menu-item,
+  .ag-toolbar-menu-item-label,
+  .ag-simple-select-option-label,
+  .ag-account-type-trigger-value,
+  .ag-account-type-menu-item,
+  .ag-account-type-submenu-item,
+  .ag-account-type-submenu-loading) {
+  line-height: var(--ag-accounts-toolbar-line-height);
+}
+
 .ag-account-type-select {
   position: relative;
 }

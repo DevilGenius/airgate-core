@@ -719,7 +719,7 @@ export default function UsagePage() {
     };
     const apiKeyColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'api_key',
-      title: 'API Key',
+      title: t('usage.api_key', 'API Key'),
       width: '112px',
       hideOnMobile: true,
       render: (row) => {
@@ -924,6 +924,7 @@ export default function UsagePage() {
       )}
 
       <TablePage
+        className="ag-usage-page"
         footer={(
           <TablePaginationFooter
             page={page}
