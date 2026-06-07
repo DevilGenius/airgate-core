@@ -8,6 +8,10 @@ import type {
 // APIKeyResp 从 types 中已有定义，这里直接引用
 import type { APIKeyResp } from '../types';
 
+type UserRequestOptions = {
+  signal?: AbortSignal;
+};
+
 export const usersApi = {
   // 用户接口
   me: () => get<UserResp>('/api/v1/users/me'),
@@ -18,8 +22,8 @@ export const usersApi = {
     get<PagedData<BalanceLogResp>>('/api/v1/users/me/balance-history', params),
 
   // 管理员接口
-  list: (params: PageReq & { status?: string; role?: string }) =>
-    get<PagedData<UserResp>>('/api/v1/admin/users', params),
+  list: (params: PageReq & { status?: string; role?: string }, options?: UserRequestOptions) =>
+    get<PagedData<UserResp>>('/api/v1/admin/users', params, options),
   create: (data: CreateUserReq) => post<UserResp>('/api/v1/admin/users', data),
   update: (id: number, data: UpdateUserReq) => put<void>(`/api/v1/admin/users/${id}`, data),
   delete: (id: number) => del<void>(`/api/v1/admin/users/${id}`),

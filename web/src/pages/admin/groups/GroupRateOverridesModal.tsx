@@ -11,6 +11,7 @@ import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { queryKeys } from '../../../shared/queryKeys';
 import { SearchFilterComboBox } from '../../../shared/components/SearchFilterComboBox';
+import { REMOTE_SEARCH_DEBOUNCE_MS } from '../../../shared/constants';
 import type { GroupResp, GroupRateOverrideResp, UserResp } from '../../../shared/types';
 
 interface GroupRateOverridesModalProps {
@@ -26,7 +27,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
   const [newRate, setNewRate] = useState('1');
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingRate, setEditingRate] = useState('');
-  const debouncedEmailQuery = useDebouncedValue(emailQuery.trim(), 250);
+  const debouncedEmailQuery = useDebouncedValue(emailQuery.trim(), REMOTE_SEARCH_DEBOUNCE_MS);
 
   const overridesKey = ['group-rate-overrides', group.id] as const;
   const { data: overrides = [], isLoading } = useQuery({

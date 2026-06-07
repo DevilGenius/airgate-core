@@ -589,9 +589,14 @@
 }
 
 .ag-dashboard-panel,
-.ag-dashboard-metric,
-.ag-dashboard-toolbar {
+.ag-dashboard-metric {
   overflow: hidden;
+}
+
+.ag-dashboard-toolbar {
+  position: relative;
+  z-index: 70;
+  overflow: visible;
 }
 
 .ag-dashboard-metric {

@@ -12,6 +12,9 @@ export const PAGE_SIZE_OPTIONS = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS;
 /** 全量拉取参数（用于下拉选择等场景） */
 export const FETCH_ALL_PARAMS = { page: 1, page_size: 100 } as const;
 
+/** 远程搜索输入默认防抖时间 */
+export const REMOTE_SEARCH_DEBOUNCE_MS = 250;
+
 /** 使用记录 Token 指标色，表格与趋势图共用 */
 export const USAGE_TOKEN_COLORS = {
   input: 'var(--ag-usage-token-input)',

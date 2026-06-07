@@ -29,14 +29,12 @@ import {
 } from 'lucide-react';
 import { decorativePalette } from '@devilgenius/airgate-theme';
 import { dashboardApi } from '../shared/api/dashboard';
-import { usersApi } from '../shared/api/users';
 import { queryKeys } from '../shared/queryKeys';
 import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
-import { useDebouncedValue } from '../shared/hooks/useDebouncedValue';
 import { CostPair, CostValue } from '../shared/components/CostValue';
 import { SimpleSelect } from '../shared/components/SimpleSelect';
-import { SearchFilterComboBox } from '../shared/components/SearchFilterComboBox';
+import { UserSearchFilterComboBox } from '../shared/components/UserSearchFilterComboBox';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
 const PIE_COLORS = PIE_CHART_COLORS;
@@ -672,38 +670,7 @@ export default function DashboardPage() {
   const [range, setRange] = useState<RangePreset>('today');
   const [granularity, setGranularity] = useState<Granularity>('day');
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>();
-  const [userKeyword, setUserKeyword] = useState('');
-  const debouncedUserKeyword = useDebouncedValue(userKeyword.trim(), 250);
   const [selectedUserLabel, setSelectedUserLabel] = useState('');
-
-  const { data: usersData } = useQuery({
-    queryKey: queryKeys.users('dashboard-filter-search', debouncedUserKeyword),
-    queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: debouncedUserKeyword }),
-    enabled: debouncedUserKeyword.length > 0,
-  });
-
-  const userOptions = (usersData?.list ?? []).map((user) => ({
-    id: String(user.id),
-    label: user.username || user.email,
-    description: user.username ? user.email : undefined,
-    textValue: `${user.username || ''} ${user.email}`,
-  }));
-  const visibleUserOptions = (() => {
-    const selectedId = selectedUserId ? String(selectedUserId) : '';
-    if (!selectedId || !selectedUserLabel || userOptions.some((option) => option.id === selectedId)) {
-      return userOptions;
-    }
-
-    return [
-      {
-        id: selectedId,
-        label: selectedUserLabel,
-        description: undefined,
-        textValue: selectedUserLabel,
-      },
-      ...userOptions,
-    ];
-  })();
   const granularityOptions = [
     { id: 'day', label: t('dashboard.granularity_day') },
     { id: 'hour', label: t('dashboard.granularity_hour') },
@@ -767,31 +734,22 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.filter_user')}</span>
             <div className="w-full sm:w-48">
-              <SearchFilterComboBox
+              <UserSearchFilterComboBox
                 ariaLabel={t('dashboard.filter_user')}
                 emptyPrompt={t('dashboard.filter_user')}
-                items={visibleUserOptions}
+                loadingLabel={t('common.loading')}
                 noDataLabel={t('common.no_data')}
                 placeholder={t('dashboard.all_users')}
                 selectedKey={selectedUserId ? String(selectedUserId) : null}
                 selectedLabel={selectedUserLabel}
-                onSearchChange={(value) => {
-                  setUserKeyword(value);
-                  if (!value.trim()) {
-                    setSelectedUserId(undefined);
-                    setSelectedUserLabel('');
-                  }
-                }}
                 onSelectionChange={(value, label) => {
                   if (!value) {
                     setSelectedUserId(undefined);
                     setSelectedUserLabel('');
-                    setUserKeyword('');
                     return;
                   }
                   setSelectedUserId(Number(value));
                   setSelectedUserLabel(label);
-                  setUserKeyword(label);
                 }}
               />
             </div>

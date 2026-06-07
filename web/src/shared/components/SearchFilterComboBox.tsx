@@ -1,8 +1,8 @@
 import { memo, useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { flushSync } from 'react-dom';
 import { Input } from '@heroui/react';
 import { Search } from 'lucide-react';
-import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { REMOTE_SEARCH_DEBOUNCE_MS } from '../constants';
+import { useSmoothSearchInput } from '../hooks/useSmoothSearchInput';
 
 export interface SearchFilterComboBoxOption {
   description?: ReactNode;
@@ -28,7 +28,7 @@ interface SearchFilterComboBoxProps {
 
 export const SearchFilterComboBox = memo(function SearchFilterComboBox({
   ariaLabel,
-  debounceMs = 0,
+  debounceMs = REMOTE_SEARCH_DEBOUNCE_MS,
   emptyPrompt,
   isLoading = false,
   items,
@@ -41,11 +41,21 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
   selectedLabel = '',
 }: SearchFilterComboBoxProps) {
   const comboBoxId = useId();
-  const [inputValue, setInputValue] = useState(selectedLabel);
   const [isOpen, setIsOpen] = useState(false);
-  const debouncedValue = useDebouncedValue(inputValue.trim(), debounceMs);
+  const { emitSearchChange, inputValue, setInputValue } = useSmoothSearchInput({
+    debounceMs,
+    onSearchChange,
+    syncValue: !!selectedKey,
+    value: selectedLabel,
+  });
+  const isOpenRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const lastEmittedValueRef = useRef(selectedLabel.trim());
+
+  const closeDropdown = useCallback(() => {
+    if (!isOpenRef.current) return;
+    isOpenRef.current = false;
+    setIsOpen(false);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -53,19 +63,19 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
     const handlePointerDown = (event: PointerEvent) => {
       const root = rootRef.current;
       if (!root || !(event.target instanceof Node) || root.contains(event.target)) return;
-      setIsOpen(false);
+      closeDropdown();
     };
     const handleFocusIn = (event: FocusEvent) => {
       const root = rootRef.current;
       if (!root || !(event.target instanceof Node) || root.contains(event.target)) return;
-      setIsOpen(false);
+      closeDropdown();
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false);
+      if (event.key === 'Escape') closeDropdown();
     };
     const handleComboBoxOpen = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail;
-      if (detail !== comboBoxId) setIsOpen(false);
+      if (detail !== comboBoxId) closeDropdown();
     };
 
     document.addEventListener('pointerdown', handlePointerDown);
@@ -78,27 +88,14 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('ag-search-combobox-open', handleComboBoxOpen);
     };
-  }, [comboBoxId, isOpen]);
-
-  useEffect(() => {
-    if (!selectedKey) return;
-    setInputValue((current) => (current === selectedLabel ? current : selectedLabel));
-    lastEmittedValueRef.current = selectedLabel.trim();
-  }, [selectedKey, selectedLabel]);
-
-  useEffect(() => {
-    if (debouncedValue === lastEmittedValueRef.current) return;
-    lastEmittedValueRef.current = debouncedValue;
-    onSearchChange(debouncedValue);
-  }, [debouncedValue, onSearchChange]);
+  }, [closeDropdown, comboBoxId, isOpen]);
 
   const openDropdown = useCallback(() => {
-    if (isOpen) return;
+    if (isOpenRef.current) return;
     document.dispatchEvent(new CustomEvent('ag-search-combobox-open', { detail: comboBoxId }));
-    flushSync(() => {
-      setIsOpen(true);
-    });
-  }, [comboBoxId, isOpen]);
+    isOpenRef.current = true;
+    setIsOpen(true);
+  }, [comboBoxId]);
 
   const handleInputPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -109,8 +106,7 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
     setInputValue(value);
     openDropdown();
     if (!value) {
-      lastEmittedValueRef.current = '';
-      onSearchChange('');
+      emitSearchChange('');
       onSelectionChange('', '');
       return;
     }
@@ -118,11 +114,7 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
       onSelectionChange('', '');
     }
     if (debounceMs <= 0) {
-      const nextSearch = value.trim();
-      if (nextSearch !== lastEmittedValueRef.current) {
-        lastEmittedValueRef.current = nextSearch;
-        onSearchChange(nextSearch);
-      }
+      emitSearchChange(value);
     }
   };
 
@@ -130,10 +122,10 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
     const option = items.find((item) => item.id === value);
     const label = option?.label ? String(option.label) : '';
     setInputValue(label);
+    isOpenRef.current = false;
     setIsOpen(false);
-    lastEmittedValueRef.current = label.trim();
     onSelectionChange(value, label);
-    onSearchChange(label.trim());
+    emitSearchChange(label);
   };
 
   const emptyStateLabel = isLoading && inputValue.trim() ? loadingLabel : (inputValue.trim() ? noDataLabel : emptyPrompt);

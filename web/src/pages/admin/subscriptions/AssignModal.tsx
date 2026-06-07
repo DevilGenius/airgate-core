@@ -115,6 +115,7 @@ export function AssignModal({
                   <Label>{t('subscriptions.user')}</Label>
                   <SearchFilterComboBox
                     ariaLabel={t('subscriptions.select_user')}
+                    debounceMs={0}
                     emptyPrompt={t('users.search_placeholder')}
                     items={filteredUserOptions.map((item) => ({
                       id: item.id,
