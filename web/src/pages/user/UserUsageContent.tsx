@@ -14,7 +14,7 @@ import type { UsageQuery } from '../../shared/types';
 import { useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
 import { getSessionAPIKey } from '../../shared/api/client';
 import { CcsImportModal } from './userkeys/CcsImportModal';
-import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
+import { RecordsTable } from '../../shared/components/RecordsTable';
 import { TablePage } from '../../shared/components/TablePage';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
@@ -479,7 +479,7 @@ export default function UserUsageContent() {
       </div>
 
       {/* 使用记录表格 */}
-      <UsageRecordsTable
+      <RecordsTable
         ariaLabel={t('usage.title', 'Usage')}
         columns={columns}
         dataVersion={dataUpdatedAt}

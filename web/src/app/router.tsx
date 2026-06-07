@@ -19,6 +19,7 @@ import {
   GroupsPage,
   lazyWithPreload,
   LoginPage,
+  MonitorPage,
   PluginPage,
   PluginsPage,
   ProfilePage,
@@ -154,6 +155,7 @@ function renderPage(Page: ElementType) {
 const adminUsersRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/users', component: renderPage(UsersPage) });
 const adminAccountsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/accounts', component: renderPage(AccountsPage) });
 const adminGroupsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/groups', component: renderPage(GroupsPage) });
+const adminMonitorRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/monitor', component: renderPage(MonitorPage) });
 const adminSubscriptionsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/subscriptions', component: renderPage(SubscriptionsPage) });
 const adminProxiesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/proxies', component: renderPage(ProxiesPage) });
 const adminUsageRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/usage', component: renderPage(UsagePage) });
@@ -227,6 +229,7 @@ const routeTree = rootRoute.addChildren([
       adminUsersRoute,
       adminAccountsRoute,
       adminGroupsRoute,
+      adminMonitorRoute,
       adminSubscriptionsRoute,
       adminProxiesRoute,
       adminUsageRoute,

@@ -189,6 +189,14 @@ func (s *Service) ResolveBySubject(ctx context.Context, query monitoring.Resolve
 	}
 }
 
+// Get returns one monitor event by id.
+func (s *Service) Get(ctx context.Context, id int) (Event, error) {
+	if s == nil || s.repo == nil {
+		return Event{}, ErrEventNotFound
+	}
+	return s.repo.Get(ctx, id)
+}
+
 // List returns a cursor page for future API handlers.
 func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, error) {
 	if s == nil || s.repo == nil {
@@ -204,6 +212,22 @@ func (s *Service) Summary(ctx context.Context) (Summary, error) {
 		return Summary{}, nil
 	}
 	return s.repo.Summary(ctx)
+}
+
+// Resolve marks one monitor event resolved.
+func (s *Service) Resolve(ctx context.Context, id int) error {
+	if s == nil || s.repo == nil {
+		return ErrEventNotFound
+	}
+	return s.repo.Resolve(ctx, id)
+}
+
+// Ignore marks one monitor event ignored.
+func (s *Service) Ignore(ctx context.Context, id int) error {
+	if s == nil || s.repo == nil {
+		return ErrEventNotFound
+	}
+	return s.repo.Ignore(ctx, id)
 }
 
 func (s *Service) normalizeInput(input monitoring.EventInput) AggregatedEvent {

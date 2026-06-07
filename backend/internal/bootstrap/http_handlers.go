@@ -17,6 +17,7 @@ import (
 	appauth "github.com/DevilGenius/airgate-core/internal/app/auth"
 	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
+	appmonitor "github.com/DevilGenius/airgate-core/internal/app/monitor"
 	appnotification "github.com/DevilGenius/airgate-core/internal/app/notification"
 	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
 	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
@@ -44,6 +45,7 @@ type HTTPDependencies struct {
 	Marketplace *plugin.Marketplace
 	Concurrency *scheduler.ConcurrencyManager
 	Scheduler   *scheduler.Scheduler
+	Monitor     *appmonitor.Service
 }
 
 // HTTPHandlers 聚合所有 HTTP 处理器。
@@ -61,6 +63,7 @@ type HTTPHandlers struct {
 	Plugin       *handler.PluginHandler
 	Version      *handler.VersionHandler
 	Upgrade      *handler.UpgradeHandler
+	Monitor      *handler.MonitorHandler
 
 	AccountService *appaccount.Service
 }
@@ -97,6 +100,11 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	})
 	usageStore := store.NewUsageStore(dep.DB)
 	usageService := appusage.NewService(usageStore, dep.Redis)
+	monitorService := dep.Monitor
+	if monitorService == nil {
+		monitorStore := store.NewMonitorStore(dep.DB)
+		monitorService = appmonitor.NewService(monitorStore)
+	}
 
 	upgradeService := upgrade.NewService(upgrade.DetectMode(), dep.Redis)
 
@@ -114,6 +122,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Plugin:         handler.NewPluginHandler(pluginAdminService),
 		Version:        handler.NewVersionHandler(),
 		Upgrade:        handler.NewUpgradeHandler(upgradeService),
+		Monitor:        handler.NewMonitorHandler(monitorService),
 		AccountService: accountService,
 	}
 }

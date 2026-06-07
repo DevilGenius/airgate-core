@@ -16,10 +16,10 @@ func (f *Forwarder) recordAPIRequestError(c *gin.Context, state *forwardState, s
 	if state == nil {
 		return
 	}
-	f.recordAPIRequestErrorForKey(c, state.keyInfo, state.requestedPlatform, state.requestPath, status, code, message, severity)
+	f.recordAPIRequestErrorForKey(c, state.keyInfo, state.requestedPlatform, state.requestPath, state.model, status, code, message, severity)
 }
 
-func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.APIKeyInfo, platform, path string, status int, code, message string, severity ...string) {
+func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.APIKeyInfo, platform, path, model string, status int, code, message string, severity ...string) {
 	if f == nil || f.monitor == nil || keyInfo == nil {
 		return
 	}
@@ -51,6 +51,7 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 		Method:             method,
 		Endpoint:           normalizeForwardPath(path),
 		RequestPath:        path,
+		Model:              model,
 		HTTPStatus:         intPtr(status),
 		ErrorCode:          code,
 		ErrorType:          errorTypeForStatus(status),
@@ -59,6 +60,7 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 		Detail: map[string]interface{}{
 			"path":        path,
 			"platform":    platform,
+			"model":       model,
 			"http_status": status,
 			"error_code":  code,
 		},
@@ -69,7 +71,7 @@ func (f *Forwarder) recordPluginRouteError(c *gin.Context, keyInfo *auth.APIKeyI
 	if f == nil || f.monitor == nil {
 		return
 	}
-	f.recordAPIRequestErrorForKey(c, keyInfo, platform, path, http.StatusServiceUnavailable, code, message, monitoring.SeverityError)
+	f.recordAPIRequestErrorForKey(c, keyInfo, platform, path, "", http.StatusServiceUnavailable, code, message, monitoring.SeverityError)
 	ctx := context.Background()
 	if c != nil && c.Request != nil {
 		ctx = c.Request.Context()

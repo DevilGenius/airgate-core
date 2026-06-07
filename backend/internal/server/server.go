@@ -125,6 +125,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Marketplace: marketplace,
 		Concurrency: concurrency,
 		Scheduler:   sched,
+		Monitor:     monitorService,
 	})
 	if s.handlers.AccountService != nil {
 		s.handlers.AccountService.SetMonitorRecorder(monitorService)

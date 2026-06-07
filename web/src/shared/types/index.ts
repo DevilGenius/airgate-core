@@ -807,6 +807,107 @@ export interface DashboardUserTrendPoint {
   tokens: number;
 }
 
+// ==================== Monitor ====================
+
+export type MonitorSeverity = 'warning' | 'error' | 'critical';
+export type MonitorStatus = 'active' | 'resolved' | 'ignored';
+
+export interface MonitorEventResp {
+  id: number;
+  kind: string;
+  severity: MonitorSeverity;
+  status: MonitorStatus;
+  source: string;
+  subject_type: string;
+  subject_id: string;
+  fingerprint: string;
+  title: string;
+  message: string;
+  api_key_id?: number;
+  api_key_name_snapshot?: string;
+  api_key_prefix?: string;
+  user_id?: number;
+  user_email_snapshot?: string;
+  group_id?: number;
+  account_id?: number;
+  account_name_snapshot?: string;
+  platform?: string;
+  plugin_id?: string;
+  task_type?: string;
+  method?: string;
+  endpoint?: string;
+  request_path?: string;
+  model?: string;
+  http_status?: number;
+  upstream_status?: number;
+  error_code?: string;
+  error_type?: string;
+  count: number;
+  created_at: string;
+  updated_at: string;
+  resolved_at?: string;
+  ignored_at?: string;
+  auto_resolve_at?: string;
+  expires_at: string;
+  last_notified_at?: string;
+  next_notify_at?: string;
+  notify_error?: string;
+  detail?: Record<string, unknown>;
+}
+
+export interface MonitorKindCountResp {
+  kind: string;
+  count: number;
+}
+
+export interface MonitorSubjectCountResp {
+  id: number;
+  name: string;
+  count: number;
+}
+
+export interface MonitorSummaryResp {
+  active_total: number;
+  critical_total: number;
+  error_total: number;
+  warning_total: number;
+  by_kind: MonitorKindCountResp[];
+  top_api_keys: MonitorSubjectCountResp[];
+  top_accounts: MonitorSubjectCountResp[];
+  recent: MonitorEventResp[];
+}
+
+export interface MonitorCursorResp {
+  updated_at: string;
+  id: number;
+}
+
+export interface MonitorListResp {
+  list: MonitorEventResp[];
+  has_more: boolean;
+  next_cursor?: MonitorCursorResp;
+}
+
+export interface MonitorListQuery {
+  status?: string;
+  severity?: string;
+  kind?: string;
+  source?: string;
+  subject_type?: string;
+  api_key_id?: number;
+  account_id?: number;
+  platform?: string;
+  plugin_id?: string;
+  task_type?: string;
+  endpoint?: string;
+  error_code?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  cursor?: string;
+  cursor_id?: number;
+}
+
 // ==================== Setup ====================
 
 export interface SetupStatusResp {

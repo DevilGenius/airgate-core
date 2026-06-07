@@ -128,6 +128,9 @@ type Summary struct {
 type Repository interface {
 	UpsertBatch(context.Context, []AggregatedEvent) error
 	ResolveBySubject(context.Context, monitoring.ResolveQuery) error
+	Get(context.Context, int) (Event, error)
+	Resolve(context.Context, int) error
+	Ignore(context.Context, int) error
 	List(context.Context, ListFilter) (ListResult, error)
 	Summary(context.Context) (Summary, error)
 	CleanupExpired(context.Context, time.Time, int) (int, error)

@@ -566,7 +566,7 @@ func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, platfo
 				sdk.LogFieldGroupID, keyInfo.GroupID,
 				sdk.LogFieldUserID, keyInfo.UserID,
 			)
-			f.recordAPIRequestErrorForKey(c, keyInfo, platform, path, http.StatusNotFound, "route_not_found", "platform does not support path")
+			f.recordAPIRequestErrorForKey(c, keyInfo, platform, path, "", http.StatusNotFound, "route_not_found", "platform does not support path")
 			openAIError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "当前平台不支持该 API 路径")
 		}
 		return nil
@@ -578,7 +578,7 @@ func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, platfo
 			sdk.LogFieldPath, path,
 			sdk.LogFieldUserID, keyInfo.UserID,
 		)
-		f.recordAPIRequestErrorForKey(c, keyInfo, platform, path, http.StatusNotFound, "route_not_found", "no matching plugin route")
+		f.recordAPIRequestErrorForKey(c, keyInfo, platform, path, "", http.StatusNotFound, "route_not_found", "no matching plugin route")
 		openAIError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "未找到匹配的插件")
 	}
 	return inst

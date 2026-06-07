@@ -1,18 +1,26 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type AnimationEvent, type CSSProperties, type ReactNode } from 'react';
 import { EmptyState } from '@heroui/react';
 import { Inbox } from 'lucide-react';
-import type { UsageColumnConfig, UsageRow } from '../columns/usageColumns';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getTotalPages } from '../utils/pagination';
 import { MobileRecordList } from './MobileRecordList';
 import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
 
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
-const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>(['model', 'user_agent']);
+const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>(['model', 'user_agent', 'event', 'subject', 'source', 'locator']);
 const NEW_ROW_ANIMATION_NAME = 'ag-usage-row-new-enter';
-const USAGE_PAGE_SIZE_OPTIONS = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS;
-const DEFAULT_USAGE_PAGE_SIZE = USAGE_PAGE_SIZE_OPTIONS[0];
-type UsageMobileLayout = 'default' | 'usageGrid' | 'usageGridWithUser';
+const RECORDS_PAGE_SIZE_OPTIONS = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS;
+const DEFAULT_RECORDS_PAGE_SIZE = RECORDS_PAGE_SIZE_OPTIONS[0];
+type RecordsMobileLayout = 'default' | 'usageGrid' | 'usageGridWithUser';
+type RecordRow = { id: string | number };
+
+interface RecordColumnConfig<T extends RecordRow = RecordRow> {
+  key: string;
+  title: ReactNode;
+  width?: string;
+  hideOnMobile?: boolean;
+  render: (row: T) => ReactNode;
+}
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -35,7 +43,7 @@ function getColumnClassName(key: string) {
   return `ag-usage-col-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 }
 
-function useNewRowMarkers<T extends UsageRow>({
+function useNewRowMarkers<T extends RecordRow>({
   dataVersion,
   enabled,
   paused,
@@ -103,16 +111,16 @@ function useNewRowMarkers<T extends UsageRow>({
   return { clearMarkedRowId, markedRowIds };
 }
 
-const UsageTableRow = memo(function UsageTableRow({
+const RecordsTableRow = memo(function RecordsTableRow({
   columns,
   isNew,
   onNewAnimationEnd,
   row,
 }: {
-  columns: UsageColumnConfig[];
+  columns: RecordColumnConfig[];
   isNew: boolean;
   onNewAnimationEnd: (rowId: string) => void;
-  row: UsageRow;
+  row: RecordRow;
 }) {
   const rowId = String(row.id);
   // 动画挂在每个 cell 上，会向上冒泡 N 次（N = 列数）。用 ref 锁住，确保 parent 回调只触发一次。
@@ -160,7 +168,7 @@ const UsageTableRow = memo(function UsageTableRow({
   );
 });
 
-export function UsageRecordsTable<T extends UsageRow>({
+export function RecordsTable<T extends RecordRow>({
   ariaLabel,
   columns,
   dataVersion,
@@ -184,7 +192,7 @@ export function UsageRecordsTable<T extends UsageRow>({
   mobileLayout = 'default',
 }: {
   ariaLabel: string;
-  columns: UsageColumnConfig<T>[];
+  columns: RecordColumnConfig<T>[];
   dataVersion?: number;
   emptyDescription?: string;
   emptyTitle: string;
@@ -203,12 +211,12 @@ export function UsageRecordsTable<T extends UsageRow>({
   summaryTotalExact?: boolean;
   total: number;
   totalExact?: boolean;
-  mobileLayout?: UsageMobileLayout;
+  mobileLayout?: RecordsMobileLayout;
 }) {
   const totalPages = getTotalPages(total, pageSize);
   useEffect(() => {
-    if (!USAGE_PAGE_SIZE_OPTIONS.some((option) => option === pageSize)) {
-      setPageSize(DEFAULT_USAGE_PAGE_SIZE);
+    if (!RECORDS_PAGE_SIZE_OPTIONS.some((option) => option === pageSize)) {
+      setPageSize(DEFAULT_RECORDS_PAGE_SIZE);
     }
   }, [pageSize, setPageSize]);
   const tableMinWidth = useMemo(
@@ -263,7 +271,7 @@ export function UsageRecordsTable<T extends UsageRow>({
       const timeColumn = columnByKey.get('created_at');
       const fieldColumns = ['api_key', 'model', 'tokens', 'cost']
         .map((key) => columnByKey.get(key))
-        .filter((column): column is UsageColumnConfig<T> => Boolean(column));
+        .filter((column): column is RecordColumnConfig<T> => Boolean(column));
       const hasAPIKeyColumn = Boolean(columnByKey.get('api_key'));
       const hasTokensColumn = Boolean(columnByKey.get('tokens'));
 
@@ -333,7 +341,7 @@ export function UsageRecordsTable<T extends UsageRow>({
     <TablePaginationFooter
       page={page}
       pageSize={pageSize}
-      pageSizeOptions={USAGE_PAGE_SIZE_OPTIONS}
+      pageSizeOptions={RECORDS_PAGE_SIZE_OPTIONS}
       setPage={setPage}
       setPageSize={setPageSize}
       summaryTotal={summaryTotal}
@@ -386,9 +394,9 @@ export function UsageRecordsTable<T extends UsageRow>({
                   </tr>
                 )
               : rows.map((row) => (
-                  <UsageTableRow
+                  <RecordsTableRow
                     key={row.id}
-                    columns={columns as UsageColumnConfig[]}
+                    columns={columns as RecordColumnConfig[]}
                     isNew={markedRowIds.has(String(row.id))}
                     onNewAnimationEnd={clearMarkedRowId}
                     row={row}

@@ -11,7 +11,7 @@ import { Activity, Columns3, DollarSign, Sigma } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
-import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
+import { RecordsTable } from '../../shared/components/RecordsTable';
 import { TablePage } from '../../shared/components/TablePage';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
@@ -1117,7 +1117,7 @@ export default function UsagePage() {
       </div>
 
       {/* 使用记录表格 */}
-      <UsageRecordsTable
+      <RecordsTable
         ariaLabel={t('usage.title', 'Usage')}
         columns={columns}
         dataVersion={dataUpdatedAt}

@@ -160,6 +160,61 @@ func (s *MonitorStore) ResolveBySubject(ctx context.Context, query monitoring.Re
 	return err
 }
 
+// Get returns one monitor event by id.
+func (s *MonitorStore) Get(ctx context.Context, id int) (appmonitor.Event, error) {
+	if s == nil || s.db == nil || id <= 0 {
+		return appmonitor.Event{}, appmonitor.ErrEventNotFound
+	}
+	row, err := s.db.MonitorEvent.Get(ctx, id)
+	if ent.IsNotFound(err) {
+		return appmonitor.Event{}, appmonitor.ErrEventNotFound
+	}
+	if err != nil {
+		return appmonitor.Event{}, err
+	}
+	return mapMonitorEvent(row), nil
+}
+
+// Resolve marks one monitor event resolved.
+func (s *MonitorStore) Resolve(ctx context.Context, id int) error {
+	if s == nil || s.db == nil || id <= 0 {
+		return appmonitor.ErrEventNotFound
+	}
+	now := time.Now()
+	err := s.db.MonitorEvent.UpdateOneID(id).
+		SetStatus(entmonitorevent.StatusResolved).
+		SetResolvedAt(now).
+		ClearIgnoredAt().
+		ClearAutoResolveAt().
+		ClearNextNotifyAt().
+		SetNotifyError("").
+		Exec(ctx)
+	if ent.IsNotFound(err) {
+		return appmonitor.ErrEventNotFound
+	}
+	return err
+}
+
+// Ignore marks one monitor event ignored.
+func (s *MonitorStore) Ignore(ctx context.Context, id int) error {
+	if s == nil || s.db == nil || id <= 0 {
+		return appmonitor.ErrEventNotFound
+	}
+	now := time.Now()
+	err := s.db.MonitorEvent.UpdateOneID(id).
+		SetStatus(entmonitorevent.StatusIgnored).
+		SetIgnoredAt(now).
+		ClearResolvedAt().
+		ClearAutoResolveAt().
+		ClearNextNotifyAt().
+		SetNotifyError("").
+		Exec(ctx)
+	if ent.IsNotFound(err) {
+		return appmonitor.ErrEventNotFound
+	}
+	return err
+}
+
 // AutoResolveDue resolves active events whose quiet window has expired.
 func (s *MonitorStore) AutoResolveDue(ctx context.Context, now time.Time, batchSize int) (int, error) {
 	if s == nil || s.db == nil {

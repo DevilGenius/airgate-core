@@ -13,6 +13,7 @@ import {
   Palette,
   Puzzle,
   Settings,
+  ShieldAlert,
   UserRoundCog,
   UserRoundKey,
   Users,
@@ -50,6 +51,7 @@ const PLUGIN_MENU_LOADING_TIMEOUT_MS = 60_000;
 
 const adminMenuItems: MenuItem[] = [
   { path: '/', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="h-5 w-5" />, sectionKey: 'nav.overview' },
+  { path: '/admin/monitor', labelKey: 'nav.monitor', icon: <ShieldAlert className="h-5 w-5" /> },
   { path: '/admin/users', labelKey: 'nav.users', icon: <Users className="h-5 w-5" />, sectionKey: 'nav.management' },
   { path: '/admin/accounts', labelKey: 'nav.accounts', icon: <IdCard className="h-5 w-5" /> },
   { path: '/admin/groups', labelKey: 'nav.groups', icon: <LayoutList className="h-5 w-5" /> },
