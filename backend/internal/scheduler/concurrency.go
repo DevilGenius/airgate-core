@@ -239,11 +239,11 @@ func (cm *ConcurrencyManager) GetCurrentCount(ctx context.Context, accountID int
 	if cm.rdb == nil {
 		return 0
 	}
-	counts := loadConcurrencyCounts(ctx, cm.rdb, []int{accountID})
+	counts := loadConcurrencyCounts(ctx, cm.rdb, []int{accountID}, true)
 	return counts[accountID]
 }
 
-func loadConcurrencyCounts(ctx context.Context, rdb *redis.Client, accountIDs []int) map[int]int {
+func loadConcurrencyCounts(ctx context.Context, rdb *redis.Client, accountIDs []int, backfillMissing bool) map[int]int {
 	result := make(map[int]int, len(accountIDs))
 	if rdb == nil || len(accountIDs) == 0 {
 		return result
@@ -271,7 +271,7 @@ func loadConcurrencyCounts(ctx context.Context, rdb *redis.Client, accountIDs []
 			result[ids[index]] = count
 		}
 	}
-	if len(missingIDs) > 0 {
+	if backfillMissing && len(missingIDs) > 0 {
 		backfillConcurrencyCounts(ctx, rdb, missingIDs, result)
 	}
 	return result
@@ -309,8 +309,8 @@ func backfillConcurrencyCounts(ctx context.Context, rdb *redis.Client, accountID
 }
 
 // GetCurrentCounts 批量获取多个账户的当前并发数。
-// 容量刷新只做一次 MGET；不能按账号执行 ZCOUNT，否则 100 行页面 0.5s 刷新会放大成
-// 200 次/s Redis 命令。
+// 容量刷新只做一次 MGET；miss 视为 0。acquire/release 会维护非零 count key，
+// 展示路径不能为确认空账号回落到每账号 ZSET 清理/ZCARD。
 func (cm *ConcurrencyManager) GetCurrentCounts(ctx context.Context, accountIDs []int) map[int]int {
-	return loadConcurrencyCounts(ctx, cm.rdb, accountIDs)
+	return loadConcurrencyCounts(ctx, cm.rdb, accountIDs, false)
 }

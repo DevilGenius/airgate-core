@@ -86,6 +86,10 @@ func familyCooldownIndexKey(accountID int) string {
 	return fmt.Sprintf("ag:cooldown:family:%d:index", accountID)
 }
 
+func familyCooldownActiveKey(accountID int) string {
+	return fmt.Sprintf("ag:cooldown:family:%d:active", accountID)
+}
+
 // familyCooldownReasonKey 保存账号和模型家族维度的冷却原因。
 func familyCooldownReasonKey(accountID int, family string) string {
 	return fmt.Sprintf("ag:cooldown:family:%d:reason:%s", accountID, family)
@@ -105,11 +109,15 @@ func (fc *FamilyCooldown) Mark(ctx context.Context, accountID int, family string
 	if indexTTL < familyCooldownIndexTTL {
 		indexTTL = familyCooldownIndexTTL
 	}
+	activeTTL := ttl + familyCooldownIndexGrace
 	indexKey := familyCooldownIndexKey(accountID)
+	activeKey := familyCooldownActiveKey(accountID)
 	pipe := fc.rdb.Pipeline()
 	pipe.Set(ctx, familyCooldownReasonKey(accountID, family), reason, ttl)
 	pipe.ZAdd(ctx, indexKey, redis.Z{Score: float64(until.UnixMilli()), Member: family})
 	pipe.Eval(ctx, familyCooldownIndexExpireScript, []string{indexKey}, indexTTL.Milliseconds())
+	pipe.SetNX(ctx, activeKey, "1", 0)
+	pipe.Eval(ctx, familyCooldownIndexExpireScript, []string{activeKey}, activeTTL.Milliseconds())
 	if _, err := pipe.Exec(ctx); err != nil {
 		slog.Debug("写入家族冷却失败",
 			"account_id", accountID, "family", family, "ttl_ms", ttl.Milliseconds(), "error", err)
@@ -188,6 +196,7 @@ func (fc *FamilyCooldown) ClearAccount(ctx context.Context, accountID int) int {
 		pipe.Del(ctx, keys...)
 	}
 	pipe.Del(ctx, indexKey)
+	pipe.Del(ctx, familyCooldownActiveKey(accountID))
 	_, _ = pipe.Exec(ctx)
 	return len(families)
 }
@@ -207,8 +216,8 @@ func (fc *FamilyCooldown) List(ctx context.Context, accountID int) []FamilyCoold
 
 // ListBatch 批量列出多个账号当前所有家族冷却。
 //
-// 冷却展示走账号索引 ZSET，不扫描 Redis keyspace。账号列表自动刷新时，当前页账号
-// 会由单个 Lua 脚本批量读取，避免按行放大 Redis 命令数。
+// 冷却展示先批量读取短 TTL active flag，只对可能存在冷却的账号读取索引 ZSET。
+// 账号列表自动刷新时，大部分无冷却账号只消耗一次 MGET，不再每行展开 ZSET 命令。
 func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[int][]FamilyCooldownEntry {
 	if fc == nil || fc.rdb == nil {
 		return nil
@@ -217,9 +226,13 @@ func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[i
 	if len(ids) == 0 {
 		return nil
 	}
+	activeIDs := fc.activeFamilyCooldownAccountIDs(ctx, ids)
+	if len(activeIDs) == 0 {
+		return map[int][]FamilyCooldownEntry{}
+	}
 	now := time.Now()
-	indexKeys := make([]string, 0, len(ids))
-	for _, accountID := range ids {
+	indexKeys := make([]string, 0, len(activeIDs))
+	for _, accountID := range activeIDs {
 		indexKeys = append(indexKeys, familyCooldownIndexKey(accountID))
 	}
 	raw, err := listFamilyCooldownsScript.Run(ctx, fc.rdb, indexKeys, now.UnixMilli()).Result()
@@ -242,7 +255,7 @@ func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[i
 	reasonPipe := fc.rdb.Pipeline()
 	for index := 0; index+2 < len(values); index += 3 {
 		rawKeyIndex, ok := redisIntValue(values[index])
-		if !ok || rawKeyIndex <= 0 || rawKeyIndex > len(ids) {
+		if !ok || rawKeyIndex <= 0 || rawKeyIndex > len(activeIDs) {
 			continue
 		}
 		family, ok := values[index+1].(string)
@@ -257,7 +270,7 @@ func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[i
 		if !until.After(now) {
 			continue
 		}
-		accountID := ids[rawKeyIndex-1]
+		accountID := activeIDs[rawKeyIndex-1]
 		pending = append(pending, pendingReason{
 			accountID: accountID,
 			family:    family,
@@ -294,6 +307,24 @@ func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[i
 		_, _ = cleanup.Exec(ctx)
 	}
 	return result
+}
+
+func (fc *FamilyCooldown) activeFamilyCooldownAccountIDs(ctx context.Context, ids []int) []int {
+	keys := make([]string, 0, len(ids))
+	for _, accountID := range ids {
+		keys = append(keys, familyCooldownActiveKey(accountID))
+	}
+	values, err := fc.rdb.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil
+	}
+	activeIDs := make([]int, 0, len(ids))
+	for index, value := range values {
+		if value != nil {
+			activeIDs = append(activeIDs, ids[index])
+		}
+	}
+	return activeIDs
 }
 
 func uniqueAccountIDs(ids []int) []int {

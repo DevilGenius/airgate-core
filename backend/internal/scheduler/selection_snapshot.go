@@ -147,7 +147,7 @@ func (s *Scheduler) selectionCurrentLoads(ctx context.Context, candidates []*ent
 	if s.rdb == nil {
 		return result
 	}
-	return loadConcurrencyCounts(ctx, s.rdb, ids)
+	return loadConcurrencyCounts(ctx, s.rdb, ids, true)
 }
 
 func accountIDsFromCandidates(candidates []*ent.Account) []int {

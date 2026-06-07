@@ -681,6 +681,6 @@ func (s *Scheduler) getCurrentLoad(ctx context.Context, accountID int) int {
 	if s.rdb == nil {
 		return 0
 	}
-	counts := loadConcurrencyCounts(ctx, s.rdb, []int{accountID})
+	counts := loadConcurrencyCounts(ctx, s.rdb, []int{accountID}, true)
 	return counts[accountID]
 }
