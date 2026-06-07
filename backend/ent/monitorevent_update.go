@@ -621,6 +621,60 @@ func (meu *MonitorEventUpdate) SetNillableExpiresAt(t *time.Time) *MonitorEventU
 	return meu
 }
 
+// SetLastNotifiedAt sets the "last_notified_at" field.
+func (meu *MonitorEventUpdate) SetLastNotifiedAt(t time.Time) *MonitorEventUpdate {
+	meu.mutation.SetLastNotifiedAt(t)
+	return meu
+}
+
+// SetNillableLastNotifiedAt sets the "last_notified_at" field if the given value is not nil.
+func (meu *MonitorEventUpdate) SetNillableLastNotifiedAt(t *time.Time) *MonitorEventUpdate {
+	if t != nil {
+		meu.SetLastNotifiedAt(*t)
+	}
+	return meu
+}
+
+// ClearLastNotifiedAt clears the value of the "last_notified_at" field.
+func (meu *MonitorEventUpdate) ClearLastNotifiedAt() *MonitorEventUpdate {
+	meu.mutation.ClearLastNotifiedAt()
+	return meu
+}
+
+// SetNextNotifyAt sets the "next_notify_at" field.
+func (meu *MonitorEventUpdate) SetNextNotifyAt(t time.Time) *MonitorEventUpdate {
+	meu.mutation.SetNextNotifyAt(t)
+	return meu
+}
+
+// SetNillableNextNotifyAt sets the "next_notify_at" field if the given value is not nil.
+func (meu *MonitorEventUpdate) SetNillableNextNotifyAt(t *time.Time) *MonitorEventUpdate {
+	if t != nil {
+		meu.SetNextNotifyAt(*t)
+	}
+	return meu
+}
+
+// ClearNextNotifyAt clears the value of the "next_notify_at" field.
+func (meu *MonitorEventUpdate) ClearNextNotifyAt() *MonitorEventUpdate {
+	meu.mutation.ClearNextNotifyAt()
+	return meu
+}
+
+// SetNotifyError sets the "notify_error" field.
+func (meu *MonitorEventUpdate) SetNotifyError(s string) *MonitorEventUpdate {
+	meu.mutation.SetNotifyError(s)
+	return meu
+}
+
+// SetNillableNotifyError sets the "notify_error" field if the given value is not nil.
+func (meu *MonitorEventUpdate) SetNillableNotifyError(s *string) *MonitorEventUpdate {
+	if s != nil {
+		meu.SetNotifyError(*s)
+	}
+	return meu
+}
+
 // SetDetail sets the "detail" field.
 func (meu *MonitorEventUpdate) SetDetail(m map[string]interface{}) *MonitorEventUpdate {
 	meu.mutation.SetDetail(m)
@@ -775,6 +829,11 @@ func (meu *MonitorEventUpdate) check() error {
 	if v, ok := meu.mutation.ErrorType(); ok {
 		if err := monitorevent.ErrorTypeValidator(v); err != nil {
 			return &ValidationError{Name: "error_type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.error_type": %w`, err)}
+		}
+	}
+	if v, ok := meu.mutation.NotifyError(); ok {
+		if err := monitorevent.NotifyErrorValidator(v); err != nil {
+			return &ValidationError{Name: "notify_error", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.notify_error": %w`, err)}
 		}
 	}
 	return nil
@@ -944,6 +1003,21 @@ func (meu *MonitorEventUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := meu.mutation.ExpiresAt(); ok {
 		_spec.SetField(monitorevent.FieldExpiresAt, field.TypeTime, value)
+	}
+	if value, ok := meu.mutation.LastNotifiedAt(); ok {
+		_spec.SetField(monitorevent.FieldLastNotifiedAt, field.TypeTime, value)
+	}
+	if meu.mutation.LastNotifiedAtCleared() {
+		_spec.ClearField(monitorevent.FieldLastNotifiedAt, field.TypeTime)
+	}
+	if value, ok := meu.mutation.NextNotifyAt(); ok {
+		_spec.SetField(monitorevent.FieldNextNotifyAt, field.TypeTime, value)
+	}
+	if meu.mutation.NextNotifyAtCleared() {
+		_spec.ClearField(monitorevent.FieldNextNotifyAt, field.TypeTime)
+	}
+	if value, ok := meu.mutation.NotifyError(); ok {
+		_spec.SetField(monitorevent.FieldNotifyError, field.TypeString, value)
 	}
 	if value, ok := meu.mutation.Detail(); ok {
 		_spec.SetField(monitorevent.FieldDetail, field.TypeJSON, value)
@@ -1564,6 +1638,60 @@ func (meuo *MonitorEventUpdateOne) SetNillableExpiresAt(t *time.Time) *MonitorEv
 	return meuo
 }
 
+// SetLastNotifiedAt sets the "last_notified_at" field.
+func (meuo *MonitorEventUpdateOne) SetLastNotifiedAt(t time.Time) *MonitorEventUpdateOne {
+	meuo.mutation.SetLastNotifiedAt(t)
+	return meuo
+}
+
+// SetNillableLastNotifiedAt sets the "last_notified_at" field if the given value is not nil.
+func (meuo *MonitorEventUpdateOne) SetNillableLastNotifiedAt(t *time.Time) *MonitorEventUpdateOne {
+	if t != nil {
+		meuo.SetLastNotifiedAt(*t)
+	}
+	return meuo
+}
+
+// ClearLastNotifiedAt clears the value of the "last_notified_at" field.
+func (meuo *MonitorEventUpdateOne) ClearLastNotifiedAt() *MonitorEventUpdateOne {
+	meuo.mutation.ClearLastNotifiedAt()
+	return meuo
+}
+
+// SetNextNotifyAt sets the "next_notify_at" field.
+func (meuo *MonitorEventUpdateOne) SetNextNotifyAt(t time.Time) *MonitorEventUpdateOne {
+	meuo.mutation.SetNextNotifyAt(t)
+	return meuo
+}
+
+// SetNillableNextNotifyAt sets the "next_notify_at" field if the given value is not nil.
+func (meuo *MonitorEventUpdateOne) SetNillableNextNotifyAt(t *time.Time) *MonitorEventUpdateOne {
+	if t != nil {
+		meuo.SetNextNotifyAt(*t)
+	}
+	return meuo
+}
+
+// ClearNextNotifyAt clears the value of the "next_notify_at" field.
+func (meuo *MonitorEventUpdateOne) ClearNextNotifyAt() *MonitorEventUpdateOne {
+	meuo.mutation.ClearNextNotifyAt()
+	return meuo
+}
+
+// SetNotifyError sets the "notify_error" field.
+func (meuo *MonitorEventUpdateOne) SetNotifyError(s string) *MonitorEventUpdateOne {
+	meuo.mutation.SetNotifyError(s)
+	return meuo
+}
+
+// SetNillableNotifyError sets the "notify_error" field if the given value is not nil.
+func (meuo *MonitorEventUpdateOne) SetNillableNotifyError(s *string) *MonitorEventUpdateOne {
+	if s != nil {
+		meuo.SetNotifyError(*s)
+	}
+	return meuo
+}
+
 // SetDetail sets the "detail" field.
 func (meuo *MonitorEventUpdateOne) SetDetail(m map[string]interface{}) *MonitorEventUpdateOne {
 	meuo.mutation.SetDetail(m)
@@ -1731,6 +1859,11 @@ func (meuo *MonitorEventUpdateOne) check() error {
 	if v, ok := meuo.mutation.ErrorType(); ok {
 		if err := monitorevent.ErrorTypeValidator(v); err != nil {
 			return &ValidationError{Name: "error_type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.error_type": %w`, err)}
+		}
+	}
+	if v, ok := meuo.mutation.NotifyError(); ok {
+		if err := monitorevent.NotifyErrorValidator(v); err != nil {
+			return &ValidationError{Name: "notify_error", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.notify_error": %w`, err)}
 		}
 	}
 	return nil
@@ -1917,6 +2050,21 @@ func (meuo *MonitorEventUpdateOne) sqlSave(ctx context.Context) (_node *MonitorE
 	}
 	if value, ok := meuo.mutation.ExpiresAt(); ok {
 		_spec.SetField(monitorevent.FieldExpiresAt, field.TypeTime, value)
+	}
+	if value, ok := meuo.mutation.LastNotifiedAt(); ok {
+		_spec.SetField(monitorevent.FieldLastNotifiedAt, field.TypeTime, value)
+	}
+	if meuo.mutation.LastNotifiedAtCleared() {
+		_spec.ClearField(monitorevent.FieldLastNotifiedAt, field.TypeTime)
+	}
+	if value, ok := meuo.mutation.NextNotifyAt(); ok {
+		_spec.SetField(monitorevent.FieldNextNotifyAt, field.TypeTime, value)
+	}
+	if meuo.mutation.NextNotifyAtCleared() {
+		_spec.ClearField(monitorevent.FieldNextNotifyAt, field.TypeTime)
+	}
+	if value, ok := meuo.mutation.NotifyError(); ok {
+		_spec.SetField(monitorevent.FieldNotifyError, field.TypeString, value)
 	}
 	if value, ok := meuo.mutation.Detail(); ok {
 		_spec.SetField(monitorevent.FieldDetail, field.TypeJSON, value)

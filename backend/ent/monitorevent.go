@@ -88,6 +88,12 @@ type MonitorEvent struct {
 	AutoResolveAt *time.Time `json:"auto_resolve_at,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt time.Time `json:"expires_at,omitempty"`
+	// LastNotifiedAt holds the value of the "last_notified_at" field.
+	LastNotifiedAt *time.Time `json:"last_notified_at,omitempty"`
+	// NextNotifyAt holds the value of the "next_notify_at" field.
+	NextNotifyAt *time.Time `json:"next_notify_at,omitempty"`
+	// NotifyError holds the value of the "notify_error" field.
+	NotifyError string `json:"notify_error,omitempty"`
 	// Detail holds the value of the "detail" field.
 	Detail       map[string]interface{} `json:"detail,omitempty"`
 	selectValues sql.SelectValues
@@ -102,9 +108,9 @@ func (*MonitorEvent) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case monitorevent.FieldID, monitorevent.FieldAPIKeyID, monitorevent.FieldUserID, monitorevent.FieldGroupID, monitorevent.FieldAccountID, monitorevent.FieldHTTPStatus, monitorevent.FieldUpstreamStatus, monitorevent.FieldCount:
 			values[i] = new(sql.NullInt64)
-		case monitorevent.FieldKind, monitorevent.FieldSeverity, monitorevent.FieldStatus, monitorevent.FieldSource, monitorevent.FieldSubjectType, monitorevent.FieldSubjectID, monitorevent.FieldFingerprint, monitorevent.FieldTitle, monitorevent.FieldMessage, monitorevent.FieldAPIKeyNameSnapshot, monitorevent.FieldAPIKeyPrefix, monitorevent.FieldUserEmailSnapshot, monitorevent.FieldAccountNameSnapshot, monitorevent.FieldPlatform, monitorevent.FieldPluginID, monitorevent.FieldTaskType, monitorevent.FieldMethod, monitorevent.FieldEndpoint, monitorevent.FieldRequestPath, monitorevent.FieldModel, monitorevent.FieldErrorCode, monitorevent.FieldErrorType:
+		case monitorevent.FieldKind, monitorevent.FieldSeverity, monitorevent.FieldStatus, monitorevent.FieldSource, monitorevent.FieldSubjectType, monitorevent.FieldSubjectID, monitorevent.FieldFingerprint, monitorevent.FieldTitle, monitorevent.FieldMessage, monitorevent.FieldAPIKeyNameSnapshot, monitorevent.FieldAPIKeyPrefix, monitorevent.FieldUserEmailSnapshot, monitorevent.FieldAccountNameSnapshot, monitorevent.FieldPlatform, monitorevent.FieldPluginID, monitorevent.FieldTaskType, monitorevent.FieldMethod, monitorevent.FieldEndpoint, monitorevent.FieldRequestPath, monitorevent.FieldModel, monitorevent.FieldErrorCode, monitorevent.FieldErrorType, monitorevent.FieldNotifyError:
 			values[i] = new(sql.NullString)
-		case monitorevent.FieldCreatedAt, monitorevent.FieldUpdatedAt, monitorevent.FieldResolvedAt, monitorevent.FieldIgnoredAt, monitorevent.FieldAutoResolveAt, monitorevent.FieldExpiresAt:
+		case monitorevent.FieldCreatedAt, monitorevent.FieldUpdatedAt, monitorevent.FieldResolvedAt, monitorevent.FieldIgnoredAt, monitorevent.FieldAutoResolveAt, monitorevent.FieldExpiresAt, monitorevent.FieldLastNotifiedAt, monitorevent.FieldNextNotifyAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -346,6 +352,26 @@ func (me *MonitorEvent) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				me.ExpiresAt = value.Time
 			}
+		case monitorevent.FieldLastNotifiedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field last_notified_at", values[i])
+			} else if value.Valid {
+				me.LastNotifiedAt = new(time.Time)
+				*me.LastNotifiedAt = value.Time
+			}
+		case monitorevent.FieldNextNotifyAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field next_notify_at", values[i])
+			} else if value.Valid {
+				me.NextNotifyAt = new(time.Time)
+				*me.NextNotifyAt = value.Time
+			}
+		case monitorevent.FieldNotifyError:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field notify_error", values[i])
+			} else if value.Valid {
+				me.NotifyError = value.String
+			}
 		case monitorevent.FieldDetail:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field detail", values[i])
@@ -512,6 +538,19 @@ func (me *MonitorEvent) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("expires_at=")
 	builder.WriteString(me.ExpiresAt.Format(time.ANSIC))
+	builder.WriteString(", ")
+	if v := me.LastNotifiedAt; v != nil {
+		builder.WriteString("last_notified_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := me.NextNotifyAt; v != nil {
+		builder.WriteString("next_notify_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("notify_error=")
+	builder.WriteString(me.NotifyError)
 	builder.WriteString(", ")
 	builder.WriteString("detail=")
 	builder.WriteString(fmt.Sprintf("%v", me.Detail))

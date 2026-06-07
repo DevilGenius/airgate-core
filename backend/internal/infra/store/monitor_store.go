@@ -79,14 +79,19 @@ func (s *MonitorStore) upsertOne(ctx context.Context, incoming appmonitor.Aggreg
 }
 
 func (s *MonitorStore) mergeActive(ctx context.Context, existing *ent.MonitorEvent, incoming appmonitor.AggregatedEvent) error {
+	existingSeverity := string(existing.Severity)
 	update := s.db.MonitorEvent.UpdateOneID(existing.ID).
 		AddCount(incoming.CountDelta).
-		SetSeverity(entmonitorevent.Severity(higherMonitorSeverity(string(existing.Severity), incoming.Severity)))
+		SetSeverity(entmonitorevent.Severity(higherMonitorSeverity(existingSeverity, incoming.Severity)))
 	if !incoming.UpdatedAt.Before(existing.UpdatedAt) {
 		update = setMonitorUpdateFields(update, incoming, false).
 			SetUpdatedAt(incoming.UpdatedAt).
 			SetExpiresAt(incoming.ExpiresAt)
 		update.SetNillableAutoResolveAt(incoming.AutoResolveAt)
+	}
+	if shouldArmNotifyOnMerge(existing, incoming.Severity) {
+		update.SetNextNotifyAt(incoming.UpdatedAt)
+		update.SetNotifyError("")
 	}
 	if err := update.Exec(ctx); err != nil && !ent.IsNotFound(err) {
 		return err
@@ -109,6 +114,13 @@ func (s *MonitorStore) mergeResolved(ctx context.Context, existing *ent.MonitorE
 		ClearIgnoredAt()
 	update = setMonitorUpdateFields(update, incoming, true)
 	update.SetNillableAutoResolveAt(incoming.AutoResolveAt)
+	update.ClearLastNotifiedAt()
+	update.SetNotifyError("")
+	if shouldNotifySeverity(incoming.Severity) {
+		update.SetNextNotifyAt(incoming.UpdatedAt)
+	} else {
+		update.ClearNextNotifyAt()
+	}
 	if err := update.Exec(ctx); err != nil && !ent.IsNotFound(err) {
 		return err
 	}
@@ -479,7 +491,7 @@ func monitorResolvePredicates(query monitoring.ResolveQuery) []predicate.Monitor
 }
 
 func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.AggregatedEvent) *ent.MonitorEventCreate {
-	return create.
+	create = create.
 		SetKind(entmonitorevent.Kind(event.Kind)).
 		SetSeverity(entmonitorevent.Severity(event.Severity)).
 		SetStatus(entmonitorevent.StatusActive).
@@ -514,6 +526,10 @@ func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.Agg
 		SetNillableAutoResolveAt(event.AutoResolveAt).
 		SetExpiresAt(event.ExpiresAt).
 		SetDetail(event.Detail)
+	if shouldNotifySeverity(event.Severity) {
+		create.SetNextNotifyAt(event.UpdatedAt)
+	}
+	return create
 }
 
 func setMonitorUpdateFields(update *ent.MonitorEventUpdateOne, event appmonitor.AggregatedEvent, replace bool) *ent.MonitorEventUpdateOne {
@@ -616,8 +632,72 @@ func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 		IgnoredAt:           row.IgnoredAt,
 		AutoResolveAt:       row.AutoResolveAt,
 		ExpiresAt:           row.ExpiresAt,
+		LastNotifiedAt:      row.LastNotifiedAt,
+		NextNotifyAt:        row.NextNotifyAt,
+		NotifyError:         row.NotifyError,
 		Detail:              detail,
 	}
+}
+
+// ListNotifyDue returns active error/critical events ready to notify.
+func (s *MonitorStore) ListNotifyDue(ctx context.Context, now time.Time, batchSize int) ([]appmonitor.Event, error) {
+	if s == nil || s.db == nil {
+		return nil, nil
+	}
+	if batchSize <= 0 {
+		batchSize = 100
+	}
+	rows, err := s.db.MonitorEvent.Query().
+		Where(
+			entmonitorevent.StatusEQ(entmonitorevent.StatusActive),
+			entmonitorevent.SeverityIn(entmonitorevent.SeverityError, entmonitorevent.SeverityCritical),
+			entmonitorevent.NextNotifyAtNotNil(),
+			entmonitorevent.NextNotifyAtLTE(now),
+		).
+		Order(ent.Asc(entmonitorevent.FieldNextNotifyAt), ent.Asc(entmonitorevent.FieldID)).
+		Limit(batchSize).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]appmonitor.Event, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, mapMonitorEvent(row))
+	}
+	return out, nil
+}
+
+// MarkNotified stores a successful notification attempt.
+func (s *MonitorStore) MarkNotified(ctx context.Context, id int, notifiedAt time.Time, nextNotifyAt time.Time) error {
+	if s == nil || s.db == nil || id <= 0 {
+		return nil
+	}
+	err := s.db.MonitorEvent.UpdateOneID(id).
+		Where(entmonitorevent.StatusEQ(entmonitorevent.StatusActive)).
+		SetLastNotifiedAt(notifiedAt).
+		SetNextNotifyAt(nextNotifyAt).
+		SetNotifyError("").
+		Exec(ctx)
+	if ent.IsNotFound(err) {
+		return nil
+	}
+	return err
+}
+
+// MarkNotifyFailed stores a failed notification attempt and retry time.
+func (s *MonitorStore) MarkNotifyFailed(ctx context.Context, id int, retryAt time.Time, reason string) error {
+	if s == nil || s.db == nil || id <= 0 {
+		return nil
+	}
+	err := s.db.MonitorEvent.UpdateOneID(id).
+		Where(entmonitorevent.StatusEQ(entmonitorevent.StatusActive)).
+		SetNextNotifyAt(retryAt).
+		SetNotifyError(truncateStoreString(reason, 500)).
+		Exec(ctx)
+	if ent.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func higherMonitorSeverity(left, right string) string {
@@ -638,6 +718,25 @@ func monitorSeverityRank(severity string) int {
 	default:
 		return 0
 	}
+}
+
+func shouldNotifySeverity(severity string) bool {
+	return severity == monitoring.SeverityError || severity == monitoring.SeverityCritical
+}
+
+func shouldArmNotifyOnMerge(existing *ent.MonitorEvent, incomingSeverity string) bool {
+	if existing == nil || !shouldNotifySeverity(incomingSeverity) {
+		return false
+	}
+	return existing.NextNotifyAt == nil || monitorSeverityRank(incomingSeverity) > monitorSeverityRank(string(existing.Severity))
+}
+
+func truncateStoreString(value string, limit int) string {
+	if limit <= 0 || len([]rune(value)) <= limit {
+		return value
+	}
+	runes := []rune(value)
+	return string(runes[:limit])
 }
 
 func sortSubjectCounts(items []appmonitor.SubjectCount) {

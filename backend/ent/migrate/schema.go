@@ -173,6 +173,9 @@ var (
 		{Name: "ignored_at", Type: field.TypeTime, Nullable: true},
 		{Name: "auto_resolve_at", Type: field.TypeTime, Nullable: true},
 		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "last_notified_at", Type: field.TypeTime, Nullable: true},
+		{Name: "next_notify_at", Type: field.TypeTime, Nullable: true},
+		{Name: "notify_error", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "detail", Type: field.TypeJSON, Nullable: true},
 	}
 	// MonitorEventsTable holds the schema information for the "monitor_events" table.
@@ -220,6 +223,11 @@ var (
 				Name:    "monitorevent_expires_at",
 				Unique:  false,
 				Columns: []*schema.Column{MonitorEventsColumns[35]},
+			},
+			{
+				Name:    "monitorevent_status_severity_next_notify_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[37]},
 			},
 		},
 	}

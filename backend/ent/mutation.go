@@ -5713,6 +5713,9 @@ type MonitorEventMutation struct {
 	ignored_at            *time.Time
 	auto_resolve_at       *time.Time
 	expires_at            *time.Time
+	last_notified_at      *time.Time
+	next_notify_at        *time.Time
+	notify_error          *string
 	detail                *map[string]interface{}
 	clearedFields         map[string]struct{}
 	done                  bool
@@ -7341,6 +7344,140 @@ func (m *MonitorEventMutation) ResetExpiresAt() {
 	m.expires_at = nil
 }
 
+// SetLastNotifiedAt sets the "last_notified_at" field.
+func (m *MonitorEventMutation) SetLastNotifiedAt(t time.Time) {
+	m.last_notified_at = &t
+}
+
+// LastNotifiedAt returns the value of the "last_notified_at" field in the mutation.
+func (m *MonitorEventMutation) LastNotifiedAt() (r time.Time, exists bool) {
+	v := m.last_notified_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastNotifiedAt returns the old "last_notified_at" field's value of the MonitorEvent entity.
+// If the MonitorEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorEventMutation) OldLastNotifiedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastNotifiedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastNotifiedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastNotifiedAt: %w", err)
+	}
+	return oldValue.LastNotifiedAt, nil
+}
+
+// ClearLastNotifiedAt clears the value of the "last_notified_at" field.
+func (m *MonitorEventMutation) ClearLastNotifiedAt() {
+	m.last_notified_at = nil
+	m.clearedFields[monitorevent.FieldLastNotifiedAt] = struct{}{}
+}
+
+// LastNotifiedAtCleared returns if the "last_notified_at" field was cleared in this mutation.
+func (m *MonitorEventMutation) LastNotifiedAtCleared() bool {
+	_, ok := m.clearedFields[monitorevent.FieldLastNotifiedAt]
+	return ok
+}
+
+// ResetLastNotifiedAt resets all changes to the "last_notified_at" field.
+func (m *MonitorEventMutation) ResetLastNotifiedAt() {
+	m.last_notified_at = nil
+	delete(m.clearedFields, monitorevent.FieldLastNotifiedAt)
+}
+
+// SetNextNotifyAt sets the "next_notify_at" field.
+func (m *MonitorEventMutation) SetNextNotifyAt(t time.Time) {
+	m.next_notify_at = &t
+}
+
+// NextNotifyAt returns the value of the "next_notify_at" field in the mutation.
+func (m *MonitorEventMutation) NextNotifyAt() (r time.Time, exists bool) {
+	v := m.next_notify_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNextNotifyAt returns the old "next_notify_at" field's value of the MonitorEvent entity.
+// If the MonitorEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorEventMutation) OldNextNotifyAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNextNotifyAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNextNotifyAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNextNotifyAt: %w", err)
+	}
+	return oldValue.NextNotifyAt, nil
+}
+
+// ClearNextNotifyAt clears the value of the "next_notify_at" field.
+func (m *MonitorEventMutation) ClearNextNotifyAt() {
+	m.next_notify_at = nil
+	m.clearedFields[monitorevent.FieldNextNotifyAt] = struct{}{}
+}
+
+// NextNotifyAtCleared returns if the "next_notify_at" field was cleared in this mutation.
+func (m *MonitorEventMutation) NextNotifyAtCleared() bool {
+	_, ok := m.clearedFields[monitorevent.FieldNextNotifyAt]
+	return ok
+}
+
+// ResetNextNotifyAt resets all changes to the "next_notify_at" field.
+func (m *MonitorEventMutation) ResetNextNotifyAt() {
+	m.next_notify_at = nil
+	delete(m.clearedFields, monitorevent.FieldNextNotifyAt)
+}
+
+// SetNotifyError sets the "notify_error" field.
+func (m *MonitorEventMutation) SetNotifyError(s string) {
+	m.notify_error = &s
+}
+
+// NotifyError returns the value of the "notify_error" field in the mutation.
+func (m *MonitorEventMutation) NotifyError() (r string, exists bool) {
+	v := m.notify_error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNotifyError returns the old "notify_error" field's value of the MonitorEvent entity.
+// If the MonitorEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorEventMutation) OldNotifyError(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNotifyError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNotifyError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNotifyError: %w", err)
+	}
+	return oldValue.NotifyError, nil
+}
+
+// ResetNotifyError resets all changes to the "notify_error" field.
+func (m *MonitorEventMutation) ResetNotifyError() {
+	m.notify_error = nil
+}
+
 // SetDetail sets the "detail" field.
 func (m *MonitorEventMutation) SetDetail(value map[string]interface{}) {
 	m.detail = &value
@@ -7424,7 +7561,7 @@ func (m *MonitorEventMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MonitorEventMutation) Fields() []string {
-	fields := make([]string, 0, 36)
+	fields := make([]string, 0, 39)
 	if m.kind != nil {
 		fields = append(fields, monitorevent.FieldKind)
 	}
@@ -7530,6 +7667,15 @@ func (m *MonitorEventMutation) Fields() []string {
 	if m.expires_at != nil {
 		fields = append(fields, monitorevent.FieldExpiresAt)
 	}
+	if m.last_notified_at != nil {
+		fields = append(fields, monitorevent.FieldLastNotifiedAt)
+	}
+	if m.next_notify_at != nil {
+		fields = append(fields, monitorevent.FieldNextNotifyAt)
+	}
+	if m.notify_error != nil {
+		fields = append(fields, monitorevent.FieldNotifyError)
+	}
 	if m.detail != nil {
 		fields = append(fields, monitorevent.FieldDetail)
 	}
@@ -7611,6 +7757,12 @@ func (m *MonitorEventMutation) Field(name string) (ent.Value, bool) {
 		return m.AutoResolveAt()
 	case monitorevent.FieldExpiresAt:
 		return m.ExpiresAt()
+	case monitorevent.FieldLastNotifiedAt:
+		return m.LastNotifiedAt()
+	case monitorevent.FieldNextNotifyAt:
+		return m.NextNotifyAt()
+	case monitorevent.FieldNotifyError:
+		return m.NotifyError()
 	case monitorevent.FieldDetail:
 		return m.Detail()
 	}
@@ -7692,6 +7844,12 @@ func (m *MonitorEventMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldAutoResolveAt(ctx)
 	case monitorevent.FieldExpiresAt:
 		return m.OldExpiresAt(ctx)
+	case monitorevent.FieldLastNotifiedAt:
+		return m.OldLastNotifiedAt(ctx)
+	case monitorevent.FieldNextNotifyAt:
+		return m.OldNextNotifyAt(ctx)
+	case monitorevent.FieldNotifyError:
+		return m.OldNotifyError(ctx)
 	case monitorevent.FieldDetail:
 		return m.OldDetail(ctx)
 	}
@@ -7948,6 +8106,27 @@ func (m *MonitorEventMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetExpiresAt(v)
 		return nil
+	case monitorevent.FieldLastNotifiedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastNotifiedAt(v)
+		return nil
+	case monitorevent.FieldNextNotifyAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNextNotifyAt(v)
+		return nil
+	case monitorevent.FieldNotifyError:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNotifyError(v)
+		return nil
 	case monitorevent.FieldDetail:
 		v, ok := value.(map[string]interface{})
 		if !ok {
@@ -8099,6 +8278,12 @@ func (m *MonitorEventMutation) ClearedFields() []string {
 	if m.FieldCleared(monitorevent.FieldAutoResolveAt) {
 		fields = append(fields, monitorevent.FieldAutoResolveAt)
 	}
+	if m.FieldCleared(monitorevent.FieldLastNotifiedAt) {
+		fields = append(fields, monitorevent.FieldLastNotifiedAt)
+	}
+	if m.FieldCleared(monitorevent.FieldNextNotifyAt) {
+		fields = append(fields, monitorevent.FieldNextNotifyAt)
+	}
 	if m.FieldCleared(monitorevent.FieldDetail) {
 		fields = append(fields, monitorevent.FieldDetail)
 	}
@@ -8142,6 +8327,12 @@ func (m *MonitorEventMutation) ClearField(name string) error {
 		return nil
 	case monitorevent.FieldAutoResolveAt:
 		m.ClearAutoResolveAt()
+		return nil
+	case monitorevent.FieldLastNotifiedAt:
+		m.ClearLastNotifiedAt()
+		return nil
+	case monitorevent.FieldNextNotifyAt:
+		m.ClearNextNotifyAt()
 		return nil
 	case monitorevent.FieldDetail:
 		m.ClearDetail()
@@ -8258,6 +8449,15 @@ func (m *MonitorEventMutation) ResetField(name string) error {
 		return nil
 	case monitorevent.FieldExpiresAt:
 		m.ResetExpiresAt()
+		return nil
+	case monitorevent.FieldLastNotifiedAt:
+		m.ResetLastNotifiedAt()
+		return nil
+	case monitorevent.FieldNextNotifyAt:
+		m.ResetNextNotifyAt()
+		return nil
+	case monitorevent.FieldNotifyError:
+		m.ResetNotifyError()
 		return nil
 	case monitorevent.FieldDetail:
 		m.ResetDetail()

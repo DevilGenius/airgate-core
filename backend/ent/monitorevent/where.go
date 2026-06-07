@@ -214,6 +214,21 @@ func ExpiresAt(v time.Time) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldExpiresAt, v))
 }
 
+// LastNotifiedAt applies equality check predicate on the "last_notified_at" field. It's identical to LastNotifiedAtEQ.
+func LastNotifiedAt(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEQ(FieldLastNotifiedAt, v))
+}
+
+// NextNotifyAt applies equality check predicate on the "next_notify_at" field. It's identical to NextNotifyAtEQ.
+func NextNotifyAt(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEQ(FieldNextNotifyAt, v))
+}
+
+// NotifyError applies equality check predicate on the "notify_error" field. It's identical to NotifyErrorEQ.
+func NotifyError(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEQ(FieldNotifyError, v))
+}
+
 // KindEQ applies the EQ predicate on the "kind" field.
 func KindEQ(v Kind) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldKind, v))
@@ -2117,6 +2132,171 @@ func ExpiresAtLT(v time.Time) predicate.MonitorEvent {
 // ExpiresAtLTE applies the LTE predicate on the "expires_at" field.
 func ExpiresAtLTE(v time.Time) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldLTE(FieldExpiresAt, v))
+}
+
+// LastNotifiedAtEQ applies the EQ predicate on the "last_notified_at" field.
+func LastNotifiedAtEQ(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEQ(FieldLastNotifiedAt, v))
+}
+
+// LastNotifiedAtNEQ applies the NEQ predicate on the "last_notified_at" field.
+func LastNotifiedAtNEQ(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNEQ(FieldLastNotifiedAt, v))
+}
+
+// LastNotifiedAtIn applies the In predicate on the "last_notified_at" field.
+func LastNotifiedAtIn(vs ...time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldIn(FieldLastNotifiedAt, vs...))
+}
+
+// LastNotifiedAtNotIn applies the NotIn predicate on the "last_notified_at" field.
+func LastNotifiedAtNotIn(vs ...time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNotIn(FieldLastNotifiedAt, vs...))
+}
+
+// LastNotifiedAtGT applies the GT predicate on the "last_notified_at" field.
+func LastNotifiedAtGT(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldGT(FieldLastNotifiedAt, v))
+}
+
+// LastNotifiedAtGTE applies the GTE predicate on the "last_notified_at" field.
+func LastNotifiedAtGTE(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldGTE(FieldLastNotifiedAt, v))
+}
+
+// LastNotifiedAtLT applies the LT predicate on the "last_notified_at" field.
+func LastNotifiedAtLT(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldLT(FieldLastNotifiedAt, v))
+}
+
+// LastNotifiedAtLTE applies the LTE predicate on the "last_notified_at" field.
+func LastNotifiedAtLTE(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldLTE(FieldLastNotifiedAt, v))
+}
+
+// LastNotifiedAtIsNil applies the IsNil predicate on the "last_notified_at" field.
+func LastNotifiedAtIsNil() predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldIsNull(FieldLastNotifiedAt))
+}
+
+// LastNotifiedAtNotNil applies the NotNil predicate on the "last_notified_at" field.
+func LastNotifiedAtNotNil() predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNotNull(FieldLastNotifiedAt))
+}
+
+// NextNotifyAtEQ applies the EQ predicate on the "next_notify_at" field.
+func NextNotifyAtEQ(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEQ(FieldNextNotifyAt, v))
+}
+
+// NextNotifyAtNEQ applies the NEQ predicate on the "next_notify_at" field.
+func NextNotifyAtNEQ(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNEQ(FieldNextNotifyAt, v))
+}
+
+// NextNotifyAtIn applies the In predicate on the "next_notify_at" field.
+func NextNotifyAtIn(vs ...time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldIn(FieldNextNotifyAt, vs...))
+}
+
+// NextNotifyAtNotIn applies the NotIn predicate on the "next_notify_at" field.
+func NextNotifyAtNotIn(vs ...time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNotIn(FieldNextNotifyAt, vs...))
+}
+
+// NextNotifyAtGT applies the GT predicate on the "next_notify_at" field.
+func NextNotifyAtGT(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldGT(FieldNextNotifyAt, v))
+}
+
+// NextNotifyAtGTE applies the GTE predicate on the "next_notify_at" field.
+func NextNotifyAtGTE(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldGTE(FieldNextNotifyAt, v))
+}
+
+// NextNotifyAtLT applies the LT predicate on the "next_notify_at" field.
+func NextNotifyAtLT(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldLT(FieldNextNotifyAt, v))
+}
+
+// NextNotifyAtLTE applies the LTE predicate on the "next_notify_at" field.
+func NextNotifyAtLTE(v time.Time) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldLTE(FieldNextNotifyAt, v))
+}
+
+// NextNotifyAtIsNil applies the IsNil predicate on the "next_notify_at" field.
+func NextNotifyAtIsNil() predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldIsNull(FieldNextNotifyAt))
+}
+
+// NextNotifyAtNotNil applies the NotNil predicate on the "next_notify_at" field.
+func NextNotifyAtNotNil() predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNotNull(FieldNextNotifyAt))
+}
+
+// NotifyErrorEQ applies the EQ predicate on the "notify_error" field.
+func NotifyErrorEQ(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEQ(FieldNotifyError, v))
+}
+
+// NotifyErrorNEQ applies the NEQ predicate on the "notify_error" field.
+func NotifyErrorNEQ(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNEQ(FieldNotifyError, v))
+}
+
+// NotifyErrorIn applies the In predicate on the "notify_error" field.
+func NotifyErrorIn(vs ...string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldIn(FieldNotifyError, vs...))
+}
+
+// NotifyErrorNotIn applies the NotIn predicate on the "notify_error" field.
+func NotifyErrorNotIn(vs ...string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNotIn(FieldNotifyError, vs...))
+}
+
+// NotifyErrorGT applies the GT predicate on the "notify_error" field.
+func NotifyErrorGT(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldGT(FieldNotifyError, v))
+}
+
+// NotifyErrorGTE applies the GTE predicate on the "notify_error" field.
+func NotifyErrorGTE(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldGTE(FieldNotifyError, v))
+}
+
+// NotifyErrorLT applies the LT predicate on the "notify_error" field.
+func NotifyErrorLT(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldLT(FieldNotifyError, v))
+}
+
+// NotifyErrorLTE applies the LTE predicate on the "notify_error" field.
+func NotifyErrorLTE(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldLTE(FieldNotifyError, v))
+}
+
+// NotifyErrorContains applies the Contains predicate on the "notify_error" field.
+func NotifyErrorContains(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldContains(FieldNotifyError, v))
+}
+
+// NotifyErrorHasPrefix applies the HasPrefix predicate on the "notify_error" field.
+func NotifyErrorHasPrefix(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldNotifyError, v))
+}
+
+// NotifyErrorHasSuffix applies the HasSuffix predicate on the "notify_error" field.
+func NotifyErrorHasSuffix(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldNotifyError, v))
+}
+
+// NotifyErrorEqualFold applies the EqualFold predicate on the "notify_error" field.
+func NotifyErrorEqualFold(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEqualFold(FieldNotifyError, v))
+}
+
+// NotifyErrorContainsFold applies the ContainsFold predicate on the "notify_error" field.
+func NotifyErrorContainsFold(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldContainsFold(FieldNotifyError, v))
 }
 
 // DetailIsNil applies the IsNil predicate on the "detail" field.

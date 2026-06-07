@@ -53,6 +53,9 @@ func (MonitorEvent) Fields() []ent.Field {
 		field.Time("ignored_at").Optional().Nillable(),
 		field.Time("auto_resolve_at").Optional().Nillable(),
 		field.Time("expires_at").Default(timeNow),
+		field.Time("last_notified_at").Optional().Nillable(),
+		field.Time("next_notify_at").Optional().Nillable(),
+		field.String("notify_error").Default("").MaxLen(500),
 		field.JSON("detail", map[string]interface{}{}).
 			Optional().
 			Default(map[string]interface{}{}),
@@ -69,5 +72,6 @@ func (MonitorEvent) Indexes() []ent.Index {
 		index.Fields("platform", "plugin_id", "status", "updated_at"),
 		index.Fields("status", "auto_resolve_at"),
 		index.Fields("expires_at"),
+		index.Fields("status", "severity", "next_notify_at"),
 	}
 }

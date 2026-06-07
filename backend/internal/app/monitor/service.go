@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 )
 
@@ -34,6 +36,13 @@ const (
 	dropLogInterval = time.Minute
 )
 
+var monitorNotifyUnlockScript = redis.NewScript(`
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+	return redis.call("DEL", KEYS[1])
+end
+return 0
+`)
+
 var (
 	bearerPattern = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+`)
 	skKeyPattern  = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{8,}\b`)
@@ -44,9 +53,17 @@ var (
 // Option customizes the monitor service.
 type Option func(*Service)
 
+// Notifier is the existing notification service surface used by monitor alerts.
+type Notifier interface {
+	IsConfigured(context.Context) (bool, error)
+	Send(context.Context, map[string]string) error
+}
+
 // Service provides best-effort temporary monitoring.
 type Service struct {
 	repo           Repository
+	notifier       Notifier
+	rdb            *redis.Client
 	queue          chan AggregatedEvent
 	retention      time.Duration
 	flushInterval  time.Duration
@@ -125,6 +142,20 @@ func WithRetention(retention time.Duration) Option {
 		if retention > 0 {
 			s.retention = retention
 		}
+	}
+}
+
+// WithNotifier enables monitor notifications through the existing notification service.
+func WithNotifier(notifier Notifier) Option {
+	return func(s *Service) {
+		s.notifier = notifier
+	}
+}
+
+// WithRedis enables cross-instance monitor notification claiming.
+func WithRedis(rdb *redis.Client) Option {
+	return func(s *Service) {
+		s.rdb = rdb
 	}
 }
 

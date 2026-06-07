@@ -351,8 +351,14 @@ func init() {
 	monitoreventDescExpiresAt := monitoreventFields[34].Descriptor()
 	// monitorevent.DefaultExpiresAt holds the default value on creation for the expires_at field.
 	monitorevent.DefaultExpiresAt = monitoreventDescExpiresAt.Default.(func() time.Time)
+	// monitoreventDescNotifyError is the schema descriptor for notify_error field.
+	monitoreventDescNotifyError := monitoreventFields[37].Descriptor()
+	// monitorevent.DefaultNotifyError holds the default value on creation for the notify_error field.
+	monitorevent.DefaultNotifyError = monitoreventDescNotifyError.Default.(string)
+	// monitorevent.NotifyErrorValidator is a validator for the "notify_error" field. It is called by the builders before save.
+	monitorevent.NotifyErrorValidator = monitoreventDescNotifyError.Validators[0].(func(string) error)
 	// monitoreventDescDetail is the schema descriptor for detail field.
-	monitoreventDescDetail := monitoreventFields[35].Descriptor()
+	monitoreventDescDetail := monitoreventFields[38].Descriptor()
 	// monitorevent.DefaultDetail holds the default value on creation for the detail field.
 	monitorevent.DefaultDetail = monitoreventDescDetail.Default.(map[string]interface{})
 	pluginFields := schema.Plugin{}.Fields()

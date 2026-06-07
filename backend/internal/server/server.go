@@ -12,6 +12,8 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	appmonitor "github.com/DevilGenius/airgate-core/internal/app/monitor"
+	appnotification "github.com/DevilGenius/airgate-core/internal/app/notification"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/bootstrap"
@@ -62,7 +64,14 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	calculator := billing.NewCalculator()
 	recorder := billing.NewRecorder(db, 0, rdb)
 	monitorStore := store.NewMonitorStore(db)
-	monitorService := appmonitor.NewService(monitorStore)
+	monitorSettingsStore := store.NewSettingsStore(db)
+	monitorSettingsService := appsettings.NewService(monitorSettingsStore)
+	monitorNotificationService := appnotification.NewService(monitorSettingsService)
+	monitorService := appmonitor.NewService(
+		monitorStore,
+		appmonitor.WithRedis(rdb),
+		appmonitor.WithNotifier(monitorNotificationService),
+	)
 
 	// 插件系统组件
 	pluginDir := cfg.Plugins.Dir

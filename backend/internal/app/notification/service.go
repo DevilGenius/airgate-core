@@ -37,6 +37,28 @@ func (s *Service) Send(ctx context.Context, values map[string]string) error {
 	return s.SendWithConfig(ctx, cfg, values)
 }
 
+// IsConfigured reports whether saved webhook notification settings are usable.
+func (s *Service) IsConfigured(ctx context.Context) (bool, error) {
+	if s == nil || s.settingsService == nil {
+		return false, nil
+	}
+	items, err := s.settingsService.List(ctx, GroupName)
+	if err != nil {
+		return false, fmt.Errorf("load notification settings: %w", err)
+	}
+	hasURL := false
+	hasBody := false
+	for _, item := range items {
+		switch item.Key {
+		case KeyWebhookURL:
+			hasURL = strings.TrimSpace(item.Value) != ""
+		case KeyWebhookBody:
+			hasBody = strings.TrimSpace(item.Value) != ""
+		}
+	}
+	return hasURL && hasBody, nil
+}
+
 // Test renders and sends a notification using unsaved form values from the settings page.
 func (s *Service) Test(ctx context.Context, webhookURL, secret, body string) error {
 	return s.SendWithConfig(ctx, notifier.WebhookConfig{

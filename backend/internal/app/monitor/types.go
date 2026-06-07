@@ -54,6 +54,9 @@ type Event struct {
 	IgnoredAt           *time.Time
 	AutoResolveAt       *time.Time
 	ExpiresAt           time.Time
+	LastNotifiedAt      *time.Time
+	NextNotifyAt        *time.Time
+	NotifyError         string
 	Detail              map[string]interface{}
 }
 
@@ -129,4 +132,7 @@ type Repository interface {
 	Summary(context.Context) (Summary, error)
 	CleanupExpired(context.Context, time.Time, int) (int, error)
 	AutoResolveDue(context.Context, time.Time, int) (int, error)
+	ListNotifyDue(context.Context, time.Time, int) ([]Event, error)
+	MarkNotified(context.Context, int, time.Time, time.Time) error
+	MarkNotifyFailed(context.Context, int, time.Time, string) error
 }

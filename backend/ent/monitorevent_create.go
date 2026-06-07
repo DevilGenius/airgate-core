@@ -494,6 +494,48 @@ func (mec *MonitorEventCreate) SetNillableExpiresAt(t *time.Time) *MonitorEventC
 	return mec
 }
 
+// SetLastNotifiedAt sets the "last_notified_at" field.
+func (mec *MonitorEventCreate) SetLastNotifiedAt(t time.Time) *MonitorEventCreate {
+	mec.mutation.SetLastNotifiedAt(t)
+	return mec
+}
+
+// SetNillableLastNotifiedAt sets the "last_notified_at" field if the given value is not nil.
+func (mec *MonitorEventCreate) SetNillableLastNotifiedAt(t *time.Time) *MonitorEventCreate {
+	if t != nil {
+		mec.SetLastNotifiedAt(*t)
+	}
+	return mec
+}
+
+// SetNextNotifyAt sets the "next_notify_at" field.
+func (mec *MonitorEventCreate) SetNextNotifyAt(t time.Time) *MonitorEventCreate {
+	mec.mutation.SetNextNotifyAt(t)
+	return mec
+}
+
+// SetNillableNextNotifyAt sets the "next_notify_at" field if the given value is not nil.
+func (mec *MonitorEventCreate) SetNillableNextNotifyAt(t *time.Time) *MonitorEventCreate {
+	if t != nil {
+		mec.SetNextNotifyAt(*t)
+	}
+	return mec
+}
+
+// SetNotifyError sets the "notify_error" field.
+func (mec *MonitorEventCreate) SetNotifyError(s string) *MonitorEventCreate {
+	mec.mutation.SetNotifyError(s)
+	return mec
+}
+
+// SetNillableNotifyError sets the "notify_error" field if the given value is not nil.
+func (mec *MonitorEventCreate) SetNillableNotifyError(s *string) *MonitorEventCreate {
+	if s != nil {
+		mec.SetNotifyError(*s)
+	}
+	return mec
+}
+
 // SetDetail sets the "detail" field.
 func (mec *MonitorEventCreate) SetDetail(m map[string]interface{}) *MonitorEventCreate {
 	mec.mutation.SetDetail(m)
@@ -630,6 +672,10 @@ func (mec *MonitorEventCreate) defaults() {
 	if _, ok := mec.mutation.ExpiresAt(); !ok {
 		v := monitorevent.DefaultExpiresAt()
 		mec.mutation.SetExpiresAt(v)
+	}
+	if _, ok := mec.mutation.NotifyError(); !ok {
+		v := monitorevent.DefaultNotifyError
+		mec.mutation.SetNotifyError(v)
 	}
 	if _, ok := mec.mutation.Detail(); !ok {
 		v := monitorevent.DefaultDetail
@@ -827,6 +873,14 @@ func (mec *MonitorEventCreate) check() error {
 	if _, ok := mec.mutation.ExpiresAt(); !ok {
 		return &ValidationError{Name: "expires_at", err: errors.New(`ent: missing required field "MonitorEvent.expires_at"`)}
 	}
+	if _, ok := mec.mutation.NotifyError(); !ok {
+		return &ValidationError{Name: "notify_error", err: errors.New(`ent: missing required field "MonitorEvent.notify_error"`)}
+	}
+	if v, ok := mec.mutation.NotifyError(); ok {
+		if err := monitorevent.NotifyErrorValidator(v); err != nil {
+			return &ValidationError{Name: "notify_error", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.notify_error": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -992,6 +1046,18 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 	if value, ok := mec.mutation.ExpiresAt(); ok {
 		_spec.SetField(monitorevent.FieldExpiresAt, field.TypeTime, value)
 		_node.ExpiresAt = value
+	}
+	if value, ok := mec.mutation.LastNotifiedAt(); ok {
+		_spec.SetField(monitorevent.FieldLastNotifiedAt, field.TypeTime, value)
+		_node.LastNotifiedAt = &value
+	}
+	if value, ok := mec.mutation.NextNotifyAt(); ok {
+		_spec.SetField(monitorevent.FieldNextNotifyAt, field.TypeTime, value)
+		_node.NextNotifyAt = &value
+	}
+	if value, ok := mec.mutation.NotifyError(); ok {
+		_spec.SetField(monitorevent.FieldNotifyError, field.TypeString, value)
+		_node.NotifyError = value
 	}
 	if value, ok := mec.mutation.Detail(); ok {
 		_spec.SetField(monitorevent.FieldDetail, field.TypeJSON, value)
