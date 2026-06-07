@@ -6,7 +6,7 @@ import { getPluginAccountIdentity } from '../../../app/plugin-frontend-registry'
 import { accountsApi } from '../../../shared/api/accounts';
 import { queryKeys } from '../../../shared/queryKeys';
 import type { AccountResp } from '../../../shared/types';
-import { PlatformIcon, useToast } from '../../../shared/ui';
+import { useToast } from '../../../shared/ui';
 import {
   AccountCapacityChip,
   AccountRowActions,
@@ -483,10 +483,13 @@ export function useAccountTableColumns({
     clearCooldowns: t('accounts.clear_family_cooldowns'),
     delete: t('common.delete'),
     edit: t('common.edit'),
+    editShort: t('common.edit'),
     more: t('common.more'),
     refreshQuota: t('accounts.refresh_quota'),
     stats: t('accounts.view_stats'),
+    statsShort: t('accounts.stats_short', '统计'),
     test: t('accounts.test_connection'),
+    testShort: t('common.test'),
   }), [t]);
 
   const accountUsageLabels = useMemo<AccountUsageMetricLabels>(() => ({
@@ -534,8 +537,7 @@ export function useAccountTableColumns({
         const PluginAccountIdentity = getPluginAccountIdentity(row.platform);
         return (
           <div className="flex w-full min-w-0 flex-col items-center gap-1 text-center">
-            <span className="inline-flex max-w-full min-w-0 items-center justify-center gap-1">
-              <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" />
+            <span className="inline-flex max-w-full min-w-0 items-center justify-center">
               <span className="min-w-0 truncate">{platformName(row.platform)}</span>
             </span>
             {PluginAccountIdentity ? (
@@ -574,7 +576,6 @@ export function useAccountTableColumns({
               <span
                 key={`${name}:${index}`}
                 className="ag-account-group-chip"
-                style={ACCOUNT_GROUP_CARD_STYLE}
               >
                 {name}
               </span>

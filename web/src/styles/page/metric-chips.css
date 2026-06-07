@@ -63,13 +63,41 @@
 
 :is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip {
   display: inline-grid !important;
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
   grid-template-columns: 2.75rem minmax(5.25rem, 1fr);
   align-items: center;
+  border: 1px solid transparent;
   border-radius: 0.25rem !important;
   color: var(--ag-text) !important;
   gap: 0.375rem;
+  padding: 0.125rem 0.5rem;
+}
+
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip[data-tone="default"] {
+  border-color: color-mix(in oklab, var(--ag-border) 88%, transparent);
+  background: var(--ag-default-bg);
+}
+
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip[data-tone="accent"] {
+  border-color: color-mix(in oklab, var(--ag-primary) 28%, transparent);
+  background: var(--ag-primary-subtle);
+}
+
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip[data-tone="warning"] {
+  border-color: color-mix(in oklab, var(--ag-warning) 28%, transparent);
+  background: var(--ag-warning-subtle);
+}
+
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip[data-tone="success"] {
+  border-color: color-mix(in oklab, var(--ag-success) 28%, transparent);
+  background: var(--ag-success-subtle);
+}
+
+:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip[data-tone="danger"] {
+  border-color: color-mix(in oklab, var(--ag-danger) 28%, transparent);
+  background: var(--ag-danger-subtle);
 }
 
 :is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip-content {
@@ -132,4 +160,3 @@
 :is(.ag-api-keys-table, .ag-groups-table) .ag-metric-infinity {
   font-weight: 800;
 }
-

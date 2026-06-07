@@ -1,7 +1,7 @@
 import { memo, startTransition, useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, Eraser, MoreHorizontal, Pencil, RefreshCw, Trash2, Zap } from 'lucide-react';
+import { Eraser, RefreshCw, Trash2 } from 'lucide-react';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { AccountResp } from '../../../shared/types';
 
@@ -706,10 +706,13 @@ export const AccountRowActions = memo(function AccountRowActions({
     clearCooldowns: string;
     delete: string;
     edit: string;
+    editShort: string;
     more: string;
     refreshQuota: string;
     stats: string;
+    statsShort: string;
     test: string;
+    testShort: string;
   };
   onEdit: (row: AccountResp) => void;
   onDelete: (row: AccountResp) => void;
@@ -723,35 +726,38 @@ export const AccountRowActions = memo(function AccountRowActions({
       <button
         type="button"
         aria-label={labels.edit}
+        title={labels.edit}
         className="ag-account-row-action-button"
         onClick={(event) => {
           event.stopPropagation();
           onEdit(row);
         }}
       >
-        <Pencil className="w-3.5 h-3.5" />
+        <span className="ag-account-row-action-label">{labels.editShort}</span>
       </button>
       <button
         type="button"
         aria-label={labels.test}
+        title={labels.test}
         className="ag-account-row-action-button"
         onClick={(event) => {
           event.stopPropagation();
           onTest(row);
         }}
       >
-        <Zap className="w-3.5 h-3.5" />
+        <span className="ag-account-row-action-label">{labels.testShort}</span>
       </button>
       <button
         type="button"
         aria-label={labels.stats}
+        title={labels.stats}
         className="ag-account-row-action-button ag-account-row-action-button--stats"
         onClick={(event) => {
           event.stopPropagation();
           onStats(row.id);
         }}
       >
-        <BarChart3 className="w-3.5 h-3.5" />
+        <span className="ag-account-row-action-label">{labels.statsShort}</span>
       </button>
       <AccountRowOverflowMenu
         row={row}
@@ -881,10 +887,11 @@ const AccountRowOverflowMenu = memo(function AccountRowOverflowMenu({
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label={labels.more}
+        title={labels.more}
         className="ag-account-row-more-trigger ag-account-row-action-button"
         onClick={toggleMenu}
       >
-        <MoreHorizontal className="w-3.5 h-3.5" />
+        <span aria-hidden="true" className="ag-account-row-more-dots" />
       </button>
       {isOpen && position && typeof document !== 'undefined' ? createPortal(
         <div

@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
 import {
   getPluginUsageCostDetail,
   getPluginUsageMetricDetail,
@@ -33,7 +32,7 @@ export interface UsageColumnConfig<T extends UsageRow = UsageRow> {
   render: (row: T) => ReactNode;
 }
 
-const RICH_TOOLTIP_TRIGGER_CLASS = 'flex h-full w-full cursor-default items-center justify-center rounded-[var(--radius)] px-1.5 py-0 text-center transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
+const RICH_TOOLTIP_TRIGGER_CLASS = 'flex h-full w-full cursor-default items-center justify-center rounded-[var(--radius)] px-1.5 py-0 text-center transition-colors hover:bg-bg-hover';
 const RICH_TOOLTIP_OFFSET_PX = 8;
 const RICH_TOOLTIP_VIEWPORT_PADDING_PX = 8;
 const RICH_TOOLTIP_WIDTH_PX = 336;
@@ -93,11 +92,6 @@ function RichTooltip({
     setPosition(null);
   }, []);
 
-  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLSpanElement>) => {
-    if (event.key !== 'Escape') return;
-    closeTooltip();
-  }, [closeTooltip]);
-
   useEffect(() => {
     if (!isOpen) return undefined;
     updatePosition();
@@ -114,10 +108,6 @@ function RichTooltip({
       <span
         ref={triggerRef}
         className={RICH_TOOLTIP_TRIGGER_CLASS}
-        tabIndex={0}
-        onBlur={closeTooltip}
-        onFocus={openTooltip}
-        onKeyDown={handleKeyDown}
         onMouseEnter={openTooltip}
         onMouseLeave={closeTooltip}
       >
@@ -315,24 +305,20 @@ const USAGE_DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN');
 /** 单行 token 数据行：固定宽度图标 + 右对齐等宽数字 */
 function TokenRow({
   color,
-  icon,
+  marker,
   value,
 }: {
   color: string;
-  icon: ReactNode;
+  marker: 'input' | 'output' | 'cache-read' | 'cache-create';
   value: string;
 }) {
   return (
     <div className="grid grid-cols-[1rem_minmax(0,1fr)] items-center gap-1">
       <span
-        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[var(--radius)] leading-none"
-        style={{
-          background: `color-mix(in srgb, ${color} 18%, transparent)`,
-          color,
-        }}
-      >
-        <span className="flex h-3 w-3 shrink-0 items-center justify-center">{icon}</span>
-      </span>
+        aria-hidden="true"
+        className={`ag-usage-token-marker ag-usage-token-marker--${marker}`}
+        style={{ '--ag-usage-token-color': color } as CSSProperties}
+      />
       <span
         className="w-[3.5rem] justify-self-center truncate text-center font-mono text-xs font-semibold tabular-nums leading-none"
         style={{ color }}
@@ -801,12 +787,12 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
                 <div className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-px">
                   <TokenRow
                     color={USAGE_TOKEN_COLORS.input}
-                    icon={<ArrowDown className="h-3 w-3 shrink-0" />}
+                    marker="input"
                     value={fmtNum(inputTokens)}
                   />
                   <TokenRow
                     color={USAGE_TOKEN_COLORS.output}
-                    icon={<ArrowUp className="h-3 w-3 shrink-0" />}
+                    marker="output"
                     value={fmtNum(outputTokens)}
                   />
                   {(hasCacheRead || hasCacheWrite) ? (
@@ -814,14 +800,14 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
                       {hasCacheRead ? (
                         <TokenRow
                           color={USAGE_TOKEN_COLORS.cacheRead}
-                          icon={<BookOpen className="h-3 w-3 shrink-0" />}
+                          marker="cache-read"
                           value={fmtNum(cacheReadTokens)}
                         />
                       ) : <div />}
                       {hasCacheWrite ? (
                         <TokenRow
                           color={USAGE_TOKEN_COLORS.cacheCreation}
-                          icon={<Sparkles className="h-3 w-3 shrink-0" />}
+                          marker="cache-create"
                           value={fmtNum(cacheCreationTokens)}
                         />
                       ) : <div />}

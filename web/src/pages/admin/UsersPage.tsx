@@ -1,7 +1,7 @@
 import { startTransition, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Chip, Dropdown, EmptyState, Spinner } from '@heroui/react';
+import { AlertDialog, Button, EmptyState, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { usersApi } from '../../shared/api/users';
 import { settingsApi } from '../../shared/api/settings';
@@ -15,6 +15,7 @@ import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { TablePage } from '../../shared/components/TablePage';
+import { TableRowMoreMenu } from '../../shared/components/TableRowMoreMenu';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { getAvatarColor } from '../../shared/utils/avatar';
@@ -26,13 +27,65 @@ import { UserApiKeysModal } from './users/UserApiKeysModal';
 import { BalanceHistoryModal } from './users/BalanceHistoryModal';
 import { UserGroupsModal } from './users/UserGroupsModal';
 import type { UserResp } from '../../shared/types';
-import {
-  Plus, Pencil, RefreshCw,
-  KeyRound, Users, PlusCircle, MinusCircle, Clock, Trash2,
-  MoreHorizontal,
-} from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 
 const FALLBACK_DEFAULT_USER_MAX_CONCURRENCY = 5;
+
+type UserRowActionTone = 'default' | 'danger' | 'info' | 'muted' | 'primary' | 'success' | 'warning';
+
+function NativeUserRoleChip({
+  children,
+  tone,
+}: {
+  children: string;
+  tone: 'default' | 'warning';
+}) {
+  return (
+    <span className="ag-users-role-chip" data-tone={tone}>
+      <span className="ag-users-role-chip__label">{children}</span>
+    </span>
+  );
+}
+
+function UserRowActionButton({
+  ariaLabel,
+  children,
+  isCircleSymbol = false,
+  onClick,
+  title,
+  tone = 'default',
+}: {
+  ariaLabel: string;
+  children: string;
+  isCircleSymbol?: boolean;
+  onClick: () => void;
+  title?: string;
+  tone?: UserRowActionTone;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      className="ag-table-row-native-action"
+      data-tone={tone}
+      title={title ?? ariaLabel}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      <span className="sr-only">{ariaLabel}</span>
+      <span
+        aria-hidden="true"
+        className={isCircleSymbol
+          ? 'ag-table-row-native-action__label ag-table-row-native-action__label--circle'
+          : 'ag-table-row-native-action__label'}
+      >
+        {children}
+      </span>
+    </button>
+  );
+}
 
 function defaultUserMaxConcurrency(settings?: Array<{ key: string; value: string }>) {
   const raw = settings?.find((item) => item.key === 'default_concurrency')?.value;
@@ -234,9 +287,9 @@ export default function UsersPage() {
                       <span className="text-text-secondary">{row.username || '-'}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <Chip color={row.role === 'admin' ? 'accent' : 'default'} size="sm" variant="soft">
+                      <NativeUserRoleChip tone={row.role === 'admin' ? 'warning' : 'default'}>
                         {row.role === 'admin' ? t('users.role_admin') : t('users.role_user')}
-                      </Chip>
+                      </NativeUserRoleChip>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <span className="font-mono">${row.balance.toFixed(2)}</span>
@@ -262,85 +315,69 @@ export default function UsersPage() {
                       <span className="text-xs text-text-secondary">{formatDateTime(row.created_at)}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="secondary"
-                          aria-label={t('common.edit')}
-                          onPress={() => setEditingUser(row)}
+                      <div className="ag-table-row-actions ag-users-row-actions flex items-center justify-center gap-0.5">
+                        <UserRowActionButton
+                          ariaLabel={t('common.edit')}
+                          title={t('common.edit')}
+                          onClick={() => setEditingUser(row)}
                         >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="secondary"
-                          aria-label={t('users.api_keys')}
-                          onPress={() => setApiKeysUser(row)}
+                          {t('common.edit_short', '编辑')}
+                        </UserRowActionButton>
+                        <UserRowActionButton
+                          ariaLabel={t('users.api_keys')}
+                          title={t('users.api_keys')}
+                          tone="primary"
+                          onClick={() => setApiKeysUser(row)}
                         >
-                          <KeyRound className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
-                        </Button>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="secondary"
-                          aria-label={t('users.groups')}
-                          onPress={() => setGroupsUser(row)}
+                          {t('users.api_keys_short', '密钥')}
+                        </UserRowActionButton>
+                        <UserRowActionButton
+                          ariaLabel={t('users.groups')}
+                          title={t('users.groups')}
+                          tone="info"
+                          onClick={() => setGroupsUser(row)}
                         >
-                          <Users className="w-3.5 h-3.5" style={{ color: 'var(--ag-info)' }} />
-                        </Button>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="secondary"
-                          aria-label={t('users.topup')}
-                          onPress={() => setBalanceUser({ user: row, defaultAction: 'add' })}
+                          {t('users.groups_short', '分组')}
+                        </UserRowActionButton>
+                        <UserRowActionButton
+                          ariaLabel={t('users.topup')}
+                          title={t('users.topup')}
+                          tone="success"
+                          isCircleSymbol
+                          onClick={() => setBalanceUser({ user: row, defaultAction: 'add' })}
                         >
-                          <PlusCircle className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
-                        </Button>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="secondary"
-                          aria-label={t('users.refund')}
-                          onPress={() => setBalanceUser({ user: row, defaultAction: 'subtract' })}
+                          +
+                        </UserRowActionButton>
+                        <UserRowActionButton
+                          ariaLabel={t('users.refund')}
+                          title={t('users.refund')}
+                          tone="warning"
+                          isCircleSymbol
+                          onClick={() => setBalanceUser({ user: row, defaultAction: 'subtract' })}
                         >
-                          <MinusCircle className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                        </Button>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="secondary"
-                          aria-label={t('users.balance_history')}
-                          onPress={() => setBalanceHistoryUser(row)}
+                          -
+                        </UserRowActionButton>
+                        <UserRowActionButton
+                          ariaLabel={t('users.balance_history')}
+                          title={t('users.balance_history')}
+                          tone="muted"
+                          onClick={() => setBalanceHistoryUser(row)}
                         >
-                          <Clock className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-                        </Button>
+                          {t('users.balance_history_short', '记录')}
+                        </UserRowActionButton>
                         {row.role !== 'admin' ? (
-                          <Dropdown>
-                            <Dropdown.Trigger
-                              aria-label={t('common.more')}
-                              className="ag-table-row-more-trigger button button--icon-only button--sm button--secondary"
-                            >
-                              <MoreHorizontal className="w-3.5 h-3.5" />
-                            </Dropdown.Trigger>
-                            <Dropdown.Popover placement="bottom end">
-                              <Dropdown.Menu
-                                aria-label={t('common.actions')}
-                                onAction={(key) => {
-                                  if (String(key) === 'delete') setDeletingUser(row);
-                                }}
-                              >
-                                <Dropdown.Item id="delete" className="text-danger" textValue={t('common.delete')}>
-                                  <span className="flex items-center gap-2">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    {t('common.delete')}
-                                  </span>
-                                </Dropdown.Item>
-                              </Dropdown.Menu>
-                            </Dropdown.Popover>
-                          </Dropdown>
+                          <TableRowMoreMenu
+                            ariaLabel={t('common.more')}
+                            menuLabel={t('common.actions')}
+                            items={[
+                              {
+                                key: 'delete',
+                                label: t('common.delete'),
+                                onSelect: () => setDeletingUser(row),
+                                tone: 'danger',
+                              },
+                            ]}
+                          />
                         ) : null}
                       </div>
                     </CommonTable.Cell>
