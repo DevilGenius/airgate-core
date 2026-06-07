@@ -16,6 +16,7 @@
 .ag-sidebar-nav {
   font-synthesis: none;
   text-rendering: geometricPrecision;
+  touch-action: pan-y;
 }
 
 .ag-sidebar-nav-item {
@@ -224,6 +225,7 @@
   flex-direction: column;
   gap: 0.125rem;
   overflow: visible;
+  touch-action: pan-y;
 }
 
 .ag-toolbar-menu-item {

@@ -37,15 +37,15 @@
 }
 
 .ag-auto-refresh-trigger--account-fixed {
-  width: 9.5rem !important;
-  min-width: 9.5rem !important;
+  width: 8rem !important;
+  min-width: 8rem !important;
   height: 2.5rem !important;
   min-height: 2.5rem !important;
 }
 
 .ag-auto-refresh-trigger--toolbar-fixed {
-  width: 9.5rem !important;
-  min-width: 9.5rem !important;
+  width: 8rem !important;
+  min-width: 8rem !important;
   height: 2.5rem !important;
   min-height: 2.5rem !important;
 }

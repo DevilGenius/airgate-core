@@ -1,6 +1,7 @@
 import {
   memo,
   useCallback,
+  useRef,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
@@ -63,17 +64,25 @@ const SidebarNavLink = memo(function SidebarNavLink({
   const navigate = useCallback(() => {
     onNavigate(item.path);
   }, [item.path, onNavigate]);
+  const navigatedOnPointerDownRef = useRef(false);
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLAnchorElement>) => {
+    navigatedOnPointerDownRef.current = false;
     if (event.button !== 0 || isModifiedNavigation(event)) return;
+    if (event.pointerType && event.pointerType !== 'mouse') return;
     event.preventDefault();
+    navigatedOnPointerDownRef.current = true;
     navigate();
   }, [navigate]);
 
   const handleClick = useCallback((event: ReactMouseEvent<HTMLAnchorElement>) => {
     if (event.button !== 0 || isModifiedNavigation(event)) return;
     event.preventDefault();
-    if (event.detail === 0) navigate();
+    if (navigatedOnPointerDownRef.current) {
+      navigatedOnPointerDownRef.current = false;
+      return;
+    }
+    navigate();
   }, [navigate]);
 
   return (

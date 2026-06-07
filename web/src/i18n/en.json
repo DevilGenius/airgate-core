@@ -320,7 +320,7 @@
   "accounts": {
     "title": "Accounts",
     "description": "Manage upstream platform accounts, authentication details and scheduling",
-    "create": "Add Account",
+    "create": "Add",
     "edit": "Edit",
     "platform": "Platform",
     "group": "Group",
@@ -387,7 +387,7 @@
     "subscription": "Subscription",
     "subscription_expired": "Expired",
     "capacity": "Capacity",
-    "capacity_auto_refresh": "Capacity refresh",
+    "capacity_auto_refresh": "Capacity",
     "scheduling": "Scheduling",
     "groups": "Groups",
     "last_used": "Last Used",

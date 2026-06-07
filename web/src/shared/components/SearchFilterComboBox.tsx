@@ -50,6 +50,7 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
   });
   const isOpenRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const selectedOnPointerDownRef = useRef(false);
 
   const closeDropdown = useCallback(() => {
     if (!isOpenRef.current) return;
@@ -118,7 +119,7 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
     }
   };
 
-  const handleSelect = (value: string) => {
+  const handleSelect = useCallback((value: string) => {
     const option = items.find((item) => item.id === value);
     const label = option?.label ? String(option.label) : '';
     setInputValue(label);
@@ -126,7 +127,24 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
     setIsOpen(false);
     onSelectionChange(value, label);
     emitSearchChange(label);
-  };
+  }, [emitSearchChange, items, onSelectionChange, setInputValue]);
+
+  const handleOptionPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>, value: string) => {
+    selectedOnPointerDownRef.current = false;
+    if (event.button !== 0) return;
+    if (event.pointerType && event.pointerType !== 'mouse') return;
+    event.preventDefault();
+    selectedOnPointerDownRef.current = true;
+    handleSelect(value);
+  }, [handleSelect]);
+
+  const handleOptionClick = useCallback((value: string) => {
+    if (selectedOnPointerDownRef.current) {
+      selectedOnPointerDownRef.current = false;
+      return;
+    }
+    handleSelect(value);
+  }, [handleSelect]);
 
   const emptyStateLabel = isLoading && inputValue.trim() ? loadingLabel : (inputValue.trim() ? noDataLabel : emptyPrompt);
 
@@ -157,15 +175,8 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
                 aria-selected={selectedKey === item.id}
                 className="ag-search-combobox-item"
                 role="option"
-                onClick={(event) => {
-                  if (event.detail !== 0) return;
-                  handleSelect(item.id);
-                }}
-                onPointerDown={(event) => {
-                  if (event.button !== 0) return;
-                  event.preventDefault();
-                  handleSelect(item.id);
-                }}
+                onClick={() => handleOptionClick(item.id)}
+                onPointerDown={(event) => handleOptionPointerDown(event, item.id)}
               >
                 <span className="ag-search-combobox-item-label">{item.label}</span>
                 {item.description ? (

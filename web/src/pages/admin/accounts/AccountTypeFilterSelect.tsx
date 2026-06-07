@@ -26,6 +26,7 @@ export function AccountTypeFilterSelect({
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
   const [isOAuthPlanMenuOpen, setIsOAuthPlanMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const selectedOnPointerDownRef = useRef(false);
   const selectedNode: ReactNode = selectedOption
     ? renderAccountTypeFilterOption(selectedOption)
     : t('accounts.all_types', '全部类型');
@@ -62,13 +63,19 @@ export function AccountTypeFilterSelect({
   }, [toggleTypeMenu]);
 
   const handleItemPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>, value: string) => {
+    selectedOnPointerDownRef.current = false;
     if (event.button !== 0) return;
+    if (event.pointerType && event.pointerType !== 'mouse') return;
     event.preventDefault();
+    selectedOnPointerDownRef.current = true;
     selectTypeFilter(value);
   }, [selectTypeFilter]);
 
-  const handleItemClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>, value: string) => {
-    if (event.detail !== 0) return;
+  const handleItemClick = useCallback((value: string) => {
+    if (selectedOnPointerDownRef.current) {
+      selectedOnPointerDownRef.current = false;
+      return;
+    }
     selectTypeFilter(value);
   }, [selectTypeFilter]);
 
@@ -117,7 +124,7 @@ export function AccountTypeFilterSelect({
             className="ag-account-type-menu-item"
             onPointerEnter={() => setIsOAuthPlanMenuOpen(false)}
             onFocus={() => setIsOAuthPlanMenuOpen(false)}
-            onClick={(event) => handleItemClick(event, '')}
+            onClick={() => handleItemClick('')}
             onPointerDown={(event) => handleItemPointerDown(event, '')}
           >
             {typeOptions[0]?.label ?? t('accounts.all_types', '全部类型')}
@@ -132,7 +139,7 @@ export function AccountTypeFilterSelect({
               role="menuitem"
               className="ag-account-type-menu-item"
               onFocus={() => setIsOAuthPlanMenuOpen(true)}
-              onClick={(event) => handleItemClick(event, 'oauth')}
+              onClick={() => handleItemClick('oauth')}
               onPointerDown={(event) => handleItemPointerDown(event, 'oauth')}
             >
               <span className="truncate">OAuth</span>
@@ -149,7 +156,7 @@ export function AccountTypeFilterSelect({
                         type="button"
                         role="menuitem"
                         className="ag-account-type-submenu-item"
-                        onClick={(event) => handleItemClick(event, plan.id)}
+                        onClick={() => handleItemClick(plan.id)}
                         onPointerDown={(event) => handleItemPointerDown(event, plan.id)}
                       >
                         {renderAccountTypeFilterOption(plan, false)}
@@ -170,7 +177,7 @@ export function AccountTypeFilterSelect({
             className="ag-account-type-menu-item"
             onPointerEnter={() => setIsOAuthPlanMenuOpen(false)}
             onFocus={() => setIsOAuthPlanMenuOpen(false)}
-            onClick={(event) => handleItemClick(event, 'apikey')}
+            onClick={() => handleItemClick('apikey')}
             onPointerDown={(event) => handleItemPointerDown(event, 'apikey')}
           >
             API Key
