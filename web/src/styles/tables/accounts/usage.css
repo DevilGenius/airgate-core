@@ -129,6 +129,30 @@
   box-shadow: var(--shadow-sm);
 }
 
+.ag-accounts-table .ag-account-usage-metric[data-tone="info"] {
+  border-color: color-mix(in srgb, var(--ag-info) 22%, var(--ag-border));
+  background: color-mix(in srgb, var(--ag-info) 10%, transparent);
+  color: var(--ag-info);
+}
+
+.ag-accounts-table .ag-account-usage-metric[data-tone="primary"] {
+  border-color: color-mix(in srgb, var(--ag-primary) 22%, var(--ag-border));
+  background: color-mix(in srgb, var(--ag-primary) 10%, transparent);
+  color: var(--ag-primary);
+}
+
+.ag-accounts-table .ag-account-usage-metric[data-tone="warning"] {
+  border-color: color-mix(in srgb, var(--ag-warning) 22%, var(--ag-border));
+  background: color-mix(in srgb, var(--ag-warning) 10%, transparent);
+  color: var(--ag-text);
+}
+
+.ag-accounts-table .ag-account-usage-metric[data-tone="success"] {
+  border-color: color-mix(in srgb, var(--ag-success) 22%, var(--ag-border));
+  background: color-mix(in srgb, var(--ag-success) 10%, transparent);
+  color: var(--ag-text);
+}
+
 .ag-accounts-table .ag-account-usage-metric-label,
 .ag-accounts-table .ag-account-usage-metric-value {
   display: inline-flex;
@@ -159,3 +183,26 @@
   text-align: center;
 }
 
+.ag-accounts-table .ag-account-usage-metric-segment {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ag-accounts-table .ag-account-usage-metric-separator {
+  flex: 0 0 auto;
+  padding-inline: 0.0625rem;
+  opacity: 0.8;
+}
+
+.ag-accounts-table .ag-account-usage-metric-currency {
+  flex: 0 0 auto;
+}
+
+.ag-accounts-table .ag-account-usage-metric[data-tone="warning"] .ag-account-usage-metric-currency {
+  color: var(--ag-warning);
+}
+
+.ag-accounts-table .ag-account-usage-metric[data-tone="success"] .ag-account-usage-metric-currency {
+  color: var(--ag-success);
+}
