@@ -52,7 +52,7 @@ func TestNormalizeAccountUsageWindowContractFields(t *testing.T) {
 	}
 }
 
-func TestUsageCacheExpiresAtUsesEarlierResetOrFiveHours(t *testing.T) {
+func TestUsageCacheExpiresAtKeepsWindowsUntilTheirOwnReset(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 
 	accounts := map[string]AccountUsageInfo{
@@ -63,7 +63,7 @@ func TestUsageCacheExpiresAtUsesEarlierResetOrFiveHours(t *testing.T) {
 			},
 		},
 	}
-	if got, want := usageCacheExpiresAt(accounts, now), now.Add(3*time.Hour); !got.Equal(want) {
+	if got, want := usageCacheExpiresAt(accounts, now), now.Add(7*24*time.Hour); !got.Equal(want) {
 		t.Fatalf("expiresAt = %s, want %s", got, want)
 	}
 
@@ -72,8 +72,47 @@ func TestUsageCacheExpiresAtUsesEarlierResetOrFiveHours(t *testing.T) {
 			{Key: "7d", ResetSeconds: int64((7 * 24 * time.Hour).Seconds())},
 		},
 	}
-	if got, want := usageCacheExpiresAt(accounts, now), now.Add(usageCacheMaxTTL); !got.Equal(want) {
+	if got, want := usageCacheExpiresAt(accounts, now), now.Add(7*24*time.Hour); !got.Equal(want) {
 		t.Fatalf("expiresAt = %s, want %s", got, want)
+	}
+}
+
+func TestLiveAccountUsageInfoDropsExpiredWindowAndKeepsLiveWindow(t *testing.T) {
+	fetchedAt := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	now := fetchedAt.Add(6 * time.Hour)
+	info := accountUsageInfoWithAbsoluteResets(AccountUsageInfo{
+		Windows: []AccountUsageWindow{
+			{Key: "5h", Label: "5h", ResetSeconds: int64((5 * time.Hour).Seconds()), UsedPercent: 10},
+			{Key: "7d", Label: "7d", ResetSeconds: int64((7 * 24 * time.Hour).Seconds()), UsedPercent: 20},
+		},
+	}, fetchedAt)
+
+	live := liveAccountUsageInfo(info, now, fetchedAt.Add(usageCacheMaxTTL))
+	if len(live.Windows) != 1 {
+		t.Fatalf("len(windows) = %d, want 1: %+v", len(live.Windows), live.Windows)
+	}
+	if got := live.Windows[0]; got.Key != "7d" || got.UsedPercent != 20 || got.ResetSeconds <= 0 {
+		t.Fatalf("live window = %+v, want unexpired 7d window", got)
+	}
+}
+
+func TestAccountUsageCachePayloadDoesNotSlideRelativeResetSeconds(t *testing.T) {
+	fetchedAt := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	now := fetchedAt.Add(time.Hour)
+	payload := newAccountUsageCachePayload(AccountUsageInfo{
+		Windows: []AccountUsageWindow{
+			{Key: "5h", Label: "5h", ResetSeconds: int64((5 * time.Hour).Seconds()), UsedPercent: 10},
+		},
+	}, fetchedAt, fetchedAt.Add(5*time.Hour))
+
+	info, ok := payload.cacheInfo(now)
+	if !ok || len(info.Windows) != 1 {
+		t.Fatalf("cacheInfo ok=%v info=%+v, want one live window", ok, info)
+	}
+	got := info.Windows[0].ResetSeconds
+	want := int64((4 * time.Hour).Seconds())
+	if got != want {
+		t.Fatalf("ResetSeconds = %d, want %d", got, want)
 	}
 }
 

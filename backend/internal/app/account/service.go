@@ -44,6 +44,7 @@ type ConcurrencyReader interface {
 // usageCacheEntry 用量缓存条目
 type usageCacheEntry struct {
 	data      map[string]AccountUsageInfo
+	fetchedAt time.Time
 	expiresAt time.Time
 }
 
@@ -1292,6 +1293,7 @@ func (s *Service) writeUsageInfoCache(ctx context.Context, accountID int, info A
 	if s.usageRedis == nil {
 		return
 	}
+	info = liveAccountUsageInfo(accountUsageInfoWithAbsoluteResets(info, now), now, now.Add(usageCacheMaxTTL))
 	if !accountUsageInfoHasData(info) {
 		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
 		return
@@ -1422,16 +1424,21 @@ func (s *Service) getUsageInfoForAccount(ctx context.Context, accountID int) (Ac
 		return AccountUsageInfo{}, false
 	}
 	now := s.now()
+	info, ok := payload.cacheInfo(now)
+	if !ok {
+		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
+		return AccountUsageInfo{}, false
+	}
 	expiresAt := payload.cacheExpiresAt(now)
 	if !expiresAt.After(now) {
 		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
 		return AccountUsageInfo{}, false
 	}
-	if !accountUsageInfoHasData(payload.Info) {
+	if !accountUsageInfoHasData(info) {
 		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
 		return AccountUsageInfo{}, false
 	}
-	return payload.Info, true
+	return info, true
 }
 
 func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string, accounts []Account) (map[int]AccountUsageInfo, []Account) {
@@ -1441,7 +1448,7 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 	}
 	missingAccounts := make([]Account, 0)
 	if s.usageRedis == nil {
-		if memory, fresh, ok := s.getUsageMemoryCache(platform); ok {
+		if memory, fetchedAt, fresh, ok := s.getUsageMemoryCache(platform); ok {
 			for _, item := range accounts {
 				info, exists := memory[strconv.Itoa(item.ID)]
 				if !exists {
@@ -1450,6 +1457,7 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 					}
 					continue
 				}
+				info = liveAccountUsageInfo(info, s.now(), fetchedAt.Add(usageCacheMaxTTL))
 				if !accountUsageInfoHasData(info) && isRefreshableUsageAccount(item) {
 					missingAccounts = append(missingAccounts, item)
 					continue
@@ -1490,20 +1498,29 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 			}
 			continue
 		}
-		if !accountUsageInfoHasData(payload.Info) && isRefreshableUsageAccount(item) {
-			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
-			missingAccounts = append(missingAccounts, item)
-			continue
-		}
-		expiresAt := payload.cacheExpiresAt(s.now())
-		if !expiresAt.After(s.now()) {
+		now := s.now()
+		info, ok := payload.cacheInfo(now)
+		if !ok {
 			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
 			if isRefreshableUsageAccount(item) {
 				missingAccounts = append(missingAccounts, item)
 			}
 			continue
 		}
-		result[item.ID] = payload.Info
+		if !accountUsageInfoHasData(info) && isRefreshableUsageAccount(item) {
+			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
+			missingAccounts = append(missingAccounts, item)
+			continue
+		}
+		expiresAt := payload.cacheExpiresAt(now)
+		if !expiresAt.After(now) {
+			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
+			if isRefreshableUsageAccount(item) {
+				missingAccounts = append(missingAccounts, item)
+			}
+			continue
+		}
+		result[item.ID] = info
 	}
 	if len(staleKeys) > 0 {
 		_ = s.usageRedis.Del(ctx, staleKeys...).Err()
@@ -1515,8 +1532,9 @@ func (s *Service) setUsageCache(ctx context.Context, cacheKey string, accounts m
 	cacheKey = usageCachePlatformKey(cacheKey)
 	now := s.now()
 	accounts = s.mergeUsageCacheAccounts(cacheKey, accounts, now)
+	accounts = usageInfoMapWithAbsoluteResets(accounts, now)
 	expiresAt := usageCacheExpiresAt(accounts, now)
-	s.setUsageMemoryCache(cacheKey, accounts, expiresAt)
+	s.setUsageMemoryCache(cacheKey, accounts, now, expiresAt)
 	for key, info := range accounts {
 		accountID, err := strconv.Atoi(key)
 		if err != nil || accountID <= 0 {
@@ -1548,25 +1566,37 @@ func (s *Service) mergeUsageCacheAccounts(cacheKey string, accounts map[string]A
 	return merged
 }
 
-func (s *Service) setUsageMemoryCache(cacheKey string, accounts map[string]AccountUsageInfo, expiresAt time.Time) {
+func usageInfoMapWithAbsoluteResets(accounts map[string]AccountUsageInfo, now time.Time) map[string]AccountUsageInfo {
+	normalized := make(map[string]AccountUsageInfo, len(accounts))
+	for key, info := range accounts {
+		normalized[key] = accountUsageInfoWithAbsoluteResets(info, now)
+	}
+	return normalized
+}
+
+func (s *Service) setUsageMemoryCache(cacheKey string, accounts map[string]AccountUsageInfo, fetchedAt, expiresAt time.Time) {
 	s.usageMu.Lock()
-	s.usageCache[usageCachePlatformKey(cacheKey)] = &usageCacheEntry{data: accounts, expiresAt: expiresAt}
+	s.usageCache[usageCachePlatformKey(cacheKey)] = &usageCacheEntry{data: accounts, fetchedAt: fetchedAt, expiresAt: expiresAt}
 	s.usageMu.Unlock()
 }
 
-func (s *Service) getUsageMemoryCache(cacheKey string) (map[string]AccountUsageInfo, bool, bool) {
+func (s *Service) getUsageMemoryCache(cacheKey string) (map[string]AccountUsageInfo, time.Time, bool, bool) {
 	cacheKey = usageCachePlatformKey(cacheKey)
 	now := s.now()
 	s.usageMu.RLock()
 	entry, ok := s.usageCache[cacheKey]
 	if !ok {
 		s.usageMu.RUnlock()
-		return nil, false, false
+		return nil, time.Time{}, false, false
 	}
 	data := entry.data
+	fetchedAt := entry.fetchedAt
 	fresh := now.Before(entry.expiresAt)
 	s.usageMu.RUnlock()
-	return data, fresh, true
+	if fetchedAt.IsZero() {
+		fetchedAt = entry.expiresAt.Add(-usageCacheMaxTTL)
+	}
+	return data, fetchedAt, fresh, true
 }
 
 func (s *Service) mergeUsageMemoryCache(platform, accountKey string, info AccountUsageInfo, now time.Time) {
@@ -1584,7 +1614,8 @@ func (s *Service) mergeUsageMemoryCache(platform, accountKey string, info Accoun
 		} else {
 			next[accountKey] = info
 		}
-		s.usageCache[cacheKey] = &usageCacheEntry{data: next, expiresAt: usageCacheExpiresAt(next, now)}
+		next = usageInfoMapWithAbsoluteResets(next, now)
+		s.usageCache[cacheKey] = &usageCacheEntry{data: next, fetchedAt: now, expiresAt: usageCacheExpiresAt(next, now)}
 	}
 }
 

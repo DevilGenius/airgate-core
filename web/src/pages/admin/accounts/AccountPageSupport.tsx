@@ -199,27 +199,20 @@ export function mergeCachedUsageWindows(data: AccountUsageData | undefined, cach
       mergedWindows.push(nextWindow);
     }
 
-    if (data.refreshing) {
-      for (const [cacheKey, cached] of cache.entries()) {
-        if (!cacheKey.startsWith(`${accountId}:`) || liveCacheKeys.has(cacheKey)) {
-          continue;
-        }
-        if (cached.resetAtMs > 0 && cached.resetAtMs <= now) {
-          continue;
-        }
-        const nextWindow = cached.resetAtMs > now
-          ? windowWithCachedReset(cached.window, cached.resetAtMs, now)
-          : {
-              ...cached.window,
-              used_percent: cached.usedPercent,
-            };
-        cache.set(cacheKey, {
-          ...cached,
-          window: nextWindow,
-        });
-        liveCacheKeys.add(cacheKey);
-        mergedWindows.push(nextWindow);
+    for (const [cacheKey, cached] of cache.entries()) {
+      if (!cacheKey.startsWith(`${accountId}:`) || liveCacheKeys.has(cacheKey)) {
+        continue;
       }
+      if (cached.resetAtMs <= now) {
+        continue;
+      }
+      const nextWindow = windowWithCachedReset(cached.window, cached.resetAtMs, now);
+      cache.set(cacheKey, {
+        ...cached,
+        window: nextWindow,
+      });
+      liveCacheKeys.add(cacheKey);
+      mergedWindows.push(nextWindow);
     }
 
     accounts[accountId] = {

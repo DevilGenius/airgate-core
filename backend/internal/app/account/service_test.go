@@ -851,9 +851,10 @@ func TestGetAccountUsage_ExpiredMemoryCacheReturnsStaleWindowsAndRefreshes(t *te
 				Slot:         "5h",
 				Group:        "base",
 				UsedPercent:  27,
+				ResetAt:      now.Add(time.Hour).Format(time.RFC3339),
 			}},
 		},
-	}, now.Add(-time.Second))
+	}, now.Add(-time.Hour), now.Add(-time.Second))
 
 	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai", []int{42}, false)
 	if err != nil {
@@ -889,7 +890,7 @@ func TestGetAccountUsage_EmptyMemoryCacheRefreshes(t *testing.T) {
 	svc.now = func() time.Time { return now }
 	svc.setUsageMemoryCache("openai", map[string]AccountUsageInfo{
 		"77": {},
-	}, now.Add(time.Hour))
+	}, now, now.Add(time.Hour))
 
 	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai", []int{77}, false)
 	if err != nil {
@@ -908,23 +909,23 @@ func TestInvalidateUsageCacheClearsAllMemoryViewForPlatform(t *testing.T) {
 	svc := NewService(stubRepository{}, nil, nil, nil)
 	svc.setUsageMemoryCache("", map[string]AccountUsageInfo{
 		"42": {Windows: []AccountUsageWindow{{Key: "5h", Label: "5h", UsedPercent: 10}}},
-	}, now.Add(time.Hour))
+	}, now, now.Add(time.Hour))
 	svc.setUsageMemoryCache("openai", map[string]AccountUsageInfo{
 		"42": {Windows: []AccountUsageWindow{{Key: "5h", Label: "5h", UsedPercent: 10}}},
-	}, now.Add(time.Hour))
+	}, now, now.Add(time.Hour))
 	svc.setUsageMemoryCache("claude", map[string]AccountUsageInfo{
 		"7": {Windows: []AccountUsageWindow{{Key: "5h", Label: "5h", UsedPercent: 20}}},
-	}, now.Add(time.Hour))
+	}, now, now.Add(time.Hour))
 
 	svc.InvalidateUsageCache("openai")
 
-	if _, _, ok := svc.getUsageMemoryCache(""); ok {
+	if _, _, _, ok := svc.getUsageMemoryCache(""); ok {
 		t.Fatalf("all memory usage view should be cleared")
 	}
-	if _, _, ok := svc.getUsageMemoryCache("openai"); ok {
+	if _, _, _, ok := svc.getUsageMemoryCache("openai"); ok {
 		t.Fatalf("platform memory usage view should be cleared")
 	}
-	if _, _, ok := svc.getUsageMemoryCache("claude"); !ok {
+	if _, _, _, ok := svc.getUsageMemoryCache("claude"); !ok {
 		t.Fatalf("unrelated platform memory usage view should be kept")
 	}
 }
@@ -934,23 +935,23 @@ func TestMergeUsageMemoryCacheUpdatesAllViewForPlatform(t *testing.T) {
 	svc := NewService(stubRepository{}, nil, nil, nil)
 	svc.setUsageMemoryCache("", map[string]AccountUsageInfo{
 		"42": {Windows: []AccountUsageWindow{{Key: "5h", Label: "5h", UsedPercent: 10}}},
-	}, now.Add(time.Hour))
+	}, now, now.Add(time.Hour))
 	svc.setUsageMemoryCache("openai", map[string]AccountUsageInfo{
 		"42": {Windows: []AccountUsageWindow{{Key: "5h", Label: "5h", UsedPercent: 10}}},
-	}, now.Add(time.Hour))
+	}, now, now.Add(time.Hour))
 
 	svc.mergeUsageMemoryCache("openai", "42", AccountUsageInfo{
 		Windows: []AccountUsageWindow{{Key: "5h", Label: "5h", UsedPercent: 66}},
 	}, now)
 
-	allView, _, ok := svc.getUsageMemoryCache("")
+	allView, _, _, ok := svc.getUsageMemoryCache("")
 	if !ok {
 		t.Fatalf("all memory usage view should still exist")
 	}
 	if got := allView["42"].Windows[0].UsedPercent; got != 66 {
 		t.Fatalf("all memory usage view percent = %v, want 66", got)
 	}
-	platformView, _, ok := svc.getUsageMemoryCache("openai")
+	platformView, _, _, ok := svc.getUsageMemoryCache("openai")
 	if !ok {
 		t.Fatalf("platform memory usage view should still exist")
 	}

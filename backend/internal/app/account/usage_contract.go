@@ -59,52 +59,74 @@ func newAccountUsageCachePayload(info AccountUsageInfo, now, expiresAt time.Time
 }
 
 func (p accountUsageCachePayload) valid() bool {
-	return p.FetchedAt != ""
+	_, ok := p.fetchedAtTime()
+	return ok
+}
+
+func (p accountUsageCachePayload) fetchedAtTime() (time.Time, bool) {
+	if p.FetchedAt == "" {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(time.RFC3339, p.FetchedAt)
+	return parsed, err == nil
+}
+
+func (p accountUsageCachePayload) cacheInfo(now time.Time) (AccountUsageInfo, bool) {
+	fetchedAt, ok := p.fetchedAtTime()
+	if !ok {
+		return AccountUsageInfo{}, false
+	}
+	info := accountUsageInfoWithAbsoluteResets(p.Info, fetchedAt)
+	info = liveAccountUsageInfo(info, now, fetchedAt.Add(usageCacheMaxTTL))
+	return info, accountUsageInfoHasData(info)
 }
 
 func (p accountUsageCachePayload) cacheExpiresAt(now time.Time) time.Time {
-	if p.ExpiresAt != "" {
-		if parsed, err := time.Parse(time.RFC3339, p.ExpiresAt); err == nil {
-			return parsed
-		}
+	fetchedAt, ok := p.fetchedAtTime()
+	if !ok {
+		return now
 	}
-	return accountUsageInfoExpiresAt(p.Info, now)
+	info := accountUsageInfoWithAbsoluteResets(p.Info, fetchedAt)
+	return accountUsageInfoExpiresAt(info, fetchedAt)
 }
 
 func accountUsageInfoExpiresAt(info AccountUsageInfo, now time.Time) time.Time {
-	expiresAt := now.Add(usageCacheMaxTTL)
+	var expiresAt time.Time
+	if info.Credits != nil {
+		expiresAt = latestTime(expiresAt, now.Add(usageCacheMaxTTL))
+	}
 	for _, window := range info.Windows {
 		resetAt, ok := accountUsageWindowResetAt(window, now)
-		if !ok {
+		if ok {
+			if resetAt.After(now) {
+				expiresAt = latestTime(expiresAt, resetAt)
+			}
 			continue
 		}
-		if !resetAt.After(now) {
-			return now
-		}
-		if resetAt.Before(expiresAt) {
-			expiresAt = resetAt
-		}
+		expiresAt = latestTime(expiresAt, now.Add(usageCacheMaxTTL))
+	}
+	if expiresAt.IsZero() {
+		return now
 	}
 	return expiresAt
 }
 
 func usageCacheExpiresAt(accounts map[string]AccountUsageInfo, now time.Time) time.Time {
-	expiresAt := now.Add(usageCacheMaxTTL)
+	var expiresAt time.Time
 	for _, account := range accounts {
-		for _, window := range account.Windows {
-			resetAt, ok := accountUsageWindowResetAt(window, now)
-			if !ok {
-				continue
-			}
-			if !resetAt.After(now) {
-				return now
-			}
-			if resetAt.Before(expiresAt) {
-				expiresAt = resetAt
-			}
-		}
+		expiresAt = latestTime(expiresAt, accountUsageInfoExpiresAt(account, now))
+	}
+	if expiresAt.IsZero() {
+		return now
 	}
 	return expiresAt
+}
+
+func latestTime(left, right time.Time) time.Time {
+	if left.IsZero() || right.After(left) {
+		return right
+	}
+	return left
 }
 
 func accountUsageWindowResetAt(window AccountUsageWindow, now time.Time) (time.Time, bool) {
@@ -280,6 +302,44 @@ func liveAccountUsageWindows(windows []AccountUsageWindow, now time.Time) []Acco
 	}
 	sortAccountUsageWindows(result)
 	return result
+}
+
+func accountUsageInfoWithAbsoluteResets(info AccountUsageInfo, now time.Time) AccountUsageInfo {
+	if len(info.Windows) == 0 {
+		return info
+	}
+	windows := make([]AccountUsageWindow, 0, len(info.Windows))
+	for _, window := range info.Windows {
+		if resetAt, ok := accountUsageWindowResetAt(window, now); ok {
+			window = windowWithResetAt(window, resetAt, now)
+		}
+		windows = append(windows, window)
+	}
+	info.Windows = windows
+	return info
+}
+
+func liveAccountUsageInfo(info AccountUsageInfo, now, fallbackExpiresAt time.Time) AccountUsageInfo {
+	if len(info.Windows) > 0 {
+		windows := make([]AccountUsageWindow, 0, len(info.Windows))
+		for _, window := range info.Windows {
+			if resetAt, ok := accountUsageWindowResetAt(window, now); ok {
+				if resetAt.After(now) {
+					windows = append(windows, windowWithResetAt(window, resetAt, now))
+				}
+				continue
+			}
+			if fallbackExpiresAt.After(now) {
+				windows = append(windows, window)
+			}
+		}
+		sortAccountUsageWindows(windows)
+		info.Windows = windows
+	}
+	if info.Credits != nil && !fallbackExpiresAt.After(now) {
+		info.Credits = nil
+	}
+	return info
 }
 
 func mergeAccountUsageWindow(existing, incoming AccountUsageWindow, now time.Time) AccountUsageWindow {
