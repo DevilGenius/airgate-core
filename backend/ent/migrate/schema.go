@@ -135,6 +135,94 @@ var (
 		Columns:    GroupsColumns,
 		PrimaryKey: []*schema.Column{GroupsColumns[0]},
 	}
+	// MonitorEventsColumns holds the columns for the "monitor_events" table.
+	MonitorEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "kind", Type: field.TypeEnum, Enums: []string{"api_request_error", "scheduler_error", "upstream_account_error", "plugin_error", "task_error", "system_error"}},
+		{Name: "severity", Type: field.TypeEnum, Enums: []string{"warning", "error", "critical"}, Default: "warning"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "resolved", "ignored"}, Default: "active"},
+		{Name: "source", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "subject_type", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "subject_id", Type: field.TypeString, Size: 128, Default: ""},
+		{Name: "fingerprint", Type: field.TypeString, Unique: true, Size: 64},
+		{Name: "title", Type: field.TypeString, Size: 160, Default: ""},
+		{Name: "message", Type: field.TypeString, Size: 500, Default: ""},
+		{Name: "api_key_id", Type: field.TypeInt, Nullable: true},
+		{Name: "api_key_name_snapshot", Type: field.TypeString, Size: 255, Default: ""},
+		{Name: "api_key_prefix", Type: field.TypeString, Size: 16, Default: ""},
+		{Name: "user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "user_email_snapshot", Type: field.TypeString, Size: 255, Default: ""},
+		{Name: "group_id", Type: field.TypeInt, Nullable: true},
+		{Name: "account_id", Type: field.TypeInt, Nullable: true},
+		{Name: "account_name_snapshot", Type: field.TypeString, Size: 255, Default: ""},
+		{Name: "platform", Type: field.TypeString, Size: 128, Default: ""},
+		{Name: "plugin_id", Type: field.TypeString, Size: 128, Default: ""},
+		{Name: "task_type", Type: field.TypeString, Size: 128, Default: ""},
+		{Name: "method", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "endpoint", Type: field.TypeString, Size: 256, Default: ""},
+		{Name: "request_path", Type: field.TypeString, Size: 256, Default: ""},
+		{Name: "model", Type: field.TypeString, Size: 128, Default: ""},
+		{Name: "http_status", Type: field.TypeInt, Nullable: true},
+		{Name: "upstream_status", Type: field.TypeInt, Nullable: true},
+		{Name: "error_code", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "error_type", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "count", Type: field.TypeInt64, Default: 0},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "resolved_at", Type: field.TypeTime, Nullable: true},
+		{Name: "ignored_at", Type: field.TypeTime, Nullable: true},
+		{Name: "auto_resolve_at", Type: field.TypeTime, Nullable: true},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "detail", Type: field.TypeJSON, Nullable: true},
+	}
+	// MonitorEventsTable holds the schema information for the "monitor_events" table.
+	MonitorEventsTable = &schema.Table{
+		Name:       "monitor_events",
+		Columns:    MonitorEventsColumns,
+		PrimaryKey: []*schema.Column{MonitorEventsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "monitorevent_status_severity_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[31]},
+			},
+			{
+				Name:    "monitorevent_status_kind_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[1], MonitorEventsColumns[31]},
+			},
+			{
+				Name:    "monitorevent_subject_type_subject_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[5], MonitorEventsColumns[6], MonitorEventsColumns[3]},
+			},
+			{
+				Name:    "monitorevent_api_key_id_endpoint_status_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[10], MonitorEventsColumns[22], MonitorEventsColumns[3], MonitorEventsColumns[31]},
+			},
+			{
+				Name:    "monitorevent_account_id_status_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[16], MonitorEventsColumns[3], MonitorEventsColumns[31]},
+			},
+			{
+				Name:    "monitorevent_platform_plugin_id_status_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[18], MonitorEventsColumns[19], MonitorEventsColumns[3], MonitorEventsColumns[31]},
+			},
+			{
+				Name:    "monitorevent_status_auto_resolve_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[34]},
+			},
+			{
+				Name:    "monitorevent_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[35]},
+			},
+		},
+	}
 	// PluginsColumns holds the columns for the "plugins" table.
 	PluginsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -493,6 +581,7 @@ var (
 		AccountsTable,
 		BalanceLogsTable,
 		GroupsTable,
+		MonitorEventsTable,
 		PluginsTable,
 		PluginSourcesTable,
 		ProxiesTable,

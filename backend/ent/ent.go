@@ -16,6 +16,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/apikey"
 	"github.com/DevilGenius/airgate-core/ent/balancelog"
 	"github.com/DevilGenius/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/ent/monitorevent"
 	"github.com/DevilGenius/airgate-core/ent/plugin"
 	"github.com/DevilGenius/airgate-core/ent/pluginsource"
 	"github.com/DevilGenius/airgate-core/ent/proxy"
@@ -88,6 +89,7 @@ func checkColumn(table, column string) error {
 			account.Table:          account.ValidColumn,
 			balancelog.Table:       balancelog.ValidColumn,
 			group.Table:            group.ValidColumn,
+			monitorevent.Table:     monitorevent.ValidColumn,
 			plugin.Table:           plugin.ValidColumn,
 			pluginsource.Table:     pluginsource.ValidColumn,
 			proxy.Table:            proxy.ValidColumn,

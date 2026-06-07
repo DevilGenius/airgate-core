@@ -11,10 +11,12 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	appmonitor "github.com/DevilGenius/airgate-core/internal/app/monitor"
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/bootstrap"
 	"github.com/DevilGenius/airgate-core/internal/config"
+	"github.com/DevilGenius/airgate-core/internal/infra/store"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
@@ -40,6 +42,7 @@ type Server struct {
 	concurrency *scheduler.ConcurrencyManager
 	calculator  *billing.Calculator
 	recorder    *billing.Recorder
+	monitor     *appmonitor.Service
 	handlers    *bootstrap.HTTPHandlers
 
 	pluginStartCancel context.CancelFunc
@@ -58,6 +61,8 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	concurrency := scheduler.NewConcurrencyManager(rdb)
 	calculator := billing.NewCalculator()
 	recorder := billing.NewRecorder(db, 0, rdb)
+	monitorStore := store.NewMonitorStore(db)
+	monitorService := appmonitor.NewService(monitorStore)
 
 	// 插件系统组件
 	pluginDir := cfg.Plugins.Dir
@@ -97,6 +102,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		concurrency:    concurrency,
 		calculator:     calculator,
 		recorder:       recorder,
+		monitor:        monitorService,
 	}
 
 	s.handlers = bootstrap.NewHTTPHandlers(bootstrap.HTTPDependencies{
@@ -159,6 +165,8 @@ func (s *Server) StartPlugins(ctx context.Context) {
 
 	go plugin.StartAssetMigrationLoop(pluginCtx, s.db)
 	go plugin.StartAssetCleanupLoop(pluginCtx, s.db)
+	go appmonitor.StartAggregatorLoop(pluginCtx, s.monitor)
+	go appmonitor.StartWorkerLoop(pluginCtx, s.monitor)
 
 	s.pluginMgr.SetLoading(true)
 	go func() {

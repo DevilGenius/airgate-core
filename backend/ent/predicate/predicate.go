@@ -18,6 +18,9 @@ type BalanceLog func(*sql.Selector)
 // Group is the predicate function for group builders.
 type Group func(*sql.Selector)
 
+// MonitorEvent is the predicate function for monitorevent builders.
+type MonitorEvent func(*sql.Selector)
+
 // Plugin is the predicate function for plugin builders.
 type Plugin func(*sql.Selector)
 
