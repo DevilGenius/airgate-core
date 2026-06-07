@@ -55,24 +55,22 @@ func TestNormalizeAccountUsageWindowContractFields(t *testing.T) {
 func TestUsageCacheExpiresAtKeepsWindowsUntilTheirOwnReset(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 
-	accounts := map[string]AccountUsageInfo{
-		"1": {
-			Windows: []AccountUsageWindow{
-				{Key: "5h", ResetSeconds: int64((3 * time.Hour).Seconds())},
-				{Key: "7d", ResetSeconds: int64((7 * 24 * time.Hour).Seconds())},
-			},
+	info := AccountUsageInfo{
+		Windows: []AccountUsageWindow{
+			{Key: "5h", ResetSeconds: int64((3 * time.Hour).Seconds())},
+			{Key: "7d", ResetSeconds: int64((7 * 24 * time.Hour).Seconds())},
 		},
 	}
-	if got, want := usageCacheExpiresAt(accounts, now), now.Add(7*24*time.Hour); !got.Equal(want) {
+	if got, want := accountUsageInfoExpiresAt(info, now), now.Add(7*24*time.Hour); !got.Equal(want) {
 		t.Fatalf("expiresAt = %s, want %s", got, want)
 	}
 
-	accounts["1"] = AccountUsageInfo{
+	info = AccountUsageInfo{
 		Windows: []AccountUsageWindow{
 			{Key: "7d", ResetSeconds: int64((7 * 24 * time.Hour).Seconds())},
 		},
 	}
-	if got, want := usageCacheExpiresAt(accounts, now), now.Add(7*24*time.Hour); !got.Equal(want) {
+	if got, want := accountUsageInfoExpiresAt(info, now), now.Add(7*24*time.Hour); !got.Equal(want) {
 		t.Fatalf("expiresAt = %s, want %s", got, want)
 	}
 }
@@ -103,7 +101,7 @@ func TestAccountUsageCachePayloadDoesNotSlideRelativeResetSeconds(t *testing.T) 
 		Windows: []AccountUsageWindow{
 			{Key: "5h", Label: "5h", ResetSeconds: int64((5 * time.Hour).Seconds()), UsedPercent: 10},
 		},
-	}, fetchedAt, fetchedAt.Add(5*time.Hour))
+	}, fetchedAt)
 
 	info, ok := payload.cacheInfo(now)
 	if !ok || len(info.Windows) != 1 {

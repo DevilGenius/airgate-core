@@ -43,7 +43,8 @@ type ConcurrencyReader interface {
 // Service 提供账号域用例编排。
 // usageCacheEntry 用量缓存条目
 type usageCacheEntry struct {
-	data      map[string]AccountUsageInfo
+	platform  string
+	info      AccountUsageInfo
 	fetchedAt time.Time
 	expiresAt time.Time
 }
@@ -102,16 +103,13 @@ type Service struct {
 	now         func() time.Time
 
 	usageMu    sync.RWMutex
-	usageCache map[string]*usageCacheEntry
+	usageCache map[int]*usageCacheEntry
 	usageRedis *redis.Client
 
 	usageRefreshMu      sync.Mutex
 	usageRefreshRunning map[string]struct{}
-	usageRefreshPending map[string]bool
 
-	// usageFlight 把同 platform 的并发 fetch 合并为一次上游调用：
-	// invalidate→refresh 与同时穿透缓存的同步请求共享同一次结果，
-	// 既减小插件压力，又避免两路写回 setUsageCache 的最后一次写覆盖。
+	// usageFlight 把同账号的并发 probe 合并为一次上游调用，避免重复打插件。
 	usageFlight singleflight.Group
 }
 
@@ -124,9 +122,8 @@ func NewService(repo Repository, plugins PluginCatalog, concurrency ConcurrencyR
 		concurrency:         concurrency,
 		stateWriter:         stateWriter,
 		now:                 time.Now,
-		usageCache:          make(map[string]*usageCacheEntry),
+		usageCache:          make(map[int]*usageCacheEntry),
 		usageRefreshRunning: make(map[string]struct{}),
-		usageRefreshPending: make(map[string]bool),
 	}
 }
 
@@ -919,25 +916,29 @@ func parseOpenAIModelsResponse(body []byte) []Model {
 }
 
 // InvalidateUsageCache 清除指定平台的用量缓存（创建/删除账号后调用）。
-// platform 为空时清理所有账号用量缓存；platform 非空时清理该平台账号 Redis key，
-// 并同时清理内存缓存中的平台视图和 all 视图。
+// platform 为空时清理所有账号用量缓存；platform 非空时清理该平台账号缓存。
 func (s *Service) InvalidateUsageCache(platform string) {
-	memoryKeys := usageMemoryCacheKeysForPlatform(platform)
+	platform = strings.TrimSpace(platform)
 	s.usageMu.Lock()
 	if platform == "" {
-		s.usageCache = make(map[string]*usageCacheEntry)
+		s.usageCache = make(map[int]*usageCacheEntry)
 	} else {
-		for _, key := range memoryKeys {
-			delete(s.usageCache, key)
+		for accountID, entry := range s.usageCache {
+			if entry != nil && entry.platform == platform {
+				delete(s.usageCache, accountID)
+			}
 		}
 	}
 	s.usageMu.Unlock()
 
+	if s.usageRedis == nil {
+		return
+	}
 	if platform == "" {
 		s.deleteAllUsageCacheKeys()
 		return
 	}
-	s.deleteUsageCacheKeys(usageRedisCacheKeysForInvalidation(platform))
+	s.deleteUsageCacheKeysForPlatform(platform)
 }
 
 type accountUsageRequest struct {
@@ -1019,7 +1020,7 @@ func (s *Service) GetSingleAccountUsage(ctx context.Context, id int) (map[string
 		if ok {
 			normalized := normalizeAccountUsageInfo(info)
 			accountUsage = accountUsageInfoToMap(normalized)
-			s.updateSingleAccountUsageCache(ctx, item.Platform, key, normalized)
+			s.updateAccountUsageCache(ctx, item.Platform, item.ID, normalized)
 			if item.State != "disabled" {
 				s.persistRateLimitFromWindows(ctx, map[string]any{key: accountUsage})
 			}
@@ -1032,27 +1033,6 @@ func (s *Service) GetSingleAccountUsage(ctx context.Context, id int) (map[string
 		return accountMap, nil
 	}
 	return map[string]any{}, nil
-}
-
-// fetchUpstreamUsageDedup 用 singleflight 合并同一 platform 的并发上游探测。
-// 注意：成功后返回的 map 在并发调用之间共享，调用方禁止就地修改。
-func (s *Service) fetchUpstreamUsageDedup(ctx context.Context, platform string) (map[string]AccountUsageInfo, error) {
-	v, err, _ := s.usageFlight.Do(usageCachePlatformKey(platform), func() (any, error) {
-		return s.fetchUpstreamUsage(ctx, platform)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return v.(map[string]AccountUsageInfo), nil
-}
-
-func (s *Service) fetchUpstreamUsage(ctx context.Context, platform string) (map[string]AccountUsageInfo, error) {
-	accounts, err := s.repo.ListAll(ctx, ListFilter{Platform: platform})
-	if err != nil {
-		return nil, err
-	}
-	s.cacheAccountProfiles(ctx, accounts)
-	return s.fetchUpstreamUsageForAccounts(ctx, accounts)
 }
 
 func (s *Service) fetchUpstreamUsageForAccounts(ctx context.Context, accounts []Account) (map[string]AccountUsageInfo, error) {
@@ -1275,27 +1255,101 @@ func (s *Service) handleSingleAccountUsageErrors(ctx context.Context, item Accou
 	}
 }
 
-// updateSingleAccountUsageCache 把单账号最新探测结果写入单账号 Redis key。
-func (s *Service) updateSingleAccountUsageCache(ctx context.Context, platform, accountKey string, info AccountUsageInfo) {
-	accountID, err := strconv.Atoi(accountKey)
-	if err != nil || accountID <= 0 {
+// updateAccountUsageCache 把单账号最新探测结果写入单账号缓存。
+func (s *Service) updateAccountUsageCache(ctx context.Context, platform string, accountID int, info AccountUsageInfo) {
+	if accountID <= 0 {
 		return
 	}
 	now := s.now()
 	if existing, ok := s.getUsageInfoForAccount(ctx, accountID); ok {
 		info = mergeAccountUsageInfo(existing, info, now)
 	}
-	s.mergeUsageMemoryCache(platform, accountKey, info, now)
-	s.writeUsageInfoCache(ctx, accountID, info, now)
+	s.writeUsageInfoCache(ctx, platform, accountID, info, now)
 }
 
-func (s *Service) writeUsageInfoCache(ctx context.Context, accountID int, info AccountUsageInfo, now time.Time) {
-	if s.usageRedis == nil {
+type accountUsageCacheWrite struct {
+	account Account
+	info    AccountUsageInfo
+}
+
+func (s *Service) updateAccountUsageCaches(ctx context.Context, accounts []Account, usage map[string]AccountUsageInfo) {
+	if len(accounts) == 0 || len(usage) == 0 {
 		return
 	}
+
+	writes := make([]accountUsageCacheWrite, 0, len(accounts))
+	for _, item := range accounts {
+		if !isRefreshableUsageAccount(item) {
+			continue
+		}
+		info, ok := usage[strconv.Itoa(item.ID)]
+		if !ok || !accountUsageInfoHasData(info) {
+			continue
+		}
+		writes = append(writes, accountUsageCacheWrite{account: item, info: info})
+	}
+	if len(writes) == 0 {
+		return
+	}
+
+	now := s.now()
+	existing := s.getUsageInfosForCacheWrites(ctx, writes, now)
+	for _, write := range writes {
+		info := write.info
+		if cached, ok := existing[write.account.ID]; ok {
+			info = mergeAccountUsageInfo(cached, info, now)
+		}
+		s.writeUsageInfoCache(ctx, write.account.Platform, write.account.ID, info, now)
+	}
+}
+
+func (s *Service) getUsageInfosForCacheWrites(ctx context.Context, writes []accountUsageCacheWrite, now time.Time) map[int]AccountUsageInfo {
+	result := make(map[int]AccountUsageInfo, len(writes))
+	if len(writes) == 0 {
+		return result
+	}
+	if s.usageRedis == nil {
+		for _, write := range writes {
+			if info, _, ok := s.getUsageInfoMemoryCache(write.account.ID); ok {
+				result[write.account.ID] = info
+			}
+		}
+		return result
+	}
+
+	keys := make([]string, 0, len(writes))
+	for _, write := range writes {
+		keys = append(keys, accountcache.UsageKey(write.account.ID))
+	}
+	values, err := s.usageRedis.MGet(ctx, keys...).Result()
+	if err != nil {
+		return result
+	}
+	for index, write := range writes {
+		raw, ok := redisValueBytes(values[index])
+		if !ok {
+			continue
+		}
+		var payload accountUsageCachePayload
+		if err := json.Unmarshal(raw, &payload); err != nil || !payload.valid() {
+			continue
+		}
+		info, ok := payload.cacheInfo(now)
+		if ok {
+			result[write.account.ID] = info
+		}
+	}
+	return result
+}
+
+func (s *Service) writeUsageInfoCache(ctx context.Context, platform string, accountID int, info AccountUsageInfo, now time.Time) {
 	info = liveAccountUsageInfo(accountUsageInfoWithAbsoluteResets(info, now), now, now.Add(usageCacheMaxTTL))
 	if !accountUsageInfoHasData(info) {
-		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
+		if s.usageRedis == nil {
+			s.deleteUsageInfoMemoryCache(accountID)
+		} else {
+			_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
+		}
 		return
 	}
 	expiresAt := accountUsageInfoExpiresAt(info, now)
@@ -1304,7 +1358,11 @@ func (s *Service) writeUsageInfoCache(ctx context.Context, accountID int, info A
 		ttl = usageCacheMinimumTTL
 		expiresAt = now.Add(ttl)
 	}
-	payload := newAccountUsageCachePayload(info, now, expiresAt)
+	if s.usageRedis == nil {
+		s.setUsageInfoMemoryCache(accountID, platform, info, now, expiresAt)
+		return
+	}
+	payload := newAccountUsageCachePayload(info, now)
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return
@@ -1312,14 +1370,6 @@ func (s *Service) writeUsageInfoCache(ctx context.Context, accountID int, info A
 	if err := s.usageRedis.Set(ctx, accountcache.UsageKey(accountID), body, ttl).Err(); err != nil {
 		slog.Debug("account_usage_cache_set_failed", sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
 	}
-}
-
-func cloneAccountUsageInfoMap(src map[string]AccountUsageInfo) map[string]AccountUsageInfo {
-	dst := make(map[string]AccountUsageInfo, len(src))
-	for key, value := range src {
-		dst[key] = value
-	}
-	return dst
 }
 
 func accountUsageInfoHasData(info AccountUsageInfo) bool {
@@ -1395,21 +1445,10 @@ func usageCacheAccountIDsRefreshKey(platform string, ids []int) string {
 	return usageCachePlatformKey(platform) + ":accounts:" + strings.Join(parts, ",")
 }
 
-func usageMemoryCacheKeysForPlatform(platform string) []string {
-	key := usageCachePlatformKey(platform)
-	if key == "__all__" {
-		return []string{"__all__"}
-	}
-	return []string{key, "__all__"}
-}
-
-func usageRedisCacheKeysForInvalidation(platform string) []string {
-	return []string{usageCachePlatformKey(platform)}
-}
-
 func (s *Service) getUsageInfoForAccount(ctx context.Context, accountID int) (AccountUsageInfo, bool) {
 	if s.usageRedis == nil {
-		return AccountUsageInfo{}, false
+		info, _, ok := s.getUsageInfoMemoryCache(accountID)
+		return info, ok
 	}
 	raw, err := s.usageRedis.Get(ctx, accountcache.UsageKey(accountID)).Bytes()
 	if err != nil {
@@ -1429,11 +1468,6 @@ func (s *Service) getUsageInfoForAccount(ctx context.Context, accountID int) (Ac
 		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
 		return AccountUsageInfo{}, false
 	}
-	expiresAt := payload.cacheExpiresAt(now)
-	if !expiresAt.After(now) {
-		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
-		return AccountUsageInfo{}, false
-	}
 	if !accountUsageInfoHasData(info) {
 		_ = s.usageRedis.Del(ctx, accountcache.UsageKey(accountID)).Err()
 		return AccountUsageInfo{}, false
@@ -1448,28 +1482,20 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 	}
 	missingAccounts := make([]Account, 0)
 	if s.usageRedis == nil {
-		if memory, fetchedAt, fresh, ok := s.getUsageMemoryCache(platform); ok {
-			for _, item := range accounts {
-				info, exists := memory[strconv.Itoa(item.ID)]
-				if !exists {
-					if isRefreshableUsageAccount(item) {
-						missingAccounts = append(missingAccounts, item)
-					}
-					continue
-				}
-				info = liveAccountUsageInfo(info, s.now(), fetchedAt.Add(usageCacheMaxTTL))
-				if !accountUsageInfoHasData(info) && isRefreshableUsageAccount(item) {
-					missingAccounts = append(missingAccounts, item)
-					continue
-				}
-				result[item.ID] = info
-				if !fresh && isRefreshableUsageAccount(item) {
+		for _, item := range accounts {
+			info, fresh, ok := s.getUsageInfoMemoryCache(item.ID)
+			if !ok {
+				if isRefreshableUsageAccount(item) {
 					missingAccounts = append(missingAccounts, item)
 				}
+				continue
 			}
-			return result, missingAccounts
+			result[item.ID] = info
+			if !fresh && isRefreshableUsageAccount(item) {
+				missingAccounts = append(missingAccounts, item)
+			}
 		}
-		return result, filterRefreshableUsageAccounts(accounts)
+		return result, missingAccounts
 	}
 	keys := make([]string, 0, len(accounts))
 	ordered := make([]Account, 0, len(accounts))
@@ -1512,14 +1538,6 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 			missingAccounts = append(missingAccounts, item)
 			continue
 		}
-		expiresAt := payload.cacheExpiresAt(now)
-		if !expiresAt.After(now) {
-			staleKeys = append(staleKeys, accountcache.UsageKey(item.ID))
-			if isRefreshableUsageAccount(item) {
-				missingAccounts = append(missingAccounts, item)
-			}
-			continue
-		}
 		result[item.ID] = info
 	}
 	if len(staleKeys) > 0 {
@@ -1528,126 +1546,67 @@ func (s *Service) getUsageInfosForAccounts(ctx context.Context, platform string,
 	return result, missingAccounts
 }
 
-func (s *Service) setUsageCache(ctx context.Context, cacheKey string, accounts map[string]AccountUsageInfo) {
-	cacheKey = usageCachePlatformKey(cacheKey)
-	now := s.now()
-	accounts = s.mergeUsageCacheAccounts(cacheKey, accounts, now)
-	accounts = usageInfoMapWithAbsoluteResets(accounts, now)
-	expiresAt := usageCacheExpiresAt(accounts, now)
-	s.setUsageMemoryCache(cacheKey, accounts, now, expiresAt)
-	for key, info := range accounts {
-		accountID, err := strconv.Atoi(key)
-		if err != nil || accountID <= 0 {
-			continue
-		}
-		if existing, ok := s.getUsageInfoForAccount(ctx, accountID); ok {
-			info = mergeAccountUsageInfo(existing, info, now)
-		}
-		s.writeUsageInfoCache(ctx, accountID, info, now)
-	}
-}
-
-func (s *Service) mergeUsageCacheAccounts(cacheKey string, accounts map[string]AccountUsageInfo, now time.Time) map[string]AccountUsageInfo {
-	s.usageMu.RLock()
-	entry, ok := s.usageCache[usageCachePlatformKey(cacheKey)]
-	if !ok {
-		s.usageMu.RUnlock()
-		return accounts
-	}
-	existing := entry.data
-	s.usageMu.RUnlock()
-
-	merged := cloneAccountUsageInfoMap(accounts)
-	for key, info := range accounts {
-		if existingInfo, ok := existing[key]; ok {
-			merged[key] = mergeAccountUsageInfo(existingInfo, info, now)
-		}
-	}
-	return merged
-}
-
-func usageInfoMapWithAbsoluteResets(accounts map[string]AccountUsageInfo, now time.Time) map[string]AccountUsageInfo {
-	normalized := make(map[string]AccountUsageInfo, len(accounts))
-	for key, info := range accounts {
-		normalized[key] = accountUsageInfoWithAbsoluteResets(info, now)
-	}
-	return normalized
-}
-
-func (s *Service) setUsageMemoryCache(cacheKey string, accounts map[string]AccountUsageInfo, fetchedAt, expiresAt time.Time) {
+func (s *Service) setUsageInfoMemoryCache(accountID int, platform string, info AccountUsageInfo, fetchedAt, expiresAt time.Time) {
 	s.usageMu.Lock()
-	s.usageCache[usageCachePlatformKey(cacheKey)] = &usageCacheEntry{data: accounts, fetchedAt: fetchedAt, expiresAt: expiresAt}
+	s.usageCache[accountID] = &usageCacheEntry{
+		platform:  strings.TrimSpace(platform),
+		info:      info,
+		fetchedAt: fetchedAt,
+		expiresAt: expiresAt,
+	}
 	s.usageMu.Unlock()
 }
 
-func (s *Service) getUsageMemoryCache(cacheKey string) (map[string]AccountUsageInfo, time.Time, bool, bool) {
-	cacheKey = usageCachePlatformKey(cacheKey)
+func (s *Service) deleteUsageInfoMemoryCache(accountID int) {
+	s.usageMu.Lock()
+	delete(s.usageCache, accountID)
+	s.usageMu.Unlock()
+}
+
+func (s *Service) getUsageInfoMemoryCache(accountID int) (AccountUsageInfo, bool, bool) {
 	now := s.now()
 	s.usageMu.RLock()
-	entry, ok := s.usageCache[cacheKey]
+	entry, ok := s.usageCache[accountID]
 	if !ok {
 		s.usageMu.RUnlock()
-		return nil, time.Time{}, false, false
+		return AccountUsageInfo{}, false, false
 	}
-	data := entry.data
+	info := entry.info
 	fetchedAt := entry.fetchedAt
+	expiresAt := entry.expiresAt
 	fresh := now.Before(entry.expiresAt)
 	s.usageMu.RUnlock()
 	if fetchedAt.IsZero() {
-		fetchedAt = entry.expiresAt.Add(-usageCacheMaxTTL)
+		fetchedAt = expiresAt.Add(-usageCacheMaxTTL)
 	}
-	return data, fetchedAt, fresh, true
+	info = liveAccountUsageInfo(info, now, fetchedAt.Add(usageCacheMaxTTL))
+	if !accountUsageInfoHasData(info) {
+		s.deleteUsageInfoMemoryCache(accountID)
+		return AccountUsageInfo{}, false, false
+	}
+	return info, fresh, true
 }
 
-func (s *Service) mergeUsageMemoryCache(platform, accountKey string, info AccountUsageInfo, now time.Time) {
-	s.usageMu.Lock()
-	defer s.usageMu.Unlock()
-	for _, raw := range usageMemoryCacheKeysForPlatform(platform) {
-		cacheKey := usageCachePlatformKey(raw)
-		entry, ok := s.usageCache[cacheKey]
-		if !ok {
-			continue
-		}
-		next := cloneAccountUsageInfoMap(entry.data)
-		if existing, ok := next[accountKey]; ok {
-			next[accountKey] = mergeAccountUsageInfo(existing, info, now)
-		} else {
-			next[accountKey] = info
-		}
-		next = usageInfoMapWithAbsoluteResets(next, now)
-		s.usageCache[cacheKey] = &usageCacheEntry{data: next, fetchedAt: now, expiresAt: usageCacheExpiresAt(next, now)}
-	}
-}
-
-func (s *Service) deleteUsageCacheKeys(keys []string) {
-	if len(keys) == 0 {
-		return
-	}
+func (s *Service) deleteUsageCacheKeysForPlatform(platform string) {
 	if s.usageRedis == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	for _, key := range keys {
-		if key == "__all__" {
-			s.deleteAllUsageCacheKeys()
+	members, err := s.usageRedis.SMembers(ctx, accountcache.PlatformKey(platform)).Result()
+	if err != nil || len(members) == 0 {
+		return
+	}
+	redisKeys := make([]string, 0, len(members))
+	for _, member := range members {
+		id, err := strconv.Atoi(member)
+		if err != nil || id <= 0 {
 			continue
 		}
-		members, err := s.usageRedis.SMembers(ctx, accountcache.PlatformKey(key)).Result()
-		if err != nil || len(members) == 0 {
-			continue
-		}
-		redisKeys := make([]string, 0, len(members))
-		for _, member := range members {
-			id, err := strconv.Atoi(member)
-			if err != nil || id <= 0 {
-				continue
-			}
-			redisKeys = append(redisKeys, accountcache.UsageKey(id))
-		}
-		if len(redisKeys) > 0 {
-			_ = s.usageRedis.Del(ctx, redisKeys...).Err()
-		}
+		redisKeys = append(redisKeys, accountcache.UsageKey(id))
+	}
+	if len(redisKeys) > 0 {
+		_ = s.usageRedis.Del(ctx, redisKeys...).Err()
 	}
 }
 
@@ -1673,28 +1632,8 @@ func (s *Service) deleteAllUsageCacheKeys() {
 	}
 }
 
-func (s *Service) refreshUsageCacheAsync(platform string) {
-	s.startUsageCacheRefresh(platform, true)
-}
-
 func (s *Service) ensureUsageCacheRefreshForAccounts(platform string, accounts []Account) {
-	s.startUsageCacheRefreshForAccountIDs(platform, accountIDsFromAccounts(filterRefreshableUsageAccounts(accounts)), false)
-}
-
-func (s *Service) startUsageCacheRefresh(platform string, queueIfRunning bool) {
-	cacheKey := usageCachePlatformKey(platform)
-	s.usageRefreshMu.Lock()
-	if _, running := s.usageRefreshRunning[cacheKey]; running {
-		if queueIfRunning {
-			s.usageRefreshPending[cacheKey] = true
-		}
-		s.usageRefreshMu.Unlock()
-		return
-	}
-	s.usageRefreshRunning[cacheKey] = struct{}{}
-	s.usageRefreshMu.Unlock()
-
-	go s.runUsageCacheRefreshLoop(platform, cacheKey)
+	s.startUsageCacheRefreshForAccountIDs(platform, accountIDsFromAccounts(filterRefreshableUsageAccounts(accounts)))
 }
 
 func (s *Service) isUsageRefreshRunning(cacheKey string) bool {
@@ -1705,7 +1644,7 @@ func (s *Service) isUsageRefreshRunning(cacheKey string) bool {
 	return running
 }
 
-func (s *Service) startUsageCacheRefreshForAccountIDs(platform string, accountIDs []int, queueIfRunning bool) {
+func (s *Service) startUsageCacheRefreshForAccountIDs(platform string, accountIDs []int) {
 	accountIDs = normalizeAccountIDs(accountIDs)
 	cacheKey := usageCacheAccountIDsRefreshKey(platform, accountIDs)
 	if cacheKey == "" {
@@ -1714,9 +1653,6 @@ func (s *Service) startUsageCacheRefreshForAccountIDs(platform string, accountID
 
 	s.usageRefreshMu.Lock()
 	if _, running := s.usageRefreshRunning[cacheKey]; running {
-		if queueIfRunning {
-			s.usageRefreshPending[cacheKey] = true
-		}
 		s.usageRefreshMu.Unlock()
 		return
 	}
@@ -1726,52 +1662,10 @@ func (s *Service) startUsageCacheRefreshForAccountIDs(platform string, accountID
 	go s.runUsageCacheRefreshAccountIDsLoop(platform, cacheKey, append([]int(nil), accountIDs...))
 }
 
-func (s *Service) runUsageCacheRefreshLoop(platform, cacheKey string) {
-	// 兜底：任何一次 fetch panic 都不能让该 platform 的 refresh 永久卡死。
-	// 必须先解除 running/pending 标记，再 recover；否则下次 refreshUsageCacheAsync
-	// 会以为还在跑、把请求挂到 pending 上等一个不会发生的回合。
-	defer func() {
-		s.usageRefreshMu.Lock()
-		delete(s.usageRefreshRunning, cacheKey)
-		delete(s.usageRefreshPending, cacheKey)
-		s.usageRefreshMu.Unlock()
-		if r := recover(); r != nil {
-			slog.Error("account_usage_cache_refresh_panic",
-				sdk.LogFieldPlatform, platform,
-				"panic", r)
-		}
-	}()
-	for {
-		fetchCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-		accounts, err := s.fetchUpstreamUsageDedup(fetchCtx, platform)
-		cancel()
-		if err == nil {
-			writeCtx, writeCancel := context.WithTimeout(context.Background(), usageCacheWriteTimeout)
-			s.setUsageCache(writeCtx, cacheKey, accounts)
-			writeCancel()
-		} else {
-			slog.Debug("account_usage_cache_refresh_failed",
-				sdk.LogFieldPlatform, platform,
-				sdk.LogFieldError, err)
-		}
-
-		s.usageRefreshMu.Lock()
-		if s.usageRefreshPending[cacheKey] {
-			delete(s.usageRefreshPending, cacheKey)
-			s.usageRefreshMu.Unlock()
-			continue
-		}
-		delete(s.usageRefreshRunning, cacheKey)
-		s.usageRefreshMu.Unlock()
-		return
-	}
-}
-
 func (s *Service) runUsageCacheRefreshAccountIDsLoop(platform, cacheKey string, accountIDs []int) {
 	defer func() {
 		s.usageRefreshMu.Lock()
 		delete(s.usageRefreshRunning, cacheKey)
-		delete(s.usageRefreshPending, cacheKey)
 		s.usageRefreshMu.Unlock()
 		if r := recover(); r != nil {
 			slog.Error("account_usage_cache_refresh_panic",
@@ -1779,36 +1673,23 @@ func (s *Service) runUsageCacheRefreshAccountIDsLoop(platform, cacheKey string, 
 				"panic", r)
 		}
 	}()
-	for {
-		fetchCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-		accounts, err := s.repo.ListAll(fetchCtx, ListFilter{Platform: platform, IDs: accountIDs})
-		var usage map[string]AccountUsageInfo
-		if err == nil {
-			usage, err = s.fetchUpstreamUsageForAccounts(fetchCtx, accounts)
-		}
-		cancel()
-		if err == nil {
-			writeCtx, writeCancel := context.WithTimeout(context.Background(), usageCacheWriteTimeout)
-			s.setUsageCache(writeCtx, platform, usage)
-			s.cacheAccountProfiles(writeCtx, accounts)
-			writeCancel()
-		}
-		if err != nil {
-			slog.Debug("account_usage_cache_refresh_failed",
-				sdk.LogFieldPlatform, platform,
-				sdk.LogFieldError, err)
-		}
-
-		s.usageRefreshMu.Lock()
-		if s.usageRefreshPending[cacheKey] {
-			delete(s.usageRefreshPending, cacheKey)
-			s.usageRefreshMu.Unlock()
-			continue
-		}
-		delete(s.usageRefreshRunning, cacheKey)
-		s.usageRefreshMu.Unlock()
+	fetchCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	accounts, err := s.repo.ListAll(fetchCtx, ListFilter{Platform: platform, IDs: accountIDs})
+	var usage map[string]AccountUsageInfo
+	if err == nil {
+		usage, err = s.fetchUpstreamUsageForAccounts(fetchCtx, accounts)
+	}
+	cancel()
+	if err == nil {
+		writeCtx, writeCancel := context.WithTimeout(context.Background(), usageCacheWriteTimeout)
+		s.cacheAccountProfiles(writeCtx, accounts)
+		s.updateAccountUsageCaches(writeCtx, accounts, usage)
+		writeCancel()
 		return
 	}
+	slog.Debug("account_usage_cache_refresh_failed",
+		sdk.LogFieldPlatform, platform,
+		sdk.LogFieldError, err)
 }
 
 // persistRateLimitFromWindows 扫描每个账号的 windows，把"有窗口已 100%"的情况
@@ -2546,8 +2427,7 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 	if probeUsage {
 		// 顺手触发一次用量强制重探测：账号额度刷新只负责刷订阅信息（plan_type / 过期时间），
 		// 不动用量窗口缓存。用户点"刷新"时如果账号从没探测过，还是看不到 5h/7d 进度条。
-		// 主动调一次 usage/probe 把窗口数据灌进插件内存缓存，下次 usage/accounts 就能读到。
-		// 探测失败不阻断主流程——订阅信息已经成功返回，窗口数据下一个 5 分钟周期还会再试。
+		// 主动调一次 usage/probe 并写入该账号缓存；失败不阻断主流程。
 		s.triggerUsageProbe(ctx, inst, item.Platform, item.ID, credentials)
 	}
 	if s.stateWriter != nil {
@@ -2615,8 +2495,6 @@ func (s *Service) queryQuotaRefresh(ctx context.Context, inst *plugin.PluginInst
 	return resp, nil
 }
 
-// triggerUsageProbe 调用插件的 usage/probe 路径强制重探测单账号用量窗口。
-// 只在插件声明支持时有效；失败只记日志，不影响调用方。
 func shouldPersistQuotaExtra(key, value string) bool {
 	if value != "" {
 		return true
@@ -2629,6 +2507,8 @@ func shouldPersistQuotaExtra(key, value string) bool {
 	}
 }
 
+// triggerUsageProbe 调用插件的 usage/probe 路径强制重探测单账号用量窗口。
+// 只更新当前账号缓存；失败只记日志，不影响调用方。
 func (s *Service) triggerUsageProbe(ctx context.Context, inst *plugin.PluginInstance, platform string, id int, credentials map[string]string) {
 	if inst == nil || inst.Gateway == nil {
 		return
@@ -2639,18 +2519,24 @@ func (s *Service) triggerUsageProbe(ctx context.Context, inst *plugin.PluginInst
 	})
 	probeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	status, _, _, err := inst.Gateway.HandleHTTPRequest(probeCtx, "POST", "usage/probe", "", nil, reqBody)
+	status, _, respBody, err := inst.Gateway.HandleHTTPRequest(probeCtx, "POST", "usage/probe", "", nil, reqBody)
 	if err != nil || status != http.StatusOK {
 		slog.Debug("account_usage_probe_failed",
 			sdk.LogFieldAccountID, id,
 			sdk.LogFieldStatus, status,
 			sdk.LogFieldError, err)
+		return
 	}
-	// 清掉 core 侧 usage KV 缓存；探测成功后异步重建该平台缓存，避免前端等二次 usage/accounts。
-	s.InvalidateUsageCache(platform)
-	if err == nil && status == http.StatusOK {
-		s.refreshUsageCacheAsync(platform)
+	info, usageErrors, ok := parseSingleAccountUsagePluginResponse(id, respBody)
+	if len(usageErrors) > 0 {
+		slog.Debug("account_usage_probe_reported_errors",
+			sdk.LogFieldAccountID, id,
+			"error_count", len(usageErrors))
 	}
+	if !ok {
+		return
+	}
+	s.updateAccountUsageCache(ctx, platform, id, info)
 }
 
 // GetStats 获取单个账号统计。

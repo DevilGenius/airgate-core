@@ -46,14 +46,12 @@ type accountUsagePluginResponse struct {
 
 type accountUsageCachePayload struct {
 	FetchedAt string           `json:"fetched_at"`
-	ExpiresAt string           `json:"expires_at,omitempty"`
 	Info      AccountUsageInfo `json:"info"`
 }
 
-func newAccountUsageCachePayload(info AccountUsageInfo, now, expiresAt time.Time) accountUsageCachePayload {
+func newAccountUsageCachePayload(info AccountUsageInfo, now time.Time) accountUsageCachePayload {
 	return accountUsageCachePayload{
 		FetchedAt: now.UTC().Format(time.RFC3339),
-		ExpiresAt: expiresAt.UTC().Format(time.RFC3339),
 		Info:      info,
 	}
 }
@@ -81,15 +79,6 @@ func (p accountUsageCachePayload) cacheInfo(now time.Time) (AccountUsageInfo, bo
 	return info, accountUsageInfoHasData(info)
 }
 
-func (p accountUsageCachePayload) cacheExpiresAt(now time.Time) time.Time {
-	fetchedAt, ok := p.fetchedAtTime()
-	if !ok {
-		return now
-	}
-	info := accountUsageInfoWithAbsoluteResets(p.Info, fetchedAt)
-	return accountUsageInfoExpiresAt(info, fetchedAt)
-}
-
 func accountUsageInfoExpiresAt(info AccountUsageInfo, now time.Time) time.Time {
 	var expiresAt time.Time
 	if info.Credits != nil {
@@ -104,17 +93,6 @@ func accountUsageInfoExpiresAt(info AccountUsageInfo, now time.Time) time.Time {
 			continue
 		}
 		expiresAt = latestTime(expiresAt, now.Add(usageCacheMaxTTL))
-	}
-	if expiresAt.IsZero() {
-		return now
-	}
-	return expiresAt
-}
-
-func usageCacheExpiresAt(accounts map[string]AccountUsageInfo, now time.Time) time.Time {
-	var expiresAt time.Time
-	for _, account := range accounts {
-		expiresAt = latestTime(expiresAt, accountUsageInfoExpiresAt(account, now))
 	}
 	if expiresAt.IsZero() {
 		return now
