@@ -91,6 +91,49 @@ body::selection {
   outline: none;
 }
 
+.ag-native-soft-chip {
+  display: inline-flex;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding-inline: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.ag-native-soft-chip[data-tone="accent"] {
+  border-color: color-mix(in oklab, var(--ag-primary) 28%, transparent);
+  background: var(--ag-primary-subtle);
+  color: var(--ag-primary);
+}
+
+.ag-native-soft-chip[data-tone="default"] {
+  border-color: color-mix(in oklab, var(--ag-border) 88%, transparent);
+  background: var(--ag-default-bg);
+  color: var(--ag-default-foreground);
+}
+
+.ag-native-soft-chip[data-tone="success"] {
+  border-color: color-mix(in oklab, var(--ag-success) 28%, transparent);
+  background: var(--ag-success-subtle);
+  color: var(--ag-success);
+}
+
+.ag-native-soft-chip__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 #root input[type="number"]::-webkit-inner-spin-button,
 #root input[type="number"]::-webkit-outer-spin-button,
 .ag-elevation-modal input[type="number"]::-webkit-inner-spin-button,

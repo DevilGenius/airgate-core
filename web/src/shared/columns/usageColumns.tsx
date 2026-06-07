@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
-import { Tooltip } from '@heroui/react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
 import {
   getPluginUsageCostDetail,
@@ -34,7 +34,35 @@ export interface UsageColumnConfig<T extends UsageRow = UsageRow> {
 }
 
 const RICH_TOOLTIP_TRIGGER_CLASS = 'flex h-full w-full cursor-default items-center justify-center rounded-[var(--radius)] px-1.5 py-0 text-center transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
-const RICH_TOOLTIP_OPEN_DELAY_MS = 140;
+const RICH_TOOLTIP_OFFSET_PX = 8;
+const RICH_TOOLTIP_VIEWPORT_PADDING_PX = 8;
+const RICH_TOOLTIP_WIDTH_PX = 336;
+const RICH_TOOLTIP_ESTIMATED_HALF_HEIGHT_PX = 160;
+
+type RichTooltipPlacement = 'left' | 'right';
+type RichTooltipPosition = { left: number; top: number; width: number };
+
+function getRichTooltipPosition(trigger: HTMLElement, placement: RichTooltipPlacement): RichTooltipPosition {
+  const rect = trigger.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const width = Math.min(RICH_TOOLTIP_WIDTH_PX, Math.max(160, viewportWidth - RICH_TOOLTIP_VIEWPORT_PADDING_PX * 4));
+  const maxLeft = Math.max(RICH_TOOLTIP_VIEWPORT_PADDING_PX, viewportWidth - width - RICH_TOOLTIP_VIEWPORT_PADDING_PX);
+  const preferredLeft = placement === 'left'
+    ? rect.left - width - RICH_TOOLTIP_OFFSET_PX
+    : rect.right + RICH_TOOLTIP_OFFSET_PX;
+  const left = Math.min(Math.max(RICH_TOOLTIP_VIEWPORT_PADDING_PX, preferredLeft), maxLeft);
+  const verticalInset = Math.min(
+    RICH_TOOLTIP_VIEWPORT_PADDING_PX + RICH_TOOLTIP_ESTIMATED_HALF_HEIGHT_PX,
+    Math.max(RICH_TOOLTIP_VIEWPORT_PADDING_PX, viewportHeight / 2),
+  );
+  const top = Math.min(
+    Math.max(verticalInset, rect.top + rect.height / 2),
+    Math.max(verticalInset, viewportHeight - verticalInset),
+  );
+
+  return { left, top, width };
+}
 
 function RichTooltip({
   children,
@@ -43,22 +71,76 @@ function RichTooltip({
 }: {
   children: ReactNode;
   content: () => ReactNode;
-  placement?: 'left' | 'right';
+  placement?: RichTooltipPlacement;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState<RichTooltipPosition | null>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger || typeof window === 'undefined') return;
+    setPosition(getRichTooltipPosition(trigger, placement));
+  }, [placement]);
+
+  const openTooltip = useCallback(() => {
+    updatePosition();
+    setIsOpen(true);
+  }, [updatePosition]);
+
+  const closeTooltip = useCallback(() => {
+    setIsOpen(false);
+    setPosition(null);
+  }, []);
+
+  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLSpanElement>) => {
+    if (event.key !== 'Escape') return;
+    closeTooltip();
+  }, [closeTooltip]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen, updatePosition]);
 
   return (
-    <Tooltip delay={RICH_TOOLTIP_OPEN_DELAY_MS} closeDelay={0} onOpenChange={setIsOpen}>
-      <Tooltip.Trigger className={RICH_TOOLTIP_TRIGGER_CLASS}>
-        {children}
-      </Tooltip.Trigger>
-      <Tooltip.Content
-        className="w-[min(21rem,calc(100vw-2rem))] border border-border bg-surface p-0 shadow-lg"
-        placement={placement}
+    <>
+      <span
+        ref={triggerRef}
+        className={RICH_TOOLTIP_TRIGGER_CLASS}
+        tabIndex={0}
+        onBlur={closeTooltip}
+        onFocus={openTooltip}
+        onKeyDown={handleKeyDown}
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltip}
       >
-        {isOpen ? content() : null}
-      </Tooltip.Content>
-    </Tooltip>
+        {children}
+      </span>
+      {isOpen && position && typeof document !== 'undefined'
+        ? createPortal(
+          <div
+            className="ag-usage-rich-tooltip-content"
+            data-placement={placement}
+            role="tooltip"
+            style={{
+              left: position.left,
+              top: position.top,
+              width: position.width,
+            }}
+          >
+            {content()}
+          </div>,
+          document.body,
+        )
+        : null}
+    </>
   );
 }
 
