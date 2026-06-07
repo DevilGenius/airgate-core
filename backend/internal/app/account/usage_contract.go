@@ -172,6 +172,8 @@ func normalizeAccountUsageWindow(window AccountUsageWindow) (AccountUsageWindow,
 }
 
 func mergeAccountUsageInfo(existing, incoming AccountUsageInfo, now time.Time) AccountUsageInfo {
+	existing = normalizeAccountUsageInfo(existing)
+	incoming = normalizeAccountUsageInfo(incoming)
 	merged := incoming
 	if merged.UpdatedAt == "" {
 		merged.UpdatedAt = existing.UpdatedAt
@@ -298,6 +300,7 @@ func accountUsageInfoWithAbsoluteResets(info AccountUsageInfo, now time.Time) Ac
 }
 
 func liveAccountUsageInfo(info AccountUsageInfo, now, fallbackExpiresAt time.Time) AccountUsageInfo {
+	info = normalizeAccountUsageInfo(info)
 	if len(info.Windows) > 0 {
 		windows := make([]AccountUsageWindow, 0, len(info.Windows))
 		for _, window := range info.Windows {
@@ -356,17 +359,23 @@ func windowWithResetAt(window AccountUsageWindow, resetAt, now time.Time) Accoun
 }
 
 func accountUsageWindowIdentity(window AccountUsageWindow) string {
-	if key := strings.TrimSpace(window.Key); key != "" {
-		return key
-	}
 	group := strings.TrimSpace(window.Group)
 	slot := normalizeUsageWindowToken(window.Slot)
 	if group != "" || slot != "" {
+		if group == "" {
+			group = "base"
+		}
+		if slot != "" {
+			return group + ":" + slot
+		}
 		label := strings.TrimSpace(window.DisplayLabel)
 		if label == "" {
 			label = strings.TrimSpace(window.Label)
 		}
-		return group + ":" + slot + ":" + label
+		return group + ":" + label
+	}
+	if key := strings.TrimSpace(window.Key); key != "" {
+		return key
 	}
 	return strings.TrimSpace(window.Label)
 }
@@ -391,9 +400,9 @@ func inferUsageWindowSlot(key, label string) string {
 	keyLower := normalizeUsageWindowToken(key)
 	labelLower := normalizeUsageWindowToken(label)
 	switch {
-	case keyLower == "5h" || strings.Contains(keyLower, ":5h") || strings.HasPrefix(labelLower, "5h"):
+	case keyLower == "5h" || strings.Contains(keyLower, ":5h") || strings.HasPrefix(keyLower, "5h-") || strings.HasPrefix(labelLower, "5h"):
 		return "5h"
-	case keyLower == "7d" || keyLower == "7d-sonnet" || strings.Contains(keyLower, ":7d") || strings.HasPrefix(labelLower, "7d"):
+	case keyLower == "7d" || strings.Contains(keyLower, ":7d") || strings.HasPrefix(keyLower, "7d-") || strings.HasPrefix(labelLower, "7d"):
 		return "7d"
 	case keyLower == "monthly" || strings.Contains(keyLower, "monthly") || strings.Contains(labelLower, "monthly"):
 		return "monthly"
@@ -409,15 +418,28 @@ func inferUsageWindowSlot(key, label string) string {
 func inferUsageWindowGroup(key, label, slot string) string {
 	key = strings.TrimSpace(key)
 	if strings.HasPrefix(key, "model:") {
-		return strings.TrimSpace(strings.TrimPrefix(strings.Replace(key, "model:"+slot+":", "model:", 1), "model::"))
+		rest := strings.TrimPrefix(key, "model:")
+		prefix := slot + ":"
+		suffix := ":" + slot
+		switch {
+		case slot != "" && strings.HasPrefix(rest, prefix):
+			return "model:" + strings.TrimSpace(strings.TrimPrefix(rest, prefix))
+		case slot != "" && strings.HasSuffix(rest, suffix):
+			return "model:" + strings.TrimSpace(strings.TrimSuffix(rest, suffix))
+		default:
+			return strings.TrimSpace(strings.Replace(key, "model::", "model:", 1))
+		}
 	}
 	if suffix := usageWindowLabelSuffix(label, slot); suffix != "" {
 		return "model:" + usageWindowGroupSlug(suffix)
 	}
-	if strings.HasPrefix(key, "7d_") || strings.HasPrefix(key, "5h_") {
-		parts := strings.SplitN(key, "_", 2)
-		if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
-			return "model:" + usageWindowGroupSlug(parts[1])
+	keyLower := normalizeUsageWindowToken(key)
+	if strings.HasPrefix(keyLower, "7d-") || strings.HasPrefix(keyLower, "5h-") {
+		if suffixIndex := strings.Index(keyLower, "-"); suffixIndex >= 0 {
+			suffix := strings.TrimSpace(keyLower[suffixIndex+1:])
+			if suffix != "" {
+				return "model:" + usageWindowGroupSlug(suffix)
+			}
 		}
 	}
 	return "base"

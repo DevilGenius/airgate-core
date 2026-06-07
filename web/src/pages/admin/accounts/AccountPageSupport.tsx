@@ -66,12 +66,13 @@ export function renderAccountTypeFilterOption(option: AccountTypeFilterOption, s
 }
 
 function getUsageWindowIdentity(window: AccountUsageWindow) {
-  const key = window.key?.trim();
+  const normalized = normalizeUsageWindow(window);
+  const group = normalized.group?.trim();
+  const slot = normalizeUsageWindowSortToken(normalized.slot);
+  if (group || slot) return `${group || 'base'}:${slot || normalized.display_label?.trim() || normalized.label.trim()}`;
+  const key = normalized.key?.trim();
   if (key) return key;
-  const group = window.group?.trim();
-  const slot = window.slot?.trim();
-  if (group || slot) return `${group || 'base'}:${slot || window.display_label?.trim() || window.label.trim()}`;
-  return window.label.trim();
+  return normalized.label.trim();
 }
 
 function getUsageWindowCacheKey(accountId: string, window: AccountUsageWindow) {
@@ -103,8 +104,98 @@ function normalizeUsageWindowSortToken(value?: string) {
   return value?.trim().toLowerCase().replace(/_/g, '-') || '';
 }
 
+function inferUsageWindowSlot(window: AccountUsageWindow) {
+  const slot = normalizeUsageWindowSortToken(window.slot);
+  if (slot) return slot;
+
+  const key = normalizeUsageWindowSortToken(window.key);
+  const label = normalizeUsageWindowSortToken(window.label);
+  if (key === '5h' || key.includes(':5h') || key.startsWith('5h-') || label.startsWith('5h')) {
+    return '5h';
+  }
+  if (key === '7d' || key.includes(':7d') || key.startsWith('7d-') || label.startsWith('7d')) {
+    return '7d';
+  }
+  if (key === 'monthly' || key.includes('monthly') || label.includes('monthly')) {
+    return 'monthly';
+  }
+  if (key) return key;
+  return label.split(/\s+/)[0] || '';
+}
+
+function usageWindowGroupSlug(value: string) {
+  return value.trim().toLowerCase().replace(/_/g, '-').replace(/\s+/g, '-');
+}
+
+function usageWindowLabelSuffix(label: string, slot: string) {
+  const parts = label.trim().split(/\s+/);
+  if (parts.length <= 1 || normalizeUsageWindowSortToken(parts[0]) !== slot) return '';
+  return parts.slice(1).join(' ').trim();
+}
+
+function inferUsageWindowGroup(window: AccountUsageWindow, slot: string) {
+  const group = window.group?.trim();
+  if (group) return group;
+
+  const key = window.key?.trim() || '';
+  if (key.startsWith('model:')) {
+    const rest = key.slice('model:'.length);
+    const prefix = `${slot}:`;
+    const suffix = `:${slot}`;
+    if (slot && rest.startsWith(prefix)) return `model:${rest.slice(prefix.length)}`;
+    if (slot && rest.endsWith(suffix)) return `model:${rest.slice(0, -suffix.length)}`;
+    return key.replace(/^model::/, 'model:');
+  }
+
+  const suffix = usageWindowLabelSuffix(window.label || '', slot);
+  if (suffix) return `model:${usageWindowGroupSlug(suffix)}`;
+
+  const normalizedKey = normalizeUsageWindowSortToken(key);
+  if (normalizedKey.startsWith('5h-') || normalizedKey.startsWith('7d-')) {
+    const suffixStart = normalizedKey.indexOf('-') + 1;
+    const keySuffix = normalizedKey.slice(suffixStart);
+    if (keySuffix) return `model:${usageWindowGroupSlug(keySuffix)}`;
+  }
+
+  return 'base';
+}
+
+function inferUsageWindowDisplayLabel(window: AccountUsageWindow, slot: string) {
+  const displayLabel = window.display_label?.trim();
+  if (displayLabel) return displayLabel;
+
+  const label = window.label?.trim() || '';
+  if (slot === 'monthly' && label.toLowerCase().startsWith('cr ')) {
+    return 'Cr';
+  }
+  return slot || window.key?.trim() || label;
+}
+
+function inferUsageWindowKey(window: AccountUsageWindow, group: string, slot: string, label: string) {
+  const key = window.key?.trim();
+  if (key) return key;
+  if (!slot) return label.trim();
+  if (!group || group === 'base') return slot;
+  return `${group}:${slot}`;
+}
+
+function normalizeUsageWindow(window: AccountUsageWindow): AccountUsageWindow {
+  const slot = inferUsageWindowSlot(window);
+  const group = inferUsageWindowGroup(window, slot);
+  const displayLabel = inferUsageWindowDisplayLabel(window, slot);
+  const label = window.label?.trim() || displayLabel;
+  return {
+    ...window,
+    key: inferUsageWindowKey(window, group, slot, label),
+    label,
+    display_label: displayLabel,
+    slot,
+    group,
+  };
+}
+
 function usageWindowSlotSortRank(window: AccountUsageWindow) {
-  switch (normalizeUsageWindowSortToken(window.slot)) {
+  switch (inferUsageWindowSlot(window)) {
     case '5h':
       return 0;
     case '7d':
@@ -131,8 +222,8 @@ function sortUsageWindows(windows: AccountUsageWindow[]) {
     const rightSlot = usageWindowSlotSortRank(right);
     if (leftSlot !== rightSlot) return leftSlot - rightSlot;
 
-    const leftGroup = left.group || '';
-    const rightGroup = right.group || '';
+    const leftGroup = inferUsageWindowGroup(left, inferUsageWindowSlot(left));
+    const rightGroup = inferUsageWindowGroup(right, inferUsageWindowSlot(right));
     if (leftGroup !== rightGroup) return leftGroup.localeCompare(rightGroup);
 
     const leftKey = left.key || '';
@@ -163,17 +254,29 @@ export function mergeCachedUsageWindows(data: AccountUsageData | undefined, cach
   const now = Date.now();
   const accounts: Record<string, AccountUsageInfo> = {};
   const liveCacheKeys = new Set<string>();
-  const cachedWindowsByAccount = new Map<string, Array<[string, CachedUsageWindow]>>();
+  const cachedWindowsByAccount = new Map<string, Map<string, CachedUsageWindow>>();
 
-  for (const entry of cache.entries()) {
+  for (const entry of Array.from(cache.entries())) {
     const accountIdEnd = entry[0].indexOf(':');
     if (accountIdEnd <= 0) continue;
     const accountId = entry[0].slice(0, accountIdEnd);
-    const cachedWindows = cachedWindowsByAccount.get(accountId);
-    if (cachedWindows) {
-      cachedWindows.push(entry);
-    } else {
-      cachedWindowsByAccount.set(accountId, [entry]);
+    const normalizedCached: CachedUsageWindow = {
+      ...entry[1],
+      window: normalizeUsageWindow(entry[1].window),
+    };
+    const cacheKey = getUsageWindowCacheKey(accountId, normalizedCached.window);
+    if (cacheKey !== entry[0]) {
+      cache.delete(entry[0]);
+      cache.set(cacheKey, normalizedCached);
+    }
+    let cachedWindows = cachedWindowsByAccount.get(accountId);
+    if (!cachedWindows) {
+      cachedWindows = new Map<string, CachedUsageWindow>();
+      cachedWindowsByAccount.set(accountId, cachedWindows);
+    }
+    const existing = cachedWindows.get(cacheKey);
+    if (!existing || normalizedCached.resetAtMs > existing.resetAtMs) {
+      cachedWindows.set(cacheKey, normalizedCached);
     }
   }
 
@@ -181,7 +284,8 @@ export function mergeCachedUsageWindows(data: AccountUsageData | undefined, cach
     const rawWindows = Array.isArray(usage?.windows) ? usage.windows : [];
     const mergedWindows: AccountUsageWindow[] = [];
 
-    for (const window of rawWindows) {
+    for (const rawWindow of rawWindows) {
+      const window = normalizeUsageWindow(rawWindow);
       const cacheKey = getUsageWindowCacheKey(accountId, window);
       const resetAtMs = getUsageWindowResetAtMs(window, now);
       const cached = cache.get(cacheKey);
@@ -213,7 +317,7 @@ export function mergeCachedUsageWindows(data: AccountUsageData | undefined, cach
       mergedWindows.push(nextWindow);
     }
 
-    for (const [cacheKey, cached] of cachedWindowsByAccount.get(accountId) ?? []) {
+    for (const [cacheKey, cached] of cachedWindowsByAccount.get(accountId)?.entries() ?? []) {
       if (liveCacheKeys.has(cacheKey)) {
         continue;
       }

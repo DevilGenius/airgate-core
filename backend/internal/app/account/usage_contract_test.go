@@ -21,6 +21,13 @@ func TestNormalizeAccountUsageWindowContractFields(t *testing.T) {
 			wantDisplay: "5h",
 		},
 		{
+			name:        "model suffix window",
+			input:       AccountUsageWindow{Key: "model:gpt-5.3-codex-spark:7d"},
+			wantSlot:    "7d",
+			wantGroup:   "model:gpt-5.3-codex-spark",
+			wantDisplay: "7d",
+		},
+		{
 			name:        "claude sonnet window",
 			input:       AccountUsageWindow{Key: "7d_sonnet", Label: "7d Sonnet"},
 			wantSlot:    "7d",
@@ -114,6 +121,28 @@ func TestAccountUsageCachePayloadDoesNotSlideRelativeResetSeconds(t *testing.T) 
 	}
 }
 
+func TestAccountUsageCachePayloadNormalizesLegacyWindows(t *testing.T) {
+	fetchedAt := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	now := fetchedAt.Add(time.Hour)
+	payload := newAccountUsageCachePayload(AccountUsageInfo{
+		Windows: []AccountUsageWindow{
+			{Key: "7d_sonnet", Label: "7d Sonnet", ResetSeconds: int64((7 * 24 * time.Hour).Seconds()), UsedPercent: 20},
+			{Label: "5h", ResetSeconds: int64((5 * time.Hour).Seconds()), UsedPercent: 10},
+		},
+	}, fetchedAt)
+
+	info, ok := payload.cacheInfo(now)
+	if !ok || len(info.Windows) != 2 {
+		t.Fatalf("cacheInfo ok=%v windows=%+v, want two live windows", ok, info.Windows)
+	}
+	if got := info.Windows[0]; got.Slot != "5h" || got.Group != "base" || got.Key != "5h" {
+		t.Fatalf("first window = %+v, want normalized base 5h", got)
+	}
+	if got := info.Windows[1]; got.Slot != "7d" || got.Group != "model:sonnet" || got.DisplayLabel != "7d" {
+		t.Fatalf("second window = %+v, want normalized 7d sonnet", got)
+	}
+}
+
 func TestMergeAccountUsageInfoPreservesLiveMissingWindows(t *testing.T) {
 	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
 	existing := AccountUsageInfo{
@@ -162,6 +191,38 @@ func TestMergeAccountUsageInfoPreservesLiveMissingWindows(t *testing.T) {
 	}
 	if got := merged.Windows[1]; got.Key != "7d" || got.UsedPercent != 55 || got.ResetSeconds <= 0 {
 		t.Fatalf("merged 7d window = %+v, want incoming usage with preserved reset", got)
+	}
+}
+
+func TestMergeAccountUsageInfoMatchesLegacyAndCanonicalWindowIdentity(t *testing.T) {
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	existing := AccountUsageInfo{
+		Windows: []AccountUsageWindow{
+			{
+				Key:         "7d_sonnet",
+				Label:       "7d Sonnet",
+				UsedPercent: 10,
+				ResetAt:     now.Add(48 * time.Hour).Format(time.RFC3339),
+			},
+		},
+	}
+	incoming := AccountUsageInfo{
+		Windows: []AccountUsageWindow{
+			{
+				Key:         "model:sonnet:7d",
+				Label:       "7d Sonnet",
+				UsedPercent: 30,
+			},
+		},
+	}
+
+	merged := mergeAccountUsageInfo(existing, incoming, now)
+	if len(merged.Windows) != 1 {
+		t.Fatalf("len(windows) = %d, want 1: %+v", len(merged.Windows), merged.Windows)
+	}
+	got := merged.Windows[0]
+	if got.UsedPercent != 30 || got.ResetSeconds <= 0 || got.Group != "model:sonnet" || got.Slot != "7d" {
+		t.Fatalf("merged window = %+v, want canonical incoming usage with preserved reset", got)
 	}
 }
 
@@ -269,9 +330,10 @@ func TestAccountUsageWindowIdentityFallbacks(t *testing.T) {
 		window AccountUsageWindow
 		want   string
 	}{
-		{"key wins", AccountUsageWindow{Key: " primary ", Group: "base", Slot: "5h", Label: "5h"}, "primary"},
-		{"group+slot+display", AccountUsageWindow{Group: "base", Slot: "5h", DisplayLabel: "5h window"}, "base:5h:5h window"},
-		{"group+slot+label fallback", AccountUsageWindow{Group: "model:opus", Slot: "7d", Label: "7d Opus"}, "model:opus:7d:7d Opus"},
+		{"group+slot wins over key", AccountUsageWindow{Key: " primary ", Group: "base", Slot: "5h", Label: "5h"}, "base:5h"},
+		{"group+slot+display", AccountUsageWindow{Group: "base", Slot: "5h", DisplayLabel: "5h window"}, "base:5h"},
+		{"group+slot+label fallback", AccountUsageWindow{Group: "model:opus", Slot: "7d", Label: "7d Opus"}, "model:opus:7d"},
+		{"key fallback", AccountUsageWindow{Key: " primary ", Label: "5h"}, "primary"},
 		{"label-only", AccountUsageWindow{Label: " 5h "}, "5h"},
 		{"empty", AccountUsageWindow{}, ""},
 	}
