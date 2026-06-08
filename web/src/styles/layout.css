@@ -490,24 +490,19 @@
   gap: 0.125rem 0.25rem !important;
 }
 
-.ag-mobile-record-field--tokens .ag-usage-token-summary > :first-child > div {
+.ag-mobile-record-field--tokens .ag-usage-token-summary .ag-usage-token-row {
   min-width: 0;
-  grid-template-columns: 0.75rem minmax(0, 1fr) !important;
-  gap: 0.125rem !important;
+  grid-template-columns: 0.75rem minmax(0, 1fr);
+  gap: 0.125rem;
 }
 
-.ag-mobile-record-field--tokens .ag-usage-token-summary > :first-child > div > span:first-child {
-  width: 0.75rem !important;
-  height: 0.75rem !important;
+.ag-mobile-record-field--tokens .ag-usage-token-summary .ag-usage-token-marker {
+  --ag-usage-token-marker-size: 0.75rem;
+  justify-self: center;
 }
 
-.ag-mobile-record-field--tokens .ag-usage-token-summary > :first-child > div > span:first-child > span {
-  width: 0.625rem !important;
-  height: 0.625rem !important;
-}
-
-.ag-mobile-record-field--tokens .ag-usage-token-summary > :first-child > div > span:last-child {
-  width: auto !important;
+.ag-mobile-record-field--tokens .ag-usage-token-summary .ag-usage-token-row > span:last-child {
+  width: auto;
   min-width: 0;
   max-width: 2.5rem;
   justify-self: start;

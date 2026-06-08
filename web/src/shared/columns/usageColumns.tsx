@@ -313,7 +313,7 @@ function TokenRow({
   value: string;
 }) {
   return (
-    <div className="grid grid-cols-[1rem_minmax(0,1fr)] items-center gap-1">
+    <div className="ag-usage-token-row grid grid-cols-[1rem_minmax(0,1fr)] items-center gap-1">
       <span
         aria-hidden="true"
         className={`ag-usage-token-marker ag-usage-token-marker--${marker}`}
