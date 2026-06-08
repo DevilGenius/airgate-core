@@ -215,6 +215,19 @@ const META_CHIP_EFFORT_COLORS: Record<string, string> = {
 
 const MODEL_META_SLOT_WIDTH_CLASS = 'w-[5.5rem]';
 
+function usagePlatformKey(platform: string): string {
+  return platform.trim().toLowerCase();
+}
+
+function isClaudeUsagePlatform(platform: string): boolean {
+  return usagePlatformKey(platform).includes('claude');
+}
+
+function reasoningEffortMetaColor(reasoningEffort: string): string {
+  const key = reasoningEffort.trim().toLowerCase().replace(/[\s_-]+/g, '');
+  return META_CHIP_EFFORT_COLORS[key] ?? 'rgb(148,163,184)';
+}
+
 function MetaChip({
   color,
   dotColor,
@@ -701,7 +714,18 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         const PluginUsageModelMeta = getPluginUsageModelMeta(row.platform);
         const metaContext = buildUsageRecordContext(row, customerScope);
         const fallbackMeta = (() => {
-          if (PluginUsageModelMeta) return null;
+          const reasoningEffort = typeof metaContext.reasoning_effort === 'string' ? metaContext.reasoning_effort.trim() : '';
+          const reasoningEffortMeta = reasoningEffort ? (
+            <MetaChip
+              color={reasoningEffortMetaColor(reasoningEffort)}
+              label={reasoningEffort}
+            />
+          ) : null;
+
+          if (PluginUsageModelMeta) {
+            return isClaudeUsagePlatform(row.platform) ? reasoningEffortMeta : null;
+          }
+
           const imageSize = usageMetadataValue(row.usage_metadata ?? {}, ['openai.image.size']) ?? '';
           if (imageSize) {
             const imageTier = getImageSizeTier(imageSize);
@@ -715,14 +739,8 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
             );
           }
 
-          const reasoningEffort = typeof metaContext.reasoning_effort === 'string' ? metaContext.reasoning_effort : '';
-          if (reasoningEffort) {
-            return (
-              <MetaChip
-                color={META_CHIP_EFFORT_COLORS[reasoningEffort.toLowerCase()] ?? 'rgb(148,163,184)'}
-                label={reasoningEffort}
-              />
-            );
+          if (reasoningEffortMeta) {
+            return reasoningEffortMeta;
           }
 
           const serviceTier = typeof metaContext.service_tier === 'string' ? metaContext.service_tier : '';
@@ -738,12 +756,12 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         return (
           <div className="ag-usage-model-cell grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2 text-left">
             <div className={`ag-usage-model-meta-slot ${MODEL_META_SLOT_WIDTH_CLASS} flex h-4 shrink-0 items-center justify-center overflow-hidden`}>
-              {PluginUsageModelMeta ? (
+              {fallbackMeta ?? (PluginUsageModelMeta ? (
                 <PluginUsageModelMeta
                   recordId={row.id}
                   context={metaContext}
                 />
-              ) : fallbackMeta}
+              ) : null)}
             </div>
             <span className="min-w-0 truncate text-sm font-medium leading-none text-text" title={row.model}>
               {row.model}
