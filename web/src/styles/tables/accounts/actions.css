@@ -18,30 +18,10 @@
     box-shadow 80ms ease;
 }
 
-.ag-accounts-table .ag-table-selection-checkbox::before {
-  content: "";
-  width: 0.55rem;
-  height: 0.55rem;
-  transform: scale(0);
-  transition: transform 80ms ease;
-  background: currentColor;
-  clip-path: polygon(14% 44%, 0 58%, 38% 96%, 100% 22%, 86% 8%, 38% 66%);
-}
-
 .ag-accounts-table .ag-table-selection-checkbox:checked,
 .ag-accounts-table .ag-table-selection-checkbox:indeterminate {
   border-color: var(--accent);
   background: var(--accent);
-}
-
-.ag-accounts-table .ag-table-selection-checkbox:checked::before,
-.ag-accounts-table .ag-table-selection-checkbox:indeterminate::before {
-  transform: scale(1);
-}
-
-.ag-accounts-table .ag-table-selection-checkbox:indeterminate::before {
-  height: 0.125rem;
-  clip-path: none;
 }
 
 .ag-accounts-table .ag-table-selection-checkbox:hover {
@@ -104,30 +84,6 @@
   text-align: center;
   text-overflow: clip;
   white-space: nowrap;
-}
-
-.ag-accounts-table .ag-account-row-more-dots {
-  position: relative;
-  display: block;
-  width: 0.875rem;
-  height: 0.875rem;
-  color: currentColor;
-}
-
-.ag-accounts-table .ag-account-row-more-dots::before {
-  position: absolute;
-  top: 50%;
-  left: 0.125rem;
-  display: block;
-  width: 0.1875rem;
-  height: 0.1875rem;
-  border-radius: 999px;
-  background: currentColor;
-  content: "";
-  transform: translateY(-50%);
-  box-shadow:
-    0.28125rem 0 0 currentColor,
-    0.5625rem 0 0 currentColor;
 }
 
 /* Account table controls. */
