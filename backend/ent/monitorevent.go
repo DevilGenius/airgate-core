@@ -40,8 +40,6 @@ type MonitorEvent struct {
 	APIKeyID *int `json:"api_key_id,omitempty"`
 	// APIKeyNameSnapshot holds the value of the "api_key_name_snapshot" field.
 	APIKeyNameSnapshot string `json:"api_key_name_snapshot,omitempty"`
-	// APIKeyPrefix holds the value of the "api_key_prefix" field.
-	APIKeyPrefix string `json:"api_key_prefix,omitempty"`
 	// UserID holds the value of the "user_id" field.
 	UserID *int `json:"user_id,omitempty"`
 	// UserEmailSnapshot holds the value of the "user_email_snapshot" field.
@@ -62,8 +60,6 @@ type MonitorEvent struct {
 	Method string `json:"method,omitempty"`
 	// Endpoint holds the value of the "endpoint" field.
 	Endpoint string `json:"endpoint,omitempty"`
-	// RequestPath holds the value of the "request_path" field.
-	RequestPath string `json:"request_path,omitempty"`
 	// Model holds the value of the "model" field.
 	Model string `json:"model,omitempty"`
 	// HTTPStatus holds the value of the "http_status" field.
@@ -106,7 +102,7 @@ func (*MonitorEvent) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case monitorevent.FieldID, monitorevent.FieldAPIKeyID, monitorevent.FieldUserID, monitorevent.FieldGroupID, monitorevent.FieldAccountID, monitorevent.FieldHTTPStatus, monitorevent.FieldUpstreamStatus:
 			values[i] = new(sql.NullInt64)
-		case monitorevent.FieldKind, monitorevent.FieldSeverity, monitorevent.FieldStatus, monitorevent.FieldSource, monitorevent.FieldSubjectType, monitorevent.FieldSubjectID, monitorevent.FieldFingerprint, monitorevent.FieldTitle, monitorevent.FieldMessage, monitorevent.FieldAPIKeyNameSnapshot, monitorevent.FieldAPIKeyPrefix, monitorevent.FieldUserEmailSnapshot, monitorevent.FieldAccountNameSnapshot, monitorevent.FieldPlatform, monitorevent.FieldPluginID, monitorevent.FieldTaskType, monitorevent.FieldMethod, monitorevent.FieldEndpoint, monitorevent.FieldRequestPath, monitorevent.FieldModel, monitorevent.FieldErrorCode, monitorevent.FieldErrorType, monitorevent.FieldNotifyError:
+		case monitorevent.FieldKind, monitorevent.FieldSeverity, monitorevent.FieldStatus, monitorevent.FieldSource, monitorevent.FieldSubjectType, monitorevent.FieldSubjectID, monitorevent.FieldFingerprint, monitorevent.FieldTitle, monitorevent.FieldMessage, monitorevent.FieldAPIKeyNameSnapshot, monitorevent.FieldUserEmailSnapshot, monitorevent.FieldAccountNameSnapshot, monitorevent.FieldPlatform, monitorevent.FieldPluginID, monitorevent.FieldTaskType, monitorevent.FieldMethod, monitorevent.FieldEndpoint, monitorevent.FieldModel, monitorevent.FieldErrorCode, monitorevent.FieldErrorType, monitorevent.FieldNotifyError:
 			values[i] = new(sql.NullString)
 		case monitorevent.FieldCreatedAt, monitorevent.FieldUpdatedAt, monitorevent.FieldResolvedAt, monitorevent.FieldIgnoredAt, monitorevent.FieldAutoResolveAt, monitorevent.FieldExpiresAt, monitorevent.FieldLastNotifiedAt, monitorevent.FieldNextNotifyAt:
 			values[i] = new(sql.NullTime)
@@ -198,12 +194,6 @@ func (me *MonitorEvent) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				me.APIKeyNameSnapshot = value.String
 			}
-		case monitorevent.FieldAPIKeyPrefix:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field api_key_prefix", values[i])
-			} else if value.Valid {
-				me.APIKeyPrefix = value.String
-			}
 		case monitorevent.FieldUserID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field user_id", values[i])
@@ -266,12 +256,6 @@ func (me *MonitorEvent) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field endpoint", values[i])
 			} else if value.Valid {
 				me.Endpoint = value.String
-			}
-		case monitorevent.FieldRequestPath:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field request_path", values[i])
-			} else if value.Valid {
-				me.RequestPath = value.String
 			}
 		case monitorevent.FieldModel:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -443,9 +427,6 @@ func (me *MonitorEvent) String() string {
 	builder.WriteString("api_key_name_snapshot=")
 	builder.WriteString(me.APIKeyNameSnapshot)
 	builder.WriteString(", ")
-	builder.WriteString("api_key_prefix=")
-	builder.WriteString(me.APIKeyPrefix)
-	builder.WriteString(", ")
 	if v := me.UserID; v != nil {
 		builder.WriteString("user_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
@@ -481,9 +462,6 @@ func (me *MonitorEvent) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("endpoint=")
 	builder.WriteString(me.Endpoint)
-	builder.WriteString(", ")
-	builder.WriteString("request_path=")
-	builder.WriteString(me.RequestPath)
 	builder.WriteString(", ")
 	builder.WriteString("model=")
 	builder.WriteString(me.Model)

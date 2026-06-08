@@ -36,8 +36,6 @@ const (
 	FieldAPIKeyID = "api_key_id"
 	// FieldAPIKeyNameSnapshot holds the string denoting the api_key_name_snapshot field in the database.
 	FieldAPIKeyNameSnapshot = "api_key_name_snapshot"
-	// FieldAPIKeyPrefix holds the string denoting the api_key_prefix field in the database.
-	FieldAPIKeyPrefix = "api_key_prefix"
 	// FieldUserID holds the string denoting the user_id field in the database.
 	FieldUserID = "user_id"
 	// FieldUserEmailSnapshot holds the string denoting the user_email_snapshot field in the database.
@@ -58,8 +56,6 @@ const (
 	FieldMethod = "method"
 	// FieldEndpoint holds the string denoting the endpoint field in the database.
 	FieldEndpoint = "endpoint"
-	// FieldRequestPath holds the string denoting the request_path field in the database.
-	FieldRequestPath = "request_path"
 	// FieldModel holds the string denoting the model field in the database.
 	FieldModel = "model"
 	// FieldHTTPStatus holds the string denoting the http_status field in the database.
@@ -108,7 +104,6 @@ var Columns = []string{
 	FieldMessage,
 	FieldAPIKeyID,
 	FieldAPIKeyNameSnapshot,
-	FieldAPIKeyPrefix,
 	FieldUserID,
 	FieldUserEmailSnapshot,
 	FieldGroupID,
@@ -119,7 +114,6 @@ var Columns = []string{
 	FieldTaskType,
 	FieldMethod,
 	FieldEndpoint,
-	FieldRequestPath,
 	FieldModel,
 	FieldHTTPStatus,
 	FieldUpstreamStatus,
@@ -174,10 +168,6 @@ var (
 	DefaultAPIKeyNameSnapshot string
 	// APIKeyNameSnapshotValidator is a validator for the "api_key_name_snapshot" field. It is called by the builders before save.
 	APIKeyNameSnapshotValidator func(string) error
-	// DefaultAPIKeyPrefix holds the default value on creation for the "api_key_prefix" field.
-	DefaultAPIKeyPrefix string
-	// APIKeyPrefixValidator is a validator for the "api_key_prefix" field. It is called by the builders before save.
-	APIKeyPrefixValidator func(string) error
 	// DefaultUserEmailSnapshot holds the default value on creation for the "user_email_snapshot" field.
 	DefaultUserEmailSnapshot string
 	// UserEmailSnapshotValidator is a validator for the "user_email_snapshot" field. It is called by the builders before save.
@@ -206,10 +196,6 @@ var (
 	DefaultEndpoint string
 	// EndpointValidator is a validator for the "endpoint" field. It is called by the builders before save.
 	EndpointValidator func(string) error
-	// DefaultRequestPath holds the default value on creation for the "request_path" field.
-	DefaultRequestPath string
-	// RequestPathValidator is a validator for the "request_path" field. It is called by the builders before save.
-	RequestPathValidator func(string) error
 	// DefaultModel holds the default value on creation for the "model" field.
 	DefaultModel string
 	// ModelValidator is a validator for the "model" field. It is called by the builders before save.
@@ -380,11 +366,6 @@ func ByAPIKeyNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAPIKeyNameSnapshot, opts...).ToFunc()
 }
 
-// ByAPIKeyPrefix orders the results by the api_key_prefix field.
-func ByAPIKeyPrefix(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldAPIKeyPrefix, opts...).ToFunc()
-}
-
 // ByUserID orders the results by the user_id field.
 func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUserID, opts...).ToFunc()
@@ -433,11 +414,6 @@ func ByMethod(opts ...sql.OrderTermOption) OrderOption {
 // ByEndpoint orders the results by the endpoint field.
 func ByEndpoint(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldEndpoint, opts...).ToFunc()
-}
-
-// ByRequestPath orders the results by the request_path field.
-func ByRequestPath(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldRequestPath, opts...).ToFunc()
 }
 
 // ByModel orders the results by the model field.

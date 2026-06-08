@@ -831,7 +831,6 @@ export interface MonitorEventResp {
   message: string;
   api_key_id?: number;
   api_key_name_snapshot?: string;
-  api_key_prefix?: string;
   user_id?: number;
   user_email_snapshot?: string;
   group_id?: number;
@@ -842,7 +841,6 @@ export interface MonitorEventResp {
   task_type?: string;
   method?: string;
   endpoint?: string;
-  request_path?: string;
   model?: string;
   http_status?: number;
   upstream_status?: number;

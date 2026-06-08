@@ -30,7 +30,6 @@ type Event struct {
 	Message             string
 	APIKeyID            *int
 	APIKeyNameSnapshot  string
-	APIKeyPrefix        string
 	UserID              *int
 	UserEmailSnapshot   string
 	GroupID             *int
@@ -41,7 +40,6 @@ type Event struct {
 	TaskType            string
 	Method              string
 	Endpoint            string
-	RequestPath         string
 	Model               string
 	HTTPStatus          *int
 	UpstreamStatus      *int

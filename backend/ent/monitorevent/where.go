@@ -94,11 +94,6 @@ func APIKeyNameSnapshot(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldAPIKeyNameSnapshot, v))
 }
 
-// APIKeyPrefix applies equality check predicate on the "api_key_prefix" field. It's identical to APIKeyPrefixEQ.
-func APIKeyPrefix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldAPIKeyPrefix, v))
-}
-
 // UserID applies equality check predicate on the "user_id" field. It's identical to UserIDEQ.
 func UserID(v int) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldUserID, v))
@@ -147,11 +142,6 @@ func Method(v string) predicate.MonitorEvent {
 // Endpoint applies equality check predicate on the "endpoint" field. It's identical to EndpointEQ.
 func Endpoint(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldEndpoint, v))
-}
-
-// RequestPath applies equality check predicate on the "request_path" field. It's identical to RequestPathEQ.
-func RequestPath(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldRequestPath, v))
 }
 
 // Model applies equality check predicate on the "model" field. It's identical to ModelEQ.
@@ -789,71 +779,6 @@ func APIKeyNameSnapshotContainsFold(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldContainsFold(FieldAPIKeyNameSnapshot, v))
 }
 
-// APIKeyPrefixEQ applies the EQ predicate on the "api_key_prefix" field.
-func APIKeyPrefixEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldAPIKeyPrefix, v))
-}
-
-// APIKeyPrefixNEQ applies the NEQ predicate on the "api_key_prefix" field.
-func APIKeyPrefixNEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldAPIKeyPrefix, v))
-}
-
-// APIKeyPrefixIn applies the In predicate on the "api_key_prefix" field.
-func APIKeyPrefixIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldAPIKeyPrefix, vs...))
-}
-
-// APIKeyPrefixNotIn applies the NotIn predicate on the "api_key_prefix" field.
-func APIKeyPrefixNotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldAPIKeyPrefix, vs...))
-}
-
-// APIKeyPrefixGT applies the GT predicate on the "api_key_prefix" field.
-func APIKeyPrefixGT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldAPIKeyPrefix, v))
-}
-
-// APIKeyPrefixGTE applies the GTE predicate on the "api_key_prefix" field.
-func APIKeyPrefixGTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldAPIKeyPrefix, v))
-}
-
-// APIKeyPrefixLT applies the LT predicate on the "api_key_prefix" field.
-func APIKeyPrefixLT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldAPIKeyPrefix, v))
-}
-
-// APIKeyPrefixLTE applies the LTE predicate on the "api_key_prefix" field.
-func APIKeyPrefixLTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldAPIKeyPrefix, v))
-}
-
-// APIKeyPrefixContains applies the Contains predicate on the "api_key_prefix" field.
-func APIKeyPrefixContains(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContains(FieldAPIKeyPrefix, v))
-}
-
-// APIKeyPrefixHasPrefix applies the HasPrefix predicate on the "api_key_prefix" field.
-func APIKeyPrefixHasPrefix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldAPIKeyPrefix, v))
-}
-
-// APIKeyPrefixHasSuffix applies the HasSuffix predicate on the "api_key_prefix" field.
-func APIKeyPrefixHasSuffix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldAPIKeyPrefix, v))
-}
-
-// APIKeyPrefixEqualFold applies the EqualFold predicate on the "api_key_prefix" field.
-func APIKeyPrefixEqualFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEqualFold(FieldAPIKeyPrefix, v))
-}
-
-// APIKeyPrefixContainsFold applies the ContainsFold predicate on the "api_key_prefix" field.
-func APIKeyPrefixContainsFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContainsFold(FieldAPIKeyPrefix, v))
-}
-
 // UserIDEQ applies the EQ predicate on the "user_id" field.
 func UserIDEQ(v int) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldUserID, v))
@@ -1457,71 +1382,6 @@ func EndpointEqualFold(v string) predicate.MonitorEvent {
 // EndpointContainsFold applies the ContainsFold predicate on the "endpoint" field.
 func EndpointContainsFold(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldContainsFold(FieldEndpoint, v))
-}
-
-// RequestPathEQ applies the EQ predicate on the "request_path" field.
-func RequestPathEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldRequestPath, v))
-}
-
-// RequestPathNEQ applies the NEQ predicate on the "request_path" field.
-func RequestPathNEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldRequestPath, v))
-}
-
-// RequestPathIn applies the In predicate on the "request_path" field.
-func RequestPathIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldRequestPath, vs...))
-}
-
-// RequestPathNotIn applies the NotIn predicate on the "request_path" field.
-func RequestPathNotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldRequestPath, vs...))
-}
-
-// RequestPathGT applies the GT predicate on the "request_path" field.
-func RequestPathGT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldRequestPath, v))
-}
-
-// RequestPathGTE applies the GTE predicate on the "request_path" field.
-func RequestPathGTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldRequestPath, v))
-}
-
-// RequestPathLT applies the LT predicate on the "request_path" field.
-func RequestPathLT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldRequestPath, v))
-}
-
-// RequestPathLTE applies the LTE predicate on the "request_path" field.
-func RequestPathLTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldRequestPath, v))
-}
-
-// RequestPathContains applies the Contains predicate on the "request_path" field.
-func RequestPathContains(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContains(FieldRequestPath, v))
-}
-
-// RequestPathHasPrefix applies the HasPrefix predicate on the "request_path" field.
-func RequestPathHasPrefix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldRequestPath, v))
-}
-
-// RequestPathHasSuffix applies the HasSuffix predicate on the "request_path" field.
-func RequestPathHasSuffix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldRequestPath, v))
-}
-
-// RequestPathEqualFold applies the EqualFold predicate on the "request_path" field.
-func RequestPathEqualFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEqualFold(FieldRequestPath, v))
-}
-
-// RequestPathContainsFold applies the ContainsFold predicate on the "request_path" field.
-func RequestPathContainsFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContainsFold(FieldRequestPath, v))
 }
 
 // ModelEQ applies the EQ predicate on the "model" field.

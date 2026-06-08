@@ -158,20 +158,6 @@ func (mec *MonitorEventCreate) SetNillableAPIKeyNameSnapshot(s *string) *Monitor
 	return mec
 }
 
-// SetAPIKeyPrefix sets the "api_key_prefix" field.
-func (mec *MonitorEventCreate) SetAPIKeyPrefix(s string) *MonitorEventCreate {
-	mec.mutation.SetAPIKeyPrefix(s)
-	return mec
-}
-
-// SetNillableAPIKeyPrefix sets the "api_key_prefix" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableAPIKeyPrefix(s *string) *MonitorEventCreate {
-	if s != nil {
-		mec.SetAPIKeyPrefix(*s)
-	}
-	return mec
-}
-
 // SetUserID sets the "user_id" field.
 func (mec *MonitorEventCreate) SetUserID(i int) *MonitorEventCreate {
 	mec.mutation.SetUserID(i)
@@ -308,20 +294,6 @@ func (mec *MonitorEventCreate) SetEndpoint(s string) *MonitorEventCreate {
 func (mec *MonitorEventCreate) SetNillableEndpoint(s *string) *MonitorEventCreate {
 	if s != nil {
 		mec.SetEndpoint(*s)
-	}
-	return mec
-}
-
-// SetRequestPath sets the "request_path" field.
-func (mec *MonitorEventCreate) SetRequestPath(s string) *MonitorEventCreate {
-	mec.mutation.SetRequestPath(s)
-	return mec
-}
-
-// SetNillableRequestPath sets the "request_path" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableRequestPath(s *string) *MonitorEventCreate {
-	if s != nil {
-		mec.SetRequestPath(*s)
 	}
 	return mec
 }
@@ -595,10 +567,6 @@ func (mec *MonitorEventCreate) defaults() {
 		v := monitorevent.DefaultAPIKeyNameSnapshot
 		mec.mutation.SetAPIKeyNameSnapshot(v)
 	}
-	if _, ok := mec.mutation.APIKeyPrefix(); !ok {
-		v := monitorevent.DefaultAPIKeyPrefix
-		mec.mutation.SetAPIKeyPrefix(v)
-	}
 	if _, ok := mec.mutation.UserEmailSnapshot(); !ok {
 		v := monitorevent.DefaultUserEmailSnapshot
 		mec.mutation.SetUserEmailSnapshot(v)
@@ -626,10 +594,6 @@ func (mec *MonitorEventCreate) defaults() {
 	if _, ok := mec.mutation.Endpoint(); !ok {
 		v := monitorevent.DefaultEndpoint
 		mec.mutation.SetEndpoint(v)
-	}
-	if _, ok := mec.mutation.RequestPath(); !ok {
-		v := monitorevent.DefaultRequestPath
-		mec.mutation.SetRequestPath(v)
 	}
 	if _, ok := mec.mutation.Model(); !ok {
 		v := monitorevent.DefaultModel
@@ -747,14 +711,6 @@ func (mec *MonitorEventCreate) check() error {
 			return &ValidationError{Name: "api_key_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.api_key_name_snapshot": %w`, err)}
 		}
 	}
-	if _, ok := mec.mutation.APIKeyPrefix(); !ok {
-		return &ValidationError{Name: "api_key_prefix", err: errors.New(`ent: missing required field "MonitorEvent.api_key_prefix"`)}
-	}
-	if v, ok := mec.mutation.APIKeyPrefix(); ok {
-		if err := monitorevent.APIKeyPrefixValidator(v); err != nil {
-			return &ValidationError{Name: "api_key_prefix", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.api_key_prefix": %w`, err)}
-		}
-	}
 	if _, ok := mec.mutation.UserEmailSnapshot(); !ok {
 		return &ValidationError{Name: "user_email_snapshot", err: errors.New(`ent: missing required field "MonitorEvent.user_email_snapshot"`)}
 	}
@@ -809,14 +765,6 @@ func (mec *MonitorEventCreate) check() error {
 	if v, ok := mec.mutation.Endpoint(); ok {
 		if err := monitorevent.EndpointValidator(v); err != nil {
 			return &ValidationError{Name: "endpoint", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.endpoint": %w`, err)}
-		}
-	}
-	if _, ok := mec.mutation.RequestPath(); !ok {
-		return &ValidationError{Name: "request_path", err: errors.New(`ent: missing required field "MonitorEvent.request_path"`)}
-	}
-	if v, ok := mec.mutation.RequestPath(); ok {
-		if err := monitorevent.RequestPathValidator(v); err != nil {
-			return &ValidationError{Name: "request_path", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.request_path": %w`, err)}
 		}
 	}
 	if _, ok := mec.mutation.Model(); !ok {
@@ -930,10 +878,6 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 		_spec.SetField(monitorevent.FieldAPIKeyNameSnapshot, field.TypeString, value)
 		_node.APIKeyNameSnapshot = value
 	}
-	if value, ok := mec.mutation.APIKeyPrefix(); ok {
-		_spec.SetField(monitorevent.FieldAPIKeyPrefix, field.TypeString, value)
-		_node.APIKeyPrefix = value
-	}
 	if value, ok := mec.mutation.UserID(); ok {
 		_spec.SetField(monitorevent.FieldUserID, field.TypeInt, value)
 		_node.UserID = &value
@@ -973,10 +917,6 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 	if value, ok := mec.mutation.Endpoint(); ok {
 		_spec.SetField(monitorevent.FieldEndpoint, field.TypeString, value)
 		_node.Endpoint = value
-	}
-	if value, ok := mec.mutation.RequestPath(); ok {
-		_spec.SetField(monitorevent.FieldRequestPath, field.TypeString, value)
-		_node.RequestPath = value
 	}
 	if value, ok := mec.mutation.Model(); ok {
 		_spec.SetField(monitorevent.FieldModel, field.TypeString, value)

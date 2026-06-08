@@ -5683,7 +5683,6 @@ type MonitorEventMutation struct {
 	api_key_id            *int
 	addapi_key_id         *int
 	api_key_name_snapshot *string
-	api_key_prefix        *string
 	user_id               *int
 	adduser_id            *int
 	user_email_snapshot   *string
@@ -5697,7 +5696,6 @@ type MonitorEventMutation struct {
 	task_type             *string
 	method                *string
 	endpoint              *string
-	request_path          *string
 	model                 *string
 	http_status           *int
 	addhttp_status        *int
@@ -6249,42 +6247,6 @@ func (m *MonitorEventMutation) ResetAPIKeyNameSnapshot() {
 	m.api_key_name_snapshot = nil
 }
 
-// SetAPIKeyPrefix sets the "api_key_prefix" field.
-func (m *MonitorEventMutation) SetAPIKeyPrefix(s string) {
-	m.api_key_prefix = &s
-}
-
-// APIKeyPrefix returns the value of the "api_key_prefix" field in the mutation.
-func (m *MonitorEventMutation) APIKeyPrefix() (r string, exists bool) {
-	v := m.api_key_prefix
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldAPIKeyPrefix returns the old "api_key_prefix" field's value of the MonitorEvent entity.
-// If the MonitorEvent object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *MonitorEventMutation) OldAPIKeyPrefix(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldAPIKeyPrefix is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldAPIKeyPrefix requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldAPIKeyPrefix: %w", err)
-	}
-	return oldValue.APIKeyPrefix, nil
-}
-
-// ResetAPIKeyPrefix resets all changes to the "api_key_prefix" field.
-func (m *MonitorEventMutation) ResetAPIKeyPrefix() {
-	m.api_key_prefix = nil
-}
-
 // SetUserID sets the "user_id" field.
 func (m *MonitorEventMutation) SetUserID(i int) {
 	m.user_id = &i
@@ -6745,42 +6707,6 @@ func (m *MonitorEventMutation) OldEndpoint(ctx context.Context) (v string, err e
 // ResetEndpoint resets all changes to the "endpoint" field.
 func (m *MonitorEventMutation) ResetEndpoint() {
 	m.endpoint = nil
-}
-
-// SetRequestPath sets the "request_path" field.
-func (m *MonitorEventMutation) SetRequestPath(s string) {
-	m.request_path = &s
-}
-
-// RequestPath returns the value of the "request_path" field in the mutation.
-func (m *MonitorEventMutation) RequestPath() (r string, exists bool) {
-	v := m.request_path
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldRequestPath returns the old "request_path" field's value of the MonitorEvent entity.
-// If the MonitorEvent object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *MonitorEventMutation) OldRequestPath(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldRequestPath is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldRequestPath requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldRequestPath: %w", err)
-	}
-	return oldValue.RequestPath, nil
-}
-
-// ResetRequestPath resets all changes to the "request_path" field.
-func (m *MonitorEventMutation) ResetRequestPath() {
-	m.request_path = nil
 }
 
 // SetModel sets the "model" field.
@@ -7503,7 +7429,7 @@ func (m *MonitorEventMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MonitorEventMutation) Fields() []string {
-	fields := make([]string, 0, 38)
+	fields := make([]string, 0, 36)
 	if m.kind != nil {
 		fields = append(fields, monitorevent.FieldKind)
 	}
@@ -7537,9 +7463,6 @@ func (m *MonitorEventMutation) Fields() []string {
 	if m.api_key_name_snapshot != nil {
 		fields = append(fields, monitorevent.FieldAPIKeyNameSnapshot)
 	}
-	if m.api_key_prefix != nil {
-		fields = append(fields, monitorevent.FieldAPIKeyPrefix)
-	}
 	if m.user_id != nil {
 		fields = append(fields, monitorevent.FieldUserID)
 	}
@@ -7569,9 +7492,6 @@ func (m *MonitorEventMutation) Fields() []string {
 	}
 	if m.endpoint != nil {
 		fields = append(fields, monitorevent.FieldEndpoint)
-	}
-	if m.request_path != nil {
-		fields = append(fields, monitorevent.FieldRequestPath)
 	}
 	if m.model != nil {
 		fields = append(fields, monitorevent.FieldModel)
@@ -7648,8 +7568,6 @@ func (m *MonitorEventMutation) Field(name string) (ent.Value, bool) {
 		return m.APIKeyID()
 	case monitorevent.FieldAPIKeyNameSnapshot:
 		return m.APIKeyNameSnapshot()
-	case monitorevent.FieldAPIKeyPrefix:
-		return m.APIKeyPrefix()
 	case monitorevent.FieldUserID:
 		return m.UserID()
 	case monitorevent.FieldUserEmailSnapshot:
@@ -7670,8 +7588,6 @@ func (m *MonitorEventMutation) Field(name string) (ent.Value, bool) {
 		return m.Method()
 	case monitorevent.FieldEndpoint:
 		return m.Endpoint()
-	case monitorevent.FieldRequestPath:
-		return m.RequestPath()
 	case monitorevent.FieldModel:
 		return m.Model()
 	case monitorevent.FieldHTTPStatus:
@@ -7733,8 +7649,6 @@ func (m *MonitorEventMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldAPIKeyID(ctx)
 	case monitorevent.FieldAPIKeyNameSnapshot:
 		return m.OldAPIKeyNameSnapshot(ctx)
-	case monitorevent.FieldAPIKeyPrefix:
-		return m.OldAPIKeyPrefix(ctx)
 	case monitorevent.FieldUserID:
 		return m.OldUserID(ctx)
 	case monitorevent.FieldUserEmailSnapshot:
@@ -7755,8 +7669,6 @@ func (m *MonitorEventMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldMethod(ctx)
 	case monitorevent.FieldEndpoint:
 		return m.OldEndpoint(ctx)
-	case monitorevent.FieldRequestPath:
-		return m.OldRequestPath(ctx)
 	case monitorevent.FieldModel:
 		return m.OldModel(ctx)
 	case monitorevent.FieldHTTPStatus:
@@ -7873,13 +7785,6 @@ func (m *MonitorEventMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetAPIKeyNameSnapshot(v)
 		return nil
-	case monitorevent.FieldAPIKeyPrefix:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetAPIKeyPrefix(v)
-		return nil
 	case monitorevent.FieldUserID:
 		v, ok := value.(int)
 		if !ok {
@@ -7949,13 +7854,6 @@ func (m *MonitorEventMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetEndpoint(v)
-		return nil
-	case monitorevent.FieldRequestPath:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetRequestPath(v)
 		return nil
 	case monitorevent.FieldModel:
 		v, ok := value.(string)
@@ -8294,9 +8192,6 @@ func (m *MonitorEventMutation) ResetField(name string) error {
 	case monitorevent.FieldAPIKeyNameSnapshot:
 		m.ResetAPIKeyNameSnapshot()
 		return nil
-	case monitorevent.FieldAPIKeyPrefix:
-		m.ResetAPIKeyPrefix()
-		return nil
 	case monitorevent.FieldUserID:
 		m.ResetUserID()
 		return nil
@@ -8326,9 +8221,6 @@ func (m *MonitorEventMutation) ResetField(name string) error {
 		return nil
 	case monitorevent.FieldEndpoint:
 		m.ResetEndpoint()
-		return nil
-	case monitorevent.FieldRequestPath:
-		m.ResetRequestPath()
 		return nil
 	case monitorevent.FieldModel:
 		m.ResetModel()

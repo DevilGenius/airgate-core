@@ -149,7 +149,6 @@ var (
 		{Name: "message", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "api_key_id", Type: field.TypeInt, Nullable: true},
 		{Name: "api_key_name_snapshot", Type: field.TypeString, Size: 255, Default: ""},
-		{Name: "api_key_prefix", Type: field.TypeString, Size: 16, Default: ""},
 		{Name: "user_id", Type: field.TypeInt, Nullable: true},
 		{Name: "user_email_snapshot", Type: field.TypeString, Size: 255, Default: ""},
 		{Name: "group_id", Type: field.TypeInt, Nullable: true},
@@ -160,7 +159,6 @@ var (
 		{Name: "task_type", Type: field.TypeString, Size: 128, Default: ""},
 		{Name: "method", Type: field.TypeString, Size: 64, Default: ""},
 		{Name: "endpoint", Type: field.TypeString, Size: 256, Default: ""},
-		{Name: "request_path", Type: field.TypeString, Size: 256, Default: ""},
 		{Name: "model", Type: field.TypeString, Size: 128, Default: ""},
 		{Name: "http_status", Type: field.TypeInt, Nullable: true},
 		{Name: "upstream_status", Type: field.TypeInt, Nullable: true},
@@ -186,12 +184,12 @@ var (
 			{
 				Name:    "monitorevent_status_severity_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[30]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[28]},
 			},
 			{
 				Name:    "monitorevent_status_kind_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[1], MonitorEventsColumns[30]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[1], MonitorEventsColumns[28]},
 			},
 			{
 				Name:    "monitorevent_fingerprint",
@@ -199,39 +197,34 @@ var (
 				Columns: []*schema.Column{MonitorEventsColumns[7]},
 			},
 			{
-				Name:    "monitorevent_subject_type_subject_id_status",
+				Name:    "monitorevent_api_key_id_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[5], MonitorEventsColumns[6], MonitorEventsColumns[3]},
-			},
-			{
-				Name:    "monitorevent_api_key_id_endpoint_status_updated_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[10], MonitorEventsColumns[22], MonitorEventsColumns[3], MonitorEventsColumns[30]},
+				Columns: []*schema.Column{MonitorEventsColumns[10], MonitorEventsColumns[28]},
 			},
 			{
 				Name:    "monitorevent_account_id_status_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[16], MonitorEventsColumns[3], MonitorEventsColumns[30]},
+				Columns: []*schema.Column{MonitorEventsColumns[15], MonitorEventsColumns[3], MonitorEventsColumns[28]},
 			},
 			{
 				Name:    "monitorevent_platform_plugin_id_status_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[18], MonitorEventsColumns[19], MonitorEventsColumns[3], MonitorEventsColumns[30]},
+				Columns: []*schema.Column{MonitorEventsColumns[17], MonitorEventsColumns[18], MonitorEventsColumns[3], MonitorEventsColumns[28]},
 			},
 			{
 				Name:    "monitorevent_status_auto_resolve_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[33]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[31]},
 			},
 			{
 				Name:    "monitorevent_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[34]},
+				Columns: []*schema.Column{MonitorEventsColumns[32]},
 			},
 			{
 				Name:    "monitorevent_status_severity_next_notify_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[36]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[34]},
 			},
 		},
 	}

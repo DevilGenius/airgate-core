@@ -29,7 +29,6 @@ const (
 	maxPlatformLength    = 128
 	maxEndpointLength    = 256
 	maxSnapshotLength    = 255
-	maxAPIKeyPrefixLen   = 16
 	maxDetailJSONBytes   = 4 * 1024
 	maxDetailArrayItems  = 5
 
@@ -240,7 +239,7 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 	subjectType := truncateString(defaultString(input.SubjectType, monitoring.SubjectSystem), maxSubjectTypeLength)
 	source := truncateString(defaultString(input.Source, monitoring.SourceMonitorWorker), maxSourceLength)
 	subjectID := inferSubjectID(input, subjectType)
-	detail := sanitizeDetail(input.Detail)
+	detail := sanitizeDetail(detailWithRequestPath(input.Detail, input.RequestPath))
 
 	title := scrubText(input.Title)
 	if strings.TrimSpace(title) == "" {
@@ -259,7 +258,6 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 		Message:             truncateString(message, maxMessageLength),
 		APIKeyID:            cloneIntPtr(input.APIKeyID),
 		APIKeyNameSnapshot:  truncateString(input.APIKeyNameSnapshot, maxSnapshotLength),
-		APIKeyPrefix:        truncateString(input.APIKeyPrefix, maxAPIKeyPrefixLen),
 		UserID:              cloneIntPtr(input.UserID),
 		UserEmailSnapshot:   truncateString(input.UserEmailSnapshot, maxSnapshotLength),
 		GroupID:             cloneIntPtr(input.GroupID),
@@ -270,7 +268,6 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 		TaskType:            truncateString(input.TaskType, maxPlatformLength),
 		Method:              truncateString(strings.ToUpper(strings.TrimSpace(input.Method)), maxCodeLength),
 		Endpoint:            truncateString(input.Endpoint, maxEndpointLength),
-		RequestPath:         truncateString(input.RequestPath, maxEndpointLength),
 		Model:               truncateString(input.Model, maxPlatformLength),
 		HTTPStatus:          cloneIntPtr(input.HTTPStatus),
 		UpstreamStatus:      cloneIntPtr(input.UpstreamStatus),
@@ -474,6 +471,19 @@ func sanitizeDetail(detail map[string]interface{}) map[string]interface{} {
 		return trimmed
 	}
 	return map[string]interface{}{"_truncated": true}
+}
+
+func detailWithRequestPath(detail map[string]interface{}, requestPath string) map[string]interface{} {
+	requestPath = truncateString(requestPath, maxEndpointLength)
+	if requestPath == "" {
+		return detail
+	}
+	out := make(map[string]interface{}, len(detail)+1)
+	for key, value := range detail {
+		out[key] = value
+	}
+	out["request_path"] = requestPath
+	return out
 }
 
 func sanitizeMap(in map[string]interface{}, depth int) map[string]interface{} {

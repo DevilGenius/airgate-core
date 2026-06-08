@@ -464,7 +464,6 @@ func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.Que
 		SetMessage(event.Message).
 		SetNillableAPIKeyID(event.APIKeyID).
 		SetAPIKeyNameSnapshot(event.APIKeyNameSnapshot).
-		SetAPIKeyPrefix(event.APIKeyPrefix).
 		SetNillableUserID(event.UserID).
 		SetUserEmailSnapshot(event.UserEmailSnapshot).
 		SetNillableGroupID(event.GroupID).
@@ -475,7 +474,6 @@ func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.Que
 		SetTaskType(event.TaskType).
 		SetMethod(event.Method).
 		SetEndpoint(event.Endpoint).
-		SetRequestPath(event.RequestPath).
 		SetModel(event.Model).
 		SetNillableHTTPStatus(event.HTTPStatus).
 		SetNillableUpstreamStatus(event.UpstreamStatus).
@@ -513,7 +511,6 @@ func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 		Message:             row.Message,
 		APIKeyID:            row.APIKeyID,
 		APIKeyNameSnapshot:  row.APIKeyNameSnapshot,
-		APIKeyPrefix:        row.APIKeyPrefix,
 		UserID:              row.UserID,
 		UserEmailSnapshot:   row.UserEmailSnapshot,
 		GroupID:             row.GroupID,
@@ -524,7 +521,6 @@ func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 		TaskType:            row.TaskType,
 		Method:              row.Method,
 		Endpoint:            row.Endpoint,
-		RequestPath:         row.RequestPath,
 		Model:               row.Model,
 		HTTPStatus:          row.HTTPStatus,
 		UpstreamStatus:      row.UpstreamStatus,

@@ -195,20 +195,6 @@ func (meu *MonitorEventUpdate) SetNillableAPIKeyNameSnapshot(s *string) *Monitor
 	return meu
 }
 
-// SetAPIKeyPrefix sets the "api_key_prefix" field.
-func (meu *MonitorEventUpdate) SetAPIKeyPrefix(s string) *MonitorEventUpdate {
-	meu.mutation.SetAPIKeyPrefix(s)
-	return meu
-}
-
-// SetNillableAPIKeyPrefix sets the "api_key_prefix" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableAPIKeyPrefix(s *string) *MonitorEventUpdate {
-	if s != nil {
-		meu.SetAPIKeyPrefix(*s)
-	}
-	return meu
-}
-
 // SetUserID sets the "user_id" field.
 func (meu *MonitorEventUpdate) SetUserID(i int) *MonitorEventUpdate {
 	meu.mutation.ResetUserID()
@@ -384,20 +370,6 @@ func (meu *MonitorEventUpdate) SetEndpoint(s string) *MonitorEventUpdate {
 func (meu *MonitorEventUpdate) SetNillableEndpoint(s *string) *MonitorEventUpdate {
 	if s != nil {
 		meu.SetEndpoint(*s)
-	}
-	return meu
-}
-
-// SetRequestPath sets the "request_path" field.
-func (meu *MonitorEventUpdate) SetRequestPath(s string) *MonitorEventUpdate {
-	meu.mutation.SetRequestPath(s)
-	return meu
-}
-
-// SetNillableRequestPath sets the "request_path" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableRequestPath(s *string) *MonitorEventUpdate {
-	if s != nil {
-		meu.SetRequestPath(*s)
 	}
 	return meu
 }
@@ -750,11 +722,6 @@ func (meu *MonitorEventUpdate) check() error {
 			return &ValidationError{Name: "api_key_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.api_key_name_snapshot": %w`, err)}
 		}
 	}
-	if v, ok := meu.mutation.APIKeyPrefix(); ok {
-		if err := monitorevent.APIKeyPrefixValidator(v); err != nil {
-			return &ValidationError{Name: "api_key_prefix", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.api_key_prefix": %w`, err)}
-		}
-	}
 	if v, ok := meu.mutation.UserEmailSnapshot(); ok {
 		if err := monitorevent.UserEmailSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "user_email_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.user_email_snapshot": %w`, err)}
@@ -788,11 +755,6 @@ func (meu *MonitorEventUpdate) check() error {
 	if v, ok := meu.mutation.Endpoint(); ok {
 		if err := monitorevent.EndpointValidator(v); err != nil {
 			return &ValidationError{Name: "endpoint", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.endpoint": %w`, err)}
-		}
-	}
-	if v, ok := meu.mutation.RequestPath(); ok {
-		if err := monitorevent.RequestPathValidator(v); err != nil {
-			return &ValidationError{Name: "request_path", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.request_path": %w`, err)}
 		}
 	}
 	if v, ok := meu.mutation.Model(); ok {
@@ -869,9 +831,6 @@ func (meu *MonitorEventUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := meu.mutation.APIKeyNameSnapshot(); ok {
 		_spec.SetField(monitorevent.FieldAPIKeyNameSnapshot, field.TypeString, value)
 	}
-	if value, ok := meu.mutation.APIKeyPrefix(); ok {
-		_spec.SetField(monitorevent.FieldAPIKeyPrefix, field.TypeString, value)
-	}
 	if value, ok := meu.mutation.UserID(); ok {
 		_spec.SetField(monitorevent.FieldUserID, field.TypeInt, value)
 	}
@@ -919,9 +878,6 @@ func (meu *MonitorEventUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := meu.mutation.Endpoint(); ok {
 		_spec.SetField(monitorevent.FieldEndpoint, field.TypeString, value)
-	}
-	if value, ok := meu.mutation.RequestPath(); ok {
-		_spec.SetField(monitorevent.FieldRequestPath, field.TypeString, value)
 	}
 	if value, ok := meu.mutation.Model(); ok {
 		_spec.SetField(monitorevent.FieldModel, field.TypeString, value)
@@ -1185,20 +1141,6 @@ func (meuo *MonitorEventUpdateOne) SetNillableAPIKeyNameSnapshot(s *string) *Mon
 	return meuo
 }
 
-// SetAPIKeyPrefix sets the "api_key_prefix" field.
-func (meuo *MonitorEventUpdateOne) SetAPIKeyPrefix(s string) *MonitorEventUpdateOne {
-	meuo.mutation.SetAPIKeyPrefix(s)
-	return meuo
-}
-
-// SetNillableAPIKeyPrefix sets the "api_key_prefix" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableAPIKeyPrefix(s *string) *MonitorEventUpdateOne {
-	if s != nil {
-		meuo.SetAPIKeyPrefix(*s)
-	}
-	return meuo
-}
-
 // SetUserID sets the "user_id" field.
 func (meuo *MonitorEventUpdateOne) SetUserID(i int) *MonitorEventUpdateOne {
 	meuo.mutation.ResetUserID()
@@ -1374,20 +1316,6 @@ func (meuo *MonitorEventUpdateOne) SetEndpoint(s string) *MonitorEventUpdateOne 
 func (meuo *MonitorEventUpdateOne) SetNillableEndpoint(s *string) *MonitorEventUpdateOne {
 	if s != nil {
 		meuo.SetEndpoint(*s)
-	}
-	return meuo
-}
-
-// SetRequestPath sets the "request_path" field.
-func (meuo *MonitorEventUpdateOne) SetRequestPath(s string) *MonitorEventUpdateOne {
-	meuo.mutation.SetRequestPath(s)
-	return meuo
-}
-
-// SetNillableRequestPath sets the "request_path" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableRequestPath(s *string) *MonitorEventUpdateOne {
-	if s != nil {
-		meuo.SetRequestPath(*s)
 	}
 	return meuo
 }
@@ -1753,11 +1681,6 @@ func (meuo *MonitorEventUpdateOne) check() error {
 			return &ValidationError{Name: "api_key_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.api_key_name_snapshot": %w`, err)}
 		}
 	}
-	if v, ok := meuo.mutation.APIKeyPrefix(); ok {
-		if err := monitorevent.APIKeyPrefixValidator(v); err != nil {
-			return &ValidationError{Name: "api_key_prefix", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.api_key_prefix": %w`, err)}
-		}
-	}
 	if v, ok := meuo.mutation.UserEmailSnapshot(); ok {
 		if err := monitorevent.UserEmailSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "user_email_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.user_email_snapshot": %w`, err)}
@@ -1791,11 +1714,6 @@ func (meuo *MonitorEventUpdateOne) check() error {
 	if v, ok := meuo.mutation.Endpoint(); ok {
 		if err := monitorevent.EndpointValidator(v); err != nil {
 			return &ValidationError{Name: "endpoint", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.endpoint": %w`, err)}
-		}
-	}
-	if v, ok := meuo.mutation.RequestPath(); ok {
-		if err := monitorevent.RequestPathValidator(v); err != nil {
-			return &ValidationError{Name: "request_path", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.request_path": %w`, err)}
 		}
 	}
 	if v, ok := meuo.mutation.Model(); ok {
@@ -1889,9 +1807,6 @@ func (meuo *MonitorEventUpdateOne) sqlSave(ctx context.Context) (_node *MonitorE
 	if value, ok := meuo.mutation.APIKeyNameSnapshot(); ok {
 		_spec.SetField(monitorevent.FieldAPIKeyNameSnapshot, field.TypeString, value)
 	}
-	if value, ok := meuo.mutation.APIKeyPrefix(); ok {
-		_spec.SetField(monitorevent.FieldAPIKeyPrefix, field.TypeString, value)
-	}
 	if value, ok := meuo.mutation.UserID(); ok {
 		_spec.SetField(monitorevent.FieldUserID, field.TypeInt, value)
 	}
@@ -1939,9 +1854,6 @@ func (meuo *MonitorEventUpdateOne) sqlSave(ctx context.Context) (_node *MonitorE
 	}
 	if value, ok := meuo.mutation.Endpoint(); ok {
 		_spec.SetField(monitorevent.FieldEndpoint, field.TypeString, value)
-	}
-	if value, ok := meuo.mutation.RequestPath(); ok {
-		_spec.SetField(monitorevent.FieldRequestPath, field.TypeString, value)
 	}
 	if value, ok := meuo.mutation.Model(); ok {
 		_spec.SetField(monitorevent.FieldModel, field.TypeString, value)

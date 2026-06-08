@@ -403,8 +403,8 @@ export default function MonitorPage() {
       render: (row) => (
         <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
           <span className="truncate font-mono text-[13px] leading-none text-text-secondary" title={monitorLocator(row)}>{monitorLocator(row)}</span>
-          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.plugin_id || row.request_path || '-'}>
-            {[row.plugin_id, row.request_path].filter(Boolean).join(' / ') || '-'}
+          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.plugin_id || '-'}>
+            {row.plugin_id || '-'}
           </span>
         </div>
       ),

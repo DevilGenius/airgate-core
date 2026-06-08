@@ -36,7 +36,6 @@ type MonitorEventResp struct {
 	Message             string                 `json:"message"`
 	APIKeyID            *int                   `json:"api_key_id,omitempty"`
 	APIKeyNameSnapshot  string                 `json:"api_key_name_snapshot,omitempty"`
-	APIKeyPrefix        string                 `json:"api_key_prefix,omitempty"`
 	UserID              *int                   `json:"user_id,omitempty"`
 	UserEmailSnapshot   string                 `json:"user_email_snapshot,omitempty"`
 	GroupID             *int                   `json:"group_id,omitempty"`
@@ -47,7 +46,6 @@ type MonitorEventResp struct {
 	TaskType            string                 `json:"task_type,omitempty"`
 	Method              string                 `json:"method,omitempty"`
 	Endpoint            string                 `json:"endpoint,omitempty"`
-	RequestPath         string                 `json:"request_path,omitempty"`
 	Model               string                 `json:"model,omitempty"`
 	HTTPStatus          *int                   `json:"http_status,omitempty"`
 	UpstreamStatus      *int                   `json:"upstream_status,omitempty"`

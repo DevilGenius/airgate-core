@@ -52,7 +52,6 @@ type EventInput struct {
 
 	APIKeyID            *int
 	APIKeyNameSnapshot  string
-	APIKeyPrefix        string
 	UserID              *int
 	UserEmailSnapshot   string
 	GroupID             *int

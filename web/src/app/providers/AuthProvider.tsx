@@ -6,6 +6,7 @@ import {
   setSessionAPIKey,
   getTokenAPIKeyID,
   getTokenRole,
+  isAuthExpiredError,
 } from '../../shared/api/client';
 import { usersApi } from '../../shared/api/users';
 import { resetAdminCache } from '../routeGuards';
@@ -58,8 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(normalizeSessionUser(userData, currentToken));
           }
         })
-        .catch(() => {
-          if (!cancelled && authRevisionRef.current === revision && getToken() === token) {
+        .catch((error) => {
+          if (
+            isAuthExpiredError(error)
+            && !cancelled
+            && authRevisionRef.current === revision
+            && getToken() === token
+          ) {
             resetAdminCache();
             setToken(null);
             setUser(null);
