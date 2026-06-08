@@ -12,7 +12,7 @@ export interface AccountTableColumn {
   mobileWidth?: string;
   maxWidth?: string;
   align?: 'left' | 'center' | 'right';
-  render: (row: AccountResp) => ReactNode;
+  render: (row: AccountResp, rowMeta?: unknown) => ReactNode;
 }
 
 export const UNGROUPED_GROUP_FILTER = '__ungrouped__';
@@ -501,6 +501,51 @@ export class AccountSelectionStore {
   }
 }
 
+export class AccountCapacityStore {
+  private counts = new Map<number, number>();
+  private listeners = new Map<number, Set<SelectionListener>>();
+
+  subscribe = (id: number, listener: SelectionListener) => {
+    let listeners = this.listeners.get(id);
+    if (!listeners) {
+      listeners = new Set();
+      this.listeners.set(id, listeners);
+    }
+    listeners.add(listener);
+    return () => {
+      listeners?.delete(listener);
+      if (listeners?.size === 0) {
+        this.listeners.delete(id);
+      }
+    };
+  };
+
+  getCurrent(id: number, fallback: number) {
+    return this.counts.get(id) ?? fallback;
+  }
+
+  setCounts(nextCounts: Record<string, number>) {
+    const changedIds: number[] = [];
+    const nextIds = new Set<number>();
+    for (const [rawId, count] of Object.entries(nextCounts)) {
+      const id = Number(rawId);
+      if (!Number.isFinite(id)) continue;
+      nextIds.add(id);
+      if (this.counts.get(id) === count) continue;
+      this.counts.set(id, count);
+      changedIds.push(id);
+    }
+    for (const id of Array.from(this.counts.keys())) {
+      if (nextIds.has(id)) continue;
+      this.counts.delete(id);
+      changedIds.push(id);
+    }
+    for (const id of changedIds) {
+      this.listeners.get(id)?.forEach((listener) => listener());
+    }
+  }
+}
+
 function StatusPill({
   label,
   status,
@@ -624,19 +669,22 @@ const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
 const AccountTableCellContent = memo(function AccountTableCellContent({
   column,
   row,
+  rowMeta,
 }: {
   column: AccountTableColumn;
   row: AccountResp;
+  rowMeta?: unknown;
 }) {
   return (
     <div className={`flex w-full min-w-0 items-center ${cellJustifyClass(column.align)}`}>
-      {column.render(row)}
+      {column.render(row, rowMeta)}
     </div>
   );
-}, (prev, next) => (
-  prev.column === next.column
-  && accountTableCellRowsEqual(prev.column.key, prev.row, next.row)
-));
+}, (prev, next) => {
+  if (prev.column !== next.column) return false;
+  return accountTableCellRowsEqual(prev.column.key, prev.row, next.row)
+    && accountTableCellMetaEqual(prev.column.key, prev.rowMeta, next.rowMeta);
+});
 
 function sameAccountExceptCapacity(left: AccountResp, right: AccountResp) {
   return left.id === right.id
@@ -694,6 +742,42 @@ function accountTableCellRowsEqual(columnKey: string, left: AccountResp, right: 
     default:
       return false;
   }
+}
+
+function accountTableCellMetaEqual(columnKey: string, left: unknown, right: unknown) {
+  if (left === right) return true;
+  switch (columnKey) {
+    case 'groups': {
+      const leftMeta = left as {
+        groupNames?: string[];
+        hiddenGroupCount?: number;
+        visibleGroups?: string[];
+      } | undefined;
+      const rightMeta = right as {
+        groupNames?: string[];
+        hiddenGroupCount?: number;
+        visibleGroups?: string[];
+      } | undefined;
+      if (!leftMeta || !rightMeta) return false;
+      return leftMeta.hiddenGroupCount === rightMeta.hiddenGroupCount
+        && stringListEqual(leftMeta.groupNames, rightMeta.groupNames)
+        && stringListEqual(leftMeta.visibleGroups, rightMeta.visibleGroups);
+    }
+    case 'usage_window':
+      return (left as { usage?: unknown } | undefined)?.usage === (right as { usage?: unknown } | undefined)?.usage;
+    case 'last_used_at':
+      return Boolean(left && right)
+        && (left as { lastUsedRelative?: string }).lastUsedRelative === (right as { lastUsedRelative?: string }).lastUsedRelative
+        && (left as { lastUsedTitle?: string }).lastUsedTitle === (right as { lastUsedTitle?: string }).lastUsedTitle;
+    default:
+      return true;
+  }
+}
+
+function stringListEqual(left: string[] | undefined, right: string[] | undefined) {
+  if (left === right) return true;
+  if (!left || !right || left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
 }
 
 export const AccountSchedulingSwitch = memo(function AccountSchedulingSwitch({
@@ -983,6 +1067,7 @@ export const AccountTableRow = memo(function AccountTableRow({
   columns,
   isUsageExpanded,
   row,
+  rowMeta,
   selectRowAriaLabel,
   selectionStore,
   onSelectedChange,
@@ -990,6 +1075,7 @@ export const AccountTableRow = memo(function AccountTableRow({
   columns: AccountTableColumn[];
   isUsageExpanded: boolean;
   row: AccountResp;
+  rowMeta?: unknown;
   selectRowAriaLabel: string;
   selectionStore: AccountSelectionStore;
   onSelectedChange: (id: number, isSelected: boolean) => void;
@@ -1010,7 +1096,7 @@ export const AccountTableRow = memo(function AccountTableRow({
           key={column.key}
           style={columnWidthStyle(column)}
         >
-          <AccountTableCellContent column={column} row={row} />
+          <AccountTableCellContent column={column} row={row} rowMeta={rowMeta} />
         </td>
       ))}
     </tr>
@@ -1019,6 +1105,7 @@ export const AccountTableRow = memo(function AccountTableRow({
   prev.columns === next.columns
   && prev.isUsageExpanded === next.isUsageExpanded
   && prev.row === next.row
+  && prev.rowMeta === next.rowMeta
   && prev.selectRowAriaLabel === next.selectRowAriaLabel
   && prev.selectionStore === next.selectionStore
   && prev.onSelectedChange === next.onSelectedChange
@@ -1304,3 +1391,23 @@ export function AccountCapacityChip({ current, max }: { current: number; max: nu
     </span>
   );
 }
+
+export const AccountCapacityLiveChip = memo(function AccountCapacityLiveChip({
+  current,
+  max,
+  rowId,
+  store,
+}: {
+  current: number;
+  max: number;
+  rowId: number;
+  store: AccountCapacityStore;
+}) {
+  const liveCurrent = useSyncExternalStore(
+    useCallback((listener) => store.subscribe(rowId, listener), [rowId, store]),
+    useCallback(() => store.getCurrent(rowId, current), [current, rowId, store]),
+    () => current,
+  );
+
+  return <AccountCapacityChip current={liveCurrent} max={max} />;
+});

@@ -53,6 +53,7 @@ import type {
 
 import {
   ACCOUNT_SELECTION_COLUMN_STYLE,
+  AccountCapacityStore,
   AccountSelectionStore,
   AccountTableRow,
   AccountsTableLoadingRow,
@@ -110,14 +111,6 @@ function useAccountModalRootIsolation(isActive: boolean) {
       }
     };
   }, [isActive]);
-}
-
-function sameCapacitySnapshot(left: Record<string, number> | undefined, right: Record<string, number>) {
-  if (!left) return false;
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-  if (leftKeys.length !== rightKeys.length) return false;
-  return rightKeys.every((key) => left[key] === right[key]);
 }
 
 type BulkEditInitialValues = {
@@ -256,6 +249,7 @@ const AccountsTableSection = memo(function AccountsTableSection({
   onRowSelected,
   onVisibleRowsSelected,
   rows,
+  rowMetaById,
   selectAllAriaLabel,
   selectionStore,
   selectRowAriaLabel,
@@ -276,6 +270,7 @@ const AccountsTableSection = memo(function AccountsTableSection({
   onRowSelected: (id: number, isSelected: boolean) => void;
   onVisibleRowsSelected: (isSelected: boolean) => void;
   rows: AccountResp[];
+  rowMetaById: ReadonlyMap<number, unknown>;
   selectAllAriaLabel: string;
   selectionStore: AccountSelectionStore;
   selectRowAriaLabel: string;
@@ -344,6 +339,7 @@ const AccountsTableSection = memo(function AccountsTableSection({
                   columns={columns}
                   isUsageExpanded={expandedUsageRowIds.has(row.id)}
                   row={row}
+                  rowMeta={rowMetaById.get(row.id)}
                   selectRowAriaLabel={selectRowAriaLabel}
                   selectionStore={selectionStore}
                   onSelectedChange={onRowSelected}
@@ -457,6 +453,11 @@ export default function AccountsPageContent() {
     selectionStoreRef.current = new AccountSelectionStore();
   }
   const selectionStore = selectionStoreRef.current;
+  const capacityStoreRef = useRef<AccountCapacityStore | null>(null);
+  if (capacityStoreRef.current === null) {
+    capacityStoreRef.current = new AccountCapacityStore();
+  }
+  const capacityStore = capacityStoreRef.current;
   const [pendingToggleIds, setPendingToggleIds] = useState<Set<number>>(() => new Set());
   const pendingToggleIdsRef = useRef(pendingToggleIds);
   pendingToggleIdsRef.current = pendingToggleIds;
@@ -521,12 +522,9 @@ export default function AccountsPageContent() {
     visibleAccountIdsRef.current = visibleAccountIds;
   }, [visibleAccountIds, visibleAccountIdsKey]);
 
-  const [capacityAccounts, setCapacityAccounts] = useState<Record<string, number> | undefined>();
   const applyCapacityData = useCallback((nextData: { accounts: Record<string, number> }) => {
-    setCapacityAccounts((prev) => (
-      sameCapacitySnapshot(prev, nextData.accounts) ? prev : { ...nextData.accounts }
-    ));
-  }, []);
+    capacityStore.setCounts(nextData.accounts);
+  }, [capacityStore]);
   const refreshVisibleCapacity = useCallback(async () => {
     const ids = visibleAccountIdsRef.current;
     if (ids.length === 0) return;
@@ -547,21 +545,6 @@ export default function AccountsPageContent() {
     }, ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS * 1000);
     return () => window.clearInterval(intervalId);
   }, [capacityAutoRefresh, refreshVisibleCapacity, visibleAccountIds.length, visibleAccountIdsKey]);
-  const rowsWithCapacity = useMemo(() => {
-    const counts = capacityAccounts;
-    if (!counts) return rows;
-    return rows.map((row) => {
-      const nextCount = counts[String(row.id)];
-      if (typeof nextCount !== 'number' || nextCount === row.current_concurrency) {
-        return row;
-      }
-      return {
-        ...row,
-        current_concurrency: nextCount,
-      };
-    });
-  }, [capacityAccounts, rows]);
-
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -948,8 +931,9 @@ export default function AccountsPageContent() {
     setBulkRefreshTargets(oauthRows);
   }, [data?.list, selectionStore, t, toast]);
 
-  const columns = useAccountTableColumns({
+  const { columns, rowMetaById } = useAccountTableColumns({
     applyQuotaRefreshResult,
+    capacityStore,
     groupMap,
     onClearRateLimitMarkers: handleClearRateLimitMarkers,
     onDeleteAccount: handleDeleteAccount,
@@ -966,7 +950,7 @@ export default function AccountsPageContent() {
   });
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
-  const visibleRowIds = useMemo(() => rowsWithCapacity.map((row) => row.id), [rowsWithCapacity]);
+  const visibleRowIds = visibleAccountIds;
   const selectAllAriaLabel = t('common.select_all', 'Select all');
   const selectRowAriaLabel = t('common.select', 'Select');
   const setVisibleRowsSelected = useCallback((isSelected: boolean) => {
@@ -1062,53 +1046,53 @@ export default function AccountsPageContent() {
     <TablePage
       className="ag-accounts-page"
       toolbar={(
-          <div className="ag-page-toolbar-filter-row">
-            <div className="w-full sm:w-48">
-              <HeroTextField fullWidth aria-label={t('accounts.search_placeholder', '搜索账号名称...')}>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-                  <Input
-                    className="pl-9"
-                    value={keyword}
-                    onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-                    placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
-                  />
-                </div>
-              </HeroTextField>
-            </div>
-
-            {toolbarFilters.map((filter) => (
-              <div
-                key={filter.key}
-                className={filter.widthClass}
-              >
-                {filter.key === 'type' ? (
-                  <AccountTypeFilterSelect
-                    oauthPlanOptions={oauthPlanOptions}
-                    platformsLoading={platformsLoading}
-                    selectedOption={selectedTypeOption}
-                    typeOptions={typeOptions}
-                    onSelect={(nextValue) => {
-                      setTypeFilter(nextValue);
-                      setPage(1);
-                    }}
-                  />
-                ) : (
-                  <SimpleSelect
-                    ariaLabel={filter.label}
-                    fullWidth
-                    items={filter.options.map((item) => ({ key: item.id, label: item.label }))}
-                    selectedKey={filter.value}
-                    selectedLabel={filter.selectedLabel}
-                    onSelectionChange={(key) => {
-                      filter.setValue(key);
-                      setPage(1);
-                    }}
-                  />
-                )}
+        <div className="ag-page-toolbar-filter-row">
+          <div className="w-full sm:w-48">
+            <HeroTextField fullWidth aria-label={t('accounts.search_placeholder', '搜索账号名称...')}>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                <Input
+                  className="pl-9"
+                  value={keyword}
+                  onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                  placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
+                />
               </div>
-            ))}
+            </HeroTextField>
           </div>
+
+          {toolbarFilters.map((filter) => (
+            <div
+              key={filter.key}
+              className={filter.widthClass}
+            >
+              {filter.key === 'type' ? (
+                <AccountTypeFilterSelect
+                  oauthPlanOptions={oauthPlanOptions}
+                  platformsLoading={platformsLoading}
+                  selectedOption={selectedTypeOption}
+                  typeOptions={typeOptions}
+                  onSelect={(nextValue) => {
+                    setTypeFilter(nextValue);
+                    setPage(1);
+                  }}
+                />
+              ) : (
+                <SimpleSelect
+                  ariaLabel={filter.label}
+                  fullWidth
+                  items={filter.options.map((item) => ({ key: item.id, label: item.label }))}
+                  selectedKey={filter.value}
+                  selectedLabel={filter.selectedLabel}
+                  onSelectionChange={(key) => {
+                    filter.setValue(key);
+                    setPage(1);
+                  }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
       )}
       actions={(
         <>
@@ -1199,7 +1183,8 @@ export default function AccountsPageContent() {
         onClearSelection={clearSelection}
         onRowSelected={setRowSelected}
         onVisibleRowsSelected={setVisibleRowsSelected}
-        rows={rowsWithCapacity}
+        rows={rows}
+        rowMetaById={rowMetaById}
         selectAllAriaLabel={selectAllAriaLabel}
         selectionStore={selectionStore}
         selectRowAriaLabel={selectRowAriaLabel}
