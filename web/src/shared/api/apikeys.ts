@@ -7,6 +7,7 @@ type APIKeyRequestOptions = {
 
 type APIKeyListParams = PageReq & {
   search_scope?: 'api_key';
+  include_usage?: boolean;
 };
 
 export const apikeysApi = {

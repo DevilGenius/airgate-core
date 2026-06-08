@@ -369,8 +369,14 @@ export interface APIKeyResp {
   sell_rate: number;
   /** API Key 级并发上限：同一把 key 同时在途请求数。0 表示不限制 */
   max_concurrency: number;
+  /** 今日销售金额（sum(billed_cost)，含 sell_rate） */
   today_cost: number;
+  /** 今日消耗金额（sum(actual_cost)，不含 sell_rate） */
+  today_actual_cost: number;
+  /** 近 30 天销售金额（sum(billed_cost)，含 sell_rate） */
   thirty_day_cost: number;
+  /** 近 30 天消耗金额（sum(actual_cost)，不含 sell_rate） */
+  thirty_day_actual_cost: number;
   expires_at?: string;
   status: string;
   created_at: string;

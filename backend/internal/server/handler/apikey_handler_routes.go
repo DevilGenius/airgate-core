@@ -50,10 +50,12 @@ func (h *APIKeyHandler) AdminListKeys(c *gin.Context) {
 	}
 
 	result, err := h.service.ListAdmin(c.Request.Context(), appapikey.ListFilter{
-		Page:        query.Page,
-		PageSize:    query.PageSize,
-		Keyword:     query.Keyword,
-		SearchScope: query.SearchScope,
+		Page:         query.Page,
+		PageSize:     query.PageSize,
+		Keyword:      query.Keyword,
+		SearchScope:  query.SearchScope,
+		IncludeUsage: query.IncludeUsage,
+		TZ:           c.Query("tz"),
 	})
 	if err != nil {
 		httpCode, message := h.handleError("管理员查询密钥列表失败", "查询失败", err)

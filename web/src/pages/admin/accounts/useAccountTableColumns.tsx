@@ -25,7 +25,7 @@ type QuotaRefreshResult = Awaited<ReturnType<typeof accountsApi.refreshQuota>>;
 
 const ACCOUNT_GROUP_CARD_STYLE: CSSProperties = {
   background: 'var(--ag-bg-surface)',
-  border: '1px solid var(--ag-glass-border)',
+  boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--ag-primary) 28%, transparent)',
   color: 'var(--ag-text-secondary)',
 };
 

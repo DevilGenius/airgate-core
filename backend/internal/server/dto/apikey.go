@@ -2,31 +2,34 @@ package dto
 
 // APIKeyResp API 密钥响应
 type APIKeyResp struct {
-	ID              int64    `json:"id"`
-	Name            string   `json:"name"`
-	Key             string   `json:"key,omitempty"` // 仅创建时返回完整密钥
-	KeyPrefix       string   `json:"key_prefix"`    // sk-xxxx...xxxx 脱敏展示
-	UserID          int64    `json:"user_id"`
-	GroupID         *int64   `json:"group_id"`
-	GroupRate       float64  `json:"group_rate,omitempty"` // 所属分组对该用户生效的实际扣费倍率
-	IPWhitelist     []string `json:"ip_whitelist,omitempty"`
-	IPBlacklist     []string `json:"ip_blacklist,omitempty"`
-	QuotaUSD        float64  `json:"quota_usd"`
-	UsedQuota       float64  `json:"used_quota"`        // 账面已用（含 sell_rate markup）
-	UsedQuotaActual float64  `json:"used_quota_actual"` // 真实成本已用（reseller 看板对比用，sum(actual_cost)）
-	SellRate        float64  `json:"sell_rate"`         // 销售倍率，1 表示不加价
-	MaxConcurrency  int      `json:"max_concurrency"`   // API Key 级并发上限，0 表示不限制
-	TodayCost       float64  `json:"today_cost"`
-	ThirtyDayCost   float64  `json:"thirty_day_cost"`
-	ExpiresAt       *string  `json:"expires_at,omitempty"`
-	Status          string   `json:"status"`
+	ID                  int64    `json:"id"`
+	Name                string   `json:"name"`
+	Key                 string   `json:"key,omitempty"` // 仅创建时返回完整密钥
+	KeyPrefix           string   `json:"key_prefix"`    // sk-xxxx...xxxx 脱敏展示
+	UserID              int64    `json:"user_id"`
+	GroupID             *int64   `json:"group_id"`
+	GroupRate           float64  `json:"group_rate,omitempty"` // 所属分组对该用户生效的实际扣费倍率
+	IPWhitelist         []string `json:"ip_whitelist,omitempty"`
+	IPBlacklist         []string `json:"ip_blacklist,omitempty"`
+	QuotaUSD            float64  `json:"quota_usd"`
+	UsedQuota           float64  `json:"used_quota"`             // 账面已用（含 sell_rate markup）
+	UsedQuotaActual     float64  `json:"used_quota_actual"`      // 真实成本已用（reseller 看板对比用，sum(actual_cost)）
+	SellRate            float64  `json:"sell_rate"`              // 销售倍率，1 表示不加价
+	MaxConcurrency      int      `json:"max_concurrency"`        // API Key 级并发上限，0 表示不限制
+	TodayCost           float64  `json:"today_cost"`             // 今日销售金额（sum(billed_cost)，含 sell_rate）
+	TodayActualCost     float64  `json:"today_actual_cost"`      // 今日消耗金额（sum(actual_cost)，不含 sell_rate）
+	ThirtyDayCost       float64  `json:"thirty_day_cost"`        // 近 30 天销售金额（sum(billed_cost)，含 sell_rate）
+	ThirtyDayActualCost float64  `json:"thirty_day_actual_cost"` // 近 30 天消耗金额（sum(actual_cost)，不含 sell_rate）
+	ExpiresAt           *string  `json:"expires_at,omitempty"`
+	Status              string   `json:"status"`
 	TimeMixin
 }
 
 // APIKeyListQuery API Key 列表查询参数。
 type APIKeyListQuery struct {
 	PageReq
-	SearchScope string `form:"search_scope"`
+	SearchScope  string `form:"search_scope"`
+	IncludeUsage bool   `form:"include_usage"`
 }
 
 // CreateAPIKeyReq 创建 API 密钥请求
