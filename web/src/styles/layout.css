@@ -114,6 +114,58 @@
   gap: 0.5rem;
 }
 
+.ag-toolbar-standard-page {
+  --ag-toolbar-standard-font-size: 0.875rem;
+  --ag-toolbar-standard-line-height: 1.25rem;
+}
+
+.ag-toolbar-standard-page .ag-page-toolbar {
+  font-size: var(--ag-toolbar-standard-font-size);
+  line-height: var(--ag-toolbar-standard-line-height);
+}
+
+.ag-toolbar-standard-page .ag-page-toolbar :where(.input,
+  .date-input-group,
+  .date-input-group__input,
+  .date-input-group__segment,
+  .select__trigger,
+  .ag-simple-select-trigger,
+  .button,
+  .ag-auto-refresh-trigger,
+  .ag-toolbar-menu-trigger-label,
+  .ag-toolbar-menu-item,
+  .ag-toolbar-menu-item-label,
+  .ag-simple-select-option-label,
+  .ag-search-combobox-item,
+  .ag-search-combobox-item-label,
+  .ag-search-combobox-empty,
+  .ag-native-switch-content,
+  .ag-account-type-trigger,
+  .ag-account-type-trigger-value,
+  .ag-account-type-menu-item,
+  .ag-account-type-submenu-item,
+  .ag-account-type-submenu-loading) {
+  font-size: var(--ag-toolbar-standard-font-size);
+}
+
+.ag-toolbar-standard-page .ag-page-toolbar :where(.date-input-group,
+  .date-input-group__input,
+  .date-input-group__segment,
+  .ag-toolbar-menu-trigger-label,
+  .ag-toolbar-menu-item,
+  .ag-toolbar-menu-item-label,
+  .ag-simple-select-option-label,
+  .ag-search-combobox-item,
+  .ag-search-combobox-item-label,
+  .ag-search-combobox-empty,
+  .ag-native-switch-content,
+  .ag-account-type-trigger-value,
+  .ag-account-type-menu-item,
+  .ag-account-type-submenu-item,
+  .ag-account-type-submenu-loading) {
+  line-height: var(--ag-toolbar-standard-line-height);
+}
+
 .ag-page-toolbar-filter-row :where(.input,
   .select__trigger,
   .combo-box__trigger,

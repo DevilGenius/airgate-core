@@ -182,6 +182,7 @@ export default function UsersPage() {
 
   return (
     <TablePage
+      className="ag-users-page ag-toolbar-standard-page"
       toolbar={(
         <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-48">

@@ -469,6 +469,7 @@ export default function MonitorPage() {
     <div>
       <MonitorStats summary={summaryQuery.data} />
       <TablePage
+        className="ag-monitor-page ag-toolbar-standard-page"
         footer={(
           <TablePaginationFooter
             page={page}

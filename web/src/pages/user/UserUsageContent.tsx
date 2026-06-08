@@ -316,6 +316,9 @@ export default function UserUsageContent() {
     width: '96px',
     hideOnMobile: true,
     render: (row) => {
+      if (row.api_key_id === 0) {
+        return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_plugin_call')}</span>;
+      }
       if ('api_key_deleted' in row && row.api_key_deleted) {
         return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_deleted')}</span>;
       }
