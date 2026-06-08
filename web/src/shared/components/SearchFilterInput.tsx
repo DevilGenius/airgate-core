@@ -1,7 +1,8 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo } from 'react';
 import { Input, TextField as HeroTextField } from '@heroui/react';
 import { Search } from 'lucide-react';
-import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { REMOTE_SEARCH_DEBOUNCE_MS } from '../constants';
+import { useSmoothSearchInput } from '../hooks/useSmoothSearchInput';
 
 interface SearchFilterInputProps {
   ariaLabel: string;
@@ -16,26 +17,17 @@ interface SearchFilterInputProps {
 export const SearchFilterInput = memo(function SearchFilterInput({
   ariaLabel,
   className,
-  debounceMs = 250,
+  debounceMs = REMOTE_SEARCH_DEBOUNCE_MS,
   inputClassName = 'pl-9',
   onSearchChange,
   placeholder,
   value = '',
 }: SearchFilterInputProps) {
-  const [inputValue, setInputValue] = useState(value);
-  const debouncedValue = useDebouncedValue(inputValue.trim(), debounceMs);
-  const lastEmittedValueRef = useRef(value.trim());
-
-  useEffect(() => {
-    setInputValue((current) => (current === value ? current : value));
-    lastEmittedValueRef.current = value.trim();
-  }, [value]);
-
-  useEffect(() => {
-    if (debouncedValue === lastEmittedValueRef.current) return;
-    lastEmittedValueRef.current = debouncedValue;
-    onSearchChange(debouncedValue);
-  }, [debouncedValue, onSearchChange]);
+  const { inputValue, setInputValue } = useSmoothSearchInput({
+    debounceMs,
+    onSearchChange,
+    value,
+  });
 
   return (
     <HeroTextField fullWidth className={className} aria-label={ariaLabel}>

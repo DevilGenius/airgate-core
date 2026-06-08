@@ -44,24 +44,15 @@ func (s *Service) ListByUser(ctx context.Context, userID int, filter ListFilter,
 		return ListResult{}, err
 	}
 
-	keyIDs := make([]int, 0, len(list))
-	for _, item := range list {
-		keyIDs = append(keyIDs, item.ID)
-	}
 	loc := timezone.Resolve(tz)
 	todayStart := timezone.StartOfDay(time.Now().In(loc))
-	todayMap, thirtyDayMap, err := s.repo.KeyUsage(ctx, keyIDs, todayStart)
-	if err != nil {
+	if err := s.attachUsage(ctx, list, todayStart); err != nil {
 		logger.Error("api_key_lookup_failed",
 			sdk.LogFieldUserID, userID,
 			sdk.LogFieldReason, "key_usage",
 			sdk.LogFieldError, err,
 		)
 		return ListResult{}, err
-	}
-	for index := range list {
-		list[index].TodayCost = todayMap[list[index].ID]
-		list[index].ThirtyDayCost = thirtyDayMap[list[index].ID]
 	}
 
 	return ListResult{
@@ -73,7 +64,7 @@ func (s *Service) ListByUser(ctx context.Context, userID int, filter ListFilter,
 }
 
 // ListAdmin 查询全局 API Key 列表。
-// 仅用于管理员选择器等轻量查询，不附加用量聚合，避免搜索时触发额外统计查询。
+// 默认用于管理员选择器等轻量查询；只有 IncludeUsage=true 时才附加用量聚合。
 func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult, error) {
 	logger := sdk.LoggerFromContext(ctx)
 	page, pageSize := normalizePage(filter.Page, filter.PageSize)
@@ -89,12 +80,43 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult,
 		return ListResult{}, err
 	}
 
+	if filter.IncludeUsage {
+		loc := timezone.Resolve(filter.TZ)
+		todayStart := timezone.StartOfDay(time.Now().In(loc))
+		if err := s.attachUsage(ctx, list, todayStart); err != nil {
+			logger.Error("api_key_lookup_failed",
+				sdk.LogFieldReason, "admin_key_usage",
+				sdk.LogFieldError, err,
+			)
+			return ListResult{}, err
+		}
+	}
+
 	return ListResult{
 		List:     list,
 		Total:    total,
 		Page:     page,
 		PageSize: pageSize,
 	}, nil
+}
+
+func (s *Service) attachUsage(ctx context.Context, list []Key, todayStart time.Time) error {
+	keyIDs := make([]int, 0, len(list))
+	for _, item := range list {
+		keyIDs = append(keyIDs, item.ID)
+	}
+	usageMap, err := s.repo.KeyUsage(ctx, keyIDs, todayStart)
+	if err != nil {
+		return err
+	}
+	for index := range list {
+		usage := usageMap[list[index].ID]
+		list[index].TodayCost = usage.TodaySalesCost
+		list[index].TodayActualCost = usage.TodayActualCost
+		list[index].ThirtyDayCost = usage.ThirtyDaySalesCost
+		list[index].ThirtyDayActualCost = usage.ThirtyDayActualCost
+	}
+	return nil
 }
 
 // CreateOwned 创建当前用户的 API Key。

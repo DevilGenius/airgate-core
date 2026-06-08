@@ -137,11 +137,19 @@ function formatAutoRefreshSeconds(seconds: number) {
   return `${seconds.toFixed(1).replace(/\.0$/, '')}s`;
 }
 
-function formatAutoRefreshOption(label: string, seconds: number, fastLabel?: string) {
+function formatAutoRefreshTitle(label: string) {
+  return label.trimEnd();
+}
+
+function formatAutoRefreshValue(seconds: number, fastLabel?: string) {
   if (seconds > 0 && seconds < 1) {
-    return `${label}${fastLabel ?? formatAutoRefreshSeconds(seconds)}`;
+    return fastLabel ?? formatAutoRefreshSeconds(seconds);
   }
-  return `${label}${formatAutoRefreshSeconds(seconds)}`;
+  return formatAutoRefreshSeconds(seconds);
+}
+
+function formatAutoRefreshOption(label: string, seconds: number, fastLabel?: string) {
+  return `${formatAutoRefreshTitle(label)} ${formatAutoRefreshValue(seconds, fastLabel)}`;
 }
 
 export const AutoRefreshControl = memo(function AutoRefreshControl({
@@ -166,25 +174,41 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   const enabled = value > 0;
   const [manualRefreshVersion, setManualRefreshVersion] = useState(0);
   const autoRefreshHandler = onAutoRefresh ?? onRefresh;
-  const labelRef = useRef<HTMLSpanElement | null>(null);
-  const currentLabel = enabled ? formatAutoRefreshOption(label, value, fastLabel) : offLabel;
+  const labelTitleRef = useRef<HTMLSpanElement | null>(null);
+  const labelValueRef = useRef<HTMLSpanElement | null>(null);
+  const currentLabelTitle = formatAutoRefreshTitle(label);
+  const currentLabelValue = enabled ? formatAutoRefreshValue(value, fastLabel) : offLabel;
   const updateDisplayLabel = useCallback((displaySeconds: number) => {
-    const element = labelRef.current;
-    if (!element) return;
-    element.textContent = enabled ? formatAutoRefreshOption(label, displaySeconds, fastLabel) : offLabel;
-  }, [enabled, fastLabel, label, offLabel]);
-  const setLabelElement = useCallback((element: HTMLSpanElement | null) => {
-    labelRef.current = element;
-    if (element) {
-      element.textContent = currentLabel;
+    const titleElement = labelTitleRef.current;
+    const valueElement = labelValueRef.current;
+    if (titleElement) {
+      titleElement.textContent = formatAutoRefreshTitle(label);
     }
-  }, [currentLabel]);
+    if (valueElement) {
+      valueElement.textContent = enabled ? formatAutoRefreshValue(displaySeconds, fastLabel) : offLabel;
+    }
+  }, [enabled, fastLabel, label, offLabel]);
+  const setLabelTitleElement = useCallback((element: HTMLSpanElement | null) => {
+    labelTitleRef.current = element;
+    if (element) {
+      element.textContent = currentLabelTitle;
+    }
+  }, [currentLabelTitle]);
+  const setLabelValueElement = useCallback((element: HTMLSpanElement | null) => {
+    labelValueRef.current = element;
+    if (element) {
+      element.textContent = currentLabelValue;
+    }
+  }, [currentLabelValue]);
 
   useEffect(() => {
-    if (labelRef.current) {
-      labelRef.current.textContent = currentLabel;
+    if (labelTitleRef.current) {
+      labelTitleRef.current.textContent = currentLabelTitle;
     }
-  }, [currentLabel]);
+    if (labelValueRef.current) {
+      labelValueRef.current.textContent = currentLabelValue;
+    }
+  }, [currentLabelTitle, currentLabelValue]);
 
   useAutoRefreshTimer({
     active: enabled && !isDisabled,
@@ -219,7 +243,13 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
       {afterRefresh}
       <ToolbarMenu
         ariaLabel={ariaLabel}
-        label={<span ref={setLabelElement} />}
+        rootClassName="ag-auto-refresh-menu"
+        label={(
+          <span className="ag-auto-refresh-label" data-enabled={currentLabelValue ? 'true' : 'false'}>
+            <span ref={setLabelTitleElement} className="ag-auto-refresh-label-title" />
+            <span ref={setLabelValueElement} className="ag-auto-refresh-label-value" />
+          </span>
+        )}
         className={[
           'ag-auto-refresh-trigger button button--sm h-8 min-w-[7.5rem] whitespace-nowrap px-3',
           enabled ? 'button--secondary' : 'button--ghost',

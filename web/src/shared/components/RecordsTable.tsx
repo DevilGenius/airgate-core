@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type AnimationEvent, type CSSProperties, type ReactNode } from 'react';
-import { EmptyState } from '@heroui/react';
 import { Inbox } from 'lucide-react';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getTotalPages } from '../utils/pagination';
 import { MobileRecordList } from './MobileRecordList';
 import { TableLoadingRow } from './TableLoadingRow';
@@ -213,6 +213,7 @@ export function RecordsTable<T extends RecordRow>({
   totalExact?: boolean;
   mobileLayout?: RecordsMobileLayout;
 }) {
+  const isMobileLayoutActive = useMediaQuery('(max-width: 767px)');
   const totalPages = getTotalPages(total, pageSize);
   useEffect(() => {
     if (!RECORDS_PAGE_SIZE_OPTIONS.some((option) => option === pageSize)) {
@@ -246,10 +247,12 @@ export function RecordsTable<T extends RecordRow>({
     rows,
   });
   const mobileColumns = useMemo(() => {
+    if (!isMobileLayoutActive) return [];
     if (mobileLayout === 'usageGrid' || mobileLayout === 'usageGridWithUser') return columns;
     return columns.filter((column) => !column.hideOnMobile);
-  }, [columns, mobileLayout]);
+  }, [columns, isMobileLayoutActive, mobileLayout]);
   const mobileItems = useMemo(() => {
+    if (!isMobileLayoutActive) return [];
     const mobileNewRowProps = (row: T, className?: string) => {
       const rowId = String(row.id);
       const isNew = markedRowIds.has(rowId);
@@ -321,10 +324,10 @@ export function RecordsTable<T extends RecordRow>({
         value: column.render(row),
       })),
     }));
-  }, [clearMarkedRowId, markedRowIds, mobileColumns, mobileLayout, rows]);
+  }, [clearMarkedRowId, isMobileLayoutActive, markedRowIds, mobileColumns, mobileLayout, rows]);
 
   const emptyState = (
-    <EmptyState className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 text-center">
+    <div className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 text-center">
       <div className="flex h-11 w-11 items-center justify-center rounded-[var(--field-radius)] bg-default text-muted shadow-sm">
         <Inbox className="h-5 w-5" />
       </div>
@@ -334,7 +337,7 @@ export function RecordsTable<T extends RecordRow>({
           <div className="text-xs text-text-tertiary">{emptyDescription}</div>
         ) : null}
       </div>
-    </EmptyState>
+    </div>
   );
 
   const paginationFooter = footer === undefined ? (
@@ -355,64 +358,67 @@ export function RecordsTable<T extends RecordRow>({
 
   return (
     <div className="ag-usage-records-table min-h-[240px]">
-      <div className="ag-usage-table-scroll ag-usage-table-desktop" data-slot="wrapper">
-        <table
-          aria-label={ariaLabel}
-          className="ag-usage-table"
-          data-slot="table"
-          style={tableStyle}
-        >
-          <thead data-slot="thead">
-            <tr data-slot="tr">
-              {columns.map((column, index) => (
-                <th
-                  data-row-header={index === 0 || undefined}
-                  data-slot="th"
-                  id={column.key}
-                  key={column.key}
-                  scope="col"
-                  className={cx(
-                    getColumnClassName(column.key),
-                    index === 0 && 'after:hidden',
-                  )}
-                  style={column.width ? { width: column.width } : undefined}
-                >
-                  <ColumnHeader>{column.title}</ColumnHeader>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody data-slot="tbody">
-            {isLoading
-              ? <TableLoadingRow colSpan={columns.length} />
-              : rows.length === 0
-                ? (
-                  <tr data-key="empty" data-slot="tr">
-                    <td colSpan={columns.length} data-slot="td">
-                      {emptyState}
-                    </td>
-                  </tr>
-                )
-              : rows.map((row) => (
-                  <RecordsTableRow
-                    key={row.id}
-                    columns={columns as RecordColumnConfig[]}
-                    isNew={markedRowIds.has(String(row.id))}
-                    onNewAnimationEnd={clearMarkedRowId}
-                    row={row}
-                  />
+      {!isMobileLayoutActive ? (
+        <div className="ag-usage-table-scroll ag-usage-table-desktop" data-slot="wrapper">
+          <table
+            aria-label={ariaLabel}
+            className="ag-usage-table"
+            data-slot="table"
+            style={tableStyle}
+          >
+            <thead data-slot="thead">
+              <tr data-slot="tr">
+                {columns.map((column, index) => (
+                  <th
+                    data-row-header={index === 0 || undefined}
+                    data-slot="th"
+                    id={column.key}
+                    key={column.key}
+                    scope="col"
+                    className={cx(
+                      getColumnClassName(column.key),
+                      index === 0 && 'after:hidden',
+                    )}
+                    style={column.width ? { width: column.width } : undefined}
+                  >
+                    <ColumnHeader>{column.title}</ColumnHeader>
+                  </th>
                 ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="ag-usage-table-mobile">
-        <MobileRecordList
-          emptyDescription={emptyDescription}
-          emptyTitle={emptyTitle}
-          isLoading={isLoading}
-          items={mobileItems}
-        />
-      </div>
+              </tr>
+            </thead>
+            <tbody data-slot="tbody">
+              {isLoading
+                ? <TableLoadingRow colSpan={columns.length} />
+                : rows.length === 0
+                  ? (
+                    <tr data-key="empty" data-slot="tr">
+                      <td colSpan={columns.length} data-slot="td">
+                        {emptyState}
+                      </td>
+                    </tr>
+                  )
+                : rows.map((row) => (
+                    <RecordsTableRow
+                      key={row.id}
+                      columns={columns as RecordColumnConfig[]}
+                      isNew={markedRowIds.has(String(row.id))}
+                      onNewAnimationEnd={clearMarkedRowId}
+                      row={row}
+                    />
+                  ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="ag-usage-table-mobile">
+          <MobileRecordList
+            emptyDescription={emptyDescription}
+            emptyTitle={emptyTitle}
+            isLoading={isLoading}
+            items={mobileItems}
+          />
+        </div>
+      )}
       {paginationFooter ? (
         <div className="table__footer" data-slot="table-footer">
           {paginationFooter}

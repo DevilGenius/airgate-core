@@ -24,7 +24,7 @@ import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { queryKeys } from '../../shared/queryKeys';
-import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
+import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS, REMOTE_SEARCH_DEBOUNCE_MS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
@@ -303,7 +303,7 @@ export default function AccountsPageContent() {
   // 筛选状态
   const { page, setPage, pageSize, setPageSize } = useUrlPagination(20, 'admin.accounts');
   const [keyword, setKeyword] = useUrlQueryParam('q');
-  const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
+  const debouncedKeyword = useDebouncedValue(keyword.trim(), REMOTE_SEARCH_DEBOUNCE_MS);
   const [platformFilter, setPlatformFilter] = useUrlQueryParam('platform');
   const [stateFilter, setStateFilter] = useUrlQueryParam('state');
   const [typeFilter, setTypeFilter] = useUrlQueryParam('type');
@@ -946,6 +946,7 @@ export default function AccountsPageContent() {
   ];
   return (
     <TablePage
+      className="ag-accounts-page"
       toolbar={(
           <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-48">

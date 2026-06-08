@@ -1,8 +1,7 @@
 import { memo, startTransition, useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Chip } from '@heroui/react';
-import { BarChart3, Eraser, MoreHorizontal, Pencil, RefreshCw, Trash2, Zap } from 'lucide-react';
+import { Eraser, RefreshCw, Trash2 } from 'lucide-react';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { AccountResp } from '../../../shared/types';
 
@@ -52,15 +51,33 @@ export type CachedUsageWindow = {
 };
 export type AccountUsageWindowCache = Map<string, CachedUsageWindow>;
 
+type NativeSoftChipTone = 'accent' | 'default' | 'success';
+
+function NativeSoftChip({
+  children,
+  className,
+  tone,
+}: {
+  children: ReactNode;
+  className?: string;
+  tone: NativeSoftChipTone;
+}) {
+  return (
+    <span className={`ag-native-soft-chip ${className ?? ''}`} data-tone={tone}>
+      <span className="ag-native-soft-chip__label">{children}</span>
+    </span>
+  );
+}
+
 export function renderAccountTypeFilterOption(option: AccountTypeFilterOption, showOAuthLabel = true): ReactNode {
   if (!option.planLabel) return option.label;
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5">
       {option.platformLabel ? <span className="truncate">{option.platformLabel}</span> : null}
       {showOAuthLabel ? <span className="truncate">OAuth</span> : null}
-      <Chip color="accent" size="sm" variant="soft">
+      <NativeSoftChip className="ag-account-type-plan-chip" tone="accent">
         {option.planLabel}
-      </Chip>
+      </NativeSoftChip>
     </span>
   );
 }
@@ -459,12 +476,19 @@ export class AccountSelectionStore {
   }
 }
 
-function StatusPill({ status, tooltip }: { status: 'active' | 'disabled'; tooltip?: string }) {
-  const { t } = useTranslation();
+function StatusPill({
+  label,
+  status,
+  tooltip,
+}: {
+  label: string;
+  status: 'active' | 'disabled';
+  tooltip?: string;
+}) {
   const chip = (
-    <Chip color={status === 'active' ? 'success' : 'default'} size="sm" variant="soft">
-      {status === 'active' ? t('status.active') : t('status.disabled')}
-    </Chip>
+    <NativeSoftChip className="ag-account-status-pill" tone={status === 'active' ? 'success' : 'default'}>
+      {label}
+    </NativeSoftChip>
   );
 
   if (!tooltip) return chip;
@@ -682,10 +706,13 @@ export const AccountRowActions = memo(function AccountRowActions({
     clearCooldowns: string;
     delete: string;
     edit: string;
+    editShort: string;
     more: string;
     refreshQuota: string;
     stats: string;
+    statsShort: string;
     test: string;
+    testShort: string;
   };
   onEdit: (row: AccountResp) => void;
   onDelete: (row: AccountResp) => void;
@@ -699,35 +726,38 @@ export const AccountRowActions = memo(function AccountRowActions({
       <button
         type="button"
         aria-label={labels.edit}
+        title={labels.edit}
         className="ag-account-row-action-button"
         onClick={(event) => {
           event.stopPropagation();
           onEdit(row);
         }}
       >
-        <Pencil className="w-3.5 h-3.5" />
+        <span className="ag-account-row-action-label">{labels.editShort}</span>
       </button>
       <button
         type="button"
         aria-label={labels.test}
+        title={labels.test}
         className="ag-account-row-action-button"
         onClick={(event) => {
           event.stopPropagation();
           onTest(row);
         }}
       >
-        <Zap className="w-3.5 h-3.5" />
+        <span className="ag-account-row-action-label">{labels.testShort}</span>
       </button>
       <button
         type="button"
         aria-label={labels.stats}
+        title={labels.stats}
         className="ag-account-row-action-button ag-account-row-action-button--stats"
         onClick={(event) => {
           event.stopPropagation();
           onStats(row.id);
         }}
       >
-        <BarChart3 className="w-3.5 h-3.5" />
+        <span className="ag-account-row-action-label">{labels.statsShort}</span>
       </button>
       <AccountRowOverflowMenu
         row={row}
@@ -857,10 +887,11 @@ const AccountRowOverflowMenu = memo(function AccountRowOverflowMenu({
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label={labels.more}
+        title={labels.more}
         className="ag-account-row-more-trigger ag-account-row-action-button"
         onClick={toggleMenu}
       >
-        <MoreHorizontal className="w-3.5 h-3.5" />
+        <span aria-hidden="true" className="ag-account-row-more-dots" />
       </button>
       {isOpen && position && typeof document !== 'undefined' ? createPortal(
         <div
@@ -1138,7 +1169,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
     const reason = row.error_msg?.trim() === '管理员手动关闭调度' ? '手动关闭' : row.error_msg?.trim();
     mainBadge = (
       <div className="inline-flex min-w-0 max-w-full flex-col items-center gap-0.5">
-        <StatusPill status="disabled" tooltip={reason || undefined} />
+        <StatusPill label={t('status.disabled')} status="disabled" tooltip={reason || undefined} />
         {reason && (
           <span className="block max-w-[5.75rem] truncate text-center text-[10px] leading-none text-[var(--ag-muted)]" title={reason}>
             {reason}
@@ -1148,7 +1179,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
     );
   } else {
     // active，或 rate_limited/degraded 已到期（lazy 恢复）
-    mainBadge = <StatusPill status="active" />;
+    mainBadge = <StatusPill label={t('status.active')} status="active" />;
   }
 
   if (liveFamilyCooldowns.length === 0) {

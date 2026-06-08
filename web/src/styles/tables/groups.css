@@ -42,3 +42,46 @@
   .table__body .table__row[data-hovered="true"] .table__cell) {
   background: var(--ag-table-row-hover-background) !important;
 }
+
+.ag-groups-table .ag-groups-soft-chip {
+  display: inline-flex;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding-inline: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.ag-groups-table .ag-groups-soft-chip[data-tone="accent"] {
+  border-color: color-mix(in oklab, var(--ag-primary) 28%, transparent);
+  background: var(--ag-primary-subtle);
+  color: var(--ag-primary);
+}
+
+.ag-groups-table .ag-groups-soft-chip[data-tone="default"] {
+  border-color: color-mix(in oklab, var(--ag-border) 88%, transparent);
+  background: var(--ag-default-bg);
+  color: var(--ag-default-foreground);
+}
+
+.ag-groups-table .ag-groups-soft-chip[data-tone="warning"] {
+  border-color: color-mix(in oklab, var(--ag-warning) 28%, transparent);
+  background: var(--ag-warning-subtle);
+  color: var(--ag-warning);
+}
+
+.ag-groups-table .ag-groups-soft-chip__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

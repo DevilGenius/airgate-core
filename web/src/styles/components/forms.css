@@ -225,6 +225,7 @@
   flex-direction: column;
   gap: 0.125rem;
   overflow: visible;
+  touch-action: pan-y;
 }
 
 .ag-search-combobox-empty {

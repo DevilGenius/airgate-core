@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button, Card, Meter } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
-import { apikeysApi } from '../../shared/api/apikeys';
 import { queryKeys } from '../../shared/queryKeys';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
@@ -19,10 +18,11 @@ import { TablePage } from '../../shared/components/TablePage';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
+import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
-import { FETCH_ALL_PARAMS, PAGE_SIZE_OPTIONS } from '../../shared/constants';
+import { PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { USER_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
@@ -237,17 +237,6 @@ export default function UserUsageContent() {
   ];
   const selectedPlatformLabel = platformOptions.find((item) => item.id === (filters.platform || ''))?.label ?? t('common.all');
 
-  const { data: apiKeysData } = useQuery({
-    queryKey: queryKeys.userKeys('usage-filter'),
-    queryFn: () => apikeysApi.list(FETCH_ALL_PARAMS),
-    enabled: !customerScope,
-  });
-  const apiKeyOptions = [
-    { id: '', label: t('common.all') },
-    ...(apiKeysData?.list ?? []).map((key) => ({ id: String(key.id), label: key.name })),
-  ];
-  const selectedApiKeyLabel = apiKeyOptions.find((item) => item.id === String(filters.api_key_id ?? ''))?.label ?? t('common.all');
-
   const {
     data,
     dataUpdatedAt,
@@ -390,6 +379,7 @@ export default function UserUsageContent() {
       </div>
 
       <TablePage
+        className="ag-usage-page"
         footer={(
           <TablePaginationFooter
             page={page}
@@ -437,14 +427,14 @@ export default function UserUsageContent() {
             </div>
             {!customerScope && (
               <div className="w-full sm:w-48">
-                <SimpleSelect
+                <APIKeySearchFilterComboBox
                   ariaLabel="API Key"
-                  fullWidth
-                  items={apiKeyOptions.map((item) => ({ key: item.id, label: item.label }))}
-                  selectedKey={String(filters.api_key_id ?? '')}
-                  selectedLabel={filters.api_key_id ? selectedApiKeyLabel : (
-                    <span className="text-text-tertiary">API Key</span>
-                  )}
+                  emptyPrompt="API Key"
+                  loadingLabel={t('common.loading')}
+                  noDataLabel={t('common.no_data')}
+                  placeholder="API Key"
+                  scope="user"
+                  selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
                   onSelectionChange={(key) => updateFilter('api_key_id', key)}
                 />
               </div>

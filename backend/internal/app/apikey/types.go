@@ -9,36 +9,48 @@ const SearchScopeAPIKey = "api_key"
 
 // Key API Key 领域对象。
 type Key struct {
-	ID              int
-	Name            string
-	KeyHint         string
-	KeyHash         string
-	KeyEncrypted    string
-	PlainKey        string
-	UserID          int
-	GroupID         *int
-	GroupRate       float64 // 所属分组对该用户生效的实际扣费倍率（未绑定分组时为 0）
-	IPWhitelist     []string
-	IPBlacklist     []string
-	QuotaUSD        float64
-	UsedQuota       float64 // 账面已用（含 sell_rate markup）
-	UsedQuotaActual float64 // 真实成本已用（聚合 sum(usage_log.actual_cost)，仅在 fetch 时填充）
-	SellRate        float64 // 销售倍率，1 表示不加价
-	MaxConcurrency  int     // API Key 级并发上限，0 表示不限制
-	TodayCost       float64
-	ThirtyDayCost   float64
-	Status          string
-	ExpiresAt       *time.Time
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID                  int
+	Name                string
+	KeyHint             string
+	KeyHash             string
+	KeyEncrypted        string
+	PlainKey            string
+	UserID              int
+	GroupID             *int
+	GroupRate           float64 // 所属分组对该用户生效的实际扣费倍率（未绑定分组时为 0）
+	IPWhitelist         []string
+	IPBlacklist         []string
+	QuotaUSD            float64
+	UsedQuota           float64 // 账面已用（含 sell_rate markup）
+	UsedQuotaActual     float64 // 真实成本已用（聚合 sum(usage_log.actual_cost)，仅在 fetch 时填充）
+	SellRate            float64 // 销售倍率，1 表示不加价
+	MaxConcurrency      int     // API Key 级并发上限，0 表示不限制
+	TodayCost           float64 // 今日销售金额（sum(billed_cost)，含 sell_rate）
+	TodayActualCost     float64 // 今日消耗金额（sum(actual_cost)，不含 sell_rate）
+	ThirtyDayCost       float64 // 近 30 天销售金额（sum(billed_cost)，含 sell_rate）
+	ThirtyDayActualCost float64 // 近 30 天消耗金额（sum(actual_cost)，不含 sell_rate）
+	Status              string
+	ExpiresAt           *time.Time
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
+// UsageCosts API Key 窗口用量金额。
+type UsageCosts struct {
+	TodaySalesCost      float64
+	TodayActualCost     float64
+	ThirtyDaySalesCost  float64
+	ThirtyDayActualCost float64
 }
 
 // ListFilter API Key 列表查询参数。
 type ListFilter struct {
-	Page        int
-	PageSize    int
-	Keyword     string
-	SearchScope string
+	Page         int
+	PageSize     int
+	Keyword      string
+	SearchScope  string
+	IncludeUsage bool
+	TZ           string
 }
 
 // ListResult API Key 列表结果。
@@ -106,9 +118,9 @@ type Mutation struct {
 type Repository interface {
 	ListByUser(context.Context, int, ListFilter) ([]Key, int64, error)
 	ListAdmin(context.Context, ListFilter) ([]Key, int64, error)
-	// KeyUsage 返回每个 key 的"今日"和"近 30 天"实际成本。
+	// KeyUsage 返回每个 key 的"今日"和"近 30 天"销售/消耗金额。
 	// todayStart 必须由调用方按用户时区计算好。
-	KeyUsage(ctx context.Context, keyIDs []int, todayStart time.Time) (map[int]float64, map[int]float64, error)
+	KeyUsage(ctx context.Context, keyIDs []int, todayStart time.Time) (map[int]UsageCosts, error)
 	GetGroupAccess(context.Context, int, int) (GroupAccess, error)
 	Create(context.Context, Mutation) (Key, error)
 	UpdateOwned(context.Context, int, int, Mutation) (Key, error)

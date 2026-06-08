@@ -3,7 +3,7 @@ import { Outlet, useRouterState } from '@tanstack/react-router';
 import { PageFooterProvider } from '../../shared/components/PageFooter';
 import { normalizePath, scheduleAfterPaint } from './navigationUtils';
 
-const ROUTE_CONTENT_ACTIVATION_DELAY_MS = 140;
+const ROUTE_CONTENT_ACTIVATION_DELAY_MS = 300;
 
 function RouteRenderPlaceholder() {
   return <div className="min-h-[320px]" aria-hidden="true" />;

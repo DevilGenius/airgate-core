@@ -1,12 +1,9 @@
 import { startTransition, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Check, Copy, Plus, Pencil, Trash2, KeyRound, Layers, Eye, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Plus, RefreshCw } from 'lucide-react';
 import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
-import {
-  StatusChip,
-} from '../../shared/ui';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { groupsApi } from '../../shared/api/groups';
 import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
@@ -21,11 +18,16 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { TablePage } from '../../shared/components/TablePage';
 import { MetricChips } from '../../shared/components/MetricChips';
+import { NativeStatusChip } from '../../shared/components/NativeStatusChip';
+import { TableRowActionButton } from '../../shared/components/TableRowActionButton';
+import { TableRowMoreMenu } from '../../shared/components/TableRowMoreMenu';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
 import { CreateKeyModal } from './apikeys/CreateKeyModal';
 import { EditKeyModal } from './apikeys/EditKeyModal';
 import type { APIKeyResp, GroupResp } from '../../shared/types';
+
+const API_KEY_AMOUNT_DECIMALS = 3;
 
 export default function APIKeysPage() {
   const { t } = useTranslation();
@@ -51,6 +53,7 @@ export default function APIKeysPage() {
       page_size: pageSize,
       keyword: keyword || undefined,
       search_scope: 'api_key',
+      include_usage: true,
     }, { signal }),
     placeholderData: keepPreviousData,
   });
@@ -174,20 +177,20 @@ export default function APIKeysPage() {
       <CommonTable
         ariaLabel={t('api_keys.title', 'API keys')}
         className="ag-api-keys-table"
-        minWidth={1070}
+        minWidth={1160}
       >
         <CommonTable.Header>
           <CommonTable.Column id="id" style={{ width: 72 }}>
             {t('common.id')}
           </CommonTable.Column>
-          <CommonTable.Column id="name" style={{ minWidth: '12rem', width: '12rem' }}>{t('common.name')}</CommonTable.Column>
-          <CommonTable.Column id="key_prefix" style={{ minWidth: '11rem', width: '11rem' }}>{t('api_keys.key_prefix')}</CommonTable.Column>
+          <CommonTable.Column id="name" style={{ minWidth: '10.5rem', width: '10.5rem' }}>{t('common.name')}</CommonTable.Column>
+          <CommonTable.Column id="key_prefix" style={{ minWidth: '10rem', width: '10rem' }}>{t('api_keys.key_prefix')}</CommonTable.Column>
           <CommonTable.Column id="group_id">{t('api_keys.group')}</CommonTable.Column>
           <CommonTable.Column id="status" style={{ width: '5.5rem' }}>{t('common.status')}</CommonTable.Column>
-          <CommonTable.Column id="quota" style={{ width: '17.5rem' }}>{t('api_keys.quota_used')}</CommonTable.Column>
-          <CommonTable.Column id="usage" style={{ width: '18.5rem' }}>{t('api_keys.usage')}</CommonTable.Column>
+          <CommonTable.Column id="quota" style={{ width: '18.5rem' }}>{t('api_keys.quota_used')}</CommonTable.Column>
+          <CommonTable.Column id="usage" style={{ width: '20.875rem' }}>{t('api_keys.usage_window', '用量(今日/30天)')}</CommonTable.Column>
           <CommonTable.Column id="expires_at" style={{ width: '7rem' }}>{t('api_keys.expire_time')}</CommonTable.Column>
-          <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
+          <CommonTable.Column id="actions" style={{ width: 112 }}>{t('common.actions')}</CommonTable.Column>
         </CommonTable.Header>
         <CommonTable.Body>
           {isLoading ? (
@@ -213,8 +216,7 @@ export default function APIKeysPage() {
                     <span className="font-mono">{row.id}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <span className="inline-flex max-w-[11rem] items-center gap-1.5">
-                      <KeyRound className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--ag-text-tertiary)' }} />
+                    <span className="ag-api-key-name">
                       <span style={{ color: 'var(--ag-text)' }} className="truncate font-medium" title={row.name}>{row.name}</span>
                     </span>
                   </CommonTable.Cell>
@@ -234,13 +236,12 @@ export default function APIKeysPage() {
                     </code>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+                    <span className="ag-api-key-group-text" title={row.group_id == null ? t('api_keys.group_unbound') : group ? group.name : `#${row.group_id}`}>
                       {row.group_id == null ? t('api_keys.group_unbound') : group ? group.name : `#${row.group_id}`}
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <StatusChip status={row.status} />
+                    <NativeStatusChip status={row.status} />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <MetricChips
@@ -249,13 +250,15 @@ export default function APIKeysPage() {
                         {
                           amount: row.used_quota,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           highlightDollar: true,
-                          label: t('api_keys.quota_used_short', '已使用'),
+                          label: t('api_keys.quota_used_short', '使用'),
                         },
                         {
                           amount: row.quota_usd > 0 ? row.quota_usd : undefined,
                           color: 'success',
-                          label: t('api_keys.quota_total_short', '总配额'),
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          label: t('api_keys.quota_total_short', '配额'),
                           value: '∞',
                         },
                       ]}
@@ -268,15 +271,33 @@ export default function APIKeysPage() {
                         {
                           amount: row.today_cost,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'warning',
-                          label: t('api_keys.today', '今日'),
+                          label: t('api_keys.sales', '销售'),
                           mutedWhenZero: true,
                         },
                         {
                           amount: row.thirty_day_cost,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'warning',
-                          label: t('api_keys.thirty_days', '近30天'),
+                          label: t('api_keys.sales', '销售'),
+                          mutedWhenZero: true,
+                        },
+                        {
+                          amount: row.today_actual_cost ?? 0,
+                          color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          dollarTone: 'warning',
+                          label: t('api_keys.consumption', '消耗'),
+                          mutedWhenZero: true,
+                        },
+                        {
+                          amount: row.thirty_day_actual_cost ?? 0,
+                          color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          dollarTone: 'warning',
+                          label: t('api_keys.consumption', '消耗'),
                           mutedWhenZero: true,
                         },
                       ]}
@@ -286,33 +307,35 @@ export default function APIKeysPage() {
                     <span className="font-mono">{formatExpiry(row.expires_at)}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <div className="ag-table-row-actions flex justify-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="secondary"
+                    <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
+                      <TableRowActionButton
+                        ariaBusy={revealMutation.isPending}
+                        ariaLabel={t('api_keys.reveal')}
                         isDisabled={revealMutation.isPending}
-                        onPress={() => revealMutation.mutate(row.id)}
+                        title={t('api_keys.reveal')}
+                        onClick={() => revealMutation.mutate(row.id)}
                       >
-                        {revealMutation.isPending ? <Spinner size="sm" /> : <Eye className="w-3.5 h-3.5" />}
-                        {t('api_keys.reveal')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onPress={() => setEditingKey(row)}
+                        {t('api_keys.reveal_short', '查看')}
+                      </TableRowActionButton>
+                      <TableRowActionButton
+                        ariaLabel={t('common.edit')}
+                        title={t('common.edit')}
+                        onClick={() => setEditingKey(row)}
                       >
-                        <Pencil className="w-3.5 h-3.5" />
-                        {t('common.edit')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger-soft"
-                        className="text-danger"
-                        onPress={() => setDeletingKey(row)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        {t('common.delete')}
-                      </Button>
+                        {t('common.edit_short', '编辑')}
+                      </TableRowActionButton>
+                      <TableRowMoreMenu
+                        ariaLabel={t('common.more')}
+                        menuLabel={t('common.actions')}
+                        items={[
+                          {
+                            key: 'delete',
+                            label: t('common.delete'),
+                            onSelect: () => setDeletingKey(row),
+                            tone: 'danger',
+                          },
+                        ]}
+                      />
                     </div>
                   </CommonTable.Cell>
                 </CommonTable.Row>

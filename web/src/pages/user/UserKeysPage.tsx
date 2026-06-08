@@ -5,11 +5,8 @@ import { apikeysApi } from '../../shared/api/apikeys';
 import { useUrlPagination } from '../../shared/hooks/useUrlTableState';
 import { groupsApi } from '../../shared/api/groups';
 import { useToast } from '../../shared/ui';
-import { Alert, AlertDialog, Button, Dropdown, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
+import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
-import {
-  StatusChip,
-} from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
@@ -19,7 +16,9 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { TablePage } from '../../shared/components/TablePage';
 import { MetricChips } from '../../shared/components/MetricChips';
-import { GROUP_CHIP_STYLE } from '../../shared/components/groupChipStyle';
+import { NativeStatusChip } from '../../shared/components/NativeStatusChip';
+import { TableRowActionButton } from '../../shared/components/TableRowActionButton';
+import { TableRowMoreMenu } from '../../shared/components/TableRowMoreMenu';
 import { dateInputToLocalStartRFC3339, formatAPIKeyHint, formatDateInputValue, formatExpiry } from '../../shared/utils/format';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
@@ -28,15 +27,6 @@ import {
   Check,
   Copy,
   Plus,
-  Pencil,
-  Trash2,
-  KeyRound,
-  Eye,
-  Ban,
-  CheckCircle,
-  Terminal,
-  Upload,
-  MoreHorizontal,
   RefreshCw,
 } from 'lucide-react';
 import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq, GroupResp } from '../../shared/types';
@@ -46,6 +36,8 @@ import { CreateKeyModal } from './userkeys/CreateKeyModal';
 import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
 import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
+
+const API_KEY_AMOUNT_DECIMALS = 3;
 
 function formatRateValue(rate: number | null | undefined) {
   if (typeof rate !== 'number' || !Number.isFinite(rate)) return '—';
@@ -322,16 +314,16 @@ export default function UserKeysPage() {
       <CommonTable
         ariaLabel={t('user_keys.title', 'API keys')}
         className="ag-api-keys-table"
-        minWidth={1070}
+        contentStyle={{ width: '100%' }}
       >
         <CommonTable.Header>
-          <CommonTable.Column id="name" style={{ minWidth: '12rem', width: '12rem' }}>{t('common.name')}</CommonTable.Column>
-          <CommonTable.Column id="key_prefix" style={{ minWidth: '11rem', width: '11rem' }}>{t('user_keys.title')}</CommonTable.Column>
+          <CommonTable.Column id="name" style={{ minWidth: '10.5rem', width: '10.5rem' }}>{t('common.name')}</CommonTable.Column>
+          <CommonTable.Column id="key_prefix" style={{ minWidth: '10rem', width: '10rem' }}>{t('user_keys.key_table_header', '密钥')}</CommonTable.Column>
           <CommonTable.Column id="group_id" style={{ width: '15rem' }}>{t('user_keys.group')}</CommonTable.Column>
           <CommonTable.Column id="status" style={{ width: '5.5rem' }}>{t('common.status')}</CommonTable.Column>
-          <CommonTable.Column id="quota" style={{ width: '17.5rem' }}>{t('user_keys.quota_label')}</CommonTable.Column>
-          <CommonTable.Column id="markup" style={{ width: '10.75rem' }}>{t('user_keys.markup_title', '销售/成本')}</CommonTable.Column>
-          <CommonTable.Column id="usage" style={{ width: '18.5rem' }}>{t('api_keys.usage')}</CommonTable.Column>
+          <CommonTable.Column id="quota" style={{ width: '18.5rem' }}>{t('user_keys.quota_table_header', '配额')}</CommonTable.Column>
+          <CommonTable.Column id="markup" style={{ width: '10.75rem' }}>{t('user_keys.markup_title', '成本/利润')}</CommonTable.Column>
+          <CommonTable.Column id="usage" style={{ width: '20.875rem' }}>{t('api_keys.usage_window', '用量(今日/30天)')}</CommonTable.Column>
           <CommonTable.Column id="expires_at" style={{ width: '7rem' }}>{t('user_keys.expires_at')}</CommonTable.Column>
           <CommonTable.Column id="actions" style={{ width: 132 }}>
             {t('common.actions')}
@@ -377,11 +369,10 @@ export default function UserKeysPage() {
               return (
                 <CommonTable.Row id={String(row.id)} key={row.id}>
                   <CommonTable.Cell>
-                    <span className="block max-w-[11rem] truncate font-medium text-text" title={row.name}>{row.name}</span>
+                    <span className="block max-w-[10rem] truncate font-medium text-text" title={row.name}>{row.name}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <span className="ag-api-key-prefix-chip inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono">
-                      <KeyRound className="w-3 h-3 text-text-tertiary" />
+                    <span className="ag-api-key-prefix-chip inline-flex items-center text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono">
                       <span className="ag-api-key-prefix-text" title={keyHint}>
                         {keyHint}
                       </span>
@@ -392,10 +383,9 @@ export default function UserKeysPage() {
                       <div className="ag-api-key-group-line">
                         <span
                           className="ag-api-key-group-name-chip inline-flex h-6 min-w-0 max-w-full items-center justify-center gap-1 rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none text-text-secondary"
-                          style={GROUP_CHIP_STYLE}
+                          data-tone={isGroupUnbound ? 'warning' : 'default'}
                           title={groupName}
                         >
-                          {isGroupUnbound ? <AlertTriangle className="h-3 w-3 shrink-0 text-warning" /> : null}
                           <span className="min-w-0 truncate">{groupName}</span>
                         </span>
                         {hasGroupRate ? (
@@ -423,7 +413,7 @@ export default function UserKeysPage() {
                     </div>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <StatusChip status={displayStatus} />
+                    <NativeStatusChip status={displayStatus} />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <MetricChips
@@ -432,13 +422,15 @@ export default function UserKeysPage() {
                         {
                           amount: row.used_quota,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           highlightDollar: true,
-                          label: t('user_keys.quota_used_short', '已使用'),
+                          label: t('user_keys.quota_used_short', '使用'),
                         },
                         {
                           amount: row.quota_usd > 0 ? row.quota_usd : undefined,
                           color: 'success',
-                          label: t('user_keys.quota_total_short', '总配额'),
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          label: t('user_keys.quota_total_short', '配额'),
                           value: '∞',
                         },
                       ]}
@@ -451,12 +443,14 @@ export default function UserKeysPage() {
                         {
                           amount: row.used_quota_actual || 0,
                           color: 'default',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'warning',
                           label: t('user_keys.cost_actual', '成本'),
                         },
                         {
                           amount: profit,
                           color: 'default',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'success',
                           label: t('user_keys.profit', '利润'),
                         },
@@ -470,15 +464,33 @@ export default function UserKeysPage() {
                         {
                           amount: row.today_cost,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'warning',
-                          label: t('api_keys.today', '今日'),
+                          label: t('api_keys.sales', '销售'),
                           mutedWhenZero: true,
                         },
                         {
                           amount: row.thirty_day_cost,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'warning',
-                          label: t('api_keys.thirty_days', '近30天'),
+                          label: t('api_keys.sales', '销售'),
+                          mutedWhenZero: true,
+                        },
+                        {
+                          amount: row.today_actual_cost ?? 0,
+                          color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          dollarTone: 'warning',
+                          label: t('api_keys.consumption', '消耗'),
+                          mutedWhenZero: true,
+                        },
+                        {
+                          amount: row.thirty_day_actual_cost ?? 0,
+                          color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          dollarTone: 'warning',
+                          label: t('api_keys.consumption', '消耗'),
                           mutedWhenZero: true,
                         },
                       ]}
@@ -489,86 +501,53 @@ export default function UserKeysPage() {
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="secondary"
-                        aria-label={t('api_keys.reveal')}
-                        onPress={() => revealMutation.mutate(row.id)}
+                      <TableRowActionButton
+                        ariaBusy={revealMutation.isPending}
+                        ariaLabel={t('api_keys.reveal')}
+                        isDisabled={revealMutation.isPending}
+                        title={t('api_keys.reveal')}
+                        onClick={() => revealMutation.mutate(row.id)}
                       >
-                        <Eye className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="secondary"
-                        aria-label={t('common.edit')}
-                        onPress={() => openEdit(row)}
+                        {t('api_keys.reveal_short', '查看')}
+                      </TableRowActionButton>
+                      <TableRowActionButton
+                        ariaLabel={t('common.edit')}
+                        title={t('common.edit')}
+                        onClick={() => openEdit(row)}
                       >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Dropdown>
-                        <Dropdown.Trigger
-                          aria-label={t('common.more')}
-                          className="ag-table-row-more-trigger button button--icon-only button--sm button--secondary"
-                        >
-                          <MoreHorizontal className="w-3.5 h-3.5" />
-                        </Dropdown.Trigger>
-                        <Dropdown.Popover placement="bottom end">
-                          <Dropdown.Menu
-                            aria-label={t('common.actions')}
-                            onAction={(key) => {
-                              switch (String(key)) {
-                                case 'import_ccs':
-                                  openCcsModal(row);
-                                  break;
-                                case 'toggle':
-                                  toggleStatusMutation.mutate({
-                                    id: row.id,
-                                    status: row.status === 'active' ? 'disabled' : 'active',
-                                  });
-                                  break;
-                                case 'use_key':
-                                  openUseKeyModal(row);
-                                  break;
-                                case 'delete':
-                                  setDeleteTarget(row);
-                                  break;
-                              }
-                            }}
-                          >
-                            <Dropdown.Item id="import_ccs" textValue={t('user_keys.import_ccs')}>
-                              <span className="flex items-center gap-2">
-                                <Upload className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-                                {t('user_keys.import_ccs')}
-                              </span>
-                            </Dropdown.Item>
-                            <Dropdown.Item
-                              id="toggle"
-                              textValue={row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
-                            >
-                              <span className="flex items-center gap-2">
-                                {row.status === 'active'
-                                  ? <Ban className="w-3.5 h-3.5" />
-                                  : <CheckCircle className="w-3.5 h-3.5" />}
-                                {row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable')}
-                              </span>
-                            </Dropdown.Item>
-                            <Dropdown.Item id="use_key" textValue={t('user_keys.use_key')}>
-                              <span className="flex items-center gap-2">
-                                <Terminal className="w-3.5 h-3.5" />
-                                {t('user_keys.use_key')}
-                              </span>
-                            </Dropdown.Item>
-                            <Dropdown.Item id="delete" className="text-danger" textValue={t('common.delete')}>
-                              <span className="flex items-center gap-2">
-                                <Trash2 className="w-3.5 h-3.5" />
-                                {t('common.delete')}
-                              </span>
-                            </Dropdown.Item>
-                          </Dropdown.Menu>
-                        </Dropdown.Popover>
-                      </Dropdown>
+                        {t('common.edit_short', '编辑')}
+                      </TableRowActionButton>
+                      <TableRowMoreMenu
+                        ariaLabel={t('common.more')}
+                        menuLabel={t('common.actions')}
+                        items={[
+                          {
+                            key: 'import_ccs',
+                            label: t('user_keys.import_ccs'),
+                            onSelect: () => openCcsModal(row),
+                          },
+                          {
+                            key: 'toggle',
+                            label: row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable'),
+                            isDisabled: toggleStatusMutation.isPending,
+                            onSelect: () => toggleStatusMutation.mutate({
+                              id: row.id,
+                              status: row.status === 'active' ? 'disabled' : 'active',
+                            }),
+                          },
+                          {
+                            key: 'use_key',
+                            label: t('user_keys.use_key'),
+                            onSelect: () => openUseKeyModal(row),
+                          },
+                          {
+                            key: 'delete',
+                            label: t('common.delete'),
+                            onSelect: () => setDeleteTarget(row),
+                            tone: 'danger',
+                          },
+                        ]}
+                      />
                     </div>
                   </CommonTable.Cell>
                 </CommonTable.Row>

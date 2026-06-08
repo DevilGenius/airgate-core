@@ -3,27 +3,25 @@ import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Card, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
-import { usersApi } from '../../shared/api/users';
-import { apikeysApi } from '../../shared/api/apikeys';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { Activity, Columns3, DollarSign, Sigma } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
-import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
+import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { RecordsTable } from '../../shared/components/RecordsTable';
 import { TablePage } from '../../shared/components/TablePage';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
-import { SearchFilterComboBox } from '../../shared/components/SearchFilterComboBox';
+import { UserSearchFilterComboBox } from '../../shared/components/UserSearchFilterComboBox';
+import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
 import { PAGE_SIZE_OPTIONS, PIE_CHART_COLORS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMenu';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
-import { formatAPIKeyHint } from '../../shared/utils/format';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
 
@@ -535,75 +533,6 @@ export default function UsagePage() {
     });
   }, [resetCursorPagination]);
 
-  // 用户搜索
-  const [userSearchKeyword, setUserSearchKeyword] = useState('');
-  const [selectedUserLabel, setSelectedUserLabel] = useState('');
-  const userSearchActive = userSearchKeyword.trim().length > 0;
-  const { data: usersData, isFetching: isUsersFetching } = useQuery({
-    queryKey: ['admin-users-search', userSearchKeyword],
-    queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: userSearchKeyword }),
-    enabled: userSearchActive,
-  });
-  const userOptions = (userSearchActive ? (usersData?.list ?? []) : []).map((u) => ({
-    id: String(u.id),
-    label: u.username || u.email,
-    description: u.username ? u.email : undefined,
-    textValue: `${u.username || ''} ${u.email}`,
-  }));
-  const visibleUserOptions = (() => {
-    const selectedId = filters.user_id ? String(filters.user_id) : '';
-    if (!selectedId || !selectedUserLabel || userOptions.some((option) => option.id === selectedId)) {
-      return userOptions;
-    }
-    return [
-      {
-        id: selectedId,
-        label: selectedUserLabel,
-        description: undefined,
-        textValue: selectedUserLabel,
-      },
-      ...userOptions,
-    ];
-  })();
-
-  // API Key 搜索：防抖 + 服务端分页，只取前 20 条候选，避免全量加载大量 key。
-  const [apiKeySearchKeyword, setAPIKeySearchKeyword] = useState('');
-  const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState('');
-  const apiKeySearchActive = apiKeySearchKeyword.trim().length > 0;
-  const { data: apiKeysData, isFetching: isAPIKeysFetching } = useQuery({
-    queryKey: ['admin-api-keys-search', 'api_key', apiKeySearchKeyword],
-    queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: apiKeySearchKeyword, search_scope: 'api_key' }, { signal }),
-    enabled: apiKeySearchActive,
-  });
-  const apiKeyOptions = (apiKeySearchActive ? (apiKeysData?.list ?? []) : []).map((key: APIKeyResp) => {
-    const keyHint = formatAPIKeyHint(key.key_prefix);
-    return {
-      id: String(key.id),
-      label: key.name || keyHint || `#${key.id}`,
-      description: [
-        `#${key.id}`,
-        keyHint,
-        key.user_id ? `User #${key.user_id}` : '',
-      ].filter(Boolean).join(' · '),
-      textValue: `${key.name || ''} ${keyHint || ''} ${key.id || ''}`,
-    };
-  });
-  const visibleAPIKeyOptions = (() => {
-    const selectedId = filters.api_key_id ? String(filters.api_key_id) : '';
-    if (!selectedId || !selectedAPIKeyLabel || apiKeyOptions.some((option) => option.id === selectedId)) {
-      return apiKeyOptions;
-    }
-    return [
-      {
-        id: selectedId,
-        label: selectedAPIKeyLabel,
-        description: undefined,
-        textValue: selectedAPIKeyLabel,
-      },
-      ...apiKeyOptions,
-    ];
-  })();
-
   // 构建查询参数
   const queryParams = useMemo<UsageQuery>(() => ({
     page,
@@ -694,22 +623,12 @@ export default function UsagePage() {
     });
   }, [resetCursorPagination]);
 
-  const handleUserSearchChange = useCallback((value: string) => {
-    setUserSearchKeyword(value);
-  }, []);
-
-  const handleUserSelectionChange = useCallback((value: string, label: string) => {
+  const handleUserSelectionChange = useCallback((value: string, _label: string) => {
     updateFilter('user_id', value);
-    setSelectedUserLabel(label);
   }, [updateFilter]);
 
-  const handleAPIKeySearchChange = useCallback((value: string) => {
-    setAPIKeySearchKeyword(value);
-  }, []);
-
-  const handleAPIKeySelectionChange = useCallback((value: string, label: string) => {
+  const handleAPIKeySelectionChange = useCallback((value: string, _label: string) => {
     updateFilter('api_key_id', value);
-    setSelectedAPIKeyLabel(label);
   }, [updateFilter]);
 
   const activeStats = stats;
@@ -800,7 +719,7 @@ export default function UsagePage() {
     };
     const apiKeyColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'api_key',
-      title: 'API Key',
+      title: t('usage.api_key', 'API Key'),
       width: '112px',
       hideOnMobile: true,
       render: (row) => {
@@ -1005,6 +924,7 @@ export default function UsagePage() {
       )}
 
       <TablePage
+        className="ag-usage-page"
         footer={(
           <TablePaginationFooter
             page={page}
@@ -1059,32 +979,25 @@ export default function UsagePage() {
               />
             </div>
             <div className="w-full sm:w-48">
-              <SearchFilterComboBox
+              <UserSearchFilterComboBox
                 ariaLabel={t('usage.search_user')}
-                isLoading={isUsersFetching}
-                items={visibleUserOptions}
-                loadingLabel={t('common.loading')}
-                selectedKey={filters.user_id ? String(filters.user_id) : null}
-                selectedLabel={selectedUserLabel}
-                placeholder={t('usage.search_user')}
                 emptyPrompt={t('usage.search_user')}
+                loadingLabel={t('common.loading')}
                 noDataLabel={t('common.no_data')}
-                onSearchChange={handleUserSearchChange}
+                placeholder={t('usage.search_user')}
+                selectedKey={filters.user_id ? String(filters.user_id) : null}
                 onSelectionChange={handleUserSelectionChange}
               />
             </div>
             <div className="w-full sm:w-48">
-              <SearchFilterComboBox
+              <APIKeySearchFilterComboBox
                 ariaLabel={t('usage.search_api_key', '搜索 API Key')}
-                isLoading={isAPIKeysFetching}
-                items={visibleAPIKeyOptions}
-                loadingLabel={t('common.loading')}
-                selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
-                selectedLabel={selectedAPIKeyLabel}
-                placeholder={t('usage.search_api_key', '搜索 API Key')}
                 emptyPrompt={t('usage.search_api_key', '搜索 API Key')}
+                loadingLabel={t('common.loading')}
                 noDataLabel={t('common.no_data')}
-                onSearchChange={handleAPIKeySearchChange}
+                placeholder={t('usage.search_api_key', '搜索 API Key')}
+                scope="admin"
+                selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
                 onSelectionChange={handleAPIKeySelectionChange}
               />
             </div>

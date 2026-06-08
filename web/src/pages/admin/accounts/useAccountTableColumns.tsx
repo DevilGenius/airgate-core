@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties, type MouseEvent } from 'react';
+import { memo, useMemo, type CSSProperties, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
@@ -6,7 +6,7 @@ import { getPluginAccountIdentity } from '../../../app/plugin-frontend-registry'
 import { accountsApi } from '../../../shared/api/accounts';
 import { queryKeys } from '../../../shared/queryKeys';
 import type { AccountResp } from '../../../shared/types';
-import { PlatformIcon, useToast } from '../../../shared/ui';
+import { useToast } from '../../../shared/ui';
 import {
   AccountCapacityChip,
   AccountRowActions,
@@ -25,8 +25,41 @@ type QuotaRefreshResult = Awaited<ReturnType<typeof accountsApi.refreshQuota>>;
 
 const ACCOUNT_GROUP_CARD_STYLE: CSSProperties = {
   background: 'var(--ag-bg-surface)',
-  border: '1px solid var(--ag-glass-border)',
+  boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--ag-primary) 28%, transparent)',
   color: 'var(--ag-text-secondary)',
+};
+
+const ACCOUNT_USAGE_BADGE_STYLE: CSSProperties = {
+  background: 'var(--ag-bg-surface)',
+  border: '1px solid var(--ag-glass-border)',
+};
+
+const ACCOUNT_USAGE_CELL_STYLE: CSSProperties = {
+  fontFamily: 'var(--ag-font-mono)',
+};
+
+const ACCOUNT_USAGE_EMPTY_TEXT_STYLE: CSSProperties = {
+  color: 'var(--ag-text-tertiary)',
+};
+
+const ACCOUNT_USAGE_REFRESH_ICON_STYLE: CSSProperties = {
+  color: 'var(--ag-text-tertiary)',
+};
+
+type UsageMetricTone = 'info' | 'primary' | 'success' | 'warning';
+
+type AccountUsageMetricLabels = {
+  accountCostShort: string;
+  imageCountInlineLabel: string;
+  imageCountTooltip: string;
+  refreshUsage: string;
+  refreshUsageFailed: string;
+  refreshUsageSuccess: string;
+  todayAccessCount: string;
+  todayStatsTooltip: string;
+  userCostShort: string;
+  windowAccountCost: string;
+  windowUserCost: string;
 };
 
 type PreparedUsageWindowRow = {
@@ -50,7 +83,10 @@ type PreparedUsageView = {
   hideAccessLabel: boolean;
   missing: boolean;
   showImageCount: boolean;
+  todayAccountCostText: string;
   todayStats: AccountUsageTodayStats | null;
+  todayTokensText: string;
+  todayUserCostText: string;
   windowRows: PreparedUsageWindowRow[];
   windowsClassName: string;
 };
@@ -65,6 +101,120 @@ type AccountRowRenderMeta = {
 };
 
 type UsageWindowRow = { id: string; window: AccountUsageWindow };
+
+const AccountUsageMetricChip = memo(function AccountUsageMetricChip({
+  currency,
+  label,
+  labelSecondary,
+  mutedLabel,
+  solo,
+  title,
+  tone,
+  value,
+  valueSecondary,
+}: {
+  currency?: boolean;
+  label: string;
+  labelSecondary?: string;
+  mutedLabel?: boolean;
+  solo?: boolean;
+  title?: string;
+  tone: UsageMetricTone;
+  value: string;
+  valueSecondary?: string;
+}) {
+  const hasLabelSecondary = Boolean(labelSecondary);
+  const hasValueSecondary = valueSecondary !== undefined;
+  const labelClassName = mutedLabel
+    ? 'ag-account-usage-metric-label text-text-secondary'
+    : 'ag-account-usage-metric-label';
+  const valueClassName = solo
+    ? 'ag-account-usage-metric-value ag-account-usage-metric-value--solo'
+    : 'ag-account-usage-metric-value';
+
+  return (
+    <span className="ag-account-usage-metric" data-tone={tone} title={title}>
+      {solo ? null : (
+        <span className={labelClassName}>
+          <span className="ag-account-usage-metric-segment">{label}</span>
+          {hasLabelSecondary ? (
+            <>
+              <span aria-hidden="true" className="ag-account-usage-metric-separator">/</span>
+              <span className="ag-account-usage-metric-segment">{labelSecondary}</span>
+            </>
+          ) : null}
+        </span>
+      )}
+      <span className={valueClassName}>
+        {currency ? <span aria-hidden="true" className="ag-account-usage-metric-currency">$</span> : null}
+        <span className="ag-account-usage-metric-segment">{value}</span>
+        {hasValueSecondary ? (
+          <>
+            <span aria-hidden="true" className="ag-account-usage-metric-separator">/</span>
+            <span className="ag-account-usage-metric-segment">{valueSecondary}</span>
+          </>
+        ) : null}
+      </span>
+    </span>
+  );
+});
+
+const AccountUsageTodayMetricChips = memo(function AccountUsageTodayMetricChips({
+  accessImageText,
+  accessRequestsText,
+  accessText,
+  accountCostText,
+  hideAccessLabel,
+  labels,
+  showImageCount,
+  tokensText,
+  userCostText,
+}: {
+  accessImageText: string;
+  accessRequestsText: string;
+  accessText: string;
+  accountCostText: string;
+  hideAccessLabel: boolean;
+  labels: AccountUsageMetricLabels;
+  showImageCount: boolean;
+  tokensText: string;
+  userCostText: string;
+}) {
+  return (
+    <div className="ag-account-usage-metrics" title={labels.todayStatsTooltip}>
+      <AccountUsageMetricChip
+        label={labels.todayAccessCount}
+        labelSecondary={showImageCount ? labels.imageCountInlineLabel : undefined}
+        mutedLabel
+        solo={hideAccessLabel}
+        title={showImageCount ? labels.imageCountTooltip : undefined}
+        tone="info"
+        value={showImageCount ? accessRequestsText : accessText}
+        valueSecondary={showImageCount ? accessImageText : undefined}
+      />
+      <AccountUsageMetricChip
+        label="Token"
+        mutedLabel
+        tone="primary"
+        value={tokensText}
+      />
+      <AccountUsageMetricChip
+        currency
+        label={labels.userCostShort}
+        title={labels.windowUserCost}
+        tone="warning"
+        value={userCostText}
+      />
+      <AccountUsageMetricChip
+        currency
+        label={labels.accountCostShort}
+        title={labels.windowAccountCost}
+        tone="success"
+        value={accountCostText}
+      />
+    </div>
+  );
+});
 
 function toFiniteNumber(value: unknown) {
   const parsed = Number(value);
@@ -223,6 +373,9 @@ function prepareUsageView(row: AccountResp, usage: AccountUsageInfo | undefined,
   const accessRequestsText = formatCompact(todayStats?.requests ?? 0, false);
   const accessImageText = formatCompact(todayImageCount, false);
   const accessText = showImageCount ? `${accessRequestsText}/${accessImageText}` : accessRequestsText;
+  const todayTokensText = todayStats ? formatCompact(todayStats.tokens) : '0';
+  const todayUserCostText = todayStats ? todayStats.user_cost.toFixed(2) : '0.00';
+  const todayAccountCostText = todayStats ? todayStats.account_cost.toFixed(2) : '0.00';
   return {
     accessImageText,
     accessRequestsText,
@@ -234,7 +387,10 @@ function prepareUsageView(row: AccountResp, usage: AccountUsageInfo | undefined,
     hideAccessLabel: showImageCount && accessText.length > '100/100'.length,
     missing,
     showImageCount,
+    todayAccountCostText,
     todayStats,
+    todayTokensText,
+    todayUserCostText,
     windowRows,
     windowsClassName: windowRows.length > 2
       ? 'ag-account-usage-windows ag-account-usage-windows--expanded'
@@ -327,10 +483,27 @@ export function useAccountTableColumns({
     clearCooldowns: t('accounts.clear_family_cooldowns'),
     delete: t('common.delete'),
     edit: t('common.edit'),
+    editShort: t('common.edit'),
     more: t('common.more'),
     refreshQuota: t('accounts.refresh_quota'),
     stats: t('accounts.view_stats'),
+    statsShort: t('accounts.stats_short', '统计'),
     test: t('accounts.test_connection'),
+    testShort: t('common.test'),
+  }), [t]);
+
+  const accountUsageLabels = useMemo<AccountUsageMetricLabels>(() => ({
+    accountCostShort: t('accounts.account_cost_short', '成本'),
+    imageCountInlineLabel: t('accounts.image_count_inline_label', '图').trim(),
+    imageCountTooltip: t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）'),
+    refreshUsage: t('accounts.refresh_usage', '点击刷新用量'),
+    refreshUsageFailed: t('accounts.refresh_usage_failed', '用量刷新失败'),
+    refreshUsageSuccess: t('accounts.refresh_usage_success', '用量刷新成功'),
+    todayAccessCount: t('accounts.today_access_count', '访问'),
+    todayStatsTooltip: t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）'),
+    userCostShort: t('accounts.user_cost_short', '消费'),
+    windowAccountCost: t('accounts.window_account_cost', '账号成本（上游计费）'),
+    windowUserCost: t('accounts.window_user_cost', '用户消耗（平台计费）'),
   }), [t]);
 
   return useMemo<AccountTableColumn[]>(() => [
@@ -364,8 +537,7 @@ export function useAccountTableColumns({
         const PluginAccountIdentity = getPluginAccountIdentity(row.platform);
         return (
           <div className="flex w-full min-w-0 flex-col items-center gap-1 text-center">
-            <span className="inline-flex max-w-full min-w-0 items-center justify-center gap-1">
-              <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" />
+            <span className="inline-flex max-w-full min-w-0 items-center justify-center">
               <span className="min-w-0 truncate">{platformName(row.platform)}</span>
             </span>
             {PluginAccountIdentity ? (
@@ -404,7 +576,6 @@ export function useAccountTableColumns({
               <span
                 key={`${name}:${index}`}
                 className="ag-account-group-chip"
-                style={ACCOUNT_GROUP_CARD_STYLE}
               >
                 {name}
               </span>
@@ -478,7 +649,7 @@ export function useAccountTableColumns({
       render: (row: AccountResp) => {
         const prepared = rowMetaById.get(row.id)?.usage;
         if (!prepared) {
-          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+          return <span style={ACCOUNT_USAGE_EMPTY_TEXT_STYLE}>-</span>;
         }
 
         const handleRefreshClick = async (event: MouseEvent<HTMLElement>) => {
@@ -491,9 +662,9 @@ export function useAccountTableColumns({
             applyQuotaRefreshResult(row.id, result);
             queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
             queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
-            toast('success', t('accounts.refresh_usage_success', '用量刷新成功'));
+            toast('success', accountUsageLabels.refreshUsageSuccess);
           } catch (err) {
-            const message = err instanceof Error && err.message ? err.message : t('accounts.refresh_usage_failed', '用量刷新失败');
+            const message = err instanceof Error && err.message ? err.message : accountUsageLabels.refreshUsageFailed;
             toast('error', message);
           }
           target.style.opacity = '1';
@@ -508,11 +679,11 @@ export function useAccountTableColumns({
                   ? 'flex items-center gap-1 cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
                   : 'flex items-center gap-1 rounded px-1 py-0.5'
               }
-              title={prepared.canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
+              title={prepared.canRefresh ? accountUsageLabels.refreshUsage : undefined}
               onClick={prepared.canRefresh ? handleRefreshClick : undefined}
             >
-              <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
-              {prepared.canRefresh && <RefreshCw size={11} style={{ color: 'var(--ag-text-tertiary)' }} />}
+              <span style={ACCOUNT_USAGE_EMPTY_TEXT_STYLE}>-</span>
+              {prepared.canRefresh && <RefreshCw size={11} style={ACCOUNT_USAGE_REFRESH_ICON_STYLE} />}
             </div>
           );
         }
@@ -525,85 +696,16 @@ export function useAccountTableColumns({
                   ? 'flex items-center gap-1 cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
                   : 'flex items-center gap-1 rounded px-1 py-0.5'
               }
-              title={prepared.canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
+              title={prepared.canRefresh ? accountUsageLabels.refreshUsage : undefined}
               onClick={prepared.canRefresh ? handleRefreshClick : undefined}
             >
-              <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
-              {prepared.canRefresh && <RefreshCw size={11} style={{ color: 'var(--ag-text-tertiary)' }} />}
+              <span style={ACCOUNT_USAGE_EMPTY_TEXT_STYLE}>-</span>
+              {prepared.canRefresh && <RefreshCw size={11} style={ACCOUNT_USAGE_REFRESH_ICON_STYLE} />}
             </div>
           );
         }
 
-        const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)' };
-        const accessLabel = prepared.showImageCount
-          ? (
-            <span className="inline-flex min-w-0 items-center">
-              <span className="truncate">{t('accounts.today_access_count', '访问')}</span>
-              <span aria-hidden="true" className="px-px opacity-80">/</span>
-              <span>{t('accounts.image_count_inline_label', '图').trim()}</span>
-            </span>
-          )
-          : t('accounts.today_access_count', '访问');
-        const accessValue = prepared.showImageCount
-          ? (
-            <span className="inline-flex min-w-0 items-center justify-end">
-              <span>{prepared.accessRequestsText}</span>
-              <span aria-hidden="true" className="px-px opacity-80">/</span>
-              <span>{prepared.accessImageText}</span>
-            </span>
-          )
-          : prepared.accessText;
-        const todayMetricClass = 'ag-account-usage-metric';
-        const todayMetricStyle = (color: string, foreground = color) => ({
-          background: `color-mix(in srgb, ${color} 10%, transparent)`,
-          borderColor: `color-mix(in srgb, ${color} 22%, var(--ag-border))`,
-          color: foreground,
-        });
-        const todayMetricColumnClass = 'ag-account-usage-metrics';
-        const todayStats = prepared.todayStats;
-        const todayMetricChips = prepared.hasTodayStats && todayStats ? (
-          <div
-            className={todayMetricColumnClass}
-            title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
-          >
-            <span
-              className={todayMetricClass}
-              style={todayMetricStyle('var(--ag-info)')}
-              title={prepared.showImageCount ? t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）') : undefined}
-            >
-              {prepared.hideAccessLabel ? null : (
-                <span className="ag-account-usage-metric-label text-text-secondary">{accessLabel}</span>
-              )}
-              <span className={`ag-account-usage-metric-value ${prepared.hideAccessLabel ? 'ag-account-usage-metric-value--solo' : ''}`}>{accessValue}</span>
-            </span>
-            <span className={todayMetricClass} style={todayMetricStyle('var(--ag-primary)')}>
-              <span className="ag-account-usage-metric-label text-text-secondary">Token</span>
-              <span className="ag-account-usage-metric-value">{formatCompact(todayStats.tokens)}</span>
-            </span>
-            <span
-              className={todayMetricClass}
-              style={todayMetricStyle('var(--ag-warning)', 'var(--ag-text)')}
-              title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
-            >
-              <span className="ag-account-usage-metric-label">{t('accounts.user_cost_short', '消费')}</span>
-              <span className="ag-account-usage-metric-value">
-                <span style={{ color: 'var(--ag-warning)' }}>$</span>
-                <span>{todayStats.user_cost.toFixed(2)}</span>
-              </span>
-            </span>
-            <span
-              className={todayMetricClass}
-              style={todayMetricStyle('var(--ag-success)', 'var(--ag-text)')}
-              title={t('accounts.window_account_cost', '账号成本（上游计费）')}
-            >
-              <span className="ag-account-usage-metric-label">{t('accounts.account_cost_short', '成本')}</span>
-              <span className="ag-account-usage-metric-value">
-                <span style={{ color: 'var(--ag-success)' }}>$</span>
-                <span>{todayStats.account_cost.toFixed(2)}</span>
-              </span>
-            </span>
-          </div>
-        ) : null;
+        const hasTodayMetricChips = prepared.hasTodayStats;
 
         return (
           <div
@@ -612,15 +714,15 @@ export function useAccountTableColumns({
                 ? 'ag-account-usage-cell ag-account-usage-cell--refreshable'
                 : 'ag-account-usage-cell'
             }
-            style={{ fontFamily: 'var(--ag-font-mono)' }}
-            title={prepared.canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
+            style={ACCOUNT_USAGE_CELL_STYLE}
+            title={prepared.canRefresh ? accountUsageLabels.refreshUsage : undefined}
             onClick={prepared.canRefresh ? handleRefreshClick : undefined}
           >
-            <div className={todayMetricChips ? 'ag-account-usage-layout' : 'ag-account-usage-layout ag-account-usage-layout--centered'}>
+            <div className={hasTodayMetricChips ? 'ag-account-usage-layout' : 'ag-account-usage-layout ag-account-usage-layout--centered'}>
               <div className={prepared.windowsClassName}>
                 {prepared.windowRows.map((item) => (
                   <div key={item.id} className="ag-account-usage-window-row">
-                    <span className="ag-account-usage-window-label text-text-secondary" style={badgeStyle} title={item.title}>
+                    <span className="ag-account-usage-window-label text-text-secondary" style={ACCOUNT_USAGE_BADGE_STYLE} title={item.title}>
                       {item.label}
                     </span>
                     <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
@@ -639,7 +741,7 @@ export function useAccountTableColumns({
                 ))}
                 {prepared.credits && (
                   <div className="flex h-5 items-center gap-1">
-                    <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
+                    <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={ACCOUNT_USAGE_BADGE_STYLE}>
                       $
                     </span>
                     <span style={{ color: prepared.credits.unlimited ? 'var(--ag-success)' : prepared.credits.balance > 0 ? 'var(--ag-text)' : 'var(--ag-danger)' }}>
@@ -648,10 +750,20 @@ export function useAccountTableColumns({
                   </div>
                 )}
               </div>
-              {todayMetricChips && (
+              {hasTodayMetricChips && (
                 <>
                   <span aria-hidden="true" />
-                  {todayMetricChips}
+                  <AccountUsageTodayMetricChips
+                    accessImageText={prepared.accessImageText}
+                    accessRequestsText={prepared.accessRequestsText}
+                    accessText={prepared.accessText}
+                    accountCostText={prepared.todayAccountCostText}
+                    hideAccessLabel={prepared.hideAccessLabel}
+                    labels={accountUsageLabels}
+                    showImageCount={prepared.showImageCount}
+                    tokensText={prepared.todayTokensText}
+                    userCostText={prepared.todayUserCostText}
+                  />
                 </>
               )}
             </div>
@@ -698,6 +810,7 @@ export function useAccountTableColumns({
     },
   ], [
     accountActionLabels,
+    accountUsageLabels,
     applyQuotaRefreshResult,
     onClearRateLimitMarkers,
     onDeleteAccount,

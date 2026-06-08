@@ -1,5 +1,4 @@
 import type { ClipboardEvent } from 'react';
-import { Chip } from '@heroui/react';
 
 type MetricChipColor = 'default' | 'warning' | 'success' | 'accent' | 'danger';
 
@@ -56,7 +55,7 @@ function MetricChip({ amount, color, copyText, decimals, dollarTone, highlightDo
   ].filter(Boolean).join(' ');
 
   return (
-    <Chip className={chipClassName} color={isMutedZero ? 'default' : color} size="sm" variant="soft">
+    <span className={chipClassName} data-tone={isMutedZero ? 'default' : color}>
       <span className="ag-metric-chip-content" data-metric-copy-text={copyText}>
         <span className="ag-metric-chip-label">{label}</span>
         <span className="ag-metric-chip-value">
@@ -70,7 +69,7 @@ function MetricChip({ amount, color, copyText, decimals, dollarTone, highlightDo
           )}
         </span>
       </span>
-    </Chip>
+    </span>
   );
 }
 

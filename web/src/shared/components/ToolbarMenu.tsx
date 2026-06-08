@@ -108,14 +108,23 @@ export const ToolbarMenuItem = memo(function ToolbarMenuItem({
   onSelect,
   role = 'menuitem',
 }: ToolbarMenuItemProps) {
+  const selectedOnPointerDownRef = useRef(false);
+
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+    selectedOnPointerDownRef.current = false;
     if (isDisabled || event.button !== 0) return;
+    if (event.pointerType && event.pointerType !== 'mouse') return;
     event.preventDefault();
+    selectedOnPointerDownRef.current = true;
     onSelect();
   }, [isDisabled, onSelect]);
 
-  const handleClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
-    if (isDisabled || event.detail !== 0) return;
+  const handleClick = useCallback(() => {
+    if (isDisabled) return;
+    if (selectedOnPointerDownRef.current) {
+      selectedOnPointerDownRef.current = false;
+      return;
+    }
     onSelect();
   }, [isDisabled, onSelect]);
 

@@ -111,23 +111,25 @@ type APIKeyBrief struct {
 }
 
 type APIKey struct {
-	ID              int
-	Name            string
-	KeyHint         string
-	KeyHash         string
-	UserID          int
-	GroupID         *int
-	IPWhitelist     []string
-	IPBlacklist     []string
-	QuotaUSD        float64
-	UsedQuota       float64
-	UsedQuotaActual float64
-	TodayCost       float64
-	ThirtyDayCost   float64
-	ExpiresAt       *time.Time
-	Status          string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID                  int
+	Name                string
+	KeyHint             string
+	KeyHash             string
+	UserID              int
+	GroupID             *int
+	IPWhitelist         []string
+	IPBlacklist         []string
+	QuotaUSD            float64
+	UsedQuota           float64
+	UsedQuotaActual     float64
+	TodayCost           float64 // 今日销售金额（sum(billed_cost)，含 sell_rate）
+	TodayActualCost     float64 // 今日消耗金额（sum(actual_cost)，不含 sell_rate）
+	ThirtyDayCost       float64 // 近 30 天销售金额（sum(billed_cost)，含 sell_rate）
+	ThirtyDayActualCost float64 // 近 30 天消耗金额（sum(actual_cost)，不含 sell_rate）
+	ExpiresAt           *time.Time
+	Status              string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 // APIKeyList API Key 分页结果。

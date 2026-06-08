@@ -7,7 +7,8 @@ import type {
   TdHTMLAttributes,
   ThHTMLAttributes,
 } from 'react';
-import { Children, isValidElement } from 'react';
+import { Children, isValidElement, useMemo } from 'react';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { MobileRecordList, type MobileRecordItem } from './MobileRecordList';
 
 type NativeTableProps = ComponentPropsWithoutRef<'table'>;
@@ -53,6 +54,7 @@ function CommonTableRoot({
   scrollClassName,
   scrollOverlay,
 }: CommonTableProps) {
+  const isMobileTableActive = useMediaQuery('(max-width: 767px)');
   const resolvedContentStyle = minWidth == null
     ? contentStyle
     : {
@@ -60,29 +62,38 @@ function CommonTableRoot({
         ...contentStyle,
       };
 
-  const mobileItems = mobileCards ? buildMobileItems(children) : [];
+  const shouldUseMobileCards = mobileCards && isMobileTableActive;
+  const mobileItems = useMemo(
+    () => (shouldUseMobileCards ? buildMobileItems(children) : []),
+    [children, shouldUseMobileCards],
+  );
+  const shouldRenderMobileList = shouldUseMobileCards && mobileItems.length > 0;
+  const shouldRenderDesktopTable = !shouldRenderMobileList;
+
   return (
     <div className={cx('ag-resource-table', className)}>
-      <div
-        className={cx(
-          'ag-resource-table-scroll',
-          mobileItems.length > 0 && 'ag-resource-table-desktop',
-          scrollClassName,
-        )}
-        data-slot="wrapper"
-      >
-        {scrollOverlay}
-        <table
-          {...contentProps}
-          aria-label={ariaLabel}
-          className={cx('ag-resource-table-content', contentClassName)}
-          data-slot="table"
-          style={resolvedContentStyle}
+      {shouldRenderDesktopTable ? (
+        <div
+          className={cx(
+            'ag-resource-table-scroll',
+            mobileItems.length > 0 && 'ag-resource-table-desktop',
+            scrollClassName,
+          )}
+          data-slot="wrapper"
         >
-          {children}
-        </table>
-      </div>
-      {mobileItems.length > 0 ? (
+          {scrollOverlay}
+          <table
+            {...contentProps}
+            aria-label={ariaLabel}
+            className={cx('ag-resource-table-content', contentClassName)}
+            data-slot="table"
+            style={resolvedContentStyle}
+          >
+            {children}
+          </table>
+        </div>
+      ) : null}
+      {shouldRenderMobileList ? (
         <div className="ag-resource-table-mobile">
           <MobileRecordList emptyTitle="暂无数据" items={mobileItems} />
         </div>

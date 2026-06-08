@@ -3,18 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   Plus,
-  Pencil,
-  ArrowUpDown,
-  Trash2,
   RefreshCw,
-  Percent,
-  Image,
-  Type,
-  MoreHorizontal,
 } from 'lucide-react';
-import { AlertDialog, Button, Chip, Dropdown, EmptyState, Spinner } from '@heroui/react';
+import { AlertDialog, Button, EmptyState, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
-import { PlatformIcon } from '../../shared/ui';
 import { groupsApi } from '../../shared/api/groups';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
@@ -26,11 +18,60 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { TablePage } from '../../shared/components/TablePage';
+import { TableRowMoreMenu } from '../../shared/components/TableRowMoreMenu';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { GroupFormModal } from './groups/EditGroupModal';
 import { GroupRateOverridesModal } from './groups/GroupRateOverridesModal';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
+
+type GroupRowActionTone = 'danger' | 'default' | 'primary';
+type GroupChipTone = 'accent' | 'default' | 'warning';
+
+function NativeGroupChip({
+  children,
+  tone,
+}: {
+  children: string;
+  tone: GroupChipTone;
+}) {
+  return (
+    <span className="ag-groups-soft-chip" data-tone={tone}>
+      <span className="ag-groups-soft-chip__label">{children}</span>
+    </span>
+  );
+}
+
+function GroupRowActionButton({
+  ariaLabel,
+  children,
+  onClick,
+  title,
+  tone = 'default',
+}: {
+  ariaLabel: string;
+  children: string;
+  onClick: () => void;
+  title?: string;
+  tone?: GroupRowActionTone;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      className="ag-table-row-native-action"
+      data-tone={tone}
+      title={title ?? ariaLabel}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      <span className="sr-only">{ariaLabel}</span>
+      <span aria-hidden="true" className="ag-table-row-native-action__label">{children}</span>
+    </button>
+  );
+}
 
 export default function GroupsPage() {
   const { t } = useTranslation();
@@ -95,7 +136,6 @@ export default function GroupsPage() {
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
   const selectedPlatformLabel = PLATFORM_OPTIONS.find((option) => option.value === platformFilter)?.label ?? t('groups.all_platforms');
-  const isImageGroup = (group: GroupResp) => group.plugin_settings?.openai?.image_enabled === 'true';
 
   return (
     <TablePage
@@ -195,27 +235,21 @@ export default function GroupsPage() {
                 rows.map((row) => (
                     <CommonTable.Row id={String(row.id)} key={row.id}>
                     <CommonTable.Cell>
-                      <span className="inline-flex max-w-[9.5rem] items-center gap-1.5">
-                        {isImageGroup(row) ? (
-                          <Image className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ag-primary)' }} />
-                        ) : (
-                          <Type className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ag-text-tertiary)' }} />
-                        )}
+                      <span className="inline-flex max-w-[9.5rem] items-center">
                         <span style={{ color: 'var(--ag-text)' }} className="truncate font-medium">
                           {row.name}
                         </span>
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="inline-flex max-w-[6.5rem] items-center gap-1.5">
-                        <PlatformIcon platform={row.platform} className="h-3.5 w-3.5 shrink-0" />
+                      <span className="inline-flex max-w-[6.5rem] items-center">
                         <span className="truncate">{platformName(row.platform)}</span>
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <Chip color={row.subscription_type === 'subscription' ? 'accent' : 'default'} size="sm" variant="soft">
+                      <NativeGroupChip tone={row.subscription_type === 'subscription' ? 'accent' : 'default'}>
                         {row.subscription_type === 'subscription' ? t('groups.type_subscription') : t('groups.type_standard')}
-                      </Chip>
+                      </NativeGroupChip>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <div className="min-w-0">
@@ -226,9 +260,9 @@ export default function GroupsPage() {
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       {row.is_exclusive ? (
-                        <Chip color="warning" size="sm" variant="soft">{t('groups.type_exclusive')}</Chip>
+                        <NativeGroupChip tone="warning">{t('groups.type_exclusive')}</NativeGroupChip>
                       ) : (
-                        <Chip color="default" size="sm" variant="soft">{t('groups.type_public')}</Chip>
+                        <NativeGroupChip tone="default">{t('groups.type_public')}</NativeGroupChip>
                       )}
                     </CommonTable.Cell>
                     <CommonTable.Cell className="ag-groups-metric-cell">
@@ -279,54 +313,39 @@ export default function GroupsPage() {
                       </div>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="inline-flex items-center gap-1 font-mono">
-                        <ArrowUpDown className="w-3 h-3" style={{ color: 'var(--ag-text-tertiary)' }} />
+                      <span className="inline-flex items-center font-mono">
                         {row.sort_weight}
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="secondary"
-                          aria-label={t('common.edit')}
-                          onPress={() => setEditingGroup(row)}
+                        <GroupRowActionButton
+                          ariaLabel={t('common.edit')}
+                          title={t('common.edit')}
+                          onClick={() => setEditingGroup(row)}
                         >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="secondary"
-                          aria-label={t('groups.rate_override_manage')}
-                          onPress={() => setRateOverrideGroup(row)}
+                          {t('common.edit_short', '编辑')}
+                        </GroupRowActionButton>
+                        <GroupRowActionButton
+                          ariaLabel={t('groups.rate_override_manage')}
+                          title={t('groups.rate_override_manage')}
+                          tone="primary"
+                          onClick={() => setRateOverrideGroup(row)}
                         >
-                          <Percent className="w-3.5 h-3.5" />
-                        </Button>
-                        <Dropdown>
-                          <Dropdown.Trigger
-                            aria-label={t('common.more')}
-                            className="ag-table-row-more-trigger button button--icon-only button--sm button--secondary"
-                          >
-                            <MoreHorizontal className="w-3.5 h-3.5" />
-                          </Dropdown.Trigger>
-                          <Dropdown.Popover placement="bottom end">
-                            <Dropdown.Menu
-                              aria-label={t('common.actions')}
-                              onAction={(key) => {
-                                if (String(key) === 'delete') setDeletingGroup(row);
-                              }}
-                            >
-                              <Dropdown.Item id="delete" className="text-danger" textValue={t('common.delete')}>
-                                <span className="flex items-center gap-2">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  {t('common.delete')}
-                                </span>
-                              </Dropdown.Item>
-                            </Dropdown.Menu>
-                          </Dropdown.Popover>
-                        </Dropdown>
+                          {t('groups.rate_override_short', '倍率')}
+                        </GroupRowActionButton>
+                        <TableRowMoreMenu
+                          ariaLabel={t('common.more')}
+                          menuLabel={t('common.actions')}
+                          items={[
+                            {
+                              key: 'delete',
+                              label: t('common.delete'),
+                              onSelect: () => setDeletingGroup(row),
+                              tone: 'danger',
+                            },
+                          ]}
+                        />
                       </div>
                     </CommonTable.Cell>
                     </CommonTable.Row>
