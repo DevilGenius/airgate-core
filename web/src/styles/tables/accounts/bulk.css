@@ -1,4 +1,4 @@
-/* Account bulk action header and selected count pulse. */
+/* Account bulk action header and selected count. */
 
 .ag-accounts-table .ag-bulk-selected-count {
   display: inline-flex;
@@ -9,86 +9,106 @@
   font-size: 1rem;
   font-weight: 800;
   line-height: 1;
-  transform-origin: center;
-}
-
-.ag-accounts-table .ag-bulk-selected-count[data-pulse="true"] {
-  animation: ag-bulk-selected-count-pop 160ms ease-out;
-}
-
-@keyframes ag-bulk-selected-count-pop {
-  0% {
-    transform: scale(1);
-  }
-
-  38% {
-    transform: scale(1.12);
-  }
-
-  100% {
-    transform: scale(1);
-  }
 }
 
 /* Bulk header overlay. */
 
 .ag-accounts-table :where(.ag-accounts-bulk-header-bar) {
-  left: var(--ag-accounts-selection-column-width) !important;
+  left: var(--ag-accounts-selection-column-width);
   width: max(
     calc(var(--ag-accounts-table-width) - var(--ag-accounts-selection-column-width)),
     calc(100% - var(--ag-accounts-selection-column-width))
-  ) !important;
-  max-width: none !important;
-  height: var(--ag-accounts-table-header-height) !important;
-  min-height: var(--ag-accounts-table-header-height) !important;
-  max-height: var(--ag-accounts-table-header-height) !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
+  );
+  max-width: none;
+  height: var(--ag-accounts-table-header-height);
+  min-height: var(--ag-accounts-table-header-height);
+  max-height: var(--ag-accounts-table-header-height);
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button {
-  box-sizing: border-box !important;
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
-  padding: 0 0.55rem !important;
-  font-size: 0.75rem !important;
-  line-height: 1 !important;
+.ag-accounts-table .ag-bulk-action-button {
+  display: inline-flex;
+  box-sizing: border-box;
+  height: 1.5rem;
+  min-height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, transparent);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0 0.55rem;
   transition:
     background-color 80ms ease,
     border-color 80ms ease,
-    color 80ms ease !important;
+    color 80ms ease;
+  white-space: nowrap;
 }
 
-.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button > :where(span, svg) {
-  line-height: 1 !important;
+.ag-accounts-table .ag-bulk-action-button > :where(span, svg) {
+  line-height: 1;
 }
 
-.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button > svg {
-  width: 0.875rem !important;
-  height: 0.875rem !important;
-  margin: 0 !important;
+.ag-accounts-table .ag-bulk-action-button > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  margin: 0;
 }
 
-.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button:hover,
-.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button[data-hovered="true"] {
-  border-color: color-mix(in oklab, var(--ag-primary) 38%, var(--border) 62%) !important;
-  background: color-mix(in oklab, var(--ag-primary) 12%, var(--background) 88%) !important;
-  color: var(--ag-primary) !important;
+.ag-accounts-table .ag-bulk-action-button:hover,
+.ag-accounts-table .ag-bulk-action-button:focus-visible {
+  border-color: color-mix(in oklab, var(--ag-primary) 38%, var(--border) 62%);
+  background: color-mix(in oklab, var(--ag-primary) 12%, var(--background) 88%);
+  color: var(--ag-primary);
+  outline: none;
 }
 
-.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button:active,
-.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.button[data-pressed="true"] {
+.ag-accounts-table .ag-bulk-action-button:active {
   transform: translateY(1px);
 }
 
-.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.text-danger:hover,
-.ag-accounts-table .ag-accounts-bulk-header-bar .ag-bulk-action-button.text-danger[data-hovered="true"] {
-  border-color: color-mix(in oklab, var(--ag-danger) 38%, var(--border) 62%) !important;
-  background: color-mix(in oklab, var(--ag-danger) 12%, var(--background) 88%) !important;
-  color: var(--ag-danger) !important;
+.ag-accounts-table .ag-bulk-action-button--danger {
+  color: var(--ag-danger);
+}
+
+.ag-accounts-table .ag-bulk-action-button--danger:hover,
+.ag-accounts-table .ag-bulk-action-button--danger:focus-visible {
+  border-color: color-mix(in oklab, var(--ag-danger) 38%, var(--border) 62%);
+  background: color-mix(in oklab, var(--ag-danger) 12%, var(--background) 88%);
+  color: var(--ag-danger);
 }
 
 .ag-accounts-table :where(.ag-accounts-bulk-header-bar .ag-bulk-selected-count) {
   font-size: 0.875rem;
 }
 
+.ag-accounts-table .ag-bulk-clear-button {
+  display: inline-flex;
+  min-height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ag-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0 0.5rem;
+  transition:
+    background-color 80ms ease,
+    color 80ms ease;
+}
+
+.ag-accounts-table .ag-bulk-clear-button:hover,
+.ag-accounts-table .ag-bulk-clear-button:focus-visible {
+  background: color-mix(in oklab, var(--ag-primary) 10%, transparent);
+  outline: none;
+}

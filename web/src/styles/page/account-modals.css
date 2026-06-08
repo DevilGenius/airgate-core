@@ -109,6 +109,101 @@
   min-width: 0;
 }
 
+.ag-account-group-select {
+  position: relative;
+  z-index: 1;
+}
+
+.ag-account-group-select[data-open="true"] {
+  z-index: 30;
+}
+
+.ag-account-group-select .select__trigger {
+  display: inline-flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font: inherit;
+  text-align: left;
+}
+
+.ag-account-group-select .select__trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.ag-account-group-select .select__trigger:disabled .select__indicator {
+  color: var(--muted);
+}
+
+.ag-account-group-select-popover {
+  box-sizing: border-box;
+  z-index: 220;
+  padding: 0.25rem;
+  overflow: hidden;
+}
+
+.ag-account-group-select-list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.125rem;
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.ag-account-group-select-option {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: calc(var(--field-radius) - 0.125rem);
+  background: transparent;
+  color: var(--overlay-foreground);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.5rem 0.625rem;
+  text-align: left;
+}
+
+.ag-account-group-select-check {
+  display: inline-flex;
+  width: 1rem;
+  min-width: 1rem;
+  height: 1rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--field-border);
+  border-radius: calc(var(--field-radius) - 0.25rem);
+  background: var(--field-background);
+  color: var(--background);
+  box-shadow: var(--field-shadow);
+}
+
+.ag-account-group-select-option[aria-selected="true"] .ag-account-group-select-check {
+  border-color: transparent;
+  background: var(--foreground);
+}
+
+.ag-account-group-select-option:hover,
+.ag-account-group-select-option:focus-visible {
+  background: color-mix(in oklab, var(--accent) 12%, var(--overlay) 88%);
+  color: var(--foreground);
+  outline: none;
+}
+
+.ag-account-group-select-option[aria-selected="true"] {
+  background: color-mix(in oklab, var(--foreground) 8%, var(--overlay) 92%);
+}
+
 /* Account test modal. */
 
 .ag-account-test-modal {

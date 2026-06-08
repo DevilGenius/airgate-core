@@ -1,4 +1,4 @@
-import { memo, useMemo, type CSSProperties, type MouseEvent } from 'react';
+import { memo, useMemo, useRef, type CSSProperties, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
@@ -8,11 +8,12 @@ import { queryKeys } from '../../../shared/queryKeys';
 import type { AccountResp } from '../../../shared/types';
 import { useToast } from '../../../shared/ui';
 import {
-  AccountCapacityChip,
+  AccountCapacityLiveChip,
   AccountRowActions,
   AccountSchedulingSwitch,
   AccountStatusCell,
   useUsageResetClock,
+  type AccountCapacityStore,
   type AccountTableColumn,
   type AccountUsageCredits,
   type AccountUsageData,
@@ -419,6 +420,7 @@ function prepareLastUsed(lastUsedAt: string | undefined, now: number, t: (key: s
 
 type UseAccountTableColumnsArgs = {
   applyQuotaRefreshResult: (id: number, result: QuotaRefreshResult) => void;
+  capacityStore: AccountCapacityStore;
   groupMap: Map<number, string>;
   onClearRateLimitMarkers: (id: number) => void;
   onDeleteAccount: (row: AccountResp) => void;
@@ -434,8 +436,76 @@ type UseAccountTableColumnsArgs = {
   usageData: AccountUsageData | undefined;
 };
 
+type UseAccountTableColumnsResult = {
+  columns: AccountTableColumn[];
+  rowMetaById: Map<number, AccountRowRenderMeta>;
+};
+
+function stringArraysEqual(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function usageTodayStatsEqual(left: AccountUsageTodayStats | null, right: AccountUsageTodayStats | null) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.requests === right.requests
+    && left.tokens === right.tokens
+    && left.account_cost === right.account_cost
+    && left.user_cost === right.user_cost;
+}
+
+function usageCreditsEqual(left: AccountUsageCredits | null, right: AccountUsageCredits | null) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.balance === right.balance && left.unlimited === right.unlimited;
+}
+
+function usageWindowRowsEqual(left: PreparedUsageWindowRow[], right: PreparedUsageWindowRow[]) {
+  return left.length === right.length && left.every((item, index) => {
+    const other = right[index];
+    if (!other) return false;
+    return item.barPercent === other.barPercent
+      && item.color === other.color
+      && item.id === other.id
+      && item.label === other.label
+      && item.percent === other.percent
+      && item.resetText === other.resetText
+      && item.title === other.title;
+  });
+}
+
+function usageViewsEqual(left: PreparedUsageView, right: PreparedUsageView) {
+  return left.accessImageText === right.accessImageText
+    && left.accessRequestsText === right.accessRequestsText
+    && left.accessText === right.accessText
+    && left.canRefresh === right.canRefresh
+    && usageCreditsEqual(left.credits, right.credits)
+    && left.hasContent === right.hasContent
+    && left.hasTodayStats === right.hasTodayStats
+    && left.hideAccessLabel === right.hideAccessLabel
+    && left.missing === right.missing
+    && left.showImageCount === right.showImageCount
+    && left.todayAccountCostText === right.todayAccountCostText
+    && usageTodayStatsEqual(left.todayStats, right.todayStats)
+    && left.todayTokensText === right.todayTokensText
+    && left.todayUserCostText === right.todayUserCostText
+    && left.windowsClassName === right.windowsClassName
+    && usageWindowRowsEqual(left.windowRows, right.windowRows);
+}
+
+function accountRowRenderMetaEqual(left: AccountRowRenderMeta | undefined, right: AccountRowRenderMeta) {
+  if (!left) return false;
+  return left.hiddenGroupCount === right.hiddenGroupCount
+    && left.lastUsedRelative === right.lastUsedRelative
+    && left.lastUsedTitle === right.lastUsedTitle
+    && stringArraysEqual(left.groupNames, right.groupNames)
+    && stringArraysEqual(left.visibleGroups, right.visibleGroups)
+    && usageViewsEqual(left.usage, right.usage);
+}
+
 export function useAccountTableColumns({
   applyQuotaRefreshResult,
+  capacityStore,
   groupMap,
   onClearRateLimitMarkers,
   onDeleteAccount,
@@ -449,15 +519,17 @@ export function useAccountTableColumns({
   platformsKey,
   rows,
   usageData,
-}: UseAccountTableColumnsArgs): AccountTableColumn[] {
+}: UseAccountTableColumnsArgs): UseAccountTableColumnsResult {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const resetNow = useUsageResetClock(Boolean(usageData?.accounts));
+  const rowMetaCacheRef = useRef<Map<number, AccountRowRenderMeta>>(new Map());
 
   const rowMetaById = useMemo(() => {
     const now = Date.now();
     const usageAccounts: Record<string, AccountUsageInfo> = usageData?.accounts ?? {};
+    const previousMetaById = rowMetaCacheRef.current;
     const nextMeta = new Map<number, AccountRowRenderMeta>();
 
     for (const row of rows) {
@@ -465,16 +537,23 @@ export function useAccountTableColumns({
       const visibleGroups = groupNames.length > 3 ? groupNames.slice(0, 2) : groupNames.slice(0, 3);
       const lastUsed = prepareLastUsed(row.last_used_at, now, t);
 
-      nextMeta.set(row.id, {
+      const rowMeta: AccountRowRenderMeta = {
         groupNames,
         hiddenGroupCount: Math.max(0, groupNames.length - visibleGroups.length),
         lastUsedRelative: lastUsed.relative,
         lastUsedTitle: lastUsed.title,
         usage: prepareUsageView(row, usageAccounts[String(row.id)], resetNow),
         visibleGroups,
-      });
+      };
+      const previousMeta = previousMetaById.get(row.id);
+      if (previousMeta && accountRowRenderMetaEqual(previousMeta, rowMeta)) {
+        nextMeta.set(row.id, previousMeta);
+      } else {
+        nextMeta.set(row.id, rowMeta);
+      }
     }
 
+    rowMetaCacheRef.current = nextMeta;
     return nextMeta;
   }, [groupMap, resetNow, rows, t, usageData?.accounts]);
 
@@ -506,7 +585,8 @@ export function useAccountTableColumns({
     windowUserCost: t('accounts.window_user_cost', '用户消耗（平台计费）'),
   }), [t]);
 
-  return useMemo<AccountTableColumn[]>(() => [
+  const columns = useMemo<AccountTableColumn[]>(() => {
+    const columns: AccountTableColumn[] = [
     {
       key: 'name',
       title: t('common.name'),
@@ -565,8 +645,8 @@ export function useAccountTableColumns({
       width: '92px',
       mobileWidth: '80px',
       align: 'center',
-      render: (row) => {
-        const meta = rowMetaById.get(row.id);
+      render: (_row, rowMeta) => {
+        const meta = rowMeta as AccountRowRenderMeta | undefined;
         if (!meta || meta.groupNames.length === 0) {
           return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
         }
@@ -601,7 +681,14 @@ export function useAccountTableColumns({
       render: (row) => {
         const current = row.current_concurrency || 0;
         const max = row.max_concurrency;
-        return <AccountCapacityChip current={current} max={max} />;
+        return (
+          <AccountCapacityLiveChip
+            current={current}
+            max={max}
+            rowId={row.id}
+            store={capacityStore}
+          />
+        );
       },
     },
     {
@@ -646,8 +733,8 @@ export function useAccountTableColumns({
       mobileWidth: '364px',
       maxWidth: '396px',
       align: 'center',
-      render: (row: AccountResp) => {
-        const prepared = rowMetaById.get(row.id)?.usage;
+      render: (row: AccountResp, rowMeta) => {
+        const prepared = (rowMeta as AccountRowRenderMeta | undefined)?.usage;
         if (!prepared) {
           return <span style={ACCOUNT_USAGE_EMPTY_TEXT_STYLE}>-</span>;
         }
@@ -777,8 +864,8 @@ export function useAccountTableColumns({
       width: '88px',
       mobileWidth: '88px',
       align: 'center',
-      render: (row) => {
-        const meta = rowMetaById.get(row.id);
+      render: (_row, rowMeta) => {
+        const meta = rowMeta as AccountRowRenderMeta | undefined;
         if (!meta?.lastUsedRelative) {
           return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
         }
@@ -808,10 +895,13 @@ export function useAccountTableColumns({
         />
       ),
     },
-  ], [
+    ];
+    return columns;
+  }, [
     accountActionLabels,
     accountUsageLabels,
     applyQuotaRefreshResult,
+    capacityStore,
     onClearRateLimitMarkers,
     onDeleteAccount,
     onEditAccount,
@@ -823,8 +913,9 @@ export function useAccountTableColumns({
     platformName,
     platformsKey,
     queryClient,
-    rowMetaById,
     t,
     toast,
   ]);
+
+  return useMemo(() => ({ columns, rowMetaById }), [columns, rowMetaById]);
 }

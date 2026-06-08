@@ -37,12 +37,20 @@ import {
 export function BulkEditAccountModal({
   open,
   count,
+  initialGroupIds,
+  initialMaxConcurrency,
+  initialPriority,
+  initialRateMultiplier,
   onClose,
   onSubmit,
   loading,
 }: {
   open: boolean;
   count: number;
+  initialGroupIds?: number[];
+  initialMaxConcurrency?: number;
+  initialPriority?: number;
+  initialRateMultiplier?: number;
   onClose: () => void;
   onSubmit: (data: Omit<BulkUpdateAccountsReq, 'account_ids'>) => void;
   loading: boolean;
@@ -60,11 +68,11 @@ export function BulkEditAccountModal({
 
   // 字段值
   const [status, setStatus] = useState<'active' | 'disabled'>('active');
-  const [priority, setPriority] = useState(DEFAULT_ACCOUNT_PRIORITY);
-  const [priorityInput, setPriorityInput] = useState(String(DEFAULT_ACCOUNT_PRIORITY));
-  const [maxConcurrency, setMaxConcurrency] = useState(DEFAULT_ACCOUNT_MAX_CONCURRENCY);
-  const [rateMultiplier, setRateMultiplier] = useState(1);
-  const [groupIds, setGroupIds] = useState<number[]>([]);
+  const [priority, setPriority] = useState(() => initialPriority ?? DEFAULT_ACCOUNT_PRIORITY);
+  const [priorityInput, setPriorityInput] = useState(() => String(initialPriority ?? DEFAULT_ACCOUNT_PRIORITY));
+  const [maxConcurrency, setMaxConcurrency] = useState(() => initialMaxConcurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY);
+  const [rateMultiplier, setRateMultiplier] = useState(() => initialRateMultiplier ?? 1);
+  const [groupIds, setGroupIds] = useState<number[]>(() => [...(initialGroupIds ?? [])]);
   const [proxyId, setProxyId] = useState<number | null>(null);
   const [messageLockEnabled, setMessageLockEnabled] = useState(false);
 
@@ -243,14 +251,13 @@ export function BulkEditAccountModal({
           onToggle={setEnableGroups}
           label={t('accounts.groups')}
         >
-          {enableGroups && (
-            <GroupCheckboxList
-              groups={groupsData?.list ?? []}
-              showLabel={false}
-              selectedIds={groupIds}
-              onChange={setGroupIds}
-            />
-          )}
+          <GroupCheckboxList
+            groups={groupsData?.list ?? []}
+            isDisabled={!enableGroups}
+            showLabel={false}
+            selectedIds={groupIds}
+            onChange={setGroupIds}
+          />
         </FieldRow>
 
         {/* 代理 */}

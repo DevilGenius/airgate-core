@@ -53,6 +53,7 @@ import type {
 
 import {
   ACCOUNT_SELECTION_COLUMN_STYLE,
+  AccountCapacityStore,
   AccountSelectionStore,
   AccountTableRow,
   AccountsTableLoadingRow,
@@ -112,16 +113,129 @@ function useAccountModalRootIsolation(isActive: boolean) {
   }, [isActive]);
 }
 
-function sameCapacitySnapshot(left: Record<string, number> | undefined, right: Record<string, number>) {
-  if (!left) return false;
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-  if (leftKeys.length !== rightKeys.length) return false;
-  return rightKeys.every((key) => left[key] === right[key]);
+type BulkEditInitialValues = {
+  groupIds: number[];
+  maxConcurrency?: number;
+  priority?: number;
+  rateMultiplier?: number;
+};
+
+type BulkEditSelection = {
+  ids: number[];
+  initialValues: BulkEditInitialValues;
+};
+
+function getBulkEditInitialValues(rows: AccountResp[], selectedIds: number[]): BulkEditInitialValues {
+  if (selectedIds.length === 0) {
+    return { groupIds: [] };
+  }
+
+  const selectedIdSet = new Set(selectedIds);
+  const selectedRows = rows.filter((row) => selectedIdSet.has(row.id));
+  const firstSelectedRow = selectedRows[0];
+  if (!firstSelectedRow || selectedRows.length !== selectedIds.length) {
+    return { groupIds: [] };
+  }
+
+  const commonGroupIds = new Set(firstSelectedRow.group_ids);
+  for (const row of selectedRows.slice(1)) {
+    const rowGroupIds = new Set(row.group_ids);
+    for (const groupId of Array.from(commonGroupIds)) {
+      if (!rowGroupIds.has(groupId)) {
+        commonGroupIds.delete(groupId);
+      }
+    }
+  }
+
+  const getCommonNumber = (selectValue: (account: AccountResp) => number) => {
+    const firstValue = selectValue(firstSelectedRow);
+    return selectedRows.every((row) => selectValue(row) === firstValue) ? firstValue : undefined;
+  };
+
+  return {
+    groupIds: firstSelectedRow.group_ids.filter((groupId) => commonGroupIds.has(groupId)),
+    maxConcurrency: getCommonNumber((account) => account.max_concurrency),
+    priority: getCommonNumber((account) => account.priority),
+    rateMultiplier: getCommonNumber((account) => account.rate_multiplier),
+  };
 }
 
+const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
+  onBulkClearRateLimitMarkers,
+  onBulkDelete,
+  onBulkDisable,
+  onBulkEdit,
+  onBulkEnable,
+  onBulkRefresh,
+  onClearSelection,
+  selectionStore,
+}: {
+  onBulkClearRateLimitMarkers: () => void;
+  onBulkDelete: () => void;
+  onBulkDisable: () => void;
+  onBulkEdit: () => void;
+  onBulkEnable: () => void;
+  onBulkRefresh: () => void;
+  onClearSelection: () => void;
+  selectionStore: AccountSelectionStore;
+}) {
+  const selectedCount = useSyncExternalStore(
+    selectionStore.subscribe,
+    selectionStore.getSelectedCount,
+    selectionStore.getSelectedCount,
+  );
+
+  if (selectedCount === 0) return null;
+
+  return (
+    <div onClick={(event) => event.stopPropagation()}>
+      <BulkActionsBar
+        overlay
+        selectedCount={selectedCount}
+        onClear={onClearSelection}
+        onEdit={onBulkEdit}
+        onEnable={onBulkEnable}
+        onDisable={onBulkDisable}
+        onRefreshQuota={onBulkRefresh}
+        onClearRateLimitMarkers={onBulkClearRateLimitMarkers}
+        onDelete={onBulkDelete}
+      />
+    </div>
+  );
+});
+
+const AccountsSelectAllHeaderCell = memo(function AccountsSelectAllHeaderCell({
+  onVisibleRowsSelected,
+  selectAllAriaLabel,
+  selectionStore,
+  visibleRowIds,
+}: {
+  onVisibleRowsSelected: (isSelected: boolean) => void;
+  selectAllAriaLabel: string;
+  selectionStore: AccountSelectionStore;
+  visibleRowIds: number[];
+}) {
+  const selectedVisibleCount = useSyncExternalStore(
+    useCallback((listener) => selectionStore.subscribe(listener), [selectionStore]),
+    useCallback(() => selectionStore.countVisible(visibleRowIds), [selectionStore, visibleRowIds]),
+    () => 0,
+  );
+  const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
+  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+
+  return (
+    <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
+      <TableSelectionCheckbox
+        ariaLabel={selectAllAriaLabel}
+        isIndeterminate={someVisibleSelected}
+        isSelected={allVisibleSelected}
+        onChange={onVisibleRowsSelected}
+      />
+    </div>
+  );
+});
+
 const AccountsTableSection = memo(function AccountsTableSection({
-  allVisibleSelected,
   columns,
   expandedUsageRowIds,
   isLoading,
@@ -135,15 +249,14 @@ const AccountsTableSection = memo(function AccountsTableSection({
   onRowSelected,
   onVisibleRowsSelected,
   rows,
+  rowMetaById,
   selectAllAriaLabel,
-  selectedCount,
   selectionStore,
   selectRowAriaLabel,
-  someVisibleSelected,
   tableAriaLabel,
   tableEmptyText,
+  visibleRowIds,
 }: {
-  allVisibleSelected: boolean;
   columns: AccountTableColumn[];
   expandedUsageRowIds: ReadonlySet<number>;
   isLoading: boolean;
@@ -157,32 +270,27 @@ const AccountsTableSection = memo(function AccountsTableSection({
   onRowSelected: (id: number, isSelected: boolean) => void;
   onVisibleRowsSelected: (isSelected: boolean) => void;
   rows: AccountResp[];
+  rowMetaById: ReadonlyMap<number, unknown>;
   selectAllAriaLabel: string;
-  selectedCount: number;
   selectionStore: AccountSelectionStore;
   selectRowAriaLabel: string;
-  someVisibleSelected: boolean;
   tableAriaLabel: string;
   tableEmptyText: string;
+  visibleRowIds: number[];
 }) {
   return (
     <div className="ag-resource-table ag-accounts-table">
       <div className="ag-resource-table-scroll" data-slot="wrapper">
-        {selectedCount > 0 ? (
-          <div onClick={(event) => event.stopPropagation()}>
-            <BulkActionsBar
-              overlay
-              selectedCount={selectedCount}
-              onClear={onClearSelection}
-              onEdit={onBulkEdit}
-              onEnable={onBulkEnable}
-              onDisable={onBulkDisable}
-              onRefreshQuota={onBulkRefresh}
-              onClearRateLimitMarkers={onBulkClearRateLimitMarkers}
-              onDelete={onBulkDelete}
-            />
-          </div>
-        ) : null}
+        <AccountsBulkActionsOverlay
+          selectionStore={selectionStore}
+          onClearSelection={onClearSelection}
+          onBulkEdit={onBulkEdit}
+          onBulkEnable={onBulkEnable}
+          onBulkDisable={onBulkDisable}
+          onBulkRefresh={onBulkRefresh}
+          onBulkClearRateLimitMarkers={onBulkClearRateLimitMarkers}
+          onBulkDelete={onBulkDelete}
+        />
         <table
           aria-label={tableAriaLabel}
           className="ag-resource-table-content ag-accounts-table-content"
@@ -192,14 +300,12 @@ const AccountsTableSection = memo(function AccountsTableSection({
           <thead data-slot="thead">
             <tr data-slot="tr">
               <th data-slot="th" scope="col" className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
-                <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
-                  <TableSelectionCheckbox
-                    ariaLabel={selectAllAriaLabel}
-                    isIndeterminate={someVisibleSelected}
-                    isSelected={allVisibleSelected}
-                    onChange={onVisibleRowsSelected}
-                  />
-                </div>
+                <AccountsSelectAllHeaderCell
+                  selectAllAriaLabel={selectAllAriaLabel}
+                  selectionStore={selectionStore}
+                  visibleRowIds={visibleRowIds}
+                  onVisibleRowsSelected={onVisibleRowsSelected}
+                />
               </th>
               {columns.map((column) => (
                 <th
@@ -233,6 +339,7 @@ const AccountsTableSection = memo(function AccountsTableSection({
                   columns={columns}
                   isUsageExpanded={expandedUsageRowIds.has(row.id)}
                   row={row}
+                  rowMeta={rowMetaById.get(row.id)}
                   selectRowAriaLabel={selectRowAriaLabel}
                   selectionStore={selectionStore}
                   onSelectedChange={onRowSelected}
@@ -346,30 +453,28 @@ export default function AccountsPageContent() {
     selectionStoreRef.current = new AccountSelectionStore();
   }
   const selectionStore = selectionStoreRef.current;
-  const selectionVersion = useSyncExternalStore(
-    selectionStore.subscribe,
-    selectionStore.getSnapshot,
-    selectionStore.getSnapshot,
-  );
-  const selectedIds = useMemo(() => selectionStore.getSelectedIds(), [selectionStore, selectionVersion]);
-  const selectedCount = selectedIds.length;
+  const capacityStoreRef = useRef<AccountCapacityStore | null>(null);
+  if (capacityStoreRef.current === null) {
+    capacityStoreRef.current = new AccountCapacityStore();
+  }
+  const capacityStore = capacityStoreRef.current;
   const [pendingToggleIds, setPendingToggleIds] = useState<Set<number>>(() => new Set());
   const pendingToggleIdsRef = useRef(pendingToggleIds);
   pendingToggleIdsRef.current = pendingToggleIds;
-  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
-  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [bulkEditSelection, setBulkEditSelection] = useState<BulkEditSelection | null>(null);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
   const isAnyAccountModalOpen = showCreateModal
     || editingAccount !== null
     || deletingAccount !== null
-    || showBulkEditModal
-    || showBulkDeleteConfirm
+    || bulkEditSelection !== null
+    || bulkDeleteIds !== null
     || bulkRefreshTargets !== null
     || testingAccount !== null
     || statsAccountId !== null;
   useAccountModalRootIsolation(isAnyAccountModalOpen);
   const clearSelection = useCallback(() => {
-    runAfterInputFrame(() => selectionStore.clear());
+    selectionStore.clear();
   }, [selectionStore]);
 
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
@@ -417,12 +522,9 @@ export default function AccountsPageContent() {
     visibleAccountIdsRef.current = visibleAccountIds;
   }, [visibleAccountIds, visibleAccountIdsKey]);
 
-  const [capacityAccounts, setCapacityAccounts] = useState<Record<string, number> | undefined>();
   const applyCapacityData = useCallback((nextData: { accounts: Record<string, number> }) => {
-    setCapacityAccounts((prev) => (
-      sameCapacitySnapshot(prev, nextData.accounts) ? prev : { ...nextData.accounts }
-    ));
-  }, []);
+    capacityStore.setCounts(nextData.accounts);
+  }, [capacityStore]);
   const refreshVisibleCapacity = useCallback(async () => {
     const ids = visibleAccountIdsRef.current;
     if (ids.length === 0) return;
@@ -443,21 +545,6 @@ export default function AccountsPageContent() {
     }, ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS * 1000);
     return () => window.clearInterval(intervalId);
   }, [capacityAutoRefresh, refreshVisibleCapacity, visibleAccountIds.length, visibleAccountIdsKey]);
-  const rowsWithCapacity = useMemo(() => {
-    const counts = capacityAccounts;
-    if (!counts) return rows;
-    return rows.map((row) => {
-      const nextCount = counts[String(row.id)];
-      if (typeof nextCount !== 'number' || nextCount === row.current_concurrency) {
-        return row;
-      }
-      return {
-        ...row,
-        current_concurrency: nextCount,
-      };
-    });
-  }, [capacityAccounts, rows]);
-
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -543,8 +630,9 @@ export default function AccountsPageContent() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const exportMutation = useMutation({
     mutationFn: () => {
-      if (selectedIds.length > 0) {
-        return accountsApi.export({ ids: selectedIds });
+      const selectedAccountIds = selectionStore.getSelectedIds();
+      if (selectedAccountIds.length > 0) {
+        return accountsApi.export({ ids: selectedAccountIds });
       }
       return accountsApi.export({
         keyword: debouncedKeyword || undefined,
@@ -762,7 +850,7 @@ export default function AccountsPageContent() {
     mutationFn: (data: BulkUpdateAccountsReq) => accountsApi.bulkUpdate(data),
     onSuccess: (res) => {
       handleBulkResult(res, 'accounts.bulk_update_success');
-      setShowBulkEditModal(false);
+      setBulkEditSelection(null);
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -772,7 +860,7 @@ export default function AccountsPageContent() {
     mutationFn: (ids: number[]) => accountsApi.bulkDelete(ids),
     onSuccess: (res) => {
       handleBulkResult(res, 'accounts.bulk_delete_success');
-      setShowBulkDeleteConfirm(false);
+      setBulkDeleteIds(null);
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -790,27 +878,42 @@ export default function AccountsPageContent() {
   const bulkDeleteMutateRef = useLatestRef(bulkDeleteMutation.mutate);
   const bulkClearRateLimitMarkersMutateRef = useLatestRef(bulkClearRateLimitMarkersMutation.mutate);
   const handleBulkEnable = useCallback(() => {
-    bulkUpdateMutateRef.current({ account_ids: selectedIds, state: 'active' });
-  }, [bulkUpdateMutateRef, selectedIds]);
+    const selectedAccountIds = selectionStore.getSelectedIds();
+    if (selectedAccountIds.length === 0) return;
+    bulkUpdateMutateRef.current({ account_ids: selectedAccountIds, state: 'active' });
+  }, [bulkUpdateMutateRef, selectionStore]);
   const handleBulkDisable = useCallback(() => {
-    bulkUpdateMutateRef.current({ account_ids: selectedIds, state: 'disabled' });
-  }, [bulkUpdateMutateRef, selectedIds]);
+    const selectedAccountIds = selectionStore.getSelectedIds();
+    if (selectedAccountIds.length === 0) return;
+    bulkUpdateMutateRef.current({ account_ids: selectedAccountIds, state: 'disabled' });
+  }, [bulkUpdateMutateRef, selectionStore]);
   const handleBulkEdit = useCallback(() => {
-    setShowBulkEditModal(true);
-  }, []);
+    const selectedAccountIds = selectionStore.getSelectedIds();
+    if (selectedAccountIds.length === 0) return;
+    setBulkEditSelection({
+      ids: selectedAccountIds,
+      initialValues: getBulkEditInitialValues(rows, selectedAccountIds),
+    });
+  }, [rows, selectionStore]);
   const handleBulkDelete = useCallback(() => {
-    setShowBulkDeleteConfirm(true);
-  }, []);
+    const selectedAccountIds = selectionStore.getSelectedIds();
+    if (selectedAccountIds.length === 0) return;
+    setBulkDeleteIds(selectedAccountIds);
+  }, [selectionStore]);
   const handleBulkDeleteConfirm = useCallback(() => {
-    bulkDeleteMutateRef.current(selectedIds);
-  }, [bulkDeleteMutateRef, selectedIds]);
+    if (!bulkDeleteIds?.length) return;
+    bulkDeleteMutateRef.current(bulkDeleteIds);
+  }, [bulkDeleteIds, bulkDeleteMutateRef]);
   const handleBulkClearRateLimitMarkers = useCallback(() => {
-    bulkClearRateLimitMarkersMutateRef.current(selectedIds);
-  }, [bulkClearRateLimitMarkersMutateRef, selectedIds]);
+    const selectedAccountIds = selectionStore.getSelectedIds();
+    if (selectedAccountIds.length === 0) return;
+    bulkClearRateLimitMarkersMutateRef.current(selectedAccountIds);
+  }, [bulkClearRateLimitMarkersMutateRef, selectionStore]);
 
   // 批量刷新令牌：只有 OAuth 类型账号支持，预先过滤后开进度弹窗
   const handleBulkRefresh = useCallback(() => {
-    const selectedIdSet = new Set(selectedIds);
+    const selectedAccountIds = selectionStore.getSelectedIds();
+    const selectedIdSet = new Set(selectedAccountIds);
     const selectedRows = (data?.list ?? []).filter((a) => selectedIdSet.has(a.id));
     const oauthRows = selectedRows
       .filter((a) => a.type === 'oauth')
@@ -819,17 +922,18 @@ export default function AccountsPageContent() {
       toast('warning', t('accounts.bulk_refresh_no_oauth'));
       return;
     }
-    if (oauthRows.length < selectedIds.length) {
+    if (oauthRows.length < selectedAccountIds.length) {
       toast('info', t('accounts.bulk_refresh_filtered', {
         count: oauthRows.length,
-        skipped: selectedIds.length - oauthRows.length,
+        skipped: selectedAccountIds.length - oauthRows.length,
       }));
     }
     setBulkRefreshTargets(oauthRows);
-  }, [data?.list, selectedIds, t, toast]);
+  }, [data?.list, selectionStore, t, toast]);
 
-  const columns = useAccountTableColumns({
+  const { columns, rowMetaById } = useAccountTableColumns({
     applyQuotaRefreshResult,
+    capacityStore,
     groupMap,
     onClearRateLimitMarkers: handleClearRateLimitMarkers,
     onDeleteAccount: handleDeleteAccount,
@@ -846,20 +950,14 @@ export default function AccountsPageContent() {
   });
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
-  const visibleRowIds = useMemo(() => rowsWithCapacity.map((row) => row.id), [rowsWithCapacity]);
-  const selectedVisibleCount = useMemo(
-    () => selectionStore.countVisible(visibleRowIds),
-    [selectionStore, selectionVersion, visibleRowIds],
-  );
-  const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
-  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+  const visibleRowIds = visibleAccountIds;
   const selectAllAriaLabel = t('common.select_all', 'Select all');
   const selectRowAriaLabel = t('common.select', 'Select');
   const setVisibleRowsSelected = useCallback((isSelected: boolean) => {
-    runAfterInputFrame(() => selectionStore.setRows(visibleRowIds, isSelected));
+    selectionStore.setRows(visibleRowIds, isSelected);
   }, [selectionStore, visibleRowIds]);
   const setRowSelected = useCallback((id: number, isSelected: boolean) => {
-    runAfterInputFrame(() => selectionStore.setRow(id, isSelected));
+    selectionStore.setRow(id, isSelected);
   }, [selectionStore]);
   const typeOptions = useMemo<AccountTypeFilterOption[]>(() => [
     { id: '', label: t('accounts.all_types', '全部类型') },
@@ -948,53 +1046,53 @@ export default function AccountsPageContent() {
     <TablePage
       className="ag-accounts-page"
       toolbar={(
-          <div className="ag-page-toolbar-filter-row">
-            <div className="w-full sm:w-48">
-              <HeroTextField fullWidth aria-label={t('accounts.search_placeholder', '搜索账号名称...')}>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-                  <Input
-                    className="pl-9"
-                    value={keyword}
-                    onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-                    placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
-                  />
-                </div>
-              </HeroTextField>
-            </div>
-
-            {toolbarFilters.map((filter) => (
-              <div
-                key={filter.key}
-                className={filter.widthClass}
-              >
-                {filter.key === 'type' ? (
-                  <AccountTypeFilterSelect
-                    oauthPlanOptions={oauthPlanOptions}
-                    platformsLoading={platformsLoading}
-                    selectedOption={selectedTypeOption}
-                    typeOptions={typeOptions}
-                    onSelect={(nextValue) => {
-                      setTypeFilter(nextValue);
-                      setPage(1);
-                    }}
-                  />
-                ) : (
-                  <SimpleSelect
-                    ariaLabel={filter.label}
-                    fullWidth
-                    items={filter.options.map((item) => ({ key: item.id, label: item.label }))}
-                    selectedKey={filter.value}
-                    selectedLabel={filter.selectedLabel}
-                    onSelectionChange={(key) => {
-                      filter.setValue(key);
-                      setPage(1);
-                    }}
-                  />
-                )}
+        <div className="ag-page-toolbar-filter-row">
+          <div className="w-full sm:w-48">
+            <HeroTextField fullWidth aria-label={t('accounts.search_placeholder', '搜索账号名称...')}>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                <Input
+                  className="pl-9"
+                  value={keyword}
+                  onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                  placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
+                />
               </div>
-            ))}
+            </HeroTextField>
           </div>
+
+          {toolbarFilters.map((filter) => (
+            <div
+              key={filter.key}
+              className={filter.widthClass}
+            >
+              {filter.key === 'type' ? (
+                <AccountTypeFilterSelect
+                  oauthPlanOptions={oauthPlanOptions}
+                  platformsLoading={platformsLoading}
+                  selectedOption={selectedTypeOption}
+                  typeOptions={typeOptions}
+                  onSelect={(nextValue) => {
+                    setTypeFilter(nextValue);
+                    setPage(1);
+                  }}
+                />
+              ) : (
+                <SimpleSelect
+                  ariaLabel={filter.label}
+                  fullWidth
+                  items={filter.options.map((item) => ({ key: item.id, label: item.label }))}
+                  selectedKey={filter.value}
+                  selectedLabel={filter.selectedLabel}
+                  onSelectionChange={(key) => {
+                    filter.setValue(key);
+                    setPage(1);
+                  }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
       )}
       actions={(
         <>
@@ -1073,7 +1171,6 @@ export default function AccountsPageContent() {
 
       {/* 表格 */}
       <AccountsTableSection
-        allVisibleSelected={allVisibleSelected}
         columns={columns}
         expandedUsageRowIds={expandedUsageRowIds}
         isLoading={isLoading}
@@ -1086,14 +1183,14 @@ export default function AccountsPageContent() {
         onClearSelection={clearSelection}
         onRowSelected={setRowSelected}
         onVisibleRowsSelected={setVisibleRowsSelected}
-        rows={rowsWithCapacity}
+        rows={rows}
+        rowMetaById={rowMetaById}
         selectAllAriaLabel={selectAllAriaLabel}
-        selectedCount={selectedCount}
         selectionStore={selectionStore}
         selectRowAriaLabel={selectRowAriaLabel}
-        someVisibleSelected={someVisibleSelected}
         tableAriaLabel={t('accounts.title', 'Accounts')}
         tableEmptyText={t('common.no_data')}
+        visibleRowIds={visibleRowIds}
       />
 
       {/* 创建弹窗 */}
@@ -1170,21 +1267,30 @@ export default function AccountsPageContent() {
       ) : null}
 
       {/* 批量编辑弹窗 */}
-      {showBulkEditModal ? (
+      {bulkEditSelection ? (
         <BulkEditAccountModal
           open
-          count={selectedIds.length}
-          onClose={() => setShowBulkEditModal(false)}
+          count={bulkEditSelection.ids.length}
+          initialGroupIds={bulkEditSelection.initialValues.groupIds}
+          initialMaxConcurrency={bulkEditSelection.initialValues.maxConcurrency}
+          initialPriority={bulkEditSelection.initialValues.priority}
+          initialRateMultiplier={bulkEditSelection.initialValues.rateMultiplier}
+          onClose={() => setBulkEditSelection(null)}
           onSubmit={(patch) =>
-            bulkUpdateMutation.mutate({ account_ids: selectedIds, ...patch })
+            bulkUpdateMutation.mutate({ account_ids: bulkEditSelection.ids, ...patch })
           }
           loading={bulkUpdateMutation.isPending}
         />
       ) : null}
 
       {/* 批量删除确认 */}
-      {showBulkDeleteConfirm ? (
-        <AlertDialog isOpen onOpenChange={setShowBulkDeleteConfirm}>
+      {bulkDeleteIds ? (
+        <AlertDialog
+          isOpen
+          onOpenChange={(open) => {
+            if (!open) setBulkDeleteIds(null);
+          }}
+        >
           <DialogTriggerShim />
           <AlertDialog.Backdrop>
             <AlertDialog.Container placement="center" size="sm">
@@ -1193,9 +1299,9 @@ export default function AccountsPageContent() {
                   <AlertDialog.Icon status="danger" />
                   <AlertDialog.Heading>{t('accounts.bulk_delete_title')}</AlertDialog.Heading>
                 </AlertDialog.Header>
-                <AlertDialog.Body>{t('accounts.bulk_delete_confirm', { count: selectedIds.length })}</AlertDialog.Body>
+                <AlertDialog.Body>{t('accounts.bulk_delete_confirm', { count: bulkDeleteIds.length })}</AlertDialog.Body>
                 <AlertDialog.Footer>
-                  <Button variant="secondary" onPress={() => setShowBulkDeleteConfirm(false)}>
+                  <Button variant="secondary" onPress={() => setBulkDeleteIds(null)}>
                     {t('common.cancel')}
                   </Button>
                   <Button
