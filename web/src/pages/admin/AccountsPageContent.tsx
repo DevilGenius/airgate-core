@@ -412,6 +412,40 @@ export default function AccountsPageContent() {
   const rows = data?.list ?? [];
   const visibleAccountIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const visibleAccountIdsKey = useMemo(() => visibleAccountIds.join(','), [visibleAccountIds]);
+  const selectedBulkEditInitialValues = useMemo(() => {
+    if (selectedIds.length === 0) {
+      return { groupIds: [] };
+    }
+
+    const selectedIdSet = new Set(selectedIds);
+    const selectedRows = rows.filter((row) => selectedIdSet.has(row.id));
+    const firstSelectedRow = selectedRows[0];
+    if (!firstSelectedRow || selectedRows.length !== selectedIds.length) {
+      return { groupIds: [] };
+    }
+
+    const commonGroupIds = new Set(firstSelectedRow.group_ids);
+    for (const row of selectedRows.slice(1)) {
+      const rowGroupIds = new Set(row.group_ids);
+      for (const groupId of Array.from(commonGroupIds)) {
+        if (!rowGroupIds.has(groupId)) {
+          commonGroupIds.delete(groupId);
+        }
+      }
+    }
+
+    const getCommonNumber = (selectValue: (account: AccountResp) => number) => {
+      const firstValue = selectValue(firstSelectedRow);
+      return selectedRows.every((row) => selectValue(row) === firstValue) ? firstValue : undefined;
+    };
+
+    return {
+      groupIds: firstSelectedRow.group_ids.filter((groupId) => commonGroupIds.has(groupId)),
+      maxConcurrency: getCommonNumber((account) => account.max_concurrency),
+      priority: getCommonNumber((account) => account.priority),
+      rateMultiplier: getCommonNumber((account) => account.rate_multiplier),
+    };
+  }, [rows, selectedIds]);
   const visibleAccountIdsRef = useRef<number[]>(visibleAccountIds);
   useEffect(() => {
     visibleAccountIdsRef.current = visibleAccountIds;
@@ -1174,6 +1208,10 @@ export default function AccountsPageContent() {
         <BulkEditAccountModal
           open
           count={selectedIds.length}
+          initialGroupIds={selectedBulkEditInitialValues.groupIds}
+          initialMaxConcurrency={selectedBulkEditInitialValues.maxConcurrency}
+          initialPriority={selectedBulkEditInitialValues.priority}
+          initialRateMultiplier={selectedBulkEditInitialValues.rateMultiplier}
           onClose={() => setShowBulkEditModal(false)}
           onSubmit={(patch) =>
             bulkUpdateMutation.mutate({ account_ids: selectedIds, ...patch })
