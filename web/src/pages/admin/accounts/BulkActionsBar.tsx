@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@heroui/react';
 import { Eraser, Pencil, Power, PowerOff, RefreshCw, Trash2 } from 'lucide-react';
 
 /**
@@ -33,28 +32,6 @@ export function BulkActionsBar({
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
-  const countPulseTimerRef = useRef<number | null>(null);
-  const [countPulseToken, setCountPulseToken] = useState(0);
-  const [isCountPulsing, setIsCountPulsing] = useState(false);
-
-  useEffect(() => {
-    if (countPulseTimerRef.current != null) {
-      window.clearTimeout(countPulseTimerRef.current);
-    }
-    setIsCountPulsing(true);
-    setCountPulseToken((token) => token + 1);
-    countPulseTimerRef.current = window.setTimeout(() => {
-      setIsCountPulsing(false);
-      countPulseTimerRef.current = null;
-    }, 420);
-  }, [selectedCount]);
-
-  useEffect(() => () => {
-    if (countPulseTimerRef.current != null) {
-      window.clearTimeout(countPulseTimerRef.current);
-    }
-  }, []);
-
   const selectedText = t('accounts.bulk_selected', { count: selectedCount });
   const selectedCountText = String(selectedCount);
   const countIndex = selectedText.indexOf(selectedCountText);
@@ -67,11 +44,7 @@ export function BulkActionsBar({
     <span className="flex h-8 shrink-0 items-center gap-0.5 whitespace-nowrap text-[15px] font-semibold leading-none text-primary">
       <span>{selectedTextBefore}</span>
       {countIndex >= 0 ? (
-        <span
-          key={countPulseToken}
-          className="ag-bulk-selected-count"
-          data-pulse={isCountPulsing || undefined}
-        >
+        <span className="ag-bulk-selected-count">
           {selectedCountText}
         </span>
       ) : null}
@@ -106,7 +79,7 @@ export function BulkActionsBar({
   if (overlay) {
     return (
       <div
-        className="ag-accounts-bulk-header-bar absolute left-0 top-0 z-20 flex w-full items-center gap-2 overflow-hidden border border-border bg-background px-2 animate-in fade-in duration-150"
+        className="ag-accounts-bulk-header-bar absolute top-0 z-20 flex items-center gap-2 overflow-hidden border border-border bg-background px-2"
         style={{
           background: 'linear-gradient(90deg, var(--surface-tertiary) 0%, var(--surface-secondary) 42%, var(--background) 100%)',
           backgroundColor: 'var(--background)',
@@ -126,7 +99,7 @@ export function BulkActionsBar({
   if (inline) {
     return (
       <div
-        className="inline-flex min-h-12 max-w-full flex-wrap items-center gap-2 rounded-[var(--radius)] border border-border bg-background px-4 py-2 animate-in fade-in slide-in-from-top-1 duration-200"
+        className="inline-flex min-h-12 max-w-full flex-wrap items-center gap-2 rounded-[var(--radius)] border border-border bg-background px-4 py-2"
         style={{
           background: 'linear-gradient(90deg, var(--surface-tertiary) 0%, var(--surface-secondary) 42%, var(--background) 100%)',
           backgroundColor: 'var(--background)',
@@ -152,14 +125,14 @@ export function BulkActionsBar({
       <span className="text-sm font-medium" style={{ color: 'var(--ag-primary)' }}>
         {t('accounts.bulk_selected', { count: selectedCount })}
       </span>
-      <Button
-        size="sm"
-        variant="ghost"
-        onPress={onClear}
+      <button
+        type="button"
+        className="ag-bulk-clear-button"
+        onClick={onClear}
         aria-label={t('accounts.bulk_clear')}
       >
         {t('accounts.bulk_clear')}
-      </Button>
+      </button>
 
       <div className="hidden h-5 w-px bg-border sm:block" />
 
@@ -174,20 +147,19 @@ function ActionButton({
   onClick,
   danger = false,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   onClick: () => void;
   danger?: boolean;
 }) {
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      className={`ag-bulk-action-button min-w-0 max-w-full shrink-0 items-center gap-1.5 leading-none ${danger ? 'text-danger' : ''}`}
-      onPress={onClick}
+    <button
+      type="button"
+      className={`ag-bulk-action-button min-w-0 max-w-full shrink-0 items-center gap-1.5 leading-none ${danger ? 'ag-bulk-action-button--danger' : ''}`}
+      onClick={onClick}
     >
       {icon}
       <span className="min-w-0 truncate leading-none">{label}</span>
-    </Button>
+    </button>
   );
 }

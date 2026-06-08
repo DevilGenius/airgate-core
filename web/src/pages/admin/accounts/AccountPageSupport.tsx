@@ -390,6 +390,7 @@ export class AccountSelectionStore {
   private version = 0;
   private listeners = new Set<SelectionListener>();
   private rowListeners = new Map<number, Set<SelectionListener>>();
+  private rowInputs = new Map<number, HTMLInputElement>();
 
   subscribe = (listener: SelectionListener) => {
     this.listeners.add(listener);
@@ -414,6 +415,17 @@ export class AccountSelectionStore {
   };
 
   getSnapshot = () => this.version;
+
+  getSelectedCount = () => this.selectedIds.size;
+
+  registerRowInput(id: number, input: HTMLInputElement | null) {
+    if (!input) {
+      this.rowInputs.delete(id);
+      return;
+    }
+    this.rowInputs.set(id, input);
+    input.checked = this.selectedIds.has(id);
+  }
 
   has(id: number) {
     return this.selectedIds.has(id);
@@ -456,7 +468,8 @@ export class AccountSelectionStore {
       changedIds.push(id);
     }
     if (changedIds.length > 0) {
-      this.notify(changedIds);
+      this.syncRowInputs(changedIds);
+      this.notify(changedIds, false);
     }
   }
 
@@ -464,13 +477,25 @@ export class AccountSelectionStore {
     if (this.selectedIds.size === 0) return;
     const changedIds = Array.from(this.selectedIds);
     this.selectedIds.clear();
-    this.notify(changedIds);
+    this.syncRowInputs(changedIds);
+    this.notify(changedIds, false);
   }
 
-  private notify(changedIds: number[]) {
-    this.version += 1;
+  private syncRowInputs(changedIds: number[]) {
     for (const id of changedIds) {
-      this.rowListeners.get(id)?.forEach((listener) => listener());
+      const input = this.rowInputs.get(id);
+      if (input) {
+        input.checked = this.selectedIds.has(id);
+      }
+    }
+  }
+
+  private notify(changedIds: number[], notifyRows = true) {
+    this.version += 1;
+    if (notifyRows) {
+      for (const id of changedIds) {
+        this.rowListeners.get(id)?.forEach((listener) => listener());
+      }
     }
     this.listeners.forEach((listener) => listener());
   }
@@ -497,16 +522,22 @@ function StatusPill({
 
 export function TableSelectionCheckbox({
   ariaLabel,
+  inputRef,
   isIndeterminate,
   isSelected,
   onChange,
 }: {
   ariaLabel: string;
+  inputRef?: (input: HTMLInputElement | null) => void;
   isIndeterminate?: boolean;
   isSelected: boolean;
   onChange: (isSelected: boolean) => void;
 }) {
   const checkboxRef = useRef<HTMLInputElement>(null);
+  const setCheckboxRef = useCallback((input: HTMLInputElement | null) => {
+    checkboxRef.current = input;
+    inputRef?.(input);
+  }, [inputRef]);
 
   useEffect(() => {
     if (checkboxRef.current) {
@@ -516,7 +547,7 @@ export function TableSelectionCheckbox({
 
   return (
     <input
-      ref={checkboxRef}
+      ref={setCheckboxRef}
       type="checkbox"
       aria-label={ariaLabel}
       checked={isSelected}
@@ -574,6 +605,9 @@ const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
   const handleChange = useCallback((nextSelected: boolean) => {
     onSelectedChange(rowId, nextSelected);
   }, [onSelectedChange, rowId]);
+  const registerInput = useCallback((input: HTMLInputElement | null) => {
+    selectionStore.registerRowInput?.(rowId, input);
+  }, [rowId, selectionStore]);
 
   return (
     <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
@@ -581,6 +615,7 @@ const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
         ariaLabel={ariaLabel}
         isSelected={isSelected}
         onChange={handleChange}
+        inputRef={registerInput}
       />
     </div>
   );
