@@ -70,8 +70,6 @@ const (
 	FieldErrorCode = "error_code"
 	// FieldErrorType holds the string denoting the error_type field in the database.
 	FieldErrorType = "error_type"
-	// FieldCount holds the string denoting the count field in the database.
-	FieldCount = "count"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -127,7 +125,6 @@ var Columns = []string{
 	FieldUpstreamStatus,
 	FieldErrorCode,
 	FieldErrorType,
-	FieldCount,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 	FieldResolvedAt,
@@ -225,8 +222,6 @@ var (
 	DefaultErrorType string
 	// ErrorTypeValidator is a validator for the "error_type" field. It is called by the builders before save.
 	ErrorTypeValidator func(string) error
-	// DefaultCount holds the default value on creation for the "count" field.
-	DefaultCount int64
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -468,11 +463,6 @@ func ByErrorCode(opts ...sql.OrderTermOption) OrderOption {
 // ByErrorType orders the results by the error_type field.
 func ByErrorType(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldErrorType, opts...).ToFunc()
-}
-
-// ByCount orders the results by the count field.
-func ByCount(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldCount, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

@@ -64,7 +64,7 @@ type Service struct {
 	repo           Repository
 	notifier       Notifier
 	rdb            *redis.Client
-	queue          chan AggregatedEvent
+	queue          chan QueuedEvent
 	retention      time.Duration
 	flushInterval  time.Duration
 	flushBatchSize int
@@ -84,7 +84,7 @@ var _ monitoring.Recorder = (*Service)(nil)
 func NewService(repo Repository, opts ...Option) *Service {
 	s := &Service{
 		repo:           repo,
-		queue:          make(chan AggregatedEvent, defaultQueueSize),
+		queue:          make(chan QueuedEvent, defaultQueueSize),
 		retention:      defaultRetention,
 		flushInterval:  defaultFlushInterval,
 		flushBatchSize: defaultFlushBatchSize,
@@ -104,7 +104,7 @@ func NewService(repo Repository, opts ...Option) *Service {
 		s.flushBatchSize = defaultFlushBatchSize
 	}
 	if s.queue == nil {
-		s.queue = make(chan AggregatedEvent, defaultQueueSize)
+		s.queue = make(chan QueuedEvent, defaultQueueSize)
 	}
 	return s
 }
@@ -113,7 +113,7 @@ func NewService(repo Repository, opts ...Option) *Service {
 func WithQueueSize(size int) Option {
 	return func(s *Service) {
 		if size > 0 {
-			s.queue = make(chan AggregatedEvent, size)
+			s.queue = make(chan QueuedEvent, size)
 		}
 	}
 }
@@ -230,7 +230,7 @@ func (s *Service) Ignore(ctx context.Context, id int) error {
 	return s.repo.Ignore(ctx, id)
 }
 
-func (s *Service) normalizeInput(input monitoring.EventInput) AggregatedEvent {
+func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 	observedAt := input.ObservedAt
 	if observedAt.IsZero() {
 		observedAt = time.Now()
@@ -276,7 +276,6 @@ func (s *Service) normalizeInput(input monitoring.EventInput) AggregatedEvent {
 		UpstreamStatus:      cloneIntPtr(input.UpstreamStatus),
 		ErrorCode:           truncateString(input.ErrorCode, maxCodeLength),
 		ErrorType:           truncateString(input.ErrorType, maxCodeLength),
-		Count:               1,
 		CreatedAt:           observedAt,
 		UpdatedAt:           observedAt,
 		ExpiresAt:           observedAt.Add(s.retention),
@@ -284,10 +283,7 @@ func (s *Service) normalizeInput(input monitoring.EventInput) AggregatedEvent {
 	}
 	event.Fingerprint = fingerprintFor(input.FingerprintMaterial, event)
 	event.AutoResolveAt = resolveAtFor(input.AutoResolveAt, event.Kind, observedAt)
-	return AggregatedEvent{
-		Event:      event,
-		CountDelta: 1,
-	}
+	return QueuedEvent{Event: event}
 }
 
 func (s *Service) logDrop(total int64) {

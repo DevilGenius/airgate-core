@@ -27,118 +27,24 @@ func NewMonitorStore(db *ent.Client) *MonitorStore {
 	return &MonitorStore{db: db}
 }
 
-// UpsertBatch applies already aggregated monitor events.
-func (s *MonitorStore) UpsertBatch(ctx context.Context, events []appmonitor.AggregatedEvent) error {
+// InsertBatch appends monitor events. Fingerprints are classification keys only,
+// not uniqueness keys.
+func (s *MonitorStore) InsertBatch(ctx context.Context, events []appmonitor.QueuedEvent) error {
 	if s == nil || s.db == nil || len(events) == 0 {
 		return nil
 	}
+	builders := make([]*ent.MonitorEventCreate, 0, len(events))
 	for _, event := range events {
 		if event.Fingerprint == "" {
 			continue
 		}
-		if event.CountDelta <= 0 {
-			event.CountDelta = 1
-		}
-		if err := s.upsertOne(ctx, event); err != nil {
-			return err
-		}
+		builders = append(builders, setMonitorCreateFields(s.db.MonitorEvent.Create(), event))
 	}
-	return nil
-}
-
-func (s *MonitorStore) upsertOne(ctx context.Context, incoming appmonitor.AggregatedEvent) error {
-	existing, err := s.db.MonitorEvent.Query().
-		Where(entmonitorevent.FingerprintEQ(incoming.Fingerprint)).
-		Only(ctx)
-	if ent.IsNotFound(err) {
-		_, err = setMonitorCreateFields(s.db.MonitorEvent.Create(), incoming).Save(ctx)
-		if err == nil {
-			return nil
-		}
-		if !ent.IsConstraintError(err) {
-			return err
-		}
-		existing, err = s.db.MonitorEvent.Query().
-			Where(entmonitorevent.FingerprintEQ(incoming.Fingerprint)).
-			Only(ctx)
-	}
-	if err != nil {
-		return err
-	}
-
-	switch string(existing.Status) {
-	case monitoring.StatusActive:
-		return s.mergeActive(ctx, existing, incoming)
-	case monitoring.StatusResolved:
-		return s.mergeResolved(ctx, existing, incoming)
-	case monitoring.StatusIgnored:
-		return s.mergeIgnored(ctx, existing, incoming)
-	default:
-		return s.mergeActive(ctx, existing, incoming)
-	}
-}
-
-func (s *MonitorStore) mergeActive(ctx context.Context, existing *ent.MonitorEvent, incoming appmonitor.AggregatedEvent) error {
-	existingSeverity := string(existing.Severity)
-	update := s.db.MonitorEvent.UpdateOneID(existing.ID).
-		AddCount(incoming.CountDelta).
-		SetSeverity(entmonitorevent.Severity(higherMonitorSeverity(existingSeverity, incoming.Severity)))
-	if !incoming.UpdatedAt.Before(existing.UpdatedAt) {
-		update = setMonitorUpdateFields(update, incoming, false).
-			SetUpdatedAt(incoming.UpdatedAt).
-			SetExpiresAt(incoming.ExpiresAt)
-		update.SetNillableAutoResolveAt(incoming.AutoResolveAt)
-	}
-	if shouldArmNotifyOnMerge(existing, incoming.Severity) {
-		update.SetNextNotifyAt(incoming.UpdatedAt)
-		update.SetNotifyError("")
-	}
-	if err := update.Exec(ctx); err != nil && !ent.IsNotFound(err) {
-		return err
-	}
-	return nil
-}
-
-func (s *MonitorStore) mergeResolved(ctx context.Context, existing *ent.MonitorEvent, incoming appmonitor.AggregatedEvent) error {
-	if existing.ResolvedAt != nil && !incoming.UpdatedAt.After(*existing.ResolvedAt) {
+	if len(builders) == 0 {
 		return nil
 	}
-	update := s.db.MonitorEvent.UpdateOneID(existing.ID).
-		SetStatus(entmonitorevent.StatusActive).
-		SetSeverity(entmonitorevent.Severity(incoming.Severity)).
-		SetCount(incoming.CountDelta).
-		SetCreatedAt(incoming.CreatedAt).
-		SetUpdatedAt(incoming.UpdatedAt).
-		SetExpiresAt(incoming.ExpiresAt).
-		ClearResolvedAt().
-		ClearIgnoredAt()
-	update = setMonitorUpdateFields(update, incoming, true)
-	update.SetNillableAutoResolveAt(incoming.AutoResolveAt)
-	update.ClearLastNotifiedAt()
-	update.SetNotifyError("")
-	if shouldNotifySeverity(incoming.Severity) {
-		update.SetNextNotifyAt(incoming.UpdatedAt)
-	} else {
-		update.ClearNextNotifyAt()
-	}
-	if err := update.Exec(ctx); err != nil && !ent.IsNotFound(err) {
-		return err
-	}
-	return nil
-}
-
-func (s *MonitorStore) mergeIgnored(ctx context.Context, existing *ent.MonitorEvent, incoming appmonitor.AggregatedEvent) error {
-	update := s.db.MonitorEvent.UpdateOneID(existing.ID).
-		AddCount(incoming.CountDelta).
-		SetSeverity(entmonitorevent.Severity(higherMonitorSeverity(string(existing.Severity), incoming.Severity)))
-	if !incoming.UpdatedAt.Before(existing.UpdatedAt) {
-		update = setMonitorUpdateFields(update, incoming, false).
-			SetUpdatedAt(incoming.UpdatedAt)
-	}
-	if err := update.Exec(ctx); err != nil && !ent.IsNotFound(err) {
-		return err
-	}
-	return nil
+	_, err := s.db.MonitorEvent.CreateBulk(builders...).Save(ctx)
+	return err
 }
 
 // ResolveBySubject marks matching active events as resolved.
@@ -422,12 +328,12 @@ func (s *MonitorStore) summaryTopAPIKeys(ctx context.Context, query *ent.Monitor
 	var rows []struct {
 		APIKeyID           int    `json:"api_key_id"`
 		APIKeyNameSnapshot string `json:"api_key_name_snapshot"`
-		Count              int64  `json:"count"`
+		Count              int    `json:"count"`
 	}
 	err := query.
 		Where(entmonitorevent.APIKeyIDNotNil()).
 		GroupBy(entmonitorevent.FieldAPIKeyID, entmonitorevent.FieldAPIKeyNameSnapshot).
-		Aggregate(ent.As(ent.Sum(entmonitorevent.FieldCount), "count")).
+		Aggregate(ent.As(ent.Count(), "count")).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, err
@@ -437,7 +343,7 @@ func (s *MonitorStore) summaryTopAPIKeys(ctx context.Context, query *ent.Monitor
 		out = append(out, appmonitor.SubjectCount{
 			ID:    row.APIKeyID,
 			Name:  row.APIKeyNameSnapshot,
-			Count: row.Count,
+			Count: int64(row.Count),
 		})
 	}
 	sortSubjectCounts(out)
@@ -448,12 +354,12 @@ func (s *MonitorStore) summaryTopAccounts(ctx context.Context, query *ent.Monito
 	var rows []struct {
 		AccountID           int    `json:"account_id"`
 		AccountNameSnapshot string `json:"account_name_snapshot"`
-		Count               int64  `json:"count"`
+		Count               int    `json:"count"`
 	}
 	err := query.
 		Where(entmonitorevent.AccountIDNotNil()).
 		GroupBy(entmonitorevent.FieldAccountID, entmonitorevent.FieldAccountNameSnapshot).
-		Aggregate(ent.As(ent.Sum(entmonitorevent.FieldCount), "count")).
+		Aggregate(ent.As(ent.Count(), "count")).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, err
@@ -463,7 +369,7 @@ func (s *MonitorStore) summaryTopAccounts(ctx context.Context, query *ent.Monito
 		out = append(out, appmonitor.SubjectCount{
 			ID:    row.AccountID,
 			Name:  row.AccountNameSnapshot,
-			Count: row.Count,
+			Count: int64(row.Count),
 		})
 	}
 	sortSubjectCounts(out)
@@ -545,7 +451,7 @@ func monitorResolvePredicates(query monitoring.ResolveQuery) []predicate.Monitor
 	return preds
 }
 
-func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.AggregatedEvent) *ent.MonitorEventCreate {
+func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.QueuedEvent) *ent.MonitorEventCreate {
 	create = create.
 		SetKind(entmonitorevent.Kind(event.Kind)).
 		SetSeverity(entmonitorevent.Severity(event.Severity)).
@@ -575,7 +481,6 @@ func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.Agg
 		SetNillableUpstreamStatus(event.UpstreamStatus).
 		SetErrorCode(event.ErrorCode).
 		SetErrorType(event.ErrorType).
-		SetCount(event.CountDelta).
 		SetCreatedAt(event.CreatedAt).
 		SetUpdatedAt(event.UpdatedAt).
 		SetNillableAutoResolveAt(event.AutoResolveAt).
@@ -585,61 +490,6 @@ func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.Agg
 		create.SetNextNotifyAt(event.UpdatedAt)
 	}
 	return create
-}
-
-func setMonitorUpdateFields(update *ent.MonitorEventUpdateOne, event appmonitor.AggregatedEvent, replace bool) *ent.MonitorEventUpdateOne {
-	update = update.
-		SetKind(entmonitorevent.Kind(event.Kind)).
-		SetSource(event.Source).
-		SetSubjectType(event.SubjectType).
-		SetSubjectID(event.SubjectID).
-		SetTitle(event.Title).
-		SetMessage(event.Message).
-		SetAPIKeyNameSnapshot(event.APIKeyNameSnapshot).
-		SetAPIKeyPrefix(event.APIKeyPrefix).
-		SetUserEmailSnapshot(event.UserEmailSnapshot).
-		SetAccountNameSnapshot(event.AccountNameSnapshot).
-		SetPlatform(event.Platform).
-		SetPluginID(event.PluginID).
-		SetTaskType(event.TaskType).
-		SetMethod(event.Method).
-		SetEndpoint(event.Endpoint).
-		SetRequestPath(event.RequestPath).
-		SetModel(event.Model).
-		SetErrorCode(event.ErrorCode).
-		SetErrorType(event.ErrorType).
-		SetDetail(event.Detail)
-	if event.APIKeyID != nil {
-		update.SetAPIKeyID(*event.APIKeyID)
-	} else if replace {
-		update.ClearAPIKeyID()
-	}
-	if event.UserID != nil {
-		update.SetUserID(*event.UserID)
-	} else if replace {
-		update.ClearUserID()
-	}
-	if event.GroupID != nil {
-		update.SetGroupID(*event.GroupID)
-	} else if replace {
-		update.ClearGroupID()
-	}
-	if event.AccountID != nil {
-		update.SetAccountID(*event.AccountID)
-	} else if replace {
-		update.ClearAccountID()
-	}
-	if event.HTTPStatus != nil {
-		update.SetHTTPStatus(*event.HTTPStatus)
-	} else if replace {
-		update.ClearHTTPStatus()
-	}
-	if event.UpstreamStatus != nil {
-		update.SetUpstreamStatus(*event.UpstreamStatus)
-	} else if replace {
-		update.ClearUpstreamStatus()
-	}
-	return update
 }
 
 func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
@@ -680,7 +530,6 @@ func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 		UpstreamStatus:      row.UpstreamStatus,
 		ErrorCode:           row.ErrorCode,
 		ErrorType:           row.ErrorType,
-		Count:               row.Count,
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,
 		ResolvedAt:          row.ResolvedAt,
@@ -755,35 +604,8 @@ func (s *MonitorStore) MarkNotifyFailed(ctx context.Context, id int, retryAt tim
 	return err
 }
 
-func higherMonitorSeverity(left, right string) string {
-	if monitorSeverityRank(right) > monitorSeverityRank(left) {
-		return right
-	}
-	return left
-}
-
-func monitorSeverityRank(severity string) int {
-	switch severity {
-	case monitoring.SeverityCritical:
-		return 3
-	case monitoring.SeverityError:
-		return 2
-	case monitoring.SeverityWarning:
-		return 1
-	default:
-		return 0
-	}
-}
-
 func shouldNotifySeverity(severity string) bool {
 	return severity == monitoring.SeverityError || severity == monitoring.SeverityCritical
-}
-
-func shouldArmNotifyOnMerge(existing *ent.MonitorEvent, incomingSeverity string) bool {
-	if existing == nil || !shouldNotifySeverity(incomingSeverity) {
-		return false
-	}
-	return existing.NextNotifyAt == nil || monitorSeverityRank(incomingSeverity) > monitorSeverityRank(string(existing.Severity))
 }
 
 func truncateStoreString(value string, limit int) string {

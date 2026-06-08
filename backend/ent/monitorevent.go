@@ -74,8 +74,6 @@ type MonitorEvent struct {
 	ErrorCode string `json:"error_code,omitempty"`
 	// ErrorType holds the value of the "error_type" field.
 	ErrorType string `json:"error_type,omitempty"`
-	// Count holds the value of the "count" field.
-	Count int64 `json:"count,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -106,7 +104,7 @@ func (*MonitorEvent) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case monitorevent.FieldDetail:
 			values[i] = new([]byte)
-		case monitorevent.FieldID, monitorevent.FieldAPIKeyID, monitorevent.FieldUserID, monitorevent.FieldGroupID, monitorevent.FieldAccountID, monitorevent.FieldHTTPStatus, monitorevent.FieldUpstreamStatus, monitorevent.FieldCount:
+		case monitorevent.FieldID, monitorevent.FieldAPIKeyID, monitorevent.FieldUserID, monitorevent.FieldGroupID, monitorevent.FieldAccountID, monitorevent.FieldHTTPStatus, monitorevent.FieldUpstreamStatus:
 			values[i] = new(sql.NullInt64)
 		case monitorevent.FieldKind, monitorevent.FieldSeverity, monitorevent.FieldStatus, monitorevent.FieldSource, monitorevent.FieldSubjectType, monitorevent.FieldSubjectID, monitorevent.FieldFingerprint, monitorevent.FieldTitle, monitorevent.FieldMessage, monitorevent.FieldAPIKeyNameSnapshot, monitorevent.FieldAPIKeyPrefix, monitorevent.FieldUserEmailSnapshot, monitorevent.FieldAccountNameSnapshot, monitorevent.FieldPlatform, monitorevent.FieldPluginID, monitorevent.FieldTaskType, monitorevent.FieldMethod, monitorevent.FieldEndpoint, monitorevent.FieldRequestPath, monitorevent.FieldModel, monitorevent.FieldErrorCode, monitorevent.FieldErrorType, monitorevent.FieldNotifyError:
 			values[i] = new(sql.NullString)
@@ -307,12 +305,6 @@ func (me *MonitorEvent) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				me.ErrorType = value.String
 			}
-		case monitorevent.FieldCount:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field count", values[i])
-			} else if value.Valid {
-				me.Count = value.Int64
-			}
 		case monitorevent.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -511,9 +503,6 @@ func (me *MonitorEvent) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("error_type=")
 	builder.WriteString(me.ErrorType)
-	builder.WriteString(", ")
-	builder.WriteString("count=")
-	builder.WriteString(fmt.Sprintf("%v", me.Count))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(me.CreatedAt.Format(time.ANSIC))

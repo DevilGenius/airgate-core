@@ -144,7 +144,7 @@ var (
 		{Name: "source", Type: field.TypeString, Size: 64, Default: ""},
 		{Name: "subject_type", Type: field.TypeString, Size: 64, Default: ""},
 		{Name: "subject_id", Type: field.TypeString, Size: 128, Default: ""},
-		{Name: "fingerprint", Type: field.TypeString, Unique: true, Size: 64},
+		{Name: "fingerprint", Type: field.TypeString, Size: 64},
 		{Name: "title", Type: field.TypeString, Size: 160, Default: ""},
 		{Name: "message", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "api_key_id", Type: field.TypeInt, Nullable: true},
@@ -166,7 +166,6 @@ var (
 		{Name: "upstream_status", Type: field.TypeInt, Nullable: true},
 		{Name: "error_code", Type: field.TypeString, Size: 64, Default: ""},
 		{Name: "error_type", Type: field.TypeString, Size: 64, Default: ""},
-		{Name: "count", Type: field.TypeInt64, Default: 0},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "resolved_at", Type: field.TypeTime, Nullable: true},
@@ -187,12 +186,17 @@ var (
 			{
 				Name:    "monitorevent_status_severity_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[31]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[30]},
 			},
 			{
 				Name:    "monitorevent_status_kind_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[1], MonitorEventsColumns[31]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[1], MonitorEventsColumns[30]},
+			},
+			{
+				Name:    "monitorevent_fingerprint",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[7]},
 			},
 			{
 				Name:    "monitorevent_subject_type_subject_id_status",
@@ -202,32 +206,32 @@ var (
 			{
 				Name:    "monitorevent_api_key_id_endpoint_status_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[10], MonitorEventsColumns[22], MonitorEventsColumns[3], MonitorEventsColumns[31]},
+				Columns: []*schema.Column{MonitorEventsColumns[10], MonitorEventsColumns[22], MonitorEventsColumns[3], MonitorEventsColumns[30]},
 			},
 			{
 				Name:    "monitorevent_account_id_status_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[16], MonitorEventsColumns[3], MonitorEventsColumns[31]},
+				Columns: []*schema.Column{MonitorEventsColumns[16], MonitorEventsColumns[3], MonitorEventsColumns[30]},
 			},
 			{
 				Name:    "monitorevent_platform_plugin_id_status_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[18], MonitorEventsColumns[19], MonitorEventsColumns[3], MonitorEventsColumns[31]},
+				Columns: []*schema.Column{MonitorEventsColumns[18], MonitorEventsColumns[19], MonitorEventsColumns[3], MonitorEventsColumns[30]},
 			},
 			{
 				Name:    "monitorevent_status_auto_resolve_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[34]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[33]},
 			},
 			{
 				Name:    "monitorevent_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[35]},
+				Columns: []*schema.Column{MonitorEventsColumns[34]},
 			},
 			{
 				Name:    "monitorevent_status_severity_next_notify_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[37]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[36]},
 			},
 		},
 	}

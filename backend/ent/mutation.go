@@ -5705,8 +5705,6 @@ type MonitorEventMutation struct {
 	addupstream_status    *int
 	error_code            *string
 	error_type            *string
-	count                 *int64
-	addcount              *int64
 	created_at            *time.Time
 	updated_at            *time.Time
 	resolved_at           *time.Time
@@ -7033,62 +7031,6 @@ func (m *MonitorEventMutation) ResetErrorType() {
 	m.error_type = nil
 }
 
-// SetCount sets the "count" field.
-func (m *MonitorEventMutation) SetCount(i int64) {
-	m.count = &i
-	m.addcount = nil
-}
-
-// Count returns the value of the "count" field in the mutation.
-func (m *MonitorEventMutation) Count() (r int64, exists bool) {
-	v := m.count
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldCount returns the old "count" field's value of the MonitorEvent entity.
-// If the MonitorEvent object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *MonitorEventMutation) OldCount(ctx context.Context) (v int64, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldCount is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldCount requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldCount: %w", err)
-	}
-	return oldValue.Count, nil
-}
-
-// AddCount adds i to the "count" field.
-func (m *MonitorEventMutation) AddCount(i int64) {
-	if m.addcount != nil {
-		*m.addcount += i
-	} else {
-		m.addcount = &i
-	}
-}
-
-// AddedCount returns the value that was added to the "count" field in this mutation.
-func (m *MonitorEventMutation) AddedCount() (r int64, exists bool) {
-	v := m.addcount
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetCount resets all changes to the "count" field.
-func (m *MonitorEventMutation) ResetCount() {
-	m.count = nil
-	m.addcount = nil
-}
-
 // SetCreatedAt sets the "created_at" field.
 func (m *MonitorEventMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -7561,7 +7503,7 @@ func (m *MonitorEventMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MonitorEventMutation) Fields() []string {
-	fields := make([]string, 0, 39)
+	fields := make([]string, 0, 38)
 	if m.kind != nil {
 		fields = append(fields, monitorevent.FieldKind)
 	}
@@ -7645,9 +7587,6 @@ func (m *MonitorEventMutation) Fields() []string {
 	}
 	if m.error_type != nil {
 		fields = append(fields, monitorevent.FieldErrorType)
-	}
-	if m.count != nil {
-		fields = append(fields, monitorevent.FieldCount)
 	}
 	if m.created_at != nil {
 		fields = append(fields, monitorevent.FieldCreatedAt)
@@ -7743,8 +7682,6 @@ func (m *MonitorEventMutation) Field(name string) (ent.Value, bool) {
 		return m.ErrorCode()
 	case monitorevent.FieldErrorType:
 		return m.ErrorType()
-	case monitorevent.FieldCount:
-		return m.Count()
 	case monitorevent.FieldCreatedAt:
 		return m.CreatedAt()
 	case monitorevent.FieldUpdatedAt:
@@ -7830,8 +7767,6 @@ func (m *MonitorEventMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldErrorCode(ctx)
 	case monitorevent.FieldErrorType:
 		return m.OldErrorType(ctx)
-	case monitorevent.FieldCount:
-		return m.OldCount(ctx)
 	case monitorevent.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case monitorevent.FieldUpdatedAt:
@@ -8057,13 +7992,6 @@ func (m *MonitorEventMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetErrorType(v)
 		return nil
-	case monitorevent.FieldCount:
-		v, ok := value.(int64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetCount(v)
-		return nil
 	case monitorevent.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -8160,9 +8088,6 @@ func (m *MonitorEventMutation) AddedFields() []string {
 	if m.addupstream_status != nil {
 		fields = append(fields, monitorevent.FieldUpstreamStatus)
 	}
-	if m.addcount != nil {
-		fields = append(fields, monitorevent.FieldCount)
-	}
 	return fields
 }
 
@@ -8183,8 +8108,6 @@ func (m *MonitorEventMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedHTTPStatus()
 	case monitorevent.FieldUpstreamStatus:
 		return m.AddedUpstreamStatus()
-	case monitorevent.FieldCount:
-		return m.AddedCount()
 	}
 	return nil, false
 }
@@ -8235,13 +8158,6 @@ func (m *MonitorEventMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddUpstreamStatus(v)
-		return nil
-	case monitorevent.FieldCount:
-		v, ok := value.(int64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddCount(v)
 		return nil
 	}
 	return fmt.Errorf("unknown MonitorEvent numeric field %s", name)
@@ -8428,9 +8344,6 @@ func (m *MonitorEventMutation) ResetField(name string) error {
 		return nil
 	case monitorevent.FieldErrorType:
 		m.ResetErrorType()
-		return nil
-	case monitorevent.FieldCount:
-		m.ResetCount()
 		return nil
 	case monitorevent.FieldCreatedAt:
 		m.ResetCreatedAt()

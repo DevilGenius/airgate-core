@@ -410,12 +410,6 @@ export default function MonitorPage() {
       ),
     },
     {
-      key: 'count',
-      title: t('monitor.count'),
-      width: '96px',
-      render: (row) => <span className="block w-full text-center font-mono text-[13px] font-semibold tabular-nums leading-none text-text">{fmtNum(row.count)}</span>,
-    },
-    {
       key: 'status',
       title: t('monitor.status'),
       width: '104px',

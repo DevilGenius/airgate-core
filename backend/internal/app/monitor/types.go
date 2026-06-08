@@ -47,7 +47,6 @@ type Event struct {
 	UpstreamStatus      *int
 	ErrorCode           string
 	ErrorType           string
-	Count               int64
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	ResolvedAt          *time.Time
@@ -60,10 +59,9 @@ type Event struct {
 	Detail              map[string]interface{}
 }
 
-// AggregatedEvent is the storage-ready result of in-memory pre-aggregation.
-type AggregatedEvent struct {
+// QueuedEvent is a normalized monitor event waiting for async persistence.
+type QueuedEvent struct {
 	Event
-	CountDelta int64
 }
 
 // ListFilter filters monitor events.
@@ -126,7 +124,7 @@ type Summary struct {
 
 // Repository defines monitor event persistence.
 type Repository interface {
-	UpsertBatch(context.Context, []AggregatedEvent) error
+	InsertBatch(context.Context, []QueuedEvent) error
 	ResolveBySubject(context.Context, monitoring.ResolveQuery) error
 	Get(context.Context, int) (Event, error)
 	Resolve(context.Context, int) error

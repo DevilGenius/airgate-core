@@ -498,27 +498,6 @@ func (meu *MonitorEventUpdate) SetNillableErrorType(s *string) *MonitorEventUpda
 	return meu
 }
 
-// SetCount sets the "count" field.
-func (meu *MonitorEventUpdate) SetCount(i int64) *MonitorEventUpdate {
-	meu.mutation.ResetCount()
-	meu.mutation.SetCount(i)
-	return meu
-}
-
-// SetNillableCount sets the "count" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableCount(i *int64) *MonitorEventUpdate {
-	if i != nil {
-		meu.SetCount(*i)
-	}
-	return meu
-}
-
-// AddCount adds i to the "count" field.
-func (meu *MonitorEventUpdate) AddCount(i int64) *MonitorEventUpdate {
-	meu.mutation.AddCount(i)
-	return meu
-}
-
 // SetCreatedAt sets the "created_at" field.
 func (meu *MonitorEventUpdate) SetCreatedAt(t time.Time) *MonitorEventUpdate {
 	meu.mutation.SetCreatedAt(t)
@@ -970,12 +949,6 @@ func (meu *MonitorEventUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := meu.mutation.ErrorType(); ok {
 		_spec.SetField(monitorevent.FieldErrorType, field.TypeString, value)
-	}
-	if value, ok := meu.mutation.Count(); ok {
-		_spec.SetField(monitorevent.FieldCount, field.TypeInt64, value)
-	}
-	if value, ok := meu.mutation.AddedCount(); ok {
-		_spec.AddField(monitorevent.FieldCount, field.TypeInt64, value)
 	}
 	if value, ok := meu.mutation.CreatedAt(); ok {
 		_spec.SetField(monitorevent.FieldCreatedAt, field.TypeTime, value)
@@ -1515,27 +1488,6 @@ func (meuo *MonitorEventUpdateOne) SetNillableErrorType(s *string) *MonitorEvent
 	return meuo
 }
 
-// SetCount sets the "count" field.
-func (meuo *MonitorEventUpdateOne) SetCount(i int64) *MonitorEventUpdateOne {
-	meuo.mutation.ResetCount()
-	meuo.mutation.SetCount(i)
-	return meuo
-}
-
-// SetNillableCount sets the "count" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableCount(i *int64) *MonitorEventUpdateOne {
-	if i != nil {
-		meuo.SetCount(*i)
-	}
-	return meuo
-}
-
-// AddCount adds i to the "count" field.
-func (meuo *MonitorEventUpdateOne) AddCount(i int64) *MonitorEventUpdateOne {
-	meuo.mutation.AddCount(i)
-	return meuo
-}
-
 // SetCreatedAt sets the "created_at" field.
 func (meuo *MonitorEventUpdateOne) SetCreatedAt(t time.Time) *MonitorEventUpdateOne {
 	meuo.mutation.SetCreatedAt(t)
@@ -2017,12 +1969,6 @@ func (meuo *MonitorEventUpdateOne) sqlSave(ctx context.Context) (_node *MonitorE
 	}
 	if value, ok := meuo.mutation.ErrorType(); ok {
 		_spec.SetField(monitorevent.FieldErrorType, field.TypeString, value)
-	}
-	if value, ok := meuo.mutation.Count(); ok {
-		_spec.SetField(monitorevent.FieldCount, field.TypeInt64, value)
-	}
-	if value, ok := meuo.mutation.AddedCount(); ok {
-		_spec.AddField(monitorevent.FieldCount, field.TypeInt64, value)
 	}
 	if value, ok := meuo.mutation.CreatedAt(); ok {
 		_spec.SetField(monitorevent.FieldCreatedAt, field.TypeTime, value)

@@ -243,7 +243,6 @@ func monitorNotificationValues(event Event) map[string]string {
 		"subject_id":           event.SubjectID,
 		"subject":              subject,
 		"message":              event.Message,
-		"count":                strconv.FormatInt(event.Count, 10),
 		"platform":             event.Platform,
 		"plugin_id":            event.PluginID,
 		"task_type":            event.TaskType,

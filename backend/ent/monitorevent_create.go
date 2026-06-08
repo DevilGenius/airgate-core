@@ -396,20 +396,6 @@ func (mec *MonitorEventCreate) SetNillableErrorType(s *string) *MonitorEventCrea
 	return mec
 }
 
-// SetCount sets the "count" field.
-func (mec *MonitorEventCreate) SetCount(i int64) *MonitorEventCreate {
-	mec.mutation.SetCount(i)
-	return mec
-}
-
-// SetNillableCount sets the "count" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableCount(i *int64) *MonitorEventCreate {
-	if i != nil {
-		mec.SetCount(*i)
-	}
-	return mec
-}
-
 // SetCreatedAt sets the "created_at" field.
 func (mec *MonitorEventCreate) SetCreatedAt(t time.Time) *MonitorEventCreate {
 	mec.mutation.SetCreatedAt(t)
@@ -657,10 +643,6 @@ func (mec *MonitorEventCreate) defaults() {
 		v := monitorevent.DefaultErrorType
 		mec.mutation.SetErrorType(v)
 	}
-	if _, ok := mec.mutation.Count(); !ok {
-		v := monitorevent.DefaultCount
-		mec.mutation.SetCount(v)
-	}
 	if _, ok := mec.mutation.CreatedAt(); !ok {
 		v := monitorevent.DefaultCreatedAt()
 		mec.mutation.SetCreatedAt(v)
@@ -861,9 +843,6 @@ func (mec *MonitorEventCreate) check() error {
 			return &ValidationError{Name: "error_type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.error_type": %w`, err)}
 		}
 	}
-	if _, ok := mec.mutation.Count(); !ok {
-		return &ValidationError{Name: "count", err: errors.New(`ent: missing required field "MonitorEvent.count"`)}
-	}
 	if _, ok := mec.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "MonitorEvent.created_at"`)}
 	}
@@ -1018,10 +997,6 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 	if value, ok := mec.mutation.ErrorType(); ok {
 		_spec.SetField(monitorevent.FieldErrorType, field.TypeString, value)
 		_node.ErrorType = value
-	}
-	if value, ok := mec.mutation.Count(); ok {
-		_spec.SetField(monitorevent.FieldCount, field.TypeInt64, value)
-		_node.Count = value
 	}
 	if value, ok := mec.mutation.CreatedAt(); ok {
 		_spec.SetField(monitorevent.FieldCreatedAt, field.TypeTime, value)

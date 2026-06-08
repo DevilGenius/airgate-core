@@ -848,7 +848,6 @@ export interface MonitorEventResp {
   upstream_status?: number;
   error_code?: string;
   error_type?: string;
-  count: number;
   created_at: string;
   updated_at: string;
   resolved_at?: string;

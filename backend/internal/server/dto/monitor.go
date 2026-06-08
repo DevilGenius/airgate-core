@@ -53,7 +53,6 @@ type MonitorEventResp struct {
 	UpstreamStatus      *int                   `json:"upstream_status,omitempty"`
 	ErrorCode           string                 `json:"error_code,omitempty"`
 	ErrorType           string                 `json:"error_type,omitempty"`
-	Count               int64                  `json:"count"`
 	CreatedAt           string                 `json:"created_at"`
 	UpdatedAt           string                 `json:"updated_at"`
 	ResolvedAt          *string                `json:"resolved_at,omitempty"`

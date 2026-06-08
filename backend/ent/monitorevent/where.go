@@ -179,11 +179,6 @@ func ErrorType(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldErrorType, v))
 }
 
-// Count applies equality check predicate on the "count" field. It's identical to CountEQ.
-func Count(v int64) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldCount, v))
-}
-
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldCreatedAt, v))
@@ -1822,46 +1817,6 @@ func ErrorTypeEqualFold(v string) predicate.MonitorEvent {
 // ErrorTypeContainsFold applies the ContainsFold predicate on the "error_type" field.
 func ErrorTypeContainsFold(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldContainsFold(FieldErrorType, v))
-}
-
-// CountEQ applies the EQ predicate on the "count" field.
-func CountEQ(v int64) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldCount, v))
-}
-
-// CountNEQ applies the NEQ predicate on the "count" field.
-func CountNEQ(v int64) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldCount, v))
-}
-
-// CountIn applies the In predicate on the "count" field.
-func CountIn(vs ...int64) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldCount, vs...))
-}
-
-// CountNotIn applies the NotIn predicate on the "count" field.
-func CountNotIn(vs ...int64) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldCount, vs...))
-}
-
-// CountGT applies the GT predicate on the "count" field.
-func CountGT(v int64) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldCount, v))
-}
-
-// CountGTE applies the GTE predicate on the "count" field.
-func CountGTE(v int64) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldCount, v))
-}
-
-// CountLT applies the LT predicate on the "count" field.
-func CountLT(v int64) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldCount, v))
-}
-
-// CountLTE applies the LTE predicate on the "count" field.
-func CountLTE(v int64) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldCount, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

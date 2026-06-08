@@ -38,7 +38,6 @@ func toMonitorEventResp(item appmonitor.Event) dto.MonitorEventResp {
 		UpstreamStatus:      item.UpstreamStatus,
 		ErrorCode:           item.ErrorCode,
 		ErrorType:           item.ErrorType,
-		Count:               item.Count,
 		CreatedAt:           monitorTimeString(item.CreatedAt),
 		UpdatedAt:           monitorTimeString(item.UpdatedAt),
 		ResolvedAt:          monitorTimePtrString(item.ResolvedAt),

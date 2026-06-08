@@ -224,19 +224,23 @@
 }
 
 .ag-usage-token-marker--cache-read::before {
-  width: 0.625rem;
-  height: 0.4375rem;
+  left: 0.125rem;
+  width: 0.5625rem;
+  height: 0.6875rem;
   border: 0.09375rem solid currentColor;
-  border-radius: 0.09375rem;
-  box-shadow: inset 0 -0.09375rem 0 color-mix(in srgb, currentColor 58%, transparent);
+  border-radius: 50% / 18%;
+  background:
+    linear-gradient(currentColor, currentColor) 50% 0.1875rem / 100% 0.09375rem no-repeat,
+    linear-gradient(currentColor, currentColor) 50% 0.40625rem / 100% 0.09375rem no-repeat;
+  opacity: 0.82;
 }
 
 .ag-usage-token-marker--cache-read::after {
-  top: 0.3125rem;
-  width: 0.09375rem;
+  right: 0.0625rem;
+  width: 0.5625rem;
   height: 0.4375rem;
   background: currentColor;
-  opacity: 0.62;
+  clip-path: polygon(0 38%, 54% 38%, 54% 12%, 100% 50%, 54% 88%, 54% 62%, 0 62%);
 }
 
 .ag-usage-token-marker--cache-create::before {
