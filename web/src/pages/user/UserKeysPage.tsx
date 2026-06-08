@@ -37,6 +37,8 @@ import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
 import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
 
+const API_KEY_AMOUNT_DECIMALS = 3;
+
 function formatRateValue(rate: number | null | undefined) {
   if (typeof rate !== 'number' || !Number.isFinite(rate)) return '—';
   const fixed = rate.toFixed(2);
@@ -312,16 +314,16 @@ export default function UserKeysPage() {
       <CommonTable
         ariaLabel={t('user_keys.title', 'API keys')}
         className="ag-api-keys-table"
-        minWidth={1070}
+        contentStyle={{ width: '100%' }}
       >
         <CommonTable.Header>
-          <CommonTable.Column id="name" style={{ minWidth: '12rem', width: '12rem' }}>{t('common.name')}</CommonTable.Column>
-          <CommonTable.Column id="key_prefix" style={{ minWidth: '11rem', width: '11rem' }}>{t('user_keys.title')}</CommonTable.Column>
+          <CommonTable.Column id="name" style={{ minWidth: '10.5rem', width: '10.5rem' }}>{t('common.name')}</CommonTable.Column>
+          <CommonTable.Column id="key_prefix" style={{ minWidth: '10rem', width: '10rem' }}>{t('user_keys.key_table_header', '密钥')}</CommonTable.Column>
           <CommonTable.Column id="group_id" style={{ width: '15rem' }}>{t('user_keys.group')}</CommonTable.Column>
           <CommonTable.Column id="status" style={{ width: '5.5rem' }}>{t('common.status')}</CommonTable.Column>
-          <CommonTable.Column id="quota" style={{ width: '17.5rem' }}>{t('user_keys.quota_label')}</CommonTable.Column>
-          <CommonTable.Column id="markup" style={{ width: '10.75rem' }}>{t('user_keys.markup_title', '销售/成本')}</CommonTable.Column>
-          <CommonTable.Column id="usage" style={{ width: '18.5rem' }}>{t('api_keys.usage')}</CommonTable.Column>
+          <CommonTable.Column id="quota" style={{ width: '18.5rem' }}>{t('user_keys.quota_table_header', '配额')}</CommonTable.Column>
+          <CommonTable.Column id="markup" style={{ width: '10.75rem' }}>{t('user_keys.markup_title', '成本/利润')}</CommonTable.Column>
+          <CommonTable.Column id="usage" style={{ width: '20.875rem' }}>{t('api_keys.usage_window', '用量(今日/30天)')}</CommonTable.Column>
           <CommonTable.Column id="expires_at" style={{ width: '7rem' }}>{t('user_keys.expires_at')}</CommonTable.Column>
           <CommonTable.Column id="actions" style={{ width: 132 }}>
             {t('common.actions')}
@@ -367,7 +369,7 @@ export default function UserKeysPage() {
               return (
                 <CommonTable.Row id={String(row.id)} key={row.id}>
                   <CommonTable.Cell>
-                    <span className="block max-w-[11rem] truncate font-medium text-text" title={row.name}>{row.name}</span>
+                    <span className="block max-w-[10rem] truncate font-medium text-text" title={row.name}>{row.name}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <span className="ag-api-key-prefix-chip inline-flex items-center text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono">
@@ -420,13 +422,15 @@ export default function UserKeysPage() {
                         {
                           amount: row.used_quota,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           highlightDollar: true,
-                          label: t('user_keys.quota_used_short', '已使用'),
+                          label: t('user_keys.quota_used_short', '使用'),
                         },
                         {
                           amount: row.quota_usd > 0 ? row.quota_usd : undefined,
                           color: 'success',
-                          label: t('user_keys.quota_total_short', '总配额'),
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          label: t('user_keys.quota_total_short', '配额'),
                           value: '∞',
                         },
                       ]}
@@ -439,12 +443,14 @@ export default function UserKeysPage() {
                         {
                           amount: row.used_quota_actual || 0,
                           color: 'default',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'warning',
                           label: t('user_keys.cost_actual', '成本'),
                         },
                         {
                           amount: profit,
                           color: 'default',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'success',
                           label: t('user_keys.profit', '利润'),
                         },
@@ -458,15 +464,33 @@ export default function UserKeysPage() {
                         {
                           amount: row.today_cost,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'warning',
-                          label: t('api_keys.today', '今日'),
+                          label: t('api_keys.sales', '销售'),
                           mutedWhenZero: true,
                         },
                         {
                           amount: row.thirty_day_cost,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'warning',
-                          label: t('api_keys.thirty_days', '近30天'),
+                          label: t('api_keys.sales', '销售'),
+                          mutedWhenZero: true,
+                        },
+                        {
+                          amount: row.today_actual_cost ?? 0,
+                          color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          dollarTone: 'warning',
+                          label: t('api_keys.consumption', '消耗'),
+                          mutedWhenZero: true,
+                        },
+                        {
+                          amount: row.thirty_day_actual_cost ?? 0,
+                          color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          dollarTone: 'warning',
+                          label: t('api_keys.consumption', '消耗'),
                           mutedWhenZero: true,
                         },
                       ]}

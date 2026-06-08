@@ -62,12 +62,15 @@ func TestListByUserNormalizesPaginationAndAttachesUsage(t *testing.T) {
 			capturedFilter = filter
 			return []Key{{ID: 1, Name: "a"}, {ID: 2, Name: "b"}}, 2, nil
 		},
-		keyUsage: func(_ context.Context, keyIDs []int, todayStart time.Time) (map[int]float64, map[int]float64, error) {
+		keyUsage: func(_ context.Context, keyIDs []int, todayStart time.Time) (map[int]UsageCosts, error) {
 			capturedIDs = append([]int(nil), keyIDs...)
 			if todayStart.IsZero() {
 				t.Fatal("今日起点不应为空")
 			}
-			return map[int]float64{1: 1.2}, map[int]float64{2: 9.8}, nil
+			return map[int]UsageCosts{
+				1: {TodaySalesCost: 1.2, TodayActualCost: 0.8},
+				2: {ThirtyDaySalesCost: 9.8, ThirtyDayActualCost: 6.4},
+			}, nil
 		},
 	}, testAPIKeySecret)
 
@@ -81,7 +84,8 @@ func TestListByUserNormalizesPaginationAndAttachesUsage(t *testing.T) {
 	if !reflect.DeepEqual(capturedIDs, []int{1, 2}) {
 		t.Fatalf("用量查询 keyIDs = %v，期望 [1 2]", capturedIDs)
 	}
-	if result.Total != 2 || result.List[0].TodayCost != 1.2 || result.List[1].ThirtyDayCost != 9.8 {
+	if result.Total != 2 || result.List[0].TodayCost != 1.2 || result.List[0].TodayActualCost != 0.8 ||
+		result.List[1].ThirtyDayCost != 9.8 || result.List[1].ThirtyDayActualCost != 6.4 {
 		t.Fatalf("列表结果异常: %+v", result)
 	}
 }
@@ -94,9 +98,9 @@ func TestListAdminNormalizesPaginationWithoutUsageAggregation(t *testing.T) {
 			capturedFilter = filter
 			return []Key{{ID: 3, Name: "admin-key"}}, 1, nil
 		},
-		keyUsage: func(_ context.Context, _ []int, _ time.Time) (map[int]float64, map[int]float64, error) {
+		keyUsage: func(_ context.Context, _ []int, _ time.Time) (map[int]UsageCosts, error) {
 			usageCalled = true
-			return nil, nil, nil
+			return nil, nil
 		},
 	}, testAPIKeySecret)
 
@@ -111,6 +115,44 @@ func TestListAdminNormalizesPaginationWithoutUsageAggregation(t *testing.T) {
 		t.Fatal("管理员搜索列表不应触发用量聚合")
 	}
 	if result.Total != 1 || len(result.List) != 1 || result.List[0].ID != 3 {
+		t.Fatalf("列表结果异常: %+v", result)
+	}
+}
+
+func TestListAdminAttachesUsageWhenRequested(t *testing.T) {
+	var capturedIDs []int
+	service := NewService(apiKeyStubRepository{
+		listAdmin: func(_ context.Context, filter ListFilter) ([]Key, int64, error) {
+			if !filter.IncludeUsage {
+				t.Fatal("IncludeUsage 应保持为 true")
+			}
+			return []Key{{ID: 3, Name: "admin-key"}}, 1, nil
+		},
+		keyUsage: func(_ context.Context, keyIDs []int, todayStart time.Time) (map[int]UsageCosts, error) {
+			capturedIDs = append([]int(nil), keyIDs...)
+			if todayStart.IsZero() {
+				t.Fatal("今日起点不应为空")
+			}
+			return map[int]UsageCosts{
+				3: {
+					TodaySalesCost:      2.5,
+					TodayActualCost:     1,
+					ThirtyDaySalesCost:  6.5,
+					ThirtyDayActualCost: 3,
+				},
+			}, nil
+		},
+	}, testAPIKeySecret)
+
+	result, err := service.ListAdmin(t.Context(), ListFilter{IncludeUsage: true, TZ: "Asia/Shanghai"})
+	if err != nil {
+		t.Fatalf("管理员查询 API Key 失败: %v", err)
+	}
+	if !reflect.DeepEqual(capturedIDs, []int{3}) {
+		t.Fatalf("用量查询 keyIDs = %v，期望 [3]", capturedIDs)
+	}
+	if result.Total != 1 || result.List[0].TodayCost != 2.5 || result.List[0].TodayActualCost != 1 ||
+		result.List[0].ThirtyDayCost != 6.5 || result.List[0].ThirtyDayActualCost != 3 {
 		t.Fatalf("列表结果异常: %+v", result)
 	}
 }
@@ -325,7 +367,7 @@ func TestResetUsageAdminResetsRepositoryUsage(t *testing.T) {
 type apiKeyStubRepository struct {
 	listByUser      func(context.Context, int, ListFilter) ([]Key, int64, error)
 	listAdmin       func(context.Context, ListFilter) ([]Key, int64, error)
-	keyUsage        func(context.Context, []int, time.Time) (map[int]float64, map[int]float64, error)
+	keyUsage        func(context.Context, []int, time.Time) (map[int]UsageCosts, error)
 	groupAccess     func(context.Context, int, int) (GroupAccess, error)
 	create          func(context.Context, Mutation) (Key, error)
 	updateOwned     func(context.Context, int, int, Mutation) (Key, error)
@@ -349,9 +391,9 @@ func (s apiKeyStubRepository) ListAdmin(ctx context.Context, filter ListFilter) 
 	return s.listAdmin(ctx, filter)
 }
 
-func (s apiKeyStubRepository) KeyUsage(ctx context.Context, keyIDs []int, todayStart time.Time) (map[int]float64, map[int]float64, error) {
+func (s apiKeyStubRepository) KeyUsage(ctx context.Context, keyIDs []int, todayStart time.Time) (map[int]UsageCosts, error) {
 	if s.keyUsage == nil {
-		return map[int]float64{}, map[int]float64{}, nil
+		return map[int]UsageCosts{}, nil
 	}
 	return s.keyUsage(ctx, keyIDs, todayStart)
 }

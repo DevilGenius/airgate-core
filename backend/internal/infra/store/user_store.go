@@ -11,6 +11,7 @@ import (
 	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	entusersubscription "github.com/DevilGenius/airgate-core/ent/usersubscription"
+	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
 	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 )
@@ -348,14 +349,14 @@ func (s *UserStore) ListAPIKeys(ctx context.Context, userID, page, pageSize int,
 	for _, item := range items {
 		keyIDs = append(keyIDs, item.ID)
 	}
-	todayUsage, thirtyDayUsage, err := queryAPIKeyUsage(ctx, s.db, keyIDs, todayStart)
+	usageMap, err := queryAPIKeyUsage(ctx, s.db, keyIDs, todayStart)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	result := make([]appuser.APIKey, 0, len(items))
 	for _, item := range items {
-		result = append(result, mapUserAPIKey(item, userID, todayUsage[item.ID], thirtyDayUsage[item.ID]))
+		result = append(result, mapUserAPIKey(item, userID, usageMap[item.ID]))
 	}
 	return result, int64(total), nil
 }
@@ -463,7 +464,7 @@ func cloneUserGroupRates(input map[int64]float64) map[int64]float64 {
 	return cloned
 }
 
-func mapUserAPIKey(item *ent.APIKey, userID int, todayCost, thirtyDayCost float64) appuser.APIKey {
+func mapUserAPIKey(item *ent.APIKey, userID int, usage appapikey.UsageCosts) appuser.APIKey {
 	var groupID *int
 	if item.Edges.Group != nil {
 		value := item.Edges.Group.ID
@@ -471,23 +472,25 @@ func mapUserAPIKey(item *ent.APIKey, userID int, todayCost, thirtyDayCost float6
 	}
 
 	return appuser.APIKey{
-		ID:              item.ID,
-		Name:            item.Name,
-		KeyHint:         item.KeyHint,
-		KeyHash:         item.KeyHash,
-		UserID:          userID,
-		GroupID:         groupID,
-		IPWhitelist:     append([]string(nil), item.IPWhitelist...),
-		IPBlacklist:     append([]string(nil), item.IPBlacklist...),
-		QuotaUSD:        item.QuotaUsd,
-		UsedQuota:       item.UsedQuota,
-		UsedQuotaActual: item.UsedQuotaActual,
-		TodayCost:       todayCost,
-		ThirtyDayCost:   thirtyDayCost,
-		ExpiresAt:       item.ExpiresAt,
-		Status:          item.Status.String(),
-		CreatedAt:       item.CreatedAt,
-		UpdatedAt:       item.UpdatedAt,
+		ID:                  item.ID,
+		Name:                item.Name,
+		KeyHint:             item.KeyHint,
+		KeyHash:             item.KeyHash,
+		UserID:              userID,
+		GroupID:             groupID,
+		IPWhitelist:         append([]string(nil), item.IPWhitelist...),
+		IPBlacklist:         append([]string(nil), item.IPBlacklist...),
+		QuotaUSD:            item.QuotaUsd,
+		UsedQuota:           item.UsedQuota,
+		UsedQuotaActual:     item.UsedQuotaActual,
+		TodayCost:           usage.TodaySalesCost,
+		TodayActualCost:     usage.TodayActualCost,
+		ThirtyDayCost:       usage.ThirtyDaySalesCost,
+		ThirtyDayActualCost: usage.ThirtyDayActualCost,
+		ExpiresAt:           item.ExpiresAt,
+		Status:              item.Status.String(),
+		CreatedAt:           item.CreatedAt,
+		UpdatedAt:           item.UpdatedAt,
 	}
 }
 

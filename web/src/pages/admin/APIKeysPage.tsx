@@ -27,6 +27,8 @@ import { CreateKeyModal } from './apikeys/CreateKeyModal';
 import { EditKeyModal } from './apikeys/EditKeyModal';
 import type { APIKeyResp, GroupResp } from '../../shared/types';
 
+const API_KEY_AMOUNT_DECIMALS = 3;
+
 export default function APIKeysPage() {
   const { t } = useTranslation();
   const copy = useClipboard();
@@ -51,6 +53,7 @@ export default function APIKeysPage() {
       page_size: pageSize,
       keyword: keyword || undefined,
       search_scope: 'api_key',
+      include_usage: true,
     }, { signal }),
     placeholderData: keepPreviousData,
   });
@@ -174,18 +177,18 @@ export default function APIKeysPage() {
       <CommonTable
         ariaLabel={t('api_keys.title', 'API keys')}
         className="ag-api-keys-table"
-        minWidth={1070}
+        minWidth={1160}
       >
         <CommonTable.Header>
           <CommonTable.Column id="id" style={{ width: 72 }}>
             {t('common.id')}
           </CommonTable.Column>
-          <CommonTable.Column id="name" style={{ minWidth: '12rem', width: '12rem' }}>{t('common.name')}</CommonTable.Column>
-          <CommonTable.Column id="key_prefix" style={{ minWidth: '11rem', width: '11rem' }}>{t('api_keys.key_prefix')}</CommonTable.Column>
+          <CommonTable.Column id="name" style={{ minWidth: '10.5rem', width: '10.5rem' }}>{t('common.name')}</CommonTable.Column>
+          <CommonTable.Column id="key_prefix" style={{ minWidth: '10rem', width: '10rem' }}>{t('api_keys.key_prefix')}</CommonTable.Column>
           <CommonTable.Column id="group_id">{t('api_keys.group')}</CommonTable.Column>
           <CommonTable.Column id="status" style={{ width: '5.5rem' }}>{t('common.status')}</CommonTable.Column>
-          <CommonTable.Column id="quota" style={{ width: '17.5rem' }}>{t('api_keys.quota_used')}</CommonTable.Column>
-          <CommonTable.Column id="usage" style={{ width: '18.5rem' }}>{t('api_keys.usage')}</CommonTable.Column>
+          <CommonTable.Column id="quota" style={{ width: '18.5rem' }}>{t('api_keys.quota_used')}</CommonTable.Column>
+          <CommonTable.Column id="usage" style={{ width: '20.875rem' }}>{t('api_keys.usage_window', '用量(今日/30天)')}</CommonTable.Column>
           <CommonTable.Column id="expires_at" style={{ width: '7rem' }}>{t('api_keys.expire_time')}</CommonTable.Column>
           <CommonTable.Column id="actions" style={{ width: 112 }}>{t('common.actions')}</CommonTable.Column>
         </CommonTable.Header>
@@ -247,13 +250,15 @@ export default function APIKeysPage() {
                         {
                           amount: row.used_quota,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           highlightDollar: true,
-                          label: t('api_keys.quota_used_short', '已使用'),
+                          label: t('api_keys.quota_used_short', '使用'),
                         },
                         {
                           amount: row.quota_usd > 0 ? row.quota_usd : undefined,
                           color: 'success',
-                          label: t('api_keys.quota_total_short', '总配额'),
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          label: t('api_keys.quota_total_short', '配额'),
                           value: '∞',
                         },
                       ]}
@@ -266,15 +271,33 @@ export default function APIKeysPage() {
                         {
                           amount: row.today_cost,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'warning',
-                          label: t('api_keys.today', '今日'),
+                          label: t('api_keys.sales', '销售'),
                           mutedWhenZero: true,
                         },
                         {
                           amount: row.thirty_day_cost,
                           color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
                           dollarTone: 'warning',
-                          label: t('api_keys.thirty_days', '近30天'),
+                          label: t('api_keys.sales', '销售'),
+                          mutedWhenZero: true,
+                        },
+                        {
+                          amount: row.today_actual_cost ?? 0,
+                          color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          dollarTone: 'warning',
+                          label: t('api_keys.consumption', '消耗'),
+                          mutedWhenZero: true,
+                        },
+                        {
+                          amount: row.thirty_day_actual_cost ?? 0,
+                          color: 'warning',
+                          decimals: API_KEY_AMOUNT_DECIMALS,
+                          dollarTone: 'warning',
+                          label: t('api_keys.consumption', '消耗'),
                           mutedWhenZero: true,
                         },
                       ]}

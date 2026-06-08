@@ -99,8 +99,8 @@ func applyAPIKeyKeyword(query *ent.APIKeyQuery, keyword string, searchScope stri
 	return query.Where(entapikey.Or(predicates...))
 }
 
-// KeyUsage 查询 API Key 今日与近 30 天用量。
-func (s *APIKeyStore) KeyUsage(ctx context.Context, keyIDs []int, todayStart time.Time) (map[int]float64, map[int]float64, error) {
+// KeyUsage 查询 API Key 今日与近 30 天账面用量。
+func (s *APIKeyStore) KeyUsage(ctx context.Context, keyIDs []int, todayStart time.Time) (map[int]appapikey.UsageCosts, error) {
 	return queryAPIKeyUsage(ctx, s.db, keyIDs, todayStart)
 }
 
