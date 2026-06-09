@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
@@ -24,14 +22,20 @@ const (
 	rateLimitedMin = 200 * time.Millisecond
 	// rateLimitedMax OAuth 某些限流可能长达数天，设上限防止异常值。
 	rateLimitedMax = 7 * 24 * time.Hour
-	// degradedDefault 池账号抖动时的软降级窗口。
-	degradedDefault = 60 * time.Second
-	// degradedMax 池账号最长降级窗口。
-	degradedMax = 10 * time.Minute
-	// accountUnavailableThreshold 账号短暂 403 连续达到该次数后升级为 disabled。
-	accountUnavailableThreshold = 3
+	// transientAvoidance* 统一处理 403 临时不可用和 5xx/网络抖动：
+	// 前三次写 degraded 短窗口并完全避让，第四次起写 60s degraded，调度变为 StickyOnly。
+	transientAvoidanceFirst  = 7500 * time.Millisecond
+	transientAvoidanceSecond = 15 * time.Second
+	transientAvoidanceThird  = 30 * time.Second
+	transientDegradedWindow  = 60 * time.Second
 
-	accountUnavailableCountExtraKey = "_airgate_account_unavailable_count"
+	// transient403DegradedThreshold 非池账号连续 403 进入 degraded 达到该次数后禁用。
+	transient403DegradedThreshold = 3
+
+	transientAvoidStepExtraKey   = "_airgate_transient_avoid_step"
+	transient403DegradedCountKey = "_airgate_transient_403_degraded_count"
+	transientKindUnavailable     = "account_unavailable"
+	transientKindUpstream        = "upstream_transient"
 )
 
 // Judgment forwarder 对一次调用的判决，交给状态机做状态转移。
@@ -40,7 +44,7 @@ type Judgment struct {
 	RetryAfter     time.Duration
 	Reason         string
 	Duration       time.Duration // 仅用于日志 / 指标
-	IsPool         bool          // 池账号（upstream_is_pool）走豁免路径
+	IsPool         bool          // 池账号（upstream_is_pool）仅在确定性账号死亡时保留部分豁免。
 	Family         string        // 模型家族键（见 ModelFamily）。非空时 RateLimited 走 Redis 家族冷却而非账号级 DB state，避免 gpt-image 限流误伤 chat。
 	UpstreamStatus int           // 上游 HTTP 状态码，用于池账号区分 401（自身凭证无效）和 403（透传上游错误）。
 }
@@ -51,11 +55,9 @@ type Judgment struct {
 //   - 把 forwarder 的 Judgment 翻译成 DB 字段变更（state / state_until / error_msg / last_used_at）
 //   - 关键转移（Active ↔ Disabled）通知上游清 route 缓存
 //
-// 只有确定性的账号级信号才动 state：AccountRateLimited / AccountDead。
-// UpstreamTransient（SSE EOF、上游 5xx、连接抖动）是上游锅，不扣账号分——让 failover 兜底。
+// 确定性的账号级信号仍由 state 记录；临时 403 和 5xx 共享瞬时避让策略。
 type StateMachine struct {
 	db             *ent.Client
-	rdb            *redis.Client
 	familyCooldown *FamilyCooldown
 	monitor        monitoring.Recorder
 
@@ -67,8 +69,11 @@ type StateMachine struct {
 
 // NewStateMachine 构造状态机。fc 提供 (account, family) 维度的限流冷却，
 // nil 时退化为旧行为：所有 RateLimited 都写账号级 DB state。
-func NewStateMachine(db *ent.Client, rdb *redis.Client, fc *FamilyCooldown) *StateMachine {
-	return &StateMachine{db: db, rdb: rdb, familyCooldown: fc}
+func NewStateMachine(db *ent.Client, fc *FamilyCooldown) *StateMachine {
+	return &StateMachine{
+		db:             db,
+		familyCooldown: fc,
+	}
 }
 
 // notifyCritical 发出关键状态变更事件。nil 回调时安静跳过。
@@ -85,8 +90,8 @@ func (sm *StateMachine) notifyCritical() {
 //	Success             → state=active，清 state_until，last_used_at=now
 //	AccountRateLimited  → state=rate_limited，state_until=now+RetryAfter
 //	AccountDead         → state=disabled（凭证失效，需人工介入）
-//	AccountUnavailable  → 非池账号 state=degraded，累计 3 次后升级 disabled
-//	UpstreamTransient   → 非池：**不动状态**（上游抖动不扣账号分，靠 failover 切走就行）；池：state=degraded
+//	AccountUnavailable  → 瞬时避让；非池账号连续 403 degraded 达阈值后 disabled
+//	UpstreamTransient   → 瞬时避让；不会 disabled
 //	ClientError / StreamAborted / Unknown → 不改状态（账号无辜）
 func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 	switch j.Kind {
@@ -130,140 +135,157 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		sm.transition(ctx, accountID, account.StateDisabled, nil, j.Reason)
 
 	case sdk.OutcomeAccountUnavailable:
-		sm.applyAccountUnavailable(ctx, accountID, j.Reason, j)
+		sm.applyTransientAvoidance(ctx, accountID, j, transientKindUnavailable)
 
 	case sdk.OutcomeUpstreamTransient:
-		// 按定义，UpstreamTransient 是"上游侧瞬时故障"（SSE 提前断流、网络抖动、上游 5xx 等），
-		// 账号本身没问题——不动 state，让 failover 切到下一账号就够了。
-		//
-		// 池账号（IsPool）保留软降级：pool 资源共享，一个账号抖起来可能拖垮整个 pool，
-		// 短时间 degraded 让调度器优先选其它账号，到期自动恢复。
-		if j.IsPool {
-			sm.applyDegraded(ctx, accountID, j.Reason)
-		}
+		sm.applyTransientAvoidance(ctx, accountID, j, transientKindUpstream)
 
 	case sdk.OutcomeClientError, sdk.OutcomeStreamAborted, sdk.OutcomeUnknown:
 		// 账号无辜，不改状态。
 	}
 }
 
-// applyDegraded 池账号软降级。state_until 到期后调度器看到就恢复 active。
-func (sm *StateMachine) applyDegraded(ctx context.Context, accountID int, reason string) {
-	dur := degradedDefault
-	if dur > degradedMax {
-		dur = degradedMax
-	}
-	until := time.Now().Add(dur)
-	sm.transition(ctx, accountID, account.StateDegraded, &until, reason)
-}
-
-func (sm *StateMachine) applyAccountUnavailable(ctx context.Context, accountID int, reason string, j Judgment) {
+func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID int, j Judgment, transientKind string) {
 	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
 	existing, err := sm.db.Account.Get(dbCtx, accountID)
 	if err != nil {
-		slog.Warn("scheduler_account_unavailable_load_failed",
+		slog.Warn("scheduler_transient_avoidance_load_failed",
 			sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
 		return
 	}
 
 	now := time.Now()
 	if existing.State == account.StateDisabled {
-		slog.Warn("scheduler_account_unavailable_ignored_disabled",
+		slog.Warn("scheduler_transient_avoidance_ignored_disabled",
 			sdk.LogFieldAccountID, accountID,
-			sdk.LogFieldReason, reason,
+			"transient_kind", transientKind,
+			sdk.LogFieldReason, j.Reason,
 		)
 		return
 	}
 	if existing.State == account.StateRateLimited && existing.StateUntil != nil && existing.StateUntil.After(now) {
-		slog.Warn("scheduler_account_unavailable_ignored_rate_limited",
+		slog.Warn("scheduler_transient_avoidance_ignored_rate_limited",
 			sdk.LogFieldAccountID, accountID,
+			"transient_kind", transientKind,
 			"until", existing.StateUntil,
-			sdk.LogFieldReason, reason,
+			sdk.LogFieldReason, j.Reason,
 		)
 		return
 	}
-	if existing.State == account.StateRateLimited {
-		slog.Debug("scheduler_account_unavailable_expired_rate_limit_as_active",
+	if existing.State == account.StateRateLimited && isExpiredTemporaryState(existing, now) {
+		slog.Debug("scheduler_transient_avoidance_expired_rate_limit_as_active",
 			sdk.LogFieldAccountID, accountID,
 			"until", existing.StateUntil,
-			sdk.LogFieldReason, reason,
+			"transient_kind", transientKind,
+			sdk.LogFieldReason, j.Reason,
 		)
-		existing.State = account.StateActive
-		existing.StateUntil = nil
-	}
-
-	if !shouldTrackAccountUnavailable(existing) {
-		slog.Warn("scheduler_account_unavailable_ignored",
-			sdk.LogFieldAccountID, accountID,
-			"account_type", existing.Type,
-			"is_pool", existing.UpstreamIsPool,
-			sdk.LogFieldReason, reason,
-		)
-		return
 	}
 
 	extra := cloneExtra(existing.Extra)
-	if existing.State == account.StateDegraded && existing.StateUntil != nil && existing.StateUntil.After(now) && extraInt(extra, accountUnavailableCountExtraKey) > 0 {
-		slog.Warn("scheduler_account_unavailable_degraded_skip_count",
-			sdk.LogFieldAccountID, accountID,
-			"count", extraInt(extra, accountUnavailableCountExtraKey),
-			"until", existing.StateUntil,
-			sdk.LogFieldReason, reason,
-		)
-		return
-	}
+	step := extraInt(extra, transientAvoidStepExtraKey)
+	delay, degraded := transientAvoidanceDelay(step)
+	nextStep := nextTransientAvoidanceStep(step)
+	until := now.Add(delay)
+	extra[transientAvoidStepExtraKey] = nextStep
 
-	count := extraInt(extra, accountUnavailableCountExtraKey) + 1
-	extra[accountUnavailableCountExtraKey] = count
-
-	if count >= accountUnavailableThreshold {
-		delete(extra, accountUnavailableCountExtraKey)
-		err = sm.db.Account.UpdateOneID(accountID).
-			SetState(account.StateDisabled).
-			ClearStateUntil().
-			SetErrorMsg(truncateReason(reason)).
-			SetExtra(extra).
-			Exec(dbCtx)
-		if err != nil {
-			slog.Error("scheduler_account_unavailable_disable_failed",
-				sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
+	if degraded && transientKind == transientKindUnavailable && !existing.UpstreamIsPool {
+		count := extraInt(extra, transient403DegradedCountKey) + 1
+		extra[transient403DegradedCountKey] = count
+		if count >= transient403DegradedThreshold {
+			clearTransientAvoidanceExtra(extra)
+			err = sm.db.Account.UpdateOneID(accountID).
+				SetState(account.StateDisabled).
+				ClearStateUntil().
+				SetErrorMsg(truncateReason(j.Reason)).
+				SetExtra(extra).
+				Exec(dbCtx)
+			if err != nil {
+				slog.Error("scheduler_transient_403_disable_failed",
+					sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
+				return
+			}
+			slog.Warn("scheduler_transient_403_disabled",
+				sdk.LogFieldAccountID, accountID,
+				"degraded_count", count,
+				sdk.LogFieldReason, j.Reason,
+			)
+			sm.recordAccountStateEvent(ctx, accountID, account.StateDisabled, nil, j.Reason, j)
+			sm.notifyCritical()
 			return
 		}
-		slog.Warn("scheduler_account_unavailable_escalated",
-			sdk.LogFieldAccountID, accountID,
-			"count", count,
-			sdk.LogFieldReason, reason,
-		)
-		sm.recordAccountStateEvent(ctx, accountID, account.StateDisabled, nil, reason, j)
-		sm.notifyCritical()
-		return
+	} else {
+		delete(extra, transient403DegradedCountKey)
 	}
 
-	until := now.Add(degradedDefault)
 	err = sm.db.Account.UpdateOneID(accountID).
 		SetState(account.StateDegraded).
 		SetStateUntil(until).
-		SetErrorMsg(truncateReason(reason)).
+		SetErrorMsg(truncateReason(j.Reason)).
 		SetExtra(extra).
 		Exec(dbCtx)
 	if err != nil {
-		slog.Error("scheduler_account_unavailable_degrade_failed",
+		slog.Error("scheduler_transient_degrade_failed",
 			sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
 		return
 	}
-	slog.Warn("scheduler_account_unavailable_degraded",
+	slog.Warn("scheduler_transient_degraded",
 		sdk.LogFieldAccountID, accountID,
-		"count", count,
+		"transient_kind", transientKind,
+		"step", nextStep,
 		"until", until,
-		sdk.LogFieldReason, reason,
+		"short_avoidance", !degraded,
+		"degraded_403_count", extraInt(extra, transient403DegradedCountKey),
+		sdk.LogFieldReason, j.Reason,
 	)
-	sm.recordAccountStateEvent(ctx, accountID, account.StateDegraded, &until, reason, j)
+	sm.recordAccountStateEvent(ctx, accountID, account.StateDegraded, &until, j.Reason, j)
 }
 
-func shouldTrackAccountUnavailable(acc *ent.Account) bool {
-	return acc != nil && !acc.UpstreamIsPool
+func transientAvoidanceDelay(step int) (time.Duration, bool) {
+	switch {
+	case step <= 0:
+		return transientAvoidanceFirst, false
+	case step == 1:
+		return transientAvoidanceSecond, false
+	case step == 2:
+		return transientAvoidanceThird, false
+	default:
+		return transientDegradedWindow, true
+	}
+}
+
+func nextTransientAvoidanceStep(step int) int {
+	if step < 0 {
+		return 1
+	}
+	if step >= 3 {
+		return 4
+	}
+	return step + 1
+}
+
+func clearTransientAvoidanceExtra(extra map[string]interface{}) {
+	delete(extra, transientAvoidStepExtraKey)
+	delete(extra, transient403DegradedCountKey)
+}
+
+func hasTransientAvoidanceExtra(extra map[string]interface{}) bool {
+	if extra == nil {
+		return false
+	}
+	if _, ok := extra[transientAvoidStepExtraKey]; ok {
+		return true
+	}
+	return hasTransient403DegradedCount(extra)
+}
+
+func hasTransient403DegradedCount(extra map[string]interface{}) bool {
+	if extra == nil {
+		return false
+	}
+	_, ok := extra[transient403DegradedCountKey]
+	return ok
 }
 
 // transitionActive 成功时回到 active：清 state_until、清 reason、清失败计数、更新 last_used_at。
@@ -304,10 +326,11 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 	if !force && isUnexpiredTemporaryState(existing, now) {
 		upd := sm.db.Account.UpdateOneID(accountID).
 			SetLastUsedAt(now)
-		if extraInt(existing.Extra, accountUnavailableCountExtraKey) > 0 {
+		if hasTransientAvoidanceExtra(existing.Extra) {
 			extra := cloneExtra(existing.Extra)
-			delete(extra, accountUnavailableCountExtraKey)
-			upd = upd.SetExtra(extra)
+			clearTransientAvoidanceExtra(extra)
+			upd = upd.SetExtra(extra).
+				SetErrorMsg("")
 		}
 		if err := upd.Exec(dbCtx); err != nil {
 			slog.Warn("scheduler_state_active_touch_failed",
@@ -322,9 +345,9 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 		SetErrorMsg("").
 		SetLastUsedAt(now)
 	if getErr == nil {
-		if extraInt(existing.Extra, accountUnavailableCountExtraKey) > 0 {
+		if hasTransientAvoidanceExtra(existing.Extra) {
 			extra := cloneExtra(existing.Extra)
-			delete(extra, accountUnavailableCountExtraKey)
+			clearTransientAvoidanceExtra(extra)
 			upd = upd.SetExtra(extra)
 		}
 	}
@@ -346,8 +369,10 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
+	var existing *ent.Account
 	if newState != account.StateDisabled {
-		existing, err := sm.db.Account.Get(dbCtx, accountID)
+		var err error
+		existing, err = sm.db.Account.Get(dbCtx, accountID)
 		if err == nil {
 			if existing.State == account.StateDisabled {
 				slog.Info("scheduler_state_transition_ignored_disabled",
@@ -377,6 +402,11 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 		upd = upd.ClearStateUntil()
 	} else {
 		upd = upd.SetStateUntil(*stateUntil)
+	}
+	if existing != nil && newState != account.StateDegraded && hasTransientAvoidanceExtra(existing.Extra) {
+		extra := cloneExtra(existing.Extra)
+		clearTransientAvoidanceExtra(extra)
+		upd = upd.SetExtra(extra)
 	}
 
 	if err := upd.Exec(dbCtx); err != nil {
@@ -464,6 +494,37 @@ func isUnexpiredTemporaryState(acc *ent.Account, now time.Time) bool {
 		return false
 	}
 	return acc.State == account.StateRateLimited || acc.State == account.StateDegraded
+}
+
+func isExpiredTemporaryState(acc *ent.Account, now time.Time) bool {
+	if acc == nil || acc.StateUntil == nil || acc.StateUntil.After(now) {
+		return false
+	}
+	return acc.State == account.StateRateLimited || acc.State == account.StateDegraded
+}
+
+func isShortDegradedWindow(acc *ent.Account, now time.Time) bool {
+	if acc == nil || acc.State != account.StateDegraded || acc.StateUntil == nil || !acc.StateUntil.After(now) {
+		return false
+	}
+	step := extraInt(acc.Extra, transientAvoidStepExtraKey)
+	return step > 0 && step < 4
+}
+
+func schedulabilityWithTransientAvoidance(acc *ent.Account, now time.Time) Schedulability {
+	sched := SchedulabilityOf(acc, now)
+	if sched == StickyOnly && isShortDegradedWindow(acc, now) {
+		return NotSchedulable
+	}
+	return sched
+}
+
+func hardAffinitySchedulabilityWithTransientAvoidance(acc *ent.Account, now time.Time) Schedulability {
+	sched := hardAffinityBaseSchedulability(acc, now)
+	if sched == StickyOnly && isShortDegradedWindow(acc, now) {
+		return NotSchedulable
+	}
+	return sched
 }
 
 // SchedulabilityOf 根据当前状态 + 到期时间判断账号是否可调度。

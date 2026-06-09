@@ -100,6 +100,7 @@ func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 	rpm := NewRPMCounter(rdb)
 	rc := newRouteCache(routeCacheTTL)
 	fc := NewFamilyCooldown(rdb)
+	sm := NewStateMachine(db, fc)
 	s := &Scheduler{
 		db:               db,
 		rdb:              rdb,
@@ -108,7 +109,7 @@ func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 		rpm:              rpm,
 		session:          NewSessionManager(rdb),
 		msgQueue:         NewMessageQueue(rdb, rpm),
-		state:            NewStateMachine(db, rdb, fc),
+		state:            sm,
 		familyCooldown:   fc,
 		routeCache:       rc,
 		responseAffinity: NewResponseAffinity(rdb),

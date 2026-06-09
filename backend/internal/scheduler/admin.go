@@ -20,9 +20,9 @@ func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 		ClearStateUntil().
 		SetErrorMsg("")
 	if existing, getErr := s.db.Account.Get(dbCtx, accountID); getErr == nil {
-		if extraInt(existing.Extra, accountUnavailableCountExtraKey) > 0 {
+		if hasTransientAvoidanceExtra(existing.Extra) {
 			extra := cloneExtra(existing.Extra)
-			delete(extra, accountUnavailableCountExtraKey)
+			clearTransientAvoidanceExtra(extra)
 			upd = upd.SetExtra(extra)
 		}
 	}

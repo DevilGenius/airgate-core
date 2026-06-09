@@ -91,7 +91,7 @@
 .ag-usage-token-marker--cache-read::before {
   left: 50%;
   top: 50%;
-  width: 0.375em;
+  width: 0.34375em;
   height: 0.5em;
   border-radius: 0.078125em 0.078125em 0 0;
   background: currentColor;
