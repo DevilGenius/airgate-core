@@ -54,13 +54,21 @@ func (s *Service) runAggregatorLoop(ctx context.Context) {
 			flush(tailCtx)
 			cancel()
 			return
-		case event := <-s.queue:
-			if event.Fingerprint == "" {
-				continue
-			}
-			pending = append(pending, event)
-			if len(pending) >= s.flushBatchSize {
+		case op := <-s.queue:
+			switch op.Kind {
+			case queuedOperationRecord:
+				if op.Event.Fingerprint == "" {
+					continue
+				}
+				pending = append(pending, op.Event)
+				if len(pending) >= s.flushBatchSize {
+					flush(ctx)
+				}
+			case queuedOperationResolve:
 				flush(ctx)
+				s.resolveBySubject(ctx, op.Resolve)
+			default:
+				continue
 			}
 		case <-ticker.C:
 			flush(ctx)
@@ -80,6 +88,15 @@ func (s *Service) flushBatch(ctx context.Context, batch []QueuedEvent) error {
 	}
 	s.flushedEvents.Add(int64(len(batch)))
 	return nil
+}
+
+func (s *Service) resolveBySubject(ctx context.Context, query monitoring.ResolveQuery) {
+	if s == nil || s.repo == nil {
+		return
+	}
+	if err := s.repo.ResolveBySubject(ctx, query); err != nil {
+		slog.Warn("monitor_resolve_by_subject_failed", "error", err)
+	}
 }
 
 func (s *Service) superviseLoop(ctx context.Context, name string, counter *atomic.Int64, run func()) {

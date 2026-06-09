@@ -63,7 +63,7 @@ type Service struct {
 	repo           Repository
 	notifier       Notifier
 	rdb            *redis.Client
-	queue          chan QueuedEvent
+	queue          chan queuedOperation
 	retention      time.Duration
 	flushInterval  time.Duration
 	flushBatchSize int
@@ -83,7 +83,7 @@ var _ monitoring.Recorder = (*Service)(nil)
 func NewService(repo Repository, opts ...Option) *Service {
 	s := &Service{
 		repo:           repo,
-		queue:          make(chan QueuedEvent, defaultQueueSize),
+		queue:          make(chan queuedOperation, defaultQueueSize),
 		retention:      defaultRetention,
 		flushInterval:  defaultFlushInterval,
 		flushBatchSize: defaultFlushBatchSize,
@@ -103,7 +103,7 @@ func NewService(repo Repository, opts ...Option) *Service {
 		s.flushBatchSize = defaultFlushBatchSize
 	}
 	if s.queue == nil {
-		s.queue = make(chan QueuedEvent, defaultQueueSize)
+		s.queue = make(chan queuedOperation, defaultQueueSize)
 	}
 	return s
 }
@@ -112,7 +112,7 @@ func NewService(repo Repository, opts ...Option) *Service {
 func WithQueueSize(size int) Option {
 	return func(s *Service) {
 		if size > 0 {
-			s.queue = make(chan QueuedEvent, size)
+			s.queue = make(chan queuedOperation, size)
 		}
 	}
 }
@@ -169,7 +169,7 @@ func (s *Service) Record(ctx context.Context, input monitoring.EventInput) {
 	}
 	event := s.normalizeInput(input)
 	select {
-	case s.queue <- event:
+	case s.queue <- queuedOperation{Kind: queuedOperationRecord, Event: event}:
 		s.queuedEvents.Add(1)
 	default:
 		dropped := s.droppedEvents.Add(1)
@@ -177,14 +177,21 @@ func (s *Service) Record(ctx context.Context, input monitoring.EventInput) {
 	}
 }
 
-// ResolveBySubject marks active events for a subject as resolved. Errors are
-// logged and intentionally hidden from callers.
+// ResolveBySubject schedules active events for a subject to be resolved. It is
+// intentionally best-effort and never performs database work in the caller path.
 func (s *Service) ResolveBySubject(ctx context.Context, query monitoring.ResolveQuery) {
-	if s == nil || s.repo == nil {
+	if s == nil {
 		return
 	}
-	if err := s.repo.ResolveBySubject(ctx, query); err != nil {
-		slog.Warn("monitor_resolve_by_subject_failed", "error", err)
+	if ctx != nil && ctx.Err() != nil {
+		return
+	}
+	select {
+	case s.queue <- queuedOperation{Kind: queuedOperationResolve, Resolve: cloneResolveQuery(query)}:
+		s.queuedEvents.Add(1)
+	default:
+		dropped := s.droppedEvents.Add(1)
+		s.logDrop(dropped)
 	}
 }
 
@@ -611,6 +618,12 @@ func cloneIntPtr(value *int) *int {
 	}
 	v := *value
 	return &v
+}
+
+func cloneResolveQuery(query monitoring.ResolveQuery) monitoring.ResolveQuery {
+	query.APIKeyID = cloneIntPtr(query.APIKeyID)
+	query.AccountID = cloneIntPtr(query.AccountID)
+	return query
 }
 
 func intPtrValue(value *int) string {

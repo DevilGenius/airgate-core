@@ -61,6 +61,19 @@ type QueuedEvent struct {
 	Event
 }
 
+type queuedOperationKind string
+
+const (
+	queuedOperationRecord  queuedOperationKind = "record"
+	queuedOperationResolve queuedOperationKind = "resolve"
+)
+
+type queuedOperation struct {
+	Kind    queuedOperationKind
+	Event   QueuedEvent
+	Resolve monitoring.ResolveQuery
+}
+
 // ListFilter filters monitor events.
 type ListFilter struct {
 	Status      string
