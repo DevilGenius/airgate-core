@@ -14,8 +14,8 @@ const (
 	Label = "monitor_event"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
-	// FieldKind holds the string denoting the kind field in the database.
-	FieldKind = "kind"
+	// FieldType holds the string denoting the type field in the database.
+	FieldType = "type"
 	// FieldSeverity holds the string denoting the severity field in the database.
 	FieldSeverity = "severity"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -64,8 +64,6 @@ const (
 	FieldUpstreamStatus = "upstream_status"
 	// FieldErrorCode holds the string denoting the error_code field in the database.
 	FieldErrorCode = "error_code"
-	// FieldErrorType holds the string denoting the error_type field in the database.
-	FieldErrorType = "error_type"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -93,7 +91,7 @@ const (
 // Columns holds all SQL columns for monitorevent fields.
 var Columns = []string{
 	FieldID,
-	FieldKind,
+	FieldType,
 	FieldSeverity,
 	FieldStatus,
 	FieldSource,
@@ -118,7 +116,6 @@ var Columns = []string{
 	FieldHTTPStatus,
 	FieldUpstreamStatus,
 	FieldErrorCode,
-	FieldErrorType,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 	FieldResolvedAt,
@@ -204,10 +201,6 @@ var (
 	DefaultErrorCode string
 	// ErrorCodeValidator is a validator for the "error_code" field. It is called by the builders before save.
 	ErrorCodeValidator func(string) error
-	// DefaultErrorType holds the default value on creation for the "error_type" field.
-	DefaultErrorType string
-	// ErrorTypeValidator is a validator for the "error_type" field. It is called by the builders before save.
-	ErrorTypeValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -222,30 +215,30 @@ var (
 	DefaultDetail map[string]interface{}
 )
 
-// Kind defines the type for the "kind" enum field.
-type Kind string
+// Type defines the type for the "type" enum field.
+type Type string
 
-// Kind values.
+// Type values.
 const (
-	KindAPIRequestError      Kind = "api_request_error"
-	KindSchedulerError       Kind = "scheduler_error"
-	KindUpstreamAccountError Kind = "upstream_account_error"
-	KindPluginError          Kind = "plugin_error"
-	KindTaskError            Kind = "task_error"
-	KindSystemError          Kind = "system_error"
+	TypeAPIRequestError      Type = "api_request_error"
+	TypeSchedulerError       Type = "scheduler_error"
+	TypeUpstreamAccountError Type = "upstream_account_error"
+	TypePluginError          Type = "plugin_error"
+	TypeTaskError            Type = "task_error"
+	TypeSystemError          Type = "system_error"
 )
 
-func (k Kind) String() string {
-	return string(k)
+func (_type Type) String() string {
+	return string(_type)
 }
 
-// KindValidator is a validator for the "kind" field enum values. It is called by the builders before save.
-func KindValidator(k Kind) error {
-	switch k {
-	case KindAPIRequestError, KindSchedulerError, KindUpstreamAccountError, KindPluginError, KindTaskError, KindSystemError:
+// TypeValidator is a validator for the "type" field enum values. It is called by the builders before save.
+func TypeValidator(_type Type) error {
+	switch _type {
+	case TypeAPIRequestError, TypeSchedulerError, TypeUpstreamAccountError, TypePluginError, TypeTaskError, TypeSystemError:
 		return nil
 	default:
-		return fmt.Errorf("monitorevent: invalid enum value for kind field: %q", k)
+		return fmt.Errorf("monitorevent: invalid enum value for type field: %q", _type)
 	}
 }
 
@@ -311,9 +304,9 @@ func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
 }
 
-// ByKind orders the results by the kind field.
-func ByKind(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldKind, opts...).ToFunc()
+// ByType orders the results by the type field.
+func ByType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldType, opts...).ToFunc()
 }
 
 // BySeverity orders the results by the severity field.
@@ -434,11 +427,6 @@ func ByUpstreamStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByErrorCode orders the results by the error_code field.
 func ByErrorCode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldErrorCode, opts...).ToFunc()
-}
-
-// ByErrorType orders the results by the error_type field.
-func ByErrorType(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldErrorType, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

@@ -263,13 +263,7 @@
     "monitor_detail": "Locator",
     "monitor_severity_warning": "Warning",
     "monitor_severity_error": "Error",
-    "monitor_severity_critical": "Critical",
-    "monitor_kind_api_request_error": "API Request Error",
-    "monitor_kind_scheduler_error": "Scheduler Error",
-    "monitor_kind_upstream_account_error": "Upstream Account Error",
-    "monitor_kind_plugin_error": "Plugin Error",
-    "monitor_kind_task_error": "Task Error",
-    "monitor_kind_system_error": "System Error"
+    "monitor_severity_critical": "Critical"
   },
 
   "user_overview": {
@@ -690,14 +684,14 @@
     "warning": "Warning",
     "status": "Status",
     "severity": "Severity",
-    "kind": "Type",
+    "type": "Type",
     "event": "Event",
     "subject": "Subject",
     "source": "Source",
     "locator": "Locator",
     "platform": "Platform",
     "model": "Request Model",
-    "updated_at": "Updated",
+    "updated_at": "Time",
     "time_range": "Time Range",
     "endpoint": "Endpoint",
     "error_code": "Error Code",
@@ -715,12 +709,12 @@
     "severity_warning": "Warning",
     "severity_error": "Error",
     "severity_critical": "Critical",
-    "kind_api_request_error": "API Request Error",
-    "kind_scheduler_error": "Scheduler Error",
-    "kind_upstream_account_error": "Upstream Account Error",
-    "kind_plugin_error": "Plugin Error",
-    "kind_task_error": "Task Error",
-    "kind_system_error": "System Error"
+    "type_api_request_error": "API Request Error",
+    "type_scheduler_error": "Scheduler Error",
+    "type_upstream_account_error": "Upstream Account Error",
+    "type_plugin_error": "Plugin Error",
+    "type_task_error": "Task Error",
+    "type_system_error": "System Error"
   },
 
   "usage": {

@@ -412,14 +412,13 @@ func (sm *StateMachine) recordAccountStateEvent(ctx context.Context, accountID i
 	}
 	errorCode := "account_" + string(state)
 	input := monitoring.EventInput{
-		Kind:        monitoring.KindUpstreamAccountError,
+		Type:        monitoring.TypeUpstreamAccountError,
 		Severity:    severity,
 		Source:      monitoring.SourceScheduler,
 		SubjectType: monitoring.SubjectAccount,
 		SubjectID:   strconv.Itoa(accountID),
 		AccountID:   &accountID,
 		ErrorCode:   errorCode,
-		ErrorType:   string(state),
 		Title:       "Upstream account " + string(state),
 		Message:     reason,
 		Detail: map[string]interface{}{
@@ -446,7 +445,7 @@ func (sm *StateMachine) resolveAccountEvents(ctx context.Context, accountID int)
 		return
 	}
 	sm.monitor.ResolveBySubject(ctx, monitoring.ResolveQuery{
-		Kind:        monitoring.KindUpstreamAccountError,
+		Type:        monitoring.TypeUpstreamAccountError,
 		SubjectType: monitoring.SubjectAccount,
 		SubjectID:   strconv.Itoa(accountID),
 		AccountID:   &accountID,

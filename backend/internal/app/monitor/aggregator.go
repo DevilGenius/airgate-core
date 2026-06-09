@@ -101,7 +101,7 @@ func (s *Service) superviseLoop(ctx context.Context, name string, counter *atomi
 		total := counter.Add(1)
 		slog.Error("monitor_loop_panic", "loop", name, "panic", panicValue, "restart_count", total)
 		s.Record(context.Background(), monitoring.EventInput{
-			Kind:        monitoring.KindSystemError,
+			Type:        monitoring.TypeSystemError,
 			Severity:    monitoring.SeverityError,
 			Source:      monitoring.SourceMonitorWorker,
 			SubjectType: monitoring.SubjectSystem,

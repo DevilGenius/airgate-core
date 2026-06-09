@@ -37,7 +37,7 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 	groupID := keyInfo.GroupID
 	apiKeyID := keyInfo.KeyID
 	f.monitor.Record(ctx, monitoring.EventInput{
-		Kind:               monitoring.KindAPIRequestError,
+		Type:               monitoring.TypeAPIRequestError,
 		Severity:           level,
 		Source:             monitoring.SourceForwarder,
 		SubjectType:        monitoring.SubjectAPIKey,
@@ -54,15 +54,14 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 		Model:              model,
 		HTTPStatus:         intPtr(status),
 		ErrorCode:          code,
-		ErrorType:          errorTypeForStatus(status),
 		Title:              "API request error",
 		Message:            message,
 		Detail: map[string]interface{}{
-			"path":        path,
-			"platform":    platform,
-			"model":       model,
-			"http_status": status,
-			"error_code":  code,
+			"platform":         platform,
+			"model":            model,
+			"http_status":      status,
+			"http_error_class": httpErrorClassForStatus(status),
+			"error_code":       code,
 		},
 	})
 }
@@ -77,7 +76,7 @@ func (f *Forwarder) recordPluginRouteError(c *gin.Context, keyInfo *auth.APIKeyI
 		ctx = c.Request.Context()
 	}
 	f.monitor.Record(ctx, monitoring.EventInput{
-		Kind:        monitoring.KindPluginError,
+		Type:        monitoring.TypePluginError,
 		Severity:    monitoring.SeverityError,
 		Source:      monitoring.SourceForwarder,
 		SubjectType: monitoring.SubjectPlugin,
@@ -87,12 +86,11 @@ func (f *Forwarder) recordPluginRouteError(c *gin.Context, keyInfo *auth.APIKeyI
 		RequestPath: path,
 		HTTPStatus:  intPtr(http.StatusServiceUnavailable),
 		ErrorCode:   code,
-		ErrorType:   "plugin_route",
 		Title:       "Plugin route error",
 		Message:     message,
 		Detail: map[string]interface{}{
-			"path":     path,
 			"platform": platform,
+			"stage":    "plugin_route",
 		},
 	})
 }
@@ -121,7 +119,7 @@ func (f *Forwarder) recordPluginExecutionError(ctx context.Context, state *forwa
 		}
 	}
 	input := monitoring.EventInput{
-		Kind:           monitoring.KindPluginError,
+		Type:           monitoring.TypePluginError,
 		Severity:       monitoring.SeverityError,
 		Source:         monitoring.SourceForwarder,
 		SubjectType:    monitoring.SubjectPlugin,
@@ -134,7 +132,6 @@ func (f *Forwarder) recordPluginExecutionError(ctx context.Context, state *forwa
 		Model:          state.model,
 		UpstreamStatus: intPtr(execution.outcome.Upstream.StatusCode),
 		ErrorCode:      code,
-		ErrorType:      "plugin_forward",
 		Title:          "Plugin forward error",
 		Message:        message,
 		Detail: map[string]interface{}{
@@ -142,6 +139,7 @@ func (f *Forwarder) recordPluginExecutionError(ctx context.Context, state *forwa
 			"duration_ms":     execution.duration.Milliseconds(),
 			"upstream_status": execution.outcome.Upstream.StatusCode,
 			"reason":          message,
+			"stage":           "plugin_forward",
 		},
 	}
 	if state.keyInfo != nil {
@@ -174,7 +172,7 @@ func shouldRecordPluginExecutionError(execution forwardExecution) bool {
 	}
 }
 
-func errorTypeForStatus(status int) string {
+func httpErrorClassForStatus(status int) string {
 	switch {
 	case status == http.StatusTooManyRequests:
 		return "rate_limit_error"

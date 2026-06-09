@@ -7,12 +7,12 @@ import (
 )
 
 const (
-	KindAPIRequestError      = "api_request_error"
-	KindSchedulerError       = "scheduler_error"
-	KindUpstreamAccountError = "upstream_account_error"
-	KindPluginError          = "plugin_error"
-	KindTaskError            = "task_error"
-	KindSystemError          = "system_error"
+	TypeAPIRequestError      = "api_request_error"
+	TypeSchedulerError       = "scheduler_error"
+	TypeUpstreamAccountError = "upstream_account_error"
+	TypePluginError          = "plugin_error"
+	TypeTaskError            = "task_error"
+	TypeSystemError          = "system_error"
 
 	SeverityWarning  = "warning"
 	SeverityError    = "error"
@@ -41,7 +41,7 @@ const (
 
 // EventInput is the best-effort event shape accepted by low-level packages.
 type EventInput struct {
-	Kind        string
+	Type        string
 	Severity    string
 	Source      string
 	SubjectType string
@@ -67,11 +67,10 @@ type EventInput struct {
 	HTTPStatus          *int
 	UpstreamStatus      *int
 	ErrorCode           string
-	ErrorType           string
 
 	// FingerprintMaterial overrides the default structured fingerprint material.
 	FingerprintMaterial string
-	// AutoResolveAt optionally overrides the default kind-based auto-resolve window.
+	// AutoResolveAt optionally overrides the default type-based auto-resolve window.
 	AutoResolveAt *time.Time
 	// ObservedAt is primarily for tests and internally replayed events. Callers usually leave it zero.
 	ObservedAt time.Time
@@ -80,7 +79,7 @@ type EventInput struct {
 
 // ResolveQuery identifies active events to resolve.
 type ResolveQuery struct {
-	Kind        string
+	Type        string
 	SubjectType string
 	SubjectID   string
 	APIKeyID    *int

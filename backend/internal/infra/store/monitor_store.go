@@ -264,7 +264,7 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
-	byKind, err := s.summaryByKind(ctx, base.Clone())
+	byType, err := s.summaryByType(ctx, base.Clone())
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
@@ -293,31 +293,31 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 		CriticalTotal: int64(criticalTotal),
 		ErrorTotal:    int64(errorTotal),
 		WarningTotal:  int64(warningTotal),
-		ByKind:        byKind,
+		ByType:        byType,
 		TopAPIKeys:    topAPIKeys,
 		TopAccounts:   topAccounts,
 		Recent:        recent,
 	}, nil
 }
 
-func (s *MonitorStore) summaryByKind(ctx context.Context, query *ent.MonitorEventQuery) ([]appmonitor.KindCount, error) {
+func (s *MonitorStore) summaryByType(ctx context.Context, query *ent.MonitorEventQuery) ([]appmonitor.TypeCount, error) {
 	var rows []struct {
-		Kind  string `json:"kind"`
+		Type  string `json:"type"`
 		Count int    `json:"count"`
 	}
-	err := query.GroupBy(entmonitorevent.FieldKind).
+	err := query.GroupBy(entmonitorevent.FieldType).
 		Aggregate(ent.Count()).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]appmonitor.KindCount, 0, len(rows))
+	out := make([]appmonitor.TypeCount, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, appmonitor.KindCount{Kind: row.Kind, Count: int64(row.Count)})
+		out = append(out, appmonitor.TypeCount{Type: row.Type, Count: int64(row.Count)})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Count == out[j].Count {
-			return out[i].Kind < out[j].Kind
+			return out[i].Type < out[j].Type
 		}
 		return out[i].Count > out[j].Count
 	})
@@ -383,8 +383,8 @@ func applyMonitorListFilter(query *ent.MonitorEventQuery, filter appmonitor.List
 	if filter.Severity != "" {
 		query = query.Where(entmonitorevent.SeverityEQ(entmonitorevent.Severity(filter.Severity)))
 	}
-	if filter.Kind != "" {
-		query = query.Where(entmonitorevent.KindEQ(entmonitorevent.Kind(filter.Kind)))
+	if filter.Type != "" {
+		query = query.Where(entmonitorevent.TypeEQ(entmonitorevent.Type(filter.Type)))
 	}
 	if filter.Source != "" {
 		query = query.Where(entmonitorevent.SourceEQ(filter.Source))
@@ -424,8 +424,8 @@ func applyMonitorListFilter(query *ent.MonitorEventQuery, filter appmonitor.List
 
 func monitorResolvePredicates(query monitoring.ResolveQuery) []predicate.MonitorEvent {
 	preds := make([]predicate.MonitorEvent, 0, 8)
-	if query.Kind != "" {
-		preds = append(preds, entmonitorevent.KindEQ(entmonitorevent.Kind(query.Kind)))
+	if query.Type != "" {
+		preds = append(preds, entmonitorevent.TypeEQ(entmonitorevent.Type(query.Type)))
 	}
 	if query.SubjectType != "" {
 		preds = append(preds, entmonitorevent.SubjectTypeEQ(query.SubjectType))
@@ -453,7 +453,7 @@ func monitorResolvePredicates(query monitoring.ResolveQuery) []predicate.Monitor
 
 func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.QueuedEvent) *ent.MonitorEventCreate {
 	create = create.
-		SetKind(entmonitorevent.Kind(event.Kind)).
+		SetType(entmonitorevent.Type(event.Type)).
 		SetSeverity(entmonitorevent.Severity(event.Severity)).
 		SetStatus(entmonitorevent.StatusActive).
 		SetSource(event.Source).
@@ -478,7 +478,6 @@ func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.Que
 		SetNillableHTTPStatus(event.HTTPStatus).
 		SetNillableUpstreamStatus(event.UpstreamStatus).
 		SetErrorCode(event.ErrorCode).
-		SetErrorType(event.ErrorType).
 		SetCreatedAt(event.CreatedAt).
 		SetUpdatedAt(event.UpdatedAt).
 		SetNillableAutoResolveAt(event.AutoResolveAt).
@@ -500,7 +499,7 @@ func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 	}
 	return appmonitor.Event{
 		ID:                  row.ID,
-		Kind:                string(row.Kind),
+		Type:                string(row.Type),
 		Severity:            string(row.Severity),
 		Status:              string(row.Status),
 		Source:              row.Source,
@@ -525,7 +524,6 @@ func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 		HTTPStatus:          row.HTTPStatus,
 		UpstreamStatus:      row.UpstreamStatus,
 		ErrorCode:           row.ErrorCode,
-		ErrorType:           row.ErrorType,
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,
 		ResolvedAt:          row.ResolvedAt,

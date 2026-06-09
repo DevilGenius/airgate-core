@@ -13,7 +13,7 @@ type MonitorEvent struct {
 
 func (MonitorEvent) Fields() []ent.Field {
 	return []ent.Field{
-		field.Enum("kind").
+		field.Enum("type").
 			Values("api_request_error", "scheduler_error", "upstream_account_error", "plugin_error", "task_error", "system_error"),
 		field.Enum("severity").
 			Values("warning", "error", "critical").
@@ -43,7 +43,6 @@ func (MonitorEvent) Fields() []ent.Field {
 		field.Int("http_status").Optional().Nillable(),
 		field.Int("upstream_status").Optional().Nillable(),
 		field.String("error_code").Default("").MaxLen(64),
-		field.String("error_type").Default("").MaxLen(64),
 		field.Time("created_at").Default(timeNow),
 		field.Time("updated_at").Default(timeNow),
 		field.Time("resolved_at").Optional().Nillable(),
@@ -62,7 +61,7 @@ func (MonitorEvent) Fields() []ent.Field {
 func (MonitorEvent) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("status", "severity", "updated_at"),
-		index.Fields("status", "kind", "updated_at"),
+		index.Fields("status", "type", "updated_at"),
 		index.Fields("fingerprint"),
 		index.Fields("api_key_id", "updated_at"),
 		index.Fields("account_id", "status", "updated_at"),

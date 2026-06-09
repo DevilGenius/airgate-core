@@ -5671,7 +5671,7 @@ type MonitorEventMutation struct {
 	op                    Op
 	typ                   string
 	id                    *int
-	kind                  *monitorevent.Kind
+	_type                 *monitorevent.Type
 	severity              *monitorevent.Severity
 	status                *monitorevent.Status
 	source                *string
@@ -5702,7 +5702,6 @@ type MonitorEventMutation struct {
 	upstream_status       *int
 	addupstream_status    *int
 	error_code            *string
-	error_type            *string
 	created_at            *time.Time
 	updated_at            *time.Time
 	resolved_at           *time.Time
@@ -5817,40 +5816,40 @@ func (m *MonitorEventMutation) IDs(ctx context.Context) ([]int, error) {
 	}
 }
 
-// SetKind sets the "kind" field.
-func (m *MonitorEventMutation) SetKind(value monitorevent.Kind) {
-	m.kind = &value
+// SetType sets the "type" field.
+func (m *MonitorEventMutation) SetType(value monitorevent.Type) {
+	m._type = &value
 }
 
-// Kind returns the value of the "kind" field in the mutation.
-func (m *MonitorEventMutation) Kind() (r monitorevent.Kind, exists bool) {
-	v := m.kind
+// GetType returns the value of the "type" field in the mutation.
+func (m *MonitorEventMutation) GetType() (r monitorevent.Type, exists bool) {
+	v := m._type
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldKind returns the old "kind" field's value of the MonitorEvent entity.
+// OldType returns the old "type" field's value of the MonitorEvent entity.
 // If the MonitorEvent object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *MonitorEventMutation) OldKind(ctx context.Context) (v monitorevent.Kind, err error) {
+func (m *MonitorEventMutation) OldType(ctx context.Context) (v monitorevent.Type, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+		return v, errors.New("OldType is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldKind requires an ID field in the mutation")
+		return v, errors.New("OldType requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+		return v, fmt.Errorf("querying old value for OldType: %w", err)
 	}
-	return oldValue.Kind, nil
+	return oldValue.Type, nil
 }
 
-// ResetKind resets all changes to the "kind" field.
-func (m *MonitorEventMutation) ResetKind() {
-	m.kind = nil
+// ResetType resets all changes to the "type" field.
+func (m *MonitorEventMutation) ResetType() {
+	m._type = nil
 }
 
 // SetSeverity sets the "severity" field.
@@ -6921,42 +6920,6 @@ func (m *MonitorEventMutation) ResetErrorCode() {
 	m.error_code = nil
 }
 
-// SetErrorType sets the "error_type" field.
-func (m *MonitorEventMutation) SetErrorType(s string) {
-	m.error_type = &s
-}
-
-// ErrorType returns the value of the "error_type" field in the mutation.
-func (m *MonitorEventMutation) ErrorType() (r string, exists bool) {
-	v := m.error_type
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldErrorType returns the old "error_type" field's value of the MonitorEvent entity.
-// If the MonitorEvent object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *MonitorEventMutation) OldErrorType(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldErrorType is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldErrorType requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldErrorType: %w", err)
-	}
-	return oldValue.ErrorType, nil
-}
-
-// ResetErrorType resets all changes to the "error_type" field.
-func (m *MonitorEventMutation) ResetErrorType() {
-	m.error_type = nil
-}
-
 // SetCreatedAt sets the "created_at" field.
 func (m *MonitorEventMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -7429,9 +7392,9 @@ func (m *MonitorEventMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MonitorEventMutation) Fields() []string {
-	fields := make([]string, 0, 36)
-	if m.kind != nil {
-		fields = append(fields, monitorevent.FieldKind)
+	fields := make([]string, 0, 35)
+	if m._type != nil {
+		fields = append(fields, monitorevent.FieldType)
 	}
 	if m.severity != nil {
 		fields = append(fields, monitorevent.FieldSeverity)
@@ -7505,9 +7468,6 @@ func (m *MonitorEventMutation) Fields() []string {
 	if m.error_code != nil {
 		fields = append(fields, monitorevent.FieldErrorCode)
 	}
-	if m.error_type != nil {
-		fields = append(fields, monitorevent.FieldErrorType)
-	}
 	if m.created_at != nil {
 		fields = append(fields, monitorevent.FieldCreatedAt)
 	}
@@ -7546,8 +7506,8 @@ func (m *MonitorEventMutation) Fields() []string {
 // schema.
 func (m *MonitorEventMutation) Field(name string) (ent.Value, bool) {
 	switch name {
-	case monitorevent.FieldKind:
-		return m.Kind()
+	case monitorevent.FieldType:
+		return m.GetType()
 	case monitorevent.FieldSeverity:
 		return m.Severity()
 	case monitorevent.FieldStatus:
@@ -7596,8 +7556,6 @@ func (m *MonitorEventMutation) Field(name string) (ent.Value, bool) {
 		return m.UpstreamStatus()
 	case monitorevent.FieldErrorCode:
 		return m.ErrorCode()
-	case monitorevent.FieldErrorType:
-		return m.ErrorType()
 	case monitorevent.FieldCreatedAt:
 		return m.CreatedAt()
 	case monitorevent.FieldUpdatedAt:
@@ -7627,8 +7585,8 @@ func (m *MonitorEventMutation) Field(name string) (ent.Value, bool) {
 // database failed.
 func (m *MonitorEventMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
-	case monitorevent.FieldKind:
-		return m.OldKind(ctx)
+	case monitorevent.FieldType:
+		return m.OldType(ctx)
 	case monitorevent.FieldSeverity:
 		return m.OldSeverity(ctx)
 	case monitorevent.FieldStatus:
@@ -7677,8 +7635,6 @@ func (m *MonitorEventMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldUpstreamStatus(ctx)
 	case monitorevent.FieldErrorCode:
 		return m.OldErrorCode(ctx)
-	case monitorevent.FieldErrorType:
-		return m.OldErrorType(ctx)
 	case monitorevent.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case monitorevent.FieldUpdatedAt:
@@ -7708,12 +7664,12 @@ func (m *MonitorEventMutation) OldField(ctx context.Context, name string) (ent.V
 // type.
 func (m *MonitorEventMutation) SetField(name string, value ent.Value) error {
 	switch name {
-	case monitorevent.FieldKind:
-		v, ok := value.(monitorevent.Kind)
+	case monitorevent.FieldType:
+		v, ok := value.(monitorevent.Type)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetKind(v)
+		m.SetType(v)
 		return nil
 	case monitorevent.FieldSeverity:
 		v, ok := value.(monitorevent.Severity)
@@ -7882,13 +7838,6 @@ func (m *MonitorEventMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetErrorCode(v)
-		return nil
-	case monitorevent.FieldErrorType:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetErrorType(v)
 		return nil
 	case monitorevent.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -8159,8 +8108,8 @@ func (m *MonitorEventMutation) ClearField(name string) error {
 // It returns an error if the field is not defined in the schema.
 func (m *MonitorEventMutation) ResetField(name string) error {
 	switch name {
-	case monitorevent.FieldKind:
-		m.ResetKind()
+	case monitorevent.FieldType:
+		m.ResetType()
 		return nil
 	case monitorevent.FieldSeverity:
 		m.ResetSeverity()
@@ -8233,9 +8182,6 @@ func (m *MonitorEventMutation) ResetField(name string) error {
 		return nil
 	case monitorevent.FieldErrorCode:
 		m.ResetErrorCode()
-		return nil
-	case monitorevent.FieldErrorType:
-		m.ResetErrorType()
 		return nil
 	case monitorevent.FieldCreatedAt:
 		m.ResetCreatedAt()

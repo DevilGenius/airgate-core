@@ -261,12 +261,12 @@ func (meq *MonitorEventQuery) Clone() *MonitorEventQuery {
 // Example:
 //
 //	var v []struct {
-//		Kind monitorevent.Kind `json:"kind,omitempty"`
+//		Type monitorevent.Type `json:"type,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.MonitorEvent.Query().
-//		GroupBy(monitorevent.FieldKind).
+//		GroupBy(monitorevent.FieldType).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (meq *MonitorEventQuery) GroupBy(field string, fields ...string) *MonitorEventGroupBy {
@@ -284,11 +284,11 @@ func (meq *MonitorEventQuery) GroupBy(field string, fields ...string) *MonitorEv
 // Example:
 //
 //	var v []struct {
-//		Kind monitorevent.Kind `json:"kind,omitempty"`
+//		Type monitorevent.Type `json:"type,omitempty"`
 //	}
 //
 //	client.MonitorEvent.Query().
-//		Select(monitorevent.FieldKind).
+//		Select(monitorevent.FieldType).
 //		Scan(ctx, &v)
 func (meq *MonitorEventQuery) Select(fields ...string) *MonitorEventSelect {
 	meq.ctx.Fields = append(meq.ctx.Fields, fields...)

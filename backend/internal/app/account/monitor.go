@@ -17,7 +17,7 @@ func (s *Service) recordQuotaRefreshFailure(ctx context.Context, item Account, c
 		message = err.Error()
 	}
 	s.monitor.Record(ctx, monitoring.EventInput{
-		Kind:                monitoring.KindUpstreamAccountError,
+		Type:                monitoring.TypeUpstreamAccountError,
 		Severity:            severity,
 		Source:              monitoring.SourceQuotaRefresh,
 		SubjectType:         monitoring.SubjectAccount,
@@ -26,13 +26,13 @@ func (s *Service) recordQuotaRefreshFailure(ctx context.Context, item Account, c
 		AccountNameSnapshot: item.Name,
 		Platform:            item.Platform,
 		ErrorCode:           code,
-		ErrorType:           "quota_refresh",
 		Title:               "Account quota refresh failed",
 		Message:             message,
 		Detail: map[string]interface{}{
 			"account_type": item.Type,
 			"state":        item.State,
 			"error_code":   code,
+			"operation":    "quota_refresh",
 		},
 	})
 }
@@ -47,7 +47,7 @@ func (s *Service) recordConnectivityTestFailure(ctx context.Context, item Accoun
 		message = err.Error()
 	}
 	s.monitor.Record(ctx, monitoring.EventInput{
-		Kind:                monitoring.KindUpstreamAccountError,
+		Type:                monitoring.TypeUpstreamAccountError,
 		Severity:            monitoring.SeverityError,
 		Source:              monitoring.SourceAccountChecker,
 		SubjectType:         monitoring.SubjectAccount,
@@ -57,7 +57,6 @@ func (s *Service) recordConnectivityTestFailure(ctx context.Context, item Accoun
 		Platform:            item.Platform,
 		Model:               modelID,
 		ErrorCode:           code,
-		ErrorType:           "connectivity_test",
 		Title:               "Account connectivity test failed",
 		Message:             message,
 		Detail: map[string]interface{}{
@@ -65,6 +64,7 @@ func (s *Service) recordConnectivityTestFailure(ctx context.Context, item Accoun
 			"state":        item.State,
 			"model":        modelID,
 			"error_code":   code,
+			"operation":    "connectivity_test",
 		},
 	})
 }
@@ -74,7 +74,7 @@ func (s *Service) resolveAccountMonitorEvents(ctx context.Context, accountID int
 		return
 	}
 	s.monitor.ResolveBySubject(ctx, monitoring.ResolveQuery{
-		Kind:        monitoring.KindUpstreamAccountError,
+		Type:        monitoring.TypeUpstreamAccountError,
 		SubjectType: monitoring.SubjectAccount,
 		SubjectID:   strconv.Itoa(accountID),
 		AccountID:   &accountID,

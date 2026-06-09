@@ -263,13 +263,7 @@
     "monitor_detail": "定位",
     "monitor_severity_warning": "警告",
     "monitor_severity_error": "错误",
-    "monitor_severity_critical": "严重",
-    "monitor_kind_api_request_error": "API 请求异常",
-    "monitor_kind_scheduler_error": "调度异常",
-    "monitor_kind_upstream_account_error": "上游账号异常",
-    "monitor_kind_plugin_error": "插件异常",
-    "monitor_kind_task_error": "任务异常",
-    "monitor_kind_system_error": "系统异常"
+    "monitor_severity_critical": "严重"
   },
 
   "user_overview": {
@@ -693,14 +687,14 @@
     "warning": "警告",
     "status": "状态",
     "severity": "级别",
-    "kind": "类型",
+    "type": "类型",
     "event": "事件",
     "subject": "对象",
     "source": "来源",
     "locator": "定位",
     "platform": "平台",
     "model": "请求模型",
-    "updated_at": "最近出现",
+    "updated_at": "时间",
     "time_range": "时间范围",
     "endpoint": "端点",
     "error_code": "错误码",
@@ -718,12 +712,12 @@
     "severity_warning": "警告",
     "severity_error": "错误",
     "severity_critical": "严重",
-    "kind_api_request_error": "API 请求异常",
-    "kind_scheduler_error": "调度异常",
-    "kind_upstream_account_error": "上游账号异常",
-    "kind_plugin_error": "插件异常",
-    "kind_task_error": "任务异常",
-    "kind_system_error": "系统异常"
+    "type_api_request_error": "API 请求异常",
+    "type_scheduler_error": "调度异常",
+    "type_upstream_account_error": "上游账号异常",
+    "type_plugin_error": "插件异常",
+    "type_task_error": "任务异常",
+    "type_system_error": "系统异常"
   },
 
   "usage": {

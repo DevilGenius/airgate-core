@@ -164,11 +164,6 @@ func ErrorCode(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldErrorCode, v))
 }
 
-// ErrorType applies equality check predicate on the "error_type" field. It's identical to ErrorTypeEQ.
-func ErrorType(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldErrorType, v))
-}
-
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldCreatedAt, v))
@@ -214,24 +209,24 @@ func NotifyError(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldNotifyError, v))
 }
 
-// KindEQ applies the EQ predicate on the "kind" field.
-func KindEQ(v Kind) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldKind, v))
+// TypeEQ applies the EQ predicate on the "type" field.
+func TypeEQ(v Type) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEQ(FieldType, v))
 }
 
-// KindNEQ applies the NEQ predicate on the "kind" field.
-func KindNEQ(v Kind) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldKind, v))
+// TypeNEQ applies the NEQ predicate on the "type" field.
+func TypeNEQ(v Type) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNEQ(FieldType, v))
 }
 
-// KindIn applies the In predicate on the "kind" field.
-func KindIn(vs ...Kind) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldKind, vs...))
+// TypeIn applies the In predicate on the "type" field.
+func TypeIn(vs ...Type) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldIn(FieldType, vs...))
 }
 
-// KindNotIn applies the NotIn predicate on the "kind" field.
-func KindNotIn(vs ...Kind) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldKind, vs...))
+// TypeNotIn applies the NotIn predicate on the "type" field.
+func TypeNotIn(vs ...Type) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNotIn(FieldType, vs...))
 }
 
 // SeverityEQ applies the EQ predicate on the "severity" field.
@@ -1612,71 +1607,6 @@ func ErrorCodeEqualFold(v string) predicate.MonitorEvent {
 // ErrorCodeContainsFold applies the ContainsFold predicate on the "error_code" field.
 func ErrorCodeContainsFold(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldContainsFold(FieldErrorCode, v))
-}
-
-// ErrorTypeEQ applies the EQ predicate on the "error_type" field.
-func ErrorTypeEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldErrorType, v))
-}
-
-// ErrorTypeNEQ applies the NEQ predicate on the "error_type" field.
-func ErrorTypeNEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldErrorType, v))
-}
-
-// ErrorTypeIn applies the In predicate on the "error_type" field.
-func ErrorTypeIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldErrorType, vs...))
-}
-
-// ErrorTypeNotIn applies the NotIn predicate on the "error_type" field.
-func ErrorTypeNotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldErrorType, vs...))
-}
-
-// ErrorTypeGT applies the GT predicate on the "error_type" field.
-func ErrorTypeGT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldErrorType, v))
-}
-
-// ErrorTypeGTE applies the GTE predicate on the "error_type" field.
-func ErrorTypeGTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldErrorType, v))
-}
-
-// ErrorTypeLT applies the LT predicate on the "error_type" field.
-func ErrorTypeLT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldErrorType, v))
-}
-
-// ErrorTypeLTE applies the LTE predicate on the "error_type" field.
-func ErrorTypeLTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldErrorType, v))
-}
-
-// ErrorTypeContains applies the Contains predicate on the "error_type" field.
-func ErrorTypeContains(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContains(FieldErrorType, v))
-}
-
-// ErrorTypeHasPrefix applies the HasPrefix predicate on the "error_type" field.
-func ErrorTypeHasPrefix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldErrorType, v))
-}
-
-// ErrorTypeHasSuffix applies the HasSuffix predicate on the "error_type" field.
-func ErrorTypeHasSuffix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldErrorType, v))
-}
-
-// ErrorTypeEqualFold applies the EqualFold predicate on the "error_type" field.
-func ErrorTypeEqualFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEqualFold(FieldErrorType, v))
-}
-
-// ErrorTypeContainsFold applies the ContainsFold predicate on the "error_type" field.
-func ErrorTypeContainsFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContainsFold(FieldErrorType, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

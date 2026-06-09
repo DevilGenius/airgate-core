@@ -317,32 +317,26 @@ func init() {
 	monitorevent.DefaultErrorCode = monitoreventDescErrorCode.Default.(string)
 	// monitorevent.ErrorCodeValidator is a validator for the "error_code" field. It is called by the builders before save.
 	monitorevent.ErrorCodeValidator = monitoreventDescErrorCode.Validators[0].(func(string) error)
-	// monitoreventDescErrorType is the schema descriptor for error_type field.
-	monitoreventDescErrorType := monitoreventFields[25].Descriptor()
-	// monitorevent.DefaultErrorType holds the default value on creation for the error_type field.
-	monitorevent.DefaultErrorType = monitoreventDescErrorType.Default.(string)
-	// monitorevent.ErrorTypeValidator is a validator for the "error_type" field. It is called by the builders before save.
-	monitorevent.ErrorTypeValidator = monitoreventDescErrorType.Validators[0].(func(string) error)
 	// monitoreventDescCreatedAt is the schema descriptor for created_at field.
-	monitoreventDescCreatedAt := monitoreventFields[26].Descriptor()
+	monitoreventDescCreatedAt := monitoreventFields[25].Descriptor()
 	// monitorevent.DefaultCreatedAt holds the default value on creation for the created_at field.
 	monitorevent.DefaultCreatedAt = monitoreventDescCreatedAt.Default.(func() time.Time)
 	// monitoreventDescUpdatedAt is the schema descriptor for updated_at field.
-	monitoreventDescUpdatedAt := monitoreventFields[27].Descriptor()
+	monitoreventDescUpdatedAt := monitoreventFields[26].Descriptor()
 	// monitorevent.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	monitorevent.DefaultUpdatedAt = monitoreventDescUpdatedAt.Default.(func() time.Time)
 	// monitoreventDescExpiresAt is the schema descriptor for expires_at field.
-	monitoreventDescExpiresAt := monitoreventFields[31].Descriptor()
+	monitoreventDescExpiresAt := monitoreventFields[30].Descriptor()
 	// monitorevent.DefaultExpiresAt holds the default value on creation for the expires_at field.
 	monitorevent.DefaultExpiresAt = monitoreventDescExpiresAt.Default.(func() time.Time)
 	// monitoreventDescNotifyError is the schema descriptor for notify_error field.
-	monitoreventDescNotifyError := monitoreventFields[34].Descriptor()
+	monitoreventDescNotifyError := monitoreventFields[33].Descriptor()
 	// monitorevent.DefaultNotifyError holds the default value on creation for the notify_error field.
 	monitorevent.DefaultNotifyError = monitoreventDescNotifyError.Default.(string)
 	// monitorevent.NotifyErrorValidator is a validator for the "notify_error" field. It is called by the builders before save.
 	monitorevent.NotifyErrorValidator = monitoreventDescNotifyError.Validators[0].(func(string) error)
 	// monitoreventDescDetail is the schema descriptor for detail field.
-	monitoreventDescDetail := monitoreventFields[35].Descriptor()
+	monitoreventDescDetail := monitoreventFields[34].Descriptor()
 	// monitorevent.DefaultDetail holds the default value on creation for the detail field.
 	monitorevent.DefaultDetail = monitoreventDescDetail.Default.(map[string]interface{})
 	pluginFields := schema.Plugin{}.Fields()

@@ -28,16 +28,16 @@ func (meu *MonitorEventUpdate) Where(ps ...predicate.MonitorEvent) *MonitorEvent
 	return meu
 }
 
-// SetKind sets the "kind" field.
-func (meu *MonitorEventUpdate) SetKind(m monitorevent.Kind) *MonitorEventUpdate {
-	meu.mutation.SetKind(m)
+// SetType sets the "type" field.
+func (meu *MonitorEventUpdate) SetType(m monitorevent.Type) *MonitorEventUpdate {
+	meu.mutation.SetType(m)
 	return meu
 }
 
-// SetNillableKind sets the "kind" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableKind(m *monitorevent.Kind) *MonitorEventUpdate {
+// SetNillableType sets the "type" field if the given value is not nil.
+func (meu *MonitorEventUpdate) SetNillableType(m *monitorevent.Type) *MonitorEventUpdate {
 	if m != nil {
-		meu.SetKind(*m)
+		meu.SetType(*m)
 	}
 	return meu
 }
@@ -456,20 +456,6 @@ func (meu *MonitorEventUpdate) SetNillableErrorCode(s *string) *MonitorEventUpda
 	return meu
 }
 
-// SetErrorType sets the "error_type" field.
-func (meu *MonitorEventUpdate) SetErrorType(s string) *MonitorEventUpdate {
-	meu.mutation.SetErrorType(s)
-	return meu
-}
-
-// SetNillableErrorType sets the "error_type" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableErrorType(s *string) *MonitorEventUpdate {
-	if s != nil {
-		meu.SetErrorType(*s)
-	}
-	return meu
-}
-
 // SetCreatedAt sets the "created_at" field.
 func (meu *MonitorEventUpdate) SetCreatedAt(t time.Time) *MonitorEventUpdate {
 	meu.mutation.SetCreatedAt(t)
@@ -672,9 +658,9 @@ func (meu *MonitorEventUpdate) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (meu *MonitorEventUpdate) check() error {
-	if v, ok := meu.mutation.Kind(); ok {
-		if err := monitorevent.KindValidator(v); err != nil {
-			return &ValidationError{Name: "kind", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.kind": %w`, err)}
+	if v, ok := meu.mutation.GetType(); ok {
+		if err := monitorevent.TypeValidator(v); err != nil {
+			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.type": %w`, err)}
 		}
 	}
 	if v, ok := meu.mutation.Severity(); ok {
@@ -767,11 +753,6 @@ func (meu *MonitorEventUpdate) check() error {
 			return &ValidationError{Name: "error_code", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.error_code": %w`, err)}
 		}
 	}
-	if v, ok := meu.mutation.ErrorType(); ok {
-		if err := monitorevent.ErrorTypeValidator(v); err != nil {
-			return &ValidationError{Name: "error_type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.error_type": %w`, err)}
-		}
-	}
 	if v, ok := meu.mutation.NotifyError(); ok {
 		if err := monitorevent.NotifyErrorValidator(v); err != nil {
 			return &ValidationError{Name: "notify_error", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.notify_error": %w`, err)}
@@ -792,8 +773,8 @@ func (meu *MonitorEventUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			}
 		}
 	}
-	if value, ok := meu.mutation.Kind(); ok {
-		_spec.SetField(monitorevent.FieldKind, field.TypeEnum, value)
+	if value, ok := meu.mutation.GetType(); ok {
+		_spec.SetField(monitorevent.FieldType, field.TypeEnum, value)
 	}
 	if value, ok := meu.mutation.Severity(); ok {
 		_spec.SetField(monitorevent.FieldSeverity, field.TypeEnum, value)
@@ -903,9 +884,6 @@ func (meu *MonitorEventUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := meu.mutation.ErrorCode(); ok {
 		_spec.SetField(monitorevent.FieldErrorCode, field.TypeString, value)
 	}
-	if value, ok := meu.mutation.ErrorType(); ok {
-		_spec.SetField(monitorevent.FieldErrorType, field.TypeString, value)
-	}
 	if value, ok := meu.mutation.CreatedAt(); ok {
 		_spec.SetField(monitorevent.FieldCreatedAt, field.TypeTime, value)
 	}
@@ -974,16 +952,16 @@ type MonitorEventUpdateOne struct {
 	mutation *MonitorEventMutation
 }
 
-// SetKind sets the "kind" field.
-func (meuo *MonitorEventUpdateOne) SetKind(m monitorevent.Kind) *MonitorEventUpdateOne {
-	meuo.mutation.SetKind(m)
+// SetType sets the "type" field.
+func (meuo *MonitorEventUpdateOne) SetType(m monitorevent.Type) *MonitorEventUpdateOne {
+	meuo.mutation.SetType(m)
 	return meuo
 }
 
-// SetNillableKind sets the "kind" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableKind(m *monitorevent.Kind) *MonitorEventUpdateOne {
+// SetNillableType sets the "type" field if the given value is not nil.
+func (meuo *MonitorEventUpdateOne) SetNillableType(m *monitorevent.Type) *MonitorEventUpdateOne {
 	if m != nil {
-		meuo.SetKind(*m)
+		meuo.SetType(*m)
 	}
 	return meuo
 }
@@ -1402,20 +1380,6 @@ func (meuo *MonitorEventUpdateOne) SetNillableErrorCode(s *string) *MonitorEvent
 	return meuo
 }
 
-// SetErrorType sets the "error_type" field.
-func (meuo *MonitorEventUpdateOne) SetErrorType(s string) *MonitorEventUpdateOne {
-	meuo.mutation.SetErrorType(s)
-	return meuo
-}
-
-// SetNillableErrorType sets the "error_type" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableErrorType(s *string) *MonitorEventUpdateOne {
-	if s != nil {
-		meuo.SetErrorType(*s)
-	}
-	return meuo
-}
-
 // SetCreatedAt sets the "created_at" field.
 func (meuo *MonitorEventUpdateOne) SetCreatedAt(t time.Time) *MonitorEventUpdateOne {
 	meuo.mutation.SetCreatedAt(t)
@@ -1631,9 +1595,9 @@ func (meuo *MonitorEventUpdateOne) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (meuo *MonitorEventUpdateOne) check() error {
-	if v, ok := meuo.mutation.Kind(); ok {
-		if err := monitorevent.KindValidator(v); err != nil {
-			return &ValidationError{Name: "kind", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.kind": %w`, err)}
+	if v, ok := meuo.mutation.GetType(); ok {
+		if err := monitorevent.TypeValidator(v); err != nil {
+			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.type": %w`, err)}
 		}
 	}
 	if v, ok := meuo.mutation.Severity(); ok {
@@ -1726,11 +1690,6 @@ func (meuo *MonitorEventUpdateOne) check() error {
 			return &ValidationError{Name: "error_code", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.error_code": %w`, err)}
 		}
 	}
-	if v, ok := meuo.mutation.ErrorType(); ok {
-		if err := monitorevent.ErrorTypeValidator(v); err != nil {
-			return &ValidationError{Name: "error_type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.error_type": %w`, err)}
-		}
-	}
 	if v, ok := meuo.mutation.NotifyError(); ok {
 		if err := monitorevent.NotifyErrorValidator(v); err != nil {
 			return &ValidationError{Name: "notify_error", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.notify_error": %w`, err)}
@@ -1768,8 +1727,8 @@ func (meuo *MonitorEventUpdateOne) sqlSave(ctx context.Context) (_node *MonitorE
 			}
 		}
 	}
-	if value, ok := meuo.mutation.Kind(); ok {
-		_spec.SetField(monitorevent.FieldKind, field.TypeEnum, value)
+	if value, ok := meuo.mutation.GetType(); ok {
+		_spec.SetField(monitorevent.FieldType, field.TypeEnum, value)
 	}
 	if value, ok := meuo.mutation.Severity(); ok {
 		_spec.SetField(monitorevent.FieldSeverity, field.TypeEnum, value)
@@ -1878,9 +1837,6 @@ func (meuo *MonitorEventUpdateOne) sqlSave(ctx context.Context) (_node *MonitorE
 	}
 	if value, ok := meuo.mutation.ErrorCode(); ok {
 		_spec.SetField(monitorevent.FieldErrorCode, field.TypeString, value)
-	}
-	if value, ok := meuo.mutation.ErrorType(); ok {
-		_spec.SetField(monitorevent.FieldErrorType, field.TypeString, value)
 	}
 	if value, ok := meuo.mutation.CreatedAt(); ok {
 		_spec.SetField(monitorevent.FieldCreatedAt, field.TypeTime, value)

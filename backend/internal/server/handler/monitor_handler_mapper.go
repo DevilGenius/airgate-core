@@ -10,7 +10,7 @@ import (
 func toMonitorEventResp(item appmonitor.Event) dto.MonitorEventResp {
 	return dto.MonitorEventResp{
 		ID:                  item.ID,
-		Kind:                item.Kind,
+		Type:                item.Type,
 		Severity:            item.Severity,
 		Status:              item.Status,
 		Source:              item.Source,
@@ -35,7 +35,6 @@ func toMonitorEventResp(item appmonitor.Event) dto.MonitorEventResp {
 		HTTPStatus:          item.HTTPStatus,
 		UpstreamStatus:      item.UpstreamStatus,
 		ErrorCode:           item.ErrorCode,
-		ErrorType:           item.ErrorType,
 		CreatedAt:           monitorTimeString(item.CreatedAt),
 		UpdatedAt:           monitorTimeString(item.UpdatedAt),
 		ResolvedAt:          monitorTimePtrString(item.ResolvedAt),
@@ -67,7 +66,7 @@ func toMonitorSummaryResp(item appmonitor.Summary) dto.MonitorSummaryResp {
 		CriticalTotal: item.CriticalTotal,
 		ErrorTotal:    item.ErrorTotal,
 		WarningTotal:  item.WarningTotal,
-		ByKind:        toMonitorKindCounts(item.ByKind),
+		ByType:        toMonitorTypeCounts(item.ByType),
 		TopAPIKeys:    toMonitorSubjectCounts(item.TopAPIKeys),
 		TopAccounts:   toMonitorSubjectCounts(item.TopAccounts),
 		Recent:        toMonitorEventRespList(item.Recent),
@@ -82,11 +81,11 @@ func toMonitorEventRespList(items []appmonitor.Event) []dto.MonitorEventResp {
 	return out
 }
 
-func toMonitorKindCounts(items []appmonitor.KindCount) []dto.MonitorKindCountResp {
-	out := make([]dto.MonitorKindCountResp, 0, len(items))
+func toMonitorTypeCounts(items []appmonitor.TypeCount) []dto.MonitorTypeCountResp {
+	out := make([]dto.MonitorTypeCountResp, 0, len(items))
 	for _, item := range items {
-		out = append(out, dto.MonitorKindCountResp{
-			Kind:  item.Kind,
+		out = append(out, dto.MonitorTypeCountResp{
+			Type:  item.Type,
 			Count: item.Count,
 		})
 	}

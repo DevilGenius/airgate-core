@@ -19,7 +19,7 @@ const (
 // Event is the monitor event domain model.
 type Event struct {
 	ID                  int
-	Kind                string
+	Type                string
 	Severity            string
 	Status              string
 	Source              string
@@ -44,7 +44,6 @@ type Event struct {
 	HTTPStatus          *int
 	UpstreamStatus      *int
 	ErrorCode           string
-	ErrorType           string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	ResolvedAt          *time.Time
@@ -66,7 +65,7 @@ type QueuedEvent struct {
 type ListFilter struct {
 	Status      string
 	Severity    string
-	Kind        string
+	Type        string
 	Source      string
 	SubjectType string
 	APIKeyID    *int
@@ -95,9 +94,9 @@ type ListResult struct {
 	NextCursor *ListCursor
 }
 
-// KindCount is a grouped active count.
-type KindCount struct {
-	Kind  string
+// TypeCount is a grouped active count.
+type TypeCount struct {
+	Type  string
 	Count int64
 }
 
@@ -114,7 +113,7 @@ type Summary struct {
 	CriticalTotal int64
 	ErrorTotal    int64
 	WarningTotal  int64
-	ByKind        []KindCount
+	ByType        []TypeCount
 	TopAPIKeys    []SubjectCount
 	TopAccounts   []SubjectCount
 	Recent        []Event

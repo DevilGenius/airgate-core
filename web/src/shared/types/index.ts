@@ -820,7 +820,7 @@ export type MonitorStatus = 'active' | 'resolved' | 'ignored';
 
 export interface MonitorEventResp {
   id: number;
-  kind: string;
+  type: string;
   severity: MonitorSeverity;
   status: MonitorStatus;
   source: string;
@@ -845,7 +845,6 @@ export interface MonitorEventResp {
   http_status?: number;
   upstream_status?: number;
   error_code?: string;
-  error_type?: string;
   created_at: string;
   updated_at: string;
   resolved_at?: string;
@@ -858,8 +857,8 @@ export interface MonitorEventResp {
   detail?: Record<string, unknown>;
 }
 
-export interface MonitorKindCountResp {
-  kind: string;
+export interface MonitorTypeCountResp {
+  type: string;
   count: number;
 }
 
@@ -874,7 +873,7 @@ export interface MonitorSummaryResp {
   critical_total: number;
   error_total: number;
   warning_total: number;
-  by_kind: MonitorKindCountResp[];
+  by_type: MonitorTypeCountResp[];
   top_api_keys: MonitorSubjectCountResp[];
   top_accounts: MonitorSubjectCountResp[];
   recent: MonitorEventResp[];
@@ -894,7 +893,7 @@ export interface MonitorListResp {
 export interface MonitorListQuery {
   status?: string;
   severity?: string;
-  kind?: string;
+  type?: string;
   source?: string;
   subject_type?: string;
   api_key_id?: number;

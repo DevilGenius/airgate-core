@@ -20,9 +20,9 @@ type MonitorEventCreate struct {
 	hooks    []Hook
 }
 
-// SetKind sets the "kind" field.
-func (mec *MonitorEventCreate) SetKind(m monitorevent.Kind) *MonitorEventCreate {
-	mec.mutation.SetKind(m)
+// SetType sets the "type" field.
+func (mec *MonitorEventCreate) SetType(m monitorevent.Type) *MonitorEventCreate {
+	mec.mutation.SetType(m)
 	return mec
 }
 
@@ -354,20 +354,6 @@ func (mec *MonitorEventCreate) SetNillableErrorCode(s *string) *MonitorEventCrea
 	return mec
 }
 
-// SetErrorType sets the "error_type" field.
-func (mec *MonitorEventCreate) SetErrorType(s string) *MonitorEventCreate {
-	mec.mutation.SetErrorType(s)
-	return mec
-}
-
-// SetNillableErrorType sets the "error_type" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableErrorType(s *string) *MonitorEventCreate {
-	if s != nil {
-		mec.SetErrorType(*s)
-	}
-	return mec
-}
-
 // SetCreatedAt sets the "created_at" field.
 func (mec *MonitorEventCreate) SetCreatedAt(t time.Time) *MonitorEventCreate {
 	mec.mutation.SetCreatedAt(t)
@@ -603,10 +589,6 @@ func (mec *MonitorEventCreate) defaults() {
 		v := monitorevent.DefaultErrorCode
 		mec.mutation.SetErrorCode(v)
 	}
-	if _, ok := mec.mutation.ErrorType(); !ok {
-		v := monitorevent.DefaultErrorType
-		mec.mutation.SetErrorType(v)
-	}
 	if _, ok := mec.mutation.CreatedAt(); !ok {
 		v := monitorevent.DefaultCreatedAt()
 		mec.mutation.SetCreatedAt(v)
@@ -631,12 +613,12 @@ func (mec *MonitorEventCreate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (mec *MonitorEventCreate) check() error {
-	if _, ok := mec.mutation.Kind(); !ok {
-		return &ValidationError{Name: "kind", err: errors.New(`ent: missing required field "MonitorEvent.kind"`)}
+	if _, ok := mec.mutation.GetType(); !ok {
+		return &ValidationError{Name: "type", err: errors.New(`ent: missing required field "MonitorEvent.type"`)}
 	}
-	if v, ok := mec.mutation.Kind(); ok {
-		if err := monitorevent.KindValidator(v); err != nil {
-			return &ValidationError{Name: "kind", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.kind": %w`, err)}
+	if v, ok := mec.mutation.GetType(); ok {
+		if err := monitorevent.TypeValidator(v); err != nil {
+			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.type": %w`, err)}
 		}
 	}
 	if _, ok := mec.mutation.Severity(); !ok {
@@ -783,14 +765,6 @@ func (mec *MonitorEventCreate) check() error {
 			return &ValidationError{Name: "error_code", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.error_code": %w`, err)}
 		}
 	}
-	if _, ok := mec.mutation.ErrorType(); !ok {
-		return &ValidationError{Name: "error_type", err: errors.New(`ent: missing required field "MonitorEvent.error_type"`)}
-	}
-	if v, ok := mec.mutation.ErrorType(); ok {
-		if err := monitorevent.ErrorTypeValidator(v); err != nil {
-			return &ValidationError{Name: "error_type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.error_type": %w`, err)}
-		}
-	}
 	if _, ok := mec.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "MonitorEvent.created_at"`)}
 	}
@@ -834,9 +808,9 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 		_node = &MonitorEvent{config: mec.config}
 		_spec = sqlgraph.NewCreateSpec(monitorevent.Table, sqlgraph.NewFieldSpec(monitorevent.FieldID, field.TypeInt))
 	)
-	if value, ok := mec.mutation.Kind(); ok {
-		_spec.SetField(monitorevent.FieldKind, field.TypeEnum, value)
-		_node.Kind = value
+	if value, ok := mec.mutation.GetType(); ok {
+		_spec.SetField(monitorevent.FieldType, field.TypeEnum, value)
+		_node.Type = value
 	}
 	if value, ok := mec.mutation.Severity(); ok {
 		_spec.SetField(monitorevent.FieldSeverity, field.TypeEnum, value)
@@ -933,10 +907,6 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 	if value, ok := mec.mutation.ErrorCode(); ok {
 		_spec.SetField(monitorevent.FieldErrorCode, field.TypeString, value)
 		_node.ErrorCode = value
-	}
-	if value, ok := mec.mutation.ErrorType(); ok {
-		_spec.SetField(monitorevent.FieldErrorType, field.TypeString, value)
-		_node.ErrorType = value
 	}
 	if value, ok := mec.mutation.CreatedAt(); ok {
 		_spec.SetField(monitorevent.FieldCreatedAt, field.TypeTime, value)

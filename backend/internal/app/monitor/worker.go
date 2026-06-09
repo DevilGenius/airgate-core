@@ -85,7 +85,7 @@ func (s *Service) runAutoResolveOnce(parent context.Context) {
 		if err != nil {
 			slog.Warn("monitor_auto_resolve_failed", "resolved", total, "error", err)
 			s.Record(context.Background(), monitoring.EventInput{
-				Kind:        monitoring.KindSystemError,
+				Type:        monitoring.TypeSystemError,
 				Severity:    monitoring.SeverityError,
 				Source:      monitoring.SourceMonitorWorker,
 				SubjectType: monitoring.SubjectSystem,
@@ -119,7 +119,7 @@ func (s *Service) runCleanupExpiredOnce(parent context.Context) {
 		if err != nil {
 			slog.Warn("monitor_cleanup_failed", "deleted", total, "error", err)
 			s.Record(context.Background(), monitoring.EventInput{
-				Kind:        monitoring.KindSystemError,
+				Type:        monitoring.TypeSystemError,
 				Severity:    monitoring.SeverityError,
 				Source:      monitoring.SourceMonitorWorker,
 				SubjectType: monitoring.SubjectSystem,
@@ -236,7 +236,7 @@ func monitorNotificationValues(event Event) map[string]string {
 		"title":                "[AirGate][" + event.Severity + "] " + event.Title,
 		"content":              content,
 		"severity":             event.Severity,
-		"kind":                 event.Kind,
+		"type":                 event.Type,
 		"status":               event.Status,
 		"source":               event.Source,
 		"subject_type":         event.SubjectType,
@@ -255,7 +255,6 @@ func monitorNotificationValues(event Event) map[string]string {
 		"http_status":          intToString(event.HTTPStatus),
 		"upstream_status":      intToString(event.UpstreamStatus),
 		"error_code":           event.ErrorCode,
-		"error_type":           event.ErrorType,
 		"created_at":           event.CreatedAt.Format(time.RFC3339),
 		"updated_at":           event.UpdatedAt.Format(time.RFC3339),
 		"last_notified_at":     timePtrToString(event.LastNotifiedAt),

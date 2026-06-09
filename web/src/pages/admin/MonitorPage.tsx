@@ -90,8 +90,8 @@ function severityLabel(t: ReturnType<typeof useTranslation>['t'], value: string)
   return t(`monitor.severity_${value}`, value);
 }
 
-function kindLabel(t: ReturnType<typeof useTranslation>['t'], value: string): string {
-  return t(`monitor.kind_${value}`, value);
+function typeLabel(t: ReturnType<typeof useTranslation>['t'], value: string): string {
+  return t(`monitor.type_${value}`, value);
 }
 
 function StatCard({
@@ -296,22 +296,22 @@ export default function MonitorPage() {
     { id: 'error', label: t('monitor.severity_error') },
     { id: 'warning', label: t('monitor.severity_warning') },
   ];
-  const kindOptions: SelectOption[] = [
+  const typeOptions: SelectOption[] = [
     { id: '', label: t('common.all') },
-    { id: 'api_request_error', label: t('monitor.kind_api_request_error') },
-    { id: 'scheduler_error', label: t('monitor.kind_scheduler_error') },
-    { id: 'upstream_account_error', label: t('monitor.kind_upstream_account_error') },
-    { id: 'plugin_error', label: t('monitor.kind_plugin_error') },
-    { id: 'task_error', label: t('monitor.kind_task_error') },
-    { id: 'system_error', label: t('monitor.kind_system_error') },
+    { id: 'api_request_error', label: t('monitor.type_api_request_error') },
+    { id: 'scheduler_error', label: t('monitor.type_scheduler_error') },
+    { id: 'upstream_account_error', label: t('monitor.type_upstream_account_error') },
+    { id: 'plugin_error', label: t('monitor.type_plugin_error') },
+    { id: 'task_error', label: t('monitor.type_task_error') },
+    { id: 'system_error', label: t('monitor.type_system_error') },
   ];
 
   const selectedStatusValue = statusOptions.find((item) => item.id === (filters.status || ''))?.label ?? t('common.all');
   const selectedSeverityValue = severityOptions.find((item) => item.id === (filters.severity || ''))?.label ?? t('common.all');
-  const selectedKindValue = kindOptions.find((item) => item.id === (filters.kind || ''))?.label ?? t('common.all');
+  const selectedTypeValue = typeOptions.find((item) => item.id === (filters.type || ''))?.label ?? t('common.all');
   const selectedStatusLabel = `${t('monitor.status')}: ${selectedStatusValue}`;
   const selectedSeverityLabel = `${t('monitor.severity')}: ${selectedSeverityValue}`;
-  const selectedKindLabel = `${t('monitor.kind')}: ${selectedKindValue}`;
+  const selectedTypeLabel = `${t('monitor.type')}: ${selectedTypeValue}`;
 
   const columns = useMemo<MonitorColumnConfig[]>(() => [
     {
@@ -335,15 +335,11 @@ export default function MonitorPage() {
       },
     },
     {
-      key: 'subject',
-      title: t('monitor.subject'),
-      width: '190px',
-      render: (row) => (
-        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
-          <span className="truncate text-[13px] font-medium leading-none text-text" title={monitorSubject(row)}>{monitorSubject(row)}</span>
-          <span className="truncate font-mono text-[11px] leading-none text-text-tertiary">{row.subject_type || '-'}</span>
-        </div>
-      ),
+      key: 'type',
+      title: t('monitor.type'),
+      width: '168px',
+      hideOnMobile: true,
+      render: (row) => <span className="block w-full truncate text-center text-[13px] leading-none text-text-secondary" title={row.type}>{typeLabel(t, row.type)}</span>,
     },
     {
       key: 'severity',
@@ -376,18 +372,22 @@ export default function MonitorPage() {
       render: (row) => (
         <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
           <span className="truncate text-[13px] font-medium leading-none text-text" title={row.title}>{row.title}</span>
-          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.message || row.kind}>
-            {row.message || kindLabel(t, row.kind)}
+          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.message || row.type}>
+            {row.message || typeLabel(t, row.type)}
           </span>
         </div>
       ),
     },
     {
-      key: 'kind',
-      title: t('monitor.kind'),
-      width: '168px',
-      hideOnMobile: true,
-      render: (row) => <span className="block w-full truncate text-center text-[13px] leading-none text-text-secondary" title={row.kind}>{kindLabel(t, row.kind)}</span>,
+      key: 'subject',
+      title: t('monitor.subject'),
+      width: '190px',
+      render: (row) => (
+        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
+          <span className="truncate text-[13px] font-medium leading-none text-text" title={monitorSubject(row)}>{monitorSubject(row)}</span>
+          <span className="truncate font-mono text-[11px] leading-none text-text-tertiary">{row.subject_type || '-'}</span>
+        </div>
+      ),
     },
     {
       key: 'model',
@@ -456,6 +456,8 @@ export default function MonitorPage() {
   ], [ignoreMutation, resolveMutation, t]);
 
   const rows = data?.list ?? [];
+  const hasRows = rows.length > 0;
+  const showInitialLoading = isLoading && !data;
   const total = totalForCursorPage(page, pageSize, rows.length, data?.has_more);
   const totalPages = getTotalPages(total, pageSize);
 
@@ -477,7 +479,7 @@ export default function MonitorPage() {
             totalPages={totalPages}
           />
         )}
-        isFetching={isPlaceholderData && isFetching && !isLoading}
+        isFetching={hasRows && isPlaceholderData && isFetching && !showInitialLoading}
       >
         <div className="ag-page-toolbar">
           <div className="ag-page-toolbar-filters">
@@ -516,12 +518,12 @@ export default function MonitorPage() {
               </div>
               <div className="w-full sm:w-56">
                 <SimpleSelect
-                  ariaLabel={t('monitor.kind')}
+                  ariaLabel={t('monitor.type')}
                   fullWidth
-                  items={kindOptions.map((item) => ({ key: item.id, label: item.label }))}
-                  selectedKey={filters.kind || ''}
-                  selectedLabel={selectedKindLabel}
-                  onSelectionChange={(key) => updateFilter('kind', key)}
+                  items={typeOptions.map((item) => ({ key: item.id, label: item.label }))}
+                  selectedKey={filters.type || ''}
+                  selectedLabel={selectedTypeLabel}
+                  onSelectionChange={(key) => updateFilter('type', key)}
                 />
               </div>
               <div className="w-full sm:w-48">
@@ -582,14 +584,14 @@ export default function MonitorPage() {
         <RecordsTable
           ariaLabel={t('monitor.title')}
           columns={columns}
-          dataVersion={dataUpdatedAt}
+          dataVersion={hasRows ? dataUpdatedAt : 0}
           emptyDescription={t('monitor.empty_description')}
           emptyTitle={t('common.no_data')}
           footer={false}
-          highlightNewRows={autoRefreshEnabled && page === 1}
+          highlightNewRows={hasRows && autoRefreshEnabled && page === 1}
           highlightResetKey={JSON.stringify({ filters, page, pageSize })}
           hasMore={data?.has_more}
-          isLoading={isLoading}
+          isLoading={showInitialLoading}
           page={page}
           pageSize={pageSize}
           rows={rows}

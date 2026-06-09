@@ -4,7 +4,7 @@ package dto
 type MonitorListQuery struct {
 	Status          string `form:"status"`
 	Severity        string `form:"severity"`
-	Kind            string `form:"kind"`
+	Type            string `form:"type"`
 	Source          string `form:"source"`
 	SubjectType     string `form:"subject_type"`
 	APIKeyID        *int   `form:"api_key_id"`
@@ -25,7 +25,7 @@ type MonitorListQuery struct {
 // MonitorEventResp is one monitor event response row.
 type MonitorEventResp struct {
 	ID                  int                    `json:"id"`
-	Kind                string                 `json:"kind"`
+	Type                string                 `json:"type"`
 	Severity            string                 `json:"severity"`
 	Status              string                 `json:"status"`
 	Source              string                 `json:"source"`
@@ -50,7 +50,6 @@ type MonitorEventResp struct {
 	HTTPStatus          *int                   `json:"http_status,omitempty"`
 	UpstreamStatus      *int                   `json:"upstream_status,omitempty"`
 	ErrorCode           string                 `json:"error_code,omitempty"`
-	ErrorType           string                 `json:"error_type,omitempty"`
 	CreatedAt           string                 `json:"created_at"`
 	UpdatedAt           string                 `json:"updated_at"`
 	ResolvedAt          *string                `json:"resolved_at,omitempty"`
@@ -76,9 +75,9 @@ type MonitorListResp struct {
 	NextCursor *MonitorCursorResp `json:"next_cursor,omitempty"`
 }
 
-// MonitorKindCountResp is a grouped count row.
-type MonitorKindCountResp struct {
-	Kind  string `json:"kind"`
+// MonitorTypeCountResp is a grouped count row.
+type MonitorTypeCountResp struct {
+	Type  string `json:"type"`
 	Count int64  `json:"count"`
 }
 
@@ -95,7 +94,7 @@ type MonitorSummaryResp struct {
 	CriticalTotal int64                     `json:"critical_total"`
 	ErrorTotal    int64                     `json:"error_total"`
 	WarningTotal  int64                     `json:"warning_total"`
-	ByKind        []MonitorKindCountResp    `json:"by_kind"`
+	ByType        []MonitorTypeCountResp    `json:"by_type"`
 	TopAPIKeys    []MonitorSubjectCountResp `json:"top_api_keys"`
 	TopAccounts   []MonitorSubjectCountResp `json:"top_accounts"`
 	Recent        []MonitorEventResp        `json:"recent"`

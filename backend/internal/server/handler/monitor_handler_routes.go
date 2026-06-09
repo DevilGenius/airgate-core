@@ -122,7 +122,7 @@ func monitorListFilterFromQuery(c *gin.Context, query dto.MonitorListQuery) (app
 	return appmonitor.ListFilter{
 		Status:      query.Status,
 		Severity:    query.Severity,
-		Kind:        query.Kind,
+		Type:        query.Type,
 		Source:      query.Source,
 		SubjectType: query.SubjectType,
 		APIKeyID:    query.APIKeyID,

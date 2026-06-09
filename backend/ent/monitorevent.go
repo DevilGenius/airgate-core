@@ -18,8 +18,8 @@ type MonitorEvent struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
-	// Kind holds the value of the "kind" field.
-	Kind monitorevent.Kind `json:"kind,omitempty"`
+	// Type holds the value of the "type" field.
+	Type monitorevent.Type `json:"type,omitempty"`
 	// Severity holds the value of the "severity" field.
 	Severity monitorevent.Severity `json:"severity,omitempty"`
 	// Status holds the value of the "status" field.
@@ -68,8 +68,6 @@ type MonitorEvent struct {
 	UpstreamStatus *int `json:"upstream_status,omitempty"`
 	// ErrorCode holds the value of the "error_code" field.
 	ErrorCode string `json:"error_code,omitempty"`
-	// ErrorType holds the value of the "error_type" field.
-	ErrorType string `json:"error_type,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -102,7 +100,7 @@ func (*MonitorEvent) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case monitorevent.FieldID, monitorevent.FieldAPIKeyID, monitorevent.FieldUserID, monitorevent.FieldGroupID, monitorevent.FieldAccountID, monitorevent.FieldHTTPStatus, monitorevent.FieldUpstreamStatus:
 			values[i] = new(sql.NullInt64)
-		case monitorevent.FieldKind, monitorevent.FieldSeverity, monitorevent.FieldStatus, monitorevent.FieldSource, monitorevent.FieldSubjectType, monitorevent.FieldSubjectID, monitorevent.FieldFingerprint, monitorevent.FieldTitle, monitorevent.FieldMessage, monitorevent.FieldAPIKeyNameSnapshot, monitorevent.FieldUserEmailSnapshot, monitorevent.FieldAccountNameSnapshot, monitorevent.FieldPlatform, monitorevent.FieldPluginID, monitorevent.FieldTaskType, monitorevent.FieldMethod, monitorevent.FieldEndpoint, monitorevent.FieldModel, monitorevent.FieldErrorCode, monitorevent.FieldErrorType, monitorevent.FieldNotifyError:
+		case monitorevent.FieldType, monitorevent.FieldSeverity, monitorevent.FieldStatus, monitorevent.FieldSource, monitorevent.FieldSubjectType, monitorevent.FieldSubjectID, monitorevent.FieldFingerprint, monitorevent.FieldTitle, monitorevent.FieldMessage, monitorevent.FieldAPIKeyNameSnapshot, monitorevent.FieldUserEmailSnapshot, monitorevent.FieldAccountNameSnapshot, monitorevent.FieldPlatform, monitorevent.FieldPluginID, monitorevent.FieldTaskType, monitorevent.FieldMethod, monitorevent.FieldEndpoint, monitorevent.FieldModel, monitorevent.FieldErrorCode, monitorevent.FieldNotifyError:
 			values[i] = new(sql.NullString)
 		case monitorevent.FieldCreatedAt, monitorevent.FieldUpdatedAt, monitorevent.FieldResolvedAt, monitorevent.FieldIgnoredAt, monitorevent.FieldAutoResolveAt, monitorevent.FieldExpiresAt, monitorevent.FieldLastNotifiedAt, monitorevent.FieldNextNotifyAt:
 			values[i] = new(sql.NullTime)
@@ -127,11 +125,11 @@ func (me *MonitorEvent) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			me.ID = int(value.Int64)
-		case monitorevent.FieldKind:
+		case monitorevent.FieldType:
 			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field kind", values[i])
+				return fmt.Errorf("unexpected type %T for field type", values[i])
 			} else if value.Valid {
-				me.Kind = monitorevent.Kind(value.String)
+				me.Type = monitorevent.Type(value.String)
 			}
 		case monitorevent.FieldSeverity:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -283,12 +281,6 @@ func (me *MonitorEvent) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				me.ErrorCode = value.String
 			}
-		case monitorevent.FieldErrorType:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field error_type", values[i])
-			} else if value.Valid {
-				me.ErrorType = value.String
-			}
 		case monitorevent.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -392,8 +384,8 @@ func (me *MonitorEvent) String() string {
 	var builder strings.Builder
 	builder.WriteString("MonitorEvent(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", me.ID))
-	builder.WriteString("kind=")
-	builder.WriteString(fmt.Sprintf("%v", me.Kind))
+	builder.WriteString("type=")
+	builder.WriteString(fmt.Sprintf("%v", me.Type))
 	builder.WriteString(", ")
 	builder.WriteString("severity=")
 	builder.WriteString(fmt.Sprintf("%v", me.Severity))
@@ -478,9 +470,6 @@ func (me *MonitorEvent) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("error_code=")
 	builder.WriteString(me.ErrorCode)
-	builder.WriteString(", ")
-	builder.WriteString("error_type=")
-	builder.WriteString(me.ErrorType)
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(me.CreatedAt.Format(time.ANSIC))

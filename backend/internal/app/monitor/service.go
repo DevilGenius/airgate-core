@@ -234,7 +234,7 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 	if observedAt.IsZero() {
 		observedAt = time.Now()
 	}
-	kind := normalizeKind(input.Kind)
+	eventType := normalizeType(input.Type)
 	severity := normalizeSeverity(input.Severity)
 	subjectType := truncateString(defaultString(input.SubjectType, monitoring.SubjectSystem), maxSubjectTypeLength)
 	source := truncateString(defaultString(input.Source, monitoring.SourceMonitorWorker), maxSourceLength)
@@ -243,12 +243,12 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 
 	title := scrubText(input.Title)
 	if strings.TrimSpace(title) == "" {
-		title = defaultTitle(kind)
+		title = defaultTitle(eventType)
 	}
 	message := scrubText(input.Message)
 
 	event := Event{
-		Kind:                kind,
+		Type:                eventType,
 		Severity:            severity,
 		Status:              monitoring.StatusActive,
 		Source:              source,
@@ -272,14 +272,13 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 		HTTPStatus:          cloneIntPtr(input.HTTPStatus),
 		UpstreamStatus:      cloneIntPtr(input.UpstreamStatus),
 		ErrorCode:           truncateString(input.ErrorCode, maxCodeLength),
-		ErrorType:           truncateString(input.ErrorType, maxCodeLength),
 		CreatedAt:           observedAt,
 		UpdatedAt:           observedAt,
 		ExpiresAt:           observedAt.Add(s.retention),
 		Detail:              detail,
 	}
 	event.Fingerprint = fingerprintFor(input.FingerprintMaterial, event)
-	event.AutoResolveAt = resolveAtFor(input.AutoResolveAt, event.Kind, observedAt)
+	event.AutoResolveAt = resolveAtFor(input.AutoResolveAt, event.Type, observedAt)
 	return QueuedEvent{Event: event}
 }
 
@@ -304,22 +303,22 @@ func normalizeListLimit(limit int) int {
 	return limit
 }
 
-func normalizeKind(kind string) string {
-	switch strings.TrimSpace(kind) {
-	case monitoring.KindAPIRequestError:
-		return monitoring.KindAPIRequestError
-	case monitoring.KindSchedulerError:
-		return monitoring.KindSchedulerError
-	case monitoring.KindUpstreamAccountError:
-		return monitoring.KindUpstreamAccountError
-	case monitoring.KindPluginError:
-		return monitoring.KindPluginError
-	case monitoring.KindTaskError:
-		return monitoring.KindTaskError
-	case monitoring.KindSystemError:
-		return monitoring.KindSystemError
+func normalizeType(eventType string) string {
+	switch strings.TrimSpace(eventType) {
+	case monitoring.TypeAPIRequestError:
+		return monitoring.TypeAPIRequestError
+	case monitoring.TypeSchedulerError:
+		return monitoring.TypeSchedulerError
+	case monitoring.TypeUpstreamAccountError:
+		return monitoring.TypeUpstreamAccountError
+	case monitoring.TypePluginError:
+		return monitoring.TypePluginError
+	case monitoring.TypeTaskError:
+		return monitoring.TypeTaskError
+	case monitoring.TypeSystemError:
+		return monitoring.TypeSystemError
 	default:
-		return monitoring.KindSystemError
+		return monitoring.TypeSystemError
 	}
 }
 
@@ -374,19 +373,19 @@ func fingerprintFor(material string, event Event) string {
 }
 
 func defaultFingerprintMaterial(event Event) string {
-	switch event.Kind {
-	case monitoring.KindAPIRequestError:
-		return joinFingerprintParts(event.Kind, intPtrValue(event.APIKeyID), event.Method, event.Endpoint, event.ErrorCode)
-	case monitoring.KindUpstreamAccountError:
-		return joinFingerprintParts(event.Kind, intPtrValue(event.AccountID), event.ErrorCode)
-	case monitoring.KindSchedulerError:
-		return joinFingerprintParts(event.Kind, event.Platform, event.Model, intPtrValue(event.GroupID), event.ErrorCode)
-	case monitoring.KindPluginError:
-		return joinFingerprintParts(event.Kind, event.PluginID, event.Endpoint, event.ErrorCode)
-	case monitoring.KindTaskError:
-		return joinFingerprintParts(event.Kind, event.PluginID, event.TaskType, event.ErrorCode)
+	switch event.Type {
+	case monitoring.TypeAPIRequestError:
+		return joinFingerprintParts(event.Type, intPtrValue(event.APIKeyID), event.Method, event.Endpoint, event.ErrorCode)
+	case monitoring.TypeUpstreamAccountError:
+		return joinFingerprintParts(event.Type, intPtrValue(event.AccountID), event.ErrorCode)
+	case monitoring.TypeSchedulerError:
+		return joinFingerprintParts(event.Type, event.Platform, event.Model, intPtrValue(event.GroupID), event.ErrorCode)
+	case monitoring.TypePluginError:
+		return joinFingerprintParts(event.Type, event.PluginID, event.Endpoint, event.ErrorCode)
+	case monitoring.TypeTaskError:
+		return joinFingerprintParts(event.Type, event.PluginID, event.TaskType, event.ErrorCode)
 	default:
-		return joinFingerprintParts(event.Kind, event.Source, event.SubjectType, event.SubjectID, event.ErrorCode)
+		return joinFingerprintParts(event.Type, event.Source, event.SubjectType, event.SubjectID, event.ErrorCode)
 	}
 }
 
@@ -394,43 +393,43 @@ func joinFingerprintParts(parts ...string) string {
 	return strings.Join(parts, "\x1f")
 }
 
-func resolveAtFor(input *time.Time, kind string, observedAt time.Time) *time.Time {
+func resolveAtFor(input *time.Time, eventType string, observedAt time.Time) *time.Time {
 	if input != nil && !input.IsZero() {
 		t := *input
 		return &t
 	}
-	t := observedAt.Add(autoResolveWindow(kind))
+	t := observedAt.Add(autoResolveWindow(eventType))
 	return &t
 }
 
-func autoResolveWindow(kind string) time.Duration {
-	switch kind {
-	case monitoring.KindAPIRequestError:
+func autoResolveWindow(eventType string) time.Duration {
+	switch eventType {
+	case monitoring.TypeAPIRequestError:
 		return 30 * time.Minute
-	case monitoring.KindSchedulerError:
+	case monitoring.TypeSchedulerError:
 		return 15 * time.Minute
-	case monitoring.KindUpstreamAccountError:
+	case monitoring.TypeUpstreamAccountError:
 		return time.Hour
-	case monitoring.KindPluginError:
+	case monitoring.TypePluginError:
 		return 30 * time.Minute
-	case monitoring.KindTaskError:
+	case monitoring.TypeTaskError:
 		return 2 * time.Hour
 	default:
 		return time.Hour
 	}
 }
 
-func defaultTitle(kind string) string {
-	switch kind {
-	case monitoring.KindAPIRequestError:
+func defaultTitle(eventType string) string {
+	switch eventType {
+	case monitoring.TypeAPIRequestError:
 		return "API request error"
-	case monitoring.KindSchedulerError:
+	case monitoring.TypeSchedulerError:
 		return "Scheduler error"
-	case monitoring.KindUpstreamAccountError:
+	case monitoring.TypeUpstreamAccountError:
 		return "Upstream account error"
-	case monitoring.KindPluginError:
+	case monitoring.TypePluginError:
 		return "Plugin error"
-	case monitoring.KindTaskError:
+	case monitoring.TypeTaskError:
 		return "Task error"
 	default:
 		return "System monitor event"
