@@ -23,7 +23,8 @@ const (
 	// rateLimitedMax OAuth 某些限流可能长达数天，设上限防止异常值。
 	rateLimitedMax = 7 * 24 * time.Hour
 	// transientAvoidance* 统一处理 403 临时不可用和 5xx/网络抖动：
-	// 前三次写 degraded 短窗口并完全避让，第四次起写 60s degraded，调度变为 StickyOnly。
+	// 前三次写 degraded 短窗口，第四次起写 60s degraded。只要带瞬时退避标记且未过期，
+	// 调度都完全避让；普通 degraded 才允许 StickyOnly。
 	transientAvoidanceFirst  = 7500 * time.Millisecond
 	transientAvoidanceSecond = 15 * time.Second
 	transientAvoidanceThird  = 30 * time.Second
@@ -503,17 +504,24 @@ func isExpiredTemporaryState(acc *ent.Account, now time.Time) bool {
 	return acc.State == account.StateRateLimited || acc.State == account.StateDegraded
 }
 
-func isShortDegradedWindow(acc *ent.Account, now time.Time) bool {
+func isTransientAvoidanceWindow(acc *ent.Account, now time.Time) bool {
 	if acc == nil || acc.State != account.StateDegraded || acc.StateUntil == nil || !acc.StateUntil.After(now) {
 		return false
 	}
-	step := extraInt(acc.Extra, transientAvoidStepExtraKey)
-	return step > 0 && step < 4
+	return hasTransientAvoidanceMarker(acc.Extra)
+}
+
+func hasTransientAvoidanceMarker(extra map[string]interface{}) bool {
+	if extra == nil {
+		return false
+	}
+	_, ok := extra[transientAvoidStepExtraKey]
+	return ok
 }
 
 func schedulabilityWithTransientAvoidance(acc *ent.Account, now time.Time) Schedulability {
 	sched := SchedulabilityOf(acc, now)
-	if sched == StickyOnly && isShortDegradedWindow(acc, now) {
+	if sched == StickyOnly && isTransientAvoidanceWindow(acc, now) {
 		return NotSchedulable
 	}
 	return sched
@@ -521,7 +529,7 @@ func schedulabilityWithTransientAvoidance(acc *ent.Account, now time.Time) Sched
 
 func hardAffinitySchedulabilityWithTransientAvoidance(acc *ent.Account, now time.Time) Schedulability {
 	sched := hardAffinityBaseSchedulability(acc, now)
-	if sched == StickyOnly && isShortDegradedWindow(acc, now) {
+	if sched == StickyOnly && isTransientAvoidanceWindow(acc, now) {
 		return NotSchedulable
 	}
 	return sched

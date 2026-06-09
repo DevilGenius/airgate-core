@@ -127,17 +127,14 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	}
 	defer releaseClientQuota()
 
-	requirements := routing.Requirements{
-		NeedsImage: requestNeedsImage(state.requestPath, state.model, state.body),
-	}
-	routes := routesForAPIKey(state, requirements)
+	routes := routesForAPIKey(state)
 	if len(routes) == 0 {
 		logger.Warn("forward_no_eligible_route",
 			sdk.LogFieldUserID, state.keyInfo.UserID,
 		)
-		if errResp, ok := apiKeyGroupRequirementError(state.keyInfo, requirements); ok {
-			f.recordAPIRequestError(c, state, errResp.status, errResp.code, errResp.message)
-			openAIError(c, errResp.status, errResp.errType, errResp.code, errResp.message)
+		if result := apiKeyGroupMatchResult(state); !result.OK && result.Code != "" {
+			f.recordAPIRequestError(c, state, result.Status, result.Code, result.Message)
+			openAIError(c, result.Status, result.ErrorType, result.Code, result.Message)
 			return
 		}
 		f.recordAPIRequestError(c, state, http.StatusServiceUnavailable, "no_available_route", "no eligible route")
@@ -594,70 +591,32 @@ func isTimeoutFailure(execution forwardExecution) bool {
 	return strings.Contains(reason, "timeout") || strings.Contains(reason, "timed out") || strings.Contains(reason, "deadline exceeded")
 }
 
-func routesForAPIKey(state *forwardState, requirements routing.Requirements) []routing.Candidate {
+func routesForAPIKey(state *forwardState) []routing.Candidate {
 	if state == nil || state.keyInfo == nil {
 		return nil
 	}
-	if !apiKeyGroupMatchesRequirements(state.keyInfo, requirements) {
+	if !apiKeyGroupMatchResult(state).OK {
 		return nil
 	}
 	return []routing.Candidate{keyInfoRoute(state.keyInfo)}
 }
 
-func apiKeyGroupMatchesRequirements(keyInfo *auth.APIKeyInfo, requirements routing.Requirements) bool {
+func apiKeyGroupMatchResult(state *forwardState) routing.GroupMatchResult {
+	if state == nil || state.keyInfo == nil {
+		return routing.GroupMatchResult{}
+	}
+	return routing.GroupMatchesRequest(entGroupFromKeyInfo(state.keyInfo), state.groupMatchInput)
+}
+
+func entGroupFromKeyInfo(keyInfo *auth.APIKeyInfo) *ent.Group {
 	if keyInfo == nil {
-		return false
+		return nil
 	}
-	if strings.EqualFold(keyInfo.GroupPlatform, "openai") {
-		imageEnabled := pluginSettingEnabledForKey(keyInfo.GroupPluginSettings, "openai", "image_enabled")
-		return imageEnabled == requirements.NeedsImage
+	return &ent.Group{
+		ID:             keyInfo.GroupID,
+		Platform:       keyInfo.GroupPlatform,
+		PluginSettings: keyInfo.GroupPluginSettings,
 	}
-	return true
-}
-
-type groupRequirementError struct {
-	status  int
-	errType string
-	code    string
-	message string
-}
-
-func apiKeyGroupRequirementError(keyInfo *auth.APIKeyInfo, requirements routing.Requirements) (groupRequirementError, bool) {
-	if keyInfo == nil || !strings.EqualFold(keyInfo.GroupPlatform, "openai") {
-		return groupRequirementError{}, false
-	}
-	imageEnabled := pluginSettingEnabledForKey(keyInfo.GroupPluginSettings, "openai", "image_enabled")
-	if requirements.NeedsImage && !imageEnabled {
-		return groupRequirementError{
-			status:  http.StatusForbidden,
-			errType: "invalid_request_error",
-			code:    "image_generation_disabled",
-			message: "当前分组未开启图片生成功能",
-		}, true
-	}
-	if !requirements.NeedsImage && imageEnabled {
-		return groupRequirementError{
-			status:  http.StatusBadRequest,
-			errType: "invalid_request_error",
-			code:    "chat_generation_disabled",
-			message: "当前分组未开启对话功能",
-		}, true
-	}
-	return groupRequirementError{}, false
-}
-
-func pluginSettingEnabledForKey(settings map[string]map[string]string, plugin, key string) bool {
-	for pluginName, kv := range settings {
-		if !strings.EqualFold(pluginName, plugin) {
-			continue
-		}
-		for k, v := range kv {
-			if strings.EqualFold(k, key) {
-				return strings.EqualFold(strings.TrimSpace(v), "true")
-			}
-		}
-	}
-	return false
 }
 
 func keyInfoRoute(keyInfo *auth.APIKeyInfo) routing.Candidate {

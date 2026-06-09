@@ -234,6 +234,26 @@ func TestStateMachineTransientAvoidanceTreatsExpiredRateLimitAsActive(t *testing
 	assertShortDBAvoidance(t, fresh, 1, 7*time.Second, 8*time.Second)
 }
 
+func TestSchedulabilityWithTransientAvoidanceKeepsPlainDegradedStickyOnly(t *testing.T) {
+	now := time.Now()
+	until := now.Add(time.Minute)
+	acc := &ent.Account{
+		State:      account.StateDegraded,
+		StateUntil: &until,
+		Extra:      map[string]interface{}{},
+	}
+
+	if got := SchedulabilityOf(acc, now); got != StickyOnly {
+		t.Fatalf("plain degraded schedulability = %v, want StickyOnly", got)
+	}
+	if got := schedulabilityWithTransientAvoidance(acc, now); got != StickyOnly {
+		t.Fatalf("plain transient-aware degraded schedulability = %v, want StickyOnly", got)
+	}
+	if got := hardAffinitySchedulabilityWithTransientAvoidance(acc, now); got != StickyOnly {
+		t.Fatalf("plain hard-affinity degraded schedulability = %v, want StickyOnly", got)
+	}
+}
+
 func TestStateMachinePool403AvoidsWithoutDisable(t *testing.T) {
 	ctx := context.Background()
 	db := openStateMachineTestDB(t, "scheduler_pool_403_avoidance")
@@ -317,11 +337,14 @@ func assertShortDBAvoidance(t *testing.T, acc *ent.Account, wantStep int, minDel
 	if got := extraInt(acc.Extra, transientAvoidStepExtraKey); got != wantStep {
 		t.Fatalf("avoid step = %d, want %d", got, wantStep)
 	}
-	if !isShortDegradedWindow(acc, now) {
-		t.Fatalf("account should be in short degraded window: state=%s until=%v extra=%+v", acc.State, acc.StateUntil, acc.Extra)
+	if !isTransientAvoidanceWindow(acc, now) {
+		t.Fatalf("account should be in transient avoidance window: state=%s until=%v extra=%+v", acc.State, acc.StateUntil, acc.Extra)
 	}
 	if got := schedulabilityWithTransientAvoidance(acc, now); got != NotSchedulable {
 		t.Fatalf("transient schedulability = %v, want NotSchedulable", got)
+	}
+	if got := hardAffinitySchedulabilityWithTransientAvoidance(acc, now); got != NotSchedulable {
+		t.Fatalf("hard-affinity transient schedulability = %v, want NotSchedulable", got)
 	}
 	if acc.StateUntil == nil {
 		t.Fatalf("degraded state_until missing")
@@ -345,8 +368,11 @@ func assertDBDegraded(t *testing.T, acc *ent.Account, minDelay time.Duration, ma
 	if got := SchedulabilityOf(acc, now); got != StickyOnly {
 		t.Fatalf("degraded schedulability = %v, want StickyOnly", got)
 	}
-	if got := schedulabilityWithTransientAvoidance(acc, now); got != StickyOnly {
-		t.Fatalf("transient-aware degraded schedulability = %v, want StickyOnly", got)
+	if got := schedulabilityWithTransientAvoidance(acc, now); got != NotSchedulable {
+		t.Fatalf("transient-aware degraded schedulability = %v, want NotSchedulable", got)
+	}
+	if got := hardAffinitySchedulabilityWithTransientAvoidance(acc, now); got != NotSchedulable {
+		t.Fatalf("hard-affinity transient-aware degraded schedulability = %v, want NotSchedulable", got)
 	}
 	if got := extraInt(acc.Extra, transientAvoidStepExtraKey); got != 4 {
 		t.Fatalf("avoid step = %d, want 4", got)

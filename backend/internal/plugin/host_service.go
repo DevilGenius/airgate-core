@@ -20,6 +20,7 @@ import (
 	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
 	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/internal/modelresolver"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	pb "github.com/DevilGenius/airgate-sdk/protocol/proto"
@@ -477,7 +478,7 @@ func (h *HostService) selectAccount(ctx context.Context, req hostSelectAccountRe
 		excludeIDs = append(excludeIDs, int(id))
 	}
 
-	acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupID), req.SessionID, excludeIDs...)
+	acc, _, err := h.pickHostAccount(ctx, g.Platform, int(req.GroupID), model, "", req.SessionID, excludeIDs...)
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
 			return nil, cerr
@@ -539,7 +540,7 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 	resp["model"] = model
 
 	// 调度选号
-	acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupID), "")
+	acc, schedulingModel, err := h.pickHostAccount(ctx, g.Platform, int(req.GroupID), model, "", "")
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
 			return nil, cerr
@@ -616,7 +617,7 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 			Kind:     outcome.Kind,
 			Duration: latency,
 			IsPool:   accFull.UpstreamIsPool,
-			Family:   scheduler.ModelFamily(accFull.Platform, model),
+			Family:   scheduler.ModelFamily(accFull.Platform, schedulingModel),
 		})
 	}
 
@@ -717,8 +718,8 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 	var lastUpstream sdk.UpstreamResponse
 	hasLastUpstream := false
 	for _, route := range routes {
-		model := h.resolveHostModel(route.Platform, req.Model)
-		if model == "" {
+		clientModel := h.resolveHostModel(route.Platform, req.Model)
+		if clientModel == "" {
 			slog.Warn("host_forward_no_model",
 				sdk.LogFieldPlatform, route.Platform, sdk.LogFieldGroupID, route.GroupID)
 			continue
@@ -731,14 +732,15 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 		}
 
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-			acc, err := h.scheduler.SelectAccount(ctx, route.Platform, model, 0, route.GroupID, "", hardExclude...)
+			acc, schedulingModel, err := h.pickHostAccount(ctx, route.Platform, route.GroupID, clientModel, req.Path, "", hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return nil, cerr
 				}
 				slog.Warn("host_forward_pick_account_failed",
 					sdk.LogFieldPlatform, route.Platform,
-					sdk.LogFieldModel, model,
+					sdk.LogFieldModel, clientModel,
+					"scheduling_models", modelresolver.ResolveSchedulingModels(route.Platform, req.Path, clientModel),
 					sdk.LogFieldGroupID, route.GroupID,
 					"effective_rate", route.EffectiveRate,
 					sdk.LogFieldError, err,
@@ -761,7 +763,8 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 				slog.Info("host_forward_account_capacity_full",
 					sdk.LogFieldGroupID, route.GroupID,
 					sdk.LogFieldAccountID, acc.ID,
-					sdk.LogFieldModel, model,
+					sdk.LogFieldModel, schedulingModel,
+					"client_model", clientModel,
 					"max_concurrency", hostForwardMaxConcurrency(accFull),
 				)
 				hardExclude = append(hardExclude, acc.ID)
@@ -773,7 +776,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 				Account: hostSDKAccount(accFull),
 				Body:    hostForwardBody(req.Body),
 				Headers: headers,
-				Model:   model,
+				Model:   clientModel,
 				Stream:  false,
 			}
 
@@ -781,7 +784,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
 			releaseCapacity()
 			duration := time.Since(start)
-			h.applyHostOutcome(ctx, acc.ID, accFull, model, outcome, duration)
+			h.applyHostOutcome(ctx, acc.ID, accFull, schedulingModel, outcome, duration)
 			if returnableUpstream(outcome.Upstream) {
 				lastUpstream = outcome.Upstream
 				hasLastUpstream = true
@@ -832,7 +835,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			resp := hostForwardPayload(outcome)
 
 			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
-				if usageID, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, userEmail, outcome, duration); err != nil {
+				if usageID, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, clientModel, accFull, userEmail, outcome, duration); err != nil {
 					slog.Error("host_forward_record_usage_failed",
 						sdk.LogFieldUserID, req.UserID,
 						sdk.LogFieldAccountID, acc.ID,
@@ -876,8 +879,8 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 	hardExclude := make([]int, 0, maxHostForwardAttempts*len(routes))
 
 	for _, route := range routes {
-		model := h.resolveHostModel(route.Platform, req.Model)
-		if model == "" {
+		clientModel := h.resolveHostModel(route.Platform, req.Model)
+		if clientModel == "" {
 			slog.Warn("host_forward_stream_no_model",
 				sdk.LogFieldPlatform, route.Platform, sdk.LogFieldGroupID, route.GroupID)
 			continue
@@ -890,14 +893,15 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 		}
 
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-			acc, err := h.scheduler.SelectAccount(ctx, route.Platform, model, 0, route.GroupID, "", hardExclude...)
+			acc, schedulingModel, err := h.pickHostAccount(ctx, route.Platform, route.GroupID, clientModel, req.Path, "", hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return cerr
 				}
 				slog.Warn("host_forward_stream_pick_account_failed",
 					sdk.LogFieldPlatform, route.Platform,
-					sdk.LogFieldModel, model,
+					sdk.LogFieldModel, clientModel,
+					"scheduling_models", modelresolver.ResolveSchedulingModels(route.Platform, req.Path, clientModel),
 					sdk.LogFieldGroupID, route.GroupID,
 					"effective_rate", route.EffectiveRate,
 					sdk.LogFieldError, err,
@@ -920,7 +924,8 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 				slog.Info("host_forward_stream_account_capacity_full",
 					sdk.LogFieldGroupID, route.GroupID,
 					sdk.LogFieldAccountID, acc.ID,
-					sdk.LogFieldModel, model,
+					sdk.LogFieldModel, schedulingModel,
+					"client_model", clientModel,
 					"max_concurrency", hostForwardMaxConcurrency(accFull),
 				)
 				hardExclude = append(hardExclude, acc.ID)
@@ -932,7 +937,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 				Account: hostSDKAccount(accFull),
 				Body:    hostForwardBody(req.Body),
 				Headers: hostForwardHeaders(req, route),
-				Model:   model,
+				Model:   clientModel,
 				Stream:  true,
 				Writer:  fw,
 			}
@@ -941,7 +946,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
 			releaseCapacity()
 			duration := time.Since(start)
-			h.applyHostOutcome(ctx, acc.ID, accFull, model, outcome, duration)
+			h.applyHostOutcome(ctx, acc.ID, accFull, schedulingModel, outcome, duration)
 			if cerr := hostContextError(fwdErr); cerr != nil {
 				return cerr
 			}
@@ -998,7 +1003,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 
 			var usage *sdk.Usage
 			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
-				if _, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, userEmail, outcome, duration); err != nil {
+				if _, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, clientModel, accFull, userEmail, outcome, duration); err != nil {
 					slog.Error("host_forward_stream_record_usage_failed",
 						sdk.LogFieldUserID, req.UserID,
 						sdk.LogFieldAccountID, acc.ID,
@@ -1442,7 +1447,7 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 				sdk.LogFieldGroupID, req.GroupID, sdk.LogFieldError, err)
 			return nil, "", hostForwardGenericError()
 		}
-		if !routing.GroupMatchesRequirements(g, hostForwardRequirements(req)) {
+		if !routing.GroupMatchesRequest(g, hostForwardGroupMatchInput(req)).OK {
 			slog.Warn("host_forward_group_requirement_unmet",
 				sdk.LogFieldGroupID, req.GroupID,
 				sdk.LogFieldModel, req.Model,
@@ -1478,7 +1483,7 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 			sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
 		return nil, "", hostForwardGenericError()
 	}
-	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, hostForwardRequirements(req))
+	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, hostForwardGroupMatchInput(req))
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
 			return nil, "", cerr
@@ -1500,8 +1505,13 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 	return routes, u.Email, nil
 }
 
-func hostForwardRequirements(req hostForwardRequest) routing.Requirements {
-	return routing.Requirements{NeedsImage: requestNeedsImage(req.Path, req.Model, hostForwardBody(req.Body))}
+func hostForwardGroupMatchInput(req hostForwardRequest) routing.GroupMatchInput {
+	body := hostForwardBody(req.Body)
+	return routing.GroupMatchInput{
+		Path:        req.Path,
+		ClientModel: req.Model,
+		NeedsImage:  requestNeedsImage(req.Path, req.Model, body),
+	}
 }
 
 func hostForwardReasoningEffort(req hostForwardRequest) string {
@@ -1517,6 +1527,24 @@ func (h *HostService) resolveHostModel(platform, model string) string {
 		return ""
 	}
 	return models[0].ID
+}
+
+func (h *HostService) pickHostAccount(ctx context.Context, platform string, groupID int, clientModel, path, sessionID string, excludeIDs ...int) (*ent.Account, string, error) {
+	var lastErr error
+	for _, schedulingModel := range modelresolver.ResolveSchedulingModels(platform, path, clientModel) {
+		acc, err := h.scheduler.SelectAccount(ctx, platform, schedulingModel, 0, groupID, sessionID, excludeIDs...)
+		if err == nil {
+			return acc, schedulingModel, nil
+		}
+		lastErr = err
+		if !errors.Is(err, scheduler.ErrNoAvailableAccount) {
+			return nil, "", err
+		}
+	}
+	if lastErr != nil {
+		return nil, "", lastErr
+	}
+	return nil, "", scheduler.ErrNoAvailableAccount
 }
 
 func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.Header {

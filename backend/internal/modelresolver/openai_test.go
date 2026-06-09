@@ -1,11 +1,11 @@
-package plugin
+package modelresolver
 
 import (
 	"reflect"
 	"testing"
 )
 
-func TestSchedulingModelsForOpenAIAnthropicMessages(t *testing.T) {
+func TestResolveSchedulingModelsForOpenAIAnthropicMessages(t *testing.T) {
 	clearSchedulingModelEnv(t)
 
 	tests := []struct {
@@ -43,33 +43,33 @@ func TestSchedulingModelsForOpenAIAnthropicMessages(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			got := schedulingModelsForRequest("openai", tt.path, tt.model)
+			got := ResolveSchedulingModels("openai", tt.path, tt.model)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Fatalf("schedulingModelsForRequest() = %#v, want %#v", got, tt.want)
+				t.Fatalf("ResolveSchedulingModels() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestSchedulingModelsForOpenAIAnthropicMessagesUsesEnvOverride(t *testing.T) {
+func TestResolveSchedulingModelsForOpenAIAnthropicMessagesUsesEnvOverride(t *testing.T) {
 	clearSchedulingModelEnv(t)
 	t.Setenv("AIRGATE_MODEL_OPUS", "openai/gpt-5.4")
 	t.Setenv("AIRGATE_MODEL_OPUS_FALLBACK", "oai/gpt-5.4")
 
-	got := schedulingModelsForRequest("openai", "/v1/messages", "claude-opus-4-7")
+	got := ResolveSchedulingModels("openai", "/v1/messages", "claude-opus-4-7")
 	want := []string{"gpt-5.4"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("schedulingModelsForRequest() = %#v, want %#v", got, want)
+		t.Fatalf("ResolveSchedulingModels() = %#v, want %#v", got, want)
 	}
 }
 
-func TestSchedulingModelsIgnoreNonAnthropicRoutes(t *testing.T) {
+func TestResolveSchedulingModelsIgnoreNonAnthropicRoutes(t *testing.T) {
 	clearSchedulingModelEnv(t)
 
-	got := schedulingModelsForRequest("openai", "/v1/chat/completions", "claude-opus-4-7")
+	got := ResolveSchedulingModels("openai", "/v1/chat/completions", "claude-opus-4-7")
 	want := []string{"claude-opus-4-7"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("schedulingModelsForRequest() = %#v, want %#v", got, want)
+		t.Fatalf("ResolveSchedulingModels() = %#v, want %#v", got, want)
 	}
 }
 

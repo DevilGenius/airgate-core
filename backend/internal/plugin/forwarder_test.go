@@ -604,17 +604,20 @@ func TestRoutesForAPIKeyUsesBoundGroupOnly(t *testing.T) {
 	t.Parallel()
 
 	settings := map[string]map[string]string{"openai": {"image_enabled": "true"}}
-	state := &forwardState{keyInfo: &auth.APIKeyInfo{
-		GroupID:                42,
-		GroupPlatform:          "openai",
-		GroupRateMultiplier:    1.5,
-		UserGroupRates:         map[int64]float64{42: 0.7, 99: 0.1},
-		GroupPluginSettings:    settings,
-		GroupServiceTier:       "priority",
-		GroupForceInstructions: "stay concise",
-	}}
+	state := &forwardState{
+		groupMatchInput: routing.GroupMatchInput{NeedsImage: true},
+		keyInfo: &auth.APIKeyInfo{
+			GroupID:                42,
+			GroupPlatform:          "openai",
+			GroupRateMultiplier:    1.5,
+			UserGroupRates:         map[int64]float64{42: 0.7, 99: 0.1},
+			GroupPluginSettings:    settings,
+			GroupServiceTier:       "priority",
+			GroupForceInstructions: "stay concise",
+		},
+	}
 
-	routes := routesForAPIKey(state, routing.Requirements{NeedsImage: true})
+	routes := routesForAPIKey(state)
 	if len(routes) != 1 {
 		t.Fatalf("len(routes) = %d, want 1", len(routes))
 	}
@@ -638,13 +641,16 @@ func TestRoutesForAPIKeyUsesBoundGroupOnly(t *testing.T) {
 func TestRoutesForAPIKeyRejectsImageWhenBoundGroupDisabled(t *testing.T) {
 	t.Parallel()
 
-	state := &forwardState{keyInfo: &auth.APIKeyInfo{
-		GroupID:             42,
-		GroupPlatform:       "openai",
-		GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "false"}},
-	}}
+	state := &forwardState{
+		groupMatchInput: routing.GroupMatchInput{NeedsImage: true},
+		keyInfo: &auth.APIKeyInfo{
+			GroupID:             42,
+			GroupPlatform:       "openai",
+			GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "false"}},
+		},
+	}
 
-	routes := routesForAPIKey(state, routing.Requirements{NeedsImage: true})
+	routes := routesForAPIKey(state)
 	if len(routes) != 0 {
 		t.Fatalf("len(routes) = %d, want 0", len(routes))
 	}
@@ -659,7 +665,7 @@ func TestRoutesForAPIKeyRejectsChatWhenBoundGroupImageEnabled(t *testing.T) {
 		GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "true"}},
 	}}
 
-	routes := routesForAPIKey(state, routing.Requirements{})
+	routes := routesForAPIKey(state)
 	if len(routes) != 0 {
 		t.Fatalf("len(routes) = %d, want 0", len(routes))
 	}
@@ -668,42 +674,47 @@ func TestRoutesForAPIKeyRejectsChatWhenBoundGroupImageEnabled(t *testing.T) {
 func TestAPIKeyGroupRequirementErrorImageDisabled(t *testing.T) {
 	t.Parallel()
 
-	errResp, ok := apiKeyGroupRequirementError(&auth.APIKeyInfo{
-		GroupPlatform:       "openai",
-		GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "false"}},
-	}, routing.Requirements{NeedsImage: true})
-	if !ok {
-		t.Fatal("ok = false, want true")
+	result := apiKeyGroupMatchResult(&forwardState{
+		groupMatchInput: routing.GroupMatchInput{NeedsImage: true},
+		keyInfo: &auth.APIKeyInfo{
+			GroupPlatform:       "openai",
+			GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "false"}},
+		},
+	})
+	if result.OK {
+		t.Fatal("OK = true, want false")
 	}
-	if errResp.status != http.StatusForbidden {
-		t.Fatalf("status = %d, want %d", errResp.status, http.StatusForbidden)
+	if result.Status != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", result.Status, http.StatusForbidden)
 	}
-	if errResp.code != "image_generation_disabled" {
-		t.Fatalf("code = %q, want image_generation_disabled", errResp.code)
+	if result.Code != "image_generation_disabled" {
+		t.Fatalf("code = %q, want image_generation_disabled", result.Code)
 	}
-	if errResp.message != "当前分组未开启图片生成功能" {
-		t.Fatalf("message = %q", errResp.message)
+	if result.Message != "当前分组未开启图片生成功能" {
+		t.Fatalf("message = %q", result.Message)
 	}
 }
 
 func TestAPIKeyGroupRequirementErrorChatDisabled(t *testing.T) {
 	t.Parallel()
 
-	errResp, ok := apiKeyGroupRequirementError(&auth.APIKeyInfo{
-		GroupPlatform:       "openai",
-		GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "true"}},
-	}, routing.Requirements{})
-	if !ok {
-		t.Fatal("ok = false, want true")
+	result := apiKeyGroupMatchResult(&forwardState{
+		keyInfo: &auth.APIKeyInfo{
+			GroupPlatform:       "openai",
+			GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "true"}},
+		},
+	})
+	if result.OK {
+		t.Fatal("OK = true, want false")
 	}
-	if errResp.status != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", errResp.status, http.StatusBadRequest)
+	if result.Status != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", result.Status, http.StatusBadRequest)
 	}
-	if errResp.code != "chat_generation_disabled" {
-		t.Fatalf("code = %q, want chat_generation_disabled", errResp.code)
+	if result.Code != "chat_generation_disabled" {
+		t.Fatalf("code = %q, want chat_generation_disabled", result.Code)
 	}
-	if errResp.message != "当前分组未开启对话功能" {
-		t.Fatalf("message = %q", errResp.message)
+	if result.Message != "当前分组未开启对话功能" {
+		t.Fatalf("message = %q", result.Message)
 	}
 }
 

@@ -17,8 +17,9 @@ type forwardState struct {
 	requestPath string
 	requestID   string
 
-	body  []byte
-	model string
+	body            []byte
+	model           string
+	groupMatchInput routing.GroupMatchInput
 	// schedulingModels 是调度层使用的模型候选。协议翻译入口里，客户端传入的
 	// model 可能不是上游真实模型，例如 OpenAI 插件的 /v1/messages 会把
 	// claude-* 映射到 GPT 模型后再调用上游。

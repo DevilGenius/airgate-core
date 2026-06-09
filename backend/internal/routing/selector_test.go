@@ -55,7 +55,7 @@ func TestListEligibleGroups(t *testing.T) {
 		SetRateMultiplier(0.01).
 		SaveX(ctx)
 
-	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", map[int64]float64{int64(publicSlow.ID): 0.3}, Requirements{})
+	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", map[int64]float64{int64(publicSlow.ID): 0.3}, GroupMatchInput{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestListEligibleGroupsFiltersImageDisabledOpenAIGroups(t *testing.T) {
 		SetRateMultiplier(0.3).
 		SaveX(ctx)
 
-	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, Requirements{NeedsImage: true})
+	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, GroupMatchInput{NeedsImage: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestListEligibleGroupsFiltersImageDisabledOpenAIGroups(t *testing.T) {
 		t.Fatalf("routes[0].GroupID = %d, want %d", routes[0].GroupID, imageEnabled.ID)
 	}
 
-	chatRoutes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, Requirements{})
+	chatRoutes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, GroupMatchInput{})
 	if err != nil {
 		t.Fatal(err)
 	}

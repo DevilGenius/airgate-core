@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"sort"
-	"strings"
 
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
@@ -13,10 +12,6 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 )
-
-type Requirements struct {
-	NeedsImage bool
-}
 
 type Candidate struct {
 	GroupID                int
@@ -29,7 +24,7 @@ type Candidate struct {
 	SortWeight             int
 }
 
-func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platform string, userGroupRates map[int64]float64, requirements Requirements) ([]Candidate, error) {
+func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platform string, userGroupRates map[int64]float64, input GroupMatchInput) ([]Candidate, error) {
 	groups, err := db.Group.Query().
 		Where(group.PlatformEQ(platform)).
 		All(ctx)
@@ -43,7 +38,7 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 
 	candidates := make([]Candidate, 0, len(groups))
 	for _, g := range groups {
-		if !GroupMatchesRequirements(g, requirements) {
+		if !GroupMatchesRequest(g, input).OK {
 			continue
 		}
 		if g.IsExclusive {
@@ -87,7 +82,7 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 		slog.Warn("routing_no_match",
 			sdk.LogFieldPlatform, platform,
 			sdk.LogFieldUserID, userID,
-			"needs_image", requirements.NeedsImage,
+			"needs_image", input.NeedsImage,
 			"groups_scanned", len(groups))
 	} else {
 		slog.Debug("routing_match",
@@ -98,31 +93,6 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 			"top_rate", candidates[0].EffectiveRate)
 	}
 	return candidates, nil
-}
-
-func GroupMatchesRequirements(g *ent.Group, requirements Requirements) bool {
-	if g == nil {
-		return false
-	}
-	if strings.EqualFold(g.Platform, "openai") {
-		imageEnabled := pluginSettingEnabled(g.PluginSettings, "openai", "image_enabled")
-		return imageEnabled == requirements.NeedsImage
-	}
-	return true
-}
-
-func pluginSettingEnabled(settings map[string]map[string]string, plugin, key string) bool {
-	for pluginName, kv := range settings {
-		if !strings.EqualFold(pluginName, plugin) {
-			continue
-		}
-		for k, v := range kv {
-			if strings.EqualFold(k, key) {
-				return strings.EqualFold(strings.TrimSpace(v), "true")
-			}
-		}
-	}
-	return false
 }
 
 func clonePluginSettings(in map[string]map[string]string) map[string]map[string]string {

@@ -12,7 +12,7 @@ import (
 //
 //	active        可调度
 //	rate_limited  被上游限流，state_until 到期前 NotSchedulable，到期后自动恢复 active
-//	degraded      软降级（池账号临时抖动），state_until 到期前优先级降到最低仅兜底
+//	degraded      临时降级；带退避标记时到期前暂停调度，无退避标记时仅 StickyOnly 兜底
 //	disabled      凭证失效 / 连续失败超阈值，需要人工重新验证
 type Account struct {
 	ent.Schema
@@ -38,7 +38,7 @@ func (Account) Fields() []ent.Field {
 		field.String("error_msg").Default("").
 			Comment("进入当前状态的原因（给运维看）"),
 		field.Bool("upstream_is_pool").Default(false).
-			Comment("上游是账号池：UpstreamTransient 走软降级 degraded；AccountDead 仍标 disabled"),
+			Comment("上游是账号池：403/5xx 走退避 degraded；池自身凭证无效才 disabled"),
 		field.Time("last_used_at").Optional().Nillable(),
 		field.JSON("extra", map[string]interface{}{}).Optional().Default(map[string]interface{}{}).
 			Comment("扩展配置（max_rpm / max_window_cost / max_sessions 等）"),

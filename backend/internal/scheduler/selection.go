@@ -51,12 +51,6 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 	if candidates = excludeAccounts(candidates, excludeIDs); len(candidates) == 0 {
 		return nil, ErrNoAvailableAccount
 	}
-	if fn, ok := s.accountFilters[platform]; ok {
-		if candidates = fn(candidates, model); len(candidates) == 0 {
-			return nil, ErrNoAvailableAccount
-		}
-	}
-
 	now := time.Now()
 	if previousResponseID := strings.TrimSpace(opts.PreviousResponseID); previousResponseID != "" && s.responseAffinity != nil {
 		if selected, handled, err := s.selectPreviousResponseAffinity(ctx, platform, model, userID, groupID, sessionID, candidates, opts, previousResponseID, now); handled {
@@ -639,7 +633,7 @@ func hardAffinityBaseSchedulability(acc *ent.Account, now time.Time) Schedulabil
 // concurrencySchedulability 根据当前并发用量返回调度约束：
 //
 //	load >= 100% → NotSchedulable（调度器直接跳过，避免下游 acquireSlot 失败浪费 failover）
-//	load >=  80% → StickyOnly（软降级：只有粘性会话能选中，新请求优先换账号）
+//	load >=  80% → StickyOnly（只有粘性会话能选中，新请求优先换账号）
 //	否则         → Normal
 //
 // 存在 TOCTOU（这里看没满、下一瞬 acquireSlot 却满）：forwarder 会 failover 到下一个账号兜底。

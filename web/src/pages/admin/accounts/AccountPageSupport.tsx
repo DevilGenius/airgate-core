@@ -1230,7 +1230,7 @@ export function useUsageResetClock(enabled: boolean): number {
  * AccountStatusCell 渲染账号状态徽标，按 state + state_until 动态展示：
  *   active       → 绿色 "活跃"
  *   rate_limited → 橙色 "限流中 Xh Ym"（state_until 倒计时）
- *   degraded     → 黄色 "降级 Xm"（池账号软降级，倒计时）
+ *   degraded     → 黄色 "降级 Xm"（上游退避，倒计时）
  *   disabled     → 红色 "已禁用"（tooltip 显示 error_msg）
  * 到期的 rate_limited / degraded 视作 active（后端 lazy 回收，前端可先显示 active）。
  *
@@ -1293,7 +1293,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
       `${t('accounts.degraded_label', '降级')} ${formatCountdown(remainingMs)}`,
       'var(--ag-warning-subtle)',
       'var(--ag-warning)',
-      t('accounts.degraded_tooltip', '上游池抖动，软降级仅做兜底，到期自动恢复'),
+      t('accounts.degraded_tooltip', '退避中，暂停调度，到期自动恢复'),
     );
   } else if (row.state === 'disabled') {
     const reason = row.error_msg?.trim() === '管理员手动关闭调度' ? '手动关闭' : row.error_msg?.trim();

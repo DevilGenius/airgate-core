@@ -367,6 +367,8 @@
     "rate_limited_label": "限流中",
     "rate_limited_auto_recover": "自动恢复",
     "rate_limited_tooltip": "上游限流，到期自动恢复，不影响调度开关",
+    "degraded_label": "降级",
+    "degraded_tooltip": "退避中，暂停调度，到期自动恢复",
     "family_cooldown_label": "{{count}} 家族限流",
     "clear_family_cooldowns": "清除标记",
     "clear_family_cooldowns_success": "标记已清除",

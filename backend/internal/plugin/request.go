@@ -18,6 +18,8 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/modelresolver"
+	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
@@ -55,7 +57,12 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	if inst == nil {
 		return nil, false
 	}
-	schedulingModels := schedulingModelsForRequest(requestedPlatform, path, parsed.Model)
+	groupMatchInput := routing.GroupMatchInput{
+		Path:        path,
+		ClientModel: parsed.Model,
+		NeedsImage:  requestNeedsImage(path, parsed.Model, body),
+	}
+	schedulingModels := modelresolver.ResolveSchedulingModels(requestedPlatform, path, parsed.Model)
 	schedulingModel := ""
 	if len(schedulingModels) > 0 {
 		schedulingModel = schedulingModels[0]
@@ -66,6 +73,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		requestPath:                 path,
 		body:                        body,
 		model:                       parsed.Model,
+		groupMatchInput:             groupMatchInput,
 		schedulingModels:            schedulingModels,
 		schedulingModel:             schedulingModel,
 		stream:                      parsed.Stream,

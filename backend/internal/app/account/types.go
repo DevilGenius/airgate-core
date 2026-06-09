@@ -34,7 +34,7 @@ type Account struct {
 	RateMultiplier     float64
 	// ErrorMsg 进入当前非 active 状态的原因（给运维看）。
 	ErrorMsg string
-	// UpstreamIsPool 上游是账号池时置 true：池抖动会被降级到 degraded 不永久标错。
+	// UpstreamIsPool 上游是账号池时置 true：临时上游错误会进入退避 degraded，不永久标错。
 	UpstreamIsPool bool
 	LastUsedAt     *time.Time
 	GroupIDs       []int64
