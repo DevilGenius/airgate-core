@@ -86,7 +86,7 @@ func (s *Service) runAutoResolveOnce(parent context.Context) {
 			slog.Warn("monitor_auto_resolve_failed", "resolved", total, "error", err)
 			s.Record(context.Background(), monitoring.EventInput{
 				Type:        monitoring.TypeSystemError,
-				Severity:    monitoring.SeverityError,
+				Severity:    monitoring.SeverityWarning,
 				Source:      monitoring.SourceMonitorWorker,
 				SubjectType: monitoring.SubjectSystem,
 				SubjectID:   "auto_resolve",
@@ -120,7 +120,7 @@ func (s *Service) runCleanupExpiredOnce(parent context.Context) {
 			slog.Warn("monitor_cleanup_failed", "deleted", total, "error", err)
 			s.Record(context.Background(), monitoring.EventInput{
 				Type:        monitoring.TypeSystemError,
-				Severity:    monitoring.SeverityError,
+				Severity:    monitoring.SeverityWarning,
 				Source:      monitoring.SourceMonitorWorker,
 				SubjectType: monitoring.SubjectSystem,
 				SubjectID:   "cleanup",

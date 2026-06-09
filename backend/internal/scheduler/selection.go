@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/monitoring"
 )
 
 // SelectAccount 选一个可用账户。流程：
@@ -35,7 +37,13 @@ type AccountSelectionOptions struct {
 // SelectAccountWithOptions 在常规调度前优先按 previous_response_id 命中原账号。
 // RequireContinuationAffinity=true 时，请求不是自包含重放，previous_response_id 或 session sticky
 // 都是硬亲和，不能被 priority 覆盖。普通 session sticky 只在当前可用最高优先级层内生效。
-func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, model string, userID, groupID int, sessionID string, opts AccountSelectionOptions, excludeIDs ...int) (*ent.Account, error) {
+func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, model string, userID, groupID int, sessionID string, opts AccountSelectionOptions, excludeIDs ...int) (selected *ent.Account, err error) {
+	defer func() {
+		if errors.Is(err, ErrNoAvailableAccount) {
+			s.recordNoAvailableAccount(ctx, platform, model, userID, groupID, sessionID, opts, excludeIDs)
+		}
+	}()
+
 	candidates, err := s.routeAccounts(ctx, platform, model, groupID)
 	if err != nil {
 		return nil, err
@@ -103,7 +111,7 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		if len(stickySelectionCandidates) == 0 {
 			return nil, ErrNoAvailableAccount
 		}
-		selected := s.selectByLoadBalance(ctx, stickySelectionCandidates, now, snapshot)
+		selected = s.selectByLoadBalance(ctx, stickySelectionCandidates, now, snapshot)
 		if selected == nil {
 			return nil, ErrNoAvailableAccount
 		}
@@ -115,11 +123,60 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, stickySelectionCandidates, now, snapshot)
 	}
 
-	selected := s.selectByLoadBalance(ctx, normalSelectionCandidates, now, snapshot)
+	selected = s.selectByLoadBalance(ctx, normalSelectionCandidates, now, snapshot)
 	if selected == nil {
 		return nil, ErrNoAvailableAccount
 	}
 	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalSelectionCandidates, now, snapshot)
+}
+
+func (s *Scheduler) recordNoAvailableAccount(ctx context.Context, platform, model string, userID, groupID int, sessionID string, opts AccountSelectionOptions, excludeIDs []int) {
+	if s == nil || s.state == nil || s.state.monitor == nil {
+		return
+	}
+	subjectID := platform
+	if groupID > 0 {
+		subjectID = strconv.Itoa(groupID)
+	}
+	detail := map[string]interface{}{
+		"exclude_count": len(excludeIDs),
+		"group_id":      groupID,
+		"model":         model,
+		"platform":      platform,
+	}
+	if userID > 0 {
+		detail["user_id"] = userID
+	}
+	if sessionID != "" {
+		detail["has_session"] = true
+	}
+	if opts.PreviousResponseID != "" {
+		detail["has_previous_response_id"] = true
+	}
+	if opts.RequireContinuationAffinity {
+		detail["require_continuation_affinity"] = true
+	}
+	s.state.monitor.Record(ctx, monitoring.EventInput{
+		Type:        monitoring.TypeSchedulerError,
+		Severity:    monitoring.SeverityError,
+		Source:      monitoring.SourceScheduler,
+		SubjectType: monitoring.SubjectScheduler,
+		SubjectID:   subjectID,
+		GroupID:     positiveIntPtr(groupID),
+		Platform:    platform,
+		Model:       model,
+		ErrorCode:   "no_available_account",
+		Title:       "No available account",
+		Message:     "Scheduler could not find an available upstream account",
+		Detail:      detail,
+	})
+}
+
+func positiveIntPtr(value int) *int {
+	if value <= 0 {
+		return nil
+	}
+	return &value
 }
 
 func (s *Scheduler) selectPreviousResponseAffinity(

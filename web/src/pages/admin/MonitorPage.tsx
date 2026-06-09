@@ -424,6 +424,9 @@ export default function MonitorPage() {
       title: t('common.actions'),
       width: '112px',
       render: (row) => {
+        if (row.severity === 'warning') {
+          return <span className="text-[13px] leading-none text-text-tertiary">-</span>;
+        }
         const disabled = row.status !== 'active';
         return (
           <div className="flex h-full w-full items-center justify-center gap-1">

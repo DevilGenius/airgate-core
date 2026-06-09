@@ -136,11 +136,11 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			sdk.LogFieldUserID, state.keyInfo.UserID,
 		)
 		if errResp, ok := apiKeyGroupRequirementError(state.keyInfo, requirements); ok {
-			f.recordAPIRequestError(c, state, errResp.status, errResp.code, errResp.message, monitoring.SeverityError)
+			f.recordAPIRequestError(c, state, errResp.status, errResp.code, errResp.message)
 			openAIError(c, errResp.status, errResp.errType, errResp.code, errResp.message)
 			return
 		}
-		f.recordAPIRequestError(c, state, http.StatusServiceUnavailable, "no_available_route", "no eligible route", monitoring.SeverityError)
+		f.recordAPIRequestError(c, state, http.StatusServiceUnavailable, "no_available_route", "no eligible route")
 		openAIError(c, http.StatusServiceUnavailable, "server_error", "no_available_route", "请求暂时无法完成，请稍后重试")
 		return
 	}
@@ -369,7 +369,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	logger.Error("forward_request_failed", failAttrs...)
 
 	response := selectAllRoutesFailureResponse(failureSummary)
-	f.recordAPIRequestError(c, state, response.status, response.code, response.message, monitoring.SeverityError)
+	f.recordAPIRequestError(c, state, response.status, response.code, response.message)
 	writeAllRoutesFailedResponse(c, response)
 }
 

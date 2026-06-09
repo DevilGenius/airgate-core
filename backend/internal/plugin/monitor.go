@@ -12,11 +12,11 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
-func (f *Forwarder) recordAPIRequestError(c *gin.Context, state *forwardState, status int, code, message, severity string) {
+func (f *Forwarder) recordAPIRequestError(c *gin.Context, state *forwardState, status int, code, message string) {
 	if state == nil {
 		return
 	}
-	f.recordAPIRequestErrorForKey(c, state.keyInfo, state.requestedPlatform, state.requestPath, state.model, status, code, message, severity)
+	f.recordAPIRequestErrorForKey(c, state.keyInfo, state.requestedPlatform, state.requestPath, state.model, status, code, message)
 }
 
 func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.APIKeyInfo, platform, path, model string, status int, code, message string, severity ...string) {
@@ -70,7 +70,7 @@ func (f *Forwarder) recordPluginRouteError(c *gin.Context, keyInfo *auth.APIKeyI
 	if f == nil || f.monitor == nil {
 		return
 	}
-	f.recordAPIRequestErrorForKey(c, keyInfo, platform, path, "", http.StatusServiceUnavailable, code, message, monitoring.SeverityError)
+	f.recordAPIRequestErrorForKey(c, keyInfo, platform, path, "", http.StatusServiceUnavailable, code, message)
 	ctx := context.Background()
 	if c != nil && c.Request != nil {
 		ctx = c.Request.Context()
