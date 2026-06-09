@@ -523,7 +523,7 @@ func TestBuildPluginRequestOmitsWriterForNonStreamImagesRequest(t *testing.T) {
 	}
 }
 
-func TestCanFailoverImagesAllowsRepeated429Failover(t *testing.T) {
+func TestCanFailoverImagesUsesOutcomeFailoverPolicy(t *testing.T) {
 	t.Parallel()
 
 	recorder := httptest.NewRecorder()
@@ -535,8 +535,27 @@ func TestCanFailoverImagesAllowsRepeated429Failover(t *testing.T) {
 	if !f.canFailover(c, base, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountRateLimited}}) {
 		t.Fatal("image 429 should allow failover")
 	}
-	if f.canFailover(c, base, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient}}) {
-		t.Fatal("image non-429 failure should not use core failover")
+	if !f.canFailover(c, base, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient}}) {
+		t.Fatal("image upstream transient should allow failover")
+	}
+	if f.canFailover(c, base, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeClientError}}) {
+		t.Fatal("image client error should not failover")
+	}
+}
+
+func TestCanFailoverImagesDoesNotRetryAfterStreamWritten(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	c.Writer.WriteHeader(http.StatusOK)
+	c.Writer.WriteHeaderNow()
+
+	f := &Forwarder{}
+	state := &forwardState{requestPath: "/v1/images/generations", stream: true}
+	if f.canFailover(c, state, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient}}) {
+		t.Fatal("image stream should not failover after response is written")
 	}
 }
 

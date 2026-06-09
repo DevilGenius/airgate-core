@@ -307,7 +307,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				releaseAccountSlot()
 				f.applyOutcome(ctx, state, execution)
 
-				if execution.outcome.Kind.IsAccountFault() {
+				if execution.outcome.Kind.IsAccountFault() || isImageSubmitAPIPath(state.requestPath) {
 					hardExclude = append(hardExclude, accountID)
 				} else {
 					softExclude = append(softExclude, accountID)
@@ -684,17 +684,14 @@ func keyInfoForRoute(base *auth.APIKeyInfo, route routing.Candidate) *auth.APIKe
 }
 
 // canFailover 是否允许换账号重试。
-// 图片提交只对账号 429 做 Core 级换号；其它请求里，流式已写入 → 不可，
-// err 非 nil（插件自身崩）→ 可；其余由 Kind.ShouldFailover() 决定。
+// 流式已写入 → 不可；err 非 nil（插件自身崩）→ 可；
+// 其余由 Kind.ShouldFailover() 决定。图片提交同样使用这套判定。
 func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution forwardExecution) bool {
 	if state.stream && c.Writer.Written() {
 		return false
 	}
 	if state.requireContinuationAffinity {
 		return false
-	}
-	if isImageSubmitAPIPath(state.requestPath) {
-		return execution.outcome.Kind == sdk.OutcomeAccountRateLimited
 	}
 	if execution.err != nil {
 		return true
