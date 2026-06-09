@@ -103,6 +103,7 @@ func (s *Service) runAutoResolveOnce(parent context.Context) {
 	}
 	if total > 0 {
 		slog.Info("monitor_auto_resolve_completed", "resolved", total)
+		s.publishMonitorChanged("auto_resolved")
 	}
 }
 
@@ -137,6 +138,7 @@ func (s *Service) runCleanupExpiredOnce(parent context.Context) {
 	}
 	if total > 0 {
 		slog.Info("monitor_cleanup_completed", "deleted", total)
+		s.publishMonitorChanged("cleanup")
 	}
 }
 

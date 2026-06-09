@@ -11,6 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/adminevents"
 	appmonitor "github.com/DevilGenius/airgate-core/internal/app/monitor"
 	appnotification "github.com/DevilGenius/airgate-core/internal/app/notification"
 	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
@@ -45,6 +46,7 @@ type Server struct {
 	calculator  *billing.Calculator
 	recorder    *billing.Recorder
 	monitor     *appmonitor.Service
+	events      *adminevents.Hub
 	handlers    *bootstrap.HTTPHandlers
 
 	pluginStartCancel context.CancelFunc
@@ -59,8 +61,10 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	jwtMgr := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.ExpireHour)
 
 	// 核心服务组件
+	eventHub := adminevents.NewHub(0)
 	sched := scheduler.NewScheduler(db, rdb)
 	concurrency := scheduler.NewConcurrencyManager(rdb)
+	concurrency.SetCapacityEventPublisher(eventHub)
 	calculator := billing.NewCalculator()
 	recorder := billing.NewRecorder(db, 0, rdb)
 	monitorStore := store.NewMonitorStore(db)
@@ -71,6 +75,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		monitorStore,
 		appmonitor.WithRedis(rdb),
 		appmonitor.WithNotifier(monitorNotificationService),
+		appmonitor.WithEventPublisher(eventHub),
 	)
 	sched.SetMonitorRecorder(monitorService)
 
@@ -114,6 +119,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		calculator:     calculator,
 		recorder:       recorder,
 		monitor:        monitorService,
+		events:         eventHub,
 	}
 
 	s.handlers = bootstrap.NewHTTPHandlers(bootstrap.HTTPDependencies{
@@ -126,6 +132,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Concurrency: concurrency,
 		Scheduler:   sched,
 		Monitor:     monitorService,
+		Events:      eventHub,
 	})
 	if s.handlers.AccountService != nil {
 		s.handlers.AccountService.SetMonitorRecorder(monitorService)

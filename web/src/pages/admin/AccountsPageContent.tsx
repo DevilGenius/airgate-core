@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../shared/ui';
 import { accountsApi } from '../../shared/api/accounts';
+import { subscribeAdminEvents } from '../../shared/api/adminEvents';
 import { groupsApi } from '../../shared/api/groups';
 import { proxiesApi } from '../../shared/api/proxies';
 import { AccountTestModal } from './AccountTestModal';
@@ -29,7 +30,6 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
-import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { TablePage } from '../../shared/components/TablePage';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
@@ -71,8 +71,6 @@ import {
 } from './accounts/AccountPageSupport';
 
 const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsAutoRefresh;
-const ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsCapacityRefresh;
-const ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS = 0.5;
 const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 
@@ -137,7 +135,8 @@ function getBulkEditInitialValues(rows: AccountResp[], selectedIds: number[]): B
     return { groupIds: [] };
   }
 
-  const commonGroupIds = new Set(firstSelectedRow.group_ids);
+  const firstGroupIds = firstSelectedRow.group_ids;
+  const commonGroupIds = new Set(firstGroupIds);
   for (const row of selectedRows.slice(1)) {
     const rowGroupIds = new Set(row.group_ids);
     for (const groupId of Array.from(commonGroupIds)) {
@@ -153,7 +152,7 @@ function getBulkEditInitialValues(rows: AccountResp[], selectedIds: number[]): B
   };
 
   return {
-    groupIds: firstSelectedRow.group_ids.filter((groupId) => commonGroupIds.has(groupId)),
+    groupIds: firstGroupIds.filter((groupId) => commonGroupIds.has(groupId)),
     maxConcurrency: getCommonNumber((account) => account.max_concurrency),
     priority: getCommonNumber((account) => account.priority),
     rateMultiplier: getCommonNumber((account) => account.rate_multiplier),
@@ -419,26 +418,8 @@ export default function AccountsPageContent() {
 
   // 自动刷新
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ACCOUNT_AUTO_REFRESH_STORAGE_KEY, 0, ACCOUNT_AUTO_REFRESH_OPTIONS); // 秒，0=关闭
-  const [capacityAutoRefresh, setCapacityAutoRefresh] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return window.localStorage.getItem(ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  });
   const autoRefreshLabel = t('accounts.auto_refresh');
   const autoRefreshOffLabel = t('accounts.auto_refresh_off');
-  const capacityAutoRefreshLabel = t('accounts.capacity_auto_refresh');
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(ACCOUNT_CAPACITY_AUTO_REFRESH_STORAGE_KEY, String(capacityAutoRefresh));
-    } catch {
-      // Storage can be unavailable in restricted browser modes.
-    }
-  }, [capacityAutoRefresh]);
 
   // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -536,15 +517,21 @@ export default function AccountsPageContent() {
     }
   }, [applyCapacityData]);
   useEffect(() => {
-    if (!capacityAutoRefresh || typeof window === 'undefined' || visibleAccountIds.length === 0) {
+    if (typeof window === 'undefined' || visibleAccountIds.length === 0) {
       return undefined;
     }
     void refreshVisibleCapacity();
-    const intervalId = window.setInterval(() => {
-      void refreshVisibleCapacity();
-    }, ACCOUNT_CAPACITY_AUTO_REFRESH_SECONDS * 1000);
-    return () => window.clearInterval(intervalId);
-  }, [capacityAutoRefresh, refreshVisibleCapacity, visibleAccountIds.length, visibleAccountIdsKey]);
+    return subscribeAdminEvents((event) => {
+      if (event.type !== 'account_capacity.changed') return;
+      const accountId = Number(event.account_id);
+      const currentConcurrency = Number(event.current_concurrency);
+      if (!Number.isFinite(accountId) || !Number.isFinite(currentConcurrency)) return;
+      if (!visibleAccountIdsRef.current.includes(accountId)) return;
+      runAfterInputFrame(() => {
+        capacityStore.setCount(accountId, currentConcurrency);
+      });
+    });
+  }, [capacityStore, refreshVisibleCapacity, visibleAccountIds.length, visibleAccountIdsKey]);
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -1101,16 +1088,6 @@ export default function AccountsPageContent() {
             options={ACCOUNT_AUTO_REFRESH_OPTIONS}
             label={autoRefreshLabel}
             offLabel={autoRefreshOffLabel}
-            beforeRefresh={(
-              <NativeSwitch
-                ariaLabel={capacityAutoRefreshLabel}
-                className="ag-page-toolbar-switch"
-                contentClassName="whitespace-nowrap text-text-secondary"
-                isSelected={capacityAutoRefresh}
-                label={capacityAutoRefreshLabel}
-                onChange={setCapacityAutoRefresh}
-              />
-            )}
             refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
             triggerClassName="ag-auto-refresh-trigger--account-fixed"
             ariaLabel={t('accounts.auto_refresh')}

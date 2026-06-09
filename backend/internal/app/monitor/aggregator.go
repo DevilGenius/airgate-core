@@ -87,6 +87,7 @@ func (s *Service) flushBatch(ctx context.Context, batch []QueuedEvent) error {
 		return err
 	}
 	s.flushedEvents.Add(int64(len(batch)))
+	s.publishMonitorChanged("recorded")
 	return nil
 }
 
@@ -96,7 +97,9 @@ func (s *Service) resolveBySubject(ctx context.Context, query monitoring.Resolve
 	}
 	if err := s.repo.ResolveBySubject(ctx, query); err != nil {
 		slog.Warn("monitor_resolve_by_subject_failed", "error", err)
+		return
 	}
+	s.publishMonitorChanged("resolved")
 }
 
 func (s *Service) superviseLoop(ctx context.Context, name string, counter *atomic.Int64, run func()) {

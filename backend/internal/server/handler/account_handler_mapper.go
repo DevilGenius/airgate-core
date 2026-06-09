@@ -26,6 +26,9 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 			UpdatedAt: account.UpdatedAt,
 		},
 	}
+	if resp.GroupIDs == nil {
+		resp.GroupIDs = []int64{}
+	}
 
 	if account.LastUsedAt != nil {
 		lastUsedAt := account.LastUsedAt.Format("2006-01-02T15:04:05Z")

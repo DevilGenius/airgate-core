@@ -58,14 +58,14 @@ var acquireSlotScript = redis.NewScript(`
 		redis.call('EXPIRE', slotKey, ttl)
 		current = redis.call('ZCARD', slotKey)
 		redis.call('SET', countKey, current, 'EX', ttl)
-		return 1
+		return {1, current}
 	end
 	if current > 0 then
 		redis.call('SET', countKey, current, 'EX', ttl)
 	else
 		redis.call('DEL', countKey)
 	end
-	return 0
+	return {0, current}
 `)
 
 var releaseSlotScript = redis.NewScript(`
@@ -86,7 +86,7 @@ var releaseSlotScript = redis.NewScript(`
 	else
 		redis.call('SET', countKey, 0, 'EX', zeroTTL)
 	end
-	return removed
+	return {removed, current}
 `)
 
 var backfillConcurrencyCountsScript = redis.NewScript(`
@@ -119,12 +119,26 @@ var backfillConcurrencyCountsScript = redis.NewScript(`
 // ConcurrencyManager 分布式并发槽位管理。
 // 基于 Redis ZSET 实现，每个账户/API Key/用户一个 ZSET，成员为 request_id。
 type ConcurrencyManager struct {
-	rdb *redis.Client
+	rdb               *redis.Client
+	capacityPublisher CapacityEventPublisher
 }
 
 // NewConcurrencyManager 创建并发管理器
 func NewConcurrencyManager(rdb *redis.Client) *ConcurrencyManager {
 	return &ConcurrencyManager{rdb: rdb}
+}
+
+// CapacityEventPublisher receives best-effort account capacity changes.
+type CapacityEventPublisher interface {
+	PublishAccountCapacityChanged(accountID int, currentConcurrency int)
+}
+
+// SetCapacityEventPublisher injects a best-effort capacity event publisher.
+func (cm *ConcurrencyManager) SetCapacityEventPublisher(publisher CapacityEventPublisher) {
+	if cm == nil {
+		return
+	}
+	cm.capacityPublisher = publisher
 }
 
 // concurrencyKey 生成账号级 Redis Key。
@@ -159,61 +173,78 @@ func userConcurrencyCountKey(userID int) string {
 // 清理僵尸 slot + 检查上限 + ZADD 加入新 slot（score = 当前时间）。
 // maxConcurrency <= 0 时视为不限制，直接放行。
 // Redis 不可用时也直接放行，避免影响主链路可用性。
-func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKey, requestID string, maxConcurrency int, slotTTL time.Duration) error {
+func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKey, requestID string, maxConcurrency int, slotTTL time.Duration) (int, bool, error) {
 	if cm.rdb == nil || maxConcurrency <= 0 {
-		return nil
+		return 0, false, nil
 	}
 	if slotTTL <= 0 {
 		slotTTL = defaultSlotTTL
 	}
 
 	now := time.Now().Unix()
-	result, err := acquireSlotScript.Run(ctx, cm.rdb, []string{key, countKey},
+	raw, err := acquireSlotScript.Run(ctx, cm.rdb, []string{key, countKey},
 		now,
 		maxConcurrency,
 		requestID,
 		int(slotTTL.Seconds()),
-	).Int()
+	).Result()
 
 	if err != nil {
 		// Redis 不可用时放行
-		return nil
+		return 0, false, nil
+	}
+	result, current, ok := parseSlotScriptResult(raw)
+	if !ok {
+		return 0, false, nil
 	}
 
 	if result == 0 {
-		return ErrConcurrencyLimit
+		return current, false, ErrConcurrencyLimit
 	}
-	return nil
+	return current, true, nil
 }
 
-func (cm *ConcurrencyManager) releaseSlotByKey(ctx context.Context, key, countKey, requestID string) {
+func (cm *ConcurrencyManager) releaseSlotByKey(ctx context.Context, key, countKey, requestID string) (int, bool) {
 	if cm.rdb == nil {
-		return
+		return 0, false
 	}
-	_, _ = releaseSlotScript.Run(ctx, cm.rdb, []string{key, countKey},
+	raw, err := releaseSlotScript.Run(ctx, cm.rdb, []string{key, countKey},
 		requestID,
 		int(defaultSlotTTL.Seconds()),
 		int(concurrencyZeroCountTTL.Seconds()),
 	).Result()
+	if err != nil {
+		return 0, false
+	}
+	removed, current, ok := parseSlotScriptResult(raw)
+	return current, ok && removed > 0
 }
 
 // AcquireSlot 获取账号级并发槽位。
 // 检查当前 SET 大小 < maxConcurrency，若未满则 SADD。
 // slotTTL 为槽位过期时间，<= 0 时使用默认值（5 分钟）。
 func (cm *ConcurrencyManager) AcquireSlot(ctx context.Context, accountID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
-	return cm.acquireSlotByKey(ctx, concurrencyKey(accountID), concurrencyCountKey(accountID), requestID, maxConcurrency, slotTTL)
+	current, changed, err := cm.acquireSlotByKey(ctx, concurrencyKey(accountID), concurrencyCountKey(accountID), requestID, maxConcurrency, slotTTL)
+	if err == nil && changed {
+		cm.publishAccountCapacity(accountID, current)
+	}
+	return err
 }
 
 // ReleaseSlot 释放账号级并发槽位
 func (cm *ConcurrencyManager) ReleaseSlot(ctx context.Context, accountID int, requestID string) {
-	cm.releaseSlotByKey(ctx, concurrencyKey(accountID), concurrencyCountKey(accountID), requestID)
+	current, changed := cm.releaseSlotByKey(ctx, concurrencyKey(accountID), concurrencyCountKey(accountID), requestID)
+	if changed {
+		cm.publishAccountCapacity(accountID, current)
+	}
 }
 
 // AcquireAPIKeySlot 获取 API Key 级并发槽位。
 // maxConcurrency <= 0 时直接放行（表示该 key 不限制并发）。
 // 与账号级并发独立，两层闸门各自计数，调用方需要分别 release。
 func (cm *ConcurrencyManager) AcquireAPIKeySlot(ctx context.Context, keyID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
-	return cm.acquireSlotByKey(ctx, apiKeyConcurrencyKey(keyID), apiKeyConcurrencyCountKey(keyID), requestID, maxConcurrency, slotTTL)
+	_, _, err := cm.acquireSlotByKey(ctx, apiKeyConcurrencyKey(keyID), apiKeyConcurrencyCountKey(keyID), requestID, maxConcurrency, slotTTL)
+	return err
 }
 
 // ReleaseAPIKeySlot 释放 API Key 级并发槽位
@@ -225,12 +256,39 @@ func (cm *ConcurrencyManager) ReleaseAPIKeySlot(ctx context.Context, keyID int, 
 // maxConcurrency <= 0 时直接放行（表示该用户不限制总并发）。
 // 与 apikey / 账号 两级槽位独立，调用方需要分别 release。
 func (cm *ConcurrencyManager) AcquireUserSlot(ctx context.Context, userID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
-	return cm.acquireSlotByKey(ctx, userConcurrencyKey(userID), userConcurrencyCountKey(userID), requestID, maxConcurrency, slotTTL)
+	_, _, err := cm.acquireSlotByKey(ctx, userConcurrencyKey(userID), userConcurrencyCountKey(userID), requestID, maxConcurrency, slotTTL)
+	return err
 }
 
 // ReleaseUserSlot 释放用户级并发槽位
 func (cm *ConcurrencyManager) ReleaseUserSlot(ctx context.Context, userID int, requestID string) {
 	cm.releaseSlotByKey(ctx, userConcurrencyKey(userID), userConcurrencyCountKey(userID), requestID)
+}
+
+func (cm *ConcurrencyManager) publishAccountCapacity(accountID int, current int) {
+	if cm == nil || cm.capacityPublisher == nil || accountID <= 0 {
+		return
+	}
+	if current < 0 {
+		current = 0
+	}
+	cm.capacityPublisher.PublishAccountCapacityChanged(accountID, current)
+}
+
+func parseSlotScriptResult(raw any) (int, int, bool) {
+	values, ok := raw.([]interface{})
+	if !ok || len(values) < 2 {
+		return 0, 0, false
+	}
+	changed, ok := redisIntValue(values[0])
+	if !ok {
+		return 0, 0, false
+	}
+	current, ok := redisIntValue(values[1])
+	if !ok {
+		return 0, 0, false
+	}
+	return changed, current, true
 }
 
 // GetCurrentCount 获取账户当前并发数。

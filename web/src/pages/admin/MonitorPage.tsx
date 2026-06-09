@@ -1,9 +1,10 @@
-import { startTransition, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card } from '@heroui/react';
-import { AlertTriangle, CheckCircle2, EyeOff, ShieldAlert, TriangleAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, EyeOff, RefreshCw, ShieldAlert, TriangleAlert } from 'lucide-react';
 import { monitorApi } from '../../shared/api/monitor';
+import { subscribeAdminEvents } from '../../shared/api/adminEvents';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { queryKeys } from '../../shared/queryKeys';
 import { RecordsTable } from '../../shared/components/RecordsTable';
@@ -12,11 +13,8 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { SearchFilterComboBox } from '../../shared/components/SearchFilterComboBox';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
-import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
-import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
-import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { useToast } from '../../shared/ui';
 import { fmtNum } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, MonitorCursorResp, MonitorEventResp, MonitorListQuery, MonitorSummaryResp } from '../../shared/types';
@@ -166,9 +164,7 @@ export default function MonitorPage() {
   const [filters, setFilters] = useState<Partial<MonitorListQuery>>({});
   const [apiKeySearchKeyword, setAPIKeySearchKeyword] = useState('');
   const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState('');
-  const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(STORAGE_KEYS.ui.adminMonitorAutoRefresh, 0, ADMIN_AUTO_REFRESH_OPTIONS);
   const cursor = page > 1 ? cursors[page] : undefined;
-  const autoRefreshEnabled = autoRefresh > 0;
 
   const apiKeySearchActive = apiKeySearchKeyword.trim().length > 0;
   const { data: apiKeysData, isFetching: isAPIKeysFetching } = useQuery({
@@ -204,6 +200,7 @@ export default function MonitorPage() {
     meta: { globalLoading: false },
     placeholderData: keepPreviousData,
   });
+  const refetchSummary = summaryQuery.refetch;
 
   const {
     data,
@@ -281,8 +278,33 @@ export default function MonitorPage() {
 
   const handleManualRefresh = useCallback(() => {
     void refetch({ cancelRefetch: false });
-    void summaryQuery.refetch({ cancelRefetch: false });
-  }, [refetch, summaryQuery]);
+    void refetchSummary({ cancelRefetch: false });
+  }, [refetch, refetchSummary]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    let timeoutId: number | undefined;
+    const refreshFromEvent = () => {
+      timeoutId = undefined;
+      void refetch({ cancelRefetch: false });
+      void refetchSummary({ cancelRefetch: false });
+    };
+
+    const unsubscribe = subscribeAdminEvents((event) => {
+      if (event.type !== 'monitor.changed' || timeoutId !== undefined) return;
+      timeoutId = window.setTimeout(refreshFromEvent, 250);
+    });
+
+    return () => {
+      unsubscribe();
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [refetch, refetchSummary]);
 
   const statusOptions: SelectOption[] = [
     { id: '', label: t('common.all') },
@@ -566,21 +588,17 @@ export default function MonitorPage() {
             </div>
           </div>
           <div className="ag-page-toolbar-actions">
-            <AutoRefreshControl
-              value={autoRefresh}
-              options={ADMIN_AUTO_REFRESH_OPTIONS}
-              label={`${t('monitor.auto_update')} `}
-              offLabel={t('monitor.auto_update_off')}
-              refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
-              triggerClassName="ag-auto-refresh-trigger--toolbar-fixed"
-              ariaLabel={t('monitor.auto_update')}
-              refreshAriaLabel={t('common.refresh', 'Refresh')}
-              onChange={setAutoRefresh}
-              onAutoRefresh={() => refetch({ cancelRefetch: false })}
-              onRefresh={handleManualRefresh}
-              isAutoRefreshing={isFetching}
-              isRefreshing={isFetching || summaryQuery.isFetching}
-            />
+            <Button
+              isIconOnly
+              aria-label={t('common.refresh', 'Refresh')}
+              className="ag-auto-refresh-refresh--toolbar h-8 w-8 min-w-8"
+              isDisabled={isFetching || summaryQuery.isFetching}
+              size="sm"
+              variant="ghost"
+              onPress={handleManualRefresh}
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching || summaryQuery.isFetching ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
 
@@ -591,7 +609,7 @@ export default function MonitorPage() {
           emptyDescription={t('monitor.empty_description')}
           emptyTitle={t('common.no_data')}
           footer={false}
-          highlightNewRows={hasRows && autoRefreshEnabled && page === 1}
+          highlightNewRows={hasRows && page === 1}
           highlightResetKey={JSON.stringify({ filters, page, pageSize })}
           hasMore={data?.has_more}
           isLoading={showInitialLoading}

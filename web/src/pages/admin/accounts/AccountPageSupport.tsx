@@ -524,6 +524,14 @@ export class AccountCapacityStore {
     return this.counts.get(id) ?? fallback;
   }
 
+  setCount(id: number, count: number) {
+    if (!Number.isFinite(id) || !Number.isFinite(count)) return;
+    const normalizedCount = Math.max(0, Math.trunc(count));
+    if (this.counts.get(id) === normalizedCount) return;
+    this.counts.set(id, normalizedCount);
+    this.listeners.get(id)?.forEach((listener) => listener());
+  }
+
   setCounts(nextCounts: Record<string, number>) {
     const changedIds: number[] = [];
     const nextIds = new Set<number>();

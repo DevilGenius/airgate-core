@@ -12,6 +12,7 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/adminevents"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
 	appauth "github.com/DevilGenius/airgate-core/internal/app/auth"
@@ -46,6 +47,7 @@ type HTTPDependencies struct {
 	Concurrency *scheduler.ConcurrencyManager
 	Scheduler   *scheduler.Scheduler
 	Monitor     *appmonitor.Service
+	Events      *adminevents.Hub
 }
 
 // HTTPHandlers 聚合所有 HTTP 处理器。
@@ -64,6 +66,7 @@ type HTTPHandlers struct {
 	Version      *handler.VersionHandler
 	Upgrade      *handler.UpgradeHandler
 	Monitor      *handler.MonitorHandler
+	Event        *handler.EventHandler
 
 	AccountService *appaccount.Service
 }
@@ -123,6 +126,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Version:        handler.NewVersionHandler(),
 		Upgrade:        handler.NewUpgradeHandler(upgradeService),
 		Monitor:        handler.NewMonitorHandler(monitorService),
+		Event:          handler.NewEventHandler(dep.Events),
 		AccountService: accountService,
 	}
 }

@@ -101,6 +101,9 @@ func (s *Server) registerRoutes() {
 	adminGroup := v1.Group("/admin")
 	adminGroup.Use(middleware.JWTAuth(s.jwtMgr, s.db), middleware.AdminOnly())
 	{
+		// 管理员事件流（SSE）
+		adminGroup.GET("/events", handlers.Event.StreamAdminEvents)
+
 		// 用户管理
 		adminGroup.GET("/users", handlers.User.ListUsers)
 		adminGroup.POST("/users", handlers.User.CreateUser)

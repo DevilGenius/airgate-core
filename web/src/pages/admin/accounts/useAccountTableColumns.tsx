@@ -679,11 +679,10 @@ export function useAccountTableColumns({
       mobileWidth: '68px',
       align: 'center',
       render: (row) => {
-        const current = row.current_concurrency || 0;
         const max = row.max_concurrency;
         return (
           <AccountCapacityLiveChip
-            current={current}
+            current={0}
             max={max}
             rowId={row.id}
             store={capacityStore}

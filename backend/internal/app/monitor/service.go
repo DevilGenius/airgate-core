@@ -58,10 +58,16 @@ type Notifier interface {
 	Send(context.Context, map[string]string) error
 }
 
+// EventPublisher receives best-effort monitor change notifications.
+type EventPublisher interface {
+	PublishMonitorChanged(reason string)
+}
+
 // Service provides best-effort temporary monitoring.
 type Service struct {
 	repo           Repository
 	notifier       Notifier
+	eventPublisher EventPublisher
 	rdb            *redis.Client
 	queue          chan queuedOperation
 	retention      time.Duration
@@ -151,6 +157,13 @@ func WithNotifier(notifier Notifier) Option {
 	}
 }
 
+// WithEventPublisher publishes monitor list/summary change notifications.
+func WithEventPublisher(publisher EventPublisher) Option {
+	return func(s *Service) {
+		s.eventPublisher = publisher
+	}
+}
+
 // WithRedis enables cross-instance monitor notification claiming.
 func WithRedis(rdb *redis.Client) Option {
 	return func(s *Service) {
@@ -225,7 +238,11 @@ func (s *Service) Resolve(ctx context.Context, id int) error {
 	if s == nil || s.repo == nil {
 		return ErrEventNotFound
 	}
-	return s.repo.Resolve(ctx, id)
+	if err := s.repo.Resolve(ctx, id); err != nil {
+		return err
+	}
+	s.publishMonitorChanged("resolved")
+	return nil
 }
 
 // Ignore marks one monitor event ignored.
@@ -233,7 +250,18 @@ func (s *Service) Ignore(ctx context.Context, id int) error {
 	if s == nil || s.repo == nil {
 		return ErrEventNotFound
 	}
-	return s.repo.Ignore(ctx, id)
+	if err := s.repo.Ignore(ctx, id); err != nil {
+		return err
+	}
+	s.publishMonitorChanged("ignored")
+	return nil
+}
+
+func (s *Service) publishMonitorChanged(reason string) {
+	if s == nil || s.eventPublisher == nil {
+		return
+	}
+	s.eventPublisher.PublishMonitorChanged(reason)
 }
 
 func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
