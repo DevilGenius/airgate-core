@@ -360,7 +360,6 @@ export default function UsersPage() {
                         <UserRowActionButton
                           ariaLabel={t('users.balance_history')}
                           title={t('users.balance_history')}
-                          tone="muted"
                           onClick={() => setBalanceHistoryUser(row)}
                         >
                           {t('users.balance_history_short', '记录')}

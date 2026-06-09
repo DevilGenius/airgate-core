@@ -170,6 +170,29 @@ func TestSelectAccountRoutesNegativePriorityOnlyAfterNonNegativeUnavailable(t *t
 	}
 }
 
+func TestSelectAccountSkipsShortDegradedWindow(t *testing.T) {
+	ctx := context.Background()
+	s := newSelectionTestScheduler(Normal)
+	groupID := 7
+	primary := newSelectionTestAccount(10)
+	primary.Priority = 20
+	until := time.Now().Add(15 * time.Second)
+	primary.State = account.StateDegraded
+	primary.StateUntil = &until
+	primary.Extra = map[string]interface{}{transientAvoidStepExtraKey: 2}
+	fallback := newSelectionTestAccount(20)
+	fallback.Priority = 10
+	s.routeCache.Set(groupID, "openai", []*ent.Account{primary, fallback}, nil)
+
+	selected, err := s.SelectAccount(ctx, "openai", "gpt-4.1", 1, groupID, "")
+	if err != nil {
+		t.Fatalf("SelectAccount() returned error: %v", err)
+	}
+	if selected.ID != fallback.ID {
+		t.Fatalf("selected account ID = %d, want fallback account %d", selected.ID, fallback.ID)
+	}
+}
+
 func TestContinuationBlockedErrorDistinguishesCapacityFromMissingAffinity(t *testing.T) {
 	t.Parallel()
 
@@ -268,6 +291,15 @@ func TestSelectAccountHardPreviousResponseBlocksKnownCooldown(t *testing.T) {
 			name: "family cooldown",
 			configure: func(s *Scheduler, _ *ent.Account) {
 				s.familyCooldown = stubFamilyCooldownTracker{inCooldown: true}
+			},
+		},
+		{
+			name: "short degraded window",
+			configure: func(s *Scheduler, acc *ent.Account) {
+				until := time.Now().Add(15 * time.Second)
+				acc.State = account.StateDegraded
+				acc.StateUntil = &until
+				acc.Extra = map[string]interface{}{transientAvoidStepExtraKey: 2}
 			},
 		},
 	}

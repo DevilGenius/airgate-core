@@ -31,15 +31,100 @@ type batchSchedulabilityTracker interface {
 func (s *Scheduler) newSelectionSnapshot(ctx context.Context, candidates []*ent.Account, model string, now time.Time) *selectionSnapshot {
 	runtimeCandidates := runtimeConstraintCandidates(candidates, now)
 	snap := &selectionSnapshot{
-		loads:    s.selectionCurrentLoads(ctx, runtimeCandidates),
+		loads:    make(map[int]int, len(runtimeCandidates)),
 		hasLoads: true,
 	}
 
+	familyLoaded := false
+	if s.currentLoad == nil && s.rdb != nil {
+		familyLoaded = s.loadRedisSelectionSnapshot(ctx, runtimeCandidates, model, snap)
+	} else {
+		snap.loads = s.selectionCurrentLoads(ctx, runtimeCandidates)
+	}
+	if !familyLoaded {
+		s.loadFamilyCooldownSnapshot(ctx, runtimeCandidates, model, snap)
+	}
+
+	return snap
+}
+
+type selectionSnapshotRedisValueKind int
+
+const (
+	selectionSnapshotRedisLoad selectionSnapshotRedisValueKind = iota
+	selectionSnapshotRedisFamilyCooldown
+)
+
+type selectionSnapshotRedisValueRef struct {
+	kind      selectionSnapshotRedisValueKind
+	accountID int
+}
+
+func (s *Scheduler) loadRedisSelectionSnapshot(ctx context.Context, candidates []*ent.Account, model string, snap *selectionSnapshot) bool {
+	keys := make([]string, 0, len(candidates)*2)
+	refs := make([]selectionSnapshotRedisValueRef, 0, len(candidates)*2)
+
+	for _, accountID := range accountIDsFromCandidates(candidates) {
+		keys = append(keys, concurrencyCountKey(accountID))
+		refs = append(refs, selectionSnapshotRedisValueRef{
+			kind:      selectionSnapshotRedisLoad,
+			accountID: accountID,
+		})
+	}
+
+	familyLoaded := false
+	if _, ok := s.familyCooldown.(*FamilyCooldown); ok {
+		familyLoaded = true
+		snap.familyCooldown = make(map[int]bool, len(candidates))
+		snap.hasFamilyCooldown = true
+		for _, acc := range candidates {
+			if acc == nil || acc.ID <= 0 {
+				continue
+			}
+			family := ModelFamily(acc.Platform, model)
+			if family == "" {
+				continue
+			}
+			keys = append(keys, familyCooldownReasonKey(acc.ID, family))
+			refs = append(refs, selectionSnapshotRedisValueRef{
+				kind:      selectionSnapshotRedisFamilyCooldown,
+				accountID: acc.ID,
+			})
+		}
+	}
+
+	if len(keys) == 0 {
+		return familyLoaded
+	}
+	values, err := s.rdb.MGet(ctx, keys...).Result()
+	if err != nil {
+		// 选号快照失败开放：并发 miss 按 0 估算，family cooldown 按未冷却处理。
+		// 真正的并发上限仍由选中账号后的 AcquireSlot 原子脚本兜底。
+		return familyLoaded
+	}
+	for index, value := range values {
+		if index >= len(refs) || value == nil {
+			continue
+		}
+		ref := refs[index]
+		switch ref.kind {
+		case selectionSnapshotRedisLoad:
+			if count, ok := redisIntValue(value); ok && count > 0 {
+				snap.loads[ref.accountID] = count
+			}
+		case selectionSnapshotRedisFamilyCooldown:
+			snap.familyCooldown[ref.accountID] = true
+		}
+	}
+	return familyLoaded
+}
+
+func (s *Scheduler) loadFamilyCooldownSnapshot(ctx context.Context, candidates []*ent.Account, model string, snap *selectionSnapshot) {
 	if batch, ok := s.familyCooldown.(familyCooldownInCooldownBatchTracker); ok {
 		snap.familyCooldown = make(map[int]bool)
 		snap.hasFamilyCooldown = true
 		idsByFamily := make(map[string][]int)
-		for _, acc := range runtimeCandidates {
+		for _, acc := range candidates {
 			if acc == nil {
 				continue
 			}
@@ -58,8 +143,6 @@ func (s *Scheduler) newSelectionSnapshot(ctx context.Context, candidates []*ent.
 			}
 		}
 	}
-
-	return snap
 }
 
 func (s *Scheduler) loadedSelectionSnapshot(ctx context.Context, candidates []*ent.Account, model string, now time.Time) *selectionSnapshot {
@@ -95,7 +178,7 @@ func (s *Scheduler) deferredConstraintCandidates(ctx context.Context, candidates
 		if acc == nil {
 			continue
 		}
-		if SchedulabilityOf(acc, now) == NotSchedulable {
+		if schedulabilityWithTransientAvoidance(acc, now) == NotSchedulable {
 			continue
 		}
 		if family := ModelFamily(acc.Platform, model); family != "" && s.familyCooldown != nil {
@@ -124,7 +207,7 @@ func runtimeConstraintCandidates(candidates []*ent.Account, now time.Time) []*en
 		if acc == nil {
 			continue
 		}
-		if hardAffinityBaseSchedulability(acc, now) == NotSchedulable {
+		if hardAffinitySchedulabilityWithTransientAvoidance(acc, now) == NotSchedulable {
 			continue
 		}
 		out = append(out, acc)

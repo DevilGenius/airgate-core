@@ -473,10 +473,10 @@ func (s *Scheduler) checkHardAffinitySchedulability(ctx context.Context, acc *en
 }
 
 func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Account, model string, now time.Time, needHardAffinity bool, snapshot *selectionSnapshot) schedulabilityResult {
-	base := SchedulabilityOf(acc, now)
+	base := schedulabilityWithTransientAvoidance(acc, now)
 	hardBase := base
 	if needHardAffinity {
-		hardBase = hardAffinityBaseSchedulability(acc, now)
+		hardBase = hardAffinitySchedulabilityWithTransientAvoidance(acc, now)
 	}
 	if base == NotSchedulable && (!needHardAffinity || hardBase == NotSchedulable) {
 		return schedulabilityResult{normal: NotSchedulable, hardAffinity: NotSchedulable}

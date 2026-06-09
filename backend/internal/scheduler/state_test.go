@@ -12,100 +12,85 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
-func TestStateMachineAccountUnavailableEscalatesAfterThreshold(t *testing.T) {
+func TestStateMachineTransientAvoidanceBackoffAnd403Escalation(t *testing.T) {
 	ctx := context.Background()
-	db := openStateMachineTestDB(t, "scheduler_account_unavailable_threshold")
-	sm := NewStateMachine(db, nil, nil)
+	db := openStateMachineTestDB(t, "scheduler_transient_403_backoff")
+	sm := NewStateMachine(db, nil)
 	criticalTransitions := 0
 	sm.onCriticalTransition = func() { criticalTransitions++ }
 
-	acc := db.Account.Create().
-		SetName("temporary 403").
-		SetPlatform("openai").
-		SetType("oauth").
-		SetCredentials(map[string]string{}).
-		SaveX(ctx)
+	acc := createStateMachineAccount(ctx, db, "temporary 403", false)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh := db.Account.GetX(ctx, acc.ID)
-	if fresh.State != account.StateDegraded {
-		t.Fatalf("state after first unavailable = %s, want degraded", fresh.State)
-	}
-	if fresh.StateUntil == nil {
-		t.Fatalf("state_until should be set after first unavailable")
-	}
-	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 1 {
-		t.Fatalf("unavailable count after first unavailable = %d, want 1", got)
-	}
+	assertShortDBAvoidance(t, fresh, 1, 7*time.Second, 8*time.Second)
+	assertNoTransient403DegradedCount(t, fresh)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
-	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 1 {
-		t.Fatalf("unavailable count during degraded window = %d, want 1", got)
-	}
+	assertShortDBAvoidance(t, fresh, 2, 14*time.Second, 16*time.Second)
+	assertNoTransient403DegradedCount(t, fresh)
 
-	expireAccountDegradedWindow(ctx, db, acc.ID)
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+	fresh = db.Account.GetX(ctx, acc.ID)
+	assertShortDBAvoidance(t, fresh, 3, 29*time.Second, 31*time.Second)
+	assertNoTransient403DegradedCount(t, fresh)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
 	if fresh.State != account.StateDegraded {
-		t.Fatalf("state after second unavailable = %s, want degraded", fresh.State)
+		t.Fatalf("state after fourth 403 = %s, want degraded", fresh.State)
 	}
-	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 2 {
-		t.Fatalf("unavailable count after second unavailable = %d, want 2", got)
+	assertDBDegraded(t, fresh, 59*time.Second, 61*time.Second)
+	if got := extraInt(fresh.Extra, transient403DegradedCountKey); got != 1 {
+		t.Fatalf("403 degraded count after first degraded = %d, want 1", got)
 	}
 
-	expireAccountDegradedWindow(ctx, db, acc.ID)
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+	fresh = db.Account.GetX(ctx, acc.ID)
+	if got := extraInt(fresh.Extra, transient403DegradedCountKey); got != 2 {
+		t.Fatalf("403 degraded count after second degraded = %d, want 2", got)
+	}
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
 	if fresh.State != account.StateDisabled {
-		t.Fatalf("state after third unavailable = %s, want disabled", fresh.State)
+		t.Fatalf("state after third degraded 403 = %s, want disabled", fresh.State)
 	}
 	if fresh.StateUntil != nil {
-		t.Fatalf("state_until should be cleared after escalation")
+		t.Fatalf("state_until should be cleared after disable")
 	}
-	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 0 {
-		t.Fatalf("unavailable count after escalation = %d, want cleared", got)
+	if hasTransient403DegradedCount(fresh.Extra) {
+		t.Fatalf("403 degraded count should be cleared after disable: %+v", fresh.Extra)
 	}
+	assertTransientAvoidanceExtraCleared(t, fresh)
 	if criticalTransitions != 1 {
 		t.Fatalf("critical transitions = %d, want 1", criticalTransitions)
 	}
 }
 
-func TestStateMachineSuccessClearsAccountUnavailableCount(t *testing.T) {
+func TestStateMachineSuccessClearsTransientAvoidanceExtra(t *testing.T) {
 	ctx := context.Background()
-	db := openStateMachineTestDB(t, "scheduler_account_unavailable_success")
-	sm := NewStateMachine(db, nil, nil)
-
-	acc := db.Account.Create().
-		SetName("temporary 403").
-		SetPlatform("openai").
-		SetType("oauth").
-		SetCredentials(map[string]string{}).
-		SetExtra(map[string]interface{}{"keep": "value"}).
-		SaveX(ctx)
+	db := openStateMachineTestDB(t, "scheduler_transient_success")
+	sm := NewStateMachine(db, nil)
+	acc := createStateMachineAccount(ctx, db, "temporary 403", false)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
-	expireAccountDegradedWindow(ctx, db, acc.ID)
+	before := db.Account.GetX(ctx, acc.ID)
+	assertShortDBAvoidance(t, before, 1, 7*time.Second, 8*time.Second)
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeSuccess})
 
 	fresh := db.Account.GetX(ctx, acc.ID)
-	if fresh.State != account.StateActive {
-		t.Fatalf("state after success = %s, want active", fresh.State)
+	if fresh.State != account.StateDegraded {
+		t.Fatalf("state after success during transient window = %s, want degraded", fresh.State)
 	}
-	if fresh.StateUntil != nil {
-		t.Fatalf("state_until should be cleared after success")
+	if fresh.StateUntil == nil || !fresh.StateUntil.Equal(*before.StateUntil) {
+		t.Fatalf("state_until after success = %v, want %v", fresh.StateUntil, before.StateUntil)
 	}
 	if fresh.ErrorMsg != "" {
 		t.Fatalf("error_msg after success = %q, want empty", fresh.ErrorMsg)
 	}
-	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 0 {
-		t.Fatalf("unavailable count after success = %d, want cleared", got)
-	}
-	if fresh.Extra["keep"] != "value" {
-		t.Fatalf("unrelated extra value was not preserved: %+v", fresh.Extra)
-	}
+	assertTransientAvoidanceExtraCleared(t, fresh)
 }
 
 func TestStateMachineSuccessDoesNotClearUnexpiredTemporaryStates(t *testing.T) {
@@ -113,19 +98,12 @@ func TestStateMachineSuccessDoesNotClearUnexpiredTemporaryStates(t *testing.T) {
 
 	t.Run("degraded", func(t *testing.T) {
 		db := openStateMachineTestDB(t, "scheduler_success_preserves_degraded")
-		sm := NewStateMachine(db, nil, nil)
-
-		acc := db.Account.Create().
-			SetName("temporary 403").
-			SetPlatform("openai").
-			SetType("oauth").
-			SetCredentials(map[string]string{}).
-			SaveX(ctx)
-
-		sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+		sm := NewStateMachine(db, nil)
+		acc := createStateMachineAccount(ctx, db, "temporary 403", false)
+		applyJudgmentN(ctx, sm, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"}, 4)
 		before := db.Account.GetX(ctx, acc.ID)
 		if before.State != account.StateDegraded || before.StateUntil == nil {
-			t.Fatalf("state before success = %s until %v, want degraded with state_until", before.State, before.StateUntil)
+			t.Fatalf("state before success = %s until %v, want degraded", before.State, before.StateUntil)
 		}
 
 		sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeSuccess})
@@ -137,6 +115,7 @@ func TestStateMachineSuccessDoesNotClearUnexpiredTemporaryStates(t *testing.T) {
 		if fresh.StateUntil == nil || !fresh.StateUntil.Equal(*before.StateUntil) {
 			t.Fatalf("state_until after success = %v, want %v", fresh.StateUntil, before.StateUntil)
 		}
+		assertTransientAvoidanceExtraCleared(t, fresh)
 		if fresh.LastUsedAt == nil {
 			t.Fatalf("last_used_at should be updated after success")
 		}
@@ -144,19 +123,13 @@ func TestStateMachineSuccessDoesNotClearUnexpiredTemporaryStates(t *testing.T) {
 
 	t.Run("rate_limited", func(t *testing.T) {
 		db := openStateMachineTestDB(t, "scheduler_success_preserves_rate_limited")
-		sm := NewStateMachine(db, nil, nil)
-
-		acc := db.Account.Create().
-			SetName("temporary 429").
-			SetPlatform("openai").
-			SetType("oauth").
-			SetCredentials(map[string]string{}).
-			SaveX(ctx)
+		sm := NewStateMachine(db, nil)
+		acc := createStateMachineAccount(ctx, db, "temporary 429", false)
 
 		sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountRateLimited, RetryAfter: time.Minute, Reason: "HTTP 429"})
 		before := db.Account.GetX(ctx, acc.ID)
 		if before.State != account.StateRateLimited || before.StateUntil == nil {
-			t.Fatalf("state before success = %s until %v, want rate_limited with state_until", before.State, before.StateUntil)
+			t.Fatalf("state before success = %s until %v, want rate_limited", before.State, before.StateUntil)
 		}
 
 		sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeSuccess})
@@ -176,34 +149,20 @@ func TestStateMachineSuccessDoesNotClearUnexpiredTemporaryStates(t *testing.T) {
 
 func TestStateMachineDisabledIsNotOverwrittenByLateJudgments(t *testing.T) {
 	ctx := context.Background()
-
 	tests := []struct {
 		name string
 		j    Judgment
 	}{
-		{
-			name: "success",
-			j:    Judgment{Kind: sdk.OutcomeSuccess},
-		},
-		{
-			name: "account rate limited",
-			j:    Judgment{Kind: sdk.OutcomeAccountRateLimited, RetryAfter: time.Minute, Reason: "HTTP 429"},
-		},
-		{
-			name: "account unavailable",
-			j:    Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"},
-		},
-		{
-			name: "pool transient degraded",
-			j:    Judgment{Kind: sdk.OutcomeUpstreamTransient, IsPool: true, Reason: "HTTP 502"},
-		},
+		{name: "success", j: Judgment{Kind: sdk.OutcomeSuccess}},
+		{name: "rate limited", j: Judgment{Kind: sdk.OutcomeAccountRateLimited, RetryAfter: time.Minute, Reason: "HTTP 429"}},
+		{name: "account unavailable", j: Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"}},
+		{name: "upstream transient", j: Judgment{Kind: sdk.OutcomeUpstreamTransient, Reason: "HTTP 502"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := openStateMachineTestDB(t, "scheduler_disabled_guard_"+tt.name)
-			sm := NewStateMachine(db, nil, nil)
-
+			sm := NewStateMachine(db, nil)
 			acc := db.Account.Create().
 				SetName("manual disabled").
 				SetPlatform("openai").
@@ -229,40 +188,36 @@ func TestStateMachineDisabledIsNotOverwrittenByLateJudgments(t *testing.T) {
 	}
 }
 
-func TestStateMachineDegradedDoesNotLoosenUnexpiredRateLimit(t *testing.T) {
+func TestStateMachineTransientAvoidanceDoesNotLoosenUnexpiredRateLimit(t *testing.T) {
 	ctx := context.Background()
-	db := openStateMachineTestDB(t, "scheduler_degraded_preserves_rate_limited")
-	sm := NewStateMachine(db, nil, nil)
-
-	acc := db.Account.Create().
-		SetName("temporary 429").
-		SetPlatform("openai").
-		SetType("oauth").
-		SetCredentials(map[string]string{}).
-		SaveX(ctx)
+	db := openStateMachineTestDB(t, "scheduler_transient_preserves_rate_limited")
+	sm := NewStateMachine(db, nil)
+	acc := createStateMachineAccount(ctx, db, "temporary 429", false)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountRateLimited, RetryAfter: time.Minute, Reason: "HTTP 429"})
 	before := db.Account.GetX(ctx, acc.ID)
-	if before.State != account.StateRateLimited || before.StateUntil == nil {
-		t.Fatalf("state before degraded = %s until %v, want rate_limited with state_until", before.State, before.StateUntil)
-	}
 
-	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeUpstreamTransient, IsPool: true, Reason: "HTTP 502"})
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeUpstreamTransient, Reason: "HTTP 502"})
 
 	fresh := db.Account.GetX(ctx, acc.ID)
 	if fresh.State != account.StateRateLimited {
-		t.Fatalf("state after degraded judgment = %s, want rate_limited", fresh.State)
+		t.Fatalf("state after transient = %s, want rate_limited", fresh.State)
 	}
 	if fresh.StateUntil == nil || !fresh.StateUntil.Equal(*before.StateUntil) {
-		t.Fatalf("state_until after degraded judgment = %v, want %v", fresh.StateUntil, before.StateUntil)
+		t.Fatalf("state_until after transient = %v, want %v", fresh.StateUntil, before.StateUntil)
+	}
+	if hasTransient403DegradedCount(fresh.Extra) {
+		t.Fatalf("403 degraded count should not be set while rate_limited: %+v", fresh.Extra)
+	}
+	if extraInt(fresh.Extra, transientAvoidStepExtraKey) != 0 {
+		t.Fatalf("transient step should not be set while rate_limited: %+v", fresh.Extra)
 	}
 }
 
-func TestStateMachineAccountUnavailableTreatsExpiredRateLimitAsActive(t *testing.T) {
+func TestStateMachineTransientAvoidanceTreatsExpiredRateLimitAsActive(t *testing.T) {
 	ctx := context.Background()
-	db := openStateMachineTestDB(t, "scheduler_unavailable_after_expired_rate_limit")
-	sm := NewStateMachine(db, nil, nil)
-
+	db := openStateMachineTestDB(t, "scheduler_transient_after_expired_rate_limit")
+	sm := NewStateMachine(db, nil)
 	acc := db.Account.Create().
 		SetName("expired 429").
 		SetPlatform("openai").
@@ -276,143 +231,46 @@ func TestStateMachineAccountUnavailableTreatsExpiredRateLimitAsActive(t *testing
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 
 	fresh := db.Account.GetX(ctx, acc.ID)
+	assertShortDBAvoidance(t, fresh, 1, 7*time.Second, 8*time.Second)
+}
+
+func TestStateMachinePool403AvoidsWithoutDisable(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_pool_403_avoidance")
+	sm := NewStateMachine(db, nil)
+	acc := createStateMachineAccount(ctx, db, "pool", true)
+
+	applyJudgmentN(ctx, sm, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"}, 8)
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State == account.StateDisabled {
+		t.Fatalf("pool account should not be disabled after 403 avoidance")
+	}
 	if fresh.State != account.StateDegraded {
-		t.Fatalf("state after unavailable on expired rate limit = %s, want degraded", fresh.State)
+		t.Fatalf("pool account state = %s, want degraded", fresh.State)
 	}
-	if fresh.StateUntil == nil || !fresh.StateUntil.After(time.Now()) {
-		t.Fatalf("state_until after unavailable = %v, want future time", fresh.StateUntil)
-	}
-	if fresh.ErrorMsg != "HTTP 403" {
-		t.Fatalf("error_msg after unavailable = %q, want HTTP 403", fresh.ErrorMsg)
-	}
-	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 1 {
-		t.Fatalf("unavailable count = %d, want 1", got)
+	if got := extraInt(fresh.Extra, transient403DegradedCountKey); got != 0 {
+		t.Fatalf("pool 403 degraded count = %d, want 0", got)
 	}
 }
 
-func TestShouldTrackAccountUnavailableOnlyNonPool(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		acc  *ent.Account
-		want bool
-	}{
-		{
-			name: "oauth account",
-			acc:  &ent.Account{Type: "oauth"},
-			want: true,
-		},
-		{
-			name: "oauth pool account",
-			acc:  &ent.Account{Type: "oauth", UpstreamIsPool: true},
-			want: false,
-		},
-		{
-			name: "api key account",
-			acc:  &ent.Account{Type: "apikey"},
-			want: true,
-		},
-		{
-			name: "api key pool account",
-			acc:  &ent.Account{Type: "apikey", UpstreamIsPool: true},
-			want: false,
-		},
-		{
-			name: "nil account",
-			acc:  nil,
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := shouldTrackAccountUnavailable(tt.acc); got != tt.want {
-				t.Fatalf("shouldTrackAccountUnavailable() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestStateMachineAccountUnavailableTracksNormalAPIKey(t *testing.T) {
+func TestStateMachineUpstreamTransientAvoidsWithoutDisable(t *testing.T) {
 	ctx := context.Background()
-	db := openStateMachineTestDB(t, "scheduler_account_unavailable_api_key")
-	sm := NewStateMachine(db, nil, nil)
+	db := openStateMachineTestDB(t, "scheduler_5xx_avoidance")
+	sm := NewStateMachine(db, nil)
+	acc := createStateMachineAccount(ctx, db, "upstream 502", false)
 
-	acc := db.Account.Create().
-		SetName("api key").
-		SetPlatform("openai").
-		SetType("apikey").
-		SetCredentials(map[string]string{}).
-		SaveX(ctx)
-
-	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+	applyJudgmentN(ctx, sm, acc.ID, Judgment{Kind: sdk.OutcomeUpstreamTransient, Reason: "HTTP 502"}, 8)
 
 	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State == account.StateDisabled {
+		t.Fatalf("5xx should never disable account")
+	}
 	if fresh.State != account.StateDegraded {
-		t.Fatalf("state after api key unavailable = %s, want degraded", fresh.State)
+		t.Fatalf("state after repeated 5xx = %s, want degraded", fresh.State)
 	}
-	if fresh.StateUntil == nil {
-		t.Fatalf("state_until should be set for normal api key account")
-	}
-	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 1 {
-		t.Fatalf("unavailable count for normal api key account = %d, want 1", got)
-	}
-}
-
-func TestStateMachineAccountUnavailableIgnoredForAPIPool(t *testing.T) {
-	ctx := context.Background()
-	db := openStateMachineTestDB(t, "scheduler_account_unavailable_api_pool")
-	sm := NewStateMachine(db, nil, nil)
-
-	acc := db.Account.Create().
-		SetName("api pool").
-		SetPlatform("openai").
-		SetType("apikey").
-		SetUpstreamIsPool(true).
-		SetCredentials(map[string]string{}).
-		SaveX(ctx)
-
-	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
-
-	fresh := db.Account.GetX(ctx, acc.ID)
-	if fresh.State != account.StateActive {
-		t.Fatalf("state after api pool unavailable = %s, want active", fresh.State)
-	}
-	if fresh.StateUntil != nil {
-		t.Fatalf("state_until should remain empty for api pool account")
-	}
-	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 0 {
-		t.Fatalf("unavailable count for api pool account = %d, want 0", got)
-	}
-}
-
-func TestStateMachineAccountUnavailableIgnoredForOAuthPool(t *testing.T) {
-	ctx := context.Background()
-	db := openStateMachineTestDB(t, "scheduler_account_unavailable_oauth_pool")
-	sm := NewStateMachine(db, nil, nil)
-
-	acc := db.Account.Create().
-		SetName("oauth pool").
-		SetPlatform("openai").
-		SetType("oauth").
-		SetUpstreamIsPool(true).
-		SetCredentials(map[string]string{}).
-		SaveX(ctx)
-
-	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
-
-	fresh := db.Account.GetX(ctx, acc.ID)
-	if fresh.State != account.StateActive {
-		t.Fatalf("state after oauth pool unavailable = %s, want active", fresh.State)
-	}
-	if fresh.StateUntil != nil {
-		t.Fatalf("state_until should remain empty for oauth pool account")
-	}
-	if got := extraInt(fresh.Extra, accountUnavailableCountExtraKey); got != 0 {
-		t.Fatalf("unavailable count for oauth pool account = %d, want 0", got)
+	if got := extraInt(fresh.Extra, transient403DegradedCountKey); got != 0 {
+		t.Fatalf("5xx should not increment 403 degraded count, got %d", got)
 	}
 }
 
@@ -427,8 +285,77 @@ func openStateMachineTestDB(t *testing.T, name string) *ent.Client {
 	return db
 }
 
-func expireAccountDegradedWindow(ctx context.Context, db *ent.Client, accountID int) {
-	db.Account.UpdateOneID(accountID).
-		SetStateUntil(time.Now().Add(-time.Second)).
-		ExecX(ctx)
+func createStateMachineAccount(ctx context.Context, db *ent.Client, name string, isPool bool) *ent.Account {
+	return db.Account.Create().
+		SetName(name).
+		SetPlatform("openai").
+		SetType("oauth").
+		SetUpstreamIsPool(isPool).
+		SetCredentials(map[string]string{}).
+		SaveX(ctx)
+}
+
+func applyJudgmentN(ctx context.Context, sm *StateMachine, accountID int, j Judgment, n int) {
+	for i := 0; i < n; i++ {
+		sm.Apply(ctx, accountID, j)
+	}
+}
+
+func assertNoTransient403DegradedCount(t *testing.T, acc *ent.Account) {
+	t.Helper()
+	if hasTransient403DegradedCount(acc.Extra) {
+		t.Fatalf("403 degraded count should not be written before degrade: %+v", acc.Extra)
+	}
+}
+
+func assertShortDBAvoidance(t *testing.T, acc *ent.Account, wantStep int, minDelay time.Duration, maxDelay time.Duration) {
+	t.Helper()
+	now := time.Now()
+	if acc.State != account.StateDegraded {
+		t.Fatalf("state = %s, want degraded", acc.State)
+	}
+	if got := extraInt(acc.Extra, transientAvoidStepExtraKey); got != wantStep {
+		t.Fatalf("avoid step = %d, want %d", got, wantStep)
+	}
+	if !isShortDegradedWindow(acc, now) {
+		t.Fatalf("account should be in short degraded window: state=%s until=%v extra=%+v", acc.State, acc.StateUntil, acc.Extra)
+	}
+	if got := schedulabilityWithTransientAvoidance(acc, now); got != NotSchedulable {
+		t.Fatalf("transient schedulability = %v, want NotSchedulable", got)
+	}
+	if acc.StateUntil == nil {
+		t.Fatalf("degraded state_until missing")
+	}
+	delay := acc.StateUntil.Sub(now)
+	if delay < minDelay || delay > maxDelay {
+		t.Fatalf("avoid delay = %s, want between %s and %s", delay, minDelay, maxDelay)
+	}
+}
+
+func assertTransientAvoidanceExtraCleared(t *testing.T, acc *ent.Account) {
+	t.Helper()
+	if hasTransientAvoidanceExtra(acc.Extra) {
+		t.Fatalf("transient avoidance extra should be cleared: %+v", acc.Extra)
+	}
+}
+
+func assertDBDegraded(t *testing.T, acc *ent.Account, minDelay time.Duration, maxDelay time.Duration) {
+	t.Helper()
+	now := time.Now()
+	if got := SchedulabilityOf(acc, now); got != StickyOnly {
+		t.Fatalf("degraded schedulability = %v, want StickyOnly", got)
+	}
+	if got := schedulabilityWithTransientAvoidance(acc, now); got != StickyOnly {
+		t.Fatalf("transient-aware degraded schedulability = %v, want StickyOnly", got)
+	}
+	if got := extraInt(acc.Extra, transientAvoidStepExtraKey); got != 4 {
+		t.Fatalf("avoid step = %d, want 4", got)
+	}
+	if acc.StateUntil == nil {
+		t.Fatalf("degraded state_until missing")
+	}
+	delay := acc.StateUntil.Sub(now)
+	if delay < minDelay || delay > maxDelay {
+		t.Fatalf("degraded delay = %s, want between %s and %s", delay, minDelay, maxDelay)
+	}
 }
