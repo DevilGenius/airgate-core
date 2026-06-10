@@ -203,6 +203,8 @@ func (s *Server) registerRoutes() {
 
 		// 系统监控（管理员）
 		adminGroup.GET("/monitor/summary", handlers.Monitor.MonitorSummary)
+		adminGroup.GET("/monitor/requests", handlers.Monitor.ListMonitorRequestEvents)
+		adminGroup.DELETE("/monitor/requests", handlers.Monitor.ClearMonitorRequestEvents)
 		adminGroup.GET("/monitor", handlers.Monitor.ListMonitorEvents)
 		adminGroup.GET("/monitor/:id", handlers.Monitor.GetMonitorEvent)
 		adminGroup.PATCH("/monitor/:id/resolve", handlers.Monitor.ResolveMonitorEvent)

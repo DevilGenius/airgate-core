@@ -96,9 +96,9 @@ func (mec *MonitorEventCreate) SetNillableSubjectID(s *string) *MonitorEventCrea
 	return mec
 }
 
-// SetFingerprint sets the "fingerprint" field.
-func (mec *MonitorEventCreate) SetFingerprint(s string) *MonitorEventCreate {
-	mec.mutation.SetFingerprint(s)
+// SetHash sets the "hash" field.
+func (mec *MonitorEventCreate) SetHash(s string) *MonitorEventCreate {
+	mec.mutation.SetHash(s)
 	return mec
 }
 
@@ -126,76 +126,6 @@ func (mec *MonitorEventCreate) SetMessage(s string) *MonitorEventCreate {
 func (mec *MonitorEventCreate) SetNillableMessage(s *string) *MonitorEventCreate {
 	if s != nil {
 		mec.SetMessage(*s)
-	}
-	return mec
-}
-
-// SetAPIKeyID sets the "api_key_id" field.
-func (mec *MonitorEventCreate) SetAPIKeyID(i int) *MonitorEventCreate {
-	mec.mutation.SetAPIKeyID(i)
-	return mec
-}
-
-// SetNillableAPIKeyID sets the "api_key_id" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableAPIKeyID(i *int) *MonitorEventCreate {
-	if i != nil {
-		mec.SetAPIKeyID(*i)
-	}
-	return mec
-}
-
-// SetAPIKeyNameSnapshot sets the "api_key_name_snapshot" field.
-func (mec *MonitorEventCreate) SetAPIKeyNameSnapshot(s string) *MonitorEventCreate {
-	mec.mutation.SetAPIKeyNameSnapshot(s)
-	return mec
-}
-
-// SetNillableAPIKeyNameSnapshot sets the "api_key_name_snapshot" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableAPIKeyNameSnapshot(s *string) *MonitorEventCreate {
-	if s != nil {
-		mec.SetAPIKeyNameSnapshot(*s)
-	}
-	return mec
-}
-
-// SetUserID sets the "user_id" field.
-func (mec *MonitorEventCreate) SetUserID(i int) *MonitorEventCreate {
-	mec.mutation.SetUserID(i)
-	return mec
-}
-
-// SetNillableUserID sets the "user_id" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableUserID(i *int) *MonitorEventCreate {
-	if i != nil {
-		mec.SetUserID(*i)
-	}
-	return mec
-}
-
-// SetUserEmailSnapshot sets the "user_email_snapshot" field.
-func (mec *MonitorEventCreate) SetUserEmailSnapshot(s string) *MonitorEventCreate {
-	mec.mutation.SetUserEmailSnapshot(s)
-	return mec
-}
-
-// SetNillableUserEmailSnapshot sets the "user_email_snapshot" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableUserEmailSnapshot(s *string) *MonitorEventCreate {
-	if s != nil {
-		mec.SetUserEmailSnapshot(*s)
-	}
-	return mec
-}
-
-// SetGroupID sets the "group_id" field.
-func (mec *MonitorEventCreate) SetGroupID(i int) *MonitorEventCreate {
-	mec.mutation.SetGroupID(i)
-	return mec
-}
-
-// SetNillableGroupID sets the "group_id" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableGroupID(i *int) *MonitorEventCreate {
-	if i != nil {
-		mec.SetGroupID(*i)
 	}
 	return mec
 }
@@ -266,76 +196,6 @@ func (mec *MonitorEventCreate) SetTaskType(s string) *MonitorEventCreate {
 func (mec *MonitorEventCreate) SetNillableTaskType(s *string) *MonitorEventCreate {
 	if s != nil {
 		mec.SetTaskType(*s)
-	}
-	return mec
-}
-
-// SetMethod sets the "method" field.
-func (mec *MonitorEventCreate) SetMethod(s string) *MonitorEventCreate {
-	mec.mutation.SetMethod(s)
-	return mec
-}
-
-// SetNillableMethod sets the "method" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableMethod(s *string) *MonitorEventCreate {
-	if s != nil {
-		mec.SetMethod(*s)
-	}
-	return mec
-}
-
-// SetEndpoint sets the "endpoint" field.
-func (mec *MonitorEventCreate) SetEndpoint(s string) *MonitorEventCreate {
-	mec.mutation.SetEndpoint(s)
-	return mec
-}
-
-// SetNillableEndpoint sets the "endpoint" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableEndpoint(s *string) *MonitorEventCreate {
-	if s != nil {
-		mec.SetEndpoint(*s)
-	}
-	return mec
-}
-
-// SetModel sets the "model" field.
-func (mec *MonitorEventCreate) SetModel(s string) *MonitorEventCreate {
-	mec.mutation.SetModel(s)
-	return mec
-}
-
-// SetNillableModel sets the "model" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableModel(s *string) *MonitorEventCreate {
-	if s != nil {
-		mec.SetModel(*s)
-	}
-	return mec
-}
-
-// SetHTTPStatus sets the "http_status" field.
-func (mec *MonitorEventCreate) SetHTTPStatus(i int) *MonitorEventCreate {
-	mec.mutation.SetHTTPStatus(i)
-	return mec
-}
-
-// SetNillableHTTPStatus sets the "http_status" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableHTTPStatus(i *int) *MonitorEventCreate {
-	if i != nil {
-		mec.SetHTTPStatus(*i)
-	}
-	return mec
-}
-
-// SetUpstreamStatus sets the "upstream_status" field.
-func (mec *MonitorEventCreate) SetUpstreamStatus(i int) *MonitorEventCreate {
-	mec.mutation.SetUpstreamStatus(i)
-	return mec
-}
-
-// SetNillableUpstreamStatus sets the "upstream_status" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableUpstreamStatus(i *int) *MonitorEventCreate {
-	if i != nil {
-		mec.SetUpstreamStatus(*i)
 	}
 	return mec
 }
@@ -549,14 +409,6 @@ func (mec *MonitorEventCreate) defaults() {
 		v := monitorevent.DefaultMessage
 		mec.mutation.SetMessage(v)
 	}
-	if _, ok := mec.mutation.APIKeyNameSnapshot(); !ok {
-		v := monitorevent.DefaultAPIKeyNameSnapshot
-		mec.mutation.SetAPIKeyNameSnapshot(v)
-	}
-	if _, ok := mec.mutation.UserEmailSnapshot(); !ok {
-		v := monitorevent.DefaultUserEmailSnapshot
-		mec.mutation.SetUserEmailSnapshot(v)
-	}
 	if _, ok := mec.mutation.AccountNameSnapshot(); !ok {
 		v := monitorevent.DefaultAccountNameSnapshot
 		mec.mutation.SetAccountNameSnapshot(v)
@@ -572,18 +424,6 @@ func (mec *MonitorEventCreate) defaults() {
 	if _, ok := mec.mutation.TaskType(); !ok {
 		v := monitorevent.DefaultTaskType
 		mec.mutation.SetTaskType(v)
-	}
-	if _, ok := mec.mutation.Method(); !ok {
-		v := monitorevent.DefaultMethod
-		mec.mutation.SetMethod(v)
-	}
-	if _, ok := mec.mutation.Endpoint(); !ok {
-		v := monitorevent.DefaultEndpoint
-		mec.mutation.SetEndpoint(v)
-	}
-	if _, ok := mec.mutation.Model(); !ok {
-		v := monitorevent.DefaultModel
-		mec.mutation.SetModel(v)
 	}
 	if _, ok := mec.mutation.ErrorCode(); !ok {
 		v := monitorevent.DefaultErrorCode
@@ -661,12 +501,12 @@ func (mec *MonitorEventCreate) check() error {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.subject_id": %w`, err)}
 		}
 	}
-	if _, ok := mec.mutation.Fingerprint(); !ok {
-		return &ValidationError{Name: "fingerprint", err: errors.New(`ent: missing required field "MonitorEvent.fingerprint"`)}
+	if _, ok := mec.mutation.Hash(); !ok {
+		return &ValidationError{Name: "hash", err: errors.New(`ent: missing required field "MonitorEvent.hash"`)}
 	}
-	if v, ok := mec.mutation.Fingerprint(); ok {
-		if err := monitorevent.FingerprintValidator(v); err != nil {
-			return &ValidationError{Name: "fingerprint", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.fingerprint": %w`, err)}
+	if v, ok := mec.mutation.Hash(); ok {
+		if err := monitorevent.HashValidator(v); err != nil {
+			return &ValidationError{Name: "hash", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.hash": %w`, err)}
 		}
 	}
 	if _, ok := mec.mutation.Title(); !ok {
@@ -683,22 +523,6 @@ func (mec *MonitorEventCreate) check() error {
 	if v, ok := mec.mutation.Message(); ok {
 		if err := monitorevent.MessageValidator(v); err != nil {
 			return &ValidationError{Name: "message", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.message": %w`, err)}
-		}
-	}
-	if _, ok := mec.mutation.APIKeyNameSnapshot(); !ok {
-		return &ValidationError{Name: "api_key_name_snapshot", err: errors.New(`ent: missing required field "MonitorEvent.api_key_name_snapshot"`)}
-	}
-	if v, ok := mec.mutation.APIKeyNameSnapshot(); ok {
-		if err := monitorevent.APIKeyNameSnapshotValidator(v); err != nil {
-			return &ValidationError{Name: "api_key_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.api_key_name_snapshot": %w`, err)}
-		}
-	}
-	if _, ok := mec.mutation.UserEmailSnapshot(); !ok {
-		return &ValidationError{Name: "user_email_snapshot", err: errors.New(`ent: missing required field "MonitorEvent.user_email_snapshot"`)}
-	}
-	if v, ok := mec.mutation.UserEmailSnapshot(); ok {
-		if err := monitorevent.UserEmailSnapshotValidator(v); err != nil {
-			return &ValidationError{Name: "user_email_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.user_email_snapshot": %w`, err)}
 		}
 	}
 	if _, ok := mec.mutation.AccountNameSnapshot(); !ok {
@@ -731,30 +555,6 @@ func (mec *MonitorEventCreate) check() error {
 	if v, ok := mec.mutation.TaskType(); ok {
 		if err := monitorevent.TaskTypeValidator(v); err != nil {
 			return &ValidationError{Name: "task_type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.task_type": %w`, err)}
-		}
-	}
-	if _, ok := mec.mutation.Method(); !ok {
-		return &ValidationError{Name: "method", err: errors.New(`ent: missing required field "MonitorEvent.method"`)}
-	}
-	if v, ok := mec.mutation.Method(); ok {
-		if err := monitorevent.MethodValidator(v); err != nil {
-			return &ValidationError{Name: "method", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.method": %w`, err)}
-		}
-	}
-	if _, ok := mec.mutation.Endpoint(); !ok {
-		return &ValidationError{Name: "endpoint", err: errors.New(`ent: missing required field "MonitorEvent.endpoint"`)}
-	}
-	if v, ok := mec.mutation.Endpoint(); ok {
-		if err := monitorevent.EndpointValidator(v); err != nil {
-			return &ValidationError{Name: "endpoint", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.endpoint": %w`, err)}
-		}
-	}
-	if _, ok := mec.mutation.Model(); !ok {
-		return &ValidationError{Name: "model", err: errors.New(`ent: missing required field "MonitorEvent.model"`)}
-	}
-	if v, ok := mec.mutation.Model(); ok {
-		if err := monitorevent.ModelValidator(v); err != nil {
-			return &ValidationError{Name: "model", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.model": %w`, err)}
 		}
 	}
 	if _, ok := mec.mutation.ErrorCode(); !ok {
@@ -832,9 +632,9 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 		_spec.SetField(monitorevent.FieldSubjectID, field.TypeString, value)
 		_node.SubjectID = value
 	}
-	if value, ok := mec.mutation.Fingerprint(); ok {
-		_spec.SetField(monitorevent.FieldFingerprint, field.TypeString, value)
-		_node.Fingerprint = value
+	if value, ok := mec.mutation.Hash(); ok {
+		_spec.SetField(monitorevent.FieldHash, field.TypeString, value)
+		_node.Hash = value
 	}
 	if value, ok := mec.mutation.Title(); ok {
 		_spec.SetField(monitorevent.FieldTitle, field.TypeString, value)
@@ -843,26 +643,6 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 	if value, ok := mec.mutation.Message(); ok {
 		_spec.SetField(monitorevent.FieldMessage, field.TypeString, value)
 		_node.Message = value
-	}
-	if value, ok := mec.mutation.APIKeyID(); ok {
-		_spec.SetField(monitorevent.FieldAPIKeyID, field.TypeInt, value)
-		_node.APIKeyID = &value
-	}
-	if value, ok := mec.mutation.APIKeyNameSnapshot(); ok {
-		_spec.SetField(monitorevent.FieldAPIKeyNameSnapshot, field.TypeString, value)
-		_node.APIKeyNameSnapshot = value
-	}
-	if value, ok := mec.mutation.UserID(); ok {
-		_spec.SetField(monitorevent.FieldUserID, field.TypeInt, value)
-		_node.UserID = &value
-	}
-	if value, ok := mec.mutation.UserEmailSnapshot(); ok {
-		_spec.SetField(monitorevent.FieldUserEmailSnapshot, field.TypeString, value)
-		_node.UserEmailSnapshot = value
-	}
-	if value, ok := mec.mutation.GroupID(); ok {
-		_spec.SetField(monitorevent.FieldGroupID, field.TypeInt, value)
-		_node.GroupID = &value
 	}
 	if value, ok := mec.mutation.AccountID(); ok {
 		_spec.SetField(monitorevent.FieldAccountID, field.TypeInt, value)
@@ -883,26 +663,6 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 	if value, ok := mec.mutation.TaskType(); ok {
 		_spec.SetField(monitorevent.FieldTaskType, field.TypeString, value)
 		_node.TaskType = value
-	}
-	if value, ok := mec.mutation.Method(); ok {
-		_spec.SetField(monitorevent.FieldMethod, field.TypeString, value)
-		_node.Method = value
-	}
-	if value, ok := mec.mutation.Endpoint(); ok {
-		_spec.SetField(monitorevent.FieldEndpoint, field.TypeString, value)
-		_node.Endpoint = value
-	}
-	if value, ok := mec.mutation.Model(); ok {
-		_spec.SetField(monitorevent.FieldModel, field.TypeString, value)
-		_node.Model = value
-	}
-	if value, ok := mec.mutation.HTTPStatus(); ok {
-		_spec.SetField(monitorevent.FieldHTTPStatus, field.TypeInt, value)
-		_node.HTTPStatus = &value
-	}
-	if value, ok := mec.mutation.UpstreamStatus(); ok {
-		_spec.SetField(monitorevent.FieldUpstreamStatus, field.TypeInt, value)
-		_node.UpstreamStatus = &value
 	}
 	if value, ok := mec.mutation.ErrorCode(); ok {
 		_spec.SetField(monitorevent.FieldErrorCode, field.TypeString, value)

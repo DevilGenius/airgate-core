@@ -112,6 +112,7 @@ func (s *Service) runCleanupExpiredOnce(parent context.Context) {
 	defer cancel()
 
 	total := 0
+	requestTotal := 0
 	for {
 		if err := ctx.Err(); err != nil {
 			return
@@ -136,8 +137,32 @@ func (s *Service) runCleanupExpiredOnce(parent context.Context) {
 			break
 		}
 	}
-	if total > 0 {
-		slog.Info("monitor_cleanup_completed", "deleted", total)
+	for {
+		if err := ctx.Err(); err != nil {
+			return
+		}
+		deleted, err := s.repo.CleanupExpiredRequests(ctx, time.Now(), workerBatchSize)
+		if err != nil {
+			slog.Warn("monitor_request_cleanup_failed", "deleted", requestTotal, "error", err)
+			s.Record(context.Background(), monitoring.EventInput{
+				Type:        monitoring.TypeSystemError,
+				Severity:    monitoring.SeverityWarning,
+				Source:      monitoring.SourceMonitorWorker,
+				SubjectType: monitoring.SubjectSystem,
+				SubjectID:   "request_cleanup",
+				Title:       "Monitor request cleanup failed",
+				Message:     err.Error(),
+				ErrorCode:   "monitor_request_cleanup_failed",
+			})
+			return
+		}
+		requestTotal += deleted
+		if deleted < workerBatchSize {
+			break
+		}
+	}
+	if total > 0 || requestTotal > 0 {
+		slog.Info("monitor_cleanup_completed", "deleted", total, "request_deleted", requestTotal)
 		s.publishMonitorChanged("cleanup")
 	}
 }
@@ -223,8 +248,6 @@ func notificationCooldown(severity string) time.Duration {
 func monitorNotificationValues(event Event) map[string]string {
 	subject := event.SubjectID
 	switch {
-	case event.APIKeyNameSnapshot != "":
-		subject = event.APIKeyNameSnapshot
 	case event.AccountNameSnapshot != "":
 		subject = event.AccountNameSnapshot
 	case event.PluginID != "":
@@ -248,14 +271,8 @@ func monitorNotificationValues(event Event) map[string]string {
 		"platform":             event.Platform,
 		"plugin_id":            event.PluginID,
 		"task_type":            event.TaskType,
-		"api_key_id":           intToString(event.APIKeyID),
-		"api_key_name":         event.APIKeyNameSnapshot,
 		"account_id":           intToString(event.AccountID),
 		"account_name":         event.AccountNameSnapshot,
-		"endpoint":             event.Endpoint,
-		"model":                event.Model,
-		"http_status":          intToString(event.HTTPStatus),
-		"upstream_status":      intToString(event.UpstreamStatus),
 		"error_code":           event.ErrorCode,
 		"created_at":           event.CreatedAt.Format(time.RFC3339),
 		"updated_at":           event.UpdatedAt.Format(time.RFC3339),

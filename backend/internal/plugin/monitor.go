@@ -3,12 +3,13 @@ package plugin
 import (
 	"context"
 	"net/http"
-	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/DevilGenius/airgate-core/internal/auth"
-	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
+	"github.com/DevilGenius/airgate-core/internal/server/middleware"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -19,13 +20,9 @@ func (f *Forwarder) recordAPIRequestError(c *gin.Context, state *forwardState, s
 	f.recordAPIRequestErrorForKey(c, state.keyInfo, state.requestedPlatform, state.requestPath, state.model, status, code, message)
 }
 
-func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.APIKeyInfo, platform, path, model string, status int, code, message string, severity ...string) {
-	if f == nil || f.monitor == nil || keyInfo == nil {
+func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.APIKeyInfo, platform, path, model string, status int, code, message string) {
+	if f == nil || f.requestMonitor == nil || keyInfo == nil {
 		return
-	}
-	level := monitoring.SeverityWarning
-	if len(severity) > 0 && severity[0] != "" {
-		level = severity[0]
 	}
 	method := ""
 	ctx := context.Background()
@@ -36,12 +33,11 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 	userID := keyInfo.UserID
 	groupID := keyInfo.GroupID
 	apiKeyID := keyInfo.KeyID
-	f.monitor.Record(ctx, monitoring.EventInput{
-		Type:               monitoring.TypeAPIRequestError,
-		Severity:           level,
-		Source:             monitoring.SourceForwarder,
-		SubjectType:        monitoring.SubjectAPIKey,
-		SubjectID:          strconv.Itoa(apiKeyID),
+	f.requestMonitor.RecordRequest(ctx, requestmonitoring.EventInput{
+		Type:               requestmonitoring.TypeAPIRequestError,
+		Severity:           requestSeverityForStatus(status),
+		Source:             requestmonitoring.SourceForwarder,
+		RequestID:          middleware.RequestIDFromGinContext(c),
 		APIKeyID:           &apiKeyID,
 		APIKeyNameSnapshot: keyInfo.KeyName,
 		UserID:             &userID,
@@ -67,21 +63,24 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 }
 
 func (f *Forwarder) recordPluginRouteError(c *gin.Context, keyInfo *auth.APIKeyInfo, platform, path, code, message string) {
-	if f == nil || f.monitor == nil {
+	if f == nil || f.requestMonitor == nil {
 		return
 	}
-	f.recordAPIRequestErrorForKey(c, keyInfo, platform, path, "", http.StatusServiceUnavailable, code, message)
 	ctx := context.Background()
 	if c != nil && c.Request != nil {
 		ctx = c.Request.Context()
 	}
-	f.monitor.Record(ctx, monitoring.EventInput{
-		Type:        monitoring.TypePluginError,
-		Severity:    monitoring.SeverityError,
-		Source:      monitoring.SourceForwarder,
-		SubjectType: monitoring.SubjectPlugin,
-		SubjectID:   platform,
+	method := ""
+	if c != nil && c.Request != nil {
+		method = c.Request.Method
+	}
+	input := requestmonitoring.EventInput{
+		Type:        requestmonitoring.TypePluginRouteError,
+		Severity:    requestmonitoring.SeverityWarning,
+		Source:      requestmonitoring.SourceForwarder,
+		RequestID:   middleware.RequestIDFromGinContext(c),
 		Platform:    platform,
+		Method:      method,
 		Endpoint:    normalizeForwardPath(path),
 		RequestPath: path,
 		HTTPStatus:  intPtr(http.StatusServiceUnavailable),
@@ -92,11 +91,13 @@ func (f *Forwarder) recordPluginRouteError(c *gin.Context, keyInfo *auth.APIKeyI
 			"platform": platform,
 			"stage":    "plugin_route",
 		},
-	})
+	}
+	attachRequestKeyInfo(&input, keyInfo)
+	f.requestMonitor.RecordRequest(ctx, input)
 }
 
 func (f *Forwarder) recordPluginExecutionError(ctx context.Context, state *forwardState, execution forwardExecution) {
-	if f == nil || f.monitor == nil || state == nil {
+	if f == nil || f.requestMonitor == nil || state == nil {
 		return
 	}
 	if !shouldRecordPluginExecutionError(execution) {
@@ -118,12 +119,11 @@ func (f *Forwarder) recordPluginExecutionError(ctx context.Context, state *forwa
 			platform = state.plugin.Platform
 		}
 	}
-	input := monitoring.EventInput{
-		Type:           monitoring.TypePluginError,
-		Severity:       monitoring.SeverityError,
-		Source:         monitoring.SourceForwarder,
-		SubjectType:    monitoring.SubjectPlugin,
-		SubjectID:      pluginID,
+	input := requestmonitoring.EventInput{
+		Type:           requestmonitoring.TypePluginForwardError,
+		Severity:       requestmonitoring.SeverityWarning,
+		Source:         requestmonitoring.SourceForwarder,
+		RequestID:      sdk.RequestIDFromContext(ctx),
 		Platform:       platform,
 		PluginID:       pluginID,
 		Method:         "POST",
@@ -143,21 +143,133 @@ func (f *Forwarder) recordPluginExecutionError(ctx context.Context, state *forwa
 		},
 	}
 	if state.keyInfo != nil {
-		apiKeyID := state.keyInfo.KeyID
-		userID := state.keyInfo.UserID
-		groupID := state.keyInfo.GroupID
-		input.APIKeyID = &apiKeyID
-		input.APIKeyNameSnapshot = state.keyInfo.KeyName
-		input.UserID = &userID
-		input.UserEmailSnapshot = state.keyInfo.UserEmail
-		input.GroupID = &groupID
+		attachRequestKeyInfo(&input, state.keyInfo)
 	}
 	if state.account != nil {
 		accountID := state.account.ID
 		input.AccountID = &accountID
 		input.AccountNameSnapshot = state.account.Name
 	}
-	f.monitor.Record(ctx, input)
+	f.requestMonitor.RecordRequest(ctx, input)
+}
+
+func (f *Forwarder) recordClientRequestError(c *gin.Context, state *forwardState, execution forwardExecution) {
+	if f == nil || f.requestMonitor == nil || state == nil || state.keyInfo == nil {
+		return
+	}
+	status := sanitizedClientErrorStatus(execution.outcome)
+	message := sanitizedClientErrorMessage(execution.outcome)
+	input := requestmonitoring.EventInput{
+		Type:           requestmonitoring.TypeClientRequestError,
+		Severity:       requestmonitoring.SeverityInfo,
+		Source:         requestmonitoring.SourceForwarder,
+		RequestID:      middleware.RequestIDFromGinContext(c),
+		Platform:       state.requestedPlatform,
+		Method:         requestMethod(c, "POST"),
+		Endpoint:       normalizeForwardPath(state.requestPath),
+		RequestPath:    state.requestPath,
+		Model:          state.model,
+		HTTPStatus:     intPtr(status),
+		UpstreamStatus: intPtr(execution.outcome.Upstream.StatusCode),
+		ErrorCode:      "invalid_request",
+		DurationMS:     execution.duration.Milliseconds(),
+		Title:          "Client request error",
+		Message:        message,
+		Detail: map[string]interface{}{
+			"http_error_class": "invalid_request_error",
+			"outcome_kind":     execution.outcome.Kind.String(),
+			"reason":           execution.outcome.Reason,
+			"stage":            "client_request",
+		},
+	}
+	if state.plugin != nil {
+		input.PluginID = state.plugin.Name
+		if input.Platform == "" {
+			input.Platform = state.plugin.Platform
+		}
+	}
+	attachRequestKeyInfo(&input, state.keyInfo)
+	if state.account != nil {
+		accountID := state.account.ID
+		input.AccountID = &accountID
+		input.AccountNameSnapshot = state.account.Name
+	}
+	recordCtx := context.Background()
+	if c != nil && c.Request != nil {
+		recordCtx = c.Request.Context()
+	}
+	f.requestMonitor.RecordRequest(recordCtx, input)
+}
+
+func (f *Forwarder) recordClientClosedRequest(c *gin.Context, state *forwardState, status int, attempts int) {
+	if f == nil || f.requestMonitor == nil || state == nil || state.keyInfo == nil || status == 0 {
+		return
+	}
+	input := requestmonitoring.EventInput{
+		Type:        requestmonitoring.TypeClientClosed,
+		Severity:    requestmonitoring.SeverityInfo,
+		Source:      requestmonitoring.SourceForwarder,
+		RequestID:   middleware.RequestIDFromGinContext(c),
+		Platform:    state.requestedPlatform,
+		Method:      requestMethod(c, "POST"),
+		Endpoint:    normalizeForwardPath(state.requestPath),
+		RequestPath: state.requestPath,
+		Model:       state.model,
+		HTTPStatus:  intPtr(status),
+		ErrorCode:   "client_closed_request",
+		DurationMS:  timeSinceMilliseconds(state.startedAt),
+		Title:       "Client closed request",
+		Message:     "Client disconnected before the request completed",
+		Detail: map[string]interface{}{
+			"attempts": attempts,
+			"stage":    "client_closed",
+		},
+	}
+	if state.plugin != nil {
+		input.PluginID = state.plugin.Name
+		if input.Platform == "" {
+			input.Platform = state.plugin.Platform
+		}
+	}
+	attachRequestKeyInfo(&input, state.keyInfo)
+	if state.account != nil {
+		accountID := state.account.ID
+		input.AccountID = &accountID
+		input.AccountNameSnapshot = state.account.Name
+	}
+	recordCtx := context.Background()
+	if c != nil && c.Request != nil {
+		recordCtx = context.WithoutCancel(c.Request.Context())
+	}
+	f.requestMonitor.RecordRequest(recordCtx, input)
+}
+
+func attachRequestKeyInfo(input *requestmonitoring.EventInput, keyInfo *auth.APIKeyInfo) {
+	if input == nil || keyInfo == nil {
+		return
+	}
+	apiKeyID := keyInfo.KeyID
+	userID := keyInfo.UserID
+	groupID := keyInfo.GroupID
+	input.APIKeyID = &apiKeyID
+	input.APIKeyNameSnapshot = keyInfo.KeyName
+	input.UserID = &userID
+	input.UserEmailSnapshot = keyInfo.UserEmail
+	input.GroupID = &groupID
+}
+
+func requestMethod(c *gin.Context, fallback string) string {
+	if c == nil || c.Request == nil || c.Request.Method == "" {
+		return fallback
+	}
+	return c.Request.Method
+}
+
+func timeSinceMilliseconds(startedAt time.Time) int64 {
+	if startedAt.IsZero() {
+		return 0
+	}
+	return time.Since(startedAt).Milliseconds()
 }
 
 func shouldRecordPluginExecutionError(execution forwardExecution) bool {
@@ -181,6 +293,13 @@ func httpErrorClassForStatus(status int) string {
 	default:
 		return "invalid_request_error"
 	}
+}
+
+func requestSeverityForStatus(status int) string {
+	if status >= http.StatusInternalServerError || status == http.StatusTooManyRequests {
+		return requestmonitoring.SeverityWarning
+	}
+	return requestmonitoring.SeverityInfo
 }
 
 func intPtr(value int) *int {

@@ -815,7 +815,7 @@ export interface DashboardUserTrendPoint {
 
 // ==================== Monitor ====================
 
-export type MonitorSeverity = 'warning' | 'error' | 'critical';
+export type MonitorSeverity = 'info' | 'warning' | 'error' | 'critical';
 export type MonitorStatus = 'active' | 'resolved' | 'ignored';
 
 export interface MonitorEventResp {
@@ -826,24 +826,14 @@ export interface MonitorEventResp {
   source: string;
   subject_type: string;
   subject_id: string;
-  fingerprint: string;
+  hash: string;
   title: string;
   message: string;
-  api_key_id?: number;
-  api_key_name_snapshot?: string;
-  user_id?: number;
-  user_email_snapshot?: string;
-  group_id?: number;
   account_id?: number;
   account_name_snapshot?: string;
   platform?: string;
   plugin_id?: string;
   task_type?: string;
-  method?: string;
-  endpoint?: string;
-  model?: string;
-  http_status?: number;
-  upstream_status?: number;
   error_code?: string;
   created_at: string;
   updated_at: string;
@@ -874,7 +864,6 @@ export interface MonitorSummaryResp {
   error_total: number;
   warning_total: number;
   by_type: MonitorTypeCountResp[];
-  top_api_keys: MonitorSubjectCountResp[];
   top_accounts: MonitorSubjectCountResp[];
   recent: MonitorEventResp[];
 }
@@ -896,18 +885,83 @@ export interface MonitorListQuery {
   type?: string;
   source?: string;
   subject_type?: string;
-  api_key_id?: number;
   account_id?: number;
   platform?: string;
   plugin_id?: string;
   task_type?: string;
-  endpoint?: string;
   error_code?: string;
   from?: string;
   to?: string;
   limit?: number;
   cursor?: string;
   cursor_id?: number;
+}
+
+export interface MonitorRequestEventResp {
+  id: number;
+  type: string;
+  severity: MonitorSeverity;
+  source: string;
+  hash: string;
+  fingerprint?: string;
+  title: string;
+  message: string;
+  request_id?: string;
+  api_key_id?: number;
+  api_key_name_snapshot?: string;
+  user_id?: number;
+  user_email_snapshot?: string;
+  group_id?: number;
+  account_id?: number;
+  account_name_snapshot?: string;
+  platform?: string;
+  plugin_id?: string;
+  method?: string;
+  endpoint?: string;
+  model?: string;
+  http_status?: number;
+  upstream_status?: number;
+  error_code?: string;
+  duration_ms?: number;
+  created_at: string;
+  expires_at: string;
+  detail?: Record<string, unknown>;
+}
+
+export interface MonitorRequestCursorResp {
+  created_at: string;
+  id: number;
+}
+
+export interface MonitorRequestListResp {
+  list: MonitorRequestEventResp[];
+  has_more: boolean;
+  next_cursor?: MonitorRequestCursorResp;
+}
+
+export interface MonitorRequestListQuery {
+  severity?: string;
+  type?: string;
+  source?: string;
+  api_key_id?: number;
+  account_id?: number;
+  platform?: string;
+  plugin_id?: string;
+  method?: string;
+  endpoint?: string;
+  model?: string;
+  http_status?: number;
+  upstream_status?: number;
+  error_code?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  cursor?: string;
+  cursor_id?: number;
+}
+
+export interface MonitorRequestClearResp {
+  deleted: number;
 }
 
 // ==================== Setup ====================

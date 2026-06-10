@@ -36,42 +36,65 @@ func (s *Service) runAggregatorLoop(ctx context.Context) {
 	defer ticker.Stop()
 
 	pending := make([]QueuedEvent, 0, s.flushBatchSize)
+	pendingRequests := make([]QueuedRequestEvent, 0, s.flushBatchSize)
 	flush := func(flushCtx context.Context) {
 		if len(pending) == 0 {
 			return
 		}
 		batch := pending
+		pending = make([]QueuedEvent, 0, s.flushBatchSize)
 		if err := s.flushBatch(flushCtx, batch); err != nil {
 			slog.Warn("monitor_aggregator_flush_failed", "events", len(batch), "error", err)
 		}
-		pending = make([]QueuedEvent, 0, s.flushBatchSize)
+	}
+	flushRequests := func(flushCtx context.Context) {
+		if len(pendingRequests) == 0 {
+			return
+		}
+		batch := pendingRequests
+		pendingRequests = make([]QueuedRequestEvent, 0, s.flushBatchSize)
+		if err := s.flushRequestBatch(flushCtx, batch); err != nil {
+			slog.Warn("monitor_request_aggregator_flush_failed", "events", len(batch), "error", err)
+		}
+	}
+	flushAll := func(flushCtx context.Context) {
+		flush(flushCtx)
+		flushRequests(flushCtx)
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			tailCtx, cancel := context.WithTimeout(context.Background(), tailFlushTimeout)
-			flush(tailCtx)
+			flushAll(tailCtx)
 			cancel()
 			return
 		case op := <-s.queue:
 			switch op.Kind {
 			case queuedOperationRecord:
-				if op.Event.Fingerprint == "" {
+				if op.Event.Hash == "" {
 					continue
 				}
 				pending = append(pending, op.Event)
 				if len(pending) >= s.flushBatchSize {
 					flush(ctx)
 				}
+			case queuedOperationRecordRequest:
+				if op.RequestEvent.Hash == "" {
+					continue
+				}
+				pendingRequests = append(pendingRequests, op.RequestEvent)
+				if len(pendingRequests) >= s.flushBatchSize {
+					flushRequests(ctx)
+				}
 			case queuedOperationResolve:
-				flush(ctx)
+				flushAll(ctx)
 				s.resolveBySubject(ctx, op.Resolve)
 			default:
 				continue
 			}
 		case <-ticker.C:
-			flush(ctx)
+			flushAll(ctx)
 		}
 	}
 }
@@ -88,6 +111,21 @@ func (s *Service) flushBatch(ctx context.Context, batch []QueuedEvent) error {
 	}
 	s.flushedEvents.Add(int64(len(batch)))
 	s.publishMonitorChanged("recorded")
+	return nil
+}
+
+func (s *Service) flushRequestBatch(ctx context.Context, batch []QueuedRequestEvent) error {
+	if len(batch) == 0 {
+		return nil
+	}
+	if s.repo == nil {
+		return nil
+	}
+	if err := s.repo.InsertRequestBatch(ctx, batch); err != nil {
+		return err
+	}
+	s.flushedEvents.Add(int64(len(batch)))
+	s.publishMonitorChanged("request_recorded")
 	return nil
 }
 

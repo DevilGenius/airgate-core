@@ -16,24 +16,14 @@ func toMonitorEventResp(item appmonitor.Event) dto.MonitorEventResp {
 		Source:              item.Source,
 		SubjectType:         item.SubjectType,
 		SubjectID:           item.SubjectID,
-		Fingerprint:         item.Fingerprint,
+		Hash:                item.Hash,
 		Title:               item.Title,
 		Message:             item.Message,
-		APIKeyID:            item.APIKeyID,
-		APIKeyNameSnapshot:  item.APIKeyNameSnapshot,
-		UserID:              item.UserID,
-		UserEmailSnapshot:   item.UserEmailSnapshot,
-		GroupID:             item.GroupID,
 		AccountID:           item.AccountID,
 		AccountNameSnapshot: item.AccountNameSnapshot,
 		Platform:            item.Platform,
 		PluginID:            item.PluginID,
 		TaskType:            item.TaskType,
-		Method:              item.Method,
-		Endpoint:            item.Endpoint,
-		Model:               item.Model,
-		HTTPStatus:          item.HTTPStatus,
-		UpstreamStatus:      item.UpstreamStatus,
 		ErrorCode:           item.ErrorCode,
 		CreatedAt:           monitorTimeString(item.CreatedAt),
 		UpdatedAt:           monitorTimeString(item.UpdatedAt),
@@ -67,9 +57,63 @@ func toMonitorSummaryResp(item appmonitor.Summary) dto.MonitorSummaryResp {
 		ErrorTotal:    item.ErrorTotal,
 		WarningTotal:  item.WarningTotal,
 		ByType:        toMonitorTypeCounts(item.ByType),
-		TopAPIKeys:    toMonitorSubjectCounts(item.TopAPIKeys),
 		TopAccounts:   toMonitorSubjectCounts(item.TopAccounts),
 		Recent:        toMonitorEventRespList(item.Recent),
+	}
+}
+
+func toMonitorRequestEventResp(item appmonitor.RequestEvent) dto.MonitorRequestEventResp {
+	return dto.MonitorRequestEventResp{
+		ID:                  item.ID,
+		Type:                item.Type,
+		Severity:            item.Severity,
+		Source:              item.Source,
+		Hash:                item.Hash,
+		Fingerprint:         item.Fingerprint,
+		Title:               item.Title,
+		Message:             item.Message,
+		RequestID:           item.RequestID,
+		APIKeyID:            item.APIKeyID,
+		APIKeyNameSnapshot:  item.APIKeyNameSnapshot,
+		UserID:              item.UserID,
+		UserEmailSnapshot:   item.UserEmailSnapshot,
+		GroupID:             item.GroupID,
+		AccountID:           item.AccountID,
+		AccountNameSnapshot: item.AccountNameSnapshot,
+		Platform:            item.Platform,
+		PluginID:            item.PluginID,
+		Method:              item.Method,
+		Endpoint:            item.Endpoint,
+		Model:               item.Model,
+		HTTPStatus:          item.HTTPStatus,
+		UpstreamStatus:      item.UpstreamStatus,
+		ErrorCode:           item.ErrorCode,
+		DurationMS:          item.DurationMS,
+		CreatedAt:           monitorTimeString(item.CreatedAt),
+		ExpiresAt:           monitorTimeString(item.ExpiresAt),
+		Detail:              item.Detail,
+	}
+}
+
+func toMonitorRequestListResp(result appmonitor.RequestListResult) dto.MonitorRequestListResp {
+	items := make([]dto.MonitorRequestEventResp, 0, len(result.List))
+	for _, item := range result.List {
+		items = append(items, toMonitorRequestEventResp(item))
+	}
+	return dto.MonitorRequestListResp{
+		List:       items,
+		HasMore:    result.HasMore,
+		NextCursor: toMonitorRequestCursorResp(result.NextCursor),
+	}
+}
+
+func toMonitorRequestCursorResp(cursor *appmonitor.RequestListCursor) *dto.MonitorRequestCursorResp {
+	if cursor == nil {
+		return nil
+	}
+	return &dto.MonitorRequestCursorResp{
+		CreatedAt: monitorTimeString(cursor.CreatedAt),
+		ID:        cursor.ID,
 	}
 }
 

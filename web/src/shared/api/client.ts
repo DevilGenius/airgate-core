@@ -323,8 +323,8 @@ export function put<T>(path: string, body?: unknown): Promise<T> {
   return request<T>('PUT', path, body);
 }
 
-export function del<T>(path: string): Promise<T> {
-  return request<T>('DELETE', path);
+export function del<T>(path: string, params?: QueryParams): Promise<T> {
+  return request<T>('DELETE', path, undefined, params);
 }
 
 export function patch<T>(path: string, body?: unknown): Promise<T> {

@@ -112,16 +112,16 @@ func (meu *MonitorEventUpdate) SetNillableSubjectID(s *string) *MonitorEventUpda
 	return meu
 }
 
-// SetFingerprint sets the "fingerprint" field.
-func (meu *MonitorEventUpdate) SetFingerprint(s string) *MonitorEventUpdate {
-	meu.mutation.SetFingerprint(s)
+// SetHash sets the "hash" field.
+func (meu *MonitorEventUpdate) SetHash(s string) *MonitorEventUpdate {
+	meu.mutation.SetHash(s)
 	return meu
 }
 
-// SetNillableFingerprint sets the "fingerprint" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableFingerprint(s *string) *MonitorEventUpdate {
+// SetNillableHash sets the "hash" field if the given value is not nil.
+func (meu *MonitorEventUpdate) SetNillableHash(s *string) *MonitorEventUpdate {
 	if s != nil {
-		meu.SetFingerprint(*s)
+		meu.SetHash(*s)
 	}
 	return meu
 }
@@ -151,115 +151,6 @@ func (meu *MonitorEventUpdate) SetNillableMessage(s *string) *MonitorEventUpdate
 	if s != nil {
 		meu.SetMessage(*s)
 	}
-	return meu
-}
-
-// SetAPIKeyID sets the "api_key_id" field.
-func (meu *MonitorEventUpdate) SetAPIKeyID(i int) *MonitorEventUpdate {
-	meu.mutation.ResetAPIKeyID()
-	meu.mutation.SetAPIKeyID(i)
-	return meu
-}
-
-// SetNillableAPIKeyID sets the "api_key_id" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableAPIKeyID(i *int) *MonitorEventUpdate {
-	if i != nil {
-		meu.SetAPIKeyID(*i)
-	}
-	return meu
-}
-
-// AddAPIKeyID adds i to the "api_key_id" field.
-func (meu *MonitorEventUpdate) AddAPIKeyID(i int) *MonitorEventUpdate {
-	meu.mutation.AddAPIKeyID(i)
-	return meu
-}
-
-// ClearAPIKeyID clears the value of the "api_key_id" field.
-func (meu *MonitorEventUpdate) ClearAPIKeyID() *MonitorEventUpdate {
-	meu.mutation.ClearAPIKeyID()
-	return meu
-}
-
-// SetAPIKeyNameSnapshot sets the "api_key_name_snapshot" field.
-func (meu *MonitorEventUpdate) SetAPIKeyNameSnapshot(s string) *MonitorEventUpdate {
-	meu.mutation.SetAPIKeyNameSnapshot(s)
-	return meu
-}
-
-// SetNillableAPIKeyNameSnapshot sets the "api_key_name_snapshot" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableAPIKeyNameSnapshot(s *string) *MonitorEventUpdate {
-	if s != nil {
-		meu.SetAPIKeyNameSnapshot(*s)
-	}
-	return meu
-}
-
-// SetUserID sets the "user_id" field.
-func (meu *MonitorEventUpdate) SetUserID(i int) *MonitorEventUpdate {
-	meu.mutation.ResetUserID()
-	meu.mutation.SetUserID(i)
-	return meu
-}
-
-// SetNillableUserID sets the "user_id" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableUserID(i *int) *MonitorEventUpdate {
-	if i != nil {
-		meu.SetUserID(*i)
-	}
-	return meu
-}
-
-// AddUserID adds i to the "user_id" field.
-func (meu *MonitorEventUpdate) AddUserID(i int) *MonitorEventUpdate {
-	meu.mutation.AddUserID(i)
-	return meu
-}
-
-// ClearUserID clears the value of the "user_id" field.
-func (meu *MonitorEventUpdate) ClearUserID() *MonitorEventUpdate {
-	meu.mutation.ClearUserID()
-	return meu
-}
-
-// SetUserEmailSnapshot sets the "user_email_snapshot" field.
-func (meu *MonitorEventUpdate) SetUserEmailSnapshot(s string) *MonitorEventUpdate {
-	meu.mutation.SetUserEmailSnapshot(s)
-	return meu
-}
-
-// SetNillableUserEmailSnapshot sets the "user_email_snapshot" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableUserEmailSnapshot(s *string) *MonitorEventUpdate {
-	if s != nil {
-		meu.SetUserEmailSnapshot(*s)
-	}
-	return meu
-}
-
-// SetGroupID sets the "group_id" field.
-func (meu *MonitorEventUpdate) SetGroupID(i int) *MonitorEventUpdate {
-	meu.mutation.ResetGroupID()
-	meu.mutation.SetGroupID(i)
-	return meu
-}
-
-// SetNillableGroupID sets the "group_id" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableGroupID(i *int) *MonitorEventUpdate {
-	if i != nil {
-		meu.SetGroupID(*i)
-	}
-	return meu
-}
-
-// AddGroupID adds i to the "group_id" field.
-func (meu *MonitorEventUpdate) AddGroupID(i int) *MonitorEventUpdate {
-	meu.mutation.AddGroupID(i)
-	return meu
-}
-
-// ClearGroupID clears the value of the "group_id" field.
-func (meu *MonitorEventUpdate) ClearGroupID() *MonitorEventUpdate {
-	meu.mutation.ClearGroupID()
 	return meu
 }
 
@@ -343,102 +234,6 @@ func (meu *MonitorEventUpdate) SetNillableTaskType(s *string) *MonitorEventUpdat
 	if s != nil {
 		meu.SetTaskType(*s)
 	}
-	return meu
-}
-
-// SetMethod sets the "method" field.
-func (meu *MonitorEventUpdate) SetMethod(s string) *MonitorEventUpdate {
-	meu.mutation.SetMethod(s)
-	return meu
-}
-
-// SetNillableMethod sets the "method" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableMethod(s *string) *MonitorEventUpdate {
-	if s != nil {
-		meu.SetMethod(*s)
-	}
-	return meu
-}
-
-// SetEndpoint sets the "endpoint" field.
-func (meu *MonitorEventUpdate) SetEndpoint(s string) *MonitorEventUpdate {
-	meu.mutation.SetEndpoint(s)
-	return meu
-}
-
-// SetNillableEndpoint sets the "endpoint" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableEndpoint(s *string) *MonitorEventUpdate {
-	if s != nil {
-		meu.SetEndpoint(*s)
-	}
-	return meu
-}
-
-// SetModel sets the "model" field.
-func (meu *MonitorEventUpdate) SetModel(s string) *MonitorEventUpdate {
-	meu.mutation.SetModel(s)
-	return meu
-}
-
-// SetNillableModel sets the "model" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableModel(s *string) *MonitorEventUpdate {
-	if s != nil {
-		meu.SetModel(*s)
-	}
-	return meu
-}
-
-// SetHTTPStatus sets the "http_status" field.
-func (meu *MonitorEventUpdate) SetHTTPStatus(i int) *MonitorEventUpdate {
-	meu.mutation.ResetHTTPStatus()
-	meu.mutation.SetHTTPStatus(i)
-	return meu
-}
-
-// SetNillableHTTPStatus sets the "http_status" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableHTTPStatus(i *int) *MonitorEventUpdate {
-	if i != nil {
-		meu.SetHTTPStatus(*i)
-	}
-	return meu
-}
-
-// AddHTTPStatus adds i to the "http_status" field.
-func (meu *MonitorEventUpdate) AddHTTPStatus(i int) *MonitorEventUpdate {
-	meu.mutation.AddHTTPStatus(i)
-	return meu
-}
-
-// ClearHTTPStatus clears the value of the "http_status" field.
-func (meu *MonitorEventUpdate) ClearHTTPStatus() *MonitorEventUpdate {
-	meu.mutation.ClearHTTPStatus()
-	return meu
-}
-
-// SetUpstreamStatus sets the "upstream_status" field.
-func (meu *MonitorEventUpdate) SetUpstreamStatus(i int) *MonitorEventUpdate {
-	meu.mutation.ResetUpstreamStatus()
-	meu.mutation.SetUpstreamStatus(i)
-	return meu
-}
-
-// SetNillableUpstreamStatus sets the "upstream_status" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableUpstreamStatus(i *int) *MonitorEventUpdate {
-	if i != nil {
-		meu.SetUpstreamStatus(*i)
-	}
-	return meu
-}
-
-// AddUpstreamStatus adds i to the "upstream_status" field.
-func (meu *MonitorEventUpdate) AddUpstreamStatus(i int) *MonitorEventUpdate {
-	meu.mutation.AddUpstreamStatus(i)
-	return meu
-}
-
-// ClearUpstreamStatus clears the value of the "upstream_status" field.
-func (meu *MonitorEventUpdate) ClearUpstreamStatus() *MonitorEventUpdate {
-	meu.mutation.ClearUpstreamStatus()
 	return meu
 }
 
@@ -688,9 +483,9 @@ func (meu *MonitorEventUpdate) check() error {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.subject_id": %w`, err)}
 		}
 	}
-	if v, ok := meu.mutation.Fingerprint(); ok {
-		if err := monitorevent.FingerprintValidator(v); err != nil {
-			return &ValidationError{Name: "fingerprint", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.fingerprint": %w`, err)}
+	if v, ok := meu.mutation.Hash(); ok {
+		if err := monitorevent.HashValidator(v); err != nil {
+			return &ValidationError{Name: "hash", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.hash": %w`, err)}
 		}
 	}
 	if v, ok := meu.mutation.Title(); ok {
@@ -701,16 +496,6 @@ func (meu *MonitorEventUpdate) check() error {
 	if v, ok := meu.mutation.Message(); ok {
 		if err := monitorevent.MessageValidator(v); err != nil {
 			return &ValidationError{Name: "message", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.message": %w`, err)}
-		}
-	}
-	if v, ok := meu.mutation.APIKeyNameSnapshot(); ok {
-		if err := monitorevent.APIKeyNameSnapshotValidator(v); err != nil {
-			return &ValidationError{Name: "api_key_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.api_key_name_snapshot": %w`, err)}
-		}
-	}
-	if v, ok := meu.mutation.UserEmailSnapshot(); ok {
-		if err := monitorevent.UserEmailSnapshotValidator(v); err != nil {
-			return &ValidationError{Name: "user_email_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.user_email_snapshot": %w`, err)}
 		}
 	}
 	if v, ok := meu.mutation.AccountNameSnapshot(); ok {
@@ -731,21 +516,6 @@ func (meu *MonitorEventUpdate) check() error {
 	if v, ok := meu.mutation.TaskType(); ok {
 		if err := monitorevent.TaskTypeValidator(v); err != nil {
 			return &ValidationError{Name: "task_type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.task_type": %w`, err)}
-		}
-	}
-	if v, ok := meu.mutation.Method(); ok {
-		if err := monitorevent.MethodValidator(v); err != nil {
-			return &ValidationError{Name: "method", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.method": %w`, err)}
-		}
-	}
-	if v, ok := meu.mutation.Endpoint(); ok {
-		if err := monitorevent.EndpointValidator(v); err != nil {
-			return &ValidationError{Name: "endpoint", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.endpoint": %w`, err)}
-		}
-	}
-	if v, ok := meu.mutation.Model(); ok {
-		if err := monitorevent.ModelValidator(v); err != nil {
-			return &ValidationError{Name: "model", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.model": %w`, err)}
 		}
 	}
 	if v, ok := meu.mutation.ErrorCode(); ok {
@@ -791,47 +561,14 @@ func (meu *MonitorEventUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := meu.mutation.SubjectID(); ok {
 		_spec.SetField(monitorevent.FieldSubjectID, field.TypeString, value)
 	}
-	if value, ok := meu.mutation.Fingerprint(); ok {
-		_spec.SetField(monitorevent.FieldFingerprint, field.TypeString, value)
+	if value, ok := meu.mutation.Hash(); ok {
+		_spec.SetField(monitorevent.FieldHash, field.TypeString, value)
 	}
 	if value, ok := meu.mutation.Title(); ok {
 		_spec.SetField(monitorevent.FieldTitle, field.TypeString, value)
 	}
 	if value, ok := meu.mutation.Message(); ok {
 		_spec.SetField(monitorevent.FieldMessage, field.TypeString, value)
-	}
-	if value, ok := meu.mutation.APIKeyID(); ok {
-		_spec.SetField(monitorevent.FieldAPIKeyID, field.TypeInt, value)
-	}
-	if value, ok := meu.mutation.AddedAPIKeyID(); ok {
-		_spec.AddField(monitorevent.FieldAPIKeyID, field.TypeInt, value)
-	}
-	if meu.mutation.APIKeyIDCleared() {
-		_spec.ClearField(monitorevent.FieldAPIKeyID, field.TypeInt)
-	}
-	if value, ok := meu.mutation.APIKeyNameSnapshot(); ok {
-		_spec.SetField(monitorevent.FieldAPIKeyNameSnapshot, field.TypeString, value)
-	}
-	if value, ok := meu.mutation.UserID(); ok {
-		_spec.SetField(monitorevent.FieldUserID, field.TypeInt, value)
-	}
-	if value, ok := meu.mutation.AddedUserID(); ok {
-		_spec.AddField(monitorevent.FieldUserID, field.TypeInt, value)
-	}
-	if meu.mutation.UserIDCleared() {
-		_spec.ClearField(monitorevent.FieldUserID, field.TypeInt)
-	}
-	if value, ok := meu.mutation.UserEmailSnapshot(); ok {
-		_spec.SetField(monitorevent.FieldUserEmailSnapshot, field.TypeString, value)
-	}
-	if value, ok := meu.mutation.GroupID(); ok {
-		_spec.SetField(monitorevent.FieldGroupID, field.TypeInt, value)
-	}
-	if value, ok := meu.mutation.AddedGroupID(); ok {
-		_spec.AddField(monitorevent.FieldGroupID, field.TypeInt, value)
-	}
-	if meu.mutation.GroupIDCleared() {
-		_spec.ClearField(monitorevent.FieldGroupID, field.TypeInt)
 	}
 	if value, ok := meu.mutation.AccountID(); ok {
 		_spec.SetField(monitorevent.FieldAccountID, field.TypeInt, value)
@@ -853,33 +590,6 @@ func (meu *MonitorEventUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := meu.mutation.TaskType(); ok {
 		_spec.SetField(monitorevent.FieldTaskType, field.TypeString, value)
-	}
-	if value, ok := meu.mutation.Method(); ok {
-		_spec.SetField(monitorevent.FieldMethod, field.TypeString, value)
-	}
-	if value, ok := meu.mutation.Endpoint(); ok {
-		_spec.SetField(monitorevent.FieldEndpoint, field.TypeString, value)
-	}
-	if value, ok := meu.mutation.Model(); ok {
-		_spec.SetField(monitorevent.FieldModel, field.TypeString, value)
-	}
-	if value, ok := meu.mutation.HTTPStatus(); ok {
-		_spec.SetField(monitorevent.FieldHTTPStatus, field.TypeInt, value)
-	}
-	if value, ok := meu.mutation.AddedHTTPStatus(); ok {
-		_spec.AddField(monitorevent.FieldHTTPStatus, field.TypeInt, value)
-	}
-	if meu.mutation.HTTPStatusCleared() {
-		_spec.ClearField(monitorevent.FieldHTTPStatus, field.TypeInt)
-	}
-	if value, ok := meu.mutation.UpstreamStatus(); ok {
-		_spec.SetField(monitorevent.FieldUpstreamStatus, field.TypeInt, value)
-	}
-	if value, ok := meu.mutation.AddedUpstreamStatus(); ok {
-		_spec.AddField(monitorevent.FieldUpstreamStatus, field.TypeInt, value)
-	}
-	if meu.mutation.UpstreamStatusCleared() {
-		_spec.ClearField(monitorevent.FieldUpstreamStatus, field.TypeInt)
 	}
 	if value, ok := meu.mutation.ErrorCode(); ok {
 		_spec.SetField(monitorevent.FieldErrorCode, field.TypeString, value)
@@ -1036,16 +746,16 @@ func (meuo *MonitorEventUpdateOne) SetNillableSubjectID(s *string) *MonitorEvent
 	return meuo
 }
 
-// SetFingerprint sets the "fingerprint" field.
-func (meuo *MonitorEventUpdateOne) SetFingerprint(s string) *MonitorEventUpdateOne {
-	meuo.mutation.SetFingerprint(s)
+// SetHash sets the "hash" field.
+func (meuo *MonitorEventUpdateOne) SetHash(s string) *MonitorEventUpdateOne {
+	meuo.mutation.SetHash(s)
 	return meuo
 }
 
-// SetNillableFingerprint sets the "fingerprint" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableFingerprint(s *string) *MonitorEventUpdateOne {
+// SetNillableHash sets the "hash" field if the given value is not nil.
+func (meuo *MonitorEventUpdateOne) SetNillableHash(s *string) *MonitorEventUpdateOne {
 	if s != nil {
-		meuo.SetFingerprint(*s)
+		meuo.SetHash(*s)
 	}
 	return meuo
 }
@@ -1075,115 +785,6 @@ func (meuo *MonitorEventUpdateOne) SetNillableMessage(s *string) *MonitorEventUp
 	if s != nil {
 		meuo.SetMessage(*s)
 	}
-	return meuo
-}
-
-// SetAPIKeyID sets the "api_key_id" field.
-func (meuo *MonitorEventUpdateOne) SetAPIKeyID(i int) *MonitorEventUpdateOne {
-	meuo.mutation.ResetAPIKeyID()
-	meuo.mutation.SetAPIKeyID(i)
-	return meuo
-}
-
-// SetNillableAPIKeyID sets the "api_key_id" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableAPIKeyID(i *int) *MonitorEventUpdateOne {
-	if i != nil {
-		meuo.SetAPIKeyID(*i)
-	}
-	return meuo
-}
-
-// AddAPIKeyID adds i to the "api_key_id" field.
-func (meuo *MonitorEventUpdateOne) AddAPIKeyID(i int) *MonitorEventUpdateOne {
-	meuo.mutation.AddAPIKeyID(i)
-	return meuo
-}
-
-// ClearAPIKeyID clears the value of the "api_key_id" field.
-func (meuo *MonitorEventUpdateOne) ClearAPIKeyID() *MonitorEventUpdateOne {
-	meuo.mutation.ClearAPIKeyID()
-	return meuo
-}
-
-// SetAPIKeyNameSnapshot sets the "api_key_name_snapshot" field.
-func (meuo *MonitorEventUpdateOne) SetAPIKeyNameSnapshot(s string) *MonitorEventUpdateOne {
-	meuo.mutation.SetAPIKeyNameSnapshot(s)
-	return meuo
-}
-
-// SetNillableAPIKeyNameSnapshot sets the "api_key_name_snapshot" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableAPIKeyNameSnapshot(s *string) *MonitorEventUpdateOne {
-	if s != nil {
-		meuo.SetAPIKeyNameSnapshot(*s)
-	}
-	return meuo
-}
-
-// SetUserID sets the "user_id" field.
-func (meuo *MonitorEventUpdateOne) SetUserID(i int) *MonitorEventUpdateOne {
-	meuo.mutation.ResetUserID()
-	meuo.mutation.SetUserID(i)
-	return meuo
-}
-
-// SetNillableUserID sets the "user_id" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableUserID(i *int) *MonitorEventUpdateOne {
-	if i != nil {
-		meuo.SetUserID(*i)
-	}
-	return meuo
-}
-
-// AddUserID adds i to the "user_id" field.
-func (meuo *MonitorEventUpdateOne) AddUserID(i int) *MonitorEventUpdateOne {
-	meuo.mutation.AddUserID(i)
-	return meuo
-}
-
-// ClearUserID clears the value of the "user_id" field.
-func (meuo *MonitorEventUpdateOne) ClearUserID() *MonitorEventUpdateOne {
-	meuo.mutation.ClearUserID()
-	return meuo
-}
-
-// SetUserEmailSnapshot sets the "user_email_snapshot" field.
-func (meuo *MonitorEventUpdateOne) SetUserEmailSnapshot(s string) *MonitorEventUpdateOne {
-	meuo.mutation.SetUserEmailSnapshot(s)
-	return meuo
-}
-
-// SetNillableUserEmailSnapshot sets the "user_email_snapshot" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableUserEmailSnapshot(s *string) *MonitorEventUpdateOne {
-	if s != nil {
-		meuo.SetUserEmailSnapshot(*s)
-	}
-	return meuo
-}
-
-// SetGroupID sets the "group_id" field.
-func (meuo *MonitorEventUpdateOne) SetGroupID(i int) *MonitorEventUpdateOne {
-	meuo.mutation.ResetGroupID()
-	meuo.mutation.SetGroupID(i)
-	return meuo
-}
-
-// SetNillableGroupID sets the "group_id" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableGroupID(i *int) *MonitorEventUpdateOne {
-	if i != nil {
-		meuo.SetGroupID(*i)
-	}
-	return meuo
-}
-
-// AddGroupID adds i to the "group_id" field.
-func (meuo *MonitorEventUpdateOne) AddGroupID(i int) *MonitorEventUpdateOne {
-	meuo.mutation.AddGroupID(i)
-	return meuo
-}
-
-// ClearGroupID clears the value of the "group_id" field.
-func (meuo *MonitorEventUpdateOne) ClearGroupID() *MonitorEventUpdateOne {
-	meuo.mutation.ClearGroupID()
 	return meuo
 }
 
@@ -1267,102 +868,6 @@ func (meuo *MonitorEventUpdateOne) SetNillableTaskType(s *string) *MonitorEventU
 	if s != nil {
 		meuo.SetTaskType(*s)
 	}
-	return meuo
-}
-
-// SetMethod sets the "method" field.
-func (meuo *MonitorEventUpdateOne) SetMethod(s string) *MonitorEventUpdateOne {
-	meuo.mutation.SetMethod(s)
-	return meuo
-}
-
-// SetNillableMethod sets the "method" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableMethod(s *string) *MonitorEventUpdateOne {
-	if s != nil {
-		meuo.SetMethod(*s)
-	}
-	return meuo
-}
-
-// SetEndpoint sets the "endpoint" field.
-func (meuo *MonitorEventUpdateOne) SetEndpoint(s string) *MonitorEventUpdateOne {
-	meuo.mutation.SetEndpoint(s)
-	return meuo
-}
-
-// SetNillableEndpoint sets the "endpoint" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableEndpoint(s *string) *MonitorEventUpdateOne {
-	if s != nil {
-		meuo.SetEndpoint(*s)
-	}
-	return meuo
-}
-
-// SetModel sets the "model" field.
-func (meuo *MonitorEventUpdateOne) SetModel(s string) *MonitorEventUpdateOne {
-	meuo.mutation.SetModel(s)
-	return meuo
-}
-
-// SetNillableModel sets the "model" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableModel(s *string) *MonitorEventUpdateOne {
-	if s != nil {
-		meuo.SetModel(*s)
-	}
-	return meuo
-}
-
-// SetHTTPStatus sets the "http_status" field.
-func (meuo *MonitorEventUpdateOne) SetHTTPStatus(i int) *MonitorEventUpdateOne {
-	meuo.mutation.ResetHTTPStatus()
-	meuo.mutation.SetHTTPStatus(i)
-	return meuo
-}
-
-// SetNillableHTTPStatus sets the "http_status" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableHTTPStatus(i *int) *MonitorEventUpdateOne {
-	if i != nil {
-		meuo.SetHTTPStatus(*i)
-	}
-	return meuo
-}
-
-// AddHTTPStatus adds i to the "http_status" field.
-func (meuo *MonitorEventUpdateOne) AddHTTPStatus(i int) *MonitorEventUpdateOne {
-	meuo.mutation.AddHTTPStatus(i)
-	return meuo
-}
-
-// ClearHTTPStatus clears the value of the "http_status" field.
-func (meuo *MonitorEventUpdateOne) ClearHTTPStatus() *MonitorEventUpdateOne {
-	meuo.mutation.ClearHTTPStatus()
-	return meuo
-}
-
-// SetUpstreamStatus sets the "upstream_status" field.
-func (meuo *MonitorEventUpdateOne) SetUpstreamStatus(i int) *MonitorEventUpdateOne {
-	meuo.mutation.ResetUpstreamStatus()
-	meuo.mutation.SetUpstreamStatus(i)
-	return meuo
-}
-
-// SetNillableUpstreamStatus sets the "upstream_status" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableUpstreamStatus(i *int) *MonitorEventUpdateOne {
-	if i != nil {
-		meuo.SetUpstreamStatus(*i)
-	}
-	return meuo
-}
-
-// AddUpstreamStatus adds i to the "upstream_status" field.
-func (meuo *MonitorEventUpdateOne) AddUpstreamStatus(i int) *MonitorEventUpdateOne {
-	meuo.mutation.AddUpstreamStatus(i)
-	return meuo
-}
-
-// ClearUpstreamStatus clears the value of the "upstream_status" field.
-func (meuo *MonitorEventUpdateOne) ClearUpstreamStatus() *MonitorEventUpdateOne {
-	meuo.mutation.ClearUpstreamStatus()
 	return meuo
 }
 
@@ -1625,9 +1130,9 @@ func (meuo *MonitorEventUpdateOne) check() error {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.subject_id": %w`, err)}
 		}
 	}
-	if v, ok := meuo.mutation.Fingerprint(); ok {
-		if err := monitorevent.FingerprintValidator(v); err != nil {
-			return &ValidationError{Name: "fingerprint", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.fingerprint": %w`, err)}
+	if v, ok := meuo.mutation.Hash(); ok {
+		if err := monitorevent.HashValidator(v); err != nil {
+			return &ValidationError{Name: "hash", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.hash": %w`, err)}
 		}
 	}
 	if v, ok := meuo.mutation.Title(); ok {
@@ -1638,16 +1143,6 @@ func (meuo *MonitorEventUpdateOne) check() error {
 	if v, ok := meuo.mutation.Message(); ok {
 		if err := monitorevent.MessageValidator(v); err != nil {
 			return &ValidationError{Name: "message", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.message": %w`, err)}
-		}
-	}
-	if v, ok := meuo.mutation.APIKeyNameSnapshot(); ok {
-		if err := monitorevent.APIKeyNameSnapshotValidator(v); err != nil {
-			return &ValidationError{Name: "api_key_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.api_key_name_snapshot": %w`, err)}
-		}
-	}
-	if v, ok := meuo.mutation.UserEmailSnapshot(); ok {
-		if err := monitorevent.UserEmailSnapshotValidator(v); err != nil {
-			return &ValidationError{Name: "user_email_snapshot", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.user_email_snapshot": %w`, err)}
 		}
 	}
 	if v, ok := meuo.mutation.AccountNameSnapshot(); ok {
@@ -1668,21 +1163,6 @@ func (meuo *MonitorEventUpdateOne) check() error {
 	if v, ok := meuo.mutation.TaskType(); ok {
 		if err := monitorevent.TaskTypeValidator(v); err != nil {
 			return &ValidationError{Name: "task_type", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.task_type": %w`, err)}
-		}
-	}
-	if v, ok := meuo.mutation.Method(); ok {
-		if err := monitorevent.MethodValidator(v); err != nil {
-			return &ValidationError{Name: "method", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.method": %w`, err)}
-		}
-	}
-	if v, ok := meuo.mutation.Endpoint(); ok {
-		if err := monitorevent.EndpointValidator(v); err != nil {
-			return &ValidationError{Name: "endpoint", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.endpoint": %w`, err)}
-		}
-	}
-	if v, ok := meuo.mutation.Model(); ok {
-		if err := monitorevent.ModelValidator(v); err != nil {
-			return &ValidationError{Name: "model", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.model": %w`, err)}
 		}
 	}
 	if v, ok := meuo.mutation.ErrorCode(); ok {
@@ -1745,47 +1225,14 @@ func (meuo *MonitorEventUpdateOne) sqlSave(ctx context.Context) (_node *MonitorE
 	if value, ok := meuo.mutation.SubjectID(); ok {
 		_spec.SetField(monitorevent.FieldSubjectID, field.TypeString, value)
 	}
-	if value, ok := meuo.mutation.Fingerprint(); ok {
-		_spec.SetField(monitorevent.FieldFingerprint, field.TypeString, value)
+	if value, ok := meuo.mutation.Hash(); ok {
+		_spec.SetField(monitorevent.FieldHash, field.TypeString, value)
 	}
 	if value, ok := meuo.mutation.Title(); ok {
 		_spec.SetField(monitorevent.FieldTitle, field.TypeString, value)
 	}
 	if value, ok := meuo.mutation.Message(); ok {
 		_spec.SetField(monitorevent.FieldMessage, field.TypeString, value)
-	}
-	if value, ok := meuo.mutation.APIKeyID(); ok {
-		_spec.SetField(monitorevent.FieldAPIKeyID, field.TypeInt, value)
-	}
-	if value, ok := meuo.mutation.AddedAPIKeyID(); ok {
-		_spec.AddField(monitorevent.FieldAPIKeyID, field.TypeInt, value)
-	}
-	if meuo.mutation.APIKeyIDCleared() {
-		_spec.ClearField(monitorevent.FieldAPIKeyID, field.TypeInt)
-	}
-	if value, ok := meuo.mutation.APIKeyNameSnapshot(); ok {
-		_spec.SetField(monitorevent.FieldAPIKeyNameSnapshot, field.TypeString, value)
-	}
-	if value, ok := meuo.mutation.UserID(); ok {
-		_spec.SetField(monitorevent.FieldUserID, field.TypeInt, value)
-	}
-	if value, ok := meuo.mutation.AddedUserID(); ok {
-		_spec.AddField(monitorevent.FieldUserID, field.TypeInt, value)
-	}
-	if meuo.mutation.UserIDCleared() {
-		_spec.ClearField(monitorevent.FieldUserID, field.TypeInt)
-	}
-	if value, ok := meuo.mutation.UserEmailSnapshot(); ok {
-		_spec.SetField(monitorevent.FieldUserEmailSnapshot, field.TypeString, value)
-	}
-	if value, ok := meuo.mutation.GroupID(); ok {
-		_spec.SetField(monitorevent.FieldGroupID, field.TypeInt, value)
-	}
-	if value, ok := meuo.mutation.AddedGroupID(); ok {
-		_spec.AddField(monitorevent.FieldGroupID, field.TypeInt, value)
-	}
-	if meuo.mutation.GroupIDCleared() {
-		_spec.ClearField(monitorevent.FieldGroupID, field.TypeInt)
 	}
 	if value, ok := meuo.mutation.AccountID(); ok {
 		_spec.SetField(monitorevent.FieldAccountID, field.TypeInt, value)
@@ -1807,33 +1254,6 @@ func (meuo *MonitorEventUpdateOne) sqlSave(ctx context.Context) (_node *MonitorE
 	}
 	if value, ok := meuo.mutation.TaskType(); ok {
 		_spec.SetField(monitorevent.FieldTaskType, field.TypeString, value)
-	}
-	if value, ok := meuo.mutation.Method(); ok {
-		_spec.SetField(monitorevent.FieldMethod, field.TypeString, value)
-	}
-	if value, ok := meuo.mutation.Endpoint(); ok {
-		_spec.SetField(monitorevent.FieldEndpoint, field.TypeString, value)
-	}
-	if value, ok := meuo.mutation.Model(); ok {
-		_spec.SetField(monitorevent.FieldModel, field.TypeString, value)
-	}
-	if value, ok := meuo.mutation.HTTPStatus(); ok {
-		_spec.SetField(monitorevent.FieldHTTPStatus, field.TypeInt, value)
-	}
-	if value, ok := meuo.mutation.AddedHTTPStatus(); ok {
-		_spec.AddField(monitorevent.FieldHTTPStatus, field.TypeInt, value)
-	}
-	if meuo.mutation.HTTPStatusCleared() {
-		_spec.ClearField(monitorevent.FieldHTTPStatus, field.TypeInt)
-	}
-	if value, ok := meuo.mutation.UpstreamStatus(); ok {
-		_spec.SetField(monitorevent.FieldUpstreamStatus, field.TypeInt, value)
-	}
-	if value, ok := meuo.mutation.AddedUpstreamStatus(); ok {
-		_spec.AddField(monitorevent.FieldUpstreamStatus, field.TypeInt, value)
-	}
-	if meuo.mutation.UpstreamStatusCleared() {
-		_spec.ClearField(monitorevent.FieldUpstreamStatus, field.TypeInt)
 	}
 	if value, ok := meuo.mutation.ErrorCode(); ok {
 		_spec.SetField(monitorevent.FieldErrorCode, field.TypeString, value)

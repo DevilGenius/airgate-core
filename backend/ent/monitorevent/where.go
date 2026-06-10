@@ -69,9 +69,9 @@ func SubjectID(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldSubjectID, v))
 }
 
-// Fingerprint applies equality check predicate on the "fingerprint" field. It's identical to FingerprintEQ.
-func Fingerprint(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldFingerprint, v))
+// Hash applies equality check predicate on the "hash" field. It's identical to HashEQ.
+func Hash(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEQ(FieldHash, v))
 }
 
 // Title applies equality check predicate on the "title" field. It's identical to TitleEQ.
@@ -82,31 +82,6 @@ func Title(v string) predicate.MonitorEvent {
 // Message applies equality check predicate on the "message" field. It's identical to MessageEQ.
 func Message(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldMessage, v))
-}
-
-// APIKeyID applies equality check predicate on the "api_key_id" field. It's identical to APIKeyIDEQ.
-func APIKeyID(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldAPIKeyID, v))
-}
-
-// APIKeyNameSnapshot applies equality check predicate on the "api_key_name_snapshot" field. It's identical to APIKeyNameSnapshotEQ.
-func APIKeyNameSnapshot(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldAPIKeyNameSnapshot, v))
-}
-
-// UserID applies equality check predicate on the "user_id" field. It's identical to UserIDEQ.
-func UserID(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldUserID, v))
-}
-
-// UserEmailSnapshot applies equality check predicate on the "user_email_snapshot" field. It's identical to UserEmailSnapshotEQ.
-func UserEmailSnapshot(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldUserEmailSnapshot, v))
-}
-
-// GroupID applies equality check predicate on the "group_id" field. It's identical to GroupIDEQ.
-func GroupID(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldGroupID, v))
 }
 
 // AccountID applies equality check predicate on the "account_id" field. It's identical to AccountIDEQ.
@@ -132,31 +107,6 @@ func PluginID(v string) predicate.MonitorEvent {
 // TaskType applies equality check predicate on the "task_type" field. It's identical to TaskTypeEQ.
 func TaskType(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldTaskType, v))
-}
-
-// Method applies equality check predicate on the "method" field. It's identical to MethodEQ.
-func Method(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldMethod, v))
-}
-
-// Endpoint applies equality check predicate on the "endpoint" field. It's identical to EndpointEQ.
-func Endpoint(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldEndpoint, v))
-}
-
-// Model applies equality check predicate on the "model" field. It's identical to ModelEQ.
-func Model(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldModel, v))
-}
-
-// HTTPStatus applies equality check predicate on the "http_status" field. It's identical to HTTPStatusEQ.
-func HTTPStatus(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldHTTPStatus, v))
-}
-
-// UpstreamStatus applies equality check predicate on the "upstream_status" field. It's identical to UpstreamStatusEQ.
-func UpstreamStatus(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldUpstreamStatus, v))
 }
 
 // ErrorCode applies equality check predicate on the "error_code" field. It's identical to ErrorCodeEQ.
@@ -464,69 +414,69 @@ func SubjectIDContainsFold(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldContainsFold(FieldSubjectID, v))
 }
 
-// FingerprintEQ applies the EQ predicate on the "fingerprint" field.
-func FingerprintEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldFingerprint, v))
+// HashEQ applies the EQ predicate on the "hash" field.
+func HashEQ(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEQ(FieldHash, v))
 }
 
-// FingerprintNEQ applies the NEQ predicate on the "fingerprint" field.
-func FingerprintNEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldFingerprint, v))
+// HashNEQ applies the NEQ predicate on the "hash" field.
+func HashNEQ(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNEQ(FieldHash, v))
 }
 
-// FingerprintIn applies the In predicate on the "fingerprint" field.
-func FingerprintIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldFingerprint, vs...))
+// HashIn applies the In predicate on the "hash" field.
+func HashIn(vs ...string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldIn(FieldHash, vs...))
 }
 
-// FingerprintNotIn applies the NotIn predicate on the "fingerprint" field.
-func FingerprintNotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldFingerprint, vs...))
+// HashNotIn applies the NotIn predicate on the "hash" field.
+func HashNotIn(vs ...string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNotIn(FieldHash, vs...))
 }
 
-// FingerprintGT applies the GT predicate on the "fingerprint" field.
-func FingerprintGT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldFingerprint, v))
+// HashGT applies the GT predicate on the "hash" field.
+func HashGT(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldGT(FieldHash, v))
 }
 
-// FingerprintGTE applies the GTE predicate on the "fingerprint" field.
-func FingerprintGTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldFingerprint, v))
+// HashGTE applies the GTE predicate on the "hash" field.
+func HashGTE(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldGTE(FieldHash, v))
 }
 
-// FingerprintLT applies the LT predicate on the "fingerprint" field.
-func FingerprintLT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldFingerprint, v))
+// HashLT applies the LT predicate on the "hash" field.
+func HashLT(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldLT(FieldHash, v))
 }
 
-// FingerprintLTE applies the LTE predicate on the "fingerprint" field.
-func FingerprintLTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldFingerprint, v))
+// HashLTE applies the LTE predicate on the "hash" field.
+func HashLTE(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldLTE(FieldHash, v))
 }
 
-// FingerprintContains applies the Contains predicate on the "fingerprint" field.
-func FingerprintContains(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContains(FieldFingerprint, v))
+// HashContains applies the Contains predicate on the "hash" field.
+func HashContains(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldContains(FieldHash, v))
 }
 
-// FingerprintHasPrefix applies the HasPrefix predicate on the "fingerprint" field.
-func FingerprintHasPrefix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldFingerprint, v))
+// HashHasPrefix applies the HasPrefix predicate on the "hash" field.
+func HashHasPrefix(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldHash, v))
 }
 
-// FingerprintHasSuffix applies the HasSuffix predicate on the "fingerprint" field.
-func FingerprintHasSuffix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldFingerprint, v))
+// HashHasSuffix applies the HasSuffix predicate on the "hash" field.
+func HashHasSuffix(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldHash, v))
 }
 
-// FingerprintEqualFold applies the EqualFold predicate on the "fingerprint" field.
-func FingerprintEqualFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEqualFold(FieldFingerprint, v))
+// HashEqualFold applies the EqualFold predicate on the "hash" field.
+func HashEqualFold(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEqualFold(FieldHash, v))
 }
 
-// FingerprintContainsFold applies the ContainsFold predicate on the "fingerprint" field.
-func FingerprintContainsFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContainsFold(FieldFingerprint, v))
+// HashContainsFold applies the ContainsFold predicate on the "hash" field.
+func HashContainsFold(v string) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldContainsFold(FieldHash, v))
 }
 
 // TitleEQ applies the EQ predicate on the "title" field.
@@ -657,286 +607,6 @@ func MessageEqualFold(v string) predicate.MonitorEvent {
 // MessageContainsFold applies the ContainsFold predicate on the "message" field.
 func MessageContainsFold(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldContainsFold(FieldMessage, v))
-}
-
-// APIKeyIDEQ applies the EQ predicate on the "api_key_id" field.
-func APIKeyIDEQ(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldAPIKeyID, v))
-}
-
-// APIKeyIDNEQ applies the NEQ predicate on the "api_key_id" field.
-func APIKeyIDNEQ(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldAPIKeyID, v))
-}
-
-// APIKeyIDIn applies the In predicate on the "api_key_id" field.
-func APIKeyIDIn(vs ...int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldAPIKeyID, vs...))
-}
-
-// APIKeyIDNotIn applies the NotIn predicate on the "api_key_id" field.
-func APIKeyIDNotIn(vs ...int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldAPIKeyID, vs...))
-}
-
-// APIKeyIDGT applies the GT predicate on the "api_key_id" field.
-func APIKeyIDGT(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldAPIKeyID, v))
-}
-
-// APIKeyIDGTE applies the GTE predicate on the "api_key_id" field.
-func APIKeyIDGTE(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldAPIKeyID, v))
-}
-
-// APIKeyIDLT applies the LT predicate on the "api_key_id" field.
-func APIKeyIDLT(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldAPIKeyID, v))
-}
-
-// APIKeyIDLTE applies the LTE predicate on the "api_key_id" field.
-func APIKeyIDLTE(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldAPIKeyID, v))
-}
-
-// APIKeyIDIsNil applies the IsNil predicate on the "api_key_id" field.
-func APIKeyIDIsNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIsNull(FieldAPIKeyID))
-}
-
-// APIKeyIDNotNil applies the NotNil predicate on the "api_key_id" field.
-func APIKeyIDNotNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotNull(FieldAPIKeyID))
-}
-
-// APIKeyNameSnapshotEQ applies the EQ predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldAPIKeyNameSnapshot, v))
-}
-
-// APIKeyNameSnapshotNEQ applies the NEQ predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotNEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldAPIKeyNameSnapshot, v))
-}
-
-// APIKeyNameSnapshotIn applies the In predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldAPIKeyNameSnapshot, vs...))
-}
-
-// APIKeyNameSnapshotNotIn applies the NotIn predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotNotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldAPIKeyNameSnapshot, vs...))
-}
-
-// APIKeyNameSnapshotGT applies the GT predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotGT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldAPIKeyNameSnapshot, v))
-}
-
-// APIKeyNameSnapshotGTE applies the GTE predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotGTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldAPIKeyNameSnapshot, v))
-}
-
-// APIKeyNameSnapshotLT applies the LT predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotLT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldAPIKeyNameSnapshot, v))
-}
-
-// APIKeyNameSnapshotLTE applies the LTE predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotLTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldAPIKeyNameSnapshot, v))
-}
-
-// APIKeyNameSnapshotContains applies the Contains predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotContains(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContains(FieldAPIKeyNameSnapshot, v))
-}
-
-// APIKeyNameSnapshotHasPrefix applies the HasPrefix predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotHasPrefix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldAPIKeyNameSnapshot, v))
-}
-
-// APIKeyNameSnapshotHasSuffix applies the HasSuffix predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotHasSuffix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldAPIKeyNameSnapshot, v))
-}
-
-// APIKeyNameSnapshotEqualFold applies the EqualFold predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotEqualFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEqualFold(FieldAPIKeyNameSnapshot, v))
-}
-
-// APIKeyNameSnapshotContainsFold applies the ContainsFold predicate on the "api_key_name_snapshot" field.
-func APIKeyNameSnapshotContainsFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContainsFold(FieldAPIKeyNameSnapshot, v))
-}
-
-// UserIDEQ applies the EQ predicate on the "user_id" field.
-func UserIDEQ(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldUserID, v))
-}
-
-// UserIDNEQ applies the NEQ predicate on the "user_id" field.
-func UserIDNEQ(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldUserID, v))
-}
-
-// UserIDIn applies the In predicate on the "user_id" field.
-func UserIDIn(vs ...int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldUserID, vs...))
-}
-
-// UserIDNotIn applies the NotIn predicate on the "user_id" field.
-func UserIDNotIn(vs ...int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldUserID, vs...))
-}
-
-// UserIDGT applies the GT predicate on the "user_id" field.
-func UserIDGT(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldUserID, v))
-}
-
-// UserIDGTE applies the GTE predicate on the "user_id" field.
-func UserIDGTE(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldUserID, v))
-}
-
-// UserIDLT applies the LT predicate on the "user_id" field.
-func UserIDLT(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldUserID, v))
-}
-
-// UserIDLTE applies the LTE predicate on the "user_id" field.
-func UserIDLTE(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldUserID, v))
-}
-
-// UserIDIsNil applies the IsNil predicate on the "user_id" field.
-func UserIDIsNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIsNull(FieldUserID))
-}
-
-// UserIDNotNil applies the NotNil predicate on the "user_id" field.
-func UserIDNotNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotNull(FieldUserID))
-}
-
-// UserEmailSnapshotEQ applies the EQ predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldUserEmailSnapshot, v))
-}
-
-// UserEmailSnapshotNEQ applies the NEQ predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotNEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldUserEmailSnapshot, v))
-}
-
-// UserEmailSnapshotIn applies the In predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldUserEmailSnapshot, vs...))
-}
-
-// UserEmailSnapshotNotIn applies the NotIn predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotNotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldUserEmailSnapshot, vs...))
-}
-
-// UserEmailSnapshotGT applies the GT predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotGT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldUserEmailSnapshot, v))
-}
-
-// UserEmailSnapshotGTE applies the GTE predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotGTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldUserEmailSnapshot, v))
-}
-
-// UserEmailSnapshotLT applies the LT predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotLT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldUserEmailSnapshot, v))
-}
-
-// UserEmailSnapshotLTE applies the LTE predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotLTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldUserEmailSnapshot, v))
-}
-
-// UserEmailSnapshotContains applies the Contains predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotContains(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContains(FieldUserEmailSnapshot, v))
-}
-
-// UserEmailSnapshotHasPrefix applies the HasPrefix predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotHasPrefix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldUserEmailSnapshot, v))
-}
-
-// UserEmailSnapshotHasSuffix applies the HasSuffix predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotHasSuffix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldUserEmailSnapshot, v))
-}
-
-// UserEmailSnapshotEqualFold applies the EqualFold predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotEqualFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEqualFold(FieldUserEmailSnapshot, v))
-}
-
-// UserEmailSnapshotContainsFold applies the ContainsFold predicate on the "user_email_snapshot" field.
-func UserEmailSnapshotContainsFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContainsFold(FieldUserEmailSnapshot, v))
-}
-
-// GroupIDEQ applies the EQ predicate on the "group_id" field.
-func GroupIDEQ(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldGroupID, v))
-}
-
-// GroupIDNEQ applies the NEQ predicate on the "group_id" field.
-func GroupIDNEQ(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldGroupID, v))
-}
-
-// GroupIDIn applies the In predicate on the "group_id" field.
-func GroupIDIn(vs ...int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldGroupID, vs...))
-}
-
-// GroupIDNotIn applies the NotIn predicate on the "group_id" field.
-func GroupIDNotIn(vs ...int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldGroupID, vs...))
-}
-
-// GroupIDGT applies the GT predicate on the "group_id" field.
-func GroupIDGT(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldGroupID, v))
-}
-
-// GroupIDGTE applies the GTE predicate on the "group_id" field.
-func GroupIDGTE(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldGroupID, v))
-}
-
-// GroupIDLT applies the LT predicate on the "group_id" field.
-func GroupIDLT(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldGroupID, v))
-}
-
-// GroupIDLTE applies the LTE predicate on the "group_id" field.
-func GroupIDLTE(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldGroupID, v))
-}
-
-// GroupIDIsNil applies the IsNil predicate on the "group_id" field.
-func GroupIDIsNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIsNull(FieldGroupID))
-}
-
-// GroupIDNotNil applies the NotNil predicate on the "group_id" field.
-func GroupIDNotNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotNull(FieldGroupID))
 }
 
 // AccountIDEQ applies the EQ predicate on the "account_id" field.
@@ -1247,301 +917,6 @@ func TaskTypeEqualFold(v string) predicate.MonitorEvent {
 // TaskTypeContainsFold applies the ContainsFold predicate on the "task_type" field.
 func TaskTypeContainsFold(v string) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldContainsFold(FieldTaskType, v))
-}
-
-// MethodEQ applies the EQ predicate on the "method" field.
-func MethodEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldMethod, v))
-}
-
-// MethodNEQ applies the NEQ predicate on the "method" field.
-func MethodNEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldMethod, v))
-}
-
-// MethodIn applies the In predicate on the "method" field.
-func MethodIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldMethod, vs...))
-}
-
-// MethodNotIn applies the NotIn predicate on the "method" field.
-func MethodNotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldMethod, vs...))
-}
-
-// MethodGT applies the GT predicate on the "method" field.
-func MethodGT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldMethod, v))
-}
-
-// MethodGTE applies the GTE predicate on the "method" field.
-func MethodGTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldMethod, v))
-}
-
-// MethodLT applies the LT predicate on the "method" field.
-func MethodLT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldMethod, v))
-}
-
-// MethodLTE applies the LTE predicate on the "method" field.
-func MethodLTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldMethod, v))
-}
-
-// MethodContains applies the Contains predicate on the "method" field.
-func MethodContains(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContains(FieldMethod, v))
-}
-
-// MethodHasPrefix applies the HasPrefix predicate on the "method" field.
-func MethodHasPrefix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldMethod, v))
-}
-
-// MethodHasSuffix applies the HasSuffix predicate on the "method" field.
-func MethodHasSuffix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldMethod, v))
-}
-
-// MethodEqualFold applies the EqualFold predicate on the "method" field.
-func MethodEqualFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEqualFold(FieldMethod, v))
-}
-
-// MethodContainsFold applies the ContainsFold predicate on the "method" field.
-func MethodContainsFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContainsFold(FieldMethod, v))
-}
-
-// EndpointEQ applies the EQ predicate on the "endpoint" field.
-func EndpointEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldEndpoint, v))
-}
-
-// EndpointNEQ applies the NEQ predicate on the "endpoint" field.
-func EndpointNEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldEndpoint, v))
-}
-
-// EndpointIn applies the In predicate on the "endpoint" field.
-func EndpointIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldEndpoint, vs...))
-}
-
-// EndpointNotIn applies the NotIn predicate on the "endpoint" field.
-func EndpointNotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldEndpoint, vs...))
-}
-
-// EndpointGT applies the GT predicate on the "endpoint" field.
-func EndpointGT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldEndpoint, v))
-}
-
-// EndpointGTE applies the GTE predicate on the "endpoint" field.
-func EndpointGTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldEndpoint, v))
-}
-
-// EndpointLT applies the LT predicate on the "endpoint" field.
-func EndpointLT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldEndpoint, v))
-}
-
-// EndpointLTE applies the LTE predicate on the "endpoint" field.
-func EndpointLTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldEndpoint, v))
-}
-
-// EndpointContains applies the Contains predicate on the "endpoint" field.
-func EndpointContains(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContains(FieldEndpoint, v))
-}
-
-// EndpointHasPrefix applies the HasPrefix predicate on the "endpoint" field.
-func EndpointHasPrefix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldEndpoint, v))
-}
-
-// EndpointHasSuffix applies the HasSuffix predicate on the "endpoint" field.
-func EndpointHasSuffix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldEndpoint, v))
-}
-
-// EndpointEqualFold applies the EqualFold predicate on the "endpoint" field.
-func EndpointEqualFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEqualFold(FieldEndpoint, v))
-}
-
-// EndpointContainsFold applies the ContainsFold predicate on the "endpoint" field.
-func EndpointContainsFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContainsFold(FieldEndpoint, v))
-}
-
-// ModelEQ applies the EQ predicate on the "model" field.
-func ModelEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldModel, v))
-}
-
-// ModelNEQ applies the NEQ predicate on the "model" field.
-func ModelNEQ(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldModel, v))
-}
-
-// ModelIn applies the In predicate on the "model" field.
-func ModelIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldModel, vs...))
-}
-
-// ModelNotIn applies the NotIn predicate on the "model" field.
-func ModelNotIn(vs ...string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldModel, vs...))
-}
-
-// ModelGT applies the GT predicate on the "model" field.
-func ModelGT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldModel, v))
-}
-
-// ModelGTE applies the GTE predicate on the "model" field.
-func ModelGTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldModel, v))
-}
-
-// ModelLT applies the LT predicate on the "model" field.
-func ModelLT(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldModel, v))
-}
-
-// ModelLTE applies the LTE predicate on the "model" field.
-func ModelLTE(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldModel, v))
-}
-
-// ModelContains applies the Contains predicate on the "model" field.
-func ModelContains(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContains(FieldModel, v))
-}
-
-// ModelHasPrefix applies the HasPrefix predicate on the "model" field.
-func ModelHasPrefix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasPrefix(FieldModel, v))
-}
-
-// ModelHasSuffix applies the HasSuffix predicate on the "model" field.
-func ModelHasSuffix(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldHasSuffix(FieldModel, v))
-}
-
-// ModelEqualFold applies the EqualFold predicate on the "model" field.
-func ModelEqualFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEqualFold(FieldModel, v))
-}
-
-// ModelContainsFold applies the ContainsFold predicate on the "model" field.
-func ModelContainsFold(v string) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldContainsFold(FieldModel, v))
-}
-
-// HTTPStatusEQ applies the EQ predicate on the "http_status" field.
-func HTTPStatusEQ(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldHTTPStatus, v))
-}
-
-// HTTPStatusNEQ applies the NEQ predicate on the "http_status" field.
-func HTTPStatusNEQ(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldHTTPStatus, v))
-}
-
-// HTTPStatusIn applies the In predicate on the "http_status" field.
-func HTTPStatusIn(vs ...int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldHTTPStatus, vs...))
-}
-
-// HTTPStatusNotIn applies the NotIn predicate on the "http_status" field.
-func HTTPStatusNotIn(vs ...int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldHTTPStatus, vs...))
-}
-
-// HTTPStatusGT applies the GT predicate on the "http_status" field.
-func HTTPStatusGT(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldHTTPStatus, v))
-}
-
-// HTTPStatusGTE applies the GTE predicate on the "http_status" field.
-func HTTPStatusGTE(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldHTTPStatus, v))
-}
-
-// HTTPStatusLT applies the LT predicate on the "http_status" field.
-func HTTPStatusLT(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldHTTPStatus, v))
-}
-
-// HTTPStatusLTE applies the LTE predicate on the "http_status" field.
-func HTTPStatusLTE(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldHTTPStatus, v))
-}
-
-// HTTPStatusIsNil applies the IsNil predicate on the "http_status" field.
-func HTTPStatusIsNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIsNull(FieldHTTPStatus))
-}
-
-// HTTPStatusNotNil applies the NotNil predicate on the "http_status" field.
-func HTTPStatusNotNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotNull(FieldHTTPStatus))
-}
-
-// UpstreamStatusEQ applies the EQ predicate on the "upstream_status" field.
-func UpstreamStatusEQ(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldUpstreamStatus, v))
-}
-
-// UpstreamStatusNEQ applies the NEQ predicate on the "upstream_status" field.
-func UpstreamStatusNEQ(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldUpstreamStatus, v))
-}
-
-// UpstreamStatusIn applies the In predicate on the "upstream_status" field.
-func UpstreamStatusIn(vs ...int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldUpstreamStatus, vs...))
-}
-
-// UpstreamStatusNotIn applies the NotIn predicate on the "upstream_status" field.
-func UpstreamStatusNotIn(vs ...int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldUpstreamStatus, vs...))
-}
-
-// UpstreamStatusGT applies the GT predicate on the "upstream_status" field.
-func UpstreamStatusGT(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldUpstreamStatus, v))
-}
-
-// UpstreamStatusGTE applies the GTE predicate on the "upstream_status" field.
-func UpstreamStatusGTE(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldUpstreamStatus, v))
-}
-
-// UpstreamStatusLT applies the LT predicate on the "upstream_status" field.
-func UpstreamStatusLT(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldUpstreamStatus, v))
-}
-
-// UpstreamStatusLTE applies the LTE predicate on the "upstream_status" field.
-func UpstreamStatusLTE(v int) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldUpstreamStatus, v))
-}
-
-// UpstreamStatusIsNil applies the IsNil predicate on the "upstream_status" field.
-func UpstreamStatusIsNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIsNull(FieldUpstreamStatus))
-}
-
-// UpstreamStatusNotNil applies the NotNil predicate on the "upstream_status" field.
-func UpstreamStatusNotNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotNull(FieldUpstreamStatus))
 }
 
 // ErrorCodeEQ applies the EQ predicate on the "error_code" field.

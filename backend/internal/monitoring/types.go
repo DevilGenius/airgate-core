@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	TypeAPIRequestError      = "api_request_error"
 	TypeSchedulerError       = "scheduler_error"
 	TypeUpstreamAccountError = "upstream_account_error"
 	TypePluginError          = "plugin_error"
@@ -30,7 +29,6 @@ const (
 	SourcePluginManager  = "plugin_manager"
 	SourceMonitorWorker  = "monitor_worker"
 
-	SubjectAPIKey    = "api_key"
 	SubjectAccount   = "account"
 	SubjectTask      = "task"
 	SubjectPlugin    = "plugin"
@@ -50,26 +48,15 @@ type EventInput struct {
 	Title   string
 	Message string
 
-	APIKeyID            *int
-	APIKeyNameSnapshot  string
-	UserID              *int
-	UserEmailSnapshot   string
-	GroupID             *int
 	AccountID           *int
 	AccountNameSnapshot string
 	Platform            string
 	PluginID            string
 	TaskType            string
-	Method              string
-	Endpoint            string
-	RequestPath         string
-	Model               string
-	HTTPStatus          *int
-	UpstreamStatus      *int
 	ErrorCode           string
 
-	// FingerprintMaterial overrides the default structured fingerprint material.
-	FingerprintMaterial string
+	// HashMaterial overrides the default structured hash material.
+	HashMaterial string
 	// AutoResolveAt optionally overrides the default type-based auto-resolve window.
 	AutoResolveAt *time.Time
 	// ObservedAt is primarily for tests and internally replayed events. Callers usually leave it zero.
@@ -82,7 +69,6 @@ type ResolveQuery struct {
 	Type        string
 	SubjectType string
 	SubjectID   string
-	APIKeyID    *int
 	AccountID   *int
 	PluginID    string
 	TaskType    string

@@ -21,6 +21,9 @@ type Group func(*sql.Selector)
 // MonitorEvent is the predicate function for monitorevent builders.
 type MonitorEvent func(*sql.Selector)
 
+// MonitorRequestEvent is the predicate function for monitorrequestevent builders.
+type MonitorRequestEvent func(*sql.Selector)
+
 // Plugin is the predicate function for plugin builders.
 type Plugin func(*sql.Selector)
 

@@ -13,6 +13,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
@@ -29,13 +30,14 @@ const (
 
 // Forwarder 请求转发器：认证 → 余额预检 → 调度 → 并发闸门 → 转发 → 判决 → 计费 → 记录。
 type Forwarder struct {
-	db          *ent.Client
-	manager     *Manager
-	scheduler   *scheduler.Scheduler
-	concurrency *scheduler.ConcurrencyManager
-	calculator  *billing.Calculator
-	recorder    *billing.Recorder
-	monitor     monitoring.Recorder
+	db             *ent.Client
+	manager        *Manager
+	scheduler      *scheduler.Scheduler
+	concurrency    *scheduler.ConcurrencyManager
+	calculator     *billing.Calculator
+	recorder       *billing.Recorder
+	monitor        monitoring.Recorder
+	requestMonitor requestmonitoring.Recorder
 }
 
 // NewForwarder 创建转发器。
@@ -63,6 +65,17 @@ func (f *Forwarder) SetMonitorRecorder(recorder monitoring.Recorder) {
 		return
 	}
 	f.monitor = recorder
+	if requestRecorder, ok := any(recorder).(requestmonitoring.Recorder); ok {
+		f.requestMonitor = requestRecorder
+	}
+}
+
+// SetRequestMonitorRecorder injects the best-effort request monitor recorder.
+func (f *Forwarder) SetRequestMonitorRecorder(recorder requestmonitoring.Recorder) {
+	if f == nil {
+		return
+	}
+	f.requestMonitor = recorder
 }
 
 // maxFailoverAttempts 非图片 429 场景的最大 failover 次数。
@@ -163,6 +176,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		for canStartForwardAttempt(state, attempt) {
 			if status := canceledRequestStatus(ctx.Err()); status != 0 {
 				markCanceledRequest(c, status)
+				f.recordClientClosedRequest(c, state, status, totalAttempts)
 				logger.Debug("forward_request_canceled",
 					"status_code", status,
 					"attempts", totalAttempts,
@@ -177,6 +191,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			if err := f.pickAccount(c, state, exclude...); err != nil {
 				if status := canceledRequestStatus(ctx.Err()); status != 0 {
 					markCanceledRequest(c, status)
+					f.recordClientClosedRequest(c, state, status, totalAttempts)
 					logger.Debug("forward_request_canceled",
 						"status_code", status,
 						"attempts", totalAttempts,
@@ -220,6 +235,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 							}
 							if status := canceledRequestStatus(ctx.Err()); status != 0 {
 								markCanceledRequest(c, status)
+								f.recordClientClosedRequest(c, state, status, totalAttempts)
 								logger.Debug("forward_request_canceled",
 									"status_code", status,
 									"attempts", totalAttempts,
@@ -289,6 +305,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					c.Set(ginCtxKeyAccountID, accountID)
 					c.Set(ginCtxKeyAttempts, totalAttempts)
 					markCanceledRequest(c, requestCanceled)
+					f.recordClientClosedRequest(c, state, requestCanceled, totalAttempts)
 					logger.Debug("forward_request_canceled",
 						"status_code", requestCanceled,
 						"attempts", totalAttempts,

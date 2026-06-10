@@ -26,22 +26,12 @@ const (
 	FieldSubjectType = "subject_type"
 	// FieldSubjectID holds the string denoting the subject_id field in the database.
 	FieldSubjectID = "subject_id"
-	// FieldFingerprint holds the string denoting the fingerprint field in the database.
-	FieldFingerprint = "fingerprint"
+	// FieldHash holds the string denoting the hash field in the database.
+	FieldHash = "hash"
 	// FieldTitle holds the string denoting the title field in the database.
 	FieldTitle = "title"
 	// FieldMessage holds the string denoting the message field in the database.
 	FieldMessage = "message"
-	// FieldAPIKeyID holds the string denoting the api_key_id field in the database.
-	FieldAPIKeyID = "api_key_id"
-	// FieldAPIKeyNameSnapshot holds the string denoting the api_key_name_snapshot field in the database.
-	FieldAPIKeyNameSnapshot = "api_key_name_snapshot"
-	// FieldUserID holds the string denoting the user_id field in the database.
-	FieldUserID = "user_id"
-	// FieldUserEmailSnapshot holds the string denoting the user_email_snapshot field in the database.
-	FieldUserEmailSnapshot = "user_email_snapshot"
-	// FieldGroupID holds the string denoting the group_id field in the database.
-	FieldGroupID = "group_id"
 	// FieldAccountID holds the string denoting the account_id field in the database.
 	FieldAccountID = "account_id"
 	// FieldAccountNameSnapshot holds the string denoting the account_name_snapshot field in the database.
@@ -52,16 +42,6 @@ const (
 	FieldPluginID = "plugin_id"
 	// FieldTaskType holds the string denoting the task_type field in the database.
 	FieldTaskType = "task_type"
-	// FieldMethod holds the string denoting the method field in the database.
-	FieldMethod = "method"
-	// FieldEndpoint holds the string denoting the endpoint field in the database.
-	FieldEndpoint = "endpoint"
-	// FieldModel holds the string denoting the model field in the database.
-	FieldModel = "model"
-	// FieldHTTPStatus holds the string denoting the http_status field in the database.
-	FieldHTTPStatus = "http_status"
-	// FieldUpstreamStatus holds the string denoting the upstream_status field in the database.
-	FieldUpstreamStatus = "upstream_status"
 	// FieldErrorCode holds the string denoting the error_code field in the database.
 	FieldErrorCode = "error_code"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -97,24 +77,14 @@ var Columns = []string{
 	FieldSource,
 	FieldSubjectType,
 	FieldSubjectID,
-	FieldFingerprint,
+	FieldHash,
 	FieldTitle,
 	FieldMessage,
-	FieldAPIKeyID,
-	FieldAPIKeyNameSnapshot,
-	FieldUserID,
-	FieldUserEmailSnapshot,
-	FieldGroupID,
 	FieldAccountID,
 	FieldAccountNameSnapshot,
 	FieldPlatform,
 	FieldPluginID,
 	FieldTaskType,
-	FieldMethod,
-	FieldEndpoint,
-	FieldModel,
-	FieldHTTPStatus,
-	FieldUpstreamStatus,
 	FieldErrorCode,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -151,8 +121,8 @@ var (
 	DefaultSubjectID string
 	// SubjectIDValidator is a validator for the "subject_id" field. It is called by the builders before save.
 	SubjectIDValidator func(string) error
-	// FingerprintValidator is a validator for the "fingerprint" field. It is called by the builders before save.
-	FingerprintValidator func(string) error
+	// HashValidator is a validator for the "hash" field. It is called by the builders before save.
+	HashValidator func(string) error
 	// DefaultTitle holds the default value on creation for the "title" field.
 	DefaultTitle string
 	// TitleValidator is a validator for the "title" field. It is called by the builders before save.
@@ -161,14 +131,6 @@ var (
 	DefaultMessage string
 	// MessageValidator is a validator for the "message" field. It is called by the builders before save.
 	MessageValidator func(string) error
-	// DefaultAPIKeyNameSnapshot holds the default value on creation for the "api_key_name_snapshot" field.
-	DefaultAPIKeyNameSnapshot string
-	// APIKeyNameSnapshotValidator is a validator for the "api_key_name_snapshot" field. It is called by the builders before save.
-	APIKeyNameSnapshotValidator func(string) error
-	// DefaultUserEmailSnapshot holds the default value on creation for the "user_email_snapshot" field.
-	DefaultUserEmailSnapshot string
-	// UserEmailSnapshotValidator is a validator for the "user_email_snapshot" field. It is called by the builders before save.
-	UserEmailSnapshotValidator func(string) error
 	// DefaultAccountNameSnapshot holds the default value on creation for the "account_name_snapshot" field.
 	DefaultAccountNameSnapshot string
 	// AccountNameSnapshotValidator is a validator for the "account_name_snapshot" field. It is called by the builders before save.
@@ -185,18 +147,6 @@ var (
 	DefaultTaskType string
 	// TaskTypeValidator is a validator for the "task_type" field. It is called by the builders before save.
 	TaskTypeValidator func(string) error
-	// DefaultMethod holds the default value on creation for the "method" field.
-	DefaultMethod string
-	// MethodValidator is a validator for the "method" field. It is called by the builders before save.
-	MethodValidator func(string) error
-	// DefaultEndpoint holds the default value on creation for the "endpoint" field.
-	DefaultEndpoint string
-	// EndpointValidator is a validator for the "endpoint" field. It is called by the builders before save.
-	EndpointValidator func(string) error
-	// DefaultModel holds the default value on creation for the "model" field.
-	DefaultModel string
-	// ModelValidator is a validator for the "model" field. It is called by the builders before save.
-	ModelValidator func(string) error
 	// DefaultErrorCode holds the default value on creation for the "error_code" field.
 	DefaultErrorCode string
 	// ErrorCodeValidator is a validator for the "error_code" field. It is called by the builders before save.
@@ -220,7 +170,6 @@ type Type string
 
 // Type values.
 const (
-	TypeAPIRequestError      Type = "api_request_error"
 	TypeSchedulerError       Type = "scheduler_error"
 	TypeUpstreamAccountError Type = "upstream_account_error"
 	TypePluginError          Type = "plugin_error"
@@ -235,7 +184,7 @@ func (_type Type) String() string {
 // TypeValidator is a validator for the "type" field enum values. It is called by the builders before save.
 func TypeValidator(_type Type) error {
 	switch _type {
-	case TypeAPIRequestError, TypeSchedulerError, TypeUpstreamAccountError, TypePluginError, TypeTaskError, TypeSystemError:
+	case TypeSchedulerError, TypeUpstreamAccountError, TypePluginError, TypeTaskError, TypeSystemError:
 		return nil
 	default:
 		return fmt.Errorf("monitorevent: invalid enum value for type field: %q", _type)
@@ -334,9 +283,9 @@ func BySubjectID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSubjectID, opts...).ToFunc()
 }
 
-// ByFingerprint orders the results by the fingerprint field.
-func ByFingerprint(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldFingerprint, opts...).ToFunc()
+// ByHash orders the results by the hash field.
+func ByHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHash, opts...).ToFunc()
 }
 
 // ByTitle orders the results by the title field.
@@ -347,31 +296,6 @@ func ByTitle(opts ...sql.OrderTermOption) OrderOption {
 // ByMessage orders the results by the message field.
 func ByMessage(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMessage, opts...).ToFunc()
-}
-
-// ByAPIKeyID orders the results by the api_key_id field.
-func ByAPIKeyID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldAPIKeyID, opts...).ToFunc()
-}
-
-// ByAPIKeyNameSnapshot orders the results by the api_key_name_snapshot field.
-func ByAPIKeyNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldAPIKeyNameSnapshot, opts...).ToFunc()
-}
-
-// ByUserID orders the results by the user_id field.
-func ByUserID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUserID, opts...).ToFunc()
-}
-
-// ByUserEmailSnapshot orders the results by the user_email_snapshot field.
-func ByUserEmailSnapshot(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUserEmailSnapshot, opts...).ToFunc()
-}
-
-// ByGroupID orders the results by the group_id field.
-func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
 }
 
 // ByAccountID orders the results by the account_id field.
@@ -397,31 +321,6 @@ func ByPluginID(opts ...sql.OrderTermOption) OrderOption {
 // ByTaskType orders the results by the task_type field.
 func ByTaskType(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTaskType, opts...).ToFunc()
-}
-
-// ByMethod orders the results by the method field.
-func ByMethod(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldMethod, opts...).ToFunc()
-}
-
-// ByEndpoint orders the results by the endpoint field.
-func ByEndpoint(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldEndpoint, opts...).ToFunc()
-}
-
-// ByModel orders the results by the model field.
-func ByModel(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldModel, opts...).ToFunc()
-}
-
-// ByHTTPStatus orders the results by the http_status field.
-func ByHTTPStatus(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldHTTPStatus, opts...).ToFunc()
-}
-
-// ByUpstreamStatus orders the results by the upstream_status field.
-func ByUpstreamStatus(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUpstreamStatus, opts...).ToFunc()
 }
 
 // ByErrorCode orders the results by the error_code field.

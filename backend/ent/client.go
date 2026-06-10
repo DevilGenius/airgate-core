@@ -20,6 +20,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/balancelog"
 	"github.com/DevilGenius/airgate-core/ent/group"
 	"github.com/DevilGenius/airgate-core/ent/monitorevent"
+	"github.com/DevilGenius/airgate-core/ent/monitorrequestevent"
 	"github.com/DevilGenius/airgate-core/ent/plugin"
 	"github.com/DevilGenius/airgate-core/ent/pluginsource"
 	"github.com/DevilGenius/airgate-core/ent/proxy"
@@ -45,6 +46,8 @@ type Client struct {
 	Group *GroupClient
 	// MonitorEvent is the client for interacting with the MonitorEvent builders.
 	MonitorEvent *MonitorEventClient
+	// MonitorRequestEvent is the client for interacting with the MonitorRequestEvent builders.
+	MonitorRequestEvent *MonitorRequestEventClient
 	// Plugin is the client for interacting with the Plugin builders.
 	Plugin *PluginClient
 	// PluginSource is the client for interacting with the PluginSource builders.
@@ -77,6 +80,7 @@ func (c *Client) init() {
 	c.BalanceLog = NewBalanceLogClient(c.config)
 	c.Group = NewGroupClient(c.config)
 	c.MonitorEvent = NewMonitorEventClient(c.config)
+	c.MonitorRequestEvent = NewMonitorRequestEventClient(c.config)
 	c.Plugin = NewPluginClient(c.config)
 	c.PluginSource = NewPluginSourceClient(c.config)
 	c.Proxy = NewProxyClient(c.config)
@@ -175,21 +179,22 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:              ctx,
-		config:           cfg,
-		APIKey:           NewAPIKeyClient(cfg),
-		Account:          NewAccountClient(cfg),
-		BalanceLog:       NewBalanceLogClient(cfg),
-		Group:            NewGroupClient(cfg),
-		MonitorEvent:     NewMonitorEventClient(cfg),
-		Plugin:           NewPluginClient(cfg),
-		PluginSource:     NewPluginSourceClient(cfg),
-		Proxy:            NewProxyClient(cfg),
-		Setting:          NewSettingClient(cfg),
-		Task:             NewTaskClient(cfg),
-		UsageLog:         NewUsageLogClient(cfg),
-		User:             NewUserClient(cfg),
-		UserSubscription: NewUserSubscriptionClient(cfg),
+		ctx:                 ctx,
+		config:              cfg,
+		APIKey:              NewAPIKeyClient(cfg),
+		Account:             NewAccountClient(cfg),
+		BalanceLog:          NewBalanceLogClient(cfg),
+		Group:               NewGroupClient(cfg),
+		MonitorEvent:        NewMonitorEventClient(cfg),
+		MonitorRequestEvent: NewMonitorRequestEventClient(cfg),
+		Plugin:              NewPluginClient(cfg),
+		PluginSource:        NewPluginSourceClient(cfg),
+		Proxy:               NewProxyClient(cfg),
+		Setting:             NewSettingClient(cfg),
+		Task:                NewTaskClient(cfg),
+		UsageLog:            NewUsageLogClient(cfg),
+		User:                NewUserClient(cfg),
+		UserSubscription:    NewUserSubscriptionClient(cfg),
 	}, nil
 }
 
@@ -207,21 +212,22 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:              ctx,
-		config:           cfg,
-		APIKey:           NewAPIKeyClient(cfg),
-		Account:          NewAccountClient(cfg),
-		BalanceLog:       NewBalanceLogClient(cfg),
-		Group:            NewGroupClient(cfg),
-		MonitorEvent:     NewMonitorEventClient(cfg),
-		Plugin:           NewPluginClient(cfg),
-		PluginSource:     NewPluginSourceClient(cfg),
-		Proxy:            NewProxyClient(cfg),
-		Setting:          NewSettingClient(cfg),
-		Task:             NewTaskClient(cfg),
-		UsageLog:         NewUsageLogClient(cfg),
-		User:             NewUserClient(cfg),
-		UserSubscription: NewUserSubscriptionClient(cfg),
+		ctx:                 ctx,
+		config:              cfg,
+		APIKey:              NewAPIKeyClient(cfg),
+		Account:             NewAccountClient(cfg),
+		BalanceLog:          NewBalanceLogClient(cfg),
+		Group:               NewGroupClient(cfg),
+		MonitorEvent:        NewMonitorEventClient(cfg),
+		MonitorRequestEvent: NewMonitorRequestEventClient(cfg),
+		Plugin:              NewPluginClient(cfg),
+		PluginSource:        NewPluginSourceClient(cfg),
+		Proxy:               NewProxyClient(cfg),
+		Setting:             NewSettingClient(cfg),
+		Task:                NewTaskClient(cfg),
+		UsageLog:            NewUsageLogClient(cfg),
+		User:                NewUserClient(cfg),
+		UserSubscription:    NewUserSubscriptionClient(cfg),
 	}, nil
 }
 
@@ -251,9 +257,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.APIKey, c.Account, c.BalanceLog, c.Group, c.MonitorEvent, c.Plugin,
-		c.PluginSource, c.Proxy, c.Setting, c.Task, c.UsageLog, c.User,
-		c.UserSubscription,
+		c.APIKey, c.Account, c.BalanceLog, c.Group, c.MonitorEvent,
+		c.MonitorRequestEvent, c.Plugin, c.PluginSource, c.Proxy, c.Setting, c.Task,
+		c.UsageLog, c.User, c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -263,9 +269,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.APIKey, c.Account, c.BalanceLog, c.Group, c.MonitorEvent, c.Plugin,
-		c.PluginSource, c.Proxy, c.Setting, c.Task, c.UsageLog, c.User,
-		c.UserSubscription,
+		c.APIKey, c.Account, c.BalanceLog, c.Group, c.MonitorEvent,
+		c.MonitorRequestEvent, c.Plugin, c.PluginSource, c.Proxy, c.Setting, c.Task,
+		c.UsageLog, c.User, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -284,6 +290,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Group.mutate(ctx, m)
 	case *MonitorEventMutation:
 		return c.MonitorEvent.mutate(ctx, m)
+	case *MonitorRequestEventMutation:
+		return c.MonitorRequestEvent.mutate(ctx, m)
 	case *PluginMutation:
 		return c.Plugin.mutate(ctx, m)
 	case *PluginSourceMutation:
@@ -1159,6 +1167,139 @@ func (c *MonitorEventClient) mutate(ctx context.Context, m *MonitorEventMutation
 		return (&MonitorEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown MonitorEvent mutation op: %q", m.Op())
+	}
+}
+
+// MonitorRequestEventClient is a client for the MonitorRequestEvent schema.
+type MonitorRequestEventClient struct {
+	config
+}
+
+// NewMonitorRequestEventClient returns a client for the MonitorRequestEvent from the given config.
+func NewMonitorRequestEventClient(c config) *MonitorRequestEventClient {
+	return &MonitorRequestEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `monitorrequestevent.Hooks(f(g(h())))`.
+func (c *MonitorRequestEventClient) Use(hooks ...Hook) {
+	c.hooks.MonitorRequestEvent = append(c.hooks.MonitorRequestEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `monitorrequestevent.Intercept(f(g(h())))`.
+func (c *MonitorRequestEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MonitorRequestEvent = append(c.inters.MonitorRequestEvent, interceptors...)
+}
+
+// Create returns a builder for creating a MonitorRequestEvent entity.
+func (c *MonitorRequestEventClient) Create() *MonitorRequestEventCreate {
+	mutation := newMonitorRequestEventMutation(c.config, OpCreate)
+	return &MonitorRequestEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MonitorRequestEvent entities.
+func (c *MonitorRequestEventClient) CreateBulk(builders ...*MonitorRequestEventCreate) *MonitorRequestEventCreateBulk {
+	return &MonitorRequestEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MonitorRequestEventClient) MapCreateBulk(slice any, setFunc func(*MonitorRequestEventCreate, int)) *MonitorRequestEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MonitorRequestEventCreateBulk{err: fmt.Errorf("calling to MonitorRequestEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MonitorRequestEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MonitorRequestEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MonitorRequestEvent.
+func (c *MonitorRequestEventClient) Update() *MonitorRequestEventUpdate {
+	mutation := newMonitorRequestEventMutation(c.config, OpUpdate)
+	return &MonitorRequestEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MonitorRequestEventClient) UpdateOne(mre *MonitorRequestEvent) *MonitorRequestEventUpdateOne {
+	mutation := newMonitorRequestEventMutation(c.config, OpUpdateOne, withMonitorRequestEvent(mre))
+	return &MonitorRequestEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MonitorRequestEventClient) UpdateOneID(id int) *MonitorRequestEventUpdateOne {
+	mutation := newMonitorRequestEventMutation(c.config, OpUpdateOne, withMonitorRequestEventID(id))
+	return &MonitorRequestEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MonitorRequestEvent.
+func (c *MonitorRequestEventClient) Delete() *MonitorRequestEventDelete {
+	mutation := newMonitorRequestEventMutation(c.config, OpDelete)
+	return &MonitorRequestEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MonitorRequestEventClient) DeleteOne(mre *MonitorRequestEvent) *MonitorRequestEventDeleteOne {
+	return c.DeleteOneID(mre.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MonitorRequestEventClient) DeleteOneID(id int) *MonitorRequestEventDeleteOne {
+	builder := c.Delete().Where(monitorrequestevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MonitorRequestEventDeleteOne{builder}
+}
+
+// Query returns a query builder for MonitorRequestEvent.
+func (c *MonitorRequestEventClient) Query() *MonitorRequestEventQuery {
+	return &MonitorRequestEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMonitorRequestEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MonitorRequestEvent entity by its id.
+func (c *MonitorRequestEventClient) Get(ctx context.Context, id int) (*MonitorRequestEvent, error) {
+	return c.Query().Where(monitorrequestevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MonitorRequestEventClient) GetX(ctx context.Context, id int) *MonitorRequestEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *MonitorRequestEventClient) Hooks() []Hook {
+	return c.hooks.MonitorRequestEvent
+}
+
+// Interceptors returns the client interceptors.
+func (c *MonitorRequestEventClient) Interceptors() []Interceptor {
+	return c.inters.MonitorRequestEvent
+}
+
+func (c *MonitorRequestEventClient) mutate(ctx context.Context, m *MonitorRequestEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MonitorRequestEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MonitorRequestEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MonitorRequestEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MonitorRequestEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MonitorRequestEvent mutation op: %q", m.Op())
 	}
 }
 
@@ -2421,11 +2562,12 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Account, BalanceLog, Group, MonitorEvent, Plugin, PluginSource, Proxy,
-		Setting, Task, UsageLog, User, UserSubscription []ent.Hook
+		APIKey, Account, BalanceLog, Group, MonitorEvent, MonitorRequestEvent, Plugin,
+		PluginSource, Proxy, Setting, Task, UsageLog, User, UserSubscription []ent.Hook
 	}
 	inters struct {
-		APIKey, Account, BalanceLog, Group, MonitorEvent, Plugin, PluginSource, Proxy,
-		Setting, Task, UsageLog, User, UserSubscription []ent.Interceptor
+		APIKey, Account, BalanceLog, Group, MonitorEvent, MonitorRequestEvent, Plugin,
+		PluginSource, Proxy, Setting, Task, UsageLog, User,
+		UserSubscription []ent.Interceptor
 	}
 )

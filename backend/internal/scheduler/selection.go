@@ -156,21 +156,12 @@ func (s *Scheduler) recordNoAvailableAccount(ctx context.Context, platform, mode
 		Source:      monitoring.SourceScheduler,
 		SubjectType: monitoring.SubjectScheduler,
 		SubjectID:   subjectID,
-		GroupID:     positiveIntPtr(groupID),
 		Platform:    platform,
-		Model:       model,
 		ErrorCode:   "no_available_account",
 		Title:       "No available account",
 		Message:     "Scheduler could not find an available upstream account",
 		Detail:      detail,
 	})
-}
-
-func positiveIntPtr(value int) *int {
-	if value <= 0 {
-		return nil
-	}
-	return &value
 }
 
 func (s *Scheduler) selectPreviousResponseAffinity(

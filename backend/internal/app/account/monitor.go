@@ -55,7 +55,6 @@ func (s *Service) recordConnectivityTestFailure(ctx context.Context, item Accoun
 		AccountID:           &accountID,
 		AccountNameSnapshot: item.Name,
 		Platform:            item.Platform,
-		Model:               modelID,
 		ErrorCode:           code,
 		Title:               "Account connectivity test failed",
 		Message:             message,

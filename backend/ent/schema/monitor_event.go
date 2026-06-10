@@ -14,7 +14,7 @@ type MonitorEvent struct {
 func (MonitorEvent) Fields() []ent.Field {
 	return []ent.Field{
 		field.Enum("type").
-			Values("api_request_error", "scheduler_error", "upstream_account_error", "plugin_error", "task_error", "system_error"),
+			Values("scheduler_error", "upstream_account_error", "plugin_error", "task_error", "system_error"),
 		field.Enum("severity").
 			Values("warning", "error", "critical").
 			Default("warning"),
@@ -24,24 +24,14 @@ func (MonitorEvent) Fields() []ent.Field {
 		field.String("source").Default("").MaxLen(64),
 		field.String("subject_type").Default("").MaxLen(64),
 		field.String("subject_id").Default("").MaxLen(128),
-		field.String("fingerprint").NotEmpty().MaxLen(64),
+		field.String("hash").NotEmpty().MaxLen(64),
 		field.String("title").Default("").MaxLen(160),
 		field.String("message").Default("").MaxLen(500),
-		field.Int("api_key_id").Optional().Nillable(),
-		field.String("api_key_name_snapshot").Default("").MaxLen(255),
-		field.Int("user_id").Optional().Nillable(),
-		field.String("user_email_snapshot").Default("").MaxLen(255),
-		field.Int("group_id").Optional().Nillable(),
 		field.Int("account_id").Optional().Nillable(),
 		field.String("account_name_snapshot").Default("").MaxLen(255),
 		field.String("platform").Default("").MaxLen(128),
 		field.String("plugin_id").Default("").MaxLen(128),
 		field.String("task_type").Default("").MaxLen(128),
-		field.String("method").Default("").MaxLen(64),
-		field.String("endpoint").Default("").MaxLen(256),
-		field.String("model").Default("").MaxLen(128),
-		field.Int("http_status").Optional().Nillable(),
-		field.Int("upstream_status").Optional().Nillable(),
 		field.String("error_code").Default("").MaxLen(64),
 		field.Time("created_at").Default(timeNow),
 		field.Time("updated_at").Default(timeNow),
@@ -62,8 +52,7 @@ func (MonitorEvent) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("status", "severity", "updated_at"),
 		index.Fields("status", "type", "updated_at"),
-		index.Fields("fingerprint"),
-		index.Fields("api_key_id", "updated_at"),
+		index.Fields("hash"),
 		index.Fields("account_id", "status", "updated_at"),
 		index.Fields("platform", "plugin_id", "status", "updated_at"),
 		index.Fields("status", "auto_resolve_at"),

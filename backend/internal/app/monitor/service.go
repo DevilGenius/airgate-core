@@ -17,6 +17,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
 )
 
 const (
@@ -28,6 +29,8 @@ const (
 	maxSubjectIDLength   = 128
 	maxPlatformLength    = 128
 	maxEndpointLength    = 256
+	maxRequestIDLength   = 128
+	maxFingerprintLength = 128
 	maxSnapshotLength    = 255
 	maxDetailJSONBytes   = 4 * 1024
 	maxDetailArrayItems  = 5
@@ -190,6 +193,25 @@ func (s *Service) Record(ctx context.Context, input monitoring.EventInput) {
 	}
 }
 
+// RecordRequest implements requestmonitoring.Recorder. It is intentionally
+// async and best-effort so request forwarding does not depend on monitor storage.
+func (s *Service) RecordRequest(ctx context.Context, input requestmonitoring.EventInput) {
+	if s == nil {
+		return
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return
+	}
+	event := s.normalizeRequestInput(input)
+	select {
+	case s.queue <- queuedOperation{Kind: queuedOperationRecordRequest, RequestEvent: event}:
+		s.queuedEvents.Add(1)
+	default:
+		dropped := s.droppedEvents.Add(1)
+		s.logDrop(dropped)
+	}
+}
+
 // ResolveBySubject schedules active events for a subject to be resolved. It is
 // intentionally best-effort and never performs database work in the caller path.
 func (s *Service) ResolveBySubject(ctx context.Context, query monitoring.ResolveQuery) {
@@ -223,6 +245,28 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	}
 	filter.Limit = normalizeListLimit(filter.Limit)
 	return s.repo.List(ctx, filter)
+}
+
+// ListRequests returns a cursor page of request monitor events.
+func (s *Service) ListRequests(ctx context.Context, filter RequestListFilter) (RequestListResult, error) {
+	if s == nil || s.repo == nil {
+		return RequestListResult{}, nil
+	}
+	filter.Limit = normalizeListLimit(filter.Limit)
+	return s.repo.ListRequests(ctx, filter)
+}
+
+// ClearRequestEvents deletes request monitor rows. A nil before value clears all rows.
+func (s *Service) ClearRequestEvents(ctx context.Context, before *time.Time) (int, error) {
+	if s == nil || s.repo == nil {
+		return 0, nil
+	}
+	deleted, err := s.repo.ClearRequestEvents(ctx, before)
+	if err != nil {
+		return 0, err
+	}
+	s.publishMonitorChanged("request_cleared")
+	return deleted, nil
 }
 
 // Summary returns the active event overview for future dashboard handlers.
@@ -274,7 +318,7 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 	subjectType := truncateString(defaultString(input.SubjectType, monitoring.SubjectSystem), maxSubjectTypeLength)
 	source := truncateString(defaultString(input.Source, monitoring.SourceMonitorWorker), maxSourceLength)
 	subjectID := inferSubjectID(input, subjectType)
-	detail := sanitizeDetail(detailWithRequestPath(input.Detail, input.RequestPath))
+	detail := sanitizeDetail(input.Detail)
 
 	title := scrubText(input.Title)
 	if strings.TrimSpace(title) == "" {
@@ -291,6 +335,46 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 		SubjectID:           subjectID,
 		Title:               truncateString(title, maxTitleLength),
 		Message:             truncateString(message, maxMessageLength),
+		AccountID:           cloneIntPtr(input.AccountID),
+		AccountNameSnapshot: truncateString(input.AccountNameSnapshot, maxSnapshotLength),
+		Platform:            truncateString(input.Platform, maxPlatformLength),
+		PluginID:            truncateString(input.PluginID, maxPlatformLength),
+		TaskType:            truncateString(input.TaskType, maxPlatformLength),
+		ErrorCode:           truncateString(input.ErrorCode, maxCodeLength),
+		CreatedAt:           observedAt,
+		UpdatedAt:           observedAt,
+		ExpiresAt:           observedAt.Add(s.retention),
+		Detail:              detail,
+	}
+	event.Hash = hashFor(input.HashMaterial, event)
+	event.AutoResolveAt = resolveAtFor(input.AutoResolveAt, event.Type, observedAt)
+	return QueuedEvent{Event: event}
+}
+
+func (s *Service) normalizeRequestInput(input requestmonitoring.EventInput) QueuedRequestEvent {
+	observedAt := input.ObservedAt
+	if observedAt.IsZero() {
+		observedAt = time.Now()
+	}
+	eventType := normalizeRequestType(input.Type)
+	severity := normalizeRequestSeverity(input.Severity)
+	source := truncateString(defaultString(input.Source, monitoring.SourceForwarder), maxSourceLength)
+	detail := sanitizeDetail(detailWithRequestPath(input.Detail, input.RequestPath))
+
+	title := scrubText(input.Title)
+	if strings.TrimSpace(title) == "" {
+		title = defaultRequestTitle(eventType)
+	}
+	message := scrubText(input.Message)
+
+	event := RequestEvent{
+		Type:                eventType,
+		Severity:            severity,
+		Source:              source,
+		Fingerprint:         truncateString(input.Fingerprint, maxFingerprintLength),
+		Title:               truncateString(title, maxTitleLength),
+		Message:             truncateString(message, maxMessageLength),
+		RequestID:           truncateString(input.RequestID, maxRequestIDLength),
 		APIKeyID:            cloneIntPtr(input.APIKeyID),
 		APIKeyNameSnapshot:  truncateString(input.APIKeyNameSnapshot, maxSnapshotLength),
 		UserID:              cloneIntPtr(input.UserID),
@@ -300,21 +384,19 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 		AccountNameSnapshot: truncateString(input.AccountNameSnapshot, maxSnapshotLength),
 		Platform:            truncateString(input.Platform, maxPlatformLength),
 		PluginID:            truncateString(input.PluginID, maxPlatformLength),
-		TaskType:            truncateString(input.TaskType, maxPlatformLength),
 		Method:              truncateString(strings.ToUpper(strings.TrimSpace(input.Method)), maxCodeLength),
 		Endpoint:            truncateString(input.Endpoint, maxEndpointLength),
 		Model:               truncateString(input.Model, maxPlatformLength),
 		HTTPStatus:          cloneIntPtr(input.HTTPStatus),
 		UpstreamStatus:      cloneIntPtr(input.UpstreamStatus),
 		ErrorCode:           truncateString(input.ErrorCode, maxCodeLength),
+		DurationMS:          maxInt64(input.DurationMS, 0),
 		CreatedAt:           observedAt,
-		UpdatedAt:           observedAt,
 		ExpiresAt:           observedAt.Add(s.retention),
 		Detail:              detail,
 	}
-	event.Fingerprint = fingerprintFor(input.FingerprintMaterial, event)
-	event.AutoResolveAt = resolveAtFor(input.AutoResolveAt, event.Type, observedAt)
-	return QueuedEvent{Event: event}
+	event.Hash = requestHashFor(input.HashMaterial, event)
+	return QueuedRequestEvent{RequestEvent: event}
 }
 
 func (s *Service) logDrop(total int64) {
@@ -340,8 +422,6 @@ func normalizeListLimit(limit int) int {
 
 func normalizeType(eventType string) string {
 	switch strings.TrimSpace(eventType) {
-	case monitoring.TypeAPIRequestError:
-		return monitoring.TypeAPIRequestError
 	case monitoring.TypeSchedulerError:
 		return monitoring.TypeSchedulerError
 	case monitoring.TypeUpstreamAccountError:
@@ -354,6 +434,23 @@ func normalizeType(eventType string) string {
 		return monitoring.TypeSystemError
 	default:
 		return monitoring.TypeSystemError
+	}
+}
+
+func normalizeRequestType(eventType string) string {
+	switch strings.TrimSpace(eventType) {
+	case requestmonitoring.TypeAPIRequestError:
+		return requestmonitoring.TypeAPIRequestError
+	case requestmonitoring.TypePluginRouteError:
+		return requestmonitoring.TypePluginRouteError
+	case requestmonitoring.TypePluginForwardError:
+		return requestmonitoring.TypePluginForwardError
+	case requestmonitoring.TypeClientRequestError:
+		return requestmonitoring.TypeClientRequestError
+	case requestmonitoring.TypeClientClosed:
+		return requestmonitoring.TypeClientClosed
+	default:
+		return requestmonitoring.TypeAPIRequestError
 	}
 }
 
@@ -370,22 +467,25 @@ func normalizeSeverity(severity string) string {
 	}
 }
 
+func normalizeRequestSeverity(severity string) string {
+	switch strings.TrimSpace(severity) {
+	case requestmonitoring.SeverityWarning:
+		return requestmonitoring.SeverityWarning
+	case requestmonitoring.SeverityInfo:
+		return requestmonitoring.SeverityInfo
+	default:
+		return requestmonitoring.SeverityInfo
+	}
+}
+
 func inferSubjectID(input monitoring.EventInput, subjectType string) string {
 	if input.SubjectID != "" {
 		return truncateString(input.SubjectID, maxSubjectIDLength)
 	}
 	switch subjectType {
-	case monitoring.SubjectAPIKey:
-		if input.APIKeyID != nil {
-			return strconv.Itoa(*input.APIKeyID)
-		}
 	case monitoring.SubjectAccount:
 		if input.AccountID != nil {
 			return strconv.Itoa(*input.AccountID)
-		}
-	case monitoring.SubjectUser:
-		if input.UserID != nil {
-			return strconv.Itoa(*input.UserID)
 		}
 	case monitoring.SubjectPlugin:
 		if input.PluginID != "" {
@@ -399,32 +499,49 @@ func inferSubjectID(input monitoring.EventInput, subjectType string) string {
 	return ""
 }
 
-func fingerprintFor(material string, event Event) string {
+func hashFor(material string, event Event) string {
 	if strings.TrimSpace(material) == "" {
-		material = defaultFingerprintMaterial(event)
+		material = defaultHashMaterial(event)
 	}
 	sum := sha256.Sum256([]byte(material))
 	return hex.EncodeToString(sum[:])
 }
 
-func defaultFingerprintMaterial(event Event) string {
+func defaultHashMaterial(event Event) string {
 	switch event.Type {
-	case monitoring.TypeAPIRequestError:
-		return joinFingerprintParts(event.Type, intPtrValue(event.APIKeyID), event.Method, event.Endpoint, event.ErrorCode)
 	case monitoring.TypeUpstreamAccountError:
-		return joinFingerprintParts(event.Type, intPtrValue(event.AccountID), event.ErrorCode)
+		return joinHashParts(event.Type, intPtrValue(event.AccountID), event.ErrorCode)
 	case monitoring.TypeSchedulerError:
-		return joinFingerprintParts(event.Type, event.Platform, event.Model, intPtrValue(event.GroupID), event.ErrorCode)
+		return joinHashParts(event.Type, event.Platform, event.SubjectID, event.ErrorCode)
 	case monitoring.TypePluginError:
-		return joinFingerprintParts(event.Type, event.PluginID, event.Endpoint, event.ErrorCode)
+		return joinHashParts(event.Type, event.PluginID, event.ErrorCode)
 	case monitoring.TypeTaskError:
-		return joinFingerprintParts(event.Type, event.PluginID, event.TaskType, event.ErrorCode)
+		return joinHashParts(event.Type, event.PluginID, event.TaskType, event.ErrorCode)
 	default:
-		return joinFingerprintParts(event.Type, event.Source, event.SubjectType, event.SubjectID, event.ErrorCode)
+		return joinHashParts(event.Type, event.Source, event.SubjectType, event.SubjectID, event.ErrorCode)
 	}
 }
 
-func joinFingerprintParts(parts ...string) string {
+func requestHashFor(material string, event RequestEvent) string {
+	if strings.TrimSpace(material) == "" {
+		material = defaultRequestHashMaterial(event)
+	}
+	sum := sha256.Sum256([]byte(material))
+	return hex.EncodeToString(sum[:])
+}
+
+func defaultRequestHashMaterial(event RequestEvent) string {
+	switch event.Type {
+	case requestmonitoring.TypePluginForwardError:
+		return joinHashParts(event.Type, event.PluginID, intPtrValue(event.AccountID), event.Endpoint, event.ErrorCode)
+	case requestmonitoring.TypeClientClosed:
+		return joinHashParts(event.Type, intPtrValue(event.APIKeyID), event.Method, event.Endpoint)
+	default:
+		return joinHashParts(event.Type, intPtrValue(event.APIKeyID), event.Method, event.Endpoint, event.ErrorCode, intPtrValue(event.HTTPStatus))
+	}
+}
+
+func joinHashParts(parts ...string) string {
 	return strings.Join(parts, "\x1f")
 }
 
@@ -439,8 +556,6 @@ func resolveAtFor(input *time.Time, eventType string, observedAt time.Time) *tim
 
 func autoResolveWindow(eventType string) time.Duration {
 	switch eventType {
-	case monitoring.TypeAPIRequestError:
-		return 30 * time.Minute
 	case monitoring.TypeSchedulerError:
 		return 15 * time.Minute
 	case monitoring.TypeUpstreamAccountError:
@@ -456,8 +571,6 @@ func autoResolveWindow(eventType string) time.Duration {
 
 func defaultTitle(eventType string) string {
 	switch eventType {
-	case monitoring.TypeAPIRequestError:
-		return "API request error"
 	case monitoring.TypeSchedulerError:
 		return "Scheduler error"
 	case monitoring.TypeUpstreamAccountError:
@@ -468,6 +581,21 @@ func defaultTitle(eventType string) string {
 		return "Task error"
 	default:
 		return "System monitor event"
+	}
+}
+
+func defaultRequestTitle(eventType string) string {
+	switch eventType {
+	case requestmonitoring.TypePluginRouteError:
+		return "Plugin route error"
+	case requestmonitoring.TypePluginForwardError:
+		return "Plugin forward error"
+	case requestmonitoring.TypeClientRequestError:
+		return "Client request error"
+	case requestmonitoring.TypeClientClosed:
+		return "Client closed request"
+	default:
+		return "API request error"
 	}
 }
 
@@ -649,7 +777,6 @@ func cloneIntPtr(value *int) *int {
 }
 
 func cloneResolveQuery(query monitoring.ResolveQuery) monitoring.ResolveQuery {
-	query.APIKeyID = cloneIntPtr(query.APIKeyID)
 	query.AccountID = cloneIntPtr(query.AccountID)
 	return query
 }
@@ -663,6 +790,13 @@ func intPtrValue(value *int) string {
 
 func minInt(a, b int) int {
 	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxInt64(a, b int64) int64 {
+	if a > b {
 		return a
 	}
 	return b

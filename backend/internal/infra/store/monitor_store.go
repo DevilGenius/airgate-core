@@ -27,7 +27,7 @@ func NewMonitorStore(db *ent.Client) *MonitorStore {
 	return &MonitorStore{db: db}
 }
 
-// InsertBatch appends monitor events. Fingerprints are classification keys only,
+// InsertBatch appends monitor events. Hashes are classification keys only,
 // not uniqueness keys.
 func (s *MonitorStore) InsertBatch(ctx context.Context, events []appmonitor.QueuedEvent) error {
 	if s == nil || s.db == nil || len(events) == 0 {
@@ -35,7 +35,7 @@ func (s *MonitorStore) InsertBatch(ctx context.Context, events []appmonitor.Queu
 	}
 	builders := make([]*ent.MonitorEventCreate, 0, len(events))
 	for _, event := range events {
-		if event.Fingerprint == "" {
+		if event.Hash == "" {
 			continue
 		}
 		builders = append(builders, setMonitorCreateFields(s.db.MonitorEvent.Create(), event))
@@ -268,10 +268,6 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
-	topAPIKeys, err := s.summaryTopAPIKeys(ctx, base.Clone())
-	if err != nil {
-		return appmonitor.Summary{}, err
-	}
 	topAccounts, err := s.summaryTopAccounts(ctx, base.Clone())
 	if err != nil {
 		return appmonitor.Summary{}, err
@@ -294,7 +290,6 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 		ErrorTotal:    int64(errorTotal),
 		WarningTotal:  int64(warningTotal),
 		ByType:        byType,
-		TopAPIKeys:    topAPIKeys,
 		TopAccounts:   topAccounts,
 		Recent:        recent,
 	}, nil
@@ -322,32 +317,6 @@ func (s *MonitorStore) summaryByType(ctx context.Context, query *ent.MonitorEven
 		return out[i].Count > out[j].Count
 	})
 	return out, nil
-}
-
-func (s *MonitorStore) summaryTopAPIKeys(ctx context.Context, query *ent.MonitorEventQuery) ([]appmonitor.SubjectCount, error) {
-	var rows []struct {
-		APIKeyID           int    `json:"api_key_id"`
-		APIKeyNameSnapshot string `json:"api_key_name_snapshot"`
-		Count              int    `json:"count"`
-	}
-	err := query.
-		Where(entmonitorevent.APIKeyIDNotNil()).
-		GroupBy(entmonitorevent.FieldAPIKeyID, entmonitorevent.FieldAPIKeyNameSnapshot).
-		Aggregate(ent.As(ent.Count(), "count")).
-		Scan(ctx, &rows)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]appmonitor.SubjectCount, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, appmonitor.SubjectCount{
-			ID:    row.APIKeyID,
-			Name:  row.APIKeyNameSnapshot,
-			Count: int64(row.Count),
-		})
-	}
-	sortSubjectCounts(out)
-	return limitSubjectCounts(out, monitorSummaryTopLimit), nil
 }
 
 func (s *MonitorStore) summaryTopAccounts(ctx context.Context, query *ent.MonitorEventQuery) ([]appmonitor.SubjectCount, error) {
@@ -392,9 +361,6 @@ func applyMonitorListFilter(query *ent.MonitorEventQuery, filter appmonitor.List
 	if filter.SubjectType != "" {
 		query = query.Where(entmonitorevent.SubjectTypeEQ(filter.SubjectType))
 	}
-	if filter.APIKeyID != nil {
-		query = query.Where(entmonitorevent.APIKeyIDEQ(*filter.APIKeyID))
-	}
 	if filter.AccountID != nil {
 		query = query.Where(entmonitorevent.AccountIDEQ(*filter.AccountID))
 	}
@@ -406,9 +372,6 @@ func applyMonitorListFilter(query *ent.MonitorEventQuery, filter appmonitor.List
 	}
 	if filter.TaskType != "" {
 		query = query.Where(entmonitorevent.TaskTypeEQ(filter.TaskType))
-	}
-	if filter.Endpoint != "" {
-		query = query.Where(entmonitorevent.EndpointEQ(filter.Endpoint))
 	}
 	if filter.ErrorCode != "" {
 		query = query.Where(entmonitorevent.ErrorCodeEQ(filter.ErrorCode))
@@ -433,9 +396,6 @@ func monitorResolvePredicates(query monitoring.ResolveQuery) []predicate.Monitor
 	if query.SubjectID != "" {
 		preds = append(preds, entmonitorevent.SubjectIDEQ(query.SubjectID))
 	}
-	if query.APIKeyID != nil {
-		preds = append(preds, entmonitorevent.APIKeyIDEQ(*query.APIKeyID))
-	}
 	if query.AccountID != nil {
 		preds = append(preds, entmonitorevent.AccountIDEQ(*query.AccountID))
 	}
@@ -459,24 +419,14 @@ func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.Que
 		SetSource(event.Source).
 		SetSubjectType(event.SubjectType).
 		SetSubjectID(event.SubjectID).
-		SetFingerprint(event.Fingerprint).
+		SetHash(event.Hash).
 		SetTitle(event.Title).
 		SetMessage(event.Message).
-		SetNillableAPIKeyID(event.APIKeyID).
-		SetAPIKeyNameSnapshot(event.APIKeyNameSnapshot).
-		SetNillableUserID(event.UserID).
-		SetUserEmailSnapshot(event.UserEmailSnapshot).
-		SetNillableGroupID(event.GroupID).
 		SetNillableAccountID(event.AccountID).
 		SetAccountNameSnapshot(event.AccountNameSnapshot).
 		SetPlatform(event.Platform).
 		SetPluginID(event.PluginID).
 		SetTaskType(event.TaskType).
-		SetMethod(event.Method).
-		SetEndpoint(event.Endpoint).
-		SetModel(event.Model).
-		SetNillableHTTPStatus(event.HTTPStatus).
-		SetNillableUpstreamStatus(event.UpstreamStatus).
 		SetErrorCode(event.ErrorCode).
 		SetCreatedAt(event.CreatedAt).
 		SetUpdatedAt(event.UpdatedAt).
@@ -505,24 +455,14 @@ func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 		Source:              row.Source,
 		SubjectType:         row.SubjectType,
 		SubjectID:           row.SubjectID,
-		Fingerprint:         row.Fingerprint,
+		Hash:                row.Hash,
 		Title:               row.Title,
 		Message:             row.Message,
-		APIKeyID:            row.APIKeyID,
-		APIKeyNameSnapshot:  row.APIKeyNameSnapshot,
-		UserID:              row.UserID,
-		UserEmailSnapshot:   row.UserEmailSnapshot,
-		GroupID:             row.GroupID,
 		AccountID:           row.AccountID,
 		AccountNameSnapshot: row.AccountNameSnapshot,
 		Platform:            row.Platform,
 		PluginID:            row.PluginID,
 		TaskType:            row.TaskType,
-		Method:              row.Method,
-		Endpoint:            row.Endpoint,
-		Model:               row.Model,
-		HTTPStatus:          row.HTTPStatus,
-		UpstreamStatus:      row.UpstreamStatus,
 		ErrorCode:           row.ErrorCode,
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,

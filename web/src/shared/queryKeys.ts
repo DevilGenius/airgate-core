@@ -21,6 +21,7 @@ export const queryKeys = {
   dashboardTrend: (...args: unknown[]) => ['dashboard-trend', ...args] as const,
   monitor: (...args: unknown[]) => ['monitor', ...args] as const,
   monitorSummary: () => ['monitor-summary'] as const,
+  monitorRequests: (...args: unknown[]) => ['monitor-requests', ...args] as const,
   usage: (...args: unknown[]) => ['usage', ...args] as const,
   userUsage: (...args: unknown[]) => ['user-usage', ...args] as const,
   settings: () => ['settings'] as const,

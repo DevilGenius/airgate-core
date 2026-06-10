@@ -41,6 +41,45 @@ func (h *MonitorHandler) ListMonitorEvents(c *gin.Context) {
 	response.Success(c, toMonitorListResp(result))
 }
 
+// ListMonitorRequestEvents returns cursor-paged request monitor events.
+func (h *MonitorHandler) ListMonitorRequestEvents(c *gin.Context) {
+	var query dto.MonitorRequestListQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	filter, ok := monitorRequestListFilterFromQuery(c, query)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.ListRequests(c.Request.Context(), filter)
+	if err != nil {
+		httpCode, message := handleMonitorError("查询请求监控事件列表失败", "查询失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, toMonitorRequestListResp(result))
+}
+
+// ClearMonitorRequestEvents deletes request monitor events. Without before it clears all request rows.
+func (h *MonitorHandler) ClearMonitorRequestEvents(c *gin.Context) {
+	before, err := parseMonitorTime(c.Query("before"), false)
+	if err != nil {
+		response.BadRequest(c, "before 时间格式错误，请使用 RFC3339 或 YYYY-MM-DD")
+		return
+	}
+
+	deleted, err := h.service.ClearRequestEvents(c.Request.Context(), before)
+	if err != nil {
+		httpCode, message := handleMonitorError("清理请求监控事件失败", "清理失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, dto.MonitorRequestClearResp{Deleted: deleted})
+}
+
 // GetMonitorEvent returns one monitor event.
 func (h *MonitorHandler) GetMonitorEvent(c *gin.Context) {
 	id, err := parseMonitorID(c.Param("id"))
@@ -125,16 +164,64 @@ func monitorListFilterFromQuery(c *gin.Context, query dto.MonitorListQuery) (app
 		Type:        query.Type,
 		Source:      query.Source,
 		SubjectType: query.SubjectType,
-		APIKeyID:    query.APIKeyID,
 		AccountID:   query.AccountID,
 		Platform:    query.Platform,
 		PluginID:    query.PluginID,
 		TaskType:    query.TaskType,
-		Endpoint:    query.Endpoint,
 		ErrorCode:   query.ErrorCode,
 		From:        from,
 		To:          to,
 		Limit:       query.Limit,
 		Cursor:      cursor,
+	}, true
+}
+
+func monitorRequestListFilterFromQuery(c *gin.Context, query dto.MonitorRequestListQuery) (appmonitor.RequestListFilter, bool) {
+	from, err := parseMonitorTime(query.From, false)
+	if err != nil {
+		response.BadRequest(c, "from 时间格式错误，请使用 RFC3339 或 YYYY-MM-DD")
+		return appmonitor.RequestListFilter{}, false
+	}
+	to, err := parseMonitorTime(query.To, true)
+	if err != nil {
+		response.BadRequest(c, "to 时间格式错误，请使用 RFC3339 或 YYYY-MM-DD")
+		return appmonitor.RequestListFilter{}, false
+	}
+
+	var cursor *appmonitor.RequestListCursor
+	cursorRaw := query.CursorCreatedAt
+	if cursorRaw == "" {
+		cursorRaw = query.Cursor
+	}
+	if cursorRaw != "" || query.CursorID > 0 {
+		cursorTime, err := parseMonitorTime(cursorRaw, false)
+		if err != nil || cursorTime == nil || query.CursorID <= 0 {
+			response.BadRequest(c, "cursor 参数无效")
+			return appmonitor.RequestListFilter{}, false
+		}
+		cursor = &appmonitor.RequestListCursor{
+			CreatedAt: *cursorTime,
+			ID:        query.CursorID,
+		}
+	}
+
+	return appmonitor.RequestListFilter{
+		Severity:       query.Severity,
+		Type:           query.Type,
+		Source:         query.Source,
+		APIKeyID:       query.APIKeyID,
+		AccountID:      query.AccountID,
+		Platform:       query.Platform,
+		PluginID:       query.PluginID,
+		Method:         query.Method,
+		Endpoint:       query.Endpoint,
+		Model:          query.Model,
+		HTTPStatus:     query.HTTPStatus,
+		UpstreamStatus: query.UpstreamStatus,
+		ErrorCode:      query.ErrorCode,
+		From:           from,
+		To:             to,
+		Limit:          query.Limit,
+		Cursor:         cursor,
 	}, true
 }

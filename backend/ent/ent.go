@@ -17,6 +17,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/balancelog"
 	"github.com/DevilGenius/airgate-core/ent/group"
 	"github.com/DevilGenius/airgate-core/ent/monitorevent"
+	"github.com/DevilGenius/airgate-core/ent/monitorrequestevent"
 	"github.com/DevilGenius/airgate-core/ent/plugin"
 	"github.com/DevilGenius/airgate-core/ent/pluginsource"
 	"github.com/DevilGenius/airgate-core/ent/proxy"
@@ -85,19 +86,20 @@ var (
 func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			apikey.Table:           apikey.ValidColumn,
-			account.Table:          account.ValidColumn,
-			balancelog.Table:       balancelog.ValidColumn,
-			group.Table:            group.ValidColumn,
-			monitorevent.Table:     monitorevent.ValidColumn,
-			plugin.Table:           plugin.ValidColumn,
-			pluginsource.Table:     pluginsource.ValidColumn,
-			proxy.Table:            proxy.ValidColumn,
-			setting.Table:          setting.ValidColumn,
-			task.Table:             task.ValidColumn,
-			usagelog.Table:         usagelog.ValidColumn,
-			user.Table:             user.ValidColumn,
-			usersubscription.Table: usersubscription.ValidColumn,
+			apikey.Table:              apikey.ValidColumn,
+			account.Table:             account.ValidColumn,
+			balancelog.Table:          balancelog.ValidColumn,
+			group.Table:               group.ValidColumn,
+			monitorevent.Table:        monitorevent.ValidColumn,
+			monitorrequestevent.Table: monitorrequestevent.ValidColumn,
+			plugin.Table:              plugin.ValidColumn,
+			pluginsource.Table:        pluginsource.ValidColumn,
+			proxy.Table:               proxy.ValidColumn,
+			setting.Table:             setting.ValidColumn,
+			task.Table:                task.ValidColumn,
+			usagelog.Table:            usagelog.ValidColumn,
+			user.Table:                user.ValidColumn,
+			usersubscription.Table:    usersubscription.ValidColumn,
 		})
 	})
 	return columnCheck(table, column)

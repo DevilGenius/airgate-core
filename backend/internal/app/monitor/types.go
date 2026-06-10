@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
 )
 
 const (
@@ -25,24 +26,14 @@ type Event struct {
 	Source              string
 	SubjectType         string
 	SubjectID           string
-	Fingerprint         string
+	Hash                string
 	Title               string
 	Message             string
-	APIKeyID            *int
-	APIKeyNameSnapshot  string
-	UserID              *int
-	UserEmailSnapshot   string
-	GroupID             *int
 	AccountID           *int
 	AccountNameSnapshot string
 	Platform            string
 	PluginID            string
 	TaskType            string
-	Method              string
-	Endpoint            string
-	Model               string
-	HTTPStatus          *int
-	UpstreamStatus      *int
 	ErrorCode           string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
@@ -61,17 +52,56 @@ type QueuedEvent struct {
 	Event
 }
 
+// RequestEvent is the request-level monitor event domain model.
+type RequestEvent struct {
+	ID                  int
+	Type                string
+	Severity            string
+	Source              string
+	Hash                string
+	Fingerprint         string
+	Title               string
+	Message             string
+	RequestID           string
+	APIKeyID            *int
+	APIKeyNameSnapshot  string
+	UserID              *int
+	UserEmailSnapshot   string
+	GroupID             *int
+	AccountID           *int
+	AccountNameSnapshot string
+	Platform            string
+	PluginID            string
+	Method              string
+	Endpoint            string
+	Model               string
+	HTTPStatus          *int
+	UpstreamStatus      *int
+	ErrorCode           string
+	DurationMS          int64
+	CreatedAt           time.Time
+	ExpiresAt           time.Time
+	Detail              map[string]interface{}
+}
+
+// QueuedRequestEvent is a normalized request monitor event waiting for async persistence.
+type QueuedRequestEvent struct {
+	RequestEvent
+}
+
 type queuedOperationKind string
 
 const (
-	queuedOperationRecord  queuedOperationKind = "record"
-	queuedOperationResolve queuedOperationKind = "resolve"
+	queuedOperationRecord        queuedOperationKind = "record"
+	queuedOperationRecordRequest queuedOperationKind = "record_request"
+	queuedOperationResolve       queuedOperationKind = "resolve"
 )
 
 type queuedOperation struct {
-	Kind    queuedOperationKind
-	Event   QueuedEvent
-	Resolve monitoring.ResolveQuery
+	Kind         queuedOperationKind
+	Event        QueuedEvent
+	RequestEvent QueuedRequestEvent
+	Resolve      monitoring.ResolveQuery
 }
 
 // ListFilter filters monitor events.
@@ -81,12 +111,10 @@ type ListFilter struct {
 	Type        string
 	Source      string
 	SubjectType string
-	APIKeyID    *int
 	AccountID   *int
 	Platform    string
 	PluginID    string
 	TaskType    string
-	Endpoint    string
 	ErrorCode   string
 	From        *time.Time
 	To          *time.Time
@@ -105,6 +133,40 @@ type ListResult struct {
 	List       []Event
 	HasMore    bool
 	NextCursor *ListCursor
+}
+
+// RequestListFilter filters request monitor events.
+type RequestListFilter struct {
+	Severity       string
+	Type           string
+	Source         string
+	APIKeyID       *int
+	AccountID      *int
+	Platform       string
+	PluginID       string
+	Method         string
+	Endpoint       string
+	Model          string
+	HTTPStatus     *int
+	UpstreamStatus *int
+	ErrorCode      string
+	From           *time.Time
+	To             *time.Time
+	Limit          int
+	Cursor         *RequestListCursor
+}
+
+// RequestListCursor is a stable cursor for created_at desc, id desc ordering.
+type RequestListCursor struct {
+	CreatedAt time.Time `json:"created_at"`
+	ID        int       `json:"id"`
+}
+
+// RequestListResult contains one request cursor page.
+type RequestListResult struct {
+	List       []RequestEvent
+	HasMore    bool
+	NextCursor *RequestListCursor
 }
 
 // TypeCount is a grouped active count.
@@ -127,7 +189,6 @@ type Summary struct {
 	ErrorTotal    int64
 	WarningTotal  int64
 	ByType        []TypeCount
-	TopAPIKeys    []SubjectCount
 	TopAccounts   []SubjectCount
 	Recent        []Event
 }
@@ -135,15 +196,21 @@ type Summary struct {
 // Repository defines monitor event persistence.
 type Repository interface {
 	InsertBatch(context.Context, []QueuedEvent) error
+	InsertRequestBatch(context.Context, []QueuedRequestEvent) error
 	ResolveBySubject(context.Context, monitoring.ResolveQuery) error
 	Get(context.Context, int) (Event, error)
 	Resolve(context.Context, int) error
 	Ignore(context.Context, int) error
 	List(context.Context, ListFilter) (ListResult, error)
+	ListRequests(context.Context, RequestListFilter) (RequestListResult, error)
+	ClearRequestEvents(context.Context, *time.Time) (int, error)
 	Summary(context.Context) (Summary, error)
 	CleanupExpired(context.Context, time.Time, int) (int, error)
+	CleanupExpiredRequests(context.Context, time.Time, int) (int, error)
 	AutoResolveDue(context.Context, time.Time, int) (int, error)
 	ListNotifyDue(context.Context, time.Time, int) ([]Event, error)
 	MarkNotified(context.Context, int, time.Time, time.Time) error
 	MarkNotifyFailed(context.Context, int, time.Time, string) error
 }
+
+var _ requestmonitoring.Recorder = (*Service)(nil)

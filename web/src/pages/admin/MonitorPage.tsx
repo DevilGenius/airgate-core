@@ -2,22 +2,28 @@ import { startTransition, useCallback, useEffect, useMemo, useState, type ReactN
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button, Card } from '@heroui/react';
-import { AlertTriangle, CheckCircle2, EyeOff, RefreshCw, ShieldAlert, TriangleAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, EyeOff, RefreshCw, ShieldAlert, Trash2, TriangleAlert } from 'lucide-react';
 import { monitorApi } from '../../shared/api/monitor';
 import { subscribeAdminEvents } from '../../shared/api/adminEvents';
-import { apikeysApi } from '../../shared/api/apikeys';
 import { queryKeys } from '../../shared/queryKeys';
 import { RecordsTable } from '../../shared/components/RecordsTable';
 import { TablePage } from '../../shared/components/TablePage';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
-import { SearchFilterComboBox } from '../../shared/components/SearchFilterComboBox';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { useToast } from '../../shared/ui';
 import { fmtNum } from '../../shared/columns/usageColumns';
-import type { APIKeyResp, MonitorCursorResp, MonitorEventResp, MonitorListQuery, MonitorSummaryResp } from '../../shared/types';
+import type {
+  MonitorCursorResp,
+  MonitorEventResp,
+  MonitorListQuery,
+  MonitorRequestCursorResp,
+  MonitorRequestEventResp,
+  MonitorRequestListQuery,
+  MonitorSummaryResp,
+} from '../../shared/types';
 
 type SelectOption = {
   id: string;
@@ -32,9 +38,18 @@ type MonitorColumnConfig = {
   render: (row: MonitorEventResp) => ReactNode;
 };
 
+type MonitorRequestColumnConfig = {
+  key: string;
+  title: ReactNode;
+  width?: string;
+  hideOnMobile?: boolean;
+  render: (row: MonitorRequestEventResp) => ReactNode;
+};
+
 const DEFAULT_PAGE_SIZE = 20;
 
 const SEVERITY_CLASSES: Record<string, string> = {
+  info: 'bg-sky-100 text-sky-700 ring-sky-200 dark:bg-sky-400/15 dark:text-sky-300 dark:ring-sky-400/25',
   critical: 'bg-danger/10 text-danger ring-danger/20',
   error: 'bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/25',
   warning: 'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
@@ -68,16 +83,42 @@ function monitorTimeLabels(value?: string) {
 }
 
 function monitorSubject(event: MonitorEventResp): string {
-  return event.api_key_name_snapshot
-    || event.account_name_snapshot
+  return event.account_name_snapshot
     || event.plugin_id
     || event.subject_id
     || '-';
 }
 
 function monitorLocator(event: MonitorEventResp): string {
+  return event.error_code || event.source || '-';
+}
+
+function monitorRequestSubject(event: MonitorRequestEventResp): string {
+  return event.api_key_name_snapshot
+    || event.account_name_snapshot
+    || event.plugin_id
+    || event.request_id
+    || '-';
+}
+
+function monitorRequestLocator(event: MonitorRequestEventResp): string {
   const endpoint = [event.method, event.endpoint].filter(Boolean).join(' ');
   return [endpoint, event.error_code].filter(Boolean).join(' / ') || event.source || '-';
+}
+
+function requestStatusLabel(event: MonitorRequestEventResp): string {
+  const status = event.http_status ? String(event.http_status) : '-';
+  if (!event.upstream_status || event.upstream_status === event.http_status) {
+    return status;
+  }
+  return `${status} / ${event.upstream_status}`;
+}
+
+function durationLabel(value?: number): string {
+  if (!value || value <= 0) {
+    return '-';
+  }
+  return `${value}ms`;
 }
 
 function statusLabel(t: ReturnType<typeof useTranslation>['t'], value: string): string {
@@ -162,30 +203,11 @@ export default function MonitorPage() {
   const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const [cursors, setCursors] = useState<Record<number, MonitorCursorResp | undefined>>({});
   const [filters, setFilters] = useState<Partial<MonitorListQuery>>({});
-  const [apiKeySearchKeyword, setAPIKeySearchKeyword] = useState('');
-  const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState('');
   const cursor = page > 1 ? cursors[page] : undefined;
-
-  const apiKeySearchActive = apiKeySearchKeyword.trim().length > 0;
-  const { data: apiKeysData, isFetching: isAPIKeysFetching } = useQuery({
-    queryKey: queryKeys.apikeys('monitor-filter-search', apiKeySearchKeyword),
-    queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: apiKeySearchKeyword, search_scope: 'api_key' }, { signal }),
-    enabled: apiKeySearchActive,
-    meta: { globalLoading: false },
-  });
-  const apiKeyOptions = (apiKeySearchActive ? (apiKeysData?.list ?? []) : []).map((key: APIKeyResp) => ({
-    id: String(key.id),
-    label: key.name || `#${key.id}`,
-    description: key.key_prefix || undefined,
-    textValue: `${key.name || ''} ${key.key_prefix || ''} ${key.id}`,
-  }));
-  const visibleAPIKeyOptions = (() => {
-    const selectedId = filters.api_key_id ? String(filters.api_key_id) : '';
-    if (!selectedId || !selectedAPIKeyLabel || apiKeyOptions.some((option) => option.id === selectedId)) {
-      return apiKeyOptions;
-    }
-    return [{ id: selectedId, label: selectedAPIKeyLabel, description: undefined, textValue: selectedAPIKeyLabel }, ...apiKeyOptions];
-  })();
+  const [requestPage, setRequestPageState] = useState(1);
+  const [requestPageSize, setRequestPageSizeState] = useState(DEFAULT_PAGE_SIZE);
+  const [requestCursors, setRequestCursors] = useState<Record<number, MonitorRequestCursorResp | undefined>>({});
+  const requestCursor = requestPage > 1 ? requestCursors[requestPage] : undefined;
 
   const listParams = useMemo<MonitorListQuery>(() => ({
     ...filters,
@@ -193,6 +215,11 @@ export default function MonitorPage() {
     cursor_id: cursor?.id,
     limit: pageSize,
   }), [cursor?.id, cursor?.updated_at, filters, pageSize]);
+  const requestListParams = useMemo<MonitorRequestListQuery>(() => ({
+    cursor: requestCursor?.created_at,
+    cursor_id: requestCursor?.id,
+    limit: requestPageSize,
+  }), [requestCursor?.created_at, requestCursor?.id, requestPageSize]);
 
   const summaryQuery = useQuery({
     queryKey: queryKeys.monitorSummary(),
@@ -218,9 +245,29 @@ export default function MonitorPage() {
     placeholderData: keepPreviousData,
   });
 
+  const {
+    data: requestData,
+    dataUpdatedAt: requestDataUpdatedAt,
+    isFetching: isRequestFetching,
+    isLoading: isRequestLoading,
+    isPlaceholderData: isRequestPlaceholderData,
+    refetch: refetchRequests,
+  } = useQuery({
+    queryKey: queryKeys.monitorRequests('list', requestListParams),
+    queryFn: ({ signal }) => monitorApi.requestList(requestListParams, { signal }),
+    meta: { globalLoading: false },
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+  });
+
   const invalidateMonitor = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.monitor() });
     void queryClient.invalidateQueries({ queryKey: queryKeys.monitorSummary() });
+  }, [queryClient]);
+
+  const invalidateRequestMonitor = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.monitorRequests() });
   }, [queryClient]);
 
   const resolveMutation = useMutation({
@@ -237,6 +284,17 @@ export default function MonitorPage() {
     onSuccess: () => {
       toast('success', t('monitor.ignore_success'));
       invalidateMonitor();
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  const clearRequestsMutation = useMutation({
+    mutationFn: () => monitorApi.clearRequests(),
+    onSuccess: (result) => {
+      toast('success', t('monitor.request_clear_success', { count: result.deleted }));
+      setRequestCursors({});
+      setRequestPageState(1);
+      invalidateRequestMonitor();
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -276,10 +334,33 @@ export default function MonitorPage() {
     setPageSizeState(nextPageSize);
   }, []);
 
+  const setRequestPage = useCallback((nextPage: number) => {
+    if (nextPage <= 1) {
+      setRequestPageState(1);
+      return;
+    }
+    if (nextPage === requestPage + 1) {
+      if (!requestData?.next_cursor) return;
+      setRequestCursors((current) => ({ ...current, [nextPage]: requestData.next_cursor }));
+      setRequestPageState(nextPage);
+      return;
+    }
+    if (nextPage < requestPage || requestCursors[nextPage]) {
+      setRequestPageState(nextPage);
+    }
+  }, [requestCursors, requestData?.next_cursor, requestPage]);
+
+  const setRequestPageSize = useCallback((nextPageSize: number) => {
+    setRequestCursors({});
+    setRequestPageState(1);
+    setRequestPageSizeState(nextPageSize);
+  }, []);
+
   const handleManualRefresh = useCallback(() => {
     void refetch({ cancelRefetch: false });
     void refetchSummary({ cancelRefetch: false });
-  }, [refetch, refetchSummary]);
+    void refetchRequests({ cancelRefetch: false });
+  }, [refetch, refetchRequests, refetchSummary]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -291,6 +372,7 @@ export default function MonitorPage() {
       timeoutId = undefined;
       void refetch({ cancelRefetch: false });
       void refetchSummary({ cancelRefetch: false });
+      void refetchRequests({ cancelRefetch: false });
     };
 
     const unsubscribe = subscribeAdminEvents((event) => {
@@ -304,7 +386,7 @@ export default function MonitorPage() {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [refetch, refetchSummary]);
+  }, [refetch, refetchRequests, refetchSummary]);
 
   const statusOptions: SelectOption[] = [
     { id: '', label: t('common.all') },
@@ -320,7 +402,6 @@ export default function MonitorPage() {
   ];
   const typeOptions: SelectOption[] = [
     { id: '', label: t('common.all') },
-    { id: 'api_request_error', label: t('monitor.type_api_request_error') },
     { id: 'scheduler_error', label: t('monitor.type_scheduler_error') },
     { id: 'upstream_account_error', label: t('monitor.type_upstream_account_error') },
     { id: 'plugin_error', label: t('monitor.type_plugin_error') },
@@ -412,12 +493,6 @@ export default function MonitorPage() {
       ),
     },
     {
-      key: 'model',
-      title: t('monitor.model'),
-      width: '200px',
-      render: (row) => <span className="block w-full truncate text-left font-mono text-[13px] leading-none text-text-secondary" title={row.model || '-'}>{row.model || '-'}</span>,
-    },
-    {
       key: 'locator',
       title: t('monitor.locator'),
       width: '240px',
@@ -480,11 +555,111 @@ export default function MonitorPage() {
     },
   ], [ignoreMutation, resolveMutation, t]);
 
+  const requestColumns = useMemo<MonitorRequestColumnConfig[]>(() => [
+    {
+      key: 'created_at',
+      title: t('monitor.time'),
+      width: '142px',
+      render: (row) => {
+        const { dateLabel, fullLabel, timeLabel } = monitorTimeLabels(row.created_at);
+        return (
+          <div className="flex min-w-0 items-center gap-1.5 font-mono text-xs" title={fullLabel}>
+            <span className="shrink-0 font-mono text-[13px] font-medium text-text">{timeLabel}</span>
+            {dateLabel ? <span className="hidden shrink-0 font-light text-text-tertiary xl:inline">{dateLabel}</span> : null}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'type',
+      title: t('monitor.type'),
+      width: '168px',
+      hideOnMobile: true,
+      render: (row) => <span className="block w-full truncate text-center text-[13px] leading-none text-text-secondary" title={row.type}>{typeLabel(t, row.type)}</span>,
+    },
+    {
+      key: 'severity',
+      title: t('monitor.severity'),
+      width: '112px',
+      render: (row) => (
+        <span className={`inline-flex h-6 min-w-[4.75rem] max-w-full items-center justify-center truncate rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none ring-1 ${SEVERITY_CLASSES[row.severity] ?? SEVERITY_CLASSES.warning}`}>
+          {severityLabel(t, row.severity)}
+        </span>
+      ),
+    },
+    {
+      key: 'source',
+      title: t('monitor.source'),
+      width: '144px',
+      hideOnMobile: true,
+      render: (row) => (
+        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
+          <span className="truncate font-mono text-[13px] leading-none text-text-secondary" title={row.source}>{row.source}</span>
+          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.platform || '-'}>{row.platform || '-'}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'event',
+      title: t('monitor.event'),
+      width: '300px',
+      render: (row) => (
+        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
+          <span className="truncate text-[13px] font-medium leading-none text-text" title={row.title}>{row.title}</span>
+          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.message || row.type}>{row.message || typeLabel(t, row.type)}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'subject',
+      title: t('monitor.subject'),
+      width: '190px',
+      render: (row) => (
+        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
+          <span className="truncate text-[13px] font-medium leading-none text-text" title={monitorRequestSubject(row)}>{monitorRequestSubject(row)}</span>
+          <span className="truncate font-mono text-[11px] leading-none text-text-tertiary">{row.api_key_id ? `api_key:${row.api_key_id}` : row.request_id || '-'}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'locator',
+      title: t('monitor.locator'),
+      width: '260px',
+      hideOnMobile: true,
+      render: (row) => (
+        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
+          <span className="truncate font-mono text-[13px] leading-none text-text-secondary" title={monitorRequestLocator(row)}>{monitorRequestLocator(row)}</span>
+          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.model || row.plugin_id || '-'}>
+            {row.model || row.plugin_id || '-'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'http_status',
+      title: t('monitor.http_status'),
+      width: '104px',
+      render: (row) => <span className="block w-full truncate text-center font-mono text-[13px] leading-none text-text-secondary">{requestStatusLabel(row)}</span>,
+    },
+    {
+      key: 'duration',
+      title: t('monitor.duration_ms'),
+      width: '104px',
+      hideOnMobile: true,
+      render: (row) => <span className="block w-full truncate text-center font-mono text-[13px] leading-none text-text-secondary">{durationLabel(row.duration_ms)}</span>,
+    },
+  ], [t]);
+
   const rows = data?.list ?? [];
   const hasRows = rows.length > 0;
   const showInitialLoading = isLoading && !data;
   const total = totalForCursorPage(page, pageSize, rows.length, data?.has_more);
   const totalPages = getTotalPages(total, pageSize);
+  const requestRows = requestData?.list ?? [];
+  const hasRequestRows = requestRows.length > 0;
+  const showRequestInitialLoading = isRequestLoading && !requestData;
+  const requestTotal = totalForCursorPage(requestPage, requestPageSize, requestRows.length, requestData?.has_more);
+  const requestTotalPages = getTotalPages(requestTotal, requestPageSize);
 
   return (
     <div>
@@ -551,32 +726,6 @@ export default function MonitorPage() {
                   onSelectionChange={(key) => updateFilter('type', key)}
                 />
               </div>
-              <div className="w-full sm:w-48">
-                <SearchFilterComboBox
-                  ariaLabel={t('monitor.search_api_key')}
-                  isLoading={isAPIKeysFetching}
-                  items={visibleAPIKeyOptions}
-                  loadingLabel={t('common.loading')}
-                  selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
-                  selectedLabel={selectedAPIKeyLabel}
-                  placeholder={t('monitor.search_api_key')}
-                  emptyPrompt={t('monitor.search_api_key')}
-                  noDataLabel={t('common.no_data')}
-                  onSearchChange={setAPIKeySearchKeyword}
-                  onSelectionChange={(value, label) => {
-                    updateFilter('api_key_id', value ? Number(value) : undefined);
-                    setSelectedAPIKeyLabel(label);
-                  }}
-                />
-              </div>
-              <div className="w-full sm:w-48">
-                <input
-                  className="input input--sm w-full"
-                  placeholder={t('monitor.endpoint')}
-                  value={filters.endpoint ?? ''}
-                  onChange={(event) => updateFilter('endpoint', event.target.value)}
-                />
-              </div>
               <div className="w-full sm:w-40">
                 <input
                   className="input input--sm w-full"
@@ -620,6 +769,78 @@ export default function MonitorPage() {
           setPageSize={setPageSize}
           suppressHighlight={isPlaceholderData}
           total={total}
+          totalExact={false}
+        />
+      </TablePage>
+      <TablePage
+        className="ag-monitor-page ag-toolbar-standard-page mt-6"
+        footer={(
+          <TablePaginationFooter
+            page={requestPage}
+            pageSize={requestPageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            setPage={setRequestPage}
+            setPageSize={setRequestPageSize}
+            total={requestTotal}
+            hasMore={requestData?.has_more}
+            totalExact={false}
+            totalPages={requestTotalPages}
+          />
+        )}
+        isFetching={hasRequestRows && isRequestPlaceholderData && isRequestFetching && !showRequestInitialLoading}
+      >
+        <div className="ag-page-toolbar">
+          <div className="ag-page-toolbar-filters">
+            <div className="ag-page-toolbar-filter-row">
+              <div className="flex min-h-8 items-center">
+                <span className="text-sm font-semibold text-text">{t('monitor.request_events')}</span>
+              </div>
+            </div>
+          </div>
+          <div className="ag-page-toolbar-actions">
+            <Button
+              isIconOnly
+              aria-label={t('common.refresh', 'Refresh')}
+              className="ag-auto-refresh-refresh--toolbar h-8 w-8 min-w-8"
+              isDisabled={isRequestFetching}
+              size="sm"
+              variant="ghost"
+              onPress={() => void refetchRequests({ cancelRefetch: false })}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRequestFetching ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button
+              isIconOnly
+              aria-label={t('monitor.clear_request_events')}
+              className="h-8 w-8 min-w-8"
+              isDisabled={clearRequestsMutation.isPending || isRequestFetching}
+              size="sm"
+              variant="ghost"
+              onPress={() => clearRequestsMutation.mutate()}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <RecordsTable
+          ariaLabel={t('monitor.request_events')}
+          columns={requestColumns}
+          dataVersion={hasRequestRows ? requestDataUpdatedAt : 0}
+          emptyDescription={t('monitor.empty_description')}
+          emptyTitle={t('common.no_data')}
+          footer={false}
+          highlightNewRows={hasRequestRows && requestPage === 1}
+          highlightResetKey={JSON.stringify({ requestPage, requestPageSize })}
+          hasMore={requestData?.has_more}
+          isLoading={showRequestInitialLoading}
+          page={requestPage}
+          pageSize={requestPageSize}
+          rows={requestRows}
+          setPage={setRequestPage}
+          setPageSize={setRequestPageSize}
+          suppressHighlight={isRequestPlaceholderData}
+          total={requestTotal}
           totalExact={false}
         />
       </TablePage>

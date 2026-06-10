@@ -94,6 +94,7 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 			"group_id", state.keyInfo.GroupID,
 			"status_code", execution.outcome.Upstream.StatusCode,
 			"reason", execution.outcome.Reason)
+		f.recordClientRequestError(c, state, execution)
 		if !state.stream || !c.Writer.Written() {
 			writeClientErrorResponse(c, execution.outcome)
 		}
