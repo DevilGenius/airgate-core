@@ -79,3 +79,8 @@ func (s *Scheduler) ClearRateLimitMarkers(ctx context.Context, accountID int) in
 func (s *Scheduler) MarkDisabled(ctx context.Context, accountID int, reason string) {
 	s.state.transition(ctx, accountID, account.StateDisabled, nil, reason)
 }
+
+// MarkDegraded 把账号临时降级，不永久禁用；用于 403 等暂不可用信号。
+func (s *Scheduler) MarkDegraded(ctx context.Context, accountID int, reason string) {
+	s.state.applyTransientAvoidance(ctx, accountID, Judgment{Reason: reason}, transientKindUnavailable)
+}
