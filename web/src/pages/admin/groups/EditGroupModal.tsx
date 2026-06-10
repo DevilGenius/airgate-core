@@ -7,6 +7,12 @@ import { ArrowUpDown, Layers, X } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import {
+  RATE_MULTIPLIER_STEP,
+  isEmptyRateMultiplierInput,
+  isValidRateMultiplierValue,
+  parseRateMultiplier,
+} from '../../../shared/utils/rateMultiplier';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../../shared/types';
 
 function parseQuotas(quotas?: Record<string, unknown>): { daily: string; weekly: string; monthly: string } {
@@ -103,7 +109,7 @@ export function GroupFormModal({
     name: group?.name ?? '',
     note: group?.note ?? '',
     platform: group?.platform ?? '',
-    rate_multiplier: group?.rate_multiplier ?? 1,
+    rate_multiplier: String(group?.rate_multiplier ?? 1),
     sort_weight: group?.sort_weight ?? 0,
     status_visible: group?.status_visible ?? true,
     subscription_type: group?.subscription_type ?? 'standard' as const,
@@ -149,9 +155,14 @@ export function GroupFormModal({
   ];
   const selectedSubscriptionTypeLabel =
     subscriptionTypeOptions.find((item) => item.id === form.subscription_type)?.label ?? t('groups.type_standard');
+  const rateMultiplierValue = parseRateMultiplier(form.rate_multiplier);
+  const rateMultiplierEmpty = isEmptyRateMultiplierInput(form.rate_multiplier);
+  const rateMultiplierValid = rateMultiplierEmpty || isValidRateMultiplierValue(rateMultiplierValue);
 
   const handleSubmit = () => {
     if (!isEdit && (!form.name || !form.platform)) return;
+    if (!rateMultiplierEmpty && !isValidRateMultiplierValue(rateMultiplierValue)) return;
+    const rateMultiplier = rateMultiplierEmpty ? null : rateMultiplierValue;
 
     const pluginSettings = clonePluginSettings(group?.plugin_settings);
     if (form.platform === 'claude') {
@@ -168,6 +179,7 @@ export function GroupFormModal({
       ...form,
       force_instructions: form.force_instructions ?? '',
       note: form.note,
+      rate_multiplier: rateMultiplier,
       plugin_settings: Object.keys(pluginSettings).length > 0 ? pluginSettings : undefined,
       quotas: form.subscription_type === 'subscription' ? buildQuotas(quotas) : undefined,
       subscription_type: form.subscription_type as 'standard' | 'subscription',
@@ -283,9 +295,10 @@ export function GroupFormModal({
           <Label>{t('groups.rate_multiplier')}</Label>
           <Input
             type="number"
-            step="0.1"
-            value={String(form.rate_multiplier)}
-            onChange={(e) => setForm({ ...form, rate_multiplier: Number(e.target.value) })}
+            min="0"
+            step={RATE_MULTIPLIER_STEP}
+            value={form.rate_multiplier}
+            onChange={(e) => setForm({ ...form, rate_multiplier: e.target.value })}
           />
         </HeroTextField>
 
@@ -465,7 +478,7 @@ export function GroupFormModal({
               <Button variant="secondary" onPress={onClose}>
                 {t('common.cancel')}
               </Button>
-              <Button variant="primary" isDisabled={loading} onPress={handleSubmit}>
+              <Button variant="primary" isDisabled={loading || !rateMultiplierValid} onPress={handleSubmit}>
                 {loading ? <Spinner size="sm" /> : null}
                 {isEdit ? t('common.save') : t('common.create')}
               </Button>

@@ -125,11 +125,14 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 			Credentials:    item.Credentials,
 			Priority:       item.Priority,
 			MaxConcurrency: item.MaxConcurrency,
-			RateMultiplier: item.RateMultiplier,
+			RateMultiplier: item.RateMultiplier.Ptr(),
 		})
 	}
 
 	summary := h.service.Import(c.Request.Context(), inputs)
+	if summary.Imported > 0 {
+		h.invalidateRouteCacheForAccountMutation()
+	}
 
 	resp := dto.ImportAccountsResp{
 		Imported: summary.Imported,
@@ -161,7 +164,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		Priority:       req.Priority,
 		MaxConcurrency: req.MaxConcurrency,
 		ProxyID:        req.ProxyID,
-		RateMultiplier: req.RateMultiplier,
+		RateMultiplier: req.RateMultiplier.Ptr(),
 		UpstreamIsPool: req.UpstreamIsPool,
 		Extra:          req.Extra,
 		GroupIDs:       req.GroupIDs,
@@ -171,6 +174,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
+	h.invalidateRouteCacheForAccountMutation()
 
 	resp := toAccountResp(item)
 	resp.FamilyCooldowns = h.familyCooldownsFor(c.Request.Context(), item.ID)
@@ -204,7 +208,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		State:          req.State,
 		Priority:       req.Priority,
 		MaxConcurrency: req.MaxConcurrency,
-		RateMultiplier: req.RateMultiplier,
+		RateMultiplier: req.RateMultiplier.PtrOrDefault(1),
 		UpstreamIsPool: req.UpstreamIsPool,
 		GroupIDs:       req.GroupIDs,
 		HasGroupIDs:    req.GroupIDs != nil,
@@ -226,6 +230,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
+	h.invalidateRouteCacheForAccountMutation()
 
 	resp := toAccountResp(item)
 	resp.FamilyCooldowns = h.familyCooldownsFor(c.Request.Context(), item.ID)
@@ -245,6 +250,7 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
+	h.invalidateRouteCacheForAccountMutation()
 
 	response.Success(c, nil)
 }
@@ -262,7 +268,7 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		State:          req.State,
 		Priority:       req.Priority,
 		MaxConcurrency: req.MaxConcurrency,
-		RateMultiplier: req.RateMultiplier,
+		RateMultiplier: req.RateMultiplier.PtrOrDefault(1),
 		GroupIDs:       req.GroupIDs,
 		HasGroupIDs:    req.GroupIDs != nil,
 		ProxyID:        req.ProxyID,
@@ -270,6 +276,9 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		Extra:          req.Extra,
 		HasExtra:       req.Extra != nil,
 	})
+	if result.Success > 0 {
+		h.invalidateRouteCacheForAccountMutation()
+	}
 	response.Success(c, toBulkOpResp(result))
 }
 
@@ -282,6 +291,9 @@ func (h *AccountHandler) BulkDeleteAccounts(c *gin.Context) {
 	}
 
 	result := h.service.BulkDelete(c.Request.Context(), req.AccountIDs)
+	if result.Success > 0 {
+		h.invalidateRouteCacheForAccountMutation()
+	}
 	response.Success(c, toBulkOpResp(result))
 }
 
@@ -409,6 +421,7 @@ func (h *AccountHandler) ToggleScheduling(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
+	h.invalidateRouteCacheForAccountMutation()
 
 	response.Success(c, map[string]any{
 		"id":    result.ID,

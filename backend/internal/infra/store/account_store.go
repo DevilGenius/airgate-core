@@ -147,6 +147,8 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 
 // Create 创建账号。
 func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput) (appaccount.Account, error) {
+	rateMultiplier := accountRateMultiplierOrDefault(input.RateMultiplier)
+
 	builder := s.db.Account.Create().
 		SetName(input.Name).
 		SetPlatform(input.Platform).
@@ -154,7 +156,7 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 		SetCredentials(cloneCredentials(input.Credentials)).
 		SetPriority(input.Priority).
 		SetMaxConcurrency(input.MaxConcurrency).
-		SetRateMultiplier(input.RateMultiplier).
+		SetRateMultiplier(rateMultiplier).
 		SetUpstreamIsPool(input.UpstreamIsPool)
 
 	if input.Extra != nil {
@@ -508,6 +510,13 @@ func toIntSlice(values []int64) []int {
 		result = append(result, int(value))
 	}
 	return result
+}
+
+func accountRateMultiplierOrDefault(value *float64) float64 {
+	if value == nil {
+		return 1
+	}
+	return *value
 }
 
 func cloneCredentials(input map[string]string) map[string]string {

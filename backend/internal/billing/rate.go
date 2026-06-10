@@ -1,13 +1,18 @@
 package billing
 
-import "github.com/DevilGenius/airgate-core/internal/auth"
+import (
+	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
+)
 
 // ResolveBillingRate 决定一次请求该用什么倍率扣 reseller 的真实成本（actual_cost）。
 //
 // 优先级链（高于者赢）：
 //  1. user.group_rates[group_id]   — 用户级专属调价（VIP/折扣）
 //  2. group.rate_multiplier        — 分组档位
-//  3. 1.0                          — 默认
+//  3. 1.0                          — 默认（无 keyInfo 或倍率非法时兜底）
+//
+// 显式 0 是有效倍率，表示本次 actual_cost 免费。
 //
 // 注意：
 //   - APIKey.sell_rate 不在这条链里。它是 reseller 对最终客户的"账面"售价倍率，
@@ -24,12 +29,11 @@ func ResolveBillingRate(keyInfo *auth.APIKeyInfo) float64 {
 // ResolveBillingRateForGroup 按指定 group 计算实际扣费倍率。
 func ResolveBillingRateForGroup(userGroupRates map[int64]float64, groupID int, groupRate float64) float64 {
 	if userGroupRates != nil {
-		if r, ok := userGroupRates[int64(groupID)]; ok && r > 0 {
-			return r
+		if r, ok := userGroupRates[int64(groupID)]; ok {
+			if ratevalue.IsValidMultiplier(r) {
+				return r
+			}
 		}
 	}
-	if groupRate > 0 {
-		return groupRate
-	}
-	return 1.0
+	return ratevalue.NormalizeMultiplier(groupRate, 1.0)
 }

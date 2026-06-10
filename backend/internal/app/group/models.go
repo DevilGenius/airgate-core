@@ -94,7 +94,7 @@ type ListResult struct {
 type CreateInput struct {
 	Name              string
 	Platform          string
-	RateMultiplier    float64
+	RateMultiplier    *float64
 	IsExclusive       bool
 	StatusVisible     bool
 	SubscriptionType  string

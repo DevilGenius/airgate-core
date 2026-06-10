@@ -2,6 +2,7 @@ package group
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -60,6 +61,61 @@ func TestCreateClonesMutableFields(t *testing.T) {
 	}
 	if captured.ModelRouting["gpt-*"][0] != 1 {
 		t.Fatalf("captured model routing mutated to %v, want 1", captured.ModelRouting["gpt-*"][0])
+	}
+	if captured.RateMultiplier == nil || *captured.RateMultiplier != 1 {
+		t.Fatalf("captured RateMultiplier = %v, want default 1", captured.RateMultiplier)
+	}
+}
+
+func TestCreateRejectsInvalidRateMultiplier(t *testing.T) {
+	service := NewService(groupStubRepository{}, stubConcurrencyReader{})
+	rate := -1.0
+
+	_, err := service.Create(t.Context(), CreateInput{
+		Name:             "默认分组",
+		Platform:         "openai",
+		SubscriptionType: "standard",
+		RateMultiplier:   &rate,
+	})
+	if !errors.Is(err, ErrInvalidRateMultiplier) {
+		t.Fatalf("Create() error = %v, want ErrInvalidRateMultiplier", err)
+	}
+}
+
+func TestCreateAllowsZeroAndMinimumPositiveRateMultiplier(t *testing.T) {
+	captured := make([]float64, 0, 2)
+	service := NewService(groupStubRepository{
+		create: func(_ context.Context, input CreateInput) (Group, error) {
+			if input.RateMultiplier == nil {
+				t.Fatalf("RateMultiplier should be normalized before repository create")
+			}
+			captured = append(captured, *input.RateMultiplier)
+			return Group{ID: len(captured)}, nil
+		},
+	}, stubConcurrencyReader{})
+
+	for _, rate := range []float64{0, 0.01} {
+		if _, err := service.Create(t.Context(), CreateInput{
+			Name:             "默认分组",
+			Platform:         "openai",
+			SubscriptionType: "standard",
+			RateMultiplier:   &rate,
+		}); err != nil {
+			t.Fatalf("Create(rate=%v) returned error: %v", rate, err)
+		}
+	}
+	if len(captured) != 2 || captured[0] != 0 || captured[1] != 0.01 {
+		t.Fatalf("captured rates = %v, want [0 0.01]", captured)
+	}
+}
+
+func TestUpdateRejectsTooSmallPositiveRateMultiplier(t *testing.T) {
+	rate := 0.001
+	service := NewService(groupStubRepository{}, stubConcurrencyReader{})
+
+	_, err := service.Update(t.Context(), 1, UpdateInput{RateMultiplier: &rate})
+	if !errors.Is(err, ErrInvalidRateMultiplier) {
+		t.Fatalf("Update() error = %v, want ErrInvalidRateMultiplier", err)
 	}
 }
 

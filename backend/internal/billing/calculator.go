@@ -1,6 +1,8 @@
 // Package billing 提供费用计算和使用量异步记录
 package billing
 
+import "github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
+
 // Calculator 费用计算器
 type Calculator struct{}
 
@@ -17,6 +19,7 @@ type CalculateInput struct {
 	CacheCreationCost float64 // 插件已计算的缓存写入费用
 
 	// BillingRate 平台真实计费倍率（已由 ResolveBillingRate 解析过的单值，不再相乘）。
+	// 0 表示免费；非法值兜底为 1。
 	// 用于扣 reseller 的 user.balance 和写入 actual_cost。
 	BillingRate float64
 
@@ -26,6 +29,7 @@ type CalculateInput struct {
 	SellRate float64
 
 	// AccountRate 账号实际成本倍率（账号自身相对上游的成本系数，比如代购账号 1.2x）。
+	// 0 表示账号成本免费；非法值兜底为 1。
 	// 用于计算 account_cost（账号实际消耗），写入 usage_log，仅供"账号计费"统计使用。
 	// 与用户计费 (BillingRate) 完全独立，不影响 actual_cost / User.balance。
 	AccountRate float64
@@ -64,29 +68,28 @@ type CalculateResult struct {
 //
 // 三者互不影响，各自存储在独立列里。
 func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
-	totalCost := input.InputCost + input.OutputCost + input.CachedInputCost + input.CacheCreationCost
+	totalCost := ratevalue.SafeAddNonNegative(
+		input.InputCost,
+		input.OutputCost,
+		input.CachedInputCost,
+		input.CacheCreationCost,
+	)
 
-	billingRate := input.BillingRate
-	if billingRate <= 0 {
-		billingRate = 1.0
-	}
-	accountRate := input.AccountRate
-	if accountRate <= 0 {
-		accountRate = 1.0
-	}
+	billingRate := ratevalue.NormalizeMultiplier(input.BillingRate, 1.0)
+	accountRate := ratevalue.NormalizeMultiplier(input.AccountRate, 1.0)
 
-	actualCost := totalCost * billingRate
+	actualCost := ratevalue.SafeMulNonNegative(totalCost, billingRate)
 
 	if input.BillingCostOverride != nil {
-		actualCost = *input.BillingCostOverride
+		actualCost = ratevalue.NormalizeNonNegative(*input.BillingCostOverride)
 	}
 
 	billedCost := actualCost
 	if input.SellRate > 0 {
-		billedCost = actualCost * input.SellRate
+		billedCost = ratevalue.SafeMulNonNegative(actualCost, input.SellRate)
 	}
 
-	accountCost := totalCost * accountRate
+	accountCost := ratevalue.SafeMulNonNegative(totalCost, accountRate)
 
 	return CalculateResult{
 		InputCost:             input.InputCost,

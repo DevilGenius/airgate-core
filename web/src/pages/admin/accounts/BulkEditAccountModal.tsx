@@ -18,6 +18,12 @@ import { GroupCheckboxList } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import {
+  RATE_MULTIPLIER_STEP,
+  isEmptyRateMultiplierInput,
+  isValidRateMultiplierValue,
+  parseRateMultiplier,
+} from '../../../shared/utils/rateMultiplier';
 import type { BulkUpdateAccountsReq } from '../../../shared/types';
 import {
   ACCOUNT_PRIORITY_MAX,
@@ -71,7 +77,7 @@ export function BulkEditAccountModal({
   const [priority, setPriority] = useState(() => initialPriority ?? DEFAULT_ACCOUNT_PRIORITY);
   const [priorityInput, setPriorityInput] = useState(() => String(initialPriority ?? DEFAULT_ACCOUNT_PRIORITY));
   const [maxConcurrency, setMaxConcurrency] = useState(() => initialMaxConcurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY);
-  const [rateMultiplier, setRateMultiplier] = useState(() => initialRateMultiplier ?? 1);
+  const [rateMultiplier, setRateMultiplier] = useState(() => String(initialRateMultiplier ?? 1));
   const [groupIds, setGroupIds] = useState<number[]>(() => [...(initialGroupIds ?? [])]);
   const [proxyId, setProxyId] = useState<number | null>(null);
   const [messageLockEnabled, setMessageLockEnabled] = useState(false);
@@ -94,7 +100,11 @@ export function BulkEditAccountModal({
     enableGroups ||
     enableProxy ||
     enableMessageLock;
-  const canSubmit = hasAnyField && (!enableProxy || proxyId != null);
+  const parsedRateMultiplier = parseRateMultiplier(rateMultiplier);
+  const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplier);
+  const rateMultiplierValid =
+    !enableRateMultiplier || rateMultiplierEmpty || isValidRateMultiplierValue(parsedRateMultiplier);
+  const canSubmit = hasAnyField && rateMultiplierValid && (!enableProxy || proxyId != null);
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -103,7 +113,13 @@ export function BulkEditAccountModal({
     if (enableStatus) patch.state = status;
     if (enablePriority) patch.priority = commitAccountPriorityInput(priorityInput, priority);
     if (enableConcurrency) patch.max_concurrency = maxConcurrency;
-    if (enableRateMultiplier) patch.rate_multiplier = rateMultiplier;
+    if (enableRateMultiplier) {
+      if (rateMultiplierEmpty) {
+        patch.rate_multiplier = null;
+      } else if (isValidRateMultiplierValue(parsedRateMultiplier)) {
+        patch.rate_multiplier = parsedRateMultiplier;
+      }
+    }
     if (enableGroups) patch.group_ids = groupIds;
     if (enableProxy && proxyId != null) patch.proxy_id = proxyId;
     if (enableMessageLock) {
@@ -237,10 +253,11 @@ export function BulkEditAccountModal({
           <HeroTextField fullWidth isDisabled={!enableRateMultiplier}>
             <Input
               type="number"
-              step="0.1"
-              value={String(rateMultiplier)}
+              min="0"
+              step={RATE_MULTIPLIER_STEP}
+              value={rateMultiplier}
               disabled={!enableRateMultiplier}
-              onChange={(e) => setRateMultiplier(Math.max(0, Number(e.target.value)))}
+              onChange={(e) => setRateMultiplier(e.target.value)}
             />
           </HeroTextField>
         </FieldRow>

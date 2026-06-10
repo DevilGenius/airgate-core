@@ -70,15 +70,18 @@ func TestCalculate_AccountCostIndependent(t *testing.T) {
 	}
 }
 
-func TestCalculate_ZeroAccountRate_DefaultsToOne(t *testing.T) {
+func TestCalculate_ZeroAccountRate_IsFree(t *testing.T) {
 	c := NewCalculator()
 	res := c.Calculate(CalculateInput{
 		InputCost:   2.0,
 		BillingRate: 1.0,
 		AccountRate: 0,
 	})
-	if !almostEqual(res.AccountCost, 2.0) {
-		t.Fatalf("AccountCost = %v, want 2.0 (account_rate defaults to 1.0)", res.AccountCost)
+	if !almostEqual(res.AccountCost, 0) {
+		t.Fatalf("AccountCost = %v, want 0 (account_rate=0 means free)", res.AccountCost)
+	}
+	if !almostEqual(res.AccountRateMultiplier, 0) {
+		t.Fatalf("AccountRateMultiplier = %v, want 0", res.AccountRateMultiplier)
 	}
 }
 
@@ -107,17 +110,45 @@ func TestCalculate_WithMarkup(t *testing.T) {
 	}
 }
 
-func TestCalculate_ZeroBillingRate_DefaultsToOne(t *testing.T) {
+func TestCalculate_ZeroBillingRate_IsFree(t *testing.T) {
 	c := NewCalculator()
 	res := c.Calculate(CalculateInput{
 		InputCost:   1.0,
-		BillingRate: 0, // 应被替换为 1.0
+		BillingRate: 0,
+	})
+	if !almostEqual(res.ActualCost, 0) {
+		t.Fatalf("ActualCost = %v, want 0", res.ActualCost)
+	}
+	if !almostEqual(res.RateMultiplier, 0) {
+		t.Fatalf("RateMultiplier = %v, want 0", res.RateMultiplier)
+	}
+}
+
+func TestCalculate_InvalidBillingRate_DefaultsToOne(t *testing.T) {
+	c := NewCalculator()
+	res := c.Calculate(CalculateInput{
+		InputCost:   1.0,
+		BillingRate: -1,
 	})
 	if !almostEqual(res.ActualCost, 1.0) {
 		t.Fatalf("ActualCost = %v, want 1.0", res.ActualCost)
 	}
 	if !almostEqual(res.RateMultiplier, 1.0) {
 		t.Fatalf("RateMultiplier = %v, want 1.0", res.RateMultiplier)
+	}
+}
+
+func TestCalculate_OverflowClampsCosts(t *testing.T) {
+	c := NewCalculator()
+	res := c.Calculate(CalculateInput{
+		InputCost:   math.MaxFloat64,
+		OutputCost:  1,
+		BillingRate: math.MaxFloat64,
+		SellRate:    math.MaxFloat64,
+		AccountRate: math.MaxFloat64,
+	})
+	if math.IsInf(res.TotalCost, 0) || math.IsInf(res.ActualCost, 0) || math.IsInf(res.BilledCost, 0) || math.IsInf(res.AccountCost, 0) {
+		t.Fatalf("costs must stay finite: %+v", res)
 	}
 }
 

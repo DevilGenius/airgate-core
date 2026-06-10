@@ -29,6 +29,12 @@ import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import {
+  RATE_MULTIPLIER_STEP,
+  isEmptyRateMultiplierInput,
+  isValidRateMultiplierValue,
+  parseRateMultiplier,
+} from '../../../shared/utils/rateMultiplier';
 import type { AccountResp, UpdateAccountReq } from '../../../shared/types';
 import {
   ACCOUNT_PRIORITY_MAX,
@@ -74,6 +80,7 @@ export function EditAccountModal({
   const [credentials, setCredentials] = useState<Record<string, string>>(account.credentials);
   const [groupIds, setGroupIds] = useState<number[]>(account.group_ids ?? []);
   const [priorityInput, setPriorityInput] = useState(String(account.priority ?? DEFAULT_ACCOUNT_PRIORITY));
+  const [rateMultiplierInput, setRateMultiplierInput] = useState(String(account.rate_multiplier ?? 1));
 
   const { data: schema } = useQuery({
     queryKey: queryKeys.credentialsSchema(account.platform),
@@ -130,6 +137,10 @@ export function EditAccountModal({
 
   const handleSubmit = () => {
     const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
+    const rateMultiplierValue = parseRateMultiplier(rateMultiplierInput);
+    const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplierInput);
+    if (!rateMultiplierEmpty && !isValidRateMultiplierValue(rateMultiplierValue)) return;
+    const rateMultiplier = rateMultiplierEmpty ? null : rateMultiplierValue;
     const merged = { ...credentials };
     const passwordKeys = new Set(
       getSchemaVisibleFields(schema, accountType)
@@ -144,6 +155,7 @@ export function EditAccountModal({
     onSubmit({
       ...form,
       priority,
+      rate_multiplier: rateMultiplier,
       type: accountType || undefined,
       credentials: merged,
       extra: form.extra,
@@ -174,6 +186,9 @@ export function EditAccountModal({
   const selectedProxyLabel =
     proxyOptions.find((item) => item.id === (form.proxy_id == null ? '' : String(form.proxy_id)))
       ?.label ?? t('accounts.no_proxy');
+  const rateMultiplierValid =
+    isEmptyRateMultiplierInput(rateMultiplierInput) ||
+    isValidRateMultiplierValue(parseRateMultiplier(rateMultiplierInput));
   const availableGroups = (groupsData?.list ?? []).filter(
     (group) => group.platform === account.platform,
   );
@@ -202,7 +217,7 @@ export function EditAccountModal({
           <Button
             variant="primary"
             onPress={handleSubmit}
-            isDisabled={loading || !form.name}
+            isDisabled={loading || !form.name || !rateMultiplierValid}
             aria-busy={loading}
           >
             {t('common.save')}
@@ -312,11 +327,10 @@ export function EditAccountModal({
                       <Label>{t('accounts.rate_multiplier')}</Label>
                       <Input
                         type="number"
-                        step="0.1"
-                        value={String(form.rate_multiplier ?? 1)}
-                        onChange={(event) =>
-                          setForm({ ...form, rate_multiplier: Number(event.target.value) })
-                        }
+                        min="0"
+                        step={RATE_MULTIPLIER_STEP}
+                        value={rateMultiplierInput}
+                        onChange={(event) => setRateMultiplierInput(event.target.value)}
                       />
                     </HeroTextField>
 

@@ -14,6 +14,7 @@ import (
 	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
 	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
 	"github.com/DevilGenius/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 )
 
 // UserStore 使用 Ent 实现用户仓储。
@@ -87,7 +88,7 @@ func (s *UserStore) EmailExists(ctx context.Context, email string) (bool, error)
 	return s.db.User.Query().Where(entuser.EmailEQ(email)).Exist(ctx)
 }
 
-// ListWithGroupRateOverride 返回所有在 group_rates 中为 groupID 设置了 > 0 倍率的用户。
+// ListWithGroupRateOverride 返回所有在 group_rates 中为 groupID 显式设置了倍率的用户。
 //
 // 采用内存过滤：group_rates 是 JSON map 字段，ent 未生成 JSONB 包含谓词；
 // 管理员后台的用户规模较小（通常数百到数千），全表扫描 + 内存过滤成本可接受。
@@ -105,7 +106,7 @@ func (s *UserStore) ListWithGroupRateOverride(ctx context.Context, groupID int64
 			continue
 		}
 		rate, ok := u.GroupRates[groupID]
-		if !ok || rate <= 0 {
+		if !ok || !ratevalue.IsValidMultiplier(rate) {
 			continue
 		}
 		result = append(result, appuser.GroupRateOverride{

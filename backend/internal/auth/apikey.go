@@ -19,6 +19,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/apikey"
 	entsetting "github.com/DevilGenius/airgate-core/ent/setting"
+	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 )
 
 // API Key 缓存。
@@ -101,7 +102,7 @@ func (i *APIKeyInfo) UserGroupRate() (float64, bool) {
 		return 0, false
 	}
 	r, ok := i.UserGroupRates[int64(i.GroupID)]
-	if !ok || r <= 0 {
+	if !ok || !ratevalue.IsValidMultiplier(r) {
 		return 0, false
 	}
 	return r, true

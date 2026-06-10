@@ -16,6 +16,7 @@ import {
 import type { UsageLogResp, CustomerUsageLogResp } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
 import { CostValue } from '../components/CostValue';
+import { formatRateMultiplier } from '../utils/rateMultiplier';
 
 /**
  * 列定义统一使用一个宽松的行类型：管理端拿到的是 UsageLogResp，
@@ -597,9 +598,9 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 {row.service_tier && (
                   <TooltipRow label={t('usage.service_tier')} value={<span className="capitalize">{row.service_tier}</span>} />
                 )}
-                <TooltipRow label={t('usage.rate_multiplier')} value={`${row.rate_multiplier.toFixed(2)}x`} />
-                {adminView && row.account_rate_multiplier > 0 && (
-                  <TooltipRow label={t('usage.account_rate', '账号倍率')} value={`${row.account_rate_multiplier.toFixed(2)}x`} />
+                <TooltipRow label={t('usage.rate_multiplier')} value={`${formatRateMultiplier(row.rate_multiplier)}x`} />
+                {adminView && Number.isFinite(row.account_rate_multiplier) && (
+                  <TooltipRow label={t('usage.account_rate', '上游倍率')} value={`${formatRateMultiplier(row.account_rate_multiplier)}x`} />
                 )}
                 {row.sell_rate > 0 && (
                   <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={`${row.sell_rate.toFixed(2)}x`} />
@@ -607,12 +608,12 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 <TooltipDivider />
                 <TooltipRow label={t('usage.original_cost')} value={<CostValue value={row.total_cost} decimals={6} tone="standard" />} />
                 {adminView && (
-                  <TooltipRow label={t('usage.account_cost', '账号计费')} value={<CostValue value={row.account_cost} decimals={6} />} />
+                  <TooltipRow label={t('usage.account_cost', '上游计费')} value={<CostValue value={row.account_cost} decimals={6} />} />
                 )}
-                <TooltipRow label={t('usage.user_charged', '用户扣费')} value={<CostValue value={row.actual_cost} decimals={6} tone="actual" />} />
+                <TooltipRow label={t('usage.billed_cost', '密钥计费')} value={<CostValue value={row.billed_cost} decimals={6} tone="actual" />} />
                 {row.sell_rate > 0 && row.billed_cost !== row.actual_cost && (
                   <>
-                    <TooltipRow label={t('usage.billed_cost', '客户账面')} value={<CostValue value={row.billed_cost} decimals={6} />} />
+                    <TooltipRow label={t('usage.user_charged', '余额扣费')} value={<CostValue value={row.actual_cost} decimals={6} />} />
                     <TooltipRow label={t('usage.profit', '利润')} value={<CostValue value={row.billed_cost - row.actual_cost} decimals={6} tone="success" />} />
                   </>
                 )}

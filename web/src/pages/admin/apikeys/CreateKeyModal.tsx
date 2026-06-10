@@ -8,6 +8,7 @@ import { useAuth } from '../../../app/providers/AuthProvider';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import { formatRateMultiplier, isValidRateMultiplierValue } from '../../../shared/utils/rateMultiplier';
 import type { CreateAPIKeyReq, GroupResp } from '../../../shared/types';
 
 interface CreateKeyModalProps {
@@ -56,7 +57,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
 
   const groupOptions = groups.map((group) => {
     const override = user?.group_rates?.[group.id];
-    const hasOverride = override != null && override > 0 && override !== group.rate_multiplier;
+    const hasOverride = isValidRateMultiplierValue(override ?? null) && override !== group.rate_multiplier;
     return {
       id: String(group.id),
       label: (
@@ -65,11 +66,11 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
           <span className="shrink-0 text-xs text-text-tertiary">
             {hasOverride ? (
               <>
-                <span className="line-through opacity-60">{group.rate_multiplier}x</span>{' '}
-                <span className="font-medium text-primary">{override}x</span>
+                <span className="line-through opacity-60">{formatRateMultiplier(group.rate_multiplier)}x</span>{' '}
+                <span className="font-medium text-primary">{formatRateMultiplier(override)}x</span>
               </>
             ) : (
-              <>{group.rate_multiplier}x 倍率</>
+              <>{formatRateMultiplier(group.rate_multiplier)}x 倍率</>
             )}
           </span>
         </div>

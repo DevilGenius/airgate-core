@@ -181,7 +181,7 @@ export interface CreateAccountReq {
   priority?: number;
   max_concurrency?: number;
   proxy_id?: number;
-  rate_multiplier?: number;
+  rate_multiplier?: number | null;
   upstream_is_pool?: boolean;
   extra?: Record<string, unknown>;
   group_ids?: number[];
@@ -196,7 +196,7 @@ export interface UpdateAccountReq {
   priority?: number;
   max_concurrency?: number;
   proxy_id?: number | null;
-  rate_multiplier?: number;
+  rate_multiplier?: number | null;
   upstream_is_pool?: boolean;
   extra?: Record<string, unknown>;
   group_ids?: number[];
@@ -208,7 +208,7 @@ export interface BulkUpdateAccountsReq {
   state?: 'active' | 'disabled';
   priority?: number;
   max_concurrency?: number;
-  rate_multiplier?: number;
+  rate_multiplier?: number | null;
   group_ids?: number[];
   proxy_id?: number;
   extra?: Record<string, unknown>;
@@ -238,7 +238,7 @@ export interface AccountExportItem {
   credentials: Record<string, string>;
   priority: number;
   max_concurrency: number;
-  rate_multiplier: number;
+  rate_multiplier?: number | null;
   group_ids?: number[];
   proxy_id?: number;
 }
@@ -311,7 +311,7 @@ export interface GroupResp {
 export interface CreateGroupReq {
   name: string;
   platform: string;
-  rate_multiplier?: number;
+  rate_multiplier?: number | null;
   is_exclusive?: boolean;
   status_visible?: boolean;
   subscription_type: 'standard' | 'subscription';
@@ -334,7 +334,7 @@ export interface GroupRateOverrideResp {
 
 export interface UpdateGroupReq {
   name?: string;
-  rate_multiplier?: number;
+  rate_multiplier?: number | null;
   is_exclusive?: boolean;
   status_visible?: boolean;
   subscription_type?: 'standard' | 'subscription';
@@ -477,9 +477,9 @@ export interface UsageLogResp {
   total_cost: number;
   /** 平台真实成本/用户扣费 = total × billing_rate */
   actual_cost: number;
-  /** 客户账面消耗（actual_cost × sell_rate）；reseller 计算 actual_cost 与之差额即利润 */
+  /** 密钥计费（actual_cost × sell_rate）；reseller 计算 actual_cost 与之差额即利润 */
   billed_cost: number;
-  /** 账号实际成本 = total × account_rate；用于"账号计费"统计 */
+  /** 上游计费 = total × account_rate；用于上游账号余额扣费统计 */
   account_cost: number;
   rate_multiplier: number;
   /** 快照：本次请求生效的 sell_rate；1 表示不加价，0 为历史/无 APIKey 兜底 */

@@ -26,6 +26,7 @@ import { PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { USER_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
+import { formatRateMultiplier, isValidRateMultiplierValue } from '../../shared/utils/rateMultiplier';
 
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.userUsageAutoRefresh;
 
@@ -112,7 +113,7 @@ function APIKeyInfoBar() {
 
   // 后端已经把"实际扣费倍率 × 销售倍率"折算成单一字段 api_key_rate，
   // 前端拿不到原始来源，避免通过 DevTools 推断 reseller 定价模型。
-  const effectiveRate = user.api_key_rate ?? 0;
+  const effectiveRate = user.api_key_rate;
 
   // 到期时间格式化
   let expiresLabel = '';
@@ -175,11 +176,11 @@ function APIKeyInfoBar() {
           </div>
         )}
 
-        {effectiveRate > 0 && (
+        {isValidRateMultiplierValue(effectiveRate ?? null) && (
           <div className="flex items-center gap-2">
             <Percent className="w-3.5 h-3.5 text-text-tertiary" />
             <span className="text-text-tertiary">{t('auth.apikey_rate', '倍率')}:</span>
-            <span className="text-text-secondary font-mono">{effectiveRate.toFixed(2)}x</span>
+            <span className="text-text-secondary font-mono">{formatRateMultiplier(effectiveRate)}x</span>
           </div>
         )}
 

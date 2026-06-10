@@ -15,6 +15,8 @@ var (
 	ErrInvalidDateRange = errors.New("日期范围无效")
 	// ErrInvalidState 账号状态参数非法。
 	ErrInvalidState = errors.New("账号状态无效")
+	// ErrInvalidRateMultiplier 账号倍率非法。
+	ErrInvalidRateMultiplier = errors.New("账号倍率必须是有限非负数；0 表示免费，正数最低 0.01")
 	// ErrReauthRequired OAuth 凭证已失效，需要重新授权（refresh_token 失效且无法本地降级）。
 	ErrReauthRequired = errors.New("账号凭证已失效，请重新授权")
 )
