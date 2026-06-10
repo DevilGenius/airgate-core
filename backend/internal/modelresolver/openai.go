@@ -50,6 +50,11 @@ func openAIAnthropicSchedulingModels(clientModel string) []string {
 
 	defaultTarget := normalizedEnvModel("gpt-5.5", "AIRGATE_DEFAULT_CLAUDE_MODEL")
 	switch {
+	case strings.HasPrefix(model, "claude-fable-"):
+		return compactUniqueModels(
+			normalizedEnvModel("gpt-5.5", "AIRGATE_MODEL_FABLE", "ANTHROPIC_DEFAULT_FABLE_MODEL"),
+			normalizedEnvModel("gpt-5.4", "AIRGATE_MODEL_FABLE_FALLBACK"),
+		)
 	case strings.HasPrefix(model, "claude-haiku-"):
 		return compactUniqueModels(
 			normalizedEnvModel("gpt-5.3-codex-spark", "AIRGATE_MODEL_HAIKU", "ANTHROPIC_DEFAULT_HAIKU_MODEL"),

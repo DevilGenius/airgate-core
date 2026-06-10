@@ -7,6 +7,7 @@ Makefile text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.json text eol=lf
+*.sql text eol=lf
 *.ts text eol=lf
 *.tsx text eol=lf
 *.css text eol=lf

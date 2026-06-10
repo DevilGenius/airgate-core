@@ -47,3 +47,17 @@ func TestValidateSystemUpgradeFilename(t *testing.T) {
 		}
 	}
 }
+
+func TestSystemUpgradeChecksumIgnoresLineEndings(t *testing.T) {
+	lf := "-- description: Upgrade usage_logs table.\nSELECT 1;\n"
+	crlf := "-- description: Upgrade usage_logs table.\r\nSELECT 1;\r\n"
+
+	normalizedLF := normalizeSystemUpgradeSQL([]byte(lf))
+	normalizedCRLF := normalizeSystemUpgradeSQL([]byte(crlf))
+	if normalizedLF != normalizedCRLF {
+		t.Fatalf("normalized SQL mismatch:\nLF:   %q\nCRLF: %q", normalizedLF, normalizedCRLF)
+	}
+	if systemUpgradeChecksum(normalizedLF) != systemUpgradeChecksum(normalizedCRLF) {
+		t.Fatal("checksum should be stable across LF and CRLF line endings")
+	}
+}

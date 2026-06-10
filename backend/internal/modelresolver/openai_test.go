@@ -15,6 +15,12 @@ func TestResolveSchedulingModelsForOpenAIAnthropicMessages(t *testing.T) {
 		want  []string
 	}{
 		{
+			name:  "fable 使用高阶主模型和降级模型",
+			path:  "/v1/messages",
+			model: "claude-fable-5",
+			want:  []string{"gpt-5.5", "gpt-5.4"},
+		},
+		{
 			name:  "opus 使用主模型和降级模型",
 			path:  "/v1/messages",
 			model: "claude-opus-4-7",
@@ -63,6 +69,32 @@ func TestResolveSchedulingModelsForOpenAIAnthropicMessagesUsesEnvOverride(t *tes
 	}
 }
 
+func TestResolveSchedulingModelsForOpenAIAnthropicMessagesFableUsesSpecificEnv(t *testing.T) {
+	clearSchedulingModelEnv(t)
+	t.Setenv("AIRGATE_MODEL_FABLE", "openai/gpt-5.5-fable")
+	t.Setenv("AIRGATE_MODEL_FABLE_FALLBACK", "oai/gpt-5.4-fable")
+	t.Setenv("AIRGATE_MODEL_OPUS", "openai/gpt-5.5-opus")
+	t.Setenv("AIRGATE_MODEL_OPUS_FALLBACK", "oai/gpt-5.4-opus")
+
+	got := ResolveSchedulingModels("openai", "/v1/messages", "claude-fable-5")
+	want := []string{"gpt-5.5-fable", "gpt-5.4-fable"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ResolveSchedulingModels() = %#v, want %#v", got, want)
+	}
+}
+
+func TestResolveSchedulingModelsForOpenAIAnthropicMessagesFableIgnoresOpusEnv(t *testing.T) {
+	clearSchedulingModelEnv(t)
+	t.Setenv("AIRGATE_MODEL_OPUS", "openai/gpt-5.5-opus")
+	t.Setenv("AIRGATE_MODEL_OPUS_FALLBACK", "oai/gpt-5.4-opus")
+
+	got := ResolveSchedulingModels("openai", "/v1/messages", "claude-fable-5")
+	want := []string{"gpt-5.5", "gpt-5.4"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ResolveSchedulingModels() = %#v, want %#v", got, want)
+	}
+}
+
 func TestResolveSchedulingModelsIgnoreNonAnthropicRoutes(t *testing.T) {
 	clearSchedulingModelEnv(t)
 
@@ -77,6 +109,8 @@ func clearSchedulingModelEnv(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{
 		"AIRGATE_DEFAULT_CLAUDE_MODEL",
+		"AIRGATE_MODEL_FABLE",
+		"ANTHROPIC_DEFAULT_FABLE_MODEL",
 		"AIRGATE_MODEL_OPUS",
 		"ANTHROPIC_DEFAULT_OPUS_MODEL",
 		"AIRGATE_MODEL_SONNET",
@@ -84,6 +118,7 @@ func clearSchedulingModelEnv(t *testing.T) {
 		"AIRGATE_MODEL_HAIKU",
 		"ANTHROPIC_DEFAULT_HAIKU_MODEL",
 		"AIRGATE_MODEL_HAIKU_FALLBACK",
+		"AIRGATE_MODEL_FABLE_FALLBACK",
 		"AIRGATE_MODEL_OPUS_FALLBACK",
 		"AIRGATE_MODEL_SONNET_FALLBACK",
 		"AIRGATE_MODEL_DEFAULT_FALLBACK",
