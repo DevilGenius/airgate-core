@@ -129,10 +129,17 @@ func (h *AccountHandler) handleError(logMessage, publicMessage string, err error
 	case errors.Is(err, appaccount.ErrModelRequired),
 		errors.Is(err, appaccount.ErrQuotaRefreshUnsupported),
 		errors.Is(err, appaccount.ErrInvalidDateRange),
-		errors.Is(err, appaccount.ErrInvalidState):
+		errors.Is(err, appaccount.ErrInvalidState),
+		errors.Is(err, appaccount.ErrInvalidRateMultiplier):
 		return 400, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage
+	}
+}
+
+func (h *AccountHandler) invalidateRouteCacheForAccountMutation() {
+	if h.scheduler != nil {
+		h.scheduler.InvalidateRouteCache(0)
 	}
 }

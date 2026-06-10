@@ -22,6 +22,7 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
+	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
@@ -282,6 +283,12 @@ func (s *Service) GetCapacity(ctx context.Context, accountIDs []int) map[int]int
 // Create 创建账号。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error) {
 	logger := sdk.LoggerFromContext(ctx)
+	rateMultiplier, err := normalizeCreateRateMultiplier(input.RateMultiplier)
+	if err != nil {
+		return Account{}, err
+	}
+	input.RateMultiplier = &rateMultiplier
+
 	account, err := s.repo.Create(ctx, input)
 	if err != nil {
 		logger.Error("account_credential_persist_failed",
@@ -311,6 +318,17 @@ func (s *Service) ExportAll(ctx context.Context, filter ListFilter) ([]Account, 
 func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary {
 	summary := ImportSummary{}
 	for index, input := range items {
+		rateMultiplier, err := normalizeCreateRateMultiplier(input.RateMultiplier)
+		if err != nil {
+			summary.Failed++
+			summary.Errors = append(summary.Errors, ImportItemError{
+				Index:   index,
+				Name:    input.Name,
+				Message: err.Error(),
+			})
+			continue
+		}
+		input.RateMultiplier = &rateMultiplier
 		input.GroupIDs = nil
 		input.ProxyID = nil
 		if _, err := s.repo.Create(ctx, input); err != nil {
@@ -333,6 +351,11 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary
 // Update 更新账号。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Account, error) {
 	logger := sdk.LoggerFromContext(ctx)
+	if input.RateMultiplier != nil {
+		if err := validateRateMultiplier(*input.RateMultiplier); err != nil {
+			return Account{}, err
+		}
+	}
 	repoInput := input
 	manualState, routeManualState, err := s.routedManualState(input.State)
 	if err != nil {
@@ -414,6 +437,14 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 // group_ids 为整体替换：若提供则覆盖账号原有分组，未提供则不触碰。
 func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkResult {
 	result := BulkResult{Results: make([]BulkResultItem, 0, len(input.IDs))}
+	if input.RateMultiplier != nil {
+		if err := validateRateMultiplier(*input.RateMultiplier); err != nil {
+			for _, id := range input.IDs {
+				result.appendFailure(id, err)
+			}
+			return result
+		}
+	}
 	mutated := false
 	for _, id := range input.IDs {
 		patch := UpdateInput{
@@ -527,6 +558,24 @@ func hasUpdateInputChanges(input UpdateInput) bool {
 		input.HasGroupIDs ||
 		input.HasProxyID ||
 		input.HasExtra
+}
+
+func normalizeCreateRateMultiplier(value *float64) (float64, error) {
+	rateMultiplier := 1.0
+	if value != nil {
+		rateMultiplier = *value
+	}
+	if err := validateRateMultiplier(rateMultiplier); err != nil {
+		return 0, err
+	}
+	return rateMultiplier, nil
+}
+
+func validateRateMultiplier(value float64) error {
+	if err := ratevalue.ValidateMultiplier(value); err != nil {
+		return errors.Join(ErrInvalidRateMultiplier, err)
+	}
+	return nil
 }
 
 func mergeAnyMap(base, patch map[string]any) map[string]any {

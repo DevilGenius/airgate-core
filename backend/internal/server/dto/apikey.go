@@ -8,7 +8,7 @@ type APIKeyResp struct {
 	KeyPrefix           string   `json:"key_prefix"`    // sk-xxxx...xxxx 脱敏展示
 	UserID              int64    `json:"user_id"`
 	GroupID             *int64   `json:"group_id"`
-	GroupRate           float64  `json:"group_rate,omitempty"` // 所属分组对该用户生效的实际扣费倍率
+	GroupRate           float64  `json:"group_rate"` // 所属分组对该用户生效的实际扣费倍率
 	IPWhitelist         []string `json:"ip_whitelist,omitempty"`
 	IPBlacklist         []string `json:"ip_blacklist,omitempty"`
 	QuotaUSD            float64  `json:"quota_usd"`

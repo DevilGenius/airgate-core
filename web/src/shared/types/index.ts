@@ -181,7 +181,7 @@ export interface CreateAccountReq {
   priority?: number;
   max_concurrency?: number;
   proxy_id?: number;
-  rate_multiplier?: number;
+  rate_multiplier?: number | null;
   upstream_is_pool?: boolean;
   extra?: Record<string, unknown>;
   group_ids?: number[];
@@ -196,7 +196,7 @@ export interface UpdateAccountReq {
   priority?: number;
   max_concurrency?: number;
   proxy_id?: number | null;
-  rate_multiplier?: number;
+  rate_multiplier?: number | null;
   upstream_is_pool?: boolean;
   extra?: Record<string, unknown>;
   group_ids?: number[];
@@ -208,7 +208,7 @@ export interface BulkUpdateAccountsReq {
   state?: 'active' | 'disabled';
   priority?: number;
   max_concurrency?: number;
-  rate_multiplier?: number;
+  rate_multiplier?: number | null;
   group_ids?: number[];
   proxy_id?: number;
   extra?: Record<string, unknown>;
@@ -238,7 +238,7 @@ export interface AccountExportItem {
   credentials: Record<string, string>;
   priority: number;
   max_concurrency: number;
-  rate_multiplier: number;
+  rate_multiplier?: number | null;
   group_ids?: number[];
   proxy_id?: number;
 }
@@ -311,7 +311,7 @@ export interface GroupResp {
 export interface CreateGroupReq {
   name: string;
   platform: string;
-  rate_multiplier?: number;
+  rate_multiplier?: number | null;
   is_exclusive?: boolean;
   status_visible?: boolean;
   subscription_type: 'standard' | 'subscription';
@@ -334,7 +334,7 @@ export interface GroupRateOverrideResp {
 
 export interface UpdateGroupReq {
   name?: string;
-  rate_multiplier?: number;
+  rate_multiplier?: number | null;
   is_exclusive?: boolean;
   status_visible?: boolean;
   subscription_type?: 'standard' | 'subscription';

@@ -126,7 +126,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 	item, err := h.service.Create(c.Request.Context(), appgroup.CreateInput{
 		Name:                     req.Name,
 		Platform:                 req.Platform,
-		RateMultiplier:           req.RateMultiplier,
+		RateMultiplier:           req.RateMultiplier.Ptr(),
 		IsExclusive:              req.IsExclusive,
 		StatusVisible:            statusVisible,
 		SubscriptionType:         req.SubscriptionType,
@@ -164,7 +164,7 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 
 	item, err := h.service.Update(c.Request.Context(), id, appgroup.UpdateInput{
 		Name:              req.Name,
-		RateMultiplier:    req.RateMultiplier,
+		RateMultiplier:    req.RateMultiplier.PtrOrDefault(1),
 		IsExclusive:       req.IsExclusive,
 		StatusVisible:     req.StatusVisible,
 		SubscriptionType:  req.SubscriptionType,

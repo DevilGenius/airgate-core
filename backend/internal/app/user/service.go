@@ -2,10 +2,12 @@ package user
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
@@ -116,6 +118,9 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 // Create 创建用户。
 func (s *Service) Create(ctx context.Context, input CreateInput) (User, error) {
 	logger := sdk.LoggerFromContext(ctx)
+	if err := validateGroupRates(input.GroupRates); err != nil {
+		return User{}, err
+	}
 	exists, err := s.repo.EmailExists(ctx, input.Email)
 	if err != nil {
 		logger.Error("user_lookup_failed",
@@ -161,14 +166,12 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (User, error) {
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (User, error) {
 	logger := sdk.LoggerFromContext(ctx)
 	if input.HasGroupRates {
-		for _, v := range input.GroupRates {
-			if v < 0 {
-				logger.Warn("user_update_rejected",
-					sdk.LogFieldUserID, id,
-					sdk.LogFieldReason, "invalid_rate_multiplier",
-				)
-				return User{}, ErrInvalidRateMultiplier
-			}
+		if err := validateGroupRates(input.GroupRates); err != nil {
+			logger.Warn("user_update_rejected",
+				sdk.LogFieldUserID, id,
+				sdk.LogFieldReason, "invalid_rate_multiplier",
+			)
+			return User{}, err
 		}
 	}
 	mutation := Mutation{
@@ -307,13 +310,13 @@ func (s *Service) ListGroupRateOverrides(ctx context.Context, groupID int64) ([]
 	return s.repo.ListWithGroupRateOverride(ctx, groupID)
 }
 
-// SetGroupRate 为用户在指定分组下设置/更新专属倍率（rate 必须 > 0）。
+// SetGroupRate 为用户在指定分组下设置/更新专属倍率。
 //
 // 读 - 改 - 写：先拉出用户当前的 group_rates map，修改单个条目，再整体写回。
 // 并发场景下存在理论上的写丢失窗口，但后台管理单用户操作可以接受。
 func (s *Service) SetGroupRate(ctx context.Context, userID int, groupID int64, rate float64) (GroupRateOverride, error) {
-	if rate <= 0 {
-		return GroupRateOverride{}, ErrInvalidRateMultiplier
+	if err := validateRateMultiplier(rate); err != nil {
+		return GroupRateOverride{}, err
 	}
 	u, err := s.repo.FindByID(ctx, userID, false)
 	if err != nil {
@@ -472,6 +475,22 @@ func cloneGroupRates(input map[int64]float64) map[int64]float64 {
 		cloned[key] = value
 	}
 	return cloned
+}
+
+func validateGroupRates(rates map[int64]float64) error {
+	for _, value := range rates {
+		if err := validateRateMultiplier(value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateRateMultiplier(value float64) error {
+	if err := ratevalue.ValidateMultiplier(value); err != nil {
+		return errors.Join(ErrInvalidRateMultiplier, err)
+	}
+	return nil
 }
 
 func stringPtr(value string) *string {

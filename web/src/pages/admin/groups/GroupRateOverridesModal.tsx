@@ -12,6 +12,12 @@ import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { queryKeys } from '../../../shared/queryKeys';
 import { SearchFilterComboBox } from '../../../shared/components/SearchFilterComboBox';
 import { REMOTE_SEARCH_DEBOUNCE_MS } from '../../../shared/constants';
+import {
+  RATE_MULTIPLIER_STEP,
+  formatRateMultiplier,
+  isValidRateMultiplierValue,
+  parseRateMultiplier,
+} from '../../../shared/utils/rateMultiplier';
 import type { GroupResp, GroupRateOverrideResp, UserResp } from '../../../shared/types';
 
 interface GroupRateOverridesModalProps {
@@ -96,17 +102,18 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
       ...searchOptions,
     ];
   }, [pickedUser, searchOptions]);
-  const newRateNum = Number(newRate);
-  const canAdd = !!pickedUser && Number.isFinite(newRateNum) && newRateNum > 0;
+  const newRateNum = parseRateMultiplier(newRate);
+  const canAdd = !!pickedUser && isValidRateMultiplierValue(newRateNum);
 
   const handleAdd = () => {
-    if (!canAdd || !pickedUser) return;
-    setMutation.mutate({ userId: pickedUser.id, rate: newRateNum });
+    const value = parseRateMultiplier(newRate);
+    if (!pickedUser || !isValidRateMultiplierValue(value)) return;
+    setMutation.mutate({ userId: pickedUser.id, rate: value });
   };
 
   const commitEdit = (userId: number) => {
-    const value = Number(editingRate);
-    if (!Number.isFinite(value) || value <= 0) return;
+    const value = parseRateMultiplier(editingRate);
+    if (!isValidRateMultiplierValue(value)) return;
     setMutation.mutate({ userId, rate: value });
   };
   const modalState = useOverlayState({
@@ -137,7 +144,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
         <span className="text-text-tertiary">{group.platform}</span>
         <span className="text-text-tertiary">|</span>
         <span className="text-text-tertiary">
-          {t('groups.default_rate')}: <span className="font-mono text-primary">{group.rate_multiplier}x</span>
+          {t('groups.default_rate')}: <span className="font-mono text-primary">{formatRateMultiplier(group.rate_multiplier)}x</span>
         </span>
       </div>
 
@@ -179,7 +186,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
             <Input
               type="number"
               min="0"
-              step="0.01"
+              step={RATE_MULTIPLIER_STEP}
               value={newRate}
               onChange={(e) => setNewRate(e.target.value)}
             />
@@ -224,7 +231,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
                         <Input
                           type="number"
                           min="0"
-                          step="0.01"
+                          step={RATE_MULTIPLIER_STEP}
                           value={editingRate}
                           onChange={(e) => setEditingRate(e.target.value)}
                         />
@@ -253,7 +260,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
                           setEditingRate(String(row.rate));
                         }}
                       >
-                        <span className="font-mono text-primary">{row.rate}x</span>
+                        <span className="font-mono text-primary">{formatRateMultiplier(row.rate)}x</span>
                       </Button>
                       <Button
                         isIconOnly

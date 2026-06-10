@@ -22,6 +22,7 @@ import { TableRowMoreMenu } from '../../shared/components/TableRowMoreMenu';
 import { dateInputToLocalStartRFC3339, formatAPIKeyHint, formatDateInputValue, formatExpiry } from '../../shared/utils/format';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
+import { formatRateMultiplier, isValidRateMultiplierValue } from '../../shared/utils/rateMultiplier';
 import {
   AlertTriangle,
   Check,
@@ -40,9 +41,7 @@ import { type KeyForm, emptyForm } from './userkeys/types';
 const API_KEY_AMOUNT_DECIMALS = 3;
 
 function formatRateValue(rate: number | null | undefined) {
-  if (typeof rate !== 'number' || !Number.isFinite(rate)) return '—';
-  const fixed = rate.toFixed(2);
-  return fixed.endsWith('00') ? rate.toFixed(1) : fixed.replace(/0$/, '');
+  return formatRateMultiplier(rate);
 }
 
 export default function UserKeysPage() {
@@ -214,17 +213,17 @@ export default function UserKeysPage() {
   const userGroupRates = user?.group_rates;
   const groupOptions = useMemo(() => groupList.map((g) => {
     const override = userGroupRates?.[g.id];
-    const hasOverride = override != null && override > 0 && override !== g.rate_multiplier;
+    const hasOverride = isValidRateMultiplierValue(override ?? null) && override !== g.rate_multiplier;
     return {
       value: String(g.id),
       label: g.name,
       suffix: hasOverride ? (
         <span className="text-text-tertiary">
-          <span className="line-through opacity-60">{g.rate_multiplier}x</span>{' '}
-          <span className="text-primary font-medium">{override}x</span>
+          <span className="line-through opacity-60">{formatRateValue(g.rate_multiplier)}x</span>{' '}
+          <span className="text-primary font-medium">{formatRateValue(override)}x</span>
         </span>
       ) : (
-        <span className="text-text-tertiary">{g.rate_multiplier}x {t('user_keys.rate_suffix', '倍率')}</span>
+        <span className="text-text-tertiary">{formatRateValue(g.rate_multiplier)}x {t('user_keys.rate_suffix', '倍率')}</span>
       ),
     };
   }), [groupList, t, userGroupRates]);
@@ -350,17 +349,16 @@ export default function UserKeysPage() {
               const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
               const userOverride = row.group_id == null ? undefined : user?.group_rates?.[row.group_id];
               const hasUserOverride =
-                typeof userOverride === 'number' &&
-                Number.isFinite(userOverride) &&
-                userOverride > 0;
+                isValidRateMultiplierValue(userOverride ?? null);
               const responseGroupRate =
-                typeof row.group_rate === 'number' && Number.isFinite(row.group_rate) && row.group_rate > 0
+                isValidRateMultiplierValue(row.group_rate ?? null)
                   ? row.group_rate
                   : undefined;
               const groupRate = responseGroupRate ?? (hasUserOverride ? userOverride : group?.rate_multiplier);
-              const hasGroupRate = typeof groupRate === 'number' && Number.isFinite(groupRate) && groupRate > 0;
+              const normalizedGroupRate = isValidRateMultiplierValue(groupRate ?? null) ? groupRate : undefined;
+              const hasGroupRate = normalizedGroupRate != null;
               const sellRate = hasSellRate && row.sell_rate != null ? row.sell_rate : 1;
-              const effectiveRate = hasGroupRate ? groupRate * sellRate : undefined;
+              const effectiveRate = hasGroupRate ? normalizedGroupRate * sellRate : undefined;
               const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
               const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
               const displayStatus = isExpired ? 'expired' : row.status;
@@ -400,13 +398,13 @@ export default function UserKeysPage() {
                       {(hasGroupRate || hasSellRate) && (
                         <div
                           className="ag-api-key-rate-row"
-                          title={`${t('user_keys.group_sell_rate_short', '分组倍率x销售倍率')} ${formatRateValue(groupRate)}x${formatRateValue(sellRate)}`}
+                          title={`${t('user_keys.group_sell_rate_short', '分组倍率x销售倍率')} ${formatRateValue(normalizedGroupRate)}x${formatRateValue(sellRate)}`}
                         >
                           <span className="ag-api-key-rate-label">
                             {t('user_keys.group_sell_rate_short', '分组倍率x销售倍率')}
                           </span>
                           <span className="ag-api-key-rate-value">
-                            {formatRateValue(groupRate)}x{formatRateValue(sellRate)}
+                            {formatRateValue(normalizedGroupRate)}x{formatRateValue(sellRate)}
                           </span>
                         </div>
                       )}

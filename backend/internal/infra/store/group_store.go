@@ -89,12 +89,14 @@ func (s *GroupStore) FindByID(ctx context.Context, id int) (appgroup.Group, erro
 
 // Create 创建分组。
 func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (appgroup.Group, error) {
+	rateMultiplier := groupRateMultiplierOrDefault(input.RateMultiplier)
+
 	// 若无需复制账号，走快路径。
 	if len(input.CopyAccountsFromGroupIDs) == 0 {
 		builder := s.db.Group.Create().
 			SetName(input.Name).
 			SetPlatform(input.Platform).
-			SetRateMultiplier(input.RateMultiplier).
+			SetRateMultiplier(rateMultiplier).
 			SetIsExclusive(input.IsExclusive).
 			SetStatusVisible(input.StatusVisible).
 			SetSubscriptionType(entgroup.SubscriptionType(input.SubscriptionType)).
@@ -167,7 +169,7 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 	builder := tx.Group.Create().
 		SetName(input.Name).
 		SetPlatform(input.Platform).
-		SetRateMultiplier(input.RateMultiplier).
+		SetRateMultiplier(rateMultiplier).
 		SetIsExclusive(input.IsExclusive).
 		SetStatusVisible(input.StatusVisible).
 		SetSubscriptionType(entgroup.SubscriptionType(input.SubscriptionType)).
@@ -409,6 +411,13 @@ func applyGroupListFilters(query *ent.GroupQuery, keyword, platform, serviceTier
 		query = query.Where(entgroup.ServiceTierEQ(serviceTier))
 	}
 	return query
+}
+
+func groupRateMultiplierOrDefault(value *float64) float64 {
+	if value == nil {
+		return 1
+	}
+	return *value
 }
 
 func mapGroups(items []*ent.Group) []appgroup.Group {

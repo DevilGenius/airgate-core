@@ -19,7 +19,7 @@ type UserResp struct {
 	APIKeyExpiresAt       string            `json:"api_key_expires_at,omitempty"` // RFC3339
 	// APIKeyRate 对客户展示的最终倍率：实际扣费倍率 × sell_rate。
 	// 故意不区分来源以避免泄漏 reseller 的定价模型。
-	APIKeyRate float64 `json:"api_key_rate,omitempty"`
+	APIKeyRate float64 `json:"api_key_rate"`
 	// APIKeyPlatform 当前 Key 所属分组平台（如 anthropic / openai），用于前端 CCS 导入识别客户端类型。
 	APIKeyPlatform string `json:"api_key_platform,omitempty"`
 	TimeMixin
@@ -74,7 +74,7 @@ type GroupRateOverrideResp struct {
 
 // SetGroupRateOverrideReq 设置分组专属倍率请求。
 type SetGroupRateOverrideReq struct {
-	Rate float64 `json:"rate" binding:"required,gt=0"`
+	Rate *float64 `json:"rate" binding:"required"`
 }
 
 // BalanceLogResp 余额变更日志响应

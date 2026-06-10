@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -51,9 +52,58 @@ func TestListAPIKeysNormalizesPagination(t *testing.T) {
 	}
 }
 
+func TestSetGroupRateAllowsZeroAndMinimumPositiveRate(t *testing.T) {
+	var captured Mutation
+	service := NewService(stubRepository{
+		findByID: func() (User, error) {
+			return User{ID: 1, Email: "user@example.com", GroupRates: map[int64]float64{9: 0.5}}, nil
+		},
+		update: func(_ context.Context, _ int, mutation Mutation) (User, error) {
+			captured = mutation
+			return User{ID: 1, Email: "user@example.com", GroupRates: mutation.GroupRates}, nil
+		},
+	})
+
+	if _, err := service.SetGroupRate(t.Context(), 1, 9, 0); err != nil {
+		t.Fatalf("SetGroupRate(rate=0) returned error: %v", err)
+	}
+	if !captured.HasGroupRates || captured.GroupRates[9] != 0 {
+		t.Fatalf("captured zero override = %+v, want explicit 0", captured)
+	}
+
+	if _, err := service.SetGroupRate(t.Context(), 1, 9, 0.001); err != nil {
+		t.Fatalf("SetGroupRate(rate=0.001) returned error: %v", err)
+	}
+	if captured.GroupRates[9] != 0.001 {
+		t.Fatalf("captured rate = %v, want 0.001", captured.GroupRates[9])
+	}
+}
+
+func TestSetGroupRateRejectsInvalidRate(t *testing.T) {
+	service := NewService(stubRepository{})
+
+	_, err := service.SetGroupRate(t.Context(), 1, 9, 0.0001)
+	if !errors.Is(err, ErrInvalidRateMultiplier) {
+		t.Fatalf("SetGroupRate() error = %v, want ErrInvalidRateMultiplier", err)
+	}
+}
+
+func TestUpdateRejectsInvalidGroupRate(t *testing.T) {
+	service := NewService(stubRepository{})
+
+	_, err := service.Update(t.Context(), 1, UpdateInput{
+		GroupRates:    map[int64]float64{9: -1},
+		HasGroupRates: true,
+	})
+	if !errors.Is(err, ErrInvalidRateMultiplier) {
+		t.Fatalf("Update() error = %v, want ErrInvalidRateMultiplier", err)
+	}
+}
+
 type stubRepository struct {
 	findByID    func() (User, error)
 	listAPIKeys func(context.Context, int, int, int) ([]APIKey, int64, error)
+	update      func(context.Context, int, Mutation) (User, error)
 }
 
 func (s stubRepository) FindByID(_ context.Context, _ int, _ bool) (User, error) {
@@ -68,7 +118,10 @@ func (s stubRepository) ListWithGroupRateOverride(_ context.Context, _ int64) ([
 	return nil, nil
 }
 func (s stubRepository) Create(_ context.Context, _ Mutation) (User, error) { return User{}, nil }
-func (s stubRepository) Update(_ context.Context, _ int, _ Mutation) (User, error) {
+func (s stubRepository) Update(ctx context.Context, id int, mutation Mutation) (User, error) {
+	if s.update != nil {
+		return s.update(ctx, id, mutation)
+	}
 	return User{}, nil
 }
 func (s stubRepository) UpdateBalance(_ context.Context, _ int, _ BalanceUpdate) (User, error) {

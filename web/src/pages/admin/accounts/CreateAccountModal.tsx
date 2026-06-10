@@ -24,6 +24,12 @@ import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import {
+  RATE_MULTIPLIER_STEP,
+  isEmptyRateMultiplierInput,
+  isValidRateMultiplierValue,
+  parseRateMultiplier,
+} from '../../../shared/utils/rateMultiplier';
 import type { CreateAccountReq, AccountExportItem } from '../../../shared/types';
 import {
   ACCOUNT_PRIORITY_MAX,
@@ -68,6 +74,7 @@ export function CreateAccountModal({
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [batchMode, setBatchMode] = useState(false);
   const [priorityInput, setPriorityInput] = useState(String(DEFAULT_ACCOUNT_PRIORITY));
+  const [rateMultiplierInput, setRateMultiplierInput] = useState('1');
 
   // 根据平台获取凭证字段定义
   const { data: schema } = useQuery({
@@ -106,6 +113,7 @@ export function CreateAccountModal({
     setAccountType('');
     setForm({ name: '', priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
     setPriorityInput(String(DEFAULT_ACCOUNT_PRIORITY));
+    setRateMultiplierInput('1');
     setCredentials({});
     setGroupIds([]);
     setBatchMode(false);
@@ -131,6 +139,9 @@ export function CreateAccountModal({
     if (!onBatchImport) return { imported: 0, failed: accounts.length };
     const prefix = form.name.trim();
     const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
+    const rateMultiplier = isEmptyRateMultiplierInput(rateMultiplierInput)
+      ? null
+      : parseRateMultiplier(rateMultiplierInput) ?? 1;
     const toImport: AccountExportItem[] = accounts.map((a, i) => ({
       name: prefix ? `${prefix}${i + 1}` : a.name || `Claude Code ${i + 1}`,
       platform,
@@ -138,7 +149,7 @@ export function CreateAccountModal({
       credentials: a.credentials,
       priority,
       max_concurrency: form.max_concurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY,
-      rate_multiplier: form.rate_multiplier ?? 1,
+      rate_multiplier: rateMultiplier,
       group_ids: groupIds.length ? groupIds : undefined,
       proxy_id: form.proxy_id,
     }));
@@ -154,9 +165,14 @@ export function CreateAccountModal({
   const handleSubmit = () => {
     if (loading || batchMode || !platform || !form.name) return;
     const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
+    const rateMultiplierValue = parseRateMultiplier(rateMultiplierInput);
+    const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplierInput);
+    if (!rateMultiplierEmpty && !isValidRateMultiplierValue(rateMultiplierValue)) return;
+    const rateMultiplier = rateMultiplierEmpty ? null : rateMultiplierValue;
     onSubmit({
       ...form,
       priority,
+      rate_multiplier: rateMultiplier,
       platform,
       type: accountType || undefined,
       credentials,
@@ -170,6 +186,7 @@ export function CreateAccountModal({
     setAccountType('');
     setForm({ name: '', priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
     setPriorityInput(String(DEFAULT_ACCOUNT_PRIORITY));
+    setRateMultiplierInput('1');
     setCredentials({});
     setGroupIds([]);
     setBatchMode(false);
@@ -193,6 +210,9 @@ export function CreateAccountModal({
     ...platforms.map((p) => ({ id: p, label: pName(p) })),
   ];
   const selectedPlatformLabel = platformOptions.find((item) => item.id === platform)?.label ?? t('accounts.select_platform');
+  const rateMultiplierValid =
+    isEmptyRateMultiplierInput(rateMultiplierInput) ||
+    isValidRateMultiplierValue(parseRateMultiplier(rateMultiplierInput));
   const proxyOptions = [
     { id: '', label: t('accounts.no_proxy') },
     ...(proxiesData?.list ?? []).map((p) => ({
@@ -227,7 +247,7 @@ export function CreateAccountModal({
             <Button
               aria-busy={loading}
               form={CREATE_ACCOUNT_FORM_ID}
-              isDisabled={loading || !platform || !form.name}
+              isDisabled={loading || !platform || !form.name || !rateMultiplierValid}
               type="submit"
               variant="primary"
             >
@@ -348,11 +368,10 @@ export function CreateAccountModal({
                       <Label>{t('accounts.rate_multiplier')}</Label>
                       <Input
                         type="number"
-                        step="0.1"
-                        value={String(form.rate_multiplier ?? 1)}
-                        onChange={(e) =>
-                          setForm({ ...form, rate_multiplier: Number(e.target.value) })
-                        }
+                        min="0"
+                        step={RATE_MULTIPLIER_STEP}
+                        value={rateMultiplierInput}
+                        onChange={(e) => setRateMultiplierInput(e.target.value)}
                       />
                     </HeroTextField>
 

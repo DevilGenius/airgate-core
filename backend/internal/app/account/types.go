@@ -121,7 +121,7 @@ type CreateInput struct {
 	Priority       int
 	MaxConcurrency int
 	ProxyID        *int64
-	RateMultiplier float64
+	RateMultiplier *float64
 	GroupIDs       []int64
 	UpstreamIsPool bool
 	Extra          map[string]any

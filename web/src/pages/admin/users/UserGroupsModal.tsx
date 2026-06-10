@@ -19,6 +19,12 @@ import { groupsApi } from '../../../shared/api/groups';
 import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
+import {
+  RATE_MULTIPLIER_STEP,
+  formatRateMultiplier,
+  isValidRateMultiplierValue,
+  parseRateMultiplier,
+} from '../../../shared/utils/rateMultiplier';
 import type { UserResp, GroupResp, UpdateUserReq } from '../../../shared/types';
 
 interface UserGroupsModalProps {
@@ -32,7 +38,7 @@ function initialRateState(groupRates?: Record<number, number>): Record<number, s
   const out: Record<number, string> = {};
   if (!groupRates) return out;
   for (const [key, value] of Object.entries(groupRates)) {
-    if (typeof value === 'number' && value > 0) {
+    if (isValidRateMultiplierValue(value)) {
       out[Number(key)] = String(value);
     }
   }
@@ -67,8 +73,8 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
     const group_rates: Record<number, number> = {};
     for (const [key, raw] of Object.entries(customRates)) {
       if (raw === '' || raw == null) continue;
-      const value = Number(raw);
-      if (!Number.isFinite(value) || value <= 0) continue;
+      const value = parseRateMultiplier(raw);
+      if (!isValidRateMultiplierValue(value)) continue;
       group_rates[Number(key)] = value;
     }
     return {
@@ -87,8 +93,8 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
   const hasInvalidRate = useMemo(() => {
     for (const raw of Object.values(customRates)) {
       if (raw === '' || raw == null) continue;
-      const value = Number(raw);
-      if (!Number.isFinite(value) || value < 0) return true;
+      const value = parseRateMultiplier(raw);
+      if (!isValidRateMultiplierValue(value)) return true;
     }
     return false;
   }, [customRates]);
@@ -108,10 +114,10 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
           aria-label={`${group.name} ${t('groups.rate_multiplier')}`}
           type="number"
           min="0"
-          step="0.01"
+          step={RATE_MULTIPLIER_STEP}
           disabled={!enabled}
           value={customRates[group.id] ?? ''}
-          placeholder={String(group.rate_multiplier ?? 1)}
+          placeholder={formatRateMultiplier(group.rate_multiplier ?? 1)}
           onChange={(event) => setCustomRates((prev) => ({ ...prev, [group.id]: event.target.value }))}
         />
       </HeroTextField>

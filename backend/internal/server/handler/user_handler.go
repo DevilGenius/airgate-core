@@ -32,9 +32,10 @@ func (h *UserHandler) handleError(logMessage, publicMessage string, err error) (
 		errors.Is(err, appuser.ErrOldPasswordMismatch),
 		errors.Is(err, appuser.ErrInsufficientBalance),
 		errors.Is(err, appuser.ErrInvalidBalanceAction),
-		errors.Is(err, appuser.ErrDeleteAdminForbidden),
-		errors.Is(err, appuser.ErrInvalidRateMultiplier):
+		errors.Is(err, appuser.ErrDeleteAdminForbidden):
 		return 400, err.Error()
+	case errors.Is(err, appuser.ErrInvalidRateMultiplier):
+		return 400, appuser.ErrInvalidRateMultiplier.Error()
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage

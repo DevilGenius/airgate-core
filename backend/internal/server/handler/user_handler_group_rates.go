@@ -56,8 +56,12 @@ func (h *UserHandler) SetGroupRateOverride(c *gin.Context) {
 		response.BindError(c, err)
 		return
 	}
+	if req.Rate == nil {
+		response.BadRequest(c, "请填写专属倍率")
+		return
+	}
 
-	item, err := h.service.SetGroupRate(c.Request.Context(), userID, groupID, req.Rate)
+	item, err := h.service.SetGroupRate(c.Request.Context(), userID, groupID, *req.Rate)
 	if err != nil {
 		httpCode, message := h.handleError("设置分组专属倍率失败", "设置失败", err)
 		response.Error(c, httpCode, httpCode, message)

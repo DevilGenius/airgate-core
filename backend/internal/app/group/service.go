@@ -2,8 +2,10 @@ package group
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
@@ -105,6 +107,11 @@ func (s *Service) Get(ctx context.Context, id int) (Group, error) {
 // Create 创建分组。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Group, error) {
 	logger := sdk.LoggerFromContext(ctx)
+	rateMultiplier := defaultRateMultiplier(input.RateMultiplier)
+	if err := validateRateMultiplier(rateMultiplier); err != nil {
+		return Group{}, err
+	}
+	input.RateMultiplier = &rateMultiplier
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
 	input.PluginSettings = clonePluginSettings(input.PluginSettings)
@@ -127,6 +134,11 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Group, error) 
 // Update 更新分组。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Group, error) {
 	logger := sdk.LoggerFromContext(ctx)
+	if input.RateMultiplier != nil {
+		if err := validateRateMultiplier(*input.RateMultiplier); err != nil {
+			return Group{}, err
+		}
+	}
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
 	input.PluginSettings = clonePluginSettings(input.PluginSettings)
@@ -157,4 +169,18 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 	}
 	logger.Info("group_delete_succeeded", sdk.LogFieldGroupID, id)
 	return nil
+}
+
+func validateRateMultiplier(value float64) error {
+	if err := ratevalue.ValidateMultiplier(value); err != nil {
+		return errors.Join(ErrInvalidRateMultiplier, err)
+	}
+	return nil
+}
+
+func defaultRateMultiplier(value *float64) float64 {
+	if value == nil {
+		return 1
+	}
+	return *value
 }

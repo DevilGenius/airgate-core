@@ -27,6 +27,7 @@ func TestImportIgnoresEnvironmentScopedIDs(t *testing.T) {
 	}, nil, nil, nil)
 
 	proxyID := int64(99)
+	rateMultiplier := 1.2
 	summary := service.Import(t.Context(), []CreateInput{{
 		Name:           "demo",
 		Platform:       "openai",
@@ -34,13 +35,112 @@ func TestImportIgnoresEnvironmentScopedIDs(t *testing.T) {
 		Credentials:    map[string]string{"api_key": "secret"},
 		Priority:       3,
 		MaxConcurrency: 5,
-		RateMultiplier: 1.2,
+		RateMultiplier: &rateMultiplier,
 		GroupIDs:       []int64{2, 1},
 		ProxyID:        &proxyID,
 	}})
 
 	if summary.Imported != 1 || summary.Failed != 0 {
 		t.Fatalf("unexpected import summary: %+v", summary)
+	}
+}
+
+func TestCreateDefaultsMissingRateMultiplierToOne(t *testing.T) {
+	var captured *float64
+	service := NewService(stubRepository{
+		create: func(_ context.Context, input CreateInput) (Account, error) {
+			captured = input.RateMultiplier
+			return Account{ID: 1, Platform: input.Platform}, nil
+		},
+	}, nil, nil, nil)
+
+	if _, err := service.Create(t.Context(), CreateInput{Platform: "openai"}); err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	if captured == nil || *captured != 1 {
+		t.Fatalf("captured RateMultiplier = %v, want default 1", captured)
+	}
+}
+
+func TestCreateAllowsZeroAndMinimumPositiveRateMultiplier(t *testing.T) {
+	captured := make([]float64, 0, 2)
+	service := NewService(stubRepository{
+		create: func(_ context.Context, input CreateInput) (Account, error) {
+			if input.RateMultiplier == nil {
+				t.Fatalf("RateMultiplier should be normalized before repository create")
+			}
+			captured = append(captured, *input.RateMultiplier)
+			return Account{ID: len(captured), Platform: input.Platform}, nil
+		},
+	}, nil, nil, nil)
+
+	for _, rate := range []float64{0, 0.001} {
+		if _, err := service.Create(t.Context(), CreateInput{
+			Platform:       "openai",
+			RateMultiplier: &rate,
+		}); err != nil {
+			t.Fatalf("Create(rate=%v) returned error: %v", rate, err)
+		}
+	}
+	if len(captured) != 2 || captured[0] != 0 || captured[1] != 0.001 {
+		t.Fatalf("captured rates = %v, want [0 0.001]", captured)
+	}
+}
+
+func TestCreateRejectsInvalidRateMultiplier(t *testing.T) {
+	service := NewService(stubRepository{
+		create: func(_ context.Context, input CreateInput) (Account, error) {
+			t.Fatalf("repo.Create should not be called for invalid rate: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	for _, rate := range []float64{-1, 0.0001} {
+		_, err := service.Create(t.Context(), CreateInput{
+			Platform:       "openai",
+			RateMultiplier: &rate,
+		})
+		if !errors.Is(err, ErrInvalidRateMultiplier) {
+			t.Fatalf("Create(rate=%v) error = %v, want ErrInvalidRateMultiplier", rate, err)
+		}
+	}
+}
+
+func TestUpdateRejectsInvalidRateMultiplier(t *testing.T) {
+	rate := 0.0001
+	service := NewService(stubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called for invalid rate: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	_, err := service.Update(t.Context(), 1, UpdateInput{RateMultiplier: &rate})
+	if !errors.Is(err, ErrInvalidRateMultiplier) {
+		t.Fatalf("Update error = %v, want ErrInvalidRateMultiplier", err)
+	}
+}
+
+func TestBulkUpdateRejectsInvalidRateMultiplier(t *testing.T) {
+	rate := -1.0
+	service := NewService(stubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called for invalid rate: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs:            []int{1, 2},
+		RateMultiplier: &rate,
+	})
+	if result.Success != 0 || result.Failed != 2 {
+		t.Fatalf("BulkUpdate result = %+v, want 2 failures", result)
+	}
+	for _, item := range result.Results {
+		if item.Success || item.Error == "" {
+			t.Fatalf("result item = %+v, want invalid rate failure", item)
+		}
 	}
 }
 

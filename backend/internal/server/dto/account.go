@@ -51,7 +51,7 @@ type CreateAccountReq struct {
 	Priority       int               `json:"priority"`
 	MaxConcurrency int               `json:"max_concurrency"`
 	ProxyID        *int64            `json:"proxy_id"`
-	RateMultiplier float64           `json:"rate_multiplier"`
+	RateMultiplier OptionalFloat     `json:"rate_multiplier"`
 	UpstreamIsPool bool              `json:"upstream_is_pool"`
 	Extra          map[string]any    `json:"extra,omitempty"`
 	GroupIDs       []int64           `json:"group_ids"`
@@ -68,7 +68,7 @@ type UpdateAccountReq struct {
 	Priority       *int              `json:"priority"`
 	MaxConcurrency *int              `json:"max_concurrency"`
 	ProxyID        *int64            `json:"proxy_id"`
-	RateMultiplier *float64          `json:"rate_multiplier"`
+	RateMultiplier OptionalFloat     `json:"rate_multiplier"`
 	UpstreamIsPool *bool             `json:"upstream_is_pool"`
 	Extra          map[string]any    `json:"extra,omitempty"`
 	HasExtra       bool              `json:"-"`
@@ -84,7 +84,7 @@ type AccountExportItem struct {
 	Credentials    map[string]string `json:"credentials"`
 	Priority       int               `json:"priority"`
 	MaxConcurrency int               `json:"max_concurrency"`
-	RateMultiplier float64           `json:"rate_multiplier"`
+	RateMultiplier OptionalFloat     `json:"rate_multiplier"`
 	GroupIDs       []int64           `json:"group_ids,omitempty"`
 	ProxyID        *int64            `json:"proxy_id,omitempty"`
 }
@@ -122,7 +122,7 @@ type BulkUpdateAccountsReq struct {
 	State          *string        `json:"state" binding:"omitempty,oneof=active disabled"`
 	Priority       *int           `json:"priority"`
 	MaxConcurrency *int           `json:"max_concurrency"`
-	RateMultiplier *float64       `json:"rate_multiplier"`
+	RateMultiplier OptionalFloat  `json:"rate_multiplier"`
 	GroupIDs       []int64        `json:"group_ids"`
 	ProxyID        *int64         `json:"proxy_id"`
 	Extra          map[string]any `json:"extra,omitempty"`
