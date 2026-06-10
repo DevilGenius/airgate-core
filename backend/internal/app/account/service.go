@@ -22,6 +22,7 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
+	"github.com/DevilGenius/airgate-core/internal/pkg/httperrors"
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
@@ -1310,20 +1311,11 @@ func (s *Service) markAccountUsageError(ctx context.Context, accountID int, mess
 	if s.stateWriter == nil {
 		return
 	}
-	if isForbiddenAccountUsageError(message) {
+	if httperrors.IsForbiddenError(message, 0) {
 		s.stateWriter.MarkDegraded(ctx, accountID, message)
 		return
 	}
 	s.stateWriter.MarkDisabled(ctx, accountID, message)
-}
-
-func isForbiddenAccountUsageError(message string) bool {
-	message = strings.ToLower(strings.TrimSpace(message))
-	return strings.HasPrefix(message, "403") ||
-		strings.Contains(message, "http 403") ||
-		strings.Contains(message, "status 403") ||
-		strings.Contains(message, "403 forbidden") ||
-		strings.Contains(message, "403:")
 }
 
 // updateAccountUsageCache 把单账号最新探测结果写入单账号缓存。

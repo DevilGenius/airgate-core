@@ -4,11 +4,11 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/pkg/httperrors"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -120,7 +120,7 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		sm.transition(ctx, accountID, account.StateRateLimited, &until, j.Reason)
 
 	case sdk.OutcomeAccountDead:
-		if isForbiddenJudgment(j) {
+		if httperrors.IsForbiddenError(j.Reason, j.UpstreamStatus) {
 			sm.applyTransientAvoidance(ctx, accountID, j, transientKindUnavailable)
 			return
 		}
@@ -140,18 +140,6 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 	case sdk.OutcomeClientError, sdk.OutcomeStreamAborted, sdk.OutcomeUnknown:
 		// 账号无辜，不改状态。
 	}
-}
-
-func isForbiddenJudgment(j Judgment) bool {
-	if j.UpstreamStatus == http.StatusForbidden {
-		return true
-	}
-	reason := strings.ToLower(strings.TrimSpace(j.Reason))
-	return strings.HasPrefix(reason, "403") ||
-		strings.Contains(reason, "http 403") ||
-		strings.Contains(reason, "status 403") ||
-		strings.Contains(reason, "403 forbidden") ||
-		strings.Contains(reason, "403:")
 }
 
 func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID int, j Judgment, transientKind string) {
