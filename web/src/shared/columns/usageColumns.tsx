@@ -610,13 +610,13 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 {adminView && (
                   <TooltipRow label={t('usage.account_cost', '上游计费')} value={<CostValue value={row.account_cost} decimals={6} />} />
                 )}
-                <TooltipRow label={t('usage.billed_cost', '密钥计费')} value={<CostValue value={row.billed_cost} decimals={6} tone="actual" />} />
                 {row.sell_rate > 0 && row.billed_cost !== row.actual_cost && (
                   <>
                     <TooltipRow label={t('usage.user_charged', '余额扣费')} value={<CostValue value={row.actual_cost} decimals={6} />} />
                     <TooltipRow label={t('usage.profit', '利润')} value={<CostValue value={row.billed_cost - row.actual_cost} decimals={6} tone="success" />} />
                   </>
                 )}
+                <TooltipRow label={t('usage.billed_cost', '密钥计费')} value={<CostValue value={row.billed_cost} decimals={6} tone="actual" />} />
               </TooltipPanel>
             )
           )}
