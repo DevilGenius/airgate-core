@@ -194,17 +194,28 @@ func loadSystemUpgrades() []systemUpgrade {
 		if err != nil {
 			panicSystemUpgrade("read system upgrade "+entry.Name(), err)
 		}
-		hash := sha256.Sum256(data)
 		id := strings.TrimSuffix(entry.Name(), ".sql")
-		sql := string(data)
+		sql := normalizeSystemUpgradeSQL(data)
 		upgrades = append(upgrades, systemUpgrade{
 			ID:          id,
 			Description: systemUpgradeDescription(sql, id),
-			Checksum:    hex.EncodeToString(hash[:]),
+			Checksum:    systemUpgradeChecksum(sql),
 			SQL:         sql,
 		})
 	}
 	return upgrades
+}
+
+func normalizeSystemUpgradeSQL(data []byte) string {
+	sql := string(data)
+	sql = strings.ReplaceAll(sql, "\r\n", "\n")
+	sql = strings.ReplaceAll(sql, "\r", "\n")
+	return sql
+}
+
+func systemUpgradeChecksum(sql string) string {
+	hash := sha256.Sum256([]byte(sql))
+	return hex.EncodeToString(hash[:])
 }
 
 func validateSystemUpgradeFilename(name string) error {
