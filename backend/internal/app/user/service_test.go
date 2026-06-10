@@ -71,18 +71,18 @@ func TestSetGroupRateAllowsZeroAndMinimumPositiveRate(t *testing.T) {
 		t.Fatalf("captured zero override = %+v, want explicit 0", captured)
 	}
 
-	if _, err := service.SetGroupRate(t.Context(), 1, 9, 0.001); err != nil {
-		t.Fatalf("SetGroupRate(rate=0.001) returned error: %v", err)
+	if _, err := service.SetGroupRate(t.Context(), 1, 9, 0.01); err != nil {
+		t.Fatalf("SetGroupRate(rate=0.01) returned error: %v", err)
 	}
-	if captured.GroupRates[9] != 0.001 {
-		t.Fatalf("captured rate = %v, want 0.001", captured.GroupRates[9])
+	if captured.GroupRates[9] != 0.01 {
+		t.Fatalf("captured rate = %v, want 0.01", captured.GroupRates[9])
 	}
 }
 
 func TestSetGroupRateRejectsInvalidRate(t *testing.T) {
 	service := NewService(stubRepository{})
 
-	_, err := service.SetGroupRate(t.Context(), 1, 9, 0.0001)
+	_, err := service.SetGroupRate(t.Context(), 1, 9, 0.001)
 	if !errors.Is(err, ErrInvalidRateMultiplier) {
 		t.Fatalf("SetGroupRate() error = %v, want ErrInvalidRateMultiplier", err)
 	}

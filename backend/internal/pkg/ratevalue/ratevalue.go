@@ -5,9 +5,9 @@ import (
 	"math"
 )
 
-const MinPositiveMultiplier = 0.001
+const MinPositiveMultiplier = 0.01
 
-var ErrInvalidMultiplier = errors.New("倍率必须是有限非负数；0 表示免费，正数最低 0.001")
+var ErrInvalidMultiplier = errors.New("倍率必须是有限非负数；0 表示免费，正数最低 0.01")
 
 func ValidateMultiplier(value float64) error {
 	if !IsValidMultiplier(value) {

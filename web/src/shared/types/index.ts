@@ -477,9 +477,9 @@ export interface UsageLogResp {
   total_cost: number;
   /** 平台真实成本/用户扣费 = total × billing_rate */
   actual_cost: number;
-  /** 客户账面消耗（actual_cost × sell_rate）；reseller 计算 actual_cost 与之差额即利润 */
+  /** 密钥计费（actual_cost × sell_rate）；reseller 计算 actual_cost 与之差额即利润 */
   billed_cost: number;
-  /** 账号实际成本 = total × account_rate；用于"账号计费"统计 */
+  /** 上游计费 = total × account_rate；用于上游账号余额扣费统计 */
   account_cost: number;
   rate_multiplier: number;
   /** 快照：本次请求生效的 sell_rate；1 表示不加价，0 为历史/无 APIKey 兜底 */

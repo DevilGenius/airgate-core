@@ -94,7 +94,7 @@ func TestCreateAllowsZeroAndMinimumPositiveRateMultiplier(t *testing.T) {
 		},
 	}, stubConcurrencyReader{})
 
-	for _, rate := range []float64{0, 0.001} {
+	for _, rate := range []float64{0, 0.01} {
 		if _, err := service.Create(t.Context(), CreateInput{
 			Name:             "默认分组",
 			Platform:         "openai",
@@ -104,13 +104,13 @@ func TestCreateAllowsZeroAndMinimumPositiveRateMultiplier(t *testing.T) {
 			t.Fatalf("Create(rate=%v) returned error: %v", rate, err)
 		}
 	}
-	if len(captured) != 2 || captured[0] != 0 || captured[1] != 0.001 {
-		t.Fatalf("captured rates = %v, want [0 0.001]", captured)
+	if len(captured) != 2 || captured[0] != 0 || captured[1] != 0.01 {
+		t.Fatalf("captured rates = %v, want [0 0.01]", captured)
 	}
 }
 
 func TestUpdateRejectsTooSmallPositiveRateMultiplier(t *testing.T) {
-	rate := 0.0001
+	rate := 0.001
 	service := NewService(groupStubRepository{}, stubConcurrencyReader{})
 
 	_, err := service.Update(t.Context(), 1, UpdateInput{RateMultiplier: &rate})

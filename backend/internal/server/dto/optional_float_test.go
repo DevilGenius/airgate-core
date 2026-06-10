@@ -37,11 +37,11 @@ func TestOptionalFloatUnmarshalDistinguishesMissingNullAndZero(t *testing.T) {
 		t.Fatalf("zero field = %+v, want Set=true Null=false Value=0", payload.RateMultiplier)
 	}
 
-	if err := json.Unmarshal([]byte(`{"rate_multiplier":0.001}`), &payload); err != nil {
+	if err := json.Unmarshal([]byte(`{"rate_multiplier":0.01}`), &payload); err != nil {
 		t.Fatalf("unmarshal min positive field: %v", err)
 	}
-	if !payload.RateMultiplier.Set || payload.RateMultiplier.Null || payload.RateMultiplier.Value != 0.001 {
-		t.Fatalf("min positive field = %+v, want Set=true Null=false Value=0.001", payload.RateMultiplier)
+	if !payload.RateMultiplier.Set || payload.RateMultiplier.Null || payload.RateMultiplier.Value != 0.01 {
+		t.Fatalf("min positive field = %+v, want Set=true Null=false Value=0.01", payload.RateMultiplier)
 	}
 }
 

@@ -277,8 +277,8 @@ function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; li
   const range = data.range;
 
   // 计算活跃天数和日均
-  // 注意：所有"账号计费"相关数字都用 account_cost（base × account_rate），
-  // 而不是 total_cost（base 原价）。这样 reseller 配置 account_rate 才能真正反映"我用这个账号的实际花费"。
+  // 注意：所有"上游计费"相关数字都用 account_cost（base × account_rate），
+  // 而不是 total_cost（base 原价）。这样 reseller 配置 account_rate 才能真正反映"我用这个上游账号的实际花费"。
   const activeDays = data.active_days || 1;
   const dailyAvgCost = range.account_cost / activeDays;
   const dailyAvgRequests = range.count / activeDays;
@@ -476,7 +476,7 @@ function TrendChart({ data }: { data: AccountStatsResp }) {
   const chartData = useMemo(() =>
     (data.daily_trend ?? []).map((d) => ({
       date: fmtDate(d.date),
-      // 趋势图的"账号计费"线读 account_cost（含 account_rate），匹配卡片数字
+      // 趋势图的"上游计费"线读 account_cost（含 account_rate），匹配卡片数字
       totalCost: Number(d.account_cost.toFixed(4)),
       actualCost: Number(d.actual_cost.toFixed(4)),
       count: d.count,

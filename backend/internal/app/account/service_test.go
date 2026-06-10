@@ -74,7 +74,7 @@ func TestCreateAllowsZeroAndMinimumPositiveRateMultiplier(t *testing.T) {
 		},
 	}, nil, nil, nil)
 
-	for _, rate := range []float64{0, 0.001} {
+	for _, rate := range []float64{0, 0.01} {
 		if _, err := service.Create(t.Context(), CreateInput{
 			Platform:       "openai",
 			RateMultiplier: &rate,
@@ -82,8 +82,8 @@ func TestCreateAllowsZeroAndMinimumPositiveRateMultiplier(t *testing.T) {
 			t.Fatalf("Create(rate=%v) returned error: %v", rate, err)
 		}
 	}
-	if len(captured) != 2 || captured[0] != 0 || captured[1] != 0.001 {
-		t.Fatalf("captured rates = %v, want [0 0.001]", captured)
+	if len(captured) != 2 || captured[0] != 0 || captured[1] != 0.01 {
+		t.Fatalf("captured rates = %v, want [0 0.01]", captured)
 	}
 }
 
@@ -95,7 +95,7 @@ func TestCreateRejectsInvalidRateMultiplier(t *testing.T) {
 		},
 	}, nil, nil, nil)
 
-	for _, rate := range []float64{-1, 0.0001} {
+	for _, rate := range []float64{-1, 0.001} {
 		_, err := service.Create(t.Context(), CreateInput{
 			Platform:       "openai",
 			RateMultiplier: &rate,
@@ -107,7 +107,7 @@ func TestCreateRejectsInvalidRateMultiplier(t *testing.T) {
 }
 
 func TestUpdateRejectsInvalidRateMultiplier(t *testing.T) {
-	rate := 0.0001
+	rate := 0.001
 	service := NewService(stubRepository{
 		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
 			t.Fatalf("repo.Update should not be called for invalid rate: %+v", input)
