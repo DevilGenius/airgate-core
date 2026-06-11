@@ -479,6 +479,7 @@ type stubStateWriter struct {
 	cleared        map[int]bool
 	markersCleared map[int]int
 	disabled       map[int]string
+	degraded       map[int]string
 	recovered      map[int]bool
 }
 
@@ -488,6 +489,7 @@ func newStubStateWriter() *stubStateWriter {
 		cleared:        map[int]bool{},
 		markersCleared: map[int]int{},
 		disabled:       map[int]string{},
+		degraded:       map[int]string{},
 		recovered:      map[int]bool{},
 	}
 }
@@ -510,6 +512,10 @@ func (s *stubStateWriter) MarkDisabled(_ context.Context, accountID int, reason 
 	s.disabled[accountID] = reason
 }
 
+func (s *stubStateWriter) MarkDegraded(_ context.Context, accountID int, reason string) {
+	s.degraded[accountID] = reason
+}
+
 func (s *stubStateWriter) ManualRecover(_ context.Context, accountID int) error {
 	s.recovered[accountID] = true
 	return nil
@@ -518,6 +524,34 @@ func (s *stubStateWriter) ManualRecover(_ context.Context, accountID int) error 
 func (s *stubStateWriter) ManualDisable(_ context.Context, accountID int, reason string) error {
 	s.disabled[accountID] = reason
 	return nil
+}
+
+func TestMarkAccountUsageErrorDegradesForbidden(t *testing.T) {
+	writer := newStubStateWriter()
+	service := NewService(stubRepository{}, nil, nil, writer)
+
+	service.markAccountUsageError(context.Background(), 42, "HTTP 403: 访问被拒绝")
+
+	if got := writer.degraded[42]; got != "HTTP 403: 访问被拒绝" {
+		t.Fatalf("MarkDegraded reason = %q, want forbidden reason", got)
+	}
+	if _, ok := writer.disabled[42]; ok {
+		t.Fatalf("403 usage error should not MarkDisabled")
+	}
+}
+
+func TestMarkAccountUsageErrorDisablesNonForbidden(t *testing.T) {
+	writer := newStubStateWriter()
+	service := NewService(stubRepository{}, nil, nil, writer)
+
+	service.markAccountUsageError(context.Background(), 42, "HTTP 401: invalid token")
+
+	if got := writer.disabled[42]; got != "HTTP 401: invalid token" {
+		t.Fatalf("MarkDisabled reason = %q, want auth reason", got)
+	}
+	if _, ok := writer.degraded[42]; ok {
+		t.Fatalf("non-403 usage error should not MarkDegraded")
+	}
 }
 
 type stubPluginCatalog struct {
@@ -1177,9 +1211,9 @@ func TestConnectivityTestErrorMessage(t *testing.T) {
 			name: "账号暂时不可用使用统一提示",
 			outcome: sdk.ForwardOutcome{
 				Kind:   sdk.OutcomeAccountUnavailable,
-				Reason: "HTTP 403: 访问被拒绝，账号可能已被禁用或无权限",
+				Reason: "HTTP 403: 访问被拒绝，账号暂不可用或无权限",
 			},
-			want: "上游账号403暂不可用: HTTP 403: 访问被拒绝，账号可能已被禁用或无权限",
+			want: "上游账号403暂不可用: HTTP 403: 访问被拒绝，账号暂不可用或无权限",
 		},
 	}
 

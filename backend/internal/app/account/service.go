@@ -23,6 +23,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/pkg/httperrors"
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
@@ -91,6 +92,8 @@ type StateWriter interface {
 	ClearRateLimitMarkers(ctx context.Context, accountID int) int
 	// MarkDisabled 永久禁用（凭证失效等，需要人工重新验证）。
 	MarkDisabled(ctx context.Context, accountID int, reason string)
+	// MarkDegraded 临时降级（如上游 403 暂不可用），不会永久禁用账号。
+	MarkDegraded(ctx context.Context, accountID int, reason string)
 	// ManualRecover 手动恢复到 active 并清除路由缓存。
 	ManualRecover(ctx context.Context, accountID int) error
 	// ManualDisable 手动禁用并清除路由缓存。
@@ -1204,11 +1207,11 @@ func (s *Service) fetchUpstreamUsageForAccounts(ctx context.Context, accounts []
 				if _, ok := poolByID[item.ID]; !ok {
 					continue
 				}
-				// 池账号 / 已禁用账号不自动 MarkDisabled（避免覆盖人工关闭的 reason）。
+				// 池账号 / 已禁用账号不自动改状态（避免覆盖人工关闭的 reason）。
 				if poolByID[item.ID] || disabledIDs[item.ID] || s.stateWriter == nil {
 					continue
 				}
-				s.stateWriter.MarkDisabled(ctx, item.ID, item.Message)
+				s.markAccountUsageError(ctx, item.ID, item.Message)
 			}
 		}
 		if ctx.Err() != nil {
@@ -1238,7 +1241,7 @@ func (s *Service) fetchSingleAccountUsageDedup(ctx context.Context, item Account
 		return result{info: info, usageErrors: usageErrors, ok: ok}, nil
 	})
 	res, _ := v.(result)
-	// 调用方早退（ctx.Done）时 res 仍是 zero/false，行为与旧版超时一致。
+	// 调用方早退（ctx.Done）时 res 仍是 zero/false。
 	if err := ctx.Err(); err != nil {
 		return AccountUsageInfo{}, nil, false
 	}
@@ -1313,9 +1316,20 @@ func (s *Service) handleSingleAccountUsageErrors(ctx context.Context, item Accou
 		if usageErr.ID != item.ID || usageErr.Message == "" {
 			continue
 		}
-		s.stateWriter.MarkDisabled(ctx, item.ID, usageErr.Message)
+		s.markAccountUsageError(ctx, item.ID, usageErr.Message)
 		return
 	}
+}
+
+func (s *Service) markAccountUsageError(ctx context.Context, accountID int, message string) {
+	if s.stateWriter == nil {
+		return
+	}
+	if httperrors.IsForbiddenError(message, 0) {
+		s.stateWriter.MarkDegraded(ctx, accountID, message)
+		return
+	}
+	s.stateWriter.MarkDisabled(ctx, accountID, message)
 }
 
 // updateAccountUsageCache 把单账号最新探测结果写入单账号缓存。

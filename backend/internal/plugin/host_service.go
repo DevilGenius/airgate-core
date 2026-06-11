@@ -678,9 +678,8 @@ func (h *HostService) listGroups(ctx context.Context) (map[string]interface{}, e
 // reportAccountResult 把账号调用结果反馈给 scheduler。
 // 内部 worker，由 pluginHostHandle.ReportAccountResult 委托。
 //
-// success=true 直接走 Apply(OutcomeSuccess)；success=false 按"上游抖动"上报
-// （由状态机的滚动窗口计数决定是否升级为 disabled），避免探测插件单次失败
-// 就把账号标死。
+// success=true 直接走 Apply(OutcomeSuccess)；success=false 按"上游抖动"上报，
+// 由状态机做临时退避降级，避免探测插件单次失败就把账号标死。
 func (h *HostService) reportAccountResult(ctx context.Context, req hostReportAccountResultRequest) (map[string]interface{}, error) {
 	if req.AccountID <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "account_id 必须 > 0")

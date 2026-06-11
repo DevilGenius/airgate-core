@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent/account"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // 管理员 / 配额巡检的状态写入口。这些调用不经过 Apply —— 它们是"外部已知事实"
@@ -79,4 +80,12 @@ func (s *Scheduler) ClearRateLimitMarkers(ctx context.Context, accountID int) in
 // MarkDisabled 把账号标记为 disabled（凭证失效等确定性错误）。
 func (s *Scheduler) MarkDisabled(ctx context.Context, accountID int, reason string) {
 	s.state.transition(ctx, accountID, account.StateDisabled, nil, reason)
+}
+
+// MarkDegraded 把账号临时降级，不永久禁用；用于 403 等暂不可用信号。
+func (s *Scheduler) MarkDegraded(ctx context.Context, accountID int, reason string) {
+	s.state.applyTransientAvoidance(ctx, accountID, Judgment{
+		Kind:   sdk.OutcomeAccountUnavailable,
+		Reason: reason,
+	}, transientKindUnavailable)
 }

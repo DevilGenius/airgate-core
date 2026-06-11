@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
-func TestStateMachineTransientAvoidanceBackoffAnd403Escalation(t *testing.T) {
+func TestStateMachineTransientAvoidanceBackoffAnd403NeverDisables(t *testing.T) {
 	ctx := context.Background()
 	db := openStateMachineTestDB(t, "scheduler_transient_403_backoff")
 	sm := NewStateMachine(db, nil)
@@ -24,17 +25,14 @@ func TestStateMachineTransientAvoidanceBackoffAnd403Escalation(t *testing.T) {
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh := db.Account.GetX(ctx, acc.ID)
 	assertShortDBAvoidance(t, fresh, 1, 7*time.Second, 8*time.Second)
-	assertNoTransient403DegradedCount(t, fresh)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
 	assertShortDBAvoidance(t, fresh, 2, 14*time.Second, 16*time.Second)
-	assertNoTransient403DegradedCount(t, fresh)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
 	assertShortDBAvoidance(t, fresh, 3, 29*time.Second, 31*time.Second)
-	assertNoTransient403DegradedCount(t, fresh)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
@@ -42,28 +40,70 @@ func TestStateMachineTransientAvoidanceBackoffAnd403Escalation(t *testing.T) {
 		t.Fatalf("state after fourth 403 = %s, want degraded", fresh.State)
 	}
 	assertDBDegraded(t, fresh, 59*time.Second, 61*time.Second)
-	if got := extraInt(fresh.Extra, transient403DegradedCountKey); got != 1 {
-		t.Fatalf("403 degraded count after first degraded = %d, want 1", got)
-	}
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
-	if got := extraInt(fresh.Extra, transient403DegradedCountKey); got != 2 {
-		t.Fatalf("403 degraded count after second degraded = %d, want 2", got)
+	if fresh.State != account.StateDegraded {
+		t.Fatalf("state after fifth 403 = %s, want degraded", fresh.State)
 	}
+	assertDBDegraded(t, fresh, 59*time.Second, 61*time.Second)
 
-	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+	applyJudgmentN(ctx, sm, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"}, 4)
 	fresh = db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateDegraded {
+		t.Fatalf("state after repeated 403 = %s, want degraded", fresh.State)
+	}
+	assertDBDegraded(t, fresh, 59*time.Second, 61*time.Second)
+	if criticalTransitions != 0 {
+		t.Fatalf("critical transitions = %d, want 0", criticalTransitions)
+	}
+}
+
+func TestStateMachineAccountDead403DegradesWithoutDisable(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_account_dead_403_degrades")
+	sm := NewStateMachine(db, nil)
+	criticalTransitions := 0
+	sm.onCriticalTransition = func() { criticalTransitions++ }
+	acc := createStateMachineAccount(ctx, db, "account dead 403", false)
+
+	applyJudgmentN(ctx, sm, acc.ID, Judgment{
+		Kind:           sdk.OutcomeAccountDead,
+		Reason:         "HTTP 403: forbidden",
+		UpstreamStatus: http.StatusForbidden,
+	}, 8)
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateDegraded {
+		t.Fatalf("state after repeated account-dead 403 = %s, want degraded", fresh.State)
+	}
+	assertDBDegraded(t, fresh, 59*time.Second, 61*time.Second)
+	if criticalTransitions != 0 {
+		t.Fatalf("critical transitions = %d, want 0", criticalTransitions)
+	}
+}
+
+func TestStateMachineAccountDead401StillDisables(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_account_dead_401_disables")
+	sm := NewStateMachine(db, nil)
+	criticalTransitions := 0
+	sm.onCriticalTransition = func() { criticalTransitions++ }
+	acc := createStateMachineAccount(ctx, db, "account dead 401", false)
+
+	sm.Apply(ctx, acc.ID, Judgment{
+		Kind:           sdk.OutcomeAccountDead,
+		Reason:         "HTTP 401: invalid token",
+		UpstreamStatus: http.StatusUnauthorized,
+	})
+
+	fresh := db.Account.GetX(ctx, acc.ID)
 	if fresh.State != account.StateDisabled {
-		t.Fatalf("state after third degraded 403 = %s, want disabled", fresh.State)
+		t.Fatalf("state after account-dead 401 = %s, want disabled", fresh.State)
 	}
 	if fresh.StateUntil != nil {
-		t.Fatalf("state_until should be cleared after disable")
+		t.Fatalf("state_until after account-dead 401 = %v, want nil", fresh.StateUntil)
 	}
-	if hasTransient403DegradedCount(fresh.Extra) {
-		t.Fatalf("403 degraded count should be cleared after disable: %+v", fresh.Extra)
-	}
-	assertTransientAvoidanceExtraCleared(t, fresh)
 	if criticalTransitions != 1 {
 		t.Fatalf("critical transitions = %d, want 1", criticalTransitions)
 	}
@@ -206,9 +246,6 @@ func TestStateMachineTransientAvoidanceDoesNotLoosenUnexpiredRateLimit(t *testin
 	if fresh.StateUntil == nil || !fresh.StateUntil.Equal(*before.StateUntil) {
 		t.Fatalf("state_until after transient = %v, want %v", fresh.StateUntil, before.StateUntil)
 	}
-	if hasTransient403DegradedCount(fresh.Extra) {
-		t.Fatalf("403 degraded count should not be set while rate_limited: %+v", fresh.Extra)
-	}
 	if extraInt(fresh.Extra, transientAvoidStepExtraKey) != 0 {
 		t.Fatalf("transient step should not be set while rate_limited: %+v", fresh.Extra)
 	}
@@ -269,9 +306,6 @@ func TestStateMachinePool403AvoidsWithoutDisable(t *testing.T) {
 	if fresh.State != account.StateDegraded {
 		t.Fatalf("pool account state = %s, want degraded", fresh.State)
 	}
-	if got := extraInt(fresh.Extra, transient403DegradedCountKey); got != 0 {
-		t.Fatalf("pool 403 degraded count = %d, want 0", got)
-	}
 }
 
 func TestStateMachineUpstreamTransientAvoidsWithoutDisable(t *testing.T) {
@@ -288,9 +322,6 @@ func TestStateMachineUpstreamTransientAvoidsWithoutDisable(t *testing.T) {
 	}
 	if fresh.State != account.StateDegraded {
 		t.Fatalf("state after repeated 5xx = %s, want degraded", fresh.State)
-	}
-	if got := extraInt(fresh.Extra, transient403DegradedCountKey); got != 0 {
-		t.Fatalf("5xx should not increment 403 degraded count, got %d", got)
 	}
 }
 
@@ -318,13 +349,6 @@ func createStateMachineAccount(ctx context.Context, db *ent.Client, name string,
 func applyJudgmentN(ctx context.Context, sm *StateMachine, accountID int, j Judgment, n int) {
 	for i := 0; i < n; i++ {
 		sm.Apply(ctx, accountID, j)
-	}
-}
-
-func assertNoTransient403DegradedCount(t *testing.T, acc *ent.Account) {
-	t.Helper()
-	if hasTransient403DegradedCount(acc.Extra) {
-		t.Fatalf("403 degraded count should not be written before degrade: %+v", acc.Extra)
 	}
 }
 

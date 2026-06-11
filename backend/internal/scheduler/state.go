@@ -3,12 +3,14 @@ package scheduler
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/pkg/httperrors"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -30,13 +32,9 @@ const (
 	transientAvoidanceThird  = 30 * time.Second
 	transientDegradedWindow  = 60 * time.Second
 
-	// transient403DegradedThreshold 非池账号连续 403 进入 degraded 达到该次数后禁用。
-	transient403DegradedThreshold = 3
-
-	transientAvoidStepExtraKey   = "_airgate_transient_avoid_step"
-	transient403DegradedCountKey = "_airgate_transient_403_degraded_count"
-	transientKindUnavailable     = "account_unavailable"
-	transientKindUpstream        = "upstream_transient"
+	transientAvoidStepExtraKey = "_airgate_transient_avoid_step"
+	transientKindUnavailable   = "account_unavailable"
+	transientKindUpstream      = "upstream_transient"
 )
 
 // Judgment forwarder 对一次调用的判决，交给状态机做状态转移。
@@ -90,8 +88,8 @@ func (sm *StateMachine) notifyCritical() {
 //
 //	Success             → state=active，清 state_until，last_used_at=now
 //	AccountRateLimited  → state=rate_limited，state_until=now+RetryAfter
-//	AccountDead         → state=disabled（凭证失效，需人工介入）
-//	AccountUnavailable  → 瞬时避让；非池账号连续 403 degraded 达阈值后 disabled
+//	AccountDead         → 401 等确定性凭证失效才 disabled；403 只降级
+//	AccountUnavailable  → 瞬时避让；连续 403 只降级，不自动 disabled
 //	UpstreamTransient   → 瞬时避让；不会 disabled
 //	ClientError / StreamAborted / Unknown → 不改状态（账号无辜）
 func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
@@ -127,9 +125,12 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		sm.transition(ctx, accountID, account.StateRateLimited, &until, j.Reason)
 
 	case sdk.OutcomeAccountDead:
-		if j.IsPool && j.UpstreamStatus != 401 {
-			// 池账号的 403 等是上游透传的错误，池子本身没问题，
-			// 不动状态，靠 failover 重试消化。
+		if httperrors.IsForbiddenError(j.Reason, j.UpstreamStatus) {
+			sm.applyTransientAvoidance(ctx, accountID, j, transientKindUnavailable)
+			return
+		}
+		if j.IsPool && j.UpstreamStatus != http.StatusUnauthorized {
+			// 池账号非 401 的 AccountDead 判决不永久禁用；靠 failover 重试消化。
 			// 401 表示池子自身的凭证无效，仍需禁用并说明原因。
 			return
 		}
@@ -191,35 +192,6 @@ func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID i
 	until := now.Add(delay)
 	extra[transientAvoidStepExtraKey] = nextStep
 
-	if degraded && transientKind == transientKindUnavailable && !existing.UpstreamIsPool {
-		count := extraInt(extra, transient403DegradedCountKey) + 1
-		extra[transient403DegradedCountKey] = count
-		if count >= transient403DegradedThreshold {
-			clearTransientAvoidanceExtra(extra)
-			err = sm.db.Account.UpdateOneID(accountID).
-				SetState(account.StateDisabled).
-				ClearStateUntil().
-				SetErrorMsg(truncateReason(j.Reason)).
-				SetExtra(extra).
-				Exec(dbCtx)
-			if err != nil {
-				slog.Error("scheduler_transient_403_disable_failed",
-					sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
-				return
-			}
-			slog.Warn("scheduler_transient_403_disabled",
-				sdk.LogFieldAccountID, accountID,
-				"degraded_count", count,
-				sdk.LogFieldReason, j.Reason,
-			)
-			sm.recordAccountStateEvent(ctx, accountID, account.StateDisabled, nil, j.Reason, j)
-			sm.notifyCritical()
-			return
-		}
-	} else {
-		delete(extra, transient403DegradedCountKey)
-	}
-
 	err = sm.db.Account.UpdateOneID(accountID).
 		SetState(account.StateDegraded).
 		SetStateUntil(until).
@@ -237,7 +209,6 @@ func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID i
 		"step", nextStep,
 		"until", until,
 		"short_avoidance", !degraded,
-		"degraded_403_count", extraInt(extra, transient403DegradedCountKey),
 		sdk.LogFieldReason, j.Reason,
 	)
 	sm.recordAccountStateEvent(ctx, accountID, account.StateDegraded, &until, j.Reason, j)
@@ -268,7 +239,6 @@ func nextTransientAvoidanceStep(step int) int {
 
 func clearTransientAvoidanceExtra(extra map[string]interface{}) {
 	delete(extra, transientAvoidStepExtraKey)
-	delete(extra, transient403DegradedCountKey)
 }
 
 func hasTransientAvoidanceExtra(extra map[string]interface{}) bool {
@@ -278,15 +248,7 @@ func hasTransientAvoidanceExtra(extra map[string]interface{}) bool {
 	if _, ok := extra[transientAvoidStepExtraKey]; ok {
 		return true
 	}
-	return hasTransient403DegradedCount(extra)
-}
-
-func hasTransient403DegradedCount(extra map[string]interface{}) bool {
-	if extra == nil {
-		return false
-	}
-	_, ok := extra[transient403DegradedCountKey]
-	return ok
+	return false
 }
 
 // transitionActive 成功时回到 active：清 state_until、清 reason、清失败计数、更新 last_used_at。
