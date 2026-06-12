@@ -781,10 +781,26 @@ func TestSelectAllRoutesFailureResponse(t *testing.T) {
 			wantCode:   "upstream_error",
 		},
 		{
-			name: "no available account",
+			name: "account unavailable",
 			summary: allRoutesFailureSummary{
 				accountDeadSeen:    true,
 				accountUnavailable: true,
+			},
+			wantStatus: http.StatusTooManyRequests,
+			wantCode:   "all_routes_account_unavailable",
+		},
+		{
+			name: "account unavailable by pick error",
+			summary: allRoutesFailureSummary{
+				accountUnavailable: true,
+			},
+			wantStatus: http.StatusTooManyRequests,
+			wantCode:   "all_routes_account_unavailable",
+		},
+		{
+			name: "account dead only",
+			summary: allRoutesFailureSummary{
+				accountDeadSeen: true,
 			},
 			wantStatus: http.StatusServiceUnavailable,
 			wantCode:   "no_available_account",

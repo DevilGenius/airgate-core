@@ -254,6 +254,11 @@ func writeFailureResponse(c *gin.Context, state *forwardState, execution forward
 			sanitizedMessage(execution.outcome.Kind), execution.outcome.RetryAfter)
 		return
 	}
+	if execution.outcome.Kind == sdk.OutcomeAccountUnavailable {
+		openAIRateLimitError(c, http.StatusTooManyRequests, "upstream_account_unavailable",
+			sanitizedMessage(execution.outcome.Kind), allRoutesFailedDefaultRetryAfter)
+		return
+	}
 	openAIError(c, http.StatusBadGateway, "server_error", "upstream_error", sanitizedMessage(execution.outcome.Kind))
 }
 
