@@ -8,7 +8,18 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/monitoring"
 )
+
+type captureMonitorRecorder struct {
+	events []monitoring.EventInput
+}
+
+func (r *captureMonitorRecorder) Record(_ context.Context, input monitoring.EventInput) {
+	r.events = append(r.events, input)
+}
+
+func (r *captureMonitorRecorder) ResolveBySubject(context.Context, monitoring.ResolveQuery) {}
 
 func TestExcludeAccountsDoesNotMutateCandidates(t *testing.T) {
 	t.Parallel()
@@ -74,6 +85,47 @@ func TestSoftStickyKeepsNegativeFallbackBehindNonNegativeStickyOnly(t *testing.T
 	}
 	if got := selectSoftStickyAccount(pool, 2); got == nil || got.ID != 2 {
 		t.Fatalf("non-negative StickyOnly sticky account = %+v, want account 2", got)
+	}
+}
+
+func TestRecordNoAvailableAccountSkipsFailoverExhaustion(t *testing.T) {
+	t.Parallel()
+
+	recorder := &captureMonitorRecorder{}
+	s := &Scheduler{state: &StateMachine{monitor: recorder}}
+
+	s.recordNoAvailableAccount(context.Background(), "openai", "gpt-4.1", 2, 7, "", AccountSelectionOptions{}, []int{101})
+
+	if len(recorder.events) != 0 {
+		t.Fatalf("events = %d, want 0", len(recorder.events))
+	}
+}
+
+func TestRecordNoAvailableAccountRecordsInitialExhaustion(t *testing.T) {
+	t.Parallel()
+
+	recorder := &captureMonitorRecorder{}
+	s := &Scheduler{state: &StateMachine{monitor: recorder}}
+
+	s.recordNoAvailableAccount(context.Background(), "openai", "gpt-4.1", 2, 7, "", AccountSelectionOptions{
+		GroupNameSnapshot: "production",
+	}, nil)
+
+	if len(recorder.events) != 1 {
+		t.Fatalf("events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.ErrorCode != "no_available_account" {
+		t.Fatalf("errorCode = %q, want no_available_account", event.ErrorCode)
+	}
+	if event.SubjectID != "7" {
+		t.Fatalf("subjectID = %q, want 7", event.SubjectID)
+	}
+	if got := event.Detail["exclude_count"]; got != 0 {
+		t.Fatalf("exclude_count = %#v, want 0", got)
+	}
+	if got := event.Detail["group_name"]; got != "production" {
+		t.Fatalf("group_name = %#v, want production", got)
 	}
 }
 

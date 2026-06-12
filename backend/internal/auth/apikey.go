@@ -70,6 +70,7 @@ type APIKeyInfo struct {
 	UserID        int
 	UserEmail     string
 	GroupID       int
+	GroupName     string
 	GroupPlatform string
 	QuotaUSD      float64
 	UsedQuota     float64
@@ -265,6 +266,7 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		UserID:             u.ID,
 		UserEmail:          u.Email,
 		GroupID:            g.ID,
+		GroupName:          g.Name,
 		GroupPlatform:      g.Platform,
 		QuotaUSD:           ak.QuotaUsd,
 		UsedQuota:          ak.UsedQuota,

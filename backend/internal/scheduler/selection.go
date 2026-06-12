@@ -32,6 +32,7 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 type AccountSelectionOptions struct {
 	PreviousResponseID          string
 	RequireContinuationAffinity bool
+	GroupNameSnapshot           string
 }
 
 // SelectAccountWithOptions 在常规调度前优先按 previous_response_id 命中原账号。
@@ -128,6 +129,9 @@ func (s *Scheduler) recordNoAvailableAccount(ctx context.Context, platform, mode
 	if s == nil || s.state == nil || s.state.monitor == nil {
 		return
 	}
+	if len(excludeIDs) > 0 {
+		return
+	}
 	subjectID := platform
 	if groupID > 0 {
 		subjectID = strconv.Itoa(groupID)
@@ -137,6 +141,9 @@ func (s *Scheduler) recordNoAvailableAccount(ctx context.Context, platform, mode
 		"group_id":      groupID,
 		"model":         model,
 		"platform":      platform,
+	}
+	if opts.GroupNameSnapshot != "" {
+		detail["group_name"] = opts.GroupNameSnapshot
 	}
 	if userID > 0 {
 		detail["user_id"] = userID

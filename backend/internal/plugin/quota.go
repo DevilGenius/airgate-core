@@ -117,6 +117,7 @@ func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs 
 			scheduler.AccountSelectionOptions{
 				PreviousResponseID:          state.previousResponseID,
 				RequireContinuationAffinity: state.requireContinuationAffinity,
+				GroupNameSnapshot:           state.keyInfo.GroupName,
 			},
 			excludeIDs...,
 		)

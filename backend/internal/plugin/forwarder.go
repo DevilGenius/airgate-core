@@ -387,6 +387,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	logger.Error("forward_request_failed", failAttrs...)
 
 	response := selectAllRoutesFailureResponse(failureSummary)
+	f.recordAllRoutesAccountUnavailable(c, state, failureSummary, response, totalAttempts)
 	f.recordAPIRequestError(c, state, response.status, response.code, response.message)
 	writeAllRoutesFailedResponse(c, response)
 }
@@ -582,7 +583,7 @@ func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFa
 			status:     http.StatusTooManyRequests,
 			errType:    "rate_limit_error",
 			code:       "all_routes_account_unavailable",
-			message:    "上游账号403暂不可用，请稍后重试",
+			message:    "当前模型暂无可用上游账号，请稍后重试",
 			retryAfter: allRoutesFailedDefaultRetryAfter,
 		}
 	}

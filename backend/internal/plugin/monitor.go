@@ -3,11 +3,13 @@ package plugin
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -33,6 +35,14 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 	userID := keyInfo.UserID
 	groupID := keyInfo.GroupID
 	apiKeyID := keyInfo.KeyID
+	detail := map[string]interface{}{
+		"platform":         platform,
+		"model":            model,
+		"http_status":      status,
+		"http_error_class": httpErrorClassForStatus(status),
+		"error_code":       code,
+	}
+	attachKeyInfoDetail(detail, keyInfo)
 	f.requestMonitor.RecordRequest(ctx, requestmonitoring.EventInput{
 		Type:               requestmonitoring.TypeAPIRequestError,
 		Severity:           requestSeverityForStatus(status),
@@ -52,13 +62,72 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 		ErrorCode:          code,
 		Title:              "API request error",
 		Message:            message,
-		Detail: map[string]interface{}{
-			"platform":         platform,
-			"model":            model,
-			"http_status":      status,
-			"http_error_class": httpErrorClassForStatus(status),
-			"error_code":       code,
-		},
+		Detail:             detail,
+	})
+}
+
+func (f *Forwarder) recordAllRoutesAccountUnavailable(c *gin.Context, state *forwardState, summary allRoutesFailureSummary, response allRoutesFailureResponse, attempts int) {
+	if f == nil || f.monitor == nil || state == nil {
+		return
+	}
+	if response.code != "all_routes_account_unavailable" && response.code != "no_available_account" {
+		return
+	}
+	ctx := context.Background()
+	if c != nil && c.Request != nil {
+		ctx = context.WithoutCancel(c.Request.Context())
+	}
+	platform := state.requestedPlatform
+	pluginID := ""
+	if state.plugin != nil {
+		pluginID = state.plugin.Name
+		if platform == "" {
+			platform = state.plugin.Platform
+		}
+	}
+	subjectID := platform
+	detail := map[string]interface{}{
+		"attempts":            attempts,
+		"error_code":          response.code,
+		"http_status":         response.status,
+		"platform":            platform,
+		"plugin_id":           pluginID,
+		"model":               state.modelForScheduling(),
+		"client_model":        state.model,
+		"request_path":        state.requestPath,
+		"account_unavailable": summary.accountUnavailable,
+		"account_dead_seen":   summary.accountDeadSeen,
+	}
+	if requestID := middleware.RequestIDFromGinContext(c); requestID != "" {
+		detail["request_id"] = requestID
+	}
+	if state.keyInfo != nil {
+		if state.keyInfo.GroupID > 0 {
+			subjectID = strconv.Itoa(state.keyInfo.GroupID)
+			detail["group_id"] = state.keyInfo.GroupID
+		}
+		if state.keyInfo.GroupName != "" {
+			detail["group_name"] = state.keyInfo.GroupName
+		}
+		if state.keyInfo.UserID > 0 {
+			detail["user_id"] = state.keyInfo.UserID
+		}
+		if state.keyInfo.KeyID > 0 {
+			detail["api_key_id"] = state.keyInfo.KeyID
+		}
+	}
+	f.monitor.Record(ctx, monitoring.EventInput{
+		Type:        monitoring.TypeSchedulerError,
+		Severity:    monitoring.SeverityError,
+		Source:      monitoring.SourceForwarder,
+		SubjectType: monitoring.SubjectScheduler,
+		SubjectID:   subjectID,
+		Platform:    platform,
+		PluginID:    pluginID,
+		ErrorCode:   response.code,
+		Title:       "All upstream accounts unavailable",
+		Message:     response.message,
+		Detail:      detail,
 	})
 }
 
@@ -256,6 +325,34 @@ func attachRequestKeyInfo(input *requestmonitoring.EventInput, keyInfo *auth.API
 	input.UserID = &userID
 	input.UserEmailSnapshot = keyInfo.UserEmail
 	input.GroupID = &groupID
+	if input.Detail == nil {
+		input.Detail = map[string]interface{}{}
+	}
+	attachKeyInfoDetail(input.Detail, keyInfo)
+}
+
+func attachKeyInfoDetail(detail map[string]interface{}, keyInfo *auth.APIKeyInfo) {
+	if detail == nil || keyInfo == nil {
+		return
+	}
+	if keyInfo.KeyID > 0 {
+		detail["api_key_id"] = keyInfo.KeyID
+	}
+	if keyInfo.KeyName != "" {
+		detail["api_key_name"] = keyInfo.KeyName
+	}
+	if keyInfo.UserID > 0 {
+		detail["user_id"] = keyInfo.UserID
+	}
+	if keyInfo.UserEmail != "" {
+		detail["user_email"] = keyInfo.UserEmail
+	}
+	if keyInfo.GroupID > 0 {
+		detail["group_id"] = keyInfo.GroupID
+	}
+	if keyInfo.GroupName != "" {
+		detail["group_name"] = keyInfo.GroupName
+	}
 }
 
 func requestMethod(c *gin.Context, fallback string) string {

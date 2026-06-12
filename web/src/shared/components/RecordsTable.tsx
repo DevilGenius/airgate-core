@@ -7,7 +7,7 @@ import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
 
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
-const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>(['model', 'user_agent', 'event', 'subject', 'source', 'locator']);
+const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>(['model', 'user_agent', 'event', 'subject', 'source', 'locator', 'detail']);
 const NEW_ROW_ANIMATION_NAME = 'ag-usage-row-new-enter';
 const RECORDS_PAGE_SIZE_OPTIONS = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS;
 const DEFAULT_RECORDS_PAGE_SIZE = RECORDS_PAGE_SIZE_OPTIONS[0];

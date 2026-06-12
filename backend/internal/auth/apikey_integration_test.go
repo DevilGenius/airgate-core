@@ -53,4 +53,7 @@ func TestValidateAPIKeyIncludesUserEmail(t *testing.T) {
 	if info.UserID != user.ID || info.UserEmail != user.Email {
 		t.Fatalf("ValidateAPIKey user info = (%d, %q), want (%d, %q)", info.UserID, info.UserEmail, user.ID, user.Email)
 	}
+	if info.GroupID != group.ID || info.GroupName != group.Name {
+		t.Fatalf("ValidateAPIKey group info = (%d, %q), want (%d, %q)", info.GroupID, info.GroupName, group.ID, group.Name)
+	}
 }

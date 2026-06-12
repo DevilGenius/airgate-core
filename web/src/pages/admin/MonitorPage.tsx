@@ -6,6 +6,7 @@ import { AlertTriangle, CheckCircle2, EyeOff, RefreshCw, ShieldAlert, Trash2, Tr
 import { monitorApi } from '../../shared/api/monitor';
 import { subscribeAdminEvents } from '../../shared/api/adminEvents';
 import { queryKeys } from '../../shared/queryKeys';
+import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
 import { RecordsTable } from '../../shared/components/RecordsTable';
 import { TablePage } from '../../shared/components/TablePage';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
@@ -46,10 +47,29 @@ type MonitorRequestColumnConfig = {
   render: (row: MonitorRequestEventResp) => ReactNode;
 };
 
+type MonitorTableKey = 'events' | 'requests';
+type MonitorTableRow = MonitorEventResp | MonitorRequestEventResp;
+type MonitorTableColumnConfig = {
+  key: string;
+  title: ReactNode;
+  width?: string;
+  hideOnMobile?: boolean;
+  render: (row: MonitorTableRow) => ReactNode;
+};
+
 const DEFAULT_PAGE_SIZE = 20;
+const MONITOR_COLUMN_WIDTHS = {
+  time: '100px',
+  severity: '116px',
+  event: '300px',
+  source: '220px',
+  subject: '200px',
+  detail: '240px',
+  status: '116px',
+  actions: '96px',
+};
 
 const SEVERITY_CLASSES: Record<string, string> = {
-  info: 'bg-sky-100 text-sky-700 ring-sky-200 dark:bg-sky-400/15 dark:text-sky-300 dark:ring-sky-400/25',
   critical: 'bg-danger/10 text-danger ring-danger/20',
   error: 'bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/25',
   warning: 'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
@@ -82,28 +102,84 @@ function monitorTimeLabels(value?: string) {
   return { dateLabel, fullLabel: `${dateLabel} ${timeLabel}`, timeLabel };
 }
 
+function detailString(detail: Record<string, unknown> | undefined, key: string): string {
+  const value = detail?.[key];
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return '';
+}
+
+function detailNumber(detail: Record<string, unknown> | undefined, key: string): number | undefined {
+  const value = detail?.[key];
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function namedIDLabel(name?: string, id?: number | string): string {
+  const trimmedName = name?.trim() ?? '';
+  const idText = id === undefined || id === null || id === '' ? '' : String(id);
+  if (trimmedName && idText) return `${trimmedName} #${idText}`;
+  if (trimmedName) return trimmedName;
+  if (idText) return `#${idText}`;
+  return '';
+}
+
+function monitorGroupLabel(event: MonitorEventResp | MonitorRequestEventResp): string {
+  const detail = event.detail;
+  const groupName = detailString(detail, 'group_name') || detailString(detail, 'group_name_snapshot');
+  const groupID = 'group_id' in event && event.group_id !== undefined
+    ? event.group_id
+    : detailNumber(detail, 'group_id') ?? ('subject_type' in event && event.subject_type === 'scheduler' ? event.subject_id : undefined);
+  return namedIDLabel(groupName, groupID);
+}
+
+function monitorAccountLabel(event: MonitorEventResp | MonitorRequestEventResp): string {
+  return namedIDLabel(event.account_name_snapshot, event.account_id);
+}
+
 function monitorSubject(event: MonitorEventResp): string {
-  return event.account_name_snapshot
-    || event.plugin_id
+  return monitorAccountLabel(event)
+    || monitorGroupLabel(event)
+    || namedIDLabel(event.plugin_id, event.subject_id)
     || event.subject_id
     || '-';
 }
 
-function monitorLocator(event: MonitorEventResp): string {
-  return event.error_code || event.source || '-';
+function monitorSubjectContext(event: MonitorEventResp): string {
+  return [event.subject_type, event.platform].filter(Boolean).join(' · ');
+}
+
+function monitorLocatorContext(event: MonitorEventResp): string {
+  return [event.source, event.plugin_id].filter(Boolean).join(' · ');
 }
 
 function monitorRequestSubject(event: MonitorRequestEventResp): string {
-  return event.api_key_name_snapshot
-    || event.account_name_snapshot
+  return namedIDLabel(event.api_key_name_snapshot, event.api_key_id)
+    || monitorAccountLabel(event)
+    || monitorGroupLabel(event)
     || event.plugin_id
     || event.request_id
     || '-';
 }
 
-function monitorRequestLocator(event: MonitorRequestEventResp): string {
-  const endpoint = [event.method, event.endpoint].filter(Boolean).join(' ');
-  return [endpoint, event.error_code].filter(Boolean).join(' / ') || event.source || '-';
+function monitorRequestSubjectContext(event: MonitorRequestEventResp): string {
+  return [
+    monitorGroupLabel(event),
+    event.user_email_snapshot || namedIDLabel(undefined, event.user_id),
+    event.platform,
+  ].filter(Boolean).join(' · ');
+}
+
+function requestEndpointLabel(event: MonitorRequestEventResp): string {
+  return [event.method, event.endpoint].filter(Boolean).join(' ') || event.source || '-';
+}
+
+function requestEndpointContext(event: MonitorRequestEventResp): string {
+  return [event.model, event.plugin_id].filter(Boolean).join(' · ');
 }
 
 function requestStatusLabel(event: MonitorRequestEventResp): string {
@@ -114,11 +190,81 @@ function requestStatusLabel(event: MonitorRequestEventResp): string {
   return `${status} / ${event.upstream_status}`;
 }
 
-function durationLabel(value?: number): string {
-  if (!value || value <= 0) {
-    return '-';
-  }
-  return `${value}ms`;
+function requestErrorCodeLabel(event: MonitorRequestEventResp): string {
+  return event.error_code || '-';
+}
+
+function requestStatusToneClass(event: MonitorRequestEventResp): string {
+  const status = Math.max(event.http_status ?? 0, event.upstream_status ?? 0);
+  if (status >= 500) return 'text-danger';
+  if (status >= 400) return 'text-amber-600 dark:text-amber-400';
+  return 'text-text-secondary';
+}
+
+type DetailEntry = {
+  key: string;
+  value: string;
+};
+
+function detailValue(detail: Record<string, unknown> | undefined, key: string): string {
+  const value = detail?.[key];
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  return '';
+}
+
+function durationMsLabel(value?: number | string): string {
+  const duration = typeof value === 'string' ? Number(value) : value;
+  if (!duration || !Number.isFinite(duration) || duration <= 0) return '';
+  if (duration >= 10_000) return `${(duration / 1000).toFixed(1)}s`;
+  if (duration >= 1000) return `${(duration / 1000).toFixed(2)}s`;
+  return `${duration}ms`;
+}
+
+function appendDetail(entries: DetailEntry[], key: string, value?: string | number | boolean) {
+  const normalized = typeof value === 'string'
+    ? value.trim()
+    : typeof value === 'number' && Number.isFinite(value)
+      ? String(value)
+      : typeof value === 'boolean'
+        ? value ? 'true' : 'false'
+        : '';
+  if (!normalized) return;
+  if (entries.some((item) => item.key === key && item.value === normalized)) return;
+  entries.push({ key, value: normalized });
+}
+
+function detailText(entries: DetailEntry[]): string {
+  return entries.map((entry) => `${entry.key}=${entry.value}`).join(' · ');
+}
+
+function monitorDetailEntries(event: MonitorEventResp): DetailEntry[] {
+  const detail = event.detail;
+  const entries: DetailEntry[] = [];
+  appendDetail(entries, 'model', detailValue(detail, 'model'));
+  appendDetail(entries, 'client_model', detailValue(detail, 'client_model'));
+  appendDetail(entries, 'http_status', detailValue(detail, 'http_status'));
+  appendDetail(entries, 'attempts', detailValue(detail, 'attempts'));
+  appendDetail(entries, 'request_id', detailValue(detail, 'request_id'));
+  appendDetail(entries, 'request_path', detailValue(detail, 'request_path'));
+  appendDetail(entries, 'stage', detailValue(detail, 'stage'));
+  appendDetail(entries, 'duration_ms', durationMsLabel(detailValue(detail, 'duration_ms')));
+  return entries;
+}
+
+function requestDetailEntries(event: MonitorRequestEventResp): DetailEntry[] {
+  const detail = event.detail;
+  const entries: DetailEntry[] = [];
+  appendDetail(entries, 'duration_ms', durationMsLabel(event.duration_ms || detailValue(detail, 'duration_ms')));
+  appendDetail(entries, 'request_id', event.request_id);
+  appendDetail(entries, 'fingerprint', event.fingerprint);
+  appendDetail(entries, 'upstream_status', event.upstream_status && event.upstream_status !== event.http_status ? event.upstream_status : undefined);
+  appendDetail(entries, 'attempts', detailValue(detail, 'attempts'));
+  appendDetail(entries, 'stage', detailValue(detail, 'stage'));
+  appendDetail(entries, 'outcome_kind', detailValue(detail, 'outcome_kind'));
+  appendDetail(entries, 'reason', detailValue(detail, 'reason'));
+  return entries;
 }
 
 function statusLabel(t: ReturnType<typeof useTranslation>['t'], value: string): string {
@@ -131,6 +277,104 @@ function severityLabel(t: ReturnType<typeof useTranslation>['t'], value: string)
 
 function typeLabel(t: ReturnType<typeof useTranslation>['t'], value: string): string {
   return t(`monitor.type_${value}`, value);
+}
+
+function TimeCell({ value }: { value?: string }) {
+  const { dateLabel, fullLabel, timeLabel } = monitorTimeLabels(value);
+  return (
+    <div className="flex min-w-0 flex-col justify-center gap-1 text-left" title={fullLabel}>
+      <span className="truncate font-mono text-[13px] font-medium leading-none text-text">{timeLabel}</span>
+      {dateLabel ? (
+        <span className="truncate font-mono text-[11px] leading-none text-text-tertiary">{dateLabel}</span>
+      ) : null}
+    </div>
+  );
+}
+
+function StackCell({
+  mono,
+  primary,
+  primaryClass = 'text-text',
+  primaryTitle,
+  secondary,
+  secondaryTitle,
+}: {
+  mono?: boolean;
+  primary: ReactNode;
+  primaryClass?: string;
+  primaryTitle?: string;
+  secondary?: ReactNode;
+  secondaryTitle?: string;
+}) {
+  return (
+    <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
+      <span className={`truncate text-[13px] leading-none ${mono ? 'font-mono ' : ''}${primaryClass}`} title={primaryTitle}>
+        {primary}
+      </span>
+      {secondary ? (
+        <span className="truncate text-[11px] leading-none text-text-tertiary" title={secondaryTitle}>
+          {secondary}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function StatusPill({ className, label }: { className?: string; label: string }) {
+  return (
+    <span className={`inline-flex h-5 max-w-full items-center justify-center truncate rounded-[var(--radius)] px-2 text-xs font-medium leading-none ring-1 ${className ?? ''}`}>
+      {label}
+    </span>
+  );
+}
+
+function DetailCell({ entries }: { entries: DetailEntry[] }) {
+  if (entries.length === 0) {
+    return <span className="block w-full truncate text-left text-[13px] leading-none text-text-tertiary">-</span>;
+  }
+  const title = detailText(entries);
+  const primary = detailText(entries.slice(0, 2));
+  const secondary = detailText(entries.slice(2));
+  return (
+    <StackCell
+      mono
+      primary={primary}
+      primaryClass="text-text-secondary"
+      primaryTitle={title}
+      secondary={secondary || undefined}
+      secondaryTitle={secondary ? title : undefined}
+    />
+  );
+}
+
+function FilterSelect({
+  ariaLabel,
+  className,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  ariaLabel: string;
+  className?: string;
+  label?: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  value: string;
+}) {
+  const selected = options.find((item) => item.id === value)?.label ?? options[0]?.label ?? '';
+  return (
+    <div className={className}>
+      <SimpleSelect
+        ariaLabel={ariaLabel}
+        fullWidth
+        items={options.map((item) => ({ key: item.id, label: item.label }))}
+        selectedKey={value}
+        selectedLabel={label ? `${label}: ${selected}` : selected}
+        onSelectionChange={onChange}
+      />
+    </div>
+  );
 }
 
 function StatCard({
@@ -199,6 +443,7 @@ export default function MonitorPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [activeTable, setActiveTable] = useState<MonitorTableKey>('events');
   const [page, setPageState] = useState(1);
   const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const [cursors, setCursors] = useState<Record<number, MonitorCursorResp | undefined>>({});
@@ -208,6 +453,8 @@ export default function MonitorPage() {
   const [requestPageSize, setRequestPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const [requestCursors, setRequestCursors] = useState<Record<number, MonitorRequestCursorResp | undefined>>({});
   const requestCursor = requestPage > 1 ? requestCursors[requestPage] : undefined;
+  const [requestFilters, setRequestFilters] = useState<Partial<MonitorRequestListQuery>>({});
+  const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState('');
 
   const listParams = useMemo<MonitorListQuery>(() => ({
     ...filters,
@@ -216,10 +463,11 @@ export default function MonitorPage() {
     limit: pageSize,
   }), [cursor?.id, cursor?.updated_at, filters, pageSize]);
   const requestListParams = useMemo<MonitorRequestListQuery>(() => ({
+    ...requestFilters,
     cursor: requestCursor?.created_at,
     cursor_id: requestCursor?.id,
     limit: requestPageSize,
-  }), [requestCursor?.created_at, requestCursor?.id, requestPageSize]);
+  }), [requestCursor?.created_at, requestCursor?.id, requestFilters, requestPageSize]);
 
   const summaryQuery = useQuery({
     queryKey: queryKeys.monitorSummary(),
@@ -311,6 +559,24 @@ export default function MonitorPage() {
       resetPagination();
     });
   }, [resetPagination]);
+
+  const resetRequestPagination = useCallback(() => {
+    setRequestCursors({});
+    setRequestPageState(1);
+  }, []);
+
+  const updateRequestFilter = useCallback((key: keyof MonitorRequestListQuery, value: string | number | undefined) => {
+    const nextValue = value === '' ? undefined : value;
+    startTransition(() => {
+      setRequestFilters((prev) => ({ ...prev, [key]: nextValue }));
+      resetRequestPagination();
+    });
+  }, [resetRequestPagination]);
+
+  const handleAPIKeySelectionChange = useCallback((value: string, label: string) => {
+    setSelectedAPIKeyLabel(value ? label : '');
+    updateRequestFilter('api_key_id', value ? Number(value) : undefined);
+  }, [updateRequestFilter]);
 
   const setPage = useCallback((nextPage: number) => {
     if (nextPage <= 1) {
@@ -425,61 +691,27 @@ export default function MonitorPage() {
     { id: 'system_error', label: t('monitor.type_system_error') },
   ];
 
-  const selectedStatusValue = statusOptions.find((item) => item.id === (filters.status || ''))?.label ?? t('common.all');
-  const selectedSeverityValue = severityOptions.find((item) => item.id === (filters.severity || ''))?.label ?? t('common.all');
-  const selectedTypeValue = typeOptions.find((item) => item.id === (filters.type || ''))?.label ?? t('common.all');
-  const selectedStatusLabel = `${t('monitor.status')}: ${selectedStatusValue}`;
-  const selectedSeverityLabel = `${t('monitor.severity')}: ${selectedSeverityValue}`;
-  const selectedTypeLabel = `${t('monitor.type')}: ${selectedTypeValue}`;
+  const httpStatusOptions: SelectOption[] = [
+    { id: '', label: t('common.all') },
+    ...['400', '401', '403', '404', '408', '429', '499', '500', '502', '503', '504'].map((code) => ({ id: code, label: code })),
+  ];
 
   const columns = useMemo<MonitorColumnConfig[]>(() => [
     {
       key: 'updated_at',
       title: t('monitor.updated_at'),
-      width: '142px',
-      render: (row) => {
-        const { dateLabel, fullLabel, timeLabel } = monitorTimeLabels(row.updated_at);
-        return (
-          <div className="flex min-w-0 items-center gap-1.5 font-mono text-xs" title={fullLabel}>
-            <span className="shrink-0 font-mono text-[13px] font-medium text-text">
-              {timeLabel}
-            </span>
-            {dateLabel ? (
-              <span className="hidden shrink-0 font-light text-text-tertiary xl:inline">
-                {dateLabel}
-              </span>
-            ) : null}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'type',
-      title: t('monitor.type'),
-      width: '168px',
-      hideOnMobile: true,
-      render: (row) => <span className="block w-full truncate text-center text-[13px] leading-none text-text-secondary" title={row.type}>{typeLabel(t, row.type)}</span>,
+      width: MONITOR_COLUMN_WIDTHS.time,
+      render: (row) => <TimeCell value={row.updated_at} />,
     },
     {
       key: 'severity',
       title: t('monitor.severity'),
-      width: '112px',
+      width: MONITOR_COLUMN_WIDTHS.severity,
       render: (row) => (
-        <span className={`inline-flex h-6 min-w-[4.75rem] max-w-full items-center justify-center truncate rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none ring-1 ${SEVERITY_CLASSES[row.severity] ?? SEVERITY_CLASSES.warning}`}>
-          {severityLabel(t, row.severity)}
-        </span>
-      ),
-    },
-    {
-      key: 'source',
-      title: t('monitor.source'),
-      width: '144px',
-      hideOnMobile: true,
-      render: (row) => (
-        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
-          <span className="truncate font-mono text-[13px] leading-none text-text-secondary" title={row.source}>{row.source}</span>
-          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.platform || '-'}>
-            {row.platform || '-'}
+        <div className="flex h-full w-full min-w-0 flex-col items-center justify-center gap-1">
+          <StatusPill className={SEVERITY_CLASSES[row.severity] ?? SEVERITY_CLASSES.warning} label={severityLabel(t, row.severity)} />
+          <span className="max-w-full truncate text-[11px] leading-none text-text-tertiary" title={typeLabel(t, row.type)}>
+            {typeLabel(t, row.type)}
           </span>
         </div>
       ),
@@ -487,55 +719,66 @@ export default function MonitorPage() {
     {
       key: 'event',
       title: t('monitor.event'),
-      width: '300px',
+      width: MONITOR_COLUMN_WIDTHS.event,
       render: (row) => (
-        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
-          <span className="truncate text-[13px] font-medium leading-none text-text" title={row.title}>{row.title}</span>
-          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.message || row.type}>
-            {row.message || typeLabel(t, row.type)}
-          </span>
-        </div>
+        <StackCell
+          primary={row.title || typeLabel(t, row.type)}
+          primaryClass="font-medium text-text"
+          primaryTitle={row.title || undefined}
+          secondary={row.message || undefined}
+          secondaryTitle={row.message || undefined}
+        />
+      ),
+    },
+    {
+      key: 'locator',
+      title: t('monitor.source'),
+      width: MONITOR_COLUMN_WIDTHS.source,
+      hideOnMobile: true,
+      render: (row) => (
+        <StackCell
+          mono
+          primary={monitorLocatorContext(row) || '-'}
+          primaryClass="text-text-secondary"
+          primaryTitle={monitorLocatorContext(row) || undefined}
+          secondary={row.error_code || undefined}
+          secondaryTitle={row.error_code || undefined}
+        />
       ),
     },
     {
       key: 'subject',
       title: t('monitor.subject'),
-      width: '190px',
+      width: MONITOR_COLUMN_WIDTHS.subject,
       render: (row) => (
-        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
-          <span className="truncate text-[13px] font-medium leading-none text-text" title={monitorSubject(row)}>{monitorSubject(row)}</span>
-          <span className="truncate font-mono text-[11px] leading-none text-text-tertiary">{row.subject_type || '-'}</span>
-        </div>
+        <StackCell
+          primary={monitorSubject(row)}
+          primaryClass="font-medium text-text"
+          primaryTitle={monitorSubject(row)}
+          secondary={monitorSubjectContext(row) || undefined}
+          secondaryTitle={monitorSubjectContext(row) || undefined}
+        />
       ),
     },
     {
-      key: 'locator',
-      title: t('monitor.locator'),
-      width: '240px',
+      key: 'detail',
+      title: t('monitor.detail'),
+      width: MONITOR_COLUMN_WIDTHS.detail,
       hideOnMobile: true,
-      render: (row) => (
-        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
-          <span className="truncate font-mono text-[13px] leading-none text-text-secondary" title={monitorLocator(row)}>{monitorLocator(row)}</span>
-          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.plugin_id || '-'}>
-            {row.plugin_id || '-'}
-          </span>
-        </div>
-      ),
+      render: (row) => <DetailCell entries={monitorDetailEntries(row)} />,
     },
     {
       key: 'status',
       title: t('monitor.status'),
-      width: '104px',
+      width: MONITOR_COLUMN_WIDTHS.status,
       render: (row) => (
-        <span className={`inline-flex h-6 min-w-[4.75rem] max-w-full items-center justify-center truncate rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none ring-1 ${STATUS_CLASSES[row.status] ?? STATUS_CLASSES.active}`}>
-          {statusLabel(t, row.status)}
-        </span>
+        <StatusPill className={STATUS_CLASSES[row.status] ?? STATUS_CLASSES.active} label={statusLabel(t, row.status)} />
       ),
     },
     {
       key: 'actions',
       title: t('common.actions'),
-      width: '112px',
+      width: MONITOR_COLUMN_WIDTHS.actions,
       render: (row) => {
         if (row.severity === 'warning') {
           return <span className="text-[13px] leading-none text-text-tertiary">-</span>;
@@ -575,94 +818,81 @@ export default function MonitorPage() {
     {
       key: 'created_at',
       title: t('monitor.time'),
-      width: '142px',
-      render: (row) => {
-        const { dateLabel, fullLabel, timeLabel } = monitorTimeLabels(row.created_at);
-        return (
-          <div className="flex min-w-0 items-center gap-1.5 font-mono text-xs" title={fullLabel}>
-            <span className="shrink-0 font-mono text-[13px] font-medium text-text">{timeLabel}</span>
-            {dateLabel ? <span className="hidden shrink-0 font-light text-text-tertiary xl:inline">{dateLabel}</span> : null}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'type',
-      title: t('monitor.type'),
-      width: '168px',
-      hideOnMobile: true,
-      render: (row) => <span className="block w-full truncate text-center text-[13px] leading-none text-text-secondary" title={row.type}>{typeLabel(t, row.type)}</span>,
-    },
-    {
-      key: 'severity',
-      title: t('monitor.severity'),
-      width: '112px',
-      render: (row) => (
-        <span className={`inline-flex h-6 min-w-[4.75rem] max-w-full items-center justify-center truncate rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none ring-1 ${SEVERITY_CLASSES[row.severity] ?? SEVERITY_CLASSES.warning}`}>
-          {severityLabel(t, row.severity)}
-        </span>
-      ),
-    },
-    {
-      key: 'source',
-      title: t('monitor.source'),
-      width: '144px',
-      hideOnMobile: true,
-      render: (row) => (
-        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
-          <span className="truncate font-mono text-[13px] leading-none text-text-secondary" title={row.source}>{row.source}</span>
-          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.platform || '-'}>{row.platform || '-'}</span>
-        </div>
-      ),
+      width: MONITOR_COLUMN_WIDTHS.time,
+      render: (row) => <TimeCell value={row.created_at} />,
     },
     {
       key: 'event',
       title: t('monitor.event'),
-      width: '300px',
+      width: MONITOR_COLUMN_WIDTHS.event,
       render: (row) => (
-        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
-          <span className="truncate text-[13px] font-medium leading-none text-text" title={row.title}>{row.title}</span>
-          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.message || row.type}>{row.message || typeLabel(t, row.type)}</span>
-        </div>
+        <StackCell
+          primary={(
+            <>
+              {row.severity === 'warning' ? (
+                <span aria-hidden className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 align-middle" />
+              ) : null}
+              {row.title || typeLabel(t, row.type)}
+            </>
+          )}
+          primaryClass="font-medium text-text"
+          primaryTitle={row.title || undefined}
+          secondary={row.message || typeLabel(t, row.type)}
+          secondaryTitle={row.message || undefined}
+        />
+      ),
+    },
+    {
+      key: 'locator',
+      title: t('monitor.endpoint'),
+      width: MONITOR_COLUMN_WIDTHS.source,
+      hideOnMobile: true,
+      render: (row) => (
+        <StackCell
+          mono
+          primary={requestEndpointLabel(row)}
+          primaryClass="text-text-secondary"
+          primaryTitle={requestEndpointLabel(row)}
+          secondary={requestEndpointContext(row) || undefined}
+          secondaryTitle={requestEndpointContext(row) || undefined}
+        />
       ),
     },
     {
       key: 'subject',
       title: t('monitor.subject'),
-      width: '190px',
+      width: MONITOR_COLUMN_WIDTHS.subject,
       render: (row) => (
-        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
-          <span className="truncate text-[13px] font-medium leading-none text-text" title={monitorRequestSubject(row)}>{monitorRequestSubject(row)}</span>
-          <span className="truncate font-mono text-[11px] leading-none text-text-tertiary">{row.api_key_id ? `api_key:${row.api_key_id}` : row.request_id || '-'}</span>
-        </div>
+        <StackCell
+          primary={monitorRequestSubject(row)}
+          primaryClass="font-medium text-text"
+          primaryTitle={monitorRequestSubject(row)}
+          secondary={monitorRequestSubjectContext(row) || undefined}
+          secondaryTitle={monitorRequestSubjectContext(row) || undefined}
+        />
       ),
     },
     {
-      key: 'locator',
-      title: t('monitor.locator'),
-      width: '260px',
-      hideOnMobile: true,
+      key: 'http_status',
+      title: t('monitor.error_code'),
+      width: MONITOR_COLUMN_WIDTHS.status,
       render: (row) => (
-        <div className="flex h-full w-full min-w-0 flex-col justify-center gap-1 text-left">
-          <span className="truncate font-mono text-[13px] leading-none text-text-secondary" title={monitorRequestLocator(row)}>{monitorRequestLocator(row)}</span>
-          <span className="truncate text-[11px] leading-none text-text-tertiary" title={row.model || row.plugin_id || '-'}>
-            {row.model || row.plugin_id || '-'}
+        <div className="flex h-full w-full min-w-0 flex-col items-center justify-center gap-1">
+          <span className={`max-w-full truncate font-mono text-[13px] font-medium leading-none ${requestStatusToneClass(row)}`} title={requestStatusLabel(row)}>
+            {requestStatusLabel(row)}
+          </span>
+          <span className="max-w-full truncate font-mono text-[11px] leading-none text-text-tertiary" title={requestErrorCodeLabel(row)}>
+            {requestErrorCodeLabel(row)}
           </span>
         </div>
       ),
     },
     {
-      key: 'http_status',
-      title: t('monitor.http_status'),
-      width: '104px',
-      render: (row) => <span className="block w-full truncate text-center font-mono text-[13px] leading-none text-text-secondary">{requestStatusLabel(row)}</span>,
-    },
-    {
-      key: 'duration',
-      title: t('monitor.duration_ms'),
-      width: '104px',
+      key: 'detail',
+      title: t('monitor.detail'),
+      width: MONITOR_COLUMN_WIDTHS.detail,
       hideOnMobile: true,
-      render: (row) => <span className="block w-full truncate text-center font-mono text-[13px] leading-none text-text-secondary">{durationLabel(row.duration_ms)}</span>,
+      render: (row) => <DetailCell entries={requestDetailEntries(row)} />,
     },
   ], [t]);
 
@@ -676,6 +906,32 @@ export default function MonitorPage() {
   const showRequestInitialLoading = isRequestLoading && !requestData;
   const requestTotal = totalForCursorPage(requestPage, requestPageSize, requestRows.length, requestData?.has_more);
   const requestTotalPages = getTotalPages(requestTotal, requestPageSize);
+  const isRequestTable = activeTable === 'requests';
+  const tableOptions = [
+    { id: 'events', label: t('monitor.title') },
+    { id: 'requests', label: t('monitor.request_events') },
+  ];
+  const activeTableLabel = tableOptions.find((item) => item.id === activeTable)?.label ?? t('monitor.title');
+  const activeColumns = (isRequestTable ? requestColumns : columns) as MonitorTableColumnConfig[];
+  const activeRows = (isRequestTable ? requestRows : rows) as MonitorTableRow[];
+  const activePage = isRequestTable ? requestPage : page;
+  const activePageSize = isRequestTable ? requestPageSize : pageSize;
+  const activeSetPage = isRequestTable ? setRequestPage : setPage;
+  const activeSetPageSize = isRequestTable ? setRequestPageSize : setPageSize;
+  const activeTotal = isRequestTable ? requestTotal : total;
+  const activeHasMore = isRequestTable ? requestData?.has_more : data?.has_more;
+  const activeTotalPages = isRequestTable ? requestTotalPages : totalPages;
+  const activeHasRows = isRequestTable ? hasRequestRows : hasRows;
+  const activeDataVersion = isRequestTable ? requestDataUpdatedAt : dataUpdatedAt;
+  const activeIsLoading = isRequestTable ? showRequestInitialLoading : showInitialLoading;
+  const activeIsPlaceholderData = isRequestTable ? isRequestPlaceholderData : isPlaceholderData;
+  const activeHighlightResetKey = isRequestTable
+    ? JSON.stringify({ requestFilters, requestPage, requestPageSize })
+    : JSON.stringify({ filters, page, pageSize });
+  const activeIsTableFetching = isRequestTable
+    ? hasRequestRows && isRequestPlaceholderData && isRequestFetching && !showRequestInitialLoading
+    : hasRows && isPlaceholderData && isFetching && !showInitialLoading;
+  const activeRefreshBusy = isRequestTable ? isRequestFetching : isFetching || summaryQuery.isFetching;
 
   return (
     <div>
@@ -684,72 +940,109 @@ export default function MonitorPage() {
         className="ag-monitor-page ag-toolbar-standard-page"
         footer={(
           <TablePaginationFooter
-            page={page}
-            pageSize={pageSize}
+            page={activePage}
+            pageSize={activePageSize}
             pageSizeOptions={PAGE_SIZE_OPTIONS}
-            setPage={setPage}
-            setPageSize={setPageSize}
-            total={total}
-            hasMore={data?.has_more}
+            setPage={activeSetPage}
+            setPageSize={activeSetPageSize}
+            total={activeTotal}
+            hasMore={activeHasMore}
             totalExact={false}
-            totalPages={totalPages}
+            totalPages={activeTotalPages}
           />
         )}
-        isFetching={hasRows && isPlaceholderData && isFetching && !showInitialLoading}
+        isFetching={activeIsTableFetching}
       >
         <div className="ag-page-toolbar">
           <div className="ag-page-toolbar-filters">
             <div className="ag-page-toolbar-filter-row">
-              <div className="w-full sm:w-72">
-                <UsageDateRangeFilter
-                  clearLabel={t('common.clear')}
-                  endDate={filters.to}
-                  label={t('monitor.time_range')}
-                  startDate={filters.from}
-                  onChange={(from, to) => {
-                    resetPagination();
-                    setFilters((prev) => ({ ...prev, from, to }));
-                  }}
-                />
-              </div>
-              <div className="w-full sm:w-44">
-                <SimpleSelect
-                  ariaLabel={t('monitor.status')}
-                  fullWidth
-                  items={statusOptions.map((item) => ({ key: item.id, label: item.label }))}
-                  selectedKey={filters.status || ''}
-                  selectedLabel={selectedStatusLabel}
-                  onSelectionChange={(key) => updateFilter('status', key)}
-                />
-              </div>
-              <div className="w-full sm:w-44">
-                <SimpleSelect
-                  ariaLabel={t('monitor.severity')}
-                  fullWidth
-                  items={severityOptions.map((item) => ({ key: item.id, label: item.label }))}
-                  selectedKey={filters.severity || ''}
-                  selectedLabel={selectedSeverityLabel}
-                  onSelectionChange={(key) => updateFilter('severity', key)}
-                />
-              </div>
-              <div className="w-full sm:w-56">
-                <SimpleSelect
-                  ariaLabel={t('monitor.type')}
-                  fullWidth
-                  items={typeOptions.map((item) => ({ key: item.id, label: item.label }))}
-                  selectedKey={filters.type || ''}
-                  selectedLabel={selectedTypeLabel}
-                  onSelectionChange={(key) => updateFilter('type', key)}
-                />
-              </div>
-              <div className="w-full sm:w-40">
-                <input
-                  className="input input--sm w-full"
-                  placeholder={t('monitor.error_code')}
-                  value={filters.error_code ?? ''}
-                  onChange={(event) => updateFilter('error_code', event.target.value)}
-                />
-              </div>
+              <FilterSelect
+                ariaLabel={t('monitor.title')}
+                className="w-full sm:w-48"
+                options={tableOptions}
+                value={activeTable}
+                onChange={(value) => setActiveTable(value as MonitorTableKey)}
+              />
+              {isRequestTable ? (
+                <>
+                  <div className="w-full sm:w-40">
+                    <input
+                      className="input input--sm w-full"
+                      placeholder={t('monitor.error_code')}
+                      value={requestFilters.error_code ?? ''}
+                      onChange={(event) => updateRequestFilter('error_code', event.target.value)}
+                    />
+                  </div>
+                  <FilterSelect
+                    ariaLabel={t('monitor.http_status_code')}
+                    className="w-full sm:w-40"
+                    label={t('monitor.http_status_code')}
+                    options={httpStatusOptions}
+                    value={requestFilters.http_status ? String(requestFilters.http_status) : ''}
+                    onChange={(value) => updateRequestFilter('http_status', value ? Number(value) : undefined)}
+                  />
+                  <div className="w-full sm:w-48">
+                    <APIKeySearchFilterComboBox
+                      ariaLabel={t('monitor.search_api_key')}
+                      emptyPrompt={t('monitor.search_api_key')}
+                      loadingLabel={t('common.loading')}
+                      noDataLabel={t('common.no_data')}
+                      placeholder={t('monitor.search_api_key')}
+                      scope="admin"
+                      selectedKey={requestFilters.api_key_id ? String(requestFilters.api_key_id) : null}
+                      selectedLabel={selectedAPIKeyLabel}
+                      onSelectionChange={handleAPIKeySelectionChange}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-full sm:w-72">
+                    <UsageDateRangeFilter
+                      clearLabel={t('common.clear')}
+                      endDate={filters.to}
+                      label={t('monitor.time_range')}
+                      startDate={filters.from}
+                      onChange={(from, to) => {
+                        resetPagination();
+                        setFilters((prev) => ({ ...prev, from, to }));
+                      }}
+                    />
+                  </div>
+                  <FilterSelect
+                    ariaLabel={t('monitor.status')}
+                    className="w-full sm:w-44"
+                    label={t('monitor.status')}
+                    options={statusOptions}
+                    value={filters.status || ''}
+                    onChange={(value) => updateFilter('status', value)}
+                  />
+                  <FilterSelect
+                    ariaLabel={t('monitor.severity')}
+                    className="w-full sm:w-44"
+                    label={t('monitor.severity')}
+                    options={severityOptions}
+                    value={filters.severity || ''}
+                    onChange={(value) => updateFilter('severity', value)}
+                  />
+                  <FilterSelect
+                    ariaLabel={t('monitor.type')}
+                    className="w-full sm:w-56"
+                    label={t('monitor.type')}
+                    options={typeOptions}
+                    value={filters.type || ''}
+                    onChange={(value) => updateFilter('type', value)}
+                  />
+                  <div className="w-full sm:w-40">
+                    <input
+                      className="input input--sm w-full"
+                      placeholder={t('monitor.source')}
+                      value={filters.source ?? ''}
+                      onChange={(event) => updateFilter('source', event.target.value)}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <div className="ag-page-toolbar-actions">
@@ -757,106 +1050,53 @@ export default function MonitorPage() {
               isIconOnly
               aria-label={t('common.refresh', 'Refresh')}
               className="ag-auto-refresh-refresh--toolbar h-8 w-8 min-w-8"
-              isDisabled={isFetching || summaryQuery.isFetching}
+              isDisabled={activeRefreshBusy}
               size="sm"
               variant="ghost"
-              onPress={handleManualRefresh}
+              onPress={() => {
+                if (isRequestTable) {
+                  void refetchRequests({ cancelRefetch: false });
+                  return;
+                }
+                handleManualRefresh();
+              }}
             >
-              <RefreshCw className={`h-4 w-4 ${isFetching || summaryQuery.isFetching ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${activeRefreshBusy ? 'animate-spin' : ''}`} />
             </Button>
+            {isRequestTable ? (
+              <Button
+                isIconOnly
+                aria-label={t('monitor.clear_request_events')}
+                className="h-8 w-8 min-w-8"
+                isDisabled={clearRequestsMutation.isPending || isRequestFetching}
+                size="sm"
+                variant="ghost"
+                onPress={() => clearRequestsMutation.mutate()}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            ) : null}
           </div>
         </div>
 
         <RecordsTable
-          ariaLabel={t('monitor.title')}
-          columns={columns}
-          dataVersion={hasRows ? dataUpdatedAt : 0}
+          ariaLabel={activeTableLabel}
+          columns={activeColumns}
+          dataVersion={activeHasRows ? activeDataVersion : 0}
           emptyDescription={t('monitor.empty_description')}
           emptyTitle={t('common.no_data')}
           footer={false}
-          highlightNewRows={hasRows && page === 1}
-          highlightResetKey={JSON.stringify({ filters, page, pageSize })}
-          hasMore={data?.has_more}
-          isLoading={showInitialLoading}
-          page={page}
-          pageSize={pageSize}
-          rows={rows}
-          setPage={setPage}
-          setPageSize={setPageSize}
-          suppressHighlight={isPlaceholderData}
-          total={total}
-          totalExact={false}
-        />
-      </TablePage>
-      <TablePage
-        className="ag-monitor-page ag-toolbar-standard-page mt-6"
-        footer={(
-          <TablePaginationFooter
-            page={requestPage}
-            pageSize={requestPageSize}
-            pageSizeOptions={PAGE_SIZE_OPTIONS}
-            setPage={setRequestPage}
-            setPageSize={setRequestPageSize}
-            total={requestTotal}
-            hasMore={requestData?.has_more}
-            totalExact={false}
-            totalPages={requestTotalPages}
-          />
-        )}
-        isFetching={hasRequestRows && isRequestPlaceholderData && isRequestFetching && !showRequestInitialLoading}
-      >
-        <div className="ag-page-toolbar">
-          <div className="ag-page-toolbar-filters">
-            <div className="ag-page-toolbar-filter-row">
-              <div className="flex min-h-8 items-center">
-                <span className="text-sm font-semibold text-text">{t('monitor.request_events')}</span>
-              </div>
-            </div>
-          </div>
-          <div className="ag-page-toolbar-actions">
-            <Button
-              isIconOnly
-              aria-label={t('common.refresh', 'Refresh')}
-              className="ag-auto-refresh-refresh--toolbar h-8 w-8 min-w-8"
-              isDisabled={isRequestFetching}
-              size="sm"
-              variant="ghost"
-              onPress={() => void refetchRequests({ cancelRefetch: false })}
-            >
-              <RefreshCw className={`h-4 w-4 ${isRequestFetching ? 'animate-spin' : ''}`} />
-            </Button>
-            <Button
-              isIconOnly
-              aria-label={t('monitor.clear_request_events')}
-              className="h-8 w-8 min-w-8"
-              isDisabled={clearRequestsMutation.isPending || isRequestFetching}
-              size="sm"
-              variant="ghost"
-              onPress={() => clearRequestsMutation.mutate()}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <RecordsTable
-          ariaLabel={t('monitor.request_events')}
-          columns={requestColumns}
-          dataVersion={hasRequestRows ? requestDataUpdatedAt : 0}
-          emptyDescription={t('monitor.empty_description')}
-          emptyTitle={t('common.no_data')}
-          footer={false}
-          highlightNewRows={hasRequestRows && requestPage === 1}
-          highlightResetKey={JSON.stringify({ requestPage, requestPageSize })}
-          hasMore={requestData?.has_more}
-          isLoading={showRequestInitialLoading}
-          page={requestPage}
-          pageSize={requestPageSize}
-          rows={requestRows}
-          setPage={setRequestPage}
-          setPageSize={setRequestPageSize}
-          suppressHighlight={isRequestPlaceholderData}
-          total={requestTotal}
+          highlightNewRows={activeHasRows && activePage === 1}
+          highlightResetKey={activeHighlightResetKey}
+          hasMore={activeHasMore}
+          isLoading={activeIsLoading}
+          page={activePage}
+          pageSize={activePageSize}
+          rows={activeRows}
+          setPage={activeSetPage}
+          setPageSize={activeSetPageSize}
+          suppressHighlight={activeIsPlaceholderData}
+          total={activeTotal}
           totalExact={false}
         />
       </TablePage>

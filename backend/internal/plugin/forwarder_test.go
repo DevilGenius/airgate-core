@@ -14,11 +14,31 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
+
+type captureMonitorRecorder struct {
+	events []monitoring.EventInput
+}
+
+func (r *captureMonitorRecorder) Record(_ context.Context, input monitoring.EventInput) {
+	r.events = append(r.events, input)
+}
+
+func (r *captureMonitorRecorder) ResolveBySubject(context.Context, monitoring.ResolveQuery) {}
+
+type captureRequestMonitorRecorder struct {
+	events []requestmonitoring.EventInput
+}
+
+func (r *captureRequestMonitorRecorder) RecordRequest(_ context.Context, input requestmonitoring.EventInput) {
+	r.events = append(r.events, input)
+}
 
 func TestParseBody(t *testing.T) {
 	t.Parallel()
@@ -820,6 +840,112 @@ func TestSelectAllRoutesFailureResponse(t *testing.T) {
 				t.Fatalf("code = %q, want %q", got.code, tt.wantCode)
 			}
 		})
+	}
+}
+
+func TestSelectAllRoutesFailureResponse_AccountUnavailableIsRateLimited(t *testing.T) {
+	t.Parallel()
+
+	got := selectAllRoutesFailureResponse(allRoutesFailureSummary{accountUnavailable: true})
+
+	if got.status != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", got.status, http.StatusTooManyRequests)
+	}
+	if got.errType != "rate_limit_error" {
+		t.Fatalf("errType = %q, want rate_limit_error", got.errType)
+	}
+	if got.message != "当前模型暂无可用上游账号，请稍后重试" {
+		t.Fatalf("message = %q, want account unavailable message", got.message)
+	}
+	if got.retryAfter != allRoutesFailedDefaultRetryAfter {
+		t.Fatalf("retryAfter = %s, want %s", got.retryAfter, allRoutesFailedDefaultRetryAfter)
+	}
+}
+
+func TestRecordAllRoutesAccountUnavailableWritesMonitorEvent(t *testing.T) {
+	t.Parallel()
+
+	recorder := &captureMonitorRecorder{}
+	forwarder := &Forwarder{monitor: recorder}
+	state := &forwardState{
+		requestPath:       "/v1/chat/completions",
+		model:             "gpt-4.1",
+		schedulingModel:   "gpt-4.1-mini",
+		requestedPlatform: "openai",
+		plugin:            &PluginInstance{Name: "openai", Platform: "openai"},
+		keyInfo: &auth.APIKeyInfo{
+			KeyID:     11,
+			UserID:    22,
+			GroupID:   33,
+			GroupName: "production",
+		},
+	}
+	response := allRoutesFailureResponse{
+		status:  http.StatusTooManyRequests,
+		code:    "all_routes_account_unavailable",
+		message: "当前模型暂无可用上游账号，请稍后重试",
+	}
+
+	forwarder.recordAllRoutesAccountUnavailable(nil, state, allRoutesFailureSummary{accountUnavailable: true}, response, 4)
+
+	if len(recorder.events) != 1 {
+		t.Fatalf("events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.Type != monitoring.TypeSchedulerError {
+		t.Fatalf("type = %q, want %q", event.Type, monitoring.TypeSchedulerError)
+	}
+	if event.Source != monitoring.SourceForwarder {
+		t.Fatalf("source = %q, want %q", event.Source, monitoring.SourceForwarder)
+	}
+	if event.SubjectType != monitoring.SubjectScheduler || event.SubjectID != "33" {
+		t.Fatalf("subject = %q/%q, want scheduler/33", event.SubjectType, event.SubjectID)
+	}
+	if event.Platform != "openai" || event.PluginID != "openai" {
+		t.Fatalf("locator = %q/%q, want openai/openai", event.Platform, event.PluginID)
+	}
+	if event.ErrorCode != "all_routes_account_unavailable" {
+		t.Fatalf("errorCode = %q, want all_routes_account_unavailable", event.ErrorCode)
+	}
+	if event.Message != "当前模型暂无可用上游账号，请稍后重试" {
+		t.Fatalf("message = %q, want account unavailable message", event.Message)
+	}
+	if got := event.Detail["attempts"]; got != 4 {
+		t.Fatalf("detail attempts = %#v, want 4", got)
+	}
+	if got := event.Detail["group_name"]; got != "production" {
+		t.Fatalf("detail group_name = %#v, want production", got)
+	}
+}
+
+func TestRecordAPIRequestErrorIncludesGroupSnapshotInDetail(t *testing.T) {
+	t.Parallel()
+
+	recorder := &captureRequestMonitorRecorder{}
+	forwarder := &Forwarder{requestMonitor: recorder}
+	keyInfo := &auth.APIKeyInfo{
+		KeyID:     11,
+		KeyName:   "default key",
+		UserID:    22,
+		UserEmail: "user@example.com",
+		GroupID:   33,
+		GroupName: "production",
+	}
+
+	forwarder.recordAPIRequestErrorForKey(nil, keyInfo, "openai", "/v1/chat/completions", "gpt-4.1", http.StatusTooManyRequests, "all_routes_account_unavailable", "当前模型暂无可用上游账号，请稍后重试")
+
+	if len(recorder.events) != 1 {
+		t.Fatalf("events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.GroupID == nil || *event.GroupID != 33 {
+		t.Fatalf("groupID = %#v, want 33", event.GroupID)
+	}
+	if got := event.Detail["group_name"]; got != "production" {
+		t.Fatalf("detail group_name = %#v, want production", got)
+	}
+	if got := event.Detail["api_key_name"]; got != "default key" {
+		t.Fatalf("detail api_key_name = %#v, want default key", got)
 	}
 }
 
