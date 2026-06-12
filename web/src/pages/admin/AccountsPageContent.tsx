@@ -1,7 +1,7 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, EmptyState, Input, Spinner, TextField as HeroTextField } from '@heroui/react';
+import { AlertDialog, Button, Input, Spinner, TextField as HeroTextField } from '@heroui/react';
 import {
   Plus,
   Search,
@@ -37,9 +37,10 @@ import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { AccountTypeFilterSelect } from './accounts/AccountTypeFilterSelect';
 import { useAccountTableColumns } from './accounts/useAccountTableColumns';
-import { BulkActionsBar } from './accounts/BulkActionsBar';
 import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
 import { BulkRefreshProgressModal } from './accounts/BulkRefreshProgressModal';
+import { AccountsTableSection } from './accounts/AccountsTableSection';
+import { getBulkEditInitialValues, type BulkEditSelection } from './accounts/bulkEditSupport';
 import type {
   AccountResp,
   CreateAccountReq,
@@ -52,20 +53,13 @@ import type {
 } from '../../shared/types';
 
 import {
-  ACCOUNT_SELECTION_COLUMN_STYLE,
   AccountCapacityStore,
   AccountSelectionStore,
-  AccountTableRow,
-  AccountsTableLoadingRow,
-  TableSelectionCheckbox,
   UNGROUPED_GROUP_FILTER,
-  columnAlignClass,
-  columnWidthStyle,
   mergeCachedUsageWindows,
   runAfterInputFrame,
   useLatestRef,
   type AccountTypeFilterOption,
-  type AccountTableColumn,
   type AccountUsageData,
   type AccountUsageWindowCache,
 } from './accounts/AccountPageSupport';
@@ -111,257 +105,6 @@ function useAccountModalRootIsolation(isActive: boolean) {
     };
   }, [isActive]);
 }
-
-type BulkEditInitialValues = {
-  groupIds: number[];
-  maxConcurrency?: number;
-  priority?: number;
-  rateMultiplier?: number;
-};
-
-type BulkEditSelection = {
-  ids: number[];
-  initialValues: BulkEditInitialValues;
-};
-
-function normalizeAccountGroupIds(value: unknown): number[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => Number(item))
-    .filter((item) => Number.isInteger(item) && item > 0);
-}
-
-function getBulkEditInitialValues(rows: AccountResp[], selectedIds: number[]): BulkEditInitialValues {
-  if (selectedIds.length === 0) {
-    return { groupIds: [] };
-  }
-
-  const selectedIdSet = new Set(selectedIds);
-  const selectedRows = rows.filter((row) => selectedIdSet.has(row.id));
-  const firstSelectedRow = selectedRows[0];
-  if (!firstSelectedRow) {
-    return { groupIds: [] };
-  }
-
-  const firstGroupIds = normalizeAccountGroupIds(firstSelectedRow.group_ids);
-  const commonGroupIds = new Set(firstGroupIds);
-  for (const row of selectedRows.slice(1)) {
-    const rowGroupIds = new Set(normalizeAccountGroupIds(row.group_ids));
-    for (const groupId of Array.from(commonGroupIds)) {
-      if (!rowGroupIds.has(groupId)) {
-        commonGroupIds.delete(groupId);
-      }
-    }
-  }
-
-  const getCommonNumber = (selectValue: (account: AccountResp) => unknown) => {
-    const firstValue = selectValue(firstSelectedRow);
-    if (typeof firstValue !== 'number' || !Number.isFinite(firstValue)) {
-      return undefined;
-    }
-    return selectedRows.every((row) => selectValue(row) === firstValue) ? firstValue : undefined;
-  };
-
-  return {
-    groupIds: firstGroupIds.filter((groupId) => commonGroupIds.has(groupId)),
-    maxConcurrency: getCommonNumber((account) => account.max_concurrency),
-    priority: getCommonNumber((account) => account.priority),
-    rateMultiplier: getCommonNumber((account) => account.rate_multiplier),
-  };
-}
-
-const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
-  onBulkClearRateLimitMarkers,
-  onBulkDelete,
-  onBulkDisable,
-  onBulkEdit,
-  onBulkEnable,
-  onBulkRefresh,
-  onClearSelection,
-  selectionStore,
-}: {
-  onBulkClearRateLimitMarkers: () => void;
-  onBulkDelete: () => void;
-  onBulkDisable: () => void;
-  onBulkEdit: () => void;
-  onBulkEnable: () => void;
-  onBulkRefresh: () => void;
-  onClearSelection: () => void;
-  selectionStore: AccountSelectionStore;
-}) {
-  const selectedCount = useSyncExternalStore(
-    selectionStore.subscribe,
-    selectionStore.getSelectedCount,
-    selectionStore.getSelectedCount,
-  );
-
-  if (selectedCount === 0) return null;
-
-  return (
-    <div onClick={(event) => event.stopPropagation()}>
-      <BulkActionsBar
-        overlay
-        selectedCount={selectedCount}
-        onClear={onClearSelection}
-        onEdit={onBulkEdit}
-        onEnable={onBulkEnable}
-        onDisable={onBulkDisable}
-        onRefreshQuota={onBulkRefresh}
-        onClearRateLimitMarkers={onBulkClearRateLimitMarkers}
-        onDelete={onBulkDelete}
-      />
-    </div>
-  );
-});
-
-const AccountsSelectAllHeaderCell = memo(function AccountsSelectAllHeaderCell({
-  onVisibleRowsSelected,
-  selectAllAriaLabel,
-  selectionStore,
-  visibleRowIds,
-}: {
-  onVisibleRowsSelected: (isSelected: boolean) => void;
-  selectAllAriaLabel: string;
-  selectionStore: AccountSelectionStore;
-  visibleRowIds: number[];
-}) {
-  const selectedVisibleCount = useSyncExternalStore(
-    useCallback((listener) => selectionStore.subscribe(listener), [selectionStore]),
-    useCallback(() => selectionStore.countVisible(visibleRowIds), [selectionStore, visibleRowIds]),
-    () => 0,
-  );
-  const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
-  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
-
-  return (
-    <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
-      <TableSelectionCheckbox
-        ariaLabel={selectAllAriaLabel}
-        isIndeterminate={someVisibleSelected}
-        isSelected={allVisibleSelected}
-        onChange={onVisibleRowsSelected}
-      />
-    </div>
-  );
-});
-
-const AccountsTableSection = memo(function AccountsTableSection({
-  columns,
-  expandedUsageRowIds,
-  isLoading,
-  onBulkClearRateLimitMarkers,
-  onBulkDelete,
-  onBulkDisable,
-  onBulkEdit,
-  onBulkEnable,
-  onBulkRefresh,
-  onClearSelection,
-  onRowSelected,
-  onVisibleRowsSelected,
-  rows,
-  rowMetaById,
-  selectAllAriaLabel,
-  selectionStore,
-  selectRowAriaLabel,
-  tableAriaLabel,
-  tableEmptyText,
-  visibleRowIds,
-}: {
-  columns: AccountTableColumn[];
-  expandedUsageRowIds: ReadonlySet<number>;
-  isLoading: boolean;
-  onBulkClearRateLimitMarkers: () => void;
-  onBulkDelete: () => void;
-  onBulkDisable: () => void;
-  onBulkEdit: () => void;
-  onBulkEnable: () => void;
-  onBulkRefresh: () => void;
-  onClearSelection: () => void;
-  onRowSelected: (id: number, isSelected: boolean) => void;
-  onVisibleRowsSelected: (isSelected: boolean) => void;
-  rows: AccountResp[];
-  rowMetaById: ReadonlyMap<number, unknown>;
-  selectAllAriaLabel: string;
-  selectionStore: AccountSelectionStore;
-  selectRowAriaLabel: string;
-  tableAriaLabel: string;
-  tableEmptyText: string;
-  visibleRowIds: number[];
-}) {
-  return (
-    <div className="ag-resource-table ag-accounts-table">
-      <div className="ag-resource-table-scroll" data-slot="wrapper">
-        <AccountsBulkActionsOverlay
-          selectionStore={selectionStore}
-          onClearSelection={onClearSelection}
-          onBulkEdit={onBulkEdit}
-          onBulkEnable={onBulkEnable}
-          onBulkDisable={onBulkDisable}
-          onBulkRefresh={onBulkRefresh}
-          onBulkClearRateLimitMarkers={onBulkClearRateLimitMarkers}
-          onBulkDelete={onBulkDelete}
-        />
-        <table
-          aria-label={tableAriaLabel}
-          className="ag-resource-table-content ag-accounts-table-content"
-          data-slot="table"
-          style={{ minWidth: 'var(--ag-accounts-current-table-width)' }}
-        >
-          <thead data-slot="thead">
-            <tr data-slot="tr">
-              <th data-slot="th" scope="col" className="text-center" style={ACCOUNT_SELECTION_COLUMN_STYLE}>
-                <AccountsSelectAllHeaderCell
-                  selectAllAriaLabel={selectAllAriaLabel}
-                  selectionStore={selectionStore}
-                  visibleRowIds={visibleRowIds}
-                  onVisibleRowsSelected={onVisibleRowsSelected}
-                />
-              </th>
-              {columns.map((column) => (
-                <th
-                  data-slot="th"
-                  id={column.key}
-                  key={column.key}
-                  scope="col"
-                  className={columnAlignClass(column.align)}
-                  style={columnWidthStyle(column)}
-                >
-                  {column.title}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody data-slot="tbody">
-            {isLoading ? (
-              <AccountsTableLoadingRow colSpan={columns.length + 1} />
-            ) : rows.length === 0 ? (
-              <tr data-slot="tr" data-key="empty">
-                <td data-slot="td" colSpan={columns.length + 1}>
-                  <EmptyState>
-                    <div className="text-sm text-default-500">{tableEmptyText}</div>
-                  </EmptyState>
-                </td>
-              </tr>
-            ) : (
-              rows.map((row) => (
-                <AccountTableRow
-                  key={row.id}
-                  columns={columns}
-                  isUsageExpanded={expandedUsageRowIds.has(row.id)}
-                  row={row}
-                  rowMeta={rowMetaById.get(row.id)}
-                  selectRowAriaLabel={selectRowAriaLabel}
-                  selectionStore={selectionStore}
-                  onSelectedChange={onRowSelected}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-});
 
 export default function AccountsPageContent() {
   const { t } = useTranslation();
