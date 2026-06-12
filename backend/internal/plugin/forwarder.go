@@ -542,7 +542,16 @@ func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFa
 			message: "上游服务暂不可用，请稍后重试",
 		}
 	}
-	if summary.accountDeadSeen || summary.accountUnavailable {
+	if summary.accountUnavailable {
+		return allRoutesFailureResponse{
+			status:     http.StatusTooManyRequests,
+			errType:    "rate_limit_error",
+			code:       "all_routes_account_unavailable",
+			message:    "上游账号403暂不可用，请稍后重试",
+			retryAfter: allRoutesFailedDefaultRetryAfter,
+		}
+	}
+	if summary.accountDeadSeen {
 		return allRoutesFailureResponse{
 			status:  http.StatusServiceUnavailable,
 			errType: "server_error",

@@ -233,6 +233,27 @@ func TestWriteFailureResponse_RateLimitedReturns429(t *testing.T) {
 	}
 }
 
+func TestWriteFailureResponse_AccountUnavailableReturns429(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+
+	writeFailureResponse(c, fakeState(false), forwardExecution{
+		outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountUnavailable},
+	})
+
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusTooManyRequests)
+	}
+	if body := recorder.Body.String(); !strings.Contains(body, "上游账号403暂不可用") {
+		t.Fatalf("body = %q, want contain '上游账号403暂不可用'", body)
+	}
+	if got := recorder.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("Retry-After = %q, want 1", got)
+	}
+}
+
 func TestSanitizedClientErrorMessage_ImageTooLarge(t *testing.T) {
 	t.Parallel()
 
