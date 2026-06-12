@@ -8,7 +8,12 @@ import { useAuth } from '../../../app/providers/AuthProvider';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
-import { formatRateMultiplier, isValidRateMultiplierValue } from '../../../shared/utils/rateMultiplier';
+import {
+  MAX_RATE_MULTIPLIER,
+  RATE_MULTIPLIER_STEP,
+  formatRateMultiplier,
+  isValidRateMultiplierValue,
+} from '../../../shared/utils/rateMultiplier';
 import type { CreateAPIKeyReq, GroupResp } from '../../../shared/types';
 
 interface CreateKeyModalProps {
@@ -44,6 +49,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
 
   const handleSubmit = () => {
     if (!form.name || !form.group_id) return;
+    if (!isValidRateMultiplierValue(form.sell_rate ?? 1)) return;
     onSubmit({
       ...form,
       expires_at: form.expires_at || undefined,
@@ -80,6 +86,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
   });
   const selectedGroupLabel =
     groupOptions.find((item) => item.id === String(form.group_id))?.label ?? t('api_keys.select_group');
+  const sellRateValid = isValidRateMultiplierValue(form.sell_rate ?? 1);
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -95,7 +102,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
           <Button variant="secondary" onPress={handleClose}>
             {t('common.cancel')}
           </Button>
-          <Button variant="primary" isDisabled={loading} onPress={handleSubmit}>
+          <Button variant="primary" isDisabled={loading || !sellRateValid} onPress={handleSubmit}>
             {loading ? <Spinner size="sm" /> : null}
             {t('common.create')}
           </Button>
@@ -150,12 +157,13 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
               <Label>{t('api_keys.sell_rate_label', '销售倍率')}</Label>
               <Input
                 type="number"
-                step="0.01"
+                step={RATE_MULTIPLIER_STEP}
                 min="0"
+                max={MAX_RATE_MULTIPLIER}
                 value={String(form.sell_rate ?? 1)}
                 onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
               />
-              <Description>{t('api_keys.sell_rate_hint', '1.2 表示在实际倍率基础上加价 20%(默认1代表不加价)')}</Description>
+              <Description>{t('api_keys.sell_rate_hint', '1.2 表示在实际倍率基础上加价 20%(默认1代表不加价)，最大 1000')}</Description>
             </HeroTextField>
           </div>
 

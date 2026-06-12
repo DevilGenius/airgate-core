@@ -2,10 +2,12 @@ package apikey
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
@@ -165,7 +167,10 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 	if maxConc < 0 {
 		maxConc = 0
 	}
-	sellRate := normalizeSellRate(input.SellRate)
+	sellRate, err := normalizeSellRate(input.SellRate)
+	if err != nil {
+		return Key{}, err
+	}
 	item, err := s.repo.Create(ctx, Mutation{
 		Name:           &input.Name,
 		KeyHint:        stringPtr(buildKeyHint(rawKey)),
@@ -342,7 +347,10 @@ func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInp
 
 	var sellRate *float64
 	if input.SellRate != nil {
-		normalized := normalizeSellRate(*input.SellRate)
+		normalized, err := normalizeSellRate(*input.SellRate)
+		if err != nil {
+			return Mutation{}, err
+		}
 		sellRate = &normalized
 	}
 
@@ -371,11 +379,14 @@ func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInp
 	return mutation, nil
 }
 
-func normalizeSellRate(rate float64) float64 {
-	if rate <= 0 {
-		return 1
+func normalizeSellRate(rate float64) (float64, error) {
+	if rate == 0 {
+		return 1, nil
 	}
-	return rate
+	if err := ratevalue.ValidateMultiplier(rate); err != nil {
+		return 0, errors.Join(ErrInvalidSellRate, err)
+	}
+	return rate, nil
 }
 
 func (s *Service) ensureUserCanUseGroup(ctx context.Context, userID, groupID int) error {

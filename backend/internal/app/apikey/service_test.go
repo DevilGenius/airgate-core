@@ -3,6 +3,7 @@ package apikey
 import (
 	"context"
 	"errors"
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -227,6 +228,24 @@ func TestCreateOwnedDefaultsSellRateToOne(t *testing.T) {
 	}
 	if captured.SellRate == nil || *captured.SellRate != 1 {
 		t.Fatalf("默认销售倍率 = %+v，期望 1", captured.SellRate)
+	}
+}
+
+func TestCreateOwnedRejectsInvalidSellRate(t *testing.T) {
+	service := NewService(apiKeyStubRepository{
+		groupAccess: func(context.Context, int, int) (GroupAccess, error) {
+			return GroupAccess{Exists: true, Allowed: true}, nil
+		},
+		create: func(context.Context, Mutation) (Key, error) {
+			t.Fatal("invalid sell_rate must not be persisted")
+			return Key{}, nil
+		},
+	}, testAPIKeySecret)
+
+	for _, rate := range []float64{math.NaN(), -1, 0.001, 1000.01, math.MaxFloat64} {
+		if _, err := service.CreateOwned(t.Context(), 7, CreateInput{Name: "bad", GroupID: 3, SellRate: rate}); !errors.Is(err, ErrInvalidSellRate) {
+			t.Fatalf("sell_rate %v error = %v, want ErrInvalidSellRate", rate, err)
+		}
 	}
 }
 

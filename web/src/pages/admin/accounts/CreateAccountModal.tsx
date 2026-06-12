@@ -25,6 +25,7 @@ import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import {
+  MAX_RATE_MULTIPLIER,
   RATE_MULTIPLIER_STEP,
   isEmptyRateMultiplierInput,
   isValidRateMultiplierValue,
@@ -369,6 +370,7 @@ export function CreateAccountModal({
                       <Input
                         type="number"
                         min="0"
+                        max={MAX_RATE_MULTIPLIER}
                         step={RATE_MULTIPLIER_STEP}
                         value={rateMultiplierInput}
                         onChange={(e) => setRateMultiplierInput(e.target.value)}

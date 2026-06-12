@@ -22,7 +22,7 @@ import { TableRowMoreMenu } from '../../shared/components/TableRowMoreMenu';
 import { dateInputToLocalStartRFC3339, formatAPIKeyHint, formatDateInputValue, formatExpiry } from '../../shared/utils/format';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
-import { formatRateMultiplier, isValidRateMultiplierValue } from '../../shared/utils/rateMultiplier';
+import { formatRateMultiplier, isValidRateMultiplierValue, parseRateMultiplier } from '../../shared/utils/rateMultiplier';
 import {
   AlertTriangle,
   Check,
@@ -177,6 +177,12 @@ export default function UserKeysPage() {
 
     // 后端要求 RFC3339 格式；空字符串表示显式清除过期时间
     const expiresAt = dateInputToLocalStartRFC3339(form.expires_at);
+    const sellRate = form.sell_rate.trim() ? parseRateMultiplier(form.sell_rate) : 1;
+    if (!isValidRateMultiplierValue(sellRate)) {
+      toast('error', t('user_keys.sell_rate_invalid', '销售倍率必须在 0.01 到 1000 之间，或填 0 使用默认 1'));
+      return;
+    }
+    const normalizedSellRate = sellRate || 1;
 
     if (editingKey) {
       const payload: UpdateAPIKeyReq = {
@@ -184,7 +190,7 @@ export default function UserKeysPage() {
         group_id: form.group_id ? Number(form.group_id) : undefined,
         // 空字符串显式改为 0 = 无限配额；省略字段只表示不修改旧配额
         quota_usd: form.quota_usd.trim() ? Number(form.quota_usd) : 0,
-        sell_rate: form.sell_rate ? Number(form.sell_rate) : 1,
+        sell_rate: normalizedSellRate,
         // 空字符串显式改为 0 = 关闭并发限制；后端看到 0 会清除旧值
         max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : 0,
         expires_at: expiresAt,
@@ -195,7 +201,7 @@ export default function UserKeysPage() {
         name: form.name,
         group_id: Number(form.group_id),
         quota_usd: form.quota_usd ? Number(form.quota_usd) : undefined,
-        sell_rate: form.sell_rate ? Number(form.sell_rate) : 1,
+        sell_rate: normalizedSellRate,
         max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : undefined,
         expires_at: expiresAt,
       };

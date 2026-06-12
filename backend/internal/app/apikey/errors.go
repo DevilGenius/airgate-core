@@ -11,6 +11,8 @@ var (
 	ErrGroupForbidden = errors.New("无权使用该分组")
 	// ErrInvalidExpiresAt 过期时间格式错误。
 	ErrInvalidExpiresAt = errors.New("过期时间格式错误")
+	// ErrInvalidSellRate 销售倍率无效。
+	ErrInvalidSellRate = errors.New("销售倍率必须是有限非负数；0 表示默认 1，正数范围为 0.01 到 1000")
 	// ErrLegacyKeyNotReveal 旧密钥无法查看原文。
 	ErrLegacyKeyNotReveal = errors.New("该密钥创建于加密存储启用前，无法查看原文")
 	// ErrKeyDecryptFailed 密钥解密失败。

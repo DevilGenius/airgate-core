@@ -1,4 +1,5 @@
 export const MIN_POSITIVE_RATE_MULTIPLIER = 0.01;
+export const MAX_RATE_MULTIPLIER = 1000;
 export const RATE_MULTIPLIER_STEP = '0.01';
 
 export function parseRateMultiplier(raw: string): number | null {
@@ -15,7 +16,7 @@ export function isValidRateMultiplierValue(value: number | null): value is numbe
   return value != null
     && Number.isFinite(value)
     && value >= 0
-    && (value === 0 || value >= MIN_POSITIVE_RATE_MULTIPLIER);
+    && (value === 0 || (value >= MIN_POSITIVE_RATE_MULTIPLIER && value <= MAX_RATE_MULTIPLIER));
 }
 
 export function isValidRateMultiplierInput(raw: string): boolean {

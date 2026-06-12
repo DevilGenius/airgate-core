@@ -13,6 +13,7 @@ import { queryKeys } from '../../../shared/queryKeys';
 import { SearchFilterComboBox } from '../../../shared/components/SearchFilterComboBox';
 import { REMOTE_SEARCH_DEBOUNCE_MS } from '../../../shared/constants';
 import {
+  MAX_RATE_MULTIPLIER,
   RATE_MULTIPLIER_STEP,
   formatRateMultiplier,
   isValidRateMultiplierValue,
@@ -186,6 +187,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
             <Input
               type="number"
               min="0"
+              max={MAX_RATE_MULTIPLIER}
               step={RATE_MULTIPLIER_STEP}
               value={newRate}
               onChange={(e) => setNewRate(e.target.value)}
@@ -231,6 +233,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
                         <Input
                           type="number"
                           min="0"
+                          max={MAX_RATE_MULTIPLIER}
                           step={RATE_MULTIPLIER_STEP}
                           value={editingRate}
                           onChange={(e) => setEditingRate(e.target.value)}

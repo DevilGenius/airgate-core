@@ -7,6 +7,11 @@ import { parseIpList, formatIpList } from '../../../shared/utils/ip';
 import { dateInputToLocalStartRFC3339, formatDateInputValue } from '../../../shared/utils/format';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import {
+  MAX_RATE_MULTIPLIER,
+  RATE_MULTIPLIER_STEP,
+  isValidRateMultiplierValue,
+} from '../../../shared/utils/rateMultiplier';
 import type { APIKeyResp, UpdateAPIKeyReq, GroupResp } from '../../../shared/types';
 
 interface EditKeyModalProps {
@@ -33,6 +38,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
   const [ipBlacklist, setIpBlacklist] = useState(formatIpList(apiKey.ip_blacklist));
 
   const handleSubmit = () => {
+    if (!isValidRateMultiplierValue(form.sell_rate ?? 1)) return;
     onSubmit({
       ...form,
       group_id: groupId !== apiKey.group_id ? groupId : undefined,
@@ -54,6 +60,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     { id: 'disabled', label: t('status.disabled') },
   ];
   const selectedStatusLabel = statusOptions.find((item) => item.id === (form.status ?? 'active'))?.label ?? t('status.active');
+  const sellRateValid = isValidRateMultiplierValue(form.sell_rate ?? 1);
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -116,12 +123,13 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
           <Label>{t('api_keys.sell_rate_label', '销售倍率')}</Label>
           <Input
             type="number"
-            step="0.01"
+            step={RATE_MULTIPLIER_STEP}
             min="0"
+            max={MAX_RATE_MULTIPLIER}
             value={String(form.sell_rate ?? 1)}
             onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
           />
-          <Description>{t('api_keys.sell_rate_hint', '1.2 表示在实际倍率基础上加价 20%(默认1代表不加价)')}</Description>
+          <Description>{t('api_keys.sell_rate_hint', '1.2 表示在实际倍率基础上加价 20%(默认1代表不加价)，最大 1000')}</Description>
         </HeroTextField>
 
         <HeroTextField fullWidth>
@@ -184,7 +192,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
               <Button variant="secondary" onPress={onClose}>
                 {t('common.cancel')}
               </Button>
-              <Button variant="primary" isDisabled={loading} onPress={handleSubmit}>
+              <Button variant="primary" isDisabled={loading || !sellRateValid} onPress={handleSubmit}>
                 {loading ? <Spinner size="sm" /> : null}
                 {t('common.save')}
               </Button>

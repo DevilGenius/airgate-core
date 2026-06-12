@@ -8,6 +8,7 @@ import { groupsApi } from '../../../shared/api/groups';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import {
+  MAX_RATE_MULTIPLIER,
   RATE_MULTIPLIER_STEP,
   isEmptyRateMultiplierInput,
   isValidRateMultiplierValue,
@@ -296,6 +297,7 @@ export function GroupFormModal({
           <Input
             type="number"
             min="0"
+            max={MAX_RATE_MULTIPLIER}
             step={RATE_MULTIPLIER_STEP}
             value={form.rate_multiplier}
             onChange={(e) => setForm({ ...form, rate_multiplier: e.target.value })}

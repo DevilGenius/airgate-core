@@ -5,9 +5,12 @@ import (
 	"math"
 )
 
-const MinPositiveMultiplier = 0.01
+const (
+	MinPositiveMultiplier = 0.01
+	MaxMultiplier         = 1000
+)
 
-var ErrInvalidMultiplier = errors.New("倍率必须是有限非负数；0 表示免费，正数最低 0.01")
+var ErrInvalidMultiplier = errors.New("倍率必须是有限非负数；0 表示免费，正数范围为 0.01 到 1000")
 
 func ValidateMultiplier(value float64) error {
 	if !IsValidMultiplier(value) {
@@ -20,7 +23,7 @@ func IsValidMultiplier(value float64) bool {
 	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
 		return false
 	}
-	return value == 0 || value >= MinPositiveMultiplier
+	return value == 0 || (value >= MinPositiveMultiplier && value <= MaxMultiplier)
 }
 
 func NormalizeMultiplier(value, fallback float64) float64 {
