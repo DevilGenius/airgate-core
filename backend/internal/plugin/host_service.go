@@ -1250,7 +1250,7 @@ func (h *HostService) recordHostForwardUsage(
 
 func (h *HostService) hostForwardSellRate(ctx context.Context, req hostForwardRequest) (float64, error) {
 	if req.APIKeyID <= 0 {
-		return 0, nil
+		return 1, nil
 	}
 	ak, err := h.db.APIKey.Query().
 		Where(

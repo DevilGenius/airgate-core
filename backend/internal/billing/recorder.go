@@ -11,6 +11,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
+	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 	"github.com/DevilGenius/airgate-core/internal/safego"
 )
@@ -52,7 +53,7 @@ type UsageRecord struct {
 	BilledCost            float64 // 客户账面消耗（累加到 APIKey.used_quota）
 	AccountCost           float64 // 账号实际成本（仅服务"账号计费"统计）
 	RateMultiplier        float64 // 快照：本次生效的平台计费倍率
-	SellRate              float64 // 快照：本次生效的销售倍率（1 表示不加价）
+	SellRate              float64 // 快照：本次生效的销售倍率（0 表示客户侧免费，1 表示不加价）
 	AccountRateMultiplier float64 // 快照：本次生效的 account_rate
 	ServiceTier           string
 	Stream                bool
@@ -332,6 +333,10 @@ func (r *Recorder) updateAccountStatsCache(ctx context.Context, batch []UsageRec
 }
 
 func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
+	rateMultiplier := ratevalue.NormalizeMultiplier(rec.RateMultiplier, 1)
+	sellRate := ratevalue.NormalizeSellMultiplier(rec.SellRate, 1)
+	accountRateMultiplier := ratevalue.NormalizeMultiplier(rec.AccountRateMultiplier, 1)
+
 	b := tx.UsageLog.Create().
 		SetPlatform(rec.Platform).
 		SetModel(rec.Model).
@@ -352,9 +357,9 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
 		SetActualCost(rec.ActualCost).
 		SetBilledCost(rec.BilledCost).
 		SetAccountCost(rec.AccountCost).
-		SetRateMultiplier(rec.RateMultiplier).
-		SetSellRate(rec.SellRate).
-		SetAccountRateMultiplier(rec.AccountRateMultiplier).
+		SetRateMultiplier(rateMultiplier).
+		SetSellRate(sellRate).
+		SetAccountRateMultiplier(accountRateMultiplier).
 		SetServiceTier(rec.ServiceTier).
 		SetStream(rec.Stream).
 		SetDurationMs(rec.DurationMs).

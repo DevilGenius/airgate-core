@@ -374,6 +374,11 @@ func (ac *AccountCreate) check() error {
 	if _, ok := ac.mutation.RateMultiplier(); !ok {
 		return &ValidationError{Name: "rate_multiplier", err: errors.New(`ent: missing required field "Account.rate_multiplier"`)}
 	}
+	if v, ok := ac.mutation.RateMultiplier(); ok {
+		if err := account.RateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Account.rate_multiplier": %w`, err)}
+		}
+	}
 	if _, ok := ac.mutation.ErrorMsg(); !ok {
 		return &ValidationError{Name: "error_msg", err: errors.New(`ent: missing required field "Account.error_msg"`)}
 	}

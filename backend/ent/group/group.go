@@ -136,6 +136,8 @@ var (
 	PlatformValidator func(string) error
 	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
 	DefaultRateMultiplier float64
+	// RateMultiplierValidator is a validator for the "rate_multiplier" field. It is called by the builders before save.
+	RateMultiplierValidator func(float64) error
 	// DefaultIsExclusive holds the default value on creation for the "is_exclusive" field.
 	DefaultIsExclusive bool
 	// DefaultStatusVisible holds the default value on creation for the "status_visible" field.

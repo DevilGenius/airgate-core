@@ -34,7 +34,7 @@ func (Account) Fields() []ent.Field {
 
 		field.Int("priority").Default(50).Min(-999).Max(999),
 		field.Int("max_concurrency").Default(10),
-		field.Float("rate_multiplier").Default(1.0),
+		field.Float("rate_multiplier").Default(1.0).Min(0.01).Max(100),
 		field.String("error_msg").Default("").
 			Comment("进入当前状态的原因（给运维看）"),
 		field.Bool("upstream_is_pool").Default(false).

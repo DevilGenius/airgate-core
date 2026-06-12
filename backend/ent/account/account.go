@@ -138,6 +138,8 @@ var (
 	DefaultMaxConcurrency int
 	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
 	DefaultRateMultiplier float64
+	// RateMultiplierValidator is a validator for the "rate_multiplier" field. It is called by the builders before save.
+	RateMultiplierValidator func(float64) error
 	// DefaultErrorMsg holds the default value on creation for the "error_msg" field.
 	DefaultErrorMsg string
 	// DefaultUpstreamIsPool holds the default value on creation for the "upstream_is_pool" field.

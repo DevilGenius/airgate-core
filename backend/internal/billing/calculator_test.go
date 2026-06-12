@@ -18,7 +18,7 @@ func TestCalculate_NoMarkup(t *testing.T) {
 		OutputCost:      0.3,
 		CachedInputCost: 0.1,
 		BillingRate:     0.3,
-		SellRate:        0,
+		SellRate:        1,
 		AccountRate:     1.0,
 	})
 
@@ -28,7 +28,6 @@ func TestCalculate_NoMarkup(t *testing.T) {
 	if !almostEqual(res.ActualCost, 0.3) {
 		t.Fatalf("ActualCost = %v, want 0.3", res.ActualCost)
 	}
-	// sell_rate<=0 时 billed_cost 必须等于 actual_cost（向后兼容）
 	if !almostEqual(res.BilledCost, res.ActualCost) {
 		t.Fatalf("BilledCost = %v, want %v (= ActualCost)", res.BilledCost, res.ActualCost)
 	}
@@ -38,6 +37,25 @@ func TestCalculate_NoMarkup(t *testing.T) {
 	}
 	if !almostEqual(res.RateMultiplier, 0.3) {
 		t.Fatalf("RateMultiplier = %v, want 0.3", res.RateMultiplier)
+	}
+	if res.SellRate != 1 {
+		t.Fatalf("SellRate = %v, want 1", res.SellRate)
+	}
+}
+
+func TestCalculate_ZeroSellRateIsFreeForCustomer(t *testing.T) {
+	c := NewCalculator()
+	res := c.Calculate(CalculateInput{
+		InputCost:   1.0,
+		BillingRate: 0.5,
+		SellRate:    0,
+		AccountRate: 1.0,
+	})
+	if !almostEqual(res.ActualCost, 0.5) {
+		t.Fatalf("ActualCost = %v, want 0.5", res.ActualCost)
+	}
+	if !almostEqual(res.BilledCost, 0) {
+		t.Fatalf("BilledCost = %v, want 0", res.BilledCost)
 	}
 	if res.SellRate != 0 {
 		t.Fatalf("SellRate = %v, want 0", res.SellRate)
@@ -70,18 +88,19 @@ func TestCalculate_AccountCostIndependent(t *testing.T) {
 	}
 }
 
-func TestCalculate_ZeroAccountRate_IsFree(t *testing.T) {
+func TestCalculate_ZeroAccountRate_DefaultsToOne(t *testing.T) {
 	c := NewCalculator()
 	res := c.Calculate(CalculateInput{
 		InputCost:   2.0,
 		BillingRate: 1.0,
+		SellRate:    1.0,
 		AccountRate: 0,
 	})
-	if !almostEqual(res.AccountCost, 0) {
-		t.Fatalf("AccountCost = %v, want 0 (account_rate=0 means free)", res.AccountCost)
+	if !almostEqual(res.AccountCost, 2.0) {
+		t.Fatalf("AccountCost = %v, want 2.0 (account_rate=0 falls back to 1)", res.AccountCost)
 	}
-	if !almostEqual(res.AccountRateMultiplier, 0) {
-		t.Fatalf("AccountRateMultiplier = %v, want 0", res.AccountRateMultiplier)
+	if !almostEqual(res.AccountRateMultiplier, 1) {
+		t.Fatalf("AccountRateMultiplier = %v, want 1", res.AccountRateMultiplier)
 	}
 }
 
@@ -110,17 +129,18 @@ func TestCalculate_WithMarkup(t *testing.T) {
 	}
 }
 
-func TestCalculate_ZeroBillingRate_IsFree(t *testing.T) {
+func TestCalculate_ZeroBillingRate_DefaultsToOne(t *testing.T) {
 	c := NewCalculator()
 	res := c.Calculate(CalculateInput{
 		InputCost:   1.0,
 		BillingRate: 0,
+		SellRate:    1,
 	})
-	if !almostEqual(res.ActualCost, 0) {
-		t.Fatalf("ActualCost = %v, want 0", res.ActualCost)
+	if !almostEqual(res.ActualCost, 1) {
+		t.Fatalf("ActualCost = %v, want 1", res.ActualCost)
 	}
-	if !almostEqual(res.RateMultiplier, 0) {
-		t.Fatalf("RateMultiplier = %v, want 0", res.RateMultiplier)
+	if !almostEqual(res.RateMultiplier, 1) {
+		t.Fatalf("RateMultiplier = %v, want 1", res.RateMultiplier)
 	}
 }
 

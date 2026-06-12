@@ -13,6 +13,8 @@ import {
   RATE_MULTIPLIER_STEP,
   formatRateMultiplier,
   isValidRateMultiplierValue,
+  isValidSellRateValue,
+  parseRateMultiplier,
 } from '../../../shared/utils/rateMultiplier';
 import type { CreateAPIKeyReq, GroupResp } from '../../../shared/types';
 
@@ -30,26 +32,30 @@ const defaultForm: CreateAPIKeyReq = {
   max_concurrency: 0,
   name: '',
   quota_usd: 0,
-  sell_rate: 1,
 };
 
 export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: CreateKeyModalProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [form, setForm] = useState<CreateAPIKeyReq>(defaultForm);
+  const [sellRateInput, setSellRateInput] = useState('1');
   const [ipWhitelist, setIpWhitelist] = useState('');
   const [ipBlacklist, setIpBlacklist] = useState('');
 
   const handleClose = () => {
     setForm(defaultForm);
+    setSellRateInput('1');
     setIpWhitelist('');
     setIpBlacklist('');
     onClose();
   };
 
+  const parsedSellRate = sellRateInput.trim() ? parseRateMultiplier(sellRateInput) : 1;
+  const sellRateValid = isValidSellRateValue(parsedSellRate);
+
   const handleSubmit = () => {
     if (!form.name || !form.group_id) return;
-    if (!isValidRateMultiplierValue(form.sell_rate ?? 1)) return;
+    if (!sellRateValid) return;
     onSubmit({
       ...form,
       expires_at: form.expires_at || undefined,
@@ -57,7 +63,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
       ip_whitelist: parseIpList(ipWhitelist),
       max_concurrency: form.max_concurrency ?? 0,
       quota_usd: form.quota_usd || undefined,
-      sell_rate: form.sell_rate || 1,
+      sell_rate: parsedSellRate ?? 1,
     });
   };
 
@@ -86,7 +92,6 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
   });
   const selectedGroupLabel =
     groupOptions.find((item) => item.id === String(form.group_id))?.label ?? t('api_keys.select_group');
-  const sellRateValid = isValidRateMultiplierValue(form.sell_rate ?? 1);
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -160,10 +165,10 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
                 step={RATE_MULTIPLIER_STEP}
                 min="0"
                 max={MAX_RATE_MULTIPLIER}
-                value={String(form.sell_rate ?? 1)}
-                onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
+                value={sellRateInput}
+                onChange={(e) => setSellRateInput(e.target.value)}
               />
-              <Description>{t('api_keys.sell_rate_hint', '1.2 表示在实际倍率基础上加价 20%(默认1代表不加价)，最大 1000')}</Description>
+              <Description>{t('api_keys.sell_rate_hint', '1.2 表示加价 20%，1 表示不加价，0 表示客户侧免费，最大 100')}</Description>
             </HeroTextField>
           </div>
 

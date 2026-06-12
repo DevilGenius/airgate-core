@@ -20,6 +20,7 @@ import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import {
   MAX_RATE_MULTIPLIER,
+  MIN_POSITIVE_RATE_MULTIPLIER,
   RATE_MULTIPLIER_STEP,
   isEmptyRateMultiplierInput,
   isValidRateMultiplierValue,
@@ -254,7 +255,7 @@ export function BulkEditAccountModal({
           <HeroTextField fullWidth isDisabled={!enableRateMultiplier}>
             <Input
               type="number"
-              min="0"
+              min={MIN_POSITIVE_RATE_MULTIPLIER}
               max={MAX_RATE_MULTIPLIER}
               step={RATE_MULTIPLIER_STEP}
               value={rateMultiplier}

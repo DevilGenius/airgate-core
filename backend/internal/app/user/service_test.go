@@ -52,7 +52,7 @@ func TestListAPIKeysNormalizesPagination(t *testing.T) {
 	}
 }
 
-func TestSetGroupRateAllowsZeroAndMinimumPositiveRate(t *testing.T) {
+func TestSetGroupRateAllowsMinimumPositiveRate(t *testing.T) {
 	var captured Mutation
 	service := NewService(stubRepository{
 		findByID: func() (User, error) {
@@ -63,13 +63,6 @@ func TestSetGroupRateAllowsZeroAndMinimumPositiveRate(t *testing.T) {
 			return User{ID: 1, Email: "user@example.com", GroupRates: mutation.GroupRates}, nil
 		},
 	})
-
-	if _, err := service.SetGroupRate(t.Context(), 1, 9, 0); err != nil {
-		t.Fatalf("SetGroupRate(rate=0) returned error: %v", err)
-	}
-	if !captured.HasGroupRates || captured.GroupRates[9] != 0 {
-		t.Fatalf("captured zero override = %+v, want explicit 0", captured)
-	}
 
 	if _, err := service.SetGroupRate(t.Context(), 1, 9, 0.01); err != nil {
 		t.Fatalf("SetGroupRate(rate=0.01) returned error: %v", err)
@@ -82,9 +75,11 @@ func TestSetGroupRateAllowsZeroAndMinimumPositiveRate(t *testing.T) {
 func TestSetGroupRateRejectsInvalidRate(t *testing.T) {
 	service := NewService(stubRepository{})
 
-	_, err := service.SetGroupRate(t.Context(), 1, 9, 0.001)
-	if !errors.Is(err, ErrInvalidRateMultiplier) {
-		t.Fatalf("SetGroupRate() error = %v, want ErrInvalidRateMultiplier", err)
+	for _, rate := range []float64{0, 0.001} {
+		_, err := service.SetGroupRate(t.Context(), 1, 9, rate)
+		if !errors.Is(err, ErrInvalidRateMultiplier) {
+			t.Fatalf("SetGroupRate(rate=%v) error = %v, want ErrInvalidRateMultiplier", rate, err)
+		}
 	}
 }
 

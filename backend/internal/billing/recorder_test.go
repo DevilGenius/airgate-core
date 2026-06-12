@@ -55,6 +55,9 @@ func TestRecordSyncPersistsUserEmailSnapshot(t *testing.T) {
 	if log.UserIDSnapshot != user.ID || log.UserEmailSnapshot != user.Email {
 		t.Fatalf("usage snapshot = (%d, %q), want (%d, %q)", log.UserIDSnapshot, log.UserEmailSnapshot, user.ID, user.Email)
 	}
+	if log.RateMultiplier != 1 || log.AccountRateMultiplier != 1 {
+		t.Fatalf("rate snapshots = (%v, %v), want defaults (1, 1)", log.RateMultiplier, log.AccountRateMultiplier)
+	}
 }
 
 func createBillingTestUser(t *testing.T, ctx context.Context, db *ent.Client, email string) *ent.User {

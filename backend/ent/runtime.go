@@ -57,7 +57,21 @@ func init() {
 	// apikey.DefaultSellRate holds the default value on creation for the sell_rate field.
 	apikey.DefaultSellRate = apikeyDescSellRate.Default.(float64)
 	// apikey.SellRateValidator is a validator for the "sell_rate" field. It is called by the builders before save.
-	apikey.SellRateValidator = apikeyDescSellRate.Validators[0].(func(float64) error)
+	apikey.SellRateValidator = func() func(float64) error {
+		validators := apikeyDescSellRate.Validators
+		fns := [...]func(float64) error{
+			validators[0].(func(float64) error),
+			validators[1].(func(float64) error),
+		}
+		return func(sell_rate float64) error {
+			for _, fn := range fns {
+				if err := fn(sell_rate); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// apikeyDescMaxConcurrency is the schema descriptor for max_concurrency field.
 	apikeyDescMaxConcurrency := apikeyFields[10].Descriptor()
 	// apikey.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
@@ -120,6 +134,22 @@ func init() {
 	accountDescRateMultiplier := accountFields[8].Descriptor()
 	// account.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	account.DefaultRateMultiplier = accountDescRateMultiplier.Default.(float64)
+	// account.RateMultiplierValidator is a validator for the "rate_multiplier" field. It is called by the builders before save.
+	account.RateMultiplierValidator = func() func(float64) error {
+		validators := accountDescRateMultiplier.Validators
+		fns := [...]func(float64) error{
+			validators[0].(func(float64) error),
+			validators[1].(func(float64) error),
+		}
+		return func(rate_multiplier float64) error {
+			for _, fn := range fns {
+				if err := fn(rate_multiplier); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// accountDescErrorMsg is the schema descriptor for error_msg field.
 	accountDescErrorMsg := accountFields[9].Descriptor()
 	// account.DefaultErrorMsg holds the default value on creation for the error_msg field.
@@ -174,6 +204,22 @@ func init() {
 	groupDescRateMultiplier := groupFields[2].Descriptor()
 	// group.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	group.DefaultRateMultiplier = groupDescRateMultiplier.Default.(float64)
+	// group.RateMultiplierValidator is a validator for the "rate_multiplier" field. It is called by the builders before save.
+	group.RateMultiplierValidator = func() func(float64) error {
+		validators := groupDescRateMultiplier.Validators
+		fns := [...]func(float64) error{
+			validators[0].(func(float64) error),
+			validators[1].(func(float64) error),
+		}
+		return func(rate_multiplier float64) error {
+			for _, fn := range fns {
+				if err := fn(rate_multiplier); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// groupDescIsExclusive is the schema descriptor for is_exclusive field.
 	groupDescIsExclusive := groupFields[3].Descriptor()
 	// group.DefaultIsExclusive holds the default value on creation for the is_exclusive field.
@@ -710,14 +756,62 @@ func init() {
 	usagelogDescRateMultiplier := usagelogFields[19].Descriptor()
 	// usagelog.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	usagelog.DefaultRateMultiplier = usagelogDescRateMultiplier.Default.(float64)
+	// usagelog.RateMultiplierValidator is a validator for the "rate_multiplier" field. It is called by the builders before save.
+	usagelog.RateMultiplierValidator = func() func(float64) error {
+		validators := usagelogDescRateMultiplier.Validators
+		fns := [...]func(float64) error{
+			validators[0].(func(float64) error),
+			validators[1].(func(float64) error),
+		}
+		return func(rate_multiplier float64) error {
+			for _, fn := range fns {
+				if err := fn(rate_multiplier); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// usagelogDescSellRate is the schema descriptor for sell_rate field.
 	usagelogDescSellRate := usagelogFields[20].Descriptor()
 	// usagelog.DefaultSellRate holds the default value on creation for the sell_rate field.
 	usagelog.DefaultSellRate = usagelogDescSellRate.Default.(float64)
+	// usagelog.SellRateValidator is a validator for the "sell_rate" field. It is called by the builders before save.
+	usagelog.SellRateValidator = func() func(float64) error {
+		validators := usagelogDescSellRate.Validators
+		fns := [...]func(float64) error{
+			validators[0].(func(float64) error),
+			validators[1].(func(float64) error),
+		}
+		return func(sell_rate float64) error {
+			for _, fn := range fns {
+				if err := fn(sell_rate); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// usagelogDescAccountRateMultiplier is the schema descriptor for account_rate_multiplier field.
 	usagelogDescAccountRateMultiplier := usagelogFields[21].Descriptor()
 	// usagelog.DefaultAccountRateMultiplier holds the default value on creation for the account_rate_multiplier field.
 	usagelog.DefaultAccountRateMultiplier = usagelogDescAccountRateMultiplier.Default.(float64)
+	// usagelog.AccountRateMultiplierValidator is a validator for the "account_rate_multiplier" field. It is called by the builders before save.
+	usagelog.AccountRateMultiplierValidator = func() func(float64) error {
+		validators := usagelogDescAccountRateMultiplier.Validators
+		fns := [...]func(float64) error{
+			validators[0].(func(float64) error),
+			validators[1].(func(float64) error),
+		}
+		return func(account_rate_multiplier float64) error {
+			for _, fn := range fns {
+				if err := fn(account_rate_multiplier); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// usagelogDescServiceTier is the schema descriptor for service_tier field.
 	usagelogDescServiceTier := usagelogFields[22].Descriptor()
 	// usagelog.DefaultServiceTier holds the default value on creation for the service_tier field.

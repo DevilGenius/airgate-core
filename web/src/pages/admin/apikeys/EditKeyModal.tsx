@@ -10,7 +10,8 @@ import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import {
   MAX_RATE_MULTIPLIER,
   RATE_MULTIPLIER_STEP,
-  isValidRateMultiplierValue,
+  isValidSellRateValue,
+  parseRateMultiplier,
 } from '../../../shared/utils/rateMultiplier';
 import type { APIKeyResp, UpdateAPIKeyReq, GroupResp } from '../../../shared/types';
 
@@ -31,19 +32,23 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     max_concurrency: apiKey.max_concurrency,
     name: apiKey.name,
     quota_usd: apiKey.quota_usd,
-    sell_rate: apiKey.sell_rate || 1,
     status: apiKey.status as 'active' | 'disabled',
   });
+  const [sellRateInput, setSellRateInput] = useState(String(apiKey.sell_rate ?? 1));
   const [ipWhitelist, setIpWhitelist] = useState(formatIpList(apiKey.ip_whitelist));
   const [ipBlacklist, setIpBlacklist] = useState(formatIpList(apiKey.ip_blacklist));
 
+  const parsedSellRate = sellRateInput.trim() ? parseRateMultiplier(sellRateInput) : 1;
+  const sellRateValid = isValidSellRateValue(parsedSellRate);
+
   const handleSubmit = () => {
-    if (!isValidRateMultiplierValue(form.sell_rate ?? 1)) return;
+    if (!sellRateValid) return;
     onSubmit({
       ...form,
       group_id: groupId !== apiKey.group_id ? groupId : undefined,
       ip_blacklist: parseIpList(ipBlacklist),
       ip_whitelist: parseIpList(ipWhitelist),
+      sell_rate: parsedSellRate ?? 1,
     });
   };
 
@@ -60,7 +65,6 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     { id: 'disabled', label: t('status.disabled') },
   ];
   const selectedStatusLabel = statusOptions.find((item) => item.id === (form.status ?? 'active'))?.label ?? t('status.active');
-  const sellRateValid = isValidRateMultiplierValue(form.sell_rate ?? 1);
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -126,10 +130,10 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
             step={RATE_MULTIPLIER_STEP}
             min="0"
             max={MAX_RATE_MULTIPLIER}
-            value={String(form.sell_rate ?? 1)}
-            onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
+            value={sellRateInput}
+            onChange={(e) => setSellRateInput(e.target.value)}
           />
-          <Description>{t('api_keys.sell_rate_hint', '1.2 表示在实际倍率基础上加价 20%(默认1代表不加价)，最大 1000')}</Description>
+          <Description>{t('api_keys.sell_rate_hint', '1.2 表示加价 20%，1 表示不加价，0 表示客户侧免费，最大 100')}</Description>
         </HeroTextField>
 
         <HeroTextField fullWidth>

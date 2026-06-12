@@ -785,11 +785,26 @@ func (ulc *UsageLogCreate) check() error {
 	if _, ok := ulc.mutation.RateMultiplier(); !ok {
 		return &ValidationError{Name: "rate_multiplier", err: errors.New(`ent: missing required field "UsageLog.rate_multiplier"`)}
 	}
+	if v, ok := ulc.mutation.RateMultiplier(); ok {
+		if err := usagelog.RateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.rate_multiplier": %w`, err)}
+		}
+	}
 	if _, ok := ulc.mutation.SellRate(); !ok {
 		return &ValidationError{Name: "sell_rate", err: errors.New(`ent: missing required field "UsageLog.sell_rate"`)}
 	}
+	if v, ok := ulc.mutation.SellRate(); ok {
+		if err := usagelog.SellRateValidator(v); err != nil {
+			return &ValidationError{Name: "sell_rate", err: fmt.Errorf(`ent: validator failed for field "UsageLog.sell_rate": %w`, err)}
+		}
+	}
 	if _, ok := ulc.mutation.AccountRateMultiplier(); !ok {
 		return &ValidationError{Name: "account_rate_multiplier", err: errors.New(`ent: missing required field "UsageLog.account_rate_multiplier"`)}
+	}
+	if v, ok := ulc.mutation.AccountRateMultiplier(); ok {
+		if err := usagelog.AccountRateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "account_rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.account_rate_multiplier": %w`, err)}
+		}
 	}
 	if _, ok := ulc.mutation.ServiceTier(); !ok {
 		return &ValidationError{Name: "service_tier", err: errors.New(`ent: missing required field "UsageLog.service_tier"`)}

@@ -408,6 +408,11 @@ func (au *AccountUpdate) check() error {
 			return &ValidationError{Name: "priority", err: fmt.Errorf(`ent: validator failed for field "Account.priority": %w`, err)}
 		}
 	}
+	if v, ok := au.mutation.RateMultiplier(); ok {
+		if err := account.RateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Account.rate_multiplier": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -1013,6 +1018,11 @@ func (auo *AccountUpdateOne) check() error {
 	if v, ok := auo.mutation.Priority(); ok {
 		if err := account.PriorityValidator(v); err != nil {
 			return &ValidationError{Name: "priority", err: fmt.Errorf(`ent: validator failed for field "Account.priority": %w`, err)}
+		}
+	}
+	if v, ok := auo.mutation.RateMultiplier(); ok {
+		if err := account.RateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Account.rate_multiplier": %w`, err)}
 		}
 	}
 	return nil

@@ -179,7 +179,7 @@ func TestCreateOwnedBuildsMutationAndReturnsPlainKey(t *testing.T) {
 		GroupID:        3,
 		IPWhitelist:    []string{"127.0.0.1"},
 		QuotaUSD:       99,
-		SellRate:       1.2,
+		SellRate:       float64Ptr(1.2),
 		MaxConcurrency: -1,
 		ExpiresAt:      &expiresAt,
 	})
@@ -231,6 +231,28 @@ func TestCreateOwnedDefaultsSellRateToOne(t *testing.T) {
 	}
 }
 
+func TestCreateOwnedPreservesExplicitZeroSellRate(t *testing.T) {
+	var captured Mutation
+	service := NewService(apiKeyStubRepository{
+		groupAccess: func(context.Context, int, int) (GroupAccess, error) {
+			return GroupAccess{Exists: true, Allowed: true}, nil
+		},
+		create: func(_ context.Context, mutation Mutation) (Key, error) {
+			captured = mutation
+			return Key{ID: 10, Name: derefString(mutation.Name), UserID: derefInt(mutation.UserID)}, nil
+		},
+	}, testAPIKeySecret)
+
+	zero := 0.0
+	_, err := service.CreateOwned(t.Context(), 7, CreateInput{Name: "免费销售", GroupID: 3, SellRate: &zero})
+	if err != nil {
+		t.Fatalf("创建 API Key 失败: %v", err)
+	}
+	if captured.SellRate == nil || *captured.SellRate != 0 {
+		t.Fatalf("显式 0 销售倍率 = %+v，期望 0", captured.SellRate)
+	}
+}
+
 func TestCreateOwnedRejectsInvalidSellRate(t *testing.T) {
 	service := NewService(apiKeyStubRepository{
 		groupAccess: func(context.Context, int, int) (GroupAccess, error) {
@@ -242,8 +264,8 @@ func TestCreateOwnedRejectsInvalidSellRate(t *testing.T) {
 		},
 	}, testAPIKeySecret)
 
-	for _, rate := range []float64{math.NaN(), -1, 0.001, 1000.01, math.MaxFloat64} {
-		if _, err := service.CreateOwned(t.Context(), 7, CreateInput{Name: "bad", GroupID: 3, SellRate: rate}); !errors.Is(err, ErrInvalidSellRate) {
+	for _, rate := range []float64{math.NaN(), -1, 0.001, 100.01, math.MaxFloat64} {
+		if _, err := service.CreateOwned(t.Context(), 7, CreateInput{Name: "bad", GroupID: 3, SellRate: &rate}); !errors.Is(err, ErrInvalidSellRate) {
 			t.Fatalf("sell_rate %v error = %v, want ErrInvalidSellRate", rate, err)
 		}
 	}
@@ -332,8 +354,8 @@ func TestUpdateOwnedBuildsMutationAndChecksGroup(t *testing.T) {
 	if !captured.HasIPBlacklist || len(captured.IPBlacklist) != 1 || !captured.HasExpiresAt || captured.ExpiresAt != nil {
 		t.Fatalf("列表或过期时间 mutation 异常: %+v", captured)
 	}
-	if captured.SellRate == nil || *captured.SellRate != 1 {
-		t.Fatalf("0 销售倍率应归一为 1，得到 %+v", captured.SellRate)
+	if captured.SellRate == nil || *captured.SellRate != 0 {
+		t.Fatalf("0 销售倍率应保留为免费，得到 %+v", captured.SellRate)
 	}
 }
 
@@ -478,4 +500,8 @@ func derefInt(value *int) int {
 		return 0
 	}
 	return *value
+}
+
+func float64Ptr(value float64) *float64 {
+	return &value
 }

@@ -17,9 +17,9 @@ func TestResolveBillingRateForGroup_PriorityChain(t *testing.T) {
 		{name: "user override wins", userGroupRates: map[int64]float64{5: 0.2}, groupID: 5, groupRate: 0.5, want: 0.2},
 		{name: "group rate fallback", userGroupRates: map[int64]float64{6: 0.2}, groupID: 5, groupRate: 0.5, want: 0.5},
 		{name: "invalid group rate falls back to default", groupID: 5, groupRate: -1, want: 1.0},
-		{name: "zero user override means free", userGroupRates: map[int64]float64{5: 0}, groupID: 5, groupRate: 0.4, want: 0},
+		{name: "zero user override is ignored", userGroupRates: map[int64]float64{5: 0}, groupID: 5, groupRate: 0.4, want: 0.4},
 		{name: "invalid user override falls through to group rate", userGroupRates: map[int64]float64{5: -1}, groupID: 5, groupRate: 0.4, want: 0.4},
-		{name: "zero group rate means free", groupID: 5, groupRate: 0, want: 0},
+		{name: "zero group rate falls back to default", groupID: 5, groupRate: 0, want: 1.0},
 		{name: "too small positive group rate falls back to default", groupID: 5, groupRate: 0.0001, want: 1.0},
 	}
 
@@ -71,12 +71,12 @@ func TestResolveBillingRate_PriorityChain(t *testing.T) {
 			want: 0.7,
 		},
 		{
-			name: "zero group rate means free",
+			name: "zero group rate falls back to default",
 			info: &auth.APIKeyInfo{
 				GroupID:             5,
 				GroupRateMultiplier: 0,
 			},
-			want: 0,
+			want: 1,
 		},
 		{
 			name: "sell_rate is NOT in priority chain — should be ignored",
@@ -88,13 +88,13 @@ func TestResolveBillingRate_PriorityChain(t *testing.T) {
 			want: 0.3,
 		},
 		{
-			name: "user.group_rates with zero value means free",
+			name: "user.group_rates with zero value is ignored",
 			info: &auth.APIKeyInfo{
 				GroupID:             5,
 				GroupRateMultiplier: 0.4,
 				UserGroupRates:      map[int64]float64{5: 0},
 			},
-			want: 0,
+			want: 0.4,
 		},
 	}
 

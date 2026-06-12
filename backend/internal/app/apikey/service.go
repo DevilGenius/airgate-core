@@ -136,6 +136,16 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 		return Key{}, err
 	}
 
+	sellRate, err := normalizeCreateSellRate(input.SellRate)
+	if err != nil {
+		logger.Warn("api_key_create_rejected",
+			sdk.LogFieldUserID, userID,
+			sdk.LogFieldGroupID, groupID,
+			sdk.LogFieldReason, "invalid_sell_rate",
+		)
+		return Key{}, err
+	}
+
 	rawKey, keyHash, err := auth.GenerateAPIKey()
 	if err != nil {
 		logger.Error("api_key_create_failed",
@@ -166,10 +176,6 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 	maxConc := input.MaxConcurrency
 	if maxConc < 0 {
 		maxConc = 0
-	}
-	sellRate, err := normalizeSellRate(input.SellRate)
-	if err != nil {
-		return Key{}, err
 	}
 	item, err := s.repo.Create(ctx, Mutation{
 		Name:           &input.Name,
@@ -379,11 +385,15 @@ func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInp
 	return mutation, nil
 }
 
-func normalizeSellRate(rate float64) (float64, error) {
-	if rate == 0 {
+func normalizeCreateSellRate(rate *float64) (float64, error) {
+	if rate == nil {
 		return 1, nil
 	}
-	if err := ratevalue.ValidateMultiplier(rate); err != nil {
+	return normalizeSellRate(*rate)
+}
+
+func normalizeSellRate(rate float64) (float64, error) {
+	if err := ratevalue.ValidateSellMultiplier(rate); err != nil {
 		return 0, errors.Join(ErrInvalidSellRate, err)
 	}
 	return rate, nil

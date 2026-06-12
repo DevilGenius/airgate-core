@@ -462,6 +462,11 @@ func (gu *GroupUpdate) check() error {
 			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "Group.platform": %w`, err)}
 		}
 	}
+	if v, ok := gu.mutation.RateMultiplier(); ok {
+		if err := group.RateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Group.rate_multiplier": %w`, err)}
+		}
+	}
 	if v, ok := gu.mutation.SubscriptionType(); ok {
 		if err := group.SubscriptionTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subscription_type", err: fmt.Errorf(`ent: validator failed for field "Group.subscription_type": %w`, err)}
@@ -1224,6 +1229,11 @@ func (guo *GroupUpdateOne) check() error {
 	if v, ok := guo.mutation.Platform(); ok {
 		if err := group.PlatformValidator(v); err != nil {
 			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "Group.platform": %w`, err)}
+		}
+	}
+	if v, ok := guo.mutation.RateMultiplier(); ok {
+		if err := group.RateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Group.rate_multiplier": %w`, err)}
 		}
 	}
 	if v, ok := guo.mutation.SubscriptionType(); ok {

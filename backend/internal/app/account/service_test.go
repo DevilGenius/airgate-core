@@ -74,16 +74,15 @@ func TestCreateAllowsZeroAndMinimumPositiveRateMultiplier(t *testing.T) {
 		},
 	}, nil, nil, nil)
 
-	for _, rate := range []float64{0, 0.01} {
-		if _, err := service.Create(t.Context(), CreateInput{
-			Platform:       "openai",
-			RateMultiplier: &rate,
-		}); err != nil {
-			t.Fatalf("Create(rate=%v) returned error: %v", rate, err)
-		}
+	rate := 0.01
+	if _, err := service.Create(t.Context(), CreateInput{
+		Platform:       "openai",
+		RateMultiplier: &rate,
+	}); err != nil {
+		t.Fatalf("Create(rate=%v) returned error: %v", rate, err)
 	}
-	if len(captured) != 2 || captured[0] != 0 || captured[1] != 0.01 {
-		t.Fatalf("captured rates = %v, want [0 0.01]", captured)
+	if len(captured) != 1 || captured[0] != 0.01 {
+		t.Fatalf("captured rates = %v, want [0.01]", captured)
 	}
 }
 
@@ -95,7 +94,7 @@ func TestCreateRejectsInvalidRateMultiplier(t *testing.T) {
 		},
 	}, nil, nil, nil)
 
-	for _, rate := range []float64{-1, 0.001} {
+	for _, rate := range []float64{-1, 0, 0.001} {
 		_, err := service.Create(t.Context(), CreateInput{
 			Platform:       "openai",
 			RateMultiplier: &rate,

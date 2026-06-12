@@ -15,7 +15,7 @@ func (Group) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
 		field.String("platform").NotEmpty(),
-		field.Float("rate_multiplier").Default(1.0),
+		field.Float("rate_multiplier").Default(1.0).Min(0.01).Max(100),
 		field.Bool("is_exclusive").Default(false),
 		// status_visible 控制此分组是否在公开「服务状态」页展示。
 		// 默认 true 保持旧行为兼容；管理员可在「分组管理」中关掉以对外隐藏

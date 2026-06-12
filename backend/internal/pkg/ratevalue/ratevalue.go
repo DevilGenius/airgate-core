@@ -7,10 +7,13 @@ import (
 
 const (
 	MinPositiveMultiplier = 0.01
-	MaxMultiplier         = 1000
+	MaxMultiplier         = 100
 )
 
-var ErrInvalidMultiplier = errors.New("倍率必须是有限非负数；0 表示免费，正数范围为 0.01 到 1000")
+var (
+	ErrInvalidMultiplier     = errors.New("倍率必须是有限正数，范围为 0.01 到 100")
+	ErrInvalidSellMultiplier = errors.New("销售倍率必须是有限非负数；0 表示免费，正数范围为 0.01 到 100")
+)
 
 func ValidateMultiplier(value float64) error {
 	if !IsValidMultiplier(value) {
@@ -23,11 +26,32 @@ func IsValidMultiplier(value float64) bool {
 	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
 		return false
 	}
-	return value == 0 || (value >= MinPositiveMultiplier && value <= MaxMultiplier)
+	return value >= MinPositiveMultiplier && value <= MaxMultiplier
 }
 
 func NormalizeMultiplier(value, fallback float64) float64 {
 	if IsValidMultiplier(value) {
+		return value
+	}
+	return fallback
+}
+
+func ValidateSellMultiplier(value float64) error {
+	if !IsValidSellMultiplier(value) {
+		return ErrInvalidSellMultiplier
+	}
+	return nil
+}
+
+func IsValidSellMultiplier(value float64) bool {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+		return false
+	}
+	return value == 0 || (value >= MinPositiveMultiplier && value <= MaxMultiplier)
+}
+
+func NormalizeSellMultiplier(value, fallback float64) float64 {
+	if IsValidSellMultiplier(value) {
 		return value
 	}
 	return fallback

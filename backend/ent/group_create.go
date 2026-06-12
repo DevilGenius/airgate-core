@@ -368,6 +368,11 @@ func (gc *GroupCreate) check() error {
 	if _, ok := gc.mutation.RateMultiplier(); !ok {
 		return &ValidationError{Name: "rate_multiplier", err: errors.New(`ent: missing required field "Group.rate_multiplier"`)}
 	}
+	if v, ok := gc.mutation.RateMultiplier(); ok {
+		if err := group.RateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Group.rate_multiplier": %w`, err)}
+		}
+	}
 	if _, ok := gc.mutation.IsExclusive(); !ok {
 		return &ValidationError{Name: "is_exclusive", err: errors.New(`ent: missing required field "Group.is_exclusive"`)}
 	}

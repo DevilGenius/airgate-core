@@ -14,6 +14,7 @@ import { SearchFilterComboBox } from '../../../shared/components/SearchFilterCom
 import { REMOTE_SEARCH_DEBOUNCE_MS } from '../../../shared/constants';
 import {
   MAX_RATE_MULTIPLIER,
+  MIN_POSITIVE_RATE_MULTIPLIER,
   RATE_MULTIPLIER_STEP,
   formatRateMultiplier,
   isValidRateMultiplierValue,
@@ -186,7 +187,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
           <HeroTextField className="w-24" fullWidth>
             <Input
               type="number"
-              min="0"
+              min={MIN_POSITIVE_RATE_MULTIPLIER}
               max={MAX_RATE_MULTIPLIER}
               step={RATE_MULTIPLIER_STEP}
               value={newRate}
@@ -232,7 +233,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
                       <HeroTextField className="w-24" fullWidth>
                         <Input
                           type="number"
-                          min="0"
+                          min={MIN_POSITIVE_RATE_MULTIPLIER}
                           max={MAX_RATE_MULTIPLIER}
                           step={RATE_MULTIPLIER_STEP}
                           value={editingRate}

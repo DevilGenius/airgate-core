@@ -22,7 +22,12 @@ import { TableRowMoreMenu } from '../../shared/components/TableRowMoreMenu';
 import { dateInputToLocalStartRFC3339, formatAPIKeyHint, formatDateInputValue, formatExpiry } from '../../shared/utils/format';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
-import { formatRateMultiplier, isValidRateMultiplierValue, parseRateMultiplier } from '../../shared/utils/rateMultiplier';
+import {
+  formatRateMultiplier,
+  isValidRateMultiplierValue,
+  isValidSellRateValue,
+  parseRateMultiplier,
+} from '../../shared/utils/rateMultiplier';
 import {
   AlertTriangle,
   Check,
@@ -152,7 +157,7 @@ export default function UserKeysPage() {
       name: key.name,
       group_id: key.group_id == null ? '' : String(key.group_id),
       quota_usd: key.quota_usd ? String(key.quota_usd) : '',
-      sell_rate: key.sell_rate > 0 ? String(key.sell_rate) : '1',
+      sell_rate: Number.isFinite(key.sell_rate) ? String(key.sell_rate) : '1',
       max_concurrency: key.max_concurrency ? String(key.max_concurrency) : '',
       expires_at: formatDateInputValue(key.expires_at),
     });
@@ -178,11 +183,11 @@ export default function UserKeysPage() {
     // 后端要求 RFC3339 格式；空字符串表示显式清除过期时间
     const expiresAt = dateInputToLocalStartRFC3339(form.expires_at);
     const sellRate = form.sell_rate.trim() ? parseRateMultiplier(form.sell_rate) : 1;
-    if (!isValidRateMultiplierValue(sellRate)) {
-      toast('error', t('user_keys.sell_rate_invalid', '销售倍率必须在 0.01 到 1000 之间，或填 0 使用默认 1'));
+    if (!isValidSellRateValue(sellRate)) {
+      toast('error', t('user_keys.sell_rate_invalid', '销售倍率必须为 0，或在 0.01 到 100 之间'));
       return;
     }
-    const normalizedSellRate = sellRate || 1;
+    const normalizedSellRate = sellRate ?? 1;
 
     if (editingKey) {
       const payload: UpdateAPIKeyReq = {
@@ -352,7 +357,8 @@ export default function UserKeysPage() {
               const groupName = isGroupUnbound
                 ? t('user_keys.group_unbound')
                 : group?.name || `#${row.group_id}`;
-              const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
+              const sellRate = isValidSellRateValue(row.sell_rate ?? null) && row.sell_rate != null ? row.sell_rate : 1;
+              const hasSellRate = sellRate !== 1;
               const userOverride = row.group_id == null ? undefined : user?.group_rates?.[row.group_id];
               const hasUserOverride =
                 isValidRateMultiplierValue(userOverride ?? null);
@@ -363,7 +369,6 @@ export default function UserKeysPage() {
               const groupRate = responseGroupRate ?? (hasUserOverride ? userOverride : group?.rate_multiplier);
               const normalizedGroupRate = isValidRateMultiplierValue(groupRate ?? null) ? groupRate : undefined;
               const hasGroupRate = normalizedGroupRate != null;
-              const sellRate = hasSellRate && row.sell_rate != null ? row.sell_rate : 1;
               const effectiveRate = hasGroupRate ? normalizedGroupRate * sellRate : undefined;
               const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
               const isExpired = row.expires_at && new Date(row.expires_at) < new Date();

@@ -602,7 +602,7 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 {adminView && Number.isFinite(row.account_rate_multiplier) && (
                   <TooltipRow label={t('usage.account_rate', '上游倍率')} value={`${formatRateMultiplier(row.account_rate_multiplier)}x`} />
                 )}
-                {row.sell_rate > 0 && (
+                {Number.isFinite(row.sell_rate) && row.sell_rate !== 1 && (
                   <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={`${row.sell_rate.toFixed(2)}x`} />
                 )}
                 <TooltipDivider />
@@ -610,7 +610,7 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 {adminView && (
                   <TooltipRow label={t('usage.account_cost', '上游计费')} value={<CostValue value={row.account_cost} decimals={6} />} />
                 )}
-                {row.sell_rate > 0 && row.billed_cost !== row.actual_cost && (
+                {row.billed_cost !== row.actual_cost && (
                   <>
                     <TooltipRow label={t('usage.user_charged', '余额扣费')} value={<CostValue value={row.actual_cost} decimals={6} />} />
                     <TooltipRow label={t('usage.profit', '利润')} value={<CostValue value={row.billed_cost - row.actual_cost} decimals={6} tone="success" />} />
@@ -622,7 +622,7 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
           )}
         >
           <div className="flex w-full flex-col items-center font-mono text-center text-xs">
-            {row.sell_rate > 0 && row.billed_cost !== row.actual_cost ? (
+            {row.billed_cost !== row.actual_cost ? (
               <div className="text-[15px] font-semibold leading-none text-text">
                 <CostValue value={row.billed_cost} decimals={6} tone="warning" />
               </div>

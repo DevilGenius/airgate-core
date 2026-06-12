@@ -226,10 +226,16 @@ var (
 	DefaultAccountCost float64
 	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
 	DefaultRateMultiplier float64
+	// RateMultiplierValidator is a validator for the "rate_multiplier" field. It is called by the builders before save.
+	RateMultiplierValidator func(float64) error
 	// DefaultSellRate holds the default value on creation for the "sell_rate" field.
 	DefaultSellRate float64
+	// SellRateValidator is a validator for the "sell_rate" field. It is called by the builders before save.
+	SellRateValidator func(float64) error
 	// DefaultAccountRateMultiplier holds the default value on creation for the "account_rate_multiplier" field.
 	DefaultAccountRateMultiplier float64
+	// AccountRateMultiplierValidator is a validator for the "account_rate_multiplier" field. It is called by the builders before save.
+	AccountRateMultiplierValidator func(float64) error
 	// DefaultServiceTier holds the default value on creation for the "service_tier" field.
 	DefaultServiceTier string
 	// DefaultStream holds the default value on creation for the "stream" field.

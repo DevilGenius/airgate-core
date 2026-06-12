@@ -21,6 +21,7 @@ import { queryKeys } from '../../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import {
   MAX_RATE_MULTIPLIER,
+  MIN_POSITIVE_RATE_MULTIPLIER,
   RATE_MULTIPLIER_STEP,
   formatRateMultiplier,
   isValidRateMultiplierValue,
@@ -114,7 +115,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
         <Input
           aria-label={`${group.name} ${t('groups.rate_multiplier')}`}
           type="number"
-          min="0"
+          min={MIN_POSITIVE_RATE_MULTIPLIER}
           max={MAX_RATE_MULTIPLIER}
           step={RATE_MULTIPLIER_STEP}
           disabled={!enabled}

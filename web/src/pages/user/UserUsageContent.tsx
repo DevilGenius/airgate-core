@@ -26,7 +26,7 @@ import { PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { USER_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
-import { formatRateMultiplier, isValidRateMultiplierValue } from '../../shared/utils/rateMultiplier';
+import { formatRateMultiplier } from '../../shared/utils/rateMultiplier';
 
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.userUsageAutoRefresh;
 const USER_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.userUsageFilters;
@@ -244,7 +244,7 @@ function APIKeyInfoBar() {
           </div>
         )}
 
-        {isValidRateMultiplierValue(effectiveRate ?? null) && (
+        {effectiveRate != null && Number.isFinite(effectiveRate) && effectiveRate >= 0 && (
           <div className="flex items-center gap-2">
             <Percent className="w-3.5 h-3.5 text-text-tertiary" />
             <span className="text-text-tertiary">{t('auth.apikey_rate', '倍率')}:</span>

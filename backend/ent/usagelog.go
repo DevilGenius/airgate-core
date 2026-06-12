@@ -62,7 +62,7 @@ type UsageLog struct {
 	AccountCost float64 `json:"account_cost,omitempty"`
 	// 快照：本次请求生效的平台计费倍率（ResolveBillingRate 结果）
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
-	// 快照：本次请求生效的 sell_rate；1 表示不加价，0 为历史/无 APIKey 兜底
+	// 快照：本次请求生效的 sell_rate；0 表示客户侧免费，1 表示不加价
 	SellRate float64 `json:"sell_rate,omitempty"`
 	// 快照：本次请求生效的 account_rate
 	AccountRateMultiplier float64 `json:"account_rate_multiplier,omitempty"`

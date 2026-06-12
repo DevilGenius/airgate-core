@@ -7,7 +7,7 @@ import { CommonModal } from '../../../shared/components/CommonModal';
 import {
   MAX_RATE_MULTIPLIER,
   RATE_MULTIPLIER_STEP,
-  isValidRateMultiplierInput,
+  isValidSellRateInput,
 } from '../../../shared/utils/rateMultiplier';
 import type { KeyForm } from './types';
 
@@ -37,7 +37,7 @@ export function EditKeyModal({
   loading: boolean;
 }) {
   const { t } = useTranslation();
-  const sellRateValid = form.sell_rate.trim() === '' || isValidRateMultiplierInput(form.sell_rate);
+  const sellRateValid = form.sell_rate.trim() === '' || isValidSellRateInput(form.sell_rate);
   const selectedGroup = groupOptions.find((option) => option.value === form.group_id);
   const groupItems = groupOptions.map((option) => ({
     id: option.value,
@@ -120,7 +120,7 @@ export function EditKeyModal({
             onChange={(e) => setForm({ ...form, sell_rate: e.target.value })}
             placeholder="1"
           />
-          <Description>{t('user_keys.sell_rate_hint', '1.2 表示在实际倍率基础上加价 20%(默认1代表不加价)，最大 1000')}</Description>
+          <Description>{t('user_keys.sell_rate_hint', '1.2 表示加价 20%，1 表示不加价，0 表示客户侧免费，最大 100')}</Description>
         </HeroTextField>
         <HeroTextField fullWidth>
           <Label>{t('user_keys.max_concurrency_label', '最大并发数')}</Label>

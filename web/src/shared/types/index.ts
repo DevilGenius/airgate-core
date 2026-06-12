@@ -365,7 +365,7 @@ export interface APIKeyResp {
   used_quota: number;
   /** 真实成本已用（reseller 用于成本核算/利润计算，end customer 不可见） */
   used_quota_actual: number;
-  /** 销售倍率：1 表示不加价，按 actual_cost 叠加客户侧计费 */
+  /** 销售倍率：0 表示客户侧免费，1 表示不加价，按 actual_cost 叠加客户侧计费 */
   sell_rate: number;
   /** API Key 级并发上限：同一把 key 同时在途请求数。0 表示不限制 */
   max_concurrency: number;
@@ -389,7 +389,7 @@ export interface CreateAPIKeyReq {
   ip_whitelist?: string[];
   ip_blacklist?: string[];
   quota_usd?: number;
-  /** 销售倍率：对客户的售价倍率；可空，默认 1 */
+  /** 销售倍率：对客户的售价倍率；0 表示客户侧免费，可空，默认 1 */
   sell_rate?: number;
   /** API Key 并发上限，0 或不传表示不限制 */
   max_concurrency?: number;
@@ -482,7 +482,7 @@ export interface UsageLogResp {
   /** 上游计费 = total × account_rate；用于上游账号余额扣费统计 */
   account_cost: number;
   rate_multiplier: number;
-  /** 快照：本次请求生效的 sell_rate；1 表示不加价，0 为历史/无 APIKey 兜底 */
+  /** 快照：本次请求生效的 sell_rate；0 表示客户侧免费，1 表示不加价 */
   sell_rate: number;
   /** 快照：本次请求生效的 account_rate */
   account_rate_multiplier: number;

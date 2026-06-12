@@ -10,5 +10,5 @@ var (
 	// ErrSourceGroupPlatformMismatch 表示复制账号的源分组与目标分组平台不一致。
 	ErrSourceGroupPlatformMismatch = errors.New("源分组平台与当前分组不一致")
 	// ErrInvalidRateMultiplier 表示分组费率倍率非法。
-	ErrInvalidRateMultiplier = errors.New("费率倍率必须是有限非负数；0 表示免费，正数最低 0.01")
+	ErrInvalidRateMultiplier = errors.New("费率倍率必须是有限正数，范围为 0.01 到 100")
 )

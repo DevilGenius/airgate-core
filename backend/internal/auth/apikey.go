@@ -74,7 +74,7 @@ type APIKeyInfo struct {
 	QuotaUSD      float64
 	UsedQuota     float64
 
-	// SellRate Reseller 设置的销售倍率（1 表示不加价，不影响平台余额扣费）
+	// SellRate Reseller 设置的销售倍率（0 表示客户侧免费，1 表示不加价，不影响平台余额扣费）
 	SellRate float64
 
 	// KeyMaxConcurrency API Key 级并发上限，0 表示不限制。

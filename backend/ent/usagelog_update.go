@@ -796,6 +796,21 @@ func (ulu *UsageLogUpdate) check() error {
 			return &ValidationError{Name: "model", err: fmt.Errorf(`ent: validator failed for field "UsageLog.model": %w`, err)}
 		}
 	}
+	if v, ok := ulu.mutation.RateMultiplier(); ok {
+		if err := usagelog.RateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.rate_multiplier": %w`, err)}
+		}
+	}
+	if v, ok := ulu.mutation.SellRate(); ok {
+		if err := usagelog.SellRateValidator(v); err != nil {
+			return &ValidationError{Name: "sell_rate", err: fmt.Errorf(`ent: validator failed for field "UsageLog.sell_rate": %w`, err)}
+		}
+	}
+	if v, ok := ulu.mutation.AccountRateMultiplier(); ok {
+		if err := usagelog.AccountRateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "account_rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.account_rate_multiplier": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -1894,6 +1909,21 @@ func (uluo *UsageLogUpdateOne) check() error {
 	if v, ok := uluo.mutation.Model(); ok {
 		if err := usagelog.ModelValidator(v); err != nil {
 			return &ValidationError{Name: "model", err: fmt.Errorf(`ent: validator failed for field "UsageLog.model": %w`, err)}
+		}
+	}
+	if v, ok := uluo.mutation.RateMultiplier(); ok {
+		if err := usagelog.RateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.rate_multiplier": %w`, err)}
+		}
+	}
+	if v, ok := uluo.mutation.SellRate(); ok {
+		if err := usagelog.SellRateValidator(v); err != nil {
+			return &ValidationError{Name: "sell_rate", err: fmt.Errorf(`ent: validator failed for field "UsageLog.sell_rate": %w`, err)}
+		}
+	}
+	if v, ok := uluo.mutation.AccountRateMultiplier(); ok {
+		if err := usagelog.AccountRateMultiplierValidator(v); err != nil {
+			return &ValidationError{Name: "account_rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.account_rate_multiplier": %w`, err)}
 		}
 	}
 	return nil

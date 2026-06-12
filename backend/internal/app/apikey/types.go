@@ -23,7 +23,7 @@ type Key struct {
 	QuotaUSD            float64
 	UsedQuota           float64 // 账面已用（含 sell_rate markup）
 	UsedQuotaActual     float64 // 真实成本已用（聚合 sum(usage_log.actual_cost)，仅在 fetch 时填充）
-	SellRate            float64 // 销售倍率，1 表示不加价
+	SellRate            float64 // 销售倍率，0 表示客户侧免费，1 表示不加价
 	MaxConcurrency      int     // API Key 级并发上限，0 表示不限制
 	TodayCost           float64 // 今日销售金额（sum(billed_cost)，含 sell_rate）
 	TodayActualCost     float64 // 今日消耗金额（sum(actual_cost)，不含 sell_rate）
@@ -68,7 +68,7 @@ type CreateInput struct {
 	IPWhitelist    []string
 	IPBlacklist    []string
 	QuotaUSD       float64
-	SellRate       float64
+	SellRate       *float64
 	MaxConcurrency int // 0 表示不限制
 	ExpiresAt      *string
 }

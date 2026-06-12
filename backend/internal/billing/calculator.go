@@ -19,17 +19,17 @@ type CalculateInput struct {
 	CacheCreationCost float64 // 插件已计算的缓存写入费用
 
 	// BillingRate 平台真实计费倍率（已由 ResolveBillingRate 解析过的单值，不再相乘）。
-	// 0 表示免费；非法值兜底为 1。
+	// 必须为正数；非法值兜底为 1。
 	// 用于扣 reseller 的 user.balance 和写入 actual_cost。
 	BillingRate float64
 
-	// SellRate Reseller 设置的销售倍率（>0 生效，1 表示不加价）。
+	// SellRate Reseller 设置的销售倍率（0 表示客户侧免费，1 表示不加价）。
 	// 用于在 actual_cost 基础上计算 billed_cost（对客户的账面消耗），累加到 APIKey.used_quota。
 	// 平台余额扣费永远不读这个字段。
 	SellRate float64
 
 	// AccountRate 账号实际成本倍率（账号自身相对上游的成本系数，比如代购账号 1.2x）。
-	// 0 表示账号成本免费；非法值兜底为 1。
+	// 必须为正数；非法值兜底为 1。
 	// 用于计算 account_cost（账号实际消耗），写入 usage_log，仅供"账号计费"统计使用。
 	// 与用户计费 (BillingRate) 完全独立，不影响 actual_cost / User.balance。
 	AccountRate float64
@@ -48,7 +48,7 @@ type CalculateResult struct {
 	CacheCreationCost     float64 // cache creation 费用（cache write）
 	TotalCost             float64 // 原始基础成本 = input + cached_input + cache_creation + output（未乘任何倍率）
 	ActualCost            float64 // 平台真实成本 = TotalCost × BillingRate（扣 reseller 余额）
-	BilledCost            float64 // 客户账面消耗 = ActualCost × SellRate（sell_rate<=0 时回退为 ActualCost）
+	BilledCost            float64 // 客户账面消耗 = ActualCost × SellRate
 	AccountCost           float64 // 账号实际成本 = TotalCost × AccountRate（仅服务于"账号计费"统计）
 	RateMultiplier        float64 // 快照：本次生效的 BillingRate
 	SellRate              float64 // 快照：本次生效的 SellRate
@@ -63,7 +63,6 @@ type CalculateResult struct {
 //
 //	actual_cost  = total_cost × billing_rate          → 扣 User.balance（平台真实计费）
 //	billed_cost  = actual_cost × sell_rate            → 累加 APIKey.used_quota（end customer 可见）
-//	             或 actual_cost（sell_rate <= 0 时回退）
 //	account_cost = total_cost × account_rate          → 写入 usage_log，仅服务"账号计费"统计
 //
 // 三者互不影响，各自存储在独立列里。
@@ -77,6 +76,7 @@ func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
 
 	billingRate := ratevalue.NormalizeMultiplier(input.BillingRate, 1.0)
 	accountRate := ratevalue.NormalizeMultiplier(input.AccountRate, 1.0)
+	sellRate := ratevalue.NormalizeSellMultiplier(input.SellRate, 1.0)
 
 	actualCost := ratevalue.SafeMulNonNegative(totalCost, billingRate)
 
@@ -84,10 +84,7 @@ func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
 		actualCost = ratevalue.NormalizeNonNegative(*input.BillingCostOverride)
 	}
 
-	billedCost := actualCost
-	if input.SellRate > 0 {
-		billedCost = ratevalue.SafeMulNonNegative(actualCost, input.SellRate)
-	}
+	billedCost := ratevalue.SafeMulNonNegative(actualCost, sellRate)
 
 	accountCost := ratevalue.SafeMulNonNegative(totalCost, accountRate)
 
@@ -101,7 +98,7 @@ func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
 		BilledCost:            billedCost,
 		AccountCost:           accountCost,
 		RateMultiplier:        billingRate,
-		SellRate:              input.SellRate,
+		SellRate:              sellRate,
 		AccountRateMultiplier: accountRate,
 	}
 }
