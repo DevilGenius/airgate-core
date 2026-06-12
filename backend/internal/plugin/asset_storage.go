@@ -24,6 +24,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/setting"
+	"github.com/DevilGenius/airgate-core/internal/safego"
 )
 
 // AssetPurpose 是 core 内部定义的资产用途枚举。
@@ -378,14 +379,14 @@ func (s *AssetStorage) repairS3FromLocal(objectKey string, data []byte, contentT
 	if _, loaded := assetRepairInFlight.LoadOrStore(objectKey, struct{}{}); loaded {
 		return
 	}
-	go func() {
+	safego.Go("asset_repair_upload", func() {
 		defer assetRepairInFlight.Delete(objectKey)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 		if err := s.putS3Bytes(ctx, objectKey, contentType, data); err != nil {
 			slog.Warn("asset_repair_upload_failed", "object_key", objectKey, "error", err)
 		}
-	}()
+	})
 }
 
 func isS3NotFoundError(err error) bool {

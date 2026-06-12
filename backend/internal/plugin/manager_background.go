@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/DevilGenius/airgate-core/internal/safego"
 	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
 )
 
@@ -44,7 +45,11 @@ func (m *Manager) startExtensionBackgroundTasks(inst *PluginInstance) {
 				"declared", t.Interval, "applied", minBackgroundInterval)
 			interval = minBackgroundInterval
 		}
-		go m.runBackgroundTaskLoop(ctx, inst.Name, inst.Extension, t.Name, interval)
+		taskName := t.Name
+		appliedInterval := interval
+		safego.Go("plugin_background_task:"+inst.Name+":"+taskName, func() {
+			m.runBackgroundTaskLoop(ctx, inst.Name, inst.Extension, taskName, appliedInterval)
+		})
 		slog.Info("已启动插件后台任务", "plugin", inst.Name, "task", t.Name, "interval", interval)
 	}
 }

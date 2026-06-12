@@ -368,20 +368,36 @@ export default function MonitorPage() {
     }
 
     let timeoutId: number | undefined;
+    let pendingWhileHidden = false;
     const refreshFromEvent = () => {
       timeoutId = undefined;
+      if (document.hidden) {
+        pendingWhileHidden = true;
+        return;
+      }
       void refetch({ cancelRefetch: false });
       void refetchSummary({ cancelRefetch: false });
       void refetchRequests({ cancelRefetch: false });
     };
+    const handleVisibilityChange = () => {
+      if (document.hidden || !pendingWhileHidden) return;
+      pendingWhileHidden = false;
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+      refreshFromEvent();
+    };
 
     const unsubscribe = subscribeAdminEvents((event) => {
-      if (event.type !== 'monitor.changed' || timeoutId !== undefined) return;
+      if ((event.type !== 'monitor.changed' && event.type !== 'admin_events.reconnected') || timeoutId !== undefined) return;
       timeoutId = window.setTimeout(refreshFromEvent, 250);
     });
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (timeoutId !== undefined) {
         window.clearTimeout(timeoutId);
       }

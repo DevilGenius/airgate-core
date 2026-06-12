@@ -1,7 +1,7 @@
 import { useMemo, useState, type PointerEvent } from 'react';
 import { fmtNum } from '../../../shared/columns/usageColumns';
 import { CostValue } from '../../../shared/components/CostValue';
-import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../../../shared/constants';
+import { USAGE_TOKEN_COLORS } from '../../../shared/constants';
 import type { UsageTrendBucket } from '../../../shared/types';
 
 type TokenTrendLineKey = 'input' | 'output' | 'cacheCreation' | 'cacheRead' | 'cacheRatio' | 'cacheCumulativeRatio';
@@ -24,97 +24,6 @@ const TOKEN_TREND_MARGIN = {
 };
 const TOKEN_TREND_PLOT_WIDTH = TOKEN_TREND_WIDTH - TOKEN_TREND_MARGIN.left - TOKEN_TREND_MARGIN.right;
 const TOKEN_TREND_PLOT_HEIGHT = TOKEN_TREND_HEIGHT - TOKEN_TREND_MARGIN.top - TOKEN_TREND_MARGIN.bottom;
-const PIE_CHART_SIZE = 176;
-const PIE_CHART_CENTER = PIE_CHART_SIZE / 2;
-const PIE_CHART_INNER_RADIUS = 42;
-const PIE_CHART_OUTER_RADIUS = 68;
-
-export interface UsagePieChartItem {
-  name: string;
-  value: number;
-}
-
-function polarToCartesian(cx: number, cy: number, radius: number, angle: number) {
-  return {
-    x: cx + radius * Math.cos(angle),
-    y: cy + radius * Math.sin(angle),
-  };
-}
-
-function buildDonutSlicePath(startAngle: number, endAngle: number) {
-  const outerStart = polarToCartesian(PIE_CHART_CENTER, PIE_CHART_CENTER, PIE_CHART_OUTER_RADIUS, startAngle);
-  const outerEnd = polarToCartesian(PIE_CHART_CENTER, PIE_CHART_CENTER, PIE_CHART_OUTER_RADIUS, endAngle);
-  const innerEnd = polarToCartesian(PIE_CHART_CENTER, PIE_CHART_CENTER, PIE_CHART_INNER_RADIUS, endAngle);
-  const innerStart = polarToCartesian(PIE_CHART_CENTER, PIE_CHART_CENTER, PIE_CHART_INNER_RADIUS, startAngle);
-  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
-
-  return [
-    `M ${outerStart.x.toFixed(3)} ${outerStart.y.toFixed(3)}`,
-    `A ${PIE_CHART_OUTER_RADIUS} ${PIE_CHART_OUTER_RADIUS} 0 ${largeArc} 1 ${outerEnd.x.toFixed(3)} ${outerEnd.y.toFixed(3)}`,
-    `L ${innerEnd.x.toFixed(3)} ${innerEnd.y.toFixed(3)}`,
-    `A ${PIE_CHART_INNER_RADIUS} ${PIE_CHART_INNER_RADIUS} 0 ${largeArc} 0 ${innerStart.x.toFixed(3)} ${innerStart.y.toFixed(3)}`,
-    'Z',
-  ].join(' ');
-}
-
-export function UsagePieChart({ data }: { data: UsagePieChartItem[] }) {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const slices = useMemo(() => {
-    const positiveItems = data.filter((item) => item.value > 0);
-    const total = positiveItems.reduce((sum, item) => sum + item.value, 0);
-    let cursor = -Math.PI / 2;
-
-    return positiveItems.map((item) => {
-      const angle = total > 0 ? (item.value / total) * Math.PI * 2 : 0;
-      const startAngle = cursor;
-      const endAngle = Math.min(cursor + angle, Math.PI * 1.5 - 0.0001);
-      cursor += angle;
-      return {
-        ...item,
-        d: buildDonutSlicePath(startAngle, endAngle),
-        originalIndex: data.indexOf(item),
-      };
-    });
-  }, [data]);
-  const hoveredSlice = hoveredIndex == null ? null : slices[hoveredIndex] ?? null;
-
-  return (
-    <div className="relative h-[176px] w-[176px]">
-      <svg
-        aria-label="Usage distribution"
-        className="block h-full w-full"
-        role="img"
-        viewBox={`0 0 ${PIE_CHART_SIZE} ${PIE_CHART_SIZE}`}
-        onPointerLeave={() => setHoveredIndex(null)}
-      >
-        <circle
-          cx={PIE_CHART_CENTER}
-          cy={PIE_CHART_CENTER}
-          fill="none"
-          r={(PIE_CHART_INNER_RADIUS + PIE_CHART_OUTER_RADIUS) / 2}
-          stroke="var(--ag-border-subtle)"
-          strokeWidth={PIE_CHART_OUTER_RADIUS - PIE_CHART_INNER_RADIUS}
-        />
-        {slices.map((slice, index) => (
-          <path
-            key={`${slice.name}:${index}`}
-            d={slice.d}
-            fill={PIE_CHART_COLORS[slice.originalIndex % PIE_CHART_COLORS.length]}
-            stroke="var(--ag-surface)"
-            strokeWidth={2}
-            onPointerEnter={() => setHoveredIndex(index)}
-          />
-        ))}
-      </svg>
-      {hoveredSlice && (
-        <div className="pointer-events-none absolute left-1/2 top-1/2 max-w-56 -translate-x-1/2 -translate-y-1/2 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
-          {hoveredSlice.name}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function fmtTime(timeStr: string): string {
   if (timeStr.includes(' ')) {
     return timeStr.split(' ')[1] ?? timeStr;

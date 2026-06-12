@@ -1,11 +1,33 @@
 import { createElement, type ComponentType } from 'react';
 import type { PluginFrontendModule } from '@devilgenius/airgate-theme/plugin';
+import { ErrorBoundary } from './providers/ErrorBoundary';
 
 function wrapPluginComponent<TProps extends object>(
   Component: ComponentType<TProps>,
 ): ComponentType<TProps> {
   return function WrappedPluginComponent(props) {
-    return createElement(Component, (props ?? {}) as TProps);
+    const name = Component.displayName || Component.name || 'plugin';
+    const child = createElement(Component, (props ?? {}) as TProps);
+    return createElement(
+      ErrorBoundary,
+      {
+        children: child,
+        fallback: createElement(
+          'div',
+          {
+            role: 'alert',
+            style: {
+              border: '1px solid var(--ag-border-color, rgba(148, 163, 184, 0.35))',
+              borderRadius: 8,
+              padding: 12,
+              color: 'var(--ag-text-muted, #64748b)',
+              background: 'var(--ag-surface-muted, rgba(148, 163, 184, 0.08))',
+            },
+          },
+          `${name} 加载失败`,
+        ),
+      },
+    );
   };
 }
 

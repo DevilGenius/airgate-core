@@ -12,13 +12,17 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
+	"github.com/DevilGenius/airgate-core/internal/safego"
 )
 
 const (
-	defaultBufferSize = 1000            // 内存 channel 缓冲大小
-	batchSize         = 100             // 批量写入阈值
-	flushInterval     = 5 * time.Second // 定时刷新间隔
-	maxRetries        = 3               // 写入失败最大重试次数
+	defaultBufferSize   = 1000            // 内存 channel 缓冲大小
+	batchSize           = 100             // 批量写入阈值
+	flushInterval       = 5 * time.Second // 定时刷新间隔
+	maxRetries          = 3               // 写入失败最大重试次数
+	retryQueueSize      = 64              // 失败批次补偿队列
+	syncFallbackTimeout = 10 * time.Second
+	maxRetryBackoff     = 30 * time.Second
 )
 
 // UsageRecord 使用记录
@@ -65,12 +69,14 @@ type UsageRecord struct {
 // 使用 channel 缓冲，goroutine 批量写入
 // 每 100 条或每 5 秒 flush 一次
 type Recorder struct {
-	db      *ent.Client
-	rdb     *redis.Client
-	ch      chan UsageRecord
-	stopCh  chan struct{}
-	stopped chan struct{}
-	once    sync.Once
+	db           *ent.Client
+	rdb          *redis.Client
+	ch           chan UsageRecord
+	retryCh      chan []UsageRecord
+	stopCh       chan struct{}
+	stopped      chan struct{}
+	retryStopped chan struct{}
+	once         sync.Once
 }
 
 // NewRecorder 创建使用量记录器
@@ -83,11 +89,13 @@ func NewRecorder(db *ent.Client, bufferSize int, rdb ...*redis.Client) *Recorder
 		cache = rdb[0]
 	}
 	return &Recorder{
-		db:      db,
-		rdb:     cache,
-		ch:      make(chan UsageRecord, bufferSize),
-		stopCh:  make(chan struct{}),
-		stopped: make(chan struct{}),
+		db:           db,
+		rdb:          cache,
+		ch:           make(chan UsageRecord, bufferSize),
+		retryCh:      make(chan []UsageRecord, retryQueueSize),
+		stopCh:       make(chan struct{}),
+		stopped:      make(chan struct{}),
+		retryStopped: make(chan struct{}),
 	}
 }
 
@@ -100,6 +108,15 @@ func (r *Recorder) Record(record UsageRecord) {
 			"user_id", record.UserID,
 			"model", record.Model,
 		)
+		ctx, cancel := context.WithTimeout(context.Background(), syncFallbackTimeout)
+		defer cancel()
+		if _, err := r.RecordSync(ctx, record); err != nil {
+			slog.Error("billing_record_sync_fallback_failed",
+				"user_id", record.UserID,
+				"model", record.Model,
+				"error", err,
+			)
+		}
 	}
 }
 
@@ -130,7 +147,8 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 
 // Start 启动后台写入 goroutine
 func (r *Recorder) Start() {
-	go r.run()
+	safego.Go("billing_recorder", r.run)
+	safego.Go("billing_recorder_retry", r.runRetries)
 }
 
 // Stop 停止写入，等待缓冲区清空
@@ -138,6 +156,8 @@ func (r *Recorder) Stop() {
 	r.once.Do(func() {
 		close(r.stopCh)
 		<-r.stopped
+		close(r.retryCh)
+		<-r.retryStopped
 	})
 }
 
@@ -180,23 +200,59 @@ func (r *Recorder) run() {
 	}
 }
 
-// flush 批量写入数据库，失败时重试
+// flush 批量写入数据库。首写失败后交给独立 retry worker，避免阻塞唯一消费者。
 func (r *Recorder) flush(ctx context.Context, batch []UsageRecord) {
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	if len(batch) == 0 {
+		return
+	}
+	if err := r.batchInsert(ctx, batch); err != nil {
+		slog.Error("billing_batch_flush_failed",
+			"attempt", 1,
+			"count", len(batch),
+			"error", err,
+		)
+		r.enqueueRetry(batch)
+		return
+	}
+	slog.Debug("billing_batch_flush_succeeded", "count", len(batch))
+}
+
+func (r *Recorder) enqueueRetry(batch []UsageRecord) {
+	retryBatch := append([]UsageRecord(nil), batch...)
+	select {
+	case r.retryCh <- retryBatch:
+	case <-r.stopCh:
+		r.flushRetryBatch(context.Background(), retryBatch)
+	}
+}
+
+func (r *Recorder) runRetries() {
+	defer close(r.retryStopped)
+	ctx := context.Background()
+	for batch := range r.retryCh {
+		r.flushRetryBatch(ctx, batch)
+	}
+}
+
+func (r *Recorder) flushRetryBatch(ctx context.Context, batch []UsageRecord) {
+	for attempt := 2; ; attempt++ {
+		backoff := time.Duration(attempt-1) * time.Second
+		if backoff > maxRetryBackoff {
+			backoff = maxRetryBackoff
+		}
+		time.Sleep(backoff)
 		if err := r.batchInsert(ctx, batch); err != nil {
 			slog.Error("billing_batch_flush_failed",
-				"attempt", attempt+1,
+				"attempt", attempt,
 				"count", len(batch),
 				"error", err,
 			)
-			if attempt < maxRetries-1 {
-				time.Sleep(time.Duration(attempt+1) * time.Second)
-				continue
+			if attempt%maxRetries == 0 {
+				slog.Warn("billing_batch_flush_retained", "count", len(batch), "next_retry_in", maxRetryBackoff)
 			}
-			slog.Error("billing_batch_flush_dropped", "count", len(batch))
-			return
+			continue
 		}
-		slog.Debug("billing_batch_flush_succeeded", "count", len(batch))
+		slog.Debug("billing_batch_flush_succeeded", "attempt", attempt, "count", len(batch))
 		return
 	}
 }

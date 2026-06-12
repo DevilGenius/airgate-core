@@ -118,22 +118,7 @@
   text-align: center;
 }
 
-/* Distribution cards keep chart panels short and let dense tables scroll inside. */
-
-.ag-distribution-card-body {
-  min-height: 0;
-  align-items: center;
-}
-
-.ag-distribution-chart-frame {
-  display: flex;
-  width: 11rem;
-  height: 11rem;
-  flex: 0 0 11rem;
-  align-items: center;
-  justify-content: center;
-  margin-inline: auto;
-}
+/* Distribution tables stay compact and scroll inside summary cards. */
 
 .ag-distribution-table-scroll {
   width: 100%;

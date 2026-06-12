@@ -73,6 +73,7 @@ class AdminEventStream {
 
   private async run(generation: number) {
     let retryDelayMs = 1000;
+    let connectedOnce = false;
 
     while (this.running && this.generation === generation && this.listeners.size > 0) {
       const controller = new AbortController();
@@ -92,6 +93,10 @@ class AdminEventStream {
           throw new Error(`admin events HTTP ${res.status}`);
         }
 
+        if (connectedOnce) {
+          this.emit({ type: 'admin_events.reconnected', ts: new Date().toISOString() });
+        }
+        connectedOnce = true;
         retryDelayMs = 1000;
         await this.readStream(res.body, controller.signal);
       } catch (err) {
@@ -157,6 +162,10 @@ class AdminEventStream {
     }
     if (!event.type) return;
 
+    this.emit(event);
+  }
+
+  private emit(event: AdminServerEvent) {
     for (const listener of this.listeners) {
       listener(event);
     }

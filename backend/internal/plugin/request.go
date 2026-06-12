@@ -3,6 +3,7 @@ package plugin
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -24,6 +25,11 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
+const (
+	defaultGatewayBodyLimit = 10 << 20
+	imageGatewayBodyLimit   = 32 << 20
+)
+
 // parseRequest 从 HTTP 请求构造 forwardState。认证 / body 读取 / 插件匹配失败时
 // 直接写响应并返回 false。
 func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
@@ -34,8 +40,26 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		return nil, false
 	}
 
+	path := requestPath(c)
+	bodyLimit := gatewayBodyLimit(path, c.GetHeader("Content-Type"))
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, bodyLimit)
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			slog.Warn("request_body_too_large",
+				sdk.LogFieldUserID, keyInfo.UserID,
+				sdk.LogFieldAPIKeyID, keyInfo.KeyID,
+				sdk.LogFieldPath, path,
+				"limit_bytes", bodyLimit,
+			)
+			message := "请求体过大，请缩小后重试"
+			if bodyLimit == imageGatewayBodyLimit {
+				message = imageTooLargeMessage
+			}
+			openAIError(c, http.StatusRequestEntityTooLarge, "invalid_request_error", "request_too_large", message)
+			return nil, false
+		}
 		slog.Error("request_body_read_failed",
 			sdk.LogFieldUserID, keyInfo.UserID,
 			sdk.LogFieldAPIKeyID, keyInfo.KeyID,
@@ -45,7 +69,6 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		return nil, false
 	}
 
-	path := requestPath(c)
 	parsed := parseBody(body, c.GetHeader("Content-Type"))
 	if !validateRequestShape(c, keyInfo, path, parsed) {
 		return nil, false
@@ -86,6 +109,13 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		keyInfo:                     keyInfo,
 		plugin:                      inst,
 	}, true
+}
+
+func gatewayBodyLimit(path, contentType string) int64 {
+	if isImageSubmitAPIPath(path) || strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "multipart/") {
+		return imageGatewayBodyLimit
+	}
+	return defaultGatewayBodyLimit
 }
 
 func requireKeyInfo(c *gin.Context) (*auth.APIKeyInfo, bool) {

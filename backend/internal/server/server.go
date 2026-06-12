@@ -21,6 +21,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
+	"github.com/DevilGenius/airgate-core/internal/safego"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
@@ -185,13 +186,13 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	pluginCtx, cancel := context.WithCancel(ctx)
 	s.pluginStartCancel = cancel
 
-	go plugin.StartAssetMigrationLoop(pluginCtx, s.db)
-	go plugin.StartAssetCleanupLoop(pluginCtx, s.db)
-	go appmonitor.StartAggregatorLoop(pluginCtx, s.monitor)
-	go appmonitor.StartWorkerLoop(pluginCtx, s.monitor)
+	safego.Go("asset_migration_loop", func() { plugin.StartAssetMigrationLoop(pluginCtx, s.db) })
+	safego.Go("asset_cleanup_loop", func() { plugin.StartAssetCleanupLoop(pluginCtx, s.db) })
+	safego.Go("monitor_aggregator_loop", func() { appmonitor.StartAggregatorLoop(pluginCtx, s.monitor) })
+	safego.Go("monitor_worker_loop", func() { appmonitor.StartWorkerLoop(pluginCtx, s.monitor) })
 
 	s.pluginMgr.SetLoading(true)
-	go func() {
+	safego.Go("plugin_loader", func() {
 		defer s.pluginMgr.SetLoading(false)
 
 		// 加载已编译的插件。后台执行，避免坏插件阻塞 core 监听端口。
@@ -225,7 +226,7 @@ func (s *Server) StartPlugins(ctx context.Context) {
 		if !s.cfg.Plugins.Marketplace.Disabled && pluginCtx.Err() == nil {
 			s.marketplace.Start(pluginCtx)
 		}
-	}()
+	})
 }
 
 // Shutdown 优雅关闭服务器

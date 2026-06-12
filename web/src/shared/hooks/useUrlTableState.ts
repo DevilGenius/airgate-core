@@ -37,6 +37,30 @@ function writeStoredPageSize(storageKey: string | undefined, pageSize: number) {
   }
 }
 
+function readStoredString(storageKey: string | undefined) {
+  if (!storageKey || typeof window === 'undefined') return null;
+
+  try {
+    return window.localStorage.getItem(storageKey);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredString(storageKey: string | undefined, value: string) {
+  if (!storageKey || typeof window === 'undefined') return;
+
+  try {
+    if (value) {
+      window.localStorage.setItem(storageKey, value);
+    } else {
+      window.localStorage.removeItem(storageKey);
+    }
+  } catch {
+    // Storage can be unavailable; URL state remains authoritative for this session.
+  }
+}
+
 function applySearchUpdates(pathname: string, updates: UrlUpdates) {
   if (typeof window === 'undefined') return;
 
@@ -85,6 +109,51 @@ export function useUrlQueryParam(key: string, defaultValue = '') {
   }, [defaultValue, key, pathname]);
 
   return [value, setUrlValue] as const;
+}
+
+export function usePersistentUrlQueryParam(key: string, storageKey: string, defaultValue = '') {
+  const searchStr = useRouterState({ select: (state) => state.location.searchStr });
+  const [value, setUrlValue] = useUrlQueryParam(key, defaultValue);
+  const valueRef = useRef(value);
+  const restoredRef = useRef(false);
+  const hasUrlValue = useMemo(() => {
+    const params = new URLSearchParams(getSearchString(searchStr));
+    return params.has(key);
+  }, [key, searchStr]);
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+
+    if (hasUrlValue) {
+      writeStoredString(storageKey, value);
+      return;
+    }
+
+    const storedValue = readStoredString(storageKey);
+    if (storedValue == null || storedValue === value) return;
+
+    valueRef.current = storedValue;
+    setUrlValue(storedValue, { resetPage: false });
+  }, [hasUrlValue, setUrlValue, storageKey, value]);
+
+  useEffect(() => {
+    if (!restoredRef.current || !hasUrlValue) return;
+    writeStoredString(storageKey, value);
+  }, [hasUrlValue, storageKey, value]);
+
+  const setPersistentUrlValue = useCallback((nextValue: SetStateAction<string>, options?: { resetPage?: boolean }) => {
+    const resolved = typeof nextValue === 'function' ? nextValue(valueRef.current) : nextValue;
+    valueRef.current = resolved;
+    writeStoredString(storageKey, resolved);
+    setUrlValue(resolved, options);
+  }, [setUrlValue, storageKey]);
+
+  return [value, setPersistentUrlValue] as const;
 }
 
 export function useUrlPagination(defaultPageSize = 20, storageKey?: string) {

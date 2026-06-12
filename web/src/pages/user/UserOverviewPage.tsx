@@ -3,45 +3,27 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Card, Tabs } from '@heroui/react';
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
-} from 'recharts';
-import {
   Wallet, Zap, Activity, Coins,
 } from 'lucide-react';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usageApi } from '../../shared/api/usage';
 import { queryKeys } from '../../shared/queryKeys';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { CostValue } from '../../shared/components/CostValue';
-import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../../shared/constants';
+import { DISTRIBUTION_COLORS, USAGE_TOKEN_COLORS } from '../../shared/constants';
 
-const PIE_COLORS = PIE_CHART_COLORS;
+const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 const TOKEN_TREND_LINE_ORDER = ['input', 'output', 'cacheRead'] as const;
-
-type PieTooltipPayload = Array<{
-  name?: unknown;
-  payload?: {
-    name?: unknown;
-  };
-}>;
-
-function PieNameTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: PieTooltipPayload;
-}) {
-  const name = payload?.[0]?.payload?.name ?? payload?.[0]?.name;
-  if (!active || name == null || name === '') return null;
-
-  return (
-    <div className="max-w-56 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
-      {String(name)}
-    </div>
-  );
-}
+const USER_OVERVIEW_TOKEN_TREND_INITIAL_DIMENSION = { width: 600, height: 248 };
 
 type RangePreset = 'today' | '7d' | '30d' | '90d';
 type MetricTone = 'blue' | 'emerald' | 'amber' | 'indigo';
@@ -266,108 +248,92 @@ export default function UserOverviewPage() {
 
       {/* 模型分布 + Token 趋势 */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* 模型分布饼图 */}
+        {/* 模型分布 */}
         <DashboardCard title={t('dashboard.model_distribution')}>
-          <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
-            <div className="ag-distribution-chart-frame">
-              {models.length > 0 ? (
-                <PieChart width={176} height={176}>
-                  <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={42} outerRadius={68} dataKey="value" isAnimationActive={false} minAngle={3} stroke="var(--ag-surface)" strokeWidth={2}>
-                    {models.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Pie>
-                  <RechartsTooltip
-                    animationDuration={0}
-                    content={<PieNameTooltip />}
-                    cursor={false}
-                    isAnimationActive={false}
-                  />
-                </PieChart>
-              ) : (
-                <div className="flex h-44 w-44 items-center justify-center text-xs text-text">{t('common.no_data')}</div>
-              )}
-            </div>
-            <div className="ag-distribution-table-scroll">
-              <CompactDataTable
-                ariaLabel={t('dashboard.model_distribution')}
-                className="ag-compact-data-table--dense"
-                emptyText={t('common.no_data')}
-                minWidth={480}
-                rowKey={(row) => row.model}
-                rows={models}
-                columns={[
-                  {
-                    key: 'model',
-                    title: t('usage.model'),
-                    width: '32%',
-                    render: (row, index) => (
-                      <>
-                        <span className="shrink-0 font-mono text-[11px] font-semibold text-text">#{index + 1}</span>
-                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
-                        <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
-                      </>
-                    ),
-                  },
-                  {
-                    align: 'end',
-                    key: 'requests',
-                    title: t('dashboard.requests'),
-                    width: '20%',
-                    render: (row) => <span className="truncate font-mono text-text">{row.requests.toLocaleString()}</span>,
-                  },
-                  {
-                    align: 'end',
-                    key: 'tokens',
-                    title: t('dashboard.tokens'),
-                    width: '24%',
-                    render: (row) => <span className="truncate font-mono text-text">{fmtNum(row.tokens)}</span>,
-                  },
-                  {
-                    align: 'end',
-                    key: 'cost',
-                    title: t('usage.cost'),
-                    width: '24%',
-                    render: (row) => <CostValue className="truncate font-mono" value={row.actual_cost} decimals={4} tone="actual" />,
-                  },
-                ]}
-              />
-            </div>
+          <div className="ag-distribution-table-scroll">
+            <CompactDataTable
+              ariaLabel={t('dashboard.model_distribution')}
+              className="ag-compact-data-table--dense"
+              emptyText={t('common.no_data')}
+              minWidth={480}
+              rowKey={(row) => row.model}
+              rows={models}
+              columns={[
+                {
+                  key: 'model',
+                  title: t('usage.model'),
+                  width: '32%',
+                  render: (row, index) => (
+                    <>
+                      <span className="shrink-0 font-mono text-[11px] font-semibold text-text">#{index + 1}</span>
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: DISTRIBUTION_DOT_COLORS[index % DISTRIBUTION_DOT_COLORS.length] }} />
+                      <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
+                    </>
+                  ),
+                },
+                {
+                  align: 'end',
+                  key: 'requests',
+                  title: t('dashboard.requests'),
+                  width: '20%',
+                  render: (row) => <span className="truncate font-mono text-text">{row.requests.toLocaleString()}</span>,
+                },
+                {
+                  align: 'end',
+                  key: 'tokens',
+                  title: t('dashboard.tokens'),
+                  width: '24%',
+                  render: (row) => <span className="truncate font-mono text-text">{fmtNum(row.tokens)}</span>,
+                },
+                {
+                  align: 'end',
+                  key: 'cost',
+                  title: t('usage.cost'),
+                  width: '24%',
+                  render: (row) => <CostValue className="truncate font-mono" value={row.actual_cost} decimals={4} tone="actual" />,
+                },
+              ]}
+            />
           </div>
         </DashboardCard>
 
         {/* Token 趋势 */}
         <DashboardCard title={t('dashboard.token_trend')}>
           {trendData.length > 0 ? (
-            <div className="h-[248px] w-full min-w-0 2xl:h-[288px]">
-              <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={{ width: 600, height: 248 }}>
-                <LineChart data={trendData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
-                  <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-                  <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
-                  <YAxis axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={(v: number) => fmtNum(v)} tickLine={false} />
-                  <RechartsTooltip content={<TokenTrendTooltip />} />
-                  <Legend
-                    height={24}
-                    content={() => (
-                      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
-                        {TOKEN_TREND_LINE_ORDER.map((key) => (
-                          <span key={key} className="inline-flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
-                            <span>{tokenTrendLabels[key]}</span>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  />
-                  <Line type="monotone" dataKey="input" name={tokenTrendLabels.input} stroke={USAGE_TOKEN_COLORS.input} strokeWidth={2.5} dot={false} isAnimationActive={false} />
-                  <Line type="monotone" dataKey="output" name={tokenTrendLabels.output} stroke={USAGE_TOKEN_COLORS.output} strokeWidth={2.5} dot={false} isAnimationActive={false} />
-                  <Line type="monotone" dataKey="cacheRead" name={tokenTrendLabels.cacheRead} stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2.5} dot={false} isAnimationActive={false} />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="flex h-[248px] w-full min-w-0 flex-col 2xl:h-[288px]">
+              <div className="min-h-0 flex-1">
+                <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={USER_OVERVIEW_TOKEN_TREND_INITIAL_DIMENSION}>
+                  <LineChart data={trendData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
+                    <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
+                    <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
+                    <YAxis axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={(v: number) => fmtNum(v)} tickLine={false} />
+                    <RechartsTooltip content={<TokenTrendTooltip />} />
+                    <Line type="monotone" dataKey="input" name={tokenTrendLabels.input} stroke={USAGE_TOKEN_COLORS.input} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="output" name={tokenTrendLabels.output} stroke={USAGE_TOKEN_COLORS.output} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="cacheRead" name={tokenTrendLabels.cacheRead} stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <TokenTrendLegend labels={tokenTrendLabels} />
             </div>
           ) : (
             <div className="flex h-[248px] items-center justify-center text-sm text-text 2xl:h-[288px]">{t('common.no_data')}</div>
           )}
         </DashboardCard>
       </div>
+    </div>
+  );
+}
+
+function TokenTrendLegend({ labels }: { labels: Record<TokenTrendKey, string> }) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
+      {TOKEN_TREND_LINE_ORDER.map((key) => (
+        <span key={key} className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
+          <span>{labels[key]}</span>
+        </span>
+      ))}
     </div>
   );
 }

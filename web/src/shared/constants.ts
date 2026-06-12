@@ -28,8 +28,8 @@ export const USAGE_TOKEN_COLORS = {
   cacheCumulativeRatio: 'var(--ag-usage-token-cache-cumulative-ratio)',
 } as const;
 
-/** 饼图专用低饱和调色板，避免分布图在黑色主题下过于刺眼 */
-export const PIE_CHART_COLORS = [
+/** 分布排名色点使用的低饱和调色板，避免在黑色主题下过于刺眼 */
+export const DISTRIBUTION_COLORS = [
   'oklch(64% 0.105 253.83)',
   'oklch(66% 0.095 156)',
   'oklch(72% 0.105 76)',

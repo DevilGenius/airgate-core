@@ -16,7 +16,7 @@ import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilt
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { UserSearchFilterComboBox } from '../../shared/components/UserSearchFilterComboBox';
 import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
-import { PAGE_SIZE_OPTIONS, PIE_CHART_COLORS } from '../../shared/constants';
+import { DISTRIBUTION_COLORS, PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMenu';
@@ -25,14 +25,11 @@ import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shar
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
 
-const UsagePieChart = lazy(() =>
-  import('./usage/UsageCharts').then((m) => ({ default: m.UsagePieChart })),
-);
 const UsageTokenTrendChart = lazy(() =>
   import('./usage/UsageCharts').then((m) => ({ default: m.UsageTokenTrendChart })),
 );
 
-const PIE_COLORS = PIE_CHART_COLORS;
+const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 
 type MetricTone = 'violet' | 'amber' | 'indigo' | 'emerald' | 'stream';
 interface ColumnVisibilityOption {
@@ -175,6 +172,7 @@ const groupByHeaderKeys: Record<string, string> = {
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageAutoRefresh;
 const ADMIN_USAGE_COLUMN_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageColumns;
+const ADMIN_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageFilters;
 const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
   'user_id',
   'created_at',
@@ -191,9 +189,86 @@ const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
   'ip_address',
 ] as const;
 
+type StoredAdminUsageFilters = {
+  api_key_id?: number;
+  api_key_label?: string;
+  platform?: string;
+  user_id?: number;
+  user_label?: string;
+};
+
+type AdminUsageFilterState = {
+  apiKeyLabel: string;
+  filters: Partial<UsageQuery>;
+  userLabel: string;
+};
+
 function compactText(value: string | undefined, fallback = '-') {
   const trimmed = value?.trim();
   return trimmed || fallback;
+}
+
+function readStoredPositiveID(value: unknown) {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
+}
+
+function isStoredFilterRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readAdminUsageFilterState(): AdminUsageFilterState {
+  const fallback: AdminUsageFilterState = { apiKeyLabel: '', filters: {}, userLabel: '' };
+  if (typeof window === 'undefined') return fallback;
+
+  try {
+    const raw = window.localStorage.getItem(ADMIN_USAGE_FILTER_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    if (!isStoredFilterRecord(parsed)) return fallback;
+
+    const filters: Partial<UsageQuery> = {};
+    const platform = typeof parsed.platform === 'string' ? parsed.platform.trim() : '';
+    const userID = readStoredPositiveID(parsed.user_id);
+    const apiKeyID = readStoredPositiveID(parsed.api_key_id);
+
+    if (platform) filters.platform = platform;
+    if (userID != null) filters.user_id = userID;
+    if (apiKeyID != null) filters.api_key_id = apiKeyID;
+
+    return {
+      apiKeyLabel: apiKeyID != null ? (typeof parsed.api_key_label === 'string' && parsed.api_key_label ? parsed.api_key_label : `#${apiKeyID}`) : '',
+      filters,
+      userLabel: userID != null ? (typeof parsed.user_label === 'string' && parsed.user_label ? parsed.user_label : `#${userID}`) : '',
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function writeAdminUsageFilterState(filters: Partial<UsageQuery>, userLabel: string, apiKeyLabel: string) {
+  if (typeof window === 'undefined') return;
+
+  const stored: StoredAdminUsageFilters = {};
+  if (filters.platform) stored.platform = filters.platform;
+  if (filters.user_id != null && filters.user_id > 0) {
+    stored.user_id = filters.user_id;
+    if (userLabel) stored.user_label = userLabel;
+  }
+  if (filters.api_key_id != null && filters.api_key_id > 0) {
+    stored.api_key_id = filters.api_key_id;
+    if (apiKeyLabel) stored.api_key_label = apiKeyLabel;
+  }
+
+  try {
+    if (Object.keys(stored).length > 0) {
+      window.localStorage.setItem(ADMIN_USAGE_FILTER_STORAGE_KEY, JSON.stringify(stored));
+    } else {
+      window.localStorage.removeItem(ADMIN_USAGE_FILTER_STORAGE_KEY);
+    }
+  } catch {
+    // localStorage may be unavailable in restricted browser modes.
+  }
 }
 
 function readAdminUsageColumnKeys() {
@@ -232,9 +307,7 @@ function displayUserAgent(value: string | undefined) {
   return display || raw;
 }
 
-// ==================== 分布饼图卡片 ====================
-
-type PieMetric = 'token' | 'cost';
+// ==================== 分布表格卡片 ====================
 
 interface DistributionItem {
   name: string;
@@ -256,92 +329,60 @@ function DistributionCard({
   firstColumnWidth?: string;
 }) {
   const { t } = useTranslation();
-  const [metric, setMetric] = useState<PieMetric>('token');
-
-  const pieData = useMemo(
-    () => data.map((d) => ({
-      name: d.name,
-      value: metric === 'token' ? d.tokens : d.actualCost,
-    })),
-    [data, metric],
-  );
-  const metricTabs = (
-    <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={metric} onSelectionChange={(key) => setMetric(key as PieMetric)}>
-      <Tabs.List>
-        <Tabs.Tab id="token">
-          <Tabs.Indicator />
-          <span>{t('usage.by_token')}</span>
-        </Tabs.Tab>
-        <Tabs.Tab id="cost">
-          <Tabs.Separator />
-          <Tabs.Indicator />
-          <span>{t('usage.by_actual_cost')}</span>
-        </Tabs.Tab>
-      </Tabs.List>
-    </Tabs>
-  );
 
   return (
-    <SectionCard title={title} extra={metricTabs}>
-      <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
-        <div className="ag-distribution-chart-frame">
-          <Suspense fallback={<div className="h-[176px] w-[176px]" />}>
-            <UsagePieChart data={pieData} />
-          </Suspense>
-        </div>
-
-        <div className="ag-distribution-table-scroll">
-          <CompactDataTable
-            ariaLabel={title}
-            className="ag-compact-data-table--dense"
-            emptyText={t('common.no_data')}
-            minWidth={480}
-            rowKey={(row) => row.name}
-            rows={data}
-            columns={[
-              {
-                key: 'name',
-                title: firstColumnTitle,
-                width: firstColumnWidth,
-                render: (item, index) => (
-                  <>
-                    <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
-                    <span className="min-w-0 truncate font-medium text-text" title={item.name}>{item.name}</span>
-                  </>
-                ),
-              },
-              {
-                align: 'end',
-                key: 'requests',
-                title: t('usage.requests'),
-                width: '16%',
-                render: (item) => <span className="truncate font-mono text-text-secondary">{item.requests.toLocaleString()}</span>,
-              },
-              {
-                align: 'end',
-                key: 'tokens',
-                title: t('usage.tokens'),
-                width: '18%',
-                render: (item) => <span className="truncate font-mono text-text-secondary">{fmtNum(item.tokens)}</span>,
-              },
-              {
-                align: 'end',
-                key: 'actualCost',
-                title: t('usage.actual_cost'),
-                width: '18%',
-                render: (item) => <CostValue className="truncate font-mono" value={item.actualCost} tone="actual" />,
-              },
-              {
-                align: 'end',
-                key: 'totalCost',
-                title: t('usage.standard_cost'),
-                width: '18%',
-                render: (item) => <CostValue className="truncate font-mono" value={item.totalCost} tone="standard" />,
-              },
-            ]}
-          />
-        </div>
+    <SectionCard title={title}>
+      <div className="ag-distribution-table-scroll">
+        <CompactDataTable
+          ariaLabel={title}
+          className="ag-compact-data-table--dense"
+          emptyText={t('common.no_data')}
+          minWidth={480}
+          rowKey={(row) => row.name}
+          rows={data}
+          columns={[
+            {
+              key: 'name',
+              title: firstColumnTitle,
+              width: firstColumnWidth,
+              render: (item, index) => (
+                <>
+                  <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: DISTRIBUTION_DOT_COLORS[index % DISTRIBUTION_DOT_COLORS.length] }} />
+                  <span className="min-w-0 truncate font-medium text-text" title={item.name}>{item.name}</span>
+                </>
+              ),
+            },
+            {
+              align: 'end',
+              key: 'requests',
+              title: t('usage.requests'),
+              width: '16%',
+              render: (item) => <span className="truncate font-mono text-text-secondary">{item.requests.toLocaleString()}</span>,
+            },
+            {
+              align: 'end',
+              key: 'tokens',
+              title: t('usage.tokens'),
+              width: '18%',
+              render: (item) => <span className="truncate font-mono text-text-secondary">{fmtNum(item.tokens)}</span>,
+            },
+            {
+              align: 'end',
+              key: 'actualCost',
+              title: t('usage.actual_cost'),
+              width: '18%',
+              render: (item) => <CostValue className="truncate font-mono" value={item.actualCost} tone="actual" />,
+            },
+            {
+              align: 'end',
+              key: 'totalCost',
+              title: t('usage.standard_cost'),
+              width: '18%',
+              render: (item) => <CostValue className="truncate font-mono" value={item.totalCost} tone="standard" />,
+            },
+          ]}
+        />
       </div>
     </SectionCard>
   );
@@ -409,7 +450,7 @@ function GroupStatsCard({
               render: (row, index) => (
                 <>
                   <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: DISTRIBUTION_DOT_COLORS[index % DISTRIBUTION_DOT_COLORS.length] }} />
                   <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
                 </>
               ),
@@ -513,7 +554,10 @@ function TokenTrendCard({
 export default function UsagePage() {
   const { t } = useTranslation();
   const { beforeId, page, setPage, pageSize, setPageSize, resetCursorPagination } = useCursorPagination(20, 'admin.usage');
-  const [filters, setFilters] = useState<Partial<UsageQuery>>({});
+  const [initialFilterState] = useState<AdminUsageFilterState>(readAdminUsageFilterState);
+  const [filters, setFilters] = useState<Partial<UsageQuery>>(() => initialFilterState.filters);
+  const [selectedUserLabel, setSelectedUserLabel] = useState(initialFilterState.userLabel);
+  const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState(initialFilterState.apiKeyLabel);
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
   const [granularity, setGranularity] = useState<string>('hour');
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<Set<string>>(
@@ -623,17 +667,23 @@ export default function UsagePage() {
     });
   }, [resetCursorPagination]);
 
-  const handleUserSelectionChange = useCallback((value: string, _label: string) => {
+  const handleUserSelectionChange = useCallback((value: string, label: string) => {
+    setSelectedUserLabel(value ? label : '');
     updateFilter('user_id', value);
   }, [updateFilter]);
 
-  const handleAPIKeySelectionChange = useCallback((value: string, _label: string) => {
+  const handleAPIKeySelectionChange = useCallback((value: string, label: string) => {
+    setSelectedAPIKeyLabel(value ? label : '');
     updateFilter('api_key_id', value);
   }, [updateFilter]);
 
+  useEffect(() => {
+    writeAdminUsageFilterState(filters, selectedUserLabel, selectedAPIKeyLabel);
+  }, [filters.api_key_id, filters.platform, filters.user_id, selectedAPIKeyLabel, selectedUserLabel]);
+
   const activeStats = stats;
 
-  // 饼图数据
+  // 分布表格数据
   const modelDistribution: DistributionItem[] = useMemo(
     () => (activeStats?.by_model ?? []).map((s) => ({
       name: s.model,
@@ -673,7 +723,9 @@ export default function UsagePage() {
     { id: '', label: t('common.all') },
     ...platforms.map((p) => ({ id: p, label: platformName(p) })),
   ];
-  const selectedPlatformLabel = platformOptions.find((item) => item.id === (filters.platform || ''))?.label ?? t('common.all');
+  const selectedPlatformLabel = filters.platform
+    ? (platformOptions.find((item) => item.id === filters.platform)?.label ?? platformName(filters.platform))
+    : t('common.all');
 
   const allColumns = useMemo(() => {
     const adminColumns: UsageColumnConfig<UsageLogResp>[] = [
@@ -989,6 +1041,7 @@ export default function UsagePage() {
                 noDataLabel={t('common.no_data')}
                 placeholder={t('usage.search_user')}
                 selectedKey={filters.user_id ? String(filters.user_id) : null}
+                selectedLabel={selectedUserLabel}
                 onSelectionChange={handleUserSelectionChange}
               />
             </div>
@@ -1001,6 +1054,7 @@ export default function UsagePage() {
                 placeholder={t('usage.search_api_key', '搜索 API Key')}
                 scope="admin"
                 selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
+                selectedLabel={selectedAPIKeyLabel}
                 onSelectionChange={handleAPIKeySelectionChange}
               />
             </div>

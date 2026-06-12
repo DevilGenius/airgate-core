@@ -3,19 +3,6 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Card, Skeleton, Tabs } from '@heroui/react';
 import {
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import {
   Activity,
   Astroid,
   CalendarDays,
@@ -27,44 +14,31 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { decorativePalette } from '@devilgenius/airgate-theme';
 import { dashboardApi } from '../shared/api/dashboard';
 import { queryKeys } from '../shared/queryKeys';
-import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
+import { DISTRIBUTION_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
 import { CostPair, CostValue } from '../shared/components/CostValue';
 import { SimpleSelect } from '../shared/components/SimpleSelect';
 import { UserSearchFilterComboBox } from '../shared/components/UserSearchFilterComboBox';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
-const PIE_COLORS = PIE_CHART_COLORS;
+const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 const USER_COLORS = [...decorativePalette];
 const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio', 'cacheCumulativeRatio'];
 const TOKEN_TREND_RATIO_KEYS = new Set<keyof typeof USAGE_TOKEN_COLORS>(['cacheRatio', 'cacheCumulativeRatio']);
-
-type PieTooltipPayload = Array<{
-  name?: unknown;
-  payload?: {
-    name?: unknown;
-  };
-}>;
-
-function PieNameTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: PieTooltipPayload;
-}) {
-  const name = payload?.[0]?.payload?.name ?? payload?.[0]?.name;
-  if (!active || name == null || name === '') return null;
-
-  return (
-    <div className="max-w-56 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
-      {String(name)}
-    </div>
-  );
-}
+const DASHBOARD_TOKEN_TREND_INITIAL_DIMENSION = { width: 600, height: 248 };
+const DASHBOARD_TOP_USERS_INITIAL_DIMENSION = { width: 1200, height: 268 };
 
 type RangePreset = 'today' | '7d' | '30d' | '90d';
 type Granularity = 'hour' | 'day';
@@ -107,6 +81,10 @@ const META_TONE_CLASSES: Record<MetaTone, string> = {
   success: 'text-emerald-600 dark:text-emerald-400',
   warning: 'text-amber-600 dark:text-amber-400',
 };
+
+function getUserTrendColor(index: number) {
+  return USER_COLORS[index % USER_COLORS.length] ?? 'var(--ag-primary)';
+}
 
 function fmtNum(n: number | undefined | null): string {
   if (n == null) return '0';
@@ -394,9 +372,6 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
   const [tab, setTab] = useState<'model' | 'user'>('model');
   const models = trend.model_distribution ?? [];
   const users = trend.user_ranking ?? [];
-  const modelPieData = useMemo(() => models.map((item) => ({ name: item.model, value: item.requests })), [models]);
-  const userPieData = useMemo(() => users.map((item) => ({ name: item.email, value: item.tokens })), [users]);
-  const activePieData = tab === 'model' ? modelPieData : userPieData;
   const activeTitle = tab === 'model' ? t('dashboard.model_distribution') : t('dashboard.user_ranking');
   const tableRows: DashboardDistributionTableRow[] = useMemo(
     () => (
@@ -439,79 +414,57 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
 
   return (
     <DashboardCard title={activeTitle} extra={distributionTabs}>
-      <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
-        <div className="ag-distribution-chart-frame">
-          {activePieData.length > 0 ? (
-            <PieChart width={176} height={176}>
-              <Pie data={activePieData} cx="50%" cy="50%" dataKey="value" innerRadius={42} isAnimationActive={false} minAngle={3} outerRadius={68} stroke="var(--ag-surface)" strokeWidth={2}>
-                {activePieData.map((_, index) => (
-                  <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <RechartsTooltip
-                animationDuration={0}
-                content={<PieNameTooltip />}
-                cursor={false}
-                isAnimationActive={false}
-              />
-            </PieChart>
-          ) : (
-            <div className="flex h-44 w-44 items-center justify-center text-xs text-text">{t('common.no_data')}</div>
-          )}
-        </div>
-
-        <div className="ag-distribution-table-scroll">
-          <CompactDataTable
-            ariaLabel={activeTitle}
-            className="ag-compact-data-table--dense"
-            emptyText={t('common.no_data')}
-            minWidth={480}
-            rowKey={(row) => row.key}
-            rows={tableRows}
-            columns={[
-              {
-                key: 'name',
-                title: firstColumnTitle,
-                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.name,
-                render: (row, index) => (
-                  <>
-                    <span className="shrink-0 font-mono text-[11px] font-semibold text-text">#{index + 1}</span>
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
-                    <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
-                  </>
-                ),
-              },
-              {
-                align: 'end',
-                key: 'requests',
-                title: t('dashboard.requests'),
-                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.requests,
-                render: (row) => <span className="truncate font-mono text-text">{row.requests.toLocaleString()}</span>,
-              },
-              {
-                align: 'end',
-                key: 'tokens',
-                title: t('dashboard.tokens'),
-                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.tokens,
-                render: (row) => <span className="truncate font-mono text-text">{fmtNum(row.tokens)}</span>,
-              },
-              {
-                align: 'end',
-                key: 'actual',
-                title: t('dashboard.actual'),
-                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.actual,
-                render: (row) => <CostValue className="truncate font-mono" value={row.actualCost} tone="actual" />,
-              },
-              {
-                align: 'end',
-                key: 'standard',
-                title: t('dashboard.standard'),
-                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.standard,
-                render: (row) => <CostValue className="truncate font-mono" value={row.standardCost} tone="standard" />,
-              },
-            ]}
-          />
-        </div>
+      <div className="ag-distribution-table-scroll">
+        <CompactDataTable
+          ariaLabel={activeTitle}
+          className="ag-compact-data-table--dense"
+          emptyText={t('common.no_data')}
+          minWidth={480}
+          rowKey={(row) => row.key}
+          rows={tableRows}
+          columns={[
+            {
+              key: 'name',
+              title: firstColumnTitle,
+              width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.name,
+              render: (row, index) => (
+                <>
+                  <span className="shrink-0 font-mono text-[11px] font-semibold text-text">#{index + 1}</span>
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: DISTRIBUTION_DOT_COLORS[index % DISTRIBUTION_DOT_COLORS.length] }} />
+                  <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
+                </>
+              ),
+            },
+            {
+              align: 'end',
+              key: 'requests',
+              title: t('dashboard.requests'),
+              width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.requests,
+              render: (row) => <span className="truncate font-mono text-text">{row.requests.toLocaleString()}</span>,
+            },
+            {
+              align: 'end',
+              key: 'tokens',
+              title: t('dashboard.tokens'),
+              width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.tokens,
+              render: (row) => <span className="truncate font-mono text-text">{fmtNum(row.tokens)}</span>,
+            },
+            {
+              align: 'end',
+              key: 'actual',
+              title: t('dashboard.actual'),
+              width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.actual,
+              render: (row) => <CostValue className="truncate font-mono" value={row.actualCost} tone="actual" />,
+            },
+            {
+              align: 'end',
+              key: 'standard',
+              title: t('dashboard.standard'),
+              width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.standard,
+              render: (row) => <CostValue className="truncate font-mono" value={row.standardCost} tone="standard" />,
+            },
+          ]}
+        />
       </div>
     </DashboardCard>
   );
@@ -562,53 +515,56 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
   return (
     <DashboardCard title={t('dashboard.token_trend')}>
       {chartData.length > 0 ? (
-        <div className="h-[248px] w-full min-w-0 2xl:h-[288px]">
-          <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={{ width: 600, height: 248 }}>
-            <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
-              <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-              <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
-              <YAxis yAxisId="tokens" axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
-              <YAxis
-                yAxisId="ratio"
-                axisLine={false}
-                domain={[0, 100]}
-                orientation="right"
-                tick={{ fill: 'var(--ag-text)', fontSize: 11 }}
-                tickFormatter={(value: number) => `${Math.round(value)}%`}
-                tickLine={false}
-                width={32}
-              />
-              <RechartsTooltip content={<TokenTrendTooltip />} />
-              <Legend
-                height={24}
-                content={() => (
-                  <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
-                    {TOKEN_TREND_LINE_ORDER.map((key) => (
-                      <span key={key} className="inline-flex items-center gap-1.5">
-                        {TOKEN_TREND_RATIO_KEYS.has(key) ? (
-                          <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: USAGE_TOKEN_COLORS[key] }} />
-                        ) : (
-                          <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
-                        )}
-                        <span>{lineLabels[key]}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              />
-              <Line yAxisId="tokens" dataKey="input" dot={false} isAnimationActive={false} name={lineLabels.input} stroke={USAGE_TOKEN_COLORS.input} strokeWidth={2.5} type="monotone" />
-              <Line yAxisId="tokens" dataKey="output" dot={false} isAnimationActive={false} name={lineLabels.output} stroke={USAGE_TOKEN_COLORS.output} strokeWidth={2.5} type="monotone" />
-              <Line yAxisId="tokens" dataKey="cacheCreation" dot={false} isAnimationActive={false} name={lineLabels.cacheCreation} stroke={USAGE_TOKEN_COLORS.cacheCreation} strokeWidth={2.5} type="monotone" />
-              <Line yAxisId="tokens" dataKey="cacheRead" dot={false} isAnimationActive={false} name={lineLabels.cacheRead} stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2.5} type="monotone" />
-              <Line yAxisId="ratio" dataKey="cacheRatio" dot={false} isAnimationActive={false} name={lineLabels.cacheRatio} stroke={USAGE_TOKEN_COLORS.cacheRatio} strokeDasharray="5 5" strokeWidth={2} type="monotone" />
-              <Line yAxisId="ratio" dataKey="cacheCumulativeRatio" dot={false} isAnimationActive={false} name={lineLabels.cacheCumulativeRatio} stroke={USAGE_TOKEN_COLORS.cacheCumulativeRatio} strokeDasharray="5 5" strokeWidth={2} type="monotone" />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="flex h-[248px] w-full min-w-0 flex-col 2xl:h-[288px]">
+          <div className="min-h-0 flex-1">
+            <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={DASHBOARD_TOKEN_TREND_INITIAL_DIMENSION}>
+              <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
+                <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
+                <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
+                <YAxis yAxisId="tokens" axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
+                <YAxis
+                  yAxisId="ratio"
+                  axisLine={false}
+                  domain={[0, 100]}
+                  orientation="right"
+                  tick={{ fill: 'var(--ag-text)', fontSize: 11 }}
+                  tickFormatter={(value: number) => `${Math.round(value)}%`}
+                  tickLine={false}
+                  width={32}
+                />
+                <RechartsTooltip content={<TokenTrendTooltip />} />
+                <Line yAxisId="tokens" dataKey="input" dot={false} isAnimationActive={false} name={lineLabels.input} stroke={USAGE_TOKEN_COLORS.input} strokeWidth={2.5} type="monotone" />
+                <Line yAxisId="tokens" dataKey="output" dot={false} isAnimationActive={false} name={lineLabels.output} stroke={USAGE_TOKEN_COLORS.output} strokeWidth={2.5} type="monotone" />
+                <Line yAxisId="tokens" dataKey="cacheCreation" dot={false} isAnimationActive={false} name={lineLabels.cacheCreation} stroke={USAGE_TOKEN_COLORS.cacheCreation} strokeWidth={2.5} type="monotone" />
+                <Line yAxisId="tokens" dataKey="cacheRead" dot={false} isAnimationActive={false} name={lineLabels.cacheRead} stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2.5} type="monotone" />
+                <Line yAxisId="ratio" dataKey="cacheRatio" dot={false} isAnimationActive={false} name={lineLabels.cacheRatio} stroke={USAGE_TOKEN_COLORS.cacheRatio} strokeDasharray="5 5" strokeWidth={2} type="monotone" />
+                <Line yAxisId="ratio" dataKey="cacheCumulativeRatio" dot={false} isAnimationActive={false} name={lineLabels.cacheCumulativeRatio} stroke={USAGE_TOKEN_COLORS.cacheCumulativeRatio} strokeDasharray="5 5" strokeWidth={2} type="monotone" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <TokenTrendLegend lineLabels={lineLabels} />
         </div>
       ) : (
         <div className="flex h-[248px] items-center justify-center text-sm text-text 2xl:h-[288px]">{t('common.no_data')}</div>
       )}
     </DashboardCard>
+  );
+}
+
+function TokenTrendLegend({ lineLabels }: { lineLabels: Record<string, string> }) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
+      {TOKEN_TREND_LINE_ORDER.map((key) => (
+        <span key={key} className="inline-flex items-center gap-1.5">
+          {TOKEN_TREND_RATIO_KEYS.has(key) ? (
+            <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: USAGE_TOKEN_COLORS[key] }} />
+          ) : (
+            <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
+          )}
+          <span>{lineLabels[key]}</span>
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -632,24 +588,39 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
   return (
     <DashboardCard title={t('dashboard.top_users')}>
       {topUsers.length > 0 ? (
-        <div className="h-[268px] w-full min-w-0 2xl:h-[320px]">
-          <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={{ width: 1200, height: 268 }}>
-            <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 8, top: 4 }}>
-              <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-              <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
-              <YAxis axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
-              <RechartsTooltip content={<ChartTooltip />} />
-              <Legend iconSize={8} iconType="circle" wrapperStyle={{ color: 'var(--ag-text)', fontSize: 11 }} />
-              {topUsers.map((user, index) => (
-                <Line key={user.user_id} dataKey={user.email} dot={false} isAnimationActive={false} stroke={USER_COLORS[index % USER_COLORS.length]} strokeWidth={2.5} type="monotone" />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="flex h-[268px] w-full min-w-0 flex-col 2xl:h-[320px]">
+          <div className="min-h-0 flex-1">
+            <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={DASHBOARD_TOP_USERS_INITIAL_DIMENSION}>
+              <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 8, top: 4 }}>
+                <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
+                <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
+                <YAxis axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
+                <RechartsTooltip content={<ChartTooltip />} />
+                {topUsers.map((user, index) => (
+                  <Line key={user.user_id} dataKey={user.email} dot={false} isAnimationActive={false} stroke={getUserTrendColor(index)} strokeWidth={2.5} type="monotone" />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <TopUsersLegend users={topUsers.map((user, index) => ({ color: getUserTrendColor(index), id: user.user_id, label: user.email }))} />
         </div>
       ) : (
         <div className="flex h-[268px] items-center justify-center text-sm text-text 2xl:h-[320px]">{t('common.no_data')}</div>
       )}
     </DashboardCard>
+  );
+}
+
+function TopUsersLegend({ users }: { users: Array<{ color: string; id: number; label: string }> }) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
+      {users.map((user) => (
+        <span key={user.id} className="inline-flex min-w-0 items-center gap-1.5">
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: user.color }} />
+          <span className="max-w-40 truncate">{user.label}</span>
+        </span>
+      ))}
+    </div>
   );
 }
 

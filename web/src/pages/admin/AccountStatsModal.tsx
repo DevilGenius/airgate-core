@@ -3,45 +3,26 @@ import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Chip, Tabs, useOverlayState } from '@heroui/react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell,
-} from 'recharts';
-import {
   DollarSign, Activity, TrendingUp, Clock, Calendar,
   Cpu, Zap,
 } from 'lucide-react';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { PlatformIcon } from '../../shared/ui';
 import { accountsApi, type AccountStatsResp } from '../../shared/api/accounts';
 import { CommonDatePicker } from '../../shared/components/CommonDatePicker';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { CommonModal } from '../../shared/components/CommonModal';
-import { PIE_CHART_COLORS } from '../../shared/constants';
+import { DISTRIBUTION_COLORS } from '../../shared/constants';
 
-const PIE_COLORS = PIE_CHART_COLORS;
-
-type PieTooltipPayload = Array<{
-  name?: unknown;
-  payload?: {
-    name?: unknown;
-  };
-}>;
-
-function PieNameTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: PieTooltipPayload;
-}) {
-  const name = payload?.[0]?.payload?.name ?? payload?.[0]?.name;
-  if (!active || name == null || name === '') return null;
-
-  return (
-    <div className="max-w-56 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
-      {String(name)}
-    </div>
-  );
-}
+const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 
 // 预设时间范围
 type RangePreset = '7d' | '30d' | '90d' | 'custom';
@@ -558,96 +539,60 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
   const { t } = useTranslation();
   const models = data.models ?? [];
 
-  const pieData = useMemo(() =>
-    models.map((m) => ({ name: m.model, value: m.count })),
-    [models],
-  );
-
   return (
     <div className="rounded-lg border border-border-subtle p-4">
       <h4 className="text-xs font-semibold text-text mb-3">{t('accounts.stats_model_distribution')}</h4>
-      <div className="ag-distribution-card-body ag-account-stats-model-distribution grid items-start gap-3 xl:grid-cols-[176px_minmax(0,1fr)]">
-        {/* 饼图 */}
-        <div className="ag-distribution-chart-frame">
-          <PieChart width={176} height={176}>
-            <Pie
-              data={pieData}
-              cx="50%"
-              cy="50%"
-              innerRadius={42}
-              outerRadius={68}
-              dataKey="value"
-              isAnimationActive={false}
-              minAngle={3}
-              stroke="var(--ag-bg-elevated)"
-              strokeWidth={1}
-            >
-              {pieData.map((_, i) => (
-                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-              ))}
-            </Pie>
-            <RechartsTooltip
-              animationDuration={0}
-              content={<PieNameTooltip />}
-              cursor={false}
-              isAnimationActive={false}
-            />
-          </PieChart>
-        </div>
-
-        {/* 模型表格 */}
-        <div className="ag-distribution-table-scroll">
-          <CompactDataTable
-            ariaLabel={t('accounts.stats_model')}
-            className="ag-compact-data-table--dense ag-account-stats-model-table"
-            emptyText={t('common.no_data')}
-            minWidth={440}
-            rowKey={(row) => row.model}
-            rows={models}
-            columns={[
-              {
-                key: 'model',
-                title: t('accounts.stats_model'),
-                width: '34%',
-                render: (row, index) => (
-                  <>
-                    <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
-                    <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
-                  </>
-                ),
-              },
-              {
-                align: 'end',
-                key: 'requests',
-                title: t('accounts.stats_requests'),
-                width: '15%',
-                render: (row) => <span className="truncate font-mono text-text-secondary">{row.count.toLocaleString()}</span>,
-              },
-              {
-                align: 'end',
-                key: 'tokens',
-                title: 'Token',
-                width: '17%',
-                render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.input_tokens + row.output_tokens)}</span>,
-              },
-              {
-                align: 'end',
-                key: 'actual',
-                title: t('accounts.stats_actual'),
-                width: '17%',
-                render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actual_cost, 2)}</span>,
-              },
-              {
-                align: 'end',
-                key: 'standard',
-                title: t('accounts.stats_standard'),
-                width: '17%',
-                render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.total_cost, 2)}</span>,
-              },
-            ]}
-          />
-        </div>
+      <div className="ag-distribution-table-scroll">
+        <CompactDataTable
+          ariaLabel={t('accounts.stats_model')}
+          className="ag-compact-data-table--dense ag-account-stats-model-table"
+          emptyText={t('common.no_data')}
+          minWidth={440}
+          rowKey={(row) => row.model}
+          rows={models}
+          columns={[
+            {
+              key: 'model',
+              title: t('accounts.stats_model'),
+              width: '34%',
+              render: (row, index) => (
+                <>
+                  <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: DISTRIBUTION_DOT_COLORS[index % DISTRIBUTION_DOT_COLORS.length] }} />
+                  <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
+                </>
+              ),
+            },
+            {
+              align: 'end',
+              key: 'requests',
+              title: t('accounts.stats_requests'),
+              width: '15%',
+              render: (row) => <span className="truncate font-mono text-text-secondary">{row.count.toLocaleString()}</span>,
+            },
+            {
+              align: 'end',
+              key: 'tokens',
+              title: 'Token',
+              width: '17%',
+              render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.input_tokens + row.output_tokens)}</span>,
+            },
+            {
+              align: 'end',
+              key: 'actual',
+              title: t('accounts.stats_actual'),
+              width: '17%',
+              render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actual_cost, 2)}</span>,
+            },
+            {
+              align: 'end',
+              key: 'standard',
+              title: t('accounts.stats_standard'),
+              width: '17%',
+              render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.total_cost, 2)}</span>,
+            },
+          ]}
+        />
       </div>
     </div>
   );

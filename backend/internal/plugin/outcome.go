@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/internal/safego"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
@@ -329,7 +331,19 @@ func (f *Forwarder) persistUpdatedCredentials(accountID int, updated map[string]
 	if len(updated) == 0 {
 		return
 	}
-	go f.updateAccountCredentials(accountID, updated)
+	release := f.acquireCredentialPersistSlot()
+	safego.Go("credential_persist", func() {
+		defer release()
+		f.updateAccountCredentials(accountID, updated)
+	})
+}
+
+func (f *Forwarder) acquireCredentialPersistSlot() func() {
+	if f.credentialPersistSem == nil {
+		return func() {}
+	}
+	f.credentialPersistSem <- struct{}{}
+	return func() { <-f.credentialPersistSem }
 }
 
 // recordUsage 写 usage_log 并更新 scheduler 的窗口费用。调用前 outcome.Usage 必须非 nil。
@@ -471,6 +485,10 @@ func (f *Forwarder) updateAccountCredentials(accountID int, updated map[string]s
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	lock := f.credentialLock(accountID)
+	lock.Lock()
+	defer lock.Unlock()
+
 	acc, err := f.db.Account.Query().Where(account.ID(accountID)).Only(ctx)
 	if err != nil {
 		slog.Error("更新凭证失败：查询账号", "account_id", accountID, "error", err)
@@ -490,4 +508,9 @@ func (f *Forwarder) updateAccountCredentials(accountID int, updated map[string]s
 		return
 	}
 	slog.Info("插件回传凭证已持久化", "account_id", accountID)
+}
+
+func (f *Forwarder) credentialLock(accountID int) *sync.Mutex {
+	actual, _ := f.credentialLocks.LoadOrStore(accountID, &sync.Mutex{})
+	return actual.(*sync.Mutex)
 }

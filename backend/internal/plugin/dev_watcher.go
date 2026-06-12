@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/DevilGenius/airgate-core/internal/safego"
 )
 
 // dev_watcher.go：监听 dev 模式插件源码目录的 .go 文件改动，自动 ReloadDev。
@@ -64,7 +66,7 @@ func newDevWatcher(mgr *Manager) *devWatcher {
 		stop:     make(chan struct{}),
 		done:     make(chan struct{}),
 	}
-	go dw.loop()
+	safego.Go("plugin_dev_watcher", dw.loop)
 	return dw
 }
 
@@ -159,10 +161,12 @@ func (dw *devWatcher) tick() {
 		dw.mu.Unlock()
 
 		dw.wg.Add(1)
-		go func() {
+		reloadName := name
+		reloadTrigger := latest
+		safego.Go("plugin_dev_reload:"+reloadName, func() {
 			defer dw.wg.Done()
-			dw.doReload(name, latest)
-		}()
+			dw.doReload(reloadName, reloadTrigger)
+		})
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	enttask "github.com/DevilGenius/airgate-core/ent/task"
+	"github.com/DevilGenius/airgate-core/internal/safego"
 	pb "github.com/DevilGenius/airgate-sdk/protocol/proto"
 	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -51,8 +52,8 @@ func (c *taskTypesCache) set(pluginID string, types []string) {
 // 启动前先将所有遗留的 processing 任务重置为 retrying，确保服务重启后立即恢复。
 func (m *Manager) StartTaskDispatcher(ctx context.Context) {
 	m.resetProcessingTasks(ctx)
-	go m.taskDispatchLoop(ctx)
-	go m.taskRecoverLoop(ctx)
+	safego.Go("task_dispatch_loop", func() { m.taskDispatchLoop(ctx) })
+	safego.Go("task_recover_loop", func() { m.taskRecoverLoop(ctx) })
 	slog.Info("task_dispatcher_started")
 }
 
@@ -146,10 +147,12 @@ func (m *Manager) dispatchPendingTasks(ctx context.Context) {
 	var wg sync.WaitGroup
 	for pluginID, pluginTasks := range byPlugin {
 		wg.Add(1)
-		go func(pid string, pts []*ent.Task) {
+		pid := pluginID
+		pts := pluginTasks
+		safego.Go("task_dispatch_plugin:"+pid, func() {
 			defer wg.Done()
 			m.dispatchPluginTasks(ctx, pid, pts)
-		}(pluginID, pluginTasks)
+		})
 	}
 	wg.Wait()
 }
@@ -229,11 +232,12 @@ func (m *Manager) dispatchPluginTasks(ctx context.Context, pluginID string, task
 
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(task *ent.Task) {
+		task := t
+		safego.Go("task_process", func() {
 			defer wg.Done()
 			defer func() { <-sem }()
 			m.processOneTask(ctx, inst, task)
-		}(t)
+		})
 	}
 	wg.Wait()
 }

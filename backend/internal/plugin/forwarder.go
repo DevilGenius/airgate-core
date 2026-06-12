@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,14 +31,16 @@ const (
 
 // Forwarder 请求转发器：认证 → 余额预检 → 调度 → 并发闸门 → 转发 → 判决 → 计费 → 记录。
 type Forwarder struct {
-	db             *ent.Client
-	manager        *Manager
-	scheduler      *scheduler.Scheduler
-	concurrency    *scheduler.ConcurrencyManager
-	calculator     *billing.Calculator
-	recorder       *billing.Recorder
-	monitor        monitoring.Recorder
-	requestMonitor requestmonitoring.Recorder
+	db                   *ent.Client
+	manager              *Manager
+	scheduler            *scheduler.Scheduler
+	concurrency          *scheduler.ConcurrencyManager
+	calculator           *billing.Calculator
+	recorder             *billing.Recorder
+	monitor              monitoring.Recorder
+	requestMonitor       requestmonitoring.Recorder
+	credentialLocks      sync.Map
+	credentialPersistSem chan struct{}
 }
 
 // NewForwarder 创建转发器。
@@ -50,12 +53,13 @@ func NewForwarder(
 	recorder *billing.Recorder,
 ) *Forwarder {
 	return &Forwarder{
-		db:          db,
-		manager:     manager,
-		scheduler:   sched,
-		concurrency: concurrency,
-		calculator:  calculator,
-		recorder:    recorder,
+		db:                   db,
+		manager:              manager,
+		scheduler:            sched,
+		concurrency:          concurrency,
+		calculator:           calculator,
+		recorder:             recorder,
+		credentialPersistSem: make(chan struct{}, 32),
 	}
 }
 

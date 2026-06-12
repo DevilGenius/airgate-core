@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button, Card, Meter } from '@heroui/react';
@@ -29,6 +29,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { formatRateMultiplier, isValidRateMultiplierValue } from '../../shared/utils/rateMultiplier';
 
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.userUsageAutoRefresh;
+const USER_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.userUsageFilters;
 
 type MetricTone = 'violet' | 'amber' | 'indigo' | 'emerald' | 'stream';
 const STREAM_BLUE = 'oklch(62.04% 0.1950 253.83)';
@@ -53,6 +54,73 @@ const METRIC_TONE_STYLES: Partial<Record<MetricTone, CSSProperties>> = {
     color: STREAM_BLUE,
   },
 };
+
+type StoredUserUsageFilters = {
+  api_key_id?: number;
+  api_key_label?: string;
+  platform?: string;
+};
+
+type UserUsageFilterState = {
+  apiKeyLabel: string;
+  filters: Partial<UsageQuery>;
+};
+
+function readStoredPositiveID(value: unknown) {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
+}
+
+function isStoredFilterRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readUserUsageFilterState(customerScope: boolean): UserUsageFilterState {
+  const fallback: UserUsageFilterState = { apiKeyLabel: '', filters: {} };
+  if (typeof window === 'undefined') return fallback;
+
+  try {
+    const raw = window.localStorage.getItem(USER_USAGE_FILTER_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    if (!isStoredFilterRecord(parsed)) return fallback;
+
+    const filters: Partial<UsageQuery> = {};
+    const platform = customerScope ? '' : (typeof parsed.platform === 'string' ? parsed.platform.trim() : '');
+    const apiKeyID = customerScope ? undefined : readStoredPositiveID(parsed.api_key_id);
+
+    if (platform) filters.platform = platform;
+    if (apiKeyID != null) filters.api_key_id = apiKeyID;
+
+    return {
+      apiKeyLabel: apiKeyID != null ? (typeof parsed.api_key_label === 'string' && parsed.api_key_label ? parsed.api_key_label : `#${apiKeyID}`) : '',
+      filters,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function writeUserUsageFilterState(filters: Partial<UsageQuery>, apiKeyLabel: string, customerScope: boolean) {
+  if (typeof window === 'undefined') return;
+
+  const stored: StoredUserUsageFilters = {};
+  if (!customerScope && filters.platform) stored.platform = filters.platform;
+  if (!customerScope && filters.api_key_id != null && filters.api_key_id > 0) {
+    stored.api_key_id = filters.api_key_id;
+    if (apiKeyLabel) stored.api_key_label = apiKeyLabel;
+  }
+
+  try {
+    if (Object.keys(stored).length > 0) {
+      window.localStorage.setItem(USER_USAGE_FILTER_STORAGE_KEY, JSON.stringify(stored));
+    } else {
+      window.localStorage.removeItem(USER_USAGE_FILTER_STORAGE_KEY);
+    }
+  } catch {
+    // localStorage may be unavailable in restricted browser modes.
+  }
+}
 
 function StatCard({
   icon,
@@ -212,7 +280,9 @@ export default function UserUsageContent() {
   const { user } = useAuth();
   const customerScope = !!user?.api_key_id;
   const { beforeId, page, setPage, pageSize, setPageSize, resetCursorPagination } = useCursorPagination(20, 'user.usage');
-  const [filters, setFilters] = useState<Partial<UsageQuery>>({});
+  const [initialFilterState] = useState(() => readUserUsageFilterState(customerScope));
+  const [filters, setFilters] = useState<Partial<UsageQuery>>(() => initialFilterState.filters);
+  const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState(initialFilterState.apiKeyLabel);
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(USER_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, USER_AUTO_REFRESH_OPTIONS);
   const autoRefreshEnabled = autoRefresh > 0;
   const autoRefreshLabel = `${t('usage.auto_update')} `;
@@ -236,7 +306,9 @@ export default function UserUsageContent() {
     { id: '', label: t('common.all') },
     ...platforms.map((p) => ({ id: p, label: platformName(p) })),
   ];
-  const selectedPlatformLabel = platformOptions.find((item) => item.id === (filters.platform || ''))?.label ?? t('common.all');
+  const selectedPlatformLabel = filters.platform
+    ? (platformOptions.find((item) => item.id === filters.platform)?.label ?? platformName(filters.platform))
+    : t('common.all');
 
   const {
     data,
@@ -280,6 +352,22 @@ export default function UserUsageContent() {
     setFilters((prev) => ({ ...prev, [key]: nextValue }));
     resetCursorPagination();
   }
+
+  useEffect(() => {
+    if (!customerScope) return;
+    setSelectedAPIKeyLabel('');
+    setFilters((prev) => {
+      if (prev.api_key_id == null && !prev.platform) return prev;
+      const next = { ...prev };
+      delete next.api_key_id;
+      delete next.platform;
+      return next;
+    });
+  }, [customerScope]);
+
+  useEffect(() => {
+    writeUserUsageFilterState(filters, selectedAPIKeyLabel, customerScope);
+  }, [customerScope, filters.api_key_id, filters.platform, selectedAPIKeyLabel]);
 
   const list = data?.list ?? [];
   const total = data?.total ?? 0;
@@ -439,7 +527,11 @@ export default function UserUsageContent() {
                   placeholder="API Key"
                   scope="user"
                   selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
-                  onSelectionChange={(key) => updateFilter('api_key_id', key)}
+                  selectedLabel={selectedAPIKeyLabel}
+                  onSelectionChange={(key, label) => {
+                    setSelectedAPIKeyLabel(key ? label : '');
+                    updateFilter('api_key_id', key);
+                  }}
                 />
               </div>
             )}

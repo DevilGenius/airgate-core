@@ -373,6 +373,10 @@ export function runAfterInputFrame(work: () => void) {
     startTransition(work);
     return;
   }
+  if (typeof document !== 'undefined' && document.hidden) {
+    window.setTimeout(() => startTransition(work), 0);
+    return;
+  }
 
   window.requestAnimationFrame(() => {
     window.setTimeout(() => startTransition(work), 0);

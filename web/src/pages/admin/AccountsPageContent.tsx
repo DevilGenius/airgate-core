@@ -22,7 +22,7 @@ import {
 } from '../../app/plugin-frontend-registry';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
-import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
+import { usePersistentUrlQueryParam, useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS, REMOTE_SEARCH_DEBOUNCE_MS } from '../../shared/constants';
@@ -71,6 +71,7 @@ import {
 } from './accounts/AccountPageSupport';
 
 const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsAutoRefresh;
+const ACCOUNT_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsFilters;
 const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 
@@ -410,11 +411,11 @@ export default function AccountsPageContent() {
   const { page, setPage, pageSize, setPageSize } = useUrlPagination(20, 'admin.accounts');
   const [keyword, setKeyword] = useUrlQueryParam('q');
   const debouncedKeyword = useDebouncedValue(keyword.trim(), REMOTE_SEARCH_DEBOUNCE_MS);
-  const [platformFilter, setPlatformFilter] = useUrlQueryParam('platform');
-  const [stateFilter, setStateFilter] = useUrlQueryParam('state');
-  const [typeFilter, setTypeFilter] = useUrlQueryParam('type');
-  const [groupFilter, setGroupFilter] = useUrlQueryParam('group');
-  const [proxyFilter, setProxyFilter] = useUrlQueryParam('proxy');
+  const [platformFilter, setPlatformFilter] = usePersistentUrlQueryParam('platform', `${ACCOUNT_FILTER_STORAGE_KEY}:platform`);
+  const [stateFilter, setStateFilter] = usePersistentUrlQueryParam('state', `${ACCOUNT_FILTER_STORAGE_KEY}:state`);
+  const [typeFilter, setTypeFilter] = usePersistentUrlQueryParam('type', `${ACCOUNT_FILTER_STORAGE_KEY}:type`);
+  const [groupFilter, setGroupFilter] = usePersistentUrlQueryParam('group', `${ACCOUNT_FILTER_STORAGE_KEY}:group`);
+  const [proxyFilter, setProxyFilter] = usePersistentUrlQueryParam('proxy', `${ACCOUNT_FILTER_STORAGE_KEY}:proxy`);
 
   // 自动刷新
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ACCOUNT_AUTO_REFRESH_STORAGE_KEY, 0, ACCOUNT_AUTO_REFRESH_OPTIONS); // 秒，0=关闭
@@ -517,11 +518,17 @@ export default function AccountsPageContent() {
     }
   }, [applyCapacityData]);
   useEffect(() => {
-    if (typeof window === 'undefined' || visibleAccountIds.length === 0) {
+    void refreshVisibleCapacity();
+  }, [refreshVisibleCapacity, visibleAccountIdsKey]);
+  useEffect(() => {
+    if (typeof window === 'undefined') {
       return undefined;
     }
-    void refreshVisibleCapacity();
     return subscribeAdminEvents((event) => {
+      if (event.type === 'admin_events.reconnected') {
+        void refreshVisibleCapacity();
+        return;
+      }
       if (event.type !== 'account_capacity.changed') return;
       const accountId = Number(event.account_id);
       const currentConcurrency = Number(event.current_concurrency);
@@ -531,7 +538,7 @@ export default function AccountsPageContent() {
         capacityStore.setCount(accountId, currentConcurrency);
       });
     });
-  }, [capacityStore, refreshVisibleCapacity, visibleAccountIds.length, visibleAccountIdsKey]);
+  }, [capacityStore, refreshVisibleCapacity]);
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -565,9 +572,10 @@ export default function AccountsPageContent() {
     },
     enabled: visibleAccountIds.length > 0,
     meta: { globalLoading: false },
-    refetchInterval: (query) => (
-      query.state.data?.refreshing ? ACCOUNT_USAGE_REFRESHING_POLL_MS : false
-    ),
+    refetchInterval: (query) => {
+      if (query.state.status === 'error') return 5000;
+      return query.state.data?.refreshing ? ACCOUNT_USAGE_REFRESHING_POLL_MS : false;
+    },
     refetchIntervalInBackground: false,
   });
   const refreshAccountUsage = useCallback((options?: { refresh?: boolean }) => {
@@ -968,12 +976,21 @@ export default function AccountsPageContent() {
     { id: '', label: t('accounts.all_proxies') },
     ...(allProxiesData?.list ?? []).map((p) => ({ id: String(p.id), label: p.name })),
   ], [allProxiesData?.list, t]);
-  const selectedPlatformLabel = PLATFORM_OPTIONS.find((item) => item.id === platformFilter)?.label ?? t('accounts.all_platforms');
-  const selectedStateLabel = STATE_OPTIONS.find((item) => item.id === stateFilter)?.label ?? t('users.all_status');
+  const selectedPlatformLabel = platformFilter
+    ? (PLATFORM_OPTIONS.find((item) => item.id === platformFilter)?.label ?? platformName(platformFilter))
+    : t('accounts.all_platforms');
+  const selectedStateLabel = stateFilter
+    ? (STATE_OPTIONS.find((item) => item.id === stateFilter)?.label ?? stateFilter)
+    : t('users.all_status');
   const selectedTypeOption = typeOptions.find((item) => item.id === typeFilter)
-    ?? oauthPlanOptions.find((item) => item.id === typeFilter);
-  const selectedGroupLabel = groupOptions.find((item) => item.id === groupFilter)?.label ?? t('accounts.all_groups');
-  const selectedProxyLabel = proxyOptions.find((item) => item.id === proxyFilter)?.label ?? t('accounts.all_proxies');
+    ?? oauthPlanOptions.find((item) => item.id === typeFilter)
+    ?? (typeFilter ? { id: typeFilter, label: typeFilter } : undefined);
+  const selectedGroupLabel = groupFilter
+    ? (groupOptions.find((item) => item.id === groupFilter)?.label ?? (groupFilter === UNGROUPED_GROUP_FILTER ? t('accounts.ungrouped') : `#${groupFilter}`))
+    : t('accounts.all_groups');
+  const selectedProxyLabel = proxyFilter
+    ? (proxyOptions.find((item) => item.id === proxyFilter)?.label ?? `#${proxyFilter}`)
+    : t('accounts.all_proxies');
   useEffect(() => {
     if (!typeFilter) return;
     if (typeOptions.some((item) => item.id === typeFilter)) return;

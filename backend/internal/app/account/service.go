@@ -27,6 +27,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
+	"github.com/DevilGenius/airgate-core/internal/safego"
 )
 
 // PluginCatalog 账号域需要的插件能力集合。
@@ -148,7 +149,7 @@ func (s *Service) SetMonitorRecorder(recorder monitoring.Recorder) {
 
 // StartQuotaRefreshLoop periodically refreshes OAuth account plan metadata written into credentials.
 func (s *Service) StartQuotaRefreshLoop(ctx context.Context) {
-	go s.runQuotaRefreshLoop(ctx)
+	safego.Go("account_quota_refresh_loop", func() { s.runQuotaRefreshLoop(ctx) })
 }
 
 func (s *Service) runQuotaRefreshLoop(ctx context.Context) {
@@ -1736,7 +1737,10 @@ func (s *Service) startUsageCacheRefreshForAccountIDs(platform string, accountID
 	s.usageRefreshRunning[cacheKey] = struct{}{}
 	s.usageRefreshMu.Unlock()
 
-	go s.runUsageCacheRefreshAccountIDsLoop(platform, cacheKey, append([]int(nil), accountIDs...))
+	ids := append([]int(nil), accountIDs...)
+	safego.Go("account_usage_cache_refresh", func() {
+		s.runUsageCacheRefreshAccountIDsLoop(platform, cacheKey, ids)
+	})
 }
 
 func (s *Service) runUsageCacheRefreshAccountIDsLoop(platform, cacheKey string, accountIDs []int) {

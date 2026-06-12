@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/DevilGenius/airgate-core/internal/safego"
 )
 
 // MarketplacePlugin 市场插件条目
@@ -173,7 +175,7 @@ func (m *Marketplace) Start(ctx context.Context) {
 		m.mu.Lock()
 		m.started = true
 		m.mu.Unlock()
-		go m.run(ctx)
+		safego.Go("plugin_marketplace", func() { m.run(ctx) })
 	})
 }
 
