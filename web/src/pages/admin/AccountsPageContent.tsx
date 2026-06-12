@@ -124,6 +124,13 @@ type BulkEditSelection = {
   initialValues: BulkEditInitialValues;
 };
 
+function normalizeAccountGroupIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item > 0);
+}
+
 function getBulkEditInitialValues(rows: AccountResp[], selectedIds: number[]): BulkEditInitialValues {
   if (selectedIds.length === 0) {
     return { groupIds: [] };
@@ -132,14 +139,14 @@ function getBulkEditInitialValues(rows: AccountResp[], selectedIds: number[]): B
   const selectedIdSet = new Set(selectedIds);
   const selectedRows = rows.filter((row) => selectedIdSet.has(row.id));
   const firstSelectedRow = selectedRows[0];
-  if (!firstSelectedRow || selectedRows.length !== selectedIds.length) {
+  if (!firstSelectedRow) {
     return { groupIds: [] };
   }
 
-  const firstGroupIds = firstSelectedRow.group_ids;
+  const firstGroupIds = normalizeAccountGroupIds(firstSelectedRow.group_ids);
   const commonGroupIds = new Set(firstGroupIds);
   for (const row of selectedRows.slice(1)) {
-    const rowGroupIds = new Set(row.group_ids);
+    const rowGroupIds = new Set(normalizeAccountGroupIds(row.group_ids));
     for (const groupId of Array.from(commonGroupIds)) {
       if (!rowGroupIds.has(groupId)) {
         commonGroupIds.delete(groupId);
@@ -147,8 +154,11 @@ function getBulkEditInitialValues(rows: AccountResp[], selectedIds: number[]): B
     }
   }
 
-  const getCommonNumber = (selectValue: (account: AccountResp) => number) => {
+  const getCommonNumber = (selectValue: (account: AccountResp) => unknown) => {
     const firstValue = selectValue(firstSelectedRow);
+    if (typeof firstValue !== 'number' || !Number.isFinite(firstValue)) {
+      return undefined;
+    }
     return selectedRows.every((row) => selectValue(row) === firstValue) ? firstValue : undefined;
   };
 
@@ -497,6 +507,13 @@ export default function AccountsPageContent() {
     void refetchAccounts({ cancelRefetch: false });
   }, [refetchAccounts]);
   const rows = data?.list ?? [];
+  const accountSnapshotRef = useRef<Map<number, AccountResp>>(new Map());
+  useEffect(() => {
+    if (rows.length === 0) return;
+    for (const row of rows) {
+      accountSnapshotRef.current.set(row.id, row);
+    }
+  }, [rows]);
   const visibleAccountIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const visibleAccountIdsKey = useMemo(() => visibleAccountIds.join(','), [visibleAccountIds]);
   const visibleAccountIdsRef = useRef<number[]>(visibleAccountIds);
@@ -885,11 +902,17 @@ export default function AccountsPageContent() {
   const handleBulkEdit = useCallback(() => {
     const selectedAccountIds = selectionStore.getSelectedIds();
     if (selectedAccountIds.length === 0) return;
+    const selectedRows = selectedAccountIds
+      .map((id) => accountSnapshotRef.current.get(id))
+      .filter((row): row is AccountResp => row != null);
+    if (selectedRows.length < selectedAccountIds.length) {
+      void refetchAccounts({ cancelRefetch: false });
+    }
     setBulkEditSelection({
       ids: selectedAccountIds,
-      initialValues: getBulkEditInitialValues(rows, selectedAccountIds),
+      initialValues: getBulkEditInitialValues(selectedRows.length > 0 ? selectedRows : rows, selectedAccountIds),
     });
-  }, [rows, selectionStore]);
+  }, [refetchAccounts, rows, selectionStore]);
   const handleBulkDelete = useCallback(() => {
     const selectedAccountIds = selectionStore.getSelectedIds();
     if (selectedAccountIds.length === 0) return;
