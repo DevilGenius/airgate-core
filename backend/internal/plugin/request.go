@@ -203,6 +203,7 @@ func parseBody(body []byte, contentType string) parsedRequest {
 			HasToolOutput:       signals.hasToolOutput,
 			HasToolCallContext:  signals.hasToolCallContext,
 			HasEncryptedContent: signals.hasEncryptedContent,
+			HasCompactionReplay: signals.hasCompactionReplay,
 			ReasoningEffort:     effort,
 		}
 	}
@@ -251,6 +252,9 @@ func firstNonEmpty(values ...string) string {
 }
 
 func requestRequiresContinuationAffinity(parsed parsedRequest) bool {
+	if parsed.HasCompactionReplay {
+		return false
+	}
 	// previous_response_id alone is a soft sticky hint: if the local affinity
 	// cache has expired, the scheduler can still fall back to session sticky or
 	// normal routing and let the upstream decide whether the anchor is usable.
@@ -262,6 +266,7 @@ type continuationSignals struct {
 	hasToolOutput       bool
 	hasToolCallContext  bool
 	hasEncryptedContent bool
+	hasCompactionReplay bool
 }
 
 func analyzeContinuationSignals(fields requestFields) continuationSignals {
@@ -278,6 +283,7 @@ func mergeSignals(dst *continuationSignals, src continuationSignals) {
 	dst.hasToolOutput = dst.hasToolOutput || src.hasToolOutput
 	dst.hasToolCallContext = dst.hasToolCallContext || src.hasToolCallContext
 	dst.hasEncryptedContent = dst.hasEncryptedContent || src.hasEncryptedContent
+	dst.hasCompactionReplay = dst.hasCompactionReplay || src.hasCompactionReplay
 }
 
 func analyzeResponsesInputSignals(raw json.RawMessage) continuationSignals {
@@ -306,6 +312,9 @@ func analyzeResponsesInputItemSignals(item map[string]any, signals *continuation
 		return
 	}
 	itemType, _ := item["type"].(string)
+	if isCompactionReplayItemType(itemType) {
+		signals.hasCompactionReplay = true
+	}
 	if isReasoningItemWithEncryptedContent(itemType, item) {
 		signals.hasEncryptedContent = true
 	}
@@ -375,11 +384,22 @@ func analyzeMessageContentSignals(content any, signals *continuationSignals) {
 			if isReasoningItemWithEncryptedContent(itemType, itemMap) {
 				signals.hasEncryptedContent = true
 			}
+		case "compaction", "compaction_summary":
+			signals.hasCompactionReplay = true
 		case "tool_result":
 			signals.hasToolOutput = true
 		case "tool_use":
 			signals.hasToolCallContext = true
 		}
+	}
+}
+
+func isCompactionReplayItemType(itemType string) bool {
+	switch strings.TrimSpace(itemType) {
+	case "compaction", "compaction_summary":
+		return true
+	default:
+		return false
 	}
 }
 

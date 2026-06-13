@@ -61,6 +61,7 @@ type parsedRequest struct {
 	HasToolOutput       bool
 	HasToolCallContext  bool
 	HasEncryptedContent bool
+	HasCompactionReplay bool
 	ReasoningEffort     string // 推理强度档位
 }
 

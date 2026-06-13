@@ -3,6 +3,7 @@ package plugin
 import (
 	"bytes"
 	"context"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -177,6 +178,19 @@ func TestParseBodyEncryptedContentNonReasoningItemDoesNotRequireContinuationAffi
 	}
 }
 
+func TestParseBodyCompactionReplayDoesNotRequireContinuationAffinity(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"compaction","encrypted_content":"summary"},{"type":"function_call_output","call_id":"call_1","output":"ok"}]}`)
+	parsed := parseBody(body, "application/json")
+	if !parsed.HasCompactionReplay {
+		t.Fatalf("HasCompactionReplay = false, want true")
+	}
+	if requestRequiresContinuationAffinity(parsed) {
+		t.Fatalf("requestRequiresContinuationAffinity = true, want false")
+	}
+}
+
 func TestRecoverContinuationAffinityMissingDropsPreviousResponseAndEncryptedContent(t *testing.T) {
 	t.Parallel()
 
@@ -238,6 +252,36 @@ func TestRecoverContinuationAffinityMissingDropsPreviousResponseOnly(t *testing.
 	}
 }
 
+func TestRecoverContinuationAffinityMissingAllowsModelBudgetFullContext(t *testing.T) {
+	t.Parallel()
+
+	largeText := strings.Repeat("x", 2<<20)
+	manager := &Manager{
+		modelCache: map[string][]sdk.ModelInfo{
+			"openai": {
+				{ID: "gpt-large", ContextWindow: 1000000},
+			},
+		},
+	}
+	state := &forwardState{
+		body:               []byte(`{"model":"gpt-large","previous_response_id":"resp_old","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"` + largeText + `"}]}]}`),
+		model:              "gpt-large",
+		requestedPlatform:  "openai",
+		previousResponseID: "resp_old",
+	}
+
+	recovered, err := recoverContinuationAffinityMissingWithManager(manager, state)
+	if err != nil {
+		t.Fatalf("recoverContinuationAffinityMissingWithManager error: %v", err)
+	}
+	if !recovered {
+		t.Fatalf("recovered = false, want true")
+	}
+	if state.previousResponseID != "" {
+		t.Fatalf("previousResponseID = %q, want empty", state.previousResponseID)
+	}
+}
+
 func TestRecoverContinuationAffinityMissingHandlesHeaderOnlyPreviousResponse(t *testing.T) {
 	t.Parallel()
 
@@ -262,6 +306,51 @@ func TestRecoverContinuationAffinityMissingHandlesHeaderOnlyPreviousResponse(t *
 	}
 	if string(state.body) != string(originalBody) {
 		t.Fatalf("body = %s, want unchanged %s", state.body, originalBody)
+	}
+}
+
+func TestRecoverContinuationAffinityMissingRejectsOversizedFullContext(t *testing.T) {
+	t.Parallel()
+
+	largeText := strings.Repeat("x", 2<<20)
+	state := &forwardState{
+		body:               []byte(`{"model":"gpt-5.4-mini","previous_response_id":"resp_old","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"` + largeText + `"}]}]}`),
+		previousResponseID: "resp_old",
+	}
+
+	recovered, err := recoverContinuationAffinityMissing(state)
+	if !errors.Is(err, errContinuationRecoveryContextTooLarge) {
+		t.Fatalf("error = %v, want errContinuationRecoveryContextTooLarge", err)
+	}
+	if recovered {
+		t.Fatalf("recovered = true, want false")
+	}
+	if state.previousResponseID != "resp_old" {
+		t.Fatalf("previousResponseID = %q, want resp_old", state.previousResponseID)
+	}
+}
+
+func TestRecoverContinuationAffinityMissingAllowsCompactionReplayToolOutput(t *testing.T) {
+	t.Parallel()
+
+	state := &forwardState{
+		body:                        []byte(`{"model":"gpt-5.4-mini","previous_response_id":"resp_old","input":[{"type":"compaction","encrypted_content":"summary"},{"type":"function_call_output","call_id":"call_1","output":"ok"}]}`),
+		previousResponseID:          "resp_old",
+		requireContinuationAffinity: true,
+	}
+
+	recovered, err := recoverContinuationAffinityMissing(state)
+	if err != nil {
+		t.Fatalf("recoverContinuationAffinityMissing error: %v", err)
+	}
+	if !recovered {
+		t.Fatalf("recovered = false, want true")
+	}
+	if state.previousResponseID != "" {
+		t.Fatalf("previousResponseID = %q, want empty", state.previousResponseID)
+	}
+	if state.requireContinuationAffinity {
+		t.Fatalf("requireContinuationAffinity = true, want false")
 	}
 }
 
@@ -560,6 +649,12 @@ func TestCanFailoverImagesUsesOutcomeFailoverPolicy(t *testing.T) {
 	}
 	if f.canFailover(c, base, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeClientError}}) {
 		t.Fatal("image client error should not failover")
+	}
+	if f.canFailover(c, base, forwardExecution{
+		outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeClientError},
+		err:     errors.New("context too large"),
+	}) {
+		t.Fatal("client error with plugin err should not failover")
 	}
 }
 
@@ -987,6 +1082,29 @@ func TestAllRoutesFailureSummaryRecordsContinuationCapacity(t *testing.T) {
 	}
 	if response.code != "continuation_unavailable" {
 		t.Fatalf("code = %q, want continuation_unavailable", response.code)
+	}
+}
+
+func TestAllRoutesFailureSummaryRecordsContinuationRecoveryContextTooLarge(t *testing.T) {
+	t.Parallel()
+
+	summary := allRoutesFailureSummary{}
+	if !summary.recordContinuationRecoveryError(errContinuationRecoveryContextTooLarge) {
+		t.Fatalf("recordContinuationRecoveryError = false, want true")
+	}
+
+	response := selectAllRoutesFailureResponse(summary)
+	if response.status != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d", response.status, http.StatusRequestEntityTooLarge)
+	}
+	if response.errType != "invalid_request_error" {
+		t.Fatalf("errType = %q, want invalid_request_error", response.errType)
+	}
+	if response.code != "context_too_large" {
+		t.Fatalf("code = %q, want context_too_large", response.code)
+	}
+	if response.message != contextTooLargeMessage {
+		t.Fatalf("message = %q, want contextTooLargeMessage", response.message)
 	}
 }
 

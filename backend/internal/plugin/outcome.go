@@ -73,7 +73,7 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 	f.applyOutcome(ctx, state, execution)
 	f.persistUpdatedCredentials(state.account.ID, execution.outcome.UpdatedCredentials)
 
-	if execution.err != nil {
+	if execution.err != nil && execution.outcome.Kind != sdk.OutcomeClientError {
 		slog.Error("插件转发失败",
 			"plugin", state.plugin.Name,
 			"kind", execution.outcome.Kind,
@@ -167,6 +167,7 @@ func responseIDsFromBody(body []byte) []string {
 const (
 	defaultClientErrorMessage = "请求无法完成，请检查输入后重试"
 	imageTooLargeMessage      = "图片过大，请压缩后重试"
+	contextTooLargeMessage    = "上下文过长，请压缩对话、减少历史或开启新会话后重试"
 )
 
 func sanitizedClientErrorStatus(outcome sdk.ForwardOutcome) int {
@@ -187,8 +188,12 @@ func writeClientErrorResponse(c *gin.Context, outcome sdk.ForwardOutcome) {
 
 func sanitizedClientErrorMessage(outcome sdk.ForwardOutcome) string {
 	message := extractErrorMessage(outcome.Upstream.Body)
+	code := extractErrorCode(outcome.Upstream.Body)
 	if message == "" {
 		message = outcome.Reason
+	}
+	if containsContextTooLargeSignal(code, message) {
+		return contextTooLargeMessage
 	}
 	if containsImageTooLargeSignal(message) || outcome.Upstream.StatusCode == http.StatusRequestEntityTooLarge {
 		return imageTooLargeMessage
@@ -197,6 +202,16 @@ func sanitizedClientErrorMessage(outcome sdk.ForwardOutcome) string {
 		return message
 	}
 	return defaultClientErrorMessage
+}
+
+func containsContextTooLargeSignal(parts ...string) bool {
+	msg := strings.ToLower(strings.Join(parts, " "))
+	return strings.Contains(msg, "context_too_large") ||
+		strings.Contains(msg, "context_length") ||
+		strings.Contains(msg, "context window") ||
+		strings.Contains(msg, "too many tokens") ||
+		strings.Contains(msg, "token limit") ||
+		strings.Contains(msg, "上下文过长")
 }
 
 func containsImageTooLargeSignal(message string) bool {
@@ -220,6 +235,24 @@ func extractErrorMessage(body []byte) string {
 	case map[string]any:
 		if msg, ok := e["message"].(string); ok {
 			return msg
+		}
+	}
+	return ""
+}
+
+func extractErrorCode(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	var payload struct {
+		Error any `json:"error"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return ""
+	}
+	if e, ok := payload.Error.(map[string]any); ok {
+		if code, ok := e["code"].(string); ok {
+			return code
 		}
 	}
 	return ""

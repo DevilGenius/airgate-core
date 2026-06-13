@@ -2,10 +2,26 @@ package plugin
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
+const (
+	continuationRecoveryBytesPerToken = 6
+	continuationRecoveryMinBodyBytes  = 512 << 10
+	continuationRecoveryMaxBodyBytes  = defaultGatewayBodyLimit
+	continuationRecoveryDefaultWindow = 272000
+)
+
+var errContinuationRecoveryContextTooLarge = errors.New("续链恢复完整上下文过长")
+
 func recoverContinuationAffinityMissing(state *forwardState) (bool, error) {
+	return recoverContinuationAffinityMissingWithManager(nil, state)
+}
+
+func recoverContinuationAffinityMissingWithManager(manager *Manager, state *forwardState) (bool, error) {
 	if state == nil || state.continuationRecoveryApplied {
 		return false, nil
 	}
@@ -19,6 +35,9 @@ func recoverContinuationAffinityMissing(state *forwardState) (bool, error) {
 	if !changed && strings.TrimSpace(state.previousResponseID) == "" {
 		return false, nil
 	}
+	if continuationRecoveryBodyTooLarge(manager, state, parsed, nextBody) {
+		return false, errContinuationRecoveryContextTooLarge
+	}
 
 	state.body = nextBody
 	state.previousResponseID = ""
@@ -28,6 +47,100 @@ func recoverContinuationAffinityMissing(state *forwardState) (bool, error) {
 		state.reasoningEffort = parsed.ReasoningEffort
 	}
 	return true, nil
+}
+
+func continuationRecoveryBodyTooLarge(manager *Manager, state *forwardState, parsed parsedRequest, body []byte) bool {
+	return len(body) > continuationRecoveryMaxBytes(manager, state, parsed)
+}
+
+func continuationRecoveryMaxBytes(manager *Manager, state *forwardState, parsed parsedRequest) int {
+	if parsed.HasCompactionReplay {
+		return continuationRecoveryMaxBodyBytes
+	}
+	contextWindow := continuationRecoveryContextWindow(manager, state, parsed)
+	limit := contextWindow * continuationRecoveryBytesPerToken
+	if limit < continuationRecoveryMinBodyBytes {
+		return continuationRecoveryMinBodyBytes
+	}
+	if limit > continuationRecoveryMaxBodyBytes {
+		return continuationRecoveryMaxBodyBytes
+	}
+	return limit
+}
+
+func continuationRecoveryContextWindow(manager *Manager, state *forwardState, parsed parsedRequest) int {
+	if manager != nil {
+		for _, platform := range continuationRecoveryPlatforms(state) {
+			models := manager.GetModels(platform)
+			if contextWindow := findContinuationModelContextWindow(models, continuationRecoveryModelCandidates(state, parsed)); contextWindow > 0 {
+				return contextWindow
+			}
+		}
+	}
+	return continuationRecoveryDefaultWindow
+}
+
+func continuationRecoveryPlatforms(state *forwardState) []string {
+	if state == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var platforms []string
+	add := func(platform string) {
+		platform = strings.TrimSpace(platform)
+		if platform == "" || seen[platform] {
+			return
+		}
+		seen[platform] = true
+		platforms = append(platforms, platform)
+	}
+	add(state.requestedPlatform)
+	add(state.selectedRoute.Platform)
+	if state.plugin != nil {
+		add(state.plugin.Platform)
+	}
+	return platforms
+}
+
+func continuationRecoveryModelCandidates(state *forwardState, parsed parsedRequest) []string {
+	seen := map[string]bool{}
+	var models []string
+	add := func(model string) {
+		model = strings.TrimSpace(model)
+		if model == "" || seen[model] {
+			return
+		}
+		seen[model] = true
+		models = append(models, model)
+	}
+	add(parsed.Model)
+	if state != nil {
+		add(state.schedulingModel)
+		for _, model := range state.schedulingModels {
+			add(model)
+		}
+		add(state.model)
+	}
+	return models
+}
+
+func findContinuationModelContextWindow(models []sdk.ModelInfo, candidates []string) int {
+	if len(models) == 0 || len(candidates) == 0 {
+		return 0
+	}
+	byID := make(map[string]int, len(models))
+	for _, model := range models {
+		id := strings.ToLower(strings.TrimSpace(model.ID))
+		if id != "" && model.ContextWindow > 0 {
+			byID[id] = model.ContextWindow
+		}
+	}
+	for _, candidate := range candidates {
+		if contextWindow := byID[strings.ToLower(strings.TrimSpace(candidate))]; contextWindow > 0 {
+			return contextWindow
+		}
+	}
+	return 0
 }
 
 func buildContinuationRecoveryBody(body []byte) ([]byte, parsedRequest, bool, error) {

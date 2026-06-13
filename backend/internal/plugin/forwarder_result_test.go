@@ -274,6 +274,23 @@ func TestSanitizedClientErrorMessage_ImageTooLarge(t *testing.T) {
 	}
 }
 
+func TestSanitizedClientErrorMessage_ContextTooLarge(t *testing.T) {
+	t.Parallel()
+
+	outcome := sdk.ForwardOutcome{
+		Kind: sdk.OutcomeClientError,
+		Upstream: sdk.UpstreamResponse{
+			StatusCode: http.StatusRequestEntityTooLarge,
+			Body:       []byte(`{"error":{"message":"HTTP 413 request entity too large","type":"invalid_request_error","code":"context_too_large"}}`),
+		},
+		Reason: "upstream request entity too large",
+	}
+
+	if got := sanitizedClientErrorMessage(outcome); got != contextTooLargeMessage {
+		t.Fatalf("message = %q, want %q", got, contextTooLargeMessage)
+	}
+}
+
 func TestSanitizedClientErrorMessage_UsesUpstreamMessage(t *testing.T) {
 	t.Parallel()
 

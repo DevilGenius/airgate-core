@@ -202,8 +202,15 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					)
 					return
 				}
-				if handled, recovered, recoverErr := recoverContinuationPickAccountError(state, err); handled {
+				if handled, recovered, recoverErr := f.recoverContinuationPickAccountError(state, err); handled {
 					if recoverErr != nil {
+						if failureSummary.recordContinuationRecoveryError(recoverErr) {
+							logger.Warn("continuation_recovery_rejected",
+								"action", "drop_previous_response_id_full_context",
+								sdk.LogFieldError, recoverErr,
+							)
+							break
+						}
 						logger.Warn("continuation_recovery_failed",
 							sdk.LogFieldError, recoverErr,
 						)
@@ -406,10 +413,22 @@ func canceledRequestStatus(err error) int {
 }
 
 func recoverContinuationPickAccountError(state *forwardState, err error) (handled bool, recovered bool, recoverErr error) {
+	return recoverContinuationPickAccountErrorWithManager(nil, state, err)
+}
+
+func (f *Forwarder) recoverContinuationPickAccountError(state *forwardState, err error) (handled bool, recovered bool, recoverErr error) {
+	var manager *Manager
+	if f != nil {
+		manager = f.manager
+	}
+	return recoverContinuationPickAccountErrorWithManager(manager, state, err)
+}
+
+func recoverContinuationPickAccountErrorWithManager(manager *Manager, state *forwardState, err error) (handled bool, recovered bool, recoverErr error) {
 	if !isRecoverableContinuationPickAccountError(err) {
 		return false, false, nil
 	}
-	recovered, recoverErr = recoverContinuationAffinityMissing(state)
+	recovered, recoverErr = recoverContinuationAffinityMissingWithManager(manager, state)
 	return true, recovered, recoverErr
 }
 
@@ -453,6 +472,7 @@ type allRoutesFailureSummary struct {
 	accountDeadSeen             bool
 	upstreamTimeoutSeen         bool
 	upstreamFailureSeen         bool
+	contextTooLargeSeen         bool
 }
 
 func (s *allRoutesFailureSummary) recordExecution(execution forwardExecution) {
@@ -502,6 +522,14 @@ func (s *allRoutesFailureSummary) recordLocalCapacityFailure() {
 	s.localCapacitySeen = true
 }
 
+func (s *allRoutesFailureSummary) recordContinuationRecoveryError(err error) bool {
+	if errors.Is(err, errContinuationRecoveryContextTooLarge) {
+		s.contextTooLargeSeen = true
+		return true
+	}
+	return false
+}
+
 type allRoutesFailureResponse struct {
 	status     int
 	errType    string
@@ -523,6 +551,14 @@ func writeAllRoutesFailedResponse(c *gin.Context, response allRoutesFailureRespo
 }
 
 func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFailureResponse {
+	if summary.contextTooLargeSeen {
+		return allRoutesFailureResponse{
+			status:  http.StatusRequestEntityTooLarge,
+			errType: "invalid_request_error",
+			code:    "context_too_large",
+			message: contextTooLargeMessage,
+		}
+	}
 	if summary.continuationAffinityMissing {
 		return allRoutesFailureResponse{
 			status:  http.StatusBadRequest,
@@ -698,6 +734,9 @@ func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution f
 		return false
 	}
 	if state.requireContinuationAffinity {
+		return false
+	}
+	if execution.outcome.Kind == sdk.OutcomeClientError {
 		return false
 	}
 	if execution.err != nil {
