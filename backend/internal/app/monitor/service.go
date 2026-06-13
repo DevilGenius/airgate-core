@@ -313,9 +313,9 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 	if observedAt.IsZero() {
 		observedAt = time.Now()
 	}
-	eventType := normalizeType(input.Type)
-	severity := normalizeSeverity(input.Severity)
 	subjectType := truncateString(defaultString(input.SubjectType, monitoring.SubjectSystem), maxSubjectTypeLength)
+	eventType := normalizeType(input.Type)
+	severity := normalizeEventSeverity(eventType, subjectType, input.Severity)
 	source := truncateString(defaultString(input.Source, monitoring.SourceMonitorWorker), maxSourceLength)
 	subjectID := inferSubjectID(input, subjectType)
 	detail := sanitizeDetail(input.Detail)
@@ -465,6 +465,14 @@ func normalizeSeverity(severity string) string {
 	default:
 		return monitoring.SeverityWarning
 	}
+}
+
+func normalizeEventSeverity(eventType string, subjectType string, severity string) string {
+	normalized := normalizeSeverity(severity)
+	if eventType == monitoring.TypeUpstreamAccountError && subjectType == monitoring.SubjectAccount {
+		return monitoring.SeverityWarning
+	}
+	return normalized
 }
 
 func normalizeRequestSeverity(severity string) string {

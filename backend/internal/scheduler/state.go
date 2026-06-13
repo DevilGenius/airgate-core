@@ -119,7 +119,7 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 				"until", until,
 				sdk.LogFieldReason, j.Reason,
 			)
-			sm.recordAccountStateEvent(ctx, accountID, account.StateRateLimited, &until, j.Reason, j)
+			sm.recordAccountStateEvent(ctx, accountID, nil, account.StateRateLimited, &until, j.Reason, j)
 			return
 		}
 		sm.transition(ctx, accountID, account.StateRateLimited, &until, j.Reason)
@@ -211,7 +211,7 @@ func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID i
 		"short_avoidance", !degraded,
 		sdk.LogFieldReason, j.Reason,
 	)
-	sm.recordAccountStateEvent(ctx, accountID, account.StateDegraded, &until, j.Reason, j)
+	sm.recordAccountStateEvent(ctx, accountID, existing, account.StateDegraded, &until, j.Reason, j)
 }
 
 func transientAvoidanceDelay(step int) (time.Duration, bool) {
@@ -386,7 +386,7 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 		"until", stateUntil,
 		sdk.LogFieldReason, reason,
 	)
-	sm.recordAccountStateEvent(ctx, accountID, newState, stateUntil, reason, Judgment{})
+	sm.recordAccountStateEvent(ctx, accountID, existing, newState, stateUntil, reason, Judgment{})
 
 	// Disabled 是关键转移：缓存里还挂着 active 的快照会让调度器反复选它、白白浪费 failover。
 	// RateLimited / Degraded 有 state_until，缓存 3s 陈旧期可接受。
@@ -395,18 +395,29 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 	}
 }
 
-func (sm *StateMachine) recordAccountStateEvent(ctx context.Context, accountID int, state account.State, stateUntil *time.Time, reason string, j Judgment) {
+func (sm *StateMachine) recordAccountStateEvent(ctx context.Context, accountID int, snapshot *ent.Account, state account.State, stateUntil *time.Time, reason string, j Judgment) {
 	if sm == nil || sm.monitor == nil || accountID <= 0 {
 		return
 	}
-	severity := monitoring.SeverityWarning
-	if state == account.StateDisabled {
-		severity = monitoring.SeverityCritical
+	if snapshot == nil {
+		snapshot = sm.loadAccountMonitorSnapshot(accountID)
 	}
 	errorCode := "account_" + string(state)
+	detail := map[string]interface{}{
+		"state":              string(state),
+		"reason":             reason,
+		"outcome_kind":       j.Kind.String(),
+		"duration_ms":        j.Duration.Milliseconds(),
+		"family":             j.Family,
+		"upstream_status":    j.UpstreamStatus,
+		"state_until":        timePtrRFC3339(stateUntil),
+		"is_pool":            j.IsPool,
+		"retry_after_ms":     j.RetryAfter.Milliseconds(),
+		"monitor_event_hint": "scheduler_account_state",
+	}
 	input := monitoring.EventInput{
 		Type:        monitoring.TypeUpstreamAccountError,
-		Severity:    severity,
+		Severity:    monitoring.SeverityWarning,
 		Source:      monitoring.SourceScheduler,
 		SubjectType: monitoring.SubjectAccount,
 		SubjectID:   strconv.Itoa(accountID),
@@ -414,23 +425,36 @@ func (sm *StateMachine) recordAccountStateEvent(ctx context.Context, accountID i
 		ErrorCode:   errorCode,
 		Title:       "Upstream account " + string(state),
 		Message:     reason,
-		Detail: map[string]interface{}{
-			"state":              string(state),
-			"reason":             reason,
-			"outcome_kind":       j.Kind.String(),
-			"duration_ms":        j.Duration.Milliseconds(),
-			"family":             j.Family,
-			"upstream_status":    j.UpstreamStatus,
-			"state_until":        timePtrRFC3339(stateUntil),
-			"is_pool":            j.IsPool,
-			"retry_after_ms":     j.RetryAfter.Milliseconds(),
-			"monitor_event_hint": "scheduler_account_state",
-		},
+		Detail:      detail,
+	}
+	if snapshot != nil {
+		input.AccountNameSnapshot = snapshot.Name
+		input.Platform = snapshot.Platform
+		if snapshot.Type != "" {
+			detail["account_type"] = snapshot.Type
+		}
 	}
 	if stateUntil != nil {
 		input.AutoResolveAt = stateUntil
 	}
 	sm.monitor.Record(ctx, input)
+}
+
+func (sm *StateMachine) loadAccountMonitorSnapshot(accountID int) *ent.Account {
+	if sm == nil || sm.db == nil || accountID <= 0 {
+		return nil
+	}
+	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+	snapshot, err := sm.db.Account.Get(dbCtx, accountID)
+	if err != nil {
+		slog.Debug("scheduler_account_monitor_snapshot_load_failed",
+			sdk.LogFieldAccountID, accountID,
+			sdk.LogFieldError, err,
+		)
+		return nil
+	}
+	return snapshot
 }
 
 func (sm *StateMachine) resolveAccountEvents(ctx context.Context, accountID int) {

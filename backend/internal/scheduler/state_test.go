@@ -9,6 +9,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/ent/migrate"
+	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
@@ -106,6 +107,38 @@ func TestStateMachineAccountDead401StillDisables(t *testing.T) {
 	}
 	if criticalTransitions != 1 {
 		t.Fatalf("critical transitions = %d, want 1", criticalTransitions)
+	}
+}
+
+func TestStateMachineAccountMonitorEventUsesSnapshotAndWarning(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_account_monitor_snapshot")
+	recorder := &captureMonitorRecorder{}
+	sm := NewStateMachine(db, nil)
+	sm.monitor = recorder
+	acc := createStateMachineAccount(ctx, db, "openai primary", false)
+
+	sm.Apply(ctx, acc.ID, Judgment{
+		Kind:           sdk.OutcomeAccountDead,
+		Reason:         "HTTP 401: invalid token",
+		UpstreamStatus: http.StatusUnauthorized,
+	})
+
+	if len(recorder.events) != 1 {
+		t.Fatalf("monitor events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.Severity != monitoring.SeverityWarning {
+		t.Fatalf("severity = %q, want warning", event.Severity)
+	}
+	if event.AccountNameSnapshot != "openai primary" {
+		t.Fatalf("account_name_snapshot = %q, want openai primary", event.AccountNameSnapshot)
+	}
+	if event.Platform != "openai" {
+		t.Fatalf("platform = %q, want openai", event.Platform)
+	}
+	if got := event.Detail["account_type"]; got != "oauth" {
+		t.Fatalf("account_type detail = %#v, want oauth", got)
 	}
 }
 
