@@ -312,6 +312,7 @@ func (s *Server) registerRoutes() {
 			s.dynamicRouter.Handle(c)
 			return
 		}
+		webfs.SetIndexHTMLCacheHeaders(c.Writer.Header())
 		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
 	})
 }

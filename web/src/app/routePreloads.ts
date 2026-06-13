@@ -1,5 +1,6 @@
 import { lazy } from 'react';
 import type { ComponentType, LazyExoticComponent } from 'react';
+import { recoverFromDynamicImportError } from '../shared/utils/dynamicImportRecovery';
 
 export type RoutePreloadModule<TProps = Record<string, never>> = {
   default: ComponentType<TProps>;
@@ -19,7 +20,11 @@ export function lazyWithPreload<TProps>(
 ): PreloadableLazyComponent<TProps> {
   let promise: Promise<RoutePreloadModule<TProps>> | undefined;
   const preload = () => {
-    promise ??= load();
+    promise ??= load().catch((error: unknown) => {
+      promise = undefined;
+      recoverFromDynamicImportError(error, 'route-preload');
+      throw error;
+    });
     return promise;
   };
   const Component = lazy(preload) as PreloadableLazyComponent<TProps>;

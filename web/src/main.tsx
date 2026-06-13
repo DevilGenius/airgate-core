@@ -15,6 +15,7 @@ import { ToastProvider, useToast } from './shared/ui';
 import { DialogTriggerShim } from './shared/components/DialogTriggerShim';
 import { isAuthExpiredError, onAuthExpired, setToken } from './shared/api/client';
 import { router } from './app/router';
+import { installDynamicImportRecovery } from './shared/utils/dynamicImportRecovery';
 import './i18n';
 
 // 将 React 暴露到全局，供插件前端模块通过 shim 引用
@@ -24,6 +25,8 @@ import './i18n';
   'react/jsx-runtime': ReactJSXRuntime,
   'react-i18next': ReactI18next,
 };
+
+installDynamicImportRecovery();
 
 // PluginAPIBridge 把 core 内的运行时能力暴露到 window.airgate，供插件前端调用。
 // 插件不能直接 useToast() —— 它们的 React 通过 shim 共享，但 ToastContext 只在

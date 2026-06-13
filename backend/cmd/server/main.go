@@ -109,11 +109,15 @@ func startSetupServer() {
 		os.Exit(1)
 	}
 	r.StaticFS("/assets", http.FS(assetsFS))
-	r.GET("/", func(c *gin.Context) {
+	serveIndexHTML := func(c *gin.Context) {
+		webfs.SetIndexHTMLCacheHeaders(c.Writer.Header())
 		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
+	}
+	r.GET("/", func(c *gin.Context) {
+		serveIndexHTML(c)
 	})
 	r.NoRoute(func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
+		serveIndexHTML(c)
 	})
 
 	host := config.GetHost()

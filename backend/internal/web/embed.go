@@ -17,6 +17,7 @@ import (
 	"embed"
 	"errors"
 	"io/fs"
+	"net/http"
 )
 
 //go:embed all:webdist
@@ -41,4 +42,13 @@ func FS() (fs.FS, error) {
 // gin 的 c.Data() 需要原始字节，c.FileFromFS() 与 http.FS 配合也行。
 func IndexHTML() ([]byte, error) {
 	return distFS.ReadFile("webdist/index.html")
+}
+
+// SetIndexHTMLCacheHeaders prevents SPA entry HTML from outliving hashed assets
+// across releases. Hashed /assets files can be cached separately by the static
+// file handler, but index.html must always be revalidated.
+func SetIndexHTMLCacheHeaders(header http.Header) {
+	header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	header.Set("Pragma", "no-cache")
+	header.Set("Expires", "0")
 }

@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Button } from '@heroui/react'
+import { recoverFromDynamicImportError } from '../../shared/utils/dynamicImportRecovery'
 
 interface Props {
   children: ReactNode
@@ -26,6 +27,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('[ErrorBoundary]', error, errorInfo)
+    recoverFromDynamicImportError(error, 'error-boundary')
   }
 
   render() {
