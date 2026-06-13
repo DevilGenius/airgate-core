@@ -300,6 +300,24 @@
   white-space: nowrap;
 }
 
+@media (hover: none), (pointer: coarse) {
+  .ag-account-type-cascade-row .ag-account-type-menu-item {
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  .ag-account-type-submenu-bridge {
+    display: none;
+  }
+
+  .ag-account-type-submenu {
+    top: calc(100% + 0.25rem);
+    left: 0;
+    width: max(100%, min(18rem, calc(100vw - 2rem)));
+    max-width: calc(100vw - 2rem);
+  }
+}
+
 .ag-accounts-table .ag-account-row-actions {
   height: 1.75rem;
   line-height: 1;

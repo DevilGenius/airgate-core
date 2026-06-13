@@ -7,6 +7,8 @@ import {
   type AccountTypeFilterOption,
 } from './AccountPageSupport';
 
+const OAUTH_SUBMENU_LONG_PRESS_MS = 450;
+
 type AccountTypeFilterSelectProps = {
   oauthPlanOptions: AccountTypeFilterOption[];
   onSelect: (value: string) => void;
@@ -27,14 +29,22 @@ export function AccountTypeFilterSelect({
   const [isOAuthPlanMenuOpen, setIsOAuthPlanMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const selectedOnPointerDownRef = useRef(false);
+  const oauthLongPressTimerRef = useRef<number | null>(null);
   const selectedNode: ReactNode = selectedOption
     ? renderAccountTypeFilterOption(selectedOption)
     : t('accounts.all_types', '全部类型');
 
+  const clearOAuthLongPressTimer = useCallback(() => {
+    if (oauthLongPressTimerRef.current === null || typeof window === 'undefined') return;
+    window.clearTimeout(oauthLongPressTimerRef.current);
+    oauthLongPressTimerRef.current = null;
+  }, []);
+
   const closeMenu = useCallback(() => {
+    clearOAuthLongPressTimer();
     setIsTypeMenuOpen(false);
     setIsOAuthPlanMenuOpen(false);
-  }, []);
+  }, [clearOAuthLongPressTimer]);
 
   const selectTypeFilter = useCallback((nextValue: string) => {
     onSelect(nextValue);
@@ -71,6 +81,21 @@ export function AccountTypeFilterSelect({
     selectTypeFilter(value);
   }, [selectTypeFilter]);
 
+  const handleOAuthPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+    selectedOnPointerDownRef.current = false;
+    if (event.button !== 0) return;
+    if (!event.pointerType || event.pointerType === 'mouse') {
+      handleItemPointerDown(event, 'oauth');
+      return;
+    }
+    clearOAuthLongPressTimer();
+    oauthLongPressTimerRef.current = window.setTimeout(() => {
+      oauthLongPressTimerRef.current = null;
+      selectedOnPointerDownRef.current = true;
+      setIsOAuthPlanMenuOpen(true);
+    }, OAUTH_SUBMENU_LONG_PRESS_MS);
+  }, [clearOAuthLongPressTimer, handleItemPointerDown]);
+
   const handleItemClick = useCallback((value: string) => {
     if (selectedOnPointerDownRef.current) {
       selectedOnPointerDownRef.current = false;
@@ -99,6 +124,8 @@ export function AccountTypeFilterSelect({
     };
   }, [closeMenu, isTypeMenuOpen]);
 
+  useEffect(() => () => clearOAuthLongPressTimer(), [clearOAuthLongPressTimer]);
+
   return (
     <div ref={menuRef} className="select select--full-width ag-account-type-select">
       <button
@@ -122,7 +149,9 @@ export function AccountTypeFilterSelect({
             type="button"
             role="menuitem"
             className="ag-account-type-menu-item"
-            onPointerEnter={() => setIsOAuthPlanMenuOpen(false)}
+            onPointerEnter={(event) => {
+              if (!event.pointerType || event.pointerType === 'mouse') setIsOAuthPlanMenuOpen(false);
+            }}
             onFocus={() => setIsOAuthPlanMenuOpen(false)}
             onClick={() => handleItemClick('')}
             onPointerDown={(event) => handleItemPointerDown(event, '')}
@@ -131,16 +160,24 @@ export function AccountTypeFilterSelect({
           </button>
           <div
             className="ag-account-type-cascade-row"
-            onPointerEnter={() => setIsOAuthPlanMenuOpen(true)}
-            onPointerLeave={() => setIsOAuthPlanMenuOpen(false)}
+            onPointerEnter={(event) => {
+              if (!event.pointerType || event.pointerType === 'mouse') setIsOAuthPlanMenuOpen(true);
+            }}
+            onPointerLeave={(event) => {
+              if (!event.pointerType || event.pointerType === 'mouse') setIsOAuthPlanMenuOpen(false);
+            }}
           >
             <button
               type="button"
               role="menuitem"
               className="ag-account-type-menu-item"
               onFocus={() => setIsOAuthPlanMenuOpen(true)}
+              onContextMenu={(event) => event.preventDefault()}
               onClick={() => handleItemClick('oauth')}
-              onPointerDown={(event) => handleItemPointerDown(event, 'oauth')}
+              onPointerCancel={clearOAuthLongPressTimer}
+              onPointerDown={handleOAuthPointerDown}
+              onPointerLeave={clearOAuthLongPressTimer}
+              onPointerUp={clearOAuthLongPressTimer}
             >
               <span className="truncate">OAuth</span>
               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
@@ -175,7 +212,9 @@ export function AccountTypeFilterSelect({
             type="button"
             role="menuitem"
             className="ag-account-type-menu-item"
-            onPointerEnter={() => setIsOAuthPlanMenuOpen(false)}
+            onPointerEnter={(event) => {
+              if (!event.pointerType || event.pointerType === 'mouse') setIsOAuthPlanMenuOpen(false);
+            }}
             onFocus={() => setIsOAuthPlanMenuOpen(false)}
             onClick={() => handleItemClick('apikey')}
             onPointerDown={(event) => handleItemPointerDown(event, 'apikey')}
