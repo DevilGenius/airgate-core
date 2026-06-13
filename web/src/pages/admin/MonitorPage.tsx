@@ -150,15 +150,17 @@ function monitorSubject(event: MonitorEventResp): string {
 }
 
 function monitorSubjectContext(event: MonitorEventResp): string {
-  return [event.subject_type, event.platform].filter(Boolean).join(' · ');
+  return [event.subject_type, event.platform].filter(Boolean).join(' › ');
 }
 
 function monitorLocatorContext(event: MonitorEventResp): string {
-  return [event.source, event.plugin_id].filter(Boolean).join(' · ');
+  return [event.source, event.plugin_id].filter(Boolean).join(' › ');
 }
 
 function monitorRequestSubject(event: MonitorRequestEventResp): string {
-  return namedIDLabel(event.api_key_name_snapshot, event.api_key_id)
+  const userLabel = event.user_email_snapshot || namedIDLabel(undefined, event.user_id);
+  const apiKeyLabel = namedIDLabel(event.api_key_name_snapshot, event.api_key_id);
+  return [apiKeyLabel, userLabel].filter(Boolean).join(' › ')
     || monitorAccountLabel(event)
     || monitorGroupLabel(event)
     || event.plugin_id
@@ -169,17 +171,26 @@ function monitorRequestSubject(event: MonitorRequestEventResp): string {
 function monitorRequestSubjectContext(event: MonitorRequestEventResp): string {
   return [
     monitorGroupLabel(event),
-    event.user_email_snapshot || namedIDLabel(undefined, event.user_id),
     event.platform,
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean).join(' › ');
 }
 
 function requestEndpointLabel(event: MonitorRequestEventResp): string {
   return [event.method, event.endpoint].filter(Boolean).join(' ') || event.source || '-';
 }
 
+function RequestEndpointPrimary({ event }: { event: MonitorRequestEventResp }) {
+  if (!event.method) return <>{event.endpoint || event.source || '-'}</>;
+  return (
+    <>
+      <span className="font-semibold text-emerald-600 dark:text-emerald-400">{event.method}</span>
+      {event.endpoint ? <span className="text-text-secondary"> {event.endpoint}</span> : null}
+    </>
+  );
+}
+
 function requestEndpointContext(event: MonitorRequestEventResp): string {
-  return [event.model, event.plugin_id].filter(Boolean).join(' · ');
+  return [event.model, event.plugin_id].filter(Boolean).join(' › ');
 }
 
 function requestStatusLabel(event: MonitorRequestEventResp): string {
@@ -236,7 +247,22 @@ function appendDetail(entries: DetailEntry[], key: string, value?: string | numb
 }
 
 function detailText(entries: DetailEntry[]): string {
-  return entries.map((entry) => `${entry.key}=${entry.value}`).join(' · ');
+  return entries.map((entry) => `${entry.key}=${entry.value}`).join(' › ');
+}
+
+function detailJsonText(entries: DetailEntry[]): string {
+  const detail: Record<string, string | string[]> = {};
+  for (const entry of entries) {
+    const existing = detail[entry.key];
+    if (existing === undefined) {
+      detail[entry.key] = entry.value;
+    } else if (Array.isArray(existing)) {
+      existing.push(entry.value);
+    } else {
+      detail[entry.key] = [existing, entry.value];
+    }
+  }
+  return JSON.stringify(detail, null, 2);
 }
 
 function monitorDetailEntries(event: MonitorEventResp): DetailEntry[] {
@@ -332,7 +358,7 @@ function DetailCell({ entries }: { entries: DetailEntry[] }) {
   if (entries.length === 0) {
     return <span className="block w-full truncate text-left text-[13px] leading-none text-text-tertiary">-</span>;
   }
-  const title = detailText(entries);
+  const title = detailJsonText(entries);
   const primary = detailText(entries.slice(0, 2));
   const secondary = detailText(entries.slice(2));
   return (
@@ -850,7 +876,7 @@ export default function MonitorPage() {
       render: (row) => (
         <StackCell
           mono
-          primary={requestEndpointLabel(row)}
+          primary={<RequestEndpointPrimary event={row} />}
           primaryClass="text-text-secondary"
           primaryTitle={requestEndpointLabel(row)}
           secondary={requestEndpointContext(row) || undefined}

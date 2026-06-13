@@ -64,6 +64,44 @@ func TestResolveTrendTimeRangeCustomIncludesEndDate(t *testing.T) {
 	}
 }
 
+func TestResolveTrendTimeRangePresetUsesNaturalDayWindow(t *testing.T) {
+	now := time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name      string
+		rangeName string
+		wantStart time.Time
+	}{
+		{
+			name:      "seven days",
+			rangeName: "7d",
+			wantStart: time.Date(2026, 4, 2, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "thirty days",
+			rangeName: "30d",
+			wantStart: time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "ninety days",
+			rangeName: "90d",
+			wantStart: time.Date(2026, 1, 9, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			start, end := resolveTrendTimeRange(TrendQuery{Range: tt.rangeName}, now)
+			if !start.Equal(tt.wantStart) {
+				t.Fatalf("start = %v, want %v", start, tt.wantStart)
+			}
+			if !end.Equal(now) {
+				t.Fatalf("end = %v, want %v", end, now)
+			}
+		})
+	}
+}
+
 func TestTrendCacheKeyBucketsMovingEndTime(t *testing.T) {
 	query := TrendQuery{Range: "today", Granularity: "hour", UserID: 7}
 	start := time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC)

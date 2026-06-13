@@ -276,11 +276,11 @@ func resolveTrendTimeRange(query TrendQuery, now time.Time) (time.Time, time.Tim
 	case "today":
 		return timezone.StartOfDay(now), endTime
 	case "7d":
-		return timezone.StartOfDay(now.AddDate(0, 0, -7)), endTime
+		return timezone.StartOfDay(now.AddDate(0, 0, -6)), endTime
 	case "30d":
-		return timezone.StartOfDay(now.AddDate(0, 0, -30)), endTime
+		return timezone.StartOfDay(now.AddDate(0, 0, -29)), endTime
 	case "90d":
-		return timezone.StartOfDay(now.AddDate(0, 0, -90)), endTime
+		return timezone.StartOfDay(now.AddDate(0, 0, -89)), endTime
 	case "custom":
 		startTime := timezone.StartOfDay(now.AddDate(0, 0, -30))
 		if query.StartDate != "" {

@@ -39,6 +39,9 @@ const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input',
 const TOKEN_TREND_RATIO_KEYS = new Set<keyof typeof USAGE_TOKEN_COLORS>(['cacheRatio', 'cacheCumulativeRatio']);
 const DASHBOARD_TOKEN_TREND_INITIAL_DIMENSION = { width: 600, height: 248 };
 const DASHBOARD_TOP_USERS_INITIAL_DIMENSION = { width: 1200, height: 268 };
+const DASHBOARD_TOKEN_Y_AXIS_WIDTH = 56;
+const DASHBOARD_RATIO_Y_AXIS_WIDTH = 36;
+const DASHBOARD_TIME_AXIS_HEIGHT = 40;
 
 type RangePreset = 'today' | '7d' | '30d' | '90d';
 type Granularity = 'hour' | 'day';
@@ -102,14 +105,66 @@ function fmtDurationMs(ms: number | undefined | null): string {
   return `${seconds.toFixed(seconds >= 10 ? 1 : 2)}s`;
 }
 
-function fmtTime(timeStr: string): string {
-  if (timeStr.includes(' ')) {
-    const time = timeStr.split(' ')[1] ?? '';
-    return time.slice(0, 5) || timeStr;
+type DashboardTimeLabel = {
+  primary: string;
+  secondary?: string;
+  tooltip: string;
+};
+
+function formatDashboardTime(timeStr: string): DashboardTimeLabel {
+  const [datePart, hourPart] = timeStr.split(' ');
+  const dateParts = datePart?.split('-') ?? [];
+  const compactDate = dateParts.length === 3 ? `${dateParts[1]}/${dateParts[2]}` : datePart;
+  if (hourPart) {
+    const hour = hourPart.slice(0, 5) || hourPart;
+    return {
+      primary: compactDate || timeStr,
+      secondary: hour,
+      tooltip: compactDate ? `${compactDate} ${hour}` : timeStr,
+    };
   }
-  const parts = timeStr.split('-');
-  if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
-  return timeStr;
+  return {
+    primary: compactDate || timeStr,
+    tooltip: compactDate || timeStr,
+  };
+}
+
+function dashboardTooltipLabel(label: string | undefined, payload?: Array<{ payload?: unknown }>) {
+  const datum = payload?.[0]?.payload;
+  const timeLabel = datum && typeof datum === 'object' && 'timeLabel' in datum
+    ? (datum as { timeLabel?: unknown }).timeLabel
+    : undefined;
+  if (timeLabel && typeof timeLabel === 'object' && 'tooltip' in timeLabel) {
+    return String((timeLabel as DashboardTimeLabel).tooltip);
+  }
+  return label ?? '';
+}
+
+function DashboardTimeAxisTick({
+  x = 0,
+  y = 0,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string | number };
+}) {
+  const label = formatDashboardTime(String(payload?.value ?? ''));
+  if (label.secondary) {
+    return (
+      <g transform={`translate(${x},${y + 8})`}>
+        <text fill="var(--ag-text)" fontSize={10} textAnchor="middle">
+          <tspan x={0} dy={0}>{label.primary}</tspan>
+          <tspan x={0} dy={13}>{label.secondary}</tspan>
+        </text>
+      </g>
+    );
+  }
+  return (
+    <g transform={`translate(${x},${y + 10})`}>
+      <text fill="var(--ag-text)" fontSize={11} textAnchor="middle">{label.primary}</text>
+    </g>
+  );
 }
 
 function DashboardCard({
@@ -285,9 +340,10 @@ function ChartTooltip({
   payload?: Array<{ color?: string; dataKey?: string; name?: string; payload?: Record<string, unknown>; value?: number }>;
 }) {
   if (!active || !payload?.length) return null;
+  const title = dashboardTooltipLabel(label, payload);
   return (
     <div className="rounded-[var(--radius)] border border-border bg-surface px-3 py-2 text-xs text-text shadow-lg">
-      <div className="mb-1 font-medium">{label}</div>
+      <div className="mb-1 font-medium">{title}</div>
       <div className="space-y-1">
         {payload.map((item) => (
           <div key={`${item.dataKey}-${item.name}`} className="flex items-center gap-2">
@@ -308,11 +364,12 @@ function TokenTrendTooltip({
 }: {
   active?: boolean;
   label?: string;
-  payload?: Array<{ color?: string; dataKey?: string; payload?: { actualCost?: number; standardCost?: number }; value?: number }>;
+  payload?: Array<{ color?: string; dataKey?: string; payload?: { actualCost?: number; standardCost?: number; timeLabel?: DashboardTimeLabel }; value?: number }>;
 }) {
   const { t } = useTranslation();
   if (!active || !payload?.length) return null;
   const datum = payload[0]?.payload;
+  const title = dashboardTooltipLabel(label, payload);
   const labels: Record<string, string> = {
     input: t('dashboard.input'),
     output: t('dashboard.output'),
@@ -329,7 +386,7 @@ function TokenTrendTooltip({
 
   return (
     <div className="rounded-[var(--radius)] border border-border bg-surface px-3 py-2 text-xs text-text shadow-lg">
-      <div className="mb-1 font-medium">{label}</div>
+      <div className="mb-1 font-medium">{title}</div>
       <div className="space-y-1">
         {orderedPayload.map((item) => (
           <div key={item.dataKey} className="flex items-center gap-2">
@@ -507,7 +564,8 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
         input: item.input_tokens,
         output: item.output_tokens,
         standardCost: item.standard_cost,
-        time: fmtTime(item.time),
+        time: item.time,
+        timeLabel: formatDashboardTime(item.time),
       };
     });
   }, [trend]);
@@ -518,10 +576,26 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
         <div className="flex h-[248px] w-full min-w-0 flex-col 2xl:h-[288px]">
           <div className="min-h-0 flex-1">
             <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={DASHBOARD_TOKEN_TREND_INITIAL_DIMENSION}>
-              <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
+              <LineChart data={chartData} margin={{ bottom: 8, left: 0, right: 4, top: 4 }}>
                 <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-                <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
-                <YAxis yAxisId="tokens" axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
+                <XAxis
+                  axisLine={false}
+                  dataKey="time"
+                  height={DASHBOARD_TIME_AXIS_HEIGHT}
+                  minTickGap={18}
+                  tick={<DashboardTimeAxisTick />}
+                  tickLine={false}
+                />
+                <YAxis
+                  yAxisId="tokens"
+                  allowDecimals={false}
+                  axisLine={false}
+                  domain={[0, 'dataMax']}
+                  tick={{ fill: 'var(--ag-text)', fontSize: 11 }}
+                  tickFormatter={fmtNum}
+                  tickLine={false}
+                  width={DASHBOARD_TOKEN_Y_AXIS_WIDTH}
+                />
                 <YAxis
                   yAxisId="ratio"
                   axisLine={false}
@@ -530,7 +604,7 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
                   tick={{ fill: 'var(--ag-text)', fontSize: 11 }}
                   tickFormatter={(value: number) => `${Math.round(value)}%`}
                   tickLine={false}
-                  width={32}
+                  width={DASHBOARD_RATIO_Y_AXIS_WIDTH}
                 />
                 <RechartsTooltip content={<TokenTrendTooltip />} />
                 <Line yAxisId="tokens" dataKey="input" dot={false} isAnimationActive={false} name={lineLabels.input} stroke={USAGE_TOKEN_COLORS.input} strokeWidth={2.5} type="monotone" />
@@ -568,22 +642,38 @@ function TokenTrendLegend({ lineLabels }: { lineLabels: Record<string, string> }
   );
 }
 
+function topUserSeriesKey(userId: number, index: number) {
+  return userId > 0 ? `user_${userId}` : `user_index_${index}`;
+}
+
 function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
   const { t } = useTranslation();
   const topUsers = trend.top_users ?? [];
+  const userSeries = useMemo(
+    () => topUsers.map((user, index) => ({
+      color: getUserTrendColor(index),
+      id: user.user_id,
+      key: topUserSeriesKey(user.user_id, index),
+      label: user.email,
+    })),
+    [topUsers],
+  );
   const chartData = useMemo(() => {
     if (topUsers.length === 0) return [];
     const timeSet = new Set<string>();
     topUsers.forEach((user) => user.trend.forEach((point) => timeSet.add(point.time)));
     const trendByUser = topUsers.map((user) => new Map(user.trend.map((point) => [point.time, point.tokens])));
     return Array.from(timeSet).sort().map((time) => {
-      const row: Record<string, number | string> = { time: fmtTime(time) };
-      topUsers.forEach((user, index) => {
-        row[user.email] = trendByUser[index]?.get(time) ?? 0;
+      const row: Record<string, DashboardTimeLabel | number | string> = {
+        time,
+        timeLabel: formatDashboardTime(time),
+      };
+      userSeries.forEach((series, index) => {
+        row[series.key] = trendByUser[index]?.get(time) ?? 0;
       });
       return row;
     });
-  }, [topUsers]);
+  }, [topUsers, userSeries]);
 
   return (
     <DashboardCard title={t('dashboard.top_users')}>
@@ -591,18 +681,33 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
         <div className="flex h-[268px] w-full min-w-0 flex-col 2xl:h-[320px]">
           <div className="min-h-0 flex-1">
             <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={DASHBOARD_TOP_USERS_INITIAL_DIMENSION}>
-              <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 8, top: 4 }}>
+              <LineChart data={chartData} margin={{ bottom: 8, left: 0, right: 8, top: 4 }}>
                 <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-                <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
-                <YAxis axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
+                <XAxis
+                  axisLine={false}
+                  dataKey="time"
+                  height={DASHBOARD_TIME_AXIS_HEIGHT}
+                  minTickGap={18}
+                  tick={<DashboardTimeAxisTick />}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  axisLine={false}
+                  domain={[0, 'dataMax']}
+                  tick={{ fill: 'var(--ag-text)', fontSize: 11 }}
+                  tickFormatter={fmtNum}
+                  tickLine={false}
+                  width={DASHBOARD_TOKEN_Y_AXIS_WIDTH}
+                />
                 <RechartsTooltip content={<ChartTooltip />} />
-                {topUsers.map((user, index) => (
-                  <Line key={user.user_id} dataKey={user.email} dot={false} isAnimationActive={false} stroke={getUserTrendColor(index)} strokeWidth={2.5} type="monotone" />
+                {userSeries.map((user) => (
+                  <Line key={user.key} dataKey={user.key} dot={false} isAnimationActive={false} name={user.label} stroke={user.color} strokeWidth={2.5} type="monotone" />
                 ))}
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <TopUsersLegend users={topUsers.map((user, index) => ({ color: getUserTrendColor(index), id: user.user_id, label: user.email }))} />
+          <TopUsersLegend users={userSeries} />
         </div>
       ) : (
         <div className="flex h-[268px] items-center justify-center text-sm text-text 2xl:h-[320px]">{t('common.no_data')}</div>
