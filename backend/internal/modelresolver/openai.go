@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/DevilGenius/airgate-core/internal/forwardpath"
 )
 
 const openAIPlatform = "openai"
@@ -33,7 +35,7 @@ func isResponsesCompactForwardPath(path string) bool {
 	if !strings.Contains(path, "compact") && !strings.Contains(path, "Compact") && !strings.Contains(path, "COMPACT") {
 		return false
 	}
-	path = normalizeForwardPath(path)
+	path = forwardpath.Normalize(path)
 	return path == "/v1/responses/compact" || path == "/responses/compact"
 }
 
@@ -48,26 +50,6 @@ func isAnthropicMessagesForwardPath(path string) bool {
 		path = path[:idx]
 	}
 	return pathHasAPIPrefix(path, "/v1/messages") || pathHasAPIPrefix(path, "/messages")
-}
-
-func normalizeForwardPath(path string) string {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return ""
-	}
-	if u, err := url.Parse(path); err == nil && u != nil {
-		path = u.Path
-	} else if idx := strings.IndexByte(path, '?'); idx >= 0 {
-		path = path[:idx]
-	}
-	path = strings.TrimRight(strings.ToLower(strings.TrimSpace(path)), "/")
-	if path == "" {
-		return "/"
-	}
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	return path
 }
 
 func pathHasAPIPrefix(path, prefix string) bool {

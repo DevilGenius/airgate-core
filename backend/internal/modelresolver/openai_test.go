@@ -130,6 +130,12 @@ func TestResolveSchedulingModelsForOpenAIResponsesCompact(t *testing.T) {
 			model: "gpt-5.5-openai-compact",
 			want:  []string{"gpt-5.5-openai-compact"},
 		},
+		{
+			name:  "compact substring in another route is not treated as compact endpoint",
+			path:  "/v1/something-compact-else",
+			model: "gpt-5.5-openai-compact",
+			want:  []string{"gpt-5.5-openai-compact"},
+		},
 	}
 
 	for _, tt := range tests {

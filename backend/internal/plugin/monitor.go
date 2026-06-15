@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/forwardpath"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
@@ -55,7 +56,7 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 		GroupID:            &groupID,
 		Platform:           platform,
 		Method:             method,
-		Endpoint:           normalizeForwardPath(path),
+		Endpoint:           forwardpath.Normalize(path),
 		RequestPath:        path,
 		Model:              model,
 		HTTPStatus:         intPtr(status),
@@ -180,7 +181,7 @@ func (f *Forwarder) recordPluginRouteError(c *gin.Context, keyInfo *auth.APIKeyI
 		RequestID:   middleware.RequestIDFromGinContext(c),
 		Platform:    platform,
 		Method:      method,
-		Endpoint:    normalizeForwardPath(path),
+		Endpoint:    forwardpath.Normalize(path),
 		RequestPath: path,
 		HTTPStatus:  intPtr(http.StatusServiceUnavailable),
 		ErrorCode:   code,
@@ -226,7 +227,7 @@ func (f *Forwarder) recordPluginExecutionError(ctx context.Context, state *forwa
 		Platform:       platform,
 		PluginID:       pluginID,
 		Method:         "POST",
-		Endpoint:       normalizeForwardPath(state.requestPath),
+		Endpoint:       forwardpath.Normalize(state.requestPath),
 		RequestPath:    state.requestPath,
 		Model:          state.model,
 		UpstreamStatus: intPtr(execution.outcome.Upstream.StatusCode),
@@ -265,7 +266,7 @@ func (f *Forwarder) recordClientRequestError(c *gin.Context, state *forwardState
 		RequestID:      middleware.RequestIDFromGinContext(c),
 		Platform:       state.requestedPlatform,
 		Method:         requestMethod(c, "POST"),
-		Endpoint:       normalizeForwardPath(state.requestPath),
+		Endpoint:       forwardpath.Normalize(state.requestPath),
 		RequestPath:    state.requestPath,
 		Model:          state.model,
 		HTTPStatus:     intPtr(status),
@@ -311,7 +312,7 @@ func (f *Forwarder) recordClientClosedRequest(c *gin.Context, state *forwardStat
 		RequestID:   middleware.RequestIDFromGinContext(c),
 		Platform:    state.requestedPlatform,
 		Method:      requestMethod(c, "POST"),
-		Endpoint:    normalizeForwardPath(state.requestPath),
+		Endpoint:    forwardpath.Normalize(state.requestPath),
 		RequestPath: state.requestPath,
 		Model:       state.model,
 		HTTPStatus:  intPtr(status),

@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/DevilGenius/airgate-core/internal/forwardpath"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
@@ -50,7 +51,7 @@ func isMetadataOnlyPath(path string) bool {
 		!strings.Contains(path, "MODELS") && !strings.Contains(path, "IMAGES/TASKS") {
 		return false
 	}
-	switch normalizeForwardPath(path) {
+	switch forwardpath.Normalize(path) {
 	case "/v1/models", "/models",
 		"/v1/images/tasks", "/images/tasks",
 		"/v1/images/tasks/list", "/images/tasks/list":

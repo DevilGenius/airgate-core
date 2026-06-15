@@ -10,7 +10,6 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/forwardpath"
 	"github.com/DevilGenius/airgate-core/internal/modelresolver"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
@@ -501,36 +501,13 @@ func isImageSubmitAPIPath(path string) bool {
 	if !strings.Contains(path, "images") && !strings.Contains(path, "Images") && !strings.Contains(path, "IMAGES") {
 		return false
 	}
-	switch normalizeForwardPath(path) {
+	switch forwardpath.Normalize(path) {
 	case "/v1/images/generations", "/images/generations",
 		"/v1/images/edits", "/images/edits":
 		return true
 	default:
 		return false
 	}
-}
-
-func normalizeForwardPath(path string) string {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return ""
-	}
-	if idx := strings.IndexByte(path, '?'); idx >= 0 {
-		path = path[:idx]
-	}
-	if strings.Contains(path, "://") {
-		if u, err := url.Parse(path); err == nil && u != nil && u.Path != "" {
-			path = u.Path
-		}
-	}
-	path = strings.TrimRight(strings.ToLower(strings.TrimSpace(path)), "/")
-	if path == "" {
-		return "/"
-	}
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	return path
 }
 
 func isImageModel(model string) bool {
