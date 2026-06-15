@@ -15,10 +15,26 @@ func init() {
 }
 
 func (openAIResolver) ResolveSchedulingModels(path, clientModel string) []string {
+	if isResponsesCompactForwardPath(path) {
+		return compactUniqueModels(openAICompactSchedulingModel(clientModel))
+	}
 	if !isAnthropicMessagesForwardPath(path) {
 		return compactUniqueModels(clientModel)
 	}
 	return openAIAnthropicSchedulingModels(clientModel)
+}
+
+func isResponsesCompactForwardPath(path string) bool {
+	path = strings.TrimSpace(path)
+	switch path {
+	case "/v1/responses/compact", "/responses/compact":
+		return true
+	}
+	if !strings.Contains(path, "compact") && !strings.Contains(path, "Compact") && !strings.Contains(path, "COMPACT") {
+		return false
+	}
+	path = normalizeForwardPath(path)
+	return path == "/v1/responses/compact" || path == "/responses/compact"
 }
 
 func isAnthropicMessagesForwardPath(path string) bool {
@@ -34,12 +50,54 @@ func isAnthropicMessagesForwardPath(path string) bool {
 	return pathHasAPIPrefix(path, "/v1/messages") || pathHasAPIPrefix(path, "/messages")
 }
 
+func normalizeForwardPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	if u, err := url.Parse(path); err == nil && u != nil {
+		path = u.Path
+	} else if idx := strings.IndexByte(path, '?'); idx >= 0 {
+		path = path[:idx]
+	}
+	path = strings.TrimRight(strings.ToLower(strings.TrimSpace(path)), "/")
+	if path == "" {
+		return "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return path
+}
+
 func pathHasAPIPrefix(path, prefix string) bool {
 	if !strings.HasPrefix(path, prefix) {
 		return false
 	}
 	rest := path[len(prefix):]
 	return rest == "" || rest[0] == '/'
+}
+
+func openAICompactSchedulingModel(clientModel string) string {
+	model := strings.TrimSpace(clientModel)
+	base, ok := openAICompactBaseModel(model)
+	if ok {
+		return base
+	}
+	return model
+}
+
+func openAICompactBaseModel(model string) (string, bool) {
+	const suffix = "-openai-compact"
+	model = strings.TrimSpace(model)
+	if model == "" || !strings.HasSuffix(strings.ToLower(model), suffix) {
+		return "", false
+	}
+	base := strings.TrimSpace(model[:len(model)-len(suffix)])
+	if base == "" {
+		return "", false
+	}
+	return base, true
 }
 
 func openAIAnthropicSchedulingModels(clientModel string) []string {

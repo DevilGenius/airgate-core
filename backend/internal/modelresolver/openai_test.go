@@ -105,6 +105,44 @@ func TestResolveSchedulingModelsIgnoreNonAnthropicRoutes(t *testing.T) {
 	}
 }
 
+func TestResolveSchedulingModelsForOpenAIResponsesCompact(t *testing.T) {
+	tests := []struct {
+		name  string
+		path  string
+		model string
+		want  []string
+	}{
+		{
+			name:  "compact alias maps to base scheduling model",
+			path:  "/v1/responses/compact",
+			model: "gpt-5.5-openai-compact",
+			want:  []string{"gpt-5.5"},
+		},
+		{
+			name:  "base model stays base on compact path",
+			path:  "/responses/compact?debug=1",
+			model: "gpt-5.5",
+			want:  []string{"gpt-5.5"},
+		},
+		{
+			name:  "compact alias is not stripped on normal responses path",
+			path:  "/v1/responses",
+			model: "gpt-5.5-openai-compact",
+			want:  []string{"gpt-5.5-openai-compact"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			got := ResolveSchedulingModels("openai", tt.path, tt.model)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("ResolveSchedulingModels() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
 func clearSchedulingModelEnv(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{
