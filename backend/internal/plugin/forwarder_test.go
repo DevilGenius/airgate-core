@@ -454,6 +454,28 @@ func TestParseRequestRejectsImageSubmitWithoutModelBeforeScheduling(t *testing.T
 	}
 }
 
+func TestParseRequestRejectsForwardRequestWithoutModelBeforeScheduling(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"messages":[]}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set(middleware.CtxKeyKeyInfo, &auth.APIKeyInfo{UserID: 11, KeyID: 22, GroupPlatform: "openai"})
+
+	state, ok := (&Forwarder{}).parseRequest(c)
+	if ok {
+		t.Fatalf("parseRequest ok = true, want false with state %#v", state)
+	}
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"code":"invalid_request"`) || !strings.Contains(body, "model is required") {
+		t.Fatalf("body = %s, want invalid_request model error", body)
+	}
+}
+
 func TestCanceledRequestStatus(t *testing.T) {
 	t.Parallel()
 

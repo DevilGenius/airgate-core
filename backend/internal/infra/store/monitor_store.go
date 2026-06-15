@@ -290,39 +290,7 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 	activeBase := base.Clone().
 		Where(entmonitorevent.StatusEQ(entmonitorevent.StatusActive))
 
-	activeTotal, err := activeBase.Clone().Count(ctx)
-	if err != nil {
-		return appmonitor.Summary{}, err
-	}
-	criticalTotal, err := base.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityCritical)).Count(ctx)
-	if err != nil {
-		return appmonitor.Summary{}, err
-	}
-	criticalActiveTotal, err := activeBase.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityCritical)).Count(ctx)
-	if err != nil {
-		return appmonitor.Summary{}, err
-	}
-	errorTotal, err := base.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityError)).Count(ctx)
-	if err != nil {
-		return appmonitor.Summary{}, err
-	}
-	errorActiveTotal, err := activeBase.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityError)).Count(ctx)
-	if err != nil {
-		return appmonitor.Summary{}, err
-	}
-	warningTotal, err := base.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityWarning)).Count(ctx)
-	if err != nil {
-		return appmonitor.Summary{}, err
-	}
-	warningActiveTotal, err := activeBase.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityWarning)).Count(ctx)
-	if err != nil {
-		return appmonitor.Summary{}, err
-	}
-	infoTotal, err := base.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityInfo)).Count(ctx)
-	if err != nil {
-		return appmonitor.Summary{}, err
-	}
-	infoActiveTotal, err := activeBase.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityInfo)).Count(ctx)
+	severityCounts, err := s.summarySeverityCounts(ctx, base.Clone())
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
@@ -347,19 +315,64 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 	}
 
 	return appmonitor.Summary{
-		ActiveTotal:         int64(activeTotal),
-		CriticalTotal:       int64(criticalTotal),
-		CriticalActiveTotal: int64(criticalActiveTotal),
-		ErrorTotal:          int64(errorTotal),
-		ErrorActiveTotal:    int64(errorActiveTotal),
-		WarningTotal:        int64(warningTotal),
-		WarningActiveTotal:  int64(warningActiveTotal),
-		InfoTotal:           int64(infoTotal),
-		InfoActiveTotal:     int64(infoActiveTotal),
+		ActiveTotal:         severityCounts.ActiveTotal,
+		CriticalTotal:       severityCounts.CriticalTotal,
+		CriticalActiveTotal: severityCounts.CriticalActiveTotal,
+		ErrorTotal:          severityCounts.ErrorTotal,
+		ErrorActiveTotal:    severityCounts.ErrorActiveTotal,
+		WarningTotal:        severityCounts.WarningTotal,
+		WarningActiveTotal:  severityCounts.WarningActiveTotal,
+		InfoTotal:           severityCounts.InfoTotal,
+		InfoActiveTotal:     severityCounts.InfoActiveTotal,
 		ByType:              byType,
 		TopAccounts:         topAccounts,
 		Recent:              recent,
 	}, nil
+}
+
+func (s *MonitorStore) summarySeverityCounts(ctx context.Context, query *ent.MonitorEventQuery) (appmonitor.Summary, error) {
+	var rows []struct {
+		Severity string `json:"severity"`
+		Status   string `json:"status"`
+		Count    int    `json:"count"`
+	}
+	err := query.GroupBy(entmonitorevent.FieldSeverity, entmonitorevent.FieldStatus).
+		Aggregate(ent.Count()).
+		Scan(ctx, &rows)
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
+
+	var out appmonitor.Summary
+	for _, row := range rows {
+		count := int64(row.Count)
+		switch row.Severity {
+		case string(entmonitorevent.SeverityCritical):
+			out.CriticalTotal += count
+			if row.Status == string(entmonitorevent.StatusActive) {
+				out.CriticalActiveTotal += count
+			}
+		case string(entmonitorevent.SeverityError):
+			out.ErrorTotal += count
+			if row.Status == string(entmonitorevent.StatusActive) {
+				out.ErrorActiveTotal += count
+			}
+		case string(entmonitorevent.SeverityWarning):
+			out.WarningTotal += count
+			if row.Status == string(entmonitorevent.StatusActive) {
+				out.WarningActiveTotal += count
+			}
+		case string(entmonitorevent.SeverityInfo):
+			out.InfoTotal += count
+			if row.Status == string(entmonitorevent.StatusActive) {
+				out.InfoActiveTotal += count
+			}
+		}
+		if row.Status == string(entmonitorevent.StatusActive) {
+			out.ActiveTotal += count
+		}
+	}
+	return out, nil
 }
 
 func (s *MonitorStore) summaryByType(ctx context.Context, query *ent.MonitorEventQuery) ([]appmonitor.TypeCount, error) {

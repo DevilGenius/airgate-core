@@ -156,22 +156,29 @@ func requestPath(c *gin.Context) string {
 }
 
 func validateRequestShape(c *gin.Context, keyInfo *auth.APIKeyInfo, path string, parsed parsedRequest) bool {
-	if !isImageSubmitAPIPath(path) {
+	if isImageSubmitAPIPath(path) {
+		if c.Request.Method != http.MethodPost {
+			c.Header("Allow", http.MethodPost)
+			slog.Info("image_request_method_not_allowed",
+				sdk.LogFieldUserID, keyInfo.UserID,
+				sdk.LogFieldAPIKeyID, keyInfo.KeyID,
+				sdk.LogFieldPath, path,
+				"method", c.Request.Method,
+			)
+			openAIError(c, http.StatusMethodNotAllowed, "invalid_request_error", "method_not_allowed", "Method Not Allowed")
+			return false
+		}
+		return validateRequestModel(c, keyInfo, path, parsed, "image_request_missing_model")
+	}
+	if isMetadataOnlyPath(path) {
 		return true
 	}
-	if c.Request.Method != http.MethodPost {
-		c.Header("Allow", http.MethodPost)
-		slog.Info("image_request_method_not_allowed",
-			sdk.LogFieldUserID, keyInfo.UserID,
-			sdk.LogFieldAPIKeyID, keyInfo.KeyID,
-			sdk.LogFieldPath, path,
-			"method", c.Request.Method,
-		)
-		openAIError(c, http.StatusMethodNotAllowed, "invalid_request_error", "method_not_allowed", "Method Not Allowed")
-		return false
-	}
+	return validateRequestModel(c, keyInfo, path, parsed, "request_missing_model")
+}
+
+func validateRequestModel(c *gin.Context, keyInfo *auth.APIKeyInfo, path string, parsed parsedRequest, logMessage string) bool {
 	if strings.TrimSpace(parsed.Model) == "" {
-		slog.Info("image_request_missing_model",
+		slog.Info(logMessage,
 			sdk.LogFieldUserID, keyInfo.UserID,
 			sdk.LogFieldAPIKeyID, keyInfo.KeyID,
 			sdk.LogFieldPath, path,
@@ -195,7 +202,7 @@ func parseBody(body []byte, contentType string) parsedRequest {
 		effort := extractAndNormalizeReasoningEffort(fields)
 		signals := analyzeContinuationSignals(fields)
 		return parsedRequest{
-			Model:               fields.Model,
+			Model:               strings.TrimSpace(fields.Model),
 			Stream:              fields.Stream,
 			SessionID:           strings.TrimSpace(fields.Metadata.UserID),
 			PromptCacheKey:      strings.TrimSpace(fields.PromptCacheKey),
