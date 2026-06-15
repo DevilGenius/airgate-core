@@ -13,13 +13,18 @@ const (
 	TypeTaskError            = "task_error"
 	TypeSystemError          = "system_error"
 
+	SeverityInfo     = "info"
 	SeverityWarning  = "warning"
 	SeverityError    = "error"
 	SeverityCritical = "critical"
 
 	StatusActive   = "active"
 	StatusResolved = "resolved"
-	StatusIgnored  = "ignored"
+
+	RecoveryModeNone     = "none"
+	RecoveryModeManual   = "manual"
+	RecoveryModeSuccess  = "success"
+	RecoveryModeExternal = "external"
 
 	SourceForwarder      = "forwarder"
 	SourceScheduler      = "scheduler"
@@ -66,6 +71,7 @@ type EventInput struct {
 
 // ResolveQuery identifies active events to resolve.
 type ResolveQuery struct {
+	Hash        string
 	Type        string
 	SubjectType string
 	SubjectID   string
@@ -80,4 +86,20 @@ type ResolveQuery struct {
 type Recorder interface {
 	Record(ctx context.Context, input EventInput)
 	ResolveBySubject(ctx context.Context, query ResolveQuery)
+}
+
+// RecoverySuccess identifies a successful operation that can prove a monitor event recovered.
+type RecoverySuccess struct {
+	Type        string
+	SubjectType string
+	SubjectID   string
+	Platform    string
+	PluginID    string
+	GroupID     int
+	Model       string
+}
+
+// RecoveryRecorder observes successful operations and resolves matching active monitor events.
+type RecoveryRecorder interface {
+	RecordRecoverySuccess(ctx context.Context, input RecoverySuccess)
 }

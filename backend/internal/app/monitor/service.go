@@ -73,6 +73,7 @@ type Service struct {
 	eventPublisher EventPublisher
 	rdb            *redis.Client
 	queue          chan queuedOperation
+	recovery       *recoverySnapshot
 	retention      time.Duration
 	flushInterval  time.Duration
 	flushBatchSize int
@@ -86,6 +87,7 @@ type Service struct {
 }
 
 var _ monitoring.Recorder = (*Service)(nil)
+var _ monitoring.RecoveryRecorder = (*Service)(nil)
 
 // NewService creates a monitor service. It is safe for hot-path callers because
 // Record only normalizes input and performs a non-blocking queue send.
@@ -93,6 +95,7 @@ func NewService(repo Repository, opts ...Option) *Service {
 	s := &Service{
 		repo:           repo,
 		queue:          make(chan queuedOperation, defaultQueueSize),
+		recovery:       newRecoverySnapshot(),
 		retention:      defaultRetention,
 		flushInterval:  defaultFlushInterval,
 		flushBatchSize: defaultFlushBatchSize,
@@ -186,6 +189,7 @@ func (s *Service) Record(ctx context.Context, input monitoring.EventInput) {
 	event := s.normalizeInput(input)
 	select {
 	case s.queue <- queuedOperation{Kind: queuedOperationRecord, Event: event}:
+		s.rememberRecoveryEvent(event)
 		s.queuedEvents.Add(1)
 	default:
 		dropped := s.droppedEvents.Add(1)
@@ -282,22 +286,18 @@ func (s *Service) Resolve(ctx context.Context, id int) error {
 	if s == nil || s.repo == nil {
 		return ErrEventNotFound
 	}
+	event, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if nonManualRecoverableEvent(event) {
+		return ErrEventNotRecoverable
+	}
 	if err := s.repo.Resolve(ctx, id); err != nil {
 		return err
 	}
+	s.forgetRecoveryEvent(ctx, event)
 	s.publishMonitorChanged("resolved")
-	return nil
-}
-
-// Ignore marks one monitor event ignored.
-func (s *Service) Ignore(ctx context.Context, id int) error {
-	if s == nil || s.repo == nil {
-		return ErrEventNotFound
-	}
-	if err := s.repo.Ignore(ctx, id); err != nil {
-		return err
-	}
-	s.publishMonitorChanged("ignored")
 	return nil
 }
 
@@ -347,7 +347,15 @@ func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {
 		Detail:              detail,
 	}
 	event.Hash = hashFor(input.HashMaterial, event)
-	event.AutoResolveAt = resolveAtFor(input.AutoResolveAt, event.Type, observedAt)
+	event.RecoveryMode = recoveryModeForEvent(event)
+	switch event.RecoveryMode {
+	case monitoring.RecoveryModeNone, monitoring.RecoveryModeExternal:
+		event.AutoResolveAt = nil
+	case monitoring.RecoveryModeSuccess:
+		event.AutoResolveAt = recoveryFallbackAt(input.AutoResolveAt, observedAt)
+	case monitoring.RecoveryModeManual:
+		event.AutoResolveAt = resolveAtFor(input.AutoResolveAt, event.Type, observedAt)
+	}
 	return QueuedEvent{Event: event}
 }
 
@@ -456,6 +464,8 @@ func normalizeRequestType(eventType string) string {
 
 func normalizeSeverity(severity string) string {
 	switch strings.TrimSpace(severity) {
+	case monitoring.SeverityInfo:
+		return monitoring.SeverityInfo
 	case monitoring.SeverityCritical:
 		return monitoring.SeverityCritical
 	case monitoring.SeverityError:
@@ -520,7 +530,7 @@ func defaultHashMaterial(event Event) string {
 	case monitoring.TypeUpstreamAccountError:
 		return joinHashParts(event.Type, intPtrValue(event.AccountID), event.ErrorCode)
 	case monitoring.TypeSchedulerError:
-		return joinHashParts(event.Type, event.Platform, event.SubjectID, event.ErrorCode)
+		return joinHashParts(event.Type, event.Platform, event.SubjectID, event.ErrorCode, monitorDetailString(event.Detail, "model"))
 	case monitoring.TypePluginError:
 		return joinHashParts(event.Type, event.PluginID, event.ErrorCode)
 	case monitoring.TypeTaskError:

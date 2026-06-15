@@ -124,15 +124,6 @@ export default function MonitorPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  const ignoreMutation = useMutation({
-    mutationFn: monitorApi.ignore,
-    onSuccess: () => {
-      toast('success', t('monitor.ignore_success'));
-      invalidateMonitor();
-    },
-    onError: (err: Error) => toast('error', err.message),
-  });
-
   const clearRequestsMutation = useMutation({
     mutationFn: () => monitorApi.clearRequests(),
     onSuccess: (result) => {
@@ -299,13 +290,13 @@ export default function MonitorPage() {
     { id: '', label: t('common.all') },
     { id: 'active', label: t('monitor.status_active') },
     { id: 'resolved', label: t('monitor.status_resolved') },
-    { id: 'ignored', label: t('monitor.status_ignored') },
   ];
   const severityOptions: SelectOption[] = [
     { id: '', label: t('common.all') },
     { id: 'critical', label: t('monitor.severity_critical') },
     { id: 'error', label: t('monitor.severity_error') },
     { id: 'warning', label: t('monitor.severity_warning') },
+    { id: 'info', label: t('monitor.severity_info') },
   ];
   const typeOptions: SelectOption[] = [
     { id: '', label: t('common.all') },
@@ -322,8 +313,6 @@ export default function MonitorPage() {
   ];
 
   const columns = useMonitorColumns({
-    ignorePending: ignoreMutation.isPending,
-    onIgnore: ignoreMutation.mutate,
     onResolve: resolveMutation.mutate,
     resolvePending: resolveMutation.isPending,
   });

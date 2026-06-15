@@ -44,6 +44,9 @@ func handleMonitorError(logMessage, publicMessage string, err error) (int, strin
 	if errors.Is(err, appmonitor.ErrEventNotFound) {
 		return 404, err.Error()
 	}
+	if errors.Is(err, appmonitor.ErrEventNotRecoverable) {
+		return 409, err.Error()
+	}
 	slog.Error(logMessage, "error", err)
 	return 500, publicMessage
 }

@@ -22,5 +22,4 @@ export const monitorApi = {
   clearRequests: (before?: string) =>
     del<MonitorRequestClearResp>('/api/v1/admin/monitor/requests', before ? { before } : undefined),
   resolve: (id: number) => patch<void>(`/api/v1/admin/monitor/${id}/resolve`),
-  ignore: (id: number) => patch<void>(`/api/v1/admin/monitor/${id}/ignore`),
 };

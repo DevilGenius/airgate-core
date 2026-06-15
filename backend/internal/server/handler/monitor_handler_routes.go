@@ -113,22 +113,6 @@ func (h *MonitorHandler) ResolveMonitorEvent(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// IgnoreMonitorEvent marks one monitor event ignored.
-func (h *MonitorHandler) IgnoreMonitorEvent(c *gin.Context) {
-	id, err := parseMonitorID(c.Param("id"))
-	if err != nil || id <= 0 {
-		response.BadRequest(c, "无效的监控事件 ID")
-		return
-	}
-
-	if err := h.service.Ignore(c.Request.Context(), id); err != nil {
-		httpCode, message := handleMonitorError("忽略监控事件失败", "操作失败", err)
-		response.Error(c, httpCode, httpCode, message)
-		return
-	}
-	response.Success(c, nil)
-}
-
 func monitorListFilterFromQuery(c *gin.Context, query dto.MonitorListQuery) (appmonitor.ListFilter, bool) {
 	from, err := parseMonitorTime(query.From, false)
 	if err != nil {

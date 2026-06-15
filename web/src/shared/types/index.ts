@@ -816,13 +816,15 @@ export interface DashboardUserTrendPoint {
 // ==================== Monitor ====================
 
 export type MonitorSeverity = 'info' | 'warning' | 'error' | 'critical';
-export type MonitorStatus = 'active' | 'resolved' | 'ignored';
+export type MonitorStatus = 'active' | 'resolved';
+export type MonitorRecoveryMode = 'none' | 'manual' | 'success' | 'external';
 
 export interface MonitorEventResp {
   id: number;
   type: string;
   severity: MonitorSeverity;
   status: MonitorStatus;
+  recovery_mode: MonitorRecoveryMode;
   source: string;
   subject_type: string;
   subject_id: string;
@@ -838,7 +840,6 @@ export interface MonitorEventResp {
   created_at: string;
   updated_at: string;
   resolved_at?: string;
-  ignored_at?: string;
   auto_resolve_at?: string;
   expires_at: string;
   last_notified_at?: string;

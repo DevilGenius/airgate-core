@@ -20,6 +20,8 @@ const (
 	FieldSeverity = "severity"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldRecoveryMode holds the string denoting the recovery_mode field in the database.
+	FieldRecoveryMode = "recovery_mode"
 	// FieldSource holds the string denoting the source field in the database.
 	FieldSource = "source"
 	// FieldSubjectType holds the string denoting the subject_type field in the database.
@@ -50,8 +52,6 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// FieldResolvedAt holds the string denoting the resolved_at field in the database.
 	FieldResolvedAt = "resolved_at"
-	// FieldIgnoredAt holds the string denoting the ignored_at field in the database.
-	FieldIgnoredAt = "ignored_at"
 	// FieldAutoResolveAt holds the string denoting the auto_resolve_at field in the database.
 	FieldAutoResolveAt = "auto_resolve_at"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
@@ -74,6 +74,7 @@ var Columns = []string{
 	FieldType,
 	FieldSeverity,
 	FieldStatus,
+	FieldRecoveryMode,
 	FieldSource,
 	FieldSubjectType,
 	FieldSubjectID,
@@ -89,7 +90,6 @@ var Columns = []string{
 	FieldCreatedAt,
 	FieldUpdatedAt,
 	FieldResolvedAt,
-	FieldIgnoredAt,
 	FieldAutoResolveAt,
 	FieldExpiresAt,
 	FieldLastNotifiedAt,
@@ -199,6 +199,7 @@ const DefaultSeverity = SeverityWarning
 
 // Severity values.
 const (
+	SeverityInfo     Severity = "info"
 	SeverityWarning  Severity = "warning"
 	SeverityError    Severity = "error"
 	SeverityCritical Severity = "critical"
@@ -211,7 +212,7 @@ func (s Severity) String() string {
 // SeverityValidator is a validator for the "severity" field enum values. It is called by the builders before save.
 func SeverityValidator(s Severity) error {
 	switch s {
-	case SeverityWarning, SeverityError, SeverityCritical:
+	case SeverityInfo, SeverityWarning, SeverityError, SeverityCritical:
 		return nil
 	default:
 		return fmt.Errorf("monitorevent: invalid enum value for severity field: %q", s)
@@ -228,7 +229,6 @@ const DefaultStatus = StatusActive
 const (
 	StatusActive   Status = "active"
 	StatusResolved Status = "resolved"
-	StatusIgnored  Status = "ignored"
 )
 
 func (s Status) String() string {
@@ -238,10 +238,38 @@ func (s Status) String() string {
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s Status) error {
 	switch s {
-	case StatusActive, StatusResolved, StatusIgnored:
+	case StatusActive, StatusResolved:
 		return nil
 	default:
 		return fmt.Errorf("monitorevent: invalid enum value for status field: %q", s)
+	}
+}
+
+// RecoveryMode defines the type for the "recovery_mode" enum field.
+type RecoveryMode string
+
+// RecoveryModeNone is the default value of the RecoveryMode enum.
+const DefaultRecoveryMode = RecoveryModeNone
+
+// RecoveryMode values.
+const (
+	RecoveryModeNone     RecoveryMode = "none"
+	RecoveryModeManual   RecoveryMode = "manual"
+	RecoveryModeSuccess  RecoveryMode = "success"
+	RecoveryModeExternal RecoveryMode = "external"
+)
+
+func (rm RecoveryMode) String() string {
+	return string(rm)
+}
+
+// RecoveryModeValidator is a validator for the "recovery_mode" field enum values. It is called by the builders before save.
+func RecoveryModeValidator(rm RecoveryMode) error {
+	switch rm {
+	case RecoveryModeNone, RecoveryModeManual, RecoveryModeSuccess, RecoveryModeExternal:
+		return nil
+	default:
+		return fmt.Errorf("monitorevent: invalid enum value for recovery_mode field: %q", rm)
 	}
 }
 
@@ -266,6 +294,11 @@ func BySeverity(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByRecoveryMode orders the results by the recovery_mode field.
+func ByRecoveryMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRecoveryMode, opts...).ToFunc()
 }
 
 // BySource orders the results by the source field.
@@ -341,11 +374,6 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByResolvedAt orders the results by the resolved_at field.
 func ByResolvedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldResolvedAt, opts...).ToFunc()
-}
-
-// ByIgnoredAt orders the results by the ignored_at field.
-func ByIgnoredAt(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldIgnoredAt, opts...).ToFunc()
 }
 
 // ByAutoResolveAt orders the results by the auto_resolve_at field.

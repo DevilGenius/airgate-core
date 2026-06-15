@@ -26,6 +26,7 @@ type MonitorEventResp struct {
 	Type                string                 `json:"type"`
 	Severity            string                 `json:"severity"`
 	Status              string                 `json:"status"`
+	RecoveryMode        string                 `json:"recovery_mode"`
 	Source              string                 `json:"source"`
 	SubjectType         string                 `json:"subject_type"`
 	SubjectID           string                 `json:"subject_id"`
@@ -41,7 +42,6 @@ type MonitorEventResp struct {
 	CreatedAt           string                 `json:"created_at"`
 	UpdatedAt           string                 `json:"updated_at"`
 	ResolvedAt          *string                `json:"resolved_at,omitempty"`
-	IgnoredAt           *string                `json:"ignored_at,omitempty"`
 	AutoResolveAt       *string                `json:"auto_resolve_at,omitempty"`
 	ExpiresAt           string                 `json:"expires_at"`
 	LastNotifiedAt      *string                `json:"last_notified_at,omitempty"`

@@ -24,6 +24,8 @@ type MonitorEvent struct {
 	Severity monitorevent.Severity `json:"severity,omitempty"`
 	// Status holds the value of the "status" field.
 	Status monitorevent.Status `json:"status,omitempty"`
+	// RecoveryMode holds the value of the "recovery_mode" field.
+	RecoveryMode monitorevent.RecoveryMode `json:"recovery_mode,omitempty"`
 	// Source holds the value of the "source" field.
 	Source string `json:"source,omitempty"`
 	// SubjectType holds the value of the "subject_type" field.
@@ -54,8 +56,6 @@ type MonitorEvent struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// ResolvedAt holds the value of the "resolved_at" field.
 	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
-	// IgnoredAt holds the value of the "ignored_at" field.
-	IgnoredAt *time.Time `json:"ignored_at,omitempty"`
 	// AutoResolveAt holds the value of the "auto_resolve_at" field.
 	AutoResolveAt *time.Time `json:"auto_resolve_at,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
@@ -80,9 +80,9 @@ func (*MonitorEvent) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case monitorevent.FieldID, monitorevent.FieldAccountID:
 			values[i] = new(sql.NullInt64)
-		case monitorevent.FieldType, monitorevent.FieldSeverity, monitorevent.FieldStatus, monitorevent.FieldSource, monitorevent.FieldSubjectType, monitorevent.FieldSubjectID, monitorevent.FieldHash, monitorevent.FieldTitle, monitorevent.FieldMessage, monitorevent.FieldAccountNameSnapshot, monitorevent.FieldPlatform, monitorevent.FieldPluginID, monitorevent.FieldTaskType, monitorevent.FieldErrorCode, monitorevent.FieldNotifyError:
+		case monitorevent.FieldType, monitorevent.FieldSeverity, monitorevent.FieldStatus, monitorevent.FieldRecoveryMode, monitorevent.FieldSource, monitorevent.FieldSubjectType, monitorevent.FieldSubjectID, monitorevent.FieldHash, monitorevent.FieldTitle, monitorevent.FieldMessage, monitorevent.FieldAccountNameSnapshot, monitorevent.FieldPlatform, monitorevent.FieldPluginID, monitorevent.FieldTaskType, monitorevent.FieldErrorCode, monitorevent.FieldNotifyError:
 			values[i] = new(sql.NullString)
-		case monitorevent.FieldCreatedAt, monitorevent.FieldUpdatedAt, monitorevent.FieldResolvedAt, monitorevent.FieldIgnoredAt, monitorevent.FieldAutoResolveAt, monitorevent.FieldExpiresAt, monitorevent.FieldLastNotifiedAt, monitorevent.FieldNextNotifyAt:
+		case monitorevent.FieldCreatedAt, monitorevent.FieldUpdatedAt, monitorevent.FieldResolvedAt, monitorevent.FieldAutoResolveAt, monitorevent.FieldExpiresAt, monitorevent.FieldLastNotifiedAt, monitorevent.FieldNextNotifyAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -122,6 +122,12 @@ func (me *MonitorEvent) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				me.Status = monitorevent.Status(value.String)
+			}
+		case monitorevent.FieldRecoveryMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field recovery_mode", values[i])
+			} else if value.Valid {
+				me.RecoveryMode = monitorevent.RecoveryMode(value.String)
 			}
 		case monitorevent.FieldSource:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -215,13 +221,6 @@ func (me *MonitorEvent) assignValues(columns []string, values []any) error {
 				me.ResolvedAt = new(time.Time)
 				*me.ResolvedAt = value.Time
 			}
-		case monitorevent.FieldIgnoredAt:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field ignored_at", values[i])
-			} else if value.Valid {
-				me.IgnoredAt = new(time.Time)
-				*me.IgnoredAt = value.Time
-			}
 		case monitorevent.FieldAutoResolveAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field auto_resolve_at", values[i])
@@ -308,6 +307,9 @@ func (me *MonitorEvent) String() string {
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", me.Status))
 	builder.WriteString(", ")
+	builder.WriteString("recovery_mode=")
+	builder.WriteString(fmt.Sprintf("%v", me.RecoveryMode))
+	builder.WriteString(", ")
 	builder.WriteString("source=")
 	builder.WriteString(me.Source)
 	builder.WriteString(", ")
@@ -354,11 +356,6 @@ func (me *MonitorEvent) String() string {
 	builder.WriteString(", ")
 	if v := me.ResolvedAt; v != nil {
 		builder.WriteString("resolved_at=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
-	builder.WriteString(", ")
-	if v := me.IgnoredAt; v != nil {
-		builder.WriteString("ignored_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")

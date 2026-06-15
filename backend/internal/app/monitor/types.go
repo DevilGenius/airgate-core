@@ -23,6 +23,7 @@ type Event struct {
 	Type                string
 	Severity            string
 	Status              string
+	RecoveryMode        string
 	Source              string
 	SubjectType         string
 	SubjectID           string
@@ -38,7 +39,6 @@ type Event struct {
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	ResolvedAt          *time.Time
-	IgnoredAt           *time.Time
 	AutoResolveAt       *time.Time
 	ExpiresAt           time.Time
 	LastNotifiedAt      *time.Time
@@ -205,7 +205,6 @@ type Repository interface {
 	ResolveBySubject(context.Context, monitoring.ResolveQuery) error
 	Get(context.Context, int) (Event, error)
 	Resolve(context.Context, int) error
-	Ignore(context.Context, int) error
 	List(context.Context, ListFilter) (ListResult, error)
 	ListRequests(context.Context, RequestListFilter) (RequestListResult, error)
 	ClearRequestEvents(context.Context, *time.Time) (int, error)

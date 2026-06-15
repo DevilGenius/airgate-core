@@ -54,6 +54,20 @@ func (mec *MonitorEventCreate) SetNillableStatus(m *monitorevent.Status) *Monito
 	return mec
 }
 
+// SetRecoveryMode sets the "recovery_mode" field.
+func (mec *MonitorEventCreate) SetRecoveryMode(mm monitorevent.RecoveryMode) *MonitorEventCreate {
+	mec.mutation.SetRecoveryMode(mm)
+	return mec
+}
+
+// SetNillableRecoveryMode sets the "recovery_mode" field if the given value is not nil.
+func (mec *MonitorEventCreate) SetNillableRecoveryMode(mm *monitorevent.RecoveryMode) *MonitorEventCreate {
+	if mm != nil {
+		mec.SetRecoveryMode(*mm)
+	}
+	return mec
+}
+
 // SetSource sets the "source" field.
 func (mec *MonitorEventCreate) SetSource(s string) *MonitorEventCreate {
 	mec.mutation.SetSource(s)
@@ -256,20 +270,6 @@ func (mec *MonitorEventCreate) SetNillableResolvedAt(t *time.Time) *MonitorEvent
 	return mec
 }
 
-// SetIgnoredAt sets the "ignored_at" field.
-func (mec *MonitorEventCreate) SetIgnoredAt(t time.Time) *MonitorEventCreate {
-	mec.mutation.SetIgnoredAt(t)
-	return mec
-}
-
-// SetNillableIgnoredAt sets the "ignored_at" field if the given value is not nil.
-func (mec *MonitorEventCreate) SetNillableIgnoredAt(t *time.Time) *MonitorEventCreate {
-	if t != nil {
-		mec.SetIgnoredAt(*t)
-	}
-	return mec
-}
-
 // SetAutoResolveAt sets the "auto_resolve_at" field.
 func (mec *MonitorEventCreate) SetAutoResolveAt(t time.Time) *MonitorEventCreate {
 	mec.mutation.SetAutoResolveAt(t)
@@ -389,6 +389,10 @@ func (mec *MonitorEventCreate) defaults() {
 		v := monitorevent.DefaultStatus
 		mec.mutation.SetStatus(v)
 	}
+	if _, ok := mec.mutation.RecoveryMode(); !ok {
+		v := monitorevent.DefaultRecoveryMode
+		mec.mutation.SetRecoveryMode(v)
+	}
 	if _, ok := mec.mutation.Source(); !ok {
 		v := monitorevent.DefaultSource
 		mec.mutation.SetSource(v)
@@ -475,6 +479,14 @@ func (mec *MonitorEventCreate) check() error {
 	if v, ok := mec.mutation.Status(); ok {
 		if err := monitorevent.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.status": %w`, err)}
+		}
+	}
+	if _, ok := mec.mutation.RecoveryMode(); !ok {
+		return &ValidationError{Name: "recovery_mode", err: errors.New(`ent: missing required field "MonitorEvent.recovery_mode"`)}
+	}
+	if v, ok := mec.mutation.RecoveryMode(); ok {
+		if err := monitorevent.RecoveryModeValidator(v); err != nil {
+			return &ValidationError{Name: "recovery_mode", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.recovery_mode": %w`, err)}
 		}
 	}
 	if _, ok := mec.mutation.Source(); !ok {
@@ -620,6 +632,10 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 		_spec.SetField(monitorevent.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
 	}
+	if value, ok := mec.mutation.RecoveryMode(); ok {
+		_spec.SetField(monitorevent.FieldRecoveryMode, field.TypeEnum, value)
+		_node.RecoveryMode = value
+	}
 	if value, ok := mec.mutation.Source(); ok {
 		_spec.SetField(monitorevent.FieldSource, field.TypeString, value)
 		_node.Source = value
@@ -679,10 +695,6 @@ func (mec *MonitorEventCreate) createSpec() (*MonitorEvent, *sqlgraph.CreateSpec
 	if value, ok := mec.mutation.ResolvedAt(); ok {
 		_spec.SetField(monitorevent.FieldResolvedAt, field.TypeTime, value)
 		_node.ResolvedAt = &value
-	}
-	if value, ok := mec.mutation.IgnoredAt(); ok {
-		_spec.SetField(monitorevent.FieldIgnoredAt, field.TypeTime, value)
-		_node.IgnoredAt = &value
 	}
 	if value, ok := mec.mutation.AutoResolveAt(); ok {
 		_spec.SetField(monitorevent.FieldAutoResolveAt, field.TypeTime, value)

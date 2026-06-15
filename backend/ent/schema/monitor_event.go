@@ -16,11 +16,14 @@ func (MonitorEvent) Fields() []ent.Field {
 		field.Enum("type").
 			Values("scheduler_error", "upstream_account_error", "plugin_error", "task_error", "system_error"),
 		field.Enum("severity").
-			Values("warning", "error", "critical").
+			Values("info", "warning", "error", "critical").
 			Default("warning"),
 		field.Enum("status").
-			Values("active", "resolved", "ignored").
+			Values("active", "resolved").
 			Default("active"),
+		field.Enum("recovery_mode").
+			Values("none", "manual", "success", "external").
+			Default("none"),
 		field.String("source").Default("").MaxLen(64),
 		field.String("subject_type").Default("").MaxLen(64),
 		field.String("subject_id").Default("").MaxLen(128),
@@ -36,7 +39,6 @@ func (MonitorEvent) Fields() []ent.Field {
 		field.Time("created_at").Default(timeNow),
 		field.Time("updated_at").Default(timeNow),
 		field.Time("resolved_at").Optional().Nillable(),
-		field.Time("ignored_at").Optional().Nillable(),
 		field.Time("auto_resolve_at").Optional().Nillable(),
 		field.Time("expires_at").Default(timeNow),
 		field.Time("last_notified_at").Optional().Nillable(),

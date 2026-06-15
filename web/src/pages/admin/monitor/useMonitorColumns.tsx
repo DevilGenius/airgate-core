@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Button } from '@heroui/react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { CheckCircle2, EyeOff } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { MONITOR_COLUMN_WIDTHS, SEVERITY_CLASSES, STATUS_CLASSES } from './constants';
 import {
   DetailCell,
@@ -43,14 +43,14 @@ function typeLabel(t: TFunction, value: string): string {
   return t(`monitor.type_${value}`, value);
 }
 
+function isManuallyRecoverableEvent(row: { recovery_mode: string }): boolean {
+  return row.recovery_mode === 'manual' || row.recovery_mode === 'success';
+}
+
 export function useMonitorColumns({
-  ignorePending,
-  onIgnore,
   onResolve,
   resolvePending,
 }: {
-  ignorePending: boolean;
-  onIgnore: (id: number) => void;
   onResolve: (id: number) => void;
   resolvePending: boolean;
 }): MonitorColumnConfig[] {
@@ -140,7 +140,7 @@ export function useMonitorColumns({
       title: t('common.actions'),
       width: MONITOR_COLUMN_WIDTHS.actions,
       render: (row) => {
-        if (row.severity === 'warning') {
+        if (!isManuallyRecoverableEvent(row)) {
           return <span className="text-[13px] leading-none text-text-tertiary">-</span>;
         }
         const disabled = row.status !== 'active';
@@ -150,29 +150,18 @@ export function useMonitorColumns({
               isIconOnly
               aria-label={t('monitor.resolve')}
               className="h-7 w-7 min-w-7"
-              isDisabled={disabled || resolvePending || ignorePending}
+              isDisabled={disabled || resolvePending}
               size="sm"
               variant="ghost"
               onPress={() => onResolve(row.id)}
             >
               <CheckCircle2 className="h-4 w-4" />
             </Button>
-            <Button
-              isIconOnly
-              aria-label={t('monitor.ignore')}
-              className="h-7 w-7 min-w-7"
-              isDisabled={disabled || resolvePending || ignorePending}
-              size="sm"
-              variant="ghost"
-              onPress={() => onIgnore(row.id)}
-            >
-              <EyeOff className="h-4 w-4" />
-            </Button>
           </div>
         );
       },
     },
-  ], [ignorePending, onIgnore, onResolve, resolvePending, t]);
+  ], [onResolve, resolvePending, t]);
 }
 
 export function useMonitorRequestColumns(): MonitorRequestColumnConfig[] {

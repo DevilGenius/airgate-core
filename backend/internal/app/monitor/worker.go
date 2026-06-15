@@ -16,6 +16,7 @@ const (
 	autoResolveInterval = 5 * time.Minute
 	cleanupInterval     = time.Hour
 	notifyInterval      = 30 * time.Second
+	recoveryInterval    = 30 * time.Second
 	workerRunTimeout    = 30 * time.Second
 	notifyRunTimeout    = 2 * time.Minute
 	notifySendTimeout   = 15 * time.Second
@@ -47,6 +48,7 @@ func (s *Service) runWorkerLoop(ctx context.Context) {
 		<-ctx.Done()
 		return
 	}
+	s.loadRecoverySnapshot(ctx)
 	s.runAutoResolveOnce(ctx)
 	s.runCleanupExpiredOnce(ctx)
 	s.runNotifyOnce(ctx)
@@ -57,6 +59,8 @@ func (s *Service) runWorkerLoop(ctx context.Context) {
 	defer cleanupTicker.Stop()
 	notifyTicker := time.NewTicker(notifyInterval)
 	defer notifyTicker.Stop()
+	recoveryTicker := time.NewTicker(recoveryInterval)
+	defer recoveryTicker.Stop()
 
 	for {
 		select {
@@ -68,6 +72,8 @@ func (s *Service) runWorkerLoop(ctx context.Context) {
 			s.runCleanupExpiredOnce(ctx)
 		case <-notifyTicker.C:
 			s.runNotifyOnce(ctx)
+		case <-recoveryTicker.C:
+			s.loadRecoverySnapshot(ctx)
 		}
 	}
 }
@@ -165,6 +171,7 @@ func (s *Service) runCleanupExpiredOnce(parent context.Context) {
 		slog.Info("monitor_cleanup_completed", "deleted", total, "request_deleted", requestTotal)
 		s.publishMonitorChanged("cleanup")
 	}
+	s.pruneRecoverySnapshot(ctx)
 }
 
 func (s *Service) runNotifyOnce(parent context.Context) {

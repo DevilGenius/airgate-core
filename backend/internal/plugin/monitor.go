@@ -131,6 +131,36 @@ func (f *Forwarder) recordAllRoutesAccountUnavailable(c *gin.Context, state *for
 	})
 }
 
+func (f *Forwarder) recordMonitorRecoverySuccess(ctx context.Context, state *forwardState) {
+	if f == nil || f.monitor == nil || state == nil {
+		return
+	}
+	recorder, ok := any(f.monitor).(monitoring.RecoveryRecorder)
+	if !ok {
+		return
+	}
+	platform := state.requestedPlatform
+	pluginID := ""
+	if state.plugin != nil {
+		pluginID = state.plugin.Name
+		if platform == "" {
+			platform = state.plugin.Platform
+		}
+	}
+	groupID := 0
+	if state.keyInfo != nil {
+		groupID = state.keyInfo.GroupID
+	}
+	recorder.RecordRecoverySuccess(ctx, monitoring.RecoverySuccess{
+		Type:        monitoring.TypeSchedulerError,
+		SubjectType: monitoring.SubjectScheduler,
+		Platform:    platform,
+		PluginID:    pluginID,
+		GroupID:     groupID,
+		Model:       state.modelForScheduling(),
+	})
+}
+
 func (f *Forwarder) recordPluginRouteError(c *gin.Context, keyInfo *auth.APIKeyInfo, platform, path, code, message string) {
 	if f == nil || f.requestMonitor == nil {
 		return

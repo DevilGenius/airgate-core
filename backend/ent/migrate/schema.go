@@ -139,8 +139,9 @@ var (
 	MonitorEventsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"scheduler_error", "upstream_account_error", "plugin_error", "task_error", "system_error"}},
-		{Name: "severity", Type: field.TypeEnum, Enums: []string{"warning", "error", "critical"}, Default: "warning"},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "resolved", "ignored"}, Default: "active"},
+		{Name: "severity", Type: field.TypeEnum, Enums: []string{"info", "warning", "error", "critical"}, Default: "warning"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "resolved"}, Default: "active"},
+		{Name: "recovery_mode", Type: field.TypeEnum, Enums: []string{"none", "manual", "success", "external"}, Default: "none"},
 		{Name: "source", Type: field.TypeString, Size: 64, Default: ""},
 		{Name: "subject_type", Type: field.TypeString, Size: 64, Default: ""},
 		{Name: "subject_id", Type: field.TypeString, Size: 128, Default: ""},
@@ -156,7 +157,6 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "resolved_at", Type: field.TypeTime, Nullable: true},
-		{Name: "ignored_at", Type: field.TypeTime, Nullable: true},
 		{Name: "auto_resolve_at", Type: field.TypeTime, Nullable: true},
 		{Name: "expires_at", Type: field.TypeTime},
 		{Name: "last_notified_at", Type: field.TypeTime, Nullable: true},
@@ -173,27 +173,27 @@ var (
 			{
 				Name:    "monitorevent_status_severity_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[17]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[18]},
 			},
 			{
 				Name:    "monitorevent_status_type_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[1], MonitorEventsColumns[17]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[1], MonitorEventsColumns[18]},
 			},
 			{
 				Name:    "monitorevent_hash",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[7]},
+				Columns: []*schema.Column{MonitorEventsColumns[8]},
 			},
 			{
 				Name:    "monitorevent_account_id_status_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[10], MonitorEventsColumns[3], MonitorEventsColumns[17]},
+				Columns: []*schema.Column{MonitorEventsColumns[11], MonitorEventsColumns[3], MonitorEventsColumns[18]},
 			},
 			{
 				Name:    "monitorevent_platform_plugin_id_status_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[12], MonitorEventsColumns[13], MonitorEventsColumns[3], MonitorEventsColumns[17]},
+				Columns: []*schema.Column{MonitorEventsColumns[13], MonitorEventsColumns[14], MonitorEventsColumns[3], MonitorEventsColumns[18]},
 			},
 			{
 				Name:    "monitorevent_status_auto_resolve_at",

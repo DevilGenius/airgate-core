@@ -32,6 +32,8 @@ func (s *Service) StartAggregatorLoop(ctx context.Context) {
 }
 
 func (s *Service) runAggregatorLoop(ctx context.Context) {
+	s.loadRecoverySnapshot(ctx)
+
 	ticker := time.NewTicker(s.flushInterval)
 	defer ticker.Stop()
 
@@ -109,6 +111,7 @@ func (s *Service) flushBatch(ctx context.Context, batch []QueuedEvent) error {
 	if err := s.repo.InsertBatch(ctx, batch); err != nil {
 		return err
 	}
+	s.persistRecoveryEvents(ctx, batch)
 	s.flushedEvents.Add(int64(len(batch)))
 	s.publishMonitorChanged("recorded")
 	return nil
@@ -137,6 +140,7 @@ func (s *Service) resolveBySubject(ctx context.Context, query monitoring.Resolve
 		slog.Warn("monitor_resolve_by_subject_failed", "error", err)
 		return
 	}
+	s.forgetRecoveryQuery(ctx, query)
 	s.publishMonitorChanged("resolved")
 }
 

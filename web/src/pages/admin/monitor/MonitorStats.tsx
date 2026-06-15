@@ -9,12 +9,14 @@ function StatCard({
   icon,
   active,
   label,
+  showActiveRatio = true,
   tone,
   total,
 }: {
   icon: ReactNode;
   active: number;
   label: string;
+  showActiveRatio?: boolean;
   tone: string;
   total: number;
 }) {
@@ -24,9 +26,15 @@ function StatCard({
         <div className="ag-dashboard-metric-copy">
           <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{label}</div>
           <div className="mt-1 flex min-w-0 items-baseline gap-1 font-mono text-[22px] font-semibold leading-none text-text 2xl:text-2xl">
-            <span className="truncate">{fmtNum(active)}</span>
-            <span className="text-base text-text-tertiary 2xl:text-lg">/</span>
-            <span className="truncate">{fmtNum(total)}</span>
+            {showActiveRatio ? (
+              <>
+                <span className="truncate">{fmtNum(active)}</span>
+                <span className="text-base text-text-tertiary 2xl:text-lg">/</span>
+                <span className="truncate">{fmtNum(total)}</span>
+              </>
+            ) : (
+              <span className="truncate">{fmtNum(total)}</span>
+            )}
           </div>
         </div>
         <span className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${tone}`}>
@@ -59,6 +67,7 @@ export function MonitorStats({ summary }: { summary?: MonitorSummaryResp }) {
         active={summary?.warning_active_total ?? 0}
         icon={<AlertTriangle className="h-5 w-5" />}
         label={t('monitor.warning')}
+        showActiveRatio={false}
         tone="bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25"
         total={summary?.warning_total ?? 0}
       />
@@ -66,6 +75,7 @@ export function MonitorStats({ summary }: { summary?: MonitorSummaryResp }) {
         active={summary?.info_active_total ?? 0}
         icon={<Info className="h-5 w-5" />}
         label={t('monitor.severity_info')}
+        showActiveRatio={false}
         tone="bg-sky-100 text-sky-600 ring-sky-200 dark:bg-sky-400/15 dark:text-sky-300 dark:ring-sky-400/25"
         total={summary?.info_total ?? 0}
       />

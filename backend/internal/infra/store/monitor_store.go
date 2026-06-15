@@ -27,23 +27,70 @@ func NewMonitorStore(db *ent.Client) *MonitorStore {
 	return &MonitorStore{db: db}
 }
 
-// InsertBatch appends monitor events. Hashes are classification keys only,
-// not uniqueness keys.
+// InsertBatch records monitor events. Active rows are coalesced by hash so a
+// persistent fault updates one row instead of producing repeated active alerts.
 func (s *MonitorStore) InsertBatch(ctx context.Context, events []appmonitor.QueuedEvent) error {
 	if s == nil || s.db == nil || len(events) == 0 {
 		return nil
 	}
-	builders := make([]*ent.MonitorEventCreate, 0, len(events))
 	for _, event := range events {
 		if event.Hash == "" {
 			continue
 		}
-		builders = append(builders, setMonitorCreateFields(s.db.MonitorEvent.Create(), event))
+		active, err := s.db.MonitorEvent.Query().
+			Where(
+				entmonitorevent.StatusEQ(entmonitorevent.StatusActive),
+				entmonitorevent.HashEQ(event.Hash),
+			).
+			Order(ent.Desc(entmonitorevent.FieldUpdatedAt), ent.Desc(entmonitorevent.FieldID)).
+			First(ctx)
+		if err != nil && !ent.IsNotFound(err) {
+			return err
+		}
+		if active != nil {
+			err = setMonitorUpdateFields(s.db.MonitorEvent.UpdateOneID(active.ID).
+				Where(entmonitorevent.StatusEQ(entmonitorevent.StatusActive)), event, active).
+				Exec(ctx)
+			if ent.IsNotFound(err) {
+				if _, createErr := setMonitorCreateFields(s.db.MonitorEvent.Create(), event).Save(ctx); createErr != nil {
+					return createErr
+				}
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if err := s.resolveDuplicateActiveMonitorEvents(ctx, active.ID, event.Hash, event.UpdatedAt); err != nil {
+				return err
+			}
+			continue
+		}
+		if _, err := setMonitorCreateFields(s.db.MonitorEvent.Create(), event).Save(ctx); err != nil {
+			return err
+		}
 	}
-	if len(builders) == 0 {
+	return nil
+}
+
+func (s *MonitorStore) resolveDuplicateActiveMonitorEvents(ctx context.Context, keepID int, hash string, resolvedAt time.Time) error {
+	if s == nil || s.db == nil || keepID <= 0 || hash == "" {
 		return nil
 	}
-	_, err := s.db.MonitorEvent.CreateBulk(builders...).Save(ctx)
+	if resolvedAt.IsZero() {
+		resolvedAt = time.Now()
+	}
+	_, err := s.db.MonitorEvent.Update().
+		Where(
+			entmonitorevent.StatusEQ(entmonitorevent.StatusActive),
+			entmonitorevent.HashEQ(hash),
+			entmonitorevent.IDNEQ(keepID),
+		).
+		SetStatus(entmonitorevent.StatusResolved).
+		SetResolvedAt(resolvedAt).
+		ClearAutoResolveAt().
+		ClearNextNotifyAt().
+		SetNotifyError("").
+		Save(ctx)
 	return err
 }
 
@@ -57,6 +104,10 @@ func (s *MonitorStore) ResolveBySubject(ctx context.Context, query monitoring.Re
 		return nil
 	}
 	preds = append([]predicate.MonitorEvent{entmonitorevent.StatusEQ(entmonitorevent.StatusActive)}, preds...)
+	preds = append(preds,
+		entmonitorevent.SeverityIn(entmonitorevent.SeverityError, entmonitorevent.SeverityCritical),
+		entmonitorevent.RecoveryModeIn(entmonitorevent.RecoveryModeManual, entmonitorevent.RecoveryModeSuccess),
+	)
 	_, err := s.db.MonitorEvent.Update().
 		Where(preds...).
 		SetStatus(entmonitorevent.StatusResolved).
@@ -88,29 +139,13 @@ func (s *MonitorStore) Resolve(ctx context.Context, id int) error {
 	}
 	now := time.Now()
 	err := s.db.MonitorEvent.UpdateOneID(id).
+		Where(
+			entmonitorevent.StatusEQ(entmonitorevent.StatusActive),
+			entmonitorevent.SeverityIn(entmonitorevent.SeverityError, entmonitorevent.SeverityCritical),
+			entmonitorevent.RecoveryModeIn(entmonitorevent.RecoveryModeManual, entmonitorevent.RecoveryModeSuccess),
+		).
 		SetStatus(entmonitorevent.StatusResolved).
 		SetResolvedAt(now).
-		ClearIgnoredAt().
-		ClearAutoResolveAt().
-		ClearNextNotifyAt().
-		SetNotifyError("").
-		Exec(ctx)
-	if ent.IsNotFound(err) {
-		return appmonitor.ErrEventNotFound
-	}
-	return err
-}
-
-// Ignore marks one monitor event ignored.
-func (s *MonitorStore) Ignore(ctx context.Context, id int) error {
-	if s == nil || s.db == nil || id <= 0 {
-		return appmonitor.ErrEventNotFound
-	}
-	now := time.Now()
-	err := s.db.MonitorEvent.UpdateOneID(id).
-		SetStatus(entmonitorevent.StatusIgnored).
-		SetIgnoredAt(now).
-		ClearResolvedAt().
 		ClearAutoResolveAt().
 		ClearNextNotifyAt().
 		SetNotifyError("").
@@ -132,6 +167,8 @@ func (s *MonitorStore) AutoResolveDue(ctx context.Context, now time.Time, batchS
 	events, err := s.db.MonitorEvent.Query().
 		Where(
 			entmonitorevent.StatusEQ(entmonitorevent.StatusActive),
+			entmonitorevent.SeverityIn(entmonitorevent.SeverityError, entmonitorevent.SeverityCritical),
+			entmonitorevent.RecoveryModeIn(entmonitorevent.RecoveryModeManual, entmonitorevent.RecoveryModeSuccess),
 			entmonitorevent.AutoResolveAtNotNil(),
 			entmonitorevent.AutoResolveAtLTE(now),
 		).
@@ -148,7 +185,11 @@ func (s *MonitorStore) AutoResolveDue(ctx context.Context, now time.Time, batchS
 			resolvedAt = *event.AutoResolveAt
 		}
 		err := s.db.MonitorEvent.UpdateOneID(event.ID).
-			Where(entmonitorevent.StatusEQ(entmonitorevent.StatusActive)).
+			Where(
+				entmonitorevent.StatusEQ(entmonitorevent.StatusActive),
+				entmonitorevent.SeverityIn(entmonitorevent.SeverityError, entmonitorevent.SeverityCritical),
+				entmonitorevent.RecoveryModeIn(entmonitorevent.RecoveryModeManual, entmonitorevent.RecoveryModeSuccess),
+			).
 			SetStatus(entmonitorevent.StatusResolved).
 			SetResolvedAt(resolvedAt).
 			Exec(ctx)
@@ -277,6 +318,14 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
+	infoTotal, err := base.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityInfo)).Count(ctx)
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
+	infoActiveTotal, err := activeBase.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityInfo)).Count(ctx)
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
 	byType, err := s.summaryByType(ctx, activeBase.Clone())
 	if err != nil {
 		return appmonitor.Summary{}, err
@@ -305,6 +354,8 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 		ErrorActiveTotal:    int64(errorActiveTotal),
 		WarningTotal:        int64(warningTotal),
 		WarningActiveTotal:  int64(warningActiveTotal),
+		InfoTotal:           int64(infoTotal),
+		InfoActiveTotal:     int64(infoActiveTotal),
 		ByType:              byType,
 		TopAccounts:         topAccounts,
 		Recent:              recent,
@@ -403,6 +454,9 @@ func applyMonitorListFilter(query *ent.MonitorEventQuery, filter appmonitor.List
 
 func monitorResolvePredicates(query monitoring.ResolveQuery) []predicate.MonitorEvent {
 	preds := make([]predicate.MonitorEvent, 0, 8)
+	if query.Hash != "" {
+		preds = append(preds, entmonitorevent.HashEQ(query.Hash))
+	}
 	if query.Type != "" {
 		preds = append(preds, entmonitorevent.TypeEQ(entmonitorevent.Type(query.Type)))
 	}
@@ -428,10 +482,12 @@ func monitorResolvePredicates(query monitoring.ResolveQuery) []predicate.Monitor
 }
 
 func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.QueuedEvent) *ent.MonitorEventCreate {
+	recoveryMode := defaultMonitorRecoveryMode(event.RecoveryMode)
 	create = create.
 		SetType(entmonitorevent.Type(event.Type)).
 		SetSeverity(entmonitorevent.Severity(event.Severity)).
 		SetStatus(entmonitorevent.StatusActive).
+		SetRecoveryMode(entmonitorevent.RecoveryMode(recoveryMode)).
 		SetSource(event.Source).
 		SetSubjectType(event.SubjectType).
 		SetSubjectID(event.SubjectID).
@@ -455,6 +511,54 @@ func setMonitorCreateFields(create *ent.MonitorEventCreate, event appmonitor.Que
 	return create
 }
 
+func setMonitorUpdateFields(update *ent.MonitorEventUpdateOne, event appmonitor.QueuedEvent, active *ent.MonitorEvent) *ent.MonitorEventUpdateOne {
+	recoveryMode := defaultMonitorRecoveryMode(event.RecoveryMode)
+	update = update.
+		SetType(entmonitorevent.Type(event.Type)).
+		SetSeverity(entmonitorevent.Severity(event.Severity)).
+		SetStatus(entmonitorevent.StatusActive).
+		SetRecoveryMode(entmonitorevent.RecoveryMode(recoveryMode)).
+		SetSource(event.Source).
+		SetSubjectType(event.SubjectType).
+		SetSubjectID(event.SubjectID).
+		SetHash(event.Hash).
+		SetTitle(event.Title).
+		SetMessage(event.Message).
+		SetAccountNameSnapshot(event.AccountNameSnapshot).
+		SetPlatform(event.Platform).
+		SetPluginID(event.PluginID).
+		SetTaskType(event.TaskType).
+		SetErrorCode(event.ErrorCode).
+		SetUpdatedAt(event.UpdatedAt).
+		SetExpiresAt(event.ExpiresAt).
+		SetDetail(event.Detail).
+		ClearResolvedAt().
+		SetNotifyError("")
+	if event.AccountID == nil {
+		update.ClearAccountID()
+	} else {
+		update.SetAccountID(*event.AccountID)
+	}
+	if event.AutoResolveAt == nil || event.AutoResolveAt.IsZero() {
+		update.ClearAutoResolveAt()
+	} else {
+		update.SetAutoResolveAt(*event.AutoResolveAt)
+	}
+	if !shouldNotifySeverity(event.Severity) {
+		update.ClearNextNotifyAt()
+	} else if active != nil && active.NextNotifyAt == nil && active.LastNotifiedAt == nil {
+		update.SetNextNotifyAt(event.UpdatedAt)
+	}
+	return update
+}
+
+func defaultMonitorRecoveryMode(value string) string {
+	if value == "" {
+		return monitoring.RecoveryModeNone
+	}
+	return value
+}
+
 func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 	if row == nil {
 		return appmonitor.Event{}
@@ -468,6 +572,7 @@ func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 		Type:                string(row.Type),
 		Severity:            string(row.Severity),
 		Status:              string(row.Status),
+		RecoveryMode:        string(row.RecoveryMode),
 		Source:              row.Source,
 		SubjectType:         row.SubjectType,
 		SubjectID:           row.SubjectID,
@@ -483,7 +588,6 @@ func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,
 		ResolvedAt:          row.ResolvedAt,
-		IgnoredAt:           row.IgnoredAt,
 		AutoResolveAt:       row.AutoResolveAt,
 		ExpiresAt:           row.ExpiresAt,
 		LastNotifiedAt:      row.LastNotifiedAt,

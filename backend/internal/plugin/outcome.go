@@ -339,6 +339,7 @@ func (f *Forwarder) applyOutcome(ctx context.Context, state *forwardState, execu
 	// Success 额外刷新会话（状态机内部已更新 last_used_at）
 	if execution.outcome.Kind == sdk.OutcomeSuccess {
 		f.scheduler.RefreshSession(ctx, state.account.ID, state.sessionID, state.account.Extra)
+		f.recordMonitorRecoverySuccess(ctx, state)
 	}
 	// Unknown 留日志提示契约不完整
 	if execution.outcome.Kind == sdk.OutcomeUnknown && execution.err != nil {

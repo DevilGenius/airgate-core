@@ -208,7 +208,6 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/monitor", handlers.Monitor.ListMonitorEvents)
 		adminGroup.GET("/monitor/:id", handlers.Monitor.GetMonitorEvent)
 		adminGroup.PATCH("/monitor/:id/resolve", handlers.Monitor.ResolveMonitorEvent)
-		adminGroup.PATCH("/monitor/:id/ignore", handlers.Monitor.IgnoreMonitorEvent)
 
 		// core 版本信息（仅管理员可见，避免对外暴露版本指纹）
 		adminGroup.GET("/version", handlers.Version.GetVersion)

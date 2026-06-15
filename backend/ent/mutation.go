@@ -5676,6 +5676,7 @@ type MonitorEventMutation struct {
 	_type                 *monitorevent.Type
 	severity              *monitorevent.Severity
 	status                *monitorevent.Status
+	recovery_mode         *monitorevent.RecoveryMode
 	source                *string
 	subject_type          *string
 	subject_id            *string
@@ -5692,7 +5693,6 @@ type MonitorEventMutation struct {
 	created_at            *time.Time
 	updated_at            *time.Time
 	resolved_at           *time.Time
-	ignored_at            *time.Time
 	auto_resolve_at       *time.Time
 	expires_at            *time.Time
 	last_notified_at      *time.Time
@@ -5909,6 +5909,42 @@ func (m *MonitorEventMutation) OldStatus(ctx context.Context) (v monitorevent.St
 // ResetStatus resets all changes to the "status" field.
 func (m *MonitorEventMutation) ResetStatus() {
 	m.status = nil
+}
+
+// SetRecoveryMode sets the "recovery_mode" field.
+func (m *MonitorEventMutation) SetRecoveryMode(mm monitorevent.RecoveryMode) {
+	m.recovery_mode = &mm
+}
+
+// RecoveryMode returns the value of the "recovery_mode" field in the mutation.
+func (m *MonitorEventMutation) RecoveryMode() (r monitorevent.RecoveryMode, exists bool) {
+	v := m.recovery_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecoveryMode returns the old "recovery_mode" field's value of the MonitorEvent entity.
+// If the MonitorEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorEventMutation) OldRecoveryMode(ctx context.Context) (v monitorevent.RecoveryMode, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecoveryMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecoveryMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecoveryMode: %w", err)
+	}
+	return oldValue.RecoveryMode, nil
+}
+
+// ResetRecoveryMode resets all changes to the "recovery_mode" field.
+func (m *MonitorEventMutation) ResetRecoveryMode() {
+	m.recovery_mode = nil
 }
 
 // SetSource sets the "source" field.
@@ -6498,55 +6534,6 @@ func (m *MonitorEventMutation) ResetResolvedAt() {
 	delete(m.clearedFields, monitorevent.FieldResolvedAt)
 }
 
-// SetIgnoredAt sets the "ignored_at" field.
-func (m *MonitorEventMutation) SetIgnoredAt(t time.Time) {
-	m.ignored_at = &t
-}
-
-// IgnoredAt returns the value of the "ignored_at" field in the mutation.
-func (m *MonitorEventMutation) IgnoredAt() (r time.Time, exists bool) {
-	v := m.ignored_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldIgnoredAt returns the old "ignored_at" field's value of the MonitorEvent entity.
-// If the MonitorEvent object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *MonitorEventMutation) OldIgnoredAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldIgnoredAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldIgnoredAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldIgnoredAt: %w", err)
-	}
-	return oldValue.IgnoredAt, nil
-}
-
-// ClearIgnoredAt clears the value of the "ignored_at" field.
-func (m *MonitorEventMutation) ClearIgnoredAt() {
-	m.ignored_at = nil
-	m.clearedFields[monitorevent.FieldIgnoredAt] = struct{}{}
-}
-
-// IgnoredAtCleared returns if the "ignored_at" field was cleared in this mutation.
-func (m *MonitorEventMutation) IgnoredAtCleared() bool {
-	_, ok := m.clearedFields[monitorevent.FieldIgnoredAt]
-	return ok
-}
-
-// ResetIgnoredAt resets all changes to the "ignored_at" field.
-func (m *MonitorEventMutation) ResetIgnoredAt() {
-	m.ignored_at = nil
-	delete(m.clearedFields, monitorevent.FieldIgnoredAt)
-}
-
 // SetAutoResolveAt sets the "auto_resolve_at" field.
 func (m *MonitorEventMutation) SetAutoResolveAt(t time.Time) {
 	m.auto_resolve_at = &t
@@ -6859,6 +6846,9 @@ func (m *MonitorEventMutation) Fields() []string {
 	if m.status != nil {
 		fields = append(fields, monitorevent.FieldStatus)
 	}
+	if m.recovery_mode != nil {
+		fields = append(fields, monitorevent.FieldRecoveryMode)
+	}
 	if m.source != nil {
 		fields = append(fields, monitorevent.FieldSource)
 	}
@@ -6904,9 +6894,6 @@ func (m *MonitorEventMutation) Fields() []string {
 	if m.resolved_at != nil {
 		fields = append(fields, monitorevent.FieldResolvedAt)
 	}
-	if m.ignored_at != nil {
-		fields = append(fields, monitorevent.FieldIgnoredAt)
-	}
 	if m.auto_resolve_at != nil {
 		fields = append(fields, monitorevent.FieldAutoResolveAt)
 	}
@@ -6939,6 +6926,8 @@ func (m *MonitorEventMutation) Field(name string) (ent.Value, bool) {
 		return m.Severity()
 	case monitorevent.FieldStatus:
 		return m.Status()
+	case monitorevent.FieldRecoveryMode:
+		return m.RecoveryMode()
 	case monitorevent.FieldSource:
 		return m.Source()
 	case monitorevent.FieldSubjectType:
@@ -6969,8 +6958,6 @@ func (m *MonitorEventMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdatedAt()
 	case monitorevent.FieldResolvedAt:
 		return m.ResolvedAt()
-	case monitorevent.FieldIgnoredAt:
-		return m.IgnoredAt()
 	case monitorevent.FieldAutoResolveAt:
 		return m.AutoResolveAt()
 	case monitorevent.FieldExpiresAt:
@@ -6998,6 +6985,8 @@ func (m *MonitorEventMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldSeverity(ctx)
 	case monitorevent.FieldStatus:
 		return m.OldStatus(ctx)
+	case monitorevent.FieldRecoveryMode:
+		return m.OldRecoveryMode(ctx)
 	case monitorevent.FieldSource:
 		return m.OldSource(ctx)
 	case monitorevent.FieldSubjectType:
@@ -7028,8 +7017,6 @@ func (m *MonitorEventMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldUpdatedAt(ctx)
 	case monitorevent.FieldResolvedAt:
 		return m.OldResolvedAt(ctx)
-	case monitorevent.FieldIgnoredAt:
-		return m.OldIgnoredAt(ctx)
 	case monitorevent.FieldAutoResolveAt:
 		return m.OldAutoResolveAt(ctx)
 	case monitorevent.FieldExpiresAt:
@@ -7071,6 +7058,13 @@ func (m *MonitorEventMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case monitorevent.FieldRecoveryMode:
+		v, ok := value.(monitorevent.RecoveryMode)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecoveryMode(v)
 		return nil
 	case monitorevent.FieldSource:
 		v, ok := value.(string)
@@ -7177,13 +7171,6 @@ func (m *MonitorEventMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetResolvedAt(v)
 		return nil
-	case monitorevent.FieldIgnoredAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetIgnoredAt(v)
-		return nil
 	case monitorevent.FieldAutoResolveAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -7277,9 +7264,6 @@ func (m *MonitorEventMutation) ClearedFields() []string {
 	if m.FieldCleared(monitorevent.FieldResolvedAt) {
 		fields = append(fields, monitorevent.FieldResolvedAt)
 	}
-	if m.FieldCleared(monitorevent.FieldIgnoredAt) {
-		fields = append(fields, monitorevent.FieldIgnoredAt)
-	}
 	if m.FieldCleared(monitorevent.FieldAutoResolveAt) {
 		fields = append(fields, monitorevent.FieldAutoResolveAt)
 	}
@@ -7312,9 +7296,6 @@ func (m *MonitorEventMutation) ClearField(name string) error {
 	case monitorevent.FieldResolvedAt:
 		m.ClearResolvedAt()
 		return nil
-	case monitorevent.FieldIgnoredAt:
-		m.ClearIgnoredAt()
-		return nil
 	case monitorevent.FieldAutoResolveAt:
 		m.ClearAutoResolveAt()
 		return nil
@@ -7343,6 +7324,9 @@ func (m *MonitorEventMutation) ResetField(name string) error {
 		return nil
 	case monitorevent.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case monitorevent.FieldRecoveryMode:
+		m.ResetRecoveryMode()
 		return nil
 	case monitorevent.FieldSource:
 		m.ResetSource()
@@ -7388,9 +7372,6 @@ func (m *MonitorEventMutation) ResetField(name string) error {
 		return nil
 	case monitorevent.FieldResolvedAt:
 		m.ResetResolvedAt()
-		return nil
-	case monitorevent.FieldIgnoredAt:
-		m.ResetIgnoredAt()
 		return nil
 	case monitorevent.FieldAutoResolveAt:
 		m.ResetAutoResolveAt()

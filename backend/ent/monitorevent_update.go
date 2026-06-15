@@ -70,6 +70,20 @@ func (meu *MonitorEventUpdate) SetNillableStatus(m *monitorevent.Status) *Monito
 	return meu
 }
 
+// SetRecoveryMode sets the "recovery_mode" field.
+func (meu *MonitorEventUpdate) SetRecoveryMode(mm monitorevent.RecoveryMode) *MonitorEventUpdate {
+	meu.mutation.SetRecoveryMode(mm)
+	return meu
+}
+
+// SetNillableRecoveryMode sets the "recovery_mode" field if the given value is not nil.
+func (meu *MonitorEventUpdate) SetNillableRecoveryMode(mm *monitorevent.RecoveryMode) *MonitorEventUpdate {
+	if mm != nil {
+		meu.SetRecoveryMode(*mm)
+	}
+	return meu
+}
+
 // SetSource sets the "source" field.
 func (meu *MonitorEventUpdate) SetSource(s string) *MonitorEventUpdate {
 	meu.mutation.SetSource(s)
@@ -299,26 +313,6 @@ func (meu *MonitorEventUpdate) ClearResolvedAt() *MonitorEventUpdate {
 	return meu
 }
 
-// SetIgnoredAt sets the "ignored_at" field.
-func (meu *MonitorEventUpdate) SetIgnoredAt(t time.Time) *MonitorEventUpdate {
-	meu.mutation.SetIgnoredAt(t)
-	return meu
-}
-
-// SetNillableIgnoredAt sets the "ignored_at" field if the given value is not nil.
-func (meu *MonitorEventUpdate) SetNillableIgnoredAt(t *time.Time) *MonitorEventUpdate {
-	if t != nil {
-		meu.SetIgnoredAt(*t)
-	}
-	return meu
-}
-
-// ClearIgnoredAt clears the value of the "ignored_at" field.
-func (meu *MonitorEventUpdate) ClearIgnoredAt() *MonitorEventUpdate {
-	meu.mutation.ClearIgnoredAt()
-	return meu
-}
-
 // SetAutoResolveAt sets the "auto_resolve_at" field.
 func (meu *MonitorEventUpdate) SetAutoResolveAt(t time.Time) *MonitorEventUpdate {
 	meu.mutation.SetAutoResolveAt(t)
@@ -468,6 +462,11 @@ func (meu *MonitorEventUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.status": %w`, err)}
 		}
 	}
+	if v, ok := meu.mutation.RecoveryMode(); ok {
+		if err := monitorevent.RecoveryModeValidator(v); err != nil {
+			return &ValidationError{Name: "recovery_mode", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.recovery_mode": %w`, err)}
+		}
+	}
 	if v, ok := meu.mutation.Source(); ok {
 		if err := monitorevent.SourceValidator(v); err != nil {
 			return &ValidationError{Name: "source", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.source": %w`, err)}
@@ -552,6 +551,9 @@ func (meu *MonitorEventUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := meu.mutation.Status(); ok {
 		_spec.SetField(monitorevent.FieldStatus, field.TypeEnum, value)
 	}
+	if value, ok := meu.mutation.RecoveryMode(); ok {
+		_spec.SetField(monitorevent.FieldRecoveryMode, field.TypeEnum, value)
+	}
 	if value, ok := meu.mutation.Source(); ok {
 		_spec.SetField(monitorevent.FieldSource, field.TypeString, value)
 	}
@@ -605,12 +607,6 @@ func (meu *MonitorEventUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if meu.mutation.ResolvedAtCleared() {
 		_spec.ClearField(monitorevent.FieldResolvedAt, field.TypeTime)
-	}
-	if value, ok := meu.mutation.IgnoredAt(); ok {
-		_spec.SetField(monitorevent.FieldIgnoredAt, field.TypeTime, value)
-	}
-	if meu.mutation.IgnoredAtCleared() {
-		_spec.ClearField(monitorevent.FieldIgnoredAt, field.TypeTime)
 	}
 	if value, ok := meu.mutation.AutoResolveAt(); ok {
 		_spec.SetField(monitorevent.FieldAutoResolveAt, field.TypeTime, value)
@@ -700,6 +696,20 @@ func (meuo *MonitorEventUpdateOne) SetStatus(m monitorevent.Status) *MonitorEven
 func (meuo *MonitorEventUpdateOne) SetNillableStatus(m *monitorevent.Status) *MonitorEventUpdateOne {
 	if m != nil {
 		meuo.SetStatus(*m)
+	}
+	return meuo
+}
+
+// SetRecoveryMode sets the "recovery_mode" field.
+func (meuo *MonitorEventUpdateOne) SetRecoveryMode(mm monitorevent.RecoveryMode) *MonitorEventUpdateOne {
+	meuo.mutation.SetRecoveryMode(mm)
+	return meuo
+}
+
+// SetNillableRecoveryMode sets the "recovery_mode" field if the given value is not nil.
+func (meuo *MonitorEventUpdateOne) SetNillableRecoveryMode(mm *monitorevent.RecoveryMode) *MonitorEventUpdateOne {
+	if mm != nil {
+		meuo.SetRecoveryMode(*mm)
 	}
 	return meuo
 }
@@ -933,26 +943,6 @@ func (meuo *MonitorEventUpdateOne) ClearResolvedAt() *MonitorEventUpdateOne {
 	return meuo
 }
 
-// SetIgnoredAt sets the "ignored_at" field.
-func (meuo *MonitorEventUpdateOne) SetIgnoredAt(t time.Time) *MonitorEventUpdateOne {
-	meuo.mutation.SetIgnoredAt(t)
-	return meuo
-}
-
-// SetNillableIgnoredAt sets the "ignored_at" field if the given value is not nil.
-func (meuo *MonitorEventUpdateOne) SetNillableIgnoredAt(t *time.Time) *MonitorEventUpdateOne {
-	if t != nil {
-		meuo.SetIgnoredAt(*t)
-	}
-	return meuo
-}
-
-// ClearIgnoredAt clears the value of the "ignored_at" field.
-func (meuo *MonitorEventUpdateOne) ClearIgnoredAt() *MonitorEventUpdateOne {
-	meuo.mutation.ClearIgnoredAt()
-	return meuo
-}
-
 // SetAutoResolveAt sets the "auto_resolve_at" field.
 func (meuo *MonitorEventUpdateOne) SetAutoResolveAt(t time.Time) *MonitorEventUpdateOne {
 	meuo.mutation.SetAutoResolveAt(t)
@@ -1115,6 +1105,11 @@ func (meuo *MonitorEventUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.status": %w`, err)}
 		}
 	}
+	if v, ok := meuo.mutation.RecoveryMode(); ok {
+		if err := monitorevent.RecoveryModeValidator(v); err != nil {
+			return &ValidationError{Name: "recovery_mode", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.recovery_mode": %w`, err)}
+		}
+	}
 	if v, ok := meuo.mutation.Source(); ok {
 		if err := monitorevent.SourceValidator(v); err != nil {
 			return &ValidationError{Name: "source", err: fmt.Errorf(`ent: validator failed for field "MonitorEvent.source": %w`, err)}
@@ -1216,6 +1211,9 @@ func (meuo *MonitorEventUpdateOne) sqlSave(ctx context.Context) (_node *MonitorE
 	if value, ok := meuo.mutation.Status(); ok {
 		_spec.SetField(monitorevent.FieldStatus, field.TypeEnum, value)
 	}
+	if value, ok := meuo.mutation.RecoveryMode(); ok {
+		_spec.SetField(monitorevent.FieldRecoveryMode, field.TypeEnum, value)
+	}
 	if value, ok := meuo.mutation.Source(); ok {
 		_spec.SetField(monitorevent.FieldSource, field.TypeString, value)
 	}
@@ -1269,12 +1267,6 @@ func (meuo *MonitorEventUpdateOne) sqlSave(ctx context.Context) (_node *MonitorE
 	}
 	if meuo.mutation.ResolvedAtCleared() {
 		_spec.ClearField(monitorevent.FieldResolvedAt, field.TypeTime)
-	}
-	if value, ok := meuo.mutation.IgnoredAt(); ok {
-		_spec.SetField(monitorevent.FieldIgnoredAt, field.TypeTime, value)
-	}
-	if meuo.mutation.IgnoredAtCleared() {
-		_spec.ClearField(monitorevent.FieldIgnoredAt, field.TypeTime)
 	}
 	if value, ok := meuo.mutation.AutoResolveAt(); ok {
 		_spec.SetField(monitorevent.FieldAutoResolveAt, field.TypeTime, value)

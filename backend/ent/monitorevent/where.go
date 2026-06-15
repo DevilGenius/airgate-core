@@ -129,11 +129,6 @@ func ResolvedAt(v time.Time) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldResolvedAt, v))
 }
 
-// IgnoredAt applies equality check predicate on the "ignored_at" field. It's identical to IgnoredAtEQ.
-func IgnoredAt(v time.Time) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldIgnoredAt, v))
-}
-
 // AutoResolveAt applies equality check predicate on the "auto_resolve_at" field. It's identical to AutoResolveAtEQ.
 func AutoResolveAt(v time.Time) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldEQ(FieldAutoResolveAt, v))
@@ -217,6 +212,26 @@ func StatusIn(vs ...Status) predicate.MonitorEvent {
 // StatusNotIn applies the NotIn predicate on the "status" field.
 func StatusNotIn(vs ...Status) predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldNotIn(FieldStatus, vs...))
+}
+
+// RecoveryModeEQ applies the EQ predicate on the "recovery_mode" field.
+func RecoveryModeEQ(v RecoveryMode) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldEQ(FieldRecoveryMode, v))
+}
+
+// RecoveryModeNEQ applies the NEQ predicate on the "recovery_mode" field.
+func RecoveryModeNEQ(v RecoveryMode) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNEQ(FieldRecoveryMode, v))
+}
+
+// RecoveryModeIn applies the In predicate on the "recovery_mode" field.
+func RecoveryModeIn(vs ...RecoveryMode) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldIn(FieldRecoveryMode, vs...))
+}
+
+// RecoveryModeNotIn applies the NotIn predicate on the "recovery_mode" field.
+func RecoveryModeNotIn(vs ...RecoveryMode) predicate.MonitorEvent {
+	return predicate.MonitorEvent(sql.FieldNotIn(FieldRecoveryMode, vs...))
 }
 
 // SourceEQ applies the EQ predicate on the "source" field.
@@ -1112,56 +1127,6 @@ func ResolvedAtIsNil() predicate.MonitorEvent {
 // ResolvedAtNotNil applies the NotNil predicate on the "resolved_at" field.
 func ResolvedAtNotNil() predicate.MonitorEvent {
 	return predicate.MonitorEvent(sql.FieldNotNull(FieldResolvedAt))
-}
-
-// IgnoredAtEQ applies the EQ predicate on the "ignored_at" field.
-func IgnoredAtEQ(v time.Time) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldEQ(FieldIgnoredAt, v))
-}
-
-// IgnoredAtNEQ applies the NEQ predicate on the "ignored_at" field.
-func IgnoredAtNEQ(v time.Time) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNEQ(FieldIgnoredAt, v))
-}
-
-// IgnoredAtIn applies the In predicate on the "ignored_at" field.
-func IgnoredAtIn(vs ...time.Time) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIn(FieldIgnoredAt, vs...))
-}
-
-// IgnoredAtNotIn applies the NotIn predicate on the "ignored_at" field.
-func IgnoredAtNotIn(vs ...time.Time) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotIn(FieldIgnoredAt, vs...))
-}
-
-// IgnoredAtGT applies the GT predicate on the "ignored_at" field.
-func IgnoredAtGT(v time.Time) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGT(FieldIgnoredAt, v))
-}
-
-// IgnoredAtGTE applies the GTE predicate on the "ignored_at" field.
-func IgnoredAtGTE(v time.Time) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldGTE(FieldIgnoredAt, v))
-}
-
-// IgnoredAtLT applies the LT predicate on the "ignored_at" field.
-func IgnoredAtLT(v time.Time) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLT(FieldIgnoredAt, v))
-}
-
-// IgnoredAtLTE applies the LTE predicate on the "ignored_at" field.
-func IgnoredAtLTE(v time.Time) predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldLTE(FieldIgnoredAt, v))
-}
-
-// IgnoredAtIsNil applies the IsNil predicate on the "ignored_at" field.
-func IgnoredAtIsNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldIsNull(FieldIgnoredAt))
-}
-
-// IgnoredAtNotNil applies the NotNil predicate on the "ignored_at" field.
-func IgnoredAtNotNil() predicate.MonitorEvent {
-	return predicate.MonitorEvent(sql.FieldNotNull(FieldIgnoredAt))
 }
 
 // AutoResolveAtEQ applies the EQ predicate on the "auto_resolve_at" field.
