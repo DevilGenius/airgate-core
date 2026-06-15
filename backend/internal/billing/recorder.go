@@ -392,7 +392,7 @@ func (r *Recorder) insertUsageLogs(ctx context.Context, tx *ent.Tx, batch []Usag
 	if err := tx.Driver().Query(ctx, query, args, &rows); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	inserted := make([]insertedUsageLog, 0, len(batch))
 	for rows.Next() {
