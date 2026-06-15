@@ -13,6 +13,7 @@ import (
 const (
 	GroupName = "notification"
 
+	KeyEnabled       = "notification_enabled"
 	KeyWebhookURL    = "notification_webhook_url"
 	KeyWebhookSecret = "notification_webhook_secret"
 	KeyWebhookBody   = "notification_webhook_body"
@@ -45,6 +46,9 @@ func (s *Service) IsConfigured(ctx context.Context) (bool, error) {
 	items, err := s.settingsService.List(ctx, GroupName)
 	if err != nil {
 		return false, fmt.Errorf("load notification settings: %w", err)
+	}
+	if !notificationEnabled(items) {
+		return false, nil
 	}
 	hasURL := false
 	hasBody := false
@@ -84,6 +88,9 @@ func (s *Service) LoadConfig(ctx context.Context) (notifier.WebhookConfig, error
 	if err != nil {
 		return notifier.WebhookConfig{}, fmt.Errorf("load notification settings: %w", err)
 	}
+	if !notificationEnabled(items) {
+		return notifier.WebhookConfig{}, fmt.Errorf("notification is disabled")
+	}
 
 	cfg := notifier.WebhookConfig{}
 	for _, item := range items {
@@ -103,6 +110,15 @@ func (s *Service) LoadConfig(ctx context.Context) (notifier.WebhookConfig, error
 		return notifier.WebhookConfig{}, fmt.Errorf("notification webhook body is not configured")
 	}
 	return cfg, nil
+}
+
+func notificationEnabled(items []appsettings.Setting) bool {
+	for _, item := range items {
+		if item.Key == KeyEnabled {
+			return strings.EqualFold(strings.TrimSpace(item.Value), "true")
+		}
+	}
+	return false
 }
 
 // DefaultTemplateValues returns common template variables for notification bodies.

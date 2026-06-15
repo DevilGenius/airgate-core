@@ -989,6 +989,10 @@
     "smtp_test_success": "Test email sent, please check your inbox",
 
     "notification_config": "Message Notifications",
+    "notification_enabled_section": "Notification Switch",
+    "notification_enabled_section_desc": "Controls whether system monitor messages are pushed to the webhook.",
+    "notification_enabled": "Enable Message Notifications",
+    "notification_enabled_desc": "Monitor messages are not sent unless this is explicitly enabled.",
     "notification_webhook": "Webhook Configuration",
     "notification_webhook_desc": "Push system message notifications to an external service.",
     "notification_webhook_url": "Webhook URL",

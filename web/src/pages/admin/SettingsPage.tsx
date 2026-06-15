@@ -43,6 +43,7 @@ const SMTP_KEYS = [
 ] as const;
 
 const NOTIFICATION_KEYS = [
+  'notification_enabled',
   'notification_webhook_url',
   'notification_webhook_secret',
   'notification_webhook_body',
@@ -226,11 +227,19 @@ export default function SettingsPage() {
     const tab = activeTab as SaveTabKey;
     const group = TAB_GROUP[tab];
     const keys = TAB_KEYS[tab];
+    function saveValue(key: string): string {
+      if (tab === 'notification' && key === 'notification_enabled') {
+        return values[key] ?? 'false';
+      }
+      if (tab === 'notification' && key === 'notification_webhook_body') {
+        return valOrDefault(key, DEFAULT_NOTIFICATION_BODY);
+      }
+      return values[key] ?? '';
+    }
+
     return keys.map((key) => ({
       key,
-      value: tab === 'notification' && key === 'notification_webhook_body'
-        ? valOrDefault(key, DEFAULT_NOTIFICATION_BODY)
-        : values[key] ?? '',
+      value: saveValue(key),
       group,
     }));
   }
@@ -394,9 +403,6 @@ export default function SettingsPage() {
 
         {activeTab === 'security' && (
           <Card>
-            <Card.Header>
-              <Card.Title>{t('settings.tab_security')}</Card.Title>
-            </Card.Header>
             <Card.Content>
               <div className="ag-settings-section-stack">
                 <SecurityPanel />
@@ -1059,25 +1065,41 @@ function NotificationPanel({
   const { t } = useTranslation();
   const variables = ['title', 'content'];
   const canTest = val('notification_webhook_url').trim() !== '' && body.trim() !== '';
+  const notificationEnabled = val('notification_enabled') === 'true';
 
   return (
     <Card>
-      <Card.Header className="justify-between gap-3">
-        <Card.Title>{t('settings.notification_config')}</Card.Title>
-        <Button
-          aria-busy={isTesting}
-          isDisabled={!canTest || isTesting}
-          onPress={onTest}
-          size="sm"
-          variant="secondary"
-        >
-          <Send className="w-3.5 h-3.5" />
-          {t('settings.notification_test')}
-        </Button>
-      </Card.Header>
       <Card.Content>
         <div className="ag-settings-section-stack">
           <SettingsSection
+            description={t('settings.notification_enabled_section_desc')}
+            title={t('settings.notification_enabled_section')}
+          >
+            <NativeSwitch
+              isSelected={notificationEnabled}
+              label={(
+                <>
+                  <span className="text-sm font-medium text-text">{t('settings.notification_enabled')}</span>
+                  <span className="block text-xs text-text-tertiary">{t('settings.notification_enabled_desc')}</span>
+                </>
+              )}
+              onChange={(v) => set('notification_enabled', String(v))}
+            />
+          </SettingsSection>
+
+          <SettingsSection
+            action={(
+              <Button
+                aria-busy={isTesting}
+                isDisabled={!canTest || isTesting}
+                onPress={onTest}
+                size="sm"
+                variant="secondary"
+              >
+                <Send className="w-3.5 h-3.5" />
+                {t('settings.notification_test')}
+              </Button>
+            )}
             description={t('settings.notification_webhook_desc')}
             title={t('settings.notification_webhook')}
           >

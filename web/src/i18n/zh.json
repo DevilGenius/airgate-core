@@ -994,6 +994,10 @@
     "smtp_test_success": "测试邮件已发送，请检查收件箱",
 
     "notification_config": "消息通知",
+    "notification_enabled_section": "消息通知开关",
+    "notification_enabled_section_desc": "控制系统监控消息是否推送到 Webhook。",
+    "notification_enabled": "启用消息通知",
+    "notification_enabled_desc": "未显式开启时不会发送监控消息。",
     "notification_webhook": "Webhook 配置",
     "notification_webhook_desc": "用于向外部系统推送系统消息通知。",
     "notification_webhook_url": "Webhook 地址",
