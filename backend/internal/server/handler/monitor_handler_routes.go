@@ -19,6 +19,17 @@ func (h *MonitorHandler) MonitorSummary(c *gin.Context) {
 	response.Success(c, toMonitorSummaryResp(result))
 }
 
+// MonitorRequestSummary returns request monitor event aggregates.
+func (h *MonitorHandler) MonitorRequestSummary(c *gin.Context) {
+	result, err := h.service.RequestSummary(c.Request.Context())
+	if err != nil {
+		httpCode, message := handleMonitorError("查询请求监控概览失败", "查询失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, toMonitorSummaryResp(result))
+}
+
 // ListMonitorEvents returns cursor-paged monitor events.
 func (h *MonitorHandler) ListMonitorEvents(c *gin.Context) {
 	var query dto.MonitorListQuery

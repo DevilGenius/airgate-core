@@ -74,6 +74,14 @@ export default function MonitorPage() {
   });
   const refetchSummary = summaryQuery.refetch;
 
+  const requestSummaryQuery = useQuery({
+    queryKey: queryKeys.monitorRequests('summary'),
+    queryFn: ({ signal }) => monitorApi.requestSummary({ signal }),
+    meta: { globalLoading: false },
+    placeholderData: keepPreviousData,
+  });
+  const refetchRequestSummary = requestSummaryQuery.refetch;
+
   const {
     data,
     dataUpdatedAt,
@@ -242,7 +250,8 @@ export default function MonitorPage() {
     void refetch({ cancelRefetch: false });
     void refetchSummary({ cancelRefetch: false });
     void refetchRequests({ cancelRefetch: false });
-  }, [refetch, refetchRequests, refetchSummary]);
+    void refetchRequestSummary({ cancelRefetch: false });
+  }, [refetch, refetchRequests, refetchRequestSummary, refetchSummary]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -260,6 +269,7 @@ export default function MonitorPage() {
       void refetch({ cancelRefetch: false });
       void refetchSummary({ cancelRefetch: false });
       void refetchRequests({ cancelRefetch: false });
+      void refetchRequestSummary({ cancelRefetch: false });
     };
     const handleVisibilityChange = () => {
       if (document.hidden || !pendingWhileHidden) return;
@@ -284,7 +294,7 @@ export default function MonitorPage() {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [refetch, refetchRequests, refetchSummary]);
+  }, [refetch, refetchRequestSummary, refetchRequests, refetchSummary]);
 
   const statusOptions: SelectOption[] = [
     { id: '', label: t('common.all') },
@@ -362,11 +372,14 @@ export default function MonitorPage() {
   const activeIsTableFetching = isRequestTable
     ? hasRequestRows && isRequestPlaceholderData && isRequestFetching && !showRequestInitialLoading
     : hasRows && isPlaceholderData && isFetching && !showInitialLoading;
-  const activeRefreshBusy = isRequestTable ? isRequestFetching : isFetching || summaryQuery.isFetching;
+  const activeSummary = isRequestTable ? requestSummaryQuery.data : summaryQuery.data;
+  const activeRefreshBusy = isRequestTable
+    ? isRequestFetching || requestSummaryQuery.isFetching
+    : isFetching || summaryQuery.isFetching;
 
   return (
     <div>
-      <MonitorStats summary={summaryQuery.data} />
+      <MonitorStats showActiveCounts={!isRequestTable} summary={activeSummary} />
       <TablePage
         className="ag-monitor-page ag-toolbar-standard-page"
         footer={(
@@ -483,6 +496,7 @@ export default function MonitorPage() {
               onPress={() => {
                 if (isRequestTable) {
                   void refetchRequests({ cancelRefetch: false });
+                  void refetchRequestSummary({ cancelRefetch: false });
                   return;
                 }
                 handleManualRefresh();

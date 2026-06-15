@@ -45,7 +45,13 @@ function StatCard({
   );
 }
 
-export function MonitorStats({ summary }: { summary?: MonitorSummaryResp }) {
+export function MonitorStats({
+  showActiveCounts = true,
+  summary,
+}: {
+  showActiveCounts?: boolean;
+  summary?: MonitorSummaryResp;
+}) {
   const { t } = useTranslation();
   return (
     <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
@@ -53,6 +59,7 @@ export function MonitorStats({ summary }: { summary?: MonitorSummaryResp }) {
         active={summary?.critical_active_total ?? 0}
         icon={<TriangleAlert className="h-5 w-5" />}
         label={t('monitor.critical')}
+        showActiveRatio={showActiveCounts}
         tone="bg-black text-white ring-black dark:bg-black dark:text-white dark:ring-zinc-600"
         total={summary?.critical_total ?? 0}
       />
@@ -60,6 +67,7 @@ export function MonitorStats({ summary }: { summary?: MonitorSummaryResp }) {
         active={summary?.error_active_total ?? 0}
         icon={<AlertTriangle className="h-5 w-5" />}
         label={t('monitor.error')}
+        showActiveRatio={showActiveCounts}
         tone="bg-rose-100 text-rose-600 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/25"
         total={summary?.error_total ?? 0}
       />

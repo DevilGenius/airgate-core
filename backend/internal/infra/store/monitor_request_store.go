@@ -82,6 +82,37 @@ func (s *MonitorStore) ListRequests(ctx context.Context, filter appmonitor.Reque
 	}, nil
 }
 
+// RequestSummary returns request monitor event aggregates. Request events only
+// have warning/info severities and do not carry active/resolved state.
+func (s *MonitorStore) RequestSummary(ctx context.Context) (appmonitor.Summary, error) {
+	if s == nil || s.db == nil {
+		return appmonitor.Summary{}, nil
+	}
+	var rows []struct {
+		Severity string `json:"severity"`
+		Count    int    `json:"count"`
+	}
+	err := s.db.MonitorRequestEvent.Query().
+		GroupBy(entmonitorrequestevent.FieldSeverity).
+		Aggregate(ent.Count()).
+		Scan(ctx, &rows)
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
+
+	var out appmonitor.Summary
+	for _, row := range rows {
+		count := int64(row.Count)
+		switch row.Severity {
+		case string(entmonitorrequestevent.SeverityWarning):
+			out.WarningTotal += count
+		case string(entmonitorrequestevent.SeverityInfo):
+			out.InfoTotal += count
+		}
+	}
+	return out, nil
+}
+
 // ClearRequestEvents deletes request monitor rows. A nil before value clears all rows.
 func (s *MonitorStore) ClearRequestEvents(ctx context.Context, before *time.Time) (int, error) {
 	if s == nil || s.db == nil {

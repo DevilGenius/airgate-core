@@ -209,6 +209,7 @@ type Repository interface {
 	ListRequests(context.Context, RequestListFilter) (RequestListResult, error)
 	ClearRequestEvents(context.Context, *time.Time) (int, error)
 	Summary(context.Context) (Summary, error)
+	RequestSummary(context.Context) (Summary, error)
 	CleanupExpired(context.Context, time.Time, int) (int, error)
 	CleanupExpiredRequests(context.Context, time.Time, int) (int, error)
 	AutoResolveDue(context.Context, time.Time, int) (int, error)

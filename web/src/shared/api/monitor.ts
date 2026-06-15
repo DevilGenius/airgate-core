@@ -15,6 +15,8 @@ type MonitorRequestOptions = {
 export const monitorApi = {
   summary: (options?: MonitorRequestOptions) =>
     get<MonitorSummaryResp>('/api/v1/admin/monitor/summary', undefined, options),
+  requestSummary: (options?: MonitorRequestOptions) =>
+    get<MonitorSummaryResp>('/api/v1/admin/monitor/requests/summary', undefined, options),
   list: (params: MonitorListQuery, options?: MonitorRequestOptions) =>
     get<MonitorListResp>('/api/v1/admin/monitor', params, options),
   requestList: (params: MonitorRequestListQuery, options?: MonitorRequestOptions) =>

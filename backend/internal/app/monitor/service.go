@@ -281,6 +281,15 @@ func (s *Service) Summary(ctx context.Context) (Summary, error) {
 	return s.repo.Summary(ctx)
 }
 
+// RequestSummary returns request monitor event counts. Request events are
+// append-only and do not have active/resolved state.
+func (s *Service) RequestSummary(ctx context.Context) (Summary, error) {
+	if s == nil || s.repo == nil {
+		return Summary{}, nil
+	}
+	return s.repo.RequestSummary(ctx)
+}
+
 // Resolve marks one monitor event resolved.
 func (s *Service) Resolve(ctx context.Context, id int) error {
 	if s == nil || s.repo == nil {
