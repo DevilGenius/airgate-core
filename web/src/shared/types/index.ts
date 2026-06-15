@@ -861,8 +861,13 @@ export interface MonitorSubjectCountResp {
 export interface MonitorSummaryResp {
   active_total: number;
   critical_total: number;
+  critical_active_total: number;
   error_total: number;
+  error_active_total: number;
   warning_total: number;
+  warning_active_total: number;
+  info_total: number;
+  info_active_total: number;
   by_type: MonitorTypeCountResp[];
   top_accounts: MonitorSubjectCountResp[];
   recent: MonitorEventResp[];

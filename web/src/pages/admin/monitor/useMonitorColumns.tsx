@@ -33,6 +33,12 @@ function severityLabel(t: TFunction, value: string): string {
   return t(`monitor.severity_${value}`, value);
 }
 
+function requestSeverityLabel(t: TFunction, value: string): string {
+  if (value === 'warning') return t('monitor.request_severity_warning', '警告');
+  if (value === 'info') return t('monitor.request_severity_info', '信息');
+  return severityLabel(t, value);
+}
+
 function typeLabel(t: TFunction, value: string): string {
   return t(`monitor.type_${value}`, value);
 }
@@ -180,19 +186,25 @@ export function useMonitorRequestColumns(): MonitorRequestColumnConfig[] {
       render: (row) => <TimeCell value={row.created_at} />,
     },
     {
+      key: 'severity',
+      title: t('monitor.severity'),
+      width: MONITOR_COLUMN_WIDTHS.severity,
+      render: (row) => (
+        <div className="flex h-full w-full min-w-0 flex-col items-center justify-center gap-1">
+          <StatusPill className={SEVERITY_CLASSES[row.severity] ?? SEVERITY_CLASSES.info} label={requestSeverityLabel(t, row.severity)} />
+          <span className="max-w-full truncate text-[11px] leading-none text-text-tertiary" title={typeLabel(t, row.type)}>
+            {typeLabel(t, row.type)}
+          </span>
+        </div>
+      ),
+    },
+    {
       key: 'event',
       title: t('monitor.event'),
       width: MONITOR_COLUMN_WIDTHS.event,
       render: (row) => (
         <StackCell
-          primary={(
-            <>
-              {row.severity === 'warning' ? (
-                <span aria-hidden className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 align-middle" />
-              ) : null}
-              {row.title || typeLabel(t, row.type)}
-            </>
-          )}
+          primary={row.title || typeLabel(t, row.type)}
           primaryClass="font-medium text-text"
           primaryTitle={row.title || undefined}
           secondary={row.message || typeLabel(t, row.type)}
@@ -231,9 +243,16 @@ export function useMonitorRequestColumns(): MonitorRequestColumnConfig[] {
       ),
     },
     {
-      key: 'http_status',
-      title: t('monitor.error_code'),
-      width: MONITOR_COLUMN_WIDTHS.status,
+      key: 'detail',
+      title: t('monitor.detail'),
+      width: MONITOR_COLUMN_WIDTHS.detail,
+      hideOnMobile: true,
+      render: (row) => <DetailCell entries={requestDetailEntries(row)} />,
+    },
+    {
+      key: 'status_error_code',
+      title: `${t('monitor.http_status')} / ${t('monitor.error_code')}`,
+      width: MONITOR_COLUMN_WIDTHS.statusActions,
       render: (row) => (
         <div className="flex h-full w-full min-w-0 flex-col items-center justify-center gap-1">
           <span className={`max-w-full truncate font-mono text-[13px] font-medium leading-none ${requestStatusToneClass(row)}`} title={requestStatusLabel(row)}>
@@ -244,13 +263,6 @@ export function useMonitorRequestColumns(): MonitorRequestColumnConfig[] {
           </span>
         </div>
       ),
-    },
-    {
-      key: 'detail',
-      title: t('monitor.detail'),
-      width: MONITOR_COLUMN_WIDTHS.detail,
-      hideOnMobile: true,
-      render: (row) => <DetailCell entries={requestDetailEntries(row)} />,
     },
   ], [t]);
 }

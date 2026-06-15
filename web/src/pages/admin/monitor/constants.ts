@@ -11,12 +11,14 @@ export const MONITOR_COLUMN_WIDTHS = {
   detail: '240px',
   status: '116px',
   actions: '96px',
+  statusActions: '212px',
 };
 
 export const SEVERITY_CLASSES: Record<string, string> = {
-  critical: 'bg-danger/10 text-danger ring-danger/20',
+  critical: 'bg-black text-white ring-black dark:bg-black dark:text-white dark:ring-zinc-600',
   error: 'bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/25',
   warning: 'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
+  info: 'bg-sky-100 text-sky-700 ring-sky-200 dark:bg-sky-400/15 dark:text-sky-300 dark:ring-sky-400/25',
 };
 
 export const STATUS_CLASSES: Record<string, string> = {

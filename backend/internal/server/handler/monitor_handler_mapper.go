@@ -52,13 +52,18 @@ func toMonitorListResp(result appmonitor.ListResult) dto.MonitorListResp {
 
 func toMonitorSummaryResp(item appmonitor.Summary) dto.MonitorSummaryResp {
 	return dto.MonitorSummaryResp{
-		ActiveTotal:   item.ActiveTotal,
-		CriticalTotal: item.CriticalTotal,
-		ErrorTotal:    item.ErrorTotal,
-		WarningTotal:  item.WarningTotal,
-		ByType:        toMonitorTypeCounts(item.ByType),
-		TopAccounts:   toMonitorSubjectCounts(item.TopAccounts),
-		Recent:        toMonitorEventRespList(item.Recent),
+		ActiveTotal:         item.ActiveTotal,
+		CriticalTotal:       item.CriticalTotal,
+		CriticalActiveTotal: item.CriticalActiveTotal,
+		ErrorTotal:          item.ErrorTotal,
+		ErrorActiveTotal:    item.ErrorActiveTotal,
+		WarningTotal:        item.WarningTotal,
+		WarningActiveTotal:  item.WarningActiveTotal,
+		InfoTotal:           item.InfoTotal,
+		InfoActiveTotal:     item.InfoActiveTotal,
+		ByType:              toMonitorTypeCounts(item.ByType),
+		TopAccounts:         toMonitorSubjectCounts(item.TopAccounts),
+		Recent:              toMonitorEventRespList(item.Recent),
 	}
 }
 

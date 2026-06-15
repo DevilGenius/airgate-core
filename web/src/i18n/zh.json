@@ -735,6 +735,8 @@
     "severity_warning": "警告",
     "severity_error": "错误",
     "severity_critical": "严重",
+    "request_severity_info": "信息",
+    "request_severity_warning": "警告",
     "type_api_request_error": "API 请求异常",
     "type_plugin_route_error": "插件路由异常",
     "type_plugin_forward_error": "插件转发异常",

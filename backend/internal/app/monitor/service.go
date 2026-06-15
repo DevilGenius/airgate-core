@@ -269,7 +269,7 @@ func (s *Service) ClearRequestEvents(ctx context.Context, before *time.Time) (in
 	return deleted, nil
 }
 
-// Summary returns the active event overview for future dashboard handlers.
+// Summary returns the monitor event overview for future dashboard handlers.
 func (s *Service) Summary(ctx context.Context) (Summary, error) {
 	if s == nil || s.repo == nil {
 		return Summary{}, nil

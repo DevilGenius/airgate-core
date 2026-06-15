@@ -151,11 +151,16 @@ type MonitorSubjectCountResp struct {
 
 // MonitorSummaryResp is the admin monitor overview.
 type MonitorSummaryResp struct {
-	ActiveTotal   int64                     `json:"active_total"`
-	CriticalTotal int64                     `json:"critical_total"`
-	ErrorTotal    int64                     `json:"error_total"`
-	WarningTotal  int64                     `json:"warning_total"`
-	ByType        []MonitorTypeCountResp    `json:"by_type"`
-	TopAccounts   []MonitorSubjectCountResp `json:"top_accounts"`
-	Recent        []MonitorEventResp        `json:"recent"`
+	ActiveTotal         int64                     `json:"active_total"`
+	CriticalTotal       int64                     `json:"critical_total"`
+	CriticalActiveTotal int64                     `json:"critical_active_total"`
+	ErrorTotal          int64                     `json:"error_total"`
+	ErrorActiveTotal    int64                     `json:"error_active_total"`
+	WarningTotal        int64                     `json:"warning_total"`
+	WarningActiveTotal  int64                     `json:"warning_active_total"`
+	InfoTotal           int64                     `json:"info_total"`
+	InfoActiveTotal     int64                     `json:"info_active_total"`
+	ByType              []MonitorTypeCountResp    `json:"by_type"`
+	TopAccounts         []MonitorSubjectCountResp `json:"top_accounts"`
+	Recent              []MonitorEventResp        `json:"recent"`
 }

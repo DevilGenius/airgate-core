@@ -730,6 +730,8 @@
     "severity_warning": "Warning",
     "severity_error": "Error",
     "severity_critical": "Critical",
+    "request_severity_info": "Info",
+    "request_severity_warning": "Warn",
     "type_api_request_error": "API Request Error",
     "type_plugin_route_error": "Plugin Route Error",
     "type_plugin_forward_error": "Plugin Forward Error",

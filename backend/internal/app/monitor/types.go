@@ -182,15 +182,20 @@ type SubjectCount struct {
 	Count int64
 }
 
-// Summary is the overview aggregate for active events.
+// Summary is the overview aggregate for monitor events.
 type Summary struct {
-	ActiveTotal   int64
-	CriticalTotal int64
-	ErrorTotal    int64
-	WarningTotal  int64
-	ByType        []TypeCount
-	TopAccounts   []SubjectCount
-	Recent        []Event
+	ActiveTotal         int64
+	CriticalTotal       int64
+	CriticalActiveTotal int64
+	ErrorTotal          int64
+	ErrorActiveTotal    int64
+	WarningTotal        int64
+	WarningActiveTotal  int64
+	InfoTotal           int64
+	InfoActiveTotal     int64
+	ByType              []TypeCount
+	TopAccounts         []SubjectCount
+	Recent              []Event
 }
 
 // Repository defines monitor event persistence.

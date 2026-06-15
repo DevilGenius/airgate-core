@@ -240,15 +240,16 @@ func (s *MonitorStore) List(ctx context.Context, filter appmonitor.ListFilter) (
 	}, nil
 }
 
-// Summary returns active monitor event aggregates.
+// Summary returns monitor event aggregates.
 func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) {
 	if s == nil || s.db == nil {
 		return appmonitor.Summary{}, nil
 	}
-	base := s.db.MonitorEvent.Query().
+	base := s.db.MonitorEvent.Query()
+	activeBase := base.Clone().
 		Where(entmonitorevent.StatusEQ(entmonitorevent.StatusActive))
 
-	activeTotal, err := base.Clone().Count(ctx)
+	activeTotal, err := activeBase.Clone().Count(ctx)
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
@@ -256,7 +257,15 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
+	criticalActiveTotal, err := activeBase.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityCritical)).Count(ctx)
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
 	errorTotal, err := base.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityError)).Count(ctx)
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
+	errorActiveTotal, err := activeBase.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityError)).Count(ctx)
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
@@ -264,15 +273,19 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
-	byType, err := s.summaryByType(ctx, base.Clone())
+	warningActiveTotal, err := activeBase.Clone().Where(entmonitorevent.SeverityEQ(entmonitorevent.SeverityWarning)).Count(ctx)
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
-	topAccounts, err := s.summaryTopAccounts(ctx, base.Clone())
+	byType, err := s.summaryByType(ctx, activeBase.Clone())
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
-	recentRows, err := base.Clone().
+	topAccounts, err := s.summaryTopAccounts(ctx, activeBase.Clone())
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
+	recentRows, err := activeBase.Clone().
 		Order(ent.Desc(entmonitorevent.FieldUpdatedAt), ent.Desc(entmonitorevent.FieldID)).
 		Limit(monitorSummaryRecentLimit).
 		All(ctx)
@@ -285,13 +298,16 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 	}
 
 	return appmonitor.Summary{
-		ActiveTotal:   int64(activeTotal),
-		CriticalTotal: int64(criticalTotal),
-		ErrorTotal:    int64(errorTotal),
-		WarningTotal:  int64(warningTotal),
-		ByType:        byType,
-		TopAccounts:   topAccounts,
-		Recent:        recent,
+		ActiveTotal:         int64(activeTotal),
+		CriticalTotal:       int64(criticalTotal),
+		CriticalActiveTotal: int64(criticalActiveTotal),
+		ErrorTotal:          int64(errorTotal),
+		ErrorActiveTotal:    int64(errorActiveTotal),
+		WarningTotal:        int64(warningTotal),
+		WarningActiveTotal:  int64(warningActiveTotal),
+		ByType:              byType,
+		TopAccounts:         topAccounts,
+		Recent:              recent,
 	}, nil
 }
 
