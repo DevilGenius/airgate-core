@@ -2,14 +2,20 @@ package billing
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
@@ -17,17 +23,22 @@ import (
 )
 
 const (
-	defaultBufferSize   = 1000            // 内存 channel 缓冲大小
-	batchSize           = 100             // 批量写入阈值
-	flushInterval       = 5 * time.Second // 定时刷新间隔
-	maxRetries          = 3               // 写入失败最大重试次数
-	retryQueueSize      = 64              // 失败批次补偿队列
-	syncFallbackTimeout = 10 * time.Second
-	maxRetryBackoff     = 30 * time.Second
+	defaultBufferSize    = 1000            // 内存 channel 缓冲大小
+	batchSize            = 100             // 批量写入阈值
+	flushInterval        = 5 * time.Second // 定时刷新间隔
+	maxFlushAttempts     = 6               // 包含首写在内的最大写入尝试次数
+	retryQueueSize       = 64              // 失败批次补偿队列
+	syncFallbackTimeout  = 10 * time.Second
+	writeAttemptTimeout  = 15 * time.Second
+	shutdownFlushTimeout = 15 * time.Second
+	maxRetryBackoff      = 30 * time.Second
 )
+
+var errRecorderStopping = errors.New("billing recorder stopping")
 
 // UsageRecord 使用记录
 type UsageRecord struct {
+	BillingEventID        string
 	UserID                int
 	UserEmail             string
 	APIKeyID              int
@@ -102,6 +113,7 @@ func NewRecorder(db *ent.Client, bufferSize int, rdb ...*redis.Client) *Recorder
 
 // Record 提交使用记录（非阻塞）
 func (r *Recorder) Record(record UsageRecord) {
+	record = ensureBillingEventID(record)
 	select {
 	case r.ch <- record:
 	default:
@@ -124,6 +136,7 @@ func (r *Recorder) Record(record UsageRecord) {
 // RecordSync 同步写入一条使用记录并返回 usage_log.id。
 // 需要立即把 usage_id 关联到任务时使用；普通转发仍走异步 Record。
 func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, error) {
+	record = ensureBillingEventID(record)
 	tx, err := r.db.Tx(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("开启事务失败: %w", err)
@@ -132,18 +145,32 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 		_ = tx.Rollback()
 	}()
 
-	log, err := usageLogCreate(tx, record).Save(ctx)
+	inserted, err := r.insertUsageLogs(ctx, tx, []UsageRecord{record})
 	if err != nil {
 		return 0, fmt.Errorf("插入 UsageLog 失败: %w", err)
 	}
-	if err := applyUsageCharges(ctx, tx, []UsageRecord{record}); err != nil {
-		return 0, err
+	if len(inserted) > 0 {
+		insertedBatch := insertedUsageRecords(inserted)
+		if err := applyUsageCharges(ctx, tx, insertedBatch); err != nil {
+			return 0, err
+		}
+		if err := tx.Commit(); err != nil {
+			return 0, fmt.Errorf("提交事务失败: %w", err)
+		}
+		r.updateAccountStatsCache(ctx, insertedBatch)
+		return inserted[0].ID, nil
+	}
+
+	usageID, err := tx.UsageLog.Query().
+		Where(usagelog.BillingEventIDEQ(record.BillingEventID)).
+		OnlyID(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("查询已有 UsageLog 失败 billing_event_id=%s: %w", record.BillingEventID, err)
 	}
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("提交事务失败: %w", err)
 	}
-	r.updateAccountStatsCache(ctx, []UsageRecord{record})
-	return log.ID, nil
+	return usageID, nil
 }
 
 // Start 启动后台写入 goroutine
@@ -194,7 +221,9 @@ func (r *Recorder) run() {
 				batch = append(batch, rec)
 			}
 			if len(batch) > 0 {
-				r.flush(ctx, batch)
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownFlushTimeout)
+				r.flush(shutdownCtx, batch)
+				cancel()
 			}
 			return
 		}
@@ -206,24 +235,31 @@ func (r *Recorder) flush(ctx context.Context, batch []UsageRecord) {
 	if len(batch) == 0 {
 		return
 	}
-	if err := r.batchInsert(ctx, batch); err != nil {
+	ensureBatchBillingEventIDs(batch)
+	insertCtx, cancel := withWriteTimeout(ctx)
+	defer cancel()
+	if err := r.batchInsert(insertCtx, batch); err != nil {
 		slog.Error("billing_batch_flush_failed",
 			"attempt", 1,
 			"count", len(batch),
 			"error", err,
 		)
-		r.enqueueRetry(batch)
+		r.enqueueRetry(ctx, batch, err)
 		return
 	}
 	slog.Debug("billing_batch_flush_succeeded", "count", len(batch))
 }
 
-func (r *Recorder) enqueueRetry(batch []UsageRecord) {
+func (r *Recorder) enqueueRetry(ctx context.Context, batch []UsageRecord, cause error) {
 	retryBatch := append([]UsageRecord(nil), batch...)
 	select {
 	case r.retryCh <- retryBatch:
 	case <-r.stopCh:
-		r.flushRetryBatch(context.Background(), retryBatch)
+		r.deadLetter(retryBatch, "recorder_stopping", cause)
+	case <-ctx.Done():
+		r.deadLetter(retryBatch, "context_cancelled", ctx.Err())
+	default:
+		r.deadLetter(retryBatch, "retry_queue_full", cause)
 	}
 }
 
@@ -231,36 +267,54 @@ func (r *Recorder) runRetries() {
 	defer close(r.retryStopped)
 	ctx := context.Background()
 	for batch := range r.retryCh {
-		r.flushRetryBatch(ctx, batch)
+		if err := r.flushRetryBatch(ctx, batch); err != nil {
+			r.deadLetter(batch, "retry_exhausted", err)
+		}
 	}
 }
 
-func (r *Recorder) flushRetryBatch(ctx context.Context, batch []UsageRecord) {
-	for attempt := 2; ; attempt++ {
+func (r *Recorder) flushRetryBatch(ctx context.Context, batch []UsageRecord) error {
+	ensureBatchBillingEventIDs(batch)
+	var lastErr error
+	for attempt := 2; attempt <= maxFlushAttempts; attempt++ {
 		backoff := time.Duration(attempt-1) * time.Second
 		if backoff > maxRetryBackoff {
 			backoff = maxRetryBackoff
 		}
-		time.Sleep(backoff)
-		if err := r.batchInsert(ctx, batch); err != nil {
+		if err := r.waitRetry(ctx, backoff); err != nil {
+			if lastErr != nil {
+				return lastErr
+			}
+			return err
+		}
+		insertCtx, cancel := withWriteTimeout(ctx)
+		err := r.batchInsert(insertCtx, batch)
+		cancel()
+		if err != nil {
+			lastErr = err
 			slog.Error("billing_batch_flush_failed",
 				"attempt", attempt,
 				"count", len(batch),
 				"error", err,
 			)
-			if attempt%maxRetries == 0 {
-				slog.Warn("billing_batch_flush_retained", "count", len(batch), "next_retry_in", maxRetryBackoff)
+			if attempt < maxFlushAttempts {
+				slog.Warn("billing_batch_flush_retained", "count", len(batch), "next_retry_in", nextRetryBackoff(attempt+1))
 			}
 			continue
 		}
 		slog.Debug("billing_batch_flush_succeeded", "attempt", attempt, "count", len(batch))
-		return
+		return nil
 	}
+	if lastErr != nil {
+		return lastErr
+	}
+	return fmt.Errorf("billing batch retry exhausted")
 }
 
 // batchInsert 在同一事务中批量写入使用记录并扣费
 // 保证 UsageLog 插入与余额扣减的原子性，避免记录成功但扣费失败
 func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
+	ensureBatchBillingEventIDs(batch)
 	tx, err := r.db.Tx(ctx)
 	if err != nil {
 		return fmt.Errorf("开启事务失败: %w", err)
@@ -270,17 +324,19 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 		_ = tx.Rollback()
 	}()
 
-	// 1. 批量写入 UsageLog（同时记录 actual_cost 和 billed_cost 双轨数据）
-	builders := make([]*ent.UsageLogCreate, 0, len(batch))
-	for _, rec := range batch {
-		builders = append(builders, usageLogCreate(tx, rec))
-	}
-
-	if _, err := tx.UsageLog.CreateBulk(builders...).Save(ctx); err != nil {
+	inserted, err := r.insertUsageLogs(ctx, tx, batch)
+	if err != nil {
 		return fmt.Errorf("批量插入 UsageLog 失败: %w", err)
 	}
+	if len(inserted) == 0 {
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("提交事务失败: %w", err)
+		}
+		return nil
+	}
+	insertedBatch := insertedUsageRecords(inserted)
 
-	if err := applyUsageCharges(ctx, tx, batch); err != nil {
+	if err := applyUsageCharges(ctx, tx, insertedBatch); err != nil {
 		return err
 	}
 
@@ -288,8 +344,265 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("提交事务失败: %w", err)
 	}
-	r.updateAccountStatsCache(ctx, batch)
+	r.updateAccountStatsCache(ctx, insertedBatch)
 	return nil
+}
+
+type insertedUsageLog struct {
+	ID     int
+	Record UsageRecord
+}
+
+func (r *Recorder) insertUsageLogs(ctx context.Context, tx *ent.Tx, batch []UsageRecord) ([]insertedUsageLog, error) {
+	if len(batch) == 0 {
+		return nil, nil
+	}
+	dialectName := tx.Driver().Dialect()
+	if dialectName != dialect.Postgres && dialectName != dialect.SQLite {
+		return nil, fmt.Errorf("unsupported billing insert dialect: %s", dialectName)
+	}
+
+	now := time.Now()
+	recordsByEvent := make(map[string]UsageRecord, len(batch))
+	insert := entsql.Dialect(dialectName).Insert(usagelog.Table).
+		Columns(usageLogInsertColumns()...).
+		OnConflict(
+			entsql.ConflictColumns(usagelog.FieldBillingEventID),
+			entsql.DoNothing(),
+		).
+		Returning(usagelog.FieldID, usagelog.FieldBillingEventID)
+
+	for _, rec := range batch {
+		rec = ensureBillingEventID(rec)
+		if err := validateUsageRecordForInsert(rec); err != nil {
+			return nil, err
+		}
+		if _, ok := recordsByEvent[rec.BillingEventID]; !ok {
+			recordsByEvent[rec.BillingEventID] = rec
+		}
+		values, err := usageLogInsertValues(rec, now)
+		if err != nil {
+			return nil, err
+		}
+		insert.Values(values...)
+	}
+
+	query, args := insert.Query()
+	var rows entsql.Rows
+	if err := tx.Driver().Query(ctx, query, args, &rows); err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	inserted := make([]insertedUsageLog, 0, len(batch))
+	for rows.Next() {
+		var id int
+		var eventID string
+		if err := rows.Scan(&id, &eventID); err != nil {
+			return nil, err
+		}
+		rec, ok := recordsByEvent[eventID]
+		if !ok {
+			return nil, fmt.Errorf("插入 UsageLog 返回未知 billing_event_id=%s", eventID)
+		}
+		inserted = append(inserted, insertedUsageLog{ID: id, Record: rec})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return inserted, nil
+}
+
+func usageLogInsertColumns() []string {
+	return []string{
+		usagelog.FieldBillingEventID,
+		usagelog.FieldPlatform,
+		usagelog.FieldModel,
+		usagelog.FieldInputTokens,
+		usagelog.FieldOutputTokens,
+		usagelog.FieldCachedInputTokens,
+		usagelog.FieldCacheCreationTokens,
+		usagelog.FieldReasoningOutputTokens,
+		usagelog.FieldInputPrice,
+		usagelog.FieldOutputPrice,
+		usagelog.FieldCachedInputPrice,
+		usagelog.FieldCacheCreationPrice,
+		usagelog.FieldInputCost,
+		usagelog.FieldOutputCost,
+		usagelog.FieldCachedInputCost,
+		usagelog.FieldCacheCreationCost,
+		usagelog.FieldTotalCost,
+		usagelog.FieldActualCost,
+		usagelog.FieldBilledCost,
+		usagelog.FieldAccountCost,
+		usagelog.FieldRateMultiplier,
+		usagelog.FieldSellRate,
+		usagelog.FieldAccountRateMultiplier,
+		usagelog.FieldServiceTier,
+		usagelog.FieldStream,
+		usagelog.FieldDurationMs,
+		usagelog.FieldFirstTokenMs,
+		usagelog.FieldUserAgent,
+		usagelog.FieldIPAddress,
+		usagelog.FieldEndpoint,
+		usagelog.FieldReasoningEffort,
+		usagelog.FieldUsageMetadata,
+		usagelog.FieldUserIDSnapshot,
+		usagelog.FieldUserEmailSnapshot,
+		usagelog.FieldCreatedAt,
+		usagelog.UserColumn,
+		usagelog.APIKeyColumn,
+		usagelog.AccountColumn,
+		usagelog.GroupColumn,
+	}
+}
+
+func usageLogInsertValues(rec UsageRecord, now time.Time) ([]any, error) {
+	metadata, err := usageMetadataValue(rec.UsageMetadata)
+	if err != nil {
+		return nil, err
+	}
+	rateMultiplier := ratevalue.NormalizeMultiplier(rec.RateMultiplier, 1)
+	sellRate := ratevalue.NormalizeSellMultiplier(rec.SellRate, 1)
+	accountRateMultiplier := ratevalue.NormalizeMultiplier(rec.AccountRateMultiplier, 1)
+	return []any{
+		rec.BillingEventID,
+		rec.Platform,
+		rec.Model,
+		rec.InputTokens,
+		rec.OutputTokens,
+		rec.CachedInputTokens,
+		rec.CacheCreationTokens,
+		rec.ReasoningOutputTokens,
+		rec.InputPrice,
+		rec.OutputPrice,
+		rec.CachedInputPrice,
+		rec.CacheCreationPrice,
+		rec.InputCost,
+		rec.OutputCost,
+		rec.CachedInputCost,
+		rec.CacheCreationCost,
+		rec.TotalCost,
+		rec.ActualCost,
+		rec.BilledCost,
+		rec.AccountCost,
+		rateMultiplier,
+		sellRate,
+		accountRateMultiplier,
+		rec.ServiceTier,
+		rec.Stream,
+		rec.DurationMs,
+		rec.FirstTokenMs,
+		rec.UserAgent,
+		rec.IPAddress,
+		rec.Endpoint,
+		rec.ReasoningEffort,
+		metadata,
+		rec.UserID,
+		rec.UserEmail,
+		now,
+		rec.UserID,
+		nullablePositiveID(rec.APIKeyID),
+		rec.AccountID,
+		rec.GroupID,
+	}, nil
+}
+
+func usageMetadataValue(metadata map[string]string) (any, error) {
+	if len(metadata) == 0 {
+		return nil, nil
+	}
+	raw, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("序列化 usage_metadata 失败: %w", err)
+	}
+	return string(raw), nil
+}
+
+func nullablePositiveID(id int) any {
+	if id <= 0 {
+		return nil
+	}
+	return id
+}
+
+func insertedUsageRecords(inserted []insertedUsageLog) []UsageRecord {
+	records := make([]UsageRecord, 0, len(inserted))
+	for _, item := range inserted {
+		records = append(records, item.Record)
+	}
+	return records
+}
+
+func validateUsageRecordForInsert(rec UsageRecord) error {
+	if rec.BillingEventID == "" {
+		return fmt.Errorf("billing_event_id 不能为空")
+	}
+	if rec.Platform == "" {
+		return fmt.Errorf("platform 不能为空 billing_event_id=%s", rec.BillingEventID)
+	}
+	if rec.Model == "" {
+		return fmt.Errorf("model 不能为空 billing_event_id=%s", rec.BillingEventID)
+	}
+	return nil
+}
+
+func ensureBillingEventID(record UsageRecord) UsageRecord {
+	if record.BillingEventID == "" {
+		record.BillingEventID = "bill_" + uuid.NewString()
+	}
+	return record
+}
+
+func ensureBatchBillingEventIDs(batch []UsageRecord) {
+	for i := range batch {
+		batch[i] = ensureBillingEventID(batch[i])
+	}
+}
+
+func withWriteTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Deadline(); ok {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, writeAttemptTimeout)
+}
+
+func (r *Recorder) waitRetry(ctx context.Context, backoff time.Duration) error {
+	timer := time.NewTimer(backoff)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-r.stopCh:
+		return errRecorderStopping
+	}
+}
+
+func nextRetryBackoff(attempt int) time.Duration {
+	backoff := time.Duration(attempt-1) * time.Second
+	if backoff > maxRetryBackoff {
+		return maxRetryBackoff
+	}
+	return backoff
+}
+
+func (r *Recorder) deadLetter(batch []UsageRecord, reason string, err error) {
+	slog.Error("billing_batch_dead_letter",
+		"reason", reason,
+		"count", len(batch),
+		"billing_event_ids", billingEventIDs(batch),
+		"error", err,
+	)
+}
+
+func billingEventIDs(batch []UsageRecord) []string {
+	ids := make([]string, 0, len(batch))
+	for _, rec := range batch {
+		ids = append(ids, rec.BillingEventID)
+	}
+	return ids
 }
 
 func (r *Recorder) updateAccountStatsCache(ctx context.Context, batch []UsageRecord) {
@@ -330,56 +643,6 @@ func (r *Recorder) updateAccountStatsCache(ctx context.Context, batch []UsageRec
 	if _, err := pipe.Exec(ctx); err != nil {
 		slog.Debug("account_stats_cache_update_failed", "count", len(batch), "error", err)
 	}
-}
-
-func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
-	rateMultiplier := ratevalue.NormalizeMultiplier(rec.RateMultiplier, 1)
-	sellRate := ratevalue.NormalizeSellMultiplier(rec.SellRate, 1)
-	accountRateMultiplier := ratevalue.NormalizeMultiplier(rec.AccountRateMultiplier, 1)
-
-	b := tx.UsageLog.Create().
-		SetPlatform(rec.Platform).
-		SetModel(rec.Model).
-		SetInputTokens(rec.InputTokens).
-		SetOutputTokens(rec.OutputTokens).
-		SetCachedInputTokens(rec.CachedInputTokens).
-		SetCacheCreationTokens(rec.CacheCreationTokens).
-		SetReasoningOutputTokens(rec.ReasoningOutputTokens).
-		SetInputPrice(rec.InputPrice).
-		SetOutputPrice(rec.OutputPrice).
-		SetCachedInputPrice(rec.CachedInputPrice).
-		SetCacheCreationPrice(rec.CacheCreationPrice).
-		SetInputCost(rec.InputCost).
-		SetOutputCost(rec.OutputCost).
-		SetCachedInputCost(rec.CachedInputCost).
-		SetCacheCreationCost(rec.CacheCreationCost).
-		SetTotalCost(rec.TotalCost).
-		SetActualCost(rec.ActualCost).
-		SetBilledCost(rec.BilledCost).
-		SetAccountCost(rec.AccountCost).
-		SetRateMultiplier(rateMultiplier).
-		SetSellRate(sellRate).
-		SetAccountRateMultiplier(accountRateMultiplier).
-		SetServiceTier(rec.ServiceTier).
-		SetStream(rec.Stream).
-		SetDurationMs(rec.DurationMs).
-		SetFirstTokenMs(rec.FirstTokenMs).
-		SetUserAgent(rec.UserAgent).
-		SetIPAddress(rec.IPAddress).
-		SetEndpoint(rec.Endpoint).
-		SetReasoningEffort(rec.ReasoningEffort).
-		SetUserIDSnapshot(rec.UserID).
-		SetUserEmailSnapshot(rec.UserEmail).
-		SetUserID(rec.UserID).
-		SetAccountID(rec.AccountID).
-		SetGroupID(rec.GroupID)
-	if rec.APIKeyID > 0 {
-		b.SetAPIKeyID(rec.APIKeyID)
-	}
-	if len(rec.UsageMetadata) > 0 {
-		b.SetUsageMetadata(rec.UsageMetadata)
-	}
-	return b
 }
 
 func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) error {

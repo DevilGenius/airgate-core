@@ -28,6 +28,7 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	}
 
 	if _, err := db.UsageLog.Create().
+		SetBillingEventID("bill_dashboard_relation_stats").
 		SetPlatform("openai").
 		SetModel("gpt-4.1").
 		SetInputTokens(10).
@@ -45,6 +46,7 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	}
 
 	if _, err := db.UsageLog.Create().
+		SetBillingEventID("bill_dashboard_snapshot_stats").
 		SetPlatform("openai").
 		SetModel("gpt-image-1").
 		SetInputTokens(1).
@@ -113,6 +115,7 @@ func TestDashboardStoreListTrendLogsIncludesSnapshotOnlyRows(t *testing.T) {
 	}
 
 	if _, err := db.UsageLog.Create().
+		SetBillingEventID("bill_dashboard_relation_trend").
 		SetPlatform("openai").
 		SetModel("gpt-4.1").
 		SetInputTokens(10).
@@ -126,6 +129,7 @@ func TestDashboardStoreListTrendLogsIncludesSnapshotOnlyRows(t *testing.T) {
 	}
 
 	if _, err := db.UsageLog.Create().
+		SetBillingEventID("bill_dashboard_snapshot_trend").
 		SetPlatform("openai").
 		SetModel("gpt-image-1").
 		SetInputTokens(1).

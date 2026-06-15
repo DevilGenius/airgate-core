@@ -406,12 +406,12 @@ func (ulq *UsageLogQuery) WithGroup(opts ...func(*GroupQuery)) *UsageLogQuery {
 // Example:
 //
 //	var v []struct {
-//		Platform string `json:"platform,omitempty"`
+//		BillingEventID string `json:"billing_event_id,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.UsageLog.Query().
-//		GroupBy(usagelog.FieldPlatform).
+//		GroupBy(usagelog.FieldBillingEventID).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (ulq *UsageLogQuery) GroupBy(field string, fields ...string) *UsageLogGroupBy {
@@ -429,11 +429,11 @@ func (ulq *UsageLogQuery) GroupBy(field string, fields ...string) *UsageLogGroup
 // Example:
 //
 //	var v []struct {
-//		Platform string `json:"platform,omitempty"`
+//		BillingEventID string `json:"billing_event_id,omitempty"`
 //	}
 //
 //	client.UsageLog.Query().
-//		Select(usagelog.FieldPlatform).
+//		Select(usagelog.FieldBillingEventID).
 //		Scan(ctx, &v)
 func (ulq *UsageLogQuery) Select(fields ...string) *UsageLogSelect {
 	ulq.ctx.Fields = append(ulq.ctx.Fields, fields...)

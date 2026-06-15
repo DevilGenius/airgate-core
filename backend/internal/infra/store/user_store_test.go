@@ -44,6 +44,7 @@ func TestUserStoreDeleteKeepsUsageAndBillingHistory(t *testing.T) {
 		t.Fatalf("create subscription: %v", err)
 	}
 	if _, err := db.UsageLog.Create().
+		SetBillingEventID("bill_user_delete_history").
 		SetPlatform("openai").
 		SetModel("gpt-test").
 		SetUserID(user.ID).

@@ -55,6 +55,11 @@ func IDLTE(id int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldID, id))
 }
 
+// BillingEventID applies equality check predicate on the "billing_event_id" field. It's identical to BillingEventIDEQ.
+func BillingEventID(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldBillingEventID, v))
+}
+
 // Platform applies equality check predicate on the "platform" field. It's identical to PlatformEQ.
 func Platform(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldPlatform, v))
@@ -218,6 +223,71 @@ func UserEmailSnapshot(v string) predicate.UsageLog {
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCreatedAt, v))
+}
+
+// BillingEventIDEQ applies the EQ predicate on the "billing_event_id" field.
+func BillingEventIDEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldBillingEventID, v))
+}
+
+// BillingEventIDNEQ applies the NEQ predicate on the "billing_event_id" field.
+func BillingEventIDNEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldBillingEventID, v))
+}
+
+// BillingEventIDIn applies the In predicate on the "billing_event_id" field.
+func BillingEventIDIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldBillingEventID, vs...))
+}
+
+// BillingEventIDNotIn applies the NotIn predicate on the "billing_event_id" field.
+func BillingEventIDNotIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldBillingEventID, vs...))
+}
+
+// BillingEventIDGT applies the GT predicate on the "billing_event_id" field.
+func BillingEventIDGT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldBillingEventID, v))
+}
+
+// BillingEventIDGTE applies the GTE predicate on the "billing_event_id" field.
+func BillingEventIDGTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldBillingEventID, v))
+}
+
+// BillingEventIDLT applies the LT predicate on the "billing_event_id" field.
+func BillingEventIDLT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldBillingEventID, v))
+}
+
+// BillingEventIDLTE applies the LTE predicate on the "billing_event_id" field.
+func BillingEventIDLTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldBillingEventID, v))
+}
+
+// BillingEventIDContains applies the Contains predicate on the "billing_event_id" field.
+func BillingEventIDContains(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContains(FieldBillingEventID, v))
+}
+
+// BillingEventIDHasPrefix applies the HasPrefix predicate on the "billing_event_id" field.
+func BillingEventIDHasPrefix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasPrefix(FieldBillingEventID, v))
+}
+
+// BillingEventIDHasSuffix applies the HasSuffix predicate on the "billing_event_id" field.
+func BillingEventIDHasSuffix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasSuffix(FieldBillingEventID, v))
+}
+
+// BillingEventIDEqualFold applies the EqualFold predicate on the "billing_event_id" field.
+func BillingEventIDEqualFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEqualFold(FieldBillingEventID, v))
+}
+
+// BillingEventIDContainsFold applies the ContainsFold predicate on the "billing_event_id" field.
+func BillingEventIDContainsFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContainsFold(FieldBillingEventID, v))
 }
 
 // PlatformEQ applies the EQ predicate on the "platform" field.

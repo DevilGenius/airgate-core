@@ -15,6 +15,8 @@ type UsageLog struct {
 
 func (UsageLog) Fields() []ent.Field {
 	return []ent.Field{
+		field.String("billing_event_id").NotEmpty().Immutable().
+			Comment("计费事件幂等键。重试写入命中唯一冲突时不重复扣费。"),
 		field.String("platform").NotEmpty(),
 		field.String("model").NotEmpty(),
 		field.Int("input_tokens").Default(0),
@@ -85,6 +87,9 @@ func (UsageLog) Edges() []ent.Edge {
 
 func (UsageLog) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("billing_event_id").
+			Unique().
+			StorageKey("usage_log_billing_event_id"),
 		index.Fields("model").
 			StorageKey("usage_log_model"),
 		index.Fields("created_at").

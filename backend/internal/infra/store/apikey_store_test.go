@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -118,6 +119,7 @@ func TestAPIKeyStoreKeyUsageReturnsSalesAndActualCostSums(t *testing.T) {
 	createUsageLog := func(apiKeyID int, createdAt time.Time, actualCost, billedCost float64) {
 		t.Helper()
 		if _, err := db.UsageLog.Create().
+			SetBillingEventID(fmt.Sprintf("bill_apikey_usage_%d_%s", apiKeyID, createdAt.Format("20060102150405"))).
 			SetPlatform("openai").
 			SetModel("gpt-test").
 			SetUserID(user.ID).

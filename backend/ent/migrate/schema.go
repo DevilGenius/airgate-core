@@ -425,6 +425,7 @@ var (
 	// UsageLogsColumns holds the columns for the "usage_logs" table.
 	UsageLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "billing_event_id", Type: field.TypeString},
 		{Name: "platform", Type: field.TypeString},
 		{Name: "model", Type: field.TypeString},
 		{Name: "input_tokens", Type: field.TypeInt, Default: 0},
@@ -472,69 +473,74 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "usage_logs_api_keys_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[35]},
+				Columns:    []*schema.Column{UsageLogsColumns[36]},
 				RefColumns: []*schema.Column{APIKeysColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_accounts_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[36]},
+				Columns:    []*schema.Column{UsageLogsColumns[37]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_groups_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[37]},
+				Columns:    []*schema.Column{UsageLogsColumns[38]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_users_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[38]},
+				Columns:    []*schema.Column{UsageLogsColumns[39]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 		},
 		Indexes: []*schema.Index{
 			{
+				Name:    "usage_log_billing_event_id",
+				Unique:  true,
+				Columns: []*schema.Column{UsageLogsColumns[1]},
+			},
+			{
 				Name:    "usage_log_model",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[2]},
+				Columns: []*schema.Column{UsageLogsColumns[3]},
 			},
 			{
 				Name:    "usage_log_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[34]},
+				Columns: []*schema.Column{UsageLogsColumns[35]},
 			},
 			{
 				Name:    "usage_log_platform_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[1], UsageLogsColumns[34]},
+				Columns: []*schema.Column{UsageLogsColumns[2], UsageLogsColumns[35]},
 			},
 			{
 				Name:    "usage_log_user_snapshot_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[32], UsageLogsColumns[34]},
+				Columns: []*schema.Column{UsageLogsColumns[33], UsageLogsColumns[35]},
 			},
 			{
 				Name:    "usage_log_user",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[38]},
+				Columns: []*schema.Column{UsageLogsColumns[39]},
 			},
 			{
 				Name:    "usage_log_api_key",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[35]},
+				Columns: []*schema.Column{UsageLogsColumns[36]},
 			},
 			{
 				Name:    "usage_log_account",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[36]},
+				Columns: []*schema.Column{UsageLogsColumns[37]},
 			},
 			{
 				Name:    "usage_log_group",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[37]},
+				Columns: []*schema.Column{UsageLogsColumns[38]},
 			},
 		},
 	}

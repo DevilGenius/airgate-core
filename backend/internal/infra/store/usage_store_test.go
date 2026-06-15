@@ -20,8 +20,9 @@ func TestUsageStoreListPaginationUsesStableIDOrder(t *testing.T) {
 	user := createTestUser(t, db, "usage-pagination@example.com")
 	sameCreatedAt := time.Date(2026, 5, 23, 10, 0, 0, 0, time.UTC)
 
-	for range 3 {
+	for i := 0; i < 3; i++ {
 		if _, err := db.UsageLog.Create().
+			SetBillingEventID("bill_usage_pagination_" + string(rune('a'+i))).
 			SetPlatform("openai").
 			SetModel("gpt-5").
 			SetUserID(user.ID).

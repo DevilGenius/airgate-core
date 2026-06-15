@@ -14,6 +14,8 @@ const (
 	Label = "usage_log"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldBillingEventID holds the string denoting the billing_event_id field in the database.
+	FieldBillingEventID = "billing_event_id"
 	// FieldPlatform holds the string denoting the platform field in the database.
 	FieldPlatform = "platform"
 	// FieldModel holds the string denoting the model field in the database.
@@ -125,6 +127,7 @@ const (
 // Columns holds all SQL columns for usagelog fields.
 var Columns = []string{
 	FieldID,
+	FieldBillingEventID,
 	FieldPlatform,
 	FieldModel,
 	FieldInputTokens,
@@ -186,6 +189,8 @@ func ValidColumn(column string) bool {
 }
 
 var (
+	// BillingEventIDValidator is a validator for the "billing_event_id" field. It is called by the builders before save.
+	BillingEventIDValidator func(string) error
 	// PlatformValidator is a validator for the "platform" field. It is called by the builders before save.
 	PlatformValidator func(string) error
 	// ModelValidator is a validator for the "model" field. It is called by the builders before save.
@@ -266,6 +271,11 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByBillingEventID orders the results by the billing_event_id field.
+func ByBillingEventID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBillingEventID, opts...).ToFunc()
 }
 
 // ByPlatform orders the results by the platform field.

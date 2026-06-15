@@ -24,6 +24,12 @@ type UsageLogCreate struct {
 	hooks    []Hook
 }
 
+// SetBillingEventID sets the "billing_event_id" field.
+func (ulc *UsageLogCreate) SetBillingEventID(s string) *UsageLogCreate {
+	ulc.mutation.SetBillingEventID(s)
+	return ulc
+}
+
 // SetPlatform sets the "platform" field.
 func (ulc *UsageLogCreate) SetPlatform(s string) *UsageLogCreate {
 	ulc.mutation.SetPlatform(s)
@@ -715,6 +721,14 @@ func (ulc *UsageLogCreate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (ulc *UsageLogCreate) check() error {
+	if _, ok := ulc.mutation.BillingEventID(); !ok {
+		return &ValidationError{Name: "billing_event_id", err: errors.New(`ent: missing required field "UsageLog.billing_event_id"`)}
+	}
+	if v, ok := ulc.mutation.BillingEventID(); ok {
+		if err := usagelog.BillingEventIDValidator(v); err != nil {
+			return &ValidationError{Name: "billing_event_id", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_event_id": %w`, err)}
+		}
+	}
 	if _, ok := ulc.mutation.Platform(); !ok {
 		return &ValidationError{Name: "platform", err: errors.New(`ent: missing required field "UsageLog.platform"`)}
 	}
@@ -865,6 +879,10 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_node = &UsageLog{config: ulc.config}
 		_spec = sqlgraph.NewCreateSpec(usagelog.Table, sqlgraph.NewFieldSpec(usagelog.FieldID, field.TypeInt))
 	)
+	if value, ok := ulc.mutation.BillingEventID(); ok {
+		_spec.SetField(usagelog.FieldBillingEventID, field.TypeString, value)
+		_node.BillingEventID = value
+	}
 	if value, ok := ulc.mutation.Platform(); ok {
 		_spec.SetField(usagelog.FieldPlatform, field.TypeString, value)
 		_node.Platform = value

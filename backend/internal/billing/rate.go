@@ -12,7 +12,7 @@ import (
 //  2. group.rate_multiplier        — 分组档位
 //  3. 1.0                          — 默认（无 keyInfo 或倍率非法时兜底）
 //
-// 显式 0 是有效倍率，表示本次 actual_cost 免费。
+// 平台真实扣费倍率必须在 0.01 到 100 之间；0 或非法值会按兜底倍率处理。
 //
 // 注意：
 //   - APIKey.sell_rate 不在这条链里。它是 reseller 对最终客户的"账面"售价倍率，

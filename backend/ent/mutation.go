@@ -14399,6 +14399,7 @@ type UsageLogMutation struct {
 	op                         Op
 	typ                        string
 	id                         *int
+	billing_event_id           *string
 	platform                   *string
 	model                      *string
 	input_tokens               *int
@@ -14566,6 +14567,42 @@ func (m *UsageLogMutation) IDs(ctx context.Context) ([]int, error) {
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
+}
+
+// SetBillingEventID sets the "billing_event_id" field.
+func (m *UsageLogMutation) SetBillingEventID(s string) {
+	m.billing_event_id = &s
+}
+
+// BillingEventID returns the value of the "billing_event_id" field in the mutation.
+func (m *UsageLogMutation) BillingEventID() (r string, exists bool) {
+	v := m.billing_event_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBillingEventID returns the old "billing_event_id" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldBillingEventID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBillingEventID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBillingEventID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBillingEventID: %w", err)
+	}
+	return oldValue.BillingEventID, nil
+}
+
+// ResetBillingEventID resets all changes to the "billing_event_id" field.
+func (m *UsageLogMutation) ResetBillingEventID() {
+	m.billing_event_id = nil
 }
 
 // SetPlatform sets the "platform" field.
@@ -16455,7 +16492,10 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 34)
+	fields := make([]string, 0, 35)
+	if m.billing_event_id != nil {
+		fields = append(fields, usagelog.FieldBillingEventID)
+	}
 	if m.platform != nil {
 		fields = append(fields, usagelog.FieldPlatform)
 	}
@@ -16566,6 +16606,8 @@ func (m *UsageLogMutation) Fields() []string {
 // schema.
 func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 	switch name {
+	case usagelog.FieldBillingEventID:
+		return m.BillingEventID()
 	case usagelog.FieldPlatform:
 		return m.Platform()
 	case usagelog.FieldModel:
@@ -16643,6 +16685,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 // database failed.
 func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
+	case usagelog.FieldBillingEventID:
+		return m.OldBillingEventID(ctx)
 	case usagelog.FieldPlatform:
 		return m.OldPlatform(ctx)
 	case usagelog.FieldModel:
@@ -16720,6 +16764,13 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 // type.
 func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 	switch name {
+	case usagelog.FieldBillingEventID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBillingEventID(v)
+		return nil
 	case usagelog.FieldPlatform:
 		v, ok := value.(string)
 		if !ok {
@@ -17295,6 +17346,9 @@ func (m *UsageLogMutation) ClearField(name string) error {
 // It returns an error if the field is not defined in the schema.
 func (m *UsageLogMutation) ResetField(name string) error {
 	switch name {
+	case usagelog.FieldBillingEventID:
+		m.ResetBillingEventID()
+		return nil
 	case usagelog.FieldPlatform:
 		m.ResetPlatform()
 		return nil

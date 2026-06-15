@@ -22,6 +22,8 @@ type UsageLog struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// 计费事件幂等键。重试写入命中唯一冲突时不重复扣费。
+	BillingEventID string `json:"billing_event_id,omitempty"`
 	// Platform holds the value of the "platform" field.
 	Platform string `json:"platform,omitempty"`
 	// Model holds the value of the "model" field.
@@ -172,7 +174,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldPlatform, usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldReasoningEffort, usagelog.FieldUserEmailSnapshot:
+		case usagelog.FieldBillingEventID, usagelog.FieldPlatform, usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldReasoningEffort, usagelog.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -205,6 +207,12 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			ul.ID = int(value.Int64)
+		case usagelog.FieldBillingEventID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field billing_event_id", values[i])
+			} else if value.Valid {
+				ul.BillingEventID = value.String
+			}
 		case usagelog.FieldPlatform:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field platform", values[i])
@@ -495,6 +503,9 @@ func (ul *UsageLog) String() string {
 	var builder strings.Builder
 	builder.WriteString("UsageLog(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", ul.ID))
+	builder.WriteString("billing_event_id=")
+	builder.WriteString(ul.BillingEventID)
+	builder.WriteString(", ")
 	builder.WriteString("platform=")
 	builder.WriteString(ul.Platform)
 	builder.WriteString(", ")
