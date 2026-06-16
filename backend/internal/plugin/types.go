@@ -56,6 +56,7 @@ type parsedRequest struct {
 	Model               string
 	Stream              bool
 	SessionID           string
+	ConversationID      string
 	PromptCacheKey      string
 	PreviousResponseID  string
 	HasToolOutput       bool
@@ -73,6 +74,7 @@ type requestFields struct {
 		UserID string `json:"user_id"`
 	} `json:"metadata"`
 	PromptCacheKey     string          `json:"prompt_cache_key"`
+	ConversationID     string          `json:"conversation_id"`
 	PreviousResponseID string          `json:"previous_response_id"`
 	Input              json.RawMessage `json:"input"`
 	Messages           json.RawMessage `json:"messages"`

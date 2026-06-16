@@ -75,6 +75,46 @@ func TestParseBody_StreamTrue(t *testing.T) {
 	}
 }
 
+func TestResolveRequestSessionIDFromMetadataUserIDJSON(t *testing.T) {
+	t.Parallel()
+
+	parsed := parsedRequest{SessionID: `{"device_id":"device-a","session_id":"session-abc"}`}
+
+	if got := resolveRequestSessionID(nil, parsed); got != "claude:session-abc" {
+		t.Fatalf("resolveRequestSessionID() = %q, want claude:session-abc", got)
+	}
+}
+
+func TestResolveRequestSessionIDFromLegacyMetadataUserID(t *testing.T) {
+	t.Parallel()
+
+	parsed := parsedRequest{SessionID: "user_xxx_account__session_ac980658-63bd-4fb3-97ba-8da64cb1e344"}
+
+	if got := resolveRequestSessionID(nil, parsed); got != "claude:ac980658-63bd-4fb3-97ba-8da64cb1e344" {
+		t.Fatalf("resolveRequestSessionID() = %q, want legacy Claude session", got)
+	}
+}
+
+func TestResolveRequestSessionIDFromSessionIDHeader(t *testing.T) {
+	t.Parallel()
+
+	headers := http.Header{"Session-Id": []string{"header-session"}}
+
+	if got := resolveRequestSessionID(headers, parsedRequest{}); got != "header-session" {
+		t.Fatalf("resolveRequestSessionID() = %q, want header-session", got)
+	}
+}
+
+func TestResolveRequestSessionIDFromBodyConversationID(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseBody([]byte(`{"model":"gpt-5.4","conversation_id":"conv-123"}`), "application/json")
+
+	if got := resolveRequestSessionID(nil, parsed); got != "conversation:conv-123" {
+		t.Fatalf("resolveRequestSessionID() = %q, want conversation:conv-123", got)
+	}
+}
+
 func TestParseBodyContinuationSignals(t *testing.T) {
 	t.Parallel()
 

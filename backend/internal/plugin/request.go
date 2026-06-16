@@ -205,6 +205,7 @@ func parseBody(body []byte, contentType string) parsedRequest {
 			Model:               strings.TrimSpace(fields.Model),
 			Stream:              fields.Stream,
 			SessionID:           strings.TrimSpace(fields.Metadata.UserID),
+			ConversationID:      strings.TrimSpace(fields.ConversationID),
 			PromptCacheKey:      strings.TrimSpace(fields.PromptCacheKey),
 			PreviousResponseID:  strings.TrimSpace(fields.PreviousResponseID),
 			HasToolOutput:       signals.hasToolOutput,
@@ -222,18 +223,59 @@ func parseBody(body []byte, contentType string) parsedRequest {
 
 func resolveRequestSessionID(headers http.Header, parsed parsedRequest) string {
 	if parsed.SessionID != "" {
+		if sid := sessionIDFromMetadataUserID(parsed.SessionID); sid != "" {
+			return sid
+		}
 		return parsed.SessionID
 	}
 	if headers != nil {
-		if v := firstNonEmpty(headers.Get("session_id"), headers.Get("Session_ID")); v != "" {
+		if v := firstNonEmpty(
+			headers.Get("X-Session-ID"),
+			headers.Get("Session-Id"),
+			headers.Get("Session_id"),
+			headers.Get("session_id"),
+			headers.Get("Session_ID"),
+		); v != "" {
 			return v
 		}
-		if v := firstNonEmpty(headers.Get("conversation_id"), headers.Get("Conversation_ID")); v != "" {
+		if v := firstNonEmpty(
+			headers.Get("conversation_id"),
+			headers.Get("Conversation_ID"),
+			headers.Get("Conversation-Id"),
+		); v != "" {
 			return "conversation:" + v
 		}
 	}
+	if parsed.ConversationID != "" {
+		return "conversation:" + parsed.ConversationID
+	}
 	if parsed.PromptCacheKey != "" {
 		return "prompt_cache:" + parsed.PromptCacheKey
+	}
+	return ""
+}
+
+func sessionIDFromMetadataUserID(userID string) string {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return ""
+	}
+	if strings.HasPrefix(userID, "{") {
+		var metadata struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal([]byte(userID), &metadata) == nil {
+			if sid := strings.TrimSpace(metadata.SessionID); sid != "" {
+				return "claude:" + sid
+			}
+		}
+		return ""
+	}
+	const marker = "_session_"
+	if idx := strings.LastIndex(userID, marker); idx >= 0 {
+		if sid := strings.TrimSpace(userID[idx+len(marker):]); sid != "" {
+			return "claude:" + sid
+		}
 	}
 	return ""
 }

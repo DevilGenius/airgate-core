@@ -167,7 +167,7 @@ func responseIDsFromBody(body []byte) []string {
 const (
 	defaultClientErrorMessage = "请求无法完成，请检查输入后重试"
 	imageTooLargeMessage      = "图片过大，请压缩后重试"
-	contextTooLargeMessage    = "上下文过长，请压缩对话、减少历史或开启新会话后重试"
+	contextTooLargeMessage    = "Your input exceeds the context window of this model. Please adjust your input and try again."
 )
 
 func sanitizedClientErrorStatus(outcome sdk.ForwardOutcome) int {
