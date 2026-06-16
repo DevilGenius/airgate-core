@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Card } from '@heroui/react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Info, TriangleAlert } from 'lucide-react';
+import { AlertTriangle, CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import { fmtNum } from '../../../shared/columns/usageColumns';
 import type { MonitorSummaryResp } from '../../../shared/types';
 
@@ -21,15 +21,15 @@ function StatCard({
   total: number;
 }) {
   return (
-    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
-      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+    <Card className="ag-dashboard-metric h-[72px] 2xl:h-[78px]">
+      <Card.Content className="ag-dashboard-metric-content h-full p-3 2xl:p-3.5">
         <div className="ag-dashboard-metric-copy">
-          <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{label}</div>
-          <div className="mt-1 flex min-w-0 items-baseline gap-1 font-mono text-[22px] font-semibold leading-none text-text 2xl:text-2xl">
+          <div className="h-5 truncate text-sm font-semibold leading-5 tracking-normal text-text-tertiary">{label}</div>
+          <div className="mt-1 flex h-6 min-w-0 items-center gap-1 font-mono text-[22px] font-semibold leading-none text-text 2xl:h-7 2xl:text-2xl">
             {showActiveRatio ? (
               <>
                 <span className="truncate">{fmtNum(active)}</span>
-                <span className="text-base text-text-tertiary 2xl:text-lg">/</span>
+                <span className="text-base leading-none text-text-tertiary 2xl:text-lg">/</span>
                 <span className="truncate">{fmtNum(total)}</span>
               </>
             ) : (
@@ -73,7 +73,7 @@ export function MonitorStats({
       />
       <StatCard
         active={summary?.warning_active_total ?? 0}
-        icon={<AlertTriangle className="h-5 w-5" />}
+        icon={<CircleAlert className="h-5 w-5" />}
         label={t('monitor.warning')}
         showActiveRatio={false}
         tone="bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25"

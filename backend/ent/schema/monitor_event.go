@@ -52,11 +52,13 @@ func (MonitorEvent) Fields() []ent.Field {
 
 func (MonitorEvent) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("updated_at"),
+		index.Fields("status", "updated_at"),
+		index.Fields("severity", "updated_at"),
+		index.Fields("type", "updated_at"),
 		index.Fields("status", "severity", "updated_at"),
 		index.Fields("status", "type", "updated_at"),
 		index.Fields("hash"),
-		index.Fields("account_id", "status", "updated_at"),
-		index.Fields("platform", "plugin_id", "status", "updated_at"),
 		index.Fields("status", "auto_resolve_at"),
 		index.Fields("expires_at"),
 		index.Fields("status", "severity", "next_notify_at"),

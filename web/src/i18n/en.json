@@ -713,6 +713,8 @@
     "endpoint": "Endpoint",
     "error_code": "Error Code",
     "search_api_key": "Search API Key",
+    "search_account": "Search Account",
+    "search_group": "Search Group",
     "resolve": "Resolve",
     "resolve_success": "Monitor event resolved",
     "request_events": "Request Events",

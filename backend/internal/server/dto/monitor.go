@@ -69,6 +69,7 @@ type MonitorRequestListQuery struct {
 	Type            string `form:"type"`
 	Source          string `form:"source"`
 	APIKeyID        *int   `form:"api_key_id"`
+	GroupID         *int   `form:"group_id"`
 	AccountID       *int   `form:"account_id"`
 	Platform        string `form:"platform"`
 	PluginID        string `form:"plugin_id"`

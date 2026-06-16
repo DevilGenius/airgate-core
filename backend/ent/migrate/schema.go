@@ -171,6 +171,26 @@ var (
 		PrimaryKey: []*schema.Column{MonitorEventsColumns[0]},
 		Indexes: []*schema.Index{
 			{
+				Name:    "monitorevent_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[18]},
+			},
+			{
+				Name:    "monitorevent_status_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[18]},
+			},
+			{
+				Name:    "monitorevent_severity_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[2], MonitorEventsColumns[18]},
+			},
+			{
+				Name:    "monitorevent_type_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorEventsColumns[1], MonitorEventsColumns[18]},
+			},
+			{
 				Name:    "monitorevent_status_severity_updated_at",
 				Unique:  false,
 				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[18]},
@@ -184,16 +204,6 @@ var (
 				Name:    "monitorevent_hash",
 				Unique:  false,
 				Columns: []*schema.Column{MonitorEventsColumns[8]},
-			},
-			{
-				Name:    "monitorevent_account_id_status_updated_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[11], MonitorEventsColumns[3], MonitorEventsColumns[18]},
-			},
-			{
-				Name:    "monitorevent_platform_plugin_id_status_updated_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[13], MonitorEventsColumns[14], MonitorEventsColumns[3], MonitorEventsColumns[18]},
 			},
 			{
 				Name:    "monitorevent_status_auto_resolve_at",
@@ -260,9 +270,24 @@ var (
 				Columns: []*schema.Column{MonitorRequestEventsColumns[26]},
 			},
 			{
+				Name:    "monitorrequestevent_type_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorRequestEventsColumns[1], MonitorRequestEventsColumns[25]},
+			},
+			{
 				Name:    "monitorrequestevent_api_key_id_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{MonitorRequestEventsColumns[9], MonitorRequestEventsColumns[25]},
+			},
+			{
+				Name:    "monitorrequestevent_group_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorRequestEventsColumns[13], MonitorRequestEventsColumns[25]},
+			},
+			{
+				Name:    "monitorrequestevent_account_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorRequestEventsColumns[14], MonitorRequestEventsColumns[25]},
 			},
 			{
 				Name:    "monitorrequestevent_endpoint_created_at",

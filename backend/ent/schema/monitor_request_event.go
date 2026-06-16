@@ -52,7 +52,10 @@ func (MonitorRequestEvent) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("created_at"),
 		index.Fields("expires_at"),
+		index.Fields("type", "created_at"),
 		index.Fields("api_key_id", "created_at"),
+		index.Fields("group_id", "created_at"),
+		index.Fields("account_id", "created_at"),
 		index.Fields("endpoint", "created_at"),
 		index.Fields("http_status", "created_at"),
 		index.Fields("error_code", "created_at"),

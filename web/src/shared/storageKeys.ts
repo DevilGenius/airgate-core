@@ -27,6 +27,7 @@ export const STORAGE_KEYS = {
     adminAccountsCapacityRefresh: 'ag:web:admin:accounts:capacity_refresh',
     adminAccountsFilters: 'ag:web:admin:accounts:filters',
     adminMonitorAutoRefresh: 'ag:web:admin:monitor:auto_refresh',
+    adminMonitorFilters: 'ag:web:admin:monitor:filters',
     adminUsageAutoRefresh: 'ag:web:admin:usage:auto_refresh',
     adminUsageColumns: 'ag:web:admin:usage:columns',
     adminUsageFilters: 'ag:web:admin:usage:filters',

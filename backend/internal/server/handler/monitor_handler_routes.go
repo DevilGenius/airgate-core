@@ -205,6 +205,7 @@ func monitorRequestListFilterFromQuery(c *gin.Context, query dto.MonitorRequestL
 		Type:           query.Type,
 		Source:         query.Source,
 		APIKeyID:       query.APIKeyID,
+		GroupID:        query.GroupID,
 		AccountID:      query.AccountID,
 		Platform:       query.Platform,
 		PluginID:       query.PluginID,

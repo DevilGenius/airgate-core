@@ -162,6 +162,9 @@ func applyMonitorRequestListFilter(query *ent.MonitorRequestEventQuery, filter a
 	if filter.APIKeyID != nil {
 		query = query.Where(entmonitorrequestevent.APIKeyIDEQ(*filter.APIKeyID))
 	}
+	if filter.GroupID != nil {
+		query = query.Where(entmonitorrequestevent.GroupIDEQ(*filter.GroupID))
+	}
 	if filter.AccountID != nil {
 		query = query.Where(entmonitorrequestevent.AccountIDEQ(*filter.AccountID))
 	}

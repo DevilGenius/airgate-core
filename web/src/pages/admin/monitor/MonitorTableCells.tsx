@@ -95,6 +95,7 @@ export function monitorRequestSubject(event: MonitorRequestEventResp): string {
 
 export function monitorRequestSubjectContext(event: MonitorRequestEventResp): string {
   return [
+    monitorAccountLabel(event),
     monitorGroupLabel(event),
     event.platform,
   ].filter(Boolean).join(' › ');
