@@ -226,22 +226,21 @@ func resolveRequestSessionID(headers http.Header, parsed parsedRequest) string {
 		if sid := sessionIDFromMetadataUserID(parsed.SessionID); sid != "" {
 			return sid
 		}
-		return parsed.SessionID
+		if !looksLikeJSONObject(parsed.SessionID) {
+			return parsed.SessionID
+		}
 	}
 	if headers != nil {
 		if v := firstNonEmpty(
 			headers.Get("X-Session-ID"),
 			headers.Get("Session-Id"),
 			headers.Get("Session_id"),
-			headers.Get("session_id"),
-			headers.Get("Session_ID"),
 		); v != "" {
 			return v
 		}
 		if v := firstNonEmpty(
-			headers.Get("conversation_id"),
-			headers.Get("Conversation_ID"),
 			headers.Get("Conversation-Id"),
+			headers.Get("conversation_id"),
 		); v != "" {
 			return "conversation:" + v
 		}
@@ -253,6 +252,10 @@ func resolveRequestSessionID(headers http.Header, parsed parsedRequest) string {
 		return "prompt_cache:" + parsed.PromptCacheKey
 	}
 	return ""
+}
+
+func looksLikeJSONObject(value string) bool {
+	return strings.HasPrefix(strings.TrimSpace(value), "{")
 }
 
 func sessionIDFromMetadataUserID(userID string) string {

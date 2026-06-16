@@ -85,6 +85,31 @@ func TestResolveRequestSessionIDFromMetadataUserIDJSON(t *testing.T) {
 	}
 }
 
+func TestResolveRequestSessionIDMetadataUserIDJSONWithoutSessionFallsBackToHeader(t *testing.T) {
+	t.Parallel()
+
+	headers := http.Header{}
+	headers.Set("Session-Id", "header-session")
+	parsed := parsedRequest{SessionID: `{"device_id":"device-a"}`}
+
+	if got := resolveRequestSessionID(headers, parsed); got != "header-session" {
+		t.Fatalf("resolveRequestSessionID() = %q, want header-session", got)
+	}
+}
+
+func TestResolveRequestSessionIDMetadataUserIDJSONWithoutSessionFallsBackToPromptCache(t *testing.T) {
+	t.Parallel()
+
+	parsed := parsedRequest{
+		SessionID:      `{"device_id":"device-a"}`,
+		PromptCacheKey: "pcache-1",
+	}
+
+	if got := resolveRequestSessionID(nil, parsed); got != "prompt_cache:pcache-1" {
+		t.Fatalf("resolveRequestSessionID() = %q, want prompt_cache:pcache-1", got)
+	}
+}
+
 func TestResolveRequestSessionIDFromLegacyMetadataUserID(t *testing.T) {
 	t.Parallel()
 

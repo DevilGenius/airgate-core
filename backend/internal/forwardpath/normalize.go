@@ -12,9 +12,12 @@ func Normalize(path string) string {
 	if path == "" {
 		return ""
 	}
-	if u, err := url.Parse(path); err == nil && u != nil {
-		path = u.Path
-	} else if idx := strings.IndexByte(path, '?'); idx >= 0 {
+	if strings.Contains(path, "://") {
+		if u, err := url.Parse(path); err == nil && u != nil && u.Path != "" {
+			path = u.Path
+		}
+	}
+	if idx := strings.IndexByte(path, '?'); idx >= 0 {
 		path = path[:idx]
 	}
 	path = strings.TrimRight(strings.ToLower(strings.TrimSpace(path)), "/")

@@ -39,6 +39,18 @@ func TestResolveSchedulingModelsForOpenAIAnthropicMessages(t *testing.T) {
 			want:  []string{"gpt-5.3-codex-spark", "gpt-5.4-mini"},
 		},
 		{
+			name:  "绝对 URL messages 路径",
+			path:  "https://example.com/v1/messages?trace=1",
+			model: "claude-opus-4-7",
+			want:  []string{"gpt-5.5", "gpt-5.4"},
+		},
+		{
+			name:  "大小写 messages 路径",
+			path:  "/V1/MESSAGES",
+			model: "claude-sonnet-4-6",
+			want:  []string{"gpt-5.5", "gpt-5.4"},
+		},
+		{
 			name:  "非 Claude 模型保持原样",
 			path:  "/v1/messages",
 			model: "gpt-5.4",
@@ -98,10 +110,29 @@ func TestResolveSchedulingModelsForOpenAIAnthropicMessagesFableIgnoresOpusEnv(t 
 func TestResolveSchedulingModelsIgnoreNonAnthropicRoutes(t *testing.T) {
 	clearSchedulingModelEnv(t)
 
-	got := ResolveSchedulingModels("openai", "/v1/chat/completions", "claude-opus-4-7")
-	want := []string{"claude-opus-4-7"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("ResolveSchedulingModels() = %#v, want %#v", got, want)
+	tests := []struct {
+		name string
+		path string
+	}{
+		{
+			name: "chat completions",
+			path: "/v1/chat/completions",
+		},
+		{
+			name: "absolute URL without API path",
+			path: "https://example.com?trace=1",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			got := ResolveSchedulingModels("openai", tt.path, "claude-opus-4-7")
+			want := []string{"claude-opus-4-7"}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("ResolveSchedulingModels() = %#v, want %#v", got, want)
+			}
+		})
 	}
 }
 
@@ -122,6 +153,12 @@ func TestResolveSchedulingModelsForOpenAIResponsesCompact(t *testing.T) {
 			name:  "base model stays base on compact path",
 			path:  "/responses/compact?debug=1",
 			model: "gpt-5.5",
+			want:  []string{"gpt-5.5"},
+		},
+		{
+			name:  "compact path is normalized",
+			path:  "HTTPS://example.com/V1/RESPONSES/COMPACT/?debug=1",
+			model: "gpt-5.5-openai-compact",
 			want:  []string{"gpt-5.5"},
 		},
 		{

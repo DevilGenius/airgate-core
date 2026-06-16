@@ -1,7 +1,6 @@
 package modelresolver
 
 import (
-	"net/url"
 	"os"
 	"strings"
 
@@ -27,27 +26,14 @@ func (openAIResolver) ResolveSchedulingModels(path, clientModel string) []string
 }
 
 func isResponsesCompactForwardPath(path string) bool {
-	path = strings.TrimSpace(path)
-	switch path {
-	case "/v1/responses/compact", "/responses/compact":
-		return true
-	}
-	if !strings.Contains(path, "compact") && !strings.Contains(path, "Compact") && !strings.Contains(path, "COMPACT") {
-		return false
-	}
 	path = forwardpath.Normalize(path)
 	return path == "/v1/responses/compact" || path == "/responses/compact"
 }
 
 func isAnthropicMessagesForwardPath(path string) bool {
-	path = strings.TrimSpace(path)
-	if path == "" {
+	path = forwardpath.Normalize(path)
+	if path == "" || path == "/" {
 		return false
-	}
-	if u, err := url.Parse(path); err == nil && u != nil {
-		path = u.Path
-	} else if idx := strings.IndexByte(path, '?'); idx >= 0 {
-		path = path[:idx]
 	}
 	return pathHasAPIPrefix(path, "/v1/messages") || pathHasAPIPrefix(path, "/messages")
 }
