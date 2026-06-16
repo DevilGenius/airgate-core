@@ -235,6 +235,69 @@ func (aku *APIKeyUpdate) AddMaxConcurrency(i int) *APIKeyUpdate {
 	return aku
 }
 
+// SetBalanceAlertEnabled sets the "balance_alert_enabled" field.
+func (aku *APIKeyUpdate) SetBalanceAlertEnabled(b bool) *APIKeyUpdate {
+	aku.mutation.SetBalanceAlertEnabled(b)
+	return aku
+}
+
+// SetNillableBalanceAlertEnabled sets the "balance_alert_enabled" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableBalanceAlertEnabled(b *bool) *APIKeyUpdate {
+	if b != nil {
+		aku.SetBalanceAlertEnabled(*b)
+	}
+	return aku
+}
+
+// SetBalanceAlertEmail sets the "balance_alert_email" field.
+func (aku *APIKeyUpdate) SetBalanceAlertEmail(s string) *APIKeyUpdate {
+	aku.mutation.SetBalanceAlertEmail(s)
+	return aku
+}
+
+// SetNillableBalanceAlertEmail sets the "balance_alert_email" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableBalanceAlertEmail(s *string) *APIKeyUpdate {
+	if s != nil {
+		aku.SetBalanceAlertEmail(*s)
+	}
+	return aku
+}
+
+// SetBalanceAlertThreshold sets the "balance_alert_threshold" field.
+func (aku *APIKeyUpdate) SetBalanceAlertThreshold(f float64) *APIKeyUpdate {
+	aku.mutation.ResetBalanceAlertThreshold()
+	aku.mutation.SetBalanceAlertThreshold(f)
+	return aku
+}
+
+// SetNillableBalanceAlertThreshold sets the "balance_alert_threshold" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableBalanceAlertThreshold(f *float64) *APIKeyUpdate {
+	if f != nil {
+		aku.SetBalanceAlertThreshold(*f)
+	}
+	return aku
+}
+
+// AddBalanceAlertThreshold adds f to the "balance_alert_threshold" field.
+func (aku *APIKeyUpdate) AddBalanceAlertThreshold(f float64) *APIKeyUpdate {
+	aku.mutation.AddBalanceAlertThreshold(f)
+	return aku
+}
+
+// SetBalanceAlertNotified sets the "balance_alert_notified" field.
+func (aku *APIKeyUpdate) SetBalanceAlertNotified(b bool) *APIKeyUpdate {
+	aku.mutation.SetBalanceAlertNotified(b)
+	return aku
+}
+
+// SetNillableBalanceAlertNotified sets the "balance_alert_notified" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableBalanceAlertNotified(b *bool) *APIKeyUpdate {
+	if b != nil {
+		aku.SetBalanceAlertNotified(*b)
+	}
+	return aku
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (aku *APIKeyUpdate) SetExpiresAt(t time.Time) *APIKeyUpdate {
 	aku.mutation.SetExpiresAt(t)
@@ -416,6 +479,11 @@ func (aku *APIKeyUpdate) check() error {
 			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_concurrency": %w`, err)}
 		}
 	}
+	if v, ok := aku.mutation.BalanceAlertEmail(); ok {
+		if err := apikey.BalanceAlertEmailValidator(v); err != nil {
+			return &ValidationError{Name: "balance_alert_email", err: fmt.Errorf(`ent: validator failed for field "APIKey.balance_alert_email": %w`, err)}
+		}
+	}
 	if v, ok := aku.mutation.Status(); ok {
 		if err := apikey.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "APIKey.status": %w`, err)}
@@ -505,6 +573,21 @@ func (aku *APIKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := aku.mutation.AddedMaxConcurrency(); ok {
 		_spec.AddField(apikey.FieldMaxConcurrency, field.TypeInt, value)
+	}
+	if value, ok := aku.mutation.BalanceAlertEnabled(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertEnabled, field.TypeBool, value)
+	}
+	if value, ok := aku.mutation.BalanceAlertEmail(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertEmail, field.TypeString, value)
+	}
+	if value, ok := aku.mutation.BalanceAlertThreshold(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertThreshold, field.TypeFloat64, value)
+	}
+	if value, ok := aku.mutation.AddedBalanceAlertThreshold(); ok {
+		_spec.AddField(apikey.FieldBalanceAlertThreshold, field.TypeFloat64, value)
+	}
+	if value, ok := aku.mutation.BalanceAlertNotified(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertNotified, field.TypeBool, value)
 	}
 	if value, ok := aku.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)
@@ -844,6 +927,69 @@ func (akuo *APIKeyUpdateOne) AddMaxConcurrency(i int) *APIKeyUpdateOne {
 	return akuo
 }
 
+// SetBalanceAlertEnabled sets the "balance_alert_enabled" field.
+func (akuo *APIKeyUpdateOne) SetBalanceAlertEnabled(b bool) *APIKeyUpdateOne {
+	akuo.mutation.SetBalanceAlertEnabled(b)
+	return akuo
+}
+
+// SetNillableBalanceAlertEnabled sets the "balance_alert_enabled" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableBalanceAlertEnabled(b *bool) *APIKeyUpdateOne {
+	if b != nil {
+		akuo.SetBalanceAlertEnabled(*b)
+	}
+	return akuo
+}
+
+// SetBalanceAlertEmail sets the "balance_alert_email" field.
+func (akuo *APIKeyUpdateOne) SetBalanceAlertEmail(s string) *APIKeyUpdateOne {
+	akuo.mutation.SetBalanceAlertEmail(s)
+	return akuo
+}
+
+// SetNillableBalanceAlertEmail sets the "balance_alert_email" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableBalanceAlertEmail(s *string) *APIKeyUpdateOne {
+	if s != nil {
+		akuo.SetBalanceAlertEmail(*s)
+	}
+	return akuo
+}
+
+// SetBalanceAlertThreshold sets the "balance_alert_threshold" field.
+func (akuo *APIKeyUpdateOne) SetBalanceAlertThreshold(f float64) *APIKeyUpdateOne {
+	akuo.mutation.ResetBalanceAlertThreshold()
+	akuo.mutation.SetBalanceAlertThreshold(f)
+	return akuo
+}
+
+// SetNillableBalanceAlertThreshold sets the "balance_alert_threshold" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableBalanceAlertThreshold(f *float64) *APIKeyUpdateOne {
+	if f != nil {
+		akuo.SetBalanceAlertThreshold(*f)
+	}
+	return akuo
+}
+
+// AddBalanceAlertThreshold adds f to the "balance_alert_threshold" field.
+func (akuo *APIKeyUpdateOne) AddBalanceAlertThreshold(f float64) *APIKeyUpdateOne {
+	akuo.mutation.AddBalanceAlertThreshold(f)
+	return akuo
+}
+
+// SetBalanceAlertNotified sets the "balance_alert_notified" field.
+func (akuo *APIKeyUpdateOne) SetBalanceAlertNotified(b bool) *APIKeyUpdateOne {
+	akuo.mutation.SetBalanceAlertNotified(b)
+	return akuo
+}
+
+// SetNillableBalanceAlertNotified sets the "balance_alert_notified" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableBalanceAlertNotified(b *bool) *APIKeyUpdateOne {
+	if b != nil {
+		akuo.SetBalanceAlertNotified(*b)
+	}
+	return akuo
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (akuo *APIKeyUpdateOne) SetExpiresAt(t time.Time) *APIKeyUpdateOne {
 	akuo.mutation.SetExpiresAt(t)
@@ -1038,6 +1184,11 @@ func (akuo *APIKeyUpdateOne) check() error {
 			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_concurrency": %w`, err)}
 		}
 	}
+	if v, ok := akuo.mutation.BalanceAlertEmail(); ok {
+		if err := apikey.BalanceAlertEmailValidator(v); err != nil {
+			return &ValidationError{Name: "balance_alert_email", err: fmt.Errorf(`ent: validator failed for field "APIKey.balance_alert_email": %w`, err)}
+		}
+	}
 	if v, ok := akuo.mutation.Status(); ok {
 		if err := apikey.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "APIKey.status": %w`, err)}
@@ -1144,6 +1295,21 @@ func (akuo *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err er
 	}
 	if value, ok := akuo.mutation.AddedMaxConcurrency(); ok {
 		_spec.AddField(apikey.FieldMaxConcurrency, field.TypeInt, value)
+	}
+	if value, ok := akuo.mutation.BalanceAlertEnabled(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertEnabled, field.TypeBool, value)
+	}
+	if value, ok := akuo.mutation.BalanceAlertEmail(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertEmail, field.TypeString, value)
+	}
+	if value, ok := akuo.mutation.BalanceAlertThreshold(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertThreshold, field.TypeFloat64, value)
+	}
+	if value, ok := akuo.mutation.AddedBalanceAlertThreshold(); ok {
+		_spec.AddField(apikey.FieldBalanceAlertThreshold, field.TypeFloat64, value)
+	}
+	if value, ok := akuo.mutation.BalanceAlertNotified(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertNotified, field.TypeBool, value)
 	}
 	if value, ok := akuo.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)

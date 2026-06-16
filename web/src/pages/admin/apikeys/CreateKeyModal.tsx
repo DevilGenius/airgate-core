@@ -7,6 +7,7 @@ import { dateInputToLocalStartRFC3339, formatDateInputValue } from '../../../sha
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
+import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import {
   MAX_RATE_MULTIPLIER,
@@ -16,6 +17,7 @@ import {
   isValidSellRateValue,
   parseRateMultiplier,
 } from '../../../shared/utils/rateMultiplier';
+import { useToast } from '../../../shared/ui';
 import type { CreateAPIKeyReq, GroupResp } from '../../../shared/types';
 
 interface CreateKeyModalProps {
@@ -32,10 +34,14 @@ const defaultForm: CreateAPIKeyReq = {
   max_concurrency: 0,
   name: '',
   quota_usd: 0,
+  balance_alert_enabled: false,
+  balance_alert_email: '',
+  balance_alert_threshold: 0,
 };
 
 export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: CreateKeyModalProps) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const { user } = useAuth();
   const [form, setForm] = useState<CreateAPIKeyReq>(defaultForm);
   const [sellRateInput, setSellRateInput] = useState('1');
@@ -52,10 +58,20 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
 
   const parsedSellRate = sellRateInput.trim() ? parseRateMultiplier(sellRateInput) : 1;
   const sellRateValid = isValidSellRateValue(parsedSellRate);
+  const balanceAlertEmail = form.balance_alert_email?.trim() || '';
+  const balanceAlertThreshold = Number(form.balance_alert_threshold ?? 0);
 
   const handleSubmit = () => {
     if (!form.name || !form.group_id) return;
     if (!sellRateValid) return;
+    if (form.balance_alert_enabled && !balanceAlertEmail) {
+      toast('error', t('api_keys.balance_alert_email_required'));
+      return;
+    }
+    if (form.balance_alert_enabled && (!Number.isFinite(balanceAlertThreshold) || balanceAlertThreshold <= 0)) {
+      toast('error', t('api_keys.balance_alert_threshold_required'));
+      return;
+    }
     onSubmit({
       ...form,
       expires_at: form.expires_at || undefined,
@@ -64,6 +80,9 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
       max_concurrency: form.max_concurrency ?? 0,
       quota_usd: form.quota_usd || undefined,
       sell_rate: parsedSellRate ?? 1,
+      balance_alert_enabled: form.balance_alert_enabled,
+      balance_alert_email: balanceAlertEmail,
+      balance_alert_threshold: Number.isFinite(balanceAlertThreshold) ? balanceAlertThreshold : 0,
     });
   };
 
@@ -184,6 +203,42 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
               />
               <Description>{t('api_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
             </HeroTextField>
+
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-text">{t('api_keys.balance_alert_enabled')}</div>
+                <p className="mt-0.5 text-xs text-text-tertiary">{t('api_keys.balance_alert_hint')}</p>
+              </div>
+              <NativeSwitch
+                ariaLabel={t('api_keys.balance_alert_enabled')}
+                isSelected={!!form.balance_alert_enabled}
+                onChange={(value) => setForm({ ...form, balance_alert_enabled: value })}
+              />
+            </div>
+
+            {form.balance_alert_enabled && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <HeroTextField fullWidth>
+                  <Label>{t('api_keys.balance_alert_email')}</Label>
+                  <Input
+                    type="email"
+                    value={form.balance_alert_email ?? ''}
+                    onChange={(e) => setForm({ ...form, balance_alert_email: e.target.value })}
+                    placeholder="name@example.com"
+                  />
+                </HeroTextField>
+                <HeroTextField fullWidth>
+                  <Label>{t('api_keys.balance_alert_threshold')}</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={String(form.balance_alert_threshold ?? 0)}
+                    onChange={(e) => setForm({ ...form, balance_alert_threshold: Number(e.target.value) })}
+                  />
+                </HeroTextField>
+              </div>
+            )}
 
             <CommonDatePicker
               description={t('api_keys.expire_hint')}

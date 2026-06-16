@@ -42,6 +42,14 @@ type APIKey struct {
 	SellRate float64 `json:"sell_rate,omitempty"`
 	// API Key 级并发上限：同一把 key 同时在途的请求数。0 表示不限制（默认）。达到上限时返回 429 + apikey_concurrency_limit，保护单个客户端不因并发过高被自己打死或耗光上游账号的并发预算。
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
+	// API Key 剩余额度邮件提醒开关。
+	BalanceAlertEnabled bool `json:"balance_alert_enabled,omitempty"`
+	// API Key 剩余额度提醒接收邮箱。
+	BalanceAlertEmail string `json:"balance_alert_email,omitempty"`
+	// API Key 剩余额度提醒阈值；0 表示关闭阈值触发。
+	BalanceAlertThreshold float64 `json:"balance_alert_threshold,omitempty"`
+	// API Key 剩余额度提醒是否已发送，用于避免重复通知。
+	BalanceAlertNotified bool `json:"balance_alert_notified,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// Status holds the value of the "status" field.
@@ -109,11 +117,13 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
 			values[i] = new([]byte)
-		case apikey.FieldQuotaUsd, apikey.FieldUsedQuota, apikey.FieldUsedQuotaActual, apikey.FieldSellRate:
+		case apikey.FieldBalanceAlertEnabled, apikey.FieldBalanceAlertNotified:
+			values[i] = new(sql.NullBool)
+		case apikey.FieldQuotaUsd, apikey.FieldUsedQuota, apikey.FieldUsedQuotaActual, apikey.FieldSellRate, apikey.FieldBalanceAlertThreshold:
 			values[i] = new(sql.NullFloat64)
 		case apikey.FieldID, apikey.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
-		case apikey.FieldName, apikey.FieldKeyHint, apikey.FieldKeyHash, apikey.FieldKeyEncrypted, apikey.FieldStatus:
+		case apikey.FieldName, apikey.FieldKeyHint, apikey.FieldKeyHash, apikey.FieldKeyEncrypted, apikey.FieldBalanceAlertEmail, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
 		case apikey.FieldExpiresAt, apikey.FieldCreatedAt, apikey.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -211,6 +221,30 @@ func (ak *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field max_concurrency", values[i])
 			} else if value.Valid {
 				ak.MaxConcurrency = int(value.Int64)
+			}
+		case apikey.FieldBalanceAlertEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field balance_alert_enabled", values[i])
+			} else if value.Valid {
+				ak.BalanceAlertEnabled = value.Bool
+			}
+		case apikey.FieldBalanceAlertEmail:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field balance_alert_email", values[i])
+			} else if value.Valid {
+				ak.BalanceAlertEmail = value.String
+			}
+		case apikey.FieldBalanceAlertThreshold:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field balance_alert_threshold", values[i])
+			} else if value.Valid {
+				ak.BalanceAlertThreshold = value.Float64
+			}
+		case apikey.FieldBalanceAlertNotified:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field balance_alert_notified", values[i])
+			} else if value.Valid {
+				ak.BalanceAlertNotified = value.Bool
 			}
 		case apikey.FieldExpiresAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -332,6 +366,18 @@ func (ak *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("max_concurrency=")
 	builder.WriteString(fmt.Sprintf("%v", ak.MaxConcurrency))
+	builder.WriteString(", ")
+	builder.WriteString("balance_alert_enabled=")
+	builder.WriteString(fmt.Sprintf("%v", ak.BalanceAlertEnabled))
+	builder.WriteString(", ")
+	builder.WriteString("balance_alert_email=")
+	builder.WriteString(ak.BalanceAlertEmail)
+	builder.WriteString(", ")
+	builder.WriteString("balance_alert_threshold=")
+	builder.WriteString(fmt.Sprintf("%v", ak.BalanceAlertThreshold))
+	builder.WriteString(", ")
+	builder.WriteString("balance_alert_notified=")
+	builder.WriteString(fmt.Sprintf("%v", ak.BalanceAlertNotified))
 	builder.WriteString(", ")
 	if v := ak.ExpiresAt; v != nil {
 		builder.WriteString("expires_at=")

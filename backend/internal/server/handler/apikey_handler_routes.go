@@ -85,14 +85,17 @@ func (h *APIKeyHandler) CreateKey(c *gin.Context) {
 	}
 
 	item, err := h.service.CreateOwned(c.Request.Context(), userID, appapikey.CreateInput{
-		Name:           req.Name,
-		GroupID:        req.GroupID,
-		IPWhitelist:    req.IPWhitelist,
-		IPBlacklist:    req.IPBlacklist,
-		QuotaUSD:       req.QuotaUSD,
-		SellRate:       req.SellRate,
-		MaxConcurrency: req.MaxConcurrency,
-		ExpiresAt:      req.ExpiresAt,
+		Name:                  req.Name,
+		GroupID:               req.GroupID,
+		IPWhitelist:           req.IPWhitelist,
+		IPBlacklist:           req.IPBlacklist,
+		QuotaUSD:              req.QuotaUSD,
+		SellRate:              req.SellRate,
+		MaxConcurrency:        req.MaxConcurrency,
+		BalanceAlertEnabled:   req.BalanceAlertEnabled,
+		BalanceAlertEmail:     req.BalanceAlertEmail,
+		BalanceAlertThreshold: req.BalanceAlertThreshold,
+		ExpiresAt:             req.ExpiresAt,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建 API 密钥失败", "创建失败", err)
@@ -124,17 +127,20 @@ func (h *APIKeyHandler) UpdateKey(c *gin.Context) {
 	}
 
 	item, err := h.service.UpdateOwned(c.Request.Context(), userID, id, appapikey.UpdateInput{
-		Name:           req.Name,
-		GroupID:        req.GroupID,
-		IPWhitelist:    req.IPWhitelist,
-		HasIPWhitelist: req.IPWhitelist != nil,
-		IPBlacklist:    req.IPBlacklist,
-		HasIPBlacklist: req.IPBlacklist != nil,
-		QuotaUSD:       req.QuotaUSD,
-		SellRate:       req.SellRate,
-		MaxConcurrency: req.MaxConcurrency,
-		ExpiresAt:      req.ExpiresAt,
-		Status:         req.Status,
+		Name:                  req.Name,
+		GroupID:               req.GroupID,
+		IPWhitelist:           req.IPWhitelist,
+		HasIPWhitelist:        req.IPWhitelist != nil,
+		IPBlacklist:           req.IPBlacklist,
+		HasIPBlacklist:        req.IPBlacklist != nil,
+		QuotaUSD:              req.QuotaUSD,
+		SellRate:              req.SellRate,
+		MaxConcurrency:        req.MaxConcurrency,
+		BalanceAlertEnabled:   req.BalanceAlertEnabled,
+		BalanceAlertEmail:     req.BalanceAlertEmail,
+		BalanceAlertThreshold: req.BalanceAlertThreshold,
+		ExpiresAt:             req.ExpiresAt,
+		Status:                req.Status,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("更新 API 密钥失败", "更新失败", err)
@@ -183,17 +189,20 @@ func (h *APIKeyHandler) AdminUpdateKey(c *gin.Context) {
 	}
 
 	item, err := h.service.UpdateAdmin(c.Request.Context(), id, appapikey.UpdateInput{
-		Name:           req.Name,
-		GroupID:        req.GroupID,
-		IPWhitelist:    req.IPWhitelist,
-		HasIPWhitelist: req.IPWhitelist != nil,
-		IPBlacklist:    req.IPBlacklist,
-		HasIPBlacklist: req.IPBlacklist != nil,
-		QuotaUSD:       req.QuotaUSD,
-		SellRate:       req.SellRate,
-		MaxConcurrency: req.MaxConcurrency,
-		ExpiresAt:      req.ExpiresAt,
-		Status:         req.Status,
+		Name:                  req.Name,
+		GroupID:               req.GroupID,
+		IPWhitelist:           req.IPWhitelist,
+		HasIPWhitelist:        req.IPWhitelist != nil,
+		IPBlacklist:           req.IPBlacklist,
+		HasIPBlacklist:        req.IPBlacklist != nil,
+		QuotaUSD:              req.QuotaUSD,
+		SellRate:              req.SellRate,
+		MaxConcurrency:        req.MaxConcurrency,
+		BalanceAlertEnabled:   req.BalanceAlertEnabled,
+		BalanceAlertEmail:     req.BalanceAlertEmail,
+		BalanceAlertThreshold: req.BalanceAlertThreshold,
+		ExpiresAt:             req.ExpiresAt,
+		Status:                req.Status,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("管理员更新 API 密钥失败", "更新失败", err)

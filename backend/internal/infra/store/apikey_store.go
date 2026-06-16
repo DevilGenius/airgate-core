@@ -148,21 +148,12 @@ func (s *APIKeyStore) Create(ctx context.Context, mutation appapikey.Mutation) (
 
 // UpdateOwned 更新当前用户的 API Key。
 func (s *APIKeyStore) UpdateOwned(ctx context.Context, userID, id int, mutation appapikey.Mutation) (appapikey.Key, error) {
-	exists, err := s.db.APIKey.Query().
-		Where(entapikey.IDEQ(id), entapikey.HasUserWith(entuser.IDEQ(userID))).
-		Exist(ctx)
-	if err != nil {
-		return appapikey.Key{}, err
-	}
-	if !exists {
-		return appapikey.Key{}, appapikey.ErrKeyNotFound
-	}
-	return s.updateByID(ctx, id, mutation)
+	return s.updateByID(ctx, id, mutation, &userID)
 }
 
 // UpdateAdmin 管理员更新 API Key。
 func (s *APIKeyStore) UpdateAdmin(ctx context.Context, id int, mutation appapikey.Mutation) (appapikey.Key, error) {
-	return s.updateByID(ctx, id, mutation)
+	return s.updateByID(ctx, id, mutation, nil)
 }
 
 // ResetUsageAdmin 管理员重置 API Key 累计用量。
@@ -170,6 +161,7 @@ func (s *APIKeyStore) ResetUsageAdmin(ctx context.Context, id int) (appapikey.Ke
 	if err := s.db.APIKey.UpdateOneID(id).
 		SetUsedQuota(0).
 		SetUsedQuotaActual(0).
+		SetBalanceAlertNotified(false).
 		Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return appapikey.Key{}, appapikey.ErrKeyNotFound
@@ -213,6 +205,14 @@ func (s *APIKeyStore) DeleteOwned(ctx context.Context, userID, id int) error {
 
 // FindOwned 查询当前用户的 API Key。
 func (s *APIKeyStore) FindOwned(ctx context.Context, userID, id int) (appapikey.Key, error) {
+	item, err := s.findOwnedAPIKeyWithEdges(ctx, userID, id)
+	if err != nil {
+		return appapikey.Key{}, err
+	}
+	return mapAPIKey(item), nil
+}
+
+func (s *APIKeyStore) findOwnedAPIKeyWithEdges(ctx context.Context, userID, id int) (*ent.APIKey, error) {
 	item, err := s.db.APIKey.Query().
 		Where(entapikey.IDEQ(id), entapikey.HasUserWith(entuser.IDEQ(userID))).
 		WithUser().
@@ -220,14 +220,22 @@ func (s *APIKeyStore) FindOwned(ctx context.Context, userID, id int) (appapikey.
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return appapikey.Key{}, appapikey.ErrKeyNotFound
+			return nil, appapikey.ErrKeyNotFound
 		}
-		return appapikey.Key{}, err
+		return nil, err
 	}
-	return mapAPIKey(item), nil
+	return item, nil
 }
 
-func (s *APIKeyStore) updateByID(ctx context.Context, id int, mutation appapikey.Mutation) (appapikey.Key, error) {
+func (s *APIKeyStore) updateByID(ctx context.Context, id int, mutation appapikey.Mutation, ownerUserID *int) (appapikey.Key, error) {
+	needCurrent := shouldCheckBalanceAlertReset(mutation)
+	current, err := s.apiKeyForUpdate(ctx, id, ownerUserID, needCurrent)
+	if err != nil {
+		return appapikey.Key{}, err
+	}
+	if current != nil && needCurrent {
+		mutation.ResetBalanceAlertNotified = shouldResetBalanceAlertNotified(current, mutation)
+	}
 	builder := s.db.APIKey.UpdateOneID(id)
 	applyAPIKeyMutationUpdate(builder, mutation)
 	if err := builder.Exec(ctx); err != nil {
@@ -237,6 +245,68 @@ func (s *APIKeyStore) updateByID(ctx context.Context, id int, mutation appapikey
 		return appapikey.Key{}, err
 	}
 	return s.loadByID(ctx, id)
+}
+
+func (s *APIKeyStore) apiKeyForUpdate(ctx context.Context, id int, ownerUserID *int, needCurrent bool) (*ent.APIKey, error) {
+	if ownerUserID == nil && !needCurrent {
+		return nil, nil
+	}
+	query := s.db.APIKey.Query().Where(entapikey.IDEQ(id))
+	if ownerUserID != nil {
+		query.Where(entapikey.HasUserWith(entuser.IDEQ(*ownerUserID)))
+	}
+	item, err := query.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, appapikey.ErrKeyNotFound
+		}
+		return nil, err
+	}
+	return item, nil
+}
+
+func shouldCheckBalanceAlertReset(mutation appapikey.Mutation) bool {
+	return mutation.QuotaUSD != nil ||
+		mutation.BalanceAlertEnabled != nil ||
+		mutation.BalanceAlertEmail != nil ||
+		mutation.BalanceAlertThreshold != nil
+}
+
+func shouldResetBalanceAlertNotified(current *ent.APIKey, mutation appapikey.Mutation) bool {
+	if mutation.QuotaUSD != nil && *mutation.QuotaUSD > current.QuotaUsd {
+		return true
+	}
+
+	enabled := current.BalanceAlertEnabled
+	if mutation.BalanceAlertEnabled != nil {
+		enabled = *mutation.BalanceAlertEnabled
+	}
+	email := strings.TrimSpace(current.BalanceAlertEmail)
+	if mutation.BalanceAlertEmail != nil {
+		email = strings.TrimSpace(*mutation.BalanceAlertEmail)
+	}
+	threshold := current.BalanceAlertThreshold
+	if mutation.BalanceAlertThreshold != nil {
+		threshold = *mutation.BalanceAlertThreshold
+	}
+	if !enabled || email == "" || threshold <= 0 {
+		return false
+	}
+
+	return balanceAlertConfigChanged(current, mutation)
+}
+
+func balanceAlertConfigChanged(current *ent.APIKey, mutation appapikey.Mutation) bool {
+	if mutation.BalanceAlertEnabled != nil && *mutation.BalanceAlertEnabled != current.BalanceAlertEnabled {
+		return true
+	}
+	if mutation.BalanceAlertEmail != nil && strings.TrimSpace(*mutation.BalanceAlertEmail) != strings.TrimSpace(current.BalanceAlertEmail) {
+		return true
+	}
+	if mutation.BalanceAlertThreshold != nil && *mutation.BalanceAlertThreshold != current.BalanceAlertThreshold {
+		return true
+	}
+	return false
 }
 
 func (s *APIKeyStore) loadByID(ctx context.Context, id int) (appapikey.Key, error) {
@@ -288,6 +358,15 @@ func applyAPIKeyMutationCreate(builder *ent.APIKeyCreate, mutation appapikey.Mut
 	if mutation.MaxConcurrency != nil {
 		builder.SetMaxConcurrency(*mutation.MaxConcurrency)
 	}
+	if mutation.BalanceAlertEnabled != nil {
+		builder.SetBalanceAlertEnabled(*mutation.BalanceAlertEnabled)
+	}
+	if mutation.BalanceAlertEmail != nil {
+		builder.SetBalanceAlertEmail(*mutation.BalanceAlertEmail)
+	}
+	if mutation.BalanceAlertThreshold != nil {
+		builder.SetBalanceAlertThreshold(*mutation.BalanceAlertThreshold)
+	}
 	if mutation.HasExpiresAt && mutation.ExpiresAt != nil {
 		builder.SetExpiresAt(*mutation.ExpiresAt)
 	}
@@ -318,6 +397,18 @@ func applyAPIKeyMutationUpdate(builder *ent.APIKeyUpdateOne, mutation appapikey.
 	if mutation.MaxConcurrency != nil {
 		builder.SetMaxConcurrency(*mutation.MaxConcurrency)
 	}
+	if mutation.BalanceAlertEnabled != nil {
+		builder.SetBalanceAlertEnabled(*mutation.BalanceAlertEnabled)
+	}
+	if mutation.BalanceAlertEmail != nil {
+		builder.SetBalanceAlertEmail(*mutation.BalanceAlertEmail)
+	}
+	if mutation.BalanceAlertThreshold != nil {
+		builder.SetBalanceAlertThreshold(*mutation.BalanceAlertThreshold)
+	}
+	if mutation.ResetBalanceAlertNotified {
+		builder.SetBalanceAlertNotified(false)
+	}
 	if mutation.HasExpiresAt {
 		if mutation.ExpiresAt != nil {
 			builder.SetExpiresAt(*mutation.ExpiresAt)
@@ -332,21 +423,25 @@ func applyAPIKeyMutationUpdate(builder *ent.APIKeyUpdateOne, mutation appapikey.
 
 func mapAPIKey(item *ent.APIKey) appapikey.Key {
 	result := appapikey.Key{
-		ID:              item.ID,
-		Name:            item.Name,
-		KeyHint:         item.KeyHint,
-		KeyHash:         item.KeyHash,
-		KeyEncrypted:    item.KeyEncrypted,
-		IPWhitelist:     cloneStringSlice(item.IPWhitelist),
-		IPBlacklist:     cloneStringSlice(item.IPBlacklist),
-		QuotaUSD:        item.QuotaUsd,
-		UsedQuota:       item.UsedQuota,
-		UsedQuotaActual: item.UsedQuotaActual,
-		SellRate:        item.SellRate,
-		MaxConcurrency:  item.MaxConcurrency,
-		Status:          item.Status.String(),
-		CreatedAt:       item.CreatedAt,
-		UpdatedAt:       item.UpdatedAt,
+		ID:                    item.ID,
+		Name:                  item.Name,
+		KeyHint:               item.KeyHint,
+		KeyHash:               item.KeyHash,
+		KeyEncrypted:          item.KeyEncrypted,
+		IPWhitelist:           cloneStringSlice(item.IPWhitelist),
+		IPBlacklist:           cloneStringSlice(item.IPBlacklist),
+		QuotaUSD:              item.QuotaUsd,
+		UsedQuota:             item.UsedQuota,
+		UsedQuotaActual:       item.UsedQuotaActual,
+		SellRate:              item.SellRate,
+		MaxConcurrency:        item.MaxConcurrency,
+		BalanceAlertEnabled:   item.BalanceAlertEnabled,
+		BalanceAlertEmail:     item.BalanceAlertEmail,
+		BalanceAlertThreshold: item.BalanceAlertThreshold,
+		BalanceAlertNotified:  item.BalanceAlertNotified,
+		Status:                item.Status.String(),
+		CreatedAt:             item.CreatedAt,
+		UpdatedAt:             item.UpdatedAt,
 	}
 	if item.ExpiresAt != nil {
 		value := *item.ExpiresAt

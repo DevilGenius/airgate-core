@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
@@ -77,6 +79,22 @@ type UsageRecord struct {
 	UsageMetadata         map[string]string
 }
 
+// APIKeyBalanceAlertInput 是 API Key 剩余额度提醒回调的输入。
+type APIKeyBalanceAlertInput struct {
+	KeyID      int
+	KeyName    string
+	UserID     int
+	UserEmail  string
+	AlertEmail string
+	Remaining  float64
+	Threshold  float64
+	QuotaUSD   float64
+	UsedQuota  float64
+}
+
+// APIKeyBalanceAlertFunc 发送 API Key 剩余额度提醒。
+type APIKeyBalanceAlertFunc func(APIKeyBalanceAlertInput)
+
 // Recorder 异步记录器
 // 使用 channel 缓冲，goroutine 批量写入
 // 每 100 条或每 5 秒 flush 一次
@@ -89,6 +107,9 @@ type Recorder struct {
 	stopped      chan struct{}
 	retryStopped chan struct{}
 	once         sync.Once
+
+	apiKeyAlertMu      sync.RWMutex
+	apiKeyBalanceAlert APIKeyBalanceAlertFunc
 }
 
 // NewRecorder 创建使用量记录器
@@ -109,6 +130,19 @@ func NewRecorder(db *ent.Client, bufferSize int, rdb ...*redis.Client) *Recorder
 		stopped:      make(chan struct{}),
 		retryStopped: make(chan struct{}),
 	}
+}
+
+// SetAPIKeyBalanceAlertCallback 设置 API Key 剩余额度提醒回调。
+func (r *Recorder) SetAPIKeyBalanceAlertCallback(fn APIKeyBalanceAlertFunc) {
+	r.apiKeyAlertMu.Lock()
+	defer r.apiKeyAlertMu.Unlock()
+	r.apiKeyBalanceAlert = fn
+}
+
+func (r *Recorder) apiKeyBalanceAlertCallback() APIKeyBalanceAlertFunc {
+	r.apiKeyAlertMu.RLock()
+	defer r.apiKeyAlertMu.RUnlock()
+	return r.apiKeyBalanceAlert
 }
 
 // Record 提交使用记录（非阻塞）
@@ -158,6 +192,7 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 			return 0, fmt.Errorf("提交事务失败: %w", err)
 		}
 		r.updateAccountStatsCache(ctx, insertedBatch)
+		r.scheduleAPIKeyBalanceAlertCheck(insertedBatch)
 		return inserted[0].ID, nil
 	}
 
@@ -345,6 +380,7 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 		return fmt.Errorf("提交事务失败: %w", err)
 	}
 	r.updateAccountStatsCache(ctx, insertedBatch)
+	r.scheduleAPIKeyBalanceAlertCheck(insertedBatch)
 	return nil
 }
 
@@ -642,6 +678,96 @@ func (r *Recorder) updateAccountStatsCache(ctx context.Context, batch []UsageRec
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
 		slog.Debug("account_stats_cache_update_failed", "count", len(batch), "error", err)
+	}
+}
+
+func (r *Recorder) scheduleAPIKeyBalanceAlertCheck(batch []UsageRecord) {
+	callback := r.apiKeyBalanceAlertCallback()
+	if callback == nil {
+		return
+	}
+	keyIDs := apiKeyBalanceAlertCandidateIDs(batch)
+	if len(keyIDs) == 0 {
+		return
+	}
+	safego.Go("api_key_balance_alert_check", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), writeAttemptTimeout)
+		defer cancel()
+		r.checkAPIKeyBalanceAlerts(ctx, keyIDs, callback)
+	})
+}
+
+func apiKeyBalanceAlertCandidateIDs(batch []UsageRecord) []int {
+	seen := make(map[int]struct{})
+	ids := make([]int, 0, len(batch))
+	for _, rec := range batch {
+		if rec.APIKeyID <= 0 || rec.BilledCost <= 0 {
+			continue
+		}
+		if _, ok := seen[rec.APIKeyID]; ok {
+			continue
+		}
+		seen[rec.APIKeyID] = struct{}{}
+		ids = append(ids, rec.APIKeyID)
+	}
+	return ids
+}
+
+func (r *Recorder) checkAPIKeyBalanceAlerts(ctx context.Context, keyIDs []int, callback APIKeyBalanceAlertFunc) {
+	keys, err := r.db.APIKey.Query().
+		Where(entapikey.IDIn(keyIDs...)).
+		WithUser().
+		All(ctx)
+	if err != nil {
+		slog.Error("api_key_balance_alert_load_failed", "key_count", len(keyIDs), "error", err)
+		return
+	}
+	for _, key := range keys {
+		alertEmail := strings.TrimSpace(key.BalanceAlertEmail)
+		threshold := key.BalanceAlertThreshold
+		remaining := key.QuotaUsd - key.UsedQuota
+		alertConfigured := key.BalanceAlertEnabled && alertEmail != "" && threshold > 0 && key.QuotaUsd > 0
+		if key.BalanceAlertNotified && (!alertConfigured || remaining > threshold) {
+			if err := r.db.APIKey.UpdateOneID(key.ID).SetBalanceAlertNotified(false).Exec(ctx); err != nil {
+				slog.Debug("api_key_balance_alert_reset_failed", "key_id", key.ID, "error", err)
+			}
+			continue
+		}
+		if !alertConfigured || remaining > threshold || key.BalanceAlertNotified {
+			continue
+		}
+		affected, err := r.db.APIKey.Update().
+			Where(
+				entapikey.IDEQ(key.ID),
+				entapikey.BalanceAlertEnabledEQ(true),
+				entapikey.BalanceAlertEmailNEQ(""),
+				entapikey.BalanceAlertThresholdGT(0),
+				entapikey.QuotaUsdGT(0),
+				entapikey.BalanceAlertNotifiedEQ(false),
+			).
+			SetBalanceAlertNotified(true).
+			Save(ctx)
+		if err != nil {
+			slog.Error("api_key_balance_alert_mark_failed", "key_id", key.ID, "error", err)
+			continue
+		}
+		if affected == 0 {
+			continue
+		}
+		input := APIKeyBalanceAlertInput{
+			KeyID:      key.ID,
+			KeyName:    key.Name,
+			AlertEmail: alertEmail,
+			Remaining:  remaining,
+			Threshold:  threshold,
+			QuotaUSD:   key.QuotaUsd,
+			UsedQuota:  key.UsedQuota,
+		}
+		if key.Edges.User != nil {
+			input.UserID = key.Edges.User.ID
+			input.UserEmail = key.Edges.User.Email
+		}
+		callback(input)
 	}
 }
 

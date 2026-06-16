@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Description, Input, Label, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
+import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import {
@@ -132,6 +133,41 @@ export function EditKeyModal({
           />
           <Description>{t('user_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
         </HeroTextField>
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-text">{t('user_keys.balance_alert_enabled')}</div>
+            <p className="mt-0.5 text-xs text-text-tertiary">{t('user_keys.balance_alert_hint')}</p>
+          </div>
+          <NativeSwitch
+            ariaLabel={t('user_keys.balance_alert_enabled')}
+            isSelected={form.balance_alert_enabled}
+            onChange={(value) => setForm({ ...form, balance_alert_enabled: value })}
+          />
+        </div>
+        {form.balance_alert_enabled && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <HeroTextField fullWidth>
+              <Label>{t('user_keys.balance_alert_email')}</Label>
+              <Input
+                type="email"
+                value={form.balance_alert_email}
+                onChange={(e) => setForm({ ...form, balance_alert_email: e.target.value })}
+                placeholder="name@example.com"
+              />
+            </HeroTextField>
+            <HeroTextField fullWidth>
+              <Label>{t('user_keys.balance_alert_threshold')}</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.balance_alert_threshold}
+                onChange={(e) => setForm({ ...form, balance_alert_threshold: e.target.value })}
+                placeholder="5.00"
+              />
+            </HeroTextField>
+          </div>
+        )}
         <CommonDatePicker
           description={t('user_keys.expire_hint')}
           label={t('user_keys.expires_at')}

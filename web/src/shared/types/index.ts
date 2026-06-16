@@ -369,6 +369,12 @@ export interface APIKeyResp {
   sell_rate: number;
   /** API Key 级并发上限：同一把 key 同时在途请求数。0 表示不限制 */
   max_concurrency: number;
+  /** API Key 剩余额度邮件提醒开关 */
+  balance_alert_enabled: boolean;
+  /** API Key 剩余额度提醒接收邮箱 */
+  balance_alert_email: string;
+  /** API Key 剩余额度提醒阈值 */
+  balance_alert_threshold: number;
   /** 今日销售金额（sum(billed_cost)，含 sell_rate） */
   today_cost: number;
   /** 今日消耗金额（sum(actual_cost)，不含 sell_rate） */
@@ -393,6 +399,9 @@ export interface CreateAPIKeyReq {
   sell_rate?: number;
   /** API Key 并发上限，0 或不传表示不限制 */
   max_concurrency?: number;
+  balance_alert_enabled?: boolean;
+  balance_alert_email?: string;
+  balance_alert_threshold?: number;
   expires_at?: string;
 }
 
@@ -406,6 +415,9 @@ export interface UpdateAPIKeyReq {
   sell_rate?: number;
   /** API Key 并发上限，0 表示关闭限制；不传则不改动 */
   max_concurrency?: number;
+  balance_alert_enabled?: boolean;
+  balance_alert_email?: string;
+  balance_alert_threshold?: number;
   expires_at?: string;
   status?: 'active' | 'disabled';
 }

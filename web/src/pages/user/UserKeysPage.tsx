@@ -159,6 +159,9 @@ export default function UserKeysPage() {
       quota_usd: key.quota_usd ? String(key.quota_usd) : '',
       sell_rate: Number.isFinite(key.sell_rate) ? String(key.sell_rate) : '1',
       max_concurrency: key.max_concurrency ? String(key.max_concurrency) : '',
+      balance_alert_enabled: key.balance_alert_enabled,
+      balance_alert_email: key.balance_alert_email || '',
+      balance_alert_threshold: key.balance_alert_threshold ? String(key.balance_alert_threshold) : '',
       expires_at: formatDateInputValue(key.expires_at),
     });
     setModalOpen(true);
@@ -188,6 +191,18 @@ export default function UserKeysPage() {
       return;
     }
     const normalizedSellRate = sellRate ?? 1;
+    const balanceAlertEmail = form.balance_alert_email.trim();
+    const balanceAlertThreshold = form.balance_alert_threshold.trim()
+      ? Number(form.balance_alert_threshold)
+      : 0;
+    if (form.balance_alert_enabled && !balanceAlertEmail) {
+      toast('error', t('user_keys.balance_alert_email_required'));
+      return;
+    }
+    if (form.balance_alert_enabled && (!Number.isFinite(balanceAlertThreshold) || balanceAlertThreshold <= 0)) {
+      toast('error', t('user_keys.balance_alert_threshold_required'));
+      return;
+    }
 
     if (editingKey) {
       const payload: UpdateAPIKeyReq = {
@@ -198,6 +213,9 @@ export default function UserKeysPage() {
         sell_rate: normalizedSellRate,
         // 空字符串显式改为 0 = 关闭并发限制；后端看到 0 会清除旧值
         max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : 0,
+        balance_alert_enabled: form.balance_alert_enabled,
+        balance_alert_email: balanceAlertEmail,
+        balance_alert_threshold: balanceAlertThreshold,
         expires_at: expiresAt,
       };
       updateMutation.mutate({ id: editingKey.id, data: payload });
@@ -208,6 +226,9 @@ export default function UserKeysPage() {
         quota_usd: form.quota_usd ? Number(form.quota_usd) : undefined,
         sell_rate: normalizedSellRate,
         max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : undefined,
+        balance_alert_enabled: form.balance_alert_enabled,
+        balance_alert_email: balanceAlertEmail,
+        balance_alert_threshold: balanceAlertThreshold,
         expires_at: expiresAt,
       };
       createMutation.mutate(payload);

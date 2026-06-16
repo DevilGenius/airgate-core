@@ -145,6 +145,62 @@ func (akc *APIKeyCreate) SetNillableMaxConcurrency(i *int) *APIKeyCreate {
 	return akc
 }
 
+// SetBalanceAlertEnabled sets the "balance_alert_enabled" field.
+func (akc *APIKeyCreate) SetBalanceAlertEnabled(b bool) *APIKeyCreate {
+	akc.mutation.SetBalanceAlertEnabled(b)
+	return akc
+}
+
+// SetNillableBalanceAlertEnabled sets the "balance_alert_enabled" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableBalanceAlertEnabled(b *bool) *APIKeyCreate {
+	if b != nil {
+		akc.SetBalanceAlertEnabled(*b)
+	}
+	return akc
+}
+
+// SetBalanceAlertEmail sets the "balance_alert_email" field.
+func (akc *APIKeyCreate) SetBalanceAlertEmail(s string) *APIKeyCreate {
+	akc.mutation.SetBalanceAlertEmail(s)
+	return akc
+}
+
+// SetNillableBalanceAlertEmail sets the "balance_alert_email" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableBalanceAlertEmail(s *string) *APIKeyCreate {
+	if s != nil {
+		akc.SetBalanceAlertEmail(*s)
+	}
+	return akc
+}
+
+// SetBalanceAlertThreshold sets the "balance_alert_threshold" field.
+func (akc *APIKeyCreate) SetBalanceAlertThreshold(f float64) *APIKeyCreate {
+	akc.mutation.SetBalanceAlertThreshold(f)
+	return akc
+}
+
+// SetNillableBalanceAlertThreshold sets the "balance_alert_threshold" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableBalanceAlertThreshold(f *float64) *APIKeyCreate {
+	if f != nil {
+		akc.SetBalanceAlertThreshold(*f)
+	}
+	return akc
+}
+
+// SetBalanceAlertNotified sets the "balance_alert_notified" field.
+func (akc *APIKeyCreate) SetBalanceAlertNotified(b bool) *APIKeyCreate {
+	akc.mutation.SetBalanceAlertNotified(b)
+	return akc
+}
+
+// SetNillableBalanceAlertNotified sets the "balance_alert_notified" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableBalanceAlertNotified(b *bool) *APIKeyCreate {
+	if b != nil {
+		akc.SetBalanceAlertNotified(*b)
+	}
+	return akc
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (akc *APIKeyCreate) SetExpiresAt(t time.Time) *APIKeyCreate {
 	akc.mutation.SetExpiresAt(t)
@@ -305,6 +361,22 @@ func (akc *APIKeyCreate) defaults() {
 		v := apikey.DefaultMaxConcurrency
 		akc.mutation.SetMaxConcurrency(v)
 	}
+	if _, ok := akc.mutation.BalanceAlertEnabled(); !ok {
+		v := apikey.DefaultBalanceAlertEnabled
+		akc.mutation.SetBalanceAlertEnabled(v)
+	}
+	if _, ok := akc.mutation.BalanceAlertEmail(); !ok {
+		v := apikey.DefaultBalanceAlertEmail
+		akc.mutation.SetBalanceAlertEmail(v)
+	}
+	if _, ok := akc.mutation.BalanceAlertThreshold(); !ok {
+		v := apikey.DefaultBalanceAlertThreshold
+		akc.mutation.SetBalanceAlertThreshold(v)
+	}
+	if _, ok := akc.mutation.BalanceAlertNotified(); !ok {
+		v := apikey.DefaultBalanceAlertNotified
+		akc.mutation.SetBalanceAlertNotified(v)
+	}
 	if _, ok := akc.mutation.Status(); !ok {
 		v := apikey.DefaultStatus
 		akc.mutation.SetStatus(v)
@@ -364,6 +436,23 @@ func (akc *APIKeyCreate) check() error {
 		if err := apikey.MaxConcurrencyValidator(v); err != nil {
 			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_concurrency": %w`, err)}
 		}
+	}
+	if _, ok := akc.mutation.BalanceAlertEnabled(); !ok {
+		return &ValidationError{Name: "balance_alert_enabled", err: errors.New(`ent: missing required field "APIKey.balance_alert_enabled"`)}
+	}
+	if _, ok := akc.mutation.BalanceAlertEmail(); !ok {
+		return &ValidationError{Name: "balance_alert_email", err: errors.New(`ent: missing required field "APIKey.balance_alert_email"`)}
+	}
+	if v, ok := akc.mutation.BalanceAlertEmail(); ok {
+		if err := apikey.BalanceAlertEmailValidator(v); err != nil {
+			return &ValidationError{Name: "balance_alert_email", err: fmt.Errorf(`ent: validator failed for field "APIKey.balance_alert_email": %w`, err)}
+		}
+	}
+	if _, ok := akc.mutation.BalanceAlertThreshold(); !ok {
+		return &ValidationError{Name: "balance_alert_threshold", err: errors.New(`ent: missing required field "APIKey.balance_alert_threshold"`)}
+	}
+	if _, ok := akc.mutation.BalanceAlertNotified(); !ok {
+		return &ValidationError{Name: "balance_alert_notified", err: errors.New(`ent: missing required field "APIKey.balance_alert_notified"`)}
 	}
 	if _, ok := akc.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "APIKey.status"`)}
@@ -451,6 +540,22 @@ func (akc *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := akc.mutation.MaxConcurrency(); ok {
 		_spec.SetField(apikey.FieldMaxConcurrency, field.TypeInt, value)
 		_node.MaxConcurrency = value
+	}
+	if value, ok := akc.mutation.BalanceAlertEnabled(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertEnabled, field.TypeBool, value)
+		_node.BalanceAlertEnabled = value
+	}
+	if value, ok := akc.mutation.BalanceAlertEmail(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertEmail, field.TypeString, value)
+		_node.BalanceAlertEmail = value
+	}
+	if value, ok := akc.mutation.BalanceAlertThreshold(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertThreshold, field.TypeFloat64, value)
+		_node.BalanceAlertThreshold = value
+	}
+	if value, ok := akc.mutation.BalanceAlertNotified(); ok {
+		_spec.SetField(apikey.FieldBalanceAlertNotified, field.TypeBool, value)
+		_node.BalanceAlertNotified = value
 	}
 	if value, ok := akc.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)

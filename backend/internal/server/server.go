@@ -134,6 +134,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Scheduler:   sched,
 		Monitor:     monitorService,
 		Events:      eventHub,
+		Recorder:    recorder,
 	})
 	if s.handlers.AccountService != nil {
 		s.handlers.AccountService.SetMonitorRecorder(monitorService)

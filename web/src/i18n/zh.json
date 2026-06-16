@@ -631,7 +631,13 @@
     "sales": "销售",
     "consumption": "消耗",
     "today": "今日",
-    "thirty_days": "近30天"
+    "thirty_days": "近30天",
+    "balance_alert_enabled": "额度邮件提醒",
+    "balance_alert_email": "接收邮箱",
+    "balance_alert_threshold": "提醒阈值 (USD)",
+    "balance_alert_hint": "剩余额度低于阈值时发送邮件",
+    "balance_alert_email_required": "请填写额度提醒接收邮箱",
+    "balance_alert_threshold_required": "请填写大于 0 的额度提醒阈值"
   },
 
   "subscriptions": {
@@ -1124,6 +1130,12 @@
     "copy": "复制",
     "copied": "已复制",
     "reveal_failed": "无法获取密钥原文",
+    "balance_alert_enabled": "额度邮件提醒",
+    "balance_alert_email": "接收邮箱",
+    "balance_alert_threshold": "提醒阈值 (USD)",
+    "balance_alert_hint": "剩余额度低于阈值时发送邮件",
+    "balance_alert_email_required": "请填写额度提醒接收邮箱",
+    "balance_alert_threshold_required": "请填写大于 0 的额度提醒阈值",
     "import_ccs": "导入 CCS",
     "ccs_select_client": "选择客户端",
     "ccs_select_desc": "选择要导入到 CC-Switch 的客户端类型。",

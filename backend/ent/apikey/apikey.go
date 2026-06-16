@@ -37,6 +37,14 @@ const (
 	FieldSellRate = "sell_rate"
 	// FieldMaxConcurrency holds the string denoting the max_concurrency field in the database.
 	FieldMaxConcurrency = "max_concurrency"
+	// FieldBalanceAlertEnabled holds the string denoting the balance_alert_enabled field in the database.
+	FieldBalanceAlertEnabled = "balance_alert_enabled"
+	// FieldBalanceAlertEmail holds the string denoting the balance_alert_email field in the database.
+	FieldBalanceAlertEmail = "balance_alert_email"
+	// FieldBalanceAlertThreshold holds the string denoting the balance_alert_threshold field in the database.
+	FieldBalanceAlertThreshold = "balance_alert_threshold"
+	// FieldBalanceAlertNotified holds the string denoting the balance_alert_notified field in the database.
+	FieldBalanceAlertNotified = "balance_alert_notified"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -90,6 +98,10 @@ var Columns = []string{
 	FieldUsedQuotaActual,
 	FieldSellRate,
 	FieldMaxConcurrency,
+	FieldBalanceAlertEnabled,
+	FieldBalanceAlertEmail,
+	FieldBalanceAlertThreshold,
+	FieldBalanceAlertNotified,
 	FieldExpiresAt,
 	FieldStatus,
 	FieldCreatedAt,
@@ -139,6 +151,16 @@ var (
 	DefaultMaxConcurrency int
 	// MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
 	MaxConcurrencyValidator func(int) error
+	// DefaultBalanceAlertEnabled holds the default value on creation for the "balance_alert_enabled" field.
+	DefaultBalanceAlertEnabled bool
+	// DefaultBalanceAlertEmail holds the default value on creation for the "balance_alert_email" field.
+	DefaultBalanceAlertEmail string
+	// BalanceAlertEmailValidator is a validator for the "balance_alert_email" field. It is called by the builders before save.
+	BalanceAlertEmailValidator func(string) error
+	// DefaultBalanceAlertThreshold holds the default value on creation for the "balance_alert_threshold" field.
+	DefaultBalanceAlertThreshold float64
+	// DefaultBalanceAlertNotified holds the default value on creation for the "balance_alert_notified" field.
+	DefaultBalanceAlertNotified bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -224,6 +246,26 @@ func BySellRate(opts ...sql.OrderTermOption) OrderOption {
 // ByMaxConcurrency orders the results by the max_concurrency field.
 func ByMaxConcurrency(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMaxConcurrency, opts...).ToFunc()
+}
+
+// ByBalanceAlertEnabled orders the results by the balance_alert_enabled field.
+func ByBalanceAlertEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBalanceAlertEnabled, opts...).ToFunc()
+}
+
+// ByBalanceAlertEmail orders the results by the balance_alert_email field.
+func ByBalanceAlertEmail(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBalanceAlertEmail, opts...).ToFunc()
+}
+
+// ByBalanceAlertThreshold orders the results by the balance_alert_threshold field.
+func ByBalanceAlertThreshold(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBalanceAlertThreshold, opts...).ToFunc()
+}
+
+// ByBalanceAlertNotified orders the results by the balance_alert_notified field.
+func ByBalanceAlertNotified(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBalanceAlertNotified, opts...).ToFunc()
 }
 
 // ByExpiresAt orders the results by the expires_at field.

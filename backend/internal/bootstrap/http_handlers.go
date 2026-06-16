@@ -27,6 +27,7 @@ import (
 	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
 	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
 	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/DevilGenius/airgate-core/internal/infra/mailer"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
@@ -48,6 +49,7 @@ type HTTPDependencies struct {
 	Scheduler   *scheduler.Scheduler
 	Monitor     *appmonitor.Service
 	Events      *adminevents.Hub
+	Recorder    *billing.Recorder
 }
 
 // HTTPHandlers 聚合所有 HTTP 处理器。
@@ -101,6 +103,11 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	userService.SetBalanceAlertCallback(func(email string, balance float64, threshold float64) {
 		balanceAlertSendEmail(settingsService, email, balance, threshold)
 	})
+	if dep.Recorder != nil {
+		dep.Recorder.SetAPIKeyBalanceAlertCallback(func(input billing.APIKeyBalanceAlertInput) {
+			apiKeyBalanceAlertSendEmail(settingsService, input)
+		})
+	}
 	usageStore := store.NewUsageStore(dep.DB)
 	usageService := appusage.NewService(usageStore, dep.Redis)
 	monitorService := dep.Monitor
@@ -236,4 +243,8 @@ func balanceAlertSendEmail(settingsService *appsettings.Service, email string, b
 			"balance", balance,
 			"threshold", threshold)
 	}
+}
+
+func apiKeyBalanceAlertSendEmail(settingsService *appsettings.Service, input billing.APIKeyBalanceAlertInput) {
+	balanceAlertSendEmail(settingsService, input.AlertEmail, input.Remaining, input.Threshold)
 }

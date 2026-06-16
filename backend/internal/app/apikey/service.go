@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/DevilGenius/airgate-core/internal/auth"
@@ -177,22 +178,27 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 	if maxConc < 0 {
 		maxConc = 0
 	}
+	balanceAlertEmail := normalizeString(input.BalanceAlertEmail)
+	balanceAlertThreshold := normalizeBalanceAlertThreshold(input.BalanceAlertThreshold)
 	item, err := s.repo.Create(ctx, Mutation{
-		Name:           &input.Name,
-		KeyHint:        stringPtr(buildKeyHint(rawKey)),
-		KeyHash:        &keyHash,
-		KeyEncrypted:   &encrypted,
-		UserID:         &userID,
-		GroupID:        &groupID,
-		IPWhitelist:    cloneStringSlice(input.IPWhitelist),
-		HasIPWhitelist: input.IPWhitelist != nil,
-		IPBlacklist:    cloneStringSlice(input.IPBlacklist),
-		HasIPBlacklist: input.IPBlacklist != nil,
-		QuotaUSD:       &input.QuotaUSD,
-		SellRate:       &sellRate,
-		MaxConcurrency: &maxConc,
-		ExpiresAt:      expiresAt,
-		HasExpiresAt:   hasExpiresAt,
+		Name:                  &input.Name,
+		KeyHint:               stringPtr(buildKeyHint(rawKey)),
+		KeyHash:               &keyHash,
+		KeyEncrypted:          &encrypted,
+		UserID:                &userID,
+		GroupID:               &groupID,
+		IPWhitelist:           cloneStringSlice(input.IPWhitelist),
+		HasIPWhitelist:        input.IPWhitelist != nil,
+		IPBlacklist:           cloneStringSlice(input.IPBlacklist),
+		HasIPBlacklist:        input.IPBlacklist != nil,
+		QuotaUSD:              &input.QuotaUSD,
+		SellRate:              &sellRate,
+		MaxConcurrency:        &maxConc,
+		BalanceAlertEnabled:   &input.BalanceAlertEnabled,
+		BalanceAlertEmail:     &balanceAlertEmail,
+		BalanceAlertThreshold: &balanceAlertThreshold,
+		ExpiresAt:             expiresAt,
+		HasExpiresAt:          hasExpiresAt,
 	})
 	if err != nil {
 		logger.Error("api_key_create_failed",
@@ -361,17 +367,20 @@ func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInp
 	}
 
 	mutation := Mutation{
-		Name:           input.Name,
-		IPWhitelist:    cloneStringSlice(input.IPWhitelist),
-		HasIPWhitelist: input.HasIPWhitelist,
-		IPBlacklist:    cloneStringSlice(input.IPBlacklist),
-		HasIPBlacklist: input.HasIPBlacklist,
-		QuotaUSD:       input.QuotaUSD,
-		SellRate:       sellRate,
-		MaxConcurrency: input.MaxConcurrency,
-		ExpiresAt:      expiresAt,
-		HasExpiresAt:   hasExpiresAt,
-		Status:         input.Status,
+		Name:                  input.Name,
+		IPWhitelist:           cloneStringSlice(input.IPWhitelist),
+		HasIPWhitelist:        input.HasIPWhitelist,
+		IPBlacklist:           cloneStringSlice(input.IPBlacklist),
+		HasIPBlacklist:        input.HasIPBlacklist,
+		QuotaUSD:              input.QuotaUSD,
+		SellRate:              sellRate,
+		MaxConcurrency:        input.MaxConcurrency,
+		BalanceAlertEnabled:   input.BalanceAlertEnabled,
+		BalanceAlertEmail:     normalizeOptionalString(input.BalanceAlertEmail),
+		BalanceAlertThreshold: normalizeOptionalBalanceAlertThreshold(input.BalanceAlertThreshold),
+		ExpiresAt:             expiresAt,
+		HasExpiresAt:          hasExpiresAt,
+		Status:                input.Status,
 	}
 	if input.GroupID != nil {
 		groupID := int(*input.GroupID)
@@ -397,6 +406,33 @@ func normalizeSellRate(rate float64) (float64, error) {
 		return 0, errors.Join(ErrInvalidSellRate, err)
 	}
 	return rate, nil
+}
+
+func normalizeBalanceAlertThreshold(threshold float64) float64 {
+	if threshold < 0 {
+		return 0
+	}
+	return threshold
+}
+
+func normalizeOptionalBalanceAlertThreshold(threshold *float64) *float64 {
+	if threshold == nil {
+		return nil
+	}
+	normalized := normalizeBalanceAlertThreshold(*threshold)
+	return &normalized
+}
+
+func normalizeOptionalString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	normalized := normalizeString(*value)
+	return &normalized
+}
+
+func normalizeString(value string) string {
+	return strings.TrimSpace(value)
 }
 
 func (s *Service) ensureUserCanUseGroup(ctx context.Context, userID, groupID int) error {

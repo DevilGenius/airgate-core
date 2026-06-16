@@ -56,42 +56,47 @@ const (
 // APIKeyMutation represents an operation that mutates the APIKey nodes in the graph.
 type APIKeyMutation struct {
 	config
-	op                   Op
-	typ                  string
-	id                   *int
-	name                 *string
-	key_hint             *string
-	key_hash             *string
-	key_encrypted        *string
-	ip_whitelist         *[]string
-	appendip_whitelist   []string
-	ip_blacklist         *[]string
-	appendip_blacklist   []string
-	quota_usd            *float64
-	addquota_usd         *float64
-	used_quota           *float64
-	addused_quota        *float64
-	used_quota_actual    *float64
-	addused_quota_actual *float64
-	sell_rate            *float64
-	addsell_rate         *float64
-	max_concurrency      *int
-	addmax_concurrency   *int
-	expires_at           *time.Time
-	status               *apikey.Status
-	created_at           *time.Time
-	updated_at           *time.Time
-	clearedFields        map[string]struct{}
-	user                 *int
-	cleareduser          bool
-	group                *int
-	clearedgroup         bool
-	usage_logs           map[int]struct{}
-	removedusage_logs    map[int]struct{}
-	clearedusage_logs    bool
-	done                 bool
-	oldValue             func(context.Context) (*APIKey, error)
-	predicates           []predicate.APIKey
+	op                         Op
+	typ                        string
+	id                         *int
+	name                       *string
+	key_hint                   *string
+	key_hash                   *string
+	key_encrypted              *string
+	ip_whitelist               *[]string
+	appendip_whitelist         []string
+	ip_blacklist               *[]string
+	appendip_blacklist         []string
+	quota_usd                  *float64
+	addquota_usd               *float64
+	used_quota                 *float64
+	addused_quota              *float64
+	used_quota_actual          *float64
+	addused_quota_actual       *float64
+	sell_rate                  *float64
+	addsell_rate               *float64
+	max_concurrency            *int
+	addmax_concurrency         *int
+	balance_alert_enabled      *bool
+	balance_alert_email        *string
+	balance_alert_threshold    *float64
+	addbalance_alert_threshold *float64
+	balance_alert_notified     *bool
+	expires_at                 *time.Time
+	status                     *apikey.Status
+	created_at                 *time.Time
+	updated_at                 *time.Time
+	clearedFields              map[string]struct{}
+	user                       *int
+	cleareduser                bool
+	group                      *int
+	clearedgroup               bool
+	usage_logs                 map[int]struct{}
+	removedusage_logs          map[int]struct{}
+	clearedusage_logs          bool
+	done                       bool
+	oldValue                   func(context.Context) (*APIKey, error)
+	predicates                 []predicate.APIKey
 }
 
 var _ ent.Mutation = (*APIKeyMutation)(nil)
@@ -759,6 +764,170 @@ func (m *APIKeyMutation) ResetMaxConcurrency() {
 	m.addmax_concurrency = nil
 }
 
+// SetBalanceAlertEnabled sets the "balance_alert_enabled" field.
+func (m *APIKeyMutation) SetBalanceAlertEnabled(b bool) {
+	m.balance_alert_enabled = &b
+}
+
+// BalanceAlertEnabled returns the value of the "balance_alert_enabled" field in the mutation.
+func (m *APIKeyMutation) BalanceAlertEnabled() (r bool, exists bool) {
+	v := m.balance_alert_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceAlertEnabled returns the old "balance_alert_enabled" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldBalanceAlertEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceAlertEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceAlertEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceAlertEnabled: %w", err)
+	}
+	return oldValue.BalanceAlertEnabled, nil
+}
+
+// ResetBalanceAlertEnabled resets all changes to the "balance_alert_enabled" field.
+func (m *APIKeyMutation) ResetBalanceAlertEnabled() {
+	m.balance_alert_enabled = nil
+}
+
+// SetBalanceAlertEmail sets the "balance_alert_email" field.
+func (m *APIKeyMutation) SetBalanceAlertEmail(s string) {
+	m.balance_alert_email = &s
+}
+
+// BalanceAlertEmail returns the value of the "balance_alert_email" field in the mutation.
+func (m *APIKeyMutation) BalanceAlertEmail() (r string, exists bool) {
+	v := m.balance_alert_email
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceAlertEmail returns the old "balance_alert_email" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldBalanceAlertEmail(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceAlertEmail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceAlertEmail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceAlertEmail: %w", err)
+	}
+	return oldValue.BalanceAlertEmail, nil
+}
+
+// ResetBalanceAlertEmail resets all changes to the "balance_alert_email" field.
+func (m *APIKeyMutation) ResetBalanceAlertEmail() {
+	m.balance_alert_email = nil
+}
+
+// SetBalanceAlertThreshold sets the "balance_alert_threshold" field.
+func (m *APIKeyMutation) SetBalanceAlertThreshold(f float64) {
+	m.balance_alert_threshold = &f
+	m.addbalance_alert_threshold = nil
+}
+
+// BalanceAlertThreshold returns the value of the "balance_alert_threshold" field in the mutation.
+func (m *APIKeyMutation) BalanceAlertThreshold() (r float64, exists bool) {
+	v := m.balance_alert_threshold
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceAlertThreshold returns the old "balance_alert_threshold" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldBalanceAlertThreshold(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceAlertThreshold is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceAlertThreshold requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceAlertThreshold: %w", err)
+	}
+	return oldValue.BalanceAlertThreshold, nil
+}
+
+// AddBalanceAlertThreshold adds f to the "balance_alert_threshold" field.
+func (m *APIKeyMutation) AddBalanceAlertThreshold(f float64) {
+	if m.addbalance_alert_threshold != nil {
+		*m.addbalance_alert_threshold += f
+	} else {
+		m.addbalance_alert_threshold = &f
+	}
+}
+
+// AddedBalanceAlertThreshold returns the value that was added to the "balance_alert_threshold" field in this mutation.
+func (m *APIKeyMutation) AddedBalanceAlertThreshold() (r float64, exists bool) {
+	v := m.addbalance_alert_threshold
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBalanceAlertThreshold resets all changes to the "balance_alert_threshold" field.
+func (m *APIKeyMutation) ResetBalanceAlertThreshold() {
+	m.balance_alert_threshold = nil
+	m.addbalance_alert_threshold = nil
+}
+
+// SetBalanceAlertNotified sets the "balance_alert_notified" field.
+func (m *APIKeyMutation) SetBalanceAlertNotified(b bool) {
+	m.balance_alert_notified = &b
+}
+
+// BalanceAlertNotified returns the value of the "balance_alert_notified" field in the mutation.
+func (m *APIKeyMutation) BalanceAlertNotified() (r bool, exists bool) {
+	v := m.balance_alert_notified
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceAlertNotified returns the old "balance_alert_notified" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldBalanceAlertNotified(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceAlertNotified is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceAlertNotified requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceAlertNotified: %w", err)
+	}
+	return oldValue.BalanceAlertNotified, nil
+}
+
+// ResetBalanceAlertNotified resets all changes to the "balance_alert_notified" field.
+func (m *APIKeyMutation) ResetBalanceAlertNotified() {
+	m.balance_alert_notified = nil
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (m *APIKeyMutation) SetExpiresAt(t time.Time) {
 	m.expires_at = &t
@@ -1082,7 +1251,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 19)
 	if m.name != nil {
 		fields = append(fields, apikey.FieldName)
 	}
@@ -1115,6 +1284,18 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.max_concurrency != nil {
 		fields = append(fields, apikey.FieldMaxConcurrency)
+	}
+	if m.balance_alert_enabled != nil {
+		fields = append(fields, apikey.FieldBalanceAlertEnabled)
+	}
+	if m.balance_alert_email != nil {
+		fields = append(fields, apikey.FieldBalanceAlertEmail)
+	}
+	if m.balance_alert_threshold != nil {
+		fields = append(fields, apikey.FieldBalanceAlertThreshold)
+	}
+	if m.balance_alert_notified != nil {
+		fields = append(fields, apikey.FieldBalanceAlertNotified)
 	}
 	if m.expires_at != nil {
 		fields = append(fields, apikey.FieldExpiresAt)
@@ -1158,6 +1339,14 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.SellRate()
 	case apikey.FieldMaxConcurrency:
 		return m.MaxConcurrency()
+	case apikey.FieldBalanceAlertEnabled:
+		return m.BalanceAlertEnabled()
+	case apikey.FieldBalanceAlertEmail:
+		return m.BalanceAlertEmail()
+	case apikey.FieldBalanceAlertThreshold:
+		return m.BalanceAlertThreshold()
+	case apikey.FieldBalanceAlertNotified:
+		return m.BalanceAlertNotified()
 	case apikey.FieldExpiresAt:
 		return m.ExpiresAt()
 	case apikey.FieldStatus:
@@ -1197,6 +1386,14 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldSellRate(ctx)
 	case apikey.FieldMaxConcurrency:
 		return m.OldMaxConcurrency(ctx)
+	case apikey.FieldBalanceAlertEnabled:
+		return m.OldBalanceAlertEnabled(ctx)
+	case apikey.FieldBalanceAlertEmail:
+		return m.OldBalanceAlertEmail(ctx)
+	case apikey.FieldBalanceAlertThreshold:
+		return m.OldBalanceAlertThreshold(ctx)
+	case apikey.FieldBalanceAlertNotified:
+		return m.OldBalanceAlertNotified(ctx)
 	case apikey.FieldExpiresAt:
 		return m.OldExpiresAt(ctx)
 	case apikey.FieldStatus:
@@ -1291,6 +1488,34 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMaxConcurrency(v)
 		return nil
+	case apikey.FieldBalanceAlertEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceAlertEnabled(v)
+		return nil
+	case apikey.FieldBalanceAlertEmail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceAlertEmail(v)
+		return nil
+	case apikey.FieldBalanceAlertThreshold:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceAlertThreshold(v)
+		return nil
+	case apikey.FieldBalanceAlertNotified:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceAlertNotified(v)
+		return nil
 	case apikey.FieldExpiresAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -1342,6 +1567,9 @@ func (m *APIKeyMutation) AddedFields() []string {
 	if m.addmax_concurrency != nil {
 		fields = append(fields, apikey.FieldMaxConcurrency)
 	}
+	if m.addbalance_alert_threshold != nil {
+		fields = append(fields, apikey.FieldBalanceAlertThreshold)
+	}
 	return fields
 }
 
@@ -1360,6 +1588,8 @@ func (m *APIKeyMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedSellRate()
 	case apikey.FieldMaxConcurrency:
 		return m.AddedMaxConcurrency()
+	case apikey.FieldBalanceAlertThreshold:
+		return m.AddedBalanceAlertThreshold()
 	}
 	return nil, false
 }
@@ -1403,6 +1633,13 @@ func (m *APIKeyMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddMaxConcurrency(v)
+		return nil
+	case apikey.FieldBalanceAlertThreshold:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBalanceAlertThreshold(v)
 		return nil
 	}
 	return fmt.Errorf("unknown APIKey numeric field %s", name)
@@ -1490,6 +1727,18 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldMaxConcurrency:
 		m.ResetMaxConcurrency()
+		return nil
+	case apikey.FieldBalanceAlertEnabled:
+		m.ResetBalanceAlertEnabled()
+		return nil
+	case apikey.FieldBalanceAlertEmail:
+		m.ResetBalanceAlertEmail()
+		return nil
+	case apikey.FieldBalanceAlertThreshold:
+		m.ResetBalanceAlertThreshold()
+		return nil
+	case apikey.FieldBalanceAlertNotified:
+		m.ResetBalanceAlertNotified()
 		return nil
 	case apikey.FieldExpiresAt:
 		m.ResetExpiresAt()

@@ -100,6 +100,26 @@ func MaxConcurrency(v int) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldMaxConcurrency, v))
 }
 
+// BalanceAlertEnabled applies equality check predicate on the "balance_alert_enabled" field. It's identical to BalanceAlertEnabledEQ.
+func BalanceAlertEnabled(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBalanceAlertEnabled, v))
+}
+
+// BalanceAlertEmail applies equality check predicate on the "balance_alert_email" field. It's identical to BalanceAlertEmailEQ.
+func BalanceAlertEmail(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertThreshold applies equality check predicate on the "balance_alert_threshold" field. It's identical to BalanceAlertThresholdEQ.
+func BalanceAlertThreshold(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBalanceAlertThreshold, v))
+}
+
+// BalanceAlertNotified applies equality check predicate on the "balance_alert_notified" field. It's identical to BalanceAlertNotifiedEQ.
+func BalanceAlertNotified(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBalanceAlertNotified, v))
+}
+
 // ExpiresAt applies equality check predicate on the "expires_at" field. It's identical to ExpiresAtEQ.
 func ExpiresAt(v time.Time) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldExpiresAt, v))
@@ -603,6 +623,131 @@ func MaxConcurrencyLT(v int) predicate.APIKey {
 // MaxConcurrencyLTE applies the LTE predicate on the "max_concurrency" field.
 func MaxConcurrencyLTE(v int) predicate.APIKey {
 	return predicate.APIKey(sql.FieldLTE(FieldMaxConcurrency, v))
+}
+
+// BalanceAlertEnabledEQ applies the EQ predicate on the "balance_alert_enabled" field.
+func BalanceAlertEnabledEQ(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBalanceAlertEnabled, v))
+}
+
+// BalanceAlertEnabledNEQ applies the NEQ predicate on the "balance_alert_enabled" field.
+func BalanceAlertEnabledNEQ(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldBalanceAlertEnabled, v))
+}
+
+// BalanceAlertEmailEQ applies the EQ predicate on the "balance_alert_email" field.
+func BalanceAlertEmailEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertEmailNEQ applies the NEQ predicate on the "balance_alert_email" field.
+func BalanceAlertEmailNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertEmailIn applies the In predicate on the "balance_alert_email" field.
+func BalanceAlertEmailIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldBalanceAlertEmail, vs...))
+}
+
+// BalanceAlertEmailNotIn applies the NotIn predicate on the "balance_alert_email" field.
+func BalanceAlertEmailNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldBalanceAlertEmail, vs...))
+}
+
+// BalanceAlertEmailGT applies the GT predicate on the "balance_alert_email" field.
+func BalanceAlertEmailGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertEmailGTE applies the GTE predicate on the "balance_alert_email" field.
+func BalanceAlertEmailGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertEmailLT applies the LT predicate on the "balance_alert_email" field.
+func BalanceAlertEmailLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertEmailLTE applies the LTE predicate on the "balance_alert_email" field.
+func BalanceAlertEmailLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertEmailContains applies the Contains predicate on the "balance_alert_email" field.
+func BalanceAlertEmailContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertEmailHasPrefix applies the HasPrefix predicate on the "balance_alert_email" field.
+func BalanceAlertEmailHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertEmailHasSuffix applies the HasSuffix predicate on the "balance_alert_email" field.
+func BalanceAlertEmailHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertEmailEqualFold applies the EqualFold predicate on the "balance_alert_email" field.
+func BalanceAlertEmailEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertEmailContainsFold applies the ContainsFold predicate on the "balance_alert_email" field.
+func BalanceAlertEmailContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldBalanceAlertEmail, v))
+}
+
+// BalanceAlertThresholdEQ applies the EQ predicate on the "balance_alert_threshold" field.
+func BalanceAlertThresholdEQ(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBalanceAlertThreshold, v))
+}
+
+// BalanceAlertThresholdNEQ applies the NEQ predicate on the "balance_alert_threshold" field.
+func BalanceAlertThresholdNEQ(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldBalanceAlertThreshold, v))
+}
+
+// BalanceAlertThresholdIn applies the In predicate on the "balance_alert_threshold" field.
+func BalanceAlertThresholdIn(vs ...float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldBalanceAlertThreshold, vs...))
+}
+
+// BalanceAlertThresholdNotIn applies the NotIn predicate on the "balance_alert_threshold" field.
+func BalanceAlertThresholdNotIn(vs ...float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldBalanceAlertThreshold, vs...))
+}
+
+// BalanceAlertThresholdGT applies the GT predicate on the "balance_alert_threshold" field.
+func BalanceAlertThresholdGT(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldBalanceAlertThreshold, v))
+}
+
+// BalanceAlertThresholdGTE applies the GTE predicate on the "balance_alert_threshold" field.
+func BalanceAlertThresholdGTE(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldBalanceAlertThreshold, v))
+}
+
+// BalanceAlertThresholdLT applies the LT predicate on the "balance_alert_threshold" field.
+func BalanceAlertThresholdLT(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldBalanceAlertThreshold, v))
+}
+
+// BalanceAlertThresholdLTE applies the LTE predicate on the "balance_alert_threshold" field.
+func BalanceAlertThresholdLTE(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldBalanceAlertThreshold, v))
+}
+
+// BalanceAlertNotifiedEQ applies the EQ predicate on the "balance_alert_notified" field.
+func BalanceAlertNotifiedEQ(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBalanceAlertNotified, v))
+}
+
+// BalanceAlertNotifiedNEQ applies the NEQ predicate on the "balance_alert_notified" field.
+func BalanceAlertNotifiedNEQ(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldBalanceAlertNotified, v))
 }
 
 // ExpiresAtEQ applies the EQ predicate on the "expires_at" field.

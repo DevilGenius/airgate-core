@@ -626,7 +626,13 @@
     "sales": "Sales",
     "consumption": "Cost",
     "today": "Today",
-    "thirty_days": "30 Days"
+    "thirty_days": "30 Days",
+    "balance_alert_enabled": "Quota Email Alert",
+    "balance_alert_email": "Recipient Email",
+    "balance_alert_threshold": "Alert Threshold (USD)",
+    "balance_alert_hint": "Send email when remaining quota is below the threshold",
+    "balance_alert_email_required": "Enter a recipient email for quota alerts",
+    "balance_alert_threshold_required": "Enter a quota alert threshold greater than 0"
   },
 
   "subscriptions": {
@@ -1119,6 +1125,12 @@
     "copy": "Copy",
     "copied": "Copied",
     "reveal_failed": "Failed to retrieve key",
+    "balance_alert_enabled": "Quota Email Alert",
+    "balance_alert_email": "Recipient Email",
+    "balance_alert_threshold": "Alert Threshold (USD)",
+    "balance_alert_hint": "Send email when remaining quota is below the threshold",
+    "balance_alert_email_required": "Enter a recipient email for quota alerts",
+    "balance_alert_threshold_required": "Enter a quota alert threshold greater than 0",
     "import_ccs": "Import CCS",
     "ccs_select_client": "Select Client",
     "ccs_select_desc": "Choose the client type to import into CC-Switch.",
