@@ -1356,53 +1356,49 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   );
 }
 
-export function AccountCapacityChip({ current, max }: { current: number; max: number }) {
-  const previousCurrentRef = useRef(current);
-  const pulseTimerRef = useRef<number | null>(null);
-  const [isPulsing, setIsPulsing] = useState(false);
-  const [pulseTone, setPulseTone] = useState<'success' | 'warning'>('success');
-  const [pulseToken, setPulseToken] = useState(0);
-  const state = current <= 0 ? 'idle' : current >= max ? 'full' : 'active';
+function AccountCapacityNumber({ value }: { value: number }) {
+  const previousRef = useRef(value);
+  const previous = previousRef.current;
+  const changed = previous !== value;
+  const direction = value > previous ? 'down' : 'up';
 
   useEffect(() => {
-    if (previousCurrentRef.current === current) return;
-    const previousCurrent = previousCurrentRef.current;
-    previousCurrentRef.current = current;
+    previousRef.current = value;
+  }, [value]);
 
-    if (pulseTimerRef.current != null) {
-      window.clearTimeout(pulseTimerRef.current);
-    }
-
-    setPulseTone(current < previousCurrent ? 'warning' : 'success');
-    setIsPulsing(true);
-    setPulseToken((token) => token + 1);
-    pulseTimerRef.current = window.setTimeout(() => {
-      setIsPulsing(false);
-      pulseTimerRef.current = null;
-    }, 520);
-  }, [current]);
-
-  useEffect(() => () => {
-    if (pulseTimerRef.current != null) {
-      window.clearTimeout(pulseTimerRef.current);
-    }
-  }, []);
+  if (!changed) {
+    return <span className="ag-account-capacity-number">{value}</span>;
+  }
 
   return (
     <span
-      key={pulseToken}
+      key={`${previous}:${value}`}
+      className="ag-account-capacity-number ag-account-capacity-number--animated"
+      data-direction={direction}
+    >
+      <span className="ag-account-capacity-number-old">{previous}</span>
+      <span className="ag-account-capacity-number-new">{value}</span>
+    </span>
+  );
+}
+
+export const AccountCapacityChip = memo(function AccountCapacityChip({ current, max }: { current: number; max: number }) {
+  const state = current <= 0 ? 'idle' : current >= max ? 'full' : 'active';
+
+  return (
+    <span
       className="ag-account-capacity"
       data-state={state}
-      data-pulse={isPulsing || undefined}
-      data-pulse-tone={pulseTone}
       title={`${current} / ${max}`}
     >
-      <span className="ag-account-capacity-current">{current}</span>
+      <span className="ag-account-capacity-current">
+        <AccountCapacityNumber value={current} />
+      </span>
       <span className="ag-account-capacity-divider">/</span>
       <span className="ag-account-capacity-max">{max}</span>
     </span>
   );
-}
+});
 
 export const AccountCapacityLiveChip = memo(function AccountCapacityLiveChip({
   current,
