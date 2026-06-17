@@ -1,4 +1,4 @@
-import { memo, startTransition, useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
+import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Eraser, RefreshCw, Trash2 } from 'lucide-react';
@@ -1361,46 +1361,137 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   );
 }
 
-function AccountCapacityNumber({ value }: { value: number }) {
-  const previousRef = useRef(value);
-  const previous = previousRef.current;
-  const changed = previous !== value;
-  const direction = value > previous ? 'down' : 'up';
+const CAPACITY_ROLL_DURATION = 200;
+const CAPACITY_ROLL_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
-  useEffect(() => {
-    previousRef.current = value;
-  }, [value]);
+type AccountCapacityDisplay = {
+  text: string;
+  fit: 'default' | 'compact' | 'compressed';
+};
 
-  if (!changed) {
-    return <span className="ag-account-capacity-number">{value}</span>;
+function formatAccountCapacityDisplay(value: number): AccountCapacityDisplay {
+  const normalized = Number.isFinite(value) ? Math.trunc(value) : 0;
+  const sign = normalized < 0 ? '-' : '';
+  const abs = Math.abs(normalized);
+  if (abs < 1000) {
+    return { text: String(normalized), fit: 'default' };
   }
 
+  const compactUnit = abs >= 1000000000
+    ? { value: 1000000000, suffix: 'b' }
+    : abs >= 1000000
+      ? { value: 1000000, suffix: 'm' }
+      : { value: 1000, suffix: 'k' };
+  const compactValue = `${sign}${Math.floor(abs / compactUnit.value)}${compactUnit.suffix}`;
+  return {
+    text: compactValue,
+    fit: compactValue.length > 3 ? 'compressed' : 'compact',
+  };
+}
+
+function prefersReducedMotion() {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * AccountCapacityNumber 渲染容量当前值，并在数值变化时做"滚动数字"动画：
+ *   - 增加：新值自下而上滚入，旧值向上滑出顶部（被裁剪）。
+ *   - 减少：旧值向下滑出底部，新值自上而下滚入。
+ *
+ * DOM 结构稳定、永不重挂载：incoming 层始终由 React 渲染当前值（文字稳定、不闪错值）；
+ * outgoing 层在动画期命令式写入旧值并经 WAAPI 滑出，fill:'none' 结束后回到 CSS 隐藏态（不滞留）。
+ * 动画走 WAAPI（仅 transform/opacity，GPU 合成层），可被 cancel() 干净中断，无每行定时器/状态，
+ * 100 行高频更新下保持高性能。首次挂载、document.hidden、prefers-reduced-motion 时不触发动画。
+ */
+function AccountCapacityNumber({ value }: { value: number }) {
+  const incomingRef = useRef<HTMLSpanElement | null>(null);
+  const outgoingRef = useRef<HTMLSpanElement | null>(null);
+  const previousRef = useRef(value);
+  const animationsRef = useRef<Animation[]>([]);
+  const display = formatAccountCapacityDisplay(value);
+
+  useLayoutEffect(() => {
+    const previous = previousRef.current;
+    if (previous === value) return;
+    previousRef.current = value;
+
+    const incoming = incomingRef.current;
+    const outgoing = outgoingRef.current;
+    if (!incoming || !outgoing || typeof incoming.animate !== 'function') return;
+    if (prefersReducedMotion()) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+
+    // 中断上一轮滚动：cancel() 后两层瞬回 CSS 静止态（incoming 显示新值、outgoing 隐藏），
+    // 因 incoming 文本始终是当前值，绝不会出现内容硬切/闪错值。
+    for (const animation of animationsRef.current) animation.cancel();
+    const previousDisplay = formatAccountCapacityDisplay(previous);
+    outgoing.textContent = previousDisplay.text;
+    outgoing.dataset.fit = previousDisplay.fit;
+
+    const rollingUp = value > previous;
+    const incomingFrom = rollingUp ? '100%' : '-100%';
+    const outgoingTo = rollingUp ? '-100%' : '100%';
+    const options: KeyframeAnimationOptions = {
+      duration: CAPACITY_ROLL_DURATION,
+      easing: CAPACITY_ROLL_EASING,
+      fill: 'none',
+    };
+
+    animationsRef.current = [
+      incoming.animate(
+        [
+          { transform: `translate3d(0, ${incomingFrom}, 0)`, opacity: 0.4 },
+          { transform: 'translate3d(0, 0, 0)', opacity: 1 },
+        ],
+        options,
+      ),
+      outgoing.animate(
+        [
+          { transform: 'translate3d(0, 0, 0)', opacity: 1 },
+          { transform: `translate3d(0, ${outgoingTo}, 0)`, opacity: 0.4 },
+        ],
+        options,
+      ),
+    ];
+  }, [value]);
+
+  useEffect(() => () => {
+    for (const animation of animationsRef.current) animation.cancel();
+    animationsRef.current = [];
+  }, []);
+
   return (
-    <span
-      key={`${previous}:${value}`}
-      className="ag-account-capacity-number ag-account-capacity-number--animated"
-      data-direction={direction}
-    >
-      <span className="ag-account-capacity-number-old">{previous}</span>
-      <span className="ag-account-capacity-number-new">{value}</span>
-    </span>
+    <>
+      <span ref={outgoingRef} aria-hidden="true" className="ag-account-capacity-number ag-account-capacity-number--out" />
+      <span
+        ref={incomingRef}
+        className="ag-account-capacity-number ag-account-capacity-number--in"
+        data-fit={display.fit}
+      >
+        {display.text}
+      </span>
+    </>
   );
 }
 
 export const AccountCapacityChip = memo(function AccountCapacityChip({ current, max }: { current: number; max: number }) {
   const state = current <= 0 ? 'idle' : current >= max ? 'full' : 'active';
+  const maxDisplay = formatAccountCapacityDisplay(max);
 
   return (
     <span
       className="ag-account-capacity"
       data-state={state}
       title={`${current} / ${max}`}
+      aria-label={`${current} / ${max}`}
     >
       <span className="ag-account-capacity-current">
         <AccountCapacityNumber value={current} />
       </span>
       <span className="ag-account-capacity-divider">/</span>
-      <span className="ag-account-capacity-max">{max}</span>
+      <span className="ag-account-capacity-max" data-fit={maxDisplay.fit}>{maxDisplay.text}</span>
     </span>
   );
 });

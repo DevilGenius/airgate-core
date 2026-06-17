@@ -675,8 +675,8 @@ export function useAccountTableColumns({
     {
       key: 'capacity',
       title: t('accounts.capacity'),
-      width: '84px',
-      mobileWidth: '68px',
+      width: '70px',
+      mobileWidth: '62px',
       align: 'center',
       render: (row) => {
         const max = row.max_concurrency;
