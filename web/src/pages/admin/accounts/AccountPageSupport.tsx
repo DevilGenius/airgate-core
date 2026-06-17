@@ -12,8 +12,11 @@ export interface AccountTableColumn {
   mobileWidth?: string;
   maxWidth?: string;
   align?: 'left' | 'center' | 'right';
+  sortKey?: string;
   render: (row: AccountResp, rowMeta?: unknown) => ReactNode;
 }
+
+export type AccountTableSortDirection = 'asc' | 'desc';
 
 export const UNGROUPED_GROUP_FILTER = '__ungrouped__';
 type SelectionListener = () => void;
@@ -746,6 +749,8 @@ function accountTableCellRowsEqual(columnKey: string, left: AccountResp, right: 
     case 'scheduling':
       return left.id === right.id
         && left.state === right.state;
+    case 'priority':
+      return left.priority === right.priority;
     case 'rate_multiplier':
       return left.rate_multiplier === right.rate_multiplier;
     case 'usage_window':

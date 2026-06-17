@@ -36,6 +36,8 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 		GroupID:     groupID,
 		Ungrouped:   ungrouped,
 		ProxyID:     parseOptionalInt(c.Query("proxy_id")),
+		SortBy:      c.Query("sort_by"),
+		SortDir:     c.Query("sort_dir"),
 	})
 	if err != nil {
 		httpCode, message := h.handleError("查询账号列表失败", "查询失败", err)

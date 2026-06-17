@@ -1,5 +1,6 @@
 import { memo, useCallback, useSyncExternalStore } from 'react';
 import { EmptyState } from '@heroui/react';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { AccountResp } from '../../../shared/types';
 import { BulkActionsBar } from './BulkActionsBar';
 import {
@@ -11,6 +12,7 @@ import {
   columnAlignClass,
   columnWidthStyle,
   type AccountTableColumn,
+  type AccountTableSortDirection,
 } from './AccountPageSupport';
 
 const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
@@ -100,12 +102,15 @@ export const AccountsTableSection = memo(function AccountsTableSection({
   onBulkRefresh,
   onClearSelection,
   onRowSelected,
+  onSortChange,
   onVisibleRowsSelected,
   rows,
   rowMetaById,
   selectAllAriaLabel,
   selectionStore,
   selectRowAriaLabel,
+  sortBy,
+  sortDir,
   tableAriaLabel,
   tableEmptyText,
   visibleRowIds,
@@ -121,12 +126,15 @@ export const AccountsTableSection = memo(function AccountsTableSection({
   onBulkRefresh: () => void;
   onClearSelection: () => void;
   onRowSelected: (id: number, isSelected: boolean) => void;
+  onSortChange?: (sortKey: string) => void;
   onVisibleRowsSelected: (isSelected: boolean) => void;
   rows: AccountResp[];
   rowMetaById: ReadonlyMap<number, unknown>;
   selectAllAriaLabel: string;
   selectionStore: AccountSelectionStore;
   selectRowAriaLabel: string;
+  sortBy?: string;
+  sortDir?: AccountTableSortDirection;
   tableAriaLabel: string;
   tableEmptyText: string;
   visibleRowIds: number[];
@@ -160,18 +168,44 @@ export const AccountsTableSection = memo(function AccountsTableSection({
                   onVisibleRowsSelected={onVisibleRowsSelected}
                 />
               </th>
-              {columns.map((column) => (
-                <th
-                  data-slot="th"
-                  id={column.key}
-                  key={column.key}
-                  scope="col"
-                  className={columnAlignClass(column.align)}
-                  style={columnWidthStyle(column)}
-                >
-                  {column.title}
-                </th>
-              ))}
+              {columns.map((column) => {
+                const isSorted = Boolean(column.sortKey && column.sortKey === sortBy);
+                const ariaSort = column.sortKey
+                  ? isSorted && sortDir === 'asc'
+                    ? 'ascending'
+                    : isSorted
+                      ? 'descending'
+                      : 'none'
+                  : undefined;
+                const SortIcon = isSorted
+                  ? sortDir === 'asc'
+                    ? ArrowUp
+                    : ArrowDown
+                  : ArrowUpDown;
+                return (
+                  <th
+                    data-slot="th"
+                    id={column.key}
+                    key={column.key}
+                    scope="col"
+                    aria-sort={ariaSort}
+                    className={columnAlignClass(column.align)}
+                    style={columnWidthStyle(column)}
+                  >
+                    {column.sortKey && onSortChange ? (
+                      <button
+                        type="button"
+                        className="ag-accounts-table-sort-button"
+                        data-active={isSorted ? 'true' : undefined}
+                        onClick={() => onSortChange(column.sortKey as string)}
+                      >
+                        <span className="ag-accounts-table-sort-title">{column.title}</span>
+                        <SortIcon className="ag-accounts-table-sort-icon" aria-hidden="true" />
+                      </button>
+                    ) : column.title}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody data-slot="tbody">

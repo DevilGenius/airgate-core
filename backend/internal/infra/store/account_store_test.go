@@ -163,6 +163,67 @@ func TestAccountStoreCredentialStringFilterMatchesPluginDeclaredPlan(t *testing.
 	}
 }
 
+func TestAccountStoreListSortsByPriority(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	accounts := []struct {
+		name     string
+		priority int
+	}{
+		{name: "Low", priority: 10},
+		{name: "High", priority: 90},
+		{name: "Middle", priority: 50},
+	}
+	for _, item := range accounts {
+		if _, err := db.Account.Create().
+			SetName(item.name).
+			SetPlatform("openai").
+			SetType("apikey").
+			SetCredentials(map[string]string{"api_key": item.name}).
+			SetPriority(item.priority).
+			Save(ctx); err != nil {
+			t.Fatalf("create account %q: %v", item.name, err)
+		}
+	}
+
+	store := NewAccountStore(db)
+	desc, total, err := store.List(ctx, account.ListFilter{Page: 1, PageSize: 20, SortBy: "priority", SortDir: "desc"})
+	if err != nil {
+		t.Fatalf("List desc returned error: %v", err)
+	}
+	if total != 3 {
+		t.Fatalf("desc total = %d, want 3", total)
+	}
+	assertAccountNames(t, desc, []string{"High", "Middle", "Low"})
+
+	asc, total, err := store.List(ctx, account.ListFilter{Page: 1, PageSize: 20, SortBy: "priority", SortDir: "asc"})
+	if err != nil {
+		t.Fatalf("List asc returned error: %v", err)
+	}
+	if total != 3 {
+		t.Fatalf("asc total = %d, want 3", total)
+	}
+	assertAccountNames(t, asc, []string{"Low", "Middle", "High"})
+}
+
+func assertAccountNames(t *testing.T, got []account.Account, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("len(got) = %d, want %d: %+v", len(got), len(want), got)
+	}
+	for index, name := range want {
+		if got[index].Name != name {
+			t.Fatalf("got[%d].Name = %q, want %q; all = %+v", index, got[index].Name, name, got)
+		}
+	}
+}
+
 func enttestOpen(t *testing.T) *ent.Client {
 	t.Helper()
 	return testdb.OpenMemoryEnt(t, "account_store", migrate.WithGlobalUniqueID(false))

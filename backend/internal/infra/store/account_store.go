@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -69,6 +70,16 @@ func applyAccountListFilters(query *ent.AccountQuery, filter appaccount.ListFilt
 	return query
 }
 
+func applyAccountListOrder(query *ent.AccountQuery, filter appaccount.ListFilter) *ent.AccountQuery {
+	if strings.EqualFold(strings.TrimSpace(filter.SortBy), "priority") {
+		if strings.EqualFold(strings.TrimSpace(filter.SortDir), "asc") {
+			return query.Order(ent.Asc(entaccount.FieldPriority), ent.Asc(entaccount.FieldCreatedAt))
+		}
+		return query.Order(ent.Desc(entaccount.FieldPriority), ent.Desc(entaccount.FieldCreatedAt))
+	}
+	return query.Order(ent.Desc(entaccount.FieldCreatedAt))
+}
+
 func accountCredentialStringMatches(filter appaccount.CredentialStringFilter) predicate.Account {
 	values := nonEmptyStrings(filter.Values)
 	if filter.Key == "" || len(values) == 0 {
@@ -115,12 +126,11 @@ func (s *AccountStore) List(ctx context.Context, filter appaccount.ListFilter) (
 		return nil, 0, err
 	}
 
-	accounts, err := query.
+	accounts, err := applyAccountListOrder(query, filter).
 		WithGroups().
 		WithProxy().
 		Offset((filter.Page - 1) * filter.PageSize).
 		Limit(filter.PageSize).
-		Order(ent.Desc(entaccount.FieldCreatedAt)).
 		All(ctx)
 	if err != nil {
 		return nil, 0, err

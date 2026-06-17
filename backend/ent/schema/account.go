@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 // Account 上游 AI 账户。
@@ -52,5 +53,12 @@ func (Account) Edges() []ent.Edge {
 		edge.To("groups", Group.Type),
 		edge.To("proxy", Proxy.Type).Unique(),
 		edge.To("usage_logs", UsageLog.Type),
+	}
+}
+
+func (Account) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("priority", "created_at").
+			StorageKey("account_priority_created_at"),
 	}
 }

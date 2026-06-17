@@ -59,6 +59,7 @@ import {
   mergeCachedUsageWindows,
   runAfterInputFrame,
   useLatestRef,
+  type AccountTableSortDirection,
   type AccountTypeFilterOption,
   type AccountUsageData,
   type AccountUsageWindowCache,
@@ -68,6 +69,7 @@ const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsAutoRefres
 const ACCOUNT_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsFilters;
 const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
+const ACCOUNT_PRIORITY_SORT_KEY = 'priority';
 
 function useAccountModalRootIsolation(isActive: boolean) {
   useLayoutEffect(() => {
@@ -169,6 +171,9 @@ export default function AccountsPageContent() {
   const [typeFilter, setTypeFilter] = usePersistentUrlQueryParam('type', `${ACCOUNT_FILTER_STORAGE_KEY}:type`);
   const [groupFilter, setGroupFilter] = usePersistentUrlQueryParam('group', `${ACCOUNT_FILTER_STORAGE_KEY}:group`);
   const [proxyFilter, setProxyFilter] = usePersistentUrlQueryParam('proxy', `${ACCOUNT_FILTER_STORAGE_KEY}:proxy`);
+  const [prioritySortDir, setPrioritySortDir] = useState<AccountTableSortDirection | ''>('');
+  const sortBy = prioritySortDir ? ACCOUNT_PRIORITY_SORT_KEY : '';
+  const sortDir: AccountTableSortDirection = prioritySortDir || 'desc';
 
   // 自动刷新
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ACCOUNT_AUTO_REFRESH_STORAGE_KEY, 0, ACCOUNT_AUTO_REFRESH_OPTIONS); // 秒，0=关闭
@@ -215,11 +220,11 @@ export default function AccountsPageContent() {
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
   useEffect(() => {
     selectionStore.clear();
-  }, [groupFilter, keyword, page, pageSize, platformFilter, proxyFilter, selectionStore, stateFilter, typeFilter]);
+  }, [groupFilter, keyword, page, pageSize, platformFilter, proxyFilter, selectionStore, sortBy, sortDir, stateFilter, typeFilter]);
 
   const accountListQueryKey = useMemo(
-    () => queryKeys.accounts(page, pageSize, debouncedKeyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter),
-    [debouncedKeyword, groupFilter, page, pageSize, platformFilter, proxyFilter, stateFilter, typeFilter],
+    () => queryKeys.accounts(page, pageSize, debouncedKeyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter, sortBy, sortDir),
+    [debouncedKeyword, groupFilter, page, pageSize, platformFilter, proxyFilter, sortBy, sortDir, stateFilter, typeFilter],
   );
 
   // 查询账号列表
@@ -242,6 +247,8 @@ export default function AccountsPageContent() {
         group_id: groupFilter && groupFilter !== UNGROUPED_GROUP_FILTER ? Number(groupFilter) : undefined,
         ungrouped: groupFilter === UNGROUPED_GROUP_FILTER ? true : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
+        sort_by: sortBy ? ACCOUNT_PRIORITY_SORT_KEY : undefined,
+        sort_dir: sortBy ? sortDir : undefined,
       }),
     meta: { globalLoading: false },
     placeholderData: keepPreviousData,
@@ -585,6 +592,15 @@ export default function AccountsPageContent() {
   const handleClearRateLimitMarkers = useCallback((id: number) => {
     clearRateLimitMarkersMutateRef.current(id);
   }, [clearRateLimitMarkersMutateRef]);
+  const handleSortChange = useCallback((nextSortBy: string) => {
+    if (nextSortBy !== ACCOUNT_PRIORITY_SORT_KEY) return;
+    setPrioritySortDir((prev) => {
+      if (prev === '') return 'desc';
+      if (prev === 'desc') return 'asc';
+      return '';
+    });
+    setPage(1);
+  }, [setPage]);
 
   // 批量操作通用的结果处理：全部成功 → success toast；部分成功 → warning；全部失败 → error。
   const handleBulkResult = (res: BulkOpResp, okKey: string) => {
@@ -942,12 +958,15 @@ export default function AccountsPageContent() {
         onBulkRefresh={handleBulkRefresh}
         onClearSelection={clearSelection}
         onRowSelected={setRowSelected}
+        onSortChange={handleSortChange}
         onVisibleRowsSelected={setVisibleRowsSelected}
         rows={rows}
         rowMetaById={rowMetaById}
         selectAllAriaLabel={selectAllAriaLabel}
         selectionStore={selectionStore}
         selectRowAriaLabel={selectRowAriaLabel}
+        sortBy={sortBy}
+        sortDir={sortDir}
         tableAriaLabel={t('accounts.title', 'Accounts')}
         tableEmptyText={t('common.no_data')}
         visibleRowIds={visibleRowIds}

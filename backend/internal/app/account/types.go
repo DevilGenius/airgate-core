@@ -92,6 +92,8 @@ type ListFilter struct {
 	Ungrouped   bool
 	ProxyID     *int
 	IDs         []int
+	SortBy      string
+	SortDir     string
 }
 
 // CredentialStringFilter 表示由插件声明的账号 credentials 字段筛选。

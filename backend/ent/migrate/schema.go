@@ -86,6 +86,13 @@ var (
 				OnDelete:   schema.SetNull,
 			},
 		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "account_priority_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{AccountsColumns[7], AccountsColumns[14]},
+			},
+		},
 	}
 	// BalanceLogsColumns holds the columns for the "balance_logs" table.
 	BalanceLogsColumns = []*schema.Column{

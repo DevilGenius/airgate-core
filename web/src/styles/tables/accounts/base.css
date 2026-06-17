@@ -64,7 +64,7 @@
     --ag-accounts-col-capacity-width: 68px;
     --ag-accounts-col-status-width: 76px;
     --ag-accounts-col-scheduling-width: 72px;
-    --ag-accounts-col-rate_multiplier-width: 72px;
+    --ag-accounts-col-priority-width: 72px;
     --ag-accounts-col-usage_window-width: 364px;
     --ag-accounts-col-last_used_at-width: 88px;
     --ag-accounts-col-actions-width: 124px;
@@ -75,6 +75,40 @@
     padding-inline: 0.375rem;
     font-size: 0.75rem;
   }
+}
+
+.ag-accounts-table .ag-accounts-table-sort-button {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ag-accounts-table .ag-accounts-table-sort-button:hover,
+.ag-accounts-table .ag-accounts-table-sort-button[data-active="true"] {
+  color: var(--ag-primary);
+}
+
+.ag-accounts-table .ag-accounts-table-sort-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-accounts-table .ag-accounts-table-sort-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: 0 0 auto;
+  color: currentColor;
 }
 
 /* Capacity chip. */

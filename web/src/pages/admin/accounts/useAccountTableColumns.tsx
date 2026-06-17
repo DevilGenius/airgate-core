@@ -714,14 +714,15 @@ export function useAccountTableColumns({
       ),
     },
     {
-      key: 'rate_multiplier',
-      title: t('accounts.rate_multiplier'),
+      key: 'priority',
+      title: t('accounts.priority'),
       width: '80px',
       mobileWidth: '72px',
       align: 'center',
+      sortKey: 'priority',
       render: (row) => (
         <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
-          {row.rate_multiplier}x
+          {row.priority}
         </span>
       ),
     },

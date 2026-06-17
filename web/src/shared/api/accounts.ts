@@ -13,6 +13,8 @@ export type AccountListFilter = {
   group_id?: number;
   ungrouped?: boolean;
   proxy_id?: number;
+  sort_by?: 'priority';
+  sort_dir?: 'asc' | 'desc';
 };
 
 export const accountsApi = {
