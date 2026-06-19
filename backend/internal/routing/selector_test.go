@@ -8,6 +8,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/migrate"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestListEligibleGroups(t *testing.T) {
@@ -61,7 +62,11 @@ func TestListEligibleGroups(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", map[int64]float64{int64(publicSlow.ID): 0.3}, RequestInput{})
+	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", map[int64]float64{int64(publicSlow.ID): 0.3}, RequestInput{
+		Method:      "POST",
+		Path:        "/v1/chat/completions",
+		ClientModel: "gpt-5.4",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,21 +100,39 @@ func TestListEligibleGroupsFiltersOperationDisabledGroups(t *testing.T) {
 		SetGroupRates(map[int64]float64{}).
 		SaveX(ctx)
 
+	imageDispatchDSL := sdk.DispatchDSL{
+		Rules: []sdk.DispatchRule{{
+			ID:        "images-generate",
+			Operation: "images.generate",
+			When: sdk.DispatchWhen{
+				Methods: []string{"POST"},
+				Paths:   []string{"/v1/images/generations"},
+			},
+			Gate: sdk.DispatchGate{RequiredOperation: "images.generate"},
+			Candidates: []sdk.DispatchCandidate{
+				{Scheduling: "${model}", Wire: "${model}"},
+			},
+		}},
+	}
+
 	db.Group.Create().
 		SetName("image disabled").
 		SetPlatform("openai").
 		SetRateMultiplier(0.1).
+		SetDispatchDsl(imageDispatchDSL).
 		SaveX(ctx)
 	imageEnabled := db.Group.Create().
 		SetName("image enabled").
 		SetPlatform("openai").
 		SetRateMultiplier(0.2).
-		SetOperationPolicies(map[string]bool{"responses.image_generation": true}).
+		SetOperationPolicies(map[string]bool{"images.generate": true}).
+		SetDispatchDsl(imageDispatchDSL).
 		SaveX(ctx)
 	db.Group.Create().
 		SetName("chat only implicit").
 		SetPlatform("openai").
 		SetRateMultiplier(0.3).
+		SetDispatchDsl(imageDispatchDSL).
 		SaveX(ctx)
 	openaiGroups := db.Group.Query().AllX(ctx)
 	groupIDs := make([]int, 0, len(openaiGroups))
@@ -125,7 +148,7 @@ func TestListEligibleGroupsFiltersOperationDisabledGroups(t *testing.T) {
 
 	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, RequestInput{
 		Method:      "POST",
-		Path:        "/v1/responses",
+		Path:        "/v1/images/generations",
 		ClientModel: "gpt-5.4",
 	})
 	if err != nil {
