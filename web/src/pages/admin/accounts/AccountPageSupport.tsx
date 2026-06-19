@@ -1397,8 +1397,8 @@ function prefersReducedMotion() {
 
 /**
  * AccountCapacityNumber 渲染容量当前值，并在数值变化时做"滚动数字"动画：
- *   - 增加：新值自下而上滚入，旧值向上滑出顶部（被裁剪）。
- *   - 减少：旧值向下滑出底部，新值自上而下滚入。
+ *   - 增加：新值自上而下滚入，旧值向下滑出底部（被裁剪）。
+ *   - 减少：旧值向上滑出顶部，新值自下而上滚入。
  *
  * DOM 结构稳定、永不重挂载：incoming 层始终由 React 渲染当前值（文字稳定、不闪错值）；
  * outgoing 层在动画期命令式写入旧值并经 WAAPI 滑出，fill:'none' 结束后回到 CSS 隐藏态（不滞留）。
@@ -1430,9 +1430,9 @@ function AccountCapacityNumber({ value }: { value: number }) {
     outgoing.textContent = previousDisplay.text;
     outgoing.dataset.fit = previousDisplay.fit;
 
-    const rollingUp = value > previous;
-    const incomingFrom = rollingUp ? '100%' : '-100%';
-    const outgoingTo = rollingUp ? '-100%' : '100%';
+    const increasing = value > previous;
+    const incomingFrom = increasing ? '-100%' : '100%';
+    const outgoingTo = increasing ? '100%' : '-100%';
     const options: KeyframeAnimationOptions = {
       duration: CAPACITY_ROLL_DURATION,
       easing: CAPACITY_ROLL_EASING,
