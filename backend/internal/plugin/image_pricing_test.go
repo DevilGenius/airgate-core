@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/DevilGenius/airgate-core/internal/billing"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -21,7 +22,7 @@ func TestImageBillingCostOverride_UsesConfiguredTier(t *testing.T) {
 		},
 	}
 
-	got, ok := imageBillingCostOverride(usage, settings)
+	got, ok := imageBillingCostFromSettings(usage, settings)
 	if !ok {
 		t.Fatal("expected override")
 	}
@@ -44,8 +45,81 @@ func TestImageBillingCostOverride_FallsBackWhenTierUnset(t *testing.T) {
 		},
 	}
 
-	if got, ok := imageBillingCostOverride(usage, settings); ok {
+	if got, ok := imageBillingCostFromSettings(usage, settings); ok {
 		t.Fatalf("override = %v, want fallback", got)
+	}
+}
+
+func TestApplyImageBillingCostPolicy_ImagesAPIUsesOverride(t *testing.T) {
+	usage := &sdk.Usage{
+		InputCost:  0.10,
+		OutputCost: 0.40,
+		Metadata: map[string]string{
+			"openai.image.size":  "1024x1024",
+			"openai.image.count": "2",
+		},
+	}
+	settings := map[string]map[string]string{
+		"openai": {
+			"image_price_1k": "0.03",
+		},
+	}
+	input := billing.CalculateInput{
+		InputCost:   usage.InputCost,
+		OutputCost:  usage.OutputCost,
+		BillingRate: 0.50,
+		SellRate:    1,
+	}
+
+	applyImageBillingCostPolicy(&input, usage, settings, "/v1/images/generations")
+
+	if input.BillingCostOverride == nil {
+		t.Fatal("expected Images API billing override")
+	}
+	if input.BillingCostAddon != nil {
+		t.Fatal("Images API must not use additive image billing")
+	}
+	if math.Abs(*input.BillingCostOverride-0.06) > 1e-9 {
+		t.Fatalf("override = %v, want 0.06", *input.BillingCostOverride)
+	}
+}
+
+func TestApplyImageBillingCostPolicy_ResponsesAddsImageCost(t *testing.T) {
+	usage := &sdk.Usage{
+		InputCost:  0.10,
+		OutputCost: 0.40,
+		Metadata: map[string]string{
+			"openai.image.size":  "1672x941",
+			"openai.image.count": "2",
+		},
+	}
+	settings := map[string]map[string]string{
+		"openai": {
+			"image_price_2k": "0.08",
+		},
+	}
+	input := billing.CalculateInput{
+		InputCost:   usage.InputCost,
+		OutputCost:  usage.OutputCost,
+		BillingRate: 0.50,
+		SellRate:    1,
+	}
+
+	applyImageBillingCostPolicy(&input, usage, settings, "/v1/responses")
+
+	if input.BillingCostOverride != nil {
+		t.Fatal("Responses image_generation must not override token billing")
+	}
+	if input.BillingCostAddon == nil {
+		t.Fatal("expected Responses image_generation billing addon")
+	}
+	if math.Abs(*input.BillingCostAddon-0.16) > 1e-9 {
+		t.Fatalf("addon = %v, want 0.16", *input.BillingCostAddon)
+	}
+
+	calc := billing.NewCalculator().Calculate(input)
+	if math.Abs(calc.ActualCost-0.41) > 1e-9 {
+		t.Fatalf("actual cost = %v, want token cost 0.25 + image cost 0.16", calc.ActualCost)
 	}
 }
 

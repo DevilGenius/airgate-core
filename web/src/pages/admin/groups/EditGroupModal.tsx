@@ -1,7 +1,19 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Chip, Description, Input, Label, Modal, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Checkbox,
+  Chip,
+  Description,
+  Input,
+  Label,
+  Modal,
+  Spinner,
+  TextArea,
+  TextField as HeroTextField,
+  useOverlayState,
+} from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { ArrowUpDown, Layers, X } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
@@ -40,8 +52,7 @@ type ImagePrices = {
 };
 
 type OpenAIOperations = {
-  imagesGenerate: boolean;
-  imagesEdit: boolean;
+  imagesApi: boolean;
   responsesImageGeneration: boolean;
 };
 
@@ -90,8 +101,7 @@ function buildOpenAISettings(
 
 function parseOpenAIOperations(policies?: Record<string, boolean>): OpenAIOperations {
   return {
-    imagesGenerate: policies?.['images.generate'] ?? false,
-    imagesEdit: policies?.['images.edit'] ?? false,
+    imagesApi: Boolean(policies?.['images.generate'] || policies?.['images.edit']),
     responsesImageGeneration: policies?.['responses.image_generation'] ?? false,
   };
 }
@@ -102,15 +112,11 @@ function buildOperationPolicies(
 ): Record<string, boolean> | undefined {
   const policies: Record<string, boolean> = { ...(current ?? {}) };
 
-  if (operations.imagesGenerate) {
+  if (operations.imagesApi) {
     policies['images.generate'] = true;
-  } else {
-    delete policies['images.generate'];
-  }
-
-  if (operations.imagesEdit) {
     policies['images.edit'] = true;
   } else {
+    delete policies['images.generate'];
     delete policies['images.edit'];
   }
 
@@ -200,6 +206,7 @@ export function GroupFormModal({
   const rateMultiplierValue = parseRateMultiplier(form.rate_multiplier);
   const rateMultiplierEmpty = isEmptyRateMultiplierInput(form.rate_multiplier);
   const rateMultiplierValid = rateMultiplierEmpty || isValidRateMultiplierValue(rateMultiplierValue);
+  const imagePricingEnabled = openaiOperations.imagesApi || openaiOperations.responsesImageGeneration;
 
   const handleSubmit = () => {
     if (!isEdit && (!form.name || !form.platform)) return;
@@ -449,46 +456,67 @@ export function GroupFormModal({
 
         {form.platform === 'openai' ? (
           <div className="space-y-3">
-            <NativeSwitch
-              isSelected={openaiOperations.imagesGenerate}
-              label={<span className="text-sm text-text">Images API /generations</span>}
-              onChange={(selected) => setOpenAIOperations((current) => ({ ...current, imagesGenerate: selected }))}
-            />
-            <NativeSwitch
-              isSelected={openaiOperations.imagesEdit}
-              label={<span className="text-sm text-text">Images API /edits</span>}
-              onChange={(selected) => setOpenAIOperations((current) => ({ ...current, imagesEdit: selected }))}
-            />
-            <NativeSwitch
+            <Checkbox
+              isSelected={openaiOperations.imagesApi}
+              onChange={(selected) => setOpenAIOperations((current) => ({
+                ...current,
+                imagesApi: selected,
+              }))}
+            >
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Checkbox.Content>
+                <span className="block text-sm text-text">开启图片 API（/generations + /edits）</span>
+                <span className="mt-1 block text-[11px] text-text-tertiary">
+                  分组始终支持文本；勾选后额外开放 Images 生成和编辑接口。
+                </span>
+              </Checkbox.Content>
+            </Checkbox>
+            <Checkbox
               isSelected={openaiOperations.responsesImageGeneration}
-              label={<span className="text-sm text-text">Responses image_generation</span>}
-              onChange={(selected) => setOpenAIOperations((current) => ({ ...current, responsesImageGeneration: selected }))}
-            />
+              onChange={(selected) =>
+                setOpenAIOperations((current) => ({ ...current, responsesImageGeneration: selected }))
+              }
+            >
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Checkbox.Content>
+                <span className="block text-sm text-text">Responses 接口开启 image_generation</span>
+                <span className="mt-1 block text-[11px] text-text-tertiary">
+                  勾选后允许文本模型路径在 Responses API 中调用 image_generation 工具。
+                </span>
+              </Checkbox.Content>
+            </Checkbox>
 
-            {openaiOperations.imagesGenerate || openaiOperations.imagesEdit || openaiOperations.responsesImageGeneration ? (
-              <div>
-                <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
-                  {t('groups.image_pricing')}
-                </p>
-                <div className="grid grid-cols-3 gap-3">
-                  {IMAGE_PRICE_FIELDS.map((field) => (
-                    <HeroTextField key={field.key} fullWidth>
-                      <Label>{field.label}</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.000001"
-                        value={imagePrices[field.key]}
-                        onChange={(e) =>
-                          setImagePrices((current) => ({ ...current, [field.key]: e.target.value }))
-                        }
-                        placeholder={t('groups.image_price_fallback')}
-                      />
-                    </HeroTextField>
-                  ))}
-                </div>
+            <div className={imagePricingEnabled ? undefined : 'opacity-60'}>
+              <p
+                className={`mb-1.5 text-xs font-medium uppercaser ${
+                  imagePricingEnabled ? 'text-text-secondary' : 'text-text-tertiary'
+                }`}
+              >
+                {t('groups.image_pricing')}
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {IMAGE_PRICE_FIELDS.map((field) => (
+                  <HeroTextField key={field.key} fullWidth isDisabled={!imagePricingEnabled}>
+                    <Label>{field.label}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.000001"
+                      disabled={!imagePricingEnabled}
+                      value={imagePrices[field.key]}
+                      onChange={(e) =>
+                        setImagePrices((current) => ({ ...current, [field.key]: e.target.value }))
+                      }
+                      placeholder={t('groups.image_price_fallback')}
+                    />
+                  </HeroTextField>
+                ))}
               </div>
-            ) : null}
+            </div>
           </div>
         ) : null}
 

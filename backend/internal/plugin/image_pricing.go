@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DevilGenius/airgate-core/internal/billing"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -18,7 +19,22 @@ const (
 	imageTier2KMaxPixels = 2048 * 2048
 )
 
-func imageBillingCostOverride(usage *sdk.Usage, settings map[string]map[string]string) (float64, bool) {
+func applyImageBillingCostPolicy(input *billing.CalculateInput, usage *sdk.Usage, settings map[string]map[string]string, requestPath string) {
+	if input == nil {
+		return
+	}
+	imageCost, ok := imageBillingCostFromSettings(usage, settings)
+	if !ok {
+		return
+	}
+	if isImageSubmitAPIPath(requestPath) {
+		input.BillingCostOverride = &imageCost
+		return
+	}
+	input.BillingCostAddon = &imageCost
+}
+
+func imageBillingCostFromSettings(usage *sdk.Usage, settings map[string]map[string]string) (float64, bool) {
 	snap := usageSnapshotFromSDK(usage)
 	if strings.TrimSpace(snap.ImageSize) == "" || snap.ImageCount <= 0 {
 		return 0, false

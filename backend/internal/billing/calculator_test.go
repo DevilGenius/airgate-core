@@ -240,3 +240,29 @@ func TestCalculate_BillingCostOverride(t *testing.T) {
 		t.Fatalf("RateMultiplier = %v, want original billing rate 0.50", res.RateMultiplier)
 	}
 }
+
+func TestCalculate_BillingCostAddon(t *testing.T) {
+	c := NewCalculator()
+	addon := 0.16
+	res := c.Calculate(CalculateInput{
+		InputCost:        0.10,
+		OutputCost:       0.40,
+		BillingRate:      0.50,
+		SellRate:         0.90,
+		BillingCostAddon: &addon,
+		AccountRate:      1.25,
+	})
+
+	if !almostEqual(res.TotalCost, 0.50) {
+		t.Fatalf("TotalCost = %v, want 0.50", res.TotalCost)
+	}
+	if !almostEqual(res.ActualCost, 0.41) {
+		t.Fatalf("ActualCost = %v, want token cost 0.25 + addon 0.16", res.ActualCost)
+	}
+	if !almostEqual(res.BilledCost, 0.369) {
+		t.Fatalf("BilledCost = %v, want 0.369", res.BilledCost)
+	}
+	if !almostEqual(res.AccountCost, 0.625) {
+		t.Fatalf("AccountCost = %v, want 0.625", res.AccountCost)
+	}
+}

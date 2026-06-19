@@ -38,6 +38,11 @@ type CalculateInput struct {
 	// 用于分组图片 1K/2K/4K 固定价：配置后整次请求按图片单张价 × 数量计费，
 	// billed_cost 仍会在 override 后的 actual_cost 基础上叠加 SellRate。
 	BillingCostOverride *float64
+
+	// BillingCostAddon 会叠加到倍率后的 actual_cost。
+	// 用于 Responses image_generation：文本 token 仍按 BillingRate 计费，
+	// 图片按分组 1K/2K/4K 固定价单独计费后加到同一条账单里。
+	BillingCostAddon *float64
 }
 
 // CalculateResult 计算结果
@@ -82,6 +87,9 @@ func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
 
 	if input.BillingCostOverride != nil {
 		actualCost = ratevalue.NormalizeNonNegative(*input.BillingCostOverride)
+	}
+	if input.BillingCostAddon != nil {
+		actualCost = ratevalue.SafeAddNonNegative(actualCost, *input.BillingCostAddon)
 	}
 
 	billedCost := ratevalue.SafeMulNonNegative(actualCost, sellRate)
