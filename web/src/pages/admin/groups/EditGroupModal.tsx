@@ -109,7 +109,7 @@ function parseOpenAIOperations(policies?: Record<string, boolean>): OpenAIOperat
 function buildOperationPolicies(
   current: Record<string, boolean> | undefined,
   operations: OpenAIOperations,
-): Record<string, boolean> | undefined {
+): Record<string, boolean> {
   const policies: Record<string, boolean> = { ...(current ?? {}) };
 
   if (operations.imagesApi) {
@@ -126,7 +126,7 @@ function buildOperationPolicies(
     delete policies['responses.image_generation'];
   }
 
-  return Object.keys(policies).length > 0 ? policies : undefined;
+  return policies;
 }
 
 export function GroupFormModal({
