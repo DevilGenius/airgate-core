@@ -6,7 +6,8 @@ import (
 )
 
 // Policy describes allow/deny model patterns. Deny has precedence; an empty
-// allow list means all models are allowed unless denied.
+// allow list means all models are allowed unless denied. Stored values keep
+// their original casing, but compiled matching is case-insensitive.
 type Policy struct {
 	Allow []string `json:"allow,omitempty"`
 	Deny  []string `json:"deny,omitempty"`
@@ -29,7 +30,7 @@ func Compile(policy Policy) Compiled {
 }
 
 func (c Compiled) Allows(model string) bool {
-	model = strings.TrimSpace(model)
+	model = normalizeModelName(model)
 	if model == "" {
 		return true
 	}
@@ -72,7 +73,7 @@ func compilePatterns(values []string) (map[string]struct{}, []string) {
 	var exact map[string]struct{}
 	var patterns []string
 	for _, value := range values {
-		value = strings.TrimSpace(value)
+		value = normalizeModelName(value)
 		if value == "" {
 			continue
 		}
@@ -86,6 +87,10 @@ func compilePatterns(values []string) (map[string]struct{}, []string) {
 		exact[value] = struct{}{}
 	}
 	return exact, patterns
+}
+
+func normalizeModelName(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
 }
 
 func matchesCompiled(exact map[string]struct{}, patterns []string, model string) bool {
