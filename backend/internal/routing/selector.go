@@ -44,6 +44,10 @@ func ListEligibleGroups(ctx context.Context, _ *ent.Client, userID int, platform
 			input.Path,
 			input.ClientModel,
 		)
+		plans = FilterDispatchPlansByAccounts(g, plans)
+		if len(plans) == 0 {
+			continue
+		}
 		requirements := RequirementsFromDispatchPlans(plans)
 		entGroup := &ent.Group{
 			ID:                g.ID,
@@ -99,6 +103,24 @@ func ListEligibleGroups(ctx context.Context, _ *ent.Client, userID int, platform
 			"required_operation", requiredOperation)
 	}
 	return candidates, nil
+}
+
+// FilterDispatchPlansByAccounts keeps dispatch plans that have at least one statically eligible account.
+func FilterDispatchPlansByAccounts(group *routegraph.GroupNode, plans []sdk.DispatchPlan) []sdk.DispatchPlan {
+	if group == nil || len(plans) == 0 {
+		return nil
+	}
+	filtered := make([]sdk.DispatchPlan, 0, len(plans))
+	for _, plan := range plans {
+		if plan.SchedulingModel == "" {
+			continue
+		}
+		if !group.HasAccountForModel(plan.SchedulingModel) {
+			continue
+		}
+		filtered = append(filtered, plan)
+	}
+	return filtered
 }
 
 func firstDispatchPlans(candidates []Candidate) []sdk.DispatchPlan {

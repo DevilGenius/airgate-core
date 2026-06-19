@@ -31,6 +31,10 @@ const (
 	FieldQuotas = "quotas"
 	// FieldModelRouting holds the string denoting the model_routing field in the database.
 	FieldModelRouting = "model_routing"
+	// FieldModelPolicy holds the string denoting the model_policy field in the database.
+	FieldModelPolicy = "model_policy"
+	// FieldAccountTypeModelPolicies holds the string denoting the account_type_model_policies field in the database.
+	FieldAccountTypeModelPolicies = "account_type_model_policies"
 	// FieldDispatchDsl holds the string denoting the dispatch_dsl field in the database.
 	FieldDispatchDsl = "dispatch_dsl"
 	// FieldOperationPolicies holds the string denoting the operation_policies field in the database.
@@ -105,6 +109,8 @@ var Columns = []string{
 	FieldSubscriptionType,
 	FieldQuotas,
 	FieldModelRouting,
+	FieldModelPolicy,
+	FieldAccountTypeModelPolicies,
 	FieldDispatchDsl,
 	FieldOperationPolicies,
 	FieldPluginSettings,

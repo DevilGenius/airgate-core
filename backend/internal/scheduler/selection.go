@@ -3,10 +3,8 @@ package scheduler
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"math/rand"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,7 +44,7 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		}
 	}()
 
-	candidates, err := s.routeAccounts(ctx, platform, model, groupID)
+	candidates, err := s.routeAccounts(platform, model, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -409,100 +407,17 @@ func (s *Scheduler) maybeRegisterSession(ctx context.Context, selected *ent.Acco
 	return selected, nil
 }
 
-// routeAccounts 取分组下匹配模型路由的账号；状态过滤延到 checkSchedulability。
-//
-// 不按 state 过滤的原因：新账号刚解除 disabled 后可立即被调度，不用等缓存失效。
-//
-// 首层命中 routeCache（key = (groupID, platform)）；miss 才查 DB。Model routing
-// 规则与账号列表一起缓存，按 model 过滤的动作每次都重新跑——避免"不同 model 复用同一条缓存"
-// 带来的错配。
-func (s *Scheduler) routeAccounts(ctx context.Context, platform, model string, groupID int) ([]*ent.Account, error) {
-	if groupNode := routegraph.Group(groupID); groupNode != nil {
-		return applyModelRouting(groupNode.Accounts, groupNode.ModelRouting, model), nil
+// routeAccounts 从 RouteGraph 取分组账号并应用静态模型策略。
+// RouteGraph 是调度热路径的权威来源；miss 表示启动快照未就绪或分组不存在。
+func (s *Scheduler) routeAccounts(platform, model string, groupID int) ([]*ent.Account, error) {
+	groupNode := routegraph.Group(groupID)
+	if groupNode == nil {
+		return nil, ErrGroupNotFound
 	}
-	if accounts, routing, ok := s.routeCache.Get(groupID, platform); ok {
-		return applyModelRouting(accounts, routing, model), nil
+	if groupNode.Platform != platform {
+		return nil, ErrNoAvailableAccount
 	}
-
-	grp, err := s.db.Group.Get(ctx, groupID)
-	if err != nil {
-		return nil, normalizeGroupLookupError(err)
-	}
-
-	accounts, err := grp.QueryAccounts().
-		Where(account.PlatformEQ(platform)).
-		WithProxy().
-		All(ctx)
-	if err != nil {
-		return nil, normalizeGroupAccountsLookupError(err)
-	}
-
-	// 缓存全量 platform 账号（包含所有 state）+ group 的 ModelRouting
-	s.routeCache.Set(groupID, platform, accounts, grp.ModelRouting)
-
-	return applyModelRouting(accounts, grp.ModelRouting, model), nil
-}
-
-func normalizeGroupLookupError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return err
-	}
-	if ent.IsNotFound(err) {
-		return fmt.Errorf("%w: %v", ErrGroupNotFound, err)
-	}
-	return fmt.Errorf("查询分组失败: %w", err)
-}
-
-func normalizeGroupAccountsLookupError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return err
-	}
-	return fmt.Errorf("查询分组账户失败: %w", err)
-}
-
-// applyModelRouting 按 model 过滤候选账号。routing 为 nil/空时原样返回；有规则但未命中时无候选。
-func applyModelRouting(accounts []*ent.Account, routing map[string][]int64, model string) []*ent.Account {
-	if len(routing) == 0 {
-		return accounts
-	}
-	allowedIDs := matchModelRouting(routing, model)
-	if allowedIDs == nil {
-		return nil
-	}
-	if len(allowedIDs) == 0 {
-		return nil
-	}
-	idSet := make(map[int64]bool, len(allowedIDs))
-	for _, id := range allowedIDs {
-		idSet[id] = true
-	}
-	// 不能原地复用 accounts slice：那是缓存共享的底层数组，别处还在读
-	filtered := make([]*ent.Account, 0, len(accounts))
-	for _, acc := range accounts {
-		if idSet[int64(acc.ID)] {
-			filtered = append(filtered, acc)
-		}
-	}
-	return filtered
-}
-
-// matchModelRouting 匹配模型路由规则，返回允许的账号 ID 列表。nil 或空表示不限制。
-func matchModelRouting(routing map[string][]int64, model string) []int64 {
-	if ids, ok := routing[model]; ok {
-		return ids
-	}
-	for pattern, ids := range routing {
-		if matched, _ := filepath.Match(pattern, model); matched {
-			return ids
-		}
-	}
-	return nil
+	return groupNode.AccountsForModel(model), nil
 }
 
 // checkSchedulability 先看状态（state + state_until），再叠加软约束（并发 / windowCost / RPM / session），取最严格者。

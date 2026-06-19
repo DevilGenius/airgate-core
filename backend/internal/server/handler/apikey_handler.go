@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"strconv"
@@ -43,8 +44,14 @@ func (h *APIKeyHandler) handleError(logMessage, publicMessage string, err error)
 	}
 }
 
-func (h *APIKeyHandler) invalidateRouteGraph() {
+func (h *APIKeyHandler) refreshRouteGraphAPIKey(ctx context.Context, keyID int) {
 	if h.scheduler != nil {
-		h.scheduler.InvalidateRouteCache(0)
+		h.scheduler.RefreshRouteGraphAPIKey(ctx, keyID)
+	}
+}
+
+func (h *APIKeyHandler) removeRouteGraphAPIKey(keyID int) {
+	if h.scheduler != nil {
+		h.scheduler.RemoveRouteGraphAPIKey(keyID)
 	}
 }

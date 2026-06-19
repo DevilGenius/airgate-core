@@ -707,6 +707,7 @@ function sameAccountExceptCapacity(left: AccountResp, right: AccountResp) {
     && left.platform === right.platform
     && left.type === right.type
     && left.credentials === right.credentials
+    && left.model_policy === right.model_policy
     && left.state === right.state
     && left.state_until === right.state_until
     && left.priority === right.priority

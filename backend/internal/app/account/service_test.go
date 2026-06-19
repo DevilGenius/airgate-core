@@ -480,6 +480,7 @@ type stubStateWriter struct {
 	disabled       map[int]string
 	degraded       map[int]string
 	recovered      map[int]bool
+	routeRefreshed map[int]bool
 }
 
 func newStubStateWriter() *stubStateWriter {
@@ -490,6 +491,7 @@ func newStubStateWriter() *stubStateWriter {
 		disabled:       map[int]string{},
 		degraded:       map[int]string{},
 		recovered:      map[int]bool{},
+		routeRefreshed: map[int]bool{},
 	}
 }
 
@@ -523,6 +525,10 @@ func (s *stubStateWriter) ManualRecover(_ context.Context, accountID int) error 
 func (s *stubStateWriter) ManualDisable(_ context.Context, accountID int, reason string) error {
 	s.disabled[accountID] = reason
 	return nil
+}
+
+func (s *stubStateWriter) RefreshRouteGraphAccount(_ context.Context, accountID int) {
+	s.routeRefreshed[accountID] = true
 }
 
 func TestMarkAccountUsageErrorDegradesForbidden(t *testing.T) {

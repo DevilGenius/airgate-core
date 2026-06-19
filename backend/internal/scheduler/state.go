@@ -52,7 +52,7 @@ type Judgment struct {
 //
 // 职责：
 //   - 把 forwarder 的 Judgment 翻译成 DB 字段变更（state / state_until / error_msg / last_used_at）
-//   - 关键转移（Active ↔ Disabled）通知上游清 route 缓存
+//   - 关键转移（Active ↔ Disabled）通知上游刷新 RouteGraph
 //
 // 确定性的账号级信号仍由 state 记录；临时 403 和 5xx 共享瞬时避让策略。
 type StateMachine struct {
@@ -61,9 +61,9 @@ type StateMachine struct {
 	monitor        monitoring.Recorder
 
 	// onCriticalTransition Active ↔ Disabled 转移后的回调（由 Scheduler 注入）。
-	// 用来清 route 缓存，让下次 SelectAccount 立刻看到新状态；
+	// 用来刷新 RouteGraph，让下次 SelectAccount 立刻看到新状态；
 	// RateLimited / Degraded 这种"带 state_until 的临时状态"不走这里，由 TTL 兜底。
-	onCriticalTransition func()
+	onCriticalTransition func(accountID int)
 	// onStateSnapshotUpdated 把最新状态镜像同步给热路径只读缓存。
 	onStateSnapshotUpdated func(accountID int, state account.State, stateUntil *time.Time, extra map[string]interface{})
 }
@@ -78,9 +78,9 @@ func NewStateMachine(db *ent.Client, fc *FamilyCooldown) *StateMachine {
 }
 
 // notifyCritical 发出关键状态变更事件。nil 回调时安静跳过。
-func (sm *StateMachine) notifyCritical() {
+func (sm *StateMachine) notifyCritical(accountID int) {
 	if sm.onCriticalTransition != nil {
-		sm.onCriticalTransition()
+		sm.onCriticalTransition(accountID)
 	}
 }
 
@@ -341,7 +341,7 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 	sm.notifyStateSnapshot(accountID, account.StateActive, nil, extra)
 	if prevState != account.StateActive {
 		sm.resolveAccountEvents(ctx, accountID)
-		sm.notifyCritical()
+		sm.notifyCritical(accountID)
 	}
 }
 
@@ -412,10 +412,10 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 	)
 	sm.recordAccountStateEvent(ctx, accountID, existing, newState, stateUntil, reason, Judgment{})
 
-	// Disabled 是关键转移：缓存里还挂着 active 的快照会让调度器反复选它、白白浪费 failover。
+	// Disabled 是关键转移：RouteGraph 里还挂着 active 快照会让调度器反复选它、白白浪费 failover。
 	// RateLimited / Degraded 有 state_until，缓存 3s 陈旧期可接受。
 	if newState == account.StateDisabled {
-		sm.notifyCritical()
+		sm.notifyCritical(accountID)
 	}
 }
 

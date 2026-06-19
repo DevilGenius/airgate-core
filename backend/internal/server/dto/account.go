@@ -1,5 +1,7 @@
 package dto
 
+import "github.com/DevilGenius/airgate-core/internal/modelpolicy"
+
 // FamilyCooldownDTO 家族级限流冷却（Redis 侧），AccountResp.FamilyCooldowns 元素。
 //
 // 与 state=rate_limited 的账号级状态区别：账号级是 DB 字段、影响整账号；
@@ -24,6 +26,7 @@ type AccountResp struct {
 	Platform           string              `json:"platform"`
 	Type               string              `json:"type"`
 	Credentials        map[string]string   `json:"credentials"`
+	ModelPolicy        modelpolicy.Policy  `json:"model_policy"`
 	State              string              `json:"state"`
 	StateUntil         *string             `json:"state_until,omitempty"`
 	Priority           int                 `json:"priority"`
@@ -44,49 +47,52 @@ type AccountResp struct {
 
 // CreateAccountReq 创建账号请求
 type CreateAccountReq struct {
-	Name           string            `json:"name" binding:"required"`
-	Platform       string            `json:"platform" binding:"required"`
-	Type           string            `json:"type"` // 账号类型，如 "apikey", "oauth"
-	Credentials    map[string]string `json:"credentials" binding:"required"`
-	Priority       int               `json:"priority"`
-	MaxConcurrency int               `json:"max_concurrency"`
-	ProxyID        *int64            `json:"proxy_id"`
-	RateMultiplier OptionalFloat     `json:"rate_multiplier"`
-	UpstreamIsPool bool              `json:"upstream_is_pool"`
-	Extra          map[string]any    `json:"extra,omitempty"`
-	GroupIDs       []int64           `json:"group_ids"`
+	Name           string             `json:"name" binding:"required"`
+	Platform       string             `json:"platform" binding:"required"`
+	Type           string             `json:"type"` // 账号类型，如 "apikey", "oauth"
+	Credentials    map[string]string  `json:"credentials" binding:"required"`
+	ModelPolicy    modelpolicy.Policy `json:"model_policy"`
+	Priority       int                `json:"priority"`
+	MaxConcurrency int                `json:"max_concurrency"`
+	ProxyID        *int64             `json:"proxy_id"`
+	RateMultiplier OptionalFloat      `json:"rate_multiplier"`
+	UpstreamIsPool bool               `json:"upstream_is_pool"`
+	Extra          map[string]any     `json:"extra,omitempty"`
+	GroupIDs       []int64            `json:"group_ids"`
 }
 
 // UpdateAccountReq 更新账号请求。
 // State 只允许 "active" / "disabled"（运维手动恢复 / 禁用）；
 // rate_limited / degraded 由状态机自动写入，不接受 API 显式赋值。
 type UpdateAccountReq struct {
-	Name           *string           `json:"name"`
-	Type           *string           `json:"type"`
-	Credentials    map[string]string `json:"credentials"`
-	State          *string           `json:"state" binding:"omitempty,oneof=active disabled"`
-	Priority       *int              `json:"priority"`
-	MaxConcurrency *int              `json:"max_concurrency"`
-	ProxyID        *int64            `json:"proxy_id"`
-	RateMultiplier OptionalFloat     `json:"rate_multiplier"`
-	UpstreamIsPool *bool             `json:"upstream_is_pool"`
-	Extra          map[string]any    `json:"extra,omitempty"`
-	HasExtra       bool              `json:"-"`
-	GroupIDs       []int64           `json:"group_ids"`
+	Name           *string             `json:"name"`
+	Type           *string             `json:"type"`
+	Credentials    map[string]string   `json:"credentials"`
+	ModelPolicy    *modelpolicy.Policy `json:"model_policy"`
+	State          *string             `json:"state" binding:"omitempty,oneof=active disabled"`
+	Priority       *int                `json:"priority"`
+	MaxConcurrency *int                `json:"max_concurrency"`
+	ProxyID        *int64              `json:"proxy_id"`
+	RateMultiplier OptionalFloat       `json:"rate_multiplier"`
+	UpstreamIsPool *bool               `json:"upstream_is_pool"`
+	Extra          map[string]any      `json:"extra,omitempty"`
+	HasExtra       bool                `json:"-"`
+	GroupIDs       []int64             `json:"group_ids"`
 }
 
 // AccountExportItem 导出文件中的单条账号。
 // group_ids / proxy_id 仅为兼容旧导入文件保留，导出时不会再写出，导入时也会被忽略。
 type AccountExportItem struct {
-	Name           string            `json:"name"`
-	Platform       string            `json:"platform"`
-	Type           string            `json:"type,omitempty"`
-	Credentials    map[string]string `json:"credentials"`
-	Priority       int               `json:"priority"`
-	MaxConcurrency int               `json:"max_concurrency"`
-	RateMultiplier OptionalFloat     `json:"rate_multiplier"`
-	GroupIDs       []int64           `json:"group_ids,omitempty"`
-	ProxyID        *int64            `json:"proxy_id,omitempty"`
+	Name           string             `json:"name"`
+	Platform       string             `json:"platform"`
+	Type           string             `json:"type,omitempty"`
+	Credentials    map[string]string  `json:"credentials"`
+	ModelPolicy    modelpolicy.Policy `json:"model_policy,omitempty"`
+	Priority       int                `json:"priority"`
+	MaxConcurrency int                `json:"max_concurrency"`
+	RateMultiplier OptionalFloat      `json:"rate_multiplier"`
+	GroupIDs       []int64            `json:"group_ids,omitempty"`
+	ProxyID        *int64             `json:"proxy_id,omitempty"`
 }
 
 // AccountExportFile 导出文件结构，仅包含可跨环境迁移的账号本体字段。
@@ -118,14 +124,15 @@ type ImportAccountsResp struct {
 
 // BulkUpdateAccountsReq 批量更新账号请求。
 type BulkUpdateAccountsReq struct {
-	AccountIDs     []int          `json:"account_ids" binding:"required,min=1"`
-	State          *string        `json:"state" binding:"omitempty,oneof=active disabled"`
-	Priority       *int           `json:"priority"`
-	MaxConcurrency *int           `json:"max_concurrency"`
-	RateMultiplier OptionalFloat  `json:"rate_multiplier"`
-	GroupIDs       []int64        `json:"group_ids"`
-	ProxyID        *int64         `json:"proxy_id"`
-	Extra          map[string]any `json:"extra,omitempty"`
+	AccountIDs     []int               `json:"account_ids" binding:"required,min=1"`
+	State          *string             `json:"state" binding:"omitempty,oneof=active disabled"`
+	Priority       *int                `json:"priority"`
+	MaxConcurrency *int                `json:"max_concurrency"`
+	RateMultiplier OptionalFloat       `json:"rate_multiplier"`
+	ModelPolicy    *modelpolicy.Policy `json:"model_policy"`
+	GroupIDs       []int64             `json:"group_ids"`
+	ProxyID        *int64              `json:"proxy_id"`
+	Extra          map[string]any      `json:"extra,omitempty"`
 }
 
 // BulkAccountIDsReq 仅携带账号 ID 列表的批量请求（用于删除、刷新令牌等）。

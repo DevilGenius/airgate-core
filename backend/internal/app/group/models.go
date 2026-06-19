@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -48,24 +49,26 @@ type AccountCapacity struct {
 
 // Group 描述分组领域对象。
 type Group struct {
-	ID                int
-	Name              string
-	Platform          string
-	RateMultiplier    float64
-	IsExclusive       bool
-	StatusVisible     bool
-	SubscriptionType  string
-	Quotas            map[string]any
-	ModelRouting      map[string][]int64
-	DispatchDSL       sdk.DispatchDSL
-	OperationPolicies map[string]bool
-	PluginSettings    map[string]map[string]string
-	ServiceTier       string
-	ForceInstructions string
-	Note              string
-	SortWeight        int
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID                       int
+	Name                     string
+	Platform                 string
+	RateMultiplier           float64
+	IsExclusive              bool
+	StatusVisible            bool
+	SubscriptionType         string
+	Quotas                   map[string]any
+	ModelRouting             map[string][]int64
+	ModelPolicy              modelpolicy.Policy
+	AccountTypeModelPolicies map[string]modelpolicy.Policy
+	DispatchDSL              sdk.DispatchDSL
+	OperationPolicies        map[string]bool
+	PluginSettings           map[string]map[string]string
+	ServiceTier              string
+	ForceInstructions        string
+	Note                     string
+	SortWeight               int
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 }
 
 // ListFilter 描述管理员分组列表查询条件。
@@ -96,41 +99,45 @@ type ListResult struct {
 
 // CreateInput 描述创建分组输入。
 type CreateInput struct {
-	Name              string
-	Platform          string
-	RateMultiplier    *float64
-	IsExclusive       bool
-	StatusVisible     bool
-	SubscriptionType  string
-	Quotas            map[string]any
-	ModelRouting      map[string][]int64
-	DispatchDSL       sdk.DispatchDSL
-	OperationPolicies map[string]bool
-	PluginSettings    map[string]map[string]string
-	ServiceTier       string
-	ForceInstructions string
-	Note              string
-	SortWeight        int
+	Name                     string
+	Platform                 string
+	RateMultiplier           *float64
+	IsExclusive              bool
+	StatusVisible            bool
+	SubscriptionType         string
+	Quotas                   map[string]any
+	ModelRouting             map[string][]int64
+	ModelPolicy              modelpolicy.Policy
+	AccountTypeModelPolicies map[string]modelpolicy.Policy
+	DispatchDSL              sdk.DispatchDSL
+	OperationPolicies        map[string]bool
+	PluginSettings           map[string]map[string]string
+	ServiceTier              string
+	ForceInstructions        string
+	Note                     string
+	SortWeight               int
 	// CopyAccountsFromGroupIDs 指定在新分组创建后从这些分组复制账号绑定（同平台，自动去重）。
 	CopyAccountsFromGroupIDs []int
 }
 
 // UpdateInput 描述更新分组输入。
 type UpdateInput struct {
-	Name              *string
-	RateMultiplier    *float64
-	IsExclusive       *bool
-	StatusVisible     *bool
-	SubscriptionType  *string
-	Quotas            map[string]any
-	ModelRouting      map[string][]int64
-	DispatchDSL       *sdk.DispatchDSL
-	OperationPolicies map[string]bool
-	PluginSettings    map[string]map[string]string
-	ServiceTier       *string
-	ForceInstructions *string
-	Note              *string
-	SortWeight        *int
+	Name                     *string
+	RateMultiplier           *float64
+	IsExclusive              *bool
+	StatusVisible            *bool
+	SubscriptionType         *string
+	Quotas                   map[string]any
+	ModelRouting             map[string][]int64
+	ModelPolicy              *modelpolicy.Policy
+	AccountTypeModelPolicies map[string]modelpolicy.Policy
+	DispatchDSL              *sdk.DispatchDSL
+	OperationPolicies        map[string]bool
+	PluginSettings           map[string]map[string]string
+	ServiceTier              *string
+	ForceInstructions        *string
+	Note                     *string
+	SortWeight               *int
 }
 
 func normalizePage(page, pageSize int) (int, int) {
@@ -163,6 +170,14 @@ func cloneModelRouting(input map[string][]int64) map[string][]int64 {
 		cloned[key] = append([]int64(nil), value...)
 	}
 	return cloned
+}
+
+func cloneModelPolicy(input modelpolicy.Policy) modelpolicy.Policy {
+	return modelpolicy.Clone(input)
+}
+
+func cloneAccountTypeModelPolicies(input map[string]modelpolicy.Policy) map[string]modelpolicy.Policy {
+	return modelpolicy.CloneMap(input)
 }
 
 func cloneDispatchDSL(input sdk.DispatchDSL) sdk.DispatchDSL {

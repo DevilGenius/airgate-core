@@ -340,6 +340,26 @@ func ModelRoutingNotNil() predicate.Group {
 	return predicate.Group(sql.FieldNotNull(FieldModelRouting))
 }
 
+// ModelPolicyIsNil applies the IsNil predicate on the "model_policy" field.
+func ModelPolicyIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldModelPolicy))
+}
+
+// ModelPolicyNotNil applies the NotNil predicate on the "model_policy" field.
+func ModelPolicyNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldModelPolicy))
+}
+
+// AccountTypeModelPoliciesIsNil applies the IsNil predicate on the "account_type_model_policies" field.
+func AccountTypeModelPoliciesIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldAccountTypeModelPolicies))
+}
+
+// AccountTypeModelPoliciesNotNil applies the NotNil predicate on the "account_type_model_policies" field.
+func AccountTypeModelPoliciesNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldAccountTypeModelPolicies))
+}
+
 // DispatchDslIsNil applies the IsNil predicate on the "dispatch_dsl" field.
 func DispatchDslIsNil() predicate.Group {
 	return predicate.Group(sql.FieldIsNull(FieldDispatchDsl))

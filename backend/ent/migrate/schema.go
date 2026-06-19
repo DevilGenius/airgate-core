@@ -60,6 +60,7 @@ var (
 		{Name: "platform", Type: field.TypeString},
 		{Name: "type", Type: field.TypeString, Nullable: true, Default: ""},
 		{Name: "credentials", Type: field.TypeJSON},
+		{Name: "model_policy", Type: field.TypeJSON, Nullable: true},
 		{Name: "state", Type: field.TypeEnum, Enums: []string{"active", "rate_limited", "degraded", "disabled"}, Default: "active"},
 		{Name: "state_until", Type: field.TypeTime, Nullable: true},
 		{Name: "priority", Type: field.TypeInt, Default: 50},
@@ -81,7 +82,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[16]},
+				Columns:    []*schema.Column{AccountsColumns[17]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -90,7 +91,7 @@ var (
 			{
 				Name:    "account_priority_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[7], AccountsColumns[14]},
+				Columns: []*schema.Column{AccountsColumns[8], AccountsColumns[15]},
 			},
 		},
 	}
@@ -132,6 +133,8 @@ var (
 		{Name: "subscription_type", Type: field.TypeEnum, Enums: []string{"standard", "subscription"}, Default: "standard"},
 		{Name: "quotas", Type: field.TypeJSON, Nullable: true},
 		{Name: "model_routing", Type: field.TypeJSON, Nullable: true},
+		{Name: "model_policy", Type: field.TypeJSON, Nullable: true},
+		{Name: "account_type_model_policies", Type: field.TypeJSON, Nullable: true},
 		{Name: "dispatch_dsl", Type: field.TypeJSON, Nullable: true},
 		{Name: "operation_policies", Type: field.TypeJSON, Nullable: true},
 		{Name: "plugin_settings", Type: field.TypeJSON, Nullable: true},

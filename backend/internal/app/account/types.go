@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"time"
+
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 )
 
 // Proxy 账号绑定的代理信息。
@@ -26,6 +28,7 @@ type Account struct {
 	Platform           string
 	Type               string
 	Credentials        map[string]string
+	ModelPolicy        modelpolicy.Policy
 	State              string
 	StateUntil         *time.Time
 	Priority           int
@@ -120,6 +123,7 @@ type CreateInput struct {
 	Platform       string
 	Type           string
 	Credentials    map[string]string
+	ModelPolicy    modelpolicy.Policy
 	Priority       int
 	MaxConcurrency int
 	ProxyID        *int64
@@ -137,6 +141,7 @@ type UpdateInput struct {
 	Name           *string
 	Type           *string
 	Credentials    map[string]string
+	ModelPolicy    *modelpolicy.Policy
 	State          *string
 	Priority       *int
 	MaxConcurrency *int
@@ -165,6 +170,7 @@ type BulkUpdateInput struct {
 	Priority       *int
 	MaxConcurrency *int
 	RateMultiplier *float64
+	ModelPolicy    *modelpolicy.Policy
 	GroupIDs       []int64
 	HasGroupIDs    bool
 	ProxyID        *int64
@@ -325,9 +331,10 @@ type LoadOptions struct {
 
 // ImportSummary 批量导入结果。
 type ImportSummary struct {
-	Imported int               `json:"imported"`
-	Failed   int               `json:"failed"`
-	Errors   []ImportItemError `json:"errors,omitempty"`
+	Imported   int               `json:"imported"`
+	Failed     int               `json:"failed"`
+	SuccessIDs []int             `json:"success_ids,omitempty"`
+	Errors     []ImportItemError `json:"errors,omitempty"`
 }
 
 // ImportItemError 单条导入失败信息。

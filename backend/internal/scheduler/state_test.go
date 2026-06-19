@@ -19,7 +19,7 @@ func TestStateMachineTransientAvoidanceBackoffAnd403NeverDisables(t *testing.T) 
 	db := openStateMachineTestDB(t, "scheduler_transient_403_backoff")
 	sm := NewStateMachine(db, nil)
 	criticalTransitions := 0
-	sm.onCriticalTransition = func() { criticalTransitions++ }
+	sm.onCriticalTransition = func(int) { criticalTransitions++ }
 
 	acc := createStateMachineAccount(ctx, db, "temporary 403", false)
 
@@ -65,7 +65,7 @@ func TestStateMachineAccountDead403DegradesWithoutDisable(t *testing.T) {
 	db := openStateMachineTestDB(t, "scheduler_account_dead_403_degrades")
 	sm := NewStateMachine(db, nil)
 	criticalTransitions := 0
-	sm.onCriticalTransition = func() { criticalTransitions++ }
+	sm.onCriticalTransition = func(int) { criticalTransitions++ }
 	acc := createStateMachineAccount(ctx, db, "account dead 403", false)
 
 	applyJudgmentN(ctx, sm, acc.ID, Judgment{
@@ -89,7 +89,7 @@ func TestStateMachineAccountDead401StillDisables(t *testing.T) {
 	db := openStateMachineTestDB(t, "scheduler_account_dead_401_disables")
 	sm := NewStateMachine(db, nil)
 	criticalTransitions := 0
-	sm.onCriticalTransition = func() { criticalTransitions++ }
+	sm.onCriticalTransition = func(int) { criticalTransitions++ }
 	acc := createStateMachineAccount(ctx, db, "account dead 401", false)
 
 	sm.Apply(ctx, acc.ID, Judgment{

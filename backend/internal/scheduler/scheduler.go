@@ -68,7 +68,6 @@ type Scheduler struct {
 	msgQueue         *MessageQueue
 	state            *StateMachine
 	familyCooldown   familyCooldownTracker
-	routeCache       *routeCache
 	responseAffinity *ResponseAffinity
 	currentLoad      func(ctx context.Context, accountID int) int
 	stateCache       *accountStateCache
@@ -85,7 +84,6 @@ func (s *Scheduler) SetMonitorRecorder(recorder monitoring.Recorder) {
 // NewScheduler 构造调度器。
 func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 	rpm := NewRPMCounter(rdb)
-	rc := newRouteCache(routeCacheTTL)
 	fc := NewFamilyCooldown(rdb)
 	sm := NewStateMachine(db, fc)
 	stateCache := newAccountStateCache()
@@ -99,15 +97,11 @@ func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 		msgQueue:         NewMessageQueue(rdb, rpm),
 		state:            sm,
 		familyCooldown:   fc,
-		routeCache:       rc,
 		responseAffinity: NewResponseAffinity(rdb),
 		stateCache:       stateCache,
 	}
-	s.state.onCriticalTransition = func() {
-		rc.InvalidateAll()
-		if err := routegraph.RefreshSync(context.Background(), db); err != nil {
-			slog.Warn("routegraph_refresh_failed", "reason", "critical_transition", "error", err)
-		}
+	s.state.onCriticalTransition = func(accountID int) {
+		s.RefreshRouteGraphAccount(context.Background(), accountID)
 	}
 	s.state.onStateSnapshotUpdated = stateCache.Store
 	return s
@@ -121,17 +115,71 @@ func (s *Scheduler) BindResponseAccount(ctx context.Context, groupID int, platfo
 	s.responseAffinity.Bind(ctx, groupID, platform, responseID, accountID)
 }
 
-// InvalidateRouteCache 清除指定分组的 route 缓存。admin 改分组 / 增删账号时调用。
-// groupID <= 0 时清空所有缓存。
-func (s *Scheduler) InvalidateRouteCache(groupID int) {
-	if groupID <= 0 {
-		s.routeCache.InvalidateAll()
-	} else {
-		s.routeCache.InvalidateGroup(groupID)
+func (s *Scheduler) RefreshRouteGraphGroup(ctx context.Context, groupID int) {
+	if s == nil || groupID <= 0 {
+		return
 	}
-	if err := routegraph.RefreshSync(context.Background(), s.db); err != nil {
-		slog.Warn("routegraph_refresh_failed", "group_id", groupID, "error", err)
+	if err := routegraph.RefreshGroup(ctx, s.db, groupID); err != nil {
+		slog.Warn("routegraph_refresh_failed", "entity", "group", "group_id", groupID, "error", err)
 	}
+}
+
+func (s *Scheduler) RemoveRouteGraphGroup(groupID int) {
+	if s == nil || groupID <= 0 {
+		return
+	}
+	routegraph.RemoveGroup(groupID)
+}
+
+func (s *Scheduler) RefreshRouteGraphAccount(ctx context.Context, accountID int) {
+	if s == nil || accountID <= 0 {
+		return
+	}
+	if err := routegraph.RefreshAccount(ctx, s.db, accountID); err != nil {
+		slog.Warn("routegraph_refresh_failed", "entity", "account", "account_id", accountID, "error", err)
+		return
+	}
+	s.stateCache.Delete(accountID)
+}
+
+func (s *Scheduler) RemoveRouteGraphAccount(accountID int) {
+	if s == nil || accountID <= 0 {
+		return
+	}
+	routegraph.RemoveAccount(accountID)
+	s.stateCache.Delete(accountID)
+}
+
+func (s *Scheduler) RefreshRouteGraphUser(ctx context.Context, userID int) {
+	if s == nil || userID <= 0 {
+		return
+	}
+	if err := routegraph.RefreshUser(ctx, s.db, userID); err != nil {
+		slog.Warn("routegraph_refresh_failed", "entity", "user", "user_id", userID, "error", err)
+	}
+}
+
+func (s *Scheduler) RemoveRouteGraphUser(userID int) {
+	if s == nil || userID <= 0 {
+		return
+	}
+	routegraph.RemoveUser(userID)
+}
+
+func (s *Scheduler) RefreshRouteGraphAPIKey(ctx context.Context, keyID int) {
+	if s == nil || keyID <= 0 {
+		return
+	}
+	if err := routegraph.RefreshAPIKey(ctx, s.db, keyID); err != nil {
+		slog.Warn("routegraph_refresh_failed", "entity", "api_key", "api_key_id", keyID, "error", err)
+	}
+}
+
+func (s *Scheduler) RemoveRouteGraphAPIKey(keyID int) {
+	if s == nil || keyID <= 0 {
+		return
+	}
+	routegraph.RemoveAPIKey(keyID)
 }
 
 // Apply 把 forwarder 的判决交给状态机。是 forwarder 与 scheduler 的唯一接触面。

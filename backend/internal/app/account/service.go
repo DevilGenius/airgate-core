@@ -95,10 +95,12 @@ type StateWriter interface {
 	MarkDisabled(ctx context.Context, accountID int, reason string)
 	// MarkDegraded 临时降级（如上游 403 暂不可用），不会永久禁用账号。
 	MarkDegraded(ctx context.Context, accountID int, reason string)
-	// ManualRecover 手动恢复到 active 并清除路由缓存。
+	// ManualRecover 手动恢复到 active 并刷新调度 RouteGraph。
 	ManualRecover(ctx context.Context, accountID int) error
-	// ManualDisable 手动禁用并清除路由缓存。
+	// ManualDisable 手动禁用并刷新调度 RouteGraph。
 	ManualDisable(ctx context.Context, accountID int, reason string) error
+	// RefreshRouteGraphAccount 刷新账号在调度 RouteGraph 中的静态快照。
+	RefreshRouteGraphAccount(ctx context.Context, accountID int)
 }
 
 type Service struct {
@@ -345,7 +347,8 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary
 		input.RateMultiplier = &rateMultiplier
 		input.GroupIDs = nil
 		input.ProxyID = nil
-		if _, err := s.repo.Create(ctx, input); err != nil {
+		created, err := s.repo.Create(ctx, input)
+		if err != nil {
 			summary.Failed++
 			summary.Errors = append(summary.Errors, ImportItemError{
 				Index:   index,
@@ -355,6 +358,7 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary
 			continue
 		}
 		summary.Imported++
+		summary.SuccessIDs = append(summary.SuccessIDs, created.ID)
 	}
 	if summary.Imported > 0 {
 		s.InvalidateUsageCache("")
@@ -466,6 +470,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			Priority:       input.Priority,
 			MaxConcurrency: input.MaxConcurrency,
 			RateMultiplier: input.RateMultiplier,
+			ModelPolicy:    input.ModelPolicy,
 		}
 		if input.HasProxyID {
 			patch.ProxyID = input.ProxyID
@@ -568,6 +573,7 @@ func hasUpdateInputChanges(input UpdateInput) bool {
 		input.Priority != nil ||
 		input.MaxConcurrency != nil ||
 		input.RateMultiplier != nil ||
+		input.ModelPolicy != nil ||
 		input.UpstreamIsPool != nil ||
 		input.HasGroupIDs ||
 		input.HasProxyID ||
@@ -636,8 +642,7 @@ func (s *Service) applyManualState(ctx context.Context, id int, state string) er
 // ToggleScheduling 快速切换账号调度状态。active ↔ disabled。
 // 其它中间态（rate_limited / degraded）一律视为"非 disabled"，切换后目标 = disabled。
 //
-// 通过 StateWriter 走状态机路径，确保路由缓存立即失效——
-// 旧实现直接写 repo 绕过状态机，导致缓存里的旧快照让账号"自己起来"。
+// 通过 StateWriter 走状态机路径，确保 RouteGraph 立即刷新。
 func (s *Service) ToggleScheduling(ctx context.Context, id int) (ToggleResult, error) {
 	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
@@ -2504,6 +2509,9 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 				"op", "save_credentials",
 				sdk.LogFieldError, err)
 			return QuotaRefreshResult{}, err
+		}
+		if s.stateWriter != nil {
+			s.stateWriter.RefreshRouteGraphAccount(ctx, item.ID)
 		}
 	}
 

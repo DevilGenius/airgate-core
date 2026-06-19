@@ -23,6 +23,8 @@ const (
 	FieldType = "type"
 	// FieldCredentials holds the string denoting the credentials field in the database.
 	FieldCredentials = "credentials"
+	// FieldModelPolicy holds the string denoting the model_policy field in the database.
+	FieldModelPolicy = "model_policy"
 	// FieldState holds the string denoting the state field in the database.
 	FieldState = "state"
 	// FieldStateUntil holds the string denoting the state_until field in the database.
@@ -81,6 +83,7 @@ var Columns = []string{
 	FieldPlatform,
 	FieldType,
 	FieldCredentials,
+	FieldModelPolicy,
 	FieldState,
 	FieldStateUntil,
 	FieldPriority,

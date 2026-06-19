@@ -5,6 +5,8 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 )
 
 // Account 上游 AI 账户。
@@ -25,6 +27,7 @@ func (Account) Fields() []ent.Field {
 		field.String("platform").NotEmpty(),
 		field.String("type").Default("").Optional(),
 		field.JSON("credentials", map[string]string{}).Default(map[string]string{}),
+		field.JSON("model_policy", modelpolicy.Policy{}).Optional(),
 
 		// state / state_until 是账号状态的单一真相源。Redis 只做缓存加速。
 		field.Enum("state").

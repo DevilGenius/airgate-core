@@ -199,7 +199,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.refreshRouteGraphUser(c.Request.Context(), item.ID)
 	response.Success(c, toUserRespFromDomain(item))
 }
 
@@ -233,7 +233,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.refreshRouteGraphUser(c.Request.Context(), item.ID)
 	response.Success(c, toUserRespFromDomain(item))
 }
 
@@ -261,7 +261,7 @@ func (h *UserHandler) AdjustBalance(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.refreshRouteGraphUser(c.Request.Context(), item.ID)
 	response.Success(c, toUserRespFromDomain(item))
 }
 
@@ -278,7 +278,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.removeRouteGraphUser(id)
 	response.Success(c, nil)
 }
 
@@ -296,7 +296,7 @@ func (h *UserHandler) ToggleUserStatus(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.refreshRouteGraphUser(c.Request.Context(), result.ID)
 	response.Success(c, map[string]any{
 		"id":     result.ID,
 		"status": result.Status,

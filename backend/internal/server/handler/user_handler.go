@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"strconv"
@@ -44,8 +45,14 @@ func (h *UserHandler) handleError(logMessage, publicMessage string, err error) (
 	}
 }
 
-func (h *UserHandler) invalidateRouteGraph() {
+func (h *UserHandler) refreshRouteGraphUser(ctx context.Context, userID int) {
 	if h.scheduler != nil {
-		h.scheduler.InvalidateRouteCache(0)
+		h.scheduler.RefreshRouteGraphUser(ctx, userID)
+	}
+}
+
+func (h *UserHandler) removeRouteGraphUser(userID int) {
+	if h.scheduler != nil {
+		h.scheduler.RemoveRouteGraphUser(userID)
 	}
 }

@@ -125,6 +125,7 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 			Platform:       item.Platform,
 			Type:           item.Type,
 			Credentials:    item.Credentials,
+			ModelPolicy:    item.ModelPolicy,
 			Priority:       item.Priority,
 			MaxConcurrency: item.MaxConcurrency,
 			RateMultiplier: item.RateMultiplier.Ptr(),
@@ -132,8 +133,8 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 	}
 
 	summary := h.service.Import(c.Request.Context(), inputs)
-	if summary.Imported > 0 {
-		h.invalidateRouteCacheForAccountMutation()
+	if len(summary.SuccessIDs) > 0 {
+		h.refreshRouteGraphAccounts(c.Request.Context(), summary.SuccessIDs)
 	}
 
 	resp := dto.ImportAccountsResp{
@@ -163,6 +164,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		Platform:       req.Platform,
 		Type:           req.Type,
 		Credentials:    req.Credentials,
+		ModelPolicy:    req.ModelPolicy,
 		Priority:       req.Priority,
 		MaxConcurrency: req.MaxConcurrency,
 		ProxyID:        req.ProxyID,
@@ -176,7 +178,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteCacheForAccountMutation()
+	h.refreshRouteGraphAccount(c.Request.Context(), item.ID)
 
 	resp := toAccountResp(item)
 	resp.FamilyCooldowns = h.familyCooldownsFor(c.Request.Context(), item.ID)
@@ -207,6 +209,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		Name:           req.Name,
 		Type:           req.Type,
 		Credentials:    req.Credentials,
+		ModelPolicy:    req.ModelPolicy,
 		State:          req.State,
 		Priority:       req.Priority,
 		MaxConcurrency: req.MaxConcurrency,
@@ -232,7 +235,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteCacheForAccountMutation()
+	h.refreshRouteGraphAccount(c.Request.Context(), item.ID)
 
 	resp := toAccountResp(item)
 	resp.FamilyCooldowns = h.familyCooldownsFor(c.Request.Context(), item.ID)
@@ -252,7 +255,7 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteCacheForAccountMutation()
+	h.removeRouteGraphAccount(id)
 
 	response.Success(c, nil)
 }
@@ -271,6 +274,7 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		Priority:       req.Priority,
 		MaxConcurrency: req.MaxConcurrency,
 		RateMultiplier: req.RateMultiplier.PtrOrDefault(1),
+		ModelPolicy:    req.ModelPolicy,
 		GroupIDs:       req.GroupIDs,
 		HasGroupIDs:    req.GroupIDs != nil,
 		ProxyID:        req.ProxyID,
@@ -279,7 +283,7 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		HasExtra:       req.Extra != nil,
 	})
 	if result.Success > 0 {
-		h.invalidateRouteCacheForAccountMutation()
+		h.refreshRouteGraphAccounts(c.Request.Context(), result.SuccessIDs)
 	}
 	response.Success(c, toBulkOpResp(result))
 }
@@ -294,7 +298,7 @@ func (h *AccountHandler) BulkDeleteAccounts(c *gin.Context) {
 
 	result := h.service.BulkDelete(c.Request.Context(), req.AccountIDs)
 	if result.Success > 0 {
-		h.invalidateRouteCacheForAccountMutation()
+		h.removeRouteGraphAccounts(result.SuccessIDs)
 	}
 	response.Success(c, toBulkOpResp(result))
 }
@@ -423,7 +427,7 @@ func (h *AccountHandler) ToggleScheduling(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteCacheForAccountMutation()
+	h.refreshRouteGraphAccount(c.Request.Context(), result.ID)
 
 	response.Success(c, map[string]any{
 		"id":    result.ID,

@@ -15,6 +15,7 @@ import (
 	entproxy "github.com/DevilGenius/airgate-core/ent/proxy"
 	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 )
 
@@ -164,6 +165,7 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 		SetPlatform(input.Platform).
 		SetType(input.Type).
 		SetCredentials(cloneCredentials(input.Credentials)).
+		SetModelPolicy(cloneModelPolicy(input.ModelPolicy)).
 		SetPriority(input.Priority).
 		SetMaxConcurrency(input.MaxConcurrency).
 		SetRateMultiplier(rateMultiplier).
@@ -199,6 +201,9 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 	}
 	if input.Credentials != nil {
 		builder = builder.SetCredentials(cloneCredentials(input.Credentials))
+	}
+	if input.ModelPolicy != nil {
+		builder = builder.SetModelPolicy(cloneModelPolicy(*input.ModelPolicy))
 	}
 	if input.State != nil {
 		builder = builder.SetState(entaccount.State(*input.State))
@@ -478,6 +483,7 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		Platform:       item.Platform,
 		Type:           item.Type,
 		Credentials:    cloneCredentials(item.Credentials),
+		ModelPolicy:    cloneModelPolicy(item.ModelPolicy),
 		State:          item.State.String(),
 		Priority:       item.Priority,
 		MaxConcurrency: item.MaxConcurrency,
@@ -538,6 +544,10 @@ func cloneCredentials(input map[string]string) map[string]string {
 		cloned[key] = value
 	}
 	return cloned
+}
+
+func cloneModelPolicy(input modelpolicy.Policy) modelpolicy.Policy {
+	return modelpolicy.Clone(input)
 }
 
 func cloneAnyMap(input map[string]interface{}) map[string]any {

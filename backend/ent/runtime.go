@@ -125,7 +125,7 @@ func init() {
 	// account.DefaultCredentials holds the default value on creation for the credentials field.
 	account.DefaultCredentials = accountDescCredentials.Default.(map[string]string)
 	// accountDescPriority is the schema descriptor for priority field.
-	accountDescPriority := accountFields[6].Descriptor()
+	accountDescPriority := accountFields[7].Descriptor()
 	// account.DefaultPriority holds the default value on creation for the priority field.
 	account.DefaultPriority = accountDescPriority.Default.(int)
 	// account.PriorityValidator is a validator for the "priority" field. It is called by the builders before save.
@@ -145,11 +145,11 @@ func init() {
 		}
 	}()
 	// accountDescMaxConcurrency is the schema descriptor for max_concurrency field.
-	accountDescMaxConcurrency := accountFields[7].Descriptor()
+	accountDescMaxConcurrency := accountFields[8].Descriptor()
 	// account.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	account.DefaultMaxConcurrency = accountDescMaxConcurrency.Default.(int)
 	// accountDescRateMultiplier is the schema descriptor for rate_multiplier field.
-	accountDescRateMultiplier := accountFields[8].Descriptor()
+	accountDescRateMultiplier := accountFields[9].Descriptor()
 	// account.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	account.DefaultRateMultiplier = accountDescRateMultiplier.Default.(float64)
 	// account.RateMultiplierValidator is a validator for the "rate_multiplier" field. It is called by the builders before save.
@@ -169,23 +169,23 @@ func init() {
 		}
 	}()
 	// accountDescErrorMsg is the schema descriptor for error_msg field.
-	accountDescErrorMsg := accountFields[9].Descriptor()
+	accountDescErrorMsg := accountFields[10].Descriptor()
 	// account.DefaultErrorMsg holds the default value on creation for the error_msg field.
 	account.DefaultErrorMsg = accountDescErrorMsg.Default.(string)
 	// accountDescUpstreamIsPool is the schema descriptor for upstream_is_pool field.
-	accountDescUpstreamIsPool := accountFields[10].Descriptor()
+	accountDescUpstreamIsPool := accountFields[11].Descriptor()
 	// account.DefaultUpstreamIsPool holds the default value on creation for the upstream_is_pool field.
 	account.DefaultUpstreamIsPool = accountDescUpstreamIsPool.Default.(bool)
 	// accountDescExtra is the schema descriptor for extra field.
-	accountDescExtra := accountFields[12].Descriptor()
+	accountDescExtra := accountFields[13].Descriptor()
 	// account.DefaultExtra holds the default value on creation for the extra field.
 	account.DefaultExtra = accountDescExtra.Default.(map[string]interface{})
 	// accountDescCreatedAt is the schema descriptor for created_at field.
-	accountDescCreatedAt := accountFields[13].Descriptor()
+	accountDescCreatedAt := accountFields[14].Descriptor()
 	// account.DefaultCreatedAt holds the default value on creation for the created_at field.
 	account.DefaultCreatedAt = accountDescCreatedAt.Default.(func() time.Time)
 	// accountDescUpdatedAt is the schema descriptor for updated_at field.
-	accountDescUpdatedAt := accountFields[14].Descriptor()
+	accountDescUpdatedAt := accountFields[15].Descriptor()
 	// account.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	account.DefaultUpdatedAt = accountDescUpdatedAt.Default.(func() time.Time)
 	// account.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -247,27 +247,27 @@ func init() {
 	// group.DefaultStatusVisible holds the default value on creation for the status_visible field.
 	group.DefaultStatusVisible = groupDescStatusVisible.Default.(bool)
 	// groupDescServiceTier is the schema descriptor for service_tier field.
-	groupDescServiceTier := groupFields[11].Descriptor()
+	groupDescServiceTier := groupFields[13].Descriptor()
 	// group.DefaultServiceTier holds the default value on creation for the service_tier field.
 	group.DefaultServiceTier = groupDescServiceTier.Default.(string)
 	// groupDescForceInstructions is the schema descriptor for force_instructions field.
-	groupDescForceInstructions := groupFields[12].Descriptor()
+	groupDescForceInstructions := groupFields[14].Descriptor()
 	// group.DefaultForceInstructions holds the default value on creation for the force_instructions field.
 	group.DefaultForceInstructions = groupDescForceInstructions.Default.(string)
 	// groupDescNote is the schema descriptor for note field.
-	groupDescNote := groupFields[13].Descriptor()
+	groupDescNote := groupFields[15].Descriptor()
 	// group.DefaultNote holds the default value on creation for the note field.
 	group.DefaultNote = groupDescNote.Default.(string)
 	// groupDescSortWeight is the schema descriptor for sort_weight field.
-	groupDescSortWeight := groupFields[14].Descriptor()
+	groupDescSortWeight := groupFields[16].Descriptor()
 	// group.DefaultSortWeight holds the default value on creation for the sort_weight field.
 	group.DefaultSortWeight = groupDescSortWeight.Default.(int)
 	// groupDescCreatedAt is the schema descriptor for created_at field.
-	groupDescCreatedAt := groupFields[15].Descriptor()
+	groupDescCreatedAt := groupFields[17].Descriptor()
 	// group.DefaultCreatedAt holds the default value on creation for the created_at field.
 	group.DefaultCreatedAt = groupDescCreatedAt.Default.(func() time.Time)
 	// groupDescUpdatedAt is the schema descriptor for updated_at field.
-	groupDescUpdatedAt := groupFields[16].Descriptor()
+	groupDescUpdatedAt := groupFields[18].Descriptor()
 	// group.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	group.DefaultUpdatedAt = groupDescUpdatedAt.Default.(func() time.Time)
 	// group.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

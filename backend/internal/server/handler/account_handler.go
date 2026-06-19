@@ -138,8 +138,32 @@ func (h *AccountHandler) handleError(logMessage, publicMessage string, err error
 	}
 }
 
-func (h *AccountHandler) invalidateRouteCacheForAccountMutation() {
+func (h *AccountHandler) refreshRouteGraphAccount(ctx context.Context, accountID int) {
 	if h.scheduler != nil {
-		h.scheduler.InvalidateRouteCache(0)
+		h.scheduler.RefreshRouteGraphAccount(ctx, accountID)
+	}
+}
+
+func (h *AccountHandler) refreshRouteGraphAccounts(ctx context.Context, accountIDs []int) {
+	if h.scheduler == nil {
+		return
+	}
+	for _, accountID := range accountIDs {
+		h.scheduler.RefreshRouteGraphAccount(ctx, accountID)
+	}
+}
+
+func (h *AccountHandler) removeRouteGraphAccount(accountID int) {
+	if h.scheduler != nil {
+		h.scheduler.RemoveRouteGraphAccount(accountID)
+	}
+}
+
+func (h *AccountHandler) removeRouteGraphAccounts(accountIDs []int) {
+	if h.scheduler == nil {
+		return
+	}
+	for _, accountID := range accountIDs {
+		h.scheduler.RemoveRouteGraphAccount(accountID)
 	}
 }

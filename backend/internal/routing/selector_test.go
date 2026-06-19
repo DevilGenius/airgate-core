@@ -4,7 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/migrate"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
 )
 
@@ -54,6 +56,10 @@ func TestListEligibleGroups(t *testing.T) {
 		SetPlatform("anthropic").
 		SetRateMultiplier(0.01).
 		SaveX(ctx)
+	addTestAccountToGroups(ctx, db, publicSlow.ID, allowedFast.ID, tieHighWeight.ID)
+	if err := routegraph.RefreshSync(ctx, db); err != nil {
+		t.Fatal(err)
+	}
 
 	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", map[int64]float64{int64(publicSlow.ID): 0.3}, RequestInput{})
 	if err != nil {
@@ -105,6 +111,17 @@ func TestListEligibleGroupsFiltersOperationDisabledGroups(t *testing.T) {
 		SetPlatform("openai").
 		SetRateMultiplier(0.3).
 		SaveX(ctx)
+	openaiGroups := db.Group.Query().AllX(ctx)
+	groupIDs := make([]int, 0, len(openaiGroups))
+	for _, group := range openaiGroups {
+		if group.Platform == "openai" {
+			groupIDs = append(groupIDs, group.ID)
+		}
+	}
+	addTestAccountToGroups(ctx, db, groupIDs...)
+	if err := routegraph.RefreshSync(ctx, db); err != nil {
+		t.Fatal(err)
+	}
 
 	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, RequestInput{
 		Method:      "POST",
@@ -132,4 +149,16 @@ func TestListEligibleGroupsFiltersOperationDisabledGroups(t *testing.T) {
 	if len(chatRoutes) != 3 {
 		t.Fatalf("len(chatRoutes) = %d, want 3", len(chatRoutes))
 	}
+}
+
+func addTestAccountToGroups(ctx context.Context, db *ent.Client, groupIDs ...int) {
+	db.Account.Create().
+		SetName("route account").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{}).
+		SetPriority(50).
+		SetMaxConcurrency(10).
+		AddGroupIDs(groupIDs...).
+		SaveX(ctx)
 }

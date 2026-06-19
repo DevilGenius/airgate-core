@@ -114,6 +114,8 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Group, error) 
 	input.RateMultiplier = &rateMultiplier
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
+	input.ModelPolicy = cloneModelPolicy(input.ModelPolicy)
+	input.AccountTypeModelPolicies = cloneAccountTypeModelPolicies(input.AccountTypeModelPolicies)
 	input.DispatchDSL = cloneDispatchDSL(input.DispatchDSL)
 	input.OperationPolicies = cloneOperationPolicies(input.OperationPolicies)
 	input.PluginSettings = clonePluginSettings(input.PluginSettings)
@@ -143,6 +145,11 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Group,
 	}
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
+	if input.ModelPolicy != nil {
+		cloned := cloneModelPolicy(*input.ModelPolicy)
+		input.ModelPolicy = &cloned
+	}
+	input.AccountTypeModelPolicies = cloneAccountTypeModelPolicies(input.AccountTypeModelPolicies)
 	if input.DispatchDSL != nil {
 		cloned := cloneDispatchDSL(*input.DispatchDSL)
 		input.DispatchDSL = &cloned

@@ -18,6 +18,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/ent/usersubscription"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -146,6 +147,38 @@ func (gu *GroupUpdate) SetModelRouting(m map[string][]int64) *GroupUpdate {
 // ClearModelRouting clears the value of the "model_routing" field.
 func (gu *GroupUpdate) ClearModelRouting() *GroupUpdate {
 	gu.mutation.ClearModelRouting()
+	return gu
+}
+
+// SetModelPolicy sets the "model_policy" field.
+func (gu *GroupUpdate) SetModelPolicy(m modelpolicy.Policy) *GroupUpdate {
+	gu.mutation.SetModelPolicy(m)
+	return gu
+}
+
+// SetNillableModelPolicy sets the "model_policy" field if the given value is not nil.
+func (gu *GroupUpdate) SetNillableModelPolicy(m *modelpolicy.Policy) *GroupUpdate {
+	if m != nil {
+		gu.SetModelPolicy(*m)
+	}
+	return gu
+}
+
+// ClearModelPolicy clears the value of the "model_policy" field.
+func (gu *GroupUpdate) ClearModelPolicy() *GroupUpdate {
+	gu.mutation.ClearModelPolicy()
+	return gu
+}
+
+// SetAccountTypeModelPolicies sets the "account_type_model_policies" field.
+func (gu *GroupUpdate) SetAccountTypeModelPolicies(m map[string]modelpolicy.Policy) *GroupUpdate {
+	gu.mutation.SetAccountTypeModelPolicies(m)
+	return gu
+}
+
+// ClearAccountTypeModelPolicies clears the value of the "account_type_model_policies" field.
+func (gu *GroupUpdate) ClearAccountTypeModelPolicies() *GroupUpdate {
+	gu.mutation.ClearAccountTypeModelPolicies()
 	return gu
 }
 
@@ -553,6 +586,18 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if gu.mutation.ModelRoutingCleared() {
 		_spec.ClearField(group.FieldModelRouting, field.TypeJSON)
 	}
+	if value, ok := gu.mutation.ModelPolicy(); ok {
+		_spec.SetField(group.FieldModelPolicy, field.TypeJSON, value)
+	}
+	if gu.mutation.ModelPolicyCleared() {
+		_spec.ClearField(group.FieldModelPolicy, field.TypeJSON)
+	}
+	if value, ok := gu.mutation.AccountTypeModelPolicies(); ok {
+		_spec.SetField(group.FieldAccountTypeModelPolicies, field.TypeJSON, value)
+	}
+	if gu.mutation.AccountTypeModelPoliciesCleared() {
+		_spec.ClearField(group.FieldAccountTypeModelPolicies, field.TypeJSON)
+	}
 	if value, ok := gu.mutation.DispatchDsl(); ok {
 		_spec.SetField(group.FieldDispatchDsl, field.TypeJSON, value)
 	}
@@ -946,6 +991,38 @@ func (guo *GroupUpdateOne) SetModelRouting(m map[string][]int64) *GroupUpdateOne
 // ClearModelRouting clears the value of the "model_routing" field.
 func (guo *GroupUpdateOne) ClearModelRouting() *GroupUpdateOne {
 	guo.mutation.ClearModelRouting()
+	return guo
+}
+
+// SetModelPolicy sets the "model_policy" field.
+func (guo *GroupUpdateOne) SetModelPolicy(m modelpolicy.Policy) *GroupUpdateOne {
+	guo.mutation.SetModelPolicy(m)
+	return guo
+}
+
+// SetNillableModelPolicy sets the "model_policy" field if the given value is not nil.
+func (guo *GroupUpdateOne) SetNillableModelPolicy(m *modelpolicy.Policy) *GroupUpdateOne {
+	if m != nil {
+		guo.SetModelPolicy(*m)
+	}
+	return guo
+}
+
+// ClearModelPolicy clears the value of the "model_policy" field.
+func (guo *GroupUpdateOne) ClearModelPolicy() *GroupUpdateOne {
+	guo.mutation.ClearModelPolicy()
+	return guo
+}
+
+// SetAccountTypeModelPolicies sets the "account_type_model_policies" field.
+func (guo *GroupUpdateOne) SetAccountTypeModelPolicies(m map[string]modelpolicy.Policy) *GroupUpdateOne {
+	guo.mutation.SetAccountTypeModelPolicies(m)
+	return guo
+}
+
+// ClearAccountTypeModelPolicies clears the value of the "account_type_model_policies" field.
+func (guo *GroupUpdateOne) ClearAccountTypeModelPolicies() *GroupUpdateOne {
+	guo.mutation.ClearAccountTypeModelPolicies()
 	return guo
 }
 
@@ -1382,6 +1459,18 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	}
 	if guo.mutation.ModelRoutingCleared() {
 		_spec.ClearField(group.FieldModelRouting, field.TypeJSON)
+	}
+	if value, ok := guo.mutation.ModelPolicy(); ok {
+		_spec.SetField(group.FieldModelPolicy, field.TypeJSON, value)
+	}
+	if guo.mutation.ModelPolicyCleared() {
+		_spec.ClearField(group.FieldModelPolicy, field.TypeJSON)
+	}
+	if value, ok := guo.mutation.AccountTypeModelPolicies(); ok {
+		_spec.SetField(group.FieldAccountTypeModelPolicies, field.TypeJSON, value)
+	}
+	if guo.mutation.AccountTypeModelPoliciesCleared() {
+		_spec.ClearField(group.FieldAccountTypeModelPolicies, field.TypeJSON)
 	}
 	if value, ok := guo.mutation.DispatchDsl(); ok {
 		_spec.SetField(group.FieldDispatchDsl, field.TypeJSON, value)

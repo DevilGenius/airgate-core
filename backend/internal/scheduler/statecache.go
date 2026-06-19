@@ -31,11 +31,22 @@ func (c *accountStateCache) Store(accountID int, state account.State, stateUntil
 		value := *stateUntil
 		until = &value
 	}
+	var snapshotExtra map[string]interface{}
+	if extra != nil {
+		snapshotExtra = cloneExtra(extra)
+	}
 	c.m.Store(accountID, accountStateSnapshot{
 		State:      state,
 		StateUntil: until,
-		Extra:      cloneExtra(extra),
+		Extra:      snapshotExtra,
 	})
+}
+
+func (c *accountStateCache) Delete(accountID int) {
+	if c == nil || accountID <= 0 {
+		return
+	}
+	c.m.Delete(accountID)
 }
 
 func (c *accountStateCache) Apply(acc *ent.Account) *ent.Account {

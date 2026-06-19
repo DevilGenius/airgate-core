@@ -9,6 +9,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 )
 
 type captureMonitorRecorder struct {
@@ -163,7 +164,7 @@ func TestSelectAccountKeepsNegativeFallbackBehindNonNegativeStickyOnly(t *testin
 	fallback := newSelectionTestAccount(20)
 	fallback.Priority = -1
 	fallback.MaxConcurrency = 10
-	s.routeCache.Set(groupID, "openai", []*ent.Account{fallback, primary}, nil)
+	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{fallback, primary}, nil)
 
 	s.currentLoad = func(_ context.Context, accountID int) int {
 		if accountID == primary.ID {
@@ -202,7 +203,7 @@ func TestSelectAccountRoutesNegativePriorityOnlyAfterNonNegativeUnavailable(t *t
 	primary.Priority = 0
 	fallback := newSelectionTestAccount(20)
 	fallback.Priority = -1
-	s.routeCache.Set(groupID, "openai", []*ent.Account{fallback, primary}, nil)
+	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{fallback, primary}, nil)
 
 	selected, err := s.SelectAccount(ctx, "openai", "gpt-4.1", 1, groupID, "")
 	if err != nil {
@@ -234,7 +235,7 @@ func TestSelectAccountSkipsShortDegradedWindow(t *testing.T) {
 	primary.Extra = map[string]interface{}{transientAvoidStepExtraKey: 2}
 	fallback := newSelectionTestAccount(20)
 	fallback.Priority = 10
-	s.routeCache.Set(groupID, "openai", []*ent.Account{primary, fallback}, nil)
+	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{primary, fallback}, nil)
 
 	selected, err := s.SelectAccount(ctx, "openai", "gpt-4.1", 1, groupID, "")
 	if err != nil {
@@ -276,7 +277,7 @@ func TestSelectAccountHardPreviousResponseAllowsWindowCostOverflow(t *testing.T)
 	s := newSelectionTestScheduler(NotSchedulable)
 	groupID := 7
 	acc := newSelectionTestAccount(10)
-	s.routeCache.Set(groupID, "openai", []*ent.Account{acc}, nil)
+	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{acc}, nil)
 
 	s.BindResponseAccount(ctx, groupID, "openai", "resp_1", acc.ID)
 	if _, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
@@ -310,7 +311,7 @@ func TestSelectAccountHardPreviousResponseAllowsDegradedProbe(t *testing.T) {
 	until := time.Now().Add(time.Minute)
 	acc.State = account.StateDegraded
 	acc.StateUntil = &until
-	s.routeCache.Set(groupID, "openai", []*ent.Account{acc}, nil)
+	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{acc}, nil)
 	s.BindResponseAccount(ctx, groupID, "openai", "resp_probe", acc.ID)
 
 	selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
@@ -363,7 +364,7 @@ func TestSelectAccountHardPreviousResponseBlocksKnownCooldown(t *testing.T) {
 			groupID := 7
 			acc := newSelectionTestAccount(10)
 			tt.configure(s, acc)
-			s.routeCache.Set(groupID, "openai", []*ent.Account{acc}, nil)
+			seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{acc}, nil)
 			s.BindResponseAccount(ctx, groupID, "openai", "resp_blocked", acc.ID)
 
 			_, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
@@ -385,7 +386,7 @@ func TestSoftPreviousResponseAffinityRequiresHighestPriority(t *testing.T) {
 	low.Priority = 10
 	high := newSelectionTestAccount(20)
 	high.Priority = 20
-	s.routeCache.Set(groupID, "openai", []*ent.Account{low, high}, nil)
+	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{low, high}, nil)
 
 	s.BindResponseAccount(ctx, groupID, "openai", "resp_low", low.ID)
 	_, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
@@ -417,7 +418,7 @@ func TestSoftPreviousResponseAffinityFastPathSkipsLowerPriorityCapacityChecks(t 
 	fallback.Priority = -1
 	high := newSelectionTestAccount(20)
 	high.Priority = 20
-	s.routeCache.Set(groupID, "openai", []*ent.Account{low, fallback, high}, nil)
+	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{low, fallback, high}, nil)
 	s.BindResponseAccount(ctx, groupID, "openai", "resp_high", high.ID)
 
 	windowCost := s.windowCost.(*stubWindowCostTracker)
@@ -443,7 +444,7 @@ func TestHardPreviousResponseAffinityFastPathSkipsUnrelatedCapacityChecks(t *tes
 	affinity := newSelectionTestAccount(10)
 	other := newSelectionTestAccount(20)
 	other.Priority = 100
-	s.routeCache.Set(groupID, "openai", []*ent.Account{other, affinity}, nil)
+	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{other, affinity}, nil)
 	s.BindResponseAccount(ctx, groupID, "openai", "resp_affinity", affinity.ID)
 
 	windowCost := s.windowCost.(*stubWindowCostTracker)
@@ -504,7 +505,7 @@ func TestHardAffinityDoesNotBypassNonWindowConstraints(t *testing.T) {
 			groupID := 7
 			acc := newSelectionTestAccount(10)
 			tt.configure(s, acc)
-			s.routeCache.Set(groupID, "openai", []*ent.Account{acc}, nil)
+			seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{acc}, nil)
 			s.BindResponseAccount(ctx, groupID, "openai", "resp_blocked", acc.ID)
 
 			_, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
@@ -593,9 +594,21 @@ func newSelectionTestScheduler(windowCostSched Schedulability) *Scheduler {
 		windowCost:       &stubWindowCostTracker{sched: windowCostSched},
 		rpm:              &stubRPMTracker{sched: Normal},
 		session:          &stubSessionTracker{sched: Normal},
-		routeCache:       newRouteCache(time.Minute),
 		responseAffinity: NewResponseAffinity(nil),
 	}
+}
+
+func seedSelectionTestGroup(t *testing.T, groupID int, platform string, accounts []*ent.Account, routing map[string][]int64) {
+	t.Helper()
+	group := &ent.Group{
+		ID:           groupID,
+		Name:         "selection test group",
+		Platform:     platform,
+		ModelRouting: routing,
+	}
+	group.Edges.Accounts = accounts
+	restore := routegraph.SetSnapshotForTesting([]*ent.Group{group})
+	t.Cleanup(restore)
 }
 
 func newSelectionTestAccount(id int) *ent.Account {
@@ -606,50 +619,5 @@ func newSelectionTestAccount(id int) *ent.Account {
 		State:          account.StateActive,
 		MaxConcurrency: DefaultAccountMaxConcurrency,
 		Extra:          map[string]interface{}{},
-	}
-}
-
-func TestNormalizeGroupLookupErrorPreservesCancellation(t *testing.T) {
-	t.Parallel()
-
-	for _, err := range []error{context.Canceled, context.DeadlineExceeded} {
-		got := normalizeGroupLookupError(err)
-		if !errors.Is(got, err) {
-			t.Fatalf("normalizeGroupLookupError(%v) = %v, want original error", err, got)
-		}
-	}
-}
-
-func TestNormalizeGroupLookupErrorWrapsGenericError(t *testing.T) {
-	t.Parallel()
-
-	orig := errors.New("db offline")
-	got := normalizeGroupLookupError(orig)
-	if errors.Is(got, ErrGroupNotFound) {
-		t.Fatalf("normalizeGroupLookupError(%v) = %v, want generic query error", orig, got)
-	}
-	if got.Error() != "查询分组失败: db offline" {
-		t.Fatalf("normalizeGroupLookupError(%v) = %q, want %q", orig, got.Error(), "查询分组失败: db offline")
-	}
-}
-
-func TestNormalizeGroupAccountsLookupErrorPreservesCancellation(t *testing.T) {
-	t.Parallel()
-
-	for _, err := range []error{context.Canceled, context.DeadlineExceeded} {
-		got := normalizeGroupAccountsLookupError(err)
-		if !errors.Is(got, err) {
-			t.Fatalf("normalizeGroupAccountsLookupError(%v) = %v, want original error", err, got)
-		}
-	}
-}
-
-func TestNormalizeGroupAccountsLookupErrorWrapsGenericError(t *testing.T) {
-	t.Parallel()
-
-	orig := errors.New("db offline")
-	got := normalizeGroupAccountsLookupError(orig)
-	if got.Error() != "查询分组账户失败: db offline" {
-		t.Fatalf("normalizeGroupAccountsLookupError(%v) = %q, want %q", orig, got.Error(), "查询分组账户失败: db offline")
 	}
 }

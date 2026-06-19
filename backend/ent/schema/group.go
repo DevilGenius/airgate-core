@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -27,6 +28,8 @@ func (Group) Fields() []ent.Field {
 		field.Enum("subscription_type").Values("standard", "subscription").Default("standard"),
 		field.JSON("quotas", map[string]interface{}{}).Optional(),
 		field.JSON("model_routing", map[string][]int64{}).Optional(),
+		field.JSON("model_policy", modelpolicy.Policy{}).Optional(),
+		field.JSON("account_type_model_policies", map[string]modelpolicy.Policy{}).Optional(),
 		field.JSON("dispatch_dsl", sdk.DispatchDSL{}).Optional(),
 		field.JSON("operation_policies", map[string]bool{}).Optional(),
 		// plugin_settings 按插件命名空间存放细粒度开关，形如

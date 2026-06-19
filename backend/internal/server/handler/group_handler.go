@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"strconv"
@@ -40,8 +41,14 @@ func (h *GroupHandler) handleError(logMessage, publicMessage string, err error) 
 	}
 }
 
-func (h *GroupHandler) invalidateRouteGraph() {
+func (h *GroupHandler) refreshRouteGraphGroup(ctx context.Context, groupID int) {
 	if h.scheduler != nil {
-		h.scheduler.InvalidateRouteCache(0)
+		h.scheduler.RefreshRouteGraphGroup(ctx, groupID)
+	}
+}
+
+func (h *GroupHandler) removeRouteGraphGroup(groupID int) {
+	if h.scheduler != nil {
+		h.scheduler.RemoveRouteGraphGroup(groupID)
 	}
 }

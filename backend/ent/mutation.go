@@ -26,6 +26,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/ent/usersubscription"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -1887,6 +1888,7 @@ type AccountMutation struct {
 	platform           *string
 	_type              *string
 	credentials        *map[string]string
+	model_policy       *modelpolicy.Policy
 	state              *account.State
 	state_until        *time.Time
 	priority           *int
@@ -2168,6 +2170,55 @@ func (m *AccountMutation) OldCredentials(ctx context.Context) (v map[string]stri
 // ResetCredentials resets all changes to the "credentials" field.
 func (m *AccountMutation) ResetCredentials() {
 	m.credentials = nil
+}
+
+// SetModelPolicy sets the "model_policy" field.
+func (m *AccountMutation) SetModelPolicy(value modelpolicy.Policy) {
+	m.model_policy = &value
+}
+
+// ModelPolicy returns the value of the "model_policy" field in the mutation.
+func (m *AccountMutation) ModelPolicy() (r modelpolicy.Policy, exists bool) {
+	v := m.model_policy
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModelPolicy returns the old "model_policy" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldModelPolicy(ctx context.Context) (v modelpolicy.Policy, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModelPolicy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModelPolicy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModelPolicy: %w", err)
+	}
+	return oldValue.ModelPolicy, nil
+}
+
+// ClearModelPolicy clears the value of the "model_policy" field.
+func (m *AccountMutation) ClearModelPolicy() {
+	m.model_policy = nil
+	m.clearedFields[account.FieldModelPolicy] = struct{}{}
+}
+
+// ModelPolicyCleared returns if the "model_policy" field was cleared in this mutation.
+func (m *AccountMutation) ModelPolicyCleared() bool {
+	_, ok := m.clearedFields[account.FieldModelPolicy]
+	return ok
+}
+
+// ResetModelPolicy resets all changes to the "model_policy" field.
+func (m *AccountMutation) ResetModelPolicy() {
+	m.model_policy = nil
+	delete(m.clearedFields, account.FieldModelPolicy)
 }
 
 // SetState sets the "state" field.
@@ -2846,7 +2897,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 16)
 	if m.name != nil {
 		fields = append(fields, account.FieldName)
 	}
@@ -2858,6 +2909,9 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m.credentials != nil {
 		fields = append(fields, account.FieldCredentials)
+	}
+	if m.model_policy != nil {
+		fields = append(fields, account.FieldModelPolicy)
 	}
 	if m.state != nil {
 		fields = append(fields, account.FieldState)
@@ -2908,6 +2962,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.GetType()
 	case account.FieldCredentials:
 		return m.Credentials()
+	case account.FieldModelPolicy:
+		return m.ModelPolicy()
 	case account.FieldState:
 		return m.State()
 	case account.FieldStateUntil:
@@ -2947,6 +3003,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldType(ctx)
 	case account.FieldCredentials:
 		return m.OldCredentials(ctx)
+	case account.FieldModelPolicy:
+		return m.OldModelPolicy(ctx)
 	case account.FieldState:
 		return m.OldState(ctx)
 	case account.FieldStateUntil:
@@ -3005,6 +3063,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCredentials(v)
+		return nil
+	case account.FieldModelPolicy:
+		v, ok := value.(modelpolicy.Policy)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModelPolicy(v)
 		return nil
 	case account.FieldState:
 		v, ok := value.(account.State)
@@ -3155,6 +3220,9 @@ func (m *AccountMutation) ClearedFields() []string {
 	if m.FieldCleared(account.FieldType) {
 		fields = append(fields, account.FieldType)
 	}
+	if m.FieldCleared(account.FieldModelPolicy) {
+		fields = append(fields, account.FieldModelPolicy)
+	}
 	if m.FieldCleared(account.FieldStateUntil) {
 		fields = append(fields, account.FieldStateUntil)
 	}
@@ -3180,6 +3248,9 @@ func (m *AccountMutation) ClearField(name string) error {
 	switch name {
 	case account.FieldType:
 		m.ClearType()
+		return nil
+	case account.FieldModelPolicy:
+		m.ClearModelPolicy()
 		return nil
 	case account.FieldStateUntil:
 		m.ClearStateUntil()
@@ -3209,6 +3280,9 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldCredentials:
 		m.ResetCredentials()
+		return nil
+	case account.FieldModelPolicy:
+		m.ResetModelPolicy()
 		return nil
 	case account.FieldState:
 		m.ResetState()
@@ -4284,47 +4358,49 @@ func (m *BalanceLogMutation) ResetEdge(name string) error {
 // GroupMutation represents an operation that mutates the Group nodes in the graph.
 type GroupMutation struct {
 	config
-	op                   Op
-	typ                  string
-	id                   *int
-	name                 *string
-	platform             *string
-	rate_multiplier      *float64
-	addrate_multiplier   *float64
-	is_exclusive         *bool
-	status_visible       *bool
-	subscription_type    *group.SubscriptionType
-	quotas               *map[string]interface{}
-	model_routing        *map[string][]int64
-	dispatch_dsl         *sdk.DispatchDSL
-	operation_policies   *map[string]bool
-	plugin_settings      *map[string]map[string]string
-	service_tier         *string
-	force_instructions   *string
-	note                 *string
-	sort_weight          *int
-	addsort_weight       *int
-	created_at           *time.Time
-	updated_at           *time.Time
-	clearedFields        map[string]struct{}
-	accounts             map[int]struct{}
-	removedaccounts      map[int]struct{}
-	clearedaccounts      bool
-	allowed_users        map[int]struct{}
-	removedallowed_users map[int]struct{}
-	clearedallowed_users bool
-	api_keys             map[int]struct{}
-	removedapi_keys      map[int]struct{}
-	clearedapi_keys      bool
-	subscriptions        map[int]struct{}
-	removedsubscriptions map[int]struct{}
-	clearedsubscriptions bool
-	usage_logs           map[int]struct{}
-	removedusage_logs    map[int]struct{}
-	clearedusage_logs    bool
-	done                 bool
-	oldValue             func(context.Context) (*Group, error)
-	predicates           []predicate.Group
+	op                          Op
+	typ                         string
+	id                          *int
+	name                        *string
+	platform                    *string
+	rate_multiplier             *float64
+	addrate_multiplier          *float64
+	is_exclusive                *bool
+	status_visible              *bool
+	subscription_type           *group.SubscriptionType
+	quotas                      *map[string]interface{}
+	model_routing               *map[string][]int64
+	model_policy                *modelpolicy.Policy
+	account_type_model_policies *map[string]modelpolicy.Policy
+	dispatch_dsl                *sdk.DispatchDSL
+	operation_policies          *map[string]bool
+	plugin_settings             *map[string]map[string]string
+	service_tier                *string
+	force_instructions          *string
+	note                        *string
+	sort_weight                 *int
+	addsort_weight              *int
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	clearedFields               map[string]struct{}
+	accounts                    map[int]struct{}
+	removedaccounts             map[int]struct{}
+	clearedaccounts             bool
+	allowed_users               map[int]struct{}
+	removedallowed_users        map[int]struct{}
+	clearedallowed_users        bool
+	api_keys                    map[int]struct{}
+	removedapi_keys             map[int]struct{}
+	clearedapi_keys             bool
+	subscriptions               map[int]struct{}
+	removedsubscriptions        map[int]struct{}
+	clearedsubscriptions        bool
+	usage_logs                  map[int]struct{}
+	removedusage_logs           map[int]struct{}
+	clearedusage_logs           bool
+	done                        bool
+	oldValue                    func(context.Context) (*Group, error)
+	predicates                  []predicate.Group
 }
 
 var _ ent.Mutation = (*GroupMutation)(nil)
@@ -4757,6 +4833,104 @@ func (m *GroupMutation) ModelRoutingCleared() bool {
 func (m *GroupMutation) ResetModelRouting() {
 	m.model_routing = nil
 	delete(m.clearedFields, group.FieldModelRouting)
+}
+
+// SetModelPolicy sets the "model_policy" field.
+func (m *GroupMutation) SetModelPolicy(value modelpolicy.Policy) {
+	m.model_policy = &value
+}
+
+// ModelPolicy returns the value of the "model_policy" field in the mutation.
+func (m *GroupMutation) ModelPolicy() (r modelpolicy.Policy, exists bool) {
+	v := m.model_policy
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModelPolicy returns the old "model_policy" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldModelPolicy(ctx context.Context) (v modelpolicy.Policy, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModelPolicy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModelPolicy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModelPolicy: %w", err)
+	}
+	return oldValue.ModelPolicy, nil
+}
+
+// ClearModelPolicy clears the value of the "model_policy" field.
+func (m *GroupMutation) ClearModelPolicy() {
+	m.model_policy = nil
+	m.clearedFields[group.FieldModelPolicy] = struct{}{}
+}
+
+// ModelPolicyCleared returns if the "model_policy" field was cleared in this mutation.
+func (m *GroupMutation) ModelPolicyCleared() bool {
+	_, ok := m.clearedFields[group.FieldModelPolicy]
+	return ok
+}
+
+// ResetModelPolicy resets all changes to the "model_policy" field.
+func (m *GroupMutation) ResetModelPolicy() {
+	m.model_policy = nil
+	delete(m.clearedFields, group.FieldModelPolicy)
+}
+
+// SetAccountTypeModelPolicies sets the "account_type_model_policies" field.
+func (m *GroupMutation) SetAccountTypeModelPolicies(value map[string]modelpolicy.Policy) {
+	m.account_type_model_policies = &value
+}
+
+// AccountTypeModelPolicies returns the value of the "account_type_model_policies" field in the mutation.
+func (m *GroupMutation) AccountTypeModelPolicies() (r map[string]modelpolicy.Policy, exists bool) {
+	v := m.account_type_model_policies
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountTypeModelPolicies returns the old "account_type_model_policies" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldAccountTypeModelPolicies(ctx context.Context) (v map[string]modelpolicy.Policy, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountTypeModelPolicies is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountTypeModelPolicies requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountTypeModelPolicies: %w", err)
+	}
+	return oldValue.AccountTypeModelPolicies, nil
+}
+
+// ClearAccountTypeModelPolicies clears the value of the "account_type_model_policies" field.
+func (m *GroupMutation) ClearAccountTypeModelPolicies() {
+	m.account_type_model_policies = nil
+	m.clearedFields[group.FieldAccountTypeModelPolicies] = struct{}{}
+}
+
+// AccountTypeModelPoliciesCleared returns if the "account_type_model_policies" field was cleared in this mutation.
+func (m *GroupMutation) AccountTypeModelPoliciesCleared() bool {
+	_, ok := m.clearedFields[group.FieldAccountTypeModelPolicies]
+	return ok
+}
+
+// ResetAccountTypeModelPolicies resets all changes to the "account_type_model_policies" field.
+func (m *GroupMutation) ResetAccountTypeModelPolicies() {
+	m.account_type_model_policies = nil
+	delete(m.clearedFields, group.FieldAccountTypeModelPolicies)
 }
 
 // SetDispatchDsl sets the "dispatch_dsl" field.
@@ -5446,7 +5620,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 17)
+	fields := make([]string, 0, 19)
 	if m.name != nil {
 		fields = append(fields, group.FieldName)
 	}
@@ -5470,6 +5644,12 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.model_routing != nil {
 		fields = append(fields, group.FieldModelRouting)
+	}
+	if m.model_policy != nil {
+		fields = append(fields, group.FieldModelPolicy)
+	}
+	if m.account_type_model_policies != nil {
+		fields = append(fields, group.FieldAccountTypeModelPolicies)
 	}
 	if m.dispatch_dsl != nil {
 		fields = append(fields, group.FieldDispatchDsl)
@@ -5522,6 +5702,10 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.Quotas()
 	case group.FieldModelRouting:
 		return m.ModelRouting()
+	case group.FieldModelPolicy:
+		return m.ModelPolicy()
+	case group.FieldAccountTypeModelPolicies:
+		return m.AccountTypeModelPolicies()
 	case group.FieldDispatchDsl:
 		return m.DispatchDsl()
 	case group.FieldOperationPolicies:
@@ -5565,6 +5749,10 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldQuotas(ctx)
 	case group.FieldModelRouting:
 		return m.OldModelRouting(ctx)
+	case group.FieldModelPolicy:
+		return m.OldModelPolicy(ctx)
+	case group.FieldAccountTypeModelPolicies:
+		return m.OldAccountTypeModelPolicies(ctx)
 	case group.FieldDispatchDsl:
 		return m.OldDispatchDsl(ctx)
 	case group.FieldOperationPolicies:
@@ -5647,6 +5835,20 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetModelRouting(v)
+		return nil
+	case group.FieldModelPolicy:
+		v, ok := value.(modelpolicy.Policy)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModelPolicy(v)
+		return nil
+	case group.FieldAccountTypeModelPolicies:
+		v, ok := value.(map[string]modelpolicy.Policy)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountTypeModelPolicies(v)
 		return nil
 	case group.FieldDispatchDsl:
 		v, ok := value.(sdk.DispatchDSL)
@@ -5774,6 +5976,12 @@ func (m *GroupMutation) ClearedFields() []string {
 	if m.FieldCleared(group.FieldModelRouting) {
 		fields = append(fields, group.FieldModelRouting)
 	}
+	if m.FieldCleared(group.FieldModelPolicy) {
+		fields = append(fields, group.FieldModelPolicy)
+	}
+	if m.FieldCleared(group.FieldAccountTypeModelPolicies) {
+		fields = append(fields, group.FieldAccountTypeModelPolicies)
+	}
 	if m.FieldCleared(group.FieldDispatchDsl) {
 		fields = append(fields, group.FieldDispatchDsl)
 	}
@@ -5802,6 +6010,12 @@ func (m *GroupMutation) ClearField(name string) error {
 		return nil
 	case group.FieldModelRouting:
 		m.ClearModelRouting()
+		return nil
+	case group.FieldModelPolicy:
+		m.ClearModelPolicy()
+		return nil
+	case group.FieldAccountTypeModelPolicies:
+		m.ClearAccountTypeModelPolicies()
 		return nil
 	case group.FieldDispatchDsl:
 		m.ClearDispatchDsl()
@@ -5843,6 +6057,12 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldModelRouting:
 		m.ResetModelRouting()
+		return nil
+	case group.FieldModelPolicy:
+		m.ResetModelPolicy()
+		return nil
+	case group.FieldAccountTypeModelPolicies:
+		m.ResetAccountTypeModelPolicies()
 		return nil
 	case group.FieldDispatchDsl:
 		m.ResetDispatchDsl()

@@ -320,6 +320,16 @@ func TypeContainsFold(v string) predicate.Account {
 	return predicate.Account(sql.FieldContainsFold(FieldType, v))
 }
 
+// ModelPolicyIsNil applies the IsNil predicate on the "model_policy" field.
+func ModelPolicyIsNil() predicate.Account {
+	return predicate.Account(sql.FieldIsNull(FieldModelPolicy))
+}
+
+// ModelPolicyNotNil applies the NotNil predicate on the "model_policy" field.
+func ModelPolicyNotNil() predicate.Account {
+	return predicate.Account(sql.FieldNotNull(FieldModelPolicy))
+}
+
 // StateEQ applies the EQ predicate on the "state" field.
 func StateEQ(v State) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldState, v))

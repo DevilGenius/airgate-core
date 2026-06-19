@@ -11,7 +11,7 @@ import (
 // 管理员 / 配额巡检的状态写入口。这些调用不经过 Apply —— 它们是"外部已知事实"
 // 的直接落库，不需要 RPM 回退、失败计数等逻辑。
 
-// ManualRecover 运维手动把账号恢复到 active：清状态、清到期、清原因，并立即刷新路由缓存。
+// ManualRecover 运维手动把账号恢复到 active：清状态、清到期、清原因，并立即刷新 RouteGraph。
 func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 	dbCtx, cancel := context.WithTimeout(ctx, dbTimeout)
 	defer cancel()
@@ -31,7 +31,8 @@ func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 	err := upd.Exec(dbCtx)
 	if err == nil {
 		s.state.resolveAccountEvents(ctx, accountID)
-		s.routeCache.InvalidateAll()
+		s.stateCache.Store(accountID, account.StateActive, nil, nil)
+		s.RefreshRouteGraphAccount(ctx, accountID)
 	}
 	return err
 }
@@ -46,7 +47,8 @@ func (s *Scheduler) ManualDisable(ctx context.Context, accountID int, reason str
 		SetErrorMsg(truncateReason(reason)).
 		Exec(dbCtx)
 	if err == nil {
-		s.routeCache.InvalidateAll()
+		s.stateCache.Store(accountID, account.StateDisabled, nil, nil)
+		s.RefreshRouteGraphAccount(ctx, accountID)
 	}
 	return err
 }

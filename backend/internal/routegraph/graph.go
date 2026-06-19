@@ -2,14 +2,21 @@ package routegraph
 
 import (
 	"context"
+	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	entaccount "github.com/DevilGenius/airgate-core/ent/account"
+	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
+	entgroup "github.com/DevilGenius/airgate-core/ent/group"
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -22,22 +29,50 @@ type Snapshot struct {
 }
 
 type GroupNode struct {
-	ID                int
-	Name              string
-	Platform          string
-	RateMultiplier    float64
-	IsExclusive       bool
-	AllowedUsers      map[int]struct{}
-	ModelRouting      map[string][]int64
-	DispatchDSL       sdk.DispatchDSL
-	DispatchResolver  *dispatchresolver.CompiledResolver
-	OperationPolicies map[string]bool
-	PluginSettings    map[string]map[string]string
-	ServiceTier       string
-	ForceInstructions string
-	SortWeight        int
-	UpdatedAt         time.Time
-	Accounts          []*ent.Account
+	ID                       int
+	Name                     string
+	Platform                 string
+	RateMultiplier           float64
+	IsExclusive              bool
+	AllowedUsers             map[int]struct{}
+	ModelRouting             map[string][]int64
+	ModelPolicy              modelpolicy.Policy
+	AccountTypeModelPolicies map[string]modelpolicy.Policy
+	DispatchDSL              sdk.DispatchDSL
+	DispatchResolver         *dispatchresolver.CompiledResolver
+	OperationPolicies        map[string]bool
+	PluginSettings           map[string]map[string]string
+	ServiceTier              string
+	ForceInstructions        string
+	SortWeight               int
+	UpdatedAt                time.Time
+	Accounts                 []*AccountNode
+
+	accountRefs         []*ent.Account
+	modelPolicy         modelpolicy.Compiled
+	accountTypePolicies []compiledAccountTypePolicy
+	hasModelConstraints bool
+}
+
+type AccountNode struct {
+	Account     *ent.Account
+	ModelPolicy modelpolicy.Policy
+
+	modelPolicy  modelpolicy.Compiled
+	categoryKeys []string
+}
+
+type compiledAccountTypePolicy struct {
+	key    string
+	policy modelpolicy.Compiled
+}
+
+var knownAccountCategoryAliases = map[string]struct{}{
+	"free":       {},
+	"plus":       {},
+	"pro":        {},
+	"team":       {},
+	"enterprise": {},
 }
 
 type UserNode struct {
@@ -54,7 +89,10 @@ type APIKeyNode struct {
 	SellRate float64
 }
 
-var snapshotValue atomic.Value // *Snapshot
+var (
+	snapshotValue atomic.Value // *Snapshot
+	updateMu      sync.Mutex
+)
 
 func Current() *Snapshot {
 	value := snapshotValue.Load()
@@ -90,75 +128,168 @@ func RefreshSync(ctx context.Context, db *ent.Client) error {
 		return err
 	}
 
-	next := &Snapshot{
-		groupsByID:       make(map[int]*GroupNode, len(groups)),
-		groupsByPlatform: make(map[string][]*GroupNode),
-		usersByID:        make(map[int]*UserNode, len(users)),
-		apiKeysByID:      make(map[int]*APIKeyNode, len(apiKeys)),
-		refreshedAt:      time.Now(),
-	}
+	next := newEmptySnapshot()
+	next.groupsByID = make(map[int]*GroupNode, len(groups))
+	next.usersByID = make(map[int]*UserNode, len(users))
+	next.apiKeysByID = make(map[int]*APIKeyNode, len(apiKeys))
 
 	for _, user := range users {
-		next.usersByID[user.ID] = &UserNode{
-			ID:             user.ID,
-			Email:          user.Email,
-			Balance:        user.Balance,
-			GroupRates:     cloneGroupRates(user.GroupRates),
-			MaxConcurrency: user.MaxConcurrency,
-		}
+		next.usersByID[user.ID] = buildUserNode(user)
 	}
-
 	for _, key := range apiKeys {
-		userID := 0
-		if key.Edges.User != nil {
-			userID = key.Edges.User.ID
-		}
-		next.apiKeysByID[key.ID] = &APIKeyNode{
-			ID:       key.ID,
-			UserID:   userID,
-			SellRate: key.SellRate,
-		}
+		next.apiKeysByID[key.ID] = buildAPIKeyNode(key)
 	}
-
 	for _, group := range groups {
-		node := &GroupNode{
-			ID:                group.ID,
-			Name:              group.Name,
-			Platform:          group.Platform,
-			RateMultiplier:    group.RateMultiplier,
-			IsExclusive:       group.IsExclusive,
-			AllowedUsers:      make(map[int]struct{}, len(group.Edges.AllowedUsers)),
-			ModelRouting:      cloneModelRouting(group.ModelRouting),
-			DispatchDSL:       cloneDispatchDSL(group.DispatchDsl),
-			OperationPolicies: cloneOperationPolicies(group.OperationPolicies),
-			PluginSettings:    clonePluginSettings(group.PluginSettings),
-			ServiceTier:       group.ServiceTier,
-			ForceInstructions: group.ForceInstructions,
-			SortWeight:        group.SortWeight,
-			UpdatedAt:         group.UpdatedAt,
-			Accounts:          append([]*ent.Account(nil), group.Edges.Accounts...),
-		}
-		node.DispatchResolver = dispatchresolver.CompileCached(groupDispatchResolverCacheKey(group.ID, group.UpdatedAt), node.DispatchDSL)
-		for _, allowed := range group.Edges.AllowedUsers {
-			node.AllowedUsers[allowed.ID] = struct{}{}
-		}
-		next.groupsByID[node.ID] = node
-		next.groupsByPlatform[node.Platform] = append(next.groupsByPlatform[node.Platform], node)
+		putGroupNode(next, buildGroupNode(group))
 	}
 
-	for platform := range next.groupsByPlatform {
-		sort.Slice(next.groupsByPlatform[platform], func(i, j int) bool {
-			a := next.groupsByPlatform[platform][i]
-			b := next.groupsByPlatform[platform][j]
-			if a.SortWeight != b.SortWeight {
-				return a.SortWeight > b.SortWeight
-			}
-			return a.ID < b.ID
-		})
-	}
-
+	updateMu.Lock()
 	snapshotValue.Store(next)
+	updateMu.Unlock()
 	return nil
+}
+
+func RefreshGroup(ctx context.Context, db *ent.Client, groupID int) error {
+	if db == nil || groupID <= 0 {
+		return nil
+	}
+	group, err := db.Group.Query().
+		Where(entgroup.IDEQ(groupID)).
+		WithAllowedUsers(func(q *ent.UserQuery) {
+			q.Select(entuser.FieldID)
+		}).
+		WithAccounts(func(q *ent.AccountQuery) {
+			q.WithProxy()
+		}).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			RemoveGroup(groupID)
+			return nil
+		}
+		return err
+	}
+	node := buildGroupNode(group)
+	updateSnapshot(func(next *Snapshot) {
+		putGroupNode(next, node)
+	})
+	return nil
+}
+
+func RemoveGroup(groupID int) {
+	if groupID <= 0 {
+		return
+	}
+	updateSnapshot(func(next *Snapshot) {
+		removeGroupNode(next, groupID)
+	})
+}
+
+func RefreshAccount(ctx context.Context, db *ent.Client, accountID int) error {
+	if db == nil || accountID <= 0 {
+		return nil
+	}
+	account, err := db.Account.Query().
+		Where(entaccount.IDEQ(accountID)).
+		WithGroups().
+		WithProxy().
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			RemoveAccount(accountID)
+			return nil
+		}
+		return err
+	}
+	node := buildAccountNode(account)
+	updateSnapshot(func(next *Snapshot) {
+		putAccountNode(next, node)
+	})
+	return nil
+}
+
+func RemoveAccount(accountID int) {
+	if accountID <= 0 {
+		return
+	}
+	updateSnapshot(func(next *Snapshot) {
+		removeAccountNode(next, accountID)
+	})
+}
+
+func RefreshUser(ctx context.Context, db *ent.Client, userID int) error {
+	if db == nil || userID <= 0 {
+		return nil
+	}
+	user, err := db.User.Query().
+		Where(entuser.IDEQ(userID)).
+		WithAllowedGroups(func(q *ent.GroupQuery) {
+			q.Select(entgroup.FieldID)
+		}).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			RemoveUser(userID)
+			return nil
+		}
+		return err
+	}
+	allowedGroupIDs := make(map[int]struct{}, len(user.Edges.AllowedGroups))
+	for _, group := range user.Edges.AllowedGroups {
+		allowedGroupIDs[group.ID] = struct{}{}
+	}
+	node := buildUserNode(user)
+	updateSnapshot(func(next *Snapshot) {
+		next.usersByID[user.ID] = node
+		replaceAllowedUser(next, user.ID, allowedGroupIDs)
+	})
+	return nil
+}
+
+func RemoveUser(userID int) {
+	if userID <= 0 {
+		return
+	}
+	updateSnapshot(func(next *Snapshot) {
+		delete(next.usersByID, userID)
+		replaceAllowedUser(next, userID, nil)
+		for keyID, key := range next.apiKeysByID {
+			if key.UserID == userID {
+				delete(next.apiKeysByID, keyID)
+			}
+		}
+	})
+}
+
+func RefreshAPIKey(ctx context.Context, db *ent.Client, keyID int) error {
+	if db == nil || keyID <= 0 {
+		return nil
+	}
+	key, err := db.APIKey.Query().
+		Where(entapikey.IDEQ(keyID)).
+		WithUser().
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			RemoveAPIKey(keyID)
+			return nil
+		}
+		return err
+	}
+	node := buildAPIKeyNode(key)
+	updateSnapshot(func(next *Snapshot) {
+		next.apiKeysByID[key.ID] = node
+	})
+	return nil
+}
+
+func RemoveAPIKey(keyID int) {
+	if keyID <= 0 {
+		return
+	}
+	updateSnapshot(func(next *Snapshot) {
+		delete(next.apiKeysByID, keyID)
+	})
 }
 
 func Group(id int) *GroupNode {
@@ -191,6 +322,534 @@ func APIKey(id int) *APIKeyNode {
 		return nil
 	}
 	return snapshot.apiKeysByID[id]
+}
+
+// SetSnapshotForTesting replaces the global snapshot for tests and returns a restore callback.
+func SetSnapshotForTesting(groups []*ent.Group) func() {
+	updateMu.Lock()
+	defer updateMu.Unlock()
+
+	previous := Current()
+	next := newEmptySnapshot()
+	for _, group := range groups {
+		putGroupNode(next, buildGroupNode(group))
+	}
+	snapshotValue.Store(next)
+	return func() {
+		updateMu.Lock()
+		defer updateMu.Unlock()
+		if previous == nil {
+			snapshotValue.Store(newEmptySnapshot())
+			return
+		}
+		snapshotValue.Store(previous)
+	}
+}
+
+func (g *GroupNode) AccountsForModel(model string) []*ent.Account {
+	if g == nil {
+		return nil
+	}
+	if !g.hasModelConstraints {
+		return g.accountRefs
+	}
+	if !g.modelPolicy.Allows(model) {
+		return nil
+	}
+
+	var allowedIDs map[int64]struct{}
+	if len(g.ModelRouting) > 0 {
+		ids := matchModelRouting(g.ModelRouting, model)
+		if len(ids) == 0 {
+			return nil
+		}
+		allowedIDs = make(map[int64]struct{}, len(ids))
+		for _, id := range ids {
+			allowedIDs[id] = struct{}{}
+		}
+	}
+
+	out := make([]*ent.Account, 0, len(g.Accounts))
+	for _, node := range g.Accounts {
+		if node == nil || node.Account == nil {
+			continue
+		}
+		if allowedIDs != nil {
+			if _, ok := allowedIDs[int64(node.Account.ID)]; !ok {
+				continue
+			}
+		}
+		if !g.accountTypeAllows(node, model) {
+			continue
+		}
+		if !node.modelPolicy.Allows(model) {
+			continue
+		}
+		out = append(out, node.Account)
+	}
+	return out
+}
+
+// HasAccountForModel reports whether at least one account can serve model after static policies.
+func (g *GroupNode) HasAccountForModel(model string) bool {
+	if g == nil {
+		return false
+	}
+	if !g.hasModelConstraints {
+		return len(g.accountRefs) > 0
+	}
+	if !g.modelPolicy.Allows(model) {
+		return false
+	}
+
+	var allowedIDs map[int64]struct{}
+	if len(g.ModelRouting) > 0 {
+		ids := matchModelRouting(g.ModelRouting, model)
+		if len(ids) == 0 {
+			return false
+		}
+		allowedIDs = make(map[int64]struct{}, len(ids))
+		for _, id := range ids {
+			allowedIDs[id] = struct{}{}
+		}
+	}
+
+	for _, node := range g.Accounts {
+		if node == nil || node.Account == nil {
+			continue
+		}
+		if allowedIDs != nil {
+			if _, ok := allowedIDs[int64(node.Account.ID)]; !ok {
+				continue
+			}
+		}
+		if !g.accountTypeAllows(node, model) {
+			continue
+		}
+		if !node.modelPolicy.Allows(model) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func (g *GroupNode) accountTypeAllows(account *AccountNode, model string) bool {
+	if len(g.accountTypePolicies) == 0 {
+		return true
+	}
+	for _, policy := range g.accountTypePolicies {
+		if !account.matchesCategory(policy.key) {
+			continue
+		}
+		if !policy.policy.Allows(model) {
+			return false
+		}
+	}
+	return true
+}
+
+func (a *AccountNode) matchesCategory(key string) bool {
+	if a == nil || key == "" {
+		return false
+	}
+	normalizedKey := normalizeCategory(key)
+	if normalizedKey == "" {
+		return false
+	}
+	for _, category := range a.categoryKeys {
+		if category == normalizedKey {
+			return true
+		}
+	}
+	return false
+}
+
+func updateSnapshot(mutator func(*Snapshot)) {
+	updateMu.Lock()
+	defer updateMu.Unlock()
+
+	next := cloneSnapshot(Current())
+	mutator(next)
+	next.refreshedAt = time.Now()
+	snapshotValue.Store(next)
+}
+
+func newEmptySnapshot() *Snapshot {
+	return &Snapshot{
+		groupsByID:       make(map[int]*GroupNode),
+		groupsByPlatform: make(map[string][]*GroupNode),
+		usersByID:        make(map[int]*UserNode),
+		apiKeysByID:      make(map[int]*APIKeyNode),
+		refreshedAt:      time.Now(),
+	}
+}
+
+func cloneSnapshot(base *Snapshot) *Snapshot {
+	if base == nil {
+		return newEmptySnapshot()
+	}
+	next := &Snapshot{
+		groupsByID:       make(map[int]*GroupNode, len(base.groupsByID)),
+		groupsByPlatform: make(map[string][]*GroupNode, len(base.groupsByPlatform)),
+		usersByID:        make(map[int]*UserNode, len(base.usersByID)),
+		apiKeysByID:      make(map[int]*APIKeyNode, len(base.apiKeysByID)),
+		refreshedAt:      base.refreshedAt,
+	}
+	for id, group := range base.groupsByID {
+		next.groupsByID[id] = group
+	}
+	for platform, groups := range base.groupsByPlatform {
+		next.groupsByPlatform[platform] = append([]*GroupNode(nil), groups...)
+	}
+	for id, user := range base.usersByID {
+		next.usersByID[id] = user
+	}
+	for id, key := range base.apiKeysByID {
+		next.apiKeysByID[id] = key
+	}
+	return next
+}
+
+func buildGroupNode(group *ent.Group) *GroupNode {
+	node := &GroupNode{
+		ID:                       group.ID,
+		Name:                     group.Name,
+		Platform:                 group.Platform,
+		RateMultiplier:           group.RateMultiplier,
+		IsExclusive:              group.IsExclusive,
+		AllowedUsers:             make(map[int]struct{}, len(group.Edges.AllowedUsers)),
+		ModelRouting:             cloneModelRouting(group.ModelRouting),
+		ModelPolicy:              modelpolicy.Clone(group.ModelPolicy),
+		AccountTypeModelPolicies: modelpolicy.CloneMap(group.AccountTypeModelPolicies),
+		DispatchDSL:              cloneDispatchDSL(group.DispatchDsl),
+		OperationPolicies:        cloneOperationPolicies(group.OperationPolicies),
+		PluginSettings:           clonePluginSettings(group.PluginSettings),
+		ServiceTier:              group.ServiceTier,
+		ForceInstructions:        group.ForceInstructions,
+		SortWeight:               group.SortWeight,
+		UpdatedAt:                group.UpdatedAt,
+	}
+	node.modelPolicy = modelpolicy.Compile(node.ModelPolicy)
+	node.accountTypePolicies = compileAccountTypePolicies(node.AccountTypeModelPolicies)
+	node.DispatchResolver = dispatchresolver.CompileCached(groupDispatchResolverCacheKey(group.ID, group.UpdatedAt), node.DispatchDSL)
+	for _, allowed := range group.Edges.AllowedUsers {
+		node.AllowedUsers[allowed.ID] = struct{}{}
+	}
+	accounts := make([]*AccountNode, 0, len(group.Edges.Accounts))
+	for _, account := range group.Edges.Accounts {
+		if account.Platform != group.Platform {
+			continue
+		}
+		accounts = append(accounts, buildAccountNode(account))
+	}
+	return withAccountNodes(node, accounts)
+}
+
+func buildAccountNode(account *ent.Account) *AccountNode {
+	policy := account.ModelPolicy
+	return &AccountNode{
+		Account:      account,
+		ModelPolicy:  modelpolicy.Clone(policy),
+		modelPolicy:  modelpolicy.Compile(policy),
+		categoryKeys: accountCategoryKeys(account),
+	}
+}
+
+func buildUserNode(user *ent.User) *UserNode {
+	return &UserNode{
+		ID:             user.ID,
+		Email:          user.Email,
+		Balance:        user.Balance,
+		GroupRates:     cloneGroupRates(user.GroupRates),
+		MaxConcurrency: user.MaxConcurrency,
+	}
+}
+
+func buildAPIKeyNode(key *ent.APIKey) *APIKeyNode {
+	userID := 0
+	if key.Edges.User != nil {
+		userID = key.Edges.User.ID
+	}
+	return &APIKeyNode{
+		ID:       key.ID,
+		UserID:   userID,
+		SellRate: key.SellRate,
+	}
+}
+
+func compileAccountTypePolicies(input map[string]modelpolicy.Policy) []compiledAccountTypePolicy {
+	if len(input) == 0 {
+		return nil
+	}
+	policies := make([]compiledAccountTypePolicy, 0, len(input))
+	for key, policy := range input {
+		compiled := modelpolicy.Compile(policy)
+		if !compiled.Restricts() {
+			continue
+		}
+		policies = append(policies, compiledAccountTypePolicy{
+			key:    key,
+			policy: compiled,
+		})
+	}
+	sort.Slice(policies, func(i, j int) bool {
+		return policies[i].key < policies[j].key
+	})
+	return policies
+}
+
+func withAccountNodes(group *GroupNode, accounts []*AccountNode) *GroupNode {
+	next := *group
+	next.Accounts = append([]*AccountNode(nil), accounts...)
+	next.accountRefs = make([]*ent.Account, 0, len(accounts))
+	next.hasModelConstraints = len(next.ModelRouting) > 0 ||
+		next.modelPolicy.Restricts() ||
+		len(next.accountTypePolicies) > 0
+	for _, account := range accounts {
+		if account == nil || account.Account == nil {
+			continue
+		}
+		next.accountRefs = append(next.accountRefs, account.Account)
+		if account.modelPolicy.Restricts() {
+			next.hasModelConstraints = true
+		}
+	}
+	return &next
+}
+
+func putGroupNode(snapshot *Snapshot, group *GroupNode) {
+	if snapshot == nil || group == nil {
+		return
+	}
+	removeGroupNode(snapshot, group.ID)
+	snapshot.groupsByID[group.ID] = group
+	snapshot.groupsByPlatform[group.Platform] = append(snapshot.groupsByPlatform[group.Platform], group)
+	sortPlatformGroups(snapshot.groupsByPlatform[group.Platform])
+}
+
+func removeGroupNode(snapshot *Snapshot, groupID int) {
+	if snapshot == nil {
+		return
+	}
+	old := snapshot.groupsByID[groupID]
+	if old == nil {
+		return
+	}
+	delete(snapshot.groupsByID, groupID)
+	groups := snapshot.groupsByPlatform[old.Platform]
+	for i, group := range groups {
+		if group.ID == groupID {
+			groups = append(groups[:i], groups[i+1:]...)
+			break
+		}
+	}
+	if len(groups) == 0 {
+		delete(snapshot.groupsByPlatform, old.Platform)
+	} else {
+		snapshot.groupsByPlatform[old.Platform] = groups
+	}
+}
+
+func putAccountNode(snapshot *Snapshot, account *AccountNode) {
+	if snapshot == nil || account == nil || account.Account == nil {
+		return
+	}
+	groupIDs := accountGroupIDSet(account.Account)
+	changedGroups := make([]*GroupNode, 0, len(groupIDs)+1)
+	for groupID, group := range snapshot.groupsByID {
+		_, linked := groupIDs[groupID]
+		if linked && group.Platform != account.Account.Platform {
+			linked = false
+		}
+		accounts, changed := replaceAccountNode(group.Accounts, account, linked)
+		if changed {
+			changedGroups = append(changedGroups, withAccountNodes(group, accounts))
+		}
+	}
+	for _, group := range changedGroups {
+		putGroupNode(snapshot, group)
+	}
+}
+
+func removeAccountNode(snapshot *Snapshot, accountID int) {
+	if snapshot == nil || accountID <= 0 {
+		return
+	}
+	var changedGroups []*GroupNode
+	for _, group := range snapshot.groupsByID {
+		accounts, changed := removeAccountFromNodes(group.Accounts, accountID)
+		if changed {
+			changedGroups = append(changedGroups, withAccountNodes(group, accounts))
+		}
+	}
+	for _, group := range changedGroups {
+		putGroupNode(snapshot, group)
+	}
+}
+
+func replaceAccountNode(accounts []*AccountNode, account *AccountNode, include bool) ([]*AccountNode, bool) {
+	for i, existing := range accounts {
+		if existing == nil || existing.Account == nil || existing.Account.ID != account.Account.ID {
+			continue
+		}
+		if !include {
+			next := append([]*AccountNode(nil), accounts[:i]...)
+			next = append(next, accounts[i+1:]...)
+			return next, true
+		}
+		next := append([]*AccountNode(nil), accounts...)
+		next[i] = account
+		return next, true
+	}
+	if !include {
+		return accounts, false
+	}
+	next := append([]*AccountNode(nil), accounts...)
+	next = append(next, account)
+	return next, true
+}
+
+func removeAccountFromNodes(accounts []*AccountNode, accountID int) ([]*AccountNode, bool) {
+	for i, existing := range accounts {
+		if existing == nil || existing.Account == nil || existing.Account.ID != accountID {
+			continue
+		}
+		next := append([]*AccountNode(nil), accounts[:i]...)
+		next = append(next, accounts[i+1:]...)
+		return next, true
+	}
+	return accounts, false
+}
+
+func accountGroupIDSet(account *ent.Account) map[int]struct{} {
+	groupIDs := make(map[int]struct{}, len(account.Edges.Groups))
+	for _, group := range account.Edges.Groups {
+		groupIDs[group.ID] = struct{}{}
+	}
+	return groupIDs
+}
+
+func replaceAllowedUser(snapshot *Snapshot, userID int, allowedGroupIDs map[int]struct{}) {
+	var changedGroups []*GroupNode
+	for _, group := range snapshot.groupsByID {
+		_, shouldAllow := allowedGroupIDs[group.ID]
+		_, allowed := group.AllowedUsers[userID]
+		if shouldAllow == allowed {
+			continue
+		}
+		next := *group
+		next.AllowedUsers = cloneAllowedUsers(group.AllowedUsers)
+		if shouldAllow {
+			next.AllowedUsers[userID] = struct{}{}
+		} else {
+			delete(next.AllowedUsers, userID)
+		}
+		changedGroups = append(changedGroups, &next)
+	}
+	for _, group := range changedGroups {
+		putGroupNode(snapshot, group)
+	}
+}
+
+func sortPlatformGroups(groups []*GroupNode) {
+	sort.Slice(groups, func(i, j int) bool {
+		a := groups[i]
+		b := groups[j]
+		if a.SortWeight != b.SortWeight {
+			return a.SortWeight > b.SortWeight
+		}
+		return a.ID < b.ID
+	})
+}
+
+func accountCategoryKeys(account *ent.Account) []string {
+	if account == nil {
+		return nil
+	}
+	seen := make(map[string]struct{}, 8)
+	var keys []string
+	addNormalized := func(value string) {
+		key := normalizeCategory(value)
+		if key == "" {
+			return
+		}
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		keys = append(keys, key)
+	}
+	addCategoryValue := func(value string) {
+		addNormalized(value)
+		for _, alias := range accountCategoryAliases(value) {
+			addNormalized(alias)
+		}
+	}
+	addNormalized(account.Type)
+	for _, key := range categoryCredentialKeys() {
+		addCategoryValue(account.Credentials[key])
+		addCategoryValue(extraString(account.Extra, key))
+	}
+	return keys
+}
+
+func categoryCredentialKeys() []string {
+	return []string{
+		"plan_type",
+		"plan",
+		"account_type",
+		"account_category",
+		"subscription_type",
+	}
+}
+
+func normalizeCategory(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	var builder strings.Builder
+	builder.Grow(len(value))
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			builder.WriteRune(r)
+		}
+	}
+	return builder.String()
+}
+
+func accountCategoryAliases(value string) []string {
+	tokens := strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
+		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
+	})
+	if len(tokens) == 0 {
+		return nil
+	}
+	aliases := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		if _, ok := knownAccountCategoryAliases[token]; ok {
+			aliases = append(aliases, token)
+		}
+	}
+	return aliases
+}
+
+func extraString(extra map[string]interface{}, key string) string {
+	if len(extra) == 0 {
+		return ""
+	}
+	value, ok := extra[key]
+	if !ok {
+		return ""
+	}
+	text, _ := value.(string)
+	return text
+}
+
+func cloneAllowedUsers(input map[int]struct{}) map[int]struct{} {
+	cloned := make(map[int]struct{}, len(input))
+	for key := range input {
+		cloned[key] = struct{}{}
+	}
+	return cloned
 }
 
 func cloneGroupRates(input map[int64]float64) map[int64]float64 {
@@ -275,6 +934,18 @@ func clonePluginSettings(input map[string]map[string]string) map[string]map[stri
 		cloned[plugin] = next
 	}
 	return cloned
+}
+
+func matchModelRouting(routing map[string][]int64, model string) []int64 {
+	if ids, ok := routing[model]; ok {
+		return ids
+	}
+	for pattern, ids := range routing {
+		if matched, _ := filepath.Match(pattern, model); matched {
+			return ids
+		}
+	}
+	return nil
 }
 
 func groupDispatchResolverCacheKey(groupID int, updatedAt time.Time) string {

@@ -16,6 +16,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/predicate"
 	"github.com/DevilGenius/airgate-core/ent/proxy"
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 )
 
 // AccountUpdate is the builder for updating Account entities.
@@ -82,6 +83,26 @@ func (au *AccountUpdate) ClearType() *AccountUpdate {
 // SetCredentials sets the "credentials" field.
 func (au *AccountUpdate) SetCredentials(m map[string]string) *AccountUpdate {
 	au.mutation.SetCredentials(m)
+	return au
+}
+
+// SetModelPolicy sets the "model_policy" field.
+func (au *AccountUpdate) SetModelPolicy(m modelpolicy.Policy) *AccountUpdate {
+	au.mutation.SetModelPolicy(m)
+	return au
+}
+
+// SetNillableModelPolicy sets the "model_policy" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableModelPolicy(m *modelpolicy.Policy) *AccountUpdate {
+	if m != nil {
+		au.SetModelPolicy(*m)
+	}
+	return au
+}
+
+// ClearModelPolicy clears the value of the "model_policy" field.
+func (au *AccountUpdate) ClearModelPolicy() *AccountUpdate {
+	au.mutation.ClearModelPolicy()
 	return au
 }
 
@@ -443,6 +464,12 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := au.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
 	}
+	if value, ok := au.mutation.ModelPolicy(); ok {
+		_spec.SetField(account.FieldModelPolicy, field.TypeJSON, value)
+	}
+	if au.mutation.ModelPolicyCleared() {
+		_spec.ClearField(account.FieldModelPolicy, field.TypeJSON)
+	}
 	if value, ok := au.mutation.State(); ok {
 		_spec.SetField(account.FieldState, field.TypeEnum, value)
 	}
@@ -681,6 +708,26 @@ func (auo *AccountUpdateOne) ClearType() *AccountUpdateOne {
 // SetCredentials sets the "credentials" field.
 func (auo *AccountUpdateOne) SetCredentials(m map[string]string) *AccountUpdateOne {
 	auo.mutation.SetCredentials(m)
+	return auo
+}
+
+// SetModelPolicy sets the "model_policy" field.
+func (auo *AccountUpdateOne) SetModelPolicy(m modelpolicy.Policy) *AccountUpdateOne {
+	auo.mutation.SetModelPolicy(m)
+	return auo
+}
+
+// SetNillableModelPolicy sets the "model_policy" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableModelPolicy(m *modelpolicy.Policy) *AccountUpdateOne {
+	if m != nil {
+		auo.SetModelPolicy(*m)
+	}
+	return auo
+}
+
+// ClearModelPolicy clears the value of the "model_policy" field.
+func (auo *AccountUpdateOne) ClearModelPolicy() *AccountUpdateOne {
+	auo.mutation.ClearModelPolicy()
 	return auo
 }
 
@@ -1071,6 +1118,12 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if value, ok := auo.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
+	}
+	if value, ok := auo.mutation.ModelPolicy(); ok {
+		_spec.SetField(account.FieldModelPolicy, field.TypeJSON, value)
+	}
+	if auo.mutation.ModelPolicyCleared() {
+		_spec.ClearField(account.FieldModelPolicy, field.TypeJSON)
 	}
 	if value, ok := auo.mutation.State(); ok {
 		_spec.SetField(account.FieldState, field.TypeEnum, value)

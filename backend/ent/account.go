@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/ent/proxy"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 )
 
 // Account is the model entity for the Account schema.
@@ -27,6 +28,8 @@ type Account struct {
 	Type string `json:"type,omitempty"`
 	// Credentials holds the value of the "credentials" field.
 	Credentials map[string]string `json:"credentials,omitempty"`
+	// ModelPolicy holds the value of the "model_policy" field.
+	ModelPolicy modelpolicy.Policy `json:"model_policy,omitempty"`
 	// State holds the value of the "state" field.
 	State account.State `json:"state,omitempty"`
 	// state 的到期时间：rate_limited / degraded 到期自动恢复 active；disabled 无到期
@@ -103,7 +106,7 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case account.FieldCredentials, account.FieldExtra:
+		case account.FieldCredentials, account.FieldModelPolicy, account.FieldExtra:
 			values[i] = new([]byte)
 		case account.FieldUpstreamIsPool:
 			values[i] = new(sql.NullBool)
@@ -162,6 +165,14 @@ func (a *Account) assignValues(columns []string, values []any) error {
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &a.Credentials); err != nil {
 					return fmt.Errorf("unmarshal field credentials: %w", err)
+				}
+			}
+		case account.FieldModelPolicy:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field model_policy", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &a.ModelPolicy); err != nil {
+					return fmt.Errorf("unmarshal field model_policy: %w", err)
 				}
 			}
 		case account.FieldState:
@@ -303,6 +314,9 @@ func (a *Account) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("credentials=")
 	builder.WriteString(fmt.Sprintf("%v", a.Credentials))
+	builder.WriteString(", ")
+	builder.WriteString("model_policy=")
+	builder.WriteString(fmt.Sprintf("%v", a.ModelPolicy))
 	builder.WriteString(", ")
 	builder.WriteString("state=")
 	builder.WriteString(fmt.Sprintf("%v", a.State))

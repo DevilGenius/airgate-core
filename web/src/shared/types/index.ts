@@ -142,12 +142,18 @@ export interface FamilyCooldownDTO {
   reason?: string;
 }
 
+export interface ModelPolicy {
+  allow?: string[];
+  deny?: string[];
+}
+
 export interface AccountResp {
   id: number;
   name: string;
   platform: string;
   type: string;
   credentials: Record<string, string>;
+  model_policy: ModelPolicy;
   state: AccountState;
   /** 当前 state 的到期时间（rate_limited / degraded 有值；active / disabled 为空）。 */
   state_until?: string;
@@ -178,6 +184,7 @@ export interface CreateAccountReq {
   platform: string;
   type?: string;
   credentials: Record<string, string>;
+  model_policy?: ModelPolicy;
   priority?: number;
   max_concurrency?: number;
   proxy_id?: number;
@@ -191,6 +198,7 @@ export interface UpdateAccountReq {
   name?: string;
   type?: string;
   credentials?: Record<string, string>;
+  model_policy?: ModelPolicy | null;
   /** 仅允许 "active" / "disabled"：运维手动恢复 / 禁用。 */
   state?: 'active' | 'disabled';
   priority?: number;
@@ -209,6 +217,7 @@ export interface BulkUpdateAccountsReq {
   priority?: number;
   max_concurrency?: number;
   rate_multiplier?: number | null;
+  model_policy?: ModelPolicy | null;
   group_ids?: number[];
   proxy_id?: number;
   extra?: Record<string, unknown>;
@@ -236,6 +245,7 @@ export interface AccountExportItem {
   platform: string;
   type?: string;
   credentials: Record<string, string>;
+  model_policy?: ModelPolicy;
   priority: number;
   max_concurrency: number;
   rate_multiplier?: number | null;
@@ -291,6 +301,8 @@ export interface GroupResp {
   subscription_type: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
+  model_policy?: ModelPolicy;
+  account_type_model_policies?: Record<string, ModelPolicy>;
   dispatch_dsl?: { rules?: unknown[] };
   operation_policies?: Record<string, boolean>;
   plugin_settings?: Record<string, Record<string, string>>;
@@ -319,6 +331,8 @@ export interface CreateGroupReq {
   subscription_type: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
+  model_policy?: ModelPolicy;
+  account_type_model_policies?: Record<string, ModelPolicy>;
   dispatch_dsl?: { rules?: unknown[] };
   operation_policies?: Record<string, boolean>;
   plugin_settings?: Record<string, Record<string, string>>;
@@ -344,6 +358,8 @@ export interface UpdateGroupReq {
   subscription_type?: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
+  model_policy?: ModelPolicy | null;
+  account_type_model_policies?: Record<string, ModelPolicy>;
   dispatch_dsl?: { rules?: unknown[] };
   operation_policies?: Record<string, boolean>;
   plugin_settings?: Record<string, Record<string, string>>;

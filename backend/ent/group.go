@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/DevilGenius/airgate-core/ent/group"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -35,6 +36,10 @@ type Group struct {
 	Quotas map[string]interface{} `json:"quotas,omitempty"`
 	// ModelRouting holds the value of the "model_routing" field.
 	ModelRouting map[string][]int64 `json:"model_routing,omitempty"`
+	// ModelPolicy holds the value of the "model_policy" field.
+	ModelPolicy modelpolicy.Policy `json:"model_policy,omitempty"`
+	// AccountTypeModelPolicies holds the value of the "account_type_model_policies" field.
+	AccountTypeModelPolicies map[string]modelpolicy.Policy `json:"account_type_model_policies,omitempty"`
 	// DispatchDsl holds the value of the "dispatch_dsl" field.
 	DispatchDsl sdk.DispatchDSL `json:"dispatch_dsl,omitempty"`
 	// OperationPolicies holds the value of the "operation_policies" field.
@@ -126,7 +131,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case group.FieldQuotas, group.FieldModelRouting, group.FieldDispatchDsl, group.FieldOperationPolicies, group.FieldPluginSettings:
+		case group.FieldQuotas, group.FieldModelRouting, group.FieldModelPolicy, group.FieldAccountTypeModelPolicies, group.FieldDispatchDsl, group.FieldOperationPolicies, group.FieldPluginSettings:
 			values[i] = new([]byte)
 		case group.FieldIsExclusive, group.FieldStatusVisible:
 			values[i] = new(sql.NullBool)
@@ -209,6 +214,22 @@ func (gr *Group) assignValues(columns []string, values []any) error {
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &gr.ModelRouting); err != nil {
 					return fmt.Errorf("unmarshal field model_routing: %w", err)
+				}
+			}
+		case group.FieldModelPolicy:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field model_policy", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &gr.ModelPolicy); err != nil {
+					return fmt.Errorf("unmarshal field model_policy: %w", err)
+				}
+			}
+		case group.FieldAccountTypeModelPolicies:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field account_type_model_policies", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &gr.AccountTypeModelPolicies); err != nil {
+					return fmt.Errorf("unmarshal field account_type_model_policies: %w", err)
 				}
 			}
 		case group.FieldDispatchDsl:
@@ -355,6 +376,12 @@ func (gr *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("model_routing=")
 	builder.WriteString(fmt.Sprintf("%v", gr.ModelRouting))
+	builder.WriteString(", ")
+	builder.WriteString("model_policy=")
+	builder.WriteString(fmt.Sprintf("%v", gr.ModelPolicy))
+	builder.WriteString(", ")
+	builder.WriteString("account_type_model_policies=")
+	builder.WriteString(fmt.Sprintf("%v", gr.AccountTypeModelPolicies))
 	builder.WriteString(", ")
 	builder.WriteString("dispatch_dsl=")
 	builder.WriteString(fmt.Sprintf("%v", gr.DispatchDsl))

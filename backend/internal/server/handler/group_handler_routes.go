@@ -132,6 +132,8 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		SubscriptionType:         req.SubscriptionType,
 		Quotas:                   req.Quotas,
 		ModelRouting:             req.ModelRouting,
+		ModelPolicy:              req.ModelPolicy,
+		AccountTypeModelPolicies: req.AccountTypeModelPolicies,
 		DispatchDSL:              req.DispatchDSL,
 		OperationPolicies:        req.OperationPolicies,
 		PluginSettings:           req.PluginSettings,
@@ -146,7 +148,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.refreshRouteGraphGroup(c.Request.Context(), item.ID)
 
 	response.Success(c, toGroupRespFromDomain(item))
 }
@@ -166,27 +168,29 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 	}
 
 	item, err := h.service.Update(c.Request.Context(), id, appgroup.UpdateInput{
-		Name:              req.Name,
-		RateMultiplier:    req.RateMultiplier.PtrOrDefault(1),
-		IsExclusive:       req.IsExclusive,
-		StatusVisible:     req.StatusVisible,
-		SubscriptionType:  req.SubscriptionType,
-		Quotas:            req.Quotas,
-		ModelRouting:      req.ModelRouting,
-		DispatchDSL:       req.DispatchDSL,
-		OperationPolicies: req.OperationPolicies,
-		PluginSettings:    req.PluginSettings,
-		ServiceTier:       req.ServiceTier,
-		ForceInstructions: req.ForceInstructions,
-		Note:              req.Note,
-		SortWeight:        req.SortWeight,
+		Name:                     req.Name,
+		RateMultiplier:           req.RateMultiplier.PtrOrDefault(1),
+		IsExclusive:              req.IsExclusive,
+		StatusVisible:            req.StatusVisible,
+		SubscriptionType:         req.SubscriptionType,
+		Quotas:                   req.Quotas,
+		ModelRouting:             req.ModelRouting,
+		ModelPolicy:              req.ModelPolicy,
+		AccountTypeModelPolicies: req.AccountTypeModelPolicies,
+		DispatchDSL:              req.DispatchDSL,
+		OperationPolicies:        req.OperationPolicies,
+		PluginSettings:           req.PluginSettings,
+		ServiceTier:              req.ServiceTier,
+		ForceInstructions:        req.ForceInstructions,
+		Note:                     req.Note,
+		SortWeight:               req.SortWeight,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("更新分组失败", "更新失败", err)
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.refreshRouteGraphGroup(c.Request.Context(), item.ID)
 
 	response.Success(c, toGroupRespFromDomain(item))
 }
@@ -204,7 +208,7 @@ func (h *GroupHandler) DeleteGroup(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.removeRouteGraphGroup(id)
 
 	response.Success(c, nil)
 }

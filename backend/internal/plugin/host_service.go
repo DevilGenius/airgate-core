@@ -1424,6 +1424,15 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 			req.Path,
 			clientModel,
 		)
+		plans = routing.FilterDispatchPlansByAccounts(g, plans)
+		if len(plans) == 0 {
+			slog.Warn("host_forward_group_model_policy_unmatched",
+				sdk.LogFieldGroupID, req.GroupID,
+				sdk.LogFieldModel, req.Model,
+				sdk.LogFieldPath, req.Path,
+			)
+			return nil, "", hostForwardGenericError()
+		}
 		entGroup := &ent.Group{ID: g.ID, Platform: g.Platform, OperationPolicies: g.OperationPolicies}
 		if !routing.GroupMatchesRequirements(entGroup, routing.RequirementsFromDispatchPlans(plans)).OK {
 			slog.Warn("host_forward_group_requirement_unmet",

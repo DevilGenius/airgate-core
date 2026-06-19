@@ -14,6 +14,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/group"
 	"github.com/DevilGenius/airgate-core/ent/proxy"
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 )
 
 // AccountCreate is the builder for creating a Account entity.
@@ -52,6 +53,20 @@ func (ac *AccountCreate) SetNillableType(s *string) *AccountCreate {
 // SetCredentials sets the "credentials" field.
 func (ac *AccountCreate) SetCredentials(m map[string]string) *AccountCreate {
 	ac.mutation.SetCredentials(m)
+	return ac
+}
+
+// SetModelPolicy sets the "model_policy" field.
+func (ac *AccountCreate) SetModelPolicy(m modelpolicy.Policy) *AccountCreate {
+	ac.mutation.SetModelPolicy(m)
+	return ac
+}
+
+// SetNillableModelPolicy sets the "model_policy" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableModelPolicy(m *modelpolicy.Policy) *AccountCreate {
+	if m != nil {
+		ac.SetModelPolicy(*m)
+	}
 	return ac
 }
 
@@ -432,6 +447,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
 		_node.Credentials = value
+	}
+	if value, ok := ac.mutation.ModelPolicy(); ok {
+		_spec.SetField(account.FieldModelPolicy, field.TypeJSON, value)
+		_node.ModelPolicy = value
 	}
 	if value, ok := ac.mutation.State(); ok {
 		_spec.SetField(account.FieldState, field.TypeEnum, value)

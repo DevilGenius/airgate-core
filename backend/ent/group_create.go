@@ -16,6 +16,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/ent/usersubscription"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -103,6 +104,26 @@ func (gc *GroupCreate) SetQuotas(m map[string]interface{}) *GroupCreate {
 // SetModelRouting sets the "model_routing" field.
 func (gc *GroupCreate) SetModelRouting(m map[string][]int64) *GroupCreate {
 	gc.mutation.SetModelRouting(m)
+	return gc
+}
+
+// SetModelPolicy sets the "model_policy" field.
+func (gc *GroupCreate) SetModelPolicy(m modelpolicy.Policy) *GroupCreate {
+	gc.mutation.SetModelPolicy(m)
+	return gc
+}
+
+// SetNillableModelPolicy sets the "model_policy" field if the given value is not nil.
+func (gc *GroupCreate) SetNillableModelPolicy(m *modelpolicy.Policy) *GroupCreate {
+	if m != nil {
+		gc.SetModelPolicy(*m)
+	}
+	return gc
+}
+
+// SetAccountTypeModelPolicies sets the "account_type_model_policies" field.
+func (gc *GroupCreate) SetAccountTypeModelPolicies(m map[string]modelpolicy.Policy) *GroupCreate {
+	gc.mutation.SetAccountTypeModelPolicies(m)
 	return gc
 }
 
@@ -483,6 +504,14 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := gc.mutation.ModelRouting(); ok {
 		_spec.SetField(group.FieldModelRouting, field.TypeJSON, value)
 		_node.ModelRouting = value
+	}
+	if value, ok := gc.mutation.ModelPolicy(); ok {
+		_spec.SetField(group.FieldModelPolicy, field.TypeJSON, value)
+		_node.ModelPolicy = value
+	}
+	if value, ok := gc.mutation.AccountTypeModelPolicies(); ok {
+		_spec.SetField(group.FieldAccountTypeModelPolicies, field.TypeJSON, value)
+		_node.AccountTypeModelPolicies = value
 	}
 	if value, ok := gc.mutation.DispatchDsl(); ok {
 		_spec.SetField(group.FieldDispatchDsl, field.TypeJSON, value)

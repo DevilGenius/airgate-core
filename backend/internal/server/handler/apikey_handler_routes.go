@@ -102,7 +102,7 @@ func (h *APIKeyHandler) CreateKey(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.refreshRouteGraphAPIKey(c.Request.Context(), item.ID)
 
 	response.Success(c, toAPIKeyResp(item))
 }
@@ -148,7 +148,7 @@ func (h *APIKeyHandler) UpdateKey(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.refreshRouteGraphAPIKey(c.Request.Context(), item.ID)
 
 	response.Success(c, toAPIKeyResp(item))
 }
@@ -172,7 +172,7 @@ func (h *APIKeyHandler) DeleteKey(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.removeRouteGraphAPIKey(id)
 
 	response.Success(c, nil)
 }
@@ -212,7 +212,7 @@ func (h *APIKeyHandler) AdminUpdateKey(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.refreshRouteGraphAPIKey(c.Request.Context(), item.ID)
 
 	response.Success(c, toAPIKeyResp(item))
 }
@@ -231,7 +231,7 @@ func (h *APIKeyHandler) AdminResetKeyUsage(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.invalidateRouteGraph()
+	h.refreshRouteGraphAPIKey(c.Request.Context(), item.ID)
 
 	response.Success(c, toAPIKeyResp(item))
 }

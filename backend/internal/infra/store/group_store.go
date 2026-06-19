@@ -12,6 +12,7 @@ import (
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	entusersubscription "github.com/DevilGenius/airgate-core/ent/usersubscription"
 	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -112,6 +113,10 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 		if input.ModelRouting != nil {
 			builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
 		}
+		builder = builder.SetModelPolicy(appgroupCloneModelPolicy(input.ModelPolicy))
+		if input.AccountTypeModelPolicies != nil {
+			builder = builder.SetAccountTypeModelPolicies(appgroupCloneAccountTypeModelPolicies(input.AccountTypeModelPolicies))
+		}
 		if len(input.DispatchDSL.Rules) > 0 {
 			builder = builder.SetDispatchDsl(appgroupCloneDispatchDSL(input.DispatchDSL))
 		}
@@ -191,6 +196,10 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 	if input.ModelRouting != nil {
 		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
 	}
+	builder = builder.SetModelPolicy(appgroupCloneModelPolicy(input.ModelPolicy))
+	if input.AccountTypeModelPolicies != nil {
+		builder = builder.SetAccountTypeModelPolicies(appgroupCloneAccountTypeModelPolicies(input.AccountTypeModelPolicies))
+	}
 	if len(input.DispatchDSL.Rules) > 0 {
 		builder = builder.SetDispatchDsl(appgroupCloneDispatchDSL(input.DispatchDSL))
 	}
@@ -240,6 +249,12 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.ModelRouting != nil {
 		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
+	}
+	if input.ModelPolicy != nil {
+		builder = builder.SetModelPolicy(appgroupCloneModelPolicy(*input.ModelPolicy))
+	}
+	if input.AccountTypeModelPolicies != nil {
+		builder = builder.SetAccountTypeModelPolicies(appgroupCloneAccountTypeModelPolicies(input.AccountTypeModelPolicies))
 	}
 	if input.DispatchDSL != nil {
 		builder = builder.SetDispatchDsl(appgroupCloneDispatchDSL(*input.DispatchDSL))
@@ -449,24 +464,26 @@ func mapGroups(items []*ent.Group) []appgroup.Group {
 
 func mapGroup(item *ent.Group) appgroup.Group {
 	return appgroup.Group{
-		ID:                item.ID,
-		Name:              item.Name,
-		Platform:          item.Platform,
-		RateMultiplier:    item.RateMultiplier,
-		IsExclusive:       item.IsExclusive,
-		StatusVisible:     item.StatusVisible,
-		SubscriptionType:  string(item.SubscriptionType),
-		Quotas:            appgroupCloneQuotas(item.Quotas),
-		ModelRouting:      appgroupCloneModelRouting(item.ModelRouting),
-		DispatchDSL:       appgroupCloneDispatchDSL(item.DispatchDsl),
-		OperationPolicies: appgroupCloneOperationPolicies(item.OperationPolicies),
-		PluginSettings:    appgroupClonePluginSettings(item.PluginSettings),
-		ServiceTier:       item.ServiceTier,
-		ForceInstructions: item.ForceInstructions,
-		Note:              item.Note,
-		SortWeight:        item.SortWeight,
-		CreatedAt:         item.CreatedAt,
-		UpdatedAt:         item.UpdatedAt,
+		ID:                       item.ID,
+		Name:                     item.Name,
+		Platform:                 item.Platform,
+		RateMultiplier:           item.RateMultiplier,
+		IsExclusive:              item.IsExclusive,
+		StatusVisible:            item.StatusVisible,
+		SubscriptionType:         string(item.SubscriptionType),
+		Quotas:                   appgroupCloneQuotas(item.Quotas),
+		ModelRouting:             appgroupCloneModelRouting(item.ModelRouting),
+		ModelPolicy:              appgroupCloneModelPolicy(item.ModelPolicy),
+		AccountTypeModelPolicies: appgroupCloneAccountTypeModelPolicies(item.AccountTypeModelPolicies),
+		DispatchDSL:              appgroupCloneDispatchDSL(item.DispatchDsl),
+		OperationPolicies:        appgroupCloneOperationPolicies(item.OperationPolicies),
+		PluginSettings:           appgroupClonePluginSettings(item.PluginSettings),
+		ServiceTier:              item.ServiceTier,
+		ForceInstructions:        item.ForceInstructions,
+		Note:                     item.Note,
+		SortWeight:               item.SortWeight,
+		CreatedAt:                item.CreatedAt,
+		UpdatedAt:                item.UpdatedAt,
 	}
 }
 
@@ -490,6 +507,14 @@ func appgroupCloneModelRouting(input map[string][]int64) map[string][]int64 {
 		cloned[key] = append([]int64(nil), value...)
 	}
 	return cloned
+}
+
+func appgroupCloneModelPolicy(input modelpolicy.Policy) modelpolicy.Policy {
+	return modelpolicy.Clone(input)
+}
+
+func appgroupCloneAccountTypeModelPolicies(input map[string]modelpolicy.Policy) map[string]modelpolicy.Policy {
+	return modelpolicy.CloneMap(input)
 }
 
 func appgroupCloneDispatchDSL(input sdk.DispatchDSL) sdk.DispatchDSL {
