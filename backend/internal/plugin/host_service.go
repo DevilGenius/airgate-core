@@ -358,15 +358,17 @@ type hostProbeForwardRequest struct {
 }
 
 type hostForwardRequest struct {
-	UserID   int64                  `json:"user_id"`
-	GroupID  int64                  `json:"group_id"`
-	APIKeyID int64                  `json:"api_key_id,omitempty"`
-	Model    string                 `json:"model"`
-	Method   string                 `json:"method"`
-	Path     string                 `json:"path"`
-	Headers  map[string]interface{} `json:"headers"`
-	Body     interface{}            `json:"body"`
-	Stream   bool                   `json:"stream"`
+	UserID         int64                  `json:"user_id"`
+	GroupID        int64                  `json:"group_id"`
+	APIKeyID       int64                  `json:"api_key_id,omitempty"`
+	TaskID         int64                  `json:"task_id,omitempty"`
+	UpstreamTaskID string                 `json:"upstream_task_id,omitempty"`
+	Model          string                 `json:"model"`
+	Method         string                 `json:"method"`
+	Path           string                 `json:"path"`
+	Headers        map[string]interface{} `json:"headers"`
+	Body           interface{}            `json:"body"`
+	Stream         bool                   `json:"stream"`
 }
 
 type hostListModelsRequest struct {
@@ -1584,9 +1586,16 @@ func (h *HostService) pickHostAccountFrom(ctx context.Context, chain *dispatchCh
 
 func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.Header {
 	headers := protoHeadersToHTTPHost(req.Headers)
+	stripClientControlledAirgateHeaders(headers)
 	headers.Set("X-Forwarded-Path", req.Path)
 	headers.Set("X-Forwarded-Method", hostForwardMethod(req))
 	headers.Set("X-Airgate-Internal", "host-forward")
+	if req.TaskID > 0 {
+		headers.Set("X-Airgate-Task-ID", strconv.FormatInt(req.TaskID, 10))
+	}
+	if upstreamTaskID := strings.TrimSpace(req.UpstreamTaskID); upstreamTaskID != "" {
+		headers.Set("X-Airgate-Upstream-Task-ID", upstreamTaskID)
+	}
 	if req.UserID > 0 {
 		headers.Set("X-Airgate-User-ID", strconv.FormatInt(req.UserID, 10))
 	}

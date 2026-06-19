@@ -927,6 +927,103 @@ func TestBuildPluginRequestRemovesPreviousResponseHeadersAfterRecovery(t *testin
 	}
 }
 
+func TestBuildHeadersStripsClientControlledAirgateHeaders(t *testing.T) {
+	t.Parallel()
+
+	source := http.Header{}
+	source.Set("Content-Type", "application/json")
+	source.Set("X-Airgate-Operation-Responses-Image-Generation", "true")
+	source.Set("X-Airgate-Service-Tier", "priority")
+	source.Set("X-Airgate-Force-Instructions", "client-forged")
+	source.Set("X-Airgate-Plugin-Openai-Image-Enabled", "true")
+	source.Set("X-Airgate-Internal", "client")
+	source.Set("X-Airgate-User-ID", "999")
+	source.Set("X-Airgate-API-Key-ID", "888")
+	source.Set("X-Airgate-Group-ID", "777")
+	source.Set("X-Airgate-Task-Execution", "true")
+	source.Set("X-Airgate-Task-ID", "123")
+	source.Set("X-Airgate-Upstream-Task-ID", "upstream-123")
+	source.Set("X-Airgate-Future-Control", "future")
+	source["x-airgate-operation-responses-image-generation"] = []string{"true"}
+	source["x-airgate-plugin-openai-image-enabled"] = []string{"true"}
+	source["x-airgate-service-tier"] = []string{"priority"}
+
+	headers := buildHeaders(source, &auth.APIKeyInfo{
+		UserID:  1,
+		KeyID:   2,
+		GroupID: 3,
+	})
+
+	if got := headers.Get("X-Airgate-User-ID"); got != "1" {
+		t.Fatalf("X-Airgate-User-ID = %q, want 1", got)
+	}
+	if got := headers.Get("X-Airgate-API-Key-ID"); got != "2" {
+		t.Fatalf("X-Airgate-API-Key-ID = %q, want 2", got)
+	}
+	if got := headers.Get("X-Airgate-Group-ID"); got != "3" {
+		t.Fatalf("X-Airgate-Group-ID = %q, want 3", got)
+	}
+	for _, header := range []string{
+		"X-Airgate-Operation-Responses-Image-Generation",
+		"X-Airgate-Service-Tier",
+		"X-Airgate-Force-Instructions",
+		"X-Airgate-Plugin-Openai-Image-Enabled",
+		"X-Airgate-Internal",
+		"X-Airgate-Task-ID",
+		"X-Airgate-Upstream-Task-ID",
+		"X-Airgate-Future-Control",
+	} {
+		if got := headers.Get(header); got != "" {
+			t.Fatalf("%s = %q, want empty", header, got)
+		}
+	}
+	if got := headers.Get("X-Airgate-Task-Execution"); got != "true" {
+		t.Fatalf("X-Airgate-Task-Execution = %q, want true", got)
+	}
+	if got := headers.Get("Content-Type"); got != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", got)
+	}
+	for _, rawKey := range []string{
+		"x-airgate-operation-responses-image-generation",
+		"x-airgate-plugin-openai-image-enabled",
+		"x-airgate-service-tier",
+	} {
+		if _, ok := headers[rawKey]; ok {
+			t.Fatalf("%s should be stripped", rawKey)
+		}
+	}
+}
+
+func TestBuildHeadersWritesTrustedAirgateControlsAfterStripping(t *testing.T) {
+	t.Parallel()
+
+	source := http.Header{}
+	source.Set("X-Airgate-Operation-Responses-Image-Generation", "false")
+	source.Set("X-Airgate-Service-Tier", "client-tier")
+	source.Set("X-Airgate-Force-Instructions", "client-instructions")
+	source.Set("X-Airgate-Plugin-Openai-Image-Enabled", "false")
+
+	headers := buildHeaders(source, &auth.APIKeyInfo{
+		GroupServiceTier:       "priority",
+		GroupForceInstructions: "server-instructions",
+		GroupOperationPolicies: map[string]bool{"responses.image_generation": true},
+		GroupPluginSettings:    map[string]map[string]string{"openai": {"image_enabled": "true"}},
+	})
+
+	if got := headers.Get("X-Airgate-Operation-Responses-Image-Generation"); got != "true" {
+		t.Fatalf("operation header = %q, want true", got)
+	}
+	if got := headers.Get("X-Airgate-Service-Tier"); got != "priority" {
+		t.Fatalf("X-Airgate-Service-Tier = %q, want priority", got)
+	}
+	if got := headers.Get("X-Airgate-Force-Instructions"); got != "server-instructions" {
+		t.Fatalf("X-Airgate-Force-Instructions = %q, want server-instructions", got)
+	}
+	if got := headers.Get("X-Airgate-Plugin-Openai-Image-Enabled"); got != "true" {
+		t.Fatalf("plugin setting header = %q, want true", got)
+	}
+}
+
 func TestRoutesForAPIKeyUsesBoundGroupOnly(t *testing.T) {
 	t.Parallel()
 

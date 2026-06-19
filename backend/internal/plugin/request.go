@@ -678,9 +678,10 @@ func removePreviousResponseIDHeaders(headers http.Header) {
 	headers.Del("previous_response_id")
 }
 
-// buildHeaders 克隆请求头并附加 X-Airgate-* 系列（分组级 service_tier / 强制 instructions / 插件开关）。
+// buildHeaders 克隆请求头并附加 Core 可信签发的 X-Airgate-* 控制头。
 func buildHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Header {
 	headers := source.Clone()
+	stripClientControlledAirgateHeaders(headers)
 	if keyInfo.UserID > 0 {
 		headers.Set("X-Airgate-User-ID", strconv.Itoa(keyInfo.UserID))
 	}
@@ -710,6 +711,49 @@ func buildHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Header {
 		}
 	}
 	return headers
+}
+
+func stripClientControlledAirgateHeaders(headers http.Header) {
+	for key := range headers {
+		if isClientControlledAirgateHeader(key) {
+			delete(headers, key)
+		}
+	}
+}
+
+func isClientControlledAirgateHeader(name string) bool {
+	const prefix = "x-airgate-"
+	if !asciiHasPrefixFold(name, prefix) {
+		return false
+	}
+	suffix := name[len(prefix):]
+	return !asciiEqualFoldLower(suffix, "task-execution")
+}
+
+func asciiHasPrefixFold(s, prefix string) bool {
+	if len(s) < len(prefix) {
+		return false
+	}
+	return asciiEqualFoldLower(s[:len(prefix)], prefix)
+}
+
+func asciiEqualFoldLower(s, lower string) bool {
+	if len(s) != len(lower) {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if asciiLower(s[i]) != lower[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func asciiLower(c byte) byte {
+	if c >= 'A' && c <= 'Z' {
+		return c + ('a' - 'A')
+	}
+	return c
 }
 
 // canonicalHeaderToken 把 snake_case / kebab-case 规范化为 HTTP header token 风格（首字母大写、下划线变连字符）。

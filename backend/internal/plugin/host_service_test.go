@@ -58,6 +58,124 @@ func TestHostForwardReasoningEffort(t *testing.T) {
 	}
 }
 
+func TestHostForwardHeadersStripsClientControlledAirgateHeaders(t *testing.T) {
+	t.Parallel()
+
+	req := hostForwardRequest{
+		UserID: 42,
+		Method: "POST",
+		Path:   "/v1/responses",
+		Headers: map[string]interface{}{
+			"Content-Type": "application/json",
+			"X-Airgate-Operation-Responses-Image-Generation": "true",
+			"X-Airgate-Service-Tier":                         "priority",
+			"X-Airgate-Force-Instructions":                   "client-forged",
+			"X-Airgate-Plugin-Openai-Image-Enabled":          "true",
+			"X-Airgate-Internal":                             "client",
+			"X-Airgate-User-ID":                              "999",
+			"X-Airgate-Group-ID":                             "888",
+			"X-Airgate-Task-Execution":                       "true",
+			"X-Airgate-Task-ID":                              "123",
+			"X-Airgate-Upstream-Task-ID":                     "upstream-123",
+			"X-Airgate-Future-Control":                       "future",
+		},
+	}
+
+	headers := hostForwardHeaders(req, routing.Candidate{GroupID: 7})
+
+	if got := headers.Get("X-Airgate-User-ID"); got != "42" {
+		t.Fatalf("X-Airgate-User-ID = %q, want 42", got)
+	}
+	if got := headers.Get("X-Airgate-Group-ID"); got != "7" {
+		t.Fatalf("X-Airgate-Group-ID = %q, want 7", got)
+	}
+	if got := headers.Get("X-Airgate-Internal"); got != "host-forward" {
+		t.Fatalf("X-Airgate-Internal = %q, want host-forward", got)
+	}
+	for _, header := range []string{
+		"X-Airgate-Operation-Responses-Image-Generation",
+		"X-Airgate-Service-Tier",
+		"X-Airgate-Force-Instructions",
+		"X-Airgate-Plugin-Openai-Image-Enabled",
+		"X-Airgate-Task-ID",
+		"X-Airgate-Upstream-Task-ID",
+		"X-Airgate-Future-Control",
+	} {
+		if got := headers.Get(header); got != "" {
+			t.Fatalf("%s = %q, want empty", header, got)
+		}
+	}
+	if got := headers.Get("X-Airgate-Task-Execution"); got != "true" {
+		t.Fatalf("X-Airgate-Task-Execution = %q, want true", got)
+	}
+	if got := headers.Get("X-Forwarded-Path"); got != "/v1/responses" {
+		t.Fatalf("X-Forwarded-Path = %q, want /v1/responses", got)
+	}
+	if got := headers.Get("X-Forwarded-Method"); got != "POST" {
+		t.Fatalf("X-Forwarded-Method = %q, want POST", got)
+	}
+}
+
+func TestHostForwardHeadersWritesStructuredTaskHeadersAfterStripping(t *testing.T) {
+	t.Parallel()
+
+	req := hostForwardRequest{
+		TaskID:         123,
+		UpstreamTaskID: " upstream-123 ",
+		Headers: map[string]interface{}{
+			"X-Airgate-Task-ID":          "forged",
+			"X-Airgate-Upstream-Task-ID": "forged-upstream",
+			"X-Airgate-Task-Execution":   "true",
+		},
+	}
+
+	headers := hostForwardHeaders(req, routing.Candidate{})
+
+	if got := headers.Get("X-Airgate-Task-ID"); got != "123" {
+		t.Fatalf("X-Airgate-Task-ID = %q, want 123", got)
+	}
+	if got := headers.Get("X-Airgate-Upstream-Task-ID"); got != "upstream-123" {
+		t.Fatalf("X-Airgate-Upstream-Task-ID = %q, want upstream-123", got)
+	}
+	if got := headers.Get("X-Airgate-Task-Execution"); got != "true" {
+		t.Fatalf("X-Airgate-Task-Execution = %q, want true", got)
+	}
+}
+
+func TestHostForwardHeadersWritesTrustedAirgateControlsAfterStripping(t *testing.T) {
+	t.Parallel()
+
+	req := hostForwardRequest{
+		Headers: map[string]interface{}{
+			"X-Airgate-Operation-Responses-Image-Generation": "false",
+			"X-Airgate-Service-Tier":                         "client-tier",
+			"X-Airgate-Force-Instructions":                   "client-instructions",
+			"X-Airgate-Plugin-Openai-Image-Enabled":          "false",
+		},
+	}
+	route := routing.Candidate{
+		GroupServiceTier:       "priority",
+		GroupForceInstructions: "server-instructions",
+		GroupOperationPolicies: map[string]bool{"responses.image_generation": true},
+		GroupPluginSettings:    map[string]map[string]string{"openai": {"image_enabled": "true"}},
+	}
+
+	headers := hostForwardHeaders(req, route)
+
+	if got := headers.Get("X-Airgate-Operation-Responses-Image-Generation"); got != "true" {
+		t.Fatalf("operation header = %q, want true", got)
+	}
+	if got := headers.Get("X-Airgate-Service-Tier"); got != "priority" {
+		t.Fatalf("X-Airgate-Service-Tier = %q, want priority", got)
+	}
+	if got := headers.Get("X-Airgate-Force-Instructions"); got != "server-instructions" {
+		t.Fatalf("X-Airgate-Force-Instructions = %q, want server-instructions", got)
+	}
+	if got := headers.Get("X-Airgate-Plugin-Openai-Image-Enabled"); got != "true" {
+		t.Fatalf("plugin setting header = %q, want true", got)
+	}
+}
+
 func TestDispatchChainAdvanceOnOutcome(t *testing.T) {
 	t.Parallel()
 
