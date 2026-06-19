@@ -107,15 +107,16 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 // （例如主循环可以根据 softExclude 是否非空决定排队等待还是直接写 503）。
 func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs ...int) error {
 	var lastErr error
-	for _, plan := range state.dispatchPlans {
-		model := strings.TrimSpace(plan.SchedulingModel)
-		if model == "" {
+	plans := state.dispatch.Plans()
+	for idx := state.dispatch.StartIndex(); idx < len(plans); idx++ {
+		candidate := state.dispatch.Candidate(idx)
+		if candidate.SchedulingModel == "" {
 			continue
 		}
 		account, err := f.scheduler.SelectAccountWithOptions(
 			c.Request.Context(),
 			state.requestedPlatform,
-			model,
+			candidate.SchedulingModel,
 			state.keyInfo.UserID,
 			state.keyInfo.GroupID,
 			state.sessionID,
@@ -127,8 +128,9 @@ func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs 
 			excludeIDs...,
 		)
 		if err == nil {
+			candidate = state.dispatch.Select(idx)
 			state.account = account
-			state.dispatchPlan = plan
+			state.dispatchPlan = candidate.Plan
 			return nil
 		}
 		lastErr = err

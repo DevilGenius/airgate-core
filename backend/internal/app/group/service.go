@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -114,10 +115,16 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Group, error) 
 	input.RateMultiplier = &rateMultiplier
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
-	input.ModelPolicy = cloneModelPolicy(input.ModelPolicy)
-	input.AccountTypeModelPolicies = cloneAccountTypeModelPolicies(input.AccountTypeModelPolicies)
+	input.ModelPolicy = modelpolicy.Normalize(input.ModelPolicy)
+	if err := validateModelPolicy(input.ModelPolicy); err != nil {
+		return Group{}, err
+	}
+	input.AccountTypeModelPolicies = modelpolicy.NormalizeMap(input.AccountTypeModelPolicies)
+	if err := validateAccountTypeModelPolicies(input.AccountTypeModelPolicies); err != nil {
+		return Group{}, err
+	}
 	input.DispatchDSL = cloneDispatchDSL(input.DispatchDSL)
-	input.OperationPolicies = cloneOperationPolicies(input.OperationPolicies)
+	input.OperationPolicies = normalizeOperationPolicies(input.OperationPolicies)
 	input.PluginSettings = clonePluginSettings(input.PluginSettings)
 	g, err := s.repo.Create(ctx, input)
 	if err != nil {
@@ -146,15 +153,21 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Group,
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
 	if input.ModelPolicy != nil {
-		cloned := cloneModelPolicy(*input.ModelPolicy)
+		cloned := modelpolicy.Normalize(*input.ModelPolicy)
+		if err := validateModelPolicy(cloned); err != nil {
+			return Group{}, err
+		}
 		input.ModelPolicy = &cloned
 	}
-	input.AccountTypeModelPolicies = cloneAccountTypeModelPolicies(input.AccountTypeModelPolicies)
+	input.AccountTypeModelPolicies = modelpolicy.NormalizeMap(input.AccountTypeModelPolicies)
+	if err := validateAccountTypeModelPolicies(input.AccountTypeModelPolicies); err != nil {
+		return Group{}, err
+	}
 	if input.DispatchDSL != nil {
 		cloned := cloneDispatchDSL(*input.DispatchDSL)
 		input.DispatchDSL = &cloned
 	}
-	input.OperationPolicies = cloneOperationPolicies(input.OperationPolicies)
+	input.OperationPolicies = normalizeOperationPolicies(input.OperationPolicies)
 	input.PluginSettings = clonePluginSettings(input.PluginSettings)
 	g, err := s.repo.Update(ctx, id, input)
 	if err != nil {
@@ -191,6 +204,20 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 func validateRateMultiplier(value float64) error {
 	if err := ratevalue.ValidateMultiplier(value); err != nil {
 		return errors.Join(ErrInvalidRateMultiplier, err)
+	}
+	return nil
+}
+
+func validateModelPolicy(policy modelpolicy.Policy) error {
+	if err := modelpolicy.Validate(policy); err != nil {
+		return errors.Join(ErrInvalidModelPolicy, err)
+	}
+	return nil
+}
+
+func validateAccountTypeModelPolicies(policies map[string]modelpolicy.Policy) error {
+	if err := modelpolicy.ValidateMap(policies); err != nil {
+		return errors.Join(ErrInvalidModelPolicy, err)
 	}
 	return nil
 }

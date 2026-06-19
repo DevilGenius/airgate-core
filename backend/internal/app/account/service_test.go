@@ -10,6 +10,7 @@ import (
 
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
 
@@ -105,6 +106,43 @@ func TestCreateRejectsInvalidRateMultiplier(t *testing.T) {
 	}
 }
 
+func TestCreateRejectsInvalidModelPolicy(t *testing.T) {
+	service := NewService(stubRepository{
+		create: func(_ context.Context, input CreateInput) (Account, error) {
+			t.Fatalf("repo.Create should not be called for invalid policy: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	_, err := service.Create(t.Context(), CreateInput{
+		Platform:    "openai",
+		ModelPolicy: modelpolicy.Policy{Allow: []string{"gpt-["}},
+	})
+	if !errors.Is(err, ErrInvalidModelPolicy) {
+		t.Fatalf("Create() error = %v, want ErrInvalidModelPolicy", err)
+	}
+}
+
+func TestCreateNormalizesModelPolicyBeforePersist(t *testing.T) {
+	var captured CreateInput
+	service := NewService(stubRepository{
+		create: func(_ context.Context, input CreateInput) (Account, error) {
+			captured = input
+			return Account{ID: 1, Platform: input.Platform}, nil
+		},
+	}, nil, nil, nil)
+
+	if _, err := service.Create(t.Context(), CreateInput{
+		Platform:    "openai",
+		ModelPolicy: modelpolicy.Policy{Allow: []string{" GPT-5* ", ""}},
+	}); err != nil {
+		t.Fatalf("Create() returned error: %v", err)
+	}
+	if len(captured.ModelPolicy.Allow) != 1 || captured.ModelPolicy.Allow[0] != "GPT-5*" {
+		t.Fatalf("captured policy = %#v, want trimmed single allow", captured.ModelPolicy)
+	}
+}
+
 func TestUpdateRejectsInvalidRateMultiplier(t *testing.T) {
 	rate := 0.001
 	service := NewService(stubRepository{
@@ -117,6 +155,21 @@ func TestUpdateRejectsInvalidRateMultiplier(t *testing.T) {
 	_, err := service.Update(t.Context(), 1, UpdateInput{RateMultiplier: &rate})
 	if !errors.Is(err, ErrInvalidRateMultiplier) {
 		t.Fatalf("Update error = %v, want ErrInvalidRateMultiplier", err)
+	}
+}
+
+func TestUpdateRejectsInvalidModelPolicy(t *testing.T) {
+	policy := modelpolicy.Policy{Deny: []string{"o3-["}}
+	service := NewService(stubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called for invalid policy: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	_, err := service.Update(t.Context(), 1, UpdateInput{ModelPolicy: &policy})
+	if !errors.Is(err, ErrInvalidModelPolicy) {
+		t.Fatalf("Update() error = %v, want ErrInvalidModelPolicy", err)
 	}
 }
 
@@ -139,6 +192,29 @@ func TestBulkUpdateRejectsInvalidRateMultiplier(t *testing.T) {
 	for _, item := range result.Results {
 		if item.Success || item.Error == "" {
 			t.Fatalf("result item = %+v, want invalid rate failure", item)
+		}
+	}
+}
+
+func TestBulkUpdateRejectsInvalidModelPolicy(t *testing.T) {
+	policy := modelpolicy.Policy{Allow: []string{"gpt-["}}
+	service := NewService(stubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called for invalid policy: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs:         []int{1, 2},
+		ModelPolicy: &policy,
+	})
+	if result.Success != 0 || result.Failed != 2 {
+		t.Fatalf("BulkUpdate result = %+v, want 2 failures", result)
+	}
+	for _, item := range result.Results {
+		if item.Success || item.Error == "" {
+			t.Fatalf("result item = %+v, want invalid policy failure", item)
 		}
 	}
 }

@@ -130,7 +130,8 @@ func (h *AccountHandler) handleError(logMessage, publicMessage string, err error
 		errors.Is(err, appaccount.ErrQuotaRefreshUnsupported),
 		errors.Is(err, appaccount.ErrInvalidDateRange),
 		errors.Is(err, appaccount.ErrInvalidState),
-		errors.Is(err, appaccount.ErrInvalidRateMultiplier):
+		errors.Is(err, appaccount.ErrInvalidRateMultiplier),
+		errors.Is(err, appaccount.ErrInvalidModelPolicy):
 		return 400, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)

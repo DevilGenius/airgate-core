@@ -171,6 +171,8 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	for _, route := range routes {
 		state.selectedRoute = route
 		state.keyInfo = keyInfoForRoute(state.keyInfo, route)
+		state.dispatch = newDispatchChain(route.DispatchPlans)
+		state.dispatchPlan = sdk.DispatchPlan{}
 
 		softExclude := make([]int, 0, maxFailoverAttempts)
 		attempt := 0
@@ -305,7 +307,6 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			}
 
 			execution := f.callPlugin(c, state)
-			attempt++
 			totalAttempts++
 
 			requestCanceled := canceledRequestStatus(ctx.Err())
@@ -325,6 +326,30 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				}
 				execution.err = nil
 			}
+
+			if requestCanceled == 0 && f.canDispatchCandidateFailover(c, state, execution) {
+				attrs := []any{
+					"attempt", totalAttempts,
+					"kind", execution.outcome.Kind,
+					"failover_scope", execution.outcome.FailoverScope,
+					sdk.LogFieldDurationMs, execution.duration.Milliseconds(),
+					sdk.LogFieldReason, judgmentReason(execution),
+					"next_scheduling_model", state.dispatchPlan.SchedulingModel,
+				}
+				if s := execution.outcome.Upstream.StatusCode; s > 0 {
+					attrs = append(attrs, "upstream_status", s)
+				}
+				if execution.err != nil {
+					attrs = append(attrs, sdk.LogFieldError, execution.err)
+				}
+				attemptLogger.Warn("forward_dispatch_candidate_failed", attrs...)
+				releaseAccountSlot()
+				f.scheduler.DecrementRPM(context.Background(), accountID)
+				softExclude = softExclude[:0]
+				continue
+			}
+
+			attempt++
 
 			if requestCanceled == 0 && f.canFailover(c, state, execution) {
 				failureSummary.recordExecution(execution)
@@ -666,7 +691,7 @@ func routesForAPIKey(state *forwardState) []routing.Candidate {
 		return nil
 	}
 	route := keyInfoRoute(state.keyInfo)
-	route.DispatchPlans = state.dispatchPlans
+	route.DispatchPlans = state.dispatch.Plans()
 	return []routing.Candidate{route}
 }
 
@@ -696,8 +721,8 @@ func keyInfoRoute(keyInfo *auth.APIKeyInfo) routing.Candidate {
 		GroupRateMultiplier:    keyInfo.GroupRateMultiplier,
 		GroupServiceTier:       keyInfo.GroupServiceTier,
 		GroupForceInstructions: keyInfo.GroupForceInstructions,
-		GroupOperationPolicies: keyInfo.GroupOperationPolicies,
-		GroupPluginSettings:    keyInfo.GroupPluginSettings,
+		GroupOperationPolicies: cloneOperationPolicies(keyInfo.GroupOperationPolicies),
+		GroupPluginSettings:    clonePluginSettings(keyInfo.GroupPluginSettings),
 	}
 }
 
@@ -708,7 +733,8 @@ func keyInfoForRoute(base *auth.APIKeyInfo, route routing.Candidate) *auth.APIKe
 	info.GroupRateMultiplier = route.GroupRateMultiplier
 	info.GroupServiceTier = route.GroupServiceTier
 	info.GroupForceInstructions = route.GroupForceInstructions
-	info.GroupPluginSettings = route.GroupPluginSettings
+	info.GroupOperationPolicies = cloneOperationPolicies(route.GroupOperationPolicies)
+	info.GroupPluginSettings = clonePluginSettings(route.GroupPluginSettings)
 	return &info
 }
 
@@ -729,6 +755,22 @@ func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution f
 		return true
 	}
 	return execution.outcome.Kind.ShouldFailover()
+}
+
+func (f *Forwarder) canDispatchCandidateFailover(c *gin.Context, state *forwardState, execution forwardExecution) bool {
+	if execution.outcome.FailoverScope != sdk.FailoverScopeDispatchCandidate {
+		return false
+	}
+	if state == nil {
+		return false
+	}
+	if state.stream && c.Writer.Written() {
+		return false
+	}
+	if state.requireContinuationAffinity {
+		return false
+	}
+	return state.advanceDispatchCandidate()
 }
 
 func canStartForwardAttempt(state *forwardState, attempt int) bool {

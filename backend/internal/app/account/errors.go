@@ -17,6 +17,8 @@ var (
 	ErrInvalidState = errors.New("账号状态无效")
 	// ErrInvalidRateMultiplier 账号倍率非法。
 	ErrInvalidRateMultiplier = errors.New("账号倍率必须是有限正数，范围为 0.01 到 100")
+	// ErrInvalidModelPolicy 模型黑白名单策略非法。
+	ErrInvalidModelPolicy = errors.New("模型策略无效")
 	// ErrReauthRequired OAuth 凭证已失效，需要重新授权（refresh_token 失效且无法本地降级）。
 	ErrReauthRequired = errors.New("账号凭证已失效，请重新授权")
 )

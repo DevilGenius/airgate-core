@@ -576,7 +576,7 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 			Name:        accFull.Name,
 			Platform:    accFull.Platform,
 			Type:        accFull.Type,
-			Credentials: cloneStringMapHost(accFull.Credentials),
+			Credentials: cloneStringMap(accFull.Credentials),
 			ProxyURL:    proxyURLFromAccount(accFull),
 		},
 		Body: body,
@@ -727,8 +727,9 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			continue
 		}
 
-		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-			acc, plan, err := h.pickHostAccount(ctx, route.DispatchPlans, route.Platform, route.GroupID, "", hardExclude...)
+		chain := newDispatchChain(route.DispatchPlans)
+		for attempt := 0; attempt < maxHostForwardAttempts; {
+			acc, candidate, err := h.pickHostAccountFrom(ctx, &chain, route.Platform, route.GroupID, "", hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return nil, cerr
@@ -743,7 +744,8 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 				)
 				break
 			}
-			schedulingModel := plan.SchedulingModel
+			plan := candidate.Plan
+			schedulingModel := candidate.SchedulingModel
 
 			accFull := acc
 
@@ -757,6 +759,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 					"max_concurrency", hostForwardMaxConcurrency(accFull),
 				)
 				hardExclude = append(hardExclude, acc.ID)
+				attempt++
 				continue
 			}
 
@@ -774,7 +777,6 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
 			releaseCapacity()
 			duration := time.Since(start)
-			h.applyHostOutcome(ctx, acc.ID, accFull, schedulingModel, outcome, duration)
 			if returnableUpstream(outcome.Upstream) {
 				lastUpstream = outcome.Upstream
 				hasLastUpstream = true
@@ -782,6 +784,23 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			if cerr := hostContextError(fwdErr); cerr != nil {
 				return nil, cerr
 			}
+
+			if next, ok := chain.AdvanceOnOutcome(outcome, false); ok {
+				slog.Warn("host_forward_dispatch_candidate_failed",
+					sdk.LogFieldGroupID, route.GroupID,
+					"effective_rate", route.EffectiveRate,
+					sdk.LogFieldAccountID, acc.ID,
+					"attempt", attempt+1,
+					"kind", outcome.Kind,
+					"failover_scope", outcome.FailoverScope,
+					sdk.LogFieldReason, outcome.Reason,
+					sdk.LogFieldError, fwdErr,
+					"next_scheduling_model", next.SchedulingModel,
+				)
+				continue
+			}
+
+			h.applyHostOutcome(ctx, acc.ID, accFull, schedulingModel, outcome, duration)
 
 			if fwdErr != nil || outcome.Kind.ShouldFailover() {
 				slog.Warn("host_forward_attempt_failed",
@@ -794,6 +813,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 					sdk.LogFieldError, fwdErr,
 				)
 				hardExclude = append(hardExclude, acc.ID)
+				attempt++
 				continue
 			}
 
@@ -882,8 +902,9 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 			continue
 		}
 
-		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-			acc, plan, err := h.pickHostAccount(ctx, route.DispatchPlans, route.Platform, route.GroupID, "", hardExclude...)
+		chain := newDispatchChain(route.DispatchPlans)
+		for attempt := 0; attempt < maxHostForwardAttempts; {
+			acc, candidate, err := h.pickHostAccountFrom(ctx, &chain, route.Platform, route.GroupID, "", hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return cerr
@@ -898,7 +919,8 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 				)
 				break
 			}
-			schedulingModel := plan.SchedulingModel
+			plan := candidate.Plan
+			schedulingModel := candidate.SchedulingModel
 
 			accFull := acc
 
@@ -912,6 +934,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 					"max_concurrency", hostForwardMaxConcurrency(accFull),
 				)
 				hardExclude = append(hardExclude, acc.ID)
+				attempt++
 				continue
 			}
 
@@ -930,10 +953,26 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
 			releaseCapacity()
 			duration := time.Since(start)
-			h.applyHostOutcome(ctx, acc.ID, accFull, schedulingModel, outcome, duration)
 			if cerr := hostContextError(fwdErr); cerr != nil {
 				return cerr
 			}
+
+			if next, ok := chain.AdvanceOnOutcome(outcome, fw.committed); ok {
+				slog.Warn("host_forward_stream_dispatch_candidate_failed",
+					sdk.LogFieldGroupID, route.GroupID,
+					"effective_rate", route.EffectiveRate,
+					sdk.LogFieldAccountID, acc.ID,
+					"attempt", attempt+1,
+					"kind", outcome.Kind,
+					"failover_scope", outcome.FailoverScope,
+					sdk.LogFieldReason, outcome.Reason,
+					sdk.LogFieldError, fwdErr,
+					"next_scheduling_model", next.SchedulingModel,
+				)
+				continue
+			}
+
+			h.applyHostOutcome(ctx, acc.ID, accFull, schedulingModel, outcome, duration)
 
 			canRetry := !fw.committed && (fwdErr != nil || outcome.Kind.ShouldFailover())
 			if canRetry {
@@ -947,6 +986,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 					sdk.LogFieldError, fwdErr,
 				)
 				hardExclude = append(hardExclude, acc.ID)
+				attempt++
 				continue
 			}
 
@@ -1447,8 +1487,8 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 			GroupRateMultiplier:    g.RateMultiplier,
 			GroupServiceTier:       g.ServiceTier,
 			GroupForceInstructions: g.ForceInstructions,
-			GroupOperationPolicies: cloneOperationPoliciesHost(g.OperationPolicies),
-			GroupPluginSettings:    clonePluginSettingsHost(g.PluginSettings),
+			GroupOperationPolicies: cloneOperationPolicies(g.OperationPolicies),
+			GroupPluginSettings:    clonePluginSettings(g.PluginSettings),
 			DispatchPlans:          cloneDispatchPlansHost(plans),
 			SortWeight:             g.SortWeight,
 		}}, u.Email, nil
@@ -1511,28 +1551,35 @@ func (h *HostService) resolveHostModel(platform, model string) string {
 }
 
 func (h *HostService) pickHostAccount(ctx context.Context, plans []sdk.DispatchPlan, platform string, groupID int, sessionID string, excludeIDs ...int) (*ent.Account, sdk.DispatchPlan, error) {
+	chain := newDispatchChain(plans)
+	acc, candidate, err := h.pickHostAccountFrom(ctx, &chain, platform, groupID, sessionID, excludeIDs...)
+	return acc, candidate.Plan, err
+}
+
+func (h *HostService) pickHostAccountFrom(ctx context.Context, chain *dispatchChain, platform string, groupID int, sessionID string, excludeIDs ...int) (*ent.Account, dispatchCandidate, error) {
+	plans := chain.Plans()
 	if len(plans) == 0 {
-		return nil, sdk.DispatchPlan{}, scheduler.ErrNoAvailableAccount
+		return nil, dispatchCandidate{}, scheduler.ErrNoAvailableAccount
 	}
 	var lastErr error
-	for _, plan := range plans {
-		schedulingModel := strings.TrimSpace(plan.SchedulingModel)
-		if schedulingModel == "" {
+	for idx := chain.StartIndex(); idx < len(plans); idx++ {
+		candidate := chain.Candidate(idx)
+		if candidate.SchedulingModel == "" {
 			continue
 		}
-		acc, err := h.scheduler.SelectAccount(ctx, platform, schedulingModel, 0, groupID, sessionID, excludeIDs...)
+		acc, err := h.scheduler.SelectAccount(ctx, platform, candidate.SchedulingModel, 0, groupID, sessionID, excludeIDs...)
 		if err == nil {
-			return acc, plan, nil
+			return acc, chain.Select(idx), nil
 		}
 		lastErr = err
 		if !errors.Is(err, scheduler.ErrNoAvailableAccount) {
-			return nil, sdk.DispatchPlan{}, err
+			return nil, dispatchCandidate{}, err
 		}
 	}
 	if lastErr != nil {
-		return nil, sdk.DispatchPlan{}, lastErr
+		return nil, dispatchCandidate{}, lastErr
 	}
-	return nil, sdk.DispatchPlan{}, scheduler.ErrNoAvailableAccount
+	return nil, dispatchCandidate{}, scheduler.ErrNoAvailableAccount
 }
 
 func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.Header {
@@ -1648,7 +1695,7 @@ func hostSDKAccount(acc *ent.Account) *sdk.Account {
 		Name:        acc.Name,
 		Platform:    acc.Platform,
 		Type:        acc.Type,
-		Credentials: cloneStringMapHost(acc.Credentials),
+		Credentials: cloneStringMap(acc.Credentials),
 		ProxyURL:    proxyURLFromAccount(acc),
 	}
 }
@@ -1808,11 +1855,11 @@ func truncateProbeErr(s string) string {
 	return s[:max] + "..."
 }
 
-// cloneStringMapHost / proxyURLFromAccount 是 host_service.go 内部独立的小 helper。
+// cloneStringMap / proxyURLFromAccount 是 plugin 包内部独立的小 helper。
 // 与 internal/app/account/service.go 里的同名 helper 重复，但跨包引用 service 层
 // 会引入循环依赖（service 层依赖 plugin 包），所以这里复制一份。
 
-func cloneStringMapHost(input map[string]string) map[string]string {
+func cloneStringMap(input map[string]string) map[string]string {
 	if input == nil {
 		return nil
 	}
@@ -1823,7 +1870,7 @@ func cloneStringMapHost(input map[string]string) map[string]string {
 	return cloned
 }
 
-func clonePluginSettingsHost(input map[string]map[string]string) map[string]map[string]string {
+func clonePluginSettings(input map[string]map[string]string) map[string]map[string]string {
 	if len(input) == 0 {
 		return nil
 	}
@@ -1832,12 +1879,12 @@ func clonePluginSettingsHost(input map[string]map[string]string) map[string]map[
 		if len(settings) == 0 {
 			continue
 		}
-		cloned[plugin] = cloneStringMapHost(settings)
+		cloned[plugin] = cloneStringMap(settings)
 	}
 	return cloned
 }
 
-func cloneOperationPoliciesHost(input map[string]bool) map[string]bool {
+func cloneOperationPolicies(input map[string]bool) map[string]bool {
 	if input == nil {
 		return nil
 	}

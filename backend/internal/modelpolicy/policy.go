@@ -1,9 +1,18 @@
 package modelpolicy
 
 import (
+	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 )
+
+const (
+	MaxPatternsPerPolicy = 200
+	MaxPatternLength     = 256
+)
+
+var ErrInvalidPolicy = errors.New("模型策略无效")
 
 // Policy describes allow/deny model patterns. Deny has precedence; an empty
 // allow list means all models are allowed unless denied. Stored values keep
@@ -69,6 +78,55 @@ func CloneMap(input map[string]Policy) map[string]Policy {
 	return cloned
 }
 
+func Normalize(policy Policy) Policy {
+	return Policy{
+		Allow: normalizePatterns(policy.Allow),
+		Deny:  normalizePatterns(policy.Deny),
+	}
+}
+
+func NormalizeMap(input map[string]Policy) map[string]Policy {
+	if input == nil {
+		return nil
+	}
+	normalized := make(map[string]Policy, len(input))
+	for key, value := range input {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		normalized[key] = Normalize(value)
+	}
+	return normalized
+}
+
+func Validate(policy Policy) error {
+	policy = Normalize(policy)
+	if total := len(policy.Allow) + len(policy.Deny); total > MaxPatternsPerPolicy {
+		return fmt.Errorf("%w: pattern count %d exceeds %d", ErrInvalidPolicy, total, MaxPatternsPerPolicy)
+	}
+	if err := validatePatternList("allow", policy.Allow); err != nil {
+		return err
+	}
+	if err := validatePatternList("deny", policy.Deny); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ValidateMap(input map[string]Policy) error {
+	for key, policy := range input {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if err := Validate(policy); err != nil {
+			return fmt.Errorf("%w: account type %q: %v", ErrInvalidPolicy, key, err)
+		}
+	}
+	return nil
+}
+
 func compilePatterns(values []string) (map[string]struct{}, []string) {
 	var exact map[string]struct{}
 	var patterns []string
@@ -87,6 +145,42 @@ func compilePatterns(values []string) (map[string]struct{}, []string) {
 		exact[value] = struct{}{}
 	}
 	return exact, patterns
+}
+
+func validatePatternList(label string, values []string) error {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if len(value) > MaxPatternLength {
+			return fmt.Errorf("%w: %s pattern %q exceeds %d characters", ErrInvalidPolicy, label, value, MaxPatternLength)
+		}
+		if strings.ContainsAny(value, "*?[") {
+			if _, err := filepath.Match(normalizeModelName(value), ""); err != nil {
+				return fmt.Errorf("%w: invalid %s pattern %q: %v", ErrInvalidPolicy, label, value, err)
+			}
+		}
+	}
+	return nil
+}
+
+func normalizePatterns(values []string) []string {
+	if values == nil {
+		return nil
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func normalizeModelName(value string) string {

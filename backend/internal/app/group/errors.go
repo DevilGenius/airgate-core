@@ -11,4 +11,6 @@ var (
 	ErrSourceGroupPlatformMismatch = errors.New("源分组平台与当前分组不一致")
 	// ErrInvalidRateMultiplier 表示分组费率倍率非法。
 	ErrInvalidRateMultiplier = errors.New("费率倍率必须是有限正数，范围为 0.01 到 100")
+	// ErrInvalidModelPolicy 表示模型黑白名单策略非法。
+	ErrInvalidModelPolicy = errors.New("模型策略无效")
 )

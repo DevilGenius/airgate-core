@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 )
 
 func TestListNormalizesPagination(t *testing.T) {
@@ -67,6 +69,63 @@ func TestCreateClonesMutableFields(t *testing.T) {
 	}
 }
 
+func TestCreateNormalizesImagesOperationsAsCombinedSwitch(t *testing.T) {
+	var captured CreateInput
+
+	service := NewService(groupStubRepository{
+		create: func(_ context.Context, input CreateInput) (Group, error) {
+			captured = input
+			return Group{ID: 1}, nil
+		},
+	}, stubConcurrencyReader{})
+
+	_, err := service.Create(t.Context(), CreateInput{
+		Name:             "图片分组",
+		Platform:         "openai",
+		SubscriptionType: "standard",
+		OperationPolicies: map[string]bool{
+			"images.generate":            true,
+			"responses.image_generation": true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Create() returned error: %v", err)
+	}
+	if !captured.OperationPolicies["images.generate"] || !captured.OperationPolicies["images.edit"] {
+		t.Fatalf("images operations = %#v, want generate/edit both true", captured.OperationPolicies)
+	}
+	if !captured.OperationPolicies["responses.image_generation"] {
+		t.Fatalf("responses.image_generation should be preserved")
+	}
+}
+
+func TestUpdateRemovesDisabledImagesOperations(t *testing.T) {
+	var captured UpdateInput
+
+	service := NewService(groupStubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Group, error) {
+			captured = input
+			return Group{ID: 1}, nil
+		},
+	}, stubConcurrencyReader{})
+
+	_, err := service.Update(t.Context(), 1, UpdateInput{
+		OperationPolicies: map[string]bool{
+			"images.generate": false,
+			"images.edit":     false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Update() returned error: %v", err)
+	}
+	if _, ok := captured.OperationPolicies["images.generate"]; ok {
+		t.Fatalf("images.generate should be removed when disabled: %#v", captured.OperationPolicies)
+	}
+	if _, ok := captured.OperationPolicies["images.edit"]; ok {
+		t.Fatalf("images.edit should be removed when disabled: %#v", captured.OperationPolicies)
+	}
+}
+
 func TestCreateRejectsInvalidRateMultiplier(t *testing.T) {
 	service := NewService(groupStubRepository{}, stubConcurrencyReader{})
 	rate := -1.0
@@ -79,6 +138,43 @@ func TestCreateRejectsInvalidRateMultiplier(t *testing.T) {
 	})
 	if !errors.Is(err, ErrInvalidRateMultiplier) {
 		t.Fatalf("Create() error = %v, want ErrInvalidRateMultiplier", err)
+	}
+}
+
+func TestCreateRejectsInvalidModelPolicy(t *testing.T) {
+	service := NewService(groupStubRepository{
+		create: func(_ context.Context, input CreateInput) (Group, error) {
+			t.Fatalf("repo.Create should not be called for invalid policy: %+v", input)
+			return Group{}, nil
+		},
+	}, stubConcurrencyReader{})
+
+	_, err := service.Create(t.Context(), CreateInput{
+		Name:             "默认分组",
+		Platform:         "openai",
+		SubscriptionType: "standard",
+		ModelPolicy:      modelpolicy.Policy{Allow: []string{"gpt-["}},
+	})
+	if !errors.Is(err, ErrInvalidModelPolicy) {
+		t.Fatalf("Create() error = %v, want ErrInvalidModelPolicy", err)
+	}
+}
+
+func TestUpdateRejectsInvalidAccountTypeModelPolicy(t *testing.T) {
+	service := NewService(groupStubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Group, error) {
+			t.Fatalf("repo.Update should not be called for invalid policy: %+v", input)
+			return Group{}, nil
+		},
+	}, stubConcurrencyReader{})
+
+	_, err := service.Update(t.Context(), 1, UpdateInput{
+		AccountTypeModelPolicies: map[string]modelpolicy.Policy{
+			"plus": {Deny: []string{"o3-["}},
+		},
+	})
+	if !errors.Is(err, ErrInvalidModelPolicy) {
+		t.Fatalf("Update() error = %v, want ErrInvalidModelPolicy", err)
 	}
 }
 

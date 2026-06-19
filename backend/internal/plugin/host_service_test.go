@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -54,6 +55,34 @@ func TestHostForwardReasoningEffort(t *testing.T) {
 
 	if got := hostForwardReasoningEffort(req); got != "xhigh" {
 		t.Fatalf("hostForwardReasoningEffort() = %q, want %q", got, "xhigh")
+	}
+}
+
+func TestDispatchChainAdvanceOnOutcome(t *testing.T) {
+	t.Parallel()
+
+	chain := newDispatchChain([]sdk.DispatchPlan{
+		{SchedulingModel: "gpt-missing"},
+		{},
+		{SchedulingModel: "gpt-fallback"},
+	})
+	outcome := sdk.ForwardOutcome{
+		Kind:          sdk.OutcomeClientError,
+		FailoverScope: sdk.FailoverScopeDispatchCandidate,
+	}
+
+	chain.Select(0)
+	next, ok := chain.AdvanceOnOutcome(outcome, false)
+	if !ok || next.Index != 2 || next.SchedulingModel != "gpt-fallback" {
+		t.Fatalf("next = %+v ok=%v, want fallback true", next, ok)
+	}
+	chain.Select(0)
+	if _, ok := chain.AdvanceOnOutcome(outcome, true); ok {
+		t.Fatal("committed stream should not fail over dispatch candidate")
+	}
+	chain.Select(2)
+	if _, ok := chain.AdvanceOnOutcome(outcome, false); ok {
+		t.Fatal("last candidate should not fail over")
 	}
 }
 
@@ -361,11 +390,17 @@ func TestCreateTaskNormalizesLargeInputDataURIs(t *testing.T) {
 
 func TestCheckHostForwardBalance(t *testing.T) {
 	ctx := context.Background()
+	restoreRouteGraph := routegraph.SetSnapshotForTesting(nil)
+	t.Cleanup(restoreRouteGraph)
+
 	db := testdb.OpenMemoryEnt(t, "host_forward_balance", schema.WithGlobalUniqueID(false))
 	t.Cleanup(func() { _ = db.Close() })
 
 	zeroBalanceUser := db.User.Create().SetEmail("zero@example.com").SetPasswordHash("hash").SetBalance(0).SaveX(ctx)
 	positiveBalanceUser := db.User.Create().SetEmail("positive@example.com").SetPasswordHash("hash").SetBalance(1).SaveX(ctx)
+	if err := routegraph.RefreshSync(ctx, db); err != nil {
+		t.Fatalf("refresh routegraph: %v", err)
+	}
 
 	host := &HostService{db: db}
 

@@ -116,7 +116,7 @@ func continuationRecoveryModelCandidates(state *forwardState, parsed parsedReque
 	add(parsed.Model)
 	if state != nil {
 		add(state.dispatchPlan.SchedulingModel)
-		for _, plan := range state.dispatchPlans {
+		for _, plan := range state.dispatch.Plans() {
 			add(plan.SchedulingModel)
 			add(plan.UpstreamModel())
 		}

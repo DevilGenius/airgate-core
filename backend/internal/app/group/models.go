@@ -172,14 +172,6 @@ func cloneModelRouting(input map[string][]int64) map[string][]int64 {
 	return cloned
 }
 
-func cloneModelPolicy(input modelpolicy.Policy) modelpolicy.Policy {
-	return modelpolicy.Clone(input)
-}
-
-func cloneAccountTypeModelPolicies(input map[string]modelpolicy.Policy) map[string]modelpolicy.Policy {
-	return modelpolicy.CloneMap(input)
-}
-
 func cloneDispatchDSL(input sdk.DispatchDSL) sdk.DispatchDSL {
 	if len(input.Rules) == 0 {
 		return sdk.DispatchDSL{}
@@ -229,6 +221,22 @@ func cloneOperationPolicies(input map[string]bool) map[string]bool {
 		cloned[key] = value
 	}
 	return cloned
+}
+
+func normalizeOperationPolicies(input map[string]bool) map[string]bool {
+	out := cloneOperationPolicies(input)
+	if out == nil {
+		return nil
+	}
+	imagesEnabled := out["images.generate"] || out["images.edit"]
+	if imagesEnabled {
+		out["images.generate"] = true
+		out["images.edit"] = true
+		return out
+	}
+	delete(out, "images.generate")
+	delete(out, "images.edit")
+	return out
 }
 
 func clonePluginSettings(input map[string]map[string]string) map[string]map[string]string {

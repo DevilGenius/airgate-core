@@ -35,6 +35,8 @@ func (h *GroupHandler) handleError(logMessage, publicMessage string, err error) 
 		return 400, err.Error()
 	case errors.Is(err, appgroup.ErrInvalidRateMultiplier):
 		return 400, appgroup.ErrInvalidRateMultiplier.Error()
+	case errors.Is(err, appgroup.ErrInvalidModelPolicy):
+		return 400, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage

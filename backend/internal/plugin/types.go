@@ -20,9 +20,9 @@ type forwardState struct {
 
 	body  []byte
 	model string
-	// dispatchPlans 是请求命中的调度候选。它同时携带客户端模型、调度模型、
+	// dispatch 是请求命中的调度候选链。它同时携带客户端模型、调度模型、
 	// 上游 wire model、operation 和分组开关要求。
-	dispatchPlans               []sdk.DispatchPlan
+	dispatch                    dispatchChain
 	dispatchPlan                sdk.DispatchPlan
 	requirements                routing.Requirements
 	stream                      bool
@@ -88,14 +88,28 @@ type requestFields struct {
 	Thinking *struct{} `json:"thinking"`
 }
 
+func (s *forwardState) advanceDispatchCandidate() bool {
+	if s == nil {
+		return false
+	}
+	next, ok := s.dispatch.Advance()
+	if !ok {
+		return false
+	}
+	s.dispatchPlan = next.Plan
+	s.account = nil
+	return true
+}
+
 func (s *forwardState) schedulingModelCandidates() []string {
 	if s == nil {
 		return nil
 	}
-	if len(s.dispatchPlans) > 0 {
-		out := make([]string, 0, len(s.dispatchPlans))
-		seen := make(map[string]struct{}, len(s.dispatchPlans))
-		for _, plan := range s.dispatchPlans {
+	plans := s.dispatch.Plans()
+	if len(plans) > 0 {
+		out := make([]string, 0, len(plans))
+		seen := make(map[string]struct{}, len(plans))
+		for _, plan := range plans {
 			model := strings.TrimSpace(plan.SchedulingModel)
 			if model == "" {
 				continue
@@ -124,8 +138,9 @@ func (s *forwardState) modelForScheduling() string {
 	if s.dispatchPlan.SchedulingModel != "" {
 		return s.dispatchPlan.SchedulingModel
 	}
-	if len(s.dispatchPlans) > 0 {
-		return s.dispatchPlans[0].SchedulingModel
+	plans := s.dispatch.Plans()
+	if len(plans) > 0 {
+		return plans[0].SchedulingModel
 	}
 	return s.model
 }

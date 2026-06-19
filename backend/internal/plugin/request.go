@@ -105,7 +105,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		requestPath:                 path,
 		body:                        body,
 		model:                       parsed.Model,
-		dispatchPlans:               dispatchPlans,
+		dispatch:                    newDispatchChain(dispatchPlans),
 		requirements:                requirements,
 		stream:                      parsed.Stream,
 		realtime:                    parsed.Stream,

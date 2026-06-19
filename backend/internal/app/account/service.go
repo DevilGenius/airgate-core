@@ -22,6 +22,7 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/pkg/httperrors"
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
@@ -304,6 +305,10 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 		return Account{}, err
 	}
 	input.RateMultiplier = &rateMultiplier
+	input.ModelPolicy = modelpolicy.Normalize(input.ModelPolicy)
+	if err := validateModelPolicy(input.ModelPolicy); err != nil {
+		return Account{}, err
+	}
 
 	account, err := s.repo.Create(ctx, input)
 	if err != nil {
@@ -345,6 +350,16 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary
 			continue
 		}
 		input.RateMultiplier = &rateMultiplier
+		input.ModelPolicy = modelpolicy.Normalize(input.ModelPolicy)
+		if err := validateModelPolicy(input.ModelPolicy); err != nil {
+			summary.Failed++
+			summary.Errors = append(summary.Errors, ImportItemError{
+				Index:   index,
+				Name:    input.Name,
+				Message: err.Error(),
+			})
+			continue
+		}
 		input.GroupIDs = nil
 		input.ProxyID = nil
 		created, err := s.repo.Create(ctx, input)
@@ -373,6 +388,13 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 		if err := validateRateMultiplier(*input.RateMultiplier); err != nil {
 			return Account{}, err
 		}
+	}
+	if input.ModelPolicy != nil {
+		policy := modelpolicy.Normalize(*input.ModelPolicy)
+		if err := validateModelPolicy(policy); err != nil {
+			return Account{}, err
+		}
+		input.ModelPolicy = &policy
 	}
 	repoInput := input
 	manualState, routeManualState, err := s.routedManualState(input.State)
@@ -462,6 +484,16 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			}
 			return result
 		}
+	}
+	if input.ModelPolicy != nil {
+		policy := modelpolicy.Normalize(*input.ModelPolicy)
+		if err := validateModelPolicy(policy); err != nil {
+			for _, id := range input.IDs {
+				result.appendFailure(id, err)
+			}
+			return result
+		}
+		input.ModelPolicy = &policy
 	}
 	mutated := false
 	for _, id := range input.IDs {
@@ -594,6 +626,13 @@ func normalizeCreateRateMultiplier(value *float64) (float64, error) {
 func validateRateMultiplier(value float64) error {
 	if err := ratevalue.ValidateMultiplier(value); err != nil {
 		return errors.Join(ErrInvalidRateMultiplier, err)
+	}
+	return nil
+}
+
+func validateModelPolicy(policy modelpolicy.Policy) error {
+	if err := modelpolicy.Validate(policy); err != nil {
+		return errors.Join(ErrInvalidModelPolicy, err)
 	}
 	return nil
 }

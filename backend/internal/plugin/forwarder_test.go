@@ -14,9 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
@@ -761,6 +764,128 @@ func TestCanFailoverImagesDoesNotRetryAfterStreamWritten(t *testing.T) {
 	}
 }
 
+func TestCanDispatchCandidateFailoverAdvancesPlan(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+	state := &forwardState{
+		dispatch: newDispatchChain([]sdk.DispatchPlan{
+			{SchedulingModel: "gpt-missing"},
+			{},
+			{SchedulingModel: "gpt-fallback"},
+		}),
+		dispatchPlan: sdk.DispatchPlan{SchedulingModel: "gpt-missing"},
+	}
+	state.dispatch.Select(0)
+
+	ok := (&Forwarder{}).canDispatchCandidateFailover(c, state, forwardExecution{
+		outcome: sdk.ForwardOutcome{
+			Kind:          sdk.OutcomeClientError,
+			FailoverScope: sdk.FailoverScopeDispatchCandidate,
+		},
+	})
+	if !ok {
+		t.Fatal("dispatch candidate failover should be allowed")
+	}
+	if state.dispatch.StartIndex() != 2 {
+		t.Fatalf("dispatch start index = %d, want 2", state.dispatch.StartIndex())
+	}
+	if state.dispatchPlan.SchedulingModel != "gpt-fallback" {
+		t.Fatalf("dispatchPlan = %+v, want fallback", state.dispatchPlan)
+	}
+}
+
+func TestCanDispatchCandidateFailoverRequiresScopeAndWritableStream(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	state := &forwardState{
+		dispatch: newDispatchChain([]sdk.DispatchPlan{
+			{SchedulingModel: "gpt-missing"},
+			{SchedulingModel: "gpt-fallback"},
+		}),
+	}
+
+	if (&Forwarder{}).canDispatchCandidateFailover(c, state, forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeClientError}}) {
+		t.Fatal("missing failover scope should not advance candidate")
+	}
+
+	c.Writer.WriteHeader(http.StatusOK)
+	c.Writer.WriteHeaderNow()
+	state.stream = true
+	if (&Forwarder{}).canDispatchCandidateFailover(c, state, forwardExecution{
+		outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeClientError, FailoverScope: sdk.FailoverScopeDispatchCandidate},
+	}) {
+		t.Fatal("written stream should not advance dispatch candidate")
+	}
+}
+
+func TestPickAccountRechecksPrimaryAfterFallbackWasSelectedForPoolMiss(t *testing.T) {
+	ctx := context.Background()
+	restoreRouteGraph := routegraph.SetSnapshotForTesting(nil)
+	defer restoreRouteGraph()
+
+	primary := &ent.Account{
+		ID:          1,
+		Name:        "primary",
+		Platform:    "openai",
+		State:       account.StateActive,
+		ModelPolicy: modelpolicy.Policy{Allow: []string{"gpt-primary"}},
+		Extra:       map[string]interface{}{},
+	}
+	fallback := &ent.Account{
+		ID:          2,
+		Name:        "fallback",
+		Platform:    "openai",
+		State:       account.StateActive,
+		ModelPolicy: modelpolicy.Policy{Allow: []string{"gpt-fallback"}},
+		Extra:       map[string]interface{}{},
+	}
+	group := &ent.Group{ID: 42, Platform: "openai"}
+	group.Edges.Accounts = []*ent.Account{fallback}
+	routegraph.SetSnapshotForTesting([]*ent.Group{group})
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil).WithContext(ctx)
+
+	state := &forwardState{
+		requestedPlatform: "openai",
+		keyInfo:           &auth.APIKeyInfo{UserID: 7, GroupID: group.ID},
+		dispatch: newDispatchChain([]sdk.DispatchPlan{
+			{SchedulingModel: "gpt-primary"},
+			{SchedulingModel: "gpt-fallback"},
+		}),
+	}
+	forwarder := &Forwarder{scheduler: scheduler.NewScheduler(nil, nil)}
+
+	if err := forwarder.pickAccount(c, state); err != nil {
+		t.Fatalf("first pickAccount() error = %v", err)
+	}
+	if state.account.ID != fallback.ID || state.dispatchPlan.SchedulingModel != "gpt-fallback" {
+		t.Fatalf("first pick account=%d plan=%q, want fallback", state.account.ID, state.dispatchPlan.SchedulingModel)
+	}
+	if got := state.dispatch.StartIndex(); got != 0 {
+		t.Fatalf("StartIndex after fallback selected by pool miss = %d, want 0", got)
+	}
+
+	group.Edges.Accounts = []*ent.Account{primary, fallback}
+	routegraph.SetSnapshotForTesting([]*ent.Group{group})
+	state.account = nil
+	state.dispatchPlan = sdk.DispatchPlan{}
+	if err := forwarder.pickAccount(c, state); err != nil {
+		t.Fatalf("second pickAccount() error = %v", err)
+	}
+	if state.account.ID != primary.ID || state.dispatchPlan.SchedulingModel != "gpt-primary" {
+		t.Fatalf("second pick account=%d plan=%q, want primary", state.account.ID, state.dispatchPlan.SchedulingModel)
+	}
+}
+
 func TestCanStartForwardAttemptImagesExhaustAccounts(t *testing.T) {
 	t.Parallel()
 
@@ -807,12 +932,12 @@ func TestRoutesForAPIKeyUsesBoundGroupOnly(t *testing.T) {
 
 	settings := map[string]map[string]string{"openai": {"image_price_1k": "0.01"}}
 	state := &forwardState{
-		dispatchPlans: []sdk.DispatchPlan{{
+		dispatch: newDispatchChain([]sdk.DispatchPlan{{
 			Operation: "responses.image_generation",
 			Gate: sdk.DispatchGate{
 				RequiredOperation: "responses.image_generation",
 			},
-		}},
+		}}),
 		requirements: routing.Requirements{
 			RequiredOperation: "responses.image_generation",
 		},
@@ -853,12 +978,12 @@ func TestRoutesForAPIKeyRejectsImageWhenBoundGroupDisabled(t *testing.T) {
 	t.Parallel()
 
 	state := &forwardState{
-		dispatchPlans: []sdk.DispatchPlan{{
+		dispatch: newDispatchChain([]sdk.DispatchPlan{{
 			Operation: "responses.image_generation",
 			Gate: sdk.DispatchGate{
 				RequiredOperation: "responses.image_generation",
 			},
-		}},
+		}}),
 		requirements: routing.Requirements{
 			RequiredOperation: "responses.image_generation",
 		},
