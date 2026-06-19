@@ -11,34 +11,31 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestHostForwardTimeout(t *testing.T) {
 	cases := []struct {
-		name string
-		req  hostForwardRequest
-		want time.Duration
+		name   string
+		routes []routing.Candidate
+		want   time.Duration
 	}{
-		{name: "empty request", req: hostForwardRequest{}, want: defaultHostForwardTimeout},
-		{name: "chat request", req: hostForwardRequest{Path: "/v1/chat/completions", Model: "gpt-4o"}, want: defaultHostForwardTimeout},
-		{name: "images API request", req: hostForwardRequest{Path: "/v1/images/generations", Model: "gpt-4o"}, want: imageHostForwardTimeout},
-		{name: "image model request", req: hostForwardRequest{Path: "/v1/responses", Model: "gpt-image-2"}, want: imageHostForwardTimeout},
+		{name: "empty request", routes: nil, want: defaultHostForwardTimeout},
+		{name: "chat request", routes: []routing.Candidate{{DispatchPlans: []sdk.DispatchPlan{{Operation: "chat.generate"}}}}, want: defaultHostForwardTimeout},
+		{name: "images API request", routes: []routing.Candidate{{DispatchPlans: []sdk.DispatchPlan{{Operation: "images.generate", TimeoutProfile: "image"}}}}, want: imageHostForwardTimeout},
+		{name: "image model request", routes: []routing.Candidate{{DispatchPlans: []sdk.DispatchPlan{{Operation: "responses.image_generation", TimeoutProfile: "image"}}}}, want: imageHostForwardTimeout},
 		{
-			name: "responses image tool request",
-			req: hostForwardRequest{
-				Path:  "/v1/responses",
-				Model: "gpt-5.4",
-				Body:  []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation"}]}`),
-			},
-			want: imageHostForwardTimeout,
+			name:   "responses image tool request",
+			routes: []routing.Candidate{{DispatchPlans: []sdk.DispatchPlan{{Operation: "responses.image_generation", TimeoutProfile: "image"}}}},
+			want:   imageHostForwardTimeout,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := hostForwardTimeout(tc.req); got != tc.want {
+			if got := hostForwardTimeout(tc.routes); got != tc.want {
 				t.Fatalf("hostForwardTimeout() = %s, want %s", got, tc.want)
 			}
 		})

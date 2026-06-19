@@ -3,15 +3,21 @@ package routing
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"sort"
 
-	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
-
 	"github.com/DevilGenius/airgate-core/ent"
-	"github.com/DevilGenius/airgate-core/ent/group"
-	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
+
+type RequestInput struct {
+	Method      string
+	Path        string
+	ClientModel string
+}
 
 type Candidate struct {
 	GroupID                int
@@ -21,38 +27,34 @@ type Candidate struct {
 	GroupServiceTier       string
 	GroupForceInstructions string
 	GroupPluginSettings    map[string]map[string]string
+	GroupOperationPolicies map[string]bool
+	DispatchPlans          []sdk.DispatchPlan
 	SortWeight             int
 }
 
-func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platform string, userGroupRates map[int64]float64, input GroupMatchInput) ([]Candidate, error) {
-	groups, err := db.Group.Query().
-		Where(group.PlatformEQ(platform)).
-		All(ctx)
-	if err != nil {
-		slog.Error("routing_load_failed",
-			sdk.LogFieldPlatform, platform,
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldError, err)
-		return nil, err
-	}
+func ListEligibleGroups(ctx context.Context, _ *ent.Client, userID int, platform string, userGroupRates map[int64]float64, input RequestInput) ([]Candidate, error) {
+	groups := routegraph.GroupsByPlatform(platform)
 
 	candidates := make([]Candidate, 0, len(groups))
 	for _, g := range groups {
-		if !GroupMatchesRequest(g, input).OK {
+		plans := dispatchresolver.ResolveDispatchPlans(
+			platform,
+			g.DispatchResolver,
+			input.Method,
+			input.Path,
+			input.ClientModel,
+		)
+		requirements := RequirementsFromDispatchPlans(plans)
+		entGroup := &ent.Group{
+			ID:                g.ID,
+			Platform:          g.Platform,
+			OperationPolicies: g.OperationPolicies,
+		}
+		if !GroupMatchesRequirements(entGroup, requirements).OK {
 			continue
 		}
 		if g.IsExclusive {
-			allowed, err := g.QueryAllowedUsers().Where(user.IDEQ(userID)).Exist(ctx)
-			if err != nil {
-				slog.Error("routing_load_failed",
-					sdk.LogFieldPlatform, platform,
-					sdk.LogFieldUserID, userID,
-					sdk.LogFieldGroupID, g.ID,
-					"stage", "exclusive_user_check",
-					sdk.LogFieldError, err)
-				return nil, err
-			}
-			if !allowed {
+			if _, ok := g.AllowedUsers[userID]; !ok {
 				continue
 			}
 		}
@@ -64,6 +66,8 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 			GroupServiceTier:       g.ServiceTier,
 			GroupForceInstructions: g.ForceInstructions,
 			GroupPluginSettings:    clonePluginSettings(g.PluginSettings),
+			GroupOperationPolicies: cloneOperationPolicies(g.OperationPolicies),
+			DispatchPlans:          cloneDispatchPlans(plans),
 			SortWeight:             g.SortWeight,
 		})
 	}
@@ -78,11 +82,12 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 		return candidates[i].GroupID < candidates[j].GroupID
 	})
 
+	requiredOperation := RequirementsFromDispatchPlans(firstDispatchPlans(candidates)).RequiredOperation
 	if len(candidates) == 0 {
 		slog.Warn("routing_no_match",
 			sdk.LogFieldPlatform, platform,
 			sdk.LogFieldUserID, userID,
-			"needs_image", input.NeedsImage,
+			"required_operation", requiredOperation,
 			"groups_scanned", len(groups))
 	} else {
 		slog.Debug("routing_match",
@@ -90,9 +95,17 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 			sdk.LogFieldUserID, userID,
 			"candidate_count", len(candidates),
 			"top_group_id", candidates[0].GroupID,
-			"top_rate", candidates[0].EffectiveRate)
+			"top_rate", candidates[0].EffectiveRate,
+			"required_operation", requiredOperation)
 	}
 	return candidates, nil
+}
+
+func firstDispatchPlans(candidates []Candidate) []sdk.DispatchPlan {
+	if len(candidates) == 0 {
+		return nil
+	}
+	return candidates[0].DispatchPlans
 }
 
 func clonePluginSettings(in map[string]map[string]string) map[string]map[string]string {
@@ -110,4 +123,32 @@ func clonePluginSettings(in map[string]map[string]string) map[string]map[string]
 		}
 	}
 	return out
+}
+
+func cloneOperationPolicies(in map[string]bool) map[string]bool {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]bool, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneDispatchPlans(in []sdk.DispatchPlan) []sdk.DispatchPlan {
+	if len(in) == 0 {
+		return nil
+	}
+	return append([]sdk.DispatchPlan(nil), in...)
+}
+
+func DefaultDenyGate(requiredOperation, code, message string) sdk.DispatchGate {
+	return sdk.DispatchGate{
+		RequiredOperation: requiredOperation,
+		Status:            http.StatusForbidden,
+		ErrorType:         "invalid_request_error",
+		Code:              code,
+		Message:           message,
+	}
 }

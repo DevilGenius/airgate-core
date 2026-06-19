@@ -16,6 +16,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/ent/usersubscription"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // GroupCreate is the builder for creating a Group entity.
@@ -102,6 +103,26 @@ func (gc *GroupCreate) SetQuotas(m map[string]interface{}) *GroupCreate {
 // SetModelRouting sets the "model_routing" field.
 func (gc *GroupCreate) SetModelRouting(m map[string][]int64) *GroupCreate {
 	gc.mutation.SetModelRouting(m)
+	return gc
+}
+
+// SetDispatchDsl sets the "dispatch_dsl" field.
+func (gc *GroupCreate) SetDispatchDsl(sd sdk.DispatchDSL) *GroupCreate {
+	gc.mutation.SetDispatchDsl(sd)
+	return gc
+}
+
+// SetNillableDispatchDsl sets the "dispatch_dsl" field if the given value is not nil.
+func (gc *GroupCreate) SetNillableDispatchDsl(sd *sdk.DispatchDSL) *GroupCreate {
+	if sd != nil {
+		gc.SetDispatchDsl(*sd)
+	}
+	return gc
+}
+
+// SetOperationPolicies sets the "operation_policies" field.
+func (gc *GroupCreate) SetOperationPolicies(m map[string]bool) *GroupCreate {
+	gc.mutation.SetOperationPolicies(m)
 	return gc
 }
 
@@ -462,6 +483,14 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := gc.mutation.ModelRouting(); ok {
 		_spec.SetField(group.FieldModelRouting, field.TypeJSON, value)
 		_node.ModelRouting = value
+	}
+	if value, ok := gc.mutation.DispatchDsl(); ok {
+		_spec.SetField(group.FieldDispatchDsl, field.TypeJSON, value)
+		_node.DispatchDsl = value
+	}
+	if value, ok := gc.mutation.OperationPolicies(); ok {
+		_spec.SetField(group.FieldOperationPolicies, field.TypeJSON, value)
+		_node.OperationPolicies = value
 	}
 	if value, ok := gc.mutation.PluginSettings(); ok {
 		_spec.SetField(group.FieldPluginSettings, field.TypeJSON, value)

@@ -107,7 +107,11 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 // （例如主循环可以根据 softExclude 是否非空决定排队等待还是直接写 503）。
 func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs ...int) error {
 	var lastErr error
-	for _, model := range state.schedulingModelCandidates() {
+	for _, plan := range state.dispatchPlans {
+		model := strings.TrimSpace(plan.SchedulingModel)
+		if model == "" {
+			continue
+		}
 		account, err := f.scheduler.SelectAccountWithOptions(
 			c.Request.Context(),
 			state.requestedPlatform,
@@ -124,7 +128,7 @@ func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs 
 		)
 		if err == nil {
 			state.account = account
-			state.schedulingModel = model
+			state.dispatchPlan = plan
 			return nil
 		}
 		lastErr = err
@@ -218,14 +222,15 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 func (f *Forwarder) forwardMetadataOnly(c *gin.Context, state *forwardState) {
 	req := &sdk.ForwardRequest{
 		// Account 留空：插件对 metadata 路径的判断发生在访问 account 之前
-		Account: &sdk.Account{Platform: state.requestedPlatform},
-		Body:    state.body,
-		Headers: buildHeaders(c.Request.Header, state.keyInfo),
-		Model:   state.model,
-		Stream:  false,
+		Account:      &sdk.Account{Platform: state.requestedPlatform},
+		Body:         state.body,
+		Headers:      buildHeaders(c.Request.Header, state.keyInfo),
+		Model:        state.model,
+		DispatchPlan: state.dispatchPlan,
+		Stream:       false,
 	}
 	req.Headers.Set("X-Forwarded-Path", state.requestPath)
-	req.Headers.Set("X-Forwarded-Method", c.Request.Method)
+	req.Headers.Set("X-Forwarded-Method", requestTransportMethod(c.Request))
 	if qs := c.Request.URL.RawQuery; qs != "" {
 		req.Headers.Set("X-Forwarded-Query", qs)
 	}

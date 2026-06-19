@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent"
@@ -17,14 +18,13 @@ type forwardState struct {
 	requestPath string
 	requestID   string
 
-	body            []byte
-	model           string
-	groupMatchInput routing.GroupMatchInput
-	// schedulingModels 是调度层使用的模型候选。协议翻译入口里，客户端传入的
-	// model 可能不是上游真实模型，例如 OpenAI 插件的 /v1/messages 会把
-	// claude-* 映射到 GPT 模型后再调用上游。
-	schedulingModels            []string
-	schedulingModel             string
+	body  []byte
+	model string
+	// dispatchPlans 是请求命中的调度候选。它同时携带客户端模型、调度模型、
+	// 上游 wire model、operation 和分组开关要求。
+	dispatchPlans               []sdk.DispatchPlan
+	dispatchPlan                sdk.DispatchPlan
+	requirements                routing.Requirements
 	stream                      bool
 	realtime                    bool
 	sessionID                   string
@@ -92,8 +92,24 @@ func (s *forwardState) schedulingModelCandidates() []string {
 	if s == nil {
 		return nil
 	}
-	if len(s.schedulingModels) > 0 {
-		return s.schedulingModels
+	if len(s.dispatchPlans) > 0 {
+		out := make([]string, 0, len(s.dispatchPlans))
+		seen := make(map[string]struct{}, len(s.dispatchPlans))
+		for _, plan := range s.dispatchPlans {
+			model := strings.TrimSpace(plan.SchedulingModel)
+			if model == "" {
+				continue
+			}
+			key := strings.ToLower(model)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, model)
+		}
+		if len(out) > 0 {
+			return out
+		}
 	}
 	if s.model == "" {
 		return nil
@@ -105,11 +121,11 @@ func (s *forwardState) modelForScheduling() string {
 	if s == nil {
 		return ""
 	}
-	if s.schedulingModel != "" {
-		return s.schedulingModel
+	if s.dispatchPlan.SchedulingModel != "" {
+		return s.dispatchPlan.SchedulingModel
 	}
-	if len(s.schedulingModels) > 0 {
-		return s.schedulingModels[0]
+	if len(s.dispatchPlans) > 0 {
+		return s.dispatchPlans[0].SchedulingModel
 	}
 	return s.model
 }

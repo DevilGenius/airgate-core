@@ -6,16 +6,18 @@ import (
 	"strconv"
 
 	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
 // APIKeyHandler API 密钥管理 Handler。
 type APIKeyHandler struct {
-	service *appapikey.Service
+	service   *appapikey.Service
+	scheduler *scheduler.Scheduler
 }
 
 // NewAPIKeyHandler 创建 APIKeyHandler。
-func NewAPIKeyHandler(service *appapikey.Service) *APIKeyHandler {
-	return &APIKeyHandler{service: service}
+func NewAPIKeyHandler(service *appapikey.Service, sched *scheduler.Scheduler) *APIKeyHandler {
+	return &APIKeyHandler{service: service, scheduler: sched}
 }
 
 func parseKeyID(raw string) (int, error) {
@@ -38,5 +40,11 @@ func (h *APIKeyHandler) handleError(logMessage, publicMessage string, err error)
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage
+	}
+}
+
+func (h *APIKeyHandler) invalidateRouteGraph() {
+	if h.scheduler != nil {
+		h.scheduler.InvalidateRouteCache(0)
 	}
 }

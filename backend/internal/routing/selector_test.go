@@ -55,7 +55,7 @@ func TestListEligibleGroups(t *testing.T) {
 		SetRateMultiplier(0.01).
 		SaveX(ctx)
 
-	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", map[int64]float64{int64(publicSlow.ID): 0.3}, GroupMatchInput{})
+	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", map[int64]float64{int64(publicSlow.ID): 0.3}, RequestInput{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestListEligibleGroups(t *testing.T) {
 	}
 }
 
-func TestListEligibleGroupsFiltersImageDisabledOpenAIGroups(t *testing.T) {
+func TestListEligibleGroupsFiltersOperationDisabledGroups(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.OpenMemoryEnt(t, "route_selector_image", migrate.WithGlobalUniqueID(false))
 	t.Cleanup(func() {
@@ -93,13 +93,12 @@ func TestListEligibleGroupsFiltersImageDisabledOpenAIGroups(t *testing.T) {
 		SetName("image disabled").
 		SetPlatform("openai").
 		SetRateMultiplier(0.1).
-		SetPluginSettings(map[string]map[string]string{"openai": {"image_enabled": "false"}}).
 		SaveX(ctx)
 	imageEnabled := db.Group.Create().
 		SetName("image enabled").
 		SetPlatform("openai").
 		SetRateMultiplier(0.2).
-		SetPluginSettings(map[string]map[string]string{"openai": {"image_enabled": "true"}}).
+		SetOperationPolicies(map[string]bool{"responses.image_generation": true}).
 		SaveX(ctx)
 	db.Group.Create().
 		SetName("chat only implicit").
@@ -107,7 +106,11 @@ func TestListEligibleGroupsFiltersImageDisabledOpenAIGroups(t *testing.T) {
 		SetRateMultiplier(0.3).
 		SaveX(ctx)
 
-	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, GroupMatchInput{NeedsImage: true})
+	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, RequestInput{
+		Method:      "POST",
+		Path:        "/v1/responses",
+		ClientModel: "gpt-5.4",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,16 +121,15 @@ func TestListEligibleGroupsFiltersImageDisabledOpenAIGroups(t *testing.T) {
 		t.Fatalf("routes[0].GroupID = %d, want %d", routes[0].GroupID, imageEnabled.ID)
 	}
 
-	chatRoutes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, GroupMatchInput{})
+	chatRoutes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, RequestInput{
+		Method:      "POST",
+		Path:        "/v1/chat/completions",
+		ClientModel: "gpt-5.4",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(chatRoutes) != 2 {
-		t.Fatalf("len(chatRoutes) = %d, want 2", len(chatRoutes))
-	}
-	for _, route := range chatRoutes {
-		if route.GroupID == imageEnabled.ID {
-			t.Fatalf("chat routes should exclude image-enabled group %d", imageEnabled.ID)
-		}
+	if len(chatRoutes) != 3 {
+		t.Fatalf("len(chatRoutes) = %d, want 3", len(chatRoutes))
 	}
 }

@@ -39,6 +39,12 @@ type ImagePrices = {
   fourK: string;
 };
 
+type OpenAIOperations = {
+  imagesGenerate: boolean;
+  imagesEdit: boolean;
+  responsesImageGeneration: boolean;
+};
+
 const IMAGE_PRICE_FIELDS: Array<{ key: keyof ImagePrices; setting: string; label: string }> = [
   { key: 'oneK', setting: 'image_price_1k', label: '1K' },
   { key: 'twoK', setting: 'image_price_2k', label: '2K' },
@@ -66,10 +72,9 @@ function clonePluginSettings(
 
 function buildOpenAISettings(
   current: Record<string, string> | undefined,
-  imageEnabled: boolean,
   prices: ImagePrices,
 ): Record<string, string> {
-  const settings: Record<string, string> = { ...(current ?? {}), image_enabled: imageEnabled ? 'true' : 'false' };
+  const settings: Record<string, string> = { ...(current ?? {}) };
 
   for (const field of IMAGE_PRICE_FIELDS) {
     delete settings[field.setting];
@@ -81,6 +86,41 @@ function buildOpenAISettings(
     }
   }
   return settings;
+}
+
+function parseOpenAIOperations(policies?: Record<string, boolean>): OpenAIOperations {
+  return {
+    imagesGenerate: policies?.['images.generate'] ?? false,
+    imagesEdit: policies?.['images.edit'] ?? false,
+    responsesImageGeneration: policies?.['responses.image_generation'] ?? false,
+  };
+}
+
+function buildOperationPolicies(
+  current: Record<string, boolean> | undefined,
+  operations: OpenAIOperations,
+): Record<string, boolean> | undefined {
+  const policies: Record<string, boolean> = { ...(current ?? {}) };
+
+  if (operations.imagesGenerate) {
+    policies['images.generate'] = true;
+  } else {
+    delete policies['images.generate'];
+  }
+
+  if (operations.imagesEdit) {
+    policies['images.edit'] = true;
+  } else {
+    delete policies['images.edit'];
+  }
+
+  if (operations.responsesImageGeneration) {
+    policies['responses.image_generation'] = true;
+  } else {
+    delete policies['responses.image_generation'];
+  }
+
+  return Object.keys(policies).length > 0 ? policies : undefined;
 }
 
 export function GroupFormModal({
@@ -118,7 +158,7 @@ export function GroupFormModal({
   });
   const [quotas, setQuotas] = useState(parseQuotas(group?.quotas as Record<string, unknown> | undefined));
   const [claudeCodeOnly, setClaudeCodeOnly] = useState(group?.plugin_settings?.claude?.claude_code_only === 'true');
-  const [imageEnabled, setImageEnabled] = useState(group?.plugin_settings?.openai?.image_enabled === 'true');
+  const [openaiOperations, setOpenAIOperations] = useState<OpenAIOperations>(() => parseOpenAIOperations(group?.operation_policies));
   const [imagePrices, setImagePrices] = useState<ImagePrices>(() => parseImagePrices(group?.plugin_settings));
   const [copyFromGroupIds, setCopyFromGroupIds] = useState<number[]>([]);
 
@@ -174,14 +214,18 @@ export function GroupFormModal({
       };
     }
     if (form.platform === 'openai') {
-      pluginSettings.openai = buildOpenAISettings(pluginSettings.openai, imageEnabled, imagePrices);
+      pluginSettings.openai = buildOpenAISettings(pluginSettings.openai, imagePrices);
     }
+    const operationPolicies = form.platform === 'openai'
+      ? buildOperationPolicies(group?.operation_policies, openaiOperations)
+      : group?.operation_policies;
 
     onSubmit({
       ...form,
       force_instructions: form.force_instructions ?? '',
       note: form.note,
       rate_multiplier: rateMultiplier,
+      operation_policies: operationPolicies,
       plugin_settings: Object.keys(pluginSettings).length > 0 ? pluginSettings : undefined,
       quotas: form.subscription_type === 'subscription' ? buildQuotas(quotas) : undefined,
       subscription_type: form.subscription_type as 'standard' | 'subscription',
@@ -406,12 +450,22 @@ export function GroupFormModal({
         {form.platform === 'openai' ? (
           <div className="space-y-3">
             <NativeSwitch
-              isSelected={imageEnabled}
-              label={<span className="text-sm text-text">{t('groups.image_generation')}</span>}
-              onChange={setImageEnabled}
+              isSelected={openaiOperations.imagesGenerate}
+              label={<span className="text-sm text-text">Images API /generations</span>}
+              onChange={(selected) => setOpenAIOperations((current) => ({ ...current, imagesGenerate: selected }))}
+            />
+            <NativeSwitch
+              isSelected={openaiOperations.imagesEdit}
+              label={<span className="text-sm text-text">Images API /edits</span>}
+              onChange={(selected) => setOpenAIOperations((current) => ({ ...current, imagesEdit: selected }))}
+            />
+            <NativeSwitch
+              isSelected={openaiOperations.responsesImageGeneration}
+              label={<span className="text-sm text-text">Responses image_generation</span>}
+              onChange={(selected) => setOpenAIOperations((current) => ({ ...current, responsesImageGeneration: selected }))}
             />
 
-            {imageEnabled ? (
+            {openaiOperations.imagesGenerate || openaiOperations.imagesEdit || openaiOperations.responsesImageGeneration ? (
               <div>
                 <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
                   {t('groups.image_pricing')}

@@ -26,6 +26,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/ent/usersubscription"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 const (
@@ -4295,6 +4296,8 @@ type GroupMutation struct {
 	subscription_type    *group.SubscriptionType
 	quotas               *map[string]interface{}
 	model_routing        *map[string][]int64
+	dispatch_dsl         *sdk.DispatchDSL
+	operation_policies   *map[string]bool
 	plugin_settings      *map[string]map[string]string
 	service_tier         *string
 	force_instructions   *string
@@ -4754,6 +4757,104 @@ func (m *GroupMutation) ModelRoutingCleared() bool {
 func (m *GroupMutation) ResetModelRouting() {
 	m.model_routing = nil
 	delete(m.clearedFields, group.FieldModelRouting)
+}
+
+// SetDispatchDsl sets the "dispatch_dsl" field.
+func (m *GroupMutation) SetDispatchDsl(sd sdk.DispatchDSL) {
+	m.dispatch_dsl = &sd
+}
+
+// DispatchDsl returns the value of the "dispatch_dsl" field in the mutation.
+func (m *GroupMutation) DispatchDsl() (r sdk.DispatchDSL, exists bool) {
+	v := m.dispatch_dsl
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDispatchDsl returns the old "dispatch_dsl" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldDispatchDsl(ctx context.Context) (v sdk.DispatchDSL, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDispatchDsl is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDispatchDsl requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDispatchDsl: %w", err)
+	}
+	return oldValue.DispatchDsl, nil
+}
+
+// ClearDispatchDsl clears the value of the "dispatch_dsl" field.
+func (m *GroupMutation) ClearDispatchDsl() {
+	m.dispatch_dsl = nil
+	m.clearedFields[group.FieldDispatchDsl] = struct{}{}
+}
+
+// DispatchDslCleared returns if the "dispatch_dsl" field was cleared in this mutation.
+func (m *GroupMutation) DispatchDslCleared() bool {
+	_, ok := m.clearedFields[group.FieldDispatchDsl]
+	return ok
+}
+
+// ResetDispatchDsl resets all changes to the "dispatch_dsl" field.
+func (m *GroupMutation) ResetDispatchDsl() {
+	m.dispatch_dsl = nil
+	delete(m.clearedFields, group.FieldDispatchDsl)
+}
+
+// SetOperationPolicies sets the "operation_policies" field.
+func (m *GroupMutation) SetOperationPolicies(value map[string]bool) {
+	m.operation_policies = &value
+}
+
+// OperationPolicies returns the value of the "operation_policies" field in the mutation.
+func (m *GroupMutation) OperationPolicies() (r map[string]bool, exists bool) {
+	v := m.operation_policies
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOperationPolicies returns the old "operation_policies" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldOperationPolicies(ctx context.Context) (v map[string]bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOperationPolicies is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOperationPolicies requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOperationPolicies: %w", err)
+	}
+	return oldValue.OperationPolicies, nil
+}
+
+// ClearOperationPolicies clears the value of the "operation_policies" field.
+func (m *GroupMutation) ClearOperationPolicies() {
+	m.operation_policies = nil
+	m.clearedFields[group.FieldOperationPolicies] = struct{}{}
+}
+
+// OperationPoliciesCleared returns if the "operation_policies" field was cleared in this mutation.
+func (m *GroupMutation) OperationPoliciesCleared() bool {
+	_, ok := m.clearedFields[group.FieldOperationPolicies]
+	return ok
+}
+
+// ResetOperationPolicies resets all changes to the "operation_policies" field.
+func (m *GroupMutation) ResetOperationPolicies() {
+	m.operation_policies = nil
+	delete(m.clearedFields, group.FieldOperationPolicies)
 }
 
 // SetPluginSettings sets the "plugin_settings" field.
@@ -5345,7 +5446,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 17)
 	if m.name != nil {
 		fields = append(fields, group.FieldName)
 	}
@@ -5369,6 +5470,12 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.model_routing != nil {
 		fields = append(fields, group.FieldModelRouting)
+	}
+	if m.dispatch_dsl != nil {
+		fields = append(fields, group.FieldDispatchDsl)
+	}
+	if m.operation_policies != nil {
+		fields = append(fields, group.FieldOperationPolicies)
 	}
 	if m.plugin_settings != nil {
 		fields = append(fields, group.FieldPluginSettings)
@@ -5415,6 +5522,10 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.Quotas()
 	case group.FieldModelRouting:
 		return m.ModelRouting()
+	case group.FieldDispatchDsl:
+		return m.DispatchDsl()
+	case group.FieldOperationPolicies:
+		return m.OperationPolicies()
 	case group.FieldPluginSettings:
 		return m.PluginSettings()
 	case group.FieldServiceTier:
@@ -5454,6 +5565,10 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldQuotas(ctx)
 	case group.FieldModelRouting:
 		return m.OldModelRouting(ctx)
+	case group.FieldDispatchDsl:
+		return m.OldDispatchDsl(ctx)
+	case group.FieldOperationPolicies:
+		return m.OldOperationPolicies(ctx)
 	case group.FieldPluginSettings:
 		return m.OldPluginSettings(ctx)
 	case group.FieldServiceTier:
@@ -5532,6 +5647,20 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetModelRouting(v)
+		return nil
+	case group.FieldDispatchDsl:
+		v, ok := value.(sdk.DispatchDSL)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDispatchDsl(v)
+		return nil
+	case group.FieldOperationPolicies:
+		v, ok := value.(map[string]bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOperationPolicies(v)
 		return nil
 	case group.FieldPluginSettings:
 		v, ok := value.(map[string]map[string]string)
@@ -5645,6 +5774,12 @@ func (m *GroupMutation) ClearedFields() []string {
 	if m.FieldCleared(group.FieldModelRouting) {
 		fields = append(fields, group.FieldModelRouting)
 	}
+	if m.FieldCleared(group.FieldDispatchDsl) {
+		fields = append(fields, group.FieldDispatchDsl)
+	}
+	if m.FieldCleared(group.FieldOperationPolicies) {
+		fields = append(fields, group.FieldOperationPolicies)
+	}
 	if m.FieldCleared(group.FieldPluginSettings) {
 		fields = append(fields, group.FieldPluginSettings)
 	}
@@ -5667,6 +5802,12 @@ func (m *GroupMutation) ClearField(name string) error {
 		return nil
 	case group.FieldModelRouting:
 		m.ClearModelRouting()
+		return nil
+	case group.FieldDispatchDsl:
+		m.ClearDispatchDsl()
+		return nil
+	case group.FieldOperationPolicies:
+		m.ClearOperationPolicies()
 		return nil
 	case group.FieldPluginSettings:
 		m.ClearPluginSettings()
@@ -5702,6 +5843,12 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldModelRouting:
 		m.ResetModelRouting()
+		return nil
+	case group.FieldDispatchDsl:
+		m.ResetDispatchDsl()
+		return nil
+	case group.FieldOperationPolicies:
+		m.ResetOperationPolicies()
 		return nil
 	case group.FieldPluginSettings:
 		m.ResetPluginSettings()

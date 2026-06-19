@@ -1,16 +1,16 @@
 package routing
 
 import (
-	"net/http"
-	"strings"
-
 	"github.com/DevilGenius/airgate-core/ent"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
-type GroupMatchInput struct {
-	Path        string
-	ClientModel string
-	NeedsImage  bool
+type Requirements struct {
+	RequiredOperation string
+	Status            int
+	ErrorType         string
+	Code              string
+	Message           string
 }
 
 type GroupMatchResult struct {
@@ -21,21 +21,47 @@ type GroupMatchResult struct {
 	Message   string
 }
 
-func GroupMatchesRequest(g *ent.Group, input GroupMatchInput) GroupMatchResult {
+func RequirementsFromDispatchPlans(plans []sdk.DispatchPlan) Requirements {
+	if len(plans) == 0 {
+		return Requirements{}
+	}
+	plan := plans[0]
+	return Requirements{
+		RequiredOperation: plan.Gate.RequiredOperation,
+		Status:            plan.Gate.Status,
+		ErrorType:         plan.Gate.ErrorType,
+		Code:              plan.Gate.Code,
+		Message:           plan.Gate.Message,
+	}
+}
+
+func GroupMatchesRequirements(g *ent.Group, requirements Requirements) GroupMatchResult {
 	if g == nil {
 		return GroupMatchResult{}
 	}
-	if !strings.EqualFold(g.Platform, "openai") {
+	if requirements.RequiredOperation == "" {
 		return AllowGroup()
 	}
-	imageEnabled := pluginSettingEnabled(g.PluginSettings, "openai", "image_enabled")
-	if imageEnabled == input.NeedsImage {
+	if groupOperationEnabled(g.OperationPolicies, requirements.RequiredOperation) {
 		return AllowGroup()
 	}
-	if input.NeedsImage {
-		return DenyGroup(http.StatusForbidden, "invalid_request_error", "image_generation_disabled", "当前分组未开启图片生成功能")
+	status := requirements.Status
+	if status == 0 {
+		status = 403
 	}
-	return DenyGroup(http.StatusBadRequest, "invalid_request_error", "chat_generation_disabled", "当前分组未开启对话功能")
+	errType := requirements.ErrorType
+	if errType == "" {
+		errType = "invalid_request_error"
+	}
+	code := requirements.Code
+	if code == "" {
+		code = "operation_disabled"
+	}
+	message := requirements.Message
+	if message == "" {
+		message = "当前分组未开启该操作"
+	}
+	return DenyGroup(status, errType, code, message)
 }
 
 func AllowGroup() GroupMatchResult {
@@ -51,16 +77,9 @@ func DenyGroup(status int, errType, code, message string) GroupMatchResult {
 	}
 }
 
-func pluginSettingEnabled(settings map[string]map[string]string, plugin, key string) bool {
-	for pluginName, kv := range settings {
-		if !strings.EqualFold(pluginName, plugin) {
-			continue
-		}
-		for k, v := range kv {
-			if strings.EqualFold(k, key) {
-				return strings.EqualFold(strings.TrimSpace(v), "true")
-			}
-		}
+func groupOperationEnabled(policies map[string]bool, operation string) bool {
+	if policies == nil || operation == "" {
+		return false
 	}
-	return false
+	return policies[operation]
 }

@@ -6,16 +6,18 @@ import (
 	"strconv"
 
 	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
 // GroupHandler 分组管理 Handler。
 type GroupHandler struct {
-	service *appgroup.Service
+	service   *appgroup.Service
+	scheduler *scheduler.Scheduler
 }
 
 // NewGroupHandler 创建 GroupHandler。
-func NewGroupHandler(service *appgroup.Service) *GroupHandler {
-	return &GroupHandler{service: service}
+func NewGroupHandler(service *appgroup.Service, sched *scheduler.Scheduler) *GroupHandler {
+	return &GroupHandler{service: service, scheduler: sched}
 }
 
 func parseGroupID(raw string) (int, error) {
@@ -35,5 +37,11 @@ func (h *GroupHandler) handleError(logMessage, publicMessage string, err error) 
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage
+	}
+}
+
+func (h *GroupHandler) invalidateRouteGraph() {
+	if h.scheduler != nil {
+		h.scheduler.InvalidateRouteCache(0)
 	}
 }

@@ -1,5 +1,7 @@
 package dto
 
+import sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
+
 // GroupResp 分组响应
 type GroupResp struct {
 	ID                int64                        `json:"id"`
@@ -11,6 +13,8 @@ type GroupResp struct {
 	SubscriptionType  string                       `json:"subscription_type"` // standard / subscription
 	Quotas            map[string]interface{}       `json:"quotas,omitempty"`  // 日/周/月限额
 	ModelRouting      map[string][]int64           `json:"model_routing,omitempty"`
+	DispatchDSL       sdk.DispatchDSL              `json:"dispatch_dsl,omitempty"`
+	OperationPolicies map[string]bool              `json:"operation_policies,omitempty"`
 	PluginSettings    map[string]map[string]string `json:"plugin_settings,omitempty"` // 插件命名空间开关
 	ServiceTier       string                       `json:"service_tier,omitempty"`
 	ForceInstructions string                       `json:"force_instructions,omitempty"`
@@ -41,6 +45,8 @@ type CreateGroupReq struct {
 	SubscriptionType  string                       `json:"subscription_type" binding:"oneof=standard subscription"`
 	Quotas            map[string]interface{}       `json:"quotas"`
 	ModelRouting      map[string][]int64           `json:"model_routing"`
+	DispatchDSL       sdk.DispatchDSL              `json:"dispatch_dsl"`
+	OperationPolicies map[string]bool              `json:"operation_policies"`
 	PluginSettings    map[string]map[string]string `json:"plugin_settings"`
 	ServiceTier       string                       `json:"service_tier" binding:"omitempty,oneof=fast flex"`
 	ForceInstructions string                       `json:"force_instructions"`
@@ -59,6 +65,8 @@ type UpdateGroupReq struct {
 	SubscriptionType  *string                      `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
 	Quotas            map[string]interface{}       `json:"quotas"`
 	ModelRouting      map[string][]int64           `json:"model_routing"`
+	DispatchDSL       *sdk.DispatchDSL             `json:"dispatch_dsl"`
+	OperationPolicies map[string]bool              `json:"operation_policies"`
 	PluginSettings    map[string]map[string]string `json:"plugin_settings"`
 	ServiceTier       *string                      `json:"service_tier" binding:"omitempty,oneof=fast flex"`
 	ForceInstructions *string                      `json:"force_instructions"`

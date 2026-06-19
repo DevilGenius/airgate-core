@@ -19,7 +19,9 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/apikey"
 	entsetting "github.com/DevilGenius/airgate-core/ent/setting"
+	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 )
 
 // API Key 缓存。
@@ -88,12 +90,15 @@ type APIKeyInfo struct {
 	UserMaxConcurrency int
 
 	// 预加载字段，避免 forwarder 重复查询
-	UserBalance            float64                      // 用户余额
-	UserGroupRates         map[int64]float64            // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
-	GroupRateMultiplier    float64                      // 分组倍率
-	GroupServiceTier       string                       // 分组 service tier
-	GroupForceInstructions string                       // 分组强制 instructions
-	GroupPluginSettings    map[string]map[string]string // 分组插件级开关（claude_code_only 等）
+	UserBalance            float64                            // 用户余额
+	UserGroupRates         map[int64]float64                  // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
+	GroupRateMultiplier    float64                            // 分组倍率
+	GroupServiceTier       string                             // 分组 service tier
+	GroupForceInstructions string                             // 分组强制 instructions
+	GroupDispatchDSL       sdk.DispatchDSL                    // 分组级 dispatch 规则覆盖
+	GroupDispatchResolver  *dispatchresolver.CompiledResolver `json:"-"` // 预编译 dispatch 规则
+	GroupOperationPolicies map[string]bool                    // 分组操作开关
+	GroupPluginSettings    map[string]map[string]string       // 分组插件级开关（claude_code_only 等）
 }
 
 // UserGroupRate 返回当前 key 所属分组在 user.group_rates 中的倍率（若存在）。
@@ -198,6 +203,7 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		if e := cached.(apiKeyCacheEntry); time.Now().Before(e.expiresAt) {
 			if e.info != nil {
 				slog.Debug("api_key_cache_hit", sdk.LogFieldAPIKeyID, e.info.KeyID)
+				hydrateAPIKeyInfo(e.info)
 			} else {
 				slog.Debug("api_key_cache_hit_negative", sdk.LogFieldError, e.err)
 			}
@@ -208,6 +214,7 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 	if info, err, ok := loadAPIKeyCacheFromRedis(ctx, hash); ok {
 		if info != nil {
 			slog.Debug("api_key_cache_hit_shared", sdk.LogFieldAPIKeyID, info.KeyID)
+			hydrateAPIKeyInfo(info)
 		} else {
 			slog.Debug("api_key_cache_hit_negative_shared", sdk.LogFieldError, err)
 		}
@@ -279,10 +286,24 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		GroupRateMultiplier:    g.RateMultiplier,
 		GroupServiceTier:       g.ServiceTier,
 		GroupForceInstructions: g.ForceInstructions,
+		GroupDispatchDSL:       g.DispatchDsl,
+		GroupOperationPolicies: g.OperationPolicies,
 		GroupPluginSettings:    g.PluginSettings,
 	}
+	hydrateAPIKeyInfo(info)
 	cacheAPIKeyResult(hash, info, nil)
 	return info, nil
+}
+
+func hydrateAPIKeyInfo(info *APIKeyInfo) {
+	if info == nil || info.GroupDispatchResolver != nil {
+		return
+	}
+	if groupNode := routegraph.Group(info.GroupID); groupNode != nil && groupNode.DispatchResolver != nil {
+		info.GroupDispatchResolver = groupNode.DispatchResolver
+		return
+	}
+	info.GroupDispatchResolver = dispatchresolver.Compile(info.GroupDispatchDSL)
 }
 
 // cacheAPIKeyResult 把验证结果（成功或已知失败）写入缓存。

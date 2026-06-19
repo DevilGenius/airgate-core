@@ -18,8 +18,8 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/forwardpath"
-	"github.com/DevilGenius/airgate-core/internal/modelresolver"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -80,15 +80,24 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	if inst == nil {
 		return nil, false
 	}
-	groupMatchInput := routing.GroupMatchInput{
-		Path:        path,
-		ClientModel: parsed.Model,
-		NeedsImage:  requestNeedsImage(path, parsed.Model, body),
-	}
-	schedulingModels := modelresolver.ResolveSchedulingModels(requestedPlatform, path, parsed.Model)
-	schedulingModel := ""
-	if len(schedulingModels) > 0 {
-		schedulingModel = schedulingModels[0]
+	method := requestTransportMethod(c.Request)
+	dispatchPlans := dispatchresolver.ResolveDispatchPlans(
+		requestedPlatform,
+		keyInfo.GroupDispatchResolver,
+		method,
+		path,
+		parsed.Model,
+	)
+	requirements := routing.Requirements{}
+	if len(dispatchPlans) > 0 {
+		firstPlan := dispatchPlans[0]
+		requirements = routing.Requirements{
+			RequiredOperation: firstPlan.Gate.RequiredOperation,
+			Status:            firstPlan.Gate.Status,
+			ErrorType:         firstPlan.Gate.ErrorType,
+			Code:              firstPlan.Gate.Code,
+			Message:           firstPlan.Gate.Message,
+		}
 	}
 
 	return &forwardState{
@@ -96,9 +105,8 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		requestPath:                 path,
 		body:                        body,
 		model:                       parsed.Model,
-		groupMatchInput:             groupMatchInput,
-		schedulingModels:            schedulingModels,
-		schedulingModel:             schedulingModel,
+		dispatchPlans:               dispatchPlans,
+		requirements:                requirements,
 		stream:                      parsed.Stream,
 		realtime:                    parsed.Stream,
 		sessionID:                   parsed.SessionID,
@@ -153,6 +161,29 @@ func requestPath(c *gin.Context) string {
 		return ""
 	}
 	return c.Request.URL.Path
+}
+
+func requestTransportMethod(req *http.Request) string {
+	if req == nil {
+		return http.MethodGet
+	}
+	if isWebSocketUpgrade(req) {
+		return "WS"
+	}
+	if strings.TrimSpace(req.Method) == "" {
+		return http.MethodGet
+	}
+	return req.Method
+}
+
+func isWebSocketUpgrade(req *http.Request) bool {
+	if req == nil {
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(req.Header.Get("Upgrade")), "websocket") {
+		return false
+	}
+	return strings.Contains(strings.ToLower(req.Header.Get("Connection")), "upgrade")
 }
 
 func validateRequestShape(c *gin.Context, keyInfo *auth.APIKeyInfo, path string, parsed parsedRequest) bool {
@@ -523,20 +554,6 @@ func normalizeReasoningEffort(effort string) string {
 	}
 }
 
-// requestNeedsImage 判断请求是否应走图片分组。
-// 对话模型携带 image_generation tool 仍按对话请求路由，避免普通 Responses
-// 工具调用被图片分组开关挡住；只有 Images API 路径和图像专用模型才强制图片分组。
-func requestNeedsImage(path, model string, _ []byte) bool {
-	return isImageSubmitAPIPath(path) || isImageModel(model)
-}
-
-// requestHasImageWorkload 判断请求是否需要更长的图片工作超时。
-// 这里仍保留 Responses API 的 image_generation tool 识别，用于放宽生成链路
-// 的等待时间，但不参与图片分组路由。
-func requestHasImageWorkload(path, model string, body []byte) bool {
-	return isImageSubmitAPIPath(path) || isImageModel(model) || hasImageGenerationTool(body)
-}
-
 func isImageSubmitAPIPath(path string) bool {
 	switch path {
 	case "/v1/images/generations", "/images/generations",
@@ -553,50 +570,6 @@ func isImageSubmitAPIPath(path string) bool {
 	default:
 		return false
 	}
-}
-
-func isImageModel(model string) bool {
-	return strings.Contains(strings.ToLower(strings.TrimSpace(model)), "image")
-}
-
-func hasImageGenerationTool(body []byte) bool {
-	if len(body) == 0 {
-		return false
-	}
-	var payload struct {
-		Tools []struct {
-			Type string `json:"type"`
-		} `json:"tools"`
-		ToolChoice json.RawMessage `json:"tool_choice"`
-	}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return false
-	}
-	for _, tool := range payload.Tools {
-		if strings.EqualFold(strings.TrimSpace(tool.Type), "image_generation") {
-			return true
-		}
-	}
-	if len(payload.ToolChoice) == 0 {
-		return false
-	}
-	var choiceString string
-	if err := json.Unmarshal(payload.ToolChoice, &choiceString); err == nil {
-		return strings.EqualFold(strings.TrimSpace(choiceString), "image_generation")
-	}
-	var choice struct {
-		Type string `json:"type"`
-		Name string `json:"name"`
-	}
-	if err := json.Unmarshal(payload.ToolChoice, &choice); err == nil {
-		if strings.EqualFold(strings.TrimSpace(choice.Type), "image_generation") {
-			return true
-		}
-		if strings.EqualFold(strings.TrimSpace(choice.Name), "image_generation") {
-			return true
-		}
-	}
-	return false
 }
 
 func parseMultipartFields(body []byte, contentType string) parsedRequest {
@@ -680,17 +653,18 @@ func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest
 	// 路径和方法显式塞进 header：sdk.ForwardRequest 里没有这两字段，
 	// 插件侧 extractForwardedPath 会优先读取这对 header。
 	headers.Set("X-Forwarded-Path", state.requestPath)
-	headers.Set("X-Forwarded-Method", c.Request.Method)
+	headers.Set("X-Forwarded-Method", requestTransportMethod(c.Request))
 	if qs := c.Request.URL.RawQuery; qs != "" {
 		headers.Set("X-Forwarded-Query", qs)
 	}
 
 	req := &sdk.ForwardRequest{
-		Account: buildSDKAccount(state.account),
-		Body:    state.body,
-		Headers: headers,
-		Model:   state.model,
-		Stream:  state.stream,
+		Account:      buildSDKAccount(state.account),
+		Body:         state.body,
+		Headers:      headers,
+		Model:        state.model,
+		DispatchPlan: state.dispatchPlan,
+		Stream:       state.stream,
 	}
 	if state.realtime {
 		req.Writer = c.Writer
@@ -721,6 +695,10 @@ func buildHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Header {
 	}
 	if keyInfo.GroupForceInstructions != "" {
 		headers.Set("X-Airgate-Force-Instructions", keyInfo.GroupForceInstructions)
+	}
+	// 分组级操作开关：X-Airgate-Operation-{operation} 约定。
+	for operation, enabled := range keyInfo.GroupOperationPolicies {
+		headers.Set("X-Airgate-Operation-"+canonicalHeaderToken(operation), strconv.FormatBool(enabled))
 	}
 	// 分组级插件开关：X-Airgate-Plugin-{plugin}-{key} 约定。
 	for plugin, kv := range keyInfo.GroupPluginSettings {

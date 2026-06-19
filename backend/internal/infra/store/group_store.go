@@ -12,6 +12,7 @@ import (
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	entusersubscription "github.com/DevilGenius/airgate-core/ent/usersubscription"
 	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // GroupStore 使用 Ent 实现分组仓储。
@@ -111,6 +112,12 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 		if input.ModelRouting != nil {
 			builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
 		}
+		if len(input.DispatchDSL.Rules) > 0 {
+			builder = builder.SetDispatchDsl(appgroupCloneDispatchDSL(input.DispatchDSL))
+		}
+		if input.OperationPolicies != nil {
+			builder = builder.SetOperationPolicies(appgroupCloneOperationPolicies(input.OperationPolicies))
+		}
 		if input.PluginSettings != nil {
 			builder = builder.SetPluginSettings(appgroupClonePluginSettings(input.PluginSettings))
 		}
@@ -184,6 +191,12 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 	if input.ModelRouting != nil {
 		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
 	}
+	if len(input.DispatchDSL.Rules) > 0 {
+		builder = builder.SetDispatchDsl(appgroupCloneDispatchDSL(input.DispatchDSL))
+	}
+	if input.OperationPolicies != nil {
+		builder = builder.SetOperationPolicies(appgroupCloneOperationPolicies(input.OperationPolicies))
+	}
 	if input.PluginSettings != nil {
 		builder = builder.SetPluginSettings(appgroupClonePluginSettings(input.PluginSettings))
 	}
@@ -227,6 +240,12 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.ModelRouting != nil {
 		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
+	}
+	if input.DispatchDSL != nil {
+		builder = builder.SetDispatchDsl(appgroupCloneDispatchDSL(*input.DispatchDSL))
+	}
+	if input.OperationPolicies != nil {
+		builder = builder.SetOperationPolicies(appgroupCloneOperationPolicies(input.OperationPolicies))
 	}
 	if input.PluginSettings != nil {
 		builder = builder.SetPluginSettings(appgroupClonePluginSettings(input.PluginSettings))
@@ -439,6 +458,8 @@ func mapGroup(item *ent.Group) appgroup.Group {
 		SubscriptionType:  string(item.SubscriptionType),
 		Quotas:            appgroupCloneQuotas(item.Quotas),
 		ModelRouting:      appgroupCloneModelRouting(item.ModelRouting),
+		DispatchDSL:       appgroupCloneDispatchDSL(item.DispatchDsl),
+		OperationPolicies: appgroupCloneOperationPolicies(item.OperationPolicies),
 		PluginSettings:    appgroupClonePluginSettings(item.PluginSettings),
 		ServiceTier:       item.ServiceTier,
 		ForceInstructions: item.ForceInstructions,
@@ -467,6 +488,57 @@ func appgroupCloneModelRouting(input map[string][]int64) map[string][]int64 {
 	cloned := make(map[string][]int64, len(input))
 	for key, value := range input {
 		cloned[key] = append([]int64(nil), value...)
+	}
+	return cloned
+}
+
+func appgroupCloneDispatchDSL(input sdk.DispatchDSL) sdk.DispatchDSL {
+	if len(input.Rules) == 0 {
+		return sdk.DispatchDSL{}
+	}
+	cloned := sdk.DispatchDSL{Rules: make([]sdk.DispatchRule, 0, len(input.Rules))}
+	for _, rule := range input.Rules {
+		next := sdk.DispatchRule{
+			ID:             rule.ID,
+			When:           rule.When,
+			Model:          rule.Model,
+			Operation:      rule.Operation,
+			TimeoutProfile: rule.TimeoutProfile,
+			Gate:           rule.Gate,
+		}
+		if len(rule.Candidates) > 0 {
+			next.Candidates = append([]sdk.DispatchCandidate(nil), rule.Candidates...)
+		}
+		if len(rule.When.Methods) > 0 {
+			next.When.Methods = append([]string(nil), rule.When.Methods...)
+		}
+		if len(rule.When.Paths) > 0 {
+			next.When.Paths = append([]string(nil), rule.When.Paths...)
+		}
+		if len(rule.When.PathPrefixes) > 0 {
+			next.When.PathPrefixes = append([]string(nil), rule.When.PathPrefixes...)
+		}
+		if len(rule.When.Models) > 0 {
+			next.When.Models = append([]string(nil), rule.When.Models...)
+		}
+		if len(rule.When.ModelPrefixes) > 0 {
+			next.When.ModelPrefixes = append([]string(nil), rule.When.ModelPrefixes...)
+		}
+		if len(rule.When.ModelSuffixes) > 0 {
+			next.When.ModelSuffixes = append([]string(nil), rule.When.ModelSuffixes...)
+		}
+		cloned.Rules = append(cloned.Rules, next)
+	}
+	return cloned
+}
+
+func appgroupCloneOperationPolicies(input map[string]bool) map[string]bool {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[string]bool, len(input))
+	for key, value := range input {
+		cloned[key] = value
 	}
 	return cloned
 }

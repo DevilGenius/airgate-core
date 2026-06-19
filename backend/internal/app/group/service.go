@@ -114,6 +114,8 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Group, error) 
 	input.RateMultiplier = &rateMultiplier
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
+	input.DispatchDSL = cloneDispatchDSL(input.DispatchDSL)
+	input.OperationPolicies = cloneOperationPolicies(input.OperationPolicies)
 	input.PluginSettings = clonePluginSettings(input.PluginSettings)
 	g, err := s.repo.Create(ctx, input)
 	if err != nil {
@@ -141,6 +143,11 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Group,
 	}
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
+	if input.DispatchDSL != nil {
+		cloned := cloneDispatchDSL(*input.DispatchDSL)
+		input.DispatchDSL = &cloned
+	}
+	input.OperationPolicies = cloneOperationPolicies(input.OperationPolicies)
 	input.PluginSettings = clonePluginSettings(input.PluginSettings)
 	g, err := s.repo.Update(ctx, id, input)
 	if err != nil {
@@ -153,6 +160,9 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Group,
 	logger.Info("group_update_succeeded", sdk.LogFieldGroupID, id)
 	if input.ModelRouting != nil {
 		logger.Info("group_routing_updated", sdk.LogFieldGroupID, id)
+	}
+	if input.DispatchDSL != nil {
+		logger.Info("group_dispatch_updated", sdk.LogFieldGroupID, id)
 	}
 	return g, err
 }

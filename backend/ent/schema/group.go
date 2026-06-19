@@ -4,6 +4,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // Group 分组
@@ -25,6 +27,8 @@ func (Group) Fields() []ent.Field {
 		field.Enum("subscription_type").Values("standard", "subscription").Default("standard"),
 		field.JSON("quotas", map[string]interface{}{}).Optional(),
 		field.JSON("model_routing", map[string][]int64{}).Optional(),
+		field.JSON("dispatch_dsl", sdk.DispatchDSL{}).Optional(),
+		field.JSON("operation_policies", map[string]bool{}).Optional(),
 		// plugin_settings 按插件命名空间存放细粒度开关，形如
 		//   {"claude": {"claude_code_only": "true"}}
 		// Core 在 buildForwardHeaders 时按约定映射成 X-Airgate-* 头下发给网关插件。

@@ -22,6 +22,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	pluginent "github.com/DevilGenius/airgate-core/ent/plugin"
 	settingent "github.com/DevilGenius/airgate-core/ent/setting"
+	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 )
 
 // pluginGRPCMaxMessageBytes 是与插件之间 gRPC 单条消息的最大字节数（收/发同值）。
@@ -438,6 +439,8 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 	}
 	m.mu.Unlock()
 
+	dispatchresolver.RegisterPlatformDSL(platform, info.DispatchDSL)
+
 	m.extractPluginWebAssets(canonicalName, gateway)
 
 	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
@@ -679,6 +682,9 @@ func (m *Manager) stopPlugin(name string) {
 	delete(m.hostHandles, inst.Name)
 	m.unregisterAliasesLocked(inst.Name, inst.SourceName, inst.BinaryDir)
 	m.mu.Unlock()
+	if inst.Platform != "" {
+		dispatchresolver.UnregisterPlatformDSL(inst.Platform)
+	}
 	defer m.finishPluginStop(stopKeys, stopDone)
 
 	// 摘掉 dev watcher 上的注册（ReloadDev 内部会再 add 回来）

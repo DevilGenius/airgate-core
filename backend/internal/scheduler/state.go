@@ -64,6 +64,8 @@ type StateMachine struct {
 	// 用来清 route 缓存，让下次 SelectAccount 立刻看到新状态；
 	// RateLimited / Degraded 这种"带 state_until 的临时状态"不走这里，由 TTL 兜底。
 	onCriticalTransition func()
+	// onStateSnapshotUpdated 把最新状态镜像同步给热路径只读缓存。
+	onStateSnapshotUpdated func(accountID int, state account.State, stateUntil *time.Time, extra map[string]interface{})
 }
 
 // NewStateMachine 构造状态机。fc 提供 (account, family) 维度的限流冷却，
@@ -79,6 +81,12 @@ func NewStateMachine(db *ent.Client, fc *FamilyCooldown) *StateMachine {
 func (sm *StateMachine) notifyCritical() {
 	if sm.onCriticalTransition != nil {
 		sm.onCriticalTransition()
+	}
+}
+
+func (sm *StateMachine) notifyStateSnapshot(accountID int, state account.State, stateUntil *time.Time, extra map[string]interface{}) {
+	if sm.onStateSnapshotUpdated != nil {
+		sm.onStateSnapshotUpdated(accountID, state, stateUntil, extra)
 	}
 }
 
@@ -211,6 +219,7 @@ func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID i
 		"short_avoidance", !degraded,
 		sdk.LogFieldReason, j.Reason,
 	)
+	sm.notifyStateSnapshot(accountID, account.StateDegraded, &until, extra)
 	sm.recordAccountStateEvent(ctx, accountID, existing, account.StateDegraded, &until, j.Reason, j)
 }
 
@@ -289,15 +298,18 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 	if !force && isUnexpiredTemporaryState(existing, now) {
 		upd := sm.db.Account.UpdateOneID(accountID).
 			SetLastUsedAt(now)
+		var nextExtra map[string]interface{}
 		if hasTransientAvoidanceExtra(existing.Extra) {
-			extra := cloneExtra(existing.Extra)
-			clearTransientAvoidanceExtra(extra)
-			upd = upd.SetExtra(extra).
+			nextExtra = cloneExtra(existing.Extra)
+			clearTransientAvoidanceExtra(nextExtra)
+			upd = upd.SetExtra(nextExtra).
 				SetErrorMsg("")
 		}
 		if err := upd.Exec(dbCtx); err != nil {
 			slog.Warn("scheduler_state_active_touch_failed",
 				sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
+		} else {
+			sm.notifyStateSnapshot(accountID, existing.State, existing.StateUntil, nextExtra)
 		}
 		return
 	}
@@ -321,6 +333,12 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 			sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
 		return
 	}
+	var extra map[string]interface{}
+	if getErr == nil && hasTransientAvoidanceExtra(existing.Extra) {
+		extra = cloneExtra(existing.Extra)
+		clearTransientAvoidanceExtra(extra)
+	}
+	sm.notifyStateSnapshot(accountID, account.StateActive, nil, extra)
 	if prevState != account.StateActive {
 		sm.resolveAccountEvents(ctx, accountID)
 		sm.notifyCritical()
@@ -380,6 +398,12 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 		)
 		return
 	}
+	var nextExtra map[string]interface{}
+	if existing != nil && newState != account.StateDegraded && hasTransientAvoidanceExtra(existing.Extra) {
+		nextExtra = cloneExtra(existing.Extra)
+		clearTransientAvoidanceExtra(nextExtra)
+	}
+	sm.notifyStateSnapshot(accountID, newState, stateUntil, nextExtra)
 	slog.Info("scheduler_state_transition",
 		sdk.LogFieldAccountID, accountID,
 		"state", newState,

@@ -7,17 +7,19 @@ import (
 
 	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
 	appuser "github.com/DevilGenius/airgate-core/internal/app/user"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
 // UserHandler 用户管理 Handler。
 type UserHandler struct {
 	service         *appuser.Service
 	settingsService *appsettings.Service
+	scheduler       *scheduler.Scheduler
 }
 
 // NewUserHandler 创建 UserHandler。
-func NewUserHandler(service *appuser.Service, settingsService *appsettings.Service) *UserHandler {
-	return &UserHandler{service: service, settingsService: settingsService}
+func NewUserHandler(service *appuser.Service, settingsService *appsettings.Service, sched *scheduler.Scheduler) *UserHandler {
+	return &UserHandler{service: service, settingsService: settingsService, scheduler: sched}
 }
 
 func parseUserID(raw string) (int, error) {
@@ -39,5 +41,11 @@ func (h *UserHandler) handleError(logMessage, publicMessage string, err error) (
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage
+	}
+}
+
+func (h *UserHandler) invalidateRouteGraph() {
+	if h.scheduler != nil {
+		h.scheduler.InvalidateRouteCache(0)
 	}
 }

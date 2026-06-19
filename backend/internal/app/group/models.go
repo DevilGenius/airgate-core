@@ -3,6 +3,8 @@ package group
 import (
 	"context"
 	"time"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 const (
@@ -55,6 +57,8 @@ type Group struct {
 	SubscriptionType  string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
+	DispatchDSL       sdk.DispatchDSL
+	OperationPolicies map[string]bool
 	PluginSettings    map[string]map[string]string
 	ServiceTier       string
 	ForceInstructions string
@@ -100,6 +104,8 @@ type CreateInput struct {
 	SubscriptionType  string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
+	DispatchDSL       sdk.DispatchDSL
+	OperationPolicies map[string]bool
 	PluginSettings    map[string]map[string]string
 	ServiceTier       string
 	ForceInstructions string
@@ -118,6 +124,8 @@ type UpdateInput struct {
 	SubscriptionType  *string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
+	DispatchDSL       *sdk.DispatchDSL
+	OperationPolicies map[string]bool
 	PluginSettings    map[string]map[string]string
 	ServiceTier       *string
 	ForceInstructions *string
@@ -153,6 +161,57 @@ func cloneModelRouting(input map[string][]int64) map[string][]int64 {
 	cloned := make(map[string][]int64, len(input))
 	for key, value := range input {
 		cloned[key] = append([]int64(nil), value...)
+	}
+	return cloned
+}
+
+func cloneDispatchDSL(input sdk.DispatchDSL) sdk.DispatchDSL {
+	if len(input.Rules) == 0 {
+		return sdk.DispatchDSL{}
+	}
+	cloned := sdk.DispatchDSL{Rules: make([]sdk.DispatchRule, 0, len(input.Rules))}
+	for _, rule := range input.Rules {
+		next := sdk.DispatchRule{
+			ID:             rule.ID,
+			When:           rule.When,
+			Model:          rule.Model,
+			Operation:      rule.Operation,
+			TimeoutProfile: rule.TimeoutProfile,
+			Gate:           rule.Gate,
+		}
+		if len(rule.Candidates) > 0 {
+			next.Candidates = append([]sdk.DispatchCandidate(nil), rule.Candidates...)
+		}
+		if len(rule.When.Methods) > 0 {
+			next.When.Methods = append([]string(nil), rule.When.Methods...)
+		}
+		if len(rule.When.Paths) > 0 {
+			next.When.Paths = append([]string(nil), rule.When.Paths...)
+		}
+		if len(rule.When.PathPrefixes) > 0 {
+			next.When.PathPrefixes = append([]string(nil), rule.When.PathPrefixes...)
+		}
+		if len(rule.When.Models) > 0 {
+			next.When.Models = append([]string(nil), rule.When.Models...)
+		}
+		if len(rule.When.ModelPrefixes) > 0 {
+			next.When.ModelPrefixes = append([]string(nil), rule.When.ModelPrefixes...)
+		}
+		if len(rule.When.ModelSuffixes) > 0 {
+			next.When.ModelSuffixes = append([]string(nil), rule.When.ModelSuffixes...)
+		}
+		cloned.Rules = append(cloned.Rules, next)
+	}
+	return cloned
+}
+
+func cloneOperationPolicies(input map[string]bool) map[string]bool {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[string]bool, len(input))
+	for key, value := range input {
+		cloned[key] = value
 	}
 	return cloned
 }

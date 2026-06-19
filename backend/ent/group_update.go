@@ -18,6 +18,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/ent/usersubscription"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // GroupUpdate is the builder for updating Group entities.
@@ -145,6 +146,38 @@ func (gu *GroupUpdate) SetModelRouting(m map[string][]int64) *GroupUpdate {
 // ClearModelRouting clears the value of the "model_routing" field.
 func (gu *GroupUpdate) ClearModelRouting() *GroupUpdate {
 	gu.mutation.ClearModelRouting()
+	return gu
+}
+
+// SetDispatchDsl sets the "dispatch_dsl" field.
+func (gu *GroupUpdate) SetDispatchDsl(sd sdk.DispatchDSL) *GroupUpdate {
+	gu.mutation.SetDispatchDsl(sd)
+	return gu
+}
+
+// SetNillableDispatchDsl sets the "dispatch_dsl" field if the given value is not nil.
+func (gu *GroupUpdate) SetNillableDispatchDsl(sd *sdk.DispatchDSL) *GroupUpdate {
+	if sd != nil {
+		gu.SetDispatchDsl(*sd)
+	}
+	return gu
+}
+
+// ClearDispatchDsl clears the value of the "dispatch_dsl" field.
+func (gu *GroupUpdate) ClearDispatchDsl() *GroupUpdate {
+	gu.mutation.ClearDispatchDsl()
+	return gu
+}
+
+// SetOperationPolicies sets the "operation_policies" field.
+func (gu *GroupUpdate) SetOperationPolicies(m map[string]bool) *GroupUpdate {
+	gu.mutation.SetOperationPolicies(m)
+	return gu
+}
+
+// ClearOperationPolicies clears the value of the "operation_policies" field.
+func (gu *GroupUpdate) ClearOperationPolicies() *GroupUpdate {
+	gu.mutation.ClearOperationPolicies()
 	return gu
 }
 
@@ -519,6 +552,18 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if gu.mutation.ModelRoutingCleared() {
 		_spec.ClearField(group.FieldModelRouting, field.TypeJSON)
+	}
+	if value, ok := gu.mutation.DispatchDsl(); ok {
+		_spec.SetField(group.FieldDispatchDsl, field.TypeJSON, value)
+	}
+	if gu.mutation.DispatchDslCleared() {
+		_spec.ClearField(group.FieldDispatchDsl, field.TypeJSON)
+	}
+	if value, ok := gu.mutation.OperationPolicies(); ok {
+		_spec.SetField(group.FieldOperationPolicies, field.TypeJSON, value)
+	}
+	if gu.mutation.OperationPoliciesCleared() {
+		_spec.ClearField(group.FieldOperationPolicies, field.TypeJSON)
 	}
 	if value, ok := gu.mutation.PluginSettings(); ok {
 		_spec.SetField(group.FieldPluginSettings, field.TypeJSON, value)
@@ -901,6 +946,38 @@ func (guo *GroupUpdateOne) SetModelRouting(m map[string][]int64) *GroupUpdateOne
 // ClearModelRouting clears the value of the "model_routing" field.
 func (guo *GroupUpdateOne) ClearModelRouting() *GroupUpdateOne {
 	guo.mutation.ClearModelRouting()
+	return guo
+}
+
+// SetDispatchDsl sets the "dispatch_dsl" field.
+func (guo *GroupUpdateOne) SetDispatchDsl(sd sdk.DispatchDSL) *GroupUpdateOne {
+	guo.mutation.SetDispatchDsl(sd)
+	return guo
+}
+
+// SetNillableDispatchDsl sets the "dispatch_dsl" field if the given value is not nil.
+func (guo *GroupUpdateOne) SetNillableDispatchDsl(sd *sdk.DispatchDSL) *GroupUpdateOne {
+	if sd != nil {
+		guo.SetDispatchDsl(*sd)
+	}
+	return guo
+}
+
+// ClearDispatchDsl clears the value of the "dispatch_dsl" field.
+func (guo *GroupUpdateOne) ClearDispatchDsl() *GroupUpdateOne {
+	guo.mutation.ClearDispatchDsl()
+	return guo
+}
+
+// SetOperationPolicies sets the "operation_policies" field.
+func (guo *GroupUpdateOne) SetOperationPolicies(m map[string]bool) *GroupUpdateOne {
+	guo.mutation.SetOperationPolicies(m)
+	return guo
+}
+
+// ClearOperationPolicies clears the value of the "operation_policies" field.
+func (guo *GroupUpdateOne) ClearOperationPolicies() *GroupUpdateOne {
+	guo.mutation.ClearOperationPolicies()
 	return guo
 }
 
@@ -1305,6 +1382,18 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	}
 	if guo.mutation.ModelRoutingCleared() {
 		_spec.ClearField(group.FieldModelRouting, field.TypeJSON)
+	}
+	if value, ok := guo.mutation.DispatchDsl(); ok {
+		_spec.SetField(group.FieldDispatchDsl, field.TypeJSON, value)
+	}
+	if guo.mutation.DispatchDslCleared() {
+		_spec.ClearField(group.FieldDispatchDsl, field.TypeJSON)
+	}
+	if value, ok := guo.mutation.OperationPolicies(); ok {
+		_spec.SetField(group.FieldOperationPolicies, field.TypeJSON, value)
+	}
+	if guo.mutation.OperationPoliciesCleared() {
+		_spec.ClearField(group.FieldOperationPolicies, field.TypeJSON)
 	}
 	if value, ok := guo.mutation.PluginSettings(); ok {
 		_spec.SetField(group.FieldPluginSettings, field.TypeJSON, value)

@@ -805,14 +805,23 @@ func TestBuildPluginRequestRemovesPreviousResponseHeadersAfterRecovery(t *testin
 func TestRoutesForAPIKeyUsesBoundGroupOnly(t *testing.T) {
 	t.Parallel()
 
-	settings := map[string]map[string]string{"openai": {"image_enabled": "true"}}
+	settings := map[string]map[string]string{"openai": {"image_price_1k": "0.01"}}
 	state := &forwardState{
-		groupMatchInput: routing.GroupMatchInput{NeedsImage: true},
+		dispatchPlans: []sdk.DispatchPlan{{
+			Operation: "responses.image_generation",
+			Gate: sdk.DispatchGate{
+				RequiredOperation: "responses.image_generation",
+			},
+		}},
+		requirements: routing.Requirements{
+			RequiredOperation: "responses.image_generation",
+		},
 		keyInfo: &auth.APIKeyInfo{
 			GroupID:                42,
 			GroupPlatform:          "openai",
 			GroupRateMultiplier:    1.5,
 			UserGroupRates:         map[int64]float64{42: 0.7, 99: 0.1},
+			GroupOperationPolicies: map[string]bool{"responses.image_generation": true},
 			GroupPluginSettings:    settings,
 			GroupServiceTier:       "priority",
 			GroupForceInstructions: "stay concise",
@@ -830,12 +839,12 @@ func TestRoutesForAPIKeyUsesBoundGroupOnly(t *testing.T) {
 	if route.EffectiveRate != 0.7 {
 		t.Fatalf("EffectiveRate = %v, want 0.7", route.EffectiveRate)
 	}
-	if route.GroupPluginSettings["openai"]["image_enabled"] != "true" {
-		t.Fatalf("image_enabled not preserved")
+	if route.GroupPluginSettings["openai"]["image_price_1k"] != "0.01" {
+		t.Fatalf("image price not preserved")
 	}
 
-	settings["openai"]["image_enabled"] = "false"
-	if route.GroupPluginSettings["openai"]["image_enabled"] != "true" {
+	settings["openai"]["image_price_1k"] = "0.02"
+	if route.GroupPluginSettings["openai"]["image_price_1k"] != "0.01" {
 		t.Fatalf("route plugin settings should be cloned")
 	}
 }
@@ -844,11 +853,19 @@ func TestRoutesForAPIKeyRejectsImageWhenBoundGroupDisabled(t *testing.T) {
 	t.Parallel()
 
 	state := &forwardState{
-		groupMatchInput: routing.GroupMatchInput{NeedsImage: true},
+		dispatchPlans: []sdk.DispatchPlan{{
+			Operation: "responses.image_generation",
+			Gate: sdk.DispatchGate{
+				RequiredOperation: "responses.image_generation",
+			},
+		}},
+		requirements: routing.Requirements{
+			RequiredOperation: "responses.image_generation",
+		},
 		keyInfo: &auth.APIKeyInfo{
-			GroupID:             42,
-			GroupPlatform:       "openai",
-			GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "false"}},
+			GroupID:                42,
+			GroupPlatform:          "openai",
+			GroupOperationPolicies: map[string]bool{},
 		},
 	}
 
@@ -858,18 +875,18 @@ func TestRoutesForAPIKeyRejectsImageWhenBoundGroupDisabled(t *testing.T) {
 	}
 }
 
-func TestRoutesForAPIKeyRejectsChatWhenBoundGroupImageEnabled(t *testing.T) {
+func TestRoutesForAPIKeyAllowsChatWithoutOperationGate(t *testing.T) {
 	t.Parallel()
 
 	state := &forwardState{keyInfo: &auth.APIKeyInfo{
-		GroupID:             42,
-		GroupPlatform:       "openai",
-		GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "true"}},
+		GroupID:                42,
+		GroupPlatform:          "openai",
+		GroupOperationPolicies: map[string]bool{"responses.image_generation": true},
 	}}
 
 	routes := routesForAPIKey(state)
-	if len(routes) != 0 {
-		t.Fatalf("len(routes) = %d, want 0", len(routes))
+	if len(routes) != 1 {
+		t.Fatalf("len(routes) = %d, want 1", len(routes))
 	}
 }
 
@@ -877,10 +894,16 @@ func TestAPIKeyGroupRequirementErrorImageDisabled(t *testing.T) {
 	t.Parallel()
 
 	result := apiKeyGroupMatchResult(&forwardState{
-		groupMatchInput: routing.GroupMatchInput{NeedsImage: true},
+		requirements: routing.Requirements{
+			RequiredOperation: "responses.image_generation",
+			Status:            http.StatusForbidden,
+			ErrorType:         "invalid_request_error",
+			Code:              "responses_image_generation_disabled",
+			Message:           "当前分组未开启文本路径图片生成功能",
+		},
 		keyInfo: &auth.APIKeyInfo{
-			GroupPlatform:       "openai",
-			GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "false"}},
+			GroupPlatform:          "openai",
+			GroupOperationPolicies: map[string]bool{},
 		},
 	})
 	if result.OK {
@@ -889,34 +912,25 @@ func TestAPIKeyGroupRequirementErrorImageDisabled(t *testing.T) {
 	if result.Status != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", result.Status, http.StatusForbidden)
 	}
-	if result.Code != "image_generation_disabled" {
-		t.Fatalf("code = %q, want image_generation_disabled", result.Code)
+	if result.Code != "responses_image_generation_disabled" {
+		t.Fatalf("code = %q, want responses_image_generation_disabled", result.Code)
 	}
-	if result.Message != "当前分组未开启图片生成功能" {
+	if result.Message != "当前分组未开启文本路径图片生成功能" {
 		t.Fatalf("message = %q", result.Message)
 	}
 }
 
-func TestAPIKeyGroupRequirementErrorChatDisabled(t *testing.T) {
+func TestAPIKeyGroupRequirementAllowsPlainChat(t *testing.T) {
 	t.Parallel()
 
 	result := apiKeyGroupMatchResult(&forwardState{
 		keyInfo: &auth.APIKeyInfo{
-			GroupPlatform:       "openai",
-			GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "true"}},
+			GroupPlatform:          "openai",
+			GroupOperationPolicies: map[string]bool{"responses.image_generation": true},
 		},
 	})
-	if result.OK {
-		t.Fatal("OK = true, want false")
-	}
-	if result.Status != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", result.Status, http.StatusBadRequest)
-	}
-	if result.Code != "chat_generation_disabled" {
-		t.Fatalf("code = %q, want chat_generation_disabled", result.Code)
-	}
-	if result.Message != "当前分组未开启对话功能" {
-		t.Fatalf("message = %q", result.Message)
+	if !result.OK {
+		t.Fatalf("OK = false, want true with no operation gate")
 	}
 }
 
@@ -1052,7 +1066,7 @@ func TestRecordAllRoutesAccountUnavailableWritesMonitorEvent(t *testing.T) {
 	state := &forwardState{
 		requestPath:       "/v1/chat/completions",
 		model:             "gpt-4.1",
-		schedulingModel:   "gpt-4.1-mini",
+		dispatchPlan:      sdk.DispatchPlan{SchedulingModel: "gpt-4.1-mini"},
 		requestedPlatform: "openai",
 		plugin:            &PluginInstance{Name: "openai", Platform: "openai"},
 		keyInfo: &auth.APIKeyInfo{

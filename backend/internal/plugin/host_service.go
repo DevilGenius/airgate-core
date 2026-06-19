@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -16,11 +17,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/DevilGenius/airgate-core/ent"
-	"github.com/DevilGenius/airgate-core/ent/account"
-	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
-	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/billing"
-	"github.com/DevilGenius/airgate-core/internal/modelresolver"
+	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	pb "github.com/DevilGenius/airgate-sdk/protocol/proto"
@@ -340,6 +339,9 @@ func decodeHostPayload(payload []byte, out interface{}) error {
 type hostSelectAccountRequest struct {
 	GroupID           int64   `json:"group_id"`
 	Model             string  `json:"model"`
+	Method            string  `json:"method"`
+	Path              string  `json:"path"`
+	Body              any     `json:"body"`
 	SessionID         string  `json:"session_id"`
 	ExcludeAccountIDs []int64 `json:"exclude_account_ids"`
 }
@@ -455,15 +457,9 @@ func (h *HostService) selectAccount(ctx context.Context, req hostSelectAccountRe
 	if req.GroupID <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "group_id 必须 > 0")
 	}
-	g, err := h.db.Group.Get(ctx, int(req.GroupID))
-	if err != nil {
-		if cerr := hostContextError(err); cerr != nil {
-			return nil, cerr
-		}
-		if ent.IsNotFound(err) {
-			return nil, status.Error(codes.NotFound, "分组不存在")
-		}
-		return nil, status.Error(codes.Internal, err.Error())
+	g := routegraph.Group(int(req.GroupID))
+	if g == nil {
+		return nil, status.Error(codes.NotFound, "分组不存在")
 	}
 
 	model := req.Model
@@ -478,7 +474,14 @@ func (h *HostService) selectAccount(ctx context.Context, req hostSelectAccountRe
 		excludeIDs = append(excludeIDs, int(id))
 	}
 
-	acc, _, err := h.pickHostAccount(ctx, g.Platform, int(req.GroupID), model, "", req.SessionID, excludeIDs...)
+	plans := dispatchresolver.ResolveDispatchPlans(
+		g.Platform,
+		g.DispatchResolver,
+		hostForwardMethodFromString(req.Method),
+		req.Path,
+		model,
+	)
+	acc, plan, err := h.pickHostAccount(ctx, plans, g.Platform, g.ID, req.SessionID, excludeIDs...)
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
 			return nil, cerr
@@ -493,6 +496,7 @@ func (h *HostService) selectAccount(ctx context.Context, req hostSelectAccountRe
 		"account_id":   int64(acc.ID),
 		"account_name": acc.Name,
 		"platform":     acc.Platform,
+		"model":        plan.SchedulingModel,
 	}, nil
 }
 
@@ -516,15 +520,9 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 		return errProbeResp("invalid_arg", "group_id 必须 > 0", start), nil
 	}
 
-	g, err := h.db.Group.Get(ctx, int(req.GroupID))
-	if err != nil {
-		if cerr := hostContextError(err); cerr != nil {
-			return nil, cerr
-		}
-		if ent.IsNotFound(err) {
-			return errProbeResp("group_not_found", err.Error(), start), nil
-		}
-		return errProbeResp("internal", err.Error(), start), nil
+	g := routegraph.Group(int(req.GroupID))
+	if g == nil {
+		return errProbeResp("group_not_found", "分组不存在", start), nil
 	}
 	resp["platform"] = g.Platform
 
@@ -539,27 +537,25 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 	}
 	resp["model"] = model
 
+	plans := dispatchresolver.ResolveDispatchPlans(
+		g.Platform,
+		g.DispatchResolver,
+		http.MethodPost,
+		"",
+		model,
+	)
 	// 调度选号
-	acc, schedulingModel, err := h.pickHostAccount(ctx, g.Platform, int(req.GroupID), model, "", "")
+	acc, plan, err := h.pickHostAccount(ctx, plans, g.Platform, g.ID, "")
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
 			return nil, cerr
 		}
 		return errProbeResp("no_account", err.Error(), start), nil
 	}
+	schedulingModel := plan.SchedulingModel
 	resp["account_id"] = int64(acc.ID)
 
-	// 加载完整账号 + proxy
-	accFull, err := h.db.Account.Query().
-		Where(account.IDEQ(acc.ID)).
-		WithProxy().
-		Only(ctx)
-	if err != nil {
-		if cerr := hostContextError(err); cerr != nil {
-			return nil, cerr
-		}
-		return errProbeResp("internal", "加载账号失败: "+err.Error(), start), nil
-	}
+	accFull := acc
 
 	inst := h.manager.GetPluginByPlatform(g.Platform)
 	if inst == nil || inst.Gateway == nil {
@@ -588,8 +584,9 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 			"Content-Type":       {"application/json"},
 			"X-Airgate-Internal": {"probe"},
 		},
-		Model:  model,
-		Stream: false,
+		Model:        model,
+		DispatchPlan: plan,
+		Stream:       false,
 	}
 
 	// 调用插件，限制最长 30s（探测不应卡住调度循环）
@@ -710,7 +707,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 	if err != nil {
 		return nil, err
 	}
-	fwdCtx, cancel := context.WithTimeout(ctx, hostForwardTimeout(req))
+	fwdCtx, cancel := context.WithTimeout(ctx, hostForwardTimeout(routes))
 	defer cancel()
 
 	hardExclude := make([]int, 0, maxHostForwardAttempts*len(routes))
@@ -731,7 +728,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 		}
 
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-			acc, schedulingModel, err := h.pickHostAccount(ctx, route.Platform, route.GroupID, clientModel, req.Path, "", hardExclude...)
+			acc, plan, err := h.pickHostAccount(ctx, route.DispatchPlans, route.Platform, route.GroupID, "", hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return nil, cerr
@@ -739,23 +736,16 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 				slog.Warn("host_forward_pick_account_failed",
 					sdk.LogFieldPlatform, route.Platform,
 					sdk.LogFieldModel, clientModel,
-					"scheduling_models", modelresolver.ResolveSchedulingModels(route.Platform, req.Path, clientModel),
+					"dispatch_models", dispatchSchedulingModels(route.DispatchPlans, clientModel),
 					sdk.LogFieldGroupID, route.GroupID,
 					"effective_rate", route.EffectiveRate,
 					sdk.LogFieldError, err,
 				)
 				break
 			}
+			schedulingModel := plan.SchedulingModel
 
-			accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
-			if err != nil {
-				if cerr := hostContextError(err); cerr != nil {
-					return nil, cerr
-				}
-				slog.Error("host_forward_account_load_failed",
-					sdk.LogFieldAccountID, acc.ID, sdk.LogFieldError, err)
-				return nil, hostForwardGenericError()
-			}
+			accFull := acc
 
 			releaseCapacity, ok := h.acquireHostForwardAccountCapacity(ctx, accFull)
 			if !ok {
@@ -772,11 +762,12 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 
 			headers := hostForwardHeaders(req, route)
 			fwdReq := &sdk.ForwardRequest{
-				Account: hostSDKAccount(accFull),
-				Body:    hostForwardBody(req.Body),
-				Headers: headers,
-				Model:   clientModel,
-				Stream:  false,
+				Account:      hostSDKAccount(accFull),
+				Body:         hostForwardBody(req.Body),
+				Headers:      headers,
+				Model:        clientModel,
+				DispatchPlan: plan,
+				Stream:       false,
 			}
 
 			start := time.Now()
@@ -892,7 +883,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 		}
 
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-			acc, schedulingModel, err := h.pickHostAccount(ctx, route.Platform, route.GroupID, clientModel, req.Path, "", hardExclude...)
+			acc, plan, err := h.pickHostAccount(ctx, route.DispatchPlans, route.Platform, route.GroupID, "", hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return cerr
@@ -900,23 +891,16 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 				slog.Warn("host_forward_stream_pick_account_failed",
 					sdk.LogFieldPlatform, route.Platform,
 					sdk.LogFieldModel, clientModel,
-					"scheduling_models", modelresolver.ResolveSchedulingModels(route.Platform, req.Path, clientModel),
+					"dispatch_models", dispatchSchedulingModels(route.DispatchPlans, clientModel),
 					sdk.LogFieldGroupID, route.GroupID,
 					"effective_rate", route.EffectiveRate,
 					sdk.LogFieldError, err,
 				)
 				break
 			}
+			schedulingModel := plan.SchedulingModel
 
-			accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
-			if err != nil {
-				if cerr := hostContextError(err); cerr != nil {
-					return cerr
-				}
-				slog.Error("host_forward_stream_account_load_failed",
-					sdk.LogFieldAccountID, acc.ID, sdk.LogFieldError, err)
-				return hostForwardGenericError()
-			}
+			accFull := acc
 
 			releaseCapacity, ok := h.acquireHostForwardAccountCapacity(ctx, accFull)
 			if !ok {
@@ -933,12 +917,13 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 
 			fw := &failoverStreamWriter{target: sw}
 			fwdReq := &sdk.ForwardRequest{
-				Account: hostSDKAccount(accFull),
-				Body:    hostForwardBody(req.Body),
-				Headers: hostForwardHeaders(req, route),
-				Model:   clientModel,
-				Stream:  true,
-				Writer:  fw,
+				Account:      hostSDKAccount(accFull),
+				Body:         hostForwardBody(req.Body),
+				Headers:      hostForwardHeaders(req, route),
+				Model:        clientModel,
+				DispatchPlan: plan,
+				Stream:       true,
+				Writer:       fw,
 			}
 
 			start := time.Now()
@@ -1033,8 +1018,8 @@ const (
 	imageHostForwardTimeout   = 300 * time.Second
 )
 
-func hostForwardTimeout(req hostForwardRequest) time.Duration {
-	if requestHasImageWorkload(req.Path, req.Model, hostForwardBody(req.Body)) {
+func hostForwardTimeout(routes []routing.Candidate) time.Duration {
+	if len(routes) > 0 && hasImageTimeoutProfile(routes[0].DispatchPlans) {
 		return imageHostForwardTimeout
 	}
 	return defaultHostForwardTimeout
@@ -1248,18 +1233,13 @@ func (h *HostService) recordHostForwardUsage(
 	return h.recorder.RecordSync(ctx, record)
 }
 
-func (h *HostService) hostForwardSellRate(ctx context.Context, req hostForwardRequest) (float64, error) {
+func (h *HostService) hostForwardSellRate(_ context.Context, req hostForwardRequest) (float64, error) {
 	if req.APIKeyID <= 0 {
 		return 1, nil
 	}
-	ak, err := h.db.APIKey.Query().
-		Where(
-			entapikey.IDEQ(int(req.APIKeyID)),
-			entapikey.HasUserWith(user.IDEQ(int(req.UserID))),
-		).
-		Only(ctx)
-	if err != nil {
-		return 0, err
+	ak := routegraph.APIKey(int(req.APIKeyID))
+	if ak == nil || ak.UserID != int(req.UserID) {
+		return 0, fmt.Errorf("api key not found")
 	}
 	return ak.SellRate, nil
 }
@@ -1425,28 +1405,27 @@ func (h *HostService) deleteAsset(ctx context.Context, req hostDeleteAssetReques
 // 与 grpc/gateway_server.go 的同名函数等价，但跨包引用会引入循环依赖。
 func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequest) ([]routing.Candidate, string, error) {
 	if req.GroupID > 0 {
-		u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserID))).Only(ctx)
-		if err != nil {
-			if cerr := hostContextError(err); cerr != nil {
-				return nil, "", cerr
-			}
-			slog.Error("host_forward_user_lookup_failed",
-				sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
-			return nil, "", hostForwardGenericError()
+		u := routegraph.User(int(req.UserID))
+		if u == nil {
+			return nil, "", status.Error(codes.NotFound, "用户不存在")
 		}
-		g, err := h.db.Group.Get(ctx, int(req.GroupID))
-		if err != nil {
-			if cerr := hostContextError(err); cerr != nil {
-				return nil, "", cerr
-			}
-			if ent.IsNotFound(err) {
-				return nil, "", status.Error(codes.NotFound, "分组不存在")
-			}
-			slog.Error("host_forward_group_lookup_failed",
-				sdk.LogFieldGroupID, req.GroupID, sdk.LogFieldError, err)
-			return nil, "", hostForwardGenericError()
+		g := routegraph.Group(int(req.GroupID))
+		if g == nil {
+			return nil, "", status.Error(codes.NotFound, "分组不存在")
 		}
-		if !routing.GroupMatchesRequest(g, hostForwardGroupMatchInput(req)).OK {
+		clientModel := req.Model
+		if clientModel == "" {
+			clientModel = h.resolveHostModel(g.Platform, "")
+		}
+		plans := dispatchresolver.ResolveDispatchPlans(
+			g.Platform,
+			g.DispatchResolver,
+			hostForwardMethod(req),
+			req.Path,
+			clientModel,
+		)
+		entGroup := &ent.Group{ID: g.ID, Platform: g.Platform, OperationPolicies: g.OperationPolicies}
+		if !routing.GroupMatchesRequirements(entGroup, routing.RequirementsFromDispatchPlans(plans)).OK {
 			slog.Warn("host_forward_group_requirement_unmet",
 				sdk.LogFieldGroupID, req.GroupID,
 				sdk.LogFieldModel, req.Model,
@@ -1461,7 +1440,9 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 			GroupRateMultiplier:    g.RateMultiplier,
 			GroupServiceTier:       g.ServiceTier,
 			GroupForceInstructions: g.ForceInstructions,
+			GroupOperationPolicies: cloneOperationPoliciesHost(g.OperationPolicies),
 			GroupPluginSettings:    clonePluginSettingsHost(g.PluginSettings),
+			DispatchPlans:          cloneDispatchPlansHost(plans),
 			SortWeight:             g.SortWeight,
 		}}, u.Email, nil
 	}
@@ -1473,16 +1454,19 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 	if platform == "" {
 		return nil, "", status.Error(codes.InvalidArgument, "platform 不能为空")
 	}
-	u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserID))).Only(ctx)
-	if err != nil {
-		if cerr := hostContextError(err); cerr != nil {
-			return nil, "", cerr
-		}
-		slog.Error("host_forward_user_lookup_failed",
-			sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
-		return nil, "", hostForwardGenericError()
+	clientModel := req.Model
+	if clientModel == "" {
+		clientModel = h.resolveHostModel(platform, "")
 	}
-	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, hostForwardGroupMatchInput(req))
+	u := routegraph.User(int(req.UserID))
+	if u == nil {
+		return nil, "", status.Error(codes.NotFound, "用户不存在")
+	}
+	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, routing.RequestInput{
+		Method:      hostForwardMethod(req),
+		Path:        req.Path,
+		ClientModel: clientModel,
+	})
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
 			return nil, "", cerr
@@ -1504,15 +1488,6 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 	return routes, u.Email, nil
 }
 
-func hostForwardGroupMatchInput(req hostForwardRequest) routing.GroupMatchInput {
-	body := hostForwardBody(req.Body)
-	return routing.GroupMatchInput{
-		Path:        req.Path,
-		ClientModel: req.Model,
-		NeedsImage:  requestNeedsImage(req.Path, req.Model, body),
-	}
-}
-
 func hostForwardReasoningEffort(req hostForwardRequest) string {
 	return parseBody(hostForwardBody(req.Body), protoHeadersToHTTPHost(req.Headers).Get("Content-Type")).ReasoningEffort
 }
@@ -1528,28 +1503,35 @@ func (h *HostService) resolveHostModel(platform, model string) string {
 	return models[0].ID
 }
 
-func (h *HostService) pickHostAccount(ctx context.Context, platform string, groupID int, clientModel, path, sessionID string, excludeIDs ...int) (*ent.Account, string, error) {
+func (h *HostService) pickHostAccount(ctx context.Context, plans []sdk.DispatchPlan, platform string, groupID int, sessionID string, excludeIDs ...int) (*ent.Account, sdk.DispatchPlan, error) {
+	if len(plans) == 0 {
+		return nil, sdk.DispatchPlan{}, scheduler.ErrNoAvailableAccount
+	}
 	var lastErr error
-	for _, schedulingModel := range modelresolver.ResolveSchedulingModels(platform, path, clientModel) {
+	for _, plan := range plans {
+		schedulingModel := strings.TrimSpace(plan.SchedulingModel)
+		if schedulingModel == "" {
+			continue
+		}
 		acc, err := h.scheduler.SelectAccount(ctx, platform, schedulingModel, 0, groupID, sessionID, excludeIDs...)
 		if err == nil {
-			return acc, schedulingModel, nil
+			return acc, plan, nil
 		}
 		lastErr = err
 		if !errors.Is(err, scheduler.ErrNoAvailableAccount) {
-			return nil, "", err
+			return nil, sdk.DispatchPlan{}, err
 		}
 	}
 	if lastErr != nil {
-		return nil, "", lastErr
+		return nil, sdk.DispatchPlan{}, lastErr
 	}
-	return nil, "", scheduler.ErrNoAvailableAccount
+	return nil, sdk.DispatchPlan{}, scheduler.ErrNoAvailableAccount
 }
 
 func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.Header {
 	headers := protoHeadersToHTTPHost(req.Headers)
 	headers.Set("X-Forwarded-Path", req.Path)
-	headers.Set("X-Forwarded-Method", req.Method)
+	headers.Set("X-Forwarded-Method", hostForwardMethod(req))
 	headers.Set("X-Airgate-Internal", "host-forward")
 	if req.UserID > 0 {
 		headers.Set("X-Airgate-User-ID", strconv.FormatInt(req.UserID, 10))
@@ -1566,6 +1548,9 @@ func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.He
 	if route.GroupForceInstructions != "" {
 		headers.Set("X-Airgate-Force-Instructions", route.GroupForceInstructions)
 	}
+	for operation, enabled := range route.GroupOperationPolicies {
+		headers.Set("X-Airgate-Operation-"+canonicalHeaderToken(operation), strconv.FormatBool(enabled))
+	}
 	for plugin, kv := range route.GroupPluginSettings {
 		for k, v := range kv {
 			if v == "" || !shouldForwardPluginSetting(plugin, k) {
@@ -1575,6 +1560,56 @@ func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.He
 		}
 	}
 	return headers
+}
+
+func hostForwardMethod(req hostForwardRequest) string {
+	if strings.TrimSpace(req.Method) == "" {
+		return http.MethodPost
+	}
+	return req.Method
+}
+
+func hostForwardMethodFromString(method string) string {
+	if strings.TrimSpace(method) == "" {
+		return http.MethodPost
+	}
+	return method
+}
+
+func hasImageTimeoutProfile(plans []sdk.DispatchPlan) bool {
+	for _, plan := range plans {
+		if strings.EqualFold(strings.TrimSpace(plan.TimeoutProfile), "image") {
+			return true
+		}
+	}
+	return false
+}
+
+func dispatchSchedulingModels(plans []sdk.DispatchPlan, fallback string) []string {
+	if len(plans) == 0 {
+		if fallback == "" {
+			return nil
+		}
+		return []string{fallback}
+	}
+	out := make([]string, 0, len(plans))
+	seen := make(map[string]struct{}, len(plans))
+	for _, plan := range plans {
+		model := strings.TrimSpace(plan.SchedulingModel)
+		if model == "" {
+			continue
+		}
+		key := strings.ToLower(model)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, model)
+	}
+	if len(out) == 0 && fallback != "" {
+		return []string{fallback}
+	}
+	return out
 }
 
 func (h *HostService) acquireHostForwardAccountCapacity(ctx context.Context, acc *ent.Account) (func(), bool) {
@@ -1628,17 +1663,9 @@ func (h *HostService) applyHostOutcome(ctx context.Context, accountID int, accFu
 }
 
 func (h *HostService) checkHostForwardBalance(ctx context.Context, userID int64) error {
-	u, err := h.db.User.Query().Where(user.IDEQ(int(userID))).Only(ctx)
-	if err != nil {
-		if cerr := hostContextError(err); cerr != nil {
-			return cerr
-		}
-		if ent.IsNotFound(err) {
-			return status.Error(codes.NotFound, "用户不存在")
-		}
-		slog.Error("host_forward_balance_check_user_lookup_failed",
-			sdk.LogFieldUserID, userID, sdk.LogFieldError, err)
-		return hostForwardGenericError()
+	u := routegraph.User(int(userID))
+	if u == nil {
+		return status.Error(codes.NotFound, "用户不存在")
 	}
 	if u.Balance <= 0 {
 		return hostForwardInsufficientQuotaError()
@@ -1758,7 +1785,7 @@ func errProbeResp(kind, msg string, start time.Time) map[string]interface{} {
 // 图片模型探测需要实际生图（成本高），跳过；如果全是图片模型则返回空。
 func pickProbeModel(models []sdk.ModelInfo) string {
 	for _, m := range models {
-		if !isImageModel(m.ID) {
+		if !m.HasCapability(sdk.ModelCapImageGeneration) {
 			return m.ID
 		}
 	}
@@ -1801,6 +1828,24 @@ func clonePluginSettingsHost(input map[string]map[string]string) map[string]map[
 		cloned[plugin] = cloneStringMapHost(settings)
 	}
 	return cloned
+}
+
+func cloneOperationPoliciesHost(input map[string]bool) map[string]bool {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[string]bool, len(input))
+	for key, value := range input {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func cloneDispatchPlansHost(input []sdk.DispatchPlan) []sdk.DispatchPlan {
+	if len(input) == 0 {
+		return nil
+	}
+	return append([]sdk.DispatchPlan(nil), input...)
 }
 
 // proxyURLFromAccount 从 ent.Account 的 proxy edge 拼装 proxy URL。

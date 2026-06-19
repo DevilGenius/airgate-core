@@ -120,10 +120,10 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 
 	return &HTTPHandlers{
 		Auth:           handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
-		User:           handler.NewUserHandler(userService, settingsService),
+		User:           handler.NewUserHandler(userService, settingsService, dep.Scheduler),
 		Account:        handler.NewAccountHandler(accountService, dep.Scheduler),
-		Group:          handler.NewGroupHandler(groupService),
-		APIKey:         handler.NewAPIKeyHandler(apiKeyService),
+		Group:          handler.NewGroupHandler(groupService, dep.Scheduler),
+		APIKey:         handler.NewAPIKeyHandler(apiKeyService, dep.Scheduler),
 		Subscription:   handler.NewSubscriptionHandler(subscriptionService),
 		Usage:          handler.NewUsageHandler(usageService),
 		Proxy:          handler.NewProxyHandler(proxyService),

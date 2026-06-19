@@ -11,6 +11,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 )
 
 var (
@@ -70,6 +71,7 @@ type Scheduler struct {
 	routeCache       *routeCache
 	responseAffinity *ResponseAffinity
 	currentLoad      func(ctx context.Context, accountID int) int
+	stateCache       *accountStateCache
 }
 
 // SetMonitorRecorder injects the best-effort monitor event recorder.
@@ -86,6 +88,7 @@ func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 	rc := newRouteCache(routeCacheTTL)
 	fc := NewFamilyCooldown(rdb)
 	sm := NewStateMachine(db, fc)
+	stateCache := newAccountStateCache()
 	s := &Scheduler{
 		db:               db,
 		rdb:              rdb,
@@ -98,8 +101,15 @@ func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 		familyCooldown:   fc,
 		routeCache:       rc,
 		responseAffinity: NewResponseAffinity(rdb),
+		stateCache:       stateCache,
 	}
-	s.state.onCriticalTransition = rc.InvalidateAll
+	s.state.onCriticalTransition = func() {
+		rc.InvalidateAll()
+		if err := routegraph.RefreshSync(context.Background(), db); err != nil {
+			slog.Warn("routegraph_refresh_failed", "reason", "critical_transition", "error", err)
+		}
+	}
+	s.state.onStateSnapshotUpdated = stateCache.Store
 	return s
 }
 
@@ -116,9 +126,12 @@ func (s *Scheduler) BindResponseAccount(ctx context.Context, groupID int, platfo
 func (s *Scheduler) InvalidateRouteCache(groupID int) {
 	if groupID <= 0 {
 		s.routeCache.InvalidateAll()
-		return
+	} else {
+		s.routeCache.InvalidateGroup(groupID)
 	}
-	s.routeCache.InvalidateGroup(groupID)
+	if err := routegraph.RefreshSync(context.Background(), s.db); err != nil {
+		slog.Warn("routegraph_refresh_failed", "group_id", groupID, "error", err)
+	}
 }
 
 // Apply 把 forwarder 的判决交给状态机。是 forwarder 与 scheduler 的唯一接触面。

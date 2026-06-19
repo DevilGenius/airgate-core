@@ -17,6 +17,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 )
 
 // SelectAccount 选一个可用账户。流程：
@@ -416,6 +417,9 @@ func (s *Scheduler) maybeRegisterSession(ctx context.Context, selected *ent.Acco
 // 规则与账号列表一起缓存，按 model 过滤的动作每次都重新跑——避免"不同 model 复用同一条缓存"
 // 带来的错配。
 func (s *Scheduler) routeAccounts(ctx context.Context, platform, model string, groupID int) ([]*ent.Account, error) {
+	if groupNode := routegraph.Group(groupID); groupNode != nil {
+		return applyModelRouting(groupNode.Accounts, groupNode.ModelRouting, model), nil
+	}
 	if accounts, routing, ok := s.routeCache.Get(groupID, platform); ok {
 		return applyModelRouting(accounts, routing, model), nil
 	}
@@ -522,6 +526,7 @@ func (s *Scheduler) checkHardAffinitySchedulability(ctx context.Context, acc *en
 }
 
 func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Account, model string, now time.Time, needHardAffinity bool, snapshot *selectionSnapshot) schedulabilityResult {
+	acc = s.stateCache.Apply(acc)
 	base := schedulabilityWithTransientAvoidance(acc, now)
 	hardBase := base
 	if needHardAffinity {

@@ -21,6 +21,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 	"github.com/DevilGenius/airgate-core/internal/safego"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
@@ -79,6 +80,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		appmonitor.WithEventPublisher(eventHub),
 	)
 	sched.SetMonitorRecorder(monitorService)
+	if err := routegraph.RefreshSync(context.Background(), db); err != nil {
+		slog.Warn("routegraph_init_failed", "error", err)
+	}
 
 	// 插件系统组件
 	pluginDir := cfg.Plugins.Dir

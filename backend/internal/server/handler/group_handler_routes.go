@@ -132,6 +132,8 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		SubscriptionType:         req.SubscriptionType,
 		Quotas:                   req.Quotas,
 		ModelRouting:             req.ModelRouting,
+		DispatchDSL:              req.DispatchDSL,
+		OperationPolicies:        req.OperationPolicies,
 		PluginSettings:           req.PluginSettings,
 		ServiceTier:              req.ServiceTier,
 		ForceInstructions:        req.ForceInstructions,
@@ -144,6 +146,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
+	h.invalidateRouteGraph()
 
 	response.Success(c, toGroupRespFromDomain(item))
 }
@@ -170,6 +173,8 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 		SubscriptionType:  req.SubscriptionType,
 		Quotas:            req.Quotas,
 		ModelRouting:      req.ModelRouting,
+		DispatchDSL:       req.DispatchDSL,
+		OperationPolicies: req.OperationPolicies,
 		PluginSettings:    req.PluginSettings,
 		ServiceTier:       req.ServiceTier,
 		ForceInstructions: req.ForceInstructions,
@@ -181,6 +186,7 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
+	h.invalidateRouteGraph()
 
 	response.Success(c, toGroupRespFromDomain(item))
 }
@@ -198,6 +204,7 @@ func (h *GroupHandler) DeleteGroup(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
+	h.invalidateRouteGraph()
 
 	response.Success(c, nil)
 }

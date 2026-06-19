@@ -665,14 +665,16 @@ func routesForAPIKey(state *forwardState) []routing.Candidate {
 	if !apiKeyGroupMatchResult(state).OK {
 		return nil
 	}
-	return []routing.Candidate{keyInfoRoute(state.keyInfo)}
+	route := keyInfoRoute(state.keyInfo)
+	route.DispatchPlans = state.dispatchPlans
+	return []routing.Candidate{route}
 }
 
 func apiKeyGroupMatchResult(state *forwardState) routing.GroupMatchResult {
 	if state == nil || state.keyInfo == nil {
 		return routing.GroupMatchResult{}
 	}
-	return routing.GroupMatchesRequest(entGroupFromKeyInfo(state.keyInfo), state.groupMatchInput)
+	return routing.GroupMatchesRequirements(entGroupFromKeyInfo(state.keyInfo), state.requirements)
 }
 
 func entGroupFromKeyInfo(keyInfo *auth.APIKeyInfo) *ent.Group {
@@ -680,9 +682,9 @@ func entGroupFromKeyInfo(keyInfo *auth.APIKeyInfo) *ent.Group {
 		return nil
 	}
 	return &ent.Group{
-		ID:             keyInfo.GroupID,
-		Platform:       keyInfo.GroupPlatform,
-		PluginSettings: keyInfo.GroupPluginSettings,
+		ID:                keyInfo.GroupID,
+		Platform:          keyInfo.GroupPlatform,
+		OperationPolicies: keyInfo.GroupOperationPolicies,
 	}
 }
 
@@ -694,25 +696,9 @@ func keyInfoRoute(keyInfo *auth.APIKeyInfo) routing.Candidate {
 		GroupRateMultiplier:    keyInfo.GroupRateMultiplier,
 		GroupServiceTier:       keyInfo.GroupServiceTier,
 		GroupForceInstructions: keyInfo.GroupForceInstructions,
-		GroupPluginSettings:    clonePluginSettingsForKey(keyInfo.GroupPluginSettings),
+		GroupOperationPolicies: keyInfo.GroupOperationPolicies,
+		GroupPluginSettings:    keyInfo.GroupPluginSettings,
 	}
-}
-
-func clonePluginSettingsForKey(in map[string]map[string]string) map[string]map[string]string {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make(map[string]map[string]string, len(in))
-	for plugin, settings := range in {
-		if len(settings) == 0 {
-			continue
-		}
-		out[plugin] = make(map[string]string, len(settings))
-		for k, v := range settings {
-			out[plugin][k] = v
-		}
-	}
-	return out
 }
 
 func keyInfoForRoute(base *auth.APIKeyInfo, route routing.Candidate) *auth.APIKeyInfo {
