@@ -3,6 +3,7 @@ package i18n
 import (
 	"embed"
 	"encoding/json"
+	"io/fs"
 	"log/slog"
 )
 
@@ -13,9 +14,13 @@ var localeFS embed.FS
 // 与 Load(dir) 不同的是，调用方不需要确保运行目录下存在 locales/ 目录 —— 这
 // 是裸金属 install.sh / systemd 部署能正常工作的前提。
 func LoadEmbedded() error {
+	return loadEmbeddedFromFS(localeFS)
+}
+
+func loadEmbeddedFromFS(fsys fs.FS) error {
 	files := []string{"zh.json", "en.json"}
 	for _, f := range files {
-		data, err := localeFS.ReadFile("locales/" + f)
+		data, err := fs.ReadFile(fsys, "locales/"+f)
 		if err != nil {
 			slog.Warn("加载嵌入翻译文件失败", "file", f, "error", err)
 			continue

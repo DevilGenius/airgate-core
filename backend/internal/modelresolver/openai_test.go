@@ -5,6 +5,38 @@ import (
 	"testing"
 )
 
+type testResolver struct {
+	models []string
+}
+
+func (r testResolver) ResolveSchedulingModels(string, string) []string {
+	return r.models
+}
+
+func TestResolverRegistryAndFallback(t *testing.T) {
+	Register("", testResolver{models: []string{"ignored"}})
+	Register("empty", nil)
+	Register(" Custom ", testResolver{models: []string{"custom"}})
+
+	if got := ResolveSchedulingModels("custom", "/anything", "client"); !reflect.DeepEqual(got, []string{"custom"}) {
+		t.Fatalf("custom resolver = %#v", got)
+	}
+	if got := ResolveSchedulingModels("missing", "/anything", " Model "); !reflect.DeepEqual(got, []string{"Model"}) {
+		t.Fatalf("fallback resolver = %#v", got)
+	}
+	if got := ForPlatform(" CUSTOM ").ResolveSchedulingModels("", "unused"); !reflect.DeepEqual(got, []string{"custom"}) {
+		t.Fatalf("ForPlatform custom resolver = %#v", got)
+	}
+}
+
+func TestCompactUniqueModels(t *testing.T) {
+	got := compactUniqueModels(" gpt-5 ", "GPT-5", "", "gpt-4")
+	want := []string{"gpt-5", "gpt-4"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("compactUniqueModels = %#v, want %#v", got, want)
+	}
+}
+
 func TestResolveSchedulingModelsForOpenAIAnthropicMessages(t *testing.T) {
 	clearSchedulingModelEnv(t)
 
@@ -55,6 +87,18 @@ func TestResolveSchedulingModelsForOpenAIAnthropicMessages(t *testing.T) {
 			path:  "/v1/messages",
 			model: "gpt-5.4",
 			want:  []string{"gpt-5.4"},
+		},
+		{
+			name:  "Claude 3 使用默认分支",
+			path:  "/v1/messages",
+			model: "claude-3-opus",
+			want:  []string{"gpt-5.5", "gpt-5.4"},
+		},
+		{
+			name:  "空 Claude 模型保持空列表",
+			path:  "/v1/messages",
+			model: " ",
+			want:  []string{},
 		},
 	}
 
@@ -122,6 +166,10 @@ func TestResolveSchedulingModelsIgnoreNonAnthropicRoutes(t *testing.T) {
 			name: "absolute URL without API path",
 			path: "https://example.com?trace=1",
 		},
+		{
+			name: "root path",
+			path: "/",
+		},
 	}
 
 	for _, tt := range tests {
@@ -173,6 +221,12 @@ func TestResolveSchedulingModelsForOpenAIResponsesCompact(t *testing.T) {
 			model: "gpt-5.5-openai-compact",
 			want:  []string{"gpt-5.5-openai-compact"},
 		},
+		{
+			name:  "empty compact base is not stripped",
+			path:  "/v1/responses/compact",
+			model: "-openai-compact",
+			want:  []string{"-openai-compact"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -181,6 +235,29 @@ func TestResolveSchedulingModelsForOpenAIResponsesCompact(t *testing.T) {
 			got := ResolveSchedulingModels("openai", tt.path, tt.model)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("ResolveSchedulingModels() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeMappedModelID(t *testing.T) {
+	tests := []struct {
+		name     string
+		raw      string
+		fallback string
+		want     string
+	}{
+		{name: "blank", raw: " ", fallback: "fallback", want: "fallback"},
+		{name: "openai prefix", raw: "openai/gpt-5", fallback: "fallback", want: "gpt-5"},
+		{name: "oai prefix", raw: "oai/gpt-5", fallback: "fallback", want: "gpt-5"},
+		{name: "provider suffix", raw: "provider@ oai/gpt-5", fallback: "fallback", want: "gpt-5"},
+		{name: "prefix leaves empty", raw: "openai/", fallback: "fallback", want: "fallback"},
+		{name: "trailing at ignored", raw: "provider@", fallback: "fallback", want: "provider@"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeMappedModelID(tt.raw, tt.fallback); got != tt.want {
+				t.Fatalf("normalizeMappedModelID(%q, %q) = %q, want %q", tt.raw, tt.fallback, got, tt.want)
 			}
 		})
 	}

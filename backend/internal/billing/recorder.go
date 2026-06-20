@@ -38,6 +38,35 @@ const (
 
 var errRecorderStopping = errors.New("billing recorder stopping")
 
+var (
+	recorderGo            = safego.Go
+	recorderFlushInterval = flushInterval
+	recorderRetryBackoff  = nextRetryBackoff
+	recorderMaxAttempts   = maxFlushAttempts
+	recorderCommitTx      = func(tx *ent.Tx) error { return tx.Commit() }
+	recorderInsertDialect = func(tx *ent.Tx) string { return tx.Driver().Dialect() }
+	recorderFindUsageID   = func(ctx context.Context, tx *ent.Tx, eventID string) (int, error) {
+		return tx.UsageLog.Query().
+			Where(usagelog.BillingEventIDEQ(eventID)).
+			OnlyID(ctx)
+	}
+	recorderQueryUsageInsert = func(ctx context.Context, tx *ent.Tx, query string, args []any) (usageLogRows, error) {
+		var rows entsql.Rows
+		if err := tx.Driver().Query(ctx, query, args, &rows); err != nil {
+			return nil, err
+		}
+		return &rows, nil
+	}
+	marshalUsageMetadata = json.Marshal
+)
+
+type usageLogRows interface {
+	Close() error
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+}
+
 // UsageRecord 使用记录
 type UsageRecord struct {
 	BillingEventID        string
@@ -188,7 +217,7 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 		if err := applyUsageCharges(ctx, tx, insertedBatch); err != nil {
 			return 0, err
 		}
-		if err := tx.Commit(); err != nil {
+		if err := recorderCommitTx(tx); err != nil {
 			return 0, fmt.Errorf("提交事务失败: %w", err)
 		}
 		r.updateAccountStatsCache(ctx, insertedBatch)
@@ -196,13 +225,11 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 		return inserted[0].ID, nil
 	}
 
-	usageID, err := tx.UsageLog.Query().
-		Where(usagelog.BillingEventIDEQ(record.BillingEventID)).
-		OnlyID(ctx)
+	usageID, err := recorderFindUsageID(ctx, tx, record.BillingEventID)
 	if err != nil {
 		return 0, fmt.Errorf("查询已有 UsageLog 失败 billing_event_id=%s: %w", record.BillingEventID, err)
 	}
-	if err := tx.Commit(); err != nil {
+	if err := recorderCommitTx(tx); err != nil {
 		return 0, fmt.Errorf("提交事务失败: %w", err)
 	}
 	return usageID, nil
@@ -210,8 +237,8 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 
 // Start 启动后台写入 goroutine
 func (r *Recorder) Start() {
-	safego.Go("billing_recorder", r.run)
-	safego.Go("billing_recorder_retry", r.runRetries)
+	recorderGo("billing_recorder", r.run)
+	recorderGo("billing_recorder_retry", r.runRetries)
 }
 
 // Stop 停止写入，等待缓冲区清空
@@ -228,7 +255,7 @@ func (r *Recorder) Stop() {
 func (r *Recorder) run() {
 	defer close(r.stopped)
 
-	ticker := time.NewTicker(flushInterval)
+	ticker := time.NewTicker(recorderFlushInterval)
 	defer ticker.Stop()
 
 	batch := make([]UsageRecord, 0, batchSize)
@@ -311,11 +338,8 @@ func (r *Recorder) runRetries() {
 func (r *Recorder) flushRetryBatch(ctx context.Context, batch []UsageRecord) error {
 	ensureBatchBillingEventIDs(batch)
 	var lastErr error
-	for attempt := 2; attempt <= maxFlushAttempts; attempt++ {
-		backoff := time.Duration(attempt-1) * time.Second
-		if backoff > maxRetryBackoff {
-			backoff = maxRetryBackoff
-		}
+	for attempt := 2; attempt <= recorderMaxAttempts; attempt++ {
+		backoff := recorderRetryBackoff(attempt)
 		if err := r.waitRetry(ctx, backoff); err != nil {
 			if lastErr != nil {
 				return lastErr
@@ -364,7 +388,7 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 		return fmt.Errorf("批量插入 UsageLog 失败: %w", err)
 	}
 	if len(inserted) == 0 {
-		if err := tx.Commit(); err != nil {
+		if err := recorderCommitTx(tx); err != nil {
 			return fmt.Errorf("提交事务失败: %w", err)
 		}
 		return nil
@@ -376,7 +400,7 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 	}
 
 	// 3. 提交事务
-	if err := tx.Commit(); err != nil {
+	if err := recorderCommitTx(tx); err != nil {
 		return fmt.Errorf("提交事务失败: %w", err)
 	}
 	r.updateAccountStatsCache(ctx, insertedBatch)
@@ -393,7 +417,7 @@ func (r *Recorder) insertUsageLogs(ctx context.Context, tx *ent.Tx, batch []Usag
 	if len(batch) == 0 {
 		return nil, nil
 	}
-	dialectName := tx.Driver().Dialect()
+	dialectName := recorderInsertDialect(tx)
 	if dialectName != dialect.Postgres && dialectName != dialect.SQLite {
 		return nil, fmt.Errorf("unsupported billing insert dialect: %s", dialectName)
 	}
@@ -424,8 +448,8 @@ func (r *Recorder) insertUsageLogs(ctx context.Context, tx *ent.Tx, batch []Usag
 	}
 
 	query, args := insert.Query()
-	var rows entsql.Rows
-	if err := tx.Driver().Query(ctx, query, args, &rows); err != nil {
+	rows, err := recorderQueryUsageInsert(ctx, tx, query, args)
+	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
@@ -548,7 +572,7 @@ func usageMetadataValue(metadata map[string]string) (any, error) {
 	if len(metadata) == 0 {
 		return nil, nil
 	}
-	raw, err := json.Marshal(metadata)
+	raw, err := marshalUsageMetadata(metadata)
 	if err != nil {
 		return nil, fmt.Errorf("序列化 usage_metadata 失败: %w", err)
 	}
@@ -690,7 +714,7 @@ func (r *Recorder) scheduleAPIKeyBalanceAlertCheck(batch []UsageRecord) {
 	if len(keyIDs) == 0 {
 		return
 	}
-	safego.Go("api_key_balance_alert_check", func() {
+	recorderGo("api_key_balance_alert_check", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), writeAttemptTimeout)
 		defer cancel()
 		r.checkAPIKeyBalanceAlerts(ctx, keyIDs, callback)
@@ -810,9 +834,6 @@ func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) err
 		keyIDs[k] = struct{}{}
 	}
 	for keyID := range keyIDs {
-		if keyID == 0 {
-			continue
-		}
 		update := tx.APIKey.UpdateOneID(keyID)
 		if billed := keyBilledCosts[keyID]; billed > 0 {
 			update = update.AddUsedQuota(billed)

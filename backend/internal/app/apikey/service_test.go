@@ -284,6 +284,20 @@ func TestCreateOwnedRejectsUnavailableGroup(t *testing.T) {
 	}
 }
 
+func TestCreateOwnedReturnsGenerateKeyError(t *testing.T) {
+	previous := generateAPIKey
+	t.Cleanup(func() { generateAPIKey = previous })
+	generateErr := errors.New("generate failed")
+	generateAPIKey = func() (string, string, error) {
+		return "", "", generateErr
+	}
+
+	_, err := NewService(apiKeyStubRepository{}, testAPIKeySecret).CreateOwned(t.Context(), 7, CreateInput{GroupID: 3})
+	if !errors.Is(err, generateErr) {
+		t.Fatalf("CreateOwned generate error = %v, want %v", err, generateErr)
+	}
+}
+
 func TestRevealOwnedDecryptsKeyAndRejectsLegacyKey(t *testing.T) {
 	encrypted, err := corauth.EncryptAPIKey("sk-secret", testAPIKeySecret)
 	if err != nil {
@@ -314,6 +328,7 @@ func TestUpdateOwnedBuildsMutationAndChecksGroup(t *testing.T) {
 	name := "更新后的 Key"
 	groupID := int64(8)
 	sellRate := 0.0
+	quota := 12.5
 	clearExpiresAt := ""
 	status := "disabled"
 	var captured Mutation
@@ -338,6 +353,7 @@ func TestUpdateOwnedBuildsMutationAndChecksGroup(t *testing.T) {
 		GroupID:        &groupID,
 		IPBlacklist:    []string{"10.0.0.1"},
 		HasIPBlacklist: true,
+		QuotaUSD:       &quota,
 		SellRate:       &sellRate,
 		ExpiresAt:      &clearExpiresAt,
 		Status:         &status,
@@ -356,6 +372,9 @@ func TestUpdateOwnedBuildsMutationAndChecksGroup(t *testing.T) {
 	}
 	if captured.SellRate == nil || *captured.SellRate != 0 {
 		t.Fatalf("0 销售倍率应保留为免费，得到 %+v", captured.SellRate)
+	}
+	if captured.QuotaUSD == nil || *captured.QuotaUSD != quota {
+		t.Fatalf("quota mutation = %+v，期望 %v", captured.QuotaUSD, quota)
 	}
 }
 
@@ -384,6 +403,18 @@ func TestUpdateAdminDoesNotCheckGroupAccess(t *testing.T) {
 	}
 }
 
+func TestUpdateAdminBuildMutationErrors(t *testing.T) {
+	badExpires := "2026-01-01"
+	if _, err := NewService(apiKeyStubRepository{}, testAPIKeySecret).UpdateAdmin(t.Context(), 1, UpdateInput{ExpiresAt: &badExpires}); !errors.Is(err, ErrInvalidExpiresAt) {
+		t.Fatalf("UpdateAdmin invalid expires error = %v", err)
+	}
+
+	badSellRate := -1.0
+	if _, err := NewService(apiKeyStubRepository{}, testAPIKeySecret).UpdateAdmin(t.Context(), 1, UpdateInput{SellRate: &badSellRate}); !errors.Is(err, ErrInvalidSellRate) {
+		t.Fatalf("UpdateAdmin invalid sell rate error = %v", err)
+	}
+}
+
 func TestResetUsageAdminResetsRepositoryUsage(t *testing.T) {
 	var capturedID int
 	service := NewService(apiKeyStubRepository{
@@ -402,6 +433,162 @@ func TestResetUsageAdminResetsRepositoryUsage(t *testing.T) {
 	}
 	if item.ID != 15 || item.UserID != 42 {
 		t.Fatalf("重置结果异常: %+v", item)
+	}
+}
+
+func TestListAndUsageErrorsPropagate(t *testing.T) {
+	repoErr := errors.New("repo failed")
+	service := NewService(apiKeyStubRepository{
+		listByUser: func(context.Context, int, ListFilter) ([]Key, int64, error) { return nil, 0, repoErr },
+		listAdmin:  func(context.Context, ListFilter) ([]Key, int64, error) { return nil, 0, repoErr },
+		keyUsage:   func(context.Context, []int, time.Time) (map[int]UsageCosts, error) { return nil, repoErr },
+	}, testAPIKeySecret)
+
+	if _, err := service.ListByUser(t.Context(), 7, ListFilter{}, "UTC"); !errors.Is(err, repoErr) {
+		t.Fatalf("ListByUser list error = %v", err)
+	}
+	if _, err := service.ListAdmin(t.Context(), ListFilter{}); !errors.Is(err, repoErr) {
+		t.Fatalf("ListAdmin list error = %v", err)
+	}
+
+	usageService := NewService(apiKeyStubRepository{
+		listByUser: func(context.Context, int, ListFilter) ([]Key, int64, error) {
+			return []Key{{ID: 1}}, 1, nil
+		},
+		listAdmin: func(context.Context, ListFilter) ([]Key, int64, error) {
+			return []Key{{ID: 1}}, 1, nil
+		},
+		keyUsage: func(context.Context, []int, time.Time) (map[int]UsageCosts, error) {
+			return nil, repoErr
+		},
+	}, testAPIKeySecret)
+	if _, err := usageService.ListByUser(t.Context(), 7, ListFilter{}, "UTC"); !errors.Is(err, repoErr) {
+		t.Fatalf("ListByUser usage error = %v", err)
+	}
+	if _, err := usageService.ListAdmin(t.Context(), ListFilter{IncludeUsage: true}); !errors.Is(err, repoErr) {
+		t.Fatalf("ListAdmin usage error = %v", err)
+	}
+}
+
+func TestCreateOwnedErrorBranches(t *testing.T) {
+	repoErr := errors.New("repo failed")
+	if _, err := NewService(apiKeyStubRepository{
+		groupAccess: func(context.Context, int, int) (GroupAccess, error) { return GroupAccess{}, repoErr },
+	}, testAPIKeySecret).CreateOwned(t.Context(), 7, CreateInput{GroupID: 3}); !errors.Is(err, repoErr) {
+		t.Fatalf("CreateOwned group access error = %v", err)
+	}
+	if _, err := NewService(apiKeyStubRepository{
+		groupAccess: func(context.Context, int, int) (GroupAccess, error) {
+			return GroupAccess{Exists: false}, nil
+		},
+	}, testAPIKeySecret).CreateOwned(t.Context(), 7, CreateInput{GroupID: 3}); !errors.Is(err, ErrGroupNotFound) {
+		t.Fatalf("CreateOwned missing group error = %v", err)
+	}
+	badExpires := "2026-01-01"
+	if _, err := NewService(apiKeyStubRepository{}, testAPIKeySecret).CreateOwned(t.Context(), 7, CreateInput{GroupID: 3, ExpiresAt: &badExpires}); !errors.Is(err, ErrInvalidExpiresAt) {
+		t.Fatalf("CreateOwned invalid expires error = %v", err)
+	}
+	if _, err := NewService(apiKeyStubRepository{
+		create: func(context.Context, Mutation) (Key, error) { return Key{}, repoErr },
+	}, testAPIKeySecret).CreateOwned(t.Context(), 7, CreateInput{GroupID: 3}); !errors.Is(err, repoErr) {
+		t.Fatalf("CreateOwned persist error = %v", err)
+	}
+	if _, err := NewService(apiKeyStubRepository{}, "bad-secret").CreateOwned(t.Context(), 7, CreateInput{GroupID: 3}); err == nil {
+		t.Fatal("CreateOwned bad secret error = nil, want encryption error")
+	}
+}
+
+func TestUpdateAndResetErrorBranches(t *testing.T) {
+	repoErr := errors.New("repo failed")
+	badExpires := "2026-01-01"
+	badSellRate := -1.0
+	groupID := int64(3)
+
+	if _, err := NewService(apiKeyStubRepository{}, testAPIKeySecret).UpdateOwned(t.Context(), 7, 1, UpdateInput{ExpiresAt: &badExpires}); !errors.Is(err, ErrInvalidExpiresAt) {
+		t.Fatalf("UpdateOwned invalid expires error = %v", err)
+	}
+	if _, err := NewService(apiKeyStubRepository{}, testAPIKeySecret).UpdateOwned(t.Context(), 7, 1, UpdateInput{SellRate: &badSellRate}); !errors.Is(err, ErrInvalidSellRate) {
+		t.Fatalf("UpdateOwned invalid sell rate error = %v", err)
+	}
+	if _, err := NewService(apiKeyStubRepository{
+		groupAccess: func(context.Context, int, int) (GroupAccess, error) {
+			return GroupAccess{Exists: true, Allowed: false}, nil
+		},
+	}, testAPIKeySecret).UpdateOwned(t.Context(), 7, 1, UpdateInput{GroupID: &groupID}); !errors.Is(err, ErrGroupForbidden) {
+		t.Fatalf("UpdateOwned group forbidden error = %v", err)
+	}
+	if _, err := NewService(apiKeyStubRepository{
+		updateOwned: func(context.Context, int, int, Mutation) (Key, error) { return Key{}, repoErr },
+	}, testAPIKeySecret).UpdateOwned(t.Context(), 7, 1, UpdateInput{}); !errors.Is(err, repoErr) {
+		t.Fatalf("UpdateOwned persist error = %v", err)
+	}
+	if _, err := NewService(apiKeyStubRepository{
+		updateAdmin: func(context.Context, int, Mutation) (Key, error) { return Key{}, repoErr },
+	}, testAPIKeySecret).UpdateAdmin(t.Context(), 1, UpdateInput{}); !errors.Is(err, repoErr) {
+		t.Fatalf("UpdateAdmin persist error = %v", err)
+	}
+	if _, err := NewService(apiKeyStubRepository{
+		resetUsageAdmin: func(context.Context, int) (Key, error) { return Key{}, repoErr },
+	}, testAPIKeySecret).ResetUsageAdmin(t.Context(), 1); !errors.Is(err, repoErr) {
+		t.Fatalf("ResetUsageAdmin error = %v", err)
+	}
+}
+
+func TestDeleteOwnedAndRevealErrors(t *testing.T) {
+	repoErr := errors.New("repo failed")
+	var deleted bool
+	service := NewService(apiKeyStubRepository{
+		deleteOwned: func(_ context.Context, userID, id int) error {
+			if userID != 7 || id != 1 {
+				t.Fatalf("DeleteOwned args = %d/%d", userID, id)
+			}
+			deleted = true
+			return nil
+		},
+	}, testAPIKeySecret)
+	if err := service.DeleteOwned(t.Context(), 7, 1); err != nil || !deleted {
+		t.Fatalf("DeleteOwned() = %v deleted=%v", err, deleted)
+	}
+	if err := NewService(apiKeyStubRepository{
+		deleteOwned: func(context.Context, int, int) error { return repoErr },
+	}, testAPIKeySecret).DeleteOwned(t.Context(), 7, 1); !errors.Is(err, repoErr) {
+		t.Fatalf("DeleteOwned error = %v", err)
+	}
+	if _, err := NewService(apiKeyStubRepository{
+		findOwned: func(context.Context, int, int) (Key, error) { return Key{}, repoErr },
+	}, testAPIKeySecret).RevealOwned(t.Context(), 7, 1); !errors.Is(err, repoErr) {
+		t.Fatalf("RevealOwned find error = %v", err)
+	}
+	if _, err := NewService(apiKeyStubRepository{
+		findOwned: func(context.Context, int, int) (Key, error) { return Key{KeyEncrypted: "bad-ciphertext"}, nil },
+	}, testAPIKeySecret).RevealOwned(t.Context(), 7, 1); !errors.Is(err, ErrKeyDecryptFailed) {
+		t.Fatalf("RevealOwned decrypt error = %v", err)
+	}
+}
+
+func TestDisplayKeyPrefixFallbacks(t *testing.T) {
+	if got := DisplayKeyPrefix(Key{KeyHash: "abcdef1234567890"}); got != "sk-abcdef12..." {
+		t.Fatalf("hash display prefix = %q", got)
+	}
+	if got := DisplayKeyPrefix(Key{KeyHash: "short"}); got != "short" {
+		t.Fatalf("short hash display prefix = %q", got)
+	}
+	if got := buildKeyHint("short-key"); got != "short-key" {
+		t.Fatalf("short buildKeyHint = %q", got)
+	}
+}
+
+func TestNormalizeOptionalHelpers(t *testing.T) {
+	if got := normalizeBalanceAlertThreshold(-1); got != 0 {
+		t.Fatalf("negative threshold = %v, want 0", got)
+	}
+	threshold := -3.0
+	if got := normalizeOptionalBalanceAlertThreshold(&threshold); got == nil || *got != 0 {
+		t.Fatalf("optional threshold = %+v, want 0", got)
+	}
+	email := " alert@example.com "
+	if got := normalizeOptionalString(&email); got == nil || *got != "alert@example.com" {
+		t.Fatalf("optional string = %+v, want trimmed email", got)
 	}
 }
 

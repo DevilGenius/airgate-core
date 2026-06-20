@@ -92,6 +92,13 @@ type APIKeyNode struct {
 var (
 	snapshotValue atomic.Value // *Snapshot
 	updateMu      sync.Mutex
+
+	queryRefreshUsers = func(ctx context.Context, db *ent.Client) ([]*ent.User, error) {
+		return db.User.Query().All(ctx)
+	}
+	queryRefreshAPIKeys = func(ctx context.Context, db *ent.Client) ([]*ent.APIKey, error) {
+		return db.APIKey.Query().WithUser().All(ctx)
+	}
 )
 
 func Current() *Snapshot {
@@ -118,12 +125,12 @@ func RefreshSync(ctx context.Context, db *ent.Client) error {
 		return err
 	}
 
-	users, err := db.User.Query().All(ctx)
+	users, err := queryRefreshUsers(ctx, db)
 	if err != nil {
 		return err
 	}
 
-	apiKeys, err := db.APIKey.Query().WithUser().All(ctx)
+	apiKeys, err := queryRefreshAPIKeys(ctx, db)
 	if err != nil {
 		return err
 	}

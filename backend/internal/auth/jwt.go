@@ -11,6 +11,7 @@ import (
 var (
 	ErrInvalidToken = errors.New("无效的 token")
 	ErrTokenExpired = errors.New("token 已过期")
+	parseJWTToken   = jwt.ParseWithClaims
 )
 
 const APIKeySessionRole = "api_key"
@@ -60,7 +61,7 @@ func (m *JWTManager) GenerateToken(userID int, role, email string) (string, erro
 
 // ParseToken 验证并解析 JWT Token
 func (m *JWTManager) ParseToken(tokenStr string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+	token, err := parseJWTToken(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
 		}
@@ -101,7 +102,7 @@ func (m *JWTManager) GenerateAPIKeyToken(userID int, _ string, email string, api
 
 // ParseTokenForRefresh 与 ParseToken 一致，但允许过期不超过 refreshGrace 的 token。
 func (m *JWTManager) ParseTokenForRefresh(tokenStr string, refreshGrace time.Duration) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+	token, err := parseJWTToken(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
 		}

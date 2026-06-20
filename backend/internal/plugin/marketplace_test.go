@@ -2,10 +2,14 @@ package plugin
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestOfficialPluginsIncludeCorePlugins(t *testing.T) {
@@ -100,5 +104,162 @@ func TestMarketplaceSyncErrorAllowsPartialSuccess(t *testing.T) {
 	err = marketplaceSyncError(0, 1, context.Canceled)
 	if err == nil {
 		t.Fatal("marketplaceSyncError() = nil, want error when all GitHub entries fail")
+	}
+}
+
+func TestNewMarketplaceOptionsAndListAvailableClone(t *testing.T) {
+	t.Parallel()
+
+	entries := []MarketplacePlugin{{
+		Name:        "demo",
+		Version:     "1.0.0",
+		Description: "Demo",
+		Type:        "extension",
+	}}
+	market := NewMarketplace(t.TempDir(),
+		WithGithubToken("token"),
+		WithEntries(entries),
+		WithRefreshInterval(time.Second),
+	)
+
+	if market.githubToken != "token" || market.refreshInterval != time.Second {
+		t.Fatalf("options not applied: token=%q interval=%s", market.githubToken, market.refreshInterval)
+	}
+	got, err := market.ListAvailable(context.Background())
+	if err != nil {
+		t.Fatalf("ListAvailable() error = %v", err)
+	}
+	if len(got) != 1 || got[0].Name != "demo" {
+		t.Fatalf("ListAvailable() = %#v", got)
+	}
+	got[0].Name = "mutated"
+	again, err := market.ListAvailable(context.Background())
+	if err != nil {
+		t.Fatalf("ListAvailable() second error = %v", err)
+	}
+	if again[0].Name != "demo" {
+		t.Fatalf("ListAvailable should clone cache, got %#v", again)
+	}
+}
+
+func TestMarketplaceSyncFromURL(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"version":"1","plugins":[{"name":"from-url","version":"2.0.0","type":"gateway"}]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	market := NewMarketplace(t.TempDir(), WithEntries([]MarketplacePlugin{{Name: "fallback"}}))
+	if err := market.SyncFromURL(context.Background(), server.URL); err != nil {
+		t.Fatalf("SyncFromURL() error = %v", err)
+	}
+	got, err := market.ListAvailable(context.Background())
+	if err != nil {
+		t.Fatalf("ListAvailable() error = %v", err)
+	}
+	if len(got) != 1 || got[0].Name != "from-url" || got[0].Version != "2.0.0" {
+		t.Fatalf("synced plugins = %#v", got)
+	}
+}
+
+func TestMarketplaceSyncFromURLErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+	}{
+		{
+			name: "status",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, "nope", http.StatusTeapot)
+			},
+		},
+		{
+			name: "json",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`not-json`))
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := httptest.NewServer(tt.handler)
+			t.Cleanup(server.Close)
+
+			if err := NewMarketplace(t.TempDir()).SyncFromURL(context.Background(), server.URL); err == nil {
+				t.Fatal("SyncFromURL() error = nil, want error")
+			}
+		})
+	}
+}
+
+func TestMarketplaceDownload(t *testing.T) {
+	t.Parallel()
+
+	data := []byte("binary")
+	sum := sha256.Sum256(data)
+	hash := hex.EncodeToString(sum[:])
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(data)
+	}))
+	t.Cleanup(server.Close)
+
+	market := NewMarketplace(t.TempDir())
+	path, err := market.Download(context.Background(), "demo", "1.0.0", server.URL, hash)
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read downloaded file: %v", err)
+	}
+	if string(got) != string(data) {
+		t.Fatalf("downloaded data = %q, want %q", got, data)
+	}
+}
+
+func TestMarketplaceDownloadErrors(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "status") {
+			http.Error(w, "nope", http.StatusBadGateway)
+			return
+		}
+		_, _ = w.Write([]byte("binary"))
+	}))
+	t.Cleanup(server.Close)
+
+	if _, err := NewMarketplace(t.TempDir()).Download(context.Background(), "demo", "1.0.0", server.URL+"/status", ""); err == nil {
+		t.Fatal("Download(non-200) error = nil, want error")
+	}
+	if _, err := NewMarketplace(t.TempDir()).Download(context.Background(), "demo", "1.0.0", server.URL, strings.Repeat("0", 64)); err == nil {
+		t.Fatal("Download(checksum mismatch) error = nil, want error")
+	}
+}
+
+func TestMarketplaceStartStopWithStaticEntries(t *testing.T) {
+	t.Parallel()
+
+	market := NewMarketplace(t.TempDir(),
+		WithEntries([]MarketplacePlugin{{Name: "static", Version: "1.0.0"}}),
+		WithRefreshInterval(time.Hour),
+	)
+	market.Start(context.Background())
+	market.Start(context.Background())
+	market.Stop()
+	market.Stop()
+
+	got, err := market.ListAvailable(context.Background())
+	if err != nil {
+		t.Fatalf("ListAvailable() error = %v", err)
+	}
+	if len(got) != 1 || got[0].Name != "static" {
+		t.Fatalf("cache = %#v", got)
 	}
 }

@@ -378,12 +378,7 @@ func usageWaitForCache[T any](ctx context.Context, rdb *redis.Client, key string
 		timer := time.NewTimer(wait)
 		select {
 		case <-ctx.Done():
-			if !timer.Stop() {
-				select {
-				case <-timer.C:
-				default:
-				}
-			}
+			timer.Stop()
 			return zero, false
 		case <-timer.C:
 		}

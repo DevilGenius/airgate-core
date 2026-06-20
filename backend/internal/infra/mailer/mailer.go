@@ -4,7 +4,9 @@ package mailer
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"net/smtp"
 	"strings"
 
@@ -27,6 +29,28 @@ type Config struct {
 // Mailer SMTP 邮件发送器。
 type Mailer struct {
 	cfg Config
+}
+
+type smtpClient interface {
+	Auth(smtp.Auth) error
+	Mail(string) error
+	Rcpt(string) error
+	Data() (io.WriteCloser, error)
+	Close() error
+}
+
+var (
+	smtpSendMail  = smtp.SendMail
+	dialTLS       = defaultDialTLS
+	newSMTPClient = defaultSMTPClient
+)
+
+func defaultDialTLS(network, addr string, config *tls.Config) (net.Conn, error) {
+	return tls.Dial(network, addr, config)
+}
+
+func defaultSMTPClient(conn net.Conn, host string) (smtpClient, error) {
+	return smtp.NewClient(conn, host)
 }
 
 // New 创建邮件发送器。
@@ -68,7 +92,7 @@ func (m *Mailer) Send(to, subject, body string) error {
 	if m.cfg.UseTLS {
 		err = m.sendTLS(addr, auth, to, []byte(msg))
 	} else {
-		err = smtp.SendMail(addr, auth, m.cfg.FromAddr, []string{to}, []byte(msg))
+		err = smtpSendMail(addr, auth, m.cfg.FromAddr, []string{to}, []byte(msg))
 	}
 	if err != nil {
 		slog.Error("mail_send_failed",
@@ -88,14 +112,14 @@ func (m *Mailer) Send(to, subject, body string) error {
 }
 
 func (m *Mailer) sendTLS(addr string, auth smtp.Auth, to string, msg []byte) error {
-	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: m.cfg.Host})
+	conn, err := dialTLS("tcp", addr, &tls.Config{ServerName: m.cfg.Host})
 	if err != nil {
 		slog.Error("smtp_connect_failed", "host", m.cfg.Host, "port", m.cfg.Port, sdk.LogFieldError, err)
 		return fmt.Errorf("TLS dial: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
 
-	client, err := smtp.NewClient(conn, m.cfg.Host)
+	client, err := newSMTPClient(conn, m.cfg.Host)
 	if err != nil {
 		slog.Error("smtp_connect_failed", "host", m.cfg.Host, "port", m.cfg.Port, sdk.LogFieldError, err)
 		return fmt.Errorf("SMTP client: %w", err)

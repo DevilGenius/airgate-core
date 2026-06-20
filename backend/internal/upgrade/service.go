@@ -27,6 +27,40 @@ import (
 const redisLockKey = "ag:upgrade:lock"
 const redisLockTTL = 10 * time.Minute
 
+type upgradeReadCloser interface {
+	io.Reader
+	Close() error
+}
+
+type upgradeWriteCloser interface {
+	io.Writer
+	Close() error
+}
+
+var (
+	upgradeHTTPGet      = http.Get
+	upgradeExecutable   = os.Executable
+	upgradeEvalSymlinks = filepath.EvalSymlinks
+	upgradeRemove       = os.Remove
+	upgradeChmod        = os.Chmod
+	upgradeRename       = os.Rename
+	upgradeOpen         = defaultUpgradeOpen
+	upgradeOpenFile     = defaultUpgradeOpenFile
+	upgradeSmokeTest    = smokeTest
+	upgradeCommand      = exec.CommandContext
+	upgradeCopyFile     = copyFile
+	upgradeSleep        = time.Sleep
+	upgradeExit         = os.Exit
+)
+
+func defaultUpgradeOpen(path string) (upgradeReadCloser, error) {
+	return os.Open(path)
+}
+
+func defaultUpgradeOpenFile(path string, flag int, perm os.FileMode) (upgradeWriteCloser, error) {
+	return os.OpenFile(path, flag, perm)
+}
+
 // Service 升级服务，对外暴露 Info / Status / Run 三个能力。
 type Service struct {
 	mode   Mode
@@ -58,7 +92,7 @@ func (s *Service) Info(ctx context.Context) (*Info, error) {
 	slog.Info("upgrade_check_start", "current_version", current, "mode", string(s.mode))
 
 	if s.mode == ModeSystemd {
-		if exe, err := os.Executable(); err == nil {
+		if exe, err := upgradeExecutable(); err == nil {
 			info.BinaryPath = exe
 		}
 	}
@@ -162,12 +196,12 @@ func (s *Service) releaseLock(ctx context.Context) {
 func (s *Service) runAsync(target string, asset *Asset) {
 	defer s.releaseLock(context.Background())
 
-	exe, err := os.Executable()
+	exe, err := upgradeExecutable()
 	if err != nil {
 		s.fail(target, "无法定位当前 binary 路径", err)
 		return
 	}
-	exe, err = filepath.EvalSymlinks(exe)
+	exe, err = upgradeEvalSymlinks(exe)
 	if err != nil {
 		s.fail(target, "解析 binary 软链失败", err)
 		return
@@ -179,7 +213,7 @@ func (s *Service) runAsync(target string, asset *Asset) {
 	// === 下载 ===
 	if err := s.download(asset, newPath); err != nil {
 		s.fail(target, "下载新版本失败", err)
-		_ = os.Remove(newPath)
+		_ = upgradeRemove(newPath)
 		return
 	}
 
@@ -187,36 +221,36 @@ func (s *Service) runAsync(target string, asset *Asset) {
 	s.box.update(func(st *Status) { st.State = StateVerifying; st.Message = "校验 SHA256" })
 	if err := s.verifyChecksum(asset, newPath); err != nil {
 		s.fail(target, "SHA256 校验失败", err)
-		_ = os.Remove(newPath)
+		_ = upgradeRemove(newPath)
 		return
 	}
 
 	// === 标记可执行 ===
-	if err := os.Chmod(newPath, 0o755); err != nil {
+	if err := upgradeChmod(newPath, 0o755); err != nil {
 		s.fail(target, "设置可执行位失败", err)
-		_ = os.Remove(newPath)
+		_ = upgradeRemove(newPath)
 		return
 	}
 
 	// === smoke test：直接 exec 新 binary 跑 --version ===
 	s.box.update(func(st *Status) { st.Message = "执行 smoke test" })
-	if err := smokeTest(newPath); err != nil {
+	if err := upgradeSmokeTest(newPath); err != nil {
 		s.fail(target, "新版本 smoke test 失败，已放弃替换", err)
-		_ = os.Remove(newPath)
+		_ = upgradeRemove(newPath)
 		return
 	}
 
 	// === 原子替换 ===
 	s.box.update(func(st *Status) { st.State = StateSwapping; st.Message = "替换 binary" })
 	// 备份当前 binary
-	if err := copyFile(exe, bakPath); err != nil {
+	if err := upgradeCopyFile(exe, bakPath); err != nil {
 		s.fail(target, "备份当前 binary 失败", err)
-		_ = os.Remove(newPath)
+		_ = upgradeRemove(newPath)
 		return
 	}
-	if err := os.Rename(newPath, exe); err != nil {
+	if err := upgradeRename(newPath, exe); err != nil {
 		// 回滚：rename 失败时 .bak 已经存在但 exe 没动，理论上无害；保险起见删 .new
-		_ = os.Remove(newPath)
+		_ = upgradeRemove(newPath)
 		s.fail(target, "原子替换 binary 失败，原版本未受影响", err)
 		return
 	}
@@ -235,12 +269,12 @@ func (s *Service) runAsync(target string, asset *Asset) {
 
 	// 给 HTTP 响应一点时间送出，再退出
 	go func() {
-		time.Sleep(800 * time.Millisecond)
+		upgradeSleep(800 * time.Millisecond)
 		slog.Warn("upgrade_self_exit",
 			"target", target,
 			"rollback_hint", "如反复重启，运行 `mv "+bakPath+" "+exe+"` 回滚",
 		)
-		os.Exit(0)
+		upgradeExit(0)
 	}()
 }
 
@@ -260,7 +294,7 @@ func (s *Service) fail(target, msg string, err error) {
 
 // download 边写边算 progress。
 func (s *Service) download(asset *Asset, dst string) error {
-	resp, err := http.Get(asset.DownloadURL)
+	resp, err := upgradeHTTPGet(asset.DownloadURL)
 	if err != nil {
 		return err
 	}
@@ -269,7 +303,7 @@ func (s *Service) download(asset *Asset, dst string) error {
 		return fmt.Errorf("HTTP 状态码 %d", resp.StatusCode)
 	}
 
-	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, err := upgradeOpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}
@@ -327,7 +361,7 @@ func (s *Service) verifyChecksum(asset *Asset, path string) error {
 		return errors.New("release 缺少 .sha256 校验文件")
 	}
 
-	resp, err := http.Get(checksumAsset.DownloadURL)
+	resp, err := upgradeHTTPGet(checksumAsset.DownloadURL)
 	if err != nil {
 		return err
 	}
@@ -341,7 +375,7 @@ func (s *Service) verifyChecksum(asset *Asset, path string) error {
 		return errors.New("无法解析 .sha256 文件内容")
 	}
 
-	f, err := os.Open(path)
+	f, err := upgradeOpen(path)
 	if err != nil {
 		return err
 	}
@@ -361,7 +395,7 @@ func (s *Service) verifyChecksum(asset *Asset, path string) error {
 func smokeTest(path string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, path, "--version").Output()
+	out, err := upgradeCommand(ctx, path, "--version").Output()
 	if err != nil {
 		return err
 	}
@@ -385,12 +419,12 @@ func pickAsset(assets []Asset, goos, goarch string) (*Asset, error) {
 
 // copyFile 用于备份当前 binary。
 func copyFile(src, dst string) error {
-	in, err := os.Open(src)
+	in, err := upgradeOpen(src)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = in.Close() }()
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+	out, err := upgradeOpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
 	if err != nil {
 		return err
 	}

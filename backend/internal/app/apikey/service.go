@@ -24,6 +24,12 @@ type Service struct {
 	secret string
 }
 
+var (
+	generateAPIKey = auth.GenerateAPIKey
+	encryptAPIKey  = auth.EncryptAPIKey
+	decryptAPIKey  = auth.DecryptAPIKey
+)
+
 // NewService 创建 API Key 服务。
 func NewService(repo Repository, secret string) *Service {
 	return &Service{repo: repo, secret: secret}
@@ -147,7 +153,7 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 		return Key{}, err
 	}
 
-	rawKey, keyHash, err := auth.GenerateAPIKey()
+	rawKey, keyHash, err := generateAPIKey()
 	if err != nil {
 		logger.Error("api_key_create_failed",
 			sdk.LogFieldUserID, userID,
@@ -156,7 +162,7 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 		)
 		return Key{}, err
 	}
-	encrypted, err := auth.EncryptAPIKey(rawKey, s.secret)
+	encrypted, err := encryptAPIKey(rawKey, s.secret)
 	if err != nil {
 		logger.Error("api_key_create_failed",
 			sdk.LogFieldUserID, userID,
@@ -319,7 +325,7 @@ func (s *Service) RevealOwned(ctx context.Context, userID, id int) (Key, error) 
 		)
 		return Key{}, ErrLegacyKeyNotReveal
 	}
-	plainKey, err := auth.DecryptAPIKey(item.KeyEncrypted, s.secret)
+	plainKey, err := decryptAPIKey(item.KeyEncrypted, s.secret)
 	if err != nil {
 		logger.Error("api_key_reveal_failed",
 			sdk.LogFieldUserID, userID,

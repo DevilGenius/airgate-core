@@ -1,9 +1,17 @@
 package setup
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
 )
 
@@ -25,6 +33,11 @@ func TestEnvDBConfigRequiresCompleteEnvironment(t *testing.T) {
 	}
 	if cfg.Host != "db" || cfg.Port != 5432 || cfg.User != "airgate" || cfg.SSLMode != "disable" {
 		t.Fatalf("数据库配置异常: %+v", cfg)
+	}
+
+	t.Setenv("DB_SSLMODE", "require")
+	if cfg := EnvDBConfig(); cfg == nil || cfg.SSLMode != "require" {
+		t.Fatalf("DB_SSLMODE 未生效: %+v", cfg)
 	}
 
 	t.Setenv("DB_PORT", "bad")
@@ -56,6 +69,11 @@ func TestEnvRedisConfigParsesOptionalDB(t *testing.T) {
 	if cfg := EnvRedisConfig(); cfg == nil || cfg.DB != 0 {
 		t.Fatalf("非法 Redis DB 应回退 0，得到 %+v", cfg)
 	}
+
+	t.Setenv("REDIS_PORT", "bad")
+	if got := EnvRedisConfig(); got != nil {
+		t.Fatalf("非法 Redis 端口应返回 nil，得到 %+v", got)
+	}
 }
 
 func TestDatabaseNotExistDetection(t *testing.T) {
@@ -84,6 +102,8 @@ func TestSetupBootstrapErrorDetection(t *testing.T) {
 		{name: "users role missing", err: &pq.Error{Code: "42703"}, want: true},
 		{name: "permission denied", err: &pq.Error{Code: "42501"}, want: false},
 		{name: "network error", err: errors.New("connection refused"), want: false},
+		{name: "nil", err: nil, want: false},
+		{name: "string database missing", err: errors.New("database does not exist"), want: true},
 		{name: "sqlite-style missing table", err: errors.New("no such table: users"), want: true},
 	}
 
@@ -104,11 +124,80 @@ func TestQuoteIdentifierEscapesDoubleQuotes(t *testing.T) {
 	}
 }
 
+func TestNeedsSetupForMissingAndInvalidConfig(t *testing.T) {
+	clearSetupEnv(t)
+	t.Setenv("CONFIG_PATH", filepath.Join(t.TempDir(), "missing.yaml"))
+	if !NeedsSetup() {
+		t.Fatal("missing config should require setup")
+	}
+
+	path := filepath.Join(t.TempDir(), "bad.yaml")
+	if err := os.WriteFile(path, []byte("server: ["), 0o600); err != nil {
+		t.Fatalf("write invalid config: %v", err)
+	}
+	t.Setenv("CONFIG_PATH", path)
+	if !NeedsSetup() {
+		t.Fatal("invalid config should require setup")
+	}
+}
+
+func TestGenerateSecretReturnsHexSecret(t *testing.T) {
+	secret := generateSecret()
+	if len(secret) != 64 {
+		t.Fatalf("secret length = %d, want 64", len(secret))
+	}
+	if _, err := hex.DecodeString(secret); err != nil {
+		t.Fatalf("secret is not hex: %v", err)
+	}
+}
+
+func TestSetupRoutesStatusAndBadJSON(t *testing.T) {
+	clearSetupEnv(t)
+	t.Setenv("CONFIG_PATH", filepath.Join(t.TempDir(), "missing.yaml"))
+	router := gin.New()
+	called := false
+	RegisterRoutesWithCallback(router, func() { called = true })
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/setup/status", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want 200", w.Code)
+	}
+	var statusResp struct {
+		Code int `json:"code"`
+		Data struct {
+			NeedsSetup bool `json:"needs_setup"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &statusResp); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	if !statusResp.Data.NeedsSetup {
+		t.Fatalf("needs_setup = false, want true; body=%s", w.Body.String())
+	}
+
+	for _, path := range []string{"/setup/test-db", "/setup/test-redis", "/setup/install"} {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader("{"))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("%s status = %d, want 400; body=%s", path, w.Code, w.Body.String())
+		}
+	}
+	if called {
+		t.Fatal("install callback should not be called for bad JSON")
+	}
+
+	RegisterRoutes(gin.New())
+}
+
 func clearSetupEnv(t *testing.T) {
 	t.Helper()
 	keys := []string{
 		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE",
 		"REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "REDIS_DB",
+		"CONFIG_PATH",
 	}
 	for _, key := range keys {
 		t.Setenv(key, "")

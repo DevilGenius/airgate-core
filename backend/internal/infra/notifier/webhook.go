@@ -17,6 +17,8 @@ const (
 	maxErrorBodyBytes     = 4096
 )
 
+var newWebhookRequest = http.NewRequestWithContext
+
 // WebhookConfig describes a single webhook notification request.
 type WebhookConfig struct {
 	URL    string
@@ -50,7 +52,7 @@ func SendWebhook(ctx context.Context, cfg WebhookConfig) error {
 		return fmt.Errorf("webhook request body is required")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(cfg.Body))
+	req, err := newWebhookRequest(ctx, http.MethodPost, endpoint, strings.NewReader(cfg.Body))
 	if err != nil {
 		return fmt.Errorf("create webhook request: %w", err)
 	}

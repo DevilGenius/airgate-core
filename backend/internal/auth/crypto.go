@@ -13,6 +13,12 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
+var (
+	newAESCipher = aes.NewCipher
+	newGCM       = cipher.NewGCM
+	nonceReader  = rand.Reader
+)
+
 // deriveAESKey 从 hex 编码的 secret 中取前 32 字节作为 AES-256 密钥
 func deriveAESKey(secret string) ([]byte, error) {
 	raw, err := hex.DecodeString(secret)
@@ -32,18 +38,18 @@ func EncryptAPIKey(plainKey, secret string) (string, error) {
 		return "", err
 	}
 
-	block, err := aes.NewCipher(key)
+	block, err := newAESCipher(key)
 	if err != nil {
 		return "", fmt.Errorf("创建 AES cipher 失败: %w", err)
 	}
 
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := newGCM(block)
 	if err != nil {
 		return "", fmt.Errorf("创建 GCM 失败: %w", err)
 	}
 
 	nonce := make([]byte, gcm.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+	if _, err := io.ReadFull(nonceReader, nonce); err != nil {
 		return "", fmt.Errorf("生成 nonce 失败: %w", err)
 	}
 
@@ -64,12 +70,12 @@ func DecryptAPIKey(encrypted, secret string) (string, error) {
 		return "", fmt.Errorf("base64 解码失败: %w", err)
 	}
 
-	block, err := aes.NewCipher(key)
+	block, err := newAESCipher(key)
 	if err != nil {
 		return "", fmt.Errorf("创建 AES cipher 失败: %w", err)
 	}
 
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := newGCM(block)
 	if err != nil {
 		return "", fmt.Errorf("创建 GCM 失败: %w", err)
 	}

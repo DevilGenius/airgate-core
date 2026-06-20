@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -480,11 +481,17 @@ func TestListKeepsUnknownOAuthPlanFilterExact(t *testing.T) {
 }
 
 type stubRepository struct {
-	create   func(context.Context, CreateInput) (Account, error)
-	update   func(context.Context, int, UpdateInput) (Account, error)
-	findByID func(context.Context, int, LoadOptions) (Account, error)
-	list     func(context.Context, ListFilter) ([]Account, int64, error)
-	listAll  func(context.Context, ListFilter) ([]Account, error)
+	create           func(context.Context, CreateInput) (Account, error)
+	update           func(context.Context, int, UpdateInput) (Account, error)
+	delete           func(context.Context, int) error
+	findByID         func(context.Context, int, LoadOptions) (Account, error)
+	list             func(context.Context, ListFilter) ([]Account, int64, error)
+	listAll          func(context.Context, ListFilter) ([]Account, error)
+	listByPlatform   func(context.Context, string) ([]Account, error)
+	findUsageLogs    func(context.Context, int, time.Time, time.Time) ([]UsageLog, error)
+	batchWindowStats func(context.Context, []int, time.Time) (map[int]AccountWindowStats, error)
+	batchImageStats  func(context.Context, []int, time.Time) (map[int]AccountImageStats, error)
+	saveCredentials  func(context.Context, int, map[string]string) error
 }
 
 type noOpConcurrency struct{}
@@ -521,7 +528,12 @@ func (s stubRepository) Update(ctx context.Context, id int, input UpdateInput) (
 	return Account{ID: id}, nil
 }
 
-func (s stubRepository) Delete(context.Context, int) error { return nil }
+func (s stubRepository) Delete(ctx context.Context, id int) error {
+	if s.delete != nil {
+		return s.delete(ctx, id)
+	}
+	return nil
+}
 
 func (s stubRepository) FindByID(ctx context.Context, id int, opts LoadOptions) (Account, error) {
 	if s.findByID == nil {
@@ -530,23 +542,40 @@ func (s stubRepository) FindByID(ctx context.Context, id int, opts LoadOptions) 
 	return s.findByID(ctx, id, opts)
 }
 
-func (s stubRepository) ListByPlatform(context.Context, string) ([]Account, error) {
+func (s stubRepository) ListByPlatform(ctx context.Context, platform string) ([]Account, error) {
+	if s.listByPlatform != nil {
+		return s.listByPlatform(ctx, platform)
+	}
 	return nil, nil
 }
 
-func (s stubRepository) FindUsageLogs(context.Context, int, time.Time, time.Time) ([]UsageLog, error) {
+func (s stubRepository) FindUsageLogs(ctx context.Context, id int, start, end time.Time) ([]UsageLog, error) {
+	if s.findUsageLogs != nil {
+		return s.findUsageLogs(ctx, id, start, end)
+	}
 	return nil, nil
 }
 
-func (s stubRepository) BatchWindowStats(context.Context, []int, time.Time) (map[int]AccountWindowStats, error) {
+func (s stubRepository) BatchWindowStats(ctx context.Context, ids []int, start time.Time) (map[int]AccountWindowStats, error) {
+	if s.batchWindowStats != nil {
+		return s.batchWindowStats(ctx, ids, start)
+	}
 	return nil, nil
 }
 
-func (s stubRepository) BatchImageStats(context.Context, []int, time.Time) (map[int]AccountImageStats, error) {
+func (s stubRepository) BatchImageStats(ctx context.Context, ids []int, start time.Time) (map[int]AccountImageStats, error) {
+	if s.batchImageStats != nil {
+		return s.batchImageStats(ctx, ids, start)
+	}
 	return nil, nil
 }
 
-func (s stubRepository) SaveCredentials(context.Context, int, map[string]string) error { return nil }
+func (s stubRepository) SaveCredentials(ctx context.Context, id int, credentials map[string]string) error {
+	if s.saveCredentials != nil {
+		return s.saveCredentials(ctx, id, credentials)
+	}
+	return nil
+}
 
 // stubStateWriter 捕获 StateWriter 调用。
 type stubStateWriter struct {
@@ -636,15 +665,19 @@ func TestMarkAccountUsageErrorDisablesNonForbidden(t *testing.T) {
 }
 
 type stubPluginCatalog struct {
-	models []sdk.ModelInfo
-	metas  []plugin.PluginMeta
+	models           []sdk.ModelInfo
+	metas            []plugin.PluginMeta
+	accountTypes     []sdk.AccountType
+	credentialFields []sdk.CredentialField
 }
 
 func (s stubPluginCatalog) GetPluginByPlatform(string) *plugin.PluginInstance { return nil }
 func (s stubPluginCatalog) GetModels(string) []sdk.ModelInfo                  { return s.models }
-func (s stubPluginCatalog) GetAccountTypes(string) []sdk.AccountType          { return nil }
-func (s stubPluginCatalog) GetCredentialFields(string) []sdk.CredentialField  { return nil }
-func (s stubPluginCatalog) GetAllPluginMeta() []plugin.PluginMeta             { return s.metas }
+func (s stubPluginCatalog) GetAccountTypes(string) []sdk.AccountType          { return s.accountTypes }
+func (s stubPluginCatalog) GetCredentialFields(string) []sdk.CredentialField {
+	return s.credentialFields
+}
+func (s stubPluginCatalog) GetAllPluginMeta() []plugin.PluginMeta { return s.metas }
 
 func TestUpdateRoutesManualStateThroughStateWriter(t *testing.T) {
 	state := " Disabled "
@@ -1371,4 +1404,390 @@ func TestPersistRateLimitFromWindows(t *testing.T) {
 	if writer.cleared[1] {
 		t.Errorf("account 1 has no windows, should not call ClearRateLimited")
 	}
+}
+
+func TestAccountServiceSimpleOperationsAndCapacity(t *testing.T) {
+	concurrency := &captureConcurrency{counts: map[int]int{2: 5}}
+	service := NewService(stubRepository{}, nil, concurrency, nil)
+
+	capacity := service.GetCapacity(t.Context(), []int{0, 2, 2, 3})
+	if len(capacity) != 2 || capacity[2] != 5 || capacity[3] != 0 {
+		t.Fatalf("capacity = %+v, want account 2=5 and account 3=0", capacity)
+	}
+	if len(concurrency.captured) != 2 || concurrency.captured[0] != 2 || concurrency.captured[1] != 3 {
+		t.Fatalf("captured capacity IDs = %v, want [2 3]", concurrency.captured)
+	}
+	if got := NewService(stubRepository{}, nil, nil, nil).GetCapacity(t.Context(), []int{4, 4}); got[4] != 0 {
+		t.Fatalf("nil concurrency capacity = %+v, want 4=0", got)
+	}
+
+	var exportFilter ListFilter
+	exported := []Account{{ID: 9, Name: "exported"}}
+	service = NewService(stubRepository{
+		listAll: func(_ context.Context, filter ListFilter) ([]Account, error) {
+			exportFilter = filter
+			return exported, nil
+		},
+	}, stubPluginCatalog{}, nil, nil)
+	gotExported, err := service.ExportAll(t.Context(), ListFilter{Platform: "openai"})
+	if err != nil {
+		t.Fatalf("ExportAll returned error: %v", err)
+	}
+	if len(gotExported) != 1 || gotExported[0].ID != 9 || exportFilter.Platform != "openai" {
+		t.Fatalf("ExportAll result = %+v filter=%+v", gotExported, exportFilter)
+	}
+
+	var deleted []int
+	service = NewService(stubRepository{
+		delete: func(_ context.Context, id int) error {
+			deleted = append(deleted, id)
+			if id == 2 {
+				return errors.New("delete failed")
+			}
+			return nil
+		},
+	}, nil, nil, nil)
+	if err := service.Delete(t.Context(), 1); err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+	result := service.BulkDelete(t.Context(), []int{1, 2, 3})
+	if result.Success != 2 || result.Failed != 1 || !sameIDs(result.SuccessIDs, []int{1, 3}) || !sameIDs(result.FailedIDs, []int{2}) {
+		t.Fatalf("BulkDelete result = %+v", result)
+	}
+	if !sameIDs(deleted, []int{1, 1, 2, 3}) {
+		t.Fatalf("deleted IDs = %v", deleted)
+	}
+}
+
+func TestBulkUpdateMergesExtraPatch(t *testing.T) {
+	var captured UpdateInput
+	service := NewService(stubRepository{
+		findByID: func(_ context.Context, id int, _ LoadOptions) (Account, error) {
+			return Account{ID: id, Extra: map[string]any{"keep": "old", "replace": "old"}}, nil
+		},
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			captured = input
+			return Account{ID: 7, Platform: "openai", Extra: input.Extra}, nil
+		},
+		listAll: func(context.Context, ListFilter) ([]Account, error) {
+			return []Account{{ID: 7, Platform: "openai"}}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs:      []int{7},
+		Extra:    map[string]any{"replace": "new", "added": float64(3)},
+		HasExtra: true,
+	})
+	if result.Success != 1 || result.Failed != 0 {
+		t.Fatalf("BulkUpdate result = %+v, want success", result)
+	}
+	if !captured.HasExtra || captured.Extra["keep"] != "old" || captured.Extra["replace"] != "new" || captured.Extra["added"] != float64(3) {
+		t.Fatalf("captured Extra = %+v", captured.Extra)
+	}
+
+	merged := mergeAnyMap(map[string]any{"a": 1, "b": 2}, map[string]any{"b": 3})
+	if merged["a"] != 1 || merged["b"] != 3 {
+		t.Fatalf("mergeAnyMap = %+v", merged)
+	}
+}
+
+func TestGetStatsUsesResolvedRangeAndRepositoryLogs(t *testing.T) {
+	now := time.Date(2026, 6, 20, 15, 0, 0, 0, time.UTC)
+	var capturedStart, capturedEnd time.Time
+	service := NewService(stubRepository{
+		findByID: func(_ context.Context, id int, _ LoadOptions) (Account, error) {
+			return Account{ID: id, Name: "stats", Platform: "openai", State: "active"}, nil
+		},
+		findUsageLogs: func(_ context.Context, id int, start, end time.Time) ([]UsageLog, error) {
+			if id != 42 {
+				t.Fatalf("FindUsageLogs id = %d, want 42", id)
+			}
+			capturedStart, capturedEnd = start, end
+			return []UsageLog{{Model: "gpt-5", InputTokens: 10, OutputTokens: 5, CreatedAt: now}}, nil
+		},
+	}, nil, nil, nil)
+	service.now = func() time.Time { return now }
+
+	stats, err := service.GetStats(t.Context(), 42, StatsQuery{StartDate: "2026-06-19", EndDate: "2026-06-20", TZ: "UTC"})
+	if err != nil {
+		t.Fatalf("GetStats returned error: %v", err)
+	}
+	if stats.AccountID != 42 || stats.Range.Count != 1 || capturedStart.Format("2006-01-02") != "2026-06-19" || capturedEnd.Format("2006-01-02") != "2026-06-20" {
+		t.Fatalf("stats=%+v start=%v end=%v", stats, capturedStart, capturedEnd)
+	}
+}
+
+func TestParseSingleAccountUsagePluginResponse(t *testing.T) {
+	info, usageErrors, ok := parseSingleAccountUsagePluginResponse(7, []byte(`{
+		"accounts":{"7":{"updated_at":"2026-06-20T00:00:00Z","windows":[{"key":"5h","label":"5h","used_percent":12,"reset_seconds":60}]}},
+		"errors":[{"id":9,"message":"ignored"}]
+	}`))
+	if !ok || len(info.Windows) != 1 || info.Windows[0].Key != "5h" || len(usageErrors) != 1 {
+		t.Fatalf("accounts response info=%+v errors=%+v ok=%v", info, usageErrors, ok)
+	}
+
+	_, usageErrors, ok = parseSingleAccountUsagePluginResponse(7, []byte(`{"errors":[{"id":7,"message":"bad token"}]}`))
+	if ok || len(usageErrors) != 1 || usageErrors[0].Message != "bad token" {
+		t.Fatalf("errors-only response errors=%+v ok=%v", usageErrors, ok)
+	}
+
+	info, usageErrors, ok = parseSingleAccountUsagePluginResponse(7, []byte(`{"credits":{"balance":4.5,"unlimited":true}}`))
+	if !ok || info.Credits == nil || !info.Credits.Unlimited || len(usageErrors) != 0 {
+		t.Fatalf("direct response info=%+v errors=%+v ok=%v", info, usageErrors, ok)
+	}
+
+	for _, body := range [][]byte{[]byte(`{bad json`), []byte(`{}`)} {
+		if info, usageErrors, ok := parseSingleAccountUsagePluginResponse(7, body); ok || len(usageErrors) != 0 || accountUsageInfoHasData(info) {
+			t.Fatalf("invalid/empty body %q parsed as info=%+v errors=%+v ok=%v", string(body), info, usageErrors, ok)
+		}
+	}
+}
+
+func TestHandleSingleAccountUsageErrors(t *testing.T) {
+	writer := newStubStateWriter()
+	service := NewService(stubRepository{}, nil, nil, writer)
+
+	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{
+		{ID: 8, Message: "wrong account"},
+		{ID: 7},
+	})
+	if len(writer.disabled) != 0 || len(writer.degraded) != 0 {
+		t.Fatalf("unexpected state changes for ignored errors: disabled=%+v degraded=%+v", writer.disabled, writer.degraded)
+	}
+
+	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{{ID: 7, Message: "HTTP 403: forbidden"}})
+	if writer.degraded[7] != "HTTP 403: forbidden" {
+		t.Fatalf("forbidden usage error should degrade account, got %+v", writer.degraded)
+	}
+
+	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 9, UpstreamIsPool: true}, []accountUsageError{{ID: 9, Message: "HTTP 401"}})
+	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 10, State: "disabled"}, []accountUsageError{{ID: 10, Message: "HTTP 401"}})
+	if _, ok := writer.disabled[9]; ok {
+		t.Fatal("pool account should not be disabled")
+	}
+	if _, ok := writer.disabled[10]; ok {
+		t.Fatal("disabled account should not be disabled again")
+	}
+}
+
+func TestUsageCacheMemoryHelpers(t *testing.T) {
+	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
+	service := NewService(stubRepository{}, nil, nil, nil)
+	service.now = func() time.Time { return now }
+
+	if got := usageCachePlatformKey("  "); got != "__all__" {
+		t.Fatalf("blank platform key = %q", got)
+	}
+	if got := normalizeAccountIDs([]int{3, 0, 3, 2}); !sameIDs(got, []int{3, 2}) {
+		t.Fatalf("normalizeAccountIDs = %v", got)
+	}
+	if got := usageCacheAccountIDsRefreshKey(" openai ", []int{5, 2, 5}); got != "openai:accounts:2,5" {
+		t.Fatalf("usageCacheAccountIDsRefreshKey = %q", got)
+	}
+
+	info := AccountUsageInfo{Windows: []AccountUsageWindow{{Key: "5h", Label: "5h", ResetAt: now.Add(time.Hour).Format(time.RFC3339)}}}
+	service.setUsageInfoMemoryCache(1, "openai", info, now, now.Add(time.Hour))
+	writes := []accountUsageCacheWrite{{account: Account{ID: 1}, info: info}, {account: Account{ID: 2}, info: info}}
+	existing := service.getUsageInfosForCacheWrites(t.Context(), writes, now)
+	if len(existing) != 1 || len(existing[1].Windows) != 1 {
+		t.Fatalf("existing cache writes = %+v", existing)
+	}
+	if empty := service.getUsageInfosForCacheWrites(t.Context(), nil, now); len(empty) != 0 {
+		t.Fatalf("empty cache writes = %+v", empty)
+	}
+
+	service.updateAccountUsageCaches(t.Context(),
+		[]Account{{ID: 1, Platform: "openai", Type: "oauth"}, {ID: 2, Platform: "openai", Type: "apikey"}, {ID: 3, Platform: "openai", Type: "oauth", State: "disabled"}},
+		map[string]AccountUsageInfo{"1": {Credits: &AccountUsageCredits{Balance: 2}}, "2": info, "3": info},
+	)
+	cached, _, ok := service.getUsageInfoMemoryCache(1)
+	if !ok || cached.Credits == nil || cached.Credits.Balance != 2 || len(cached.Windows) != 1 {
+		t.Fatalf("merged cached account 1 = %+v ok=%v", cached, ok)
+	}
+	if _, _, ok := service.getUsageInfoMemoryCache(2); ok {
+		t.Fatal("apikey account should not be cached by updateAccountUsageCaches")
+	}
+
+	service.writeUsageInfoCache(t.Context(), "openai", 1, AccountUsageInfo{}, now)
+	if _, _, ok := service.getUsageInfoMemoryCache(1); ok {
+		t.Fatal("empty usage info should delete memory cache")
+	}
+	service.updateAccountUsageCache(t.Context(), "openai", 0, info)
+	if _, _, ok := service.getUsageInfoMemoryCache(0); ok {
+		t.Fatal("accountID <= 0 should not create memory cache")
+	}
+
+	service.setUsageInfoMemoryCache(4, "openai", info, now.Add(-2*time.Hour), now.Add(-time.Hour))
+	byAccount, missing := service.getUsageInfosForAccounts(t.Context(), "openai", []Account{
+		{ID: 4, Platform: "openai", Type: "oauth"},
+		{ID: 5, Platform: "openai", Type: "oauth"},
+		{ID: 6, Platform: "openai", Type: "apikey"},
+	})
+	if len(byAccount) != 1 || len(byAccount[4].Windows) != 1 || len(missing) != 2 || missing[0].ID != 4 || missing[1].ID != 5 {
+		t.Fatalf("getUsageInfosForAccounts byAccount=%+v missing=%+v", byAccount, missing)
+	}
+}
+
+func TestUsageWindowNumberAndResetHelpers(t *testing.T) {
+	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
+	resetAt := now.Add(time.Hour).Format(time.RFC3339)
+	if got := parseWindowReset(map[string]any{"reset_at": resetAt}, now); got == nil || got.UTC().Format(time.RFC3339) != resetAt {
+		t.Fatalf("reset_at parse = %v", got)
+	}
+	if got := parseWindowReset(map[string]any{"reset_seconds": int64(30)}, now); got == nil || got.Sub(now) != 30*time.Second {
+		t.Fatalf("reset_seconds parse = %v", got)
+	}
+	if got := parseWindowReset(map[string]any{"reset_after_seconds": int32(45)}, now); got == nil || got.Sub(now) != 45*time.Second {
+		t.Fatalf("reset_after_seconds parse = %v", got)
+	}
+	if got := parseWindowReset(map[string]any{"reset_at": "bad"}, now); got != nil {
+		t.Fatalf("bad reset parse = %v", got)
+	}
+	if !usageWindowIgnoresLimit(map[string]any{"enforce_limit": false}) {
+		t.Fatal("enforce_limit=false should ignore limit")
+	}
+	for _, value := range []any{float64(1.5), float32(2.5), 3, int64(4), int32(5), json.Number("6.5")} {
+		if _, ok := usageNumber(value); !ok {
+			t.Fatalf("usageNumber(%T) returned !ok", value)
+		}
+	}
+	if _, ok := usageNumber("7"); ok {
+		t.Fatal("usageNumber string should not be accepted")
+	}
+	if _, ok := usageNumber(json.Number("bad")); ok {
+		t.Fatal("usageNumber bad json.Number should not be accepted")
+	}
+}
+
+func TestAccountProfileCacheAndRedisValueHelpers(t *testing.T) {
+	stateUntil := time.Date(2026, 6, 20, 11, 0, 0, 0, time.FixedZone("CST", 8*3600))
+	lastUsed := stateUntil.Add(-time.Hour)
+	item := Account{
+		ID: 8, Name: "profile", Platform: "openai", Type: "oauth", State: "rate_limited",
+		StateUntil: &stateUntil, LastUsedAt: &lastUsed, Priority: 9, MaxConcurrency: 10,
+		RateMultiplier: 1.5, ErrorMsg: "limited", UpstreamIsPool: true, GroupIDs: []int64{1, 2},
+		Proxy: &Proxy{ID: 77}, CreatedAt: lastUsed, UpdatedAt: stateUntil,
+	}
+	payload := accountProfileCacheFromAccount(item)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal profile payload: %v", err)
+	}
+	decoded, ok := decodeAccountProfileCache(body, item.ID)
+	if !ok || decoded.ID != item.ID {
+		t.Fatalf("decodeAccountProfileCache = %+v ok=%v", decoded, ok)
+	}
+	account, ok := accountProfileCacheToAccount(decoded)
+	if !ok || account.ID != item.ID || account.Proxy == nil || account.Proxy.ID != 77 ||
+		account.StateUntil == nil || account.LastUsedAt == nil || account.Credentials == nil {
+		t.Fatalf("accountProfileCacheToAccount = %+v ok=%v", account, ok)
+	}
+	if _, ok := decodeAccountProfileCache([]byte(`{bad`), item.ID); ok {
+		t.Fatal("bad JSON profile cache decoded successfully")
+	}
+	if _, ok := decodeAccountProfileCache(body, 99); ok {
+		t.Fatal("wrong account ID profile cache decoded successfully")
+	}
+	if _, ok := accountProfileCacheToAccount(accountProfileCachePayload{}); ok {
+		t.Fatal("zero ID profile payload should be invalid")
+	}
+	if !parseAccountProfileCacheTime("bad").IsZero() {
+		t.Fatal("bad profile time should parse to zero time")
+	}
+
+	if got, ok := redisValueBytes("abc"); !ok || string(got) != "abc" {
+		t.Fatalf("redisValueBytes string = %q ok=%v", string(got), ok)
+	}
+	if got, ok := redisValueBytes([]byte("def")); !ok || string(got) != "def" {
+		t.Fatalf("redisValueBytes bytes = %q ok=%v", string(got), ok)
+	}
+	if _, ok := redisValueBytes(123); ok {
+		t.Fatal("redisValueBytes int should fail")
+	}
+	for _, value := range []any{int64(1), 2, "3", []byte("4")} {
+		if _, ok := redisValueInt64(value); !ok {
+			t.Fatalf("redisValueInt64(%T) returned !ok", value)
+		}
+	}
+	if _, ok := redisValueInt64("bad"); ok {
+		t.Fatal("redisValueInt64 bad string should fail")
+	}
+	for _, value := range []any{float64(1.2), float32(2.3), int64(3), 4, "5.5", []byte("6.5")} {
+		if _, ok := redisValueFloat64(value); !ok {
+			t.Fatalf("redisValueFloat64(%T) returned !ok", value)
+		}
+	}
+	if _, ok := redisValueFloat64("bad"); ok {
+		t.Fatal("redisValueFloat64 bad string should fail")
+	}
+
+	stats, ok := parseCachedTodayStats([]any{"3", []byte("100"), "1.25", float64(2.5), "ignored"})
+	if !ok || stats.Requests != 3 || stats.Tokens != 100 || stats.AccountCost != 1.25 || stats.UserCost != 2.5 {
+		t.Fatalf("parseCachedTodayStats = %+v ok=%v", stats, ok)
+	}
+	if _, ok := parseCachedTodayStats([]any{nil, "1", "2", "3"}); ok {
+		t.Fatal("nil cached today stats should fail")
+	}
+	if _, ok := parseCachedTodayStats([]any{"1", "2", "3"}); ok {
+		t.Fatal("short cached today stats should fail")
+	}
+
+	source := map[string]any{"1": map[string]any{"windows": []any{"same"}}, "raw": "value"}
+	cloned := cloneMergedShallow(source)
+	cloned["1"].(map[string]any)["today_stats"] = map[string]any{"requests": int64(1)}
+	if _, leaked := source["1"].(map[string]any)["today_stats"]; leaked || cloned["raw"] != "value" {
+		t.Fatalf("cloneMergedShallow source=%+v clone=%+v", source, cloned)
+	}
+}
+
+func TestGetCredentialsSchemaUsesPluginAndFallbacks(t *testing.T) {
+	service := NewService(stubRepository{}, stubPluginCatalog{
+		accountTypes: []sdk.AccountType{{
+			Key: "oauth", Label: "OAuth", Description: "OAuth account",
+			Fields: []sdk.CredentialField{{Key: "refresh_token", Label: "Refresh Token", Type: "password", Required: true, Placeholder: "rt", EditDisabled: true}},
+		}},
+	}, nil, nil)
+	schema := service.GetCredentialsSchema("custom")
+	if len(schema.AccountTypes) != 1 || len(schema.Fields) != 1 || schema.Fields[0].Key != "refresh_token" || !schema.Fields[0].EditDisabled {
+		t.Fatalf("account type schema = %+v", schema)
+	}
+
+	service = NewService(stubRepository{}, stubPluginCatalog{
+		credentialFields: []sdk.CredentialField{{Key: "api_key", Label: "API Key", Type: "password", Required: true}},
+	}, nil, nil)
+	schema = service.GetCredentialsSchema("flat")
+	if len(schema.AccountTypes) != 0 || len(schema.Fields) != 1 || schema.Fields[0].Key != "api_key" {
+		t.Fatalf("flat credential schema = %+v", schema)
+	}
+
+	service = NewService(stubRepository{}, stubPluginCatalog{}, nil, nil)
+	if schema := service.GetCredentialsSchema("openai"); len(schema.Fields) != 2 || schema.Fields[0].Key != "api_key" {
+		t.Fatalf("openai fallback schema = %+v", schema)
+	}
+	if schema := service.GetCredentialsSchema("unknown"); len(schema.Fields) != 2 || schema.Fields[1].Key != "base_url" {
+		t.Fatalf("generic fallback schema = %+v", schema)
+	}
+}
+
+type captureConcurrency struct {
+	counts   map[int]int
+	captured []int
+}
+
+func (c *captureConcurrency) GetCurrentCounts(_ context.Context, ids []int) map[int]int {
+	c.captured = append([]int(nil), ids...)
+	return c.counts
+}
+
+func sameIDs(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

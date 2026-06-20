@@ -26,7 +26,11 @@ var distFS embed.FS
 // FS 返回根目录指向 webdist/ 的子文件系统。
 // 调用方可以直接 http.FS(web.FS()) 暴露给 gin / net/http。
 func FS() (fs.FS, error) {
-	sub, err := fs.Sub(distFS, "webdist")
+	return subFSWithIndex(distFS, "webdist")
+}
+
+func subFSWithIndex(root fs.FS, dir string) (fs.FS, error) {
+	sub, err := fs.Sub(root, dir)
 	if err != nil {
 		return nil, err
 	}

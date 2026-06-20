@@ -5,12 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
 
 // GithubRepo 仓库标识。
 const GithubRepo = "DevilGenius/airgate-core"
+
+var (
+	githubAPIBaseURL = "https://api.github.com"
+	githubHTTPClient = &http.Client{Timeout: 10 * time.Second}
+)
 
 // githubClient 带 ETag 缓存和短时间内存缓存的 GitHub release 客户端。
 type githubClient struct {
@@ -36,7 +42,7 @@ func (c *githubClient) LatestRelease(ctx context.Context) (*ReleaseInfo, error) 
 		return c.cached, nil
 	}
 
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", c.repo)
+	apiURL := fmt.Sprintf("%s/repos/%s/releases/latest", strings.TrimRight(githubAPIBaseURL, "/"), c.repo)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err
@@ -46,8 +52,7 @@ func (c *githubClient) LatestRelease(ctx context.Context) (*ReleaseInfo, error) 
 		req.Header.Set("If-None-Match", c.etag)
 	}
 
-	httpClient := &http.Client{Timeout: 10 * time.Second}
-	resp, err := httpClient.Do(req)
+	resp, err := githubHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("请求 GitHub API 失败: %w", err)
 	}

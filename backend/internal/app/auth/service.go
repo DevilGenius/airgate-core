@@ -14,7 +14,12 @@ import (
 // Service 提供认证域用例编排。
 type Service struct {
 	repo   Repository
-	jwtMgr *corauth.JWTManager
+	jwtMgr tokenIssuer
+}
+
+type tokenIssuer interface {
+	GenerateToken(userID int, role, email string) (string, error)
+	GenerateAPIKeyToken(userID int, role, email string, apiKeyID int) (string, error)
 }
 
 // NewService 创建认证服务。

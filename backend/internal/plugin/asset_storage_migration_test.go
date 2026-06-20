@@ -20,6 +20,7 @@ import (
 type fakeS3Object struct {
 	data        []byte
 	contentType string
+	lastModified time.Time
 }
 
 type fakeS3Server struct {
@@ -69,6 +70,11 @@ func (f *fakeS3Server) handle(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"></LocationConstraint>`))
 			return
 		}
+		if r.Method == http.MethodGet {
+			prefix := r.URL.Query().Get("prefix")
+			f.writeListBucketResult(w, prefix)
+			return
+		}
 		if r.Method == http.MethodHead {
 			w.WriteHeader(http.StatusOK)
 			return
@@ -90,7 +96,7 @@ func (f *fakeS3Server) handle(w http.ResponseWriter, r *http.Request) {
 		}
 		ct := r.Header.Get("Content-Type")
 		f.mu.Lock()
-		f.objects[key] = fakeS3Object{data: data, contentType: ct}
+		f.objects[key] = fakeS3Object{data: data, contentType: ct, lastModified: time.Now().UTC()}
 		f.mu.Unlock()
 		w.Header().Set("ETag", `"fake-etag"`)
 		w.WriteHeader(http.StatusOK)
@@ -107,7 +113,7 @@ func (f *fakeS3Server) handle(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", obj.contentType)
 		}
 		w.Header().Set("ETag", `"fake-etag"`)
-		w.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+		w.Header().Set("Last-Modified", fakeS3LastModified(obj).Format(http.TimeFormat))
 		w.WriteHeader(http.StatusOK)
 	case http.MethodGet:
 		f.mu.Lock()
@@ -121,7 +127,7 @@ func (f *fakeS3Server) handle(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", obj.contentType)
 		}
 		w.Header().Set("ETag", `"fake-etag"`)
-		w.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+		w.Header().Set("Last-Modified", fakeS3LastModified(obj).Format(http.TimeFormat))
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(obj.data)))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(obj.data)
@@ -133,6 +139,34 @@ func (f *fakeS3Server) handle(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func (f *fakeS3Server) writeListBucketResult(w http.ResponseWriter, prefix string) {
+	f.mu.Lock()
+	objects := make(map[string]fakeS3Object, len(f.objects))
+	for key, obj := range f.objects {
+		objects[key] = obj
+	}
+	f.mu.Unlock()
+
+	w.Header().Set("Content-Type", "application/xml")
+	w.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>%s</Name><Prefix>%s</Prefix><KeyCount>%d</KeyCount><MaxKeys>1000</MaxKeys><IsTruncated>false</IsTruncated>`, f.bucket, prefix, len(objects))
+	for key, obj := range objects {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		_, _ = fmt.Fprintf(w, `<Contents><Key>%s</Key><LastModified>%s</LastModified><ETag>"fake-etag"</ETag><Size>%d</Size><StorageClass>STANDARD</StorageClass></Contents>`,
+			key, fakeS3LastModified(obj).Format(time.RFC3339), len(obj.data))
+	}
+	_, _ = w.Write([]byte(`</ListBucketResult>`))
+}
+
+func fakeS3LastModified(obj fakeS3Object) time.Time {
+	if obj.lastModified.IsZero() {
+		return time.Now().UTC()
+	}
+	return obj.lastModified
 }
 
 func writeS3Error(w http.ResponseWriter, status int, code, message string) {

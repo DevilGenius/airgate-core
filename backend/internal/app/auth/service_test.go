@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -99,6 +100,57 @@ func TestLoginRejectsDisabledUserAndWrongPassword(t *testing.T) {
 	}
 }
 
+func TestLoginMasksRepositoryLookupErrors(t *testing.T) {
+	lookupErr := errors.New("database unavailable")
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "missing_user", err: ErrUserNotFound},
+		{name: "repository_error", err: lookupErr},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := NewService(authStubRepository{
+				findByEmail: func() (User, error) { return User{}, tt.err },
+			}, corauth.NewJWTManager("secret", 24))
+
+			_, err := service.Login(t.Context(), LoginInput{Email: "missing@test.com", Password: "password123"})
+			if !errors.Is(err, ErrInvalidCredentials) {
+				t.Fatalf("登录错误 = %v，期望 %v", err, ErrInvalidCredentials)
+			}
+		})
+	}
+}
+
+func TestLoginReturnsTokenIssueError(t *testing.T) {
+	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("生成密码 hash 失败: %v", err)
+	}
+	tokenErr := errors.New("token issue failed")
+	service := &Service{
+		repo: authStubRepository{
+			findByEmail: func() (User, error) {
+				return User{
+					ID:           7,
+					Email:        "u@test.com",
+					PasswordHash: string(hash),
+					Role:         "user",
+					Status:       "active",
+				}, nil
+			},
+		},
+		jwtMgr: failingTokenIssuer{tokenErr: tokenErr},
+	}
+
+	_, err = service.Login(t.Context(), LoginInput{Email: "u@test.com", Password: "password123"})
+	if !errors.Is(err, tokenErr) {
+		t.Fatalf("登录错误 = %v，期望 %v", err, tokenErr)
+	}
+}
+
 func TestRegisterCreatesActiveUserAndToken(t *testing.T) {
 	jwtMgr := corauth.NewJWTManager("secret", 24)
 	var captured CreateUserInput
@@ -142,6 +194,77 @@ func TestRegisterCreatesActiveUserAndToken(t *testing.T) {
 	}
 }
 
+func TestRegisterReturnsTokenIssueError(t *testing.T) {
+	tokenErr := errors.New("token issue failed")
+	service := &Service{
+		repo: authStubRepository{
+			emailExists: func() (bool, error) { return false, nil },
+			create: func(input CreateUserInput) (User, error) {
+				return User{ID: 9, Email: input.Email, Role: input.Role, Status: input.Status}, nil
+			},
+		},
+		jwtMgr: failingTokenIssuer{tokenErr: tokenErr},
+	}
+
+	_, err := service.Register(t.Context(), RegisterInput{
+		Email:    "new@test.com",
+		Password: "password123",
+		Username: "新用户",
+	})
+	if !errors.Is(err, tokenErr) {
+		t.Fatalf("注册错误 = %v，期望 %v", err, tokenErr)
+	}
+}
+
+func TestRegisterPropagatesRepositoryAndHashErrors(t *testing.T) {
+	emailLookupErr := errors.New("email lookup failed")
+	createErr := errors.New("create failed")
+
+	tests := []struct {
+		name    string
+		service *Service
+		input   RegisterInput
+		wantErr error
+	}{
+		{
+			name: "email_exists_error",
+			service: NewService(authStubRepository{
+				emailExists: func() (bool, error) { return false, emailLookupErr },
+			}, corauth.NewJWTManager("secret", 24)),
+			input:   RegisterInput{Email: "u@test.com", Password: "password123"},
+			wantErr: emailLookupErr,
+		},
+		{
+			name: "password_too_long",
+			service: NewService(authStubRepository{
+				emailExists: func() (bool, error) { return false, nil },
+			}, corauth.NewJWTManager("secret", 24)),
+			input:   RegisterInput{Email: "u@test.com", Password: strings.Repeat("x", 73)},
+			wantErr: bcrypt.ErrPasswordTooLong,
+		},
+		{
+			name: "create_error",
+			service: NewService(authStubRepository{
+				emailExists: func() (bool, error) { return false, nil },
+				create: func(CreateUserInput) (User, error) {
+					return User{}, createErr
+				},
+			}, corauth.NewJWTManager("secret", 24)),
+			input:   RegisterInput{Email: "u@test.com", Password: "password123"},
+			wantErr: createErr,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.service.Register(t.Context(), tt.input)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("注册错误 = %v，期望 %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestRefreshTokenPreservesAPIKeyIdentity(t *testing.T) {
 	jwtMgr := corauth.NewJWTManager("secret", 24)
 	service := NewService(authStubRepository{}, jwtMgr)
@@ -164,6 +287,40 @@ func TestRefreshTokenPreservesAPIKeyIdentity(t *testing.T) {
 	}
 }
 
+func TestRefreshTokenPreservesUserIdentity(t *testing.T) {
+	jwtMgr := corauth.NewJWTManager("secret", 24)
+	service := NewService(authStubRepository{}, jwtMgr)
+
+	token, err := service.RefreshToken(t.Context(), AuthIdentity{
+		UserID: 5,
+		Role:   "admin",
+		Email:  "u@test.com",
+	})
+	if err != nil {
+		t.Fatalf("刷新 token 失败: %v", err)
+	}
+	claims, err := jwtMgr.ParseToken(token)
+	if err != nil {
+		t.Fatalf("解析刷新 token 失败: %v", err)
+	}
+	if claims.UserID != 5 || claims.APIKeyID != 0 || claims.Role != "admin" || claims.Email != "u@test.com" {
+		t.Fatalf("刷新 claims 异常: %+v", claims)
+	}
+}
+
+func TestRefreshTokenReturnsUserTokenIssueError(t *testing.T) {
+	tokenErr := errors.New("token issue failed")
+	service := &Service{
+		repo:   authStubRepository{},
+		jwtMgr: failingTokenIssuer{tokenErr: tokenErr},
+	}
+
+	_, err := service.RefreshToken(t.Context(), AuthIdentity{UserID: 5, Role: "admin", Email: "u@test.com"})
+	if !errors.Is(err, tokenErr) {
+		t.Fatalf("刷新错误 = %v，期望 %v", err, tokenErr)
+	}
+}
+
 func TestRefreshTokenRejectsInvalidAPIKeySession(t *testing.T) {
 	jwtMgr := corauth.NewJWTManager("secret", 24)
 	service := NewService(authStubRepository{
@@ -180,6 +337,28 @@ func TestRefreshTokenRejectsInvalidAPIKeySession(t *testing.T) {
 	})
 	if !errors.Is(err, ErrInvalidAPIKeySession) {
 		t.Fatalf("刷新错误 = %v，期望 %v", err, ErrInvalidAPIKeySession)
+	}
+}
+
+func TestRefreshTokenReturnsAPIKeyTokenIssueError(t *testing.T) {
+	tokenErr := errors.New("api key token issue failed")
+	service := &Service{
+		repo: authStubRepository{
+			validateAPIKeySession: func(userID, _ int) (User, error) {
+				return User{ID: userID, Email: "u@test.com", Role: "admin", Status: "active"}, nil
+			},
+		},
+		jwtMgr: failingTokenIssuer{apiKeyTokenErr: tokenErr},
+	}
+
+	_, err := service.RefreshToken(t.Context(), AuthIdentity{
+		UserID:   5,
+		Role:     "admin",
+		Email:    "u@test.com",
+		APIKeyID: 13,
+	})
+	if !errors.Is(err, tokenErr) {
+		t.Fatalf("刷新错误 = %v，期望 %v", err, tokenErr)
 	}
 }
 
@@ -210,6 +389,25 @@ type authStubRepository struct {
 	create                func(CreateUserInput) (User, error)
 	findByID              func() (User, error)
 	validateAPIKeySession func(userID, keyID int) (User, error)
+}
+
+type failingTokenIssuer struct {
+	tokenErr       error
+	apiKeyTokenErr error
+}
+
+func (f failingTokenIssuer) GenerateToken(int, string, string) (string, error) {
+	if f.tokenErr != nil {
+		return "", f.tokenErr
+	}
+	return "token", nil
+}
+
+func (f failingTokenIssuer) GenerateAPIKeyToken(int, string, string, int) (string, error) {
+	if f.apiKeyTokenErr != nil {
+		return "", f.apiKeyTokenErr
+	}
+	return "api-key-token", nil
 }
 
 func (s authStubRepository) FindByEmail(_ context.Context, _ string) (User, error) {

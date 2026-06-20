@@ -45,10 +45,12 @@ var trendLockReleaseScript = redis.NewScript(`
 	local key = KEYS[1]
 	local token = ARGV[1]
 	if redis.call('GET', key) == token then
-		return redis.call('DEL', key)
+	return redis.call('DEL', key)
 	end
 	return 0
 `)
+
+var newTrendLockToken = uuid.NewString
 
 // Stats 查询仪表盘统计。userID 为 0 表示查全部。
 // tz 为调用方的 IANA 时区名（如 "Asia/Shanghai"、"America/New_York"），决定"今天"的起点；
@@ -212,7 +214,7 @@ func (s *Service) tryLockTrendCache(ctx context.Context, key string) (string, bo
 	if s.rdb == nil {
 		return "", false, false
 	}
-	token := uuid.NewString()
+	token := newTrendLockToken()
 	ok, err := s.rdb.SetNX(ctx, key+":lock", token, trendLockTTL).Result()
 	if err != nil {
 		return "", false, false
@@ -251,17 +253,21 @@ func (s *Service) waitForTrendCache(ctx context.Context, key string, timeout tim
 		timer := time.NewTimer(wait)
 		select {
 		case <-ctx.Done():
-			if !timer.Stop() {
-				select {
-				case <-timer.C:
-				default:
-				}
-			}
+			stopTrendWaitTimer(timer)
 			return Trend{}, false
 		case <-timer.C:
 		}
 		if delay < 250*time.Millisecond {
 			delay *= 2
+		}
+	}
+}
+
+func stopTrendWaitTimer(timer *time.Timer) {
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
 		}
 	}
 }

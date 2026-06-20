@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"sync"
 	"time"
@@ -47,6 +48,28 @@ var (
 	apiKeyCache   sync.Map // map[hash] → apiKeyCacheEntry
 	apiKeyCacheMu sync.Mutex
 	apiKeyRedis   *redis.Client
+	apiKeyRandom  io.Reader = rand.Reader
+
+	queryAPIKeyForLogin = func(ctx context.Context, db *ent.Client, hash string) (*ent.APIKey, error) {
+		return db.APIKey.Query().
+			Where(
+				apikey.KeyHash(hash),
+				apikey.StatusEQ(apikey.StatusActive),
+			).
+			WithUser().
+			Only(ctx)
+	}
+
+	queryAPIKeyForValidation = func(ctx context.Context, db *ent.Client, hash string) (*ent.APIKey, error) {
+		return db.APIKey.Query().
+			Where(
+				apikey.KeyHash(hash),
+				apikey.StatusEQ(apikey.StatusActive),
+			).
+			WithUser().
+			WithGroup().
+			Only(ctx)
+	}
 )
 
 var (
@@ -127,7 +150,7 @@ func GenerateAdminAPIKey() (key string, hash string, err error) {
 
 func generatePrefixedAPIKey(prefix string) (key string, hash string, err error) {
 	b := make([]byte, 32)
-	if _, err = rand.Read(b); err != nil {
+	if _, err = io.ReadFull(apiKeyRandom, b); err != nil {
 		return "", "", err
 	}
 	key = prefix + hex.EncodeToString(b)
@@ -159,13 +182,7 @@ func IsAdminAPIKey(key string) bool {
 func ValidateAPIKeyForLogin(ctx context.Context, db *ent.Client, key string) (*APIKeyInfo, error) {
 	hash := HashAPIKey(key)
 
-	ak, err := db.APIKey.Query().
-		Where(
-			apikey.KeyHash(hash),
-			apikey.StatusEQ(apikey.StatusActive),
-		).
-		WithUser().
-		Only(ctx)
+	ak, err := queryAPIKeyForLogin(ctx, db, hash)
 	if err != nil {
 		return nil, ErrInvalidAPIKey
 	}
@@ -224,14 +241,7 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 	slog.Debug("api_key_cache_miss")
 
 	// 缓存未命中，查 DB
-	ak, err := db.APIKey.Query().
-		Where(
-			apikey.KeyHash(hash),
-			apikey.StatusEQ(apikey.StatusActive),
-		).
-		WithUser().
-		WithGroup().
-		Only(ctx)
+	ak, err := queryAPIKeyForValidation(ctx, db, hash)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			// 真"key 不存在"：缓存负结果，避免被拒的 key 反复打 DB

@@ -82,6 +82,37 @@ plugins:
 	}
 }
 
+func TestLoadReturnsReadAndYAMLErrors(t *testing.T) {
+	clearConfigEnv(t)
+	if _, err := Load(filepath.Join(t.TempDir(), "missing.yaml")); err == nil {
+		t.Fatal("Load missing file returned nil error")
+	}
+
+	path := filepath.Join(t.TempDir(), "bad.yaml")
+	if err := os.WriteFile(path, []byte("server: ["), 0o600); err != nil {
+		t.Fatalf("写入非法配置失败: %v", err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load invalid YAML returned nil error")
+	}
+}
+
+func TestLoadBackfillsEmptyHost(t *testing.T) {
+	clearConfigEnv(t)
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("server:\n  host: \"\"\n"), 0o600); err != nil {
+		t.Fatalf("写入临时配置失败: %v", err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Server.Host != DefaultHost {
+		t.Fatalf("Server.Host = %q, want %q", cfg.Server.Host, DefaultHost)
+	}
+}
+
 func TestDatabaseDSNDefaultsSSLMode(t *testing.T) {
 	dsn := DatabaseConfig{
 		Host:     "db",
@@ -111,6 +142,11 @@ func TestAPIKeySecretValidatesConfiguredSecret(t *testing.T) {
 }
 
 func TestConfigPathUsesEnvironment(t *testing.T) {
+	t.Setenv("CONFIG_PATH", "")
+	if got := ConfigPath(); got != "config.yaml" {
+		t.Fatalf("默认配置路径 = %q，期望 config.yaml", got)
+	}
+
 	t.Setenv("CONFIG_PATH", "/tmp/airgate.yaml")
 	if got := ConfigPath(); got != "/tmp/airgate.yaml" {
 		t.Fatalf("配置路径 = %q，期望环境变量值", got)

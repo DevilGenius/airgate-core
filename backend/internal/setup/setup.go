@@ -31,6 +31,31 @@ import (
 
 var installMu sync.Mutex
 
+type setupRedisClient interface {
+	Ping(context.Context) *redis.StatusCmd
+	Close() error
+}
+
+var (
+	setupNeedsSetup          = NeedsSetup
+	setupTestDBConnection    = TestDBConnection
+	setupTestRedisConnection = TestRedisConnection
+	setupInstall             = Install
+	setupEnvDBConfig         = EnvDBConfig
+	setupEnvRedisConfig      = EnvRedisConfig
+	setupSQLOpen             = sql.Open
+	setupEntSQLOpen          = entsql.Open
+	setupRedisNewClient      = defaultSetupRedisNewClient
+	setupCloseEntClient      = (*ent.Client).Close
+	setupYAMLMarshal         = yaml.Marshal
+	setupWriteFile           = os.WriteFile
+	setupRandRead            = rand.Read
+)
+
+func defaultSetupRedisNewClient(opts *redis.Options) setupRedisClient {
+	return redis.NewClient(opts)
+}
+
 // EnvDBConfig 从环境变量解析数据库配置。
 // 当 DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME 全部存在时返回非 nil；
 // 任意一项缺失返回 nil（用户需要走 wizard 手填）。
@@ -108,7 +133,7 @@ func NeedsSetup() bool {
 	}
 
 	dsn := cfg.Database.DSN()
-	db, err := sql.Open("postgres", dsn)
+	db, err := setupSQLOpen("postgres", dsn)
 	if err != nil {
 		slog.Warn("db_open_failed", "stage", "needs_setup", "dsn", store.RedactDSN(dsn), sdk.LogFieldError, err)
 		return true
@@ -171,7 +196,7 @@ func TestDBConnection(host string, port int, user, password, dbname, sslmode str
 func pingDatabase(host string, port int, user, password, dbname, sslmode string) error {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, password, dbname, sslmode)
-	db, err := sql.Open("postgres", dsn)
+	db, err := setupSQLOpen("postgres", dsn)
 	if err != nil {
 		return err
 	}
@@ -222,7 +247,7 @@ func isSetupBootstrapError(err error) bool {
 func createDatabase(host string, port int, user, password, dbname, sslmode string) error {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=postgres sslmode=%s",
 		host, port, user, password, sslmode)
-	db, err := sql.Open("postgres", dsn)
+	db, err := setupSQLOpen("postgres", dsn)
 	if err != nil {
 		return fmt.Errorf("连接 postgres 系统库失败: %w", err)
 	}
@@ -250,7 +275,7 @@ func quoteIdentifier(name string) string {
 
 // TestRedisConnection 测试 Redis 连接
 func TestRedisConnection(host string, port int, password string, db int) error {
-	rdb := redis.NewClient(&redis.Options{
+	rdb := setupRedisNewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", host, port),
 		Password: password,
 		DB:       db,
@@ -281,28 +306,28 @@ func Install(params InstallParams) error {
 	installMu.Lock()
 	defer installMu.Unlock()
 
-	if !NeedsSetup() {
+	if !setupNeedsSetup() {
 		return fmt.Errorf("系统已安装")
 	}
 
 	slog.Info("setup_initialization_start")
 
 	// 1. 测试数据库连接
-	if err := TestDBConnection(params.DB.Host, params.DB.Port, params.DB.User, params.DB.Password, params.DB.DBName, params.DB.SSLMode); err != nil {
+	if err := setupTestDBConnection(params.DB.Host, params.DB.Port, params.DB.User, params.DB.Password, params.DB.DBName, params.DB.SSLMode); err != nil {
 		slog.Error("setup_failed", "stage", "test_db_connection", sdk.LogFieldError, err)
 		return fmt.Errorf("数据库连接失败: %w", err)
 	}
 
 	// 2. 连接数据库，运行 Ent 迁移
 	dsn := params.DB.DSN()
-	drv, err := entsql.Open(dialect.Postgres, dsn)
+	drv, err := setupEntSQLOpen(dialect.Postgres, dsn)
 	if err != nil {
 		slog.Error("setup_failed", "stage", "open_database", "dsn", store.RedactDSN(dsn), sdk.LogFieldError, err)
 		return fmt.Errorf("打开数据库失败: %w", err)
 	}
 	client := ent.NewClient(ent.Driver(drv), store.EntSlogLogger())
 	defer func() {
-		if err := client.Close(); err != nil {
+		if err := setupCloseEntClient(client); err != nil {
 			slog.Warn("db_close_failed", "stage", "setup_install", sdk.LogFieldError, err)
 		}
 	}()
@@ -342,12 +367,12 @@ func Install(params InstallParams) error {
 		Redis:    params.Redis,
 		JWT:      config.JWTConfig{Secret: generateSecret(), ExpireHour: 24},
 	}
-	cfgData, err := yaml.Marshal(cfg)
+	cfgData, err := setupYAMLMarshal(cfg)
 	if err != nil {
 		slog.Error("setup_failed", "stage", "marshal_config", sdk.LogFieldError, err)
 		return fmt.Errorf("序列化配置失败: %w", err)
 	}
-	if err := os.WriteFile(config.ConfigPath(), cfgData, 0644); err != nil {
+	if err := setupWriteFile(config.ConfigPath(), cfgData, 0644); err != nil {
 		slog.Error("setup_failed", "stage", "write_config", sdk.LogFieldError, err)
 		return fmt.Errorf("写入配置文件失败: %w", err)
 	}
@@ -359,7 +384,7 @@ func Install(params InstallParams) error {
 
 func generateSecret() string {
 	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
+	if _, err := setupRandRead(b); err != nil {
 		// 极端情况下的回退
 		return "airgate-default-secret-change-me"
 	}

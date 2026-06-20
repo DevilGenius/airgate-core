@@ -103,3 +103,23 @@ func TestPagedDataKeepsPaginationFields(t *testing.T) {
 		t.Fatalf("列表字段异常: %#v", data["list"])
 	}
 }
+
+func TestCursorPagedDataAddsCursorFields(t *testing.T) {
+	next := int64(42)
+	data := CursorPagedData([]string{"a"}, 9, 2, 5, true, &next, false)
+
+	if data["total"] != int64(9) || data["page"] != 2 || data["page_size"] != 5 {
+		t.Fatalf("分页字段异常: %#v", data)
+	}
+	if data["has_more"] != true || data["total_exact"] != false || data["next_cursor"] != int64(42) {
+		t.Fatalf("游标字段异常: %#v", data)
+	}
+
+	data = CursorPagedData(nil, 0, 1, 20, false, nil, true)
+	if _, ok := data["next_cursor"]; ok {
+		t.Fatalf("next_cursor should be omitted when nil: %#v", data)
+	}
+	if data["has_more"] != false || data["total_exact"] != true {
+		t.Fatalf("游标布尔字段异常: %#v", data)
+	}
+}

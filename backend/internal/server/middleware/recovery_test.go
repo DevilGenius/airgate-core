@@ -34,6 +34,41 @@ func TestRequestLoggerPropagatesRequestID(t *testing.T) {
 	}
 }
 
+func TestRequestLoggerCoversStatusLevelsAndAccessFields(t *testing.T) {
+	router := gin.New()
+	router.Use(RequestLogger())
+	router.GET("/healthz", func(c *gin.Context) {
+		c.String(http.StatusOK, "ok")
+	})
+	router.GET("/bad", func(c *gin.Context) {
+		c.Set(CtxKeyUserID, int64(123))
+		c.Set(CtxKeyAccessModel, "gpt-5")
+		c.Set(CtxKeyAccessPlatform, "openai")
+		c.Set(CtxKeyAccessAccountID, 45)
+		c.Set(CtxKeyAccessAttempts, 2)
+		c.String(http.StatusBadRequest, "bad")
+	})
+	router.GET("/err", func(c *gin.Context) {
+		c.Set(CtxKeyUserID, 7)
+		c.Set(CtxKeyAccessModel, "")
+		c.Set(CtxKeyAccessPlatform, "")
+		c.Set(CtxKeyAccessAccountID, 0)
+		c.Set(CtxKeyAccessAttempts, 1)
+		c.String(http.StatusInternalServerError, "err")
+	})
+
+	for _, path := range []string{"/healthz", "/bad", "/err"} {
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		if w.Code < 200 || w.Code >= 600 {
+			t.Fatalf("%s status = %d", path, w.Code)
+		}
+		if got := w.Header().Get(sdk.HeaderRequestID); got == "" {
+			t.Fatalf("%s missing response request id", path)
+		}
+	}
+}
+
 func TestRequestIDFromGinContextHandlesNil(t *testing.T) {
 	if got := RequestIDFromGinContext(nil); got != "" {
 		t.Fatalf("nil context request_id = %q，期望空字符串", got)

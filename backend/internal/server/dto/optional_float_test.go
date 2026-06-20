@@ -30,6 +30,13 @@ func TestOptionalFloatUnmarshalDistinguishesMissingNullAndZero(t *testing.T) {
 		t.Fatalf("empty string field = %+v, want Set=true Null=true", payload.RateMultiplier)
 	}
 
+	if err := json.Unmarshal([]byte(`{"rate_multiplier":" \t "}`), &payload); err != nil {
+		t.Fatalf("unmarshal blank string field: %v", err)
+	}
+	if !payload.RateMultiplier.Set || !payload.RateMultiplier.Null {
+		t.Fatalf("blank string field = %+v, want Set=true Null=true", payload.RateMultiplier)
+	}
+
 	if err := json.Unmarshal([]byte(`{"rate_multiplier":0}`), &payload); err != nil {
 		t.Fatalf("unmarshal zero field: %v", err)
 	}
@@ -46,16 +53,25 @@ func TestOptionalFloatUnmarshalDistinguishesMissingNullAndZero(t *testing.T) {
 }
 
 func TestOptionalFloatUpdatePointerMapping(t *testing.T) {
+	if got := (OptionalFloat{}).Ptr(); got != nil {
+		t.Fatalf("missing field Ptr = %v, want nil", *got)
+	}
 	if got := (OptionalFloat{}).PtrOrDefault(1); got != nil {
 		t.Fatalf("missing field PtrOrDefault = %v, want nil", *got)
 	}
 
 	nullValue := OptionalFloat{Set: true, Null: true}
+	if got := nullValue.Ptr(); got != nil {
+		t.Fatalf("null field Ptr = %v, want nil", *got)
+	}
 	if got := nullValue.PtrOrDefault(1); got == nil || *got != 1 {
 		t.Fatalf("null field PtrOrDefault = %v, want 1", got)
 	}
 
 	zeroValue := OptionalFloat{Set: true, Value: 0}
+	if got := zeroValue.Ptr(); got == nil || *got != 0 {
+		t.Fatalf("zero field Ptr = %v, want 0", got)
+	}
 	if got := zeroValue.PtrOrDefault(1); got == nil || *got != 0 {
 		t.Fatalf("zero field PtrOrDefault = %v, want 0", got)
 	}
@@ -70,5 +86,35 @@ func TestOptionalFloatMarshalAsNumber(t *testing.T) {
 	}
 	if string(payload) != `{"rate_multiplier":0}` {
 		t.Fatalf("payload = %s, want numeric rate_multiplier", payload)
+	}
+}
+
+func TestOptionalFloatMarshalNullWhenUnsetOrNull(t *testing.T) {
+	for _, value := range []OptionalFloat{{}, {Set: true, Null: true}} {
+		payload, err := json.Marshal(value)
+		if err != nil {
+			t.Fatalf("marshal optional float: %v", err)
+		}
+		if string(payload) != `null` {
+			t.Fatalf("payload = %s, want null", payload)
+		}
+	}
+}
+
+func TestOptionalFloatRejectsInvalidJSON(t *testing.T) {
+	tests := []string{
+		`"not-a-number"`,
+		`{}`,
+	}
+	for _, input := range tests {
+		var value OptionalFloat
+		if err := json.Unmarshal([]byte(input), &value); err == nil {
+			t.Fatalf("json.Unmarshal(%s) returned nil error", input)
+		}
+	}
+
+	var value OptionalFloat
+	if err := value.UnmarshalJSON([]byte(`"unterminated`)); err == nil {
+		t.Fatal("direct UnmarshalJSON unterminated string returned nil error")
 	}
 }

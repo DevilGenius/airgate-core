@@ -8,8 +8,11 @@ import (
 	"strings"
 
 	"github.com/DevilGenius/airgate-core/internal/plugin"
+	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
+
+var pluginAdminProxyHandleHTTPRequest = (*sdkgrpc.GatewayGRPCClient).HandleHTTPRequest
 
 // Service 提供插件管理用例编排。
 type Service struct {
@@ -178,7 +181,8 @@ func (s *Service) Proxy(ctx context.Context, input ProxyInput) (ProxyResult, err
 		return ProxyResult{}, ErrPluginUnavailable
 	}
 
-	status, headers, body, err := inst.Gateway.HandleHTTPRequest(
+	status, headers, body, err := pluginAdminProxyHandleHTTPRequest(
+		inst.Gateway,
 		ctx,
 		input.Method,
 		input.Action,

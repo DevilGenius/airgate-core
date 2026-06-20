@@ -1,6 +1,9 @@
 package i18n
 
-import "testing"
+import (
+	"testing"
+	"testing/fstest"
+)
 
 func TestTUsesLanguageThenDefaultThenKey(t *testing.T) {
 	restoreTranslations := replaceTranslationsForTest(map[string]map[string]string{
@@ -32,6 +35,36 @@ func TestLoadEmbeddedLoadsDefaultLocales(t *testing.T) {
 	defer mu.RUnlock()
 	if len(translations["zh"]) == 0 || len(translations["en"]) == 0 {
 		t.Fatalf("嵌入翻译未加载完整: %+v", translations)
+	}
+}
+
+func TestLoadEmbeddedFromFSContinuesPastMissingAndInvalidFiles(t *testing.T) {
+	restoreTranslations := replaceTranslationsForTest(map[string]map[string]string{}, "zh")
+	defer restoreTranslations()
+
+	err := loadEmbeddedFromFS(fstest.MapFS{
+		"locales/zh.json": {Data: []byte(`{"hello":"你好"}`)},
+		"locales/en.json": {Data: []byte(`{`)},
+	})
+	if err != nil {
+		t.Fatalf("loadEmbeddedFromFS returned error: %v", err)
+	}
+
+	if got := T("zh", "hello"); got != "你好" {
+		t.Fatalf("zh hello = %q", got)
+	}
+	if got := T("en", "hello"); got != "你好" {
+		t.Fatalf("invalid en should not replace default fallback, got %q", got)
+	}
+
+	restoreTranslations()
+	restoreTranslations = replaceTranslationsForTest(map[string]map[string]string{}, "zh")
+	defer restoreTranslations()
+	if err := loadEmbeddedFromFS(fstest.MapFS{}); err != nil {
+		t.Fatalf("loadEmbeddedFromFS missing files returned error: %v", err)
+	}
+	if got := T("zh", "hello"); got != "hello" {
+		t.Fatalf("missing files should leave translations empty, got %q", got)
 	}
 }
 

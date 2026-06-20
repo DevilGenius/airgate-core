@@ -29,6 +29,50 @@ type Prober interface {
 	Probe(context.Context, Proxy) TestResult
 }
 
+type probeEndpoint struct {
+	url   string
+	parse func([]byte) (ip, country, countryCode, city string)
+}
+
+var (
+	proxyProbeEndpoints = []probeEndpoint{
+		{
+			url: "http://ip-api.com/json/?lang=zh-CN",
+			parse: func(body []byte) (string, string, string, string) {
+				var r struct {
+					Status      string `json:"status"`
+					Query       string `json:"query"`
+					Country     string `json:"country"`
+					CountryCode string `json:"countryCode"`
+					City        string `json:"city"`
+				}
+				if json.Unmarshal(body, &r) != nil || r.Status != "success" {
+					return "", "", "", ""
+				}
+				return r.Query, r.Country, r.CountryCode, r.City
+			},
+		},
+		{
+			url: "http://httpbin.org/ip",
+			parse: func(body []byte) (string, string, string, string) {
+				var r struct {
+					Origin string `json:"origin"`
+				}
+				if json.Unmarshal(body, &r) != nil {
+					return "", "", "", ""
+				}
+				return r.Origin, "", "", ""
+			},
+		},
+	}
+	proxyProbeFallbackTargets = []string{"https://api.openai.com", "https://api.anthropic.com"}
+	newProxyProbeClient       = func(transport http.RoundTripper, timeout time.Duration) *http.Client {
+		return &http.Client{Transport: transport, Timeout: timeout}
+	}
+	newProxyProbeRequest = http.NewRequestWithContext
+	newSOCKS5Dialer      = xproxy.SOCKS5
+)
+
 // NewService 创建代理服务。
 func NewService(repo Repository) *Service {
 	return &Service{
@@ -138,47 +182,11 @@ func (DefaultProber) Probe(ctx context.Context, p Proxy) TestResult {
 	if err != nil {
 		return TestResult{Success: false, ErrorMsg: "构建代理传输失败: " + err.Error()}
 	}
-	client := &http.Client{Transport: transport, Timeout: timeout}
-
-	type probeEndpoint struct {
-		url   string
-		parse func([]byte) (ip, country, countryCode, city string)
-	}
-
-	endpoints := []probeEndpoint{
-		{
-			url: "http://ip-api.com/json/?lang=zh-CN",
-			parse: func(body []byte) (string, string, string, string) {
-				var r struct {
-					Status      string `json:"status"`
-					Query       string `json:"query"`
-					Country     string `json:"country"`
-					CountryCode string `json:"countryCode"`
-					City        string `json:"city"`
-				}
-				if json.Unmarshal(body, &r) != nil || r.Status != "success" {
-					return "", "", "", ""
-				}
-				return r.Query, r.Country, r.CountryCode, r.City
-			},
-		},
-		{
-			url: "http://httpbin.org/ip",
-			parse: func(body []byte) (string, string, string, string) {
-				var r struct {
-					Origin string `json:"origin"`
-				}
-				if json.Unmarshal(body, &r) != nil {
-					return "", "", "", ""
-				}
-				return r.Origin, "", "", ""
-			},
-		},
-	}
+	client := newProxyProbeClient(transport, timeout)
 
 	var lastErr string
-	for _, ep := range endpoints {
-		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, ep.url, nil)
+	for _, ep := range proxyProbeEndpoints {
+		req, reqErr := newProxyProbeRequest(ctx, http.MethodGet, ep.url, nil)
 		if reqErr != nil {
 			lastErr = fmt.Sprintf("[%s] 创建请求失败: %v", ep.url, reqErr)
 			continue
@@ -216,8 +224,8 @@ func (DefaultProber) Probe(ctx context.Context, p Proxy) TestResult {
 		}
 	}
 
-	for _, target := range []string{"https://api.openai.com", "https://api.anthropic.com"} {
-		req, reqErr := http.NewRequestWithContext(ctx, http.MethodHead, target, nil)
+	for _, target := range proxyProbeFallbackTargets {
+		req, reqErr := newProxyProbeRequest(ctx, http.MethodHead, target, nil)
 		if reqErr != nil {
 			continue
 		}
@@ -263,7 +271,7 @@ func buildProxyTransport(p Proxy) (*http.Transport, error) {
 				Password: p.Password,
 			}
 		}
-		dialer, err := xproxy.SOCKS5("tcp", addr, auth, xproxy.Direct)
+		dialer, err := newSOCKS5Dialer("tcp", addr, auth, xproxy.Direct)
 		if err != nil {
 			return nil, fmt.Errorf("创建 SOCKS5 dialer 失败: %w", err)
 		}

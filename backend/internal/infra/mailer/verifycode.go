@@ -18,12 +18,14 @@ type codeEntry struct {
 	expiresAt time.Time
 }
 
+var verifyCodeCleanupInterval = 5 * time.Minute
+
 // NewVerifyCodeStore 创建验证码存储。
 func NewVerifyCodeStore() *VerifyCodeStore {
 	s := &VerifyCodeStore{codes: make(map[string]codeEntry)}
 	// 后台清理过期条目
 	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
+		ticker := time.NewTicker(verifyCodeCleanupInterval)
 		for range ticker.C {
 			s.cleanup()
 		}

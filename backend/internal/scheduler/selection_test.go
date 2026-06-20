@@ -154,6 +154,35 @@ func TestSelectByLoadBalanceUsesNegativePriorityAsFallback(t *testing.T) {
 	}
 }
 
+func TestSelectByLoadBalanceScoresSamePriorityTier(t *testing.T) {
+	t.Parallel()
+
+	s := newSelectionTestScheduler(Normal)
+	now := time.Now()
+	s.currentLoad = func(_ context.Context, accountID int) int {
+		if accountID%3 == 0 {
+			return 2
+		}
+		return 0
+	}
+
+	candidates := make([]*ent.Account, 0, 40)
+	for i := 1; i <= 40; i++ {
+		acc := newSelectionTestAccount(i)
+		acc.Priority = 5
+		acc.MaxConcurrency = 4
+		if i%2 == 0 {
+			used := now.Add(-time.Duration(i) * time.Minute)
+			acc.LastUsedAt = &used
+		}
+		candidates = append(candidates, acc)
+	}
+	selected := s.selectByLoadBalance(context.Background(), candidates, now, nil)
+	if selected == nil || selected.Priority != 5 {
+		t.Fatalf("selected account = %+v, want same priority candidate", selected)
+	}
+}
+
 func TestSelectAccountKeepsNegativeFallbackBehindNonNegativeStickyOnly(t *testing.T) {
 	ctx := context.Background()
 	s := newSelectionTestScheduler(Normal)
@@ -255,6 +284,30 @@ func TestContinuationBlockedErrorDistinguishesCapacityFromMissingAffinity(t *tes
 	}
 	if err := continuationBlockedError(candidates, 2); !errors.Is(err, ErrContinuationAffinityMissing) {
 		t.Fatalf("continuationBlockedError(missing) = %v, want ErrContinuationAffinityMissing", err)
+	}
+}
+
+func TestSelectionSmallBranchHelpers(t *testing.T) {
+	t.Parallel()
+
+	if got := findAccountByID([]*ent.Account{{ID: 1}}, 0); got != nil {
+		t.Fatalf("findAccountByID(0) = %+v, want nil", got)
+	}
+	filtered := filterPriorityCandidates([]*ent.Account{
+		nil,
+		&ent.Account{ID: 1, Priority: -1},
+		&ent.Account{ID: 2, Priority: 0},
+	}, true)
+	if len(filtered) != 1 || filtered[0].ID != 1 {
+		t.Fatalf("filterPriorityCandidates negative = %+v", filtered)
+	}
+	affinity := &ent.Account{ID: 1, Priority: -2}
+	competitor := &ent.Account{ID: 2, Priority: -1}
+	if !softAffinityCompetitorBlocks(affinity, StickyOnly, competitor, StickyOnly) {
+		t.Fatal("negative sticky affinity should be blocked by higher negative sticky competitor")
+	}
+	if softAffinityCompetitorBlocks(affinity, Normal, competitor, StickyOnly) {
+		t.Fatal("negative normal affinity should not be blocked by sticky-only negative competitor")
 	}
 }
 
@@ -516,6 +569,78 @@ func TestHardAffinityDoesNotBypassNonWindowConstraints(t *testing.T) {
 				t.Fatalf("SelectAccountWithOptions() error = %v, want ErrContinuationCapacityExceeded", err)
 			}
 		})
+	}
+}
+
+type scriptedSessionTracker struct {
+	stubSessionTracker
+	allowed []bool
+	calls   []int
+}
+
+func (s *scriptedSessionTracker) RegisterSession(_ context.Context, accountID int, _ string, _ int, _ time.Duration) (bool, error) {
+	s.calls = append(s.calls, accountID)
+	if len(s.allowed) == 0 {
+		return false, nil
+	}
+	allowed := s.allowed[0]
+	s.allowed = s.allowed[1:]
+	return allowed, nil
+}
+
+func TestMaybeRegisterSessionRetriesAndReportsExhaustion(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	primary := newSelectionTestAccount(10)
+	primary.Extra = map[string]interface{}{"max_sessions": 1}
+	fallback := newSelectionTestAccount(20)
+	fallback.Extra = map[string]interface{}{"max_sessions": 1}
+
+	session := &scriptedSessionTracker{allowed: []bool{false, true}}
+	s := newSelectionTestScheduler(Normal)
+	s.session = session
+	selected, err := s.maybeRegisterSession(ctx, primary, 7, "openai", "sess", []*ent.Account{primary, fallback}, now, nil)
+	if err != nil {
+		t.Fatalf("maybeRegisterSession retry error = %v", err)
+	}
+	if selected.ID != fallback.ID {
+		t.Fatalf("selected account = %d, want fallback %d", selected.ID, fallback.ID)
+	}
+	if len(session.calls) != 2 || session.calls[0] != primary.ID || session.calls[1] != fallback.ID {
+		t.Fatalf("RegisterSession calls = %v", session.calls)
+	}
+	if stickyID, ok := s.sticky.Get(ctx, 7, "openai", "sess"); !ok || stickyID != fallback.ID {
+		t.Fatalf("sticky after retry = %d/%v, want fallback", stickyID, ok)
+	}
+
+	session = &scriptedSessionTracker{allowed: []bool{false}}
+	s = newSelectionTestScheduler(Normal)
+	s.session = session
+	if _, err := s.maybeRegisterSession(ctx, primary, 7, "openai", "sess", []*ent.Account{primary}, now, nil); !errors.Is(err, ErrNoAvailableAccount) {
+		t.Fatalf("maybeRegisterSession exhausted error = %v, want ErrNoAvailableAccount", err)
+	}
+}
+
+func TestRouteAccountsAndCurrentLoadEdges(t *testing.T) {
+	restore := routegraph.SetSnapshotForTesting(nil)
+	defer restore()
+	s := newSelectionTestScheduler(Normal)
+	if _, err := s.routeAccounts("openai", "gpt-4.1", 999); !errors.Is(err, ErrGroupNotFound) {
+		t.Fatalf("routeAccounts missing group error = %v", err)
+	}
+
+	seedSelectionTestGroup(t, 100, "claude", []*ent.Account{newSelectionTestAccount(1)}, nil)
+	if _, err := s.routeAccounts("openai", "gpt-4.1", 100); !errors.Is(err, ErrNoAvailableAccount) {
+		t.Fatalf("routeAccounts platform mismatch error = %v", err)
+	}
+
+	s.currentLoad = func(context.Context, int) int { return 7 }
+	if got := s.getCurrentLoad(context.Background(), 1); got != 7 {
+		t.Fatalf("getCurrentLoad callback = %d, want 7", got)
+	}
+	s.currentLoad = nil
+	if got := s.getCurrentLoad(context.Background(), 1); got != 0 {
+		t.Fatalf("getCurrentLoad without redis = %d, want 0", got)
 	}
 }
 
