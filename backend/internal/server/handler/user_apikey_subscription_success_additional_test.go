@@ -256,3 +256,169 @@ func TestUserGroupRateOverrideValidationAndErrors(t *testing.T) {
 		t.Fatalf("delete missing user status = %d, body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestUserAPIKeyAndSubscriptionRouteServiceErrorsWithSQLite(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.OpenMemoryEnt(t, "handler_user_key_subscription_errors", schema.WithGlobalUniqueID(false))
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	userEnt, err := db.User.Create().
+		SetEmail("route-errors@example.com").
+		SetPasswordHash(string(hash)).
+		SetUsername("route-errors").
+		SetRole("user").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	adminEnt, err := db.User.Create().
+		SetEmail("admin-route-errors@example.com").
+		SetPasswordHash(string(hash)).
+		SetUsername("admin-route-errors").
+		SetRole("admin").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	groupEnt, err := db.Group.Create().
+		SetName("Route Error Group").
+		SetPlatform("openai").
+		SetSubscriptionType("standard").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+
+	userHandler := NewUserHandler(appuser.NewService(store.NewUserStore(db)), nil, nil)
+	withMissingUser := func(c *gin.Context) { c.Set("user_id", 9999) }
+	withUser := func(c *gin.Context) { c.Set("user_id", userEnt.ID) }
+
+	userCases := []struct {
+		name   string
+		method string
+		target string
+		body   string
+		params gin.Params
+		setup  func(*gin.Context)
+		fn     func(*gin.Context)
+		status int
+	}{
+		{name: "get me missing", method: http.MethodGet, target: "/users/me", setup: withMissingUser, fn: userHandler.GetMe, status: http.StatusNotFound},
+		{name: "update profile missing", method: http.MethodPut, target: "/users/me", body: `{"username":"x"}`, setup: withMissingUser, fn: userHandler.UpdateProfile, status: http.StatusNotFound},
+		{name: "balance alert missing", method: http.MethodPut, target: "/users/me/balance-alert", body: `{"threshold":1}`, setup: withMissingUser, fn: userHandler.UpdateBalanceAlert, status: http.StatusInternalServerError},
+		{name: "change password mismatch", method: http.MethodPost, target: "/users/me/password", body: `{"old_password":"wrong","new_password":"password456"}`, setup: withUser, fn: userHandler.ChangePassword, status: http.StatusBadRequest},
+		{name: "create duplicate email", method: http.MethodPost, target: "/users", body: `{"email":"route-errors@example.com","password":"password123","role":"user"}`, fn: userHandler.CreateUser, status: http.StatusBadRequest},
+		{name: "update missing user", method: http.MethodPut, target: "/users/9999", params: gin.Params{{Key: "id", Value: "9999"}}, body: `{"username":"missing"}`, fn: userHandler.UpdateUser, status: http.StatusNotFound},
+		{name: "update invalid group rate", method: http.MethodPut, target: "/users/1", params: gin.Params{{Key: "id", Value: fmt.Sprint(userEnt.ID)}}, body: `{"group_rates":{"1":0}}`, fn: userHandler.UpdateUser, status: http.StatusBadRequest},
+		{name: "adjust invalid action", method: http.MethodPost, target: "/users/1/balance", params: gin.Params{{Key: "id", Value: fmt.Sprint(userEnt.ID)}}, body: `{"action":"bad","amount":1}`, fn: userHandler.AdjustBalance, status: http.StatusBadRequest},
+		{name: "adjust insufficient balance", method: http.MethodPost, target: "/users/1/balance", params: gin.Params{{Key: "id", Value: fmt.Sprint(userEnt.ID)}}, body: `{"action":"subtract","amount":1}`, fn: userHandler.AdjustBalance, status: http.StatusBadRequest},
+		{name: "delete admin forbidden", method: http.MethodDelete, target: "/users/admin", params: gin.Params{{Key: "id", Value: fmt.Sprint(adminEnt.ID)}}, fn: userHandler.DeleteUser, status: http.StatusBadRequest},
+		{name: "delete missing user", method: http.MethodDelete, target: "/users/9999", params: gin.Params{{Key: "id", Value: "9999"}}, fn: userHandler.DeleteUser, status: http.StatusNotFound},
+		{name: "toggle missing user", method: http.MethodPatch, target: "/users/9999/toggle", params: gin.Params{{Key: "id", Value: "9999"}}, fn: userHandler.ToggleUserStatus, status: http.StatusNotFound},
+	}
+	for _, tt := range userCases {
+		t.Run(tt.name, func(t *testing.T) {
+			w := invokeHandlerForValidation(tt.method, tt.target, tt.body, tt.params, tt.setup, tt.fn)
+			if w.Code != tt.status {
+				t.Fatalf("status = %d, want %d; body=%s", w.Code, tt.status, w.Body.String())
+			}
+		})
+	}
+
+	apiKeyHandler := NewAPIKeyHandler(appapikey.NewService(store.NewAPIKeyStore(db), strings.Repeat("c", 64)), nil)
+	apiKeyCases := []struct {
+		name   string
+		method string
+		target string
+		body   string
+		params gin.Params
+		setup  func(*gin.Context)
+		fn     func(*gin.Context)
+		status int
+	}{
+		{name: "create missing group", method: http.MethodPost, target: "/api-keys", body: `{"name":"missing","group_id":9999}`, setup: withUser, fn: apiKeyHandler.CreateKey, status: http.StatusNotFound},
+		{name: "create invalid expires", method: http.MethodPost, target: "/api-keys", body: fmt.Sprintf(`{"name":"expired","group_id":%d,"expires_at":"bad-time"}`, groupEnt.ID), setup: withUser, fn: apiKeyHandler.CreateKey, status: http.StatusBadRequest},
+		{name: "update missing owned", method: http.MethodPut, target: "/api-keys/9999", params: gin.Params{{Key: "id", Value: "9999"}}, body: `{"name":"missing"}`, setup: withUser, fn: apiKeyHandler.UpdateKey, status: http.StatusNotFound},
+		{name: "delete missing owned", method: http.MethodDelete, target: "/api-keys/9999", params: gin.Params{{Key: "id", Value: "9999"}}, setup: withUser, fn: apiKeyHandler.DeleteKey, status: http.StatusNotFound},
+		{name: "admin update missing", method: http.MethodPut, target: "/admin/api-keys/9999", params: gin.Params{{Key: "id", Value: "9999"}}, body: `{"name":"missing"}`, fn: apiKeyHandler.AdminUpdateKey, status: http.StatusNotFound},
+		{name: "admin reset missing", method: http.MethodPost, target: "/admin/api-keys/9999/reset", params: gin.Params{{Key: "id", Value: "9999"}}, fn: apiKeyHandler.AdminResetKeyUsage, status: http.StatusNotFound},
+		{name: "reveal missing", method: http.MethodGet, target: "/api-keys/9999/reveal", params: gin.Params{{Key: "id", Value: "9999"}}, setup: withUser, fn: apiKeyHandler.RevealKey, status: http.StatusNotFound},
+	}
+	for _, tt := range apiKeyCases {
+		t.Run(tt.name, func(t *testing.T) {
+			w := invokeHandlerForValidation(tt.method, tt.target, tt.body, tt.params, tt.setup, tt.fn)
+			if w.Code != tt.status {
+				t.Fatalf("status = %d, want %d; body=%s", w.Code, tt.status, w.Body.String())
+			}
+		})
+	}
+
+	subscriptionHandler := NewSubscriptionHandler(appsubscription.NewService(store.NewSubscriptionStore(db)))
+	subscriptionCases := []struct {
+		name   string
+		method string
+		target string
+		body   string
+		params gin.Params
+		fn     func(*gin.Context)
+		status int
+	}{
+		{name: "assign invalid expires", method: http.MethodPost, target: "/admin/subscriptions/assign", body: fmt.Sprintf(`{"user_id":%d,"group_id":%d,"expires_at":"bad-time"}`, userEnt.ID, groupEnt.ID), fn: subscriptionHandler.AdminAssign, status: http.StatusBadRequest},
+		{name: "bulk assign invalid expires", method: http.MethodPost, target: "/admin/subscriptions/bulk", body: fmt.Sprintf(`{"user_ids":[%d],"group_id":%d,"expires_at":"bad-time"}`, userEnt.ID, groupEnt.ID), fn: subscriptionHandler.AdminBulkAssign, status: http.StatusBadRequest},
+		{name: "adjust missing", method: http.MethodPut, target: "/admin/subscriptions/9999", params: gin.Params{{Key: "id", Value: "9999"}}, body: `{"status":"active"}`, fn: subscriptionHandler.AdminAdjust, status: http.StatusNotFound},
+		{name: "adjust invalid expires", method: http.MethodPut, target: "/admin/subscriptions/9999", params: gin.Params{{Key: "id", Value: "9999"}}, body: `{"expires_at":"bad-time"}`, fn: subscriptionHandler.AdminAdjust, status: http.StatusBadRequest},
+	}
+	for _, tt := range subscriptionCases {
+		t.Run(tt.name, func(t *testing.T) {
+			w := invokeHandlerForValidation(tt.method, tt.target, tt.body, tt.params, nil, tt.fn)
+			if w.Code != tt.status {
+				t.Fatalf("status = %d, want %d; body=%s", w.Code, tt.status, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestListStyleRoutesPropagateRepositoryErrorsWithClosedSQLite(t *testing.T) {
+	db := testdb.OpenMemoryEnt(t, "handler_list_route_repo_errors", schema.WithGlobalUniqueID(false))
+	userHandler := NewUserHandler(appuser.NewService(store.NewUserStore(db)), nil, nil)
+	apiKeyHandler := NewAPIKeyHandler(appapikey.NewService(store.NewAPIKeyStore(db), strings.Repeat("d", 64)), nil)
+	subscriptionHandler := NewSubscriptionHandler(appsubscription.NewService(store.NewSubscriptionStore(db)))
+	if err := db.Close(); err != nil {
+		t.Fatalf("close db before route calls: %v", err)
+	}
+
+	withUser := func(c *gin.Context) { c.Set("user_id", 7) }
+	tests := []struct {
+		name   string
+		target string
+		params gin.Params
+		setup  func(*gin.Context)
+		fn     func(*gin.Context)
+	}{
+		{name: "my balance history", target: "/users/me/balance-history?page=1&page_size=10", setup: withUser, fn: userHandler.GetMyBalanceHistory},
+		{name: "list users", target: "/users?page=1&page_size=10", fn: userHandler.ListUsers},
+		{name: "user balance history", target: "/users/7/balance-history?page=1&page_size=10", params: gin.Params{{Key: "id", Value: "7"}}, fn: userHandler.GetUserBalanceHistory},
+		{name: "admin list user keys", target: "/users/7/api-keys?page=1&page_size=10", params: gin.Params{{Key: "id", Value: "7"}}, fn: userHandler.AdminListUserKeys},
+		{name: "list owned api keys", target: "/api-keys?page=1&page_size=10", setup: withUser, fn: apiKeyHandler.ListKeys},
+		{name: "admin list api keys", target: "/admin/api-keys?page=1&page_size=10", fn: apiKeyHandler.AdminListKeys},
+		{name: "user subscriptions", target: "/subscriptions?page=1&page_size=10", setup: withUser, fn: subscriptionHandler.UserSubscriptions},
+		{name: "active subscriptions", target: "/subscriptions/active", setup: withUser, fn: subscriptionHandler.ActiveSubscriptions},
+		{name: "admin subscriptions", target: "/admin/subscriptions?page=1&page_size=10", fn: subscriptionHandler.AdminListSubscriptions},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := invokeHandlerForValidation(http.MethodGet, tt.target, "", tt.params, tt.setup, tt.fn)
+			if w.Code != http.StatusInternalServerError {
+				t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusInternalServerError, w.Body.String())
+			}
+		})
+	}
+}

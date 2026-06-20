@@ -11,6 +11,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	entaccount "github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
@@ -109,6 +110,185 @@ func TestForwarderWriteResultOutcomeBranchesWithSQLite(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Body.String(), "upstream_rate_limit") {
 		t.Fatalf("rate limit body = %s", recorder.Body.String())
+	}
+}
+
+func TestForwarderUpdateAccountCredentialsMergesExistingValues(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.OpenMemoryEnt(t, "plugin_update_account_credentials", schema.WithGlobalUniqueID(false))
+	t.Cleanup(func() { _ = db.Close() })
+
+	accountEnt, err := db.Account.Create().
+		SetName("credential-merge").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{
+			"access_token":  "old-access",
+			"refresh_token": "old-refresh",
+			"keep":          "unchanged",
+		}).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	forwarder := &Forwarder{db: db}
+	forwarder.updateAccountCredentials(accountEnt.ID, map[string]string{
+		"access_token": "new-access",
+		"expires_at":   "2026-06-20T00:00:00Z",
+	})
+
+	updated, err := db.Account.Get(ctx, accountEnt.ID)
+	if err != nil {
+		t.Fatalf("get updated account: %v", err)
+	}
+	want := map[string]string{
+		"access_token":  "new-access",
+		"refresh_token": "old-refresh",
+		"keep":          "unchanged",
+		"expires_at":    "2026-06-20T00:00:00Z",
+	}
+	for key, value := range want {
+		if updated.Credentials[key] != value {
+			t.Fatalf("credential %s = %q, want %q in %#v", key, updated.Credentials[key], value, updated.Credentials)
+		}
+	}
+
+	forwarder.updateAccountCredentials(accountEnt.ID+999, map[string]string{"access_token": "ignored"})
+
+	forwarder.credentialPersistSem = make(chan struct{}, 1)
+	forwarder.persistUpdatedCredentials(accountEnt.ID, map[string]string{"refresh_token": "async-refresh"})
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		updated, err = db.Account.Get(ctx, accountEnt.ID)
+		if err != nil {
+			t.Fatalf("get async updated account: %v", err)
+		}
+		if updated.Credentials["refresh_token"] == "async-refresh" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("async credential update did not persist: %#v", updated.Credentials)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestForwarderRecordUsagePersistsFallbackRecord(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.OpenMemoryEnt(t, "plugin_record_usage_fallback", schema.WithGlobalUniqueID(false))
+	t.Cleanup(func() { _ = db.Close() })
+
+	user, err := db.User.Create().
+		SetEmail("record-usage@example.com").
+		SetPasswordHash("hash").
+		SetBalance(10).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	group, err := db.Group.Create().
+		SetName("record-usage").
+		SetPlatform("openai").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	accountEnt, err := db.Account.Create().
+		SetName("record-usage").
+		SetPlatform("openai").
+		SetType("apikey").
+		SetRateMultiplier(1.5).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	key, err := db.APIKey.Create().
+		SetName("record-usage").
+		SetKeyHash("hash-record-usage").
+		SetUserID(user.ID).
+		SetGroupID(group.ID).
+		SetSellRate(2).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+
+	recorder := billing.NewRecorder(db, 1)
+	recorder.Record(billing.UsageRecord{
+		BillingEventID: "prefill-record-usage",
+		UserID:         user.ID,
+		UserEmail:      user.Email,
+		AccountID:      accountEnt.ID,
+		GroupID:        group.ID,
+		Platform:       "openai",
+		Model:          "prefill",
+	})
+	forwarder := &Forwarder{
+		scheduler:  scheduler.NewScheduler(db, nil),
+		calculator: billing.NewCalculator(),
+		recorder:   recorder,
+	}
+	state := &forwardState{
+		requestPath:       "/v1/responses",
+		requestedPlatform: "openai",
+		model:             "gpt-4.1",
+		reasoningEffort:   "low",
+		stream:            true,
+		plugin:            &PluginInstance{Name: "openai", Platform: "openai"},
+		account:           accountEnt,
+		keyInfo: &auth.APIKeyInfo{
+			UserID:              user.ID,
+			UserEmail:           user.Email,
+			KeyID:               key.ID,
+			GroupID:             group.ID,
+			GroupPlatform:       "openai",
+			GroupRateMultiplier: 1,
+			SellRate:            2,
+		},
+	}
+	c, _ := pluginTestContext(http.MethodPost, "/v1/responses")
+	c.Request.Header.Set("User-Agent", "record-usage-test")
+
+	forwarder.recordUsage(c, state, forwardExecution{
+		outcome: sdk.ForwardOutcome{Usage: &sdk.Usage{
+			Model:           "gpt-4.1-mini",
+			InputTokens:     100,
+			OutputTokens:    20,
+			InputCost:       0.25,
+			OutputCost:      0.75,
+			FirstTokenMs:    123,
+			ReasoningEffort: "medium",
+			Metadata:        map[string]string{"openai.response_id": "resp_usage"},
+		}},
+		duration: 1500 * time.Millisecond,
+	})
+
+	count, err := db.UsageLog.Query().Count(ctx)
+	if err != nil {
+		t.Fatalf("count usage logs: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("usage log count = %d, want fallback persisted one record", count)
+	}
+	log, err := db.UsageLog.Query().Only(ctx)
+	if err != nil {
+		t.Fatalf("query usage log: %v", err)
+	}
+	if log.Model != "gpt-4.1-mini" || log.Endpoint != "/v1/responses" || log.ReasoningEffort != "medium" {
+		t.Fatalf("usage log core fields = model:%q endpoint:%q reasoning:%q", log.Model, log.Endpoint, log.ReasoningEffort)
+	}
+	if log.InputTokens != 100 || log.OutputTokens != 20 || log.FirstTokenMs != 123 || !log.Stream {
+		t.Fatalf("usage log tokens/timing = input:%d output:%d first:%d stream:%v", log.InputTokens, log.OutputTokens, log.FirstTokenMs, log.Stream)
+	}
+	if log.TotalCost != 1 || log.ActualCost != 1 || log.BilledCost != 2 || log.AccountCost != 1.5 {
+		t.Fatalf("usage log costs = total:%v actual:%v billed:%v account:%v", log.TotalCost, log.ActualCost, log.BilledCost, log.AccountCost)
+	}
+	if log.UsageMetadata[responseIDUsageMetadataKey] != "resp_usage" {
+		t.Fatalf("usage metadata = %#v", log.UsageMetadata)
+	}
+	if exists, err := db.UsageLog.Query().Where(usagelog.BillingEventIDEQ("prefill-record-usage")).Exist(ctx); err != nil || exists {
+		t.Fatalf("prefill queued record persisted = %v/%v, want false nil", exists, err)
 	}
 }
 

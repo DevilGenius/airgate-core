@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,6 +156,93 @@ func TestForwarderEdgeHelpers(t *testing.T) {
 	}
 	if isOptionalTaskExtensionUnavailable(status.Error(codes.Internal, "boom")) {
 		t.Fatal("internal error should not be optional task extension unavailable")
+	}
+}
+
+func TestAllRoutesFailureResponsesAndFailoverDecisions(t *testing.T) {
+	responses := []struct {
+		name        string
+		summary     allRoutesFailureSummary
+		status      int
+		code        string
+		retryHeader bool
+	}{
+		{name: "context too large", summary: allRoutesFailureSummary{contextTooLargeSeen: true}, status: http.StatusRequestEntityTooLarge, code: "context_too_large"},
+		{name: "continuation affinity missing", summary: allRoutesFailureSummary{continuationAffinityMissing: true}, status: http.StatusBadRequest, code: "continuation_affinity_missing"},
+		{name: "rate limited", summary: allRoutesFailureSummary{rateLimitedSeen: true, rateLimitedRetryAfter: 1500 * time.Millisecond}, status: http.StatusTooManyRequests, code: "all_routes_rate_limited", retryHeader: true},
+		{name: "continuation unavailable", summary: allRoutesFailureSummary{continuationUnavailable: true}, status: http.StatusTooManyRequests, code: "continuation_unavailable", retryHeader: true},
+		{name: "local capacity", summary: allRoutesFailureSummary{localCapacitySeen: true}, status: http.StatusTooManyRequests, code: "all_routes_capacity_exhausted", retryHeader: true},
+		{name: "upstream timeout", summary: allRoutesFailureSummary{upstreamTimeoutSeen: true}, status: http.StatusGatewayTimeout, code: "upstream_timeout"},
+		{name: "upstream failure", summary: allRoutesFailureSummary{upstreamFailureSeen: true}, status: http.StatusBadGateway, code: "upstream_error"},
+		{name: "account unavailable", summary: allRoutesFailureSummary{accountUnavailable: true}, status: http.StatusTooManyRequests, code: "all_routes_account_unavailable", retryHeader: true},
+		{name: "account dead", summary: allRoutesFailureSummary{accountDeadSeen: true}, status: http.StatusServiceUnavailable, code: "no_available_account"},
+		{name: "default", summary: allRoutesFailureSummary{}, status: http.StatusServiceUnavailable, code: "all_routes_failed"},
+	}
+	for _, tt := range responses {
+		t.Run(tt.name, func(t *testing.T) {
+			c, recorder := pluginTestContext(http.MethodPost, "/v1/chat/completions")
+			writeAllRoutesFailed(c, tt.summary)
+			if recorder.Code != tt.status {
+				t.Fatalf("status = %d, want %d; body=%s", recorder.Code, tt.status, recorder.Body.String())
+			}
+			if !strings.Contains(recorder.Body.String(), tt.code) {
+				t.Fatalf("body missing code %q: %s", tt.code, recorder.Body.String())
+			}
+			if got := recorder.Header().Get("Retry-After"); tt.retryHeader && got == "" {
+				t.Fatalf("Retry-After header missing for %s", tt.name)
+			} else if !tt.retryHeader && got != "" {
+				t.Fatalf("unexpected Retry-After header %q for %s", got, tt.name)
+			}
+		})
+	}
+
+	for _, tt := range []struct {
+		name    string
+		written bool
+		state   *forwardState
+		exec    forwardExecution
+		want    bool
+	}{
+		{name: "stream already written", written: true, state: &forwardState{stream: true}, exec: forwardExecution{err: errors.New("boom")}, want: false},
+		{name: "continuation required", state: &forwardState{requireContinuationAffinity: true}, exec: forwardExecution{err: errors.New("boom")}, want: false},
+		{name: "client error", state: &forwardState{}, exec: forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeClientError}}, want: false},
+		{name: "plugin error", state: &forwardState{}, exec: forwardExecution{err: errors.New("boom")}, want: true},
+		{name: "account rate limited", state: &forwardState{}, exec: forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountRateLimited}}, want: true},
+		{name: "success", state: &forwardState{}, exec: forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess}}, want: false},
+	} {
+		t.Run("can failover "+tt.name, func(t *testing.T) {
+			c, _ := pluginTestContext(http.MethodPost, "/v1/chat/completions")
+			if tt.written {
+				c.Writer.WriteHeaderNow()
+			}
+			if got := (&Forwarder{}).canFailover(c, tt.state, tt.exec); got != tt.want {
+				t.Fatalf("canFailover() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+type timeoutFailureErr struct{}
+
+func (timeoutFailureErr) Error() string   { return "temporary timeout" }
+func (timeoutFailureErr) Timeout() bool   { return true }
+func (timeoutFailureErr) Temporary() bool { return true }
+
+func TestIsTimeoutFailureVariants(t *testing.T) {
+	if !isTimeoutFailure(forwardExecution{outcome: sdk.ForwardOutcome{Upstream: sdk.UpstreamResponse{StatusCode: http.StatusGatewayTimeout}}}) {
+		t.Fatal("gateway timeout status should be timeout failure")
+	}
+	if !isTimeoutFailure(forwardExecution{err: context.DeadlineExceeded}) {
+		t.Fatal("context deadline should be timeout failure")
+	}
+	if !isTimeoutFailure(forwardExecution{err: timeoutFailureErr{}}) {
+		t.Fatal("Timeout() error should be timeout failure")
+	}
+	if !isTimeoutFailure(forwardExecution{outcome: sdk.ForwardOutcome{Reason: "upstream timed out"}}) {
+		t.Fatal("timeout reason should be timeout failure")
+	}
+	if isTimeoutFailure(forwardExecution{outcome: sdk.ForwardOutcome{Reason: "connection reset"}}) {
+		t.Fatal("non-timeout reason should not be timeout failure")
 	}
 }
 

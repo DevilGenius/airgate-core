@@ -162,6 +162,36 @@ func TestDynamicRouterRemoveRoutesAndAllowedMethods(t *testing.T) {
 	}
 }
 
+func TestDynamicRouterHandleAdditionalBranches(t *testing.T) {
+	nilRouter := NewDynamicRouter(nil)
+	c, w := newServerTestContext(http.MethodGet, "/v1/test", nil)
+	nilRouter.Handle(c)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("nil forwarder status = %d body=%s", w.Code, w.Body.String())
+	}
+
+	dr := NewDynamicRouter(&plugin.Forwarder{})
+	dr.AddRoutes("test", []routeEntry{{Method: http.MethodGet, Path: "/v1/test"}})
+	c, w = newServerTestContext(http.MethodPost, "/v1/test", gin.Params{{Key: "path", Value: "/v1/test"}})
+	dr.Handle(c)
+	if w.Code != http.StatusMethodNotAllowed || w.Header().Get("Allow") != http.MethodGet {
+		t.Fatalf("method mismatch response = %d allow=%q body=%s", w.Code, w.Header().Get("Allow"), w.Body.String())
+	}
+
+	c, w = newServerTestContext(http.MethodGet, "/v1/test", gin.Params{{Key: "path", Value: "/v1/test"}})
+	dr.Handle(c)
+	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), "missing_api_key") {
+		t.Fatalf("matched route should enter forwarder auth path, got %d %s", w.Code, w.Body.String())
+	}
+
+	openRouter := NewDynamicRouter(&plugin.Forwarder{})
+	c, w = newServerTestContext(http.MethodGet, "/v1/anything", nil)
+	openRouter.Handle(c)
+	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), "missing_api_key") {
+		t.Fatalf("open router should enter forwarder auth path, got %d %s", w.Code, w.Body.String())
+	}
+}
+
 func TestServePluginAssetFallbacks(t *testing.T) {
 	baseDir := t.TempDir()
 	assetDir := filepath.Join(baseDir, "demo", "assets")
@@ -236,5 +266,18 @@ func TestHandleRuntimeAssetRejectsInvalidPathAndContentTypes(t *testing.T) {
 		if got := contentTypeFromExt(tt.name); got != tt.want {
 			t.Fatalf("contentTypeFromExt(%q) = %q, want %q", tt.name, got, tt.want)
 		}
+	}
+}
+
+func TestHandleRuntimeAssetStorageInitError(t *testing.T) {
+	db := testdb.OpenMemoryEnt(t, "server_runtime_asset_closed_db", schema.WithGlobalUniqueID(false))
+	if err := db.Close(); err != nil {
+		t.Fatalf("close db: %v", err)
+	}
+	s := &Server{db: db}
+	c, _ := newServerTestContext(http.MethodGet, "/assets-runtime/chat/1/a.png", gin.Params{{Key: "path", Value: "/chat/1/a.png"}})
+	s.handleRuntimeAsset(c)
+	if status := c.Writer.Status(); status != http.StatusInternalServerError {
+		t.Fatalf("closed db runtime asset status = %d", status)
 	}
 }
