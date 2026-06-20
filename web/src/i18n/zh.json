@@ -742,7 +742,7 @@
     "severity_critical": "严重",
     "request_severity_info": "信息",
     "request_severity_warning": "警告",
-    "type_api_request_error": "API 请求异常",
+    "type_api_request_error": "网关请求异常",
     "type_plugin_route_error": "插件路由异常",
     "type_plugin_forward_error": "插件转发异常",
     "type_client_request_error": "客户端请求异常",
