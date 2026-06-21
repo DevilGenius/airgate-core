@@ -1,5 +1,4 @@
 import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { flushSync } from 'react-dom';
 import { Check, ChevronDown } from 'lucide-react';
 
 interface ToolbarMenuProps {
@@ -9,6 +8,7 @@ interface ToolbarMenuProps {
   disabled?: boolean;
   icon?: ReactNode;
   label: ReactNode;
+  onOpenChange?: (isOpen: boolean) => void;
   rootClassName?: string;
 }
 
@@ -28,17 +28,28 @@ export const ToolbarMenu = memo(function ToolbarMenu({
   disabled = false,
   icon,
   label,
+  onOpenChange,
   rootClassName,
 }: ToolbarMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const isOpenRef = useRef(isOpen);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  const close = useCallback(() => setIsOpen(false), []);
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  const setOpen = useCallback((nextOpen: boolean) => {
+    if (isOpenRef.current === nextOpen) return;
+    isOpenRef.current = nextOpen;
+    onOpenChange?.(nextOpen);
+    setIsOpen(nextOpen);
+  }, [onOpenChange]);
+
+  const close = useCallback(() => setOpen(false), [setOpen]);
   const toggleOpen = useCallback(() => {
-    flushSync(() => {
-      setIsOpen((open) => !open);
-    });
-  }, []);
+    setOpen(!isOpenRef.current);
+  }, [setOpen]);
 
   const handleTriggerPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
     if (disabled || event.button !== 0) return;

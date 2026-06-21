@@ -396,28 +396,13 @@ export class AccountSelectionStore {
   private selectedIds = new Set<number>();
   private version = 0;
   private listeners = new Set<SelectionListener>();
-  private rowListeners = new Map<number, Set<SelectionListener>>();
+  private notifyFrameId: number | null = null;
   private rowInputs = new Map<number, HTMLInputElement>();
 
   subscribe = (listener: SelectionListener) => {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
-    };
-  };
-
-  subscribeRow = (id: number, listener: SelectionListener) => {
-    let listeners = this.rowListeners.get(id);
-    if (!listeners) {
-      listeners = new Set();
-      this.rowListeners.set(id, listeners);
-    }
-    listeners.add(listener);
-    return () => {
-      listeners?.delete(listener);
-      if (listeners?.size === 0) {
-        this.rowListeners.delete(id);
-      }
     };
   };
 
@@ -452,14 +437,16 @@ export class AccountSelectionStore {
 
   setRow(id: number, isSelected: boolean) {
     const alreadySelected = this.selectedIds.has(id);
-    if (alreadySelected === isSelected) return;
+    if (alreadySelected === isSelected) return 0;
 
     if (isSelected) {
       this.selectedIds.add(id);
     } else {
       this.selectedIds.delete(id);
     }
-    this.notify([id]);
+    this.syncRowInputs([id]);
+    this.notify();
+    return 1;
   }
 
   setRows(ids: number[], isSelected: boolean) {
@@ -476,16 +463,18 @@ export class AccountSelectionStore {
     }
     if (changedIds.length > 0) {
       this.syncRowInputs(changedIds);
-      this.notify(changedIds, false);
+      this.notify();
     }
+    return changedIds.length;
   }
 
   clear() {
-    if (this.selectedIds.size === 0) return;
+    if (this.selectedIds.size === 0) return 0;
     const changedIds = Array.from(this.selectedIds);
     this.selectedIds.clear();
     this.syncRowInputs(changedIds);
-    this.notify(changedIds, false);
+    this.notify();
+    return changedIds.length;
   }
 
   private syncRowInputs(changedIds: number[]) {
@@ -497,14 +486,17 @@ export class AccountSelectionStore {
     }
   }
 
-  private notify(changedIds: number[], notifyRows = true) {
+  private notify() {
     this.version += 1;
-    if (notifyRows) {
-      for (const id of changedIds) {
-        this.rowListeners.get(id)?.forEach((listener) => listener());
-      }
+    if (typeof window === 'undefined') {
+      this.listeners.forEach((listener) => listener());
+      return;
     }
-    this.listeners.forEach((listener) => listener());
+    if (this.notifyFrameId != null) return;
+    this.notifyFrameId = window.requestAnimationFrame(() => {
+      this.notifyFrameId = null;
+      this.listeners.forEach((listener) => listener());
+    });
   }
 }
 
@@ -582,15 +574,17 @@ function StatusPill({
 
 export function TableSelectionCheckbox({
   ariaLabel,
+  defaultSelected,
   inputRef,
   isIndeterminate,
   isSelected,
   onChange,
 }: {
   ariaLabel: string;
+  defaultSelected?: boolean;
   inputRef?: (input: HTMLInputElement | null) => void;
   isIndeterminate?: boolean;
-  isSelected: boolean;
+  isSelected?: boolean;
   onChange: (isSelected: boolean) => void;
 }) {
   const checkboxRef = useRef<HTMLInputElement>(null);
@@ -599,18 +593,21 @@ export function TableSelectionCheckbox({
     inputRef?.(input);
   }, [inputRef]);
 
-  useEffect(() => {
-    if (checkboxRef.current) {
-      checkboxRef.current.indeterminate = !!isIndeterminate;
+  useLayoutEffect(() => {
+    const checkbox = checkboxRef.current;
+    if (!checkbox) return;
+    if (isSelected !== undefined) {
+      checkbox.checked = isSelected;
     }
-  }, [isIndeterminate]);
+    checkbox.indeterminate = !!isIndeterminate;
+  }, [isIndeterminate, isSelected]);
 
   return (
     <input
       ref={setCheckboxRef}
       type="checkbox"
       aria-label={ariaLabel}
-      checked={isSelected}
+      defaultChecked={defaultSelected ?? isSelected ?? false}
       className="ag-table-selection-checkbox"
       onChange={(event) => onChange(event.currentTarget.checked)}
     />
@@ -657,11 +654,6 @@ const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
   rowId: number;
   onSelectedChange: (id: number, isSelected: boolean) => void;
 }) {
-  const isSelected = useSyncExternalStore(
-    useCallback((listener) => selectionStore.subscribeRow(rowId, listener), [rowId, selectionStore]),
-    useCallback(() => selectionStore.has(rowId), [rowId, selectionStore]),
-    () => false,
-  );
   const handleChange = useCallback((nextSelected: boolean) => {
     onSelectedChange(rowId, nextSelected);
   }, [onSelectedChange, rowId]);
@@ -673,7 +665,7 @@ const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
     <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
       <TableSelectionCheckbox
         ariaLabel={ariaLabel}
-        isSelected={isSelected}
+        defaultSelected={selectionStore.has(rowId)}
         onChange={handleChange}
         inputRef={registerInput}
       />

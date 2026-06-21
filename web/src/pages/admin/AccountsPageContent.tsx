@@ -70,6 +70,45 @@ const ACCOUNT_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsFilters;
 const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 const ACCOUNT_PRIORITY_SORT_KEY = 'priority';
+const ACCOUNT_MODAL_TABLE_PLACEHOLDER_MIN_HEIGHT = 320;
+
+type AccountModalPerfTarget = 'create' | 'edit' | 'delete' | 'bulk-edit' | 'bulk-delete' | 'bulk-refresh' | 'test' | 'stats';
+
+type AccountModalPerfSample = {
+  rows: number;
+  startedAt: number;
+  target: AccountModalPerfTarget;
+};
+
+type AccountSelectionPerfAction = 'select-visible' | 'select-row';
+
+type AccountToolbarMenuPerfTarget = 'platform' | 'state' | 'type' | 'group' | 'proxy' | 'auto-refresh';
+
+type AccountToolbarMenuPerfSample = {
+  rows: number;
+  startedAt: number;
+  target: AccountToolbarMenuPerfTarget;
+};
+
+function readElementHeight(element: HTMLElement | null) {
+  return element ? Math.ceil(element.getBoundingClientRect().height) : 0;
+}
+
+function getNodeCount(selector: string) {
+  if (typeof document === 'undefined') return 0;
+  return document.querySelectorAll(selector).length;
+}
+
+function getCheckedAccountRowCount() {
+  if (typeof document === 'undefined') return 0;
+  return document.querySelectorAll('tbody input.ag-table-selection-checkbox:checked').length;
+}
+
+function getAccountsTableFrameContentVisibility() {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return '';
+  const frame = document.querySelector('.ag-accounts-table-frame');
+  return frame instanceof HTMLElement ? window.getComputedStyle(frame).contentVisibility : '';
+}
 
 function useAccountModalRootIsolation(isActive: boolean) {
   useLayoutEffect(() => {
@@ -106,6 +145,192 @@ function useAccountModalRootIsolation(isActive: boolean) {
       }
     };
   }, [isActive]);
+}
+
+function useMeasuredElementHeight<T extends HTMLElement>() {
+  const [height, setHeight] = useState(0);
+  const [observedElement, setObservedElement] = useState<T | null>(null);
+
+  const ref = useCallback((element: T | null) => {
+    setObservedElement(element);
+    const nextHeight = readElementHeight(element);
+    if (nextHeight > 0) {
+      setHeight(nextHeight);
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    const element = observedElement;
+    if (!element || typeof ResizeObserver === 'undefined') return undefined;
+
+    let frameId = 0;
+    const observer = new ResizeObserver((entries) => {
+      const nextHeight = Math.ceil(entries[0]?.contentRect.height ?? 0);
+      if (nextHeight <= 0) return;
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => {
+        setHeight((current) => (current === nextHeight ? current : nextHeight));
+      });
+    });
+
+    observer.observe(element);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
+  }, [observedElement]);
+
+  return [ref, height] as const;
+}
+
+function useAccountModalPerfMonitor(isModalOpen: boolean) {
+  const pendingSampleRef = useRef<AccountModalPerfSample | null>(null);
+
+  const markModalOpenStart = useCallback((target: AccountModalPerfTarget, rows: number) => {
+    if (!import.meta.env.DEV || typeof performance === 'undefined') return;
+
+    pendingSampleRef.current = {
+      rows,
+      startedAt: performance.now(),
+      target,
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isModalOpen || !import.meta.env.DEV || typeof performance === 'undefined') return undefined;
+
+    const sample = pendingSampleRef.current;
+    if (!sample) return undefined;
+    pendingSampleRef.current = null;
+
+    const committedAt = performance.now();
+    let timeoutId: number | undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      const paintedAt = performance.now();
+      timeoutId = window.setTimeout(() => {
+        const metric = {
+          commitMs: Math.round((committedAt - sample.startedAt) * 10) / 10,
+          documentNodesAfter: getNodeCount('*'),
+          paintMs: Math.round((paintedAt - sample.startedAt) * 10) / 10,
+          rows: sample.rows,
+          tableFrameContentVisibility: getAccountsTableFrameContentVisibility(),
+          tableMountedAfter: getNodeCount('.ag-accounts-table [data-slot="tbody"]') > 0,
+          tableNodesAfter: getNodeCount('.ag-accounts-table *'),
+          target: sample.target,
+        };
+        console.info('[accounts:modal-open]', JSON.stringify(metric));
+      }, 0);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [isModalOpen]);
+
+  return markModalOpenStart;
+}
+
+function useAccountSelectionPerfMonitor() {
+  const lastLogAtRef = useRef(0);
+
+  return useCallback((
+    action: AccountSelectionPerfAction,
+    rows: number,
+    nextSelected: boolean,
+    work: () => number,
+  ) => {
+    if (!import.meta.env.DEV || typeof performance === 'undefined') {
+      return work();
+    }
+
+    const startedAt = performance.now();
+    const shouldLog = startedAt - lastLogAtRef.current >= 250;
+    const changed = work();
+    const workedAt = performance.now();
+    if (!shouldLog) return changed;
+    lastLogAtRef.current = workedAt;
+
+    const frameId = window.requestAnimationFrame(() => {
+      const paintedAt = performance.now();
+      window.setTimeout(() => {
+        const metric = {
+          action,
+          changed,
+          checkedAfter: getCheckedAccountRowCount(),
+          nextSelected,
+          paintMs: Math.round((paintedAt - startedAt) * 10) / 10,
+          rows,
+          selectedCount: getCheckedAccountRowCount(),
+          tableNodesAfter: getNodeCount('.ag-accounts-table *'),
+          workMs: Math.round((workedAt - startedAt) * 10) / 10,
+        };
+        console.info('[accounts:selection]', JSON.stringify(metric));
+      }, 0);
+    });
+
+    window.setTimeout(() => window.cancelAnimationFrame(frameId), 1000);
+    return changed;
+  }, []);
+}
+
+function useAccountToolbarMenuPerfMonitor() {
+  const pendingSampleRef = useRef<AccountToolbarMenuPerfSample | null>(null);
+  const paintFrameIdRef = useRef<number | null>(null);
+  const paintTimeoutIdRef = useRef<number | null>(null);
+
+  const markToolbarMenuOpenStart = useCallback((target: AccountToolbarMenuPerfTarget, rows: number) => {
+    if (!import.meta.env.DEV || typeof performance === 'undefined' || typeof window === 'undefined') return;
+
+    const sample: AccountToolbarMenuPerfSample = {
+      rows,
+      startedAt: performance.now(),
+      target,
+    };
+    pendingSampleRef.current = sample;
+
+    if (paintFrameIdRef.current != null && typeof window !== 'undefined') {
+      window.cancelAnimationFrame(paintFrameIdRef.current);
+    }
+    if (paintTimeoutIdRef.current != null) {
+      window.clearTimeout(paintTimeoutIdRef.current);
+      paintTimeoutIdRef.current = null;
+    }
+
+    paintFrameIdRef.current = window.requestAnimationFrame(() => {
+      paintFrameIdRef.current = null;
+      const pendingSample = pendingSampleRef.current;
+      if (!pendingSample) return;
+      pendingSampleRef.current = null;
+      const paintedAt = performance.now();
+      paintTimeoutIdRef.current = window.setTimeout(() => {
+        paintTimeoutIdRef.current = null;
+        const metric = {
+          documentNodesAfter: getNodeCount('*'),
+          paintMs: Math.round((paintedAt - pendingSample.startedAt) * 10) / 10,
+          rows: pendingSample.rows,
+          tableFrameContentVisibility: getAccountsTableFrameContentVisibility(),
+          tableMountedAfter: getNodeCount('.ag-accounts-table [data-slot="tbody"]') > 0,
+          tableNodesAfter: getNodeCount('.ag-accounts-table *'),
+          target: pendingSample.target,
+        };
+        console.info('[accounts:toolbar-menu-open]', JSON.stringify(metric));
+      }, 0);
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (paintFrameIdRef.current != null && typeof window !== 'undefined') {
+      window.cancelAnimationFrame(paintFrameIdRef.current);
+    }
+    if (paintTimeoutIdRef.current != null && typeof window !== 'undefined') {
+      window.clearTimeout(paintTimeoutIdRef.current);
+    }
+  }, []);
+
+  return markToolbarMenuOpenStart;
 }
 
 export default function AccountsPageContent() {
@@ -213,6 +438,12 @@ export default function AccountsPageContent() {
     || testingAccount !== null
     || statsAccountId !== null;
   useAccountModalRootIsolation(isAnyAccountModalOpen);
+  const markModalOpenStart = useAccountModalPerfMonitor(isAnyAccountModalOpen);
+  const runSelectionPerf = useAccountSelectionPerfMonitor();
+  const markToolbarMenuOpenStart = useAccountToolbarMenuPerfMonitor();
+  const [accountsTableFrameRef, accountsTableHeight] = useMeasuredElementHeight<HTMLDivElement>();
+  const shouldRenderAccountsTable = !isAnyAccountModalOpen;
+  const accountsTablePlaceholderHeight = Math.max(accountsTableHeight, ACCOUNT_MODAL_TABLE_PLACEHOLDER_MIN_HEIGHT);
   const clearSelection = useCallback(() => {
     selectionStore.clear();
   }, [selectionStore]);
@@ -257,6 +488,10 @@ export default function AccountsPageContent() {
     void refetchAccounts({ cancelRefetch: false });
   }, [refetchAccounts]);
   const rows = data?.list ?? [];
+  const handleToolbarMenuOpenChange = useCallback((target: AccountToolbarMenuPerfTarget, isOpen: boolean) => {
+    if (!isOpen) return;
+    markToolbarMenuOpenStart(target, rows.length);
+  }, [markToolbarMenuOpenStart, rows.length]);
   const accountSnapshotRef = useRef<Map<number, AccountResp>>(new Map());
   useEffect(() => {
     if (rows.length === 0) return;
@@ -570,22 +805,30 @@ export default function AccountsPageContent() {
   const toggleSchedulingMutateRef = useLatestRef(toggleMutation.mutate);
   const refreshQuotaMutateRef = useLatestRef(refreshQuotaMutation.mutate);
   const clearRateLimitMarkersMutateRef = useLatestRef(clearRateLimitMarkersMutation.mutate);
+  const handleCreateAccount = useCallback(() => {
+    markModalOpenStart('create', rows.length);
+    setShowCreateModal(true);
+  }, [markModalOpenStart, rows.length]);
   const handleToggleScheduling = useCallback((id: number) => {
     if (pendingToggleIdsRef.current.has(id)) return;
     toggleSchedulingMutateRef.current(id);
   }, [toggleSchedulingMutateRef]);
   const handleEditAccount = useCallback((row: AccountResp) => {
+    markModalOpenStart('edit', rows.length);
     setEditingAccount(row);
-  }, []);
+  }, [markModalOpenStart, rows.length]);
   const handleDeleteAccount = useCallback((row: AccountResp) => {
+    markModalOpenStart('delete', rows.length);
     setDeletingAccount(row);
-  }, []);
+  }, [markModalOpenStart, rows.length]);
   const handleTestAccount = useCallback((row: AccountResp) => {
+    markModalOpenStart('test', rows.length);
     setTestingAccount(row);
-  }, []);
+  }, [markModalOpenStart, rows.length]);
   const handleStatsAccount = useCallback((id: number) => {
+    markModalOpenStart('stats', rows.length);
     setStatsAccountId(id);
-  }, []);
+  }, [markModalOpenStart, rows.length]);
   const handleRefreshQuota = useCallback((id: number) => {
     refreshQuotaMutateRef.current(id);
   }, [refreshQuotaMutateRef]);
@@ -667,16 +910,18 @@ export default function AccountsPageContent() {
     if (selectedRows.length < selectedAccountIds.length) {
       void refetchAccounts({ cancelRefetch: false });
     }
+    markModalOpenStart('bulk-edit', rows.length);
     setBulkEditSelection({
       ids: selectedAccountIds,
       initialValues: getBulkEditInitialValues(selectedRows.length > 0 ? selectedRows : rows, selectedAccountIds),
     });
-  }, [refetchAccounts, rows, selectionStore]);
+  }, [markModalOpenStart, refetchAccounts, rows, selectionStore]);
   const handleBulkDelete = useCallback(() => {
     const selectedAccountIds = selectionStore.getSelectedIds();
     if (selectedAccountIds.length === 0) return;
+    markModalOpenStart('bulk-delete', rows.length);
     setBulkDeleteIds(selectedAccountIds);
-  }, [selectionStore]);
+  }, [markModalOpenStart, rows.length, selectionStore]);
   const handleBulkDeleteConfirm = useCallback(() => {
     if (!bulkDeleteIds?.length) return;
     bulkDeleteMutateRef.current(bulkDeleteIds);
@@ -705,8 +950,9 @@ export default function AccountsPageContent() {
         skipped: selectedAccountIds.length - oauthRows.length,
       }));
     }
+    markModalOpenStart('bulk-refresh', rows.length);
     setBulkRefreshTargets(oauthRows);
-  }, [data?.list, selectionStore, t, toast]);
+  }, [data?.list, markModalOpenStart, rows.length, selectionStore, t, toast]);
 
   const { columns, rowMetaById } = useAccountTableColumns({
     applyQuotaRefreshResult,
@@ -731,11 +977,15 @@ export default function AccountsPageContent() {
   const selectAllAriaLabel = t('common.select_all', 'Select all');
   const selectRowAriaLabel = t('common.select', 'Select');
   const setVisibleRowsSelected = useCallback((isSelected: boolean) => {
-    selectionStore.setRows(visibleRowIds, isSelected);
-  }, [selectionStore, visibleRowIds]);
+    runSelectionPerf('select-visible', visibleRowIds.length, isSelected, () => (
+      selectionStore.setRows(visibleRowIds, isSelected)
+    ));
+  }, [runSelectionPerf, selectionStore, visibleRowIds]);
   const setRowSelected = useCallback((id: number, isSelected: boolean) => {
-    selectionStore.setRow(id, isSelected);
-  }, [selectionStore]);
+    runSelectionPerf('select-row', visibleRowIds.length, isSelected, () => (
+      selectionStore.setRow(id, isSelected)
+    ));
+  }, [runSelectionPerf, selectionStore, visibleRowIds.length]);
   const typeOptions = useMemo<AccountTypeFilterOption[]>(() => [
     { id: '', label: t('accounts.all_types', '全部类型') },
     { id: 'oauth', label: 'OAuth' },
@@ -784,6 +1034,7 @@ export default function AccountsPageContent() {
   const toolbarFilters = [
     {
       key: 'platform',
+      perfTarget: 'platform' as const,
       label: t('groups.platform'),
       value: platformFilter,
       selectedLabel: selectedPlatformLabel,
@@ -793,6 +1044,7 @@ export default function AccountsPageContent() {
     },
     {
       key: 'state',
+      perfTarget: 'state' as const,
       label: t('common.status'),
       value: stateFilter,
       selectedLabel: selectedStateLabel,
@@ -802,6 +1054,7 @@ export default function AccountsPageContent() {
     },
     {
       key: 'type',
+      perfTarget: 'type' as const,
       label: t('common.type'),
       value: typeFilter,
       selectedLabel: selectedTypeOption?.label ?? t('accounts.all_types', '全部类型'),
@@ -811,6 +1064,7 @@ export default function AccountsPageContent() {
     },
     {
       key: 'group',
+      perfTarget: 'group' as const,
       label: t('accounts.group'),
       value: groupFilter,
       selectedLabel: selectedGroupLabel,
@@ -820,6 +1074,7 @@ export default function AccountsPageContent() {
     },
     {
       key: 'proxy',
+      perfTarget: 'proxy' as const,
       label: t('accounts.proxy'),
       value: proxyFilter,
       selectedLabel: selectedProxyLabel,
@@ -858,6 +1113,7 @@ export default function AccountsPageContent() {
                   platformsLoading={platformsLoading}
                   selectedOption={selectedTypeOption}
                   typeOptions={typeOptions}
+                  onOpenChange={(isOpen) => handleToolbarMenuOpenChange(filter.perfTarget, isOpen)}
                   onSelect={(nextValue) => {
                     setTypeFilter(nextValue);
                     setPage(1);
@@ -870,6 +1126,7 @@ export default function AccountsPageContent() {
                   items={filter.options.map((item) => ({ key: item.id, label: item.label }))}
                   selectedKey={filter.value}
                   selectedLabel={filter.selectedLabel}
+                  onOpenChange={(isOpen) => handleToolbarMenuOpenChange(filter.perfTarget, isOpen)}
                   onSelectionChange={(key) => {
                     filter.setValue(key);
                     setPage(1);
@@ -893,6 +1150,7 @@ export default function AccountsPageContent() {
             refreshAriaLabel={t('common.refresh')}
             onChange={setAutoRefresh}
             onAutoRefresh={refreshAccountOverview}
+            onMenuOpenChange={(isOpen) => handleToolbarMenuOpenChange('auto-refresh', isOpen)}
             onRefresh={refreshAccountOverview}
             isRefreshing={isAccountsFetching}
             isAutoRefreshing={isAccountsFetching || isUsageFetching}
@@ -917,7 +1175,7 @@ export default function AccountsPageContent() {
             <Download className="h-4 w-4" />
             {t('accounts.export')}
           </Button>
-          <Button className="ag-page-toolbar-button" variant="primary" onPress={() => setShowCreateModal(true)}>
+          <Button className="ag-page-toolbar-button" variant="primary" onPress={handleCreateAccount}>
             <Plus className="h-4 w-4" />
             {t('accounts.create')}
           </Button>
@@ -946,31 +1204,44 @@ export default function AccountsPageContent() {
       />
 
       {/* 表格 */}
-      <AccountsTableSection
-        columns={columns}
-        expandedUsageRowIds={expandedUsageRowIds}
-        isLoading={isLoading}
-        onBulkClearRateLimitMarkers={handleBulkClearRateLimitMarkers}
-        onBulkDelete={handleBulkDelete}
-        onBulkDisable={handleBulkDisable}
-        onBulkEdit={handleBulkEdit}
-        onBulkEnable={handleBulkEnable}
-        onBulkRefresh={handleBulkRefresh}
-        onClearSelection={clearSelection}
-        onRowSelected={setRowSelected}
-        onSortChange={handleSortChange}
-        onVisibleRowsSelected={setVisibleRowsSelected}
-        rows={rows}
-        rowMetaById={rowMetaById}
-        selectAllAriaLabel={selectAllAriaLabel}
-        selectionStore={selectionStore}
-        selectRowAriaLabel={selectRowAriaLabel}
-        sortBy={sortBy}
-        sortDir={sortDir}
-        tableAriaLabel={t('accounts.title', 'Accounts')}
-        tableEmptyText={t('common.no_data')}
-        visibleRowIds={visibleRowIds}
-      />
+      {shouldRenderAccountsTable ? (
+        <div
+          ref={accountsTableFrameRef}
+          className="ag-accounts-table-frame"
+        >
+          <AccountsTableSection
+            columns={columns}
+            expandedUsageRowIds={expandedUsageRowIds}
+            isLoading={isLoading}
+            onBulkClearRateLimitMarkers={handleBulkClearRateLimitMarkers}
+            onBulkDelete={handleBulkDelete}
+            onBulkDisable={handleBulkDisable}
+            onBulkEdit={handleBulkEdit}
+            onBulkEnable={handleBulkEnable}
+            onBulkRefresh={handleBulkRefresh}
+            onClearSelection={clearSelection}
+            onRowSelected={setRowSelected}
+            onSortChange={handleSortChange}
+            onVisibleRowsSelected={setVisibleRowsSelected}
+            rows={rows}
+            rowMetaById={rowMetaById}
+            selectAllAriaLabel={selectAllAriaLabel}
+            selectionStore={selectionStore}
+            selectRowAriaLabel={selectRowAriaLabel}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            tableAriaLabel={t('accounts.title', 'Accounts')}
+            tableEmptyText={t('common.no_data')}
+            visibleRowIds={visibleRowIds}
+          />
+        </div>
+      ) : (
+        <div
+          aria-hidden="true"
+          className="ag-resource-table ag-accounts-table"
+          style={{ minHeight: accountsTablePlaceholderHeight }}
+        />
+      )}
 
       {/* 创建弹窗 */}
       {showCreateModal ? (

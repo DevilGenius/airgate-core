@@ -16,6 +16,7 @@ interface SimpleSelectProps {
   isDisabled?: boolean;
   items: SimpleSelectOption[];
   itemClassName?: string;
+  onOpenChange?: (isOpen: boolean) => void;
   onSelectionChange: (key: string) => void;
   placeholder?: ReactNode;
   popoverClassName?: string;
@@ -31,6 +32,7 @@ export const SimpleSelect = memo(function SimpleSelect({
   isDisabled = false,
   items,
   itemClassName,
+  onOpenChange,
   onSelectionChange,
   placeholder,
   popoverClassName,
@@ -48,6 +50,7 @@ export const SimpleSelect = memo(function SimpleSelect({
       className={['ag-simple-select-trigger select__trigger', triggerClassName].filter(Boolean).join(' ')}
       disabled={isDisabled}
       label={displayLabel}
+      onOpenChange={onOpenChange}
       rootClassName={['ag-simple-select', fullWidth && 'ag-simple-select--full', className].filter(Boolean).join(' ')}
     >
       {(close) => (

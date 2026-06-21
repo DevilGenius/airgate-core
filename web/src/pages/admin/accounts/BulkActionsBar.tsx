@@ -10,6 +10,7 @@ import { Eraser, Pencil, Power, PowerOff, RefreshCw, Trash2 } from 'lucide-react
  */
 export function BulkActionsBar({
   inline = false,
+  isActive,
   overlay = false,
   selectedCount,
   onClear,
@@ -21,6 +22,7 @@ export function BulkActionsBar({
   onDelete,
 }: {
   inline?: boolean;
+  isActive?: boolean;
   overlay?: boolean;
   selectedCount: number;
   onClear: () => void;
@@ -32,13 +34,15 @@ export function BulkActionsBar({
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
+  const hasSelection = selectedCount > 0;
+  const active = isActive ?? hasSelection;
   const selectedText = t('accounts.bulk_selected', { count: selectedCount });
   const selectedCountText = String(selectedCount);
   const countIndex = selectedText.indexOf(selectedCountText);
   const selectedTextBefore = countIndex >= 0 ? selectedText.slice(0, countIndex) : selectedText;
   const selectedTextAfter = countIndex >= 0 ? selectedText.slice(countIndex + selectedCountText.length) : '';
 
-  if (selectedCount === 0) return null;
+  if (!hasSelection && !overlay) return null;
 
   const selectedCountLabel = (
     <span className="flex h-8 shrink-0 items-center gap-0.5 whitespace-nowrap text-[15px] font-semibold leading-none text-primary">
@@ -54,20 +58,23 @@ export function BulkActionsBar({
 
   const actionButtons = (
     <>
-      <ActionButton icon={<Pencil className="w-3.5 h-3.5" />} label={t('accounts.bulk_edit')} onClick={onEdit} />
-      <ActionButton icon={<Power className="w-3.5 h-3.5" />} label={t('accounts.bulk_enable')} onClick={onEnable} />
-      <ActionButton icon={<PowerOff className="w-3.5 h-3.5" />} label={t('accounts.bulk_disable')} onClick={onDisable} />
+      <ActionButton disabled={!active} icon={<Pencil className="w-3.5 h-3.5" />} label={t('accounts.bulk_edit')} onClick={onEdit} />
+      <ActionButton disabled={!active} icon={<Power className="w-3.5 h-3.5" />} label={t('accounts.bulk_enable')} onClick={onEnable} />
+      <ActionButton disabled={!active} icon={<PowerOff className="w-3.5 h-3.5" />} label={t('accounts.bulk_disable')} onClick={onDisable} />
       <ActionButton
+        disabled={!active}
         icon={<RefreshCw className="w-3.5 h-3.5 text-success" />}
         label={t('accounts.bulk_refresh_quota')}
         onClick={onRefreshQuota}
       />
       <ActionButton
+        disabled={!active}
         icon={<Eraser className="w-3.5 h-3.5 text-warning" />}
         label={t('accounts.bulk_clear_family_cooldowns')}
         onClick={onClearRateLimitMarkers}
       />
       <ActionButton
+        disabled={!active}
         icon={<Trash2 className="w-3.5 h-3.5" />}
         label={t('accounts.bulk_delete')}
         onClick={onDelete}
@@ -79,7 +86,9 @@ export function BulkActionsBar({
   if (overlay) {
     return (
       <div
+        aria-hidden={!active}
         className="ag-accounts-bulk-header-bar absolute top-0 z-20 flex items-center gap-2 overflow-hidden border border-border bg-background px-2"
+        data-active={active ? 'true' : 'false'}
         style={{
           background: 'linear-gradient(90deg, var(--surface-tertiary) 0%, var(--surface-secondary) 42%, var(--background) 100%)',
           backgroundColor: 'var(--background)',
@@ -142,11 +151,13 @@ export function BulkActionsBar({
 }
 
 function ActionButton({
+  disabled = false,
   icon,
   label,
   onClick,
   danger = false,
 }: {
+  disabled?: boolean;
   icon: ReactNode;
   label: string;
   onClick: () => void;
@@ -156,7 +167,10 @@ function ActionButton({
     <button
       type="button"
       className={`ag-bulk-action-button min-w-0 max-w-full shrink-0 items-center gap-1.5 leading-none ${danger ? 'ag-bulk-action-button--danger' : ''}`}
-      onClick={onClick}
+      disabled={disabled}
+      onClick={() => {
+        if (!disabled) onClick();
+      }}
     >
       {icon}
       <span className="min-w-0 truncate leading-none">{label}</span>

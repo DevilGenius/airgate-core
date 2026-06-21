@@ -12,10 +12,7 @@
   background: var(--field-background);
   color: var(--accent-foreground);
   cursor: pointer;
-  transition:
-    background-color 80ms ease,
-    border-color 80ms ease,
-    box-shadow 80ms ease;
+  transition: none;
 }
 
 .ag-accounts-table .ag-table-selection-checkbox:checked,

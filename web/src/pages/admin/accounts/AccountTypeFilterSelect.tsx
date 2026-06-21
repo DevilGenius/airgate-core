@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
@@ -11,6 +10,7 @@ const OAUTH_SUBMENU_LONG_PRESS_MS = 450;
 
 type AccountTypeFilterSelectProps = {
   oauthPlanOptions: AccountTypeFilterOption[];
+  onOpenChange?: (isOpen: boolean) => void;
   onSelect: (value: string) => void;
   platformsLoading: boolean;
   selectedOption: AccountTypeFilterOption | undefined;
@@ -19,6 +19,7 @@ type AccountTypeFilterSelectProps = {
 
 export function AccountTypeFilterSelect({
   oauthPlanOptions,
+  onOpenChange,
   onSelect,
   platformsLoading,
   selectedOption,
@@ -27,6 +28,7 @@ export function AccountTypeFilterSelect({
   const { t } = useTranslation();
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
   const [isOAuthPlanMenuOpen, setIsOAuthPlanMenuOpen] = useState(false);
+  const isTypeMenuOpenRef = useRef(isTypeMenuOpen);
   const menuRef = useRef<HTMLDivElement>(null);
   const selectedOnPointerDownRef = useRef(false);
   const oauthLongPressTimerRef = useRef<number | null>(null);
@@ -40,11 +42,22 @@ export function AccountTypeFilterSelect({
     oauthLongPressTimerRef.current = null;
   }, []);
 
+  useEffect(() => {
+    isTypeMenuOpenRef.current = isTypeMenuOpen;
+  }, [isTypeMenuOpen]);
+
+  const setTypeMenuOpen = useCallback((nextOpen: boolean) => {
+    if (isTypeMenuOpenRef.current === nextOpen) return;
+    isTypeMenuOpenRef.current = nextOpen;
+    onOpenChange?.(nextOpen);
+    setIsTypeMenuOpen(nextOpen);
+  }, [onOpenChange]);
+
   const closeMenu = useCallback(() => {
     clearOAuthLongPressTimer();
-    setIsTypeMenuOpen(false);
     setIsOAuthPlanMenuOpen(false);
-  }, [clearOAuthLongPressTimer]);
+    setTypeMenuOpen(false);
+  }, [clearOAuthLongPressTimer, setTypeMenuOpen]);
 
   const selectTypeFilter = useCallback((nextValue: string) => {
     onSelect(nextValue);
@@ -52,13 +65,10 @@ export function AccountTypeFilterSelect({
   }, [closeMenu, onSelect]);
 
   const toggleTypeMenu = useCallback(() => {
-    flushSync(() => {
-      setIsTypeMenuOpen((open) => {
-        if (open) setIsOAuthPlanMenuOpen(false);
-        return !open;
-      });
-    });
-  }, []);
+    const nextOpen = !isTypeMenuOpenRef.current;
+    if (!nextOpen) setIsOAuthPlanMenuOpen(false);
+    setTypeMenuOpen(nextOpen);
+  }, [setTypeMenuOpen]);
 
   const handleTriggerPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;

@@ -18,6 +18,7 @@ interface AutoRefreshControlProps {
   refreshAriaLabel: string;
   onChange: (value: number) => void;
   onAutoRefresh?: () => void | Promise<unknown>;
+  onMenuOpenChange?: (isOpen: boolean) => void;
   onRefresh: () => void | Promise<unknown>;
   isRefreshing?: boolean;
   isAutoRefreshing?: boolean;
@@ -166,6 +167,7 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   refreshAriaLabel,
   onChange,
   onAutoRefresh,
+  onMenuOpenChange,
   onRefresh,
   isAutoRefreshing,
   isRefreshing = false,
@@ -256,6 +258,7 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
           triggerClassName,
         ].filter(Boolean).join(' ')}
         disabled={isDisabled}
+        onOpenChange={onMenuOpenChange}
       >
         {(close) => (
           <>

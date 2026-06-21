@@ -40,12 +40,11 @@ const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
     selectionStore.getSelectedCount,
   );
 
-  if (selectedCount === 0) return null;
-
   return (
     <div onClick={(event) => event.stopPropagation()}>
       <BulkActionsBar
         overlay
+        isActive={selectedCount > 0}
         selectedCount={selectedCount}
         onClear={onClearSelection}
         onEdit={onBulkEdit}
