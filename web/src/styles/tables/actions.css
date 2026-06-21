@@ -126,9 +126,16 @@
   background: var(--surface-secondary);
   color: var(--foreground);
   cursor: pointer;
+  overflow: hidden;
   font: inherit;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0;
   line-height: 1;
   padding: 0;
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
   transition:
     background-color 80ms ease,
     border-color 80ms ease,

@@ -402,10 +402,11 @@ export default function UserKeysPage() {
                     <span className="block max-w-[10rem] truncate font-medium text-text" title={row.name}>{row.name}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <span className="ag-api-key-prefix-chip inline-flex items-center text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono">
-                      <span className="ag-api-key-prefix-text" title={keyHint}>
-                        {keyHint}
-                      </span>
+                    <span
+                      className="ag-api-key-prefix-chip inline-flex items-center text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono"
+                      title={keyHint}
+                    >
+                      {keyHint}
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
@@ -416,14 +417,14 @@ export default function UserKeysPage() {
                           data-tone={isGroupUnbound ? 'warning' : 'default'}
                           title={groupName}
                         >
-                          <span className="min-w-0 truncate">{groupName}</span>
+                          {groupName}
                         </span>
                         {hasGroupRate ? (
                           <span
                             className="ag-api-key-effective-rate-chip"
                             title={`${t('user_keys.effective_rate_short', '综合倍率')} ${formatRateValue(effectiveRate)}`}
                           >
-                            <span className="ag-api-key-effective-rate-chip-value">{formatRateValue(effectiveRate)}</span>
+                            {formatRateValue(effectiveRate)}
                           </span>
                         ) : null}
                       </div>

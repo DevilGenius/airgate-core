@@ -150,17 +150,14 @@ const RecordsTableRow = memo(function RecordsTableRow({
           <td
             data-slot="td"
             key={column.key}
-            className={cx(getColumnClassName(column.key), leftAlignedContent ? 'text-left' : 'text-center')}
+            className={cx(
+              getColumnClassName(column.key),
+              'ag-usage-cell',
+              fullCellContent && 'ag-usage-cell--full',
+              leftAlignedContent && 'ag-usage-cell--left',
+            )}
           >
-            <div
-              className={cx(
-                'flex h-[var(--ag-usage-table-row-height)] w-full items-center overflow-hidden',
-                leftAlignedContent ? 'justify-start text-left' : 'justify-center text-center',
-                fullCellContent ? 'px-1 py-0.5' : 'px-2.5 py-0.5',
-              )}
-            >
-              {column.render(row)}
-            </div>
+            {column.render(row)}
           </td>
         );
       })}

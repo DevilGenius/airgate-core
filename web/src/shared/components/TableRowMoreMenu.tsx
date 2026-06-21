@@ -111,7 +111,6 @@ export const TableRowMoreMenu = memo(function TableRowMoreMenu({
         onClick={toggleMenu}
       >
         <span className="sr-only">{ariaLabel}</span>
-        <span aria-hidden="true" className="ag-table-row-more-dots" />
       </button>
       {isOpen && position && typeof document !== 'undefined' ? createPortal(
         <div

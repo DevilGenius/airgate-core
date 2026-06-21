@@ -548,9 +548,8 @@
   gap: 0.125rem;
 }
 
-.ag-mobile-record-field--tokens .ag-usage-token-summary .ag-usage-token-marker {
+.ag-mobile-record-field--tokens .ag-usage-token-summary .ag-usage-token-row {
   --ag-usage-token-marker-size: 0.75rem;
-  justify-self: center;
 }
 
 .ag-mobile-record-field--tokens .ag-usage-token-summary .ag-usage-token-row > span:last-child {

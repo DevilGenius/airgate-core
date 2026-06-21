@@ -1,24 +1,13 @@
 /* Lightweight CSS-drawn icons. */
 
-.ag-table-row-more-dots {
-  position: relative;
-  display: block;
-  width: 0.875rem;
-  height: 0.875rem;
-  color: currentColor;
-}
-
-.ag-table-row-more-dots::before {
-  position: absolute;
-  top: 50%;
-  left: 0.125rem;
+.ag-table-row-more-trigger::before {
   display: block;
   width: 0.1875rem;
   height: 0.1875rem;
   border-radius: 999px;
   background: currentColor;
   content: "";
-  transform: translateY(-50%);
+  transform: translateX(-0.28125rem);
   box-shadow:
     0.28125rem 0 0 currentColor,
     0.5625rem 0 0 currentColor;
@@ -57,69 +46,56 @@
   clip-path: none;
 }
 
-.ag-usage-token-marker {
+.ag-usage-token-row {
   --ag-usage-token-color: var(--ag-text-secondary);
   --ag-usage-token-marker-size: 1rem;
+  color: var(--ag-usage-token-color);
+}
+
+.ag-usage-token-row::before,
+.ag-usage-token-row::after {
+  display: block;
+  content: "";
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: center;
+}
+
+.ag-usage-token-row::before {
   position: relative;
-  display: inline-flex;
   width: var(--ag-usage-token-marker-size);
   height: var(--ag-usage-token-marker-size);
   flex: 0 0 var(--ag-usage-token-marker-size);
-  align-items: center;
-  justify-content: center;
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--ag-usage-token-color) 18%, transparent);
-  color: var(--ag-usage-token-color);
   font-size: var(--ag-usage-token-marker-size);
   line-height: 1;
 }
 
-.ag-usage-token-marker::before,
-.ag-usage-token-marker::after {
-  position: absolute;
-  display: block;
-  content: "";
-}
-
-.ag-usage-token-marker--input::before,
-.ag-usage-token-marker--output::before {
-  left: 50%;
-  top: 50%;
+.ag-usage-token-row::after {
   width: 0.5em;
   height: 0.5em;
   background: currentColor;
-  transform: translate(-50%, -50%);
+  font-size: var(--ag-usage-token-marker-size);
 }
 
-.ag-usage-token-marker--input::before {
+.ag-usage-token-row--input::after {
   clip-path: polygon(50% 82%, 12% 24%, 88% 24%);
 }
 
-.ag-usage-token-marker--output::before {
+.ag-usage-token-row--output::after {
   clip-path: polygon(50% 18%, 12% 76%, 88% 76%);
 }
 
-.ag-usage-token-marker--cache-read::before {
-  left: 50%;
-  top: 50%;
+.ag-usage-token-row--cache-read::after {
   width: 0.34375em;
   height: 0.5em;
   border-radius: 0.078125em 0.078125em 0 0;
-  background: currentColor;
-  transform: translate(-50%, -50%);
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 62%, 0 100%);
 }
 
-.ag-usage-token-marker--cache-read::after {
-  display: none;
-}
-
-.ag-usage-token-marker--cache-create::before {
-  left: 50%;
-  top: 50%;
+.ag-usage-token-row--cache-create::after {
   width: 0.625em;
   height: 0.625em;
-  background: currentColor;
-  transform: translate(-50%, -50%);
   clip-path: polygon(50% 0, 61% 36%, 100% 50%, 61% 64%, 50% 100%, 39% 64%, 0 50%, 39% 36%);
 }

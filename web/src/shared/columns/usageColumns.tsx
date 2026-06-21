@@ -260,13 +260,6 @@ function MetaChip({
       style={style}
       title={label}
     >
-      {dotColor ? (
-        <span
-          className="ag-usage-meta-chip-dot"
-          aria-hidden="true"
-          style={{ backgroundColor: dotColor }}
-        />
-      ) : null}
       {label}
     </span>
   );
@@ -327,12 +320,10 @@ function TokenRow({
   value: string;
 }) {
   return (
-    <div className="ag-usage-token-row grid grid-cols-[1rem_minmax(0,1fr)] items-center gap-1">
-      <span
-        aria-hidden="true"
-        className={`ag-usage-token-marker ag-usage-token-marker--${marker}`}
-        style={{ '--ag-usage-token-color': color } as CSSProperties}
-      />
+    <div
+      className={`ag-usage-token-row ag-usage-token-row--${marker} grid grid-cols-[1rem_minmax(0,1fr)] items-center gap-1`}
+      style={{ '--ag-usage-token-color': color } as CSSProperties}
+    >
       <span
         className="w-[3.5rem] justify-self-center truncate text-center font-mono text-xs font-semibold tabular-nums leading-none"
         style={{ color }}

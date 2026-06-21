@@ -217,13 +217,14 @@ export default function APIKeysPage() {
                     <span className="font-mono">{row.id}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <span className="ag-api-key-name">
-                      <span style={{ color: 'var(--ag-text)' }} className="truncate font-medium" title={row.name}>{row.name}</span>
+                    <span className="ag-api-key-name truncate font-medium" title={row.name}>
+                      {row.name}
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <code
                       className="ag-api-key-prefix-chip text-xs px-2 py-0.5 rounded"
+                      title={keyHint}
                       style={{
                         fontFamily: 'var(--ag-font-mono)',
                         background: 'var(--ag-bg-surface)',
@@ -231,9 +232,7 @@ export default function APIKeysPage() {
                         border: '1px solid var(--ag-border-subtle)',
                       }}
                     >
-                      <span className="ag-api-key-prefix-text" title={keyHint}>
-                        {keyHint}
-                      </span>
+                      {keyHint}
                     </code>
                   </CommonTable.Cell>
                   <CommonTable.Cell>

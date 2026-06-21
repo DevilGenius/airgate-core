@@ -34,8 +34,7 @@ export function TableRowActionButton({
         onClick();
       }}
     >
-      <span className="sr-only">{ariaLabel}</span>
-      <span aria-hidden="true" className="ag-table-row-native-action__label">{children}</span>
+      {children}
     </button>
   );
 }
