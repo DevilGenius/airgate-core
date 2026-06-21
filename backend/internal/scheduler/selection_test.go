@@ -295,8 +295,8 @@ func TestSelectionSmallBranchHelpers(t *testing.T) {
 	}
 	filtered := filterPriorityCandidates([]*ent.Account{
 		nil,
-		&ent.Account{ID: 1, Priority: -1},
-		&ent.Account{ID: 2, Priority: 0},
+		{ID: 1, Priority: -1},
+		{ID: 2, Priority: 0},
 	}, true)
 	if len(filtered) != 1 || filtered[0].ID != 1 {
 		t.Fatalf("filterPriorityCandidates negative = %+v", filtered)

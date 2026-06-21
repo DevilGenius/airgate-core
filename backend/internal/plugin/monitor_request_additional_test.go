@@ -257,7 +257,7 @@ func TestOutcomeResponseIDsAndCredentialSlotBranches(t *testing.T) {
 	outcome := sdk.ForwardOutcome{
 		Usage: &sdk.Usage{Metadata: map[string]string{
 			responseIDUsageMetadataKey: " resp_usage ",
-			"openai.response_ids":     "resp_a,ignored,resp_a, resp_b ",
+			"openai.response_ids":      "resp_a,ignored,resp_a, resp_b ",
 		}},
 		Upstream: sdk.UpstreamResponse{Body: []byte(`{"id":"resp_body","response":{"id":"resp_nested"}}`)},
 	}

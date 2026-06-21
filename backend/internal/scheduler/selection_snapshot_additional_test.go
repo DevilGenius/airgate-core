@@ -53,11 +53,15 @@ func (b *batchSchedTracker) AddCost(context.Context, int, float64) {}
 
 func (b *batchSchedTracker) IncrementRPM(context.Context, int) (int, error) { return 0, nil }
 
-func (b *batchSchedTracker) TryIncrementRPM(context.Context, int, int) (bool, error) { return true, nil }
+func (b *batchSchedTracker) TryIncrementRPM(context.Context, int, int) (bool, error) {
+	return true, nil
+}
 
 func (b *batchSchedTracker) DecrementRPM(context.Context, int) {}
 
-func (b *batchSchedTracker) RefreshSession(context.Context, int, string, time.Duration) error { return nil }
+func (b *batchSchedTracker) RefreshSession(context.Context, int, string, time.Duration) error {
+	return nil
+}
 
 func (b *batchSchedTracker) RegisterSession(context.Context, int, string, int, time.Duration) (bool, error) {
 	return true, nil
@@ -84,7 +88,9 @@ type batchRPMSchedTracker struct {
 
 func (b *batchRPMSchedTracker) IncrementRPM(context.Context, int) (int, error) { return 0, nil }
 
-func (b *batchRPMSchedTracker) TryIncrementRPM(context.Context, int, int) (bool, error) { return true, nil }
+func (b *batchRPMSchedTracker) TryIncrementRPM(context.Context, int, int) (bool, error) {
+	return true, nil
+}
 
 func (b *batchRPMSchedTracker) DecrementRPM(context.Context, int) {}
 

@@ -34,12 +34,12 @@ func (p *accountFakeGatewayPlugin) Info() sdk.PluginInfo {
 	return sdk.PluginInfo{ID: "fake-" + p.platform, Name: "Fake " + p.platform, Type: sdk.PluginTypeGateway}
 }
 
-func (p *accountFakeGatewayPlugin) Init(sdk.PluginContext) error     { return nil }
-func (p *accountFakeGatewayPlugin) Start(context.Context) error      { return nil }
-func (p *accountFakeGatewayPlugin) Stop(context.Context) error       { return nil }
-func (p *accountFakeGatewayPlugin) Platform() string                 { return p.platform }
-func (p *accountFakeGatewayPlugin) Models() []sdk.ModelInfo          { return p.models }
-func (p *accountFakeGatewayPlugin) Routes() []sdk.RouteDefinition    { return nil }
+func (p *accountFakeGatewayPlugin) Init(sdk.PluginContext) error  { return nil }
+func (p *accountFakeGatewayPlugin) Start(context.Context) error   { return nil }
+func (p *accountFakeGatewayPlugin) Stop(context.Context) error    { return nil }
+func (p *accountFakeGatewayPlugin) Platform() string              { return p.platform }
+func (p *accountFakeGatewayPlugin) Models() []sdk.ModelInfo       { return p.models }
+func (p *accountFakeGatewayPlugin) Routes() []sdk.RouteDefinition { return nil }
 func (p *accountFakeGatewayPlugin) ValidateAccount(context.Context, map[string]string) error {
 	return nil
 }

@@ -18,8 +18,8 @@ import (
 )
 
 type fakeS3Object struct {
-	data        []byte
-	contentType string
+	data         []byte
+	contentType  string
 	lastModified time.Time
 }
 
