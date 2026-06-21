@@ -193,7 +193,7 @@ func TestRepositoryPassthroughResolveAndFlush(t *testing.T) {
 }
 
 func TestRecoverySnapshotAndQueries(t *testing.T) {
-	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
 	recovery := newRecoverySnapshot()
 	recovery.remember(" keep ", now.Add(time.Hour))
 	recovery.remember("expired", now.Add(-time.Hour))
