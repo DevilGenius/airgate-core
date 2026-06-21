@@ -7,13 +7,14 @@ import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
-import { AlertDialog, Button, Card, Checkbox, Chip, Description, EmptyState, Input, Label, Modal, Skeleton, Spinner, Tabs, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { AlertDialog, Button, Card, Chip, Description, EmptyState, Input, Label, Modal, Skeleton, Spinner, Tabs, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   Trash2, Download, Loader2, RefreshCw,
   Package, User, Tag, Plus, Upload, Settings, Store, History,
 } from 'lucide-react';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { NativeCheckbox } from '../../shared/components/NativeCheckbox';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
 
 type InstallPrefill = {
@@ -492,13 +493,15 @@ function PluginConfigModal({
               const checked = values[field.key] === 'true';
               return (
                 <div key={field.key}>
-                  <Checkbox
+                  <NativeCheckbox
                     isSelected={checked}
                     onChange={(selected) => setValues({ ...values, [field.key]: selected ? 'true' : 'false' })}
                   >
-                    {field.label || field.key}
-                    {field.required && <span className="text-danger ml-1">*</span>}
-                  </Checkbox>
+                    <span>
+                      {field.label || field.key}
+                      {field.required && <span className="text-danger ml-1">*</span>}
+                    </span>
+                  </NativeCheckbox>
                   {field.description && (
                     <p className="mt-1 ml-6 text-xs text-text-tertiary">{field.description}</p>
                   )}

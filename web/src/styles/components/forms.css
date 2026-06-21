@@ -425,24 +425,6 @@
   max-width: min(var(--trigger-width), calc(100vw - 2rem)) !important;
 }
 
-#root .checkbox__control,
-.ag-elevation-modal .checkbox__control {
-  border: 1px solid var(--field-border);
-  background: var(--field-background);
-  box-shadow: var(--field-shadow);
-}
-
-#root :where(.checkbox:hover, .checkbox[data-hovered="true"]) .checkbox__control,
-.ag-elevation-modal :where(.checkbox:hover, .checkbox[data-hovered="true"]) .checkbox__control {
-  border-color: color-mix(in oklab, var(--border) 92%, var(--foreground) 8%);
-  background: color-mix(in oklab, var(--field-background) 86%, var(--surface) 14%);
-}
-
-#root :where(.checkbox[data-selected="true"], .checkbox[aria-checked="true"], .checkbox[data-indeterminate="true"]) .checkbox__control,
-.ag-elevation-modal :where(.checkbox[data-selected="true"], .checkbox[aria-checked="true"], .checkbox[data-indeterminate="true"]) .checkbox__control {
-  border-color: transparent;
-}
-
 .ag-form-scroll-safe .textfield,
 .ag-form-scroll-safe .select,
 .ag-form-scroll-safe .ag-simple-select,

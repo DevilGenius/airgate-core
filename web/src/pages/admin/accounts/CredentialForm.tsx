@@ -110,19 +110,21 @@ export function SchemaCredentialsForm({
 
       {accountTypes.length > 0 && mode === 'create' && (
         <>
-          <div className="space-y-1.5">
+          <div className="ag-account-type-field">
             <Label>{t('common.type')}</Label>
             <SimpleSelect
               ariaLabel={t('common.type')}
-            fullWidth
+              className="ag-account-type-select"
+              fullWidth
               items={accountTypes.map((item) => ({ key: item.key, label: item.label }))}
-            selectedKey={selectedType?.key ?? ''}
+              selectedKey={selectedType?.key ?? ''}
               selectedLabel={selectedType?.label ?? ''}
+              triggerClassName="ag-account-type-select-trigger"
               onSelectionChange={onAccountTypeChange}
             />
           </div>
           {selectedType?.description && (
-            <p className="text-xs text-text-tertiary -mt-2">
+            <p className="ag-account-type-description">
               {selectedType.description}
             </p>
           )}

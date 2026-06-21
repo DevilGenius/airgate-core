@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Checkbox, Form, Input, Label, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Form, Input, Label, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { IdCard, Hash, Gauge } from 'lucide-react';
 import type {
   PluginBatchAccountInput,
@@ -22,6 +22,7 @@ import {
 } from './accountUtils';
 import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
+import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import {
@@ -419,24 +420,19 @@ export function CreateAccountModal({
                       <Label>{t('accounts.groups')}</Label>
                       <div className="ag-create-account-group-list">
                         {availableGroups.map((group) => (
-                          <Checkbox
+                          <NativeCheckbox
                             key={group.id}
                             className="ag-create-account-group-item"
                             isSelected={groupIds.includes(group.id)}
                             onChange={() => toggleGroup(group.id)}
                           >
-                            <Checkbox.Control>
-                              <Checkbox.Indicator />
-                            </Checkbox.Control>
-                            <Checkbox.Content>
-                              <span className="min-w-0">
-                                <span className="block truncate">{group.name}</span>
-                                <span className="block truncate text-[10px] text-text-tertiary">
-                                  {pName(group.platform)}
-                                </span>
+                            <span className="min-w-0">
+                              <span className="block truncate">{group.name}</span>
+                              <span className="block truncate text-[10px] text-text-tertiary">
+                                {pName(group.platform)}
                               </span>
-                            </Checkbox.Content>
-                          </Checkbox>
+                            </span>
+                          </NativeCheckbox>
                         ))}
                       </div>
                     </div>

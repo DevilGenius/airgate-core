@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   Button,
-  Checkbox,
   Chip,
   Input,
   Modal,
@@ -14,6 +13,7 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
+import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { usersApi } from '../../../shared/api/users';
 import { groupsApi } from '../../../shared/api/groups';
 import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
@@ -138,16 +138,12 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
         className={selected ? 'bg-primary-subtle/55' : undefined}
       >
         <Table.Cell className="h-10 w-12 border-b border-border-subtle px-2 py-1 text-center">
-          <Checkbox
-            aria-label={`${group.name} ${t('common.select', '选择')}`}
+          <NativeCheckbox
+            ariaLabel={`${group.name} ${t('common.select', '选择')}`}
             isDisabled={!group.is_exclusive}
             isSelected={selected}
             onChange={(nextSelected) => toggleExclusiveGroup(group.id, nextSelected)}
-          >
-            <Checkbox.Control className={selected ? 'border-primary bg-primary text-primary-foreground' : undefined}>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-          </Checkbox>
+          />
         </Table.Cell>
         <Table.Cell className="h-10 w-[11rem] border-b border-border-subtle px-2 py-1.5">
           <span className="block min-w-0 truncate text-sm font-medium text-text" title={group.name}>

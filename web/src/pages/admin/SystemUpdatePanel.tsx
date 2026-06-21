@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, Checkbox, Link as HeroLink, Modal, useOverlayState } from '@heroui/react';
+import { Alert, Button, Card, Link as HeroLink, Modal, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
+import { NativeCheckbox } from '../../shared/components/NativeCheckbox';
 import {
   Download, RefreshCw, ExternalLink, Copy, ShieldAlert, CheckCircle2,
   XCircle, Loader2, Info,
@@ -328,7 +329,7 @@ function UpgradeRunModal({
               </Alert.Content>
             </Alert>
 
-            <Checkbox
+            <NativeCheckbox
               className="items-start"
               isSelected={confirmBackup}
               onChange={setConfirmBackup}
@@ -336,7 +337,7 @@ function UpgradeRunModal({
               <span className="text-xs text-text-secondary">
                 {t('settings.system_confirm_backup')}
               </span>
-            </Checkbox>
+            </NativeCheckbox>
           </>
         )}
 

@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   Button,
-  Checkbox,
   Chip,
   Description,
   Input,
@@ -17,6 +16,7 @@ import {
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { ArrowUpDown, Layers, X } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
+import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import {
@@ -444,9 +444,9 @@ export function GroupFormModal({
             isSelected={claudeCodeOnly}
             label={(
               <span>
-                <span className="block text-sm">仅 Claude Code 客户端</span>
+                <span className="block text-sm">{t('groups.claude_code_only')}</span>
                 <span className="mt-1 block text-[11px] text-text-tertiary">
-                  开启后，本分组的账号只接受官方 Claude CLI 发起的流量；非 CLI 请求返回 403。
+                  {t('groups.claude_code_only_hint')}
                 </span>
               </span>
             )}
@@ -456,39 +456,33 @@ export function GroupFormModal({
 
         {form.platform === 'openai' ? (
           <div className="space-y-3">
-            <Checkbox
+            <NativeCheckbox
               isSelected={openaiOperations.imagesApi}
               onChange={(selected) => setOpenAIOperations((current) => ({
                 ...current,
                 imagesApi: selected,
               }))}
             >
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>
-                <span className="block text-sm text-text">开启图片 API（/generations + /edits）</span>
+              <span>
+                <span className="block text-sm text-text">{t('groups.openai_images_api')}</span>
                 <span className="mt-1 block text-[11px] text-text-tertiary">
-                  分组始终支持文本；勾选后额外开放 Images 生成和编辑接口。
+                  {t('groups.openai_images_api_hint')}
                 </span>
-              </Checkbox.Content>
-            </Checkbox>
-            <Checkbox
+              </span>
+            </NativeCheckbox>
+            <NativeCheckbox
               isSelected={openaiOperations.responsesImageGeneration}
               onChange={(selected) =>
                 setOpenAIOperations((current) => ({ ...current, responsesImageGeneration: selected }))
               }
             >
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>
-                <span className="block text-sm text-text">Responses 接口开启 image_generation</span>
+              <span>
+                <span className="block text-sm text-text">{t('groups.openai_responses_image_generation')}</span>
                 <span className="mt-1 block text-[11px] text-text-tertiary">
-                  勾选后允许文本模型路径在 Responses API 中调用 image_generation 工具。
+                  {t('groups.openai_responses_image_generation_hint')}
                 </span>
-              </Checkbox.Content>
-            </Checkbox>
+              </span>
+            </NativeCheckbox>
 
             <div className={imagePricingEnabled ? undefined : 'opacity-60'}>
               <p

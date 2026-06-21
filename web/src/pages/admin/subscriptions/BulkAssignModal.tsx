@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Input, Label, Modal, Spinner, useOverlayState } from '@heroui/react';
+import { Button, Input, Label, Modal, Spinner, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Search, User } from 'lucide-react';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
+import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import type {
   BulkAssignReq,
@@ -119,7 +120,7 @@ export function BulkAssignModal({
                     ) : filteredUsers.map((user) => {
                       const isSelected = selectedUserIdSet.has(user.id);
                       return (
-                        <Checkbox
+                        <NativeCheckbox
                           key={user.id}
                           className={`w-full rounded-md border p-2.5 transition-colors ${
                             isSelected
@@ -129,19 +130,14 @@ export function BulkAssignModal({
                           isSelected={isSelected}
                           onChange={(selected) => toggleUser(user.id, selected)}
                         >
-                          <Checkbox.Control className={isSelected ? 'border-primary bg-primary text-primary-foreground' : undefined}>
-                            <Checkbox.Indicator />
-                          </Checkbox.Control>
-                          <Checkbox.Content>
-                            <span className="flex min-w-0 items-center gap-2">
-                              <User className={isSelected ? 'h-3.5 w-3.5 shrink-0 text-primary' : 'h-3.5 w-3.5 shrink-0 text-text-tertiary'} />
-                              <span className="min-w-0 text-left">
-                                <span className="block truncate text-sm font-medium text-text">{user.email}</span>
-                                <span className="block truncate text-xs text-text-tertiary">{user.username || '-'}</span>
-                              </span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <User className={isSelected ? 'h-3.5 w-3.5 shrink-0 text-primary' : 'h-3.5 w-3.5 shrink-0 text-text-tertiary'} />
+                            <span className="min-w-0 text-left">
+                              <span className="block truncate text-sm font-medium text-text">{user.email}</span>
+                              <span className="block truncate text-xs text-text-tertiary">{user.username || '-'}</span>
                             </span>
-                          </Checkbox.Content>
-                        </Checkbox>
+                          </span>
+                        </NativeCheckbox>
                       );
                     })}
                   </div>

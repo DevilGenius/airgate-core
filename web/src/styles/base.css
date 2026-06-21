@@ -226,3 +226,107 @@ body::selection {
 .ag-native-switch-content {
   min-width: 0;
 }
+
+.ag-native-checkbox {
+  --ag-native-checkbox-control-size: 1rem;
+  --ag-native-checkbox-control-radius: calc(var(--field-radius) - 0.125rem);
+  --ag-native-checkbox-control-border: var(--field-border);
+  --ag-native-checkbox-control-background: var(--field-background);
+  --ag-native-checkbox-control-shadow: var(--field-shadow);
+  --ag-native-checkbox-control-hover-border: color-mix(in oklab, var(--border) 92%, var(--foreground) 8%);
+  --ag-native-checkbox-control-hover-background: color-mix(in oklab, var(--field-background) 86%, var(--surface) 14%);
+  --ag-native-checkbox-control-checked-background: var(--accent);
+  --ag-native-checkbox-control-checked-foreground: var(--accent-foreground);
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  align-items: flex-start;
+  color: var(--foreground);
+  cursor: var(--cursor-interactive);
+  user-select: none;
+  vertical-align: middle;
+}
+
+.ag-native-checkbox-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+}
+
+.ag-native-checkbox-content {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+  color: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: inherit;
+  user-select: none;
+}
+
+.ag-native-checkbox-control {
+  position: relative;
+  display: inline-flex;
+  width: var(--ag-native-checkbox-control-size);
+  height: var(--ag-native-checkbox-control-size);
+  flex: 0 0 var(--ag-native-checkbox-control-size);
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--ag-native-checkbox-control-border);
+  border-radius: var(--ag-native-checkbox-control-radius);
+  background: var(--ag-native-checkbox-control-background);
+  color: var(--ag-native-checkbox-control-checked-foreground);
+  box-shadow: var(--ag-native-checkbox-control-shadow);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.ag-native-checkbox:not([data-disabled="true"]):hover .ag-native-checkbox-control {
+  border-color: var(--ag-native-checkbox-control-hover-border);
+  background: var(--ag-native-checkbox-control-hover-background);
+}
+
+.ag-native-checkbox-input:checked + .ag-native-checkbox-content .ag-native-checkbox-control,
+.ag-native-checkbox-input:indeterminate + .ag-native-checkbox-content .ag-native-checkbox-control,
+.ag-native-checkbox:is([data-checked="true"], [data-indeterminate="true"]) .ag-native-checkbox-control {
+  border-color: transparent;
+  background: var(--ag-native-checkbox-control-checked-background);
+}
+
+.ag-native-checkbox-indicator {
+  display: inline-flex;
+  width: 0.75rem;
+  height: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.ag-native-checkbox-indicator svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ag-native-checkbox-input:focus-visible + .ag-native-checkbox-content .ag-native-checkbox-control {
+  outline: 1.5px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.ag-native-checkbox[data-disabled="true"] {
+  cursor: var(--cursor-disabled);
+  opacity: 0.62;
+}
+
+.ag-native-checkbox[data-disabled="true"] .ag-native-checkbox-control {
+  pointer-events: none;
+}

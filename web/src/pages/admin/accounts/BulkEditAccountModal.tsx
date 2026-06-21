@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   Button,
-  Checkbox,
   Form,
   Input,
   TextField as HeroTextField,
@@ -16,6 +15,7 @@ import { queryKeys } from '../../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { GroupCheckboxList } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
+import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import {
@@ -335,20 +335,15 @@ function FieldRow({
 }) {
   return (
     <div className="grid items-center gap-3 border-t border-border-subtle pt-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
-      <Checkbox
+      <NativeCheckbox
         className="self-center"
         isSelected={enabled}
         onChange={onToggle}
       >
-        <Checkbox.Control>
-          <Checkbox.Indicator />
-        </Checkbox.Control>
-        <Checkbox.Content>
-          <span className={enabled ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
-            {label}
-          </span>
-        </Checkbox.Content>
-      </Checkbox>
+        <span className={enabled ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
+          {label}
+        </span>
+      </NativeCheckbox>
       <div className="min-w-0">{children}</div>
     </div>
   );
