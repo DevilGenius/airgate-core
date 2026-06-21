@@ -16,7 +16,8 @@ import {
 import { subscriptionsApi } from '../../shared/api/subscriptions';
 import { groupsApi } from '../../shared/api/groups';
 import { usersApi } from '../../shared/api/users';
-import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
+import { useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
@@ -48,7 +49,7 @@ export default function SubscriptionsPage() {
   ];
 
   // 筛选状态
-  const { page, setPage, pageSize, setPageSize } = useUrlPagination(DEFAULT_PAGE_SIZE, 'admin.subscriptions');
+  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.subscriptions');
   const [statusFilter, setStatusFilter] = useUrlQueryParam('status');
 
   // 弹窗状态

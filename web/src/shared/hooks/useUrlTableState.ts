@@ -1,7 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useRouterState } from '@tanstack/react-router';
-import { storagePageSizeKey } from '../storageKeys';
-import { normalizePaginationPageSize } from '../utils/pagination';
 
 type UrlPrimitive = string | number | boolean | null | undefined;
 type UrlUpdates = Record<string, UrlPrimitive>;
@@ -9,32 +7,6 @@ type UrlUpdates = Record<string, UrlPrimitive>;
 function getSearchString(searchStr?: string) {
   if (typeof window === 'undefined') return searchStr ?? '';
   return searchStr ?? window.location.search;
-}
-
-function readPositiveInt(params: URLSearchParams, key: string, fallback: number) {
-  const parsed = Number(params.get(key));
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
-}
-
-function readStoredPageSize(storageKey: string | undefined, fallback: number) {
-  if (!storageKey || typeof window === 'undefined') return fallback;
-
-  try {
-    const raw = window.localStorage.getItem(storagePageSizeKey(storageKey));
-    return normalizePaginationPageSize(raw, fallback);
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStoredPageSize(storageKey: string | undefined, pageSize: number) {
-  if (!storageKey || typeof window === 'undefined') return;
-
-  try {
-    window.localStorage.setItem(storagePageSizeKey(storageKey), String(pageSize));
-  } catch {
-    // Storage can be unavailable; URL state remains authoritative for this session.
-  }
 }
 
 function readStoredString(storageKey: string | undefined) {
@@ -96,14 +68,13 @@ export function useUrlQueryParam(key: string, defaultValue = '') {
     setValue(valueFromUrl);
   }, [valueFromUrl]);
 
-  const setUrlValue = useCallback((nextValue: SetStateAction<string>, options?: { resetPage?: boolean }) => {
+  const setUrlValue = useCallback((nextValue: SetStateAction<string>) => {
     const resolved = typeof nextValue === 'function' ? nextValue(valueRef.current) : nextValue;
     valueRef.current = resolved;
     setValue(resolved);
     startTransition(() => {
       applySearchUpdates(pathname, {
         [key]: resolved === defaultValue ? '' : resolved,
-        ...(options?.resetPage === false ? {} : { page: null }),
       });
     });
   }, [defaultValue, key, pathname]);
@@ -138,7 +109,7 @@ export function usePersistentUrlQueryParam(key: string, storageKey: string, defa
     if (storedValue == null || storedValue === value) return;
 
     valueRef.current = storedValue;
-    setUrlValue(storedValue, { resetPage: false });
+    setUrlValue(storedValue);
   }, [hasUrlValue, setUrlValue, storageKey, value]);
 
   useEffect(() => {
@@ -146,64 +117,12 @@ export function usePersistentUrlQueryParam(key: string, storageKey: string, defa
     writeStoredString(storageKey, value);
   }, [hasUrlValue, storageKey, value]);
 
-  const setPersistentUrlValue = useCallback((nextValue: SetStateAction<string>, options?: { resetPage?: boolean }) => {
+  const setPersistentUrlValue = useCallback((nextValue: SetStateAction<string>) => {
     const resolved = typeof nextValue === 'function' ? nextValue(valueRef.current) : nextValue;
     valueRef.current = resolved;
     writeStoredString(storageKey, resolved);
-    setUrlValue(resolved, options);
+    setUrlValue(resolved);
   }, [setUrlValue, storageKey]);
 
   return [value, setPersistentUrlValue] as const;
-}
-
-export function useUrlPagination(defaultPageSize = 20, storageKey?: string) {
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const searchStr = useRouterState({ select: (state) => state.location.searchStr });
-  const safeDefaultPageSize = normalizePaginationPageSize(defaultPageSize);
-  const snapshot = useMemo(() => {
-    const params = new URLSearchParams(getSearchString(searchStr));
-    const storedPageSize = readStoredPageSize(storageKey, safeDefaultPageSize);
-    return {
-      page: readPositiveInt(params, 'page', 1),
-      pageSize: normalizePaginationPageSize(params.get('page_size'), storedPageSize),
-    };
-  }, [safeDefaultPageSize, searchStr, storageKey]);
-
-  const [page, setPageState] = useState(snapshot.page);
-  const [pageSize, setPageSizeState] = useState(snapshot.pageSize);
-  const pageRef = useRef(snapshot.page);
-
-  useEffect(() => {
-    pageRef.current = snapshot.page;
-    startTransition(() => {
-      setPageState(snapshot.page);
-      setPageSizeState(snapshot.pageSize);
-    });
-  }, [snapshot.page, snapshot.pageSize]);
-
-  const setPage = useCallback((nextPage: SetStateAction<number>) => {
-    const resolved = typeof nextPage === 'function' ? nextPage(pageRef.current) : nextPage;
-    const safePage = Number.isFinite(resolved) && resolved > 1 ? Math.floor(resolved) : 1;
-    pageRef.current = safePage;
-    setPageState(safePage);
-    startTransition(() => {
-      applySearchUpdates(pathname, { page: safePage > 1 ? safePage : null });
-    });
-  }, [pathname]);
-
-  const setPageSize = useCallback((nextPageSize: number) => {
-    const safePageSize = normalizePaginationPageSize(nextPageSize, safeDefaultPageSize);
-    writeStoredPageSize(storageKey, safePageSize);
-    pageRef.current = 1;
-    startTransition(() => {
-      setPageState(1);
-      setPageSizeState(safePageSize);
-      applySearchUpdates(pathname, {
-        page: null,
-        page_size: safePageSize === safeDefaultPageSize ? null : safePageSize,
-      });
-    });
-  }, [pathname, safeDefaultPageSize, storageKey]);
-
-  return { page, pageSize, setPage, setPageSize };
 }

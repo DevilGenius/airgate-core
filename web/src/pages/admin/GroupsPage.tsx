@@ -9,7 +9,8 @@ import { AlertDialog, Button, EmptyState, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { groupsApi } from '../../shared/api/groups';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
+import { useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
@@ -82,7 +83,7 @@ export default function GroupsPage() {
     ...platforms.map((p) => ({ value: p, label: platformName(p) })),
   ];
   // 筛选状态
-  const { page, setPage, pageSize, setPageSize } = useUrlPagination(DEFAULT_PAGE_SIZE, 'admin.groups');
+  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.groups');
   const [platformFilter, setPlatformFilter] = useUrlQueryParam('platform');
 
   // 弹窗状态

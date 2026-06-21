@@ -78,14 +78,12 @@ const AccountsSelectAllHeaderCell = memo(function AccountsSelectAllHeaderCell({
   const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
 
   return (
-    <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
-      <TableSelectionCheckbox
-        ariaLabel={selectAllAriaLabel}
-        isIndeterminate={someVisibleSelected}
-        isSelected={allVisibleSelected}
-        onChange={onVisibleRowsSelected}
-      />
-    </div>
+    <TableSelectionCheckbox
+      ariaLabel={selectAllAriaLabel}
+      isIndeterminate={someVisibleSelected}
+      isSelected={allVisibleSelected}
+      onChange={onVisibleRowsSelected}
+    />
   );
 });
 

@@ -346,3 +346,7 @@
   height: 0.875rem !important;
   margin: 0 !important;
 }
+
+.ag-accounts-table .ag-native-switch {
+  margin-inline: auto;
+}

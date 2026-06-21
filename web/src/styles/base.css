@@ -99,6 +99,7 @@ body::selection {
   height: 1.5rem;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   border: 1px solid transparent;
   border-radius: 999px;
   padding-inline: 0.5rem;
@@ -107,6 +108,7 @@ body::selection {
   letter-spacing: 0;
   line-height: 1;
   vertical-align: middle;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -126,12 +128,6 @@ body::selection {
   border-color: color-mix(in oklab, var(--ag-success) 28%, transparent);
   background: var(--ag-success-subtle);
   color: var(--ag-success);
-}
-
-.ag-native-soft-chip__label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 #root input[type="number"]::-webkit-inner-spin-button,

@@ -27,7 +27,8 @@
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  grid-template-columns: minmax(0, 1fr) 0.25rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 0.25rem;
   align-items: center;
 }
 
@@ -83,6 +84,15 @@
   min-width: 0;
   overflow: hidden;
   border-radius: 999px;
+}
+
+.ag-accounts-table .ag-account-usage-bar::before {
+  display: block;
+  width: var(--ag-account-usage-bar-width, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ag-account-usage-bar-color, var(--ag-success));
+  content: "";
 }
 
 .ag-accounts-table .ag-account-usage-percent,

@@ -137,7 +137,7 @@ const AccountUsageMetricChip = memo(function AccountUsageMetricChip({
     <span className="ag-account-usage-metric" data-tone={tone} title={title}>
       {solo ? null : (
         <span className={labelClassName}>
-          <span className="ag-account-usage-metric-segment">{label}</span>
+          {hasLabelSecondary ? <span className="ag-account-usage-metric-segment">{label}</span> : label}
           {hasLabelSecondary ? (
             <>
               <span aria-hidden="true" className="ag-account-usage-metric-separator">/</span>
@@ -148,7 +148,7 @@ const AccountUsageMetricChip = memo(function AccountUsageMetricChip({
       )}
       <span className={valueClassName}>
         {currency ? <span aria-hidden="true" className="ag-account-usage-metric-currency">$</span> : null}
-        <span className="ag-account-usage-metric-segment">{value}</span>
+        {hasValueSecondary ? <span className="ag-account-usage-metric-segment">{value}</span> : value}
         {hasValueSecondary ? (
           <>
             <span aria-hidden="true" className="ag-account-usage-metric-separator">/</span>
@@ -617,8 +617,8 @@ export function useAccountTableColumns({
         const PluginAccountIdentity = getPluginAccountIdentity(row.platform);
         return (
           <div className="flex w-full min-w-0 flex-col items-center gap-1 text-center">
-            <span className="inline-flex max-w-full min-w-0 items-center justify-center">
-              <span className="min-w-0 truncate">{platformName(row.platform)}</span>
+            <span className="max-w-full min-w-0 truncate">
+              {platformName(row.platform)}
             </span>
             {PluginAccountIdentity ? (
               <PluginAccountIdentity
@@ -626,15 +626,11 @@ export function useAccountTableColumns({
                 accountType={row.type}
                 context={{ account: row, credentials: row.credentials }}
               />
-            ) : (
-              <div className="flex max-w-full items-center justify-center gap-1">
-                {row.type && (
-                  <span className="truncate rounded px-1 py-0 text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
-                    {{ oauth: 'OAuth', session_key: 'Session Key', apikey: 'API Key' }[row.type] ?? row.type}
-                  </span>
-                )}
-              </div>
-            )}
+            ) : row.type ? (
+              <span className="max-w-full truncate rounded px-1 py-0 text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
+                {{ oauth: 'OAuth', session_key: 'Session Key', apikey: 'API Key' }[row.type] ?? row.type}
+              </span>
+            ) : null}
           </div>
         );
       },
@@ -812,12 +808,14 @@ export function useAccountTableColumns({
                     <span className="ag-account-usage-window-label text-text-secondary" style={ACCOUNT_USAGE_BADGE_STYLE} title={item.title}>
                       {item.label}
                     </span>
-                    <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${item.barPercent}%`, background: item.color }}
-                      />
-                    </div>
+                    <div
+                      className="ag-account-usage-bar"
+                      style={{
+                        '--ag-account-usage-bar-color': item.color,
+                        '--ag-account-usage-bar-width': `${item.barPercent}%`,
+                        background: 'var(--ag-glass-border)',
+                      } as CSSProperties}
+                    />
                     <span className="ag-account-usage-percent" style={{ color: item.color }}>
                       {item.percent}%
                     </span>
@@ -838,20 +836,17 @@ export function useAccountTableColumns({
                 )}
               </div>
               {hasTodayMetricChips && (
-                <>
-                  <span aria-hidden="true" />
-                  <AccountUsageTodayMetricChips
-                    accessImageText={prepared.accessImageText}
-                    accessRequestsText={prepared.accessRequestsText}
-                    accessText={prepared.accessText}
-                    accountCostText={prepared.todayAccountCostText}
-                    hideAccessLabel={prepared.hideAccessLabel}
-                    labels={accountUsageLabels}
-                    showImageCount={prepared.showImageCount}
-                    tokensText={prepared.todayTokensText}
-                    userCostText={prepared.todayUserCostText}
-                  />
-                </>
+                <AccountUsageTodayMetricChips
+                  accessImageText={prepared.accessImageText}
+                  accessRequestsText={prepared.accessRequestsText}
+                  accessText={prepared.accessText}
+                  accountCostText={prepared.todayAccountCostText}
+                  hideAccessLabel={prepared.hideAccessLabel}
+                  labels={accountUsageLabels}
+                  showImageCount={prepared.showImageCount}
+                  tokensText={prepared.todayTokensText}
+                  userCostText={prepared.todayUserCostText}
+                />
               )}
             </div>
           </div>

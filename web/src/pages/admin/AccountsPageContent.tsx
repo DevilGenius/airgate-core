@@ -22,7 +22,8 @@ import {
 } from '../../app/plugin-frontend-registry';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
-import { usePersistentUrlQueryParam, useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
+import { usePersistentUrlQueryParam, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS, REMOTE_SEARCH_DEBOUNCE_MS } from '../../shared/constants';
@@ -388,7 +389,7 @@ export default function AccountsPageContent() {
   ];
 
   // 筛选状态
-  const { page, setPage, pageSize, setPageSize } = useUrlPagination(20, 'admin.accounts');
+  const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.accounts');
   const [keyword, setKeyword] = useUrlQueryParam('q');
   const debouncedKeyword = useDebouncedValue(keyword.trim(), REMOTE_SEARCH_DEBOUNCE_MS);
   const [platformFilter, setPlatformFilter] = usePersistentUrlQueryParam('platform', `${ACCOUNT_FILTER_STORAGE_KEY}:platform`);

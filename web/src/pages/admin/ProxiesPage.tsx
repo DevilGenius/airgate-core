@@ -5,7 +5,7 @@ import { proxiesApi } from '../../shared/api/proxies';
 import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
-import { useUrlPagination } from '../../shared/hooks/useUrlTableState';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { AlertDialog, Button, Chip, EmptyState, Form, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { StatusChip } from '../../shared/ui';
@@ -41,7 +41,7 @@ export default function ProxiesPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
 
-  const { page, setPage, pageSize, setPageSize } = useUrlPagination(20, 'admin.proxies');
+  const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.proxies');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProxy, setEditingProxy] = useState<ProxyResp | null>(null);
   const [form, setForm] = useState<ProxyForm>(emptyForm);

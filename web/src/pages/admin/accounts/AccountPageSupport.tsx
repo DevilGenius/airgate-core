@@ -59,15 +59,17 @@ type NativeSoftChipTone = 'accent' | 'default' | 'success';
 function NativeSoftChip({
   children,
   className,
+  title,
   tone,
 }: {
   children: ReactNode;
   className?: string;
+  title?: string;
   tone: NativeSoftChipTone;
 }) {
   return (
-    <span className={`ag-native-soft-chip ${className ?? ''}`} data-tone={tone}>
-      <span className="ag-native-soft-chip__label">{children}</span>
+    <span className={`ag-native-soft-chip ${className ?? ''}`} data-tone={tone} title={title}>
+      {children}
     </span>
   );
 }
@@ -562,14 +564,15 @@ function StatusPill({
   status: 'active' | 'disabled';
   tooltip?: string;
 }) {
-  const chip = (
-    <NativeSoftChip className="ag-account-status-pill" tone={status === 'active' ? 'success' : 'default'}>
+  return (
+    <NativeSoftChip
+      className="ag-account-status-pill"
+      title={tooltip}
+      tone={status === 'active' ? 'success' : 'default'}
+    >
       {label}
     </NativeSoftChip>
   );
-
-  if (!tooltip) return chip;
-  return <span className="inline-flex" title={tooltip}>{chip}</span>;
 }
 
 export function TableSelectionCheckbox({
@@ -609,6 +612,7 @@ export function TableSelectionCheckbox({
       aria-label={ariaLabel}
       defaultChecked={defaultSelected ?? isSelected ?? false}
       className="ag-table-selection-checkbox"
+      onClick={(event) => event.stopPropagation()}
       onChange={(event) => onChange(event.currentTarget.checked)}
     />
   );
@@ -618,12 +622,6 @@ export function columnAlignClass(align?: AccountTableColumn['align']) {
   if (align === 'right') return 'text-right';
   if (align === 'left') return 'text-left';
   return 'text-center';
-}
-
-function cellJustifyClass(align?: AccountTableColumn['align']) {
-  if (align === 'right') return 'justify-end';
-  if (align === 'left') return 'justify-start';
-  return 'justify-center';
 }
 
 export const ACCOUNT_SELECTION_COLUMN_STYLE: CSSProperties = {
@@ -662,14 +660,12 @@ const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
   }, [rowId, selectionStore]);
 
   return (
-    <div className="inline-flex" onClick={(event) => event.stopPropagation()}>
-      <TableSelectionCheckbox
-        ariaLabel={ariaLabel}
-        defaultSelected={selectionStore.has(rowId)}
-        onChange={handleChange}
-        inputRef={registerInput}
-      />
-    </div>
+    <TableSelectionCheckbox
+      ariaLabel={ariaLabel}
+      defaultSelected={selectionStore.has(rowId)}
+      onChange={handleChange}
+      inputRef={registerInput}
+    />
   );
 });
 
@@ -682,11 +678,7 @@ const AccountTableCellContent = memo(function AccountTableCellContent({
   row: AccountResp;
   rowMeta?: unknown;
 }) {
-  return (
-    <div className={`flex w-full min-w-0 items-center ${cellJustifyClass(column.align)}`}>
-      {column.render(row, rowMeta)}
-    </div>
-  );
+  return <>{column.render(row, rowMeta)}</>;
 }, (prev, next) => {
   if (prev.column !== next.column) return false;
   return accountTableCellRowsEqual(prev.column.key, prev.row, next.row)
@@ -856,37 +848,37 @@ export const AccountRowActions = memo(function AccountRowActions({
         type="button"
         aria-label={labels.edit}
         title={labels.edit}
-        className="ag-account-row-action-button"
+        className="ag-account-row-action-button ag-account-row-action-label"
         onClick={(event) => {
           event.stopPropagation();
           onEdit(row);
         }}
       >
-        <span className="ag-account-row-action-label">{labels.editShort}</span>
+        {labels.editShort}
       </button>
       <button
         type="button"
         aria-label={labels.test}
         title={labels.test}
-        className="ag-account-row-action-button"
+        className="ag-account-row-action-button ag-account-row-action-label"
         onClick={(event) => {
           event.stopPropagation();
           onTest(row);
         }}
       >
-        <span className="ag-account-row-action-label">{labels.testShort}</span>
+        {labels.testShort}
       </button>
       <button
         type="button"
         aria-label={labels.stats}
         title={labels.stats}
-        className="ag-account-row-action-button ag-account-row-action-button--stats"
+        className="ag-account-row-action-button ag-account-row-action-button--stats ag-account-row-action-label"
         onClick={(event) => {
           event.stopPropagation();
           onStats(row.id);
         }}
       >
-        <span className="ag-account-row-action-label">{labels.statsShort}</span>
+        {labels.statsShort}
       </button>
       <AccountRowOverflowMenu
         row={row}
@@ -1019,9 +1011,7 @@ const AccountRowOverflowMenu = memo(function AccountRowOverflowMenu({
         title={labels.more}
         className="ag-account-row-more-trigger ag-account-row-action-button"
         onClick={toggleMenu}
-      >
-        <span aria-hidden="true" className="ag-account-row-more-dots" />
-      </button>
+      />
       {isOpen && position && typeof document !== 'undefined' ? createPortal(
         <div
           ref={menuRef}
@@ -1104,6 +1094,7 @@ export const AccountTableRow = memo(function AccountTableRow({
         <td
           data-slot="td"
           key={column.key}
+          className={columnAlignClass(column.align)}
           style={columnWidthStyle(column)}
         >
           <AccountTableCellContent column={column} row={row} rowMeta={rowMeta} />

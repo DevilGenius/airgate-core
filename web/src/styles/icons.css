@@ -1,7 +1,6 @@
 /* Lightweight CSS-drawn icons. */
 
-.ag-table-row-more-dots,
-.ag-accounts-table .ag-account-row-more-dots {
+.ag-table-row-more-dots {
   position: relative;
   display: block;
   width: 0.875rem;
@@ -9,8 +8,7 @@
   color: currentColor;
 }
 
-.ag-table-row-more-dots::before,
-.ag-accounts-table .ag-account-row-more-dots::before {
+.ag-table-row-more-dots::before {
   position: absolute;
   top: 50%;
   left: 0.125rem;
@@ -21,6 +19,19 @@
   background: currentColor;
   content: "";
   transform: translateY(-50%);
+  box-shadow:
+    0.28125rem 0 0 currentColor,
+    0.5625rem 0 0 currentColor;
+}
+
+.ag-accounts-table .ag-account-row-more-trigger::before {
+  display: block;
+  width: 0.1875rem;
+  height: 0.1875rem;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+  transform: translateX(-0.28125rem);
   box-shadow:
     0.28125rem 0 0 currentColor,
     0.5625rem 0 0 currentColor;

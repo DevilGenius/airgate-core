@@ -6,7 +6,8 @@ import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { groupsApi } from '../../shared/api/groups';
-import { useUrlPagination, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
+import { useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
@@ -33,7 +34,7 @@ export default function APIKeysPage() {
   const { t } = useTranslation();
   const copy = useClipboard();
 
-  const { page, setPage, pageSize, setPageSize } = useUrlPagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
+  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
   const [keyword, setKeyword] = useUrlQueryParam('q');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
