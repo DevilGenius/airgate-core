@@ -44,16 +44,17 @@
   display: flex;
   width: 100%;
   min-width: 0;
+  align-self: stretch;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 0.25rem;
 }
 
 .ag-accounts-table .ag-account-usage-windows--expanded {
   gap: var(--ag-account-usage-window-expanded-gap);
   /* Reserve four window rows so a Pro account keeps its height when its 5h windows
-     expire and only two bars remain. flex-start (above) anchors them to the top so
-     they do not re-center as the row count changes. */
+     expire and only two bars remain. Fewer rows are centered in the reserved space. */
+  justify-content: center;
   min-height: calc(4 * var(--ag-account-usage-window-row-height) + 3 * var(--ag-account-usage-window-expanded-gap));
 }
 
