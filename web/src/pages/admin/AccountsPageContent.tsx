@@ -976,7 +976,7 @@ export default function AccountsPageContent() {
             isDisabled={importMutation.isPending}
             aria-busy={importMutation.isPending}
           >
-            <Upload className="h-4 w-4" />
+            <Download className="h-4 w-4" />
             {t('accounts.import')}
           </Button>
           <Button
@@ -986,7 +986,7 @@ export default function AccountsPageContent() {
             isDisabled={exportMutation.isPending}
             aria-busy={exportMutation.isPending}
           >
-            <Download className="h-4 w-4" />
+            <Upload className="h-4 w-4" />
             {t('accounts.export')}
           </Button>
           <Button className="ag-page-toolbar-button" variant="primary" onPress={handleCreateAccount}>

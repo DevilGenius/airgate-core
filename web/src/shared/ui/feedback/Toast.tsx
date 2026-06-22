@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ToastProvider as HeroToastProvider, toast as heroToast } from '@heroui/react';
+import { Toast, ToastQueue, type ToastContentValue } from '@heroui/react';
 
 export type ToastType = 'success' | 'error' | 'danger' | 'warning' | 'info';
 
@@ -7,22 +7,29 @@ export interface ToastApi {
   toast: (type: ToastType, message: ReactNode, title?: ReactNode) => string;
 }
 
-function notify(type: ToastType, message: ReactNode, title?: ReactNode): string {
-  const options = title ? { description: message } : undefined;
-  const content = title ?? message;
+const appToastQueue = new ToastQueue<ToastContentValue>({ maxVisibleToasts: 4 });
 
+function toastVariant(type: ToastType): ToastContentValue['variant'] {
   switch (type) {
     case 'success':
-      return heroToast.success(content, options);
+      return 'success';
     case 'warning':
-      return heroToast.warning(content, options);
+      return 'warning';
     case 'error':
     case 'danger':
-      return heroToast.danger(content, options);
+      return 'danger';
     case 'info':
     default:
-      return heroToast.info(content, options);
+      return 'default';
   }
+}
+
+function notify(type: ToastType, message: ReactNode, title?: ReactNode): string {
+  return appToastQueue.add({
+    description: title ? message : undefined,
+    title: title ?? message,
+    variant: toastVariant(type),
+  });
 }
 
 const toastApi: ToastApi = { toast: notify };
@@ -31,7 +38,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
-      <HeroToastProvider className="ag-toast-region" maxVisibleToasts={4} placement="top end" width={420} />
+      <Toast.Provider className="ag-toast-region" placement="bottom end" queue={appToastQueue} width={420} />
     </>
   );
 }
@@ -40,4 +47,4 @@ export function useToast(): ToastApi {
   return toastApi;
 }
 
-export { heroToast as toast };
+export { appToastQueue as toastQueue };

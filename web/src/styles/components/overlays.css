@@ -13,10 +13,6 @@
   --ag-alert-dialog-md-width: 34rem;
 }
 
-.ag-toast-region[data-slot="toast-region"] {
-  top: calc(env(safe-area-inset-top, 0px) + 5rem) !important;
-}
-
 :where(.modal__container, .alert-dialog__container):has(.ag-elevation-modal) {
   padding-inline: clamp(0.75rem, 2.5vw, 3rem) !important;
   padding-block: clamp(1rem, 3vh, 3rem) !important;
@@ -308,10 +304,6 @@
 }
 
 @media (max-width: 48rem) {
-
-  .ag-toast-region[data-slot="toast-region"] {
-    top: calc(env(safe-area-inset-top, 0px) + 4rem) !important;
-  }
 
   .ag-elevation-modal .ag-modal-header--with-close {
     padding-inline: 2rem;
