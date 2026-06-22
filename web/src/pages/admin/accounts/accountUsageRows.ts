@@ -22,7 +22,7 @@ export function getWindowSlot(w: AccountUsageWindow) {
       : normalizedKey === 'monthly' || normalizedKey.includes('monthly') || normalizedLabel.includes('monthly') ? 'monthly'
         : '5h');
   const group = w.group?.trim()
-    || (key.startsWith('model:') ? key.replace(/^model:(5h|7d):/, 'model:') : 'base');
+    || (key.startsWith('model:') ? key.replace(/^model:[^:]+:/, 'model:') : 'base');
   return { group, slot };
 }
 

@@ -585,7 +585,6 @@ func (s stubRepository) SaveCredentials(ctx context.Context, id int, credentials
 type stubStateWriter struct {
 	rateLimited    map[int]*time.Time
 	cleared        map[int]bool
-	markersCleared map[int]int
 	disabled       map[int]string
 	degraded       map[int]string
 	recovered      map[int]bool
@@ -596,7 +595,6 @@ func newStubStateWriter() *stubStateWriter {
 	return &stubStateWriter{
 		rateLimited:    map[int]*time.Time{},
 		cleared:        map[int]bool{},
-		markersCleared: map[int]int{},
 		disabled:       map[int]string{},
 		degraded:       map[int]string{},
 		recovered:      map[int]bool{},
@@ -611,11 +609,6 @@ func (s *stubStateWriter) MarkRateLimited(_ context.Context, accountID int, unti
 
 func (s *stubStateWriter) ClearRateLimited(_ context.Context, accountID int) {
 	s.cleared[accountID] = true
-}
-
-func (s *stubStateWriter) ClearRateLimitMarkers(_ context.Context, accountID int) int {
-	s.markersCleared[accountID]++
-	return 0
 }
 
 func (s *stubStateWriter) MarkDisabled(_ context.Context, accountID int, reason string) {

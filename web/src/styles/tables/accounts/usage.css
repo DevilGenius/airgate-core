@@ -38,6 +38,9 @@
 }
 
 .ag-accounts-table .ag-account-usage-windows {
+  --ag-account-usage-window-expanded-gap: 0.1875rem;
+  --ag-account-usage-window-row-height: 1.25rem;
+
   display: flex;
   width: 100%;
   min-width: 0;
@@ -47,16 +50,16 @@
 }
 
 .ag-accounts-table .ag-account-usage-windows--expanded {
-  gap: 0.1875rem;
+  gap: var(--ag-account-usage-window-expanded-gap);
   /* Reserve four window rows so a Pro account keeps its height when its 5h windows
      expire and only two bars remain. flex-start (above) anchors them to the top so
-     they do not re-center as the row count changes. 4*1.25rem + 3*0.1875rem gap. */
-  min-height: 5.5625rem;
+     they do not re-center as the row count changes. */
+  min-height: calc(4 * var(--ag-account-usage-window-row-height) + 3 * var(--ag-account-usage-window-expanded-gap));
 }
 
 .ag-accounts-table .ag-account-usage-window-row {
   display: grid;
-  height: 1.25rem;
+  height: var(--ag-account-usage-window-row-height);
   min-width: 0;
   grid-template-columns: 1.625rem minmax(2.5rem, 1fr) 1.375rem 2.75rem;
   align-items: center;

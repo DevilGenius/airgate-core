@@ -117,6 +117,10 @@ describe('getWindowSlot', () => {
     expect(getWindowSlot({ label: '7d', key: '7d', used_percent: 0 }).slot).toBe('7d');
     expect(getWindowSlot({ label: 'Monthly', key: 'monthly', used_percent: 0 }).slot).toBe('monthly');
     expect(getWindowSlot({ label: 'x', key: 'model:5h:opus', used_percent: 0 }).group).toBe('model:opus');
+    expect(getWindowSlot({ label: 'Monthly', key: 'model:monthly:opus', used_percent: 0 })).toEqual({
+      slot: 'monthly',
+      group: 'model:opus',
+    });
     // Unknown patterns default to the 5h slot and base group.
     expect(getWindowSlot({ label: 'whatever', used_percent: 0 })).toEqual({ slot: '5h', group: 'base' });
   });

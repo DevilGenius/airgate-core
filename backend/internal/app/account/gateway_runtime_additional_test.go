@@ -202,8 +202,8 @@ func TestQuotaRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 	if probeRequest["id"].(float64) != 9 {
 		t.Fatalf("probe request = %+v", probeRequest)
 	}
-	if !writer.routeRefreshed[9] || writer.markersCleared[9] != 0 {
-		t.Fatalf("state writer refreshed=%+v markersCleared=%+v", writer.routeRefreshed, writer.markersCleared)
+	if !writer.routeRefreshed[9] {
+		t.Fatalf("state writer refreshed=%+v", writer.routeRefreshed)
 	}
 	if info, ok := service.getUsageInfoForAccount(t.Context(), 9); !ok || info.Credits == nil || info.Credits.Balance != 12.5 {
 		t.Fatalf("usage cache info=%+v ok=%v", info, ok)
