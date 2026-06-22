@@ -7,6 +7,146 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 const BACKEND = 'http://localhost:9517';
 const backendUrl = new URL(BACKEND);
 const PLUGIN_INDEX_CSS_RE = /^\/plugins\/[^/]+\/assets\/index\.css(?:[?#].*)?$/;
+const HEROUI_COMPONENT_GROUPS: Record<string, string[]> = {
+  herouiForms: [
+    'autocomplete',
+    'calendar',
+    'calendar-year-picker',
+    'checkbox',
+    'checkbox-group',
+    'combo-box',
+    'date-field',
+    'date-input-group',
+    'date-picker',
+    'date-range-picker',
+    'description',
+    'error-message',
+    'field-error',
+    'fieldset',
+    'form',
+    'input',
+    'input-group',
+    'input-otp',
+    'label',
+    'number-field',
+    'radio',
+    'radio-group',
+    'range-calendar',
+    'search-field',
+    'select',
+    'switch',
+    'switch-group',
+    'textarea',
+    'textfield',
+    'time-field',
+  ],
+  herouiOverlays: [
+    'alert-dialog',
+    'close-button',
+    'drawer',
+    'dropdown',
+    'list-box',
+    'list-box-item',
+    'list-box-section',
+    'menu',
+    'menu-item',
+    'menu-section',
+    'modal',
+    'popover',
+    'tooltip',
+  ],
+  herouiDisplay: [
+    'alert',
+    'avatar',
+    'badge',
+    'breadcrumbs',
+    'card',
+    'chip',
+    'empty-state',
+    'header',
+    'kbd',
+    'link',
+    'meter',
+    'pagination',
+    'progress-bar',
+    'progress-circle',
+    'scroll-shadow',
+    'separator',
+    'skeleton',
+    'spinner',
+    'surface',
+    'table',
+    'tabs',
+    'tag',
+    'tag-group',
+    'typography',
+  ],
+  herouiActions: [
+    'accordion',
+    'button',
+    'button-group',
+    'disclosure',
+    'disclosure-group',
+    'toggle-button',
+    'toggle-button-group',
+    'toolbar',
+  ],
+  herouiColor: [
+    'color-area',
+    'color-field',
+    'color-input-group',
+    'color-picker',
+    'color-slider',
+    'color-swatch',
+    'color-swatch-picker',
+  ],
+};
+const MANUAL_CHUNK_PACKAGES: Record<string, string[]> = {
+  vendor: ['react', 'react-dom', '@tanstack/react-router', '@tanstack/react-query', 'i18next', 'react-i18next'],
+  herouiCore: ['tailwind-variants', 'tailwind-merge', 'clsx', 'class-variance-authority'],
+  reactAria: ['react-aria', 'react-aria-components', '@react-aria', '@react-stately', '@react-types'],
+  floating: ['@floating-ui'],
+  intlDate: ['@internationalized/date', '@internationalized/number'],
+  icons: ['lucide-react'],
+  motion: ['motion'],
+  charts: ['recharts'],
+  markdown: ['react-markdown', 'remark-gfm'],
+};
+
+function getHeroUiComponentChunk(normalizedId: string) {
+  const match = normalizedId.match(/\/node_modules\/@heroui\/(?:react|styles)\/dist\/components\/([^/]+)\//);
+  if (!match) return undefined;
+
+  const componentName = match[1];
+  for (const [chunkName, components] of Object.entries(HEROUI_COMPONENT_GROUPS)) {
+    if (components.includes(componentName)) return chunkName;
+  }
+
+  return 'herouiCore';
+}
+
+function manualChunks(id: string) {
+  const normalizedId = id.replace(/\\/g, '/');
+  if (!normalizedId.includes('/node_modules/')) return undefined;
+
+  const heroUiComponentChunk = getHeroUiComponentChunk(normalizedId);
+  if (heroUiComponentChunk) return heroUiComponentChunk;
+
+  if (
+    normalizedId.includes('/node_modules/@heroui/react/') ||
+    normalizedId.includes('/node_modules/@heroui/styles/')
+  ) {
+    return 'herouiCore';
+  }
+
+  for (const [chunkName, packages] of Object.entries(MANUAL_CHUNK_PACKAGES)) {
+    if (packages.some((pkg) => normalizedId.includes(`/node_modules/${pkg}/`))) {
+      return chunkName;
+    }
+  }
+
+  return undefined;
+}
 
 function proxyOptionalPluginCss(
   req: IncomingMessage,
@@ -111,14 +251,9 @@ export default defineConfig({
     exclude: ['@devilgenius/airgate-theme'],
   },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', '@tanstack/react-router', '@tanstack/react-query', 'i18next', 'react-i18next'],
-          ui: ['@heroui/react', '@heroui/styles', 'lucide-react', 'motion'],
-          charts: ['recharts'],
-          markdown: ['react-markdown', 'remark-gfm'],
-        },
+        manualChunks,
       },
     },
   },
