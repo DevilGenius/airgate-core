@@ -91,8 +91,6 @@ type StateWriter interface {
 	MarkRateLimited(ctx context.Context, accountID int, until time.Time, reason string)
 	// ClearRateLimited 账号已从限流中恢复，回到 active。
 	ClearRateLimited(ctx context.Context, accountID int)
-	// ClearRateLimitMarkers 清除账号上的临时限流标记。
-	ClearRateLimitMarkers(ctx context.Context, accountID int) int
 	// MarkDisabled 永久禁用（凭证失效等，需要人工重新验证）。
 	MarkDisabled(ctx context.Context, accountID int, reason string)
 	// MarkDegraded 临时降级（如上游 403 暂不可用），不会永久禁用账号。
@@ -2653,9 +2651,6 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 		// 不动用量窗口缓存。用户点"刷新"时如果账号从没探测过，还是看不到 5h/7d 进度条。
 		// 主动调一次 usage/probe 并写入该账号缓存；失败不阻断主流程。
 		s.triggerUsageProbe(ctx, inst, item.Platform, item.ID, credentials)
-	}
-	if s.stateWriter != nil {
-		s.stateWriter.ClearRateLimitMarkers(ctx, item.ID)
 	}
 	s.resolveAccountMonitorEvents(ctx, item.ID)
 

@@ -66,11 +66,11 @@ export function EditAccountModal({
   const { t } = useTranslation();
   const { platformName: pName } = usePlatforms();
   const initialAccountType = account.type || detectCredentialAccountType(account.credentials);
+  const initialDispatchEnabled = account.state !== 'disabled';
   const [accountType, setAccountType] = useState(initialAccountType);
   const [form, setForm] = useState<UpdateAccountReq>({
     name: account.name,
     type: initialAccountType || undefined,
-    state: account.state === 'disabled' ? 'disabled' : 'active',
     priority: account.priority,
     max_concurrency: account.max_concurrency,
     rate_multiplier: account.rate_multiplier,
@@ -81,6 +81,7 @@ export function EditAccountModal({
   const origCredentials = useRef(account.credentials);
   const [credentials, setCredentials] = useState<Record<string, string>>(account.credentials);
   const [groupIds, setGroupIds] = useState<number[]>(account.group_ids ?? []);
+  const [dispatchEnabled, setDispatchEnabled] = useState(initialDispatchEnabled);
   const [priorityInput, setPriorityInput] = useState(String(account.priority ?? DEFAULT_ACCOUNT_PRIORITY));
   const [rateMultiplierInput, setRateMultiplierInput] = useState(String(account.rate_multiplier ?? 1));
 
@@ -154,8 +155,13 @@ export function EditAccountModal({
       if (passwordKeys.has(key) && merged[key] === '' && value) merged[key] = value;
     }
 
+    const nextState = dispatchEnabled === initialDispatchEnabled
+      ? undefined
+      : dispatchEnabled ? 'active' : 'disabled';
+
     onSubmit({
       ...form,
+      ...(nextState ? { state: nextState } : {}),
       priority,
       rate_multiplier: rateMultiplier,
       type: accountType || undefined,
@@ -283,11 +289,9 @@ export function EditAccountModal({
 
                 <section className="ag-create-account-advanced space-y-4">
                   <NativeSwitch
-                    isSelected={form.state !== 'disabled'}
+                    isSelected={dispatchEnabled}
                     label={<span className="text-sm text-text">{t('accounts.enable_dispatch')}</span>}
-                    onChange={(enabled) =>
-                      setForm({ ...form, state: enabled ? 'active' : 'disabled' })
-                    }
+                    onChange={setDispatchEnabled}
                   />
 
                   <div className="grid gap-4 md:grid-cols-2">
