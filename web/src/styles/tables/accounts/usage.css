@@ -29,7 +29,7 @@
   max-width: 100%;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: 0.25rem;
-  align-items: center;
+  align-items: start;
 }
 
 .ag-accounts-table .ag-account-usage-layout--centered {
@@ -42,12 +42,16 @@
   width: 100%;
   min-width: 0;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.25rem;
 }
 
 .ag-accounts-table .ag-account-usage-windows--expanded {
   gap: 0.1875rem;
+  /* Reserve four window rows so a Pro account keeps its height when its 5h windows
+     expire and only two bars remain. flex-start (above) anchors them to the top so
+     they do not re-center as the row count changes. 4*1.25rem + 3*0.1875rem gap. */
+  min-height: 5.5625rem;
 }
 
 .ag-accounts-table .ag-account-usage-window-row {
@@ -120,6 +124,10 @@
   display: grid;
   width: 100%;
   min-width: 0;
+  /* The layout grid is top-anchored (align-items: start) so the window bars do not
+     re-center when rows expire. Keep the today-metrics column vertically centered
+     against the taller windows column. */
+  align-self: center;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.125rem;
 }

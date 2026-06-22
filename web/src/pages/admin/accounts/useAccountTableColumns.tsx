@@ -21,6 +21,7 @@ import {
   type AccountUsageTodayStats,
   type AccountUsageWindow,
 } from './AccountPageSupport';
+import { buildWindowRows, getWindowDisplay, shouldExpandUsageWindows } from './accountUsageRows';
 
 type QuotaRefreshResult = Awaited<ReturnType<typeof accountsApi.refreshQuota>>;
 
@@ -100,8 +101,6 @@ type AccountRowRenderMeta = {
   usage: PreparedUsageView;
   visibleGroups: string[];
 };
-
-type UsageWindowRow = { id: string; window: AccountUsageWindow };
 
 const AccountUsageMetricChip = memo(function AccountUsageMetricChip({
   currency,
@@ -260,87 +259,6 @@ function usageColor(pct: number) {
   return 'var(--ag-danger)';
 }
 
-function normalizeWindowToken(value?: string) {
-  return value?.trim().toLowerCase().replace(/_/g, '-') || '';
-}
-
-function getWindowSlot(w: AccountUsageWindow) {
-  const key = w.key || '';
-  const label = w.label || '';
-  const normalizedKey = normalizeWindowToken(key);
-  const normalizedLabel = normalizeWindowToken(label);
-  const slot = normalizeWindowToken(w.slot)
-    || (normalizedKey.includes(':7d') || normalizedKey === '7d' || normalizedLabel.startsWith('7d') ? '7d'
-      : normalizedKey === 'monthly' || normalizedKey.includes('monthly') || normalizedLabel.includes('monthly') ? 'monthly'
-        : '5h');
-  const group = w.group?.trim()
-    || (key.startsWith('model:') ? key.replace(/^model:(5h|7d):/, 'model:') : 'base');
-  return { group, slot };
-}
-
-function getWindowGroupLabel(group: string, slot: string, label: string) {
-  const labelParts = label.trim().split(/\s+/);
-  if (labelParts.length > 1 && normalizeWindowToken(labelParts[0]) === slot) {
-    return labelParts.slice(1).join(' ');
-  }
-  const rawGroup = group.replace(/^model:/, '').trim();
-  if (!rawGroup || rawGroup === 'base') return '';
-  const parts = rawGroup.split(/[-\s:]+/).filter(Boolean);
-  return parts[parts.length - 1] ?? rawGroup;
-}
-
-function getWindowDisplay(w: AccountUsageWindow) {
-  const { group, slot } = getWindowSlot(w);
-  const explicitLabel = w.display_label?.trim();
-  const fallbackLabel = explicitLabel || slot || w.label;
-  if (group !== 'base' && slot) {
-    const groupLabel = getWindowGroupLabel(group, slot, w.label || '');
-    if (groupLabel && (!explicitLabel || normalizeWindowToken(explicitLabel) === slot)) {
-      return {
-        label: `${slot}${groupLabel.charAt(0).toUpperCase()}`,
-        title: `${slot} ${groupLabel}`,
-      };
-    }
-  }
-  return {
-    label: fallbackLabel,
-    title: w.label || fallbackLabel,
-  };
-}
-
-function buildWindowRows(items: AccountUsageWindow[]): UsageWindowRow[] {
-  const groups: Array<{ id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow; other: AccountUsageWindow[] }> = [];
-  const groupMap = new Map<string, { id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow; other: AccountUsageWindow[] }>();
-
-  for (const item of items) {
-    const { group, slot } = getWindowSlot(item);
-    let bucket = groupMap.get(group);
-    if (!bucket) {
-      bucket = { id: group, other: [] };
-      groupMap.set(group, bucket);
-      groups.push(bucket);
-    }
-    if (slot === '7d') bucket.seven = item;
-    else if (slot === '5h') bucket.five = item;
-    else bucket.other.push(item);
-  }
-
-  return groups.flatMap((group) => {
-    const rows: UsageWindowRow[] = [];
-    if (group.five) {
-      rows.push({ id: `${group.id}:5h`, window: group.five });
-    }
-    if (group.seven) {
-      rows.push({ id: `${group.id}:7d`, window: group.seven });
-    }
-    for (const window of group.other) {
-      const { slot } = getWindowSlot(window);
-      rows.push({ id: `${group.id}:${window.key || slot}:${rows.length}`, window });
-    }
-    return rows;
-  });
-}
-
 function prepareUsageView(row: AccountResp, usage: AccountUsageInfo | undefined, resetNow: number): PreparedUsageView {
   const missing = !usage;
   const windows: AccountUsageWindow[] = Array.isArray(usage?.windows) ? usage.windows : [];
@@ -393,7 +311,7 @@ function prepareUsageView(row: AccountResp, usage: AccountUsageInfo | undefined,
     todayTokensText,
     todayUserCostText,
     windowRows,
-    windowsClassName: windowRows.length > 2
+    windowsClassName: shouldExpandUsageWindows(windows)
       ? 'ag-account-usage-windows ag-account-usage-windows--expanded'
       : 'ag-account-usage-windows',
   };

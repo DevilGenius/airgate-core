@@ -58,6 +58,7 @@ import {
   AccountSelectionStore,
   UNGROUPED_GROUP_FILTER,
   mergeCachedUsageWindows,
+  shouldExpandUsageWindows,
   runAfterInputFrame,
   useLatestRef,
   type AccountTableSortDirection,
@@ -418,7 +419,7 @@ export default function AccountsPageContent() {
     const nextExpandedIds = new Set<number>();
     for (const accountId of visibleAccountIds) {
       const windows = usageAccounts[String(accountId)]?.windows;
-      if (Array.isArray(windows) && windows.length > 2) {
+      if (shouldExpandUsageWindows(windows)) {
         nextExpandedIds.add(accountId);
       }
     }
