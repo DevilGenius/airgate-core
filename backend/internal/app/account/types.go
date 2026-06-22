@@ -88,7 +88,7 @@ type ListFilter struct {
 	PageSize    int
 	Keyword     string
 	Platform    string
-	State       string // active / rate_limited / degraded / disabled
+	State       string // active / rate_limited / degraded / disabled / working(list-only)
 	AccountType string
 	Credential  *CredentialStringFilter
 	GroupID     *int

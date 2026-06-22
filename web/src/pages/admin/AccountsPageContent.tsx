@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, Input, Spinner, TextField as HeroTextField } from '@heroui/react';
@@ -65,6 +65,14 @@ import {
   type AccountUsageData,
   type AccountUsageWindowCache,
 } from './accounts/AccountPageSupport';
+import {
+  useAccountModalPerfMonitor,
+  useAccountModalRootIsolation,
+  useAccountSelectionPerfMonitor,
+  useAccountToolbarMenuPerfMonitor,
+  useMeasuredElementHeight,
+  type AccountToolbarMenuPerfTarget,
+} from './accounts/accountPagePerf';
 
 const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsAutoRefresh;
 const ACCOUNT_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsFilters;
@@ -72,267 +80,8 @@ const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 const ACCOUNT_PRIORITY_SORT_KEY = 'priority';
 const ACCOUNT_MODAL_TABLE_PLACEHOLDER_MIN_HEIGHT = 320;
-
-type AccountModalPerfTarget = 'create' | 'edit' | 'delete' | 'bulk-edit' | 'bulk-delete' | 'bulk-refresh' | 'test' | 'stats';
-
-type AccountModalPerfSample = {
-  rows: number;
-  startedAt: number;
-  target: AccountModalPerfTarget;
-};
-
-type AccountSelectionPerfAction = 'select-visible' | 'select-row';
-
-type AccountToolbarMenuPerfTarget = 'platform' | 'state' | 'type' | 'group' | 'proxy' | 'auto-refresh';
-
-type AccountToolbarMenuPerfSample = {
-  rows: number;
-  startedAt: number;
-  target: AccountToolbarMenuPerfTarget;
-};
-
-function readElementHeight(element: HTMLElement | null) {
-  return element ? Math.ceil(element.getBoundingClientRect().height) : 0;
-}
-
-function getNodeCount(selector: string) {
-  if (typeof document === 'undefined') return 0;
-  return document.querySelectorAll(selector).length;
-}
-
-function getCheckedAccountRowCount() {
-  if (typeof document === 'undefined') return 0;
-  return document.querySelectorAll('tbody input.ag-table-selection-checkbox:checked').length;
-}
-
-function getAccountsTableFrameContentVisibility() {
-  if (typeof document === 'undefined' || typeof window === 'undefined') return '';
-  const frame = document.querySelector('.ag-accounts-table-frame');
-  return frame instanceof HTMLElement ? window.getComputedStyle(frame).contentVisibility : '';
-}
-
-function useAccountModalRootIsolation(isActive: boolean) {
-  useLayoutEffect(() => {
-    if (!isActive || typeof document === 'undefined' || typeof window === 'undefined') {
-      return undefined;
-    }
-
-    const root = document.getElementById('root');
-    if (!root) return undefined;
-
-    const hadTopLayer = root.hasAttribute('data-react-aria-top-layer');
-    const previousAriaHidden = root.getAttribute('aria-hidden');
-    root.setAttribute('data-react-aria-top-layer', 'true');
-
-    let frameId = 0;
-    const applyAriaHidden = () => {
-      if (root.contains(document.activeElement)) {
-        frameId = window.requestAnimationFrame(applyAriaHidden);
-        return;
-      }
-      root.setAttribute('aria-hidden', 'true');
-    };
-    frameId = window.requestAnimationFrame(applyAriaHidden);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      if (!hadTopLayer) {
-        root.removeAttribute('data-react-aria-top-layer');
-      }
-      if (previousAriaHidden == null) {
-        root.removeAttribute('aria-hidden');
-      } else {
-        root.setAttribute('aria-hidden', previousAriaHidden);
-      }
-    };
-  }, [isActive]);
-}
-
-function useMeasuredElementHeight<T extends HTMLElement>() {
-  const [height, setHeight] = useState(0);
-  const [observedElement, setObservedElement] = useState<T | null>(null);
-
-  const ref = useCallback((element: T | null) => {
-    setObservedElement(element);
-    const nextHeight = readElementHeight(element);
-    if (nextHeight > 0) {
-      setHeight(nextHeight);
-    }
-  }, []);
-
-  useLayoutEffect(() => {
-    const element = observedElement;
-    if (!element || typeof ResizeObserver === 'undefined') return undefined;
-
-    let frameId = 0;
-    const observer = new ResizeObserver((entries) => {
-      const nextHeight = Math.ceil(entries[0]?.contentRect.height ?? 0);
-      if (nextHeight <= 0) return;
-      window.cancelAnimationFrame(frameId);
-      frameId = window.requestAnimationFrame(() => {
-        setHeight((current) => (current === nextHeight ? current : nextHeight));
-      });
-    });
-
-    observer.observe(element);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      observer.disconnect();
-    };
-  }, [observedElement]);
-
-  return [ref, height] as const;
-}
-
-function useAccountModalPerfMonitor(isModalOpen: boolean) {
-  const pendingSampleRef = useRef<AccountModalPerfSample | null>(null);
-
-  const markModalOpenStart = useCallback((target: AccountModalPerfTarget, rows: number) => {
-    if (!import.meta.env.DEV || typeof performance === 'undefined') return;
-
-    pendingSampleRef.current = {
-      rows,
-      startedAt: performance.now(),
-      target,
-    };
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!isModalOpen || !import.meta.env.DEV || typeof performance === 'undefined') return undefined;
-
-    const sample = pendingSampleRef.current;
-    if (!sample) return undefined;
-    pendingSampleRef.current = null;
-
-    const committedAt = performance.now();
-    let timeoutId: number | undefined;
-    const frameId = window.requestAnimationFrame(() => {
-      const paintedAt = performance.now();
-      timeoutId = window.setTimeout(() => {
-        const metric = {
-          commitMs: Math.round((committedAt - sample.startedAt) * 10) / 10,
-          documentNodesAfter: getNodeCount('*'),
-          paintMs: Math.round((paintedAt - sample.startedAt) * 10) / 10,
-          rows: sample.rows,
-          tableFrameContentVisibility: getAccountsTableFrameContentVisibility(),
-          tableMountedAfter: getNodeCount('.ag-accounts-table [data-slot="tbody"]') > 0,
-          tableNodesAfter: getNodeCount('.ag-accounts-table *'),
-          target: sample.target,
-        };
-        console.info('[accounts:modal-open]', JSON.stringify(metric));
-      }, 0);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, [isModalOpen]);
-
-  return markModalOpenStart;
-}
-
-function useAccountSelectionPerfMonitor() {
-  const lastLogAtRef = useRef(0);
-
-  return useCallback((
-    action: AccountSelectionPerfAction,
-    rows: number,
-    nextSelected: boolean,
-    work: () => number,
-  ) => {
-    if (!import.meta.env.DEV || typeof performance === 'undefined') {
-      return work();
-    }
-
-    const startedAt = performance.now();
-    const shouldLog = startedAt - lastLogAtRef.current >= 250;
-    const changed = work();
-    const workedAt = performance.now();
-    if (!shouldLog) return changed;
-    lastLogAtRef.current = workedAt;
-
-    const frameId = window.requestAnimationFrame(() => {
-      const paintedAt = performance.now();
-      window.setTimeout(() => {
-        const metric = {
-          action,
-          changed,
-          checkedAfter: getCheckedAccountRowCount(),
-          nextSelected,
-          paintMs: Math.round((paintedAt - startedAt) * 10) / 10,
-          rows,
-          selectedCount: getCheckedAccountRowCount(),
-          tableNodesAfter: getNodeCount('.ag-accounts-table *'),
-          workMs: Math.round((workedAt - startedAt) * 10) / 10,
-        };
-        console.info('[accounts:selection]', JSON.stringify(metric));
-      }, 0);
-    });
-
-    window.setTimeout(() => window.cancelAnimationFrame(frameId), 1000);
-    return changed;
-  }, []);
-}
-
-function useAccountToolbarMenuPerfMonitor() {
-  const pendingSampleRef = useRef<AccountToolbarMenuPerfSample | null>(null);
-  const paintFrameIdRef = useRef<number | null>(null);
-  const paintTimeoutIdRef = useRef<number | null>(null);
-
-  const markToolbarMenuOpenStart = useCallback((target: AccountToolbarMenuPerfTarget, rows: number) => {
-    if (!import.meta.env.DEV || typeof performance === 'undefined' || typeof window === 'undefined') return;
-
-    const sample: AccountToolbarMenuPerfSample = {
-      rows,
-      startedAt: performance.now(),
-      target,
-    };
-    pendingSampleRef.current = sample;
-
-    if (paintFrameIdRef.current != null && typeof window !== 'undefined') {
-      window.cancelAnimationFrame(paintFrameIdRef.current);
-    }
-    if (paintTimeoutIdRef.current != null) {
-      window.clearTimeout(paintTimeoutIdRef.current);
-      paintTimeoutIdRef.current = null;
-    }
-
-    paintFrameIdRef.current = window.requestAnimationFrame(() => {
-      paintFrameIdRef.current = null;
-      const pendingSample = pendingSampleRef.current;
-      if (!pendingSample) return;
-      pendingSampleRef.current = null;
-      const paintedAt = performance.now();
-      paintTimeoutIdRef.current = window.setTimeout(() => {
-        paintTimeoutIdRef.current = null;
-        const metric = {
-          documentNodesAfter: getNodeCount('*'),
-          paintMs: Math.round((paintedAt - pendingSample.startedAt) * 10) / 10,
-          rows: pendingSample.rows,
-          tableFrameContentVisibility: getAccountsTableFrameContentVisibility(),
-          tableMountedAfter: getNodeCount('.ag-accounts-table [data-slot="tbody"]') > 0,
-          tableNodesAfter: getNodeCount('.ag-accounts-table *'),
-          target: pendingSample.target,
-        };
-        console.info('[accounts:toolbar-menu-open]', JSON.stringify(metric));
-      }, 0);
-    });
-  }, []);
-
-  useEffect(() => () => {
-    if (paintFrameIdRef.current != null && typeof window !== 'undefined') {
-      window.cancelAnimationFrame(paintFrameIdRef.current);
-    }
-    if (paintTimeoutIdRef.current != null && typeof window !== 'undefined') {
-      window.clearTimeout(paintTimeoutIdRef.current);
-    }
-  }, []);
-
-  return markToolbarMenuOpenStart;
-}
+const ACCOUNT_WORKING_STATE_FILTER = 'working';
+const ACCOUNT_WORKING_REFETCH_THROTTLE_MS = 750;
 
 export default function AccountsPageContent() {
   const { t } = useTranslation();
@@ -382,6 +131,7 @@ export default function AccountsPageContent() {
 
   const STATE_OPTIONS = [
     { id: '', label: t('users.all_status') },
+    { id: ACCOUNT_WORKING_STATE_FILTER, label: t('status.working', '工作中') },
     { id: 'active', label: t('status.active') },
     { id: 'rate_limited', label: t('status.rate_limited', '限流中') },
     { id: 'degraded', label: t('status.degraded', '降级中') },
@@ -488,6 +238,24 @@ export default function AccountsPageContent() {
   const refreshAccounts = useCallback(() => {
     void refetchAccounts({ cancelRefetch: false });
   }, [refetchAccounts]);
+  const stateFilterRef = useLatestRef(stateFilter);
+  const workingRefetchTimerRef = useRef<number | null>(null);
+  const scheduleWorkingAccountsRefresh = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (stateFilterRef.current !== ACCOUNT_WORKING_STATE_FILTER) return;
+    if (workingRefetchTimerRef.current != null) return;
+    workingRefetchTimerRef.current = window.setTimeout(() => {
+      workingRefetchTimerRef.current = null;
+      if (stateFilterRef.current !== ACCOUNT_WORKING_STATE_FILTER) return;
+      void refetchAccounts({ cancelRefetch: false });
+    }, ACCOUNT_WORKING_REFETCH_THROTTLE_MS);
+  }, [refetchAccounts, stateFilterRef]);
+  useEffect(() => () => {
+    if (workingRefetchTimerRef.current != null) {
+      window.clearTimeout(workingRefetchTimerRef.current);
+      workingRefetchTimerRef.current = null;
+    }
+  }, []);
   const rows = data?.list ?? [];
   const handleToolbarMenuOpenChange = useCallback((target: AccountToolbarMenuPerfTarget, isOpen: boolean) => {
     if (!isOpen) return;
@@ -495,17 +263,51 @@ export default function AccountsPageContent() {
   }, [markToolbarMenuOpenStart, rows.length]);
   const accountSnapshotRef = useRef<Map<number, AccountResp>>(new Map());
   useEffect(() => {
-    if (rows.length === 0) return;
-    for (const row of rows) {
-      accountSnapshotRef.current.set(row.id, row);
+    const selectedIds = new Set(selectionStore.getSelectedIds());
+    const nextSnapshots = new Map<number, AccountResp>();
+    for (const [id, row] of accountSnapshotRef.current) {
+      if (selectedIds.has(id)) {
+        nextSnapshots.set(id, row);
+      }
     }
-  }, [rows]);
+    for (const row of rows) {
+      nextSnapshots.set(row.id, row);
+    }
+    accountSnapshotRef.current = nextSnapshots;
+  }, [rows, selectionStore]);
   const visibleAccountIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const visibleAccountIdsKey = useMemo(() => visibleAccountIds.join(','), [visibleAccountIds]);
   const visibleAccountIdsRef = useRef<number[]>(visibleAccountIds);
+  const visibleAccountIdSetRef = useRef<Set<number>>(new Set(visibleAccountIds));
   useEffect(() => {
     visibleAccountIdsRef.current = visibleAccountIds;
+    visibleAccountIdSetRef.current = new Set(visibleAccountIds);
   }, [visibleAccountIds, visibleAccountIdsKey]);
+  const pendingCapacityUpdatesRef = useRef<Map<number, number>>(new Map());
+  const capacityUpdateFrameRef = useRef<number | null>(null);
+  const flushPendingCapacityUpdates = useCallback(() => {
+    capacityUpdateFrameRef.current = null;
+    const updates = pendingCapacityUpdatesRef.current;
+    if (updates.size === 0) return;
+    pendingCapacityUpdatesRef.current = new Map();
+    capacityStore.setMany(updates);
+  }, [capacityStore]);
+  const queueCapacityUpdate = useCallback((accountId: number, currentConcurrency: number) => {
+    pendingCapacityUpdatesRef.current.set(accountId, currentConcurrency);
+    if (typeof window === 'undefined') {
+      flushPendingCapacityUpdates();
+      return;
+    }
+    if (capacityUpdateFrameRef.current != null) return;
+    capacityUpdateFrameRef.current = window.requestAnimationFrame(flushPendingCapacityUpdates);
+  }, [flushPendingCapacityUpdates]);
+  useEffect(() => () => {
+    if (capacityUpdateFrameRef.current != null) {
+      window.cancelAnimationFrame(capacityUpdateFrameRef.current);
+      capacityUpdateFrameRef.current = null;
+    }
+    pendingCapacityUpdatesRef.current.clear();
+  }, []);
 
   const applyCapacityData = useCallback((nextData: { accounts: Record<string, number> }) => {
     capacityStore.setCounts(nextData.accounts);
@@ -530,18 +332,20 @@ export default function AccountsPageContent() {
     return subscribeAdminEvents((event) => {
       if (event.type === 'admin_events.reconnected') {
         void refreshVisibleCapacity();
+        scheduleWorkingAccountsRefresh();
         return;
       }
       if (event.type !== 'account_capacity.changed') return;
       const accountId = Number(event.account_id);
       const currentConcurrency = Number(event.current_concurrency);
       if (!Number.isFinite(accountId) || !Number.isFinite(currentConcurrency)) return;
-      if (!visibleAccountIdsRef.current.includes(accountId)) return;
-      runAfterInputFrame(() => {
-        capacityStore.setCount(accountId, currentConcurrency);
-      });
+      if (stateFilterRef.current === ACCOUNT_WORKING_STATE_FILTER) {
+        scheduleWorkingAccountsRefresh();
+      }
+      if (!visibleAccountIdSetRef.current.has(accountId)) return;
+      queueCapacityUpdate(accountId, currentConcurrency);
     });
-  }, [capacityStore, refreshVisibleCapacity]);
+  }, [queueCapacityUpdate, refreshVisibleCapacity, scheduleWorkingAccountsRefresh, stateFilterRef]);
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -566,7 +370,12 @@ export default function AccountsPageContent() {
     [platformFilter, visibleAccountIdsKey],
   );
   const forceUsageRefreshRef = useRef(false);
-  const { data: rawUsageData, isFetching: isUsageFetching, refetch: refetchAccountUsage } = useQuery({
+  const {
+    data: rawUsageData,
+    dataUpdatedAt: rawUsageDataUpdatedAt,
+    isFetching: isUsageFetching,
+    refetch: refetchAccountUsage,
+  } = useQuery({
     queryKey: accountUsageQueryKey,
     queryFn: () => {
       const forceRefresh = forceUsageRefreshRef.current;
@@ -594,10 +403,14 @@ export default function AccountsPageContent() {
     refreshAccounts();
     refreshAccountUsage({ refresh: true });
   }, [refreshAccountUsage, refreshAccounts]);
-  const usageData = useMemo(
-    () => mergeCachedUsageWindows(rawUsageData as AccountUsageData | undefined, usageWindowCacheRef.current),
-    [rawUsageData],
+  const usageMerge = useMemo(
+    () => mergeCachedUsageWindows(rawUsageData as AccountUsageData | undefined, usageWindowCacheRef.current, rawUsageDataUpdatedAt),
+    [rawUsageData, rawUsageDataUpdatedAt],
   );
+  useEffect(() => {
+    usageWindowCacheRef.current = usageMerge.cache;
+  }, [usageMerge.cache]);
+  const usageData = usageMerge.data;
   const expandedUsageRowIds = useMemo(() => {
     const usageAccounts = usageData?.accounts;
     if (!usageAccounts) return new Set<number>();

@@ -43,6 +43,7 @@ type PluginCatalog interface {
 // ConcurrencyReader 并发读接口。
 type ConcurrencyReader interface {
 	GetCurrentCounts(context.Context, []int) map[int]int
+	GetWorkingCounts(context.Context) map[int]int
 }
 
 // Service 提供账号域用例编排。
@@ -220,11 +221,33 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	filter.PageSize = pageSize
 	filter = s.normalizeListFilter(filter)
 
+	workingCounts := map[int]int(nil)
+	if isWorkingStateFilter(filter.State) {
+		nextFilter, counts, empty := s.applyWorkingStateFilter(ctx, filter)
+		if empty {
+			return ListResult{List: []Account{}, Total: 0, Page: page, PageSize: pageSize}, nil
+		}
+		filter = nextFilter
+		workingCounts = counts
+	}
+
 	accounts, total, err := s.repo.List(ctx, filter)
 	if err != nil {
 		return ListResult{}, err
 	}
+	s.hydrateAccountListRuntimeData(ctx, accounts, workingCounts)
 
+	s.cacheAccountProfiles(ctx, accounts)
+
+	return ListResult{
+		List:     accounts,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
+}
+
+func (s *Service) hydrateAccountListRuntimeData(ctx context.Context, accounts []Account, workingCounts map[int]int) {
 	ids := make([]int, 0, len(accounts))
 	openaiIDs := make([]int, 0, len(accounts))
 	for _, item := range accounts {
@@ -234,7 +257,10 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 			openaiIDs = append(openaiIDs, item.ID)
 		}
 	}
-	counts := s.concurrency.GetCurrentCounts(ctx, ids)
+	counts := workingCounts
+	if counts == nil {
+		counts = s.currentConcurrencyCounts(ctx, ids)
+	}
 	for index := range accounts {
 		accounts[index].CurrentConcurrency = counts[accounts[index].ID]
 	}
@@ -266,15 +292,6 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 			}
 		}
 	}
-
-	s.cacheAccountProfiles(ctx, accounts)
-
-	return ListResult{
-		List:     accounts,
-		Total:    total,
-		Page:     page,
-		PageSize: pageSize,
-	}, nil
 }
 
 // GetCapacity 查询当前账号并发容量。只读取调度器 Redis 运行态，不访问账号 DB。
@@ -293,6 +310,76 @@ func (s *Service) GetCapacity(ctx context.Context, accountIDs []int) map[int]int
 	counts := s.concurrency.GetCurrentCounts(ctx, accountIDs)
 	for _, id := range accountIDs {
 		result[id] = counts[id]
+	}
+	return result
+}
+
+func isWorkingStateFilter(state string) bool {
+	return strings.EqualFold(strings.TrimSpace(state), "working")
+}
+
+func (s *Service) applyWorkingStateFilter(ctx context.Context, filter ListFilter) (ListFilter, map[int]int, bool) {
+	counts := s.workingConcurrencyCounts(ctx)
+	if len(counts) == 0 {
+		return filter, counts, true
+	}
+	filter.State = ""
+	filter.IDs = intersectAccountIDs(filter.IDs, mapKeys(counts))
+	if len(filter.IDs) == 0 {
+		return filter, counts, true
+	}
+	return filter, counts, false
+}
+
+func (s *Service) currentConcurrencyCounts(ctx context.Context, ids []int) map[int]int {
+	if s.concurrency == nil {
+		return map[int]int{}
+	}
+	return s.concurrency.GetCurrentCounts(ctx, ids)
+}
+
+func (s *Service) workingConcurrencyCounts(ctx context.Context) map[int]int {
+	if s.concurrency == nil {
+		return map[int]int{}
+	}
+	return s.concurrency.GetWorkingCounts(ctx)
+}
+
+func mapKeys(values map[int]int) []int {
+	keys := make([]int, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func intersectAccountIDs(left []int, right []int) []int {
+	if len(left) == 0 {
+		return normalizeAccountIDs(right)
+	}
+	if len(right) == 0 {
+		return nil
+	}
+	rightSet := make(map[int]struct{}, len(right))
+	for _, id := range right {
+		if id > 0 {
+			rightSet[id] = struct{}{}
+		}
+	}
+	result := make([]int, 0, len(left))
+	seen := make(map[int]struct{}, len(left))
+	for _, id := range left {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := rightSet[id]; !ok {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
 	}
 	return result
 }
@@ -332,6 +419,13 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 // ExportAll 查询符合筛选条件的全部账号（用于导出，不分页、不带并发计数）。
 func (s *Service) ExportAll(ctx context.Context, filter ListFilter) ([]Account, error) {
 	filter = s.normalizeListFilter(filter)
+	if isWorkingStateFilter(filter.State) {
+		nextFilter, _, empty := s.applyWorkingStateFilter(ctx, filter)
+		if empty {
+			return []Account{}, nil
+		}
+		filter = nextFilter
+	}
 	return s.repo.ListAll(ctx, filter)
 }
 

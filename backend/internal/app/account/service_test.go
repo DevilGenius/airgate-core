@@ -500,6 +500,10 @@ func (noOpConcurrency) GetCurrentCounts(context.Context, []int) map[int]int {
 	return map[int]int{}
 }
 
+func (noOpConcurrency) GetWorkingCounts(context.Context) map[int]int {
+	return map[int]int{}
+}
+
 func (s stubRepository) List(ctx context.Context, filter ListFilter) ([]Account, int64, error) {
 	if s.list != nil {
 		return s.list(ctx, filter)
@@ -1777,6 +1781,10 @@ type captureConcurrency struct {
 
 func (c *captureConcurrency) GetCurrentCounts(_ context.Context, ids []int) map[int]int {
 	c.captured = append([]int(nil), ids...)
+	return c.counts
+}
+
+func (c *captureConcurrency) GetWorkingCounts(context.Context) map[int]int {
 	return c.counts
 }
 

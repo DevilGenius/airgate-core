@@ -102,6 +102,7 @@
     "pending": "待处理",
     "paid": "已支付",
     "failed": "失败",
+    "working": "工作中",
     "installed": "已安装"
   },
 

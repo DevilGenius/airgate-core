@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -32,10 +34,12 @@ const (
 //
 //	KEYS[1] = 槽位 key
 //	KEYS[2] = count key
+//	KEYS[3] = 可选：账号工作中索引 key（仅账号级并发）
 //	ARGV[1] = 当前 unix 秒
 //	ARGV[2] = max_concurrency
 //	ARGV[3] = requestID
 //	ARGV[4] = slotTTL 秒（既是单个 slot 的存活上限，也是整 key 的兜底 TTL）
+//	ARGV[5] = 可选：账号 ID（仅账号级并发）
 //
 // 注：三类槽用不同前缀的 key 隔离（ag:concurrency:account:<id> /
 // ag:concurrency:apikey:<id> / ag:concurrency:user:<id>），
@@ -47,10 +51,12 @@ var acquireSlotScript = redis.NewScript(`
 	local max = tonumber(ARGV[2])
 	local requestID = ARGV[3]
 	local ttl = tonumber(ARGV[4])
+	local indexKey = KEYS[3]
+	local accountID = ARGV[5]
 	local staleBefore = now - ttl
 
 	-- 清理僵尸 slot：score 早于 (now - ttl) 视为泄漏
-	redis.call('ZREMRANGEBYSCORE', slotKey, '-inf', staleBefore)
+	local staleRemoved = redis.call('ZREMRANGEBYSCORE', slotKey, '-inf', staleBefore)
 
 	local current = redis.call('ZCARD', slotKey)
 	if current < max then
@@ -58,12 +64,21 @@ var acquireSlotScript = redis.NewScript(`
 		redis.call('EXPIRE', slotKey, ttl)
 		current = redis.call('ZCARD', slotKey)
 		redis.call('SET', countKey, current, 'EX', ttl)
+		if indexKey and accountID then
+			redis.call('ZADD', indexKey, current, accountID)
+		end
 		return {1, current}
 	end
 	if current > 0 then
 		redis.call('SET', countKey, current, 'EX', ttl)
+		if staleRemoved > 0 and indexKey and accountID then
+			redis.call('ZADD', indexKey, current, accountID)
+		end
 	else
 		redis.call('DEL', countKey)
+		if indexKey and accountID then
+			redis.call('ZREM', indexKey, accountID)
+		end
 	end
 	return {0, current}
 `)
@@ -71,9 +86,11 @@ var acquireSlotScript = redis.NewScript(`
 var releaseSlotScript = redis.NewScript(`
 	local slotKey = KEYS[1]
 	local countKey = KEYS[2]
+	local indexKey = KEYS[3]
 	local requestID = ARGV[1]
 	local fallbackTTL = tonumber(ARGV[2])
 	local zeroTTL = tonumber(ARGV[3])
+	local accountID = ARGV[4]
 
 	local removed = redis.call('ZREM', slotKey, requestID)
 	local current = redis.call('ZCARD', slotKey)
@@ -83,8 +100,14 @@ var releaseSlotScript = redis.NewScript(`
 			ttl = fallbackTTL
 		end
 		redis.call('SET', countKey, current, 'EX', ttl)
+		if removed > 0 and indexKey and accountID then
+			redis.call('ZADD', indexKey, current, accountID)
+		end
 	else
 		redis.call('SET', countKey, 0, 'EX', zeroTTL)
+		if indexKey and accountID then
+			redis.call('ZREM', indexKey, accountID)
+		end
 	end
 	return {removed, current}
 `)
@@ -150,6 +173,10 @@ func concurrencyCountKey(accountID int) string {
 	return fmt.Sprintf("ag:concurrency:account:%d:count", accountID)
 }
 
+func accountConcurrencyWorkingIndexKey() string {
+	return "ag:concurrency:account:working"
+}
+
 // apiKeyConcurrencyKey 生成 API Key 级 Redis Key。
 func apiKeyConcurrencyKey(keyID int) string {
 	return fmt.Sprintf("ag:concurrency:apikey:%d", keyID)
@@ -173,7 +200,7 @@ func userConcurrencyCountKey(userID int) string {
 // 清理僵尸 slot + 检查上限 + ZADD 加入新 slot（score = 当前时间）。
 // maxConcurrency <= 0 时视为不限制，直接放行。
 // Redis 不可用时也直接放行，避免影响主链路可用性。
-func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKey, requestID string, maxConcurrency int, slotTTL time.Duration) (int, bool, error) {
+func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKey, indexKey, indexMember, requestID string, maxConcurrency int, slotTTL time.Duration) (int, bool, error) {
 	if cm.rdb == nil || maxConcurrency <= 0 {
 		return 0, false, nil
 	}
@@ -182,12 +209,18 @@ func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKe
 	}
 
 	now := time.Now().Unix()
-	raw, err := acquireSlotScript.Run(ctx, cm.rdb, []string{key, countKey},
+	keys := []string{key, countKey}
+	args := []interface{}{
 		now,
 		maxConcurrency,
 		requestID,
 		int(slotTTL.Seconds()),
-	).Result()
+	}
+	if indexKey != "" && indexMember != "" {
+		keys = append(keys, indexKey)
+		args = append(args, indexMember)
+	}
+	raw, err := acquireSlotScript.Run(ctx, cm.rdb, keys, args...).Result()
 
 	if err != nil {
 		// Redis 不可用时放行
@@ -204,15 +237,21 @@ func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKe
 	return current, true, nil
 }
 
-func (cm *ConcurrencyManager) releaseSlotByKey(ctx context.Context, key, countKey, requestID string) (int, bool) {
+func (cm *ConcurrencyManager) releaseSlotByKey(ctx context.Context, key, countKey, indexKey, indexMember, requestID string) (int, bool) {
 	if cm.rdb == nil {
 		return 0, false
 	}
-	raw, err := releaseSlotScript.Run(ctx, cm.rdb, []string{key, countKey},
+	keys := []string{key, countKey}
+	args := []interface{}{
 		requestID,
 		int(defaultSlotTTL.Seconds()),
 		int(concurrencyZeroCountTTL.Seconds()),
-	).Result()
+	}
+	if indexKey != "" && indexMember != "" {
+		keys = append(keys, indexKey)
+		args = append(args, indexMember)
+	}
+	raw, err := releaseSlotScript.Run(ctx, cm.rdb, keys, args...).Result()
 	if err != nil {
 		return 0, false
 	}
@@ -224,7 +263,8 @@ func (cm *ConcurrencyManager) releaseSlotByKey(ctx context.Context, key, countKe
 // 检查当前 SET 大小 < maxConcurrency，若未满则 SADD。
 // slotTTL 为槽位过期时间，<= 0 时使用默认值（5 分钟）。
 func (cm *ConcurrencyManager) AcquireSlot(ctx context.Context, accountID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
-	current, changed, err := cm.acquireSlotByKey(ctx, concurrencyKey(accountID), concurrencyCountKey(accountID), requestID, maxConcurrency, slotTTL)
+	accountIDString := strconv.Itoa(accountID)
+	current, changed, err := cm.acquireSlotByKey(ctx, concurrencyKey(accountID), concurrencyCountKey(accountID), accountConcurrencyWorkingIndexKey(), accountIDString, requestID, maxConcurrency, slotTTL)
 	if err == nil && changed {
 		cm.publishAccountCapacity(accountID, current)
 	}
@@ -233,7 +273,8 @@ func (cm *ConcurrencyManager) AcquireSlot(ctx context.Context, accountID int, re
 
 // ReleaseSlot 释放账号级并发槽位
 func (cm *ConcurrencyManager) ReleaseSlot(ctx context.Context, accountID int, requestID string) {
-	current, changed := cm.releaseSlotByKey(ctx, concurrencyKey(accountID), concurrencyCountKey(accountID), requestID)
+	accountIDString := strconv.Itoa(accountID)
+	current, changed := cm.releaseSlotByKey(ctx, concurrencyKey(accountID), concurrencyCountKey(accountID), accountConcurrencyWorkingIndexKey(), accountIDString, requestID)
 	if changed {
 		cm.publishAccountCapacity(accountID, current)
 	}
@@ -243,26 +284,26 @@ func (cm *ConcurrencyManager) ReleaseSlot(ctx context.Context, accountID int, re
 // maxConcurrency <= 0 时直接放行（表示该 key 不限制并发）。
 // 与账号级并发独立，两层闸门各自计数，调用方需要分别 release。
 func (cm *ConcurrencyManager) AcquireAPIKeySlot(ctx context.Context, keyID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
-	_, _, err := cm.acquireSlotByKey(ctx, apiKeyConcurrencyKey(keyID), apiKeyConcurrencyCountKey(keyID), requestID, maxConcurrency, slotTTL)
+	_, _, err := cm.acquireSlotByKey(ctx, apiKeyConcurrencyKey(keyID), apiKeyConcurrencyCountKey(keyID), "", "", requestID, maxConcurrency, slotTTL)
 	return err
 }
 
 // ReleaseAPIKeySlot 释放 API Key 级并发槽位
 func (cm *ConcurrencyManager) ReleaseAPIKeySlot(ctx context.Context, keyID int, requestID string) {
-	cm.releaseSlotByKey(ctx, apiKeyConcurrencyKey(keyID), apiKeyConcurrencyCountKey(keyID), requestID)
+	cm.releaseSlotByKey(ctx, apiKeyConcurrencyKey(keyID), apiKeyConcurrencyCountKey(keyID), "", "", requestID)
 }
 
 // AcquireUserSlot 获取用户级并发槽位。
 // maxConcurrency <= 0 时直接放行（表示该用户不限制总并发）。
 // 与 apikey / 账号 两级槽位独立，调用方需要分别 release。
 func (cm *ConcurrencyManager) AcquireUserSlot(ctx context.Context, userID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
-	_, _, err := cm.acquireSlotByKey(ctx, userConcurrencyKey(userID), userConcurrencyCountKey(userID), requestID, maxConcurrency, slotTTL)
+	_, _, err := cm.acquireSlotByKey(ctx, userConcurrencyKey(userID), userConcurrencyCountKey(userID), "", "", requestID, maxConcurrency, slotTTL)
 	return err
 }
 
 // ReleaseUserSlot 释放用户级并发槽位
 func (cm *ConcurrencyManager) ReleaseUserSlot(ctx context.Context, userID int, requestID string) {
-	cm.releaseSlotByKey(ctx, userConcurrencyKey(userID), userConcurrencyCountKey(userID), requestID)
+	cm.releaseSlotByKey(ctx, userConcurrencyKey(userID), userConcurrencyCountKey(userID), "", "", requestID)
 }
 
 func (cm *ConcurrencyManager) publishAccountCapacity(accountID int, current int) {
@@ -371,4 +412,147 @@ func backfillConcurrencyCounts(ctx context.Context, rdb *redis.Client, accountID
 // 展示路径不能为确认空账号回落到每账号 ZSET 清理/ZCARD。
 func (cm *ConcurrencyManager) GetCurrentCounts(ctx context.Context, accountIDs []int) map[int]int {
 	return loadConcurrencyCounts(ctx, cm.rdb, accountIDs, false)
+}
+
+// GetWorkingCounts returns account IDs whose current account-level concurrency is > 0.
+func (cm *ConcurrencyManager) GetWorkingCounts(ctx context.Context) map[int]int {
+	if cm == nil || cm.rdb == nil {
+		return map[int]int{}
+	}
+	return loadWorkingConcurrencyCounts(ctx, cm.rdb)
+}
+
+func loadWorkingConcurrencyCounts(ctx context.Context, rdb *redis.Client) map[int]int {
+	result := make(map[int]int)
+	if rdb == nil {
+		return result
+	}
+
+	members, err := rdb.ZRange(ctx, accountConcurrencyWorkingIndexKey(), 0, -1).Result()
+	if err == nil && len(members) > 0 {
+		ids := accountIDsFromRedisMembers(members)
+		counts := loadConcurrencyCounts(ctx, rdb, ids, true)
+		if len(counts) < len(ids) {
+			removeStaleWorkingIndexMembers(ctx, rdb, members, counts)
+		}
+		if len(counts) > 0 {
+			return counts
+		}
+	}
+
+	return scanWorkingConcurrencyCounts(ctx, rdb)
+}
+
+func accountIDsFromRedisMembers(members []string) []int {
+	ids := make([]int, 0, len(members))
+	seen := make(map[int]struct{}, len(members))
+	for _, member := range members {
+		id, err := strconv.Atoi(member)
+		if err != nil || id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func removeWorkingIndexMembers(ctx context.Context, rdb *redis.Client, members []string) {
+	if len(members) == 0 {
+		return
+	}
+	args := make([]interface{}, 0, len(members))
+	for _, member := range members {
+		args = append(args, member)
+	}
+	_ = rdb.ZRem(ctx, accountConcurrencyWorkingIndexKey(), args...).Err()
+}
+
+func removeStaleWorkingIndexMembers(ctx context.Context, rdb *redis.Client, members []string, counts map[int]int) {
+	stale := make([]string, 0)
+	for _, member := range members {
+		id, err := strconv.Atoi(member)
+		if err != nil || id <= 0 {
+			stale = append(stale, member)
+			continue
+		}
+		if counts[id] <= 0 {
+			stale = append(stale, member)
+		}
+	}
+	removeWorkingIndexMembers(ctx, rdb, stale)
+}
+
+func scanWorkingConcurrencyCounts(ctx context.Context, rdb *redis.Client) map[int]int {
+	result := make(map[int]int)
+	var cursor uint64
+	for {
+		keys, nextCursor, err := rdb.Scan(ctx, cursor, "ag:concurrency:account:*:count", 1000).Result()
+		if err != nil {
+			return result
+		}
+		addWorkingCountsFromKeys(ctx, rdb, keys, result)
+		cursor = nextCursor
+		if cursor == 0 {
+			return result
+		}
+	}
+}
+
+func addWorkingCountsFromKeys(ctx context.Context, rdb *redis.Client, keys []string, result map[int]int) {
+	if len(keys) == 0 {
+		return
+	}
+	ids := make([]int, 0, len(keys))
+	countKeys := make([]string, 0, len(keys))
+	for _, key := range keys {
+		id, ok := accountIDFromConcurrencyCountKey(key)
+		if !ok {
+			continue
+		}
+		ids = append(ids, id)
+		countKeys = append(countKeys, key)
+	}
+	if len(countKeys) == 0 {
+		return
+	}
+	values, err := rdb.MGet(ctx, countKeys...).Result()
+	if err != nil {
+		return
+	}
+	pipe := rdb.Pipeline()
+	indexWrites := 0
+	for index, value := range values {
+		count, ok := redisIntValue(value)
+		if !ok || count <= 0 {
+			continue
+		}
+		id := ids[index]
+		result[id] = count
+		pipe.ZAdd(ctx, accountConcurrencyWorkingIndexKey(), redis.Z{
+			Score:  float64(count),
+			Member: strconv.Itoa(id),
+		})
+		indexWrites++
+	}
+	if indexWrites > 0 {
+		_, _ = pipe.Exec(ctx)
+	}
+}
+
+func accountIDFromConcurrencyCountKey(key string) (int, bool) {
+	const prefix = "ag:concurrency:account:"
+	const suffix = ":count"
+	if !strings.HasPrefix(key, prefix) || !strings.HasSuffix(key, suffix) {
+		return 0, false
+	}
+	rawID := strings.TrimSuffix(strings.TrimPrefix(key, prefix), suffix)
+	id, err := strconv.Atoi(rawID)
+	if err != nil || id <= 0 {
+		return 0, false
+	}
+	return id, true
 }

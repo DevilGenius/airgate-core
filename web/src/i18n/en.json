@@ -102,6 +102,7 @@
     "pending": "Pending",
     "paid": "Paid",
     "failed": "Failed",
+    "working": "Working",
     "installed": "Installed"
   },
 

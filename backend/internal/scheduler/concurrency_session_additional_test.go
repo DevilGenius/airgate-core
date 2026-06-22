@@ -104,8 +104,8 @@ func TestConcurrencyManagerAcquireReleaseScripts(t *testing.T) {
 	publisher := &recordingCapacityPublisher{}
 	cm.SetCapacityEventPublisher(publisher)
 
-	mock.Regexp().ExpectEvalSha(acquireSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7)},
-		`^\d+$`, "2", "req-1", "1",
+	mock.Regexp().ExpectEvalSha(acquireSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7), accountConcurrencyWorkingIndexKey()},
+		`^\d+$`, "2", "req-1", "1", "7",
 	).SetVal([]interface{}{int64(1), int64(2)})
 	if err := cm.AcquireSlot(ctx, 7, "req-1", 2, time.Second); err != nil {
 		t.Fatalf("AcquireSlot allowed = %v", err)
@@ -114,23 +114,23 @@ func TestConcurrencyManagerAcquireReleaseScripts(t *testing.T) {
 		t.Fatalf("capacity events after acquire = %#v", publisher.events)
 	}
 
-	mock.Regexp().ExpectEvalSha(acquireSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7)},
-		`^\d+$`, "2", "req-2", "1",
+	mock.Regexp().ExpectEvalSha(acquireSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7), accountConcurrencyWorkingIndexKey()},
+		`^\d+$`, "2", "req-2", "1", "7",
 	).SetVal([]interface{}{int64(0), int64(2)})
 	if err := cm.AcquireSlot(ctx, 7, "req-2", 2, time.Second); !errors.Is(err, ErrConcurrencyLimit) {
 		t.Fatalf("AcquireSlot full = %v, want ErrConcurrencyLimit", err)
 	}
 
-	mock.ExpectEvalSha(releaseSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7)},
-		"req-1", int(defaultSlotTTL.Seconds()), int(concurrencyZeroCountTTL.Seconds()),
+	mock.ExpectEvalSha(releaseSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7), accountConcurrencyWorkingIndexKey()},
+		"req-1", int(defaultSlotTTL.Seconds()), int(concurrencyZeroCountTTL.Seconds()), "7",
 	).SetVal([]interface{}{int64(1), int64(1)})
 	cm.ReleaseSlot(ctx, 7, "req-1")
 	if len(publisher.events) != 2 || publisher.events[1] != (capacityEvent{accountID: 7, current: 1}) {
 		t.Fatalf("capacity events after release = %#v", publisher.events)
 	}
 
-	mock.ExpectEvalSha(releaseSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7)},
-		"missing", int(defaultSlotTTL.Seconds()), int(concurrencyZeroCountTTL.Seconds()),
+	mock.ExpectEvalSha(releaseSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7), accountConcurrencyWorkingIndexKey()},
+		"missing", int(defaultSlotTTL.Seconds()), int(concurrencyZeroCountTTL.Seconds()), "7",
 	).SetVal([]interface{}{int64(0), int64(1)})
 	cm.ReleaseSlot(ctx, 7, "missing")
 	if len(publisher.events) != 2 {
@@ -169,20 +169,20 @@ func TestConcurrencyManagerFailOpenAndCurrentCounts(t *testing.T) {
 
 	rdb, mock := redismock.NewClientMock()
 	cm := NewConcurrencyManager(rdb)
-	mock.Regexp().ExpectEvalSha(acquireSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7)},
-		`^\d+$`, "2", "req", "300",
+	mock.Regexp().ExpectEvalSha(acquireSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7), accountConcurrencyWorkingIndexKey()},
+		`^\d+$`, "2", "req", "300", "7",
 	).SetErr(errors.New("redis down"))
 	if err := cm.AcquireSlot(ctx, 7, "req", 2, 0); err != nil {
 		t.Fatalf("AcquireSlot redis error should fail open, got %v", err)
 	}
-	mock.Regexp().ExpectEvalSha(acquireSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7)},
-		`^\d+$`, "2", "bad", "300",
+	mock.Regexp().ExpectEvalSha(acquireSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7), accountConcurrencyWorkingIndexKey()},
+		`^\d+$`, "2", "bad", "300", "7",
 	).SetVal("bad")
 	if err := cm.AcquireSlot(ctx, 7, "bad", 2, 0); err != nil {
 		t.Fatalf("AcquireSlot malformed result should fail open, got %v", err)
 	}
-	mock.ExpectEvalSha(releaseSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7)},
-		"req", int(defaultSlotTTL.Seconds()), int(concurrencyZeroCountTTL.Seconds()),
+	mock.ExpectEvalSha(releaseSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7), accountConcurrencyWorkingIndexKey()},
+		"req", int(defaultSlotTTL.Seconds()), int(concurrencyZeroCountTTL.Seconds()), "7",
 	).SetErr(errors.New("redis down"))
 	cm.ReleaseSlot(ctx, 7, "req")
 	if err := mock.ExpectationsWereMet(); err != nil {

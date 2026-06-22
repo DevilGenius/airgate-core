@@ -678,7 +678,7 @@ export function useAccountTableColumns({
         const max = row.max_concurrency;
         return (
           <AccountCapacityLiveChip
-            current={0}
+            current={row.current_concurrency}
             max={max}
             rowId={row.id}
             store={capacityStore}
