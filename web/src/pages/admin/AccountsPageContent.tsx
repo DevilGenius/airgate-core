@@ -64,6 +64,7 @@ import {
   type AccountTableSortDirection,
   type AccountTypeFilterOption,
   type AccountUsageData,
+  type AccountUsageInfo,
   type AccountUsageWindowCache,
 } from './accounts/AccountPageSupport';
 import {
@@ -83,6 +84,16 @@ const ACCOUNT_PRIORITY_SORT_KEY = 'priority';
 const ACCOUNT_MODAL_TABLE_PLACEHOLDER_MIN_HEIGHT = 320;
 const ACCOUNT_WORKING_STATE_FILTER = 'working';
 const ACCOUNT_WORKING_REFETCH_THROTTLE_MS = 750;
+const ACCOUNT_USAGE_SNAPSHOT_MAX_ACCOUNTS = 5000;
+
+function accountUsageInfoHasContent(usage: AccountUsageInfo | undefined) {
+  if (!usage) return false;
+  return Boolean(
+    (Array.isArray(usage.windows) && usage.windows.length > 0)
+    || usage.credits
+    || usage.today_stats,
+  );
+}
 
 export default function AccountsPageContent() {
   const { t } = useTranslation();
@@ -411,7 +422,60 @@ export default function AccountsPageContent() {
   useEffect(() => {
     usageWindowCacheRef.current = usageMerge.cache;
   }, [usageMerge.cache]);
-  const usageData = usageMerge.data;
+  const usageAccountSnapshotRef = useRef<Map<string, AccountUsageInfo>>(new Map());
+  useEffect(() => {
+    const accounts = usageMerge.data?.accounts;
+    if (!accounts) return;
+
+    const snapshot = usageAccountSnapshotRef.current;
+    const keepExistingOnEmpty = Boolean(usageMerge.data?.refreshing) || isUsageFetching;
+    for (const [accountId, usage] of Object.entries(accounts)) {
+      if (!accountUsageInfoHasContent(usage)) {
+        if (!keepExistingOnEmpty) {
+          snapshot.delete(accountId);
+        }
+        continue;
+      }
+      snapshot.delete(accountId);
+      snapshot.set(accountId, usage);
+    }
+
+    if (snapshot.size <= ACCOUNT_USAGE_SNAPSHOT_MAX_ACCOUNTS) return;
+    const visibleKeys = new Set(visibleAccountIdsRef.current.map(String));
+    for (const accountId of snapshot.keys()) {
+      if (snapshot.size <= ACCOUNT_USAGE_SNAPSHOT_MAX_ACCOUNTS) break;
+      if (!visibleKeys.has(accountId)) {
+        snapshot.delete(accountId);
+      }
+    }
+  }, [isUsageFetching, usageMerge.data]);
+  const usageData = useMemo(() => {
+    const data = usageMerge.data;
+    if (rows.length === 0) return data;
+
+    const liveAccounts = data?.accounts;
+    const snapshot = usageAccountSnapshotRef.current;
+    const accounts: Record<string, AccountUsageInfo> = {};
+    let hasAccounts = false;
+    const keepSnapshot = isUsageFetching || Boolean(data?.refreshing) || !data;
+
+    for (const row of rows) {
+      const key = String(row.id);
+      const liveUsage = liveAccounts?.[key];
+      const snapshotUsage = snapshot.get(key);
+      const usage = accountUsageInfoHasContent(liveUsage)
+        ? liveUsage
+        : keepSnapshot && snapshotUsage
+          ? snapshotUsage
+          : liveUsage;
+      if (!usage) continue;
+      accounts[key] = usage;
+      hasAccounts = true;
+    }
+
+    if (!hasAccounts && !data) return undefined;
+    return data ? { ...data, accounts } : { accounts };
+  }, [isUsageFetching, rows, usageMerge.data]);
   const expandedUsageRowIds = useMemo(() => {
     const usageAccounts = usageData?.accounts;
     if (!usageAccounts) return new Set<number>();
