@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button, Card, Meter } from '@heroui/react';
@@ -27,33 +27,10 @@ import { USER_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../share
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { formatRateMultiplier } from '../../shared/utils/rateMultiplier';
+import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../../shared/ui/metricTones';
 
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.userUsageAutoRefresh;
 const USER_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.userUsageFilters;
-
-type MetricTone = 'violet' | 'amber' | 'indigo' | 'emerald' | 'stream';
-const STREAM_BLUE = 'oklch(62.04% 0.1950 253.83)';
-
-const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
-  amber: 'bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
-  emerald: '',
-  indigo: 'bg-indigo-100 text-indigo-600 ring-indigo-200 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-indigo-400/25',
-  stream: '',
-  violet: 'bg-violet-100 text-violet-600 ring-violet-200 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/25',
-};
-
-const METRIC_TONE_STYLES: Partial<Record<MetricTone, CSSProperties>> = {
-  emerald: {
-    background: 'color-mix(in srgb, var(--ag-success) 18%, var(--ag-surface))',
-    boxShadow: '0 0 0 1px color-mix(in srgb, var(--ag-success) 34%, var(--ag-border)), var(--shadow-sm)',
-    color: 'var(--ag-success)',
-  },
-  stream: {
-    background: `color-mix(in srgb, ${STREAM_BLUE} 18%, transparent)`,
-    boxShadow: `0 0 0 1px color-mix(in srgb, ${STREAM_BLUE} 34%, transparent), var(--shadow-sm)`,
-    color: STREAM_BLUE,
-  },
-};
 
 type StoredUserUsageFilters = {
   api_key_id?: number;

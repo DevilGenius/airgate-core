@@ -1,9 +1,45 @@
-import { createElement, type ComponentType } from 'react';
+import { Suspense, createElement, type ComponentType, type ReactNode } from 'react';
 import type { PluginFrontendModule } from '@devilgenius/airgate-theme/plugin';
 import { ErrorBoundary } from './providers/ErrorBoundary';
 
+type PluginSurfaceKind = 'page' | 'form' | 'inline';
+
+function PluginEmptyFallback() {
+  return null;
+}
+
+function createPluginSuspenseFallback(kind: PluginSurfaceKind): ReactNode {
+  if (kind === 'inline') return null;
+
+  return createElement('div', {
+    style: {
+      minHeight: kind === 'page' ? 160 : 64,
+    },
+  });
+}
+
+function createPluginErrorFallback(name: string, kind: PluginSurfaceKind): ReactNode {
+  if (kind === 'inline') return createElement(PluginEmptyFallback);
+
+  return createElement(
+    'div',
+    {
+      role: 'alert',
+      style: {
+        border: '1px solid var(--ag-border-color, rgba(148, 163, 184, 0.35))',
+        borderRadius: 8,
+        padding: 12,
+        color: 'var(--ag-text-muted, #64748b)',
+        background: 'var(--ag-surface-muted, rgba(148, 163, 184, 0.08))',
+      },
+    },
+    `${name} 加载失败`,
+  );
+}
+
 function wrapPluginComponent<TProps extends object>(
   Component: ComponentType<TProps>,
+  kind: PluginSurfaceKind,
 ): ComponentType<TProps> {
   return function WrappedPluginComponent(props) {
     const name = Component.displayName || Component.name || 'plugin';
@@ -11,21 +47,12 @@ function wrapPluginComponent<TProps extends object>(
     return createElement(
       ErrorBoundary,
       {
-        children: child,
-        fallback: createElement(
-          'div',
-          {
-            role: 'alert',
-            style: {
-              border: '1px solid var(--ag-border-color, rgba(148, 163, 184, 0.35))',
-              borderRadius: 8,
-              padding: 12,
-              color: 'var(--ag-text-muted, #64748b)',
-              background: 'var(--ag-surface-muted, rgba(148, 163, 184, 0.08))',
-            },
-          },
-          `${name} 加载失败`,
+        children: createElement(
+          Suspense,
+          { fallback: createPluginSuspenseFallback(kind) },
+          child,
         ),
+        fallback: createPluginErrorFallback(name, kind),
       },
     );
   };
@@ -39,32 +66,32 @@ function normalizePluginFrontendModule(
   return {
     ...mod,
     accountCreate: mod.accountCreate
-      ? wrapPluginComponent(mod.accountCreate)
+      ? wrapPluginComponent(mod.accountCreate, 'form')
       : undefined,
     accountEdit: mod.accountEdit
-      ? wrapPluginComponent(mod.accountEdit)
+      ? wrapPluginComponent(mod.accountEdit, 'form')
       : undefined,
     accountIdentity: mod.accountIdentity
-      ? wrapPluginComponent(mod.accountIdentity)
+      ? wrapPluginComponent(mod.accountIdentity, 'inline')
       : undefined,
     platformIcon: mod.platformIcon
-      ? wrapPluginComponent(mod.platformIcon)
+      ? wrapPluginComponent(mod.platformIcon, 'inline')
       : undefined,
     accountUsageWindow: mod.accountUsageWindow
-      ? wrapPluginComponent(mod.accountUsageWindow)
+      ? wrapPluginComponent(mod.accountUsageWindow, 'form')
       : undefined,
     usageModelMeta: mod.usageModelMeta
-      ? wrapPluginComponent(mod.usageModelMeta)
+      ? wrapPluginComponent(mod.usageModelMeta, 'inline')
       : undefined,
     usageMetricDetail: mod.usageMetricDetail
-      ? wrapPluginComponent(mod.usageMetricDetail)
+      ? wrapPluginComponent(mod.usageMetricDetail, 'inline')
       : undefined,
     usageCostDetail: mod.usageCostDetail
-      ? wrapPluginComponent(mod.usageCostDetail)
+      ? wrapPluginComponent(mod.usageCostDetail, 'inline')
       : undefined,
     routes: mod.routes?.map((route) => ({
       ...route,
-      component: wrapPluginComponent(route.component),
+      component: wrapPluginComponent(route.component, 'page'),
     })),
   };
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Card, Skeleton, Tabs } from '@heroui/react';
@@ -31,6 +31,7 @@ import { CompactDataTable } from '../shared/components/CompactDataTable';
 import { CostPair, CostValue } from '../shared/components/CostValue';
 import { SimpleSelect } from '../shared/components/SimpleSelect';
 import { UserSearchFilterComboBox } from '../shared/components/UserSearchFilterComboBox';
+import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../shared/ui/metricTones';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
 const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
@@ -47,35 +48,7 @@ type RangePreset = 'today' | '7d' | '30d' | '90d';
 type Granularity = 'hour' | 'day';
 
 const RANGE_PRESETS = ['today', '7d', '30d', '90d'] as const;
-type MetricTone = 'blue' | 'gray' | 'violet' | 'emerald' | 'teal' | 'amber' | 'indigo' | 'purple' | 'rose' | 'stream';
 type MetaTone = 'default' | 'success' | 'warning' | 'danger' | 'accent';
-const STREAM_BLUE = 'oklch(62.04% 0.1950 253.83)';
-
-const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
-  amber: 'bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
-  blue: 'bg-blue-100 text-blue-600 ring-blue-200 dark:bg-blue-400/15 dark:text-blue-300 dark:ring-blue-400/25',
-  emerald: '',
-  gray: 'bg-zinc-100 text-zinc-600 ring-zinc-200 dark:bg-zinc-400/15 dark:text-zinc-300 dark:ring-zinc-400/25',
-  indigo: 'bg-indigo-100 text-indigo-600 ring-indigo-200 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-indigo-400/25',
-  purple: 'bg-purple-100 text-purple-600 ring-purple-200 dark:bg-purple-400/15 dark:text-purple-300 dark:ring-purple-400/25',
-  rose: 'bg-rose-100 text-rose-600 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/25',
-  stream: '',
-  teal: 'bg-teal-100 text-teal-600 ring-teal-200 dark:bg-teal-400/15 dark:text-teal-300 dark:ring-teal-400/25',
-  violet: 'bg-violet-100 text-violet-600 ring-violet-200 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/25',
-};
-
-const METRIC_TONE_STYLES: Partial<Record<MetricTone, CSSProperties>> = {
-  emerald: {
-    background: 'color-mix(in srgb, var(--ag-success) 18%, var(--ag-surface))',
-    boxShadow: '0 0 0 1px color-mix(in srgb, var(--ag-success) 34%, var(--ag-border)), var(--shadow-sm)',
-    color: 'var(--ag-success)',
-  },
-  stream: {
-    background: `color-mix(in srgb, ${STREAM_BLUE} 18%, transparent)`,
-    boxShadow: `0 0 0 1px color-mix(in srgb, ${STREAM_BLUE} 34%, transparent), var(--shadow-sm)`,
-    color: STREAM_BLUE,
-  },
-};
 
 const META_TONE_CLASSES: Record<MetaTone, string> = {
   accent: 'text-primary',

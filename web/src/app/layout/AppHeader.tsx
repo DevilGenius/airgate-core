@@ -11,7 +11,7 @@ import {
   Moon,
   Sun,
 } from 'lucide-react';
-import { setStoredLanguage } from '../../i18n';
+import { ensureLanguageBundle, setStoredLanguage } from '../../i18n';
 import { useTheme } from '../providers/ThemeProvider';
 import { useSiteSettings } from '../providers/SiteSettingsProvider';
 import { effectiveDocUrl } from '../../shared/utils/docUrl';
@@ -37,7 +37,7 @@ export const AppHeader = memo(function AppHeader({
 
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'zh' ? 'en' : 'zh';
-    void i18n.changeLanguage(nextLang);
+    void ensureLanguageBundle(nextLang).then(() => i18n.changeLanguage(nextLang));
     setStoredLanguage(nextLang);
   };
 
