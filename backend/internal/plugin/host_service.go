@@ -595,7 +595,7 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 	fwdCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
+	outcome, fwdErr := inst.Forward(fwdCtx, fwdReq)
 	latency := time.Since(start)
 	resp["latency_ms"] = latency.Milliseconds()
 	resp["status_code"] = int64(outcome.Upstream.StatusCode)
@@ -776,7 +776,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			}
 
 			start := time.Now()
-			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
+			outcome, fwdErr := inst.Forward(fwdCtx, fwdReq)
 			releaseCapacity()
 			duration := time.Since(start)
 			if returnableUpstream(outcome.Upstream) {
@@ -952,7 +952,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 			}
 
 			start := time.Now()
-			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
+			outcome, fwdErr := inst.Forward(fwdCtx, fwdReq)
 			releaseCapacity()
 			duration := time.Since(start)
 			if cerr := hostContextError(fwdErr); cerr != nil {

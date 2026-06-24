@@ -3,6 +3,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -39,6 +40,79 @@ type PluginInstance struct {
 	// 后台任务调度上下文。stopBackground 由 Core 调度器创建，用于停止
 	// 该插件实例的所有后台任务 goroutine。stopPlugin 时调用。
 	stopBackground context.CancelFunc
+
+	lifecycleMu    sync.Mutex
+	activeRequests int
+	draining       bool
+	idleCh         chan struct{}
+}
+
+var errPluginInstanceDraining = errors.New("plugin instance is reloading or stopping")
+
+func (inst *PluginInstance) Forward(ctx context.Context, req *sdk.ForwardRequest) (sdk.ForwardOutcome, error) {
+	if inst == nil || inst.Gateway == nil {
+		return sdk.ForwardOutcome{}, errors.New("plugin gateway is not available")
+	}
+	if !inst.acquireRequest() {
+		return sdk.ForwardOutcome{Kind: sdk.OutcomeUnknown, Reason: errPluginInstanceDraining.Error()}, errPluginInstanceDraining
+	}
+	defer inst.releaseRequest()
+	return inst.Gateway.Forward(ctx, req)
+}
+
+func (inst *PluginInstance) acquireRequest() bool {
+	if inst == nil {
+		return false
+	}
+	inst.lifecycleMu.Lock()
+	defer inst.lifecycleMu.Unlock()
+	if inst.draining {
+		return false
+	}
+	inst.activeRequests++
+	return true
+}
+
+func (inst *PluginInstance) releaseRequest() {
+	if inst == nil {
+		return
+	}
+	inst.lifecycleMu.Lock()
+	defer inst.lifecycleMu.Unlock()
+	if inst.activeRequests > 0 {
+		inst.activeRequests--
+	}
+	if inst.draining && inst.activeRequests == 0 && inst.idleCh != nil {
+		close(inst.idleCh)
+		inst.idleCh = nil
+	}
+}
+
+func (inst *PluginInstance) beginDrain() <-chan struct{} {
+	closed := make(chan struct{})
+	close(closed)
+	if inst == nil {
+		return closed
+	}
+	inst.lifecycleMu.Lock()
+	defer inst.lifecycleMu.Unlock()
+	inst.draining = true
+	if inst.activeRequests == 0 {
+		return closed
+	}
+	if inst.idleCh == nil {
+		inst.idleCh = make(chan struct{})
+	}
+	return inst.idleCh
+}
+
+func (inst *PluginInstance) activeRequestCount() int {
+	if inst == nil {
+		return 0
+	}
+	inst.lifecycleMu.Lock()
+	defer inst.lifecycleMu.Unlock()
+	return inst.activeRequests
 }
 
 // Manager 插件管理器。

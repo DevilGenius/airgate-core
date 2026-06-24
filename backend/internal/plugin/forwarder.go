@@ -784,7 +784,7 @@ func canStartForwardAttempt(state *forwardState, attempt int) bool {
 
 // callPlugin 把请求发给插件。
 func (f *Forwarder) callPlugin(c *gin.Context, state *forwardState) forwardExecution {
-	outcome, err := state.plugin.Gateway.Forward(c.Request.Context(), buildPluginRequest(c, state))
+	outcome, err := state.plugin.Forward(c.Request.Context(), buildPluginRequest(c, state))
 	return forwardExecution{
 		outcome:  outcome,
 		err:      err,

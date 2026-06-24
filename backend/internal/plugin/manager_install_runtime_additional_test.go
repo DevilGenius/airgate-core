@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestInstallFromBinaryWithSHA256ValidationEdges(t *testing.T) {
@@ -266,6 +267,42 @@ func TestManagerRuntimeFilesystemAndStopEdges(t *testing.T) {
 		t.Fatalf("stopPlugin left runtime cache entries: instances=%+v models=%+v handles=%+v", mgr.instances, mgr.modelCache, mgr.hostHandles)
 	}
 	mgr.StopAll(ctx)
+}
+
+func TestStopPluginRuntimeDoesNotBeginDrain(t *testing.T) {
+	mgr := &Manager{}
+	inst := &PluginInstance{Name: "demo"}
+
+	mgr.stopPluginRuntime(inst, nil, pluginStopDrainTimeout)
+
+	inst.lifecycleMu.Lock()
+	draining := inst.draining
+	inst.lifecycleMu.Unlock()
+	if draining {
+		t.Fatal("stopPluginRuntime should use caller-provided drain state")
+	}
+}
+
+func TestStopPluginDrainTimeoutIsImmediate(t *testing.T) {
+	idle := make(chan struct{})
+	done := make(chan bool, 1)
+	go func() {
+		done <- waitPluginDrain(nil, idle, pluginStopDrainTimeout)
+	}()
+
+	select {
+	case drained := <-done:
+		if drained {
+			t.Fatal("open idle channel should not drain with immediate stop timeout")
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("immediate stop timeout blocked waiting for drain")
+	}
+
+	close(idle)
+	if !waitPluginDrain(nil, idle, pluginStopDrainTimeout) {
+		t.Fatal("closed idle channel should report drained")
+	}
 }
 
 func TestManagerInstallLocalFilesystemEdges(t *testing.T) {

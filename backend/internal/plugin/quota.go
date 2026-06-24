@@ -237,7 +237,7 @@ func (f *Forwarder) forwardMetadataOnly(c *gin.Context, state *forwardState) {
 		req.Headers.Set("X-Forwarded-Query", qs)
 	}
 
-	outcome, err := state.plugin.Gateway.Forward(c.Request.Context(), req)
+	outcome, err := state.plugin.Forward(c.Request.Context(), req)
 	if err != nil {
 		slog.Error("metadata 请求插件失败", "plugin", state.plugin.Name, "path", state.requestPath, "error", err)
 		openAIError(c, http.StatusBadGateway, "server_error", "upstream_error", "metadata 请求插件失败")

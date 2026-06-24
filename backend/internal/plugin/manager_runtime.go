@@ -33,6 +33,13 @@ const pluginGRPCMaxMessageBytes = 64 * 1024 * 1024
 // 的启动或后台加载协程长期卡死。
 const pluginStartTimeout = 15 * time.Second
 
+// pluginStopDrainTimeout 是显式 stop 前等待已开始 Forward 调用自然结束的最长时间。
+// 0 表示立即 Stop/Kill；stopPlugin 已经摘掉实例并 beginDrain，后续新请求不会再进入旧实例。
+const pluginStopDrainTimeout = 0
+
+// pluginReloadDrainTimeout 是热重载替换旧实例前等待已开始 Forward 调用自然结束的最长时间。
+const pluginReloadDrainTimeout = 5 * time.Minute
+
 // newPluginClientConfig 构造与插件子进程通信的 go-plugin ClientConfig。
 //
 // forwardOutput=true 时把插件的 stdout/stderr 透传到 core 自身（用于正常运行的插件），
@@ -246,8 +253,36 @@ func (m *Manager) ReloadDev(ctx context.Context, name string) error {
 	}
 
 	slog.Debug("plugin_dev_reload_start", sdk.LogFieldPluginID, resolvedName, "src", srcPath)
-	m.stopPlugin(resolvedName)
-	return m.LoadDev(ctx, resolvedName, srcPath)
+	if m.devWatcher != nil {
+		m.devWatcher.remove(resolvedName)
+	}
+
+	cmd := exec.Command("go", "run", ".")
+	cmd.Dir = srcPath
+
+	canonicalName, err := m.startPluginWithOptions(ctx, resolvedName, cmd, "", pluginStartOptions{replaceExisting: true})
+	if err != nil {
+		if m.devWatcher != nil {
+			m.devWatcher.add(resolvedName, srcPath)
+		}
+		return fmt.Errorf("热加载开发插件失败: %w", err)
+	}
+
+	m.mu.Lock()
+	m.devPaths[canonicalName] = srcPath
+	m.registerAliasesLocked(canonicalName, resolvedName)
+	m.mu.Unlock()
+
+	if m.devWatcher != nil {
+		m.devWatcher.add(canonicalName, srcPath)
+	}
+
+	slog.Debug("plugin_dev_load_completed",
+		sdk.LogFieldPluginID, canonicalName,
+		"requested_name", resolvedName,
+		"src", srcPath,
+	)
+	return nil
 }
 
 // IsDev 检查插件是否为开发模式。
@@ -258,33 +293,54 @@ func (m *Manager) IsDev(name string) bool {
 	return ok
 }
 
+type pluginStartOptions struct {
+	replaceExisting bool
+}
+
+type pluginStartRuntime struct {
+	replaceExisting bool
+	hostHandle      *pluginHostHandle
+}
+
 func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string) (string, error) {
-	if err := m.waitForPluginStop(ctx, requestedName); err != nil {
-		return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+	return m.startPluginWithOptions(ctx, requestedName, cmd, binaryDir, pluginStartOptions{})
+}
+
+func (m *Manager) startPluginWithOptions(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string, opts pluginStartOptions) (string, error) {
+	if !opts.replaceExisting {
+		if err := m.waitForPluginStop(ctx, requestedName); err != nil {
+			return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+		}
 	}
+
+	hostHandle := m.prepareStartHostHandle(requestedName, opts)
+	startRuntime := pluginStartRuntime{replaceExisting: opts.replaceExisting, hostHandle: hostHandle}
 
 	// 在 spawn 之前先用 requestedName 占位创建 host handle。
 	// canonical name 可能在 Info() 之后才确定；spawn 完成后会用 canonicalName 重新注册 handle。
-	hostHandle := m.prepareHostHandle(requestedName)
 	client := goplugin.NewClient(m.newPluginClientConfig(cmd, true, hostHandle))
+
+	cleanupHost := func(name string) {
+		m.cleanupStartHostHandle(name, startRuntime)
+	}
 
 	rpcClient, err := client.Client()
 	if err != nil {
 		client.Kill()
-		m.removeHostHandle(requestedName)
+		cleanupHost(requestedName)
 		return "", fmt.Errorf("连接插件进程失败: %w", err)
 	}
 
 	raw, err := rpcClient.Dispense(sdkgrpc.PluginKeyGateway)
 	if err != nil {
 		client.Kill()
-		m.removeHostHandle(requestedName)
+		cleanupHost(requestedName)
 		return "", fmt.Errorf("获取插件接口失败: %w", err)
 	}
 	probe, ok := raw.(*sdkgrpc.GatewayGRPCClient)
 	if !ok {
 		client.Kill()
-		m.removeHostHandle(requestedName)
+		cleanupHost(requestedName)
 		return "", fmt.Errorf("插件类型断言失败")
 	}
 
@@ -294,39 +350,110 @@ func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *ex
 		extRaw, err := rpcClient.Dispense(sdkgrpc.PluginKeyExtension)
 		if err != nil {
 			client.Kill()
-			m.removeHostHandle(requestedName)
+			cleanupHost(requestedName)
 			return "", fmt.Errorf("获取 extension 插件接口失败: %w", err)
 		}
 		ext, ok := extRaw.(*sdkgrpc.ExtensionGRPCClient)
 		if !ok {
 			client.Kill()
-			m.removeHostHandle(requestedName)
+			cleanupHost(requestedName)
 			return "", fmt.Errorf("extension 插件类型断言失败")
 		}
-		return m.startExtensionPlugin(ctx, client, ext, requestedName, binaryDir)
+		return m.startExtensionPlugin(ctx, client, ext, requestedName, binaryDir, startRuntime)
 
 	case sdk.PluginTypeMiddleware:
 		mwRaw, err := rpcClient.Dispense(sdkgrpc.PluginKeyMiddleware)
 		if err != nil {
 			client.Kill()
-			m.removeHostHandle(requestedName)
+			cleanupHost(requestedName)
 			return "", fmt.Errorf("获取 middleware 插件接口失败: %w", err)
 		}
 		mw, ok := mwRaw.(*sdkgrpc.MiddlewareGRPCClient)
 		if !ok {
 			client.Kill()
-			m.removeHostHandle(requestedName)
+			cleanupHost(requestedName)
 			return "", fmt.Errorf("middleware 插件类型断言失败")
 		}
-		return m.startMiddlewarePlugin(ctx, client, mw, requestedName, binaryDir)
+		return m.startMiddlewarePlugin(ctx, client, mw, requestedName, binaryDir, startRuntime)
 
 	default:
 		// 默认按 gateway 处理（包括 info.Type == "" 的极老插件）
-		return m.startGatewayPlugin(ctx, client, probe, requestedName, binaryDir)
+		return m.startGatewayPlugin(ctx, client, probe, requestedName, binaryDir, startRuntime)
 	}
 }
 
-func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Client, gateway *sdkgrpc.GatewayGRPCClient, requestedName, binaryDir string) (string, error) {
+func (m *Manager) prepareStartHostHandle(requestedName string, opts pluginStartOptions) *pluginHostHandle {
+	if m.hostFactory == nil {
+		return nil
+	}
+	if opts.replaceExisting {
+		return m.hostFactory.NewPluginHandle(requestedName)
+	}
+	return m.prepareHostHandle(requestedName)
+}
+
+func (m *Manager) cleanupStartHostHandle(name string, start pluginStartRuntime) {
+	if start.replaceExisting {
+		return
+	}
+	m.removeHostHandle(name)
+}
+
+func startRuntimeFromOptions(opts []pluginStartRuntime) pluginStartRuntime {
+	if len(opts) == 0 {
+		return pluginStartRuntime{}
+	}
+	return opts[0]
+}
+
+func (m *Manager) bindStartHostHandle(requestedName, canonicalName string, info sdk.PluginInfo, start pluginStartRuntime) {
+	if start.replaceExisting {
+		if start.hostHandle == nil {
+			return
+		}
+		start.hostHandle.pluginName = canonicalName
+		caps := make(map[sdk.Capability]bool, len(info.Capabilities))
+		for _, c := range info.Capabilities {
+			caps[c] = true
+		}
+		start.hostHandle.SetCapabilities(caps)
+		slog.Info("plugin capability 已绑定",
+			"plugin", canonicalName, "sdk_version", info.SDKVersion, "capabilities", info.Capabilities)
+		return
+	}
+	m.relocateHostHandle(requestedName, canonicalName)
+	m.finalizeHostHandle(canonicalName, info)
+}
+
+func (m *Manager) installStartHostHandleLocked(canonicalName string, start pluginStartRuntime) {
+	if start.replaceExisting && start.hostHandle != nil {
+		m.hostHandles[canonicalName] = start.hostHandle
+	}
+}
+
+func (m *Manager) replaceInstanceLocked(canonicalName string, instance *PluginInstance, start pluginStartRuntime) (*PluginInstance, <-chan struct{}) {
+	var old *PluginInstance
+	var oldIdle <-chan struct{}
+	if start.replaceExisting {
+		old = m.instances[canonicalName]
+		if old != nil && old != instance {
+			oldIdle = old.beginDrain()
+		}
+	}
+	m.instances[canonicalName] = instance
+	m.installStartHostHandleLocked(canonicalName, start)
+	return old, oldIdle
+}
+
+func (m *Manager) retireReplacedPlugin(old *PluginInstance, idle <-chan struct{}) {
+	if old == nil {
+		return
+	}
+	go m.stopPluginRuntime(old, idle, pluginReloadDrainTimeout)
+}
+
+func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Client, gateway *sdkgrpc.GatewayGRPCClient, requestedName, binaryDir string, opts ...pluginStartRuntime) (string, error) {
+	start := startRuntimeFromOptions(opts)
 	startCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
 	defer cancel()
 
@@ -334,25 +461,24 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 	canonicalName := canonicalPluginName(info, requestedName)
 	if canonicalName == "" {
 		client.Kill()
-		m.removeHostHandle(requestedName)
+		m.cleanupStartHostHandle(requestedName, start)
 		return "", fmt.Errorf("插件未提供有效的 ID/name")
 	}
-	if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
-		client.Kill()
-		m.removeHostHandle(requestedName)
-		return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+	if !start.replaceExisting {
+		if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
+			client.Kill()
+			m.cleanupStartHostHandle(requestedName, start)
+			return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+		}
 	}
 
-	// canonicalName 可能与 requestedName 不同，把 host handle 从临时占位 key 改名到正式 key
-	m.relocateHostHandle(requestedName, canonicalName)
-	// 解析插件声明的 capability set，写入 handle。之后插件调任何 RPC 都会被校验。
-	m.finalizeHostHandle(canonicalName, info)
+	m.bindStartHostHandle(requestedName, canonicalName, info, start)
 
 	initConfig := m.buildInitConfig(ctx, canonicalName)
 	pluginCtx := newCorePluginContext(initConfig, canonicalName)
 	if err := gateway.Init(pluginCtx); err != nil {
 		client.Kill()
-		m.removeHostHandle(canonicalName)
+		m.cleanupStartHostHandle(canonicalName, start)
 		return "", fmt.Errorf("初始化插件失败: %w", err)
 	}
 	if err := gateway.Start(startCtx); err != nil {
@@ -364,7 +490,7 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 			)
 		}
 		client.Kill()
-		m.removeHostHandle(canonicalName)
+		m.cleanupStartHostHandle(canonicalName, start)
 		return "", fmt.Errorf("启动插件失败: %w", err)
 	}
 
@@ -426,7 +552,7 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 	}
 
 	m.mu.Lock()
-	m.instances[canonicalName] = instance
+	old, oldIdle := m.replaceInstanceLocked(canonicalName, instance, start)
 	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
 	m.modelCache[platform] = cloneModels(models)
 	m.routeCache[canonicalName] = cloneRoutes(routes)
@@ -444,6 +570,7 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		delete(m.frontendPageCache, canonicalName)
 	}
 	m.mu.Unlock()
+	m.retireReplacedPlugin(old, oldIdle)
 
 	dispatchresolver.RegisterPlatformDSL(platform, info.DispatchDSL)
 
@@ -465,7 +592,8 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 	return canonicalName, nil
 }
 
-func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Client, ext *sdkgrpc.ExtensionGRPCClient, requestedName, binaryDir string) (string, error) {
+func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Client, ext *sdkgrpc.ExtensionGRPCClient, requestedName, binaryDir string, opts ...pluginStartRuntime) (string, error) {
+	start := startRuntimeFromOptions(opts)
 	startCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
 	defer cancel()
 
@@ -473,23 +601,24 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 	canonicalName := canonicalPluginName(info, requestedName)
 	if canonicalName == "" {
 		client.Kill()
-		m.removeHostHandle(requestedName)
+		m.cleanupStartHostHandle(requestedName, start)
 		return "", fmt.Errorf("插件未提供有效的 ID/name")
 	}
-	if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
-		client.Kill()
-		m.removeHostHandle(requestedName)
-		return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+	if !start.replaceExisting {
+		if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
+			client.Kill()
+			m.cleanupStartHostHandle(requestedName, start)
+			return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+		}
 	}
 
-	m.relocateHostHandle(requestedName, canonicalName)
-	m.finalizeHostHandle(canonicalName, info)
+	m.bindStartHostHandle(requestedName, canonicalName, info, start)
 
 	initConfig := m.buildInitConfig(ctx, canonicalName)
 	pluginCtx := newCorePluginContext(initConfig, canonicalName)
 	if err := ext.Init(pluginCtx); err != nil {
 		client.Kill()
-		m.removeHostHandle(canonicalName)
+		m.cleanupStartHostHandle(canonicalName, start)
 		return "", fmt.Errorf("初始化 extension 插件失败: %w", err)
 	}
 	if err := ext.Start(startCtx); err != nil {
@@ -502,7 +631,7 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 			)
 		}
 		client.Kill()
-		m.removeHostHandle(canonicalName)
+		m.cleanupStartHostHandle(canonicalName, start)
 		return "", fmt.Errorf("启动 extension 插件失败: %w", err)
 	}
 	if err := ext.Migrate(); err != nil {
@@ -532,7 +661,7 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 	}
 
 	m.mu.Lock()
-	m.instances[canonicalName] = instance
+	old, oldIdle := m.replaceInstanceLocked(canonicalName, instance, start)
 	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
 	// 必须无条件 delete + set，避免插件移除 frontend pages 后旧 cache 残留。
 	if len(info.FrontendPages) > 0 {
@@ -541,6 +670,7 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 		delete(m.frontendPageCache, canonicalName)
 	}
 	m.mu.Unlock()
+	m.retireReplacedPlugin(old, oldIdle)
 
 	m.extractPluginWebAssets(canonicalName, ext)
 
@@ -572,7 +702,8 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 //
 // 与 gateway 的区别：
 //   - 不替代 upstream（不需要 Platform / Models / Routes）
-func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Client, mw *sdkgrpc.MiddlewareGRPCClient, requestedName, binaryDir string) (string, error) {
+func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Client, mw *sdkgrpc.MiddlewareGRPCClient, requestedName, binaryDir string, opts ...pluginStartRuntime) (string, error) {
+	start := startRuntimeFromOptions(opts)
 	startCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
 	defer cancel()
 
@@ -580,23 +711,24 @@ func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Cl
 	canonicalName := canonicalPluginName(info, requestedName)
 	if canonicalName == "" {
 		client.Kill()
-		m.removeHostHandle(requestedName)
+		m.cleanupStartHostHandle(requestedName, start)
 		return "", fmt.Errorf("插件未提供有效的 ID/name")
 	}
-	if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
-		client.Kill()
-		m.removeHostHandle(requestedName)
-		return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+	if !start.replaceExisting {
+		if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
+			client.Kill()
+			m.cleanupStartHostHandle(requestedName, start)
+			return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+		}
 	}
 
-	m.relocateHostHandle(requestedName, canonicalName)
-	m.finalizeHostHandle(canonicalName, info)
+	m.bindStartHostHandle(requestedName, canonicalName, info, start)
 
 	initConfig := m.buildInitConfig(ctx, canonicalName)
 	pluginCtx := newCorePluginContext(initConfig, canonicalName)
 	if err := mw.Init(pluginCtx); err != nil {
 		client.Kill()
-		m.removeHostHandle(canonicalName)
+		m.cleanupStartHostHandle(canonicalName, start)
 		return "", fmt.Errorf("初始化 middleware 插件失败: %w", err)
 	}
 	if err := mw.Start(startCtx); err != nil {
@@ -609,7 +741,7 @@ func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Cl
 			)
 		}
 		client.Kill()
-		m.removeHostHandle(canonicalName)
+		m.cleanupStartHostHandle(canonicalName, start)
 		return "", fmt.Errorf("启动 middleware 插件失败: %w", err)
 	}
 
@@ -630,7 +762,7 @@ func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Cl
 	}
 
 	m.mu.Lock()
-	m.instances[canonicalName] = instance
+	old, oldIdle := m.replaceInstanceLocked(canonicalName, instance, start)
 	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
 	// 必须无条件 delete + set，避免插件移除 frontend pages 后旧 cache 残留。
 	if len(info.FrontendPages) > 0 {
@@ -639,6 +771,7 @@ func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Cl
 		delete(m.frontendPageCache, canonicalName)
 	}
 	m.mu.Unlock()
+	m.retireReplacedPlugin(old, oldIdle)
 
 	m.extractPluginWebAssets(canonicalName, mw)
 
@@ -679,6 +812,7 @@ func (m *Manager) stopPlugin(name string) {
 	for _, key := range stopKeys {
 		m.stopping[key] = stopDone
 	}
+	idle := inst.beginDrain()
 	delete(m.instances, resolvedName)
 	delete(m.modelCache, inst.Platform)
 	delete(m.routeCache, inst.Name)
@@ -698,10 +832,28 @@ func (m *Manager) stopPlugin(name string) {
 		m.devWatcher.remove(inst.Name)
 	}
 
+	m.stopPluginRuntime(inst, idle, pluginStopDrainTimeout)
+}
+
+func (m *Manager) stopPluginRuntime(inst *PluginInstance, idle <-chan struct{}, drainTimeout time.Duration) {
+	if inst == nil {
+		return
+	}
+
+	// Caller must begin drain before unlinking/replacing the instance so new
+	// requests stop at the lifecycle boundary and in-flight requests are counted.
 	// 先停后台任务调度器，再走插件 Stop —— 避免 ticker 在 plugin 进程被 Kill
 	// 之后还往 dead client 发 RPC，造成一堆 connection refused 噪音。
 	if inst.stopBackground != nil {
 		inst.stopBackground()
+	}
+
+	if !waitPluginDrain(inst, idle, drainTimeout) {
+		slog.Warn("plugin_drain_timeout",
+			sdk.LogFieldPluginID, inst.Name,
+			"active_requests", inst.activeRequestCount(),
+			"timeout_ms", drainTimeout.Milliseconds(),
+		)
 	}
 
 	if inst.Gateway != nil {
@@ -727,6 +879,32 @@ func (m *Manager) stopPlugin(name string) {
 	}
 
 	slog.Info("plugin_runtime_stopped", sdk.LogFieldPluginID, inst.Name)
+}
+
+func waitPluginDrain(inst *PluginInstance, idle <-chan struct{}, timeout time.Duration) bool {
+	if idle == nil {
+		return true
+	}
+	if timeout < 0 {
+		<-idle
+		return true
+	}
+	if timeout == 0 {
+		select {
+		case <-idle:
+			return true
+		default:
+			return false
+		}
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-idle:
+		return true
+	case <-timer.C:
+		return false
+	}
 }
 
 func (m *Manager) waitForPluginStop(ctx context.Context, name string) error {
