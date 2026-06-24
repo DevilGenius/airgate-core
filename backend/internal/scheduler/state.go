@@ -99,11 +99,12 @@ func (sm *StateMachine) notifyStateSnapshot(accountID int, state account.State, 
 //	AccountDead         → 401 等确定性凭证失效才 disabled；403 只降级
 //	AccountUnavailable  → 瞬时避让；连续 403 只降级，不自动 disabled
 //	UpstreamTransient   → 瞬时避让；不会 disabled
+//	FamilyTransient     → (account, family) 维度瞬时避让；不改账号级 DB state
 //	ClientError / StreamAborted / Unknown → 不改状态（账号无辜）
 func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 	switch j.Kind {
 	case sdk.OutcomeSuccess:
-		sm.transitionActive(ctx, accountID, false)
+		sm.applySuccess(ctx, accountID, j)
 
 	case sdk.OutcomeAccountRateLimited:
 		dur := j.RetryAfter
@@ -150,9 +151,58 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 	case sdk.OutcomeUpstreamTransient:
 		sm.applyTransientAvoidance(ctx, accountID, j, transientKindUpstream)
 
+	case sdk.OutcomeFamilyTransient:
+		sm.applyFamilyTransientAvoidance(ctx, accountID, j)
+
 	case sdk.OutcomeClientError, sdk.OutcomeStreamAborted, sdk.OutcomeUnknown:
 		// 账号无辜，不改状态。
 	}
+}
+
+func (sm *StateMachine) applySuccess(ctx context.Context, accountID int, j Judgment) {
+	if j.Family != "" && sm.familyCooldown != nil {
+		sm.familyCooldown.ClearTransientStep(ctx, accountID, j.Family)
+	}
+	sm.transitionActive(ctx, accountID, false)
+}
+
+func (sm *StateMachine) applyFamilyTransientAvoidance(ctx context.Context, accountID int, j Judgment) {
+	if j.Family == "" || sm.familyCooldown == nil {
+		sm.applyTransientAvoidance(ctx, accountID, j, transientKindUpstream)
+		return
+	}
+
+	snapshot := sm.loadAccountMonitorSnapshot(accountID)
+	if snapshot != nil && snapshot.State == account.StateDisabled {
+		slog.Warn("scheduler_family_transient_ignored_disabled",
+			sdk.LogFieldAccountID, accountID,
+			"family", j.Family,
+			sdk.LogFieldReason, j.Reason,
+		)
+		return
+	}
+
+	step := sm.familyCooldown.TransientStep(ctx, accountID, j.Family)
+	delay, degraded := transientAvoidanceDelay(step)
+	nextStep := nextTransientAvoidanceStep(step)
+	until := time.Now().Add(delay)
+	sm.familyCooldown.MarkTransient(ctx, accountID, j.Family, until, j.Reason, nextStep)
+
+	slog.Warn("scheduler_family_transient_cooldown",
+		sdk.LogFieldAccountID, accountID,
+		"family", j.Family,
+		"step", nextStep,
+		"until", until,
+		"short_avoidance", !degraded,
+		sdk.LogFieldReason, j.Reason,
+	)
+	sm.recordFamilyCooldownEvent(ctx, accountID, snapshot, j, familyCooldownEvent{
+		family:         j.Family,
+		stateUntil:     &until,
+		reason:         j.Reason,
+		step:           nextStep,
+		shortAvoidance: !degraded,
+	})
 }
 
 func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID int, j Judgment, transientKind string) {
@@ -460,6 +510,60 @@ func (sm *StateMachine) recordAccountStateEvent(ctx context.Context, accountID i
 	}
 	if stateUntil != nil {
 		input.AutoResolveAt = stateUntil
+	}
+	sm.monitor.Record(ctx, input)
+}
+
+type familyCooldownEvent struct {
+	family         string
+	stateUntil     *time.Time
+	reason         string
+	step           int
+	shortAvoidance bool
+}
+
+func (sm *StateMachine) recordFamilyCooldownEvent(ctx context.Context, accountID int, snapshot *ent.Account, j Judgment, event familyCooldownEvent) {
+	if sm == nil || sm.monitor == nil || accountID <= 0 {
+		return
+	}
+	if snapshot == nil {
+		snapshot = sm.loadAccountMonitorSnapshot(accountID)
+	}
+	detail := map[string]interface{}{
+		"state":              "family_transient",
+		"reason":             event.reason,
+		"outcome_kind":       j.Kind.String(),
+		"duration_ms":        j.Duration.Milliseconds(),
+		"family":             event.family,
+		"upstream_status":    j.UpstreamStatus,
+		"state_until":        timePtrRFC3339(event.stateUntil),
+		"is_pool":            j.IsPool,
+		"retry_after_ms":     j.RetryAfter.Milliseconds(),
+		"step":               event.step,
+		"short_avoidance":    event.shortAvoidance,
+		"monitor_event_hint": "scheduler_family_cooldown",
+	}
+	input := monitoring.EventInput{
+		Type:        monitoring.TypeUpstreamAccountError,
+		Severity:    monitoring.SeverityWarning,
+		Source:      monitoring.SourceScheduler,
+		SubjectType: monitoring.SubjectAccount,
+		SubjectID:   strconv.Itoa(accountID),
+		AccountID:   &accountID,
+		ErrorCode:   "account_family_transient",
+		Title:       "Upstream account family transient",
+		Message:     event.reason,
+		Detail:      detail,
+	}
+	if snapshot != nil {
+		input.AccountNameSnapshot = snapshot.Name
+		input.Platform = snapshot.Platform
+		if snapshot.Type != "" {
+			detail["account_type"] = snapshot.Type
+		}
+	}
+	if event.stateUntil != nil {
+		input.AutoResolveAt = event.stateUntil
 	}
 	sm.monitor.Record(ctx, input)
 }

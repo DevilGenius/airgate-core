@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-redis/redismock/v9"
+
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/ent/migrate"
@@ -164,6 +166,73 @@ func TestStateMachineSuccessClearsTransientAvoidanceExtra(t *testing.T) {
 		t.Fatalf("error_msg after success = %q, want empty", fresh.ErrorMsg)
 	}
 	assertTransientAvoidanceExtraCleared(t, fresh)
+}
+
+func TestStateMachineFamilyTransientDoesNotChangeAccountState(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_family_transient_state")
+	recorder := &captureMonitorRecorder{}
+	sm := NewStateMachine(db, NewFamilyCooldown(nil))
+	sm.monitor = recorder
+	acc := createStateMachineAccount(ctx, db, "family overloaded", false)
+
+	start := time.Now()
+	sm.Apply(ctx, acc.ID, Judgment{
+		Kind:           sdk.OutcomeFamilyTransient,
+		Reason:         "Our servers are currently overloaded. Please try again later.",
+		Family:         "openai:gpt-5",
+		UpstreamStatus: http.StatusTooManyRequests,
+		Duration:       123 * time.Millisecond,
+	})
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateActive {
+		t.Fatalf("state after family transient = %s, want active", fresh.State)
+	}
+	if fresh.StateUntil != nil {
+		t.Fatalf("state_until after family transient = %v, want nil", fresh.StateUntil)
+	}
+	if fresh.ErrorMsg != "" {
+		t.Fatalf("error_msg after family transient = %q, want empty", fresh.ErrorMsg)
+	}
+	if len(recorder.events) != 1 {
+		t.Fatalf("monitor events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.ErrorCode != "account_family_transient" {
+		t.Fatalf("error_code = %q, want account_family_transient", event.ErrorCode)
+	}
+	if got := event.Detail["family"]; got != "openai:gpt-5" {
+		t.Fatalf("family detail = %#v, want openai:gpt-5", got)
+	}
+	if got := event.Detail["step"]; got != 1 {
+		t.Fatalf("step detail = %#v, want 1", got)
+	}
+	if got := event.Detail["short_avoidance"]; got != true {
+		t.Fatalf("short_avoidance detail = %#v, want true", got)
+	}
+	if event.AutoResolveAt == nil {
+		t.Fatalf("auto_resolve_at should be set")
+	}
+	delay := event.AutoResolveAt.Sub(start)
+	if delay < 7*time.Second || delay > 8*time.Second {
+		t.Fatalf("family transient delay = %s, want about 7.5s", delay)
+	}
+}
+
+func TestStateMachineSuccessClearsFamilyTransientStep(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_family_transient_success")
+	rdb, mock := redismock.NewClientMock()
+	sm := NewStateMachine(db, NewFamilyCooldown(rdb))
+	acc := createStateMachineAccount(ctx, db, "family success", false)
+
+	mock.ExpectDel(familyCooldownTransientStepKey(acc.ID, "openai:gpt-5")).SetVal(1)
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeSuccess, Family: "openai:gpt-5"})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("redis expectations: %v", err)
+	}
 }
 
 func TestStateMachineSuccessDoesNotClearUnexpiredTemporaryStates(t *testing.T) {

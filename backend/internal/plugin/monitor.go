@@ -405,7 +405,7 @@ func shouldRecordPluginExecutionError(execution forwardExecution) bool {
 		return true
 	}
 	switch execution.outcome.Kind {
-	case sdk.OutcomeUpstreamTransient, sdk.OutcomeStreamAborted, sdk.OutcomeUnknown:
+	case sdk.OutcomeUpstreamTransient, sdk.OutcomeFamilyTransient, sdk.OutcomeStreamAborted, sdk.OutcomeUnknown:
 		return true
 	default:
 		return false

@@ -27,7 +27,27 @@ func TestFamilyCooldownRedisPaths(t *testing.T) {
 	mock.ExpectEval(familyCooldownIndexExpireScript, []string{indexKey}, familyCooldownIndexTTL.Milliseconds()).SetVal(int64(1))
 	mock.ExpectSetNX(activeKey, "1", 0).SetVal(true)
 	mock.ExpectEval(familyCooldownIndexExpireScript, []string{activeKey}, (time.Minute + time.Millisecond).Milliseconds()).SetVal(int64(1))
+	mock.ExpectDel(familyCooldownTransientStepKey(7, "gpt")).SetVal(1)
 	fc.Mark(ctx, 7, "gpt", until, "429")
+
+	mock.ExpectGet(familyCooldownTransientStepKey(7, "gpt")).SetVal("3")
+	if got := fc.TransientStep(ctx, 7, "gpt"); got != 3 {
+		t.Fatalf("TransientStep = %d, want 3", got)
+	}
+	mock.ExpectGet(familyCooldownTransientStepKey(7, "gpt")).SetErr(redis.Nil)
+	if got := fc.TransientStep(ctx, 7, "gpt"); got != 0 {
+		t.Fatalf("TransientStep nil = %d, want 0", got)
+	}
+	mock.ExpectDel(familyCooldownTransientStepKey(7, "gpt")).SetVal(1)
+	fc.ClearTransientStep(ctx, 7, "gpt")
+
+	mock.ExpectSet(reasonKey, "overloaded", time.Millisecond).SetVal("OK")
+	mock.ExpectZAdd(indexKey, redis.Z{Score: float64(until.UnixMilli()), Member: "gpt"}).SetVal(1)
+	mock.ExpectEval(familyCooldownIndexExpireScript, []string{indexKey}, familyCooldownIndexTTL.Milliseconds()).SetVal(int64(1))
+	mock.ExpectSetNX(activeKey, "1", 0).SetVal(true)
+	mock.ExpectEval(familyCooldownIndexExpireScript, []string{activeKey}, (time.Minute + time.Millisecond).Milliseconds()).SetVal(int64(1))
+	mock.ExpectSet(familyCooldownTransientStepKey(7, "gpt"), "2", familyTransientStepTTL).SetVal("OK")
+	fc.MarkTransient(ctx, 7, "gpt", until, "overloaded", 2)
 
 	mock.ExpectTTL(reasonKey).SetVal(time.Minute)
 	if gotUntil, ok := fc.Until(ctx, 7, "gpt"); !ok || !gotUntil.After(time.Now()) {
@@ -53,11 +73,15 @@ func TestFamilyCooldownRedisPaths(t *testing.T) {
 	}
 
 	mock.ExpectDel(reasonKey).SetVal(1)
+	mock.ExpectDel(familyCooldownTransientStepKey(7, "gpt")).SetVal(1)
 	mock.ExpectZRem(indexKey, "gpt").SetVal(1)
 	fc.Clear(ctx, 7, "gpt")
 
 	mock.ExpectZRange(indexKey, 0, -1).SetVal([]string{"gpt", "img"})
-	mock.ExpectDel(familyCooldownReasonKey(7, "gpt"), familyCooldownReasonKey(7, "img")).SetVal(2)
+	mock.ExpectDel(
+		familyCooldownReasonKey(7, "gpt"), familyCooldownTransientStepKey(7, "gpt"),
+		familyCooldownReasonKey(7, "img"), familyCooldownTransientStepKey(7, "img"),
+	).SetVal(4)
 	mock.ExpectDel(indexKey).SetVal(1)
 	mock.ExpectDel(activeKey).SetVal(1)
 	if got := fc.ClearAccount(ctx, 7); got != 2 {

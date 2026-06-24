@@ -635,7 +635,7 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 		resp["success"] = false
 		resp["error_kind"] = "account_unavailable"
 		resp["error_msg"] = truncateProbeErr(outcome.Reason)
-	case sdk.OutcomeUpstreamTransient, sdk.OutcomeStreamAborted:
+	case sdk.OutcomeUpstreamTransient, sdk.OutcomeFamilyTransient, sdk.OutcomeStreamAborted:
 		resp["success"] = false
 		resp["error_kind"] = "upstream_5xx"
 		resp["error_msg"] = truncateProbeErr(outcome.Reason)

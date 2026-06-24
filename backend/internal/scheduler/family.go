@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,6 +51,7 @@ type FamilyCooldown struct {
 const (
 	familyCooldownIndexTTL   = 24 * time.Hour
 	familyCooldownIndexGrace = time.Minute
+	familyTransientStepTTL   = 24 * time.Hour
 )
 
 const familyCooldownIndexExpireScript = `
@@ -95,9 +97,22 @@ func familyCooldownReasonKey(accountID int, family string) string {
 	return fmt.Sprintf("ag:cooldown:family:%d:reason:%s", accountID, family)
 }
 
+func familyCooldownTransientStepKey(accountID int, family string) string {
+	return fmt.Sprintf("ag:cooldown:family:%d:transient_step:%s", accountID, family)
+}
+
 // Mark 把 (account, family) 写入冷却，TTL = until - now（最少 1ms）。
 // 旧的 cooldown 直接被覆盖：上游每次给的 Retry-After 都视为最新建议，无须保留历史。
 func (fc *FamilyCooldown) Mark(ctx context.Context, accountID int, family string, until time.Time, reason string) {
+	fc.mark(ctx, accountID, family, until, reason, 0, false)
+}
+
+// MarkTransient 把 (account, family) 写入瞬时退避冷却，并持久化升级 step。
+func (fc *FamilyCooldown) MarkTransient(ctx context.Context, accountID int, family string, until time.Time, reason string, step int) {
+	fc.mark(ctx, accountID, family, until, reason, step, true)
+}
+
+func (fc *FamilyCooldown) mark(ctx context.Context, accountID int, family string, until time.Time, reason string, step int, transient bool) {
 	if fc == nil || fc.rdb == nil || family == "" {
 		return
 	}
@@ -118,10 +133,40 @@ func (fc *FamilyCooldown) Mark(ctx context.Context, accountID int, family string
 	pipe.Eval(ctx, familyCooldownIndexExpireScript, []string{indexKey}, indexTTL.Milliseconds())
 	pipe.SetNX(ctx, activeKey, "1", 0)
 	pipe.Eval(ctx, familyCooldownIndexExpireScript, []string{activeKey}, activeTTL.Milliseconds())
+	stepKey := familyCooldownTransientStepKey(accountID, family)
+	if transient {
+		pipe.Set(ctx, stepKey, strconv.Itoa(step), familyTransientStepTTL)
+	} else {
+		pipe.Del(ctx, stepKey)
+	}
 	if _, err := pipe.Exec(ctx); err != nil {
 		slog.Debug("写入家族冷却失败",
 			"account_id", accountID, "family", family, "ttl_ms", ttl.Milliseconds(), "error", err)
 	}
+}
+
+// TransientStep 读取 (account, family) 的瞬时退避升级 step。
+func (fc *FamilyCooldown) TransientStep(ctx context.Context, accountID int, family string) int {
+	if fc == nil || fc.rdb == nil || family == "" {
+		return 0
+	}
+	value, err := fc.rdb.Get(ctx, familyCooldownTransientStepKey(accountID, family)).Result()
+	if err != nil {
+		return 0
+	}
+	step, err := strconv.Atoi(value)
+	if err != nil || step < 0 {
+		return 0
+	}
+	return step
+}
+
+// ClearTransientStep 清除 (account, family) 的瞬时退避升级 step，不影响仍在生效的冷却。
+func (fc *FamilyCooldown) ClearTransientStep(ctx context.Context, accountID int, family string) {
+	if fc == nil || fc.rdb == nil || family == "" {
+		return
+	}
+	_ = fc.rdb.Del(ctx, familyCooldownTransientStepKey(accountID, family)).Err()
 }
 
 // Until 查询 (account, family) 的冷却到期时间。
@@ -173,6 +218,7 @@ func (fc *FamilyCooldown) Clear(ctx context.Context, accountID int, family strin
 	}
 	pipe := fc.rdb.Pipeline()
 	pipe.Del(ctx, familyCooldownReasonKey(accountID, family))
+	pipe.Del(ctx, familyCooldownTransientStepKey(accountID, family))
 	pipe.ZRem(ctx, familyCooldownIndexKey(accountID), family)
 	_, _ = pipe.Exec(ctx)
 }
@@ -189,9 +235,10 @@ func (fc *FamilyCooldown) ClearAccount(ctx context.Context, accountID int) int {
 	}
 	pipe := fc.rdb.Pipeline()
 	if len(families) > 0 {
-		keys := make([]string, 0, len(families))
+		keys := make([]string, 0, len(families)*2)
 		for _, family := range families {
 			keys = append(keys, familyCooldownReasonKey(accountID, family))
+			keys = append(keys, familyCooldownTransientStepKey(accountID, family))
 		}
 		pipe.Del(ctx, keys...)
 	}

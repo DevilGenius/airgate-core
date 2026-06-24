@@ -307,6 +307,8 @@ func sanitizedMessage(kind sdk.OutcomeKind) string {
 		return "上游账号403暂不可用，请稍后重试"
 	case sdk.OutcomeStreamAborted:
 		return "响应流中断"
+	case sdk.OutcomeFamilyTransient:
+		return "上游模型当前过载，请稍后重试"
 	case sdk.OutcomeUpstreamTransient:
 		return "上游服务暂不可用，请稍后重试"
 	default:

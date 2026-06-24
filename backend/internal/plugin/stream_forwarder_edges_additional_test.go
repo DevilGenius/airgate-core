@@ -136,6 +136,7 @@ func TestForwarderEdgeHelpers(t *testing.T) {
 	summary.recordExecution(forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountRateLimited, RetryAfter: 2 * time.Second}})
 	summary.recordExecution(forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountDead}})
 	summary.recordExecution(forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountUnavailable}})
+	summary.recordExecution(forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeFamilyTransient}})
 	summary.recordExecution(forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeUnknown}, err: errors.New("boom")})
 	summary.recordPickAccountError(errors.New("plain"))
 	summary.recordLocalCapacityFailure()
@@ -208,6 +209,7 @@ func TestAllRoutesFailureResponsesAndFailoverDecisions(t *testing.T) {
 		{name: "client error", state: &forwardState{}, exec: forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeClientError}}, want: false},
 		{name: "plugin error", state: &forwardState{}, exec: forwardExecution{err: errors.New("boom")}, want: true},
 		{name: "account rate limited", state: &forwardState{}, exec: forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountRateLimited}}, want: true},
+		{name: "family transient", state: &forwardState{}, exec: forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeFamilyTransient}}, want: true},
 		{name: "success", state: &forwardState{}, exec: forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess}}, want: false},
 	} {
 		t.Run("can failover "+tt.name, func(t *testing.T) {

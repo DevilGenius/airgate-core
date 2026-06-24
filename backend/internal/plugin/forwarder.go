@@ -515,6 +515,8 @@ func (s *allRoutesFailureSummary) recordExecution(execution forwardExecution) {
 			return
 		}
 		s.upstreamFailureSeen = true
+	case sdk.OutcomeFamilyTransient:
+		s.upstreamFailureSeen = true
 	case sdk.OutcomeUnknown:
 		if execution.err != nil {
 			s.upstreamFailureSeen = true
