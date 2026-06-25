@@ -14,7 +14,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@devilgenius/airgate-theme": "https://github.com/DevilGenius/airgate-sdk/releases/download/v0.2.4/airgate-theme-v0.2.4.tgz",
+    "@devilgenius/airgate-theme": "https://github.com/DevilGenius/airgate-sdk/releases/download/v0.2.5/airgate-theme-v0.2.5.tgz",
     "@fontsource/fira-code": "^5.2.7",
     "@heroui/react": "^3.2.1",
     "@heroui/styles": "^3.2.1",

@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	entgo.io/ent v0.13.1
-	github.com/DevilGenius/airgate-sdk v0.2.4
+	github.com/DevilGenius/airgate-sdk v0.2.5
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
