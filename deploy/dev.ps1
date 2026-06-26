@@ -198,13 +198,20 @@ function Assert-Command([string]$Name) {
 }
 
 function Invoke-PnpmInstall([string]$Directory, [switch]$Force) {
-  $command = if ($Force) { "pnpm install --force" } else { "pnpm install" }
+  $command = if ($Force) { "pnpm install --force --config.confirmModulesPurge=false" } else { "pnpm install --config.confirmModulesPurge=false" }
   try {
     Invoke-InDir $Directory $command
   } catch {
     Write-Step "pnpm install failed; approving esbuild build script and retrying"
     Invoke-InDir $Directory "pnpm approve-builds esbuild"
     Invoke-InDir $Directory $command
+  }
+}
+
+function Assert-WebDepsInstalled([string]$Directory, [string]$Name) {
+  $themeTypes = Join-Path $Directory "node_modules\@devilgenius\airgate-theme\dist\index.d.ts"
+  if (-not (Test-Path $themeTypes)) {
+    throw "$Name web dependencies are missing or incomplete. Run with -Install before building: .\deploy\dev.ps1 start -Install -Build"
   }
 }
 
@@ -399,11 +406,7 @@ function Sync-PluginWebdist($Plugin) {
 
 function Build-Plugin($Plugin) {
   Ensure-PluginGoWork $Plugin
-
-  $themeTypes = Join-Path $Plugin.WebDir "node_modules\@devilgenius\airgate-theme\dist\index.d.ts"
-  if (-not (Test-Path $themeTypes)) {
-    Invoke-PnpmInstall $Plugin.WebDir -Force
-  }
+  Assert-WebDepsInstalled $Plugin.WebDir $Plugin.Name
 
   Invoke-InDir $Plugin.WebDir "pnpm build"
   Sync-PluginWebdist $Plugin
@@ -416,11 +419,7 @@ function Build-All {
   Assert-Command "pnpm"
   Invoke-CoreUnusedLint
   Invoke-InDir $SdkTheme "pnpm build"
-
-  $themeTypes = Join-Path $WebDir "node_modules\@devilgenius\airgate-theme\dist\index.d.ts"
-  if (-not (Test-Path $themeTypes)) {
-    Invoke-PnpmInstall $WebDir -Force
-  }
+  Assert-WebDepsInstalled $WebDir "core"
 
   Invoke-InDir $WebDir "pnpm build"
   Sync-Webdist
