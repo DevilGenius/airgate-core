@@ -259,11 +259,12 @@ func TestParseBodyCompactionReplayDoesNotRequireContinuationAffinity(t *testing.
 	}
 }
 
-func TestRecoverContinuationAffinityMissingDropsPreviousResponseAndEncryptedContent(t *testing.T) {
+func TestRecoverContinuationAffinityMissingDelegatesPreviousResponseAndEncryptedContent(t *testing.T) {
 	t.Parallel()
 
+	originalBody := []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"reasoning","id":"rs_1","encrypted_content":"sealed"},{"type":"message","role":"user","content":[{"type":"input_text","text":"continue"}]}]}`)
 	state := &forwardState{
-		body:                        []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"reasoning","id":"rs_1","encrypted_content":"sealed"},{"type":"message","role":"user","content":[{"type":"input_text","text":"continue"}]}]}`),
+		body:                        originalBody,
 		previousResponseID:          "resp_old",
 		requireContinuationAffinity: true,
 	}
@@ -281,23 +282,17 @@ func TestRecoverContinuationAffinityMissingDropsPreviousResponseAndEncryptedCont
 	if state.requireContinuationAffinity {
 		t.Fatalf("requireContinuationAffinity = true, want false")
 	}
-	body := string(state.body)
-	if strings.Contains(body, "previous_response_id") {
-		t.Fatalf("body still contains previous_response_id: %s", body)
-	}
-	if strings.Contains(body, "encrypted_content") {
-		t.Fatalf("body still contains encrypted_content: %s", body)
-	}
-	if !strings.Contains(body, "continue") {
-		t.Fatalf("body lost user message: %s", body)
+	if string(state.body) != string(originalBody) {
+		t.Fatalf("body = %s, want unchanged %s", state.body, originalBody)
 	}
 }
 
-func TestRecoverContinuationAffinityMissingDropsPreviousResponseOnly(t *testing.T) {
+func TestRecoverContinuationAffinityMissingDelegatesPreviousResponseOnly(t *testing.T) {
 	t.Parallel()
 
+	originalBody := []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"continue with full context"}]}]}`)
 	state := &forwardState{
-		body:               []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"continue with full context"}]}]}`),
+		body:               originalBody,
 		previousResponseID: "resp_old",
 	}
 
@@ -311,12 +306,8 @@ func TestRecoverContinuationAffinityMissingDropsPreviousResponseOnly(t *testing.
 	if state.previousResponseID != "" {
 		t.Fatalf("previousResponseID = %q, want empty", state.previousResponseID)
 	}
-	body := string(state.body)
-	if strings.Contains(body, "previous_response_id") {
-		t.Fatalf("body still contains previous_response_id: %s", body)
-	}
-	if !strings.Contains(body, "continue with full context") {
-		t.Fatalf("body lost full context message: %s", body)
+	if string(state.body) != string(originalBody) {
+		t.Fatalf("body = %s, want unchanged %s", state.body, originalBody)
 	}
 }
 
@@ -377,24 +368,49 @@ func TestRecoverContinuationAffinityMissingHandlesHeaderOnlyPreviousResponse(t *
 	}
 }
 
-func TestRecoverContinuationAffinityMissingRejectsOversizedFullContext(t *testing.T) {
+func TestRecoverContinuationAffinityMissingDelegatesOversizedReplay(t *testing.T) {
 	t.Parallel()
 
-	largeText := strings.Repeat("x", 2<<20)
+	originalBody := []byte(`{"model":"gpt-5.4-mini","previous_response_id":"resp_old","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"` + strings.Repeat("x", 2<<20) + `"}]}]}`)
 	state := &forwardState{
-		body:               []byte(`{"model":"gpt-5.4-mini","previous_response_id":"resp_old","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"` + largeText + `"}]}]}`),
+		body:               originalBody,
 		previousResponseID: "resp_old",
 	}
 
 	recovered, err := recoverContinuationAffinityMissing(state)
-	if !errors.Is(err, errContinuationRecoveryContextTooLarge) {
-		t.Fatalf("error = %v, want errContinuationRecoveryContextTooLarge", err)
+	if err != nil {
+		t.Fatalf("recoverContinuationAffinityMissing error: %v", err)
 	}
-	if recovered {
-		t.Fatalf("recovered = true, want false")
+	if !recovered {
+		t.Fatalf("recovered = false, want true")
 	}
-	if state.previousResponseID != "resp_old" {
-		t.Fatalf("previousResponseID = %q, want resp_old", state.previousResponseID)
+	if string(state.body) != string(originalBody) {
+		t.Fatalf("body = %s, want unchanged", state.body)
+	}
+}
+
+func TestRecoverContinuationAffinityMissingDelegatesOversizedFullContext(t *testing.T) {
+	t.Parallel()
+
+	largeText := strings.Repeat("x", 2<<20)
+	originalBody := []byte(`{"model":"gpt-5.4-mini","previous_response_id":"resp_old","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"` + largeText + `"}]}]}`)
+	state := &forwardState{
+		body:               originalBody,
+		previousResponseID: "resp_old",
+	}
+
+	recovered, err := recoverContinuationAffinityMissing(state)
+	if err != nil {
+		t.Fatalf("recoverContinuationAffinityMissing error: %v", err)
+	}
+	if !recovered {
+		t.Fatalf("recovered = false, want true")
+	}
+	if state.previousResponseID != "" {
+		t.Fatalf("previousResponseID = %q, want empty", state.previousResponseID)
+	}
+	if string(state.body) != string(originalBody) {
+		t.Fatalf("body = %s, want unchanged", state.body)
 	}
 }
 
@@ -719,6 +735,34 @@ func TestBuildPluginRequestOmitsWriterForNonStreamImagesRequest(t *testing.T) {
 	}
 	if req.Writer != nil {
 		t.Fatalf("Writer = %T, want nil", req.Writer)
+	}
+}
+
+func TestBuildPluginRequestSignalsContinuationRecoveryWithoutChangingBody(t *testing.T) {
+	t.Parallel()
+
+	originalBody := []byte(`{"model":"gpt-5.4","previous_response_id":"resp_old","input":"continue"}`)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	c.Request.Header.Set("OpenAI-Previous-Response-ID", "resp_header")
+	state := &forwardState{
+		requestPath:                 "/v1/responses",
+		body:                        originalBody,
+		continuationRecoveryApplied: true,
+		keyInfo:                     &auth.APIKeyInfo{},
+		account:                     &ent.Account{},
+	}
+
+	req := buildPluginRequest(c, state)
+	if string(req.Body) != string(originalBody) {
+		t.Fatalf("body = %s, want unchanged %s", req.Body, originalBody)
+	}
+	if got := req.Headers.Get("OpenAI-Previous-Response-ID"); got != "" {
+		t.Fatalf("previous response header = %q, want empty", got)
+	}
+	if got := req.Headers.Get("X-Airgate-Continuation-Recovery"); got != "drop_previous_response_id" {
+		t.Fatalf("recovery header = %q, want drop_previous_response_id", got)
 	}
 }
 

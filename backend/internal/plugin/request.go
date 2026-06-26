@@ -649,6 +649,7 @@ func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest
 	headers := buildHeaders(c.Request.Header, state.keyInfo)
 	if state.continuationRecoveryApplied {
 		removePreviousResponseIDHeaders(headers)
+		headers.Set("X-Airgate-Continuation-Recovery", "drop_previous_response_id")
 	}
 	// 路径和方法显式塞进 header：sdk.ForwardRequest 里没有这两字段，
 	// 插件侧 extractForwardedPath 会优先读取这对 header。

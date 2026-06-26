@@ -219,7 +219,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					}
 					if recovered {
 						logger.Warn("continuation_recovery_retry",
-							"action", "drop_previous_response_id_full_context",
+							"action", "delegate_previous_response_recovery",
 						)
 						continue
 					}

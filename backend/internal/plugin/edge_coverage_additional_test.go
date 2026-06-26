@@ -18,7 +18,6 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
-	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
@@ -48,88 +47,6 @@ func TestContinuationRecoveryAdditionalEdges(t *testing.T) {
 	recovered, err := recoverContinuationAffinityMissing(state)
 	if err != nil || !recovered || state.reasoningEffort != "xhigh" {
 		t.Fatalf("reasoning recover = recovered %v effort %q err %v", recovered, state.reasoningEffort, err)
-	}
-
-	if got := continuationRecoveryMaxBytes(&Manager{modelCache: map[string][]sdk.ModelInfo{
-		"openai": {{ID: "tiny", ContextWindow: 10}},
-	}}, &forwardState{requestedPlatform: "openai"}, parsedRequest{Model: "tiny"}); got != continuationRecoveryMinBodyBytes {
-		t.Fatalf("tiny model max bytes = %d, want min %d", got, continuationRecoveryMinBodyBytes)
-	}
-	if got := continuationRecoveryMaxBytes(&Manager{modelCache: map[string][]sdk.ModelInfo{
-		"openai": {{ID: "huge", ContextWindow: 1 << 30}},
-	}}, &forwardState{requestedPlatform: "openai"}, parsedRequest{Model: "huge"}); got != continuationRecoveryMaxBodyBytes {
-		t.Fatalf("huge model max bytes = %d, want cap %d", got, continuationRecoveryMaxBodyBytes)
-	}
-	if got := continuationRecoveryMaxBytes(nil, nil, parsedRequest{HasCompactionReplay: true}); got != continuationRecoveryMaxBodyBytes {
-		t.Fatalf("compaction max bytes = %d, want %d", got, continuationRecoveryMaxBodyBytes)
-	}
-	if got := continuationRecoveryPlatforms(nil); got != nil {
-		t.Fatalf("nil platforms = %#v, want nil", got)
-	}
-	platforms := continuationRecoveryPlatforms(&forwardState{
-		requestedPlatform: " openai ",
-		selectedRoute:     routing.Candidate{Platform: "openai"},
-		plugin:            &PluginInstance{Platform: "anthropic"},
-	})
-	if len(platforms) != 2 || platforms[0] != "openai" || platforms[1] != "anthropic" {
-		t.Fatalf("platforms = %#v", platforms)
-	}
-	if got := continuationRecoveryModelCandidates(nil, parsedRequest{}); got != nil {
-		t.Fatalf("nil model candidates = %#v, want nil", got)
-	}
-	if got := findContinuationModelContextWindow(nil, []string{"gpt"}); got != 0 {
-		t.Fatalf("empty model window = %d, want 0", got)
-	}
-	if got := findContinuationModelContextWindow([]sdk.ModelInfo{{ID: "gpt", ContextWindow: 0}}, []string{"missing"}); got != 0 {
-		t.Fatalf("missing model window = %d, want 0", got)
-	}
-}
-
-func TestContinuationRecoveryTrimAndSanitizeEdges(t *testing.T) {
-	t.Parallel()
-
-	if trimEncryptedReasoningItems(nil) {
-		t.Fatal("nil request data should not change")
-	}
-	noInput := map[string]any{"model": "gpt"}
-	if trimEncryptedReasoningItems(noInput) {
-		t.Fatal("request without input should not change")
-	}
-	textInput := map[string]any{"input": "plain"}
-	if trimEncryptedReasoningItems(textInput) {
-		t.Fatal("plain input should not change")
-	}
-	noChange := map[string]any{"input": map[string]any{"type": "message", "content": "hi"}}
-	if trimEncryptedReasoningItems(noChange) {
-		t.Fatal("non-reasoning object should not change")
-	}
-	kept := map[string]any{"input": map[string]any{"type": "reasoning", "id": "rs_1", "encrypted_content": "sealed"}}
-	if !trimEncryptedReasoningItems(kept) {
-		t.Fatal("reasoning object with id should change")
-	}
-	if input := kept["input"].(map[string]any); input["encrypted_content"] != nil || input["id"] != "rs_1" {
-		t.Fatalf("kept input = %#v", input)
-	}
-	dropped := map[string]any{"input": map[string]any{"type": "reasoning", "encrypted_content": "sealed"}}
-	if !trimEncryptedReasoningItems(dropped) {
-		t.Fatal("reasoning-only object should change")
-	}
-	if _, ok := dropped["input"]; ok {
-		t.Fatalf("reasoning-only input should be removed: %#v", dropped)
-	}
-	listDropped := map[string]any{"input": []any{map[string]any{"type": "reasoning", "encrypted_content": "sealed"}}}
-	if !trimEncryptedReasoningItems(listDropped) {
-		t.Fatal("reasoning-only list should change")
-	}
-	if _, ok := listDropped["input"]; ok {
-		t.Fatalf("reasoning-only list should remove input: %#v", listDropped)
-	}
-
-	if next, changed, keep := sanitizeEncryptedReasoningInputItem("text"); next != "text" || changed || !keep {
-		t.Fatalf("string sanitize = %#v/%v/%v", next, changed, keep)
-	}
-	if _, changed, keep := sanitizeEncryptedReasoningInputItem(map[string]any{"type": "reasoning"}); changed || !keep {
-		t.Fatalf("reasoning without encrypted content = changed %v keep %v", changed, keep)
 	}
 }
 
