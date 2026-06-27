@@ -5,7 +5,7 @@ import { Card, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import { Activity, Columns3, DollarSign, Sigma } from 'lucide-react';
+import { Activity, ChevronDown, ChevronUp, Columns3, DollarSign, Sigma } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
@@ -21,6 +21,7 @@ import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMenu';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
+import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
@@ -148,6 +149,7 @@ const groupByHeaderKeys: Record<string, string> = {
 
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageAutoRefresh;
+const ADMIN_USAGE_CARDS_COLLAPSED_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageCardsCollapsed;
 const ADMIN_USAGE_COLUMN_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageColumns;
 const ADMIN_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageFilters;
 const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
@@ -541,6 +543,7 @@ export default function UsagePage() {
     readAdminUsageColumnKeys,
   );
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS);
+  const [usageCardsCollapsed, setUsageCardsCollapsed] = usePersistentBoolean(ADMIN_USAGE_CARDS_COLLAPSED_STORAGE_KEY, false);
   const { platforms, platformName } = usePlatforms();
   const autoRefreshEnabled = autoRefresh > 0;
   const autoRefreshLabel = `${t('usage.auto_update')} `;
@@ -925,33 +928,37 @@ export default function UsagePage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <DistributionCard
-              title={t('usage.model_distribution')}
-              firstColumnTitle={t('usage.model')}
-              firstColumnWidth="30%"
-              data={modelDistribution}
-            />
-            <DistributionCard
-              title={t('usage.group_distribution')}
-              firstColumnTitle={t('groups.group')}
-              firstColumnWidth="26%"
-              data={groupDistribution}
-            />
-          </div>
+          {!usageCardsCollapsed ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <DistributionCard
+                  title={t('usage.model_distribution')}
+                  firstColumnTitle={t('usage.model')}
+                  firstColumnWidth="30%"
+                  data={modelDistribution}
+                />
+                <DistributionCard
+                  title={t('usage.group_distribution')}
+                  firstColumnTitle={t('groups.group')}
+                  firstColumnWidth="26%"
+                  data={groupDistribution}
+                />
+              </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <TokenTrendCard
-              data={trendData ?? []}
-              granularity={granularity}
-              onGranularityChange={setGranularity}
-            />
-            <GroupStatsCard
-              activeKey={statsGroupBy}
-              rows={groupStatsRows}
-              onActiveKeyChange={setStatsGroupBy}
-            />
-          </div>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <TokenTrendCard
+                  data={trendData ?? []}
+                  granularity={granularity}
+                  onGranularityChange={setGranularity}
+                />
+                <GroupStatsCard
+                  activeKey={statsGroupBy}
+                  rows={groupStatsRows}
+                  onActiveKeyChange={setStatsGroupBy}
+                />
+              </div>
+            </>
+          ) : null}
         </div>
       )}
 
@@ -1053,6 +1060,18 @@ export default function UsagePage() {
             isAutoRefreshing={isUsageTableRefreshing}
             isRefreshing={isRefreshing}
           />
+          <button
+            type="button"
+            aria-label={usageCardsCollapsed ? t('usage.show_analysis_cards') : t('usage.hide_analysis_cards')}
+            aria-pressed={usageCardsCollapsed}
+            className="ag-page-toolbar-button ag-usage-cards-toggle-button ag-toolbar-menu-trigger button button--sm button--secondary inline-flex items-center justify-center gap-2 whitespace-nowrap px-3"
+            onClick={() => setUsageCardsCollapsed((value) => !value)}
+          >
+            {usageCardsCollapsed ? <ChevronDown className="ag-toolbar-menu-caret" aria-hidden="true" /> : <ChevronUp className="ag-toolbar-menu-caret" aria-hidden="true" />}
+            <span className="ag-toolbar-menu-trigger-label">
+              {usageCardsCollapsed ? t('usage.show_analysis_cards') : t('usage.hide_analysis_cards')}
+            </span>
+          </button>
           <ColumnVisibilityMenu
             label={t('usage.column_visibility', '列显示')}
             options={columnOptions}

@@ -30,6 +30,7 @@ export const STORAGE_KEYS = {
     adminMonitorAutoRefresh: 'ag:web:admin:monitor:auto_refresh',
     adminMonitorFilters: 'ag:web:admin:monitor:filters',
     adminUsageAutoRefresh: 'ag:web:admin:usage:auto_refresh',
+    adminUsageCardsCollapsed: 'ag:web:admin:usage:cards_collapsed',
     adminUsageColumns: 'ag:web:admin:usage:columns',
     adminUsageFilters: 'ag:web:admin:usage:filters',
     tableStatePrefix: 'ag:web:table:',

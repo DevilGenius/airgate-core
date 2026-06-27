@@ -835,6 +835,8 @@
     "cache_cumulative_ratio": "Cumulative Cache Ratio",
     "auto_update": "Update",
     "auto_update_off": "Off",
+    "hide_analysis_cards": "Hide Cards",
+    "show_analysis_cards": "Show Cards",
     "granularity_hour": "Hourly",
     "granularity_day": "Daily"
   },

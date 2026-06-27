@@ -840,6 +840,8 @@
     "cache_cumulative_ratio": "缓存累计比例",
     "auto_update": "自动更新",
     "auto_update_off": "关闭",
+    "hide_analysis_cards": "隐藏卡片",
+    "show_analysis_cards": "显示卡片",
     "granularity_hour": "按小时",
     "granularity_day": "按天"
   },

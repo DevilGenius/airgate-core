@@ -46,6 +46,12 @@
   line-height: var(--ag-usage-toolbar-line-height);
 }
 
+.ag-usage-page .ag-usage-cards-toggle-button {
+  font: inherit;
+  font-size: var(--ag-usage-toolbar-font-size);
+  line-height: var(--ag-usage-toolbar-line-height);
+}
+
 .ag-usage-page .ag-column-visibility-menu {
   max-width: 100%;
 }
