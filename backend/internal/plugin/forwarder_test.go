@@ -653,6 +653,16 @@ func TestParseBody_ReasoningEffort(t *testing.T) {
 			want: "max",
 		},
 		{
+			name: "anthropic output maximum effort",
+			body: `{"model":"claude-opus-4-6","output_config":{"effort":"maximum"}}`,
+			want: "max",
+		},
+		{
+			name: "anthropic output ultra effort",
+			body: `{"model":"claude-opus-4-6","output_config":{"effort":"ultra"}}`,
+			want: "ultra",
+		},
+		{
 			name: "anthropic default",
 			body: `{"model":"claude-opus-4-6","thinking":{"type":"enabled","budget_tokens":32768}}`,
 			want: "high",

@@ -547,8 +547,10 @@ func normalizeReasoningEffort(effort string) string {
 		return "high"
 	case "xhigh", "extrahigh":
 		return "xhigh"
-	case "max":
+	case "max", "maximum":
 		return "max"
+	case "ultra":
+		return "ultra"
 	default:
 		return ""
 	}
