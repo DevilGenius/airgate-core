@@ -2,18 +2,20 @@ import { startTransition, useCallback, useEffect, useMemo, useState } from 'reac
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@heroui/react';
-import { RefreshCw, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { accountsApi } from '../../shared/api/accounts';
 import { groupsApi } from '../../shared/api/groups';
 import { monitorApi } from '../../shared/api/monitor';
 import { subscribeAdminEvents } from '../../shared/api/adminEvents';
 import { queryKeys } from '../../shared/queryKeys';
 import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
+import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { RecordsTable } from '../../shared/components/RecordsTable';
 import { RemoteSearchFilterComboBox } from '../../shared/components/RemoteSearchFilterComboBox';
 import { TablePage } from '../../shared/components/TablePage';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { PAGE_SIZE_OPTIONS } from '../../shared/constants';
+import { usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
@@ -21,7 +23,7 @@ import { useToast } from '../../shared/ui';
 import { DEFAULT_PAGE_SIZE, MONITOR_TIME_RANGE_PRESETS } from './monitor/constants';
 import { MonitorCustomTimeRangeModal } from './monitor/MonitorCustomTimeRangeModal';
 import { MonitorFilterSelect as FilterSelect } from './monitor/MonitorFilterSelect';
-import { MonitorStats } from './monitor/MonitorStats';
+import { MonitorRuntimeStats } from './monitor/MonitorRuntimeStats';
 import { totalForCursorPage } from './monitor/pagination';
 import { monitorRangeLabel, presetTimeRange } from './monitor/timeRange';
 import { useMonitorColumns, useMonitorRequestColumns } from './monitor/useMonitorColumns';
@@ -41,10 +43,12 @@ import type {
   SelectOption,
 } from './monitor/types';
 
-const MONITOR_TOOLBAR_CONTROL_CLASS = 'w-full sm:w-56';
+const MONITOR_TOOLBAR_CONTROL_CLASS = 'ag-monitor-toolbar-control';
 const MONITOR_EVENTS_PAGE_SIZE_SCOPE = 'admin.monitor.events';
 const MONITOR_REQUESTS_PAGE_SIZE_SCOPE = 'admin.monitor.requests';
 const MONITOR_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminMonitorFilters;
+const MONITOR_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminMonitorAutoRefresh;
+const MONITOR_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30, 60] as const;
 const MONITOR_REQUEST_TYPE_IDS = [
   'api_request_error',
   'plugin_route_error',
@@ -216,6 +220,10 @@ export default function MonitorPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(MONITOR_AUTO_REFRESH_STORAGE_KEY, 15, MONITOR_AUTO_REFRESH_OPTIONS);
+  const autoRefreshEnabled = autoRefresh > 0;
+  const autoRefreshLabel = `${t('monitor.auto_update')} `;
+  const autoRefreshOffLabel = t('monitor.auto_update_off');
   const [initialMonitorState] = useState(readInitialMonitorState);
   const [activeTable, setActiveTableState] = useState<MonitorTableKey>(initialMonitorState.activeTable);
   const {
@@ -256,6 +264,16 @@ export default function MonitorPage() {
     cursor_id: requestCursor?.id,
     limit: requestPageSize,
   }), [requestCursor?.created_at, requestCursor?.id, requestFilters, requestPageSize]);
+
+  const runtimeQuery = useQuery({
+    queryKey: queryKeys.monitorRuntime(),
+    queryFn: ({ signal }) => monitorApi.runtime({ signal }),
+    meta: { globalLoading: false },
+    refetchOnReconnect: autoRefreshEnabled,
+    refetchOnWindowFocus: autoRefreshEnabled,
+    placeholderData: keepPreviousData,
+  });
+  const refetchRuntime = runtimeQuery.refetch;
 
   const summaryQuery = useQuery({
     queryKey: queryKeys.monitorSummary(),
@@ -521,11 +539,16 @@ export default function MonitorPage() {
   }, [setRequestPageSizeState, setRequestPageState]);
 
   const handleManualRefresh = useCallback(() => {
+    void refetchRuntime({ cancelRefetch: false });
     void refetch({ cancelRefetch: false });
     void refetchSummary({ cancelRefetch: false });
     void refetchRequests({ cancelRefetch: false });
     void refetchRequestSummary({ cancelRefetch: false });
-  }, [refetch, refetchRequests, refetchRequestSummary, refetchSummary]);
+  }, [refetch, refetchRequestSummary, refetchRequests, refetchRuntime, refetchSummary]);
+
+  const handleRuntimeAutoRefresh = useCallback(() => {
+    void refetchRuntime({ cancelRefetch: false });
+  }, [refetchRuntime]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -654,7 +677,7 @@ export default function MonitorPage() {
 
   return (
     <div>
-      <MonitorStats showActiveCounts={!isRequestTable} summary={activeSummary} />
+      <MonitorRuntimeStats showActiveCounts={!isRequestTable} snapshot={runtimeQuery.data} summary={activeSummary} />
       <TablePage
         className="ag-monitor-page ag-toolbar-standard-page"
         footer={(
@@ -799,24 +822,21 @@ export default function MonitorPage() {
             </div>
           </div>
           <div className="ag-page-toolbar-actions">
-            <Button
-              isIconOnly
-              aria-label={t('common.refresh', 'Refresh')}
-              className="ag-auto-refresh-refresh--toolbar h-8 w-8 min-w-8"
-              isDisabled={activeRefreshBusy}
-              size="sm"
-              variant="ghost"
-              onPress={() => {
-                if (isRequestTable) {
-                  void refetchRequests({ cancelRefetch: false });
-                  void refetchRequestSummary({ cancelRefetch: false });
-                  return;
-                }
-                handleManualRefresh();
-              }}
-            >
-              <RefreshCw className={`h-4 w-4 ${activeRefreshBusy ? 'animate-spin' : ''}`} />
-            </Button>
+            <AutoRefreshControl
+              value={autoRefresh}
+              options={MONITOR_AUTO_REFRESH_OPTIONS}
+              label={autoRefreshLabel}
+              offLabel={autoRefreshOffLabel}
+              refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
+              triggerClassName="ag-auto-refresh-trigger--toolbar-fixed"
+              ariaLabel={t('monitor.auto_update')}
+              refreshAriaLabel={t('common.refresh', 'Refresh')}
+              onChange={setAutoRefresh}
+              onAutoRefresh={handleRuntimeAutoRefresh}
+              onRefresh={handleManualRefresh}
+              isAutoRefreshing={runtimeQuery.isFetching}
+              isRefreshing={activeRefreshBusy || runtimeQuery.isFetching}
+            />
             {isRequestTable ? (
               <Button
                 isIconOnly

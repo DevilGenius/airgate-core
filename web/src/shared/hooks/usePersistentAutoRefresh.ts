@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export const ADMIN_AUTO_REFRESH_OPTIONS = [0, 1, 3, 5, 15, 30] as const;
-export const USER_AUTO_REFRESH_OPTIONS = [0, 5, 10, 15, 30] as const;
+export const USER_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30, 60] as const;
 
 export type AutoRefreshOptions = readonly number[];
 type AutoRefreshValueInput = string | number | boolean | null | undefined | ((previous: number) => unknown);

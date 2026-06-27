@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	stdsql "database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -48,6 +49,7 @@ type Server struct {
 	calculator  *billing.Calculator
 	recorder    *billing.Recorder
 	monitor     *appmonitor.Service
+	runtime     *appmonitor.RuntimeSampler
 	events      *adminevents.Hub
 	handlers    *bootstrap.HTTPHandlers
 
@@ -55,7 +57,7 @@ type Server struct {
 }
 
 // NewServer 创建 HTTP 服务器
-func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
+func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt ...*stdsql.DB) *Server {
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -69,6 +71,10 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	concurrency.SetCapacityEventPublisher(eventHub)
 	calculator := billing.NewCalculator()
 	recorder := billing.NewRecorder(db, 0, rdb)
+	var sqlDB *stdsql.DB
+	if len(sqlDBOpt) > 0 {
+		sqlDB = sqlDBOpt[0]
+	}
 	monitorStore := store.NewMonitorStore(db)
 	monitorSettingsStore := store.NewSettingsStore(db)
 	monitorSettingsService := appsettings.NewService(monitorSettingsStore)
@@ -79,6 +85,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		appmonitor.WithNotifier(monitorNotificationService),
 		appmonitor.WithEventPublisher(eventHub),
 	)
+	runtimeSampler := appmonitor.NewRuntimeSampler(sqlDB, rdb, sched, concurrency, recorder, monitorService)
 	sched.SetMonitorRecorder(monitorService)
 	if err := routegraph.RefreshSync(context.Background(), db); err != nil {
 		slog.Warn("routegraph_init_failed", "error", err)
@@ -124,6 +131,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		calculator:     calculator,
 		recorder:       recorder,
 		monitor:        monitorService,
+		runtime:        runtimeSampler,
 		events:         eventHub,
 	}
 
@@ -137,6 +145,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Concurrency: concurrency,
 		Scheduler:   sched,
 		Monitor:     monitorService,
+		Runtime:     runtimeSampler,
 		Events:      eventHub,
 		Recorder:    recorder,
 	})
@@ -195,6 +204,9 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	safego.Go("asset_cleanup_loop", func() { plugin.StartAssetCleanupLoop(pluginCtx, s.db) })
 	safego.Go("monitor_aggregator_loop", func() { appmonitor.StartAggregatorLoop(pluginCtx, s.monitor) })
 	safego.Go("monitor_worker_loop", func() { appmonitor.StartWorkerLoop(pluginCtx, s.monitor) })
+	if s.runtime != nil {
+		safego.Go("monitor_runtime_sampler", func() { s.runtime.Start(pluginCtx) })
+	}
 
 	s.pluginMgr.SetLoading(true)
 	safego.Go("plugin_loader", func() {

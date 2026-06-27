@@ -48,6 +48,7 @@ type HTTPDependencies struct {
 	Concurrency *scheduler.ConcurrencyManager
 	Scheduler   *scheduler.Scheduler
 	Monitor     *appmonitor.Service
+	Runtime     *appmonitor.RuntimeSampler
 	Events      *adminevents.Hub
 	Recorder    *billing.Recorder
 }
@@ -132,7 +133,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Plugin:         handler.NewPluginHandler(pluginAdminService),
 		Version:        handler.NewVersionHandler(),
 		Upgrade:        handler.NewUpgradeHandler(upgradeService),
-		Monitor:        handler.NewMonitorHandler(monitorService),
+		Monitor:        handler.NewMonitorHandler(monitorService, dep.Runtime),
 		Event:          handler.NewEventHandler(dep.Events),
 		AccountService: accountService,
 	}

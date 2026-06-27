@@ -239,7 +239,7 @@ func startMainServer(cfg *config.Config) {
 	slog.Info("bootstrap_completed", "duration_ms", time.Since(bootStart).Milliseconds())
 
 	// 创建并启动 HTTP 服务器
-	srv := server.NewServer(cfg, db, rdb)
+	srv := server.NewServer(cfg, db, rdb, drv.DB())
 
 	// 启动插件系统（非阻塞，失败不影响核心服务）
 	srv.StartPlugins(context.Background())

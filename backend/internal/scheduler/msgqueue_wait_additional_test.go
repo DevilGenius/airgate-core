@@ -32,14 +32,15 @@ func TestMessageQueueDefaultTTLAndWaiterReleaseBranches(t *testing.T) {
 	rdb, mock = redismock.NewClientMock()
 	queue = NewMessageQueue(rdb, NewRPMCounter(nil))
 	waiterKey := waitersCounterKey(7)
+	waiterIndexKey := waitersIndexKey()
 	waiterTTL := time.Second + time.Second + 60*time.Second
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
 
 	mock.ExpectEvalSha(acquireLockScript.Hash(), []string{lockKey}, "cancel", int64(1000)).SetVal(int64(0))
-	mock.ExpectEvalSha(registerWaiterScript.Hash(), []string{waiterKey}, 2, waiterTTL.Milliseconds()).SetVal(int64(1))
+	mock.ExpectEvalSha(registerWaiterScript.Hash(), []string{waiterKey, waiterIndexKey}, 2, waiterTTL.Milliseconds(), 7).SetVal([]interface{}{int64(1), int64(1)})
 	mock.ExpectTTL(lockKey).SetVal(time.Second)
-	mock.ExpectEvalSha(releaseWaiterScript.Hash(), []string{waiterKey}, waiterTTL.Milliseconds()).SetVal(int64(1))
+	mock.ExpectEvalSha(releaseWaiterScript.Hash(), []string{waiterKey, waiterIndexKey}, waiterTTL.Milliseconds(), 7).SetVal(int64(1))
 	if ok, err := queue.WaitAcquire(cancelled, 7, "cancel", time.Second, time.Second, 2); ok || !errors.Is(err, context.Canceled) {
 		t.Fatalf("WaitAcquire cancelled = %v, %v", ok, err)
 	}
@@ -55,13 +56,14 @@ func TestMessageQueueWaitAcquireRetriesAfterShortTTL(t *testing.T) {
 	queue := NewMessageQueue(rdb, NewRPMCounter(nil))
 	lockKey := msgQueueLockKey(9)
 	waiterKey := waitersCounterKey(9)
+	waiterIndexKey := waitersIndexKey()
 	waiterTTL := time.Second + time.Second + 60*time.Second
 
 	mock.ExpectEvalSha(acquireLockScript.Hash(), []string{lockKey}, "retry", int64(1000)).SetVal(int64(0))
-	mock.ExpectEvalSha(registerWaiterScript.Hash(), []string{waiterKey}, 3, waiterTTL.Milliseconds()).SetVal(int64(1))
+	mock.ExpectEvalSha(registerWaiterScript.Hash(), []string{waiterKey, waiterIndexKey}, 3, waiterTTL.Milliseconds(), 9).SetVal([]interface{}{int64(1), int64(1)})
 	mock.ExpectTTL(lockKey).SetVal(time.Nanosecond)
 	mock.ExpectEvalSha(acquireLockScript.Hash(), []string{lockKey}, "retry", int64(1000)).SetVal(int64(1))
-	mock.ExpectEvalSha(releaseWaiterScript.Hash(), []string{waiterKey}, waiterTTL.Milliseconds()).SetVal(int64(1))
+	mock.ExpectEvalSha(releaseWaiterScript.Hash(), []string{waiterKey, waiterIndexKey}, waiterTTL.Milliseconds(), 9).SetVal(int64(1))
 
 	if ok, err := queue.WaitAcquire(ctx, 9, "retry", time.Second, time.Second, 3); err != nil || !ok {
 		t.Fatalf("WaitAcquire retry = %v, %v", ok, err)

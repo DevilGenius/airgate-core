@@ -349,6 +349,15 @@
   margin-left: auto;
 }
 
+.ag-monitor-toolbar-control {
+  width: 100%;
+  min-width: 0;
+}
+
+.ag-monitor-page .ag-page-toolbar-filter-row {
+  gap: 0.75rem;
+}
+
 @media (min-width: 640px) {
   .ag-page-toolbar-filter-row {
     flex-flow: row wrap;
@@ -357,6 +366,11 @@
 
   .ag-page-toolbar-filter-row > * {
     flex-shrink: 0;
+  }
+
+  .ag-monitor-toolbar-control {
+    flex-basis: 10rem;
+    width: 10rem;
   }
 }
 
@@ -374,6 +388,26 @@
     margin-left: auto;
     flex-wrap: nowrap;
     justify-content: flex-end;
+  }
+
+  .ag-monitor-page {
+    container-type: inline-size;
+  }
+
+  .ag-monitor-toolbar-control {
+    flex-basis: calc(12.5cqw - 0.65625rem);
+    width: calc(12.5cqw - 0.65625rem);
+  }
+}
+
+@media (min-width: 1536px) {
+  .ag-monitor-page .ag-page-toolbar-filter-row {
+    gap: 1rem;
+  }
+
+  .ag-monitor-toolbar-control {
+    flex-basis: calc(12.5cqw - 0.875rem);
+    width: calc(12.5cqw - 0.875rem);
   }
 }
 

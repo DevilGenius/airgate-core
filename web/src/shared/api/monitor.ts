@@ -5,6 +5,7 @@ import type {
   MonitorRequestClearResp,
   MonitorRequestListQuery,
   MonitorRequestListResp,
+  MonitorRuntimeResp,
   MonitorSummaryResp,
 } from '../types';
 
@@ -13,6 +14,8 @@ type MonitorRequestOptions = {
 };
 
 export const monitorApi = {
+  runtime: (options?: MonitorRequestOptions) =>
+    get<MonitorRuntimeResp>('/api/v1/admin/monitor/runtime', undefined, options),
   summary: (options?: MonitorRequestOptions) =>
     get<MonitorSummaryResp>('/api/v1/admin/monitor/summary', undefined, options),
   requestSummary: (options?: MonitorRequestOptions) =>

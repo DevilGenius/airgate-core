@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -144,6 +145,7 @@ var backfillConcurrencyCountsScript = redis.NewScript(`
 type ConcurrencyManager struct {
 	rdb               *redis.Client
 	capacityPublisher CapacityEventPublisher
+	rejectTotal       atomic.Int64
 }
 
 // NewConcurrencyManager 创建并发管理器
@@ -232,9 +234,18 @@ func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKe
 	}
 
 	if result == 0 {
+		cm.rejectTotal.Add(1)
 		return current, false, ErrConcurrencyLimit
 	}
 	return current, true, nil
+}
+
+// RejectTotal returns the total number of concurrency-slot rejections.
+func (cm *ConcurrencyManager) RejectTotal() int64 {
+	if cm == nil {
+		return 0
+	}
+	return cm.rejectTotal.Load()
 }
 
 func (cm *ConcurrencyManager) releaseSlotByKey(ctx context.Context, key, countKey, indexKey, indexMember, requestID string) (int, bool) {

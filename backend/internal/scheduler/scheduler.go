@@ -279,6 +279,14 @@ func (s *Scheduler) AcquireMessageLock(ctx context.Context, accountID int, reque
 	return s.msgQueue.WaitAcquire(ctx, accountID, requestID, lockTTL, wait, maxWaiters)
 }
 
+// MessageQueueStats returns message-lock waiter counters for runtime monitoring.
+func (s *Scheduler) MessageQueueStats(ctx context.Context) MessageQueueStats {
+	if s == nil || s.msgQueue == nil {
+		return MessageQueueStats{}
+	}
+	return s.msgQueue.Stats(ctx)
+}
+
 // ReleaseMessageLock 释放消息锁。
 func (s *Scheduler) ReleaseMessageLock(ctx context.Context, accountID int, requestID string) {
 	if err := s.msgQueue.Release(ctx, accountID, requestID); err != nil {

@@ -202,6 +202,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/dashboard/trend", handlers.Dashboard.Trend)
 
 		// 系统监控（管理员）
+		adminGroup.GET("/monitor/runtime", handlers.Monitor.MonitorRuntime)
 		adminGroup.GET("/monitor/summary", handlers.Monitor.MonitorSummary)
 		adminGroup.GET("/monitor/requests/summary", handlers.Monitor.MonitorRequestSummary)
 		adminGroup.GET("/monitor/requests", handlers.Monitor.ListMonitorRequestEvents)

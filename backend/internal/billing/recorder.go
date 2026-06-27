@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"entgo.io/ent/dialect"
@@ -139,6 +140,16 @@ type Recorder struct {
 
 	apiKeyAlertMu      sync.RWMutex
 	apiKeyBalanceAlert APIKeyBalanceAlertFunc
+	deadLetterTotal    atomic.Int64
+}
+
+// RecorderStats exposes queue counters for runtime monitoring.
+type RecorderStats struct {
+	QueueLen        int   `json:"queue_len"`
+	QueueCap        int   `json:"queue_cap"`
+	RetryQueueLen   int   `json:"retry_queue_len"`
+	RetryQueueCap   int   `json:"retry_queue_cap"`
+	DeadLetterTotal int64 `json:"dead_letter_total"`
 }
 
 // NewRecorder 创建使用量记录器
@@ -249,6 +260,20 @@ func (r *Recorder) Stop() {
 		close(r.retryCh)
 		<-r.retryStopped
 	})
+}
+
+// Stats returns cheap in-memory queue counters for runtime monitoring.
+func (r *Recorder) Stats() RecorderStats {
+	if r == nil {
+		return RecorderStats{}
+	}
+	return RecorderStats{
+		QueueLen:        len(r.ch),
+		QueueCap:        cap(r.ch),
+		RetryQueueLen:   len(r.retryCh),
+		RetryQueueCap:   cap(r.retryCh),
+		DeadLetterTotal: r.deadLetterTotal.Load(),
+	}
 }
 
 // run 后台运行循环
@@ -649,6 +674,7 @@ func nextRetryBackoff(attempt int) time.Duration {
 }
 
 func (r *Recorder) deadLetter(batch []UsageRecord, reason string, err error) {
+	r.deadLetterTotal.Add(int64(len(batch)))
 	slog.Error("billing_batch_dead_letter",
 		"reason", reason,
 		"count", len(batch),

@@ -1005,6 +1005,82 @@ export interface MonitorRequestClearResp {
   deleted: number;
 }
 
+export interface MonitorRuntimeResp {
+  sampled_at: string;
+  window_seconds: number;
+  latency: MonitorRuntimeLatencyResp;
+  capacity: MonitorRuntimeCapacityResp;
+  dependencies: MonitorRuntimeDependenciesResp;
+  runtime: MonitorRuntimeProcessResp;
+}
+
+export interface MonitorRuntimeLatencyResp {
+  sample_count: number;
+  frt_avg_ms: number;
+  frt_p50_ms: number;
+  frt_p95_ms: number;
+  frt_p99_ms: number;
+  error_rate: number;
+  error_count: number;
+  stale: boolean;
+  last_error?: string;
+}
+
+export interface MonitorRuntimeCapacityResp {
+  account_in_use: number;
+  account_capacity: number;
+  working_accounts: number;
+  message_waiters: number;
+  max_account_waiters: number;
+  waiting_accounts: number;
+  concurrency_reject_delta: number;
+  queue_full_delta: number;
+}
+
+export interface MonitorRuntimeDependenciesResp {
+  postgres: MonitorRuntimePostgresResp;
+  redis: MonitorRuntimeRedisResp;
+}
+
+export interface MonitorRuntimePostgresResp {
+  healthy: boolean;
+  ping_ms: number;
+  open: number;
+  active: number;
+  idle: number;
+  max_open: number;
+  wait_count_delta: number;
+  wait_duration_ms_delta: number;
+  last_error?: string;
+}
+
+export interface MonitorRuntimeRedisResp {
+  healthy: boolean;
+  ping_ms: number;
+  total: number;
+  active: number;
+  idle: number;
+  timeout_delta: number;
+  last_error?: string;
+}
+
+export interface MonitorRuntimeProcessResp {
+  cpu_percent?: number;
+  heap_alloc_bytes: number;
+  sys_bytes: number;
+  goroutines: number;
+  billing_queue_len: number;
+  billing_queue_cap: number;
+  billing_retry_len: number;
+  billing_retry_cap: number;
+  billing_dead_letter_total: number;
+  monitor_queue_len: number;
+  monitor_queue_cap: number;
+  monitor_dropped_total: number;
+  monitor_queued_total: number;
+  monitor_flushed_total: number;
+}
+
 // ==================== Setup ====================
 
 export interface SetupStatusResp {

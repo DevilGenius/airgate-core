@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -25,8 +27,9 @@ const (
 // MessageQueue 用户消息串行队列
 // 通过分布式锁实现账户级请求串行化，配合 RPM 自适应延迟
 type MessageQueue struct {
-	rdb *redis.Client
-	rpm *RPMCounter
+	rdb               *redis.Client
+	rpm               *RPMCounter
+	waiterRejectTotal atomic.Int64
 }
 
 // NewMessageQueue 创建消息队列
@@ -84,39 +87,67 @@ func waitersCounterKey(accountID int) string {
 	return fmt.Sprintf("ag:queue:message:{%d}:waiters", accountID)
 }
 
+func waitersIndexKey() string {
+	return "ag:queue:message:waiters"
+}
+
 var registerWaiterScript = redis.NewScript(`
 	local key = KEYS[1]
+	local indexKey = KEYS[2]
 	local maxWaiters = tonumber(ARGV[1])
 	local ttlMs = tonumber(ARGV[2])
+	local accountID = ARGV[3]
 
 	local current = tonumber(redis.call('GET', key) or '0')
 	if current >= maxWaiters then
-		return 0
+		if indexKey and accountID and current > 0 then
+			redis.call('ZADD', indexKey, current, accountID)
+		end
+		return {0, current}
 	end
 
-	redis.call('INCR', key)
+	current = redis.call('INCR', key)
 	if ttlMs > 0 then
 		redis.call('PEXPIRE', key, ttlMs)
 	end
-	return 1
+	if indexKey and accountID then
+		redis.call('ZADD', indexKey, current, accountID)
+	end
+	return {1, current}
 `)
 
 var releaseWaiterScript = redis.NewScript(`
 	local key = KEYS[1]
+	local indexKey = KEYS[2]
 	local ttlMs = tonumber(ARGV[1])
+	local accountID = ARGV[2]
 
 	local current = tonumber(redis.call('GET', key) or '0')
 	if current <= 1 then
 		redis.call('DEL', key)
+		if indexKey and accountID then
+			redis.call('ZREM', indexKey, accountID)
+		end
 		return 1
 	end
 
-	redis.call('DECR', key)
+	current = redis.call('DECR', key)
 	if ttlMs > 0 then
 		redis.call('PEXPIRE', key, ttlMs)
 	end
+	if indexKey and accountID then
+		redis.call('ZADD', indexKey, current, accountID)
+	end
 	return 1
 `)
+
+// MessageQueueStats exposes message-lock waiter counters for runtime sampling.
+type MessageQueueStats struct {
+	WaitersTotal      int
+	MaxAccountWaiters int
+	WaitingAccounts   int
+	WaiterRejectTotal int64
+}
 
 // TryAcquire 尝试获取账户级消息锁
 // 返回是否获取成功。如果获取失败，调用方应等待重试或放弃
@@ -164,7 +195,7 @@ func (m *MessageQueue) WaitAcquire(ctx context.Context, accountID int, requestID
 	waiterRegistered := false
 	defer func() {
 		if waiterRegistered {
-			_, _ = releaseWaiterScript.Run(context.Background(), m.rdb, []string{waiterKey}, waiterTTL.Milliseconds()).Result()
+			_, _ = releaseWaiterScript.Run(context.Background(), m.rdb, []string{waiterKey, waitersIndexKey()}, waiterTTL.Milliseconds(), accountID).Result()
 		}
 	}()
 	for {
@@ -177,11 +208,16 @@ func (m *MessageQueue) WaitAcquire(ctx context.Context, accountID int, requestID
 		}
 
 		if !waiterRegistered {
-			registered, err := registerWaiterScript.Run(ctx, m.rdb, []string{waiterKey}, waiterLimit, waiterTTL.Milliseconds()).Int()
+			raw, err := registerWaiterScript.Run(ctx, m.rdb, []string{waiterKey, waitersIndexKey()}, waiterLimit, waiterTTL.Milliseconds(), accountID).Result()
 			if err != nil {
 				return true, nil // fail-open
 			}
+			registered, _, ok := parseSlotScriptResult(raw)
+			if !ok {
+				return true, nil // fail-open
+			}
 			if registered != 1 {
+				m.waiterRejectTotal.Add(1)
 				return false, nil
 			}
 			waiterRegistered = true
@@ -232,6 +268,77 @@ func (m *MessageQueue) WaitAcquire(ctx context.Context, accountID int, requestID
 			}
 		}
 	}
+}
+
+// Stats returns message-lock waiter counters without scanning Redis keyspace.
+func (m *MessageQueue) Stats(ctx context.Context) MessageQueueStats {
+	stats := MessageQueueStats{}
+	if m == nil {
+		return stats
+	}
+	stats.WaiterRejectTotal = m.waiterRejectTotal.Load()
+	if m.rdb == nil {
+		return stats
+	}
+
+	rows, err := m.rdb.ZRevRangeWithScores(ctx, waitersIndexKey(), 0, -1).Result()
+	if err != nil || len(rows) == 0 {
+		return stats
+	}
+
+	accountIDs := make([]int, 0, len(rows))
+	keys := make([]string, 0, len(rows))
+	staleMembers := make([]string, 0)
+	for _, row := range rows {
+		member := fmt.Sprint(row.Member)
+		accountID, err := strconv.Atoi(member)
+		if err != nil || accountID <= 0 {
+			staleMembers = append(staleMembers, member)
+			continue
+		}
+		accountIDs = append(accountIDs, accountID)
+		keys = append(keys, waitersCounterKey(accountID))
+	}
+	if len(keys) == 0 {
+		removeWaiterIndexMembers(ctx, m.rdb, staleMembers)
+		return stats
+	}
+
+	values, err := m.rdb.MGet(ctx, keys...).Result()
+	if err != nil {
+		return stats
+	}
+	for index, value := range values {
+		count, ok := redisIntValue(value)
+		if !ok || count <= 0 {
+			staleMembers = append(staleMembers, strconv.Itoa(accountIDs[index]))
+			continue
+		}
+		stats.WaitingAccounts++
+		stats.WaitersTotal += count
+		if count > stats.MaxAccountWaiters {
+			stats.MaxAccountWaiters = count
+		}
+	}
+	removeWaiterIndexMembers(ctx, m.rdb, staleMembers)
+	return stats
+}
+
+func removeWaiterIndexMembers(ctx context.Context, rdb *redis.Client, members []string) {
+	if rdb == nil || len(members) == 0 {
+		return
+	}
+	args := make([]interface{}, 0, len(members))
+	for _, member := range members {
+		if member == "" {
+			continue
+		}
+		args = append(args, member)
+	}
+	if len(args) == 0 {
+		return
+	}
+	_ = rdb.ZRem(ctx, waitersIndexKey(), args...).Err()
 }
 
 // ForceRelease 无条件删除账户的消息队列锁（用于管理员清理孤立锁）

@@ -30,6 +30,15 @@ func (h *MonitorHandler) MonitorRequestSummary(c *gin.Context) {
 	response.Success(c, toMonitorSummaryResp(result))
 }
 
+// MonitorRuntime returns the latest runtime observability snapshot.
+func (h *MonitorHandler) MonitorRuntime(c *gin.Context) {
+	if h.runtimeSampler == nil {
+		response.Success(c, appmonitor.RuntimeSnapshot{WindowSeconds: 300})
+		return
+	}
+	response.Success(c, h.runtimeSampler.Snapshot())
+}
+
 // ListMonitorEvents returns cursor-paged monitor events.
 func (h *MonitorHandler) ListMonitorEvents(c *gin.Context) {
 	var query dto.MonitorListQuery

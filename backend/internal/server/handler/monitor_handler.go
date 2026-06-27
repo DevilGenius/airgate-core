@@ -11,12 +11,17 @@ import (
 
 // MonitorHandler handles admin monitor event APIs.
 type MonitorHandler struct {
-	service *appmonitor.Service
+	service        *appmonitor.Service
+	runtimeSampler *appmonitor.RuntimeSampler
 }
 
 // NewMonitorHandler creates a MonitorHandler.
-func NewMonitorHandler(service *appmonitor.Service) *MonitorHandler {
-	return &MonitorHandler{service: service}
+func NewMonitorHandler(service *appmonitor.Service, runtimeSampler ...*appmonitor.RuntimeSampler) *MonitorHandler {
+	h := &MonitorHandler{service: service}
+	if len(runtimeSampler) > 0 {
+		h.runtimeSampler = runtimeSampler[0]
+	}
+	return h
 }
 
 func parseMonitorID(raw string) (int, error) {

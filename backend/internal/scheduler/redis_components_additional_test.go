@@ -251,7 +251,7 @@ func TestMessageQueueRedisPaths(t *testing.T) {
 	}
 
 	mock.ExpectEvalSha(acquireLockScript.Hash(), []string{lockKey}, "queued", int64(1000)).SetVal(int64(0))
-	mock.ExpectEvalSha(registerWaiterScript.Hash(), []string{waitersCounterKey(7)}, 1, int64(62000)).SetVal(int64(0))
+	mock.ExpectEvalSha(registerWaiterScript.Hash(), []string{waitersCounterKey(7), waitersIndexKey()}, 1, int64(62000), 7).SetVal([]interface{}{int64(0), int64(1)})
 	if ok, err := queue.WaitAcquire(ctx, 7, "queued", time.Second, time.Second, 1); err != nil || ok {
 		t.Fatalf("WaitAcquire full queue = %v, %v", ok, err)
 	}

@@ -290,6 +290,22 @@ func (s *Service) RequestSummary(ctx context.Context) (Summary, error) {
 	return s.repo.RequestSummary(ctx)
 }
 
+// RuntimeStats returns cheap in-memory counters for the runtime sampler.
+func (s *Service) RuntimeStats() RuntimeStats {
+	if s == nil {
+		return RuntimeStats{}
+	}
+	return RuntimeStats{
+		QueueLen:        len(s.queue),
+		QueueCap:        cap(s.queue),
+		QueuedTotal:     s.queuedEvents.Load(),
+		FlushedTotal:    s.flushedEvents.Load(),
+		DroppedTotal:    s.droppedEvents.Load(),
+		AggregatorPanic: s.aggregatorPanics.Load(),
+		WorkerPanic:     s.workerPanics.Load(),
+	}
+}
+
 // Resolve marks one monitor event resolved.
 func (s *Service) Resolve(ctx context.Context, id int) error {
 	if s == nil || s.repo == nil {

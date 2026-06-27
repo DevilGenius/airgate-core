@@ -199,6 +199,17 @@ type Summary struct {
 	Recent              []Event
 }
 
+// RuntimeStats exposes in-memory monitor queue counters for runtime sampling.
+type RuntimeStats struct {
+	QueueLen        int
+	QueueCap        int
+	QueuedTotal     int64
+	FlushedTotal    int64
+	DroppedTotal    int64
+	AggregatorPanic int64
+	WorkerPanic     int64
+}
+
 // Repository defines monitor event persistence.
 type Repository interface {
 	InsertBatch(context.Context, []QueuedEvent) error
