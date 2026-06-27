@@ -872,6 +872,19 @@ export default function AccountsPageContent() {
   ], [t]);
   const oauthPlanOptions = useMemo<AccountTypeFilterOption[]>(() => oauthPlanFilters
     .filter((item) => !platformFilter || item.platform === platformFilter)
+    .sort((a, b) => {
+      const platformRank = (platform: string) => {
+        const normalized = platform.toLowerCase();
+        if (normalized === 'openai') return 0;
+        if (normalized === 'claude') return 1;
+        return 2;
+      };
+      const rankCompare = platformRank(a.platform) - platformRank(b.platform);
+      if (rankCompare !== 0) return rankCompare;
+      const platformCompare = a.platformLabel.localeCompare(b.platformLabel, undefined, { sensitivity: 'base' });
+      if (platformCompare !== 0) return platformCompare;
+      return a.planLabel.localeCompare(b.planLabel, undefined, { sensitivity: 'base' });
+    })
     .map((item) => ({
       id: item.id,
       label: platformFilter ? `OAuth ${item.planLabel}` : `${item.platformLabel} OAuth ${item.planLabel}`,
