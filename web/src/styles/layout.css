@@ -647,6 +647,14 @@
   overflow: visible;
 }
 
+.ag-dashboard-toolbar :where(.ag-auto-refresh-trigger,
+  .ag-toolbar-menu-trigger-label,
+  .ag-toolbar-menu-item,
+  .ag-toolbar-menu-item-label) {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
 .ag-dashboard-metric {
   padding: 0;
 }

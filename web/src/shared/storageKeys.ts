@@ -23,6 +23,7 @@ export const STORAGE_KEYS = {
     publicSite: 'ag:web:settings:public_site',
   },
   ui: {
+    adminDashboardAutoRefresh: 'ag:web:admin:dashboard:auto_refresh',
     adminAccountsAutoRefresh: 'ag:web:admin:accounts:auto_refresh',
     adminAccountsCapacityRefresh: 'ag:web:admin:accounts:capacity_refresh',
     adminAccountsFilters: 'ag:web:admin:accounts:filters',

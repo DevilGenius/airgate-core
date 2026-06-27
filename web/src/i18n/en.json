@@ -225,6 +225,8 @@
     "range_30d": "30 Days",
     "range_90d": "90 Days",
     "range_custom": "Custom",
+    "auto_refresh": "Update",
+    "auto_refresh_off": "Off",
     "granularity": "Granularity",
     "granularity_hour": "Hourly",
     "granularity_day": "Daily",

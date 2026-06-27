@@ -1,14 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Card, Skeleton, Tabs } from '@heroui/react';
+import { Alert, Card, Skeleton, Tabs } from '@heroui/react';
 import {
   Activity,
   Astroid,
   CalendarDays,
   Clock,
   KeyRound,
-  RefreshCw,
   Sigma,
   ToggleRight,
   Users,
@@ -27,10 +26,13 @@ import { decorativePalette } from '@devilgenius/airgate-theme';
 import { dashboardApi } from '../shared/api/dashboard';
 import { queryKeys } from '../shared/queryKeys';
 import { DISTRIBUTION_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
+import { AutoRefreshControl } from '../shared/components/AutoRefreshControl';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
 import { CostPair, CostValue } from '../shared/components/CostValue';
 import { SimpleSelect } from '../shared/components/SimpleSelect';
 import { UserSearchFilterComboBox } from '../shared/components/UserSearchFilterComboBox';
+import { usePersistentAutoRefresh } from '../shared/hooks/usePersistentAutoRefresh';
+import { STORAGE_KEYS } from '../shared/storageKeys';
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../shared/ui/metricTones';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
@@ -43,6 +45,8 @@ const DASHBOARD_TOP_USERS_INITIAL_DIMENSION = { width: 1200, height: 268 };
 const DASHBOARD_TOKEN_Y_AXIS_WIDTH = 56;
 const DASHBOARD_RATIO_Y_AXIS_WIDTH = 36;
 const DASHBOARD_TIME_AXIS_HEIGHT = 40;
+const DASHBOARD_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminDashboardAutoRefresh;
+const DASHBOARD_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 
 type RangePreset = 'today' | '7d' | '30d' | '90d';
 type Granularity = 'hour' | 'day';
@@ -720,6 +724,7 @@ export default function DashboardPage() {
   const [granularity, setGranularity] = useState<Granularity>('day');
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>();
   const [selectedUserLabel, setSelectedUserLabel] = useState('');
+  const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(DASHBOARD_AUTO_REFRESH_STORAGE_KEY, 0, DASHBOARD_AUTO_REFRESH_OPTIONS);
   const granularityOptions = [
     { id: 'day', label: t('dashboard.granularity_day') },
     { id: 'hour', label: t('dashboard.granularity_hour') },
@@ -749,6 +754,7 @@ export default function DashboardPage() {
     statsQuery.refetch();
     trendQuery.refetch();
   };
+  const isDashboardRefreshing = statsQuery.isFetching || trendQuery.isFetching;
 
   return (
     <div className="space-y-5 2xl:space-y-6">
@@ -774,9 +780,21 @@ export default function DashboardPage() {
               ))}
             </Tabs.List>
           </Tabs>
-          <Button isIconOnly aria-label={t('common.refresh', 'Refresh')} size="sm" variant="ghost" onPress={refresh}>
-            <RefreshCw className={`h-4 w-4 ${statsQuery.isFetching || trendQuery.isFetching ? 'animate-spin' : ''}`} />
-          </Button>
+          <AutoRefreshControl
+            value={autoRefresh}
+            options={DASHBOARD_AUTO_REFRESH_OPTIONS}
+            label={t('dashboard.auto_refresh')}
+            offLabel={t('dashboard.auto_refresh_off')}
+            refreshButtonClassName="ag-auto-refresh-refresh--dashboard-compact"
+            triggerClassName="ag-auto-refresh-trigger--dashboard-compact"
+            ariaLabel={t('dashboard.auto_refresh')}
+            refreshAriaLabel={t('common.refresh', 'Refresh')}
+            onChange={setAutoRefresh}
+            onAutoRefresh={refresh}
+            onRefresh={refresh}
+            isRefreshing={isDashboardRefreshing}
+            isAutoRefreshing={isDashboardRefreshing}
+          />
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
