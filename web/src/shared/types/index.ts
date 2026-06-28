@@ -1009,6 +1009,7 @@ export interface MonitorRuntimeResp {
   sampled_at: string;
   window_seconds: number;
   latency: MonitorRuntimeLatencyResp;
+  latency_1h?: MonitorRuntimeLatencyResp;
   capacity: MonitorRuntimeCapacityResp;
   dependencies: MonitorRuntimeDependenciesResp;
   runtime: MonitorRuntimeProcessResp;

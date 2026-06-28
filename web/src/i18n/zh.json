@@ -743,7 +743,7 @@
     "empty_description": "调整筛选条件后重试",
     "auto_update": "自动更新",
     "auto_update_off": "关闭",
-    "runtime_latency": "延迟概览",
+    "runtime_latency": "延迟概览(5min/1h)",
     "runtime_capacity": "队列与容量",
     "runtime_dependencies": "Redis / Postgres",
     "runtime_process": "运行时与后台",

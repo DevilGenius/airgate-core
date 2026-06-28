@@ -738,7 +738,7 @@
     "empty_description": "Adjust filters and try again",
     "auto_update": "Update",
     "auto_update_off": "Off",
-    "runtime_latency": "Latency",
+    "runtime_latency": "Latency (5min/1h)",
     "runtime_capacity": "Queue & Capacity",
     "runtime_dependencies": "Redis / Postgres",
     "runtime_process": "Runtime & Backlog",

@@ -15,12 +15,13 @@ import (
 )
 
 const (
-	defaultRuntimeSampleInterval  = 5 * time.Second
-	defaultLatencySampleInterval  = 30 * time.Second
-	defaultRuntimeLatencyWindow   = 5 * time.Minute
-	defaultDependencyPingTimeout  = 300 * time.Millisecond
-	defaultRuntimeQueryTimeout    = time.Second
-	defaultRuntimeCapacityTimeout = 500 * time.Millisecond
+	defaultRuntimeSampleInterval    = 5 * time.Second
+	defaultLatencySampleInterval    = 30 * time.Second
+	defaultRuntimeLatencyWindow     = 5 * time.Minute
+	defaultRuntimeLatencyLongWindow = time.Hour
+	defaultDependencyPingTimeout    = 300 * time.Millisecond
+	defaultRuntimeQueryTimeout      = time.Second
+	defaultRuntimeCapacityTimeout   = 500 * time.Millisecond
 )
 
 // RuntimeSampler periodically collects low-cost operational signals and keeps
@@ -57,6 +58,7 @@ type RuntimeSnapshot struct {
 	SampledAt     time.Time              `json:"sampled_at"`
 	WindowSeconds int                    `json:"window_seconds"`
 	Latency       RuntimeLatencyStats    `json:"latency"`
+	Latency1H     RuntimeLatencyStats    `json:"latency_1h"`
 	Capacity      RuntimeCapacityStats   `json:"capacity"`
 	Dependencies  RuntimeDependencyStats `json:"dependencies"`
 	Runtime       RuntimeProcessStats    `json:"runtime"`
@@ -149,6 +151,9 @@ func NewRuntimeSampler(sqlDB *stdsql.DB, rdb *redis.Client, sched *scheduler.Sch
 		Latency: RuntimeLatencyStats{
 			Stale: true,
 		},
+		Latency1H: RuntimeLatencyStats{
+			Stale: true,
+		},
 	})
 	return s
 }
@@ -205,25 +210,33 @@ func (s *RuntimeSampler) sampleLatency(parent context.Context) {
 	snap.SampledAt = time.Now().UTC()
 	snap.WindowSeconds = int(s.latencyWindow / time.Second)
 
-	latency, err := s.queryLatency(parent)
+	latency, err := s.queryLatency(parent, s.latencyWindow)
 	if err != nil {
 		snap.Latency.Stale = true
 		snap.Latency.LastError = truncateRuntimeError(err.Error())
+	} else {
+		snap.Latency = latency
+	}
+
+	longLatency, err := s.queryLatency(parent, defaultRuntimeLatencyLongWindow)
+	if err != nil {
+		snap.Latency1H.Stale = true
+		snap.Latency1H.LastError = truncateRuntimeError(err.Error())
 		s.snapshot.Store(snap)
 		return
 	}
-	snap.Latency = latency
+	snap.Latency1H = longLatency
 	s.snapshot.Store(snap)
 }
 
-func (s *RuntimeSampler) queryLatency(parent context.Context) (RuntimeLatencyStats, error) {
+func (s *RuntimeSampler) queryLatency(parent context.Context, window time.Duration) (RuntimeLatencyStats, error) {
 	if s.sqlDB == nil {
 		return RuntimeLatencyStats{Stale: true, LastError: "postgres unavailable"}, nil
 	}
 	ctx, cancel := context.WithTimeout(parent, defaultRuntimeQueryTimeout)
 	defer cancel()
 
-	since := time.Now().Add(-s.latencyWindow)
+	since := time.Now().Add(-window)
 	var sampleCount int64
 	var frtAvg, frtP50, frtP95, frtP99 float64
 	if err := s.sqlDB.QueryRowContext(ctx, `
