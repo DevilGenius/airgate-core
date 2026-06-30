@@ -88,6 +88,7 @@ type TrendLog struct {
 	UserID              int
 	UserEmail           string
 	Model               string
+	Requests            int64
 	InputTokens         int64
 	OutputTokens        int64
 	CachedInputTokens   int64

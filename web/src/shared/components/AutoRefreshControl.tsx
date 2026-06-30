@@ -22,6 +22,7 @@ interface AutoRefreshControlProps {
   onRefresh: () => void | Promise<unknown>;
   isRefreshing?: boolean;
   isAutoRefreshing?: boolean;
+  isAutoRefreshDisabled?: boolean;
   isDisabled?: boolean;
 }
 
@@ -170,16 +171,18 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   onMenuOpenChange,
   onRefresh,
   isAutoRefreshing,
+  isAutoRefreshDisabled = false,
   isRefreshing = false,
   isDisabled = false,
 }: AutoRefreshControlProps) {
   const enabled = value > 0;
+  const autoRefreshEnabled = enabled && !isAutoRefreshDisabled;
   const [manualRefreshVersion, setManualRefreshVersion] = useState(0);
   const autoRefreshHandler = onAutoRefresh ?? onRefresh;
   const labelTitleRef = useRef<HTMLSpanElement | null>(null);
   const labelValueRef = useRef<HTMLSpanElement | null>(null);
   const currentLabelTitle = formatAutoRefreshTitle(label);
-  const currentLabelValue = enabled ? formatAutoRefreshValue(value, fastLabel) : offLabel;
+  const currentLabelValue = autoRefreshEnabled ? formatAutoRefreshValue(value, fastLabel) : offLabel;
   const updateDisplayLabel = useCallback((displaySeconds: number) => {
     const titleElement = labelTitleRef.current;
     const valueElement = labelValueRef.current;
@@ -187,9 +190,9 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
       titleElement.textContent = formatAutoRefreshTitle(label);
     }
     if (valueElement) {
-      valueElement.textContent = enabled ? formatAutoRefreshValue(displaySeconds, fastLabel) : offLabel;
+      valueElement.textContent = autoRefreshEnabled ? formatAutoRefreshValue(displaySeconds, fastLabel) : offLabel;
     }
-  }, [enabled, fastLabel, label, offLabel]);
+  }, [autoRefreshEnabled, fastLabel, label, offLabel]);
   const setLabelTitleElement = useCallback((element: HTMLSpanElement | null) => {
     labelTitleRef.current = element;
     if (element) {
@@ -213,7 +216,7 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   }, [currentLabelTitle, currentLabelValue]);
 
   useAutoRefreshTimer({
-    active: enabled && !isDisabled,
+    active: autoRefreshEnabled && !isDisabled,
     isRefreshing: isAutoRefreshing ?? isRefreshing,
     onDisplaySecondsChange: updateDisplayLabel,
     onRefresh: autoRefreshHandler,
@@ -223,10 +226,10 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   const optionLabel = (seconds: number) => (seconds === 0 ? offLabel : formatAutoRefreshOption(label, seconds, fastLabel));
   const handleRefresh = useCallback(() => {
     void onRefresh();
-    if (enabled) {
+    if (autoRefreshEnabled) {
       setManualRefreshVersion((version) => version + 1);
     }
-  }, [enabled, onRefresh]);
+  }, [autoRefreshEnabled, onRefresh]);
 
   return (
     <>
@@ -254,10 +257,10 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
         )}
         className={[
           'ag-auto-refresh-trigger button button--sm h-8 min-w-[7.5rem] whitespace-nowrap px-3',
-          enabled ? 'button--secondary' : 'button--ghost',
+          autoRefreshEnabled ? 'button--secondary' : 'button--ghost',
           triggerClassName,
         ].filter(Boolean).join(' ')}
-        disabled={isDisabled}
+        disabled={isDisabled || isAutoRefreshDisabled}
         onOpenChange={onMenuOpenChange}
       >
         {(close) => (

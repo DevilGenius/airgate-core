@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/ent"
@@ -107,6 +108,7 @@ type UsageRecord struct {
 	Endpoint              string
 	ReasoningEffort       string
 	UsageMetadata         map[string]string
+	OccurredAt            time.Time // 服务端记录到 usage 的时间，写入 usage_logs.created_at。
 }
 
 // APIKeyBalanceAlertInput 是 API Key 剩余额度提醒回调的输入。
@@ -188,6 +190,7 @@ func (r *Recorder) apiKeyBalanceAlertCallback() APIKeyBalanceAlertFunc {
 // Record 提交使用记录（非阻塞）
 func (r *Recorder) Record(record UsageRecord) {
 	record = ensureBillingEventID(record)
+	record = ensureUsageOccurredAt(record, time.Now())
 	select {
 	case r.ch <- record:
 	default:
@@ -211,6 +214,7 @@ func (r *Recorder) Record(record UsageRecord) {
 // 需要立即把 usage_id 关联到任务时使用；普通转发仍走异步 Record。
 func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, error) {
 	record = ensureBillingEventID(record)
+	record = ensureUsageOccurredAt(record, time.Now())
 	tx, err := r.db.Tx(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("开启事务失败: %w", err)
@@ -225,6 +229,9 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 	}
 	if len(inserted) > 0 {
 		insertedBatch := insertedUsageRecords(inserted)
+		if err := upsertUsageHourlyRollups(ctx, tx, inserted); err != nil {
+			return 0, fmt.Errorf("更新 UsageLog 聚合失败: %w", err)
+		}
 		if err := applyUsageCharges(ctx, tx, insertedBatch); err != nil {
 			return 0, err
 		}
@@ -420,6 +427,10 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 	}
 	insertedBatch := insertedUsageRecords(inserted)
 
+	if err := upsertUsageHourlyRollups(ctx, tx, inserted); err != nil {
+		return fmt.Errorf("更新 UsageLog 聚合失败: %w", err)
+	}
+
 	if err := applyUsageCharges(ctx, tx, insertedBatch); err != nil {
 		return err
 	}
@@ -434,8 +445,9 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 }
 
 type insertedUsageLog struct {
-	ID     int
-	Record UsageRecord
+	ID        int
+	Record    UsageRecord
+	CreatedAt time.Time
 }
 
 func (r *Recorder) insertUsageLogs(ctx context.Context, tx *ent.Tx, batch []UsageRecord) ([]insertedUsageLog, error) {
@@ -448,7 +460,7 @@ func (r *Recorder) insertUsageLogs(ctx context.Context, tx *ent.Tx, batch []Usag
 	}
 
 	now := time.Now()
-	recordsByEvent := make(map[string]UsageRecord, len(batch))
+	recordsByEvent := make(map[string]insertedUsageLog, len(batch))
 	insert := entsql.Dialect(dialectName).Insert(usagelog.Table).
 		Columns(usageLogInsertColumns()...).
 		OnConflict(
@@ -459,13 +471,14 @@ func (r *Recorder) insertUsageLogs(ctx context.Context, tx *ent.Tx, batch []Usag
 
 	for _, rec := range batch {
 		rec = ensureBillingEventID(rec)
+		createdAt := usageRecordCreatedAt(rec, now)
 		if err := validateUsageRecordForInsert(rec); err != nil {
 			return nil, err
 		}
 		if _, ok := recordsByEvent[rec.BillingEventID]; !ok {
-			recordsByEvent[rec.BillingEventID] = rec
+			recordsByEvent[rec.BillingEventID] = insertedUsageLog{Record: rec, CreatedAt: createdAt}
 		}
-		values, err := usageLogInsertValues(rec, now)
+		values, err := usageLogInsertValues(rec, createdAt)
 		if err != nil {
 			return nil, err
 		}
@@ -486,11 +499,11 @@ func (r *Recorder) insertUsageLogs(ctx context.Context, tx *ent.Tx, batch []Usag
 		if err := rows.Scan(&id, &eventID); err != nil {
 			return nil, err
 		}
-		rec, ok := recordsByEvent[eventID]
+		pending, ok := recordsByEvent[eventID]
 		if !ok {
 			return nil, fmt.Errorf("插入 UsageLog 返回未知 billing_event_id=%s", eventID)
 		}
-		inserted = append(inserted, insertedUsageLog{ID: id, Record: rec})
+		inserted = append(inserted, insertedUsageLog{ID: id, Record: pending.Record, CreatedAt: pending.CreatedAt})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -542,7 +555,7 @@ func usageLogInsertColumns() []string {
 	}
 }
 
-func usageLogInsertValues(rec UsageRecord, now time.Time) ([]any, error) {
+func usageLogInsertValues(rec UsageRecord, createdAt time.Time) ([]any, error) {
 	metadata, err := usageMetadataValue(rec.UsageMetadata)
 	if err != nil {
 		return nil, err
@@ -585,12 +598,26 @@ func usageLogInsertValues(rec UsageRecord, now time.Time) ([]any, error) {
 		metadata,
 		rec.UserID,
 		rec.UserEmail,
-		now,
+		createdAt,
 		rec.UserID,
 		nullablePositiveID(rec.APIKeyID),
 		rec.AccountID,
 		rec.GroupID,
 	}, nil
+}
+
+func ensureUsageOccurredAt(record UsageRecord, fallback time.Time) UsageRecord {
+	if record.OccurredAt.IsZero() {
+		record.OccurredAt = fallback
+	}
+	return record
+}
+
+func usageRecordCreatedAt(record UsageRecord, fallback time.Time) time.Time {
+	if record.OccurredAt.IsZero() {
+		return fallback
+	}
+	return record.OccurredAt
 }
 
 func usageMetadataValue(metadata map[string]string) (any, error) {
@@ -617,6 +644,142 @@ func insertedUsageRecords(inserted []insertedUsageLog) []UsageRecord {
 		records = append(records, item.Record)
 	}
 	return records
+}
+
+type usageHourlyRollupBatchField struct {
+	name  string
+	cast  string
+	value any
+}
+
+func upsertUsageHourlyRollups(ctx context.Context, tx *ent.Tx, inserted []insertedUsageLog) error {
+	if len(inserted) == 0 || recorderInsertDialect(tx) != dialect.Postgres {
+		return nil
+	}
+
+	var args []any
+	valueRows := make([]string, 0, len(inserted))
+	for _, item := range inserted {
+		var valueRow string
+		args, valueRow = appendUsageHourlyRollupBatchRow(args, item)
+		valueRows = append(valueRows, valueRow)
+	}
+
+	query := `WITH batch (
+` + usageHourlyRollupBatchColumnList() + `
+) AS (VALUES ` + strings.Join(valueRows, ",") + `)
+INSERT INTO public.usage_hourly_rollups (
+	bucket_start,
+	user_id,
+	user_email,
+	model,
+	requests,
+	input_tokens,
+	output_tokens,
+	cached_input_tokens,
+	cache_creation_tokens,
+	actual_cost,
+	total_cost,
+	image_requests,
+	non_image_requests,
+	non_image_duration_ms,
+	first_token_requests,
+	first_token_ms,
+	image_duration_ms,
+	updated_at
+)
+SELECT
+	date_trunc('hour', created_at),
+	user_id,
+	COALESCE(MAX(NULLIF(user_email, '')), ''),
+	model,
+	COUNT(*)::bigint,
+	COALESCE(SUM(input_tokens), 0)::bigint,
+	COALESCE(SUM(output_tokens), 0)::bigint,
+	COALESCE(SUM(cached_input_tokens), 0)::bigint,
+	COALESCE(SUM(cache_creation_tokens), 0)::bigint,
+	COALESCE(SUM(actual_cost), 0),
+	COALESCE(SUM(total_cost), 0),
+	COALESCE(SUM(CASE WHEN is_image THEN 1 ELSE 0 END), 0)::bigint,
+	COALESCE(SUM(CASE WHEN NOT is_image THEN 1 ELSE 0 END), 0)::bigint,
+	COALESCE(SUM(CASE WHEN NOT is_image THEN duration_ms ELSE 0 END), 0)::bigint,
+	COALESCE(SUM(CASE WHEN NOT is_image AND first_token_ms > 0 THEN 1 ELSE 0 END), 0)::bigint,
+	COALESCE(SUM(CASE WHEN NOT is_image AND first_token_ms > 0 THEN first_token_ms ELSE 0 END), 0)::bigint,
+	COALESCE(SUM(CASE WHEN is_image THEN duration_ms ELSE 0 END), 0)::bigint,
+	now()
+FROM batch
+GROUP BY 1, user_id, model
+ON CONFLICT (bucket_start, user_id, model) DO UPDATE SET
+	user_email = CASE
+		WHEN EXCLUDED.user_email <> '' THEN EXCLUDED.user_email
+		ELSE public.usage_hourly_rollups.user_email
+	END,
+	requests = public.usage_hourly_rollups.requests + EXCLUDED.requests,
+	input_tokens = public.usage_hourly_rollups.input_tokens + EXCLUDED.input_tokens,
+	output_tokens = public.usage_hourly_rollups.output_tokens + EXCLUDED.output_tokens,
+	cached_input_tokens = public.usage_hourly_rollups.cached_input_tokens + EXCLUDED.cached_input_tokens,
+	cache_creation_tokens = public.usage_hourly_rollups.cache_creation_tokens + EXCLUDED.cache_creation_tokens,
+	actual_cost = public.usage_hourly_rollups.actual_cost + EXCLUDED.actual_cost,
+	total_cost = public.usage_hourly_rollups.total_cost + EXCLUDED.total_cost,
+	image_requests = public.usage_hourly_rollups.image_requests + EXCLUDED.image_requests,
+	non_image_requests = public.usage_hourly_rollups.non_image_requests + EXCLUDED.non_image_requests,
+	non_image_duration_ms = public.usage_hourly_rollups.non_image_duration_ms + EXCLUDED.non_image_duration_ms,
+	first_token_requests = public.usage_hourly_rollups.first_token_requests + EXCLUDED.first_token_requests,
+	first_token_ms = public.usage_hourly_rollups.first_token_ms + EXCLUDED.first_token_ms,
+	image_duration_ms = public.usage_hourly_rollups.image_duration_ms + EXCLUDED.image_duration_ms,
+	updated_at = now()`
+
+	var result entsql.Result
+	if err := tx.Driver().Exec(ctx, query, args, &result); err != nil {
+		if isUsageHourlyRollupMissing(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+func isUsageHourlyRollupMissing(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "42P01"
+}
+
+func appendUsageHourlyRollupBatchRow(args []any, item insertedUsageLog) ([]any, string) {
+	fields := usageHourlyRollupBatchFields(item)
+	placeholders := make([]string, 0, len(fields))
+	for _, field := range fields {
+		args = append(args, field.value)
+		placeholders = append(placeholders, fmt.Sprintf("$%d::%s", len(args), field.cast))
+	}
+	return args, "(" + strings.Join(placeholders, ",") + ")"
+}
+
+func usageHourlyRollupBatchColumnList() string {
+	fields := usageHourlyRollupBatchFields(insertedUsageLog{})
+	columns := make([]string, 0, len(fields))
+	for _, field := range fields {
+		columns = append(columns, "\t"+field.name)
+	}
+	return strings.Join(columns, ",\n")
+}
+
+func usageHourlyRollupBatchFields(item insertedUsageLog) []usageHourlyRollupBatchField {
+	rec := item.Record
+	return []usageHourlyRollupBatchField{
+		{name: "created_at", cast: "timestamptz", value: item.CreatedAt},
+		{name: "user_id", cast: "integer", value: rec.UserID},
+		{name: "user_email", cast: "text", value: rec.UserEmail},
+		{name: "model", cast: "text", value: rec.Model},
+		{name: "input_tokens", cast: "bigint", value: rec.InputTokens},
+		{name: "output_tokens", cast: "bigint", value: rec.OutputTokens},
+		{name: "cached_input_tokens", cast: "bigint", value: rec.CachedInputTokens},
+		{name: "cache_creation_tokens", cast: "bigint", value: rec.CacheCreationTokens},
+		{name: "actual_cost", cast: "numeric", value: rec.ActualCost},
+		{name: "total_cost", cast: "numeric", value: rec.TotalCost},
+		{name: "duration_ms", cast: "bigint", value: rec.DurationMs},
+		{name: "first_token_ms", cast: "bigint", value: rec.FirstTokenMs},
+		{name: "is_image", cast: "boolean", value: usagemodel.IsImageGen(rec.Model)},
+	}
 }
 
 func validateUsageRecordForInsert(rec UsageRecord) error {

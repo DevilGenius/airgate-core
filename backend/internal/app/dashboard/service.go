@@ -313,7 +313,7 @@ func aggregateModelDistribution(logs []TrendLog) []ModelStats {
 			stat = &ModelStats{Model: item.Model}
 			modelMap[item.Model] = stat
 		}
-		stat.Requests++
+		stat.Requests += trendLogRequests(item)
 		stat.Tokens += item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens
 		stat.ActualCost += item.ActualCost
 		stat.StandardCost += item.StandardCost
@@ -340,7 +340,7 @@ func aggregateUserRanking(logs []TrendLog) []UserRanking {
 			}
 			userMap[item.UserID] = ranking
 		}
-		ranking.Requests++
+		ranking.Requests += trendLogRequests(item)
 		ranking.Tokens += item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens
 		ranking.ActualCost += item.ActualCost
 		ranking.StandardCost += item.StandardCost
@@ -457,4 +457,11 @@ func trendTimeLayout(granularity string) string {
 		return "2006-01-02 15:00"
 	}
 	return "2006-01-02"
+}
+
+func trendLogRequests(item TrendLog) int64 {
+	if item.Requests > 0 {
+		return item.Requests
+	}
+	return 1
 }

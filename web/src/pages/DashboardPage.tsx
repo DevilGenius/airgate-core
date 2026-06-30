@@ -729,7 +729,8 @@ export default function DashboardPage() {
     { id: 'day', label: t('dashboard.granularity_day') },
     { id: 'hour', label: t('dashboard.granularity_hour') },
   ];
-  const selectedGranularity = range === 'today' ? 'hour' : granularity;
+  const isTodayRange = range === 'today';
+  const selectedGranularity = isTodayRange ? 'hour' : granularity;
   const selectedGranularityLabel = granularityOptions.find((item) => item.id === selectedGranularity)?.label ?? '';
   const userFilter = selectedUserId ? { user_id: selectedUserId } : undefined;
 
@@ -740,9 +741,9 @@ export default function DashboardPage() {
 
   const trendParams = useMemo(() => ({
     range,
-    granularity: range === 'today' ? 'hour' as const : granularity,
+    granularity: isTodayRange ? 'hour' as const : granularity,
     ...(selectedUserId ? { user_id: selectedUserId } : {}),
-  }), [range, granularity, selectedUserId]);
+  }), [range, isTodayRange, granularity, selectedUserId]);
 
   const trendQuery = useQuery({
     queryKey: queryKeys.dashboardTrend(trendParams),
@@ -794,6 +795,7 @@ export default function DashboardPage() {
             onRefresh={refresh}
             isRefreshing={isDashboardRefreshing}
             isAutoRefreshing={isDashboardRefreshing}
+            isAutoRefreshDisabled={!isTodayRange}
           />
         </div>
 
@@ -828,7 +830,7 @@ export default function DashboardPage() {
               <SimpleSelect
                 ariaLabel={t('dashboard.granularity')}
                 fullWidth
-                isDisabled={range === 'today'}
+                isDisabled={isTodayRange}
                 items={granularityOptions.map((item) => ({ key: item.id, label: item.label }))}
                 selectedKey={selectedGranularity}
                 selectedLabel={(

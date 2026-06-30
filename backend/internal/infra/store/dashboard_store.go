@@ -3,12 +3,15 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/ent"
@@ -84,6 +87,10 @@ func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, five
 
 // ListTrendLogs 读取趋势聚合所需日志。userID 为 0 表示查全部。
 func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]appdashboard.TrendLog, error) {
+	if logs, handled, err := s.listTrendLogsFromRollups(ctx, startTime, endTime, userID); handled {
+		return logs, err
+	}
+
 	preds := []predicate.UsageLog{
 		entusagelog.CreatedAtGTE(startTime),
 		entusagelog.CreatedAtLT(endTime),
@@ -111,16 +118,38 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 		return nil, err
 	}
 
-	emailMap := make(map[int]string)
-	userIDs := make([]int, 0, len(list))
-	seenUserIDs := make(map[int]struct{}, len(list))
+	result := make([]appdashboard.TrendLog, 0, len(list))
 	for _, item := range list {
-		if item.UserIDSnapshot > 0 && item.UserEmailSnapshot == "" {
-			if _, ok := seenUserIDs[item.UserIDSnapshot]; ok {
+		log := appdashboard.TrendLog{
+			UserID:              item.UserIDSnapshot,
+			UserEmail:           item.UserEmailSnapshot,
+			Model:               item.Model,
+			Requests:            1,
+			InputTokens:         int64(item.InputTokens),
+			OutputTokens:        int64(item.OutputTokens),
+			CachedInputTokens:   int64(item.CachedInputTokens),
+			CacheCreationTokens: int64(item.CacheCreationTokens),
+			ActualCost:          item.ActualCost,
+			StandardCost:        item.TotalCost,
+			CreatedAt:           item.CreatedAt,
+		}
+		result = append(result, log)
+	}
+
+	return s.fillTrendLogEmails(ctx, result)
+}
+
+func (s *DashboardStore) fillTrendLogEmails(ctx context.Context, logs []appdashboard.TrendLog) ([]appdashboard.TrendLog, error) {
+	emailMap := make(map[int]string)
+	userIDs := make([]int, 0, len(logs))
+	seenUserIDs := make(map[int]struct{}, len(logs))
+	for _, item := range logs {
+		if item.UserID > 0 && item.UserEmail == "" {
+			if _, ok := seenUserIDs[item.UserID]; ok {
 				continue
 			}
-			seenUserIDs[item.UserIDSnapshot] = struct{}{}
-			userIDs = append(userIDs, item.UserIDSnapshot)
+			seenUserIDs[item.UserID] = struct{}{}
+			userIDs = append(userIDs, item.UserID)
 		}
 	}
 	if len(userIDs) > 0 {
@@ -133,24 +162,82 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 		}
 	}
 
-	result := make([]appdashboard.TrendLog, 0, len(list))
-	for _, item := range list {
-		log := appdashboard.TrendLog{
-			UserID:              item.UserIDSnapshot,
-			UserEmail:           coalesceString(item.UserEmailSnapshot, emailMap[item.UserIDSnapshot]),
-			Model:               item.Model,
-			InputTokens:         int64(item.InputTokens),
-			OutputTokens:        int64(item.OutputTokens),
-			CachedInputTokens:   int64(item.CachedInputTokens),
-			CacheCreationTokens: int64(item.CacheCreationTokens),
-			ActualCost:          item.ActualCost,
-			StandardCost:        item.TotalCost,
-			CreatedAt:           item.CreatedAt,
-		}
-		result = append(result, log)
+	for i := range logs {
+		logs[i].UserEmail = coalesceString(logs[i].UserEmail, emailMap[logs[i].UserID])
 	}
 
-	return result, nil
+	return logs, nil
+}
+
+func (s *DashboardStore) listTrendLogsFromRollups(ctx context.Context, startTime, endTime time.Time, userID int) ([]appdashboard.TrendLog, bool, error) {
+	if !s.canQueryDashboardRollups() {
+		return nil, false, nil
+	}
+	const query = `
+SELECT
+	user_id,
+	user_email,
+	model,
+	requests,
+	input_tokens,
+	output_tokens,
+	cached_input_tokens,
+	cache_creation_tokens,
+	actual_cost::double precision,
+	total_cost::double precision,
+	bucket_start
+FROM public.usage_hourly_rollups
+WHERE bucket_start >= $1
+	AND bucket_start < $2
+	AND ($3::integer = 0 OR user_id = $3::integer)
+ORDER BY bucket_start`
+
+	var rows entsql.Rows
+	if err := s.db.Driver().Query(ctx, query, []any{startTime, endTime, userID}, &rows); err != nil {
+		if isDashboardRollupUnavailable(err) {
+			return nil, false, nil
+		}
+		return nil, true, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	logs := make([]appdashboard.TrendLog, 0)
+	for rows.Next() {
+		var item appdashboard.TrendLog
+		if err := rows.Scan(
+			&item.UserID,
+			&item.UserEmail,
+			&item.Model,
+			&item.Requests,
+			&item.InputTokens,
+			&item.OutputTokens,
+			&item.CachedInputTokens,
+			&item.CacheCreationTokens,
+			&item.ActualCost,
+			&item.StandardCost,
+			&item.CreatedAt,
+		); err != nil {
+			return nil, true, err
+		}
+		logs = append(logs, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, true, err
+	}
+	logs, err := s.fillTrendLogEmails(ctx, logs)
+	return logs, true, err
+}
+
+func (s *DashboardStore) canQueryDashboardRollups() bool {
+	return s != nil && s.db != nil && s.db.Driver() != nil && s.db.Driver().Dialect() == dialect.Postgres
+}
+
+func isDashboardRollupUnavailable(err error) bool {
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) {
+		return pqErr.Code == "42P01"
+	}
+	return false
 }
 
 type usageTotals struct {
@@ -172,6 +259,77 @@ type usageTodaySnapshot struct {
 	FirstTokenMs       int64
 	ImageDurationMs    int64
 	ActiveUsers        int64
+}
+
+type rollupUsageSnapshot struct {
+	AllTime usageTotals
+	Today   usageTodaySnapshot
+}
+
+func (s *DashboardStore) loadStatsUsageFromRollups(ctx context.Context, todayStart time.Time, userID int) (rollupUsageSnapshot, bool, error) {
+	if !s.canQueryDashboardRollups() {
+		return rollupUsageSnapshot{}, false, nil
+	}
+	const query = `
+SELECT
+	COALESCE(SUM(requests), 0)::bigint AS all_time_requests,
+	COALESCE(SUM(input_tokens + output_tokens + cached_input_tokens + cache_creation_tokens), 0)::bigint AS all_time_tokens,
+	COALESCE(SUM(actual_cost), 0)::double precision AS all_time_cost,
+	COALESCE(SUM(total_cost), 0)::double precision AS all_time_standard_cost,
+	COALESCE(SUM(requests) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_requests,
+	COALESCE(SUM(image_requests) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_image_requests,
+	COALESCE(SUM(non_image_requests) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_non_image_requests,
+	COALESCE(SUM(input_tokens + output_tokens + cached_input_tokens + cache_creation_tokens) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_tokens,
+	COALESCE(SUM(actual_cost) FILTER (WHERE bucket_start >= $1), 0)::double precision AS today_cost,
+	COALESCE(SUM(total_cost) FILTER (WHERE bucket_start >= $1), 0)::double precision AS today_standard_cost,
+	COALESCE(SUM(non_image_duration_ms) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_non_image_duration_ms,
+	COALESCE(SUM(first_token_requests) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_first_token_requests,
+	COALESCE(SUM(first_token_ms) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_first_token_ms,
+	COALESCE(SUM(image_duration_ms) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_image_duration_ms,
+	COALESCE(COUNT(DISTINCT NULLIF(user_id, 0)) FILTER (WHERE bucket_start >= $1), 0)::bigint AS active_users
+FROM public.usage_hourly_rollups
+WHERE $2::integer = 0 OR user_id = $2::integer`
+
+	var rows entsql.Rows
+	if err := s.db.Driver().Query(ctx, query, []any{todayStart, userID}, &rows); err != nil {
+		if isDashboardRollupUnavailable(err) {
+			return rollupUsageSnapshot{}, false, nil
+		}
+		return rollupUsageSnapshot{}, true, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return rollupUsageSnapshot{}, true, err
+		}
+		return rollupUsageSnapshot{}, true, nil
+	}
+
+	var snapshot rollupUsageSnapshot
+	if err := rows.Scan(
+		&snapshot.AllTime.Requests,
+		&snapshot.AllTime.Tokens,
+		&snapshot.AllTime.Cost,
+		&snapshot.AllTime.StandardCost,
+		&snapshot.Today.Requests,
+		&snapshot.Today.ImageRequests,
+		&snapshot.Today.NonImageRequests,
+		&snapshot.Today.Tokens,
+		&snapshot.Today.Cost,
+		&snapshot.Today.StandardCost,
+		&snapshot.Today.NonImageDurationMs,
+		&snapshot.Today.FirstTokenRequests,
+		&snapshot.Today.FirstTokenMs,
+		&snapshot.Today.ImageDurationMs,
+		&snapshot.Today.ActiveUsers,
+	); err != nil {
+		return rollupUsageSnapshot{}, true, err
+	}
+	if err := rows.Err(); err != nil {
+		return rollupUsageSnapshot{}, true, err
+	}
+	return snapshot, true, nil
 }
 
 func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (usageTotals, error) {
@@ -372,20 +530,34 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		return appdashboard.StatsSnapshot{}, err
 	}
 
-	usageQuery := s.db.UsageLog.Query().Where(userPred...)
-	allTimeTotals, err := queryUsageTotals(ctx, usageQuery)
-	if err != nil {
+	var allTimeTotals usageTotals
+	var todayUsage usageTodaySnapshot
+	var recentTotals usageTotals
+	if rollupSnapshot, handled, err := s.loadStatsUsageFromRollups(ctx, todayStart, userID); err != nil {
 		return appdashboard.StatsSnapshot{}, err
-	}
+	} else if handled {
+		allTimeTotals = rollupSnapshot.AllTime
+		todayUsage = rollupSnapshot.Today
+		recentTotals, err = queryUsageTotals(ctx, s.db.UsageLog.Query().Where(userPred...).Where(entusagelog.CreatedAtGTE(fiveMinAgo)))
+		if err != nil {
+			return appdashboard.StatsSnapshot{}, err
+		}
+	} else {
+		usageQuery := s.db.UsageLog.Query().Where(userPred...)
+		allTimeTotals, err = queryUsageTotals(ctx, usageQuery)
+		if err != nil {
+			return appdashboard.StatsSnapshot{}, err
+		}
 
-	todayUsage, err := queryTodayUsageSnapshot(ctx, usageQuery, todayStart)
-	if err != nil {
-		return appdashboard.StatsSnapshot{}, err
-	}
+		todayUsage, err = queryTodayUsageSnapshot(ctx, usageQuery, todayStart)
+		if err != nil {
+			return appdashboard.StatsSnapshot{}, err
+		}
 
-	recentTotals, err := queryUsageTotals(ctx, usageQuery.Clone().Where(entusagelog.CreatedAtGTE(fiveMinAgo)))
-	if err != nil {
-		return appdashboard.StatsSnapshot{}, err
+		recentTotals, err = queryUsageTotals(ctx, usageQuery.Clone().Where(entusagelog.CreatedAtGTE(fiveMinAgo)))
+		if err != nil {
+			return appdashboard.StatsSnapshot{}, err
+		}
 	}
 
 	return appdashboard.StatsSnapshot{
