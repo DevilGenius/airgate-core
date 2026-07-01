@@ -194,7 +194,7 @@ func TestParseBodyPreviousResponseIDOnlyDoesNotRequireContinuationAffinity(t *te
 	}
 }
 
-func TestParseBodyEncryptedContentRequiresContinuationAffinity(t *testing.T) {
+func TestParseBodyEncryptedContentDoesNotRequireContinuationAffinity(t *testing.T) {
 	t.Parallel()
 
 	body := []byte(`{"model":"gpt-5.4","input":[{"type":"reasoning","id":"rs_1","encrypted_content":"sealed"}]}`)
@@ -202,12 +202,12 @@ func TestParseBodyEncryptedContentRequiresContinuationAffinity(t *testing.T) {
 	if !parsed.HasEncryptedContent {
 		t.Fatalf("HasEncryptedContent = false, want true")
 	}
-	if !requestRequiresContinuationAffinity(parsed) {
-		t.Fatalf("requestRequiresContinuationAffinity = false, want true")
+	if requestRequiresContinuationAffinity(parsed) {
+		t.Fatalf("requestRequiresContinuationAffinity = true, want false")
 	}
 }
 
-func TestParseBodyEncryptedContentSingleObjectRequiresContinuationAffinity(t *testing.T) {
+func TestParseBodyEncryptedContentSingleObjectDoesNotRequireContinuationAffinity(t *testing.T) {
 	t.Parallel()
 
 	body := []byte(`{"model":"gpt-5.4","input":{"type":"reasoning","id":"rs_1","encrypted_content":"sealed"}}`)
@@ -215,8 +215,8 @@ func TestParseBodyEncryptedContentSingleObjectRequiresContinuationAffinity(t *te
 	if !parsed.HasEncryptedContent {
 		t.Fatalf("HasEncryptedContent = false, want true")
 	}
-	if !requestRequiresContinuationAffinity(parsed) {
-		t.Fatalf("requestRequiresContinuationAffinity = false, want true")
+	if requestRequiresContinuationAffinity(parsed) {
+		t.Fatalf("requestRequiresContinuationAffinity = true, want false")
 	}
 }
 

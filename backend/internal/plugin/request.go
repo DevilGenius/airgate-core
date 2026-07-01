@@ -341,8 +341,9 @@ func requestRequiresContinuationAffinity(parsed parsedRequest) bool {
 	// previous_response_id alone is a soft sticky hint: if the local affinity
 	// cache has expired, the scheduler can still fall back to session sticky or
 	// normal routing and let the upstream decide whether the anchor is usable.
-	return parsed.HasEncryptedContent ||
-		(parsed.HasToolOutput && !parsed.HasToolCallContext)
+	// encrypted_content is a stateless replay carrier under store=false. It must
+	// be preserved, but it does not require the same upstream account by itself.
+	return parsed.HasToolOutput && !parsed.HasToolCallContext
 }
 
 type continuationSignals struct {
