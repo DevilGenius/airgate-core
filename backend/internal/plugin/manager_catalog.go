@@ -157,7 +157,19 @@ func (m *Manager) MatchPluginByPlatformAndPath(platform, path string) *PluginIns
 }
 
 func matchRoutePath(routePath, path string) bool {
-	return path == routePath || len(path) > len(routePath) && strings.HasPrefix(path, routePath)
+	if routePath == "" {
+		return false
+	}
+	if path == routePath {
+		return true
+	}
+	if !strings.HasPrefix(path, routePath) {
+		return false
+	}
+	if strings.HasSuffix(routePath, "/") {
+		return true
+	}
+	return len(path) > len(routePath) && path[len(routePath)] == '/'
 }
 
 // IsRunning 检查插件是否正在运行。

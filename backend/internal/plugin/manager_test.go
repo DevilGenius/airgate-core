@@ -49,6 +49,33 @@ func TestMatchPluginByPlatformAndPathRejectsUnsupportedPath(t *testing.T) {
 	}
 }
 
+func TestMatchRoutePathRequiresSegmentBoundary(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		routePath string
+		path      string
+		want      bool
+	}{
+		{name: "exact", routePath: "/v1", path: "/v1", want: true},
+		{name: "segment child", routePath: "/v1", path: "/v1/chat/completions", want: true},
+		{name: "trailing slash route", routePath: "/v1/", path: "/v1/chat/completions", want: true},
+		{name: "version sibling", routePath: "/v1", path: "/v10/models", want: false},
+		{name: "name sibling", routePath: "/v1/foo", path: "/v1/foobar", want: false},
+		{name: "empty route", routePath: "", path: "/v1", want: false},
+		{name: "missing prefix", routePath: "/v1/messages", path: "/v1/chat/completions", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := matchRoutePath(tt.routePath, tt.path); got != tt.want {
+				t.Fatalf("matchRoutePath(%q, %q) = %v, want %v", tt.routePath, tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseGithubRepo(t *testing.T) {
 	owner, name, err := parseGithubRepo("https://github.com/acme/airgate-plugin.git")
 	if err != nil {
