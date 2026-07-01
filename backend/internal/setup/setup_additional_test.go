@@ -188,12 +188,12 @@ func TestTestRedisConnectionBranches(t *testing.T) {
 		restoreSetupHooks(t)
 		fake := &fakeSetupRedisClient{}
 		setupRedisNewClient = func(opts *redis.Options) setupRedisClient {
-			if opts.Addr != "redis:6379" || opts.Password != "secret" || opts.DB != 2 {
+			if opts.Addr != "redis:6379" || opts.Password != "secret" || opts.DB != 2 || opts.TLSConfig == nil {
 				t.Fatalf("redis options = %+v", opts)
 			}
 			return fake
 		}
-		if err := TestRedisConnection("redis", 6379, "secret", 2); err != nil {
+		if err := TestRedisConnection("redis", 6379, "secret", 2, true); err != nil {
 			t.Fatalf("TestRedisConnection() error = %v", err)
 		}
 		if !fake.pingCalled || !fake.closed {
@@ -207,7 +207,7 @@ func TestTestRedisConnectionBranches(t *testing.T) {
 		setupRedisNewClient = func(*redis.Options) setupRedisClient {
 			return &fakeSetupRedisClient{pingErr: wantErr}
 		}
-		if err := TestRedisConnection("redis", 6379, "", 0); err != wantErr {
+		if err := TestRedisConnection("redis", 6379, "", 0, false); err != wantErr {
 			t.Fatalf("TestRedisConnection() error = %v, want %v", err, wantErr)
 		}
 	})
@@ -217,7 +217,7 @@ func TestTestRedisConnectionBranches(t *testing.T) {
 		setupRedisNewClient = func(*redis.Options) setupRedisClient {
 			return &fakeSetupRedisClient{closeErr: errors.New("close failed")}
 		}
-		if err := TestRedisConnection("redis", 6379, "", 0); err != nil {
+		if err := TestRedisConnection("redis", 6379, "", 0, false); err != nil {
 			t.Fatalf("TestRedisConnection() error = %v", err)
 		}
 	})
@@ -241,7 +241,7 @@ func TestSetupRouteSuccessFailureAndGuardBranches(t *testing.T) {
 		return &config.RedisConfig{Host: "env-redis", Port: 16379, Password: "env-secret", DB: 3}
 	}
 	setupTestDBConnection = func(string, int, string, string, string, string) error { return dbErr }
-	setupTestRedisConnection = func(string, int, string, int) error { return redisErr }
+	setupTestRedisConnection = func(string, int, string, int, bool) error { return redisErr }
 	setupInstall = func(params InstallParams) error {
 		installed = params
 		return installErr

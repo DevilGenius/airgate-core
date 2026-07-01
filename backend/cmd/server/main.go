@@ -27,6 +27,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/DevilGenius/airgate-core/internal/i18n"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
+	"github.com/DevilGenius/airgate-core/internal/redisconfig"
 	"github.com/DevilGenius/airgate-core/internal/server"
 	"github.com/DevilGenius/airgate-core/internal/setup"
 	"github.com/DevilGenius/airgate-core/internal/version"
@@ -211,11 +212,7 @@ func startMainServer(cfg *config.Config) {
 	bootstrap.RunSystemUpgrades(drv)
 
 	// 初始化 Redis
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port),
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
-	})
+	rdb := redis.NewClient(redisconfig.Options(cfg.Redis))
 	redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	if err := rdb.Ping(redisCtx).Err(); err != nil {
 		redisCancel()
@@ -229,7 +226,8 @@ func startMainServer(cfg *config.Config) {
 	slog.Info("redis_connected",
 		"host", cfg.Redis.Host,
 		"port", cfg.Redis.Port,
-		"db", cfg.Redis.DB)
+		"db", cfg.Redis.DB,
+		"tls", cfg.Redis.TLS)
 	defer func() {
 		if err := rdb.Close(); err != nil {
 			slog.Warn("redis_close_failed", sdk.LogFieldError, err)

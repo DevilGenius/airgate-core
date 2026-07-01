@@ -27,6 +27,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/migrate"
 	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
+	"github.com/DevilGenius/airgate-core/internal/redisconfig"
 )
 
 var installMu sync.Mutex
@@ -113,6 +114,16 @@ func EnvRedisConfig() *config.RedisConfig {
 		Port:     port,
 		Password: password,
 		DB:       dbNum,
+		TLS:      parseEnvBool(os.Getenv("REDIS_TLS")),
+	}
+}
+
+func parseEnvBool(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "yes", "on":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -274,12 +285,14 @@ func quoteIdentifier(name string) string {
 }
 
 // TestRedisConnection 测试 Redis 连接
-func TestRedisConnection(host string, port int, password string, db int) error {
-	rdb := setupRedisNewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", host, port),
+func TestRedisConnection(host string, port int, password string, db int, tlsEnabled bool) error {
+	rdb := setupRedisNewClient(redisconfig.Options(config.RedisConfig{
+		Host:     host,
+		Port:     port,
 		Password: password,
 		DB:       db,
-	})
+		TLS:      tlsEnabled,
+	}))
 	defer func() {
 		if err := rdb.Close(); err != nil {
 			slog.Warn("redis_close_failed", "stage", "setup_test", sdk.LogFieldError, err)

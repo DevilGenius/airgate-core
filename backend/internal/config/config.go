@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -211,6 +212,7 @@ func applyEnvOverrides(cfg *Config) {
 	envInt("REDIS_PORT", &cfg.Redis.Port)
 	envStr("REDIS_PASSWORD", &cfg.Redis.Password)
 	envInt("REDIS_DB", &cfg.Redis.DB)
+	envBool("REDIS_TLS", &cfg.Redis.TLS)
 
 	// JWT
 	envStr("JWT_SECRET", &cfg.JWT.Secret)
@@ -241,6 +243,16 @@ func envInt(key string, dst *int) {
 		if n, err := strconv.Atoi(v); err == nil {
 			*dst = n
 		}
+	}
+}
+
+// envBool 如果环境变量存在且为常见布尔值，覆盖目标布尔。
+func envBool(key string, dst *bool) {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "true", "1", "yes", "on":
+		*dst = true
+	case "false", "0", "no", "off":
+		*dst = false
 	}
 }
 

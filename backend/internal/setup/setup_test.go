@@ -56,12 +56,13 @@ func TestEnvRedisConfigParsesOptionalDB(t *testing.T) {
 	t.Setenv("REDIS_PORT", "6379")
 	t.Setenv("REDIS_PASSWORD", "secret")
 	t.Setenv("REDIS_DB", "2")
+	t.Setenv("REDIS_TLS", "true")
 	cfg := EnvRedisConfig()
 	if cfg == nil {
 		t.Fatal("完整 Redis 环境变量应返回配置")
 		return
 	}
-	if cfg.Host != "redis" || cfg.Port != 6379 || cfg.Password != "secret" || cfg.DB != 2 {
+	if cfg.Host != "redis" || cfg.Port != 6379 || cfg.Password != "secret" || cfg.DB != 2 || !cfg.TLS {
 		t.Fatalf("Redis 配置异常: %+v", cfg)
 	}
 
@@ -196,7 +197,7 @@ func clearSetupEnv(t *testing.T) {
 	t.Helper()
 	keys := []string{
 		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE",
-		"REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "REDIS_DB",
+		"REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "REDIS_DB", "REDIS_TLS",
 		"CONFIG_PATH",
 	}
 	for _, key := range keys {

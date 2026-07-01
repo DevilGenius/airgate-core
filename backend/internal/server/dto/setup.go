@@ -25,6 +25,7 @@ type EnvRedisHint struct {
 	Host string `json:"host"`
 	Port int    `json:"port"`
 	DB   int    `json:"db"`
+	TLS  bool   `json:"tls"`
 }
 
 // TestDBReq 测试数据库连接请求
