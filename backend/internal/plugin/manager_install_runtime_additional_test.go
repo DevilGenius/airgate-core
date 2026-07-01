@@ -28,6 +28,16 @@ func TestInstallFromBinaryWithSHA256ValidationEdges(t *testing.T) {
 	}
 }
 
+func TestReadPluginBinaryEnforcesLimit(t *testing.T) {
+	got, err := readPluginBinary(strings.NewReader("12345"), 5)
+	if err != nil || string(got) != "12345" {
+		t.Fatalf("readPluginBinary exact limit = %q/%v", got, err)
+	}
+	if _, err := readPluginBinary(strings.NewReader("123456"), 5); err == nil || !strings.Contains(err.Error(), "超过") {
+		t.Fatalf("readPluginBinary over limit error = %v", err)
+	}
+}
+
 func TestParseGithubRepoEdges(t *testing.T) {
 	tests := []struct {
 		raw       string
@@ -132,8 +142,16 @@ func TestInstallFromGithubValidationErrorsBeforeProcessStart(t *testing.T) {
 			return pluginJSONResponse(req, http.StatusOK, fmt.Sprintf(`{"tag_name":"v1.0.0","assets":[{"name":%q,"browser_download_url":"https://downloads.test/no-sha"}]}`, assetName), ""), nil
 		case "/repos/acme/mismatch/releases/latest":
 			return pluginJSONResponse(req, http.StatusOK, fmt.Sprintf(`{"tag_name":"v1.0.0","assets":[{"name":%q,"browser_download_url":"https://downloads.test/mismatch","digest":"sha256:%s"}]}`, assetName, wrongSHA), ""), nil
+		case "/repos/acme/asset-too-large/releases/latest":
+			return pluginJSONResponse(req, http.StatusOK, fmt.Sprintf(`{"tag_name":"v1.0.0","assets":[{"name":%q,"browser_download_url":"https://downloads.test/asset-too-large","size":%d,"digest":"sha256:%s"}]}`, assetName, MaxPluginBinarySize+1, wrongSHA), ""), nil
+		case "/repos/acme/content-too-large/releases/latest":
+			return pluginJSONResponse(req, http.StatusOK, fmt.Sprintf(`{"tag_name":"v1.0.0","assets":[{"name":%q,"browser_download_url":"https://downloads.test/content-too-large","digest":"sha256:%s"}]}`, assetName, wrongSHA), ""), nil
 		case "/download-500":
 			return pluginJSONResponse(req, http.StatusInternalServerError, `failed`, ""), nil
+		case "/content-too-large":
+			resp := pluginJSONResponse(req, http.StatusOK, "", "")
+			resp.ContentLength = MaxPluginBinarySize + 1
+			return resp, nil
 		case "/no-sha", "/mismatch":
 			return pluginJSONResponse(req, http.StatusOK, string(binary), ""), nil
 		default:
@@ -152,6 +170,8 @@ func TestInstallFromGithubValidationErrorsBeforeProcessStart(t *testing.T) {
 		{repo: "acme/download-500", want: "下载返回状态码 500"},
 		{repo: "acme/no-sha", want: "缺少 SHA256"},
 		{repo: "acme/mismatch", want: "SHA256"},
+		{repo: "acme/asset-too-large", want: "超过"},
+		{repo: "acme/content-too-large", want: "超过"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.repo, func(t *testing.T) {

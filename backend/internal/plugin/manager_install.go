@@ -22,6 +22,8 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
+const MaxPluginBinarySize int64 = 200 << 20
+
 // Uninstall 卸载插件。
 func (m *Manager) Uninstall(ctx context.Context, name string) error {
 	resolvedName := m.resolveName(name)
@@ -185,6 +187,9 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo, version string) e
 	if asset == nil || asset.BrowserDownloadURL == "" {
 		return fmt.Errorf("未找到适配 %s/%s 的二进制文件，Release: %s", targetOS, targetArch, release.TagName)
 	}
+	if asset.Size > MaxPluginBinarySize {
+		return pluginBinaryTooLargeError(asset.Size)
+	}
 
 	dlReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, asset.BrowserDownloadURL, nil)
 	dlResp, err := http.DefaultClient.Do(dlReq)
@@ -200,8 +205,11 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo, version string) e
 	if dlResp.StatusCode != http.StatusOK {
 		return fmt.Errorf("下载返回状态码 %d", dlResp.StatusCode)
 	}
+	if dlResp.ContentLength > MaxPluginBinarySize {
+		return pluginBinaryTooLargeError(dlResp.ContentLength)
+	}
 
-	binary, err := io.ReadAll(dlResp.Body)
+	binary, err := ReadPluginBinary(dlResp.Body)
 	if err != nil {
 		return fmt.Errorf("读取下载内容失败: %w", err)
 	}
@@ -222,6 +230,25 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo, version string) e
 	}
 
 	return m.installFromBinary(ctx, repoName, binary, meta)
+}
+
+func ReadPluginBinary(r io.Reader) ([]byte, error) {
+	return readPluginBinary(r, MaxPluginBinarySize)
+}
+
+func readPluginBinary(r io.Reader, limit int64) ([]byte, error) {
+	binary, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(binary)) > limit {
+		return nil, pluginBinaryTooLargeError(int64(len(binary)))
+	}
+	return binary, nil
+}
+
+func pluginBinaryTooLargeError(size int64) error {
+	return fmt.Errorf("插件二进制超过 %d MiB 上限: %d bytes", MaxPluginBinarySize>>20, size)
 }
 
 func calcBinarySHA256(binary []byte) string {
@@ -316,6 +343,7 @@ type githubAsset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
 	Digest             string `json:"digest"`
+	Size               int64  `json:"size"`
 }
 
 // parseGithubRepo 解析 GitHub 仓库地址。

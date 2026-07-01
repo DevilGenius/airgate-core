@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
+	coreplugin "github.com/DevilGenius/airgate-core/internal/plugin"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
@@ -92,9 +94,15 @@ func (h *PluginHandler) ListPluginMenu(c *gin.Context) {
 
 // UploadPlugin 上传安装插件。
 func (h *PluginHandler) UploadPlugin(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, coreplugin.MaxPluginBinarySize+(1<<20))
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		response.BadRequest(c, "请上传插件文件")
+		return
+	}
+	if file.Size > coreplugin.MaxPluginBinarySize {
+		response.BadRequest(c, fmt.Sprintf("插件文件超过 %d MiB 上限", coreplugin.MaxPluginBinarySize>>20))
 		return
 	}
 
@@ -107,7 +115,7 @@ func (h *PluginHandler) UploadPlugin(c *gin.Context) {
 		_ = f.Close()
 	}()
 
-	binary, err := io.ReadAll(f)
+	binary, err := coreplugin.ReadPluginBinary(f)
 	if err != nil {
 		response.InternalError(c, "读取文件内容失败")
 		return
