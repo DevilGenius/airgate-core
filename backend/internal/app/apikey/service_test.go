@@ -538,19 +538,19 @@ func TestDeleteOwnedAndRevealErrors(t *testing.T) {
 	repoErr := errors.New("repo failed")
 	var deleted bool
 	service := NewService(apiKeyStubRepository{
-		deleteOwned: func(_ context.Context, userID, id int) error {
+		deleteOwned: func(_ context.Context, userID, id int) (Key, error) {
 			if userID != 7 || id != 1 {
 				t.Fatalf("DeleteOwned args = %d/%d", userID, id)
 			}
 			deleted = true
-			return nil
+			return Key{KeyHash: "deleted-hash"}, nil
 		},
 	}, testAPIKeySecret)
 	if err := service.DeleteOwned(t.Context(), 7, 1); err != nil || !deleted {
 		t.Fatalf("DeleteOwned() = %v deleted=%v", err, deleted)
 	}
 	if err := NewService(apiKeyStubRepository{
-		deleteOwned: func(context.Context, int, int) error { return repoErr },
+		deleteOwned: func(context.Context, int, int) (Key, error) { return Key{}, repoErr },
 	}, testAPIKeySecret).DeleteOwned(t.Context(), 7, 1); !errors.Is(err, repoErr) {
 		t.Fatalf("DeleteOwned error = %v", err)
 	}
@@ -601,7 +601,7 @@ type apiKeyStubRepository struct {
 	updateOwned     func(context.Context, int, int, Mutation) (Key, error)
 	updateAdmin     func(context.Context, int, Mutation) (Key, error)
 	resetUsageAdmin func(context.Context, int) (Key, error)
-	deleteOwned     func(context.Context, int, int) error
+	deleteOwned     func(context.Context, int, int) (Key, error)
 	findOwned       func(context.Context, int, int) (Key, error)
 }
 
@@ -661,9 +661,9 @@ func (s apiKeyStubRepository) ResetUsageAdmin(ctx context.Context, id int) (Key,
 	return s.resetUsageAdmin(ctx, id)
 }
 
-func (s apiKeyStubRepository) DeleteOwned(ctx context.Context, userID, id int) error {
+func (s apiKeyStubRepository) DeleteOwned(ctx context.Context, userID, id int) (Key, error) {
 	if s.deleteOwned == nil {
-		return nil
+		return Key{}, nil
 	}
 	return s.deleteOwned(ctx, userID, id)
 }

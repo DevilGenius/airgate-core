@@ -87,7 +87,8 @@ func TestStoresPropagateClosedDBErrors(t *testing.T) {
 			return err
 		}},
 		{name: "apikey delete owned", call: func() error {
-			return apiKeyStore.DeleteOwned(ctx, 1, 1)
+			_, err := apiKeyStore.DeleteOwned(ctx, 1, 1)
+			return err
 		}},
 		{name: "apikey load by id", call: func() error {
 			_, err := apiKeyStore.loadByID(ctx, 1)

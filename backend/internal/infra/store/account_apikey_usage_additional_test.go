@@ -460,11 +460,13 @@ func TestAPIKeyStoreMutationsAccessAndUsage(t *testing.T) {
 
 	todayStart := time.Date(2026, 6, 20, 0, 0, 0, 0, time.UTC)
 	createAccountUsageLog(t, db, "apikey_delete_usage", user.ID, created.ID, 0, group.ID, "gpt-5", todayStart, 1, 2, 0, 0, 0.5, 0.75, 1.5)
-	if err := store.DeleteOwned(ctx, otherUser.ID, created.ID); !errors.Is(err, appapikey.ErrKeyNotFound) {
+	if _, err := store.DeleteOwned(ctx, otherUser.ID, created.ID); !errors.Is(err, appapikey.ErrKeyNotFound) {
 		t.Fatalf("DeleteOwned wrong owner error = %v, want ErrKeyNotFound", err)
 	}
-	if err := store.DeleteOwned(ctx, user.ID, created.ID); err != nil {
+	if deleted, err := store.DeleteOwned(ctx, user.ID, created.ID); err != nil {
 		t.Fatalf("DeleteOwned returned error: %v", err)
+	} else if deleted.KeyHash == "" {
+		t.Fatalf("DeleteOwned returned empty key hash: %+v", deleted)
 	}
 	if _, err := store.FindOwned(ctx, user.ID, created.ID); !errors.Is(err, appapikey.ErrKeyNotFound) {
 		t.Fatalf("FindOwned deleted error = %v, want ErrKeyNotFound", err)

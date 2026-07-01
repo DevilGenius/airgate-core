@@ -243,6 +243,7 @@ func (s *Service) UpdateOwned(ctx context.Context, userID, id int, input UpdateI
 		return Key{}, err
 	}
 	logApiKeyMutationOutcome(logger, userID, id, mutation)
+	auth.InvalidateAPIKeyHashCache(updated.KeyHash)
 	return updated, nil
 }
 
@@ -263,6 +264,7 @@ func (s *Service) UpdateAdmin(ctx context.Context, id int, input UpdateInput) (K
 		return Key{}, err
 	}
 	logApiKeyMutationOutcome(logger, updated.UserID, id, mutation)
+	auth.InvalidateAPIKeyHashCache(updated.KeyHash)
 	return updated, nil
 }
 
@@ -289,7 +291,8 @@ func (s *Service) ResetUsageAdmin(ctx context.Context, id int) (Key, error) {
 // DeleteOwned 删除当前用户的 API Key。
 func (s *Service) DeleteOwned(ctx context.Context, userID, id int) error {
 	logger := sdk.LoggerFromContext(ctx)
-	if err := s.repo.DeleteOwned(ctx, userID, id); err != nil {
+	deleted, err := s.repo.DeleteOwned(ctx, userID, id)
+	if err != nil {
 		logger.Error("api_key_delete_failed",
 			sdk.LogFieldUserID, userID,
 			sdk.LogFieldAPIKeyID, id,
@@ -297,6 +300,7 @@ func (s *Service) DeleteOwned(ctx context.Context, userID, id int) error {
 		)
 		return err
 	}
+	auth.InvalidateAPIKeyHashCache(deleted.KeyHash)
 	logger.Info("api_key_deleted",
 		sdk.LogFieldUserID, userID,
 		sdk.LogFieldAPIKeyID, id,

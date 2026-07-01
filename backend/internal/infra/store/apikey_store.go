@@ -172,20 +172,16 @@ func (s *APIKeyStore) ResetUsageAdmin(ctx context.Context, id int) (appapikey.Ke
 }
 
 // DeleteOwned 删除当前用户 API Key。
-func (s *APIKeyStore) DeleteOwned(ctx context.Context, userID, id int) error {
-	exists, err := s.db.APIKey.Query().
-		Where(entapikey.IDEQ(id), entapikey.HasUserWith(entuser.IDEQ(userID))).
-		Exist(ctx)
+func (s *APIKeyStore) DeleteOwned(ctx context.Context, userID, id int) (appapikey.Key, error) {
+	item, err := s.findOwnedAPIKeyWithEdges(ctx, userID, id)
 	if err != nil {
-		return err
+		return appapikey.Key{}, err
 	}
-	if !exists {
-		return appapikey.ErrKeyNotFound
-	}
+	deleted := mapAPIKey(item)
 
 	tx, err := s.db.Tx(ctx)
 	if err != nil {
-		return err
+		return appapikey.Key{}, err
 	}
 	defer func() {
 		_ = tx.Rollback()
@@ -195,12 +191,15 @@ func (s *APIKeyStore) DeleteOwned(ctx context.Context, userID, id int) error {
 		Where(entusagelog.HasAPIKeyWith(entapikey.IDEQ(id))).
 		ClearAPIKey().
 		Exec(ctx); err != nil {
-		return err
+		return appapikey.Key{}, err
 	}
 	if err := tx.APIKey.DeleteOneID(id).Exec(ctx); err != nil {
-		return err
+		return appapikey.Key{}, err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return appapikey.Key{}, err
+	}
+	return deleted, nil
 }
 
 // FindOwned 查询当前用户的 API Key。
