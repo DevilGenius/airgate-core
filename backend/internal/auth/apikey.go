@@ -20,6 +20,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/apikey"
 	entsetting "github.com/DevilGenius/airgate-core/ent/setting"
+	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
@@ -55,6 +56,7 @@ var (
 			Where(
 				apikey.KeyHash(hash),
 				apikey.StatusEQ(apikey.StatusActive),
+				apikey.HasUserWith(user.StatusEQ(user.StatusActive)),
 			).
 			WithUser().
 			Only(ctx)
@@ -65,6 +67,7 @@ var (
 			Where(
 				apikey.KeyHash(hash),
 				apikey.StatusEQ(apikey.StatusActive),
+				apikey.HasUserWith(user.StatusEQ(user.StatusActive)),
 			).
 			WithUser().
 			WithGroup().

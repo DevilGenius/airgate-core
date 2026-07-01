@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql/schema"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
@@ -114,6 +115,42 @@ func TestValidateAPIKeyForLogin(t *testing.T) {
 	}
 	if _, err := ValidateAPIKeyForLogin(ctx, db, "sk-missing"); !errors.Is(err, ErrInvalidAPIKey) {
 		t.Fatalf("missing login api key error = %v, want %v", err, ErrInvalidAPIKey)
+	}
+}
+
+func TestValidateAPIKeyRejectsDisabledUser(t *testing.T) {
+	resetAPIKeyTestCache(t)
+	db := testdb.OpenMemoryEnt(t, "apikey_disabled_user", schema.WithGlobalUniqueID(false))
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	user := createAPIKeyTestUser(t, ctx, db, "disabled-user@example.com")
+	if err := db.User.UpdateOneID(user.ID).SetStatus(entuser.StatusDisabled).Exec(ctx); err != nil {
+		t.Fatalf("disable user: %v", err)
+	}
+	group := createAPIKeyTestGroup(t, ctx, db, "OpenAI", "openai")
+	key, hash, err := GenerateAPIKey()
+	if err != nil {
+		t.Fatalf("GenerateAPIKey: %v", err)
+	}
+	if _, err := db.APIKey.Create().
+		SetName("disabled-user-key").
+		SetKeyHash(hash).
+		SetUser(user).
+		SetGroup(group).
+		Save(ctx); err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+
+	if _, err := ValidateAPIKeyForLogin(ctx, db, key); !errors.Is(err, ErrInvalidAPIKey) {
+		t.Fatalf("disabled user login error = %v, want %v", err, ErrInvalidAPIKey)
+	}
+	if _, err := ValidateAPIKey(ctx, db, key); !errors.Is(err, ErrInvalidAPIKey) {
+		t.Fatalf("disabled user validate error = %v, want %v", err, ErrInvalidAPIKey)
 	}
 }
 
