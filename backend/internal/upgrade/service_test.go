@@ -65,7 +65,10 @@ func TestPickAssetAndIsNewer(t *testing.T) {
 	if !isNewer("v1.2.0", "v1.1.0") || !isNewer("v1.2.0", "dev") || !isNewer("v1.2.0", "v1.1.0-dirty") {
 		t.Fatal("新版本判断应识别更新场景")
 	}
-	if isNewer("", "v1.1.0") || isNewer("v1.2.0", "v1.2.0") {
+	if !isNewer("v1.10.0", "v1.9.0") || !isNewer("v1.2.0", "v1.2.0-beta.1") {
+		t.Fatal("新版本判断应按 semver 数值和 prerelease 规则比较")
+	}
+	if isNewer("", "v1.1.0") || isNewer("v1.2.0", "v1.2.0") || isNewer("v1.1.0", "v1.2.0") || isNewer("v1.9.0", "v1.10.0") {
 		t.Fatal("新版本判断误判")
 	}
 }

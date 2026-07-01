@@ -435,11 +435,10 @@ func copyFile(src, dst string) error {
 
 // isNewer 判断 latest 是否比 current 新。
 //
-// 简化策略：
-//   - current 为 "dev"、空、或包含 "-dirty" → 总是认为有更新
-//   - 否则做 v 前缀去除后字符串比较；release tag 走 semver 也接受
-//
-// 这里不引第三方 semver 库，少一个依赖；prerelease 比较留给 GitHub 端按时间排序。
+// 策略：
+//   - current 为 "dev"、空、或包含 "-dirty" → 总是认为有更新。
+//   - stable release 按 MAJOR.MINOR.PATCH 数值比较。
+//   - stable 版本高于同号 prerelease；两个 prerelease 同号时按标识符词法比较。
 func isNewer(latest, current string) bool {
 	if latest == "" {
 		return false
@@ -447,5 +446,70 @@ func isNewer(latest, current string) bool {
 	if current == "" || current == "dev" || strings.Contains(current, "-dirty") {
 		return true
 	}
-	return strings.TrimPrefix(latest, "v") != strings.TrimPrefix(current, "v")
+	latestVersion, ok := parseReleaseVersion(latest)
+	if !ok {
+		return false
+	}
+	currentVersion, ok := parseReleaseVersion(current)
+	if !ok {
+		return true
+	}
+	return latestVersion.compare(currentVersion) > 0
+}
+
+type releaseVersion struct {
+	major int
+	minor int
+	patch int
+	pre   string
+}
+
+func parseReleaseVersion(raw string) (releaseVersion, bool) {
+	s := strings.TrimPrefix(strings.TrimSpace(raw), "v")
+	if i := strings.IndexByte(s, '+'); i >= 0 {
+		s = s[:i]
+	}
+	pre := ""
+	if i := strings.IndexByte(s, '-'); i >= 0 {
+		pre = s[i+1:]
+		s = s[:i]
+	}
+	parts := strings.Split(s, ".")
+	if len(parts) != 3 {
+		return releaseVersion{}, false
+	}
+	nums := [3]int{}
+	for i, part := range parts {
+		if part == "" {
+			return releaseVersion{}, false
+		}
+		for _, r := range part {
+			if r < '0' || r > '9' {
+				return releaseVersion{}, false
+			}
+			nums[i] = nums[i]*10 + int(r-'0')
+		}
+	}
+	return releaseVersion{major: nums[0], minor: nums[1], patch: nums[2], pre: pre}, true
+}
+
+func (v releaseVersion) compare(other releaseVersion) int {
+	for _, pair := range [][2]int{{v.major, other.major}, {v.minor, other.minor}, {v.patch, other.patch}} {
+		if pair[0] > pair[1] {
+			return 1
+		}
+		if pair[0] < pair[1] {
+			return -1
+		}
+	}
+	if v.pre == other.pre {
+		return 0
+	}
+	if v.pre == "" {
+		return 1
+	}
+	if other.pre == "" {
+		return -1
+	}
+	return strings.Compare(v.pre, other.pre)
 }
