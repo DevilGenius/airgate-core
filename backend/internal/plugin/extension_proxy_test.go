@@ -25,7 +25,14 @@ func TestExtensionProxyBuildProxyRequest(t *testing.T) {
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodPost, "https://core.example.test/api/v1/ext/demo/hello?debug=1", strings.NewReader("payload"))
 	c.Request.Header.Set("Content-Type", "application/json")
-	c.Request.Header.Set("X-Forwarded-Proto", "https")
+	c.Request.Header.Set("Forwarded", "host=evil.example.test;proto=http")
+	c.Request.Header.Set("X-Forwarded-Host", "evil.example.test")
+	c.Request.Header.Set("X-Forwarded-Proto", "http")
+	c.Request.Header.Set("X-Forwarded-For", "203.0.113.10")
+	c.Request.Header.Set("X-Real-IP", "203.0.113.11")
+	c.Request.Header.Set("X-Airgate-Entry", "admin")
+	c.Request.Header.Set("X-Airgate-User-ID", "999")
+	c.Request.Header.Set("X-Airgate-Role", "admin")
 	c.Request.Header.Add("X-Custom", "a")
 	c.Request.Header.Add("X-Custom", "b")
 	c.Set(middleware.CtxKeyUserID, 123)
@@ -55,6 +62,11 @@ func TestExtensionProxyBuildProxyRequest(t *testing.T) {
 	}
 	if got := req.Headers["x-forwarded-proto"].Values[0]; got != "https" {
 		t.Fatalf("x-forwarded-proto = %q, want https", got)
+	}
+	for _, name := range []string{"forwarded", "x-forwarded-for", "x-real-ip"} {
+		if _, ok := req.Headers[name]; ok {
+			t.Fatalf("%s should not be forwarded: %#v", name, req.Headers[name])
+		}
 	}
 	if got := req.Headers["x-airgate-user-id"].Values[0]; got != "123" {
 		t.Fatalf("x-airgate-user-id = %q, want 123", got)

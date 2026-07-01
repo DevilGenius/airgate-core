@@ -44,6 +44,14 @@ var blockedResponseHeaders = map[string]bool{
 	"x-powered-by":                        true,
 }
 
+func blockedProxyRequestHeader(name string) bool {
+	name = strings.ToLower(name)
+	return name == "forwarded" ||
+		name == "x-real-ip" ||
+		strings.HasPrefix(name, "x-forwarded-") ||
+		strings.HasPrefix(name, "x-airgate-")
+}
+
 // ExtensionProxy 将 HTTP 请求代理到 extension 类型插件
 type ExtensionProxy struct {
 	manager *Manager
@@ -111,20 +119,22 @@ func (ep *ExtensionProxy) buildProxyRequest(c *gin.Context, subPath, entry strin
 
 	headers := make(map[string]*pb.HeaderValues)
 	for k, v := range c.Request.Header {
-		headers[strings.ToLower(k)] = &pb.HeaderValues{Values: v}
+		name := strings.ToLower(k)
+		if blockedProxyRequestHeader(name) {
+			continue
+		}
+		headers[name] = &pb.HeaderValues{Values: v}
 	}
 
 	headers["x-airgate-entry"] = &pb.HeaderValues{Values: []string{entry}}
-	if _, ok := headers["x-forwarded-host"]; !ok && c.Request.Host != "" {
+	if c.Request.Host != "" {
 		headers["x-forwarded-host"] = &pb.HeaderValues{Values: []string{c.Request.Host}}
 	}
-	if _, ok := headers["x-forwarded-proto"]; !ok {
-		proto := "http"
-		if c.Request.TLS != nil {
-			proto = "https"
-		}
-		headers["x-forwarded-proto"] = &pb.HeaderValues{Values: []string{proto}}
+	proto := "http"
+	if c.Request.TLS != nil {
+		proto = "https"
 	}
+	headers["x-forwarded-proto"] = &pb.HeaderValues{Values: []string{proto}}
 	if uid, ok := c.Get(middleware.CtxKeyUserID); ok {
 		if id, ok := uid.(int); ok {
 			headers["x-airgate-user-id"] = &pb.HeaderValues{Values: []string{strconv.Itoa(id)}}
