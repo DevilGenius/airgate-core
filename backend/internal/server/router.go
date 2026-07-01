@@ -60,7 +60,7 @@ func (s *Server) registerRoutes() {
 
 	// === 用户路由（需要 JWT 认证） ===
 	userGroup := v1.Group("")
-	userGroup.Use(middleware.JWTAuth(s.jwtMgr))
+	userGroup.Use(middleware.JWTAuth(s.jwtMgr, s.db))
 	{
 		accountGroup := userGroup.Group("")
 		accountGroup.Use(middleware.RequireRoles("admin", "user"))
@@ -231,7 +231,7 @@ func (s *Server) registerRoutes() {
 	// 用于支付插件等面向用户的扩展，让普通用户能调用插件接口（创建充值订单、查询自己订单等）。
 	// 插件需自行根据 X-Airgate-User-ID 头识别用户，并校验数据归属。
 	extUserGroup := r.Group("/api/v1/ext-user")
-	extUserGroup.Use(middleware.JWTAuth(s.jwtMgr), middleware.RequireRoles("admin", "user"))
+	extUserGroup.Use(middleware.JWTAuth(s.jwtMgr, s.db), middleware.RequireRoles("admin", "user"))
 	{
 		extUserGroup.Any("/:pluginName/*path", s.extensionProxy.Handle)
 	}

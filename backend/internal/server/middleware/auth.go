@@ -11,6 +11,7 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
@@ -62,6 +63,17 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 			response.Unauthorized(c, "Token 无效或已过期")
 			c.Abort()
 			return
+		}
+		if claims.UserID > 0 && len(db) > 0 && db[0] != nil {
+			exists, err := db[0].User.Query().
+				Where(entuser.IDEQ(claims.UserID), entuser.StatusEQ(entuser.StatusActive)).
+				Exist(c.Request.Context())
+			if err != nil || !exists {
+				slog.Warn("jwt_validation_failed", sdk.LogFieldReason, "user_inactive", sdk.LogFieldError, err, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+				response.Unauthorized(c, "Token 无效或已过期")
+				c.Abort()
+				return
+			}
 		}
 
 		c.Set(CtxKeyUserID, claims.UserID)

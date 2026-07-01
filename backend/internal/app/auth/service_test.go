@@ -289,7 +289,11 @@ func TestRefreshTokenPreservesAPIKeyIdentity(t *testing.T) {
 
 func TestRefreshTokenPreservesUserIdentity(t *testing.T) {
 	jwtMgr := corauth.NewJWTManager("secret", 24)
-	service := NewService(authStubRepository{}, jwtMgr)
+	service := NewService(authStubRepository{
+		findByID: func() (User, error) {
+			return User{ID: 5, Role: "user", Email: "fresh@test.com", Status: "active"}, nil
+		},
+	}, jwtMgr)
 
 	token, err := service.RefreshToken(t.Context(), AuthIdentity{
 		UserID: 5,
@@ -303,7 +307,7 @@ func TestRefreshTokenPreservesUserIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("解析刷新 token 失败: %v", err)
 	}
-	if claims.UserID != 5 || claims.APIKeyID != 0 || claims.Role != "admin" || claims.Email != "u@test.com" {
+	if claims.UserID != 5 || claims.APIKeyID != 0 || claims.Role != "user" || claims.Email != "fresh@test.com" {
 		t.Fatalf("刷新 claims 异常: %+v", claims)
 	}
 }
@@ -311,13 +315,31 @@ func TestRefreshTokenPreservesUserIdentity(t *testing.T) {
 func TestRefreshTokenReturnsUserTokenIssueError(t *testing.T) {
 	tokenErr := errors.New("token issue failed")
 	service := &Service{
-		repo:   authStubRepository{},
+		repo: authStubRepository{
+			findByID: func() (User, error) {
+				return User{ID: 5, Role: "admin", Email: "u@test.com", Status: "active"}, nil
+			},
+		},
 		jwtMgr: failingTokenIssuer{tokenErr: tokenErr},
 	}
 
 	_, err := service.RefreshToken(t.Context(), AuthIdentity{UserID: 5, Role: "admin", Email: "u@test.com"})
 	if !errors.Is(err, tokenErr) {
 		t.Fatalf("刷新错误 = %v，期望 %v", err, tokenErr)
+	}
+}
+
+func TestRefreshTokenRejectsInactiveUser(t *testing.T) {
+	jwtMgr := corauth.NewJWTManager("secret", 24)
+	service := NewService(authStubRepository{
+		findByID: func() (User, error) {
+			return User{ID: 5, Role: "user", Email: "disabled@test.com", Status: "disabled"}, nil
+		},
+	}, jwtMgr)
+
+	_, err := service.RefreshToken(t.Context(), AuthIdentity{UserID: 5, Role: "user", Email: "disabled@test.com"})
+	if !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("inactive refresh error = %v, want %v", err, ErrUserNotFound)
 	}
 }
 

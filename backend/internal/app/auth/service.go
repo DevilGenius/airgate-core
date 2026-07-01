@@ -148,7 +148,22 @@ func (s *Service) RefreshToken(ctx context.Context, identity AuthIdentity) (stri
 		}
 		return token, err
 	}
-	token, err := s.jwtMgr.GenerateToken(identity.UserID, identity.Role, identity.Email)
+	user, err := s.repo.FindByID(ctx, identity.UserID, false)
+	if err != nil {
+		slog.Default().Warn("jwt_refresh_rejected",
+			sdk.LogFieldUserID, identity.UserID,
+			sdk.LogFieldError, err,
+		)
+		return "", err
+	}
+	if user.Status != "active" {
+		slog.Default().Warn("jwt_refresh_rejected",
+			sdk.LogFieldUserID, identity.UserID,
+			sdk.LogFieldReason, "user_inactive",
+		)
+		return "", ErrUserNotFound
+	}
+	token, err := s.jwtMgr.GenerateToken(user.ID, user.Role, user.Email)
 	if err != nil {
 		slog.Default().Error("jwt_issue_failed",
 			sdk.LogFieldUserID, identity.UserID,
