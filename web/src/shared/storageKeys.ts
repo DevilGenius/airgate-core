@@ -17,7 +17,6 @@ export const STORAGE_KEYS = {
     pageSizePrefix: 'ag:web:pagination:page_size:',
   },
   setup: {
-    bootstrapToken: 'ag:web:setup:bootstrap_token',
     complete: 'ag:web:setup:complete',
   },
   settings: {

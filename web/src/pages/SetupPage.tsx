@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import type { TestDBReq, TestRedisReq, AdminSetup } from '../shared/types';
 import { setupApi } from '../shared/api/setup';
-import { STORAGE_KEYS } from '../shared/storageKeys';
 import StepDatabase from './setup/StepDatabase';
 import StepRedis from './setup/StepRedis';
 import StepAdmin from './setup/StepAdmin';
@@ -119,19 +118,6 @@ export default function SetupPage() {
     password: '',
     confirmPassword: '',
   });
-
-  useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get('token')?.trim();
-    if (!token) return;
-    try {
-      window.sessionStorage.setItem(STORAGE_KEYS.setup.bootstrapToken, token);
-      const url = new URL(window.location.href);
-      url.searchParams.delete('token');
-      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-    } catch {
-      // Storage can be unavailable in locked-down browsers; the backend will reject guarded setup calls.
-    }
-  }, []);
 
   // 拉取后端 status，预填环境变量已提供的字段并标记跳过
   useEffect(() => {

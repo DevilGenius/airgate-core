@@ -1,12 +1,7 @@
 package setup
 
 import (
-	"crypto/rand"
-	"crypto/subtle"
-	"encoding/hex"
 	"net/http"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -19,10 +14,6 @@ import (
 // 安装完成回调
 var onInstallDone func()
 var setupInstallCallbackDelay = 500 * time.Millisecond
-var setupBootstrapTokenMu sync.RWMutex
-var setupBootstrapToken string
-
-const SetupBootstrapTokenHeader = "X-Airgate-Setup-Token"
 
 // RegisterRoutes 注册安装向导路由（无回调）
 func RegisterRoutes(r *gin.Engine) {
@@ -32,15 +23,13 @@ func RegisterRoutes(r *gin.Engine) {
 // RegisterRoutesWithCallback 注册安装向导路由，安装成功后触发回调
 func RegisterRoutesWithCallback(r *gin.Engine, callback func()) {
 	onInstallDone = callback
-	EnsureBootstrapToken()
 	setup := r.Group("/setup")
 	{
 		setup.GET("/status", handleStatus)
-		guarded := setup.Group("")
-		guarded.Use(setupGuard())
-		guarded.POST("/test-db", handleTestDB)
-		guarded.POST("/test-redis", handleTestRedis)
-		guarded.POST("/install", handleInstall)
+		setup.Use(setupGuard())
+		setup.POST("/test-db", handleTestDB)
+		setup.POST("/test-redis", handleTestRedis)
+		setup.POST("/install", handleInstall)
 	}
 }
 
@@ -52,55 +41,8 @@ func setupGuard() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if !validSetupBootstrapToken(c) {
-			response.Error(c, http.StatusUnauthorized, 401, "安装令牌无效")
-			c.Abort()
-			return
-		}
 		c.Next()
 	}
-}
-
-func EnsureBootstrapToken() string {
-	setupBootstrapTokenMu.Lock()
-	defer setupBootstrapTokenMu.Unlock()
-	if setupBootstrapToken == "" {
-		setupBootstrapToken = generateBootstrapToken()
-	}
-	return setupBootstrapToken
-}
-
-func ResetBootstrapToken() string {
-	setupBootstrapTokenMu.Lock()
-	defer setupBootstrapTokenMu.Unlock()
-	setupBootstrapToken = generateBootstrapToken()
-	return setupBootstrapToken
-}
-
-func CurrentBootstrapToken() string {
-	setupBootstrapTokenMu.RLock()
-	defer setupBootstrapTokenMu.RUnlock()
-	return setupBootstrapToken
-}
-
-func generateBootstrapToken() string {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return ""
-	}
-	return hex.EncodeToString(buf)
-}
-
-func validSetupBootstrapToken(c *gin.Context) bool {
-	want := CurrentBootstrapToken()
-	if want == "" {
-		return false
-	}
-	got := strings.TrimSpace(c.GetHeader(SetupBootstrapTokenHeader))
-	if got == "" {
-		got = strings.TrimSpace(c.Query("token"))
-	}
-	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 }
 
 func handleStatus(c *gin.Context) {

@@ -151,10 +151,6 @@ function buildHeaders(includeContentType: boolean): Record<string, string> {
   if (includeContentType) {
     headers['Content-Type'] = 'application/json';
   }
-  const setupToken = readBrowserStorage('sessionStorage', STORAGE_KEYS.setup.bootstrapToken);
-  if (setupToken) {
-    headers['X-Airgate-Setup-Token'] = setupToken;
-  }
   if (accessToken) {
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
