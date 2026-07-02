@@ -17,9 +17,9 @@ const DefaultPort = 9517
 
 // DefaultHost 默认监听地址
 //
-// 127.0.0.1 = 仅本机可访问（需要通过反向代理或防火墙转发才能暴露）
-// 0.0.0.0 = 绑定所有接口，局域网/公网可达（取决于防火墙），必须显式配置
-const DefaultHost = "127.0.0.1"
+// 0.0.0.0 = 绑定所有接口，适配 Docker 端口发布和反向代理部署
+// 127.0.0.1 = 仅本机可访问（需显式配置）
+const DefaultHost = "0.0.0.0"
 
 // GetPort 获取服务端口（优先环境变量 PORT）
 func GetPort() int {
@@ -95,8 +95,8 @@ type DevPlugin struct {
 // 如果旧的 config.yaml 里仍有 web_dir，会被 yaml 解析器静默忽略，无需手工清理。
 type ServerConfig struct {
 	// Host 监听地址：
-	//   - "127.0.0.1"（默认）仅本机访问
-	//   - "0.0.0.0" 绑定所有网卡，局域网可达
+	//   - "0.0.0.0"（默认）绑定所有网卡，适配 Docker 端口发布和反向代理部署
+	//   - "127.0.0.1" 仅本机访问
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 	Mode string `yaml:"mode"` // debug / release

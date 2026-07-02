@@ -118,7 +118,7 @@ services:
       # 运行时图片资产持久化
       - ./data/assets:/app/data/assets
     ports:
-      - "${BIND_HOST:-127.0.0.1}:${PORT:-9517}:9517"
+      - "${BIND_HOST:-0.0.0.0}:${PORT:-9517}:9517"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9517/healthz"]
       interval: 30s

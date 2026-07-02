@@ -1,5 +1,5 @@
 server:
-  host: 127.0.0.1                # 监听地址：127.0.0.1=仅本机 / 0.0.0.0=所有接口(需显式配置)
+  host: 0.0.0.0                  # 监听地址：0.0.0.0=所有接口 / 127.0.0.1=仅本机
   port: 9517
   mode: release                  # debug / release
   trusted_proxies: []            # 反向代理 IP/CIDR；为空表示不信任 X-Forwarded-For
