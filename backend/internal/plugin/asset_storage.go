@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -52,6 +53,8 @@ const (
 	maxAssetDownloadSize = 50 << 20
 	assetDownloadTimeout = 60 * time.Second
 )
+
+var allowPrivateAssetDownloadsForTesting bool
 
 const DefaultAssetStorageDir = "data/assets"
 
@@ -450,6 +453,9 @@ func (s *AssetStorage) StoreFromURL(ctx context.Context, userID int64, purpose A
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return nil, fmt.Errorf("invalid source URL: must be http or https")
 	}
+	if err := validateAssetSourceURL(ctx, parsed); err != nil {
+		return nil, err
+	}
 
 	dlCtx, cancel := context.WithTimeout(ctx, assetDownloadTimeout)
 	defer cancel()
@@ -458,7 +464,13 @@ func (s *AssetStorage) StoreFromURL(ctx context.Context, userID int64, purpose A
 	if err != nil {
 		return nil, fmt.Errorf("build download request: %w", err)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{
+		Timeout: assetDownloadTimeout,
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			return validateAssetSourceURL(req.Context(), req.URL)
+		},
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("download asset: %w", err)
 	}
@@ -486,6 +498,50 @@ func (s *AssetStorage) StoreFromURL(ctx context.Context, userID int64, purpose A
 	ext := extensionForContentType(ct)
 
 	return s.Store(ctx, userID, purpose, ct, ext, data)
+}
+
+func validateAssetSourceURL(ctx context.Context, parsed *url.URL) error {
+	if parsed == nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return fmt.Errorf("invalid source URL: must be http or https")
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		return fmt.Errorf("invalid source URL: missing host")
+	}
+	if allowPrivateAssetDownloadsForTesting {
+		return nil
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if unsafeAssetDownloadIP(ip) {
+			return fmt.Errorf("invalid source URL: private or local address is not allowed")
+		}
+		return nil
+	}
+	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return fmt.Errorf("resolve source URL host: %w", err)
+	}
+	if len(ips) == 0 {
+		return fmt.Errorf("resolve source URL host: no addresses")
+	}
+	for _, resolved := range ips {
+		if unsafeAssetDownloadIP(resolved.IP) {
+			return fmt.Errorf("invalid source URL: private or local address is not allowed")
+		}
+	}
+	return nil
+}
+
+func unsafeAssetDownloadIP(ip net.IP) bool {
+	if ip == nil {
+		return true
+	}
+	return ip.IsUnspecified() ||
+		ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast()
 }
 
 func extensionForContentType(ct string) string {

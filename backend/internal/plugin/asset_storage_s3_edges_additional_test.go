@@ -151,6 +151,7 @@ func TestAssetStorageCleanupLocalAndS3Purposes(t *testing.T) {
 }
 
 func TestAssetStorageStoreFromURLDefaultsAndTooLarge(t *testing.T) {
+	allowPrivateAssetDownloads(t)
 	storage := newTestAssetStorage(t)
 	server := httptestServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("plain"))

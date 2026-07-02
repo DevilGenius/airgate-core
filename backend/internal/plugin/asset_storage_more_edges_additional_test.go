@@ -163,6 +163,7 @@ func (zeroReader) Read(p []byte) (int, error) {
 }
 
 func TestAssetStorageStoreFromURLTooLarge(t *testing.T) {
+	allowPrivateAssetDownloads(t)
 	storage := newTestAssetStorage(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "image/png")

@@ -112,7 +112,7 @@ func TestAssetStorageLocalErrorBranches(t *testing.T) {
 }
 
 func TestAssetStorageStoreFromURLLocal(t *testing.T) {
-	t.Parallel()
+	allowPrivateAssetDownloads(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/png; charset=utf-8")
@@ -138,13 +138,15 @@ func TestAssetStorageStoreFromURLLocal(t *testing.T) {
 }
 
 func TestAssetStorageStoreFromURLErrors(t *testing.T) {
-	t.Parallel()
-
 	storage := newTestAssetStorage(t)
 	if _, err := storage.StoreFromURL(context.Background(), 42, AssetPurposeUpload, "file:///tmp/a.png"); err == nil {
 		t.Fatal("StoreFromURL(file) error = nil, want error")
 	}
+	if _, err := storage.StoreFromURL(context.Background(), 42, AssetPurposeUpload, "http://127.0.0.1/internal.png"); err == nil || !strings.Contains(err.Error(), "private or local") {
+		t.Fatalf("StoreFromURL(loopback) error = %v", err)
+	}
 
+	allowPrivateAssetDownloads(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "nope", http.StatusBadGateway)
 	}))
@@ -152,4 +154,11 @@ func TestAssetStorageStoreFromURLErrors(t *testing.T) {
 	if _, err := storage.StoreFromURL(context.Background(), 42, AssetPurposeUpload, server.URL); err == nil {
 		t.Fatal("StoreFromURL(non-200) error = nil, want error")
 	}
+}
+
+func allowPrivateAssetDownloads(t *testing.T) {
+	t.Helper()
+	prev := allowPrivateAssetDownloadsForTesting
+	allowPrivateAssetDownloadsForTesting = true
+	t.Cleanup(func() { allowPrivateAssetDownloadsForTesting = prev })
 }

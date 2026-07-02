@@ -136,6 +136,7 @@ func TestHostInvokeDispatchesLocalMethods(t *testing.T) {
 		t.Fatalf("asset bytes payload = %+v", bytesPayload)
 	}
 
+	allowPrivateAssetDownloads(t)
 	downloadServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/png; charset=binary")
 		_, _ = w.Write([]byte("remote-asset"))
