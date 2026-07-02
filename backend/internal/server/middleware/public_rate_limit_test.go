@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -42,6 +43,52 @@ func TestPublicRateLimitLimitsByClientAndRoute(t *testing.T) {
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("different route should have separate bucket, status=%d", w.Code)
+	}
+}
+
+func TestPublicRateLimitIgnoresForwardedFor(t *testing.T) {
+	resetPublicRateLimiterForTesting()
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(PublicRateLimit(2, time.Minute))
+	router.POST("/login", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/login", nil)
+		req.RemoteAddr = "203.0.113.1:1234"
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("198.51.100.%d", i+1))
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusNoContent {
+			t.Fatalf("request %d status = %d", i, w.Code)
+		}
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/login", nil)
+	req.RemoteAddr = "203.0.113.1:1234"
+	req.Header.Set("X-Forwarded-For", "198.51.100.99")
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("spoofed X-Forwarded-For bypassed limiter, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestPublicRateLimitPeerIP(t *testing.T) {
+	tests := []struct {
+		remoteAddr string
+		want       string
+	}{
+		{"203.0.113.1:1234", "203.0.113.1"},
+		{"[2001:db8::1]:443", "2001:db8::1"},
+		{"unix-socket", "unix-socket"},
+	}
+
+	for _, tt := range tests {
+		if got := publicRateLimitPeerIP(tt.remoteAddr); got != tt.want {
+			t.Fatalf("publicRateLimitPeerIP(%q) = %q, want %q", tt.remoteAddr, got, tt.want)
+		}
 	}
 }
 

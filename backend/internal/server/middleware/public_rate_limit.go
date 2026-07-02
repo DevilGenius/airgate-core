@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -48,7 +49,15 @@ func publicRateLimitKey(c *gin.Context) string {
 	if route == "" {
 		route = c.Request.URL.Path
 	}
-	return c.ClientIP() + "\x00" + route
+	return publicRateLimitPeerIP(c.Request.RemoteAddr) + "\x00" + route
+}
+
+func publicRateLimitPeerIP(remoteAddr string) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err == nil {
+		return host
+	}
+	return remoteAddr
 }
 
 func (l *publicRateLimiter) allow(key string, maxRequests int, window time.Duration, now time.Time) (bool, time.Duration) {
