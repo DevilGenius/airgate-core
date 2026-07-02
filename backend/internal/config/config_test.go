@@ -64,6 +64,7 @@ plugins:
 	t.Setenv("DB_HOST", "db.env")
 	t.Setenv("DB_PORT", "15432")
 	t.Setenv("REDIS_TLS", "true")
+	t.Setenv("REDIS_TLS_SERVER_NAME", "redis.service.local")
 	t.Setenv("LOG_LEVEL", "debug")
 	t.Setenv("PLUGINS_DIR", "env/plugins")
 
@@ -80,6 +81,9 @@ plugins:
 	}
 	if !cfg.Redis.TLS {
 		t.Fatalf("Redis TLS 未被环境变量覆盖: %+v", cfg.Redis)
+	}
+	if cfg.Redis.TLSServerName != "redis.service.local" {
+		t.Fatalf("Redis TLS ServerName 未被环境变量覆盖: %+v", cfg.Redis)
 	}
 	if cfg.Log.Level != "debug" || cfg.Plugins.Dir != "env/plugins" {
 		t.Fatalf("日志或插件配置未被环境变量覆盖: log=%+v plugins=%+v", cfg.Log, cfg.Plugins)
@@ -189,7 +193,7 @@ func clearConfigEnv(t *testing.T) {
 	keys := []string{
 		"HOST", "PORT", "GIN_MODE",
 		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE",
-		"REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "REDIS_DB", "REDIS_TLS",
+		"REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "REDIS_DB", "REDIS_TLS", "REDIS_TLS_SERVER_NAME",
 		"JWT_SECRET", "JWT_EXPIRE_HOUR",
 		"LOG_LEVEL", "LOG_FORMAT",
 		"API_KEY_SECRET", "PLUGINS_DIR", "PLUGINS_MARKETPLACE_GITHUB_TOKEN",

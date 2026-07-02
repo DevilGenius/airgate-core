@@ -3,6 +3,7 @@ package redisconfig
 import (
 	"crypto/tls"
 	"fmt"
+	"strings"
 
 	"github.com/redis/go-redis/v9"
 
@@ -16,7 +17,11 @@ func Options(cfg config.RedisConfig) *redis.Options {
 		DB:       cfg.DB,
 	}
 	if cfg.TLS {
-		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		serverName := strings.TrimSpace(cfg.TLSServerName)
+		if serverName == "" {
+			serverName = strings.TrimSpace(cfg.Host)
+		}
+		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, ServerName: serverName}
 	}
 	return opts
 }

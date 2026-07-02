@@ -211,7 +211,7 @@ func clearSetupEnv(t *testing.T) {
 	t.Helper()
 	keys := []string{
 		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE",
-		"REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "REDIS_DB", "REDIS_TLS",
+		"REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "REDIS_DB", "REDIS_TLS", "REDIS_TLS_SERVER_NAME",
 		"CONFIG_PATH",
 	}
 	for _, key := range keys {

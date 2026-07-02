@@ -121,11 +121,12 @@ type DatabaseConfig struct {
 
 // RedisConfig Redis 配置
 type RedisConfig struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	Password string `yaml:"password"`
-	DB       int    `yaml:"db"`
-	TLS      bool   `yaml:"tls"`
+	Host          string `yaml:"host"`
+	Port          int    `yaml:"port"`
+	Password      string `yaml:"password"`
+	DB            int    `yaml:"db"`
+	TLS           bool   `yaml:"tls"`
+	TLSServerName string `yaml:"tls_server_name"`
 }
 
 // JWTConfig JWT 配置
@@ -253,6 +254,7 @@ func applyEnvOverrides(cfg *Config) {
 	envStr("REDIS_PASSWORD", &cfg.Redis.Password)
 	envInt("REDIS_DB", &cfg.Redis.DB)
 	envBool("REDIS_TLS", &cfg.Redis.TLS)
+	envStr("REDIS_TLS_SERVER_NAME", &cfg.Redis.TLSServerName)
 
 	// JWT
 	envStr("JWT_SECRET", &cfg.JWT.Secret)
