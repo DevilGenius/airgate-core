@@ -740,7 +740,7 @@
     "auto_update_off": "Off",
     "runtime_latency": "Latency (5min/1h)",
     "runtime_capacity": "Queue & Capacity",
-    "runtime_dependencies": "Redis / Postgres",
+    "runtime_dependencies": "Storage",
     "runtime_process": "Runtime & Backlog",
     "runtime_event_counts": "Event Counts",
     "runtime_frt_avg": "FRT",

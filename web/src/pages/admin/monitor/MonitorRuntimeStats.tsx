@@ -60,6 +60,10 @@ function DetailSeparator() {
 }
 
 function joinDetail(parts: ReactNode[]) {
+  if (parts.length <= 1) {
+    return <span className="block min-w-0 truncate">{parts[0]}</span>;
+  }
+
   const columns = parts.length > 2
     ? 'grid-cols-[minmax(0,1fr)_0.75rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)]'
     : 'grid-cols-[minmax(0,1fr)_0.75rem_minmax(0,1fr)]';
@@ -104,7 +108,7 @@ function RuntimeCard({
         </div>
         <div className="mt-auto min-w-0">
           <div className="mt-1.5 space-y-0.5 text-xs leading-4 text-text-tertiary">
-            <div className="min-w-0 overflow-hidden">{meta}</div>
+            {meta ? <div className="min-w-0 overflow-hidden">{meta}</div> : null}
             {details.map((detail, index) => (
               <div className="min-w-0 overflow-hidden" key={index}>{detail}</div>
             ))}
@@ -119,6 +123,25 @@ function MetricIcon({ icon, tone }: { icon: ReactNode; tone: string }) {
   return (
     <span className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${tone}`}>
       {icon}
+    </span>
+  );
+}
+
+function DependencyLatencyValue({
+  postgresLatency,
+  redisLatency,
+}: {
+  postgresLatency: string;
+  redisLatency: string;
+}) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-4 align-middle">
+      <span className="min-w-0 truncate">
+        PG {postgresLatency}
+      </span>
+      <span className="min-w-0 truncate">
+        Redis {redisLatency}
+      </span>
     </span>
   );
 }
@@ -212,7 +235,6 @@ export function MonitorRuntimeStats({
   const redis = snapshot?.dependencies?.redis;
   const runtime = snapshot?.runtime;
 
-  const dependencyStatus = (healthy?: boolean) => (healthy ? t('monitor.runtime_ok') : t('monitor.runtime_down'));
   const latencyFRTValue = [
     t('monitor.runtime_frt_avg'),
     formatDurationPairWithDelta(latency?.frt_avg_ms, latency1H?.frt_avg_ms),
@@ -244,26 +266,6 @@ export function MonitorRuntimeStats({
       <RuntimeCard
         details={[
           joinDetail([
-            `PG ${postgres?.active ?? 0}/${postgres?.open ?? 0}`,
-            `Redis ${redis?.active ?? 0}/${redis?.total ?? 0}`,
-          ]),
-          joinDetail([
-            `PG wait +${fmtNum(postgres?.wait_count_delta ?? 0)}`,
-            `Redis timeout +${fmtNum(redis?.timeout_delta ?? 0)}`,
-          ]),
-        ]}
-        icon={<Database className="h-5 w-5" />}
-        label={t('monitor.runtime_dependencies')}
-        meta={joinDetail([
-          `PG ${formatPing(postgres?.healthy, postgres?.ping_ms)}`,
-          `Redis ${formatPing(redis?.healthy, redis?.ping_ms)}`,
-        ])}
-        tone="bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-400/15 dark:text-emerald-300 dark:ring-emerald-400/25"
-        value={`PG ${dependencyStatus(postgres?.healthy)} Redis ${dependencyStatus(redis?.healthy)}`}
-      />
-      <RuntimeCard
-        details={[
-          joinDetail([
             `${t('monitor.runtime_capacity')} ${ratioText(capacity?.account_in_use, capacity?.account_capacity)}`,
             `${t('monitor.runtime_working')} ${fmtNum(capacity?.working_accounts ?? 0)}`,
           ]),
@@ -284,6 +286,28 @@ export function MonitorRuntimeStats({
         ])}
         tone="bg-violet-100 text-violet-700 ring-violet-200 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/25"
         value={`${fmtNum(runtime?.goroutines ?? 0)} goroutines`}
+      />
+      <RuntimeCard
+        details={[
+          joinDetail([
+            `PG ${postgres?.active ?? 0}/${postgres?.open ?? 0}`,
+            `Redis ${redis?.active ?? 0}/${redis?.total ?? 0}`,
+          ]),
+          joinDetail([
+            `PG wait +${fmtNum(postgres?.wait_count_delta ?? 0)}`,
+            `Redis timeout +${fmtNum(redis?.timeout_delta ?? 0)}`,
+          ]),
+        ]}
+        icon={<Database className="h-5 w-5" />}
+        label={t('monitor.runtime_dependencies')}
+        meta={null}
+        tone="bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-400/15 dark:text-emerald-300 dark:ring-emerald-400/25"
+        value={(
+          <DependencyLatencyValue
+            postgresLatency={formatPing(postgres?.healthy, postgres?.ping_ms)}
+            redisLatency={formatPing(redis?.healthy, redis?.ping_ms)}
+          />
+        )}
       />
     </div>
   );

@@ -745,7 +745,7 @@
     "auto_update_off": "关闭",
     "runtime_latency": "延迟概览(5min/1h)",
     "runtime_capacity": "队列与容量",
-    "runtime_dependencies": "Redis / Postgres",
+    "runtime_dependencies": "存储",
     "runtime_process": "运行时与后台",
     "runtime_event_counts": "事件数量",
     "runtime_frt_avg": "FRT",
