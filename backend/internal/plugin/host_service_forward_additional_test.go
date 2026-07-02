@@ -5,11 +5,14 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"entgo.io/ent/dialect/sql/schema"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
@@ -183,6 +186,128 @@ func TestHostServiceSchedulerProbeAndForwardRuntime(t *testing.T) {
 	})
 	if err != nil || clientErr["status_code"] != http.StatusBadRequest || !strings.Contains(clientErr["body"].(string), `"bad"`) {
 		t.Fatalf("host forward client error payload = %+v, %v", clientErr, err)
+	}
+}
+
+func TestHostForwardRejectsInactivePrincipalsAndExclusiveBypass(t *testing.T) {
+	ctx := context.Background()
+	restoreRouteGraph := routegraph.SetSnapshotForTesting(nil)
+	t.Cleanup(restoreRouteGraph)
+
+	db := testdb.OpenMemoryEnt(t, "host_forward_authz_boundaries", schema.WithGlobalUniqueID(false))
+	t.Cleanup(func() { _ = db.Close() })
+
+	activeUser := db.User.Create().
+		SetEmail("active@example.com").
+		SetUsername("active").
+		SetPasswordHash("hash").
+		SetBalance(100).
+		SaveX(ctx)
+	disabledUser := db.User.Create().
+		SetEmail("disabled@example.com").
+		SetUsername("disabled").
+		SetPasswordHash("hash").
+		SetBalance(100).
+		SetStatus(entuser.StatusDisabled).
+		SaveX(ctx)
+	publicGroup := db.Group.Create().
+		SetName("public").
+		SetPlatform("openai").
+		SaveX(ctx)
+	exclusiveGroup := db.Group.Create().
+		SetName("exclusive").
+		SetPlatform("openai").
+		SetIsExclusive(true).
+		SaveX(ctx)
+	db.Account.Create().
+		SetName("public account").
+		SetPlatform("openai").
+		SetType("apikey").
+		SetCredentials(map[string]string{"api_key": "sk-public"}).
+		AddGroupIDs(publicGroup.ID).
+		SaveX(ctx)
+	db.Account.Create().
+		SetName("exclusive account").
+		SetPlatform("openai").
+		SetType("apikey").
+		SetCredentials(map[string]string{"api_key": "sk-exclusive"}).
+		AddGroupIDs(exclusiveGroup.ID).
+		SaveX(ctx)
+
+	activeKey := db.APIKey.Create().
+		SetName("active").
+		SetKeyHash("active").
+		SetSellRate(1.5).
+		SetUser(activeUser).
+		SaveX(ctx)
+	disabledKey := db.APIKey.Create().
+		SetName("disabled").
+		SetKeyHash("disabled").
+		SetStatus(entapikey.StatusDisabled).
+		SetUser(activeUser).
+		SaveX(ctx)
+	expiredKey := db.APIKey.Create().
+		SetName("expired").
+		SetKeyHash("expired").
+		SetExpiresAt(time.Now().Add(-time.Hour)).
+		SetUser(activeUser).
+		SaveX(ctx)
+	exhaustedKey := db.APIKey.Create().
+		SetName("exhausted").
+		SetKeyHash("exhausted").
+		SetQuotaUsd(1).
+		SetUsedQuota(1).
+		SetUser(activeUser).
+		SaveX(ctx)
+
+	if err := routegraph.RefreshSync(ctx, db); err != nil {
+		t.Fatalf("refresh routegraph: %v", err)
+	}
+	host := NewHostService(db, &Manager{}, nil, nil, nil, nil)
+
+	_, _, err := host.hostForwardRoutes(ctx, hostForwardRequest{
+		UserID: int64(disabledUser.ID),
+		Model:  "gpt-4.1",
+		Headers: map[string]interface{}{
+			"X-Airgate-Platform": "openai",
+		},
+	})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("disabled user route error = %v", err)
+	}
+
+	_, _, err = host.hostForwardRoutes(ctx, hostForwardRequest{
+		UserID:  int64(activeUser.ID),
+		GroupID: int64(exclusiveGroup.ID),
+		Model:   "gpt-4.1",
+	})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("exclusive group route error = %v", err)
+	}
+
+	if err := host.checkHostForwardAPIKey(hostForwardRequest{UserID: int64(activeUser.ID), APIKeyID: int64(activeKey.ID)}); err != nil {
+		t.Fatalf("active api key rejected: %v", err)
+	}
+	if sellRate, err := host.hostForwardSellRate(ctx, hostForwardRequest{UserID: int64(activeUser.ID), APIKeyID: int64(activeKey.ID)}); err != nil || sellRate != 1.5 {
+		t.Fatalf("active sell rate = %v, %v", sellRate, err)
+	}
+
+	for _, tt := range []struct {
+		name string
+		key  int
+		code codes.Code
+	}{
+		{name: "disabled", key: disabledKey.ID, code: codes.PermissionDenied},
+		{name: "expired", key: expiredKey.ID, code: codes.PermissionDenied},
+		{name: "exhausted", key: exhaustedKey.ID, code: codes.ResourceExhausted},
+	} {
+		err := host.checkHostForwardAPIKey(hostForwardRequest{UserID: int64(activeUser.ID), APIKeyID: int64(tt.key)})
+		if status.Code(err) != tt.code {
+			t.Fatalf("%s key error = %v, want %v", tt.name, err, tt.code)
+		}
+		if _, err := host.hostForwardSellRate(ctx, hostForwardRequest{UserID: int64(activeUser.ID), APIKeyID: int64(tt.key)}); err == nil {
+			t.Fatalf("%s key sell rate error = nil", tt.name)
+		}
 	}
 }
 

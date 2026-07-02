@@ -149,7 +149,10 @@ func TestRefreshSyncAndIncrementalUpdates(t *testing.T) {
 	if userNode := User(user.ID); userNode == nil || userNode.Email != user.Email || userNode.Balance != 12.5 || userNode.MaxConcurrency != 7 {
 		t.Fatalf("User = %+v", userNode)
 	}
-	if keyNode := APIKey(key.ID); keyNode == nil || keyNode.UserID != user.ID || keyNode.SellRate != 3 {
+	if userNode := User(user.ID); !userNode.Active() {
+		t.Fatalf("User active = false: %+v", userNode)
+	}
+	if keyNode := APIKey(key.ID); keyNode == nil || keyNode.UserID != user.ID || keyNode.SellRate != 3 || !keyNode.Active(time.Now()) {
 		t.Fatalf("APIKey = %+v", keyNode)
 	}
 
@@ -215,6 +218,15 @@ func TestRefreshSyncAndIncrementalUpdates(t *testing.T) {
 	}
 	if got := APIKey(key.ID).SellRate; got != 4 {
 		t.Fatalf("APIKey sell rate = %v, want 4", got)
+	}
+	if err := db.APIKey.UpdateOneID(key.ID).SetQuotaUsd(1).SetUsedQuota(1).Exec(ctx); err != nil {
+		t.Fatalf("exhaust api key: %v", err)
+	}
+	if err := RefreshAPIKey(ctx, db, key.ID); err != nil {
+		t.Fatalf("RefreshAPIKey exhausted returned error: %v", err)
+	}
+	if keyNode := APIKey(key.ID); keyNode == nil || !keyNode.QuotaExhausted() || keyNode.Active(time.Now()) {
+		t.Fatalf("exhausted APIKey = %+v", keyNode)
 	}
 	if err := db.APIKey.DeleteOneID(key.ID).Exec(ctx); err != nil {
 		t.Fatalf("delete api key: %v", err)

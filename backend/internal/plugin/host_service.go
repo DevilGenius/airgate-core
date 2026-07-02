@@ -704,6 +704,9 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 	if err := h.checkHostForwardBalance(ctx, req.UserID); err != nil {
 		return nil, err
 	}
+	if err := h.checkHostForwardAPIKey(req); err != nil {
+		return nil, err
+	}
 
 	routes, userEmail, err := h.hostForwardRoutes(ctx, req)
 	if err != nil {
@@ -877,6 +880,9 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 		return status.Error(codes.InvalidArgument, "user_id 必须 > 0")
 	}
 	if err := h.checkHostForwardBalance(ctx, req.UserID); err != nil {
+		return err
+	}
+	if err := h.checkHostForwardAPIKey(req); err != nil {
 		return err
 	}
 
@@ -1281,6 +1287,9 @@ func (h *HostService) hostForwardSellRate(_ context.Context, req hostForwardRequ
 	if ak == nil || ak.UserID != int(req.UserID) {
 		return 0, fmt.Errorf("api key not found")
 	}
+	if !ak.Active(time.Now()) {
+		return 0, fmt.Errorf("api key is not usable")
+	}
 	return ak.SellRate, nil
 }
 
@@ -1449,9 +1458,17 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 		if u == nil {
 			return nil, "", status.Error(codes.NotFound, "用户不存在")
 		}
+		if !u.Active() {
+			return nil, "", status.Error(codes.PermissionDenied, "用户已禁用")
+		}
 		g := routegraph.Group(int(req.GroupID))
 		if g == nil {
 			return nil, "", status.Error(codes.NotFound, "分组不存在")
+		}
+		if g.IsExclusive {
+			if _, ok := g.AllowedUsers[int(req.UserID)]; !ok {
+				return nil, "", status.Error(codes.PermissionDenied, "用户无权访问该专属分组")
+			}
 		}
 		clientModel := req.Model
 		if clientModel == "" {
@@ -1510,6 +1527,9 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 	u := routegraph.User(int(req.UserID))
 	if u == nil {
 		return nil, "", status.Error(codes.NotFound, "用户不存在")
+	}
+	if !u.Active() {
+		return nil, "", status.Error(codes.PermissionDenied, "用户已禁用")
 	}
 	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, routing.RequestInput{
 		Method:      hostForwardMethod(req),
@@ -1730,8 +1750,32 @@ func (h *HostService) checkHostForwardBalance(ctx context.Context, userID int64)
 	if u == nil {
 		return status.Error(codes.NotFound, "用户不存在")
 	}
+	if !u.Active() {
+		return status.Error(codes.PermissionDenied, "用户已禁用")
+	}
 	if u.Balance <= 0 {
 		return hostForwardInsufficientQuotaError()
+	}
+	return nil
+}
+
+func (h *HostService) checkHostForwardAPIKey(req hostForwardRequest) error {
+	if req.APIKeyID <= 0 {
+		return nil
+	}
+	ak := routegraph.APIKey(int(req.APIKeyID))
+	if ak == nil || ak.UserID != int(req.UserID) {
+		return status.Error(codes.PermissionDenied, "api key not found")
+	}
+	now := time.Now()
+	if ak.Status != "active" {
+		return status.Error(codes.PermissionDenied, "api key disabled")
+	}
+	if ak.ExpiresAt != nil && !ak.ExpiresAt.After(now) {
+		return status.Error(codes.PermissionDenied, "api key expired")
+	}
+	if ak.QuotaExhausted() {
+		return status.Error(codes.ResourceExhausted, "api key quota exhausted")
 	}
 	return nil
 }

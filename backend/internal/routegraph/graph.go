@@ -78,15 +78,35 @@ var knownAccountCategoryAliases = map[string]struct{}{
 type UserNode struct {
 	ID             int
 	Email          string
+	Status         entuser.Status
 	Balance        float64
 	GroupRates     map[int64]float64
 	MaxConcurrency int
 }
 
 type APIKeyNode struct {
-	ID       int
-	UserID   int
-	SellRate float64
+	ID        int
+	UserID    int
+	Status    entapikey.Status
+	QuotaUSD  float64
+	UsedQuota float64
+	SellRate  float64
+	ExpiresAt *time.Time
+}
+
+func (u *UserNode) Active() bool {
+	return u != nil && u.Status == entuser.StatusActive
+}
+
+func (k *APIKeyNode) Active(now time.Time) bool {
+	return k != nil &&
+		k.Status == entapikey.StatusActive &&
+		(k.ExpiresAt == nil || k.ExpiresAt.After(now)) &&
+		(k.QuotaUSD <= 0 || k.UsedQuota < k.QuotaUSD)
+}
+
+func (k *APIKeyNode) QuotaExhausted() bool {
+	return k != nil && k.QuotaUSD > 0 && k.UsedQuota >= k.QuotaUSD
 }
 
 var (
@@ -567,6 +587,7 @@ func buildUserNode(user *ent.User) *UserNode {
 	return &UserNode{
 		ID:             user.ID,
 		Email:          user.Email,
+		Status:         user.Status,
 		Balance:        user.Balance,
 		GroupRates:     cloneGroupRates(user.GroupRates),
 		MaxConcurrency: user.MaxConcurrency,
@@ -579,9 +600,13 @@ func buildAPIKeyNode(key *ent.APIKey) *APIKeyNode {
 		userID = key.Edges.User.ID
 	}
 	return &APIKeyNode{
-		ID:       key.ID,
-		UserID:   userID,
-		SellRate: key.SellRate,
+		ID:        key.ID,
+		UserID:    userID,
+		Status:    key.Status,
+		QuotaUSD:  key.QuotaUsd,
+		UsedQuota: key.UsedQuota,
+		SellRate:  key.SellRate,
+		ExpiresAt: key.ExpiresAt,
 	}
 }
 
