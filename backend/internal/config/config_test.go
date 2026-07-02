@@ -133,7 +133,7 @@ func TestDatabaseDSNDefaultsSSLMode(t *testing.T) {
 }
 
 func TestAPIKeySecretValidatesConfiguredSecret(t *testing.T) {
-	valid := "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff-extra"
+	valid := "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
 	cfg := &Config{Security: SecurityConfig{APIKeySecret: valid}}
 	if got := cfg.APIKeySecret(); got != valid {
 		t.Fatalf("有效密钥 = %q，期望使用配置值", got)
@@ -142,6 +142,33 @@ func TestAPIKeySecretValidatesConfiguredSecret(t *testing.T) {
 	cfg.Security.APIKeySecret = "不是有效 hex"
 	if got := cfg.APIKeySecret(); got == cfg.Security.APIKeySecret {
 		t.Fatalf("非法密钥不应被采用")
+	}
+}
+
+func TestValidateProductionRejectsWeakSecrets(t *testing.T) {
+	cfg := &Config{
+		Server:   ServerConfig{Mode: "release"},
+		Database: DatabaseConfig{Password: "airgate"},
+		JWT:      JWTConfig{Secret: "change-me-in-production"},
+		Security: SecurityConfig{APIKeySecret: defaultAPIKeySecret},
+	}
+	if err := cfg.ValidateProduction(); err == nil {
+		t.Fatal("ValidateProduction weak config error = nil")
+	}
+
+	cfg.Database.Password = "strong-db-password"
+	cfg.JWT.Secret = "0123456789abcdef0123456789abcdef"
+	cfg.Security.APIKeySecret = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+	if err := cfg.ValidateProduction(); err != nil {
+		t.Fatalf("ValidateProduction strong config error = %v", err)
+	}
+
+	cfg.Server.Mode = "debug"
+	cfg.JWT.Secret = ""
+	cfg.Database.Password = ""
+	cfg.Security.APIKeySecret = ""
+	if err := cfg.ValidateProduction(); err != nil {
+		t.Fatalf("debug mode should not enforce production secrets: %v", err)
 	}
 }
 

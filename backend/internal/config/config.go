@@ -3,6 +3,7 @@ package config
 
 import (
 	"encoding/hex"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -140,21 +141,27 @@ type JWTConfig struct {
 const defaultAPIKeySecret = "6a8f3d2e1b9c4f7a0e5d2c8b3a1f6e9d4c7b2a5e8f1d3c6b9a2e5f8d1c4b7a0e"
 
 // APIKeySecret 返回实际使用的 API Key 加密密钥：
-// 优先使用配置值（需为合法 hex 且 ≥64 字符），否则使用内置默认值
+// 优先使用配置值（需为合法 32 字节 hex），否则使用内置默认值。
+// 生产模式必须先通过 ValidateProduction，禁止落到内置默认值。
 func (c *Config) APIKeySecret() string {
-	s := c.Security.APIKeySecret
-	if len(s) >= 64 {
-		// 简单校验：尝试 hex 解码前 64 字符
-		if b, err := hex.DecodeString(s[:64]); err == nil && len(b) == 32 {
-			return s
-		}
+	s := strings.TrimSpace(c.Security.APIKeySecret)
+	if validAPIKeySecret(s) {
+		return s
 	}
 	return defaultAPIKeySecret
 }
 
+func validAPIKeySecret(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	b, err := hex.DecodeString(s)
+	return err == nil && len(b) == 32
+}
+
 // SecurityConfig 安全相关配置
 type SecurityConfig struct {
-	APIKeySecret string `yaml:"api_key_secret"` // API Key 加密密钥（hex 编码，≥64 字符）
+	APIKeySecret string `yaml:"api_key_secret"` // API Key 加密密钥（32 字节 hex，即 64 字符）
 }
 
 // DSN 返回 PostgreSQL 连接字符串
@@ -190,6 +197,41 @@ func Load(path string) (*Config, error) {
 	}
 	applyEnvOverrides(cfg)
 	return cfg, nil
+}
+
+func (c *Config) ValidateProduction() error {
+	if !strings.EqualFold(strings.TrimSpace(c.Server.Mode), "release") {
+		return nil
+	}
+
+	var problems []string
+	if weakPlainSecret(c.JWT.Secret, "change-me-in-production", "airgate-docker-secret-change-me", "airgate-default-secret-change-me", "change-me-to-a-long-random-string") || len(strings.TrimSpace(c.JWT.Secret)) < 32 {
+		problems = append(problems, "jwt.secret must be a non-default secret with at least 32 characters")
+	}
+	if weakPlainSecret(c.Database.Password, "airgate", "postgres", "change-me-please") {
+		problems = append(problems, "database.password must be non-empty and not a public default")
+	}
+	apiKeySecret := strings.TrimSpace(c.Security.APIKeySecret)
+	if !validAPIKeySecret(apiKeySecret) || apiKeySecret == defaultAPIKeySecret || weakPlainSecret(apiKeySecret, "change-me-please") {
+		problems = append(problems, "security.api_key_secret must be a unique 32-byte hex secret")
+	}
+	if len(problems) > 0 {
+		return fmt.Errorf("production configuration is insecure: %s", strings.Join(problems, "; "))
+	}
+	return nil
+}
+
+func weakPlainSecret(value string, weakValues ...string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return true
+	}
+	for _, weak := range weakValues {
+		if strings.EqualFold(value, weak) {
+			return true
+		}
+	}
+	return false
 }
 
 // applyEnvOverrides 用环境变量覆盖配置值

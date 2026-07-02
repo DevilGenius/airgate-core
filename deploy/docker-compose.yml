@@ -7,7 +7,7 @@
 # 手动用法：
 #   1. 在本目录（或任意空目录）准备 docker-compose.yml + .env：
 #        cp .env.example .env && vim .env
-#        # 必填：DB_PASSWORD / REDIS_PASSWORD / JWT_SECRET
+#        # 必填：DB_PASSWORD / REDIS_PASSWORD / JWT_SECRET / API_KEY_SECRET
 #   2. 启动前先建好 ./data 子目录（避免 docker 以 root 创建后续读写不便）：
 #        mkdir -p data/postgres data/redis data/plugins data/uploads data/assets
 #   3. 启动：
@@ -29,7 +29,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: airgate
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-airgate}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
       POSTGRES_DB: airgate
       PGDATA: /var/lib/postgresql/data/pgdata
       TZ: ${TZ:-Asia/Shanghai}
@@ -90,7 +90,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: airgate
-      DB_PASSWORD: ${DB_PASSWORD:-airgate}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
       DB_NAME: airgate
       DB_SSLMODE: disable
       # ---- Redis ----
@@ -98,8 +98,8 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required, see .env.example}
       # ---- 安全 ----
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      API_KEY_SECRET: ${API_KEY_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required, see .env.example}
+      API_KEY_SECRET: ${API_KEY_SECRET:?API_KEY_SECRET is required, see .env.example}
       # ---- 运行时 ----
       GIN_MODE: release
       LOG_LEVEL: info
@@ -117,7 +117,7 @@ services:
       # 运行时图片资产持久化
       - ./data/assets:/app/data/assets
     ports:
-      - "${BIND_HOST:-0.0.0.0}:${PORT:-9517}:9517"
+      - "${BIND_HOST:-127.0.0.1}:${PORT:-9517}:9517"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9517/healthz"]
       interval: 30s

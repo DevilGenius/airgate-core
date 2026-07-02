@@ -81,6 +81,10 @@ func main() {
 
 	// 用配置值重新初始化日志（应用配置文件中的 level/format）
 	sdk.InitLogger("core", cfg.Log.Level, cfg.Log.Format)
+	if err := cfg.ValidateProduction(); err != nil {
+		slog.Error("config_validate_failed", "path", cfgPath, "error", err)
+		os.Exit(1)
+	}
 	slog.Info("config_loaded", "path", cfgPath, "log_level", cfg.Log.Level, "log_format", cfg.Log.Format)
 
 	// 启动正常服务

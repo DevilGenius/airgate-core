@@ -379,6 +379,7 @@ func Install(params InstallParams) error {
 		Database: params.DB,
 		Redis:    params.Redis,
 		JWT:      config.JWTConfig{Secret: generateSecret(), ExpireHour: 24},
+		Security: config.SecurityConfig{APIKeySecret: generateSecret()},
 	}
 	cfgData, err := setupYAMLMarshal(cfg)
 	if err != nil {
