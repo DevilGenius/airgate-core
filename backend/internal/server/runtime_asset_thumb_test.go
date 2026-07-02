@@ -2,13 +2,17 @@ package server
 
 import (
 	"bytes"
+	"encoding/binary"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func writePNG(t *testing.T, path string, w, h int) {
@@ -86,6 +90,40 @@ func TestGenerateThumbnail_SkipsWhenSourceSmaller(t *testing.T) {
 	}
 }
 
+func TestGenerateThumbnailRejectsOversizedConfig(t *testing.T) {
+	dir := t.TempDir()
+	dst := filepath.Join(dir, "oversized.jpg")
+
+	_, err := generateThumbnailFromBytes(pngConfigOnly(maxThumbSourceDimension+1, 1), dst, 256)
+	if err == nil || !strings.Contains(err.Error(), "exceed") {
+		t.Fatalf("oversized config error = %v", err)
+	}
+	if _, err := os.Stat(dst); !os.IsNotExist(err) {
+		t.Fatalf("oversized source should not write cache: %v", err)
+	}
+}
+
+func TestThumbFailureCacheMarker(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "bad.png")
+	markThumbFailure(src, 256)
+	if !thumbFailureCached(src, 256) {
+		t.Fatal("fresh thumb failure marker should be cached")
+	}
+
+	marker := thumbFailureCachePath(src, 256)
+	old := time.Now().Add(-thumbFailureCacheTTL - time.Minute)
+	if err := os.Chtimes(marker, old, old); err != nil {
+		t.Fatalf("age marker: %v", err)
+	}
+	if thumbFailureCached(src, 256) {
+		t.Fatal("stale thumb failure marker should not be cached")
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("stale marker should be removed: %v", err)
+	}
+}
+
 func TestThumbnailableExt(t *testing.T) {
 	cases := map[string]bool{
 		"foo.png":  true,
@@ -103,4 +141,28 @@ func TestThumbnailableExt(t *testing.T) {
 			t.Errorf("thumbnailableExt(%q) = %v, want %v", in, got, want)
 		}
 	}
+}
+
+func pngConfigOnly(width, height int) []byte {
+	var out bytes.Buffer
+	out.Write([]byte{137, 80, 78, 71, 13, 10, 26, 10})
+
+	ihdr := make([]byte, 13)
+	binary.BigEndian.PutUint32(ihdr[0:4], uint32(width))
+	binary.BigEndian.PutUint32(ihdr[4:8], uint32(height))
+	ihdr[8] = 8
+	ihdr[9] = 2
+	writePNGChunk(&out, "IHDR", ihdr)
+	writePNGChunk(&out, "IEND", nil)
+	return out.Bytes()
+}
+
+func writePNGChunk(out *bytes.Buffer, kind string, data []byte) {
+	_ = binary.Write(out, binary.BigEndian, uint32(len(data)))
+	out.WriteString(kind)
+	out.Write(data)
+	crc := crc32.NewIEEE()
+	_, _ = crc.Write([]byte(kind))
+	_, _ = crc.Write(data)
+	_ = binary.Write(out, binary.BigEndian, crc.Sum32())
 }

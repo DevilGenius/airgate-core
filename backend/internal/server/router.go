@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -353,21 +354,27 @@ func (s *Server) handleRuntimeAsset(c *gin.Context) {
 			c.Data(http.StatusOK, "image/jpeg", data)
 			return
 		}
-		data, contentType, err := storage.GetBytes(c.Request.Context(), rel)
-		if err != nil {
-			c.Status(http.StatusNotFound)
+		if !thumbFailureCached(localPath, width) {
+			data, contentType, err := storage.GetBytes(c.Request.Context(), rel)
+			if err != nil {
+				c.Status(http.StatusNotFound)
+				return
+			}
+			thumb, thumbErr := generateThumbnailFromBytes(data, cachePath, width)
+			if thumbErr == nil {
+				_ = os.Remove(thumbFailureCachePath(localPath, width))
+				c.Data(http.StatusOK, "image/jpeg", thumb)
+				return
+			}
+			if !errors.Is(thumbErr, errSkipThumb) {
+				markThumbFailure(localPath, width)
+			}
+			if contentType == "" || contentType == "application/octet-stream" {
+				contentType = contentTypeFromExt(rel)
+			}
+			c.Data(http.StatusOK, contentType, data)
 			return
 		}
-		thumb, thumbErr := generateThumbnailFromBytes(data, cachePath, width)
-		if thumbErr == nil {
-			c.Data(http.StatusOK, "image/jpeg", thumb)
-			return
-		}
-		if contentType == "" || contentType == "application/octet-stream" {
-			contentType = contentTypeFromExt(rel)
-		}
-		c.Data(http.StatusOK, contentType, data)
-		return
 	}
 
 	data, contentType, err := storage.GetBytes(c.Request.Context(), rel)

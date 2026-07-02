@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/gif"
 	"image/jpeg"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/image/draw"
 
@@ -23,6 +25,15 @@ import (
 // arbitrary ?w= values. The set matches what the studio frontend actually
 // requests via srcset.
 var allowedThumbWidths = map[int]bool{256: true, 512: true}
+
+const (
+	maxThumbSourceDimension = 16_384
+	maxThumbSourcePixels    = 32_000_000
+	thumbFailureCacheTTL    = time.Hour
+	thumbnailConcurrency    = 4
+)
+
+var thumbnailSem = make(chan struct{}, thumbnailConcurrency)
 
 // thumbnailableExt returns true when the file is an image format we know how to
 // decode. Unknown formats fall through to the unmodified file served by the
@@ -59,6 +70,31 @@ func thumbCachePath(srcPath string, width int) string {
 	return srcPath + ".w" + strconv.Itoa(width) + ".jpg"
 }
 
+func thumbFailureCachePath(srcPath string, width int) string {
+	return thumbCachePath(srcPath, width) + ".fail"
+}
+
+func thumbFailureCached(srcPath string, width int) bool {
+	marker := thumbFailureCachePath(srcPath, width)
+	info, err := os.Stat(marker)
+	if err != nil {
+		return false
+	}
+	if time.Since(info.ModTime()) <= thumbFailureCacheTTL {
+		return true
+	}
+	_ = os.Remove(marker)
+	return false
+}
+
+func markThumbFailure(srcPath string, width int) {
+	marker := thumbFailureCachePath(srcPath, width)
+	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
+		return
+	}
+	_ = os.WriteFile(marker, nil, 0o644)
+}
+
 // generateThumbnail decodes srcPath, downscales to fit `width` (preserving
 // aspect ratio), encodes as JPEG q=82, and writes to dstPath. Returns the
 // encoded bytes for immediate serving so the caller doesn't re-read from disk.
@@ -77,7 +113,24 @@ func generateThumbnailFromBytes(src []byte, dstPath string, width int) ([]byte, 
 	return generateThumbnailFromReader(bytes.NewReader(src), dstPath, width)
 }
 
-func generateThumbnailFromReader(src io.Reader, dstPath string, width int) ([]byte, error) {
+func generateThumbnailFromReader(src io.ReadSeeker, dstPath string, width int) ([]byte, error) {
+	thumbnailSem <- struct{}{}
+	defer func() { <-thumbnailSem }()
+
+	cfg, _, err := image.DecodeConfig(src)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateThumbSourceDimensions(cfg.Width, cfg.Height); err != nil {
+		return nil, err
+	}
+	if cfg.Width <= width {
+		return nil, errSkipThumb
+	}
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+
 	img, _, err := image.Decode(src)
 	if err != nil {
 		return nil, err
@@ -85,8 +138,8 @@ func generateThumbnailFromReader(src io.Reader, dstPath string, width int) ([]by
 
 	bounds := img.Bounds()
 	srcW, srcH := bounds.Dx(), bounds.Dy()
-	if srcW <= 0 || srcH <= 0 {
-		return nil, errors.New("invalid image dimensions")
+	if err := validateThumbSourceDimensions(srcW, srcH); err != nil {
+		return nil, err
 	}
 	if srcW <= width {
 		// Source is already smaller than the requested thumb; encoding a larger
@@ -127,6 +180,19 @@ func generateThumbnailFromReader(src io.Reader, dstPath string, width int) ([]by
 	}
 
 	return buf.Bytes(), nil
+}
+
+func validateThumbSourceDimensions(width, height int) error {
+	if width <= 0 || height <= 0 {
+		return errors.New("invalid image dimensions")
+	}
+	if width > maxThumbSourceDimension || height > maxThumbSourceDimension {
+		return fmt.Errorf("image dimensions exceed thumbnail limit: %dx%d", width, height)
+	}
+	if width > maxThumbSourcePixels/height {
+		return fmt.Errorf("image pixels exceed thumbnail limit: %dx%d", width, height)
+	}
+	return nil
 }
 
 // errSkipThumb signals that the request should fall through to the original
