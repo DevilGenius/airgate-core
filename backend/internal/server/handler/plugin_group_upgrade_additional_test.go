@@ -74,7 +74,7 @@ func TestPluginHandlerRoutesWithFakeAdminService(t *testing.T) {
 		{name: "list menu", method: http.MethodGet, target: "/plugins/menu", fn: handler.ListPluginMenu, want: `"/plugins/openai"`},
 		{name: "get config", method: http.MethodGet, target: "/plugins/gateway-openai/config", params: gin.Params{{Key: "name", Value: "gateway-openai"}}, fn: handler.GetPluginConfig, want: `"api_key":"secret"`},
 		{name: "update config", method: http.MethodPut, target: "/plugins/gateway-openai/config", params: gin.Params{{Key: "name", Value: "gateway-openai"}}, body: `{"config":{"api_key":"updated"}}`, fn: handler.UpdatePluginConfig},
-		{name: "install github", method: http.MethodPost, target: "/plugins/github", body: `{"repo":"DevilGenius/airgate-openai","version":" v0.2.0 "}`, fn: handler.InstallFromGithub},
+		{name: "install github", method: http.MethodPost, target: "/plugins/github", body: `{"repo":"DevilGenius/airgate-openai","version":" v0.2.0 ","trust_frontend":true}`, fn: handler.InstallFromGithub},
 		{name: "uninstall", method: http.MethodDelete, target: "/plugins/gateway-openai", params: gin.Params{{Key: "name", Value: "gateway-openai"}}, fn: handler.UninstallPlugin},
 		{name: "reload", method: http.MethodPost, target: "/plugins/gateway-openai/reload", params: gin.Params{{Key: "name", Value: "gateway-openai"}}, fn: handler.ReloadPlugin},
 		{name: "refresh marketplace", method: http.MethodPost, target: "/plugins/marketplace/refresh", fn: handler.RefreshMarketplace},
@@ -111,6 +111,9 @@ func TestPluginHandlerRoutesWithFakeAdminService(t *testing.T) {
 	if err := writer.WriteField("sha256", strings.Repeat("d", 64)); err != nil {
 		t.Fatalf("write sha field: %v", err)
 	}
+	if err := writer.WriteField("trust_frontend", "true"); err != nil {
+		t.Fatalf("write trust field: %v", err)
+	}
 	if err := writer.Close(); err != nil {
 		t.Fatalf("close multipart writer: %v", err)
 	}
@@ -118,6 +121,28 @@ func TestPluginHandlerRoutesWithFakeAdminService(t *testing.T) {
 	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
 	if manager.installedName != "gateway-openai" || manager.installedHash != strings.Repeat("d", 64) || manager.installedSize == 0 {
 		t.Fatalf("upload delegation manager=%+v", manager)
+	}
+
+	untrustedBody := &bytes.Buffer{}
+	untrustedWriter := multipart.NewWriter(untrustedBody)
+	untrustedPart, err := untrustedWriter.CreateFormFile("file", "gateway-openai.exe")
+	if err != nil {
+		t.Fatalf("create untrusted multipart file: %v", err)
+	}
+	if _, err := untrustedPart.Write([]byte("plugin-binary")); err != nil {
+		t.Fatalf("write untrusted multipart file: %v", err)
+	}
+	if err := untrustedWriter.Close(); err != nil {
+		t.Fatalf("close untrusted multipart writer: %v", err)
+	}
+	w = invokeMultipartPluginHandler(http.MethodPost, "/plugins/upload", untrustedBody, untrustedWriter.FormDataContentType(), nil, handler.UploadPlugin)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("untrusted upload status = %d body=%s", w.Code, w.Body.String())
+	}
+
+	w = invokeHandlerForValidation(http.MethodPost, "/plugins/github", `{"repo":"DevilGenius/airgate-openai"}`, nil, nil, handler.InstallFromGithub)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("untrusted github status = %d body=%s", w.Code, w.Body.String())
 	}
 
 	w = invokeHandlerForValidation(http.MethodPost, "/plugins/gateway-openai/proxy/admin/ping?dry_run=true", "payload", gin.Params{
@@ -153,7 +178,7 @@ func TestPluginHandlerErrorRoutesWithFakeAdminService(t *testing.T) {
 	}{
 		{name: "get config error", method: http.MethodGet, target: "/plugins/p/config", params: gin.Params{{Key: "name", Value: "p"}}, fn: handler.GetPluginConfig, status: http.StatusInternalServerError},
 		{name: "update config error", method: http.MethodPut, target: "/plugins/p/config", params: gin.Params{{Key: "name", Value: "p"}}, body: `{"config":{}}`, fn: handler.UpdatePluginConfig, status: http.StatusInternalServerError},
-		{name: "install github error", method: http.MethodPost, target: "/plugins/github", body: `{"repo":"owner/repo"}`, fn: handler.InstallFromGithub, status: http.StatusInternalServerError},
+		{name: "install github error", method: http.MethodPost, target: "/plugins/github", body: `{"repo":"owner/repo","trust_frontend":true}`, fn: handler.InstallFromGithub, status: http.StatusInternalServerError},
 		{name: "uninstall error", method: http.MethodDelete, target: "/plugins/p", params: gin.Params{{Key: "name", Value: "p"}}, fn: handler.UninstallPlugin, status: http.StatusInternalServerError},
 		{name: "reload error", method: http.MethodPost, target: "/plugins/p/reload", params: gin.Params{{Key: "name", Value: "p"}}, fn: handler.ReloadPlugin, status: http.StatusInternalServerError},
 		{name: "refresh marketplace error", method: http.MethodPost, target: "/plugins/marketplace/refresh", fn: handler.RefreshMarketplace, status: http.StatusInternalServerError},

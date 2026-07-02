@@ -19,16 +19,17 @@ export const pluginsApi = {
   // 强制从 GitHub 同步市场列表
   refreshMarketplace: () => post<void>('/api/v1/admin/marketplace/refresh'),
   // 上传安装插件
-  upload: (file: File, name?: string, sha256?: string) => {
+  upload: (file: File, name: string | undefined, sha256: string | undefined, trustFrontend: boolean) => {
     const fd = new FormData();
     fd.append('file', file);
     if (name) fd.append('name', name);
     if (sha256) fd.append('sha256', sha256);
+    fd.append('trust_frontend', trustFrontend ? 'true' : 'false');
     return upload<void>('/api/v1/admin/plugins/upload', fd);
   },
   // 从 GitHub Release 安装
-  installGithub: (repo: string, version?: string) =>
-    post<void>('/api/v1/admin/plugins/install-github', { repo, version }),
+  installGithub: (repo: string, version: string | undefined, trustFrontend: boolean) =>
+    post<void>('/api/v1/admin/plugins/install-github', { repo, version, trust_frontend: trustFrontend }),
   // 通用插件 RPC 调用，action 由插件自行定义
   rpc: <T = unknown>(name: string, action: string, body?: unknown) =>
     post<T>(`/api/v1/admin/plugins/${name}/rpc/${action}`, body),

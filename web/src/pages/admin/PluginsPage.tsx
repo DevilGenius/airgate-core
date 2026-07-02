@@ -57,7 +57,7 @@ export default function PluginsPage() {
   const [installingRepo, setInstallingRepo] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const marketInstallMutation = useMutation({
-    mutationFn: ({ repo, version }: { repo: string; version?: string }) => pluginsApi.installGithub(repo, version),
+    mutationFn: ({ repo, version }: { repo: string; version?: string }) => pluginsApi.installGithub(repo, version, true),
     onSuccess: () => {
       toast('success', t(isUpdating ? 'plugins.update_success' : 'plugins.github_success'));
       // 插件前端模块需要整页重载才能生效
@@ -71,6 +71,9 @@ export default function PluginsPage() {
   });
 
   function handleMarketInstall(repo: string, update = false, version?: string) {
+    if (!window.confirm('仅安装你信任的插件。插件前端会作为后台同源代码执行。')) {
+      return;
+    }
     setInstallingRepo(repo);
     setIsUpdating(update);
     marketInstallMutation.mutate({ repo, version });
@@ -576,6 +579,7 @@ function InstallPluginModal({
   const [uploadSHA256, setUploadSHA256] = useState('');
   const [githubRepo, setGithubRepo] = useState('');
   const [githubVersion, setGithubVersion] = useState('');
+  const [trustFrontend, setTrustFrontend] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -588,7 +592,7 @@ function InstallPluginModal({
 
   // 上传安装
   const uploadMutation = useMutation({
-    mutationFn: () => pluginsApi.upload(selectedFile!, pluginName || undefined, uploadSHA256.trim()),
+    mutationFn: () => pluginsApi.upload(selectedFile!, pluginName || undefined, uploadSHA256.trim(), trustFrontend),
     onSuccess: () => {
       toast('success', t('plugins.upload_success'));
       resetForm();
@@ -599,7 +603,7 @@ function InstallPluginModal({
 
   // GitHub 安装
   const githubMutation = useMutation({
-    mutationFn: () => pluginsApi.installGithub(githubRepo, githubVersion.trim() || undefined),
+    mutationFn: () => pluginsApi.installGithub(githubRepo, githubVersion.trim() || undefined, trustFrontend),
     onSuccess: () => {
       toast('success', t('plugins.github_success'));
       resetForm();
@@ -614,6 +618,7 @@ function InstallPluginModal({
     setUploadSHA256('');
     setGithubRepo('');
     setGithubVersion('');
+    setTrustFrontend(false);
     dragCounterRef.current = 0;
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
@@ -791,6 +796,14 @@ function InstallPluginModal({
                   </div>
                 </Tabs.Panel>
               </Tabs>
+              <div className="mt-4">
+                <NativeCheckbox
+                  isSelected={trustFrontend}
+                  onChange={setTrustFrontend}
+                >
+                  <span>我信任该插件前端代码</span>
+                </NativeCheckbox>
+              </div>
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" isDisabled={installing} onPress={handleClose}>
@@ -798,7 +811,7 @@ function InstallPluginModal({
               </Button>
               {installTab === 'upload' ? (
                 <Button
-                  isDisabled={!selectedFile || !uploadSHA256.trim() || uploadMutation.isPending}
+                  isDisabled={!selectedFile || !uploadSHA256.trim() || !trustFrontend || uploadMutation.isPending}
                   variant="primary"
                   onPress={() => uploadMutation.mutate()}
                 >
@@ -807,7 +820,7 @@ function InstallPluginModal({
                 </Button>
               ) : (
                 <Button
-                  isDisabled={!githubRepo.trim() || githubMutation.isPending}
+                  isDisabled={!githubRepo.trim() || !trustFrontend || githubMutation.isPending}
                   variant="primary"
                   onPress={() => githubMutation.mutate()}
                 >

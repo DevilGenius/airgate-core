@@ -105,6 +105,10 @@ func (h *PluginHandler) UploadPlugin(c *gin.Context) {
 		response.BadRequest(c, fmt.Sprintf("插件文件超过 %d MiB 上限", coreplugin.MaxPluginBinarySize>>20))
 		return
 	}
+	if c.PostForm("trust_frontend") != "true" {
+		response.BadRequest(c, "安装插件前必须确认信任该插件前端代码")
+		return
+	}
 
 	f, err := file.Open()
 	if err != nil {
