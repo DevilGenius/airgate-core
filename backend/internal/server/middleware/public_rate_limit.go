@@ -15,16 +15,20 @@ type publicRateLimitBucket struct {
 }
 
 type publicRateLimiter struct {
-	mu      sync.Mutex
-	buckets map[string]publicRateLimitBucket
+	mu          sync.Mutex
+	cleanupOnce sync.Once
+	buckets     map[string]publicRateLimitBucket
 }
 
 var defaultPublicRateLimiter = &publicRateLimiter{buckets: map[string]publicRateLimitBucket{}}
+
+const publicRateLimitCleanupInterval = time.Minute
 
 func PublicRateLimit(maxRequests int, window time.Duration) gin.HandlerFunc {
 	if maxRequests <= 0 || window <= 0 {
 		return func(c *gin.Context) { c.Next() }
 	}
+	defaultPublicRateLimiter.startCleanup(publicRateLimitCleanupInterval)
 	return func(c *gin.Context) {
 		allowed, retryAfter := defaultPublicRateLimiter.allow(publicRateLimitKey(c), maxRequests, window, time.Now())
 		if !allowed {
@@ -68,6 +72,31 @@ func (l *publicRateLimiter) allow(key string, maxRequests int, window time.Durat
 	bucket.count++
 	l.buckets[key] = bucket
 	return true, 0
+}
+
+func (l *publicRateLimiter) startCleanup(interval time.Duration) {
+	if interval <= 0 {
+		return
+	}
+	l.cleanupOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			for now := range ticker.C {
+				l.cleanupExpired(now)
+			}
+		}()
+	})
+}
+
+func (l *publicRateLimiter) cleanupExpired(now time.Time) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for key, bucket := range l.buckets {
+		if !bucket.reset.IsZero() && !now.Before(bucket.reset) {
+			delete(l.buckets, key)
+		}
+	}
 }
 
 func resetPublicRateLimiterForTesting() {

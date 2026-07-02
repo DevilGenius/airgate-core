@@ -58,3 +58,24 @@ func TestPublicRateLimiterWindowResets(t *testing.T) {
 		t.Fatal("request after window should pass")
 	}
 }
+
+func TestPublicRateLimiterCleanupExpiredBuckets(t *testing.T) {
+	now := time.Unix(100, 0)
+	limiter := &publicRateLimiter{buckets: map[string]publicRateLimitBucket{
+		"expired": {count: 1, reset: now.Add(-time.Second)},
+		"active":  {count: 1, reset: now.Add(time.Minute)},
+		"zero":    {count: 1},
+	}}
+
+	limiter.cleanupExpired(now)
+
+	if _, ok := limiter.buckets["expired"]; ok {
+		t.Fatal("expired bucket was not removed")
+	}
+	if _, ok := limiter.buckets["active"]; !ok {
+		t.Fatal("active bucket was removed")
+	}
+	if _, ok := limiter.buckets["zero"]; !ok {
+		t.Fatal("zero reset bucket should be preserved")
+	}
+}
