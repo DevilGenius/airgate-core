@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -153,6 +154,24 @@ func TestAssetStorageStoreFromURLErrors(t *testing.T) {
 	t.Cleanup(server.Close)
 	if _, err := storage.StoreFromURL(context.Background(), 42, AssetPurposeUpload, server.URL); err == nil {
 		t.Fatal("StoreFromURL(non-200) error = nil, want error")
+	}
+}
+
+func TestAssetDownloadDialRejectsPrivateResolvedAddress(t *testing.T) {
+	prevLookup := assetSourceLookupIPAddr
+	prevAllowPrivate := allowPrivateAssetDownloadsForTesting
+	assetSourceLookupIPAddr = func(context.Context, string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+	}
+	allowPrivateAssetDownloadsForTesting = false
+	t.Cleanup(func() {
+		assetSourceLookupIPAddr = prevLookup
+		allowPrivateAssetDownloadsForTesting = prevAllowPrivate
+	})
+
+	_, err := dialValidatedAssetSource(context.Background(), "tcp", "assets.example:80")
+	if err == nil || !strings.Contains(err.Error(), "private or local") {
+		t.Fatalf("dialValidatedAssetSource private resolver error = %v", err)
 	}
 }
 

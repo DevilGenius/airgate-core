@@ -55,6 +55,7 @@ const (
 )
 
 var allowPrivateAssetDownloadsForTesting bool
+var assetSourceLookupIPAddr = net.DefaultResolver.LookupIPAddr
 
 const DefaultAssetStorageDir = "data/assets"
 
@@ -464,11 +465,9 @@ func (s *AssetStorage) StoreFromURL(ctx context.Context, userID int64, purpose A
 	if err != nil {
 		return nil, fmt.Errorf("build download request: %w", err)
 	}
-	client := &http.Client{
-		Timeout: assetDownloadTimeout,
-		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-			return validateAssetSourceURL(req.Context(), req.URL)
-		},
+	client := assetDownloadHTTPClient()
+	client.CheckRedirect = func(req *http.Request, _ []*http.Request) error {
+		return validateAssetSourceURL(req.Context(), req.URL)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -500,6 +499,21 @@ func (s *AssetStorage) StoreFromURL(ctx context.Context, userID int64, purpose A
 	return s.Store(ctx, userID, purpose, ct, ext, data)
 }
 
+func assetDownloadHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			// Proxy is intentionally nil so downloads cannot bypass source IP validation.
+			DialContext:           dialValidatedAssetSource,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: time.Second,
+		},
+		Timeout: assetDownloadTimeout,
+	}
+}
+
 func validateAssetSourceURL(ctx context.Context, parsed *url.URL) error {
 	if parsed == nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return fmt.Errorf("invalid source URL: must be http or https")
@@ -508,28 +522,100 @@ func validateAssetSourceURL(ctx context.Context, parsed *url.URL) error {
 	if host == "" {
 		return fmt.Errorf("invalid source URL: missing host")
 	}
+	_, err := resolveSafeAssetSourceIPs(ctx, host, "")
+	return err
+}
+
+func dialValidatedAssetSource(ctx context.Context, network, address string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	ips, err := resolveSafeAssetSourceIPs(ctx, host, network)
+	if err != nil {
+		return nil, err
+	}
+	dialer := &net.Dialer{}
+	var lastErr error
+	for _, ip := range ips {
+		conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, fmt.Errorf("resolve source URL host: no addresses")
+}
+
+func resolveSafeAssetSourceIPs(ctx context.Context, host, network string) ([]net.IP, error) {
 	if allowPrivateAssetDownloadsForTesting {
-		return nil
+		return resolveAssetSourceIPs(ctx, host, network)
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		if unsafeAssetDownloadIP(ip) {
-			return fmt.Errorf("invalid source URL: private or local address is not allowed")
+			return nil, fmt.Errorf("invalid source URL: private or local address is not allowed")
 		}
-		return nil
+		if !assetSourceIPMatchesNetwork(ip, network) {
+			return nil, fmt.Errorf("resolve source URL host: no addresses")
+		}
+		return []net.IP{ip}, nil
 	}
-	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	ips, err := assetSourceLookupIPAddr(ctx, host)
 	if err != nil {
-		return fmt.Errorf("resolve source URL host: %w", err)
+		return nil, fmt.Errorf("resolve source URL host: %w", err)
 	}
 	if len(ips) == 0 {
-		return fmt.Errorf("resolve source URL host: no addresses")
+		return nil, fmt.Errorf("resolve source URL host: no addresses")
 	}
+	safeIPs := make([]net.IP, 0, len(ips))
 	for _, resolved := range ips {
 		if unsafeAssetDownloadIP(resolved.IP) {
-			return fmt.Errorf("invalid source URL: private or local address is not allowed")
+			return nil, fmt.Errorf("invalid source URL: private or local address is not allowed")
+		}
+		if assetSourceIPMatchesNetwork(resolved.IP, network) {
+			safeIPs = append(safeIPs, resolved.IP)
 		}
 	}
-	return nil
+	if len(safeIPs) == 0 {
+		return nil, fmt.Errorf("resolve source URL host: no addresses")
+	}
+	return safeIPs, nil
+}
+
+func resolveAssetSourceIPs(ctx context.Context, host, network string) ([]net.IP, error) {
+	if ip := net.ParseIP(host); ip != nil {
+		if !assetSourceIPMatchesNetwork(ip, network) {
+			return nil, fmt.Errorf("resolve source URL host: no addresses")
+		}
+		return []net.IP{ip}, nil
+	}
+	resolved, err := assetSourceLookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, fmt.Errorf("resolve source URL host: %w", err)
+	}
+	ips := make([]net.IP, 0, len(resolved))
+	for _, item := range resolved {
+		if assetSourceIPMatchesNetwork(item.IP, network) {
+			ips = append(ips, item.IP)
+		}
+	}
+	if len(ips) == 0 {
+		return nil, fmt.Errorf("resolve source URL host: no addresses")
+	}
+	return ips, nil
+}
+
+func assetSourceIPMatchesNetwork(ip net.IP, network string) bool {
+	if network == "tcp4" {
+		return ip.To4() != nil
+	}
+	if network == "tcp6" {
+		return ip.To4() == nil && ip.To16() != nil
+	}
+	return ip.To16() != nil
 }
 
 func unsafeAssetDownloadIP(ip net.IP) bool {
