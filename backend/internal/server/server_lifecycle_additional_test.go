@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql/schema"
+	"github.com/gin-gonic/gin"
+
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
-	"github.com/gin-gonic/gin"
 )
 
 func TestNewServerRegistersCoreRoutesWithSQLite(t *testing.T) {
