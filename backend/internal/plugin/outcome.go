@@ -16,6 +16,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/safego"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
+	"github.com/DevilGenius/airgate-core/internal/server/middleware"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -450,7 +451,7 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		DurationMs:            execution.duration.Milliseconds(),
 		FirstTokenMs:          usageValues.FirstTokenMs,
 		UserAgent:             c.Request.UserAgent(),
-		IPAddress:             c.ClientIP(),
+		IPAddress:             middleware.AuditClientIP(c),
 		Endpoint:              state.requestPath,
 		ReasoningEffort:       reasoningEffort,
 		UsageMetadata:         usageMetadata,

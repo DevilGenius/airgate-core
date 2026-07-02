@@ -76,7 +76,7 @@ func RequestLogger() gin.HandlerFunc {
 			sdk.LogFieldStatus, status,
 			sdk.LogFieldDurationMs, duration.Milliseconds(),
 			sdk.LogFieldUserID, userID,
-			"ip", c.ClientIP(),
+			"ip", AuditClientIP(c),
 			"bytes_out", c.Writer.Size(),
 			sdk.LogFieldRequestID, rid,
 		}

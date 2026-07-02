@@ -48,7 +48,7 @@ func publicRateLimitKey(c *gin.Context) string {
 	if route == "" {
 		route = c.Request.URL.Path
 	}
-	return c.ClientIP() + "\x00" + route
+	return PeerIP(c) + "\x00" + route
 }
 
 func (l *publicRateLimiter) allow(key string, maxRequests int, window time.Duration, now time.Time) (bool, time.Duration) {

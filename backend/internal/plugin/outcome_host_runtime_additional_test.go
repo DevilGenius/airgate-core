@@ -249,6 +249,8 @@ func TestForwarderRecordUsagePersistsFallbackRecord(t *testing.T) {
 	}
 	c, _ := pluginTestContext(http.MethodPost, "/v1/responses")
 	c.Request.Header.Set("User-Agent", "record-usage-test")
+	c.Request.Header.Set("X-Forwarded-For", "198.51.100.30, 172.18.0.1")
+	c.Request.RemoteAddr = "172.18.0.1:4567"
 
 	forwarder.recordUsage(c, state, forwardExecution{
 		outcome: sdk.ForwardOutcome{Usage: &sdk.Usage{
@@ -286,6 +288,9 @@ func TestForwarderRecordUsagePersistsFallbackRecord(t *testing.T) {
 	}
 	if log.UsageMetadata[responseIDUsageMetadataKey] != "resp_usage" {
 		t.Fatalf("usage metadata = %#v", log.UsageMetadata)
+	}
+	if log.IPAddress != "198.51.100.30" {
+		t.Fatalf("usage log ip = %q, want forwarded client ip", log.IPAddress)
 	}
 	if exists, err := db.UsageLog.Query().Where(usagelog.BillingEventIDEQ("prefill-record-usage")).Exist(ctx); err != nil || exists {
 		t.Fatalf("prefill queued record persisted = %v/%v, want false nil", exists, err)

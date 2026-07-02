@@ -80,7 +80,7 @@ func TestPublicRateLimitIgnoresForwardedFor(t *testing.T) {
 	}
 }
 
-func TestPublicRateLimitUsesForwardedForFromTrustedProxy(t *testing.T) {
+func TestPublicRateLimitIgnoresForwardedForFromTrustedProxy(t *testing.T) {
 	resetPublicRateLimiterForTesting()
 	gin.SetMode(gin.TestMode)
 
@@ -107,8 +107,8 @@ func TestPublicRateLimitUsesForwardedForFromTrustedProxy(t *testing.T) {
 	req.RemoteAddr = "203.0.113.1:1234"
 	req.Header.Set("X-Forwarded-For", "198.51.100.2")
 	router.ServeHTTP(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("different forwarded client should have separate bucket, status=%d body=%s", w.Code, w.Body.String())
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("trusted forwarded client bypassed limiter, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
