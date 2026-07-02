@@ -107,6 +107,7 @@ services:
       WEB_DIR: frontend
       PLUGINS_DIR: /app/data/plugins
       ASSETS_DIR: /app/data/assets
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       PLUGINS_MARKETPLACE_GITHUB_TOKEN: ${PLUGINS_MARKETPLACE_GITHUB_TOKEN:-}
       TZ: ${TZ:-Asia/Shanghai}
     volumes:

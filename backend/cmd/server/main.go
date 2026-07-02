@@ -94,6 +94,10 @@ func main() {
 // startSetupServer 启动安装向导服务器，安装完成后自动关闭
 func startSetupServer() {
 	r := gin.Default()
+	if err := r.SetTrustedProxies(nil); err != nil {
+		slog.Error("setup_server_trusted_proxy_config_failed", sdk.LogFieldError, err)
+		os.Exit(1)
+	}
 
 	// 用于通知安装完成
 	done := make(chan struct{})
@@ -241,7 +245,11 @@ func startMainServer(cfg *config.Config) {
 	slog.Info("bootstrap_completed", "duration_ms", time.Since(bootStart).Milliseconds())
 
 	// 创建并启动 HTTP 服务器
-	srv := server.NewServer(cfg, db, rdb, drv.DB())
+	srv, err := server.NewServer(cfg, db, rdb, drv.DB())
+	if err != nil {
+		slog.Error("server_init_failed", sdk.LogFieldError, err)
+		os.Exit(1)
+	}
 
 	// 启动插件系统（非阻塞，失败不影响核心服务）
 	srv.StartPlugins(context.Background())

@@ -100,6 +100,8 @@ type ServerConfig struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 	Mode string `yaml:"mode"` // debug / release
+	// TrustedProxies 显式可信反向代理 IP/CIDR。为空表示不信任任何代理头。
+	TrustedProxies []string `yaml:"trusted_proxies"`
 }
 
 // DatabaseConfig 数据库配置
@@ -239,6 +241,7 @@ func applyEnvOverrides(cfg *Config) {
 	envStr("HOST", &cfg.Server.Host)
 	envInt("PORT", &cfg.Server.Port)
 	envStr("GIN_MODE", &cfg.Server.Mode)
+	envStringList("TRUSTED_PROXIES", &cfg.Server.TrustedProxies)
 
 	// 数据库
 	envStr("DB_HOST", &cfg.Database.Host)
@@ -276,6 +279,20 @@ func applyEnvOverrides(cfg *Config) {
 func envStr(key string, dst *string) {
 	if v := os.Getenv(key); v != "" {
 		*dst = v
+	}
+}
+
+// envStringList 用逗号分隔的环境变量覆盖字符串列表。
+func envStringList(key string, dst *[]string) {
+	if v := os.Getenv(key); v != "" {
+		parts := strings.Split(v, ",")
+		values := make([]string, 0, len(parts))
+		for _, part := range parts {
+			if value := strings.TrimSpace(part); value != "" {
+				values = append(values, value)
+			}
+		}
+		*dst = values
 	}
 }
 

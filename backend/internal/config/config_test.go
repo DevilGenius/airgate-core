@@ -39,6 +39,8 @@ func TestLoadAppliesDefaultsAndEnvironmentOverrides(t *testing.T) {
 server:
   port: 9000
   mode: debug
+  trusted_proxies:
+    - 127.0.0.1
 database:
   host: db.local
   port: 5432
@@ -61,6 +63,7 @@ plugins:
 	}
 	t.Setenv("HOST", "127.0.0.1")
 	t.Setenv("PORT", "18080")
+	t.Setenv("TRUSTED_PROXIES", "10.0.0.0/8, 192.168.1.10")
 	t.Setenv("DB_HOST", "db.env")
 	t.Setenv("DB_PORT", "15432")
 	t.Setenv("REDIS_TLS", "true")
@@ -75,6 +78,9 @@ plugins:
 
 	if cfg.Server.Host != "127.0.0.1" || cfg.Server.Port != 18080 {
 		t.Fatalf("服务器配置未被环境变量覆盖: %+v", cfg.Server)
+	}
+	if len(cfg.Server.TrustedProxies) != 2 || cfg.Server.TrustedProxies[0] != "10.0.0.0/8" || cfg.Server.TrustedProxies[1] != "192.168.1.10" {
+		t.Fatalf("可信代理配置未被环境变量覆盖: %+v", cfg.Server.TrustedProxies)
 	}
 	if cfg.Database.Host != "db.env" || cfg.Database.Port != 15432 {
 		t.Fatalf("数据库配置未被环境变量覆盖: %+v", cfg.Database)
@@ -192,6 +198,7 @@ func clearConfigEnv(t *testing.T) {
 	t.Helper()
 	keys := []string{
 		"HOST", "PORT", "GIN_MODE",
+		"TRUSTED_PROXIES",
 		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE",
 		"REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "REDIS_DB", "REDIS_TLS", "REDIS_TLS_SERVER_NAME",
 		"JWT_SECRET", "JWT_EXPIRE_HOUR",

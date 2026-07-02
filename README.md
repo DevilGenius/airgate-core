@@ -203,6 +203,7 @@ rm -rf data .env docker-compose.yml
 | `JWT_SECRET` | JWT 签名密钥，建议 `openssl rand -hex 32` | ✅ |
 | `BIND_HOST` | 监听地址，反向代理后部署时改 `127.0.0.1` | ❌ |
 | `PORT` | 对外端口，默认 9517 | ❌ |
+| `TRUSTED_PROXIES` | 可信反向代理 IP/CIDR，逗号分隔；为空时不信任 `X-Forwarded-For` | ❌ |
 | `TZ` | 时区，默认 `Asia/Shanghai` | ❌ |
 | `AIRGATE_IMAGE_TAG` | 镜像版本，默认 `latest`，可固定到 `v0.x.y` | ❌ |
 | `API_KEY_SECRET` | 用户 API Key 加密密钥，hex 编码 ≥64 字符 | ❌ |

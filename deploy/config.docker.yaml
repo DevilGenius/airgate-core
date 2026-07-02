@@ -1,6 +1,7 @@
 server:
   port: 9517
   mode: release
+  trusted_proxies: []
   web_dir: frontend
 
 database:

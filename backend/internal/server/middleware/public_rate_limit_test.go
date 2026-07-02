@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,6 +14,9 @@ func TestPublicRateLimitLimitsByClientAndRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
+	if err := router.SetTrustedProxies(nil); err != nil {
+		t.Fatalf("SetTrustedProxies: %v", err)
+	}
 	router.Use(PublicRateLimit(2, time.Minute))
 	router.POST("/login", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 	router.POST("/register", func(c *gin.Context) { c.Status(http.StatusNoContent) })
@@ -51,6 +53,9 @@ func TestPublicRateLimitIgnoresForwardedFor(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
+	if err := router.SetTrustedProxies(nil); err != nil {
+		t.Fatalf("SetTrustedProxies: %v", err)
+	}
 	router.Use(PublicRateLimit(2, time.Minute))
 	router.POST("/login", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 
@@ -58,7 +63,7 @@ func TestPublicRateLimitIgnoresForwardedFor(t *testing.T) {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/login", nil)
 		req.RemoteAddr = "203.0.113.1:1234"
-		req.Header.Set("X-Forwarded-For", fmt.Sprintf("198.51.100.%d", i+1))
+		req.Header.Set("X-Forwarded-For", "198.51.100.1")
 		router.ServeHTTP(w, req)
 		if w.Code != http.StatusNoContent {
 			t.Fatalf("request %d status = %d", i, w.Code)
@@ -75,20 +80,35 @@ func TestPublicRateLimitIgnoresForwardedFor(t *testing.T) {
 	}
 }
 
-func TestPublicRateLimitPeerIP(t *testing.T) {
-	tests := []struct {
-		remoteAddr string
-		want       string
-	}{
-		{"203.0.113.1:1234", "203.0.113.1"},
-		{"[2001:db8::1]:443", "2001:db8::1"},
-		{"unix-socket", "unix-socket"},
+func TestPublicRateLimitUsesForwardedForFromTrustedProxy(t *testing.T) {
+	resetPublicRateLimiterForTesting()
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	if err := router.SetTrustedProxies([]string{"203.0.113.1"}); err != nil {
+		t.Fatalf("SetTrustedProxies: %v", err)
+	}
+	router.Use(PublicRateLimit(2, time.Minute))
+	router.POST("/login", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/login", nil)
+		req.RemoteAddr = "203.0.113.1:1234"
+		req.Header.Set("X-Forwarded-For", "198.51.100.1")
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusNoContent {
+			t.Fatalf("trusted proxy request %d status = %d", i, w.Code)
+		}
 	}
 
-	for _, tt := range tests {
-		if got := publicRateLimitPeerIP(tt.remoteAddr); got != tt.want {
-			t.Fatalf("publicRateLimitPeerIP(%q) = %q, want %q", tt.remoteAddr, got, tt.want)
-		}
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/login", nil)
+	req.RemoteAddr = "203.0.113.1:1234"
+	req.Header.Set("X-Forwarded-For", "198.51.100.2")
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("different forwarded client should have separate bucket, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

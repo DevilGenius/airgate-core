@@ -14,6 +14,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
+	"github.com/gin-gonic/gin"
 )
 
 func TestNewServerRegistersCoreRoutesWithSQLite(t *testing.T) {
@@ -36,7 +37,10 @@ func TestNewServerRegistersCoreRoutesWithSQLite(t *testing.T) {
 		},
 	}
 
-	s := NewServer(cfg, db, nil)
+	s, err := NewServer(cfg, db, nil)
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
 	if s == nil || s.engine == nil || s.handlers == nil || s.srv == nil {
 		t.Fatalf("NewServer returned incomplete server: %#v", s)
 	}
@@ -67,6 +71,25 @@ func TestServerStartReturnsListenError(t *testing.T) {
 
 	if err := s.Start(); err == nil {
 		t.Fatal("Start returned nil error for invalid listen address")
+	}
+}
+
+func TestConfigureTrustedProxiesRejectsInvalidConfig(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := gin.New()
+	if err := configureTrustedProxies(engine, nil); err != nil {
+		t.Fatalf("empty trusted proxies should be valid: %v", err)
+	}
+
+	engine = gin.New()
+	if err := configureTrustedProxies(engine, []string{"127.0.0.1", "10.0.0.0/8"}); err != nil {
+		t.Fatalf("valid trusted proxies returned error: %v", err)
+	}
+
+	engine = gin.New()
+	if err := configureTrustedProxies(engine, []string{"not-a-cidr"}); err == nil {
+		t.Fatal("invalid trusted proxy config returned nil error")
 	}
 }
 
@@ -115,7 +138,10 @@ func TestServerStartPluginsInitializesBackgroundComponents(t *testing.T) {
 			},
 		},
 	}
-	s := NewServer(cfg, db, nil)
+	s, err := NewServer(cfg, db, nil)
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.StartPlugins(ctx)

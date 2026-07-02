@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -57,7 +58,7 @@ type Server struct {
 }
 
 // NewServer 创建 HTTP 服务器
-func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt ...*stdsql.DB) *Server {
+func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt ...*stdsql.DB) (*Server, error) {
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -114,13 +115,18 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	dynamicRouter := NewDynamicRouter(forwarder)
 	extensionProxy := plugin.NewExtensionProxy(pluginMgr)
 
+	engine := gin.New()
+	if err := configureTrustedProxies(engine, cfg.Server.TrustedProxies); err != nil {
+		return nil, err
+	}
+
 	s := &Server{
 		cfg:    cfg,
 		db:     db,
 		rdb:    rdb,
 		jwtMgr: jwtMgr,
 		// gin.New 不挂默认 Logger/Recovery，由我们的中间件接管以便接入结构化日志
-		engine:         gin.New(),
+		engine:         engine,
 		pluginMgr:      pluginMgr,
 		forwarder:      forwarder,
 		marketplace:    marketplace,
@@ -161,7 +167,23 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		Handler: s.engine,
 	}
 
-	return s
+	return s, nil
+}
+
+func configureTrustedProxies(engine *gin.Engine, proxies []string) error {
+	trusted := make([]string, 0, len(proxies))
+	for _, proxy := range proxies {
+		if proxy = strings.TrimSpace(proxy); proxy != "" {
+			trusted = append(trusted, proxy)
+		}
+	}
+	if len(trusted) == 0 {
+		trusted = nil
+	}
+	if err := engine.SetTrustedProxies(trusted); err != nil {
+		return fmt.Errorf("invalid server.trusted_proxies: %w", err)
+	}
+	return nil
 }
 
 // convertMarketEntries 把 config 层 MarketEntry 转换为 plugin 层 MarketplacePlugin
