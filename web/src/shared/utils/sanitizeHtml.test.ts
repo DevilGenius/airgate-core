@@ -14,6 +14,12 @@ describe('sanitizeHtml', () => {
     expect(html).toContain('href="https://docs.example.com"');
     expect(html).toContain('rel="noopener noreferrer"');
   });
+
+  it('preserves existing rel tokens when adding security tokens', () => {
+    const html = sanitizeHtml('<a href="https://docs.example.com" rel="nofollow sponsored noopener">docs</a>');
+
+    expect(html).toContain('rel="nofollow sponsored noopener noreferrer"');
+  });
 });
 
 describe('effectiveDocUrl', () => {

@@ -40,11 +40,23 @@ function cleanElement(element: Element) {
   }
 
   if (tag === 'a') {
-    element.setAttribute('rel', 'noopener noreferrer');
+    element.setAttribute('rel', mergeRelTokens(element.getAttribute('rel'), ['noopener', 'noreferrer']));
     if (element.getAttribute('target') && element.getAttribute('target') !== '_blank') {
       element.setAttribute('target', '_blank');
     }
   }
+}
+
+function mergeRelTokens(value: string | null, required: string[]): string {
+  const tokens = (value ?? '').split(/\s+/).filter(Boolean);
+  const seen = new Set(tokens.map((token) => token.toLowerCase()));
+  for (const token of required) {
+    if (!seen.has(token)) {
+      tokens.push(token);
+      seen.add(token);
+    }
+  }
+  return tokens.join(' ');
 }
 
 export function sanitizeHtml(html: string | undefined | null): string {
