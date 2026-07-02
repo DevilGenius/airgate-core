@@ -153,6 +153,75 @@ func TestBatchInsertIsIdempotentByBillingEventID(t *testing.T) {
 	}
 }
 
+func TestRecordSyncRejectsInsufficientBalanceAndQuotaAtomically(t *testing.T) {
+	db := testdb.OpenMemoryEnt(t, "billing_atomic_quota", schema.WithGlobalUniqueID(false))
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	user, group, account, key := createBillingFixture(t, ctx, db, "atomic")
+	if err := db.User.UpdateOneID(user.ID).SetBalance(1).Exec(ctx); err != nil {
+		t.Fatalf("set user balance: %v", err)
+	}
+	recorder := NewRecorder(db, 0)
+
+	overBalance := billingRecordForFixture("bill_atomic_balance", user, group, account, key)
+	overBalance.ActualCost = 2
+	if _, err := recorder.RecordSync(ctx, overBalance); err == nil || !strings.Contains(err.Error(), "用户余额不足") {
+		t.Fatalf("over balance RecordSync error = %v", err)
+	}
+	if exists, err := db.UsageLog.Query().Where(usagelog.BillingEventIDEQ(overBalance.BillingEventID)).Exist(ctx); err != nil || exists {
+		t.Fatalf("over balance usage exists=%v err=%v", exists, err)
+	}
+	userAfter, err := db.User.Get(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("get user after balance reject: %v", err)
+	}
+	if userAfter.Balance != 1 {
+		t.Fatalf("balance after reject = %.2f, want 1", userAfter.Balance)
+	}
+
+	if err := db.User.UpdateOneID(user.ID).SetBalance(100).Exec(ctx); err != nil {
+		t.Fatalf("restore user balance: %v", err)
+	}
+	if err := db.APIKey.UpdateOneID(key.ID).SetQuotaUsd(5).SetUsedQuota(4.5).Exec(ctx); err != nil {
+		t.Fatalf("set key quota: %v", err)
+	}
+	overQuota := billingRecordForFixture("bill_atomic_quota", user, group, account, key)
+	overQuota.ActualCost = 0.25
+	overQuota.BilledCost = 1
+	if _, err := recorder.RecordSync(ctx, overQuota); err == nil || !strings.Contains(err.Error(), "API Key 额度不足") {
+		t.Fatalf("over quota RecordSync error = %v", err)
+	}
+	if exists, err := db.UsageLog.Query().Where(usagelog.BillingEventIDEQ(overQuota.BillingEventID)).Exist(ctx); err != nil || exists {
+		t.Fatalf("over quota usage exists=%v err=%v", exists, err)
+	}
+	keyAfter, err := db.APIKey.Get(ctx, key.ID)
+	if err != nil {
+		t.Fatalf("get key after quota reject: %v", err)
+	}
+	if keyAfter.UsedQuota != 4.5 || keyAfter.UsedQuotaActual != 0 {
+		t.Fatalf("key usage after reject = (%.2f, %.2f), want (4.50, 0)", keyAfter.UsedQuota, keyAfter.UsedQuotaActual)
+	}
+
+	atLimit := billingRecordForFixture("bill_atomic_quota_exact", user, group, account, key)
+	atLimit.ActualCost = 0.25
+	atLimit.BilledCost = 0.5
+	if _, err := recorder.RecordSync(ctx, atLimit); err != nil {
+		t.Fatalf("exact quota RecordSync error = %v", err)
+	}
+	keyAfter, err = db.APIKey.Get(ctx, key.ID)
+	if err != nil {
+		t.Fatalf("get key after exact quota: %v", err)
+	}
+	if keyAfter.UsedQuota != 5 || keyAfter.UsedQuotaActual != 0.25 {
+		t.Fatalf("key usage after exact quota = (%.2f, %.2f), want (5.00, 0.25)", keyAfter.UsedQuota, keyAfter.UsedQuotaActual)
+	}
+}
+
 func TestRecorderStartAndCallbackUseInjectedRunner(t *testing.T) {
 	var labels []string
 	oldGo := recorderGo
@@ -597,7 +666,7 @@ func TestRecordSyncCommitAndChargeErrors(t *testing.T) {
 		db := openBillingRecorderDB(t, "billing_recordsync_charge_error")
 		defer closeBillingDB(t, db)
 		user, group, account, _ := createBillingFixture(t, ctx, db, "recordsync-charge-error")
-		db.User.Use(errorUserMutationHook(ent.OpUpdateOne, errors.New("charge failed")))
+		db.User.Use(errorUserMutationHook(ent.OpUpdate, errors.New("charge failed")))
 		record := billingRecordForFixture("bill_recordsync_charge_error", user, group, account, nil)
 		record.ActualCost = 1
 		if _, err := NewRecorder(db, 1).RecordSync(ctx, record); err == nil || !strings.Contains(err.Error(), "扣减用户余额失败") {
@@ -653,7 +722,7 @@ func TestBatchInsertTxCommitAndChargeErrors(t *testing.T) {
 		db := openBillingRecorderDB(t, "billing_batch_charge_error")
 		defer closeBillingDB(t, db)
 		user, group, account, _ := createBillingFixture(t, ctx, db, "batch-charge-error")
-		db.User.Use(errorUserMutationHook(ent.OpUpdateOne, errors.New("charge failed")))
+		db.User.Use(errorUserMutationHook(ent.OpUpdate, errors.New("charge failed")))
 		record := billingRecordForFixture("bill_batch_charge_error", user, group, account, nil)
 		record.ActualCost = 1
 		if err := NewRecorder(db, 1).batchInsert(ctx, []UsageRecord{record}); err == nil || !strings.Contains(err.Error(), "扣减用户余额失败") {

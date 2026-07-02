@@ -19,7 +19,9 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
+	"github.com/DevilGenius/airgate-core/ent/predicate"
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
+	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
@@ -1006,10 +1008,8 @@ func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) err
 	}
 
 	for userID, cost := range userActualCosts {
-		if err := tx.User.UpdateOneID(userID).
-			AddBalance(-cost).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("扣减用户余额失败 user_id=%d cost=%.8f: %w", userID, cost, err)
+		if err := debitUserBalance(ctx, tx, userID, cost); err != nil {
+			return err
 		}
 	}
 
@@ -1023,16 +1023,60 @@ func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) err
 		keyIDs[k] = struct{}{}
 	}
 	for keyID := range keyIDs {
-		update := tx.APIKey.UpdateOneID(keyID)
-		if billed := keyBilledCosts[keyID]; billed > 0 {
-			update = update.AddUsedQuota(billed)
-		}
-		if actual := keyActualCosts[keyID]; actual > 0 {
-			update = update.AddUsedQuotaActual(actual)
-		}
-		if err := update.Exec(ctx); err != nil {
-			return fmt.Errorf("更新 API Key 用量失败 key_id=%d: %w", keyID, err)
+		if err := addAPIKeyUsage(ctx, tx, keyID, keyBilledCosts[keyID], keyActualCosts[keyID]); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func debitUserBalance(ctx context.Context, tx *ent.Tx, userID int, cost float64) error {
+	affected, err := tx.User.Update().
+		Where(entuser.IDEQ(userID), entuser.BalanceGTE(cost)).
+		AddBalance(-cost).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("扣减用户余额失败 user_id=%d cost=%.8f: %w", userID, cost, err)
+	}
+	if affected != 1 {
+		return fmt.Errorf("用户余额不足 user_id=%d cost=%.8f", userID, cost)
+	}
+	return nil
+}
+
+func addAPIKeyUsage(ctx context.Context, tx *ent.Tx, keyID int, billed, actual float64) error {
+	if billed <= 0 && actual <= 0 {
+		return nil
+	}
+	predicates := []predicate.APIKey{entapikey.IDEQ(keyID)}
+	if billed > 0 {
+		predicates = append(predicates, apiKeyQuotaAllows(billed))
+	}
+	update := tx.APIKey.Update().Where(predicates...)
+	if billed > 0 {
+		update = update.AddUsedQuota(billed)
+	}
+	if actual > 0 {
+		update = update.AddUsedQuotaActual(actual)
+	}
+	affected, err := update.Save(ctx)
+	if err != nil {
+		return fmt.Errorf("更新 API Key 用量失败 key_id=%d: %w", keyID, err)
+	}
+	if affected != 1 {
+		if billed > 0 {
+			return fmt.Errorf("API Key 额度不足 key_id=%d billed=%.8f", keyID, billed)
+		}
+		return fmt.Errorf("API Key 不存在 key_id=%d", keyID)
+	}
+	return nil
+}
+
+func apiKeyQuotaAllows(delta float64) predicate.APIKey {
+	return entapikey.Or(
+		entapikey.QuotaUsdLTE(0),
+		predicate.APIKey(func(s *entsql.Selector) {
+			s.Where(entsql.ExprP(s.C(entapikey.FieldUsedQuota)+" + ? <= "+s.C(entapikey.FieldQuotaUsd), delta))
+		}),
+	)
 }
