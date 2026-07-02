@@ -283,7 +283,7 @@ func (s *Server) registerRoutes() {
 	r.GET("/v1/usage", s.handleCCCompatUserBalance)
 
 	// 上传文件静态服务（这部分仍然在磁盘上，因为是用户上传的运行时数据）
-	r.Static("/uploads", "data/uploads")
+	r.GET("/uploads/*path", serveUploadAsset("data/uploads"))
 	r.GET("/assets-runtime/*path", s.handleRuntimeAsset)
 
 	// 插件前端静态资源（/plugins/{pluginName}/assets/*）
@@ -408,6 +408,7 @@ func servePluginAsset(mgr *plugin.Manager, baseDir string) gin.HandlerFunc {
 			full := filepath.Join(devDir, rel)
 			if data, err := os.ReadFile(full); err == nil {
 				c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+				setPluginAssetSecurityHeaders(c, rel)
 				c.Data(http.StatusOK, contentTypeFromExt(rel), data)
 				return
 			}
@@ -420,13 +421,69 @@ func servePluginAsset(mgr *plugin.Manager, baseDir string) gin.HandlerFunc {
 			// 插件可选 CSS：若 index.css 不存在，返回空 CSS 而非 404。
 			// 否则浏览器会在 network 面板打印 404，污染开发者控制台。
 			if rel == "index.css" {
+				setPluginAssetSecurityHeaders(c, rel)
 				c.Data(http.StatusOK, "text/css; charset=utf-8", nil)
 				return
 			}
 			c.Status(http.StatusNotFound)
 			return
 		}
+		setPluginAssetSecurityHeaders(c, rel)
 		c.Data(http.StatusOK, contentTypeFromExt(rel), data)
+	}
+}
+
+func serveUploadAsset(baseDir string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rel := strings.TrimPrefix(c.Param("path"), "/")
+		clean := filepath.Clean("/" + rel)
+		if clean == "/" || strings.Contains(clean, "..") {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		rel = strings.TrimPrefix(clean, "/")
+		contentType, ok := safeUploadContentType(rel)
+		if !ok {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		data, err := os.ReadFile(filepath.Join(baseDir, rel))
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Data(http.StatusOK, contentType, data)
+	}
+}
+
+func safeUploadContentType(name string) (string, bool) {
+	switch {
+	case strings.HasSuffix(name, ".png"):
+		return "image/png", true
+	case strings.HasSuffix(name, ".jpg"), strings.HasSuffix(name, ".jpeg"):
+		return "image/jpeg", true
+	case strings.HasSuffix(name, ".gif"):
+		return "image/gif", true
+	case strings.HasSuffix(name, ".ico"):
+		return "image/x-icon", true
+	case strings.HasSuffix(name, ".webp"):
+		return "image/webp", true
+	default:
+		return "", false
+	}
+}
+
+func setPluginAssetSecurityHeaders(c *gin.Context, name string) {
+	c.Header("X-Content-Type-Options", "nosniff")
+	if strings.HasSuffix(name, ".html") {
+		c.Header("Content-Disposition", "attachment")
+		c.Header("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'none'; object-src 'none'; base-uri 'none'")
+		return
+	}
+	if strings.HasSuffix(name, ".svg") {
+		c.Header("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'none'; object-src 'none'; base-uri 'none'")
 	}
 }
 

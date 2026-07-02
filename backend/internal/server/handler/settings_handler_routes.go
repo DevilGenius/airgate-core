@@ -219,11 +219,11 @@ func (h *SettingsHandler) UploadFile(c *gin.Context) {
 		return
 	}
 
-	// 只允许图片
+	// 只允许不可执行图片。SVG 是 XML 文档，同源直接服务时会扩大 XSS 边界。
 	ext := strings.ToLower(filepath.Ext(header.Filename))
-	allowed := map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".svg": true, ".ico": true, ".webp": true}
+	allowed := map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".ico": true, ".webp": true}
 	if !allowed[ext] {
-		response.BadRequest(c, "只支持 PNG/JPG/GIF/SVG/ICO/WebP 格式")
+		response.BadRequest(c, "只支持 PNG/JPG/GIF/ICO/WebP 格式")
 		return
 	}
 

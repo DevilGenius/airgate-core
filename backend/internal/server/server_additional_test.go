@@ -201,6 +201,12 @@ func TestServePluginAssetFallbacks(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(assetDir, "app.js"), []byte("console.log('ok')"), 0o644); err != nil {
 		t.Fatalf("write app.js: %v", err)
 	}
+	if err := os.WriteFile(filepath.Join(assetDir, "index.html"), []byte("<script>alert(1)</script>"), 0o644); err != nil {
+		t.Fatalf("write index.html: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(assetDir, "logo.svg"), []byte(`<svg onload="alert(1)"></svg>`), 0o644); err != nil {
+		t.Fatalf("write logo.svg: %v", err)
+	}
 	mgr := plugin.NewManager(baseDir, "", "", nil)
 	handler := servePluginAsset(mgr, baseDir)
 
@@ -210,8 +216,28 @@ func TestServePluginAssetFallbacks(t *testing.T) {
 	})
 	handler(c)
 	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "application/javascript; charset=utf-8" ||
+		w.Header().Get("X-Content-Type-Options") != "nosniff" ||
 		!strings.Contains(w.Body.String(), "console.log") {
 		t.Fatalf("app.js response = %d %q %q", w.Code, w.Header().Get("Content-Type"), w.Body.String())
+	}
+
+	c, w = newServerTestContext(http.MethodGet, "/plugins/demo/assets/index.html", gin.Params{
+		{Key: "name", Value: "demo"},
+		{Key: "path", Value: "/index.html"},
+	})
+	handler(c)
+	if w.Code != http.StatusOK || w.Header().Get("Content-Disposition") != "attachment" ||
+		!strings.Contains(w.Header().Get("Content-Security-Policy"), "script-src 'none'") {
+		t.Fatalf("index.html headers = status %d disposition=%q csp=%q", w.Code, w.Header().Get("Content-Disposition"), w.Header().Get("Content-Security-Policy"))
+	}
+
+	c, w = newServerTestContext(http.MethodGet, "/plugins/demo/assets/logo.svg", gin.Params{
+		{Key: "name", Value: "demo"},
+		{Key: "path", Value: "/logo.svg"},
+	})
+	handler(c)
+	if w.Code != http.StatusOK || !strings.Contains(w.Header().Get("Content-Security-Policy"), "script-src 'none'") {
+		t.Fatalf("logo.svg headers = status %d csp=%q", w.Code, w.Header().Get("Content-Security-Policy"))
 	}
 
 	c, w = newServerTestContext(http.MethodGet, "/plugins/demo/assets/index.css", gin.Params{
@@ -239,6 +265,35 @@ func TestServePluginAssetFallbacks(t *testing.T) {
 	handler(c)
 	if status := c.Writer.Status(); status != http.StatusBadRequest {
 		t.Fatalf("traversal status = %d recorder=%d", status, w.Code)
+	}
+}
+
+func TestServeUploadAssetRejectsExecutableContent(t *testing.T) {
+	baseDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(baseDir, "logo.png"), []byte("png"), 0o644); err != nil {
+		t.Fatalf("write logo.png: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(baseDir, "old.svg"), []byte(`<svg onload="alert(1)"></svg>`), 0o644); err != nil {
+		t.Fatalf("write old.svg: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(baseDir, "index.html"), []byte("<script>alert(1)</script>"), 0o644); err != nil {
+		t.Fatalf("write index.html: %v", err)
+	}
+	handler := serveUploadAsset(baseDir)
+
+	c, w := newServerTestContext(http.MethodGet, "/uploads/logo.png", gin.Params{{Key: "path", Value: "/logo.png"}})
+	handler(c)
+	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "image/png" ||
+		w.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("logo.png response = %d type=%q nosniff=%q", w.Code, w.Header().Get("Content-Type"), w.Header().Get("X-Content-Type-Options"))
+	}
+
+	for _, rel := range []string{"/old.svg", "/index.html", "/app.js"} {
+		c, w = newServerTestContext(http.MethodGet, "/uploads"+rel, gin.Params{{Key: "path", Value: rel}})
+		handler(c)
+		if status := c.Writer.Status(); status != http.StatusNotFound {
+			t.Fatalf("upload %s status = %d recorder=%d", rel, status, w.Code)
+		}
 	}
 }
 

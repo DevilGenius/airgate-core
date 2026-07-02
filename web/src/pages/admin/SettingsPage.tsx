@@ -1322,7 +1322,7 @@ function LogoUpload({ value, onChange }: { value: string; onChange: (url: string
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/svg+xml,image/x-icon,image/webp"
+          accept="image/png,image/jpeg,image/gif,image/x-icon,image/webp"
           onChange={handleFile}
           className="hidden"
         />

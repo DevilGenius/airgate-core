@@ -33,6 +33,12 @@ func TestSettingsUploadFileBranches(t *testing.T) {
 		t.Fatalf("invalid extension status = %d body=%s", w.Code, w.Body.String())
 	}
 
+	body, contentType = multipartBodyWithFile(t, "file", "logo.svg", []byte(`<svg onload="alert(1)"></svg>`))
+	w = invokeMultipartPluginHandler(http.MethodPost, "/settings/upload", body, contentType, nil, handler.UploadFile)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("svg upload status = %d body=%s", w.Code, w.Body.String())
+	}
+
 	body, contentType = multipartBodyWithFile(t, "file", "huge.png", bytes.Repeat([]byte("x"), (2<<20)+1))
 	w = invokeMultipartPluginHandler(http.MethodPost, "/settings/upload", body, contentType, nil, handler.UploadFile)
 	if w.Code != http.StatusBadRequest {
