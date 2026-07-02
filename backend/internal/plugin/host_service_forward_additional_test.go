@@ -293,17 +293,21 @@ func TestHostForwardRejectsInactivePrincipalsAndExclusiveBypass(t *testing.T) {
 	}
 
 	for _, tt := range []struct {
-		name string
-		key  int
-		code codes.Code
+		name    string
+		key     int
+		code    codes.Code
+		message string
 	}{
-		{name: "disabled", key: disabledKey.ID, code: codes.PermissionDenied},
-		{name: "expired", key: expiredKey.ID, code: codes.PermissionDenied},
-		{name: "exhausted", key: exhaustedKey.ID, code: codes.ResourceExhausted},
+		{name: "disabled", key: disabledKey.ID, code: codes.PermissionDenied, message: "api key disabled"},
+		{name: "expired", key: expiredKey.ID, code: codes.PermissionDenied, message: "api key expired"},
+		{name: "exhausted", key: exhaustedKey.ID, code: codes.ResourceExhausted, message: "api key quota exhausted"},
 	} {
 		err := host.checkHostForwardAPIKey(hostForwardRequest{UserID: int64(activeUser.ID), APIKeyID: int64(tt.key)})
 		if status.Code(err) != tt.code {
 			t.Fatalf("%s key error = %v, want %v", tt.name, err, tt.code)
+		}
+		if got := status.Convert(err).Message(); got != tt.message {
+			t.Fatalf("%s key message = %q, want %q", tt.name, got, tt.message)
 		}
 		if _, err := host.hostForwardSellRate(ctx, hostForwardRequest{UserID: int64(activeUser.ID), APIKeyID: int64(tt.key)}); err == nil {
 			t.Fatalf("%s key sell rate error = nil", tt.name)

@@ -1287,8 +1287,8 @@ func (h *HostService) hostForwardSellRate(_ context.Context, req hostForwardRequ
 	if ak == nil || ak.UserID != int(req.UserID) {
 		return 0, fmt.Errorf("api key not found")
 	}
-	if !ak.Active(time.Now()) {
-		return 0, fmt.Errorf("api key is not usable")
+	if reason := ak.InactiveReason(time.Now()); reason != routegraph.APIKeyInactiveNone {
+		return 0, errors.New(apiKeyInactiveMessage(reason))
 	}
 	return ak.SellRate, nil
 }
@@ -1767,17 +1767,30 @@ func (h *HostService) checkHostForwardAPIKey(req hostForwardRequest) error {
 	if ak == nil || ak.UserID != int(req.UserID) {
 		return status.Error(codes.PermissionDenied, "api key not found")
 	}
-	now := time.Now()
-	if ak.Status != "active" {
-		return status.Error(codes.PermissionDenied, "api key disabled")
-	}
-	if ak.ExpiresAt != nil && !ak.ExpiresAt.After(now) {
-		return status.Error(codes.PermissionDenied, "api key expired")
-	}
-	if ak.QuotaExhausted() {
-		return status.Error(codes.ResourceExhausted, "api key quota exhausted")
+	if reason := ak.InactiveReason(time.Now()); reason != routegraph.APIKeyInactiveNone {
+		return hostForwardAPIKeyInactiveError(reason)
 	}
 	return nil
+}
+
+func hostForwardAPIKeyInactiveError(reason routegraph.APIKeyInactiveReason) error {
+	if reason == routegraph.APIKeyInactiveExhausted {
+		return status.Error(codes.ResourceExhausted, apiKeyInactiveMessage(reason))
+	}
+	return status.Error(codes.PermissionDenied, apiKeyInactiveMessage(reason))
+}
+
+func apiKeyInactiveMessage(reason routegraph.APIKeyInactiveReason) string {
+	switch reason {
+	case routegraph.APIKeyInactiveDisabled:
+		return "api key disabled"
+	case routegraph.APIKeyInactiveExpired:
+		return "api key expired"
+	case routegraph.APIKeyInactiveExhausted:
+		return "api key quota exhausted"
+	default:
+		return "api key not found"
+	}
 }
 
 func hostForwardGenericError() error {

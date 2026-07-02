@@ -94,15 +94,38 @@ type APIKeyNode struct {
 	ExpiresAt *time.Time
 }
 
+type APIKeyInactiveReason string
+
+const (
+	APIKeyInactiveNone      APIKeyInactiveReason = ""
+	APIKeyInactiveMissing   APIKeyInactiveReason = "missing"
+	APIKeyInactiveDisabled  APIKeyInactiveReason = "disabled"
+	APIKeyInactiveExpired   APIKeyInactiveReason = "expired"
+	APIKeyInactiveExhausted APIKeyInactiveReason = "quota_exhausted"
+)
+
 func (u *UserNode) Active() bool {
 	return u != nil && u.Status == entuser.StatusActive
 }
 
 func (k *APIKeyNode) Active(now time.Time) bool {
-	return k != nil &&
-		k.Status == entapikey.StatusActive &&
-		(k.ExpiresAt == nil || k.ExpiresAt.After(now)) &&
-		(k.QuotaUSD <= 0 || k.UsedQuota < k.QuotaUSD)
+	return k.InactiveReason(now) == APIKeyInactiveNone
+}
+
+func (k *APIKeyNode) InactiveReason(now time.Time) APIKeyInactiveReason {
+	if k == nil {
+		return APIKeyInactiveMissing
+	}
+	if k.Status != entapikey.StatusActive {
+		return APIKeyInactiveDisabled
+	}
+	if k.ExpiresAt != nil && !k.ExpiresAt.After(now) {
+		return APIKeyInactiveExpired
+	}
+	if k.QuotaExhausted() {
+		return APIKeyInactiveExhausted
+	}
+	return APIKeyInactiveNone
 }
 
 func (k *APIKeyNode) QuotaExhausted() bool {

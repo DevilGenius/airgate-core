@@ -228,6 +228,9 @@ func TestRefreshSyncAndIncrementalUpdates(t *testing.T) {
 	if keyNode := APIKey(key.ID); keyNode == nil || !keyNode.QuotaExhausted() || keyNode.Active(time.Now()) {
 		t.Fatalf("exhausted APIKey = %+v", keyNode)
 	}
+	if reason := APIKey(key.ID).InactiveReason(time.Now()); reason != APIKeyInactiveExhausted {
+		t.Fatalf("exhausted APIKey inactive reason = %q, want %q", reason, APIKeyInactiveExhausted)
+	}
 	if err := db.APIKey.DeleteOneID(key.ID).Exec(ctx); err != nil {
 		t.Fatalf("delete api key: %v", err)
 	}
