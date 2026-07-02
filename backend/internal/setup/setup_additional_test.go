@@ -281,7 +281,7 @@ func TestSetupRouteSuccessFailureAndGuardBranches(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			*tc.errp = nil
 			w := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+			req := setupTokenRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			router.ServeHTTP(w, req)
 			if !connectionSuccess(t, w.Body.Bytes()) {
@@ -290,7 +290,7 @@ func TestSetupRouteSuccessFailureAndGuardBranches(t *testing.T) {
 
 			*tc.errp = errors.New("connection failed")
 			w = httptest.NewRecorder()
-			req = httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+			req = setupTokenRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			router.ServeHTTP(w, req)
 			if connectionSuccess(t, w.Body.Bytes()) {
@@ -302,7 +302,7 @@ func TestSetupRouteSuccessFailureAndGuardBranches(t *testing.T) {
 
 	installReq := `{"database":{"host":"posted-db","port":5432,"user":"u","password":"p","dbname":"posted"},"redis":{"host":"posted-redis","port":6379,"password":"p","db":1},"admin":{"email":"admin@example.com","password":"secret123"}}`
 	w = httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/setup/install", strings.NewReader(installReq))
+	req := setupTokenRequest(http.MethodPost, "/setup/install", strings.NewReader(installReq))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -319,7 +319,7 @@ func TestSetupRouteSuccessFailureAndGuardBranches(t *testing.T) {
 
 	installErr = errors.New("install failed")
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/setup/install", strings.NewReader(installReq))
+	req = setupTokenRequest(http.MethodPost, "/setup/install", strings.NewReader(installReq))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusInternalServerError {
@@ -464,6 +464,7 @@ func restoreSetupHooks(t *testing.T) {
 	prevRandRead := setupRandRead
 	prevDelay := setupInstallCallbackDelay
 	prevDone := onInstallDone
+	prevToken := CurrentBootstrapToken()
 	t.Cleanup(func() {
 		setupNeedsSetup = prevNeedsSetup
 		setupTestDBConnection = prevTestDB
@@ -480,6 +481,9 @@ func restoreSetupHooks(t *testing.T) {
 		setupRandRead = prevRandRead
 		setupInstallCallbackDelay = prevDelay
 		onInstallDone = prevDone
+		setupBootstrapTokenMu.Lock()
+		setupBootstrapToken = prevToken
+		setupBootstrapTokenMu.Unlock()
 	})
 }
 

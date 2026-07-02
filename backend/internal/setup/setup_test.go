@@ -177,9 +177,17 @@ func TestSetupRoutesStatusAndBadJSON(t *testing.T) {
 		t.Fatalf("needs_setup = false, want true; body=%s", w.Body.String())
 	}
 
+	w = httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/setup/test-db", strings.NewReader(`{"host":"db","port":5432,"user":"u","dbname":"airgate"}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("missing setup token status = %d, want 401; body=%s", w.Code, w.Body.String())
+	}
+
 	for _, path := range []string{"/setup/test-db", "/setup/test-redis", "/setup/install"} {
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader("{"))
+		req := setupTokenRequest(http.MethodPost, path, strings.NewReader("{"))
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 		if w.Code != http.StatusBadRequest {
@@ -191,6 +199,12 @@ func TestSetupRoutesStatusAndBadJSON(t *testing.T) {
 	}
 
 	RegisterRoutes(gin.New())
+}
+
+func setupTokenRequest(method, target string, body *strings.Reader) *http.Request {
+	req := httptest.NewRequest(method, target, body)
+	req.Header.Set(SetupBootstrapTokenHeader, CurrentBootstrapToken())
+	return req
 }
 
 func clearSetupEnv(t *testing.T) {
