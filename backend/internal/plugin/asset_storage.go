@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -54,8 +55,18 @@ const (
 	assetDownloadTimeout = 60 * time.Second
 )
 
-var allowPrivateAssetDownloadsForTesting bool
+var allowPrivateAssetDownloadsForTesting atomic.Bool
 var assetSourceLookupIPAddr = net.DefaultResolver.LookupIPAddr
+
+var assetDownloadTransport = &http.Transport{
+	// Proxy is intentionally nil so downloads cannot bypass source IP validation.
+	DialContext:           dialValidatedAssetSource,
+	ForceAttemptHTTP2:     true,
+	MaxIdleConns:          100,
+	IdleConnTimeout:       90 * time.Second,
+	TLSHandshakeTimeout:   10 * time.Second,
+	ExpectContinueTimeout: time.Second,
+}
 
 const DefaultAssetStorageDir = "data/assets"
 
@@ -454,7 +465,7 @@ func (s *AssetStorage) StoreFromURL(ctx context.Context, userID int64, purpose A
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return nil, fmt.Errorf("invalid source URL: must be http or https")
 	}
-	if err := validateAssetSourceURL(ctx, parsed); err != nil {
+	if err := validateAssetSourceURL(parsed); err != nil {
 		return nil, err
 	}
 
@@ -467,7 +478,7 @@ func (s *AssetStorage) StoreFromURL(ctx context.Context, userID int64, purpose A
 	}
 	client := assetDownloadHTTPClient()
 	client.CheckRedirect = func(req *http.Request, _ []*http.Request) error {
-		return validateAssetSourceURL(req.Context(), req.URL)
+		return validateAssetSourceURL(req.URL)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -501,20 +512,12 @@ func (s *AssetStorage) StoreFromURL(ctx context.Context, userID int64, purpose A
 
 func assetDownloadHTTPClient() *http.Client {
 	return &http.Client{
-		Transport: &http.Transport{
-			// Proxy is intentionally nil so downloads cannot bypass source IP validation.
-			DialContext:           dialValidatedAssetSource,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: time.Second,
-		},
-		Timeout: assetDownloadTimeout,
+		Transport: assetDownloadTransport,
+		Timeout:   assetDownloadTimeout,
 	}
 }
 
-func validateAssetSourceURL(ctx context.Context, parsed *url.URL) error {
+func validateAssetSourceURL(parsed *url.URL) error {
 	if parsed == nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return fmt.Errorf("invalid source URL: must be http or https")
 	}
@@ -522,8 +525,7 @@ func validateAssetSourceURL(ctx context.Context, parsed *url.URL) error {
 	if host == "" {
 		return fmt.Errorf("invalid source URL: missing host")
 	}
-	_, err := resolveSafeAssetSourceIPs(ctx, host, "")
-	return err
+	return nil
 }
 
 func dialValidatedAssetSource(ctx context.Context, network, address string) (net.Conn, error) {
@@ -551,7 +553,7 @@ func dialValidatedAssetSource(ctx context.Context, network, address string) (net
 }
 
 func resolveSafeAssetSourceIPs(ctx context.Context, host, network string) ([]net.IP, error) {
-	if allowPrivateAssetDownloadsForTesting {
+	if allowPrivateAssetDownloadsForTesting.Load() {
 		return resolveAssetSourceIPs(ctx, host, network)
 	}
 	if ip := net.ParseIP(host); ip != nil {

@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -159,14 +161,14 @@ func TestAssetStorageStoreFromURLErrors(t *testing.T) {
 
 func TestAssetDownloadDialRejectsPrivateResolvedAddress(t *testing.T) {
 	prevLookup := assetSourceLookupIPAddr
-	prevAllowPrivate := allowPrivateAssetDownloadsForTesting
+	prevAllowPrivate := allowPrivateAssetDownloadsForTesting.Load()
 	assetSourceLookupIPAddr = func(context.Context, string) ([]net.IPAddr, error) {
 		return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
 	}
-	allowPrivateAssetDownloadsForTesting = false
+	allowPrivateAssetDownloadsForTesting.Store(false)
 	t.Cleanup(func() {
 		assetSourceLookupIPAddr = prevLookup
-		allowPrivateAssetDownloadsForTesting = prevAllowPrivate
+		allowPrivateAssetDownloadsForTesting.Store(prevAllowPrivate)
 	})
 
 	_, err := dialValidatedAssetSource(context.Background(), "tcp", "assets.example:80")
@@ -175,9 +177,82 @@ func TestAssetDownloadDialRejectsPrivateResolvedAddress(t *testing.T) {
 	}
 }
 
+func TestAssetDownloadHTTPClientReusesTransport(t *testing.T) {
+	first := assetDownloadHTTPClient()
+	second := assetDownloadHTTPClient()
+	if first.Transport == nil || first.Transport != second.Transport {
+		t.Fatal("asset download clients should share one transport")
+	}
+}
+
+func TestAssetStorageStoreFromURLUsesDialValidationOncePerConnection(t *testing.T) {
+	allowPrivateAssetDownloads(t)
+
+	var dials atomic.Int32
+	var conns sync.Map
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		connID := r.RemoteAddr
+		conns.Store(connID, struct{}{})
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("png-data"))
+	}))
+	server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			dials.Add(1)
+		}
+	}
+	server.Start()
+	t.Cleanup(server.Close)
+
+	storage := newTestAssetStorage(t)
+	for i := 0; i < 2; i++ {
+		if _, err := storage.StoreFromURL(context.Background(), 42, AssetPurposeUpload, server.URL); err != nil {
+			t.Fatalf("StoreFromURL(%d) error = %v", i, err)
+		}
+	}
+	if got := dials.Load(); got != 1 {
+		t.Fatalf("server connections = %d, want 1", got)
+	}
+	count := 0
+	conns.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+	if count != 1 {
+		t.Fatalf("remote connections = %d, want 1", count)
+	}
+}
+
+func TestAssetStorageStoreFromURLDoesNotResolveBeforeDial(t *testing.T) {
+	allowPrivateAssetDownloads(t)
+
+	prevLookup := assetSourceLookupIPAddr
+	var lookups atomic.Int32
+	assetSourceLookupIPAddr = func(context.Context, string) ([]net.IPAddr, error) {
+		lookups.Add(1)
+		return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+	}
+	t.Cleanup(func() { assetSourceLookupIPAddr = prevLookup })
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("png-data"))
+	}))
+	t.Cleanup(server.Close)
+
+	sourceURL := strings.Replace(server.URL, "127.0.0.1", "localhost", 1)
+	storage := newTestAssetStorage(t)
+	if _, err := storage.StoreFromURL(context.Background(), 42, AssetPurposeUpload, sourceURL); err != nil {
+		t.Fatalf("StoreFromURL() error = %v", err)
+	}
+	if got := lookups.Load(); got != 1 {
+		t.Fatalf("download DNS lookups = %d, want 1", got)
+	}
+}
+
 func allowPrivateAssetDownloads(t *testing.T) {
 	t.Helper()
-	prev := allowPrivateAssetDownloadsForTesting
-	allowPrivateAssetDownloadsForTesting = true
-	t.Cleanup(func() { allowPrivateAssetDownloadsForTesting = prev })
+	prev := allowPrivateAssetDownloadsForTesting.Load()
+	allowPrivateAssetDownloadsForTesting.Store(true)
+	t.Cleanup(func() { allowPrivateAssetDownloadsForTesting.Store(prev) })
 }
