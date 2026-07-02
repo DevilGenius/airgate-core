@@ -41,8 +41,14 @@ function cleanElement(element: Element) {
 
   if (tag === 'a') {
     element.setAttribute('rel', mergeRelTokens(element.getAttribute('rel'), ['noopener', 'noreferrer']));
-    if (element.getAttribute('target') && element.getAttribute('target') !== '_blank') {
-      element.setAttribute('target', '_blank');
+    const target = element.getAttribute('target');
+    if (target) {
+      const normalizedTarget = target.trim().toLowerCase();
+      if (normalizedTarget === '_blank' || normalizedTarget === '_self') {
+        element.setAttribute('target', normalizedTarget);
+      } else {
+        element.removeAttribute('target');
+      }
     }
   }
 }

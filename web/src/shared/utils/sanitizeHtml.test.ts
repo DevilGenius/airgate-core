@@ -20,6 +20,13 @@ describe('sanitizeHtml', () => {
 
     expect(html).toContain('rel="nofollow sponsored noopener noreferrer"');
   });
+
+  it('preserves self targets and removes unsupported targets', () => {
+    const html = sanitizeHtml('<a href="/docs" target="_self">self</a><a href="/docs" target="popup">popup</a>');
+
+    expect(html).toContain('target="_self"');
+    expect(html).not.toContain('target="popup"');
+  });
 });
 
 describe('effectiveDocUrl', () => {
