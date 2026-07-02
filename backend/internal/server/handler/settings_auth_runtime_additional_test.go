@@ -209,7 +209,7 @@ func TestAuthAPIKeyLoginGetMeAndVerifyMailRoutesWithSQLite(t *testing.T) {
 	}
 	coreauth.InvalidateAPIKeyCache("")
 	w = invokeHandlerForValidation(http.MethodPost, "/login/api-key", fmt.Sprintf(`{"key":%q}`, key.PlainKey), nil, nil, authHandler.LoginByAPIKey)
-	if w.Code != http.StatusForbidden {
+	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("disabled user api key login status=%d body=%s", w.Code, w.Body.String())
 	}
 }
