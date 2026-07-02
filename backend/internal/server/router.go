@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -48,6 +49,7 @@ func (s *Server) registerRoutes() {
 	// 而登录/注册这些前置鉴权阶段根本还没设 user_id，中间件直接 c.Next() 放行，
 	// 实际是空转。随同硬编码 60 req/min 的用户限流一起移除了。
 	authGroup := v1.Group("/auth")
+	authGroup.Use(middleware.PublicRateLimit(20, time.Minute))
 	{
 		authGroup.POST("/login", handlers.Auth.Login)
 		authGroup.POST("/login-apikey", handlers.Auth.LoginByAPIKey)
@@ -57,7 +59,7 @@ func (s *Server) registerRoutes() {
 	}
 
 	// Token 刷新（独立于 JWT 中间件，允许过期 token 刷新）
-	v1.POST("/auth/refresh", handlers.Auth.RefreshToken)
+	v1.POST("/auth/refresh", middleware.PublicRateLimit(60, time.Minute), handlers.Auth.RefreshToken)
 
 	// === 用户路由（需要 JWT 认证） ===
 	userGroup := v1.Group("")
