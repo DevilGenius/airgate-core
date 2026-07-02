@@ -43,7 +43,7 @@ LDFLAGS := -X github.com/DevilGenius/airgate-core/internal/version.Version=$(VER
 .PHONY: help dev dev-backend dev-frontend dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-playground dev-plugin-epay dev-plugin-health dev-plugin-kiro dev-plugin-studio \
         build build-backend build-frontend \
         build-plugins sync-plugins \
-        ent lint lint-unused lint-tools fmt test clean install ci pre-commit setup-hooks \
+        ent lint lint-unused lint-tools fmt test test-frontend clean install ci pre-commit setup-hooks \
         docker-build docker-rebuild docker-up docker-down docker-restart docker-dev
 
 help: ## 显示帮助信息
@@ -285,9 +285,13 @@ fmt: ## 格式化代码
 	fi
 	@echo "代码格式化完成"
 
-test: ensure-webdist ## 运行测试
+test: ensure-webdist test-frontend ## 运行测试
 	@cd $(BACKEND_DIR) && $(GO) test ./...
 	@echo "后端测试完成"
+
+test-frontend: ## 运行前端测试
+	@cd $(WEB_DIR) && pnpm test
+	@echo "前端测试完成"
 
 
 # ===================== CI =====================
