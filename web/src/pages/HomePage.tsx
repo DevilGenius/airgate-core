@@ -5,6 +5,7 @@ import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsPr
 import { useTheme } from '../app/providers/ThemeProvider';
 import { getToken } from '../shared/api/client';
 import { effectiveDocUrl } from '../shared/utils/docUrl';
+import { sanitizeHtml } from '../shared/utils/sanitizeHtml';
 import { useStatusPageEnabled } from '../shared/hooks/useStatusPageEnabled';
 import {
   Zap, Shield, Globe, ArrowRight, Sun, Moon, Code, BarChart3, KeyRound, Layers, Activity,
@@ -20,6 +21,7 @@ export default function HomePage() {
   const isLoggedIn = !!getToken();
   // 文档链接 fallback：管理员未填外部 doc_url 时回退到内置 /docs（详见 docUrl.ts）
   const docs = effectiveDocUrl(site.doc_url);
+  const homeContentHtml = sanitizeHtml(site.home_content);
 
   const features = [
     { icon: <Zap className="w-6 h-6" />, titleKey: 'home.feature_gateway', descKey: 'home.feature_gateway_desc' },
@@ -132,11 +134,11 @@ export default function HomePage() {
       </section>
 
       {/* 自定义 HTML 内容 */}
-      {site.home_content && (
+      {homeContentHtml && (
         <section className="relative z-10 px-6 pb-16 max-w-4xl mx-auto">
           <div
             className="prose prose-sm dark:prose-invert max-w-none text-text-secondary"
-            dangerouslySetInnerHTML={{ __html: site.home_content }}
+            dangerouslySetInnerHTML={{ __html: homeContentHtml }}
           />
         </section>
       )}

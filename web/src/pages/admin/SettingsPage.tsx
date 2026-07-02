@@ -18,6 +18,7 @@ import type { SettingItem, TestSMTPReq, TestNotificationReq } from '../../shared
 import { SystemUpdatePanel } from './SystemUpdatePanel';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { CommonModal } from '../../shared/components/CommonModal';
+import { sanitizeHtml } from '../../shared/utils/sanitizeHtml';
 
 // ==================== 设置 key 定义 ====================
 
@@ -972,7 +973,7 @@ function EmailTemplateEditor({
     return result;
   }
 
-  const previewHtml = replaceVars(body);
+  const previewHtml = sanitizeHtml(replaceVars(body));
   const previewModalState = useOverlayState({
     isOpen: isPreviewOpen,
     onOpenChange: onPreviewOpenChange,

@@ -1,3 +1,5 @@
+import { isSafeURL } from './sanitizeHtml';
+
 /**
  * effectiveDocUrl 解析"文档"按钮应该跳转到哪里。
  *
@@ -12,8 +14,8 @@ export function effectiveDocUrl(docUrl: string | undefined | null): {
   isExternal: boolean;
 } {
   const trimmed = (docUrl ?? '').trim();
-  if (trimmed) {
-    return { href: trimmed, isExternal: true };
+  if (trimmed && isSafeURL(trimmed)) {
+    return { href: trimmed, isExternal: !trimmed.startsWith('/') };
   }
   return { href: '/docs', isExternal: false };
 }
