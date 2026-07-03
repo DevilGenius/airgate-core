@@ -1214,6 +1214,7 @@ export default function AccountsPageContent() {
           open
           count={bulkEditSelection.ids.length}
           initialGroupIds={bulkEditSelection.initialValues.groupIds}
+          initialGroupPriorities={bulkEditSelection.initialValues.groupPriorities}
           initialMaxConcurrency={bulkEditSelection.initialValues.maxConcurrency}
           initialPriority={bulkEditSelection.initialValues.priority}
           initialRateMultiplier={bulkEditSelection.initialValues.rateMultiplier}

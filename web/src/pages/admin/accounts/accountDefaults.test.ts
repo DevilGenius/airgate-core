@@ -5,9 +5,11 @@ import {
   DEFAULT_ACCOUNT_PRIORITY,
   clampAccountPriority,
   commitAccountPriorityInput,
+  getAccountGroupPriorities,
   getAccountMessageLockEnabled,
   isAccountPriorityDraft,
   parseAccountPriorityInput,
+  setAccountGroupPriorities,
   setAccountMessageLockEnabled,
 } from './accountDefaults';
 
@@ -34,6 +36,25 @@ describe('account default helpers', () => {
     expect(setAccountMessageLockEnabled({ existing: 'value' }, true)).toEqual({
       existing: 'value',
       msg_lock_enabled: true,
+    });
+  });
+
+  it('reads and writes per-group priority overrides in account extra data', () => {
+    expect(getAccountGroupPriorities({
+      group_priorities: {
+        2: 88,
+        3: 10000,
+        bad: 1,
+        4: '5',
+      },
+    })).toEqual({ 2: 88, 3: ACCOUNT_PRIORITY_MAX });
+
+    expect(setAccountGroupPriorities({ existing: 'value' }, { 2: 10, 3: null })).toEqual({
+      existing: 'value',
+      group_priorities: { 2: 10 },
+    });
+    expect(setAccountGroupPriorities({ existing: 'value', group_priorities: { 2: 10 } }, {})).toEqual({
+      existing: 'value',
     });
   });
 });

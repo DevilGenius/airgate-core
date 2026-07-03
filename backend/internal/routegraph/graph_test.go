@@ -67,6 +67,48 @@ func TestAccountsForModelAppliesModelPolicies(t *testing.T) {
 	}
 }
 
+func TestAccountsForModelAppliesGroupPriorityOverrides(t *testing.T) {
+	shared := &ent.Account{
+		ID:       1,
+		Platform: "openai",
+		Priority: 50,
+		Extra: map[string]interface{}{
+			accountGroupPrioritiesExtraKey: map[string]interface{}{
+				"10": float64(80),
+				"20": float64(-5),
+			},
+		},
+	}
+	fallback := &ent.Account{
+		ID:       2,
+		Platform: "openai",
+		Priority: 30,
+		Extra:    map[string]interface{}{},
+	}
+	groupA := &ent.Group{ID: 10, Platform: "openai"}
+	groupA.Edges.Accounts = []*ent.Account{shared, fallback}
+	groupB := &ent.Group{ID: 20, Platform: "openai"}
+	groupB.Edges.Accounts = []*ent.Account{shared, fallback}
+	groupC := &ent.Group{ID: 30, Platform: "openai"}
+	groupC.Edges.Accounts = []*ent.Account{shared, fallback}
+
+	restore := SetSnapshotForTesting([]*ent.Group{groupA, groupB, groupC})
+	defer restore()
+
+	if got := accountPriorities(Group(10).AccountsForModel("gpt-5")); got[1] != 80 || got[2] != 30 {
+		t.Fatalf("group 10 priorities = %+v, want account 1 override and account 2 fallback", got)
+	}
+	if got := accountPriorities(Group(20).AccountsForModel("gpt-5")); got[1] != -5 || got[2] != 30 {
+		t.Fatalf("group 20 priorities = %+v, want account 1 override and account 2 fallback", got)
+	}
+	if got := accountPriorities(Group(30).AccountsForModel("gpt-5")); got[1] != 50 || got[2] != 30 {
+		t.Fatalf("group 30 priorities = %+v, want account-level fallback", got)
+	}
+	if shared.Priority != 50 {
+		t.Fatalf("source account priority mutated to %d", shared.Priority)
+	}
+}
+
 func TestRefreshSyncAndIncrementalUpdates(t *testing.T) {
 	restore := preserveSnapshot(t)
 	defer restore()
@@ -649,6 +691,14 @@ func accountIDs(accounts []*ent.Account) []int {
 	out := make([]int, 0, len(accounts))
 	for _, account := range accounts {
 		out = append(out, account.ID)
+	}
+	return out
+}
+
+func accountPriorities(accounts []*ent.Account) map[int]int {
+	out := make(map[int]int, len(accounts))
+	for _, account := range accounts {
+		out[account.ID] = account.Priority
 	}
 	return out
 }
