@@ -67,8 +67,11 @@ function getCommonGroupPriorities(rows: AccountResp[], groupIds: number[]) {
   if (rows.length === 0 || groupIds.length === 0) return result;
 
   const prioritiesByRow = rows.map((row) => getAccountGroupPriorities(row.extra));
+  const firstPriorities = prioritiesByRow[0];
+  if (!firstPriorities) return result;
+
   for (const groupId of groupIds) {
-    const firstPriority = prioritiesByRow[0][groupId];
+    const firstPriority = firstPriorities[groupId];
     if (firstPriority == null) continue;
     if (prioritiesByRow.every((priorities) => priorities[groupId] === firstPriority)) {
       result[groupId] = firstPriority;
