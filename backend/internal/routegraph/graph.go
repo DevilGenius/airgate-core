@@ -84,7 +84,7 @@ var knownAccountCategoryAliases = map[string]struct{}{
 }
 
 var accountCategoryTokenAliases = map[string][]string{
-	"k12": []string{"team"},
+	"k12": {"team"},
 }
 
 type UserNode struct {
