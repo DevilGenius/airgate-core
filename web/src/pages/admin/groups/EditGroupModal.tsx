@@ -27,7 +27,7 @@ import {
   isValidRateMultiplierValue,
   parseRateMultiplier,
 } from '../../../shared/utils/rateMultiplier';
-import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../../shared/types';
+import type { GroupResp, CreateGroupReq, UpdateGroupReq, ModelPolicy } from '../../../shared/types';
 
 function parseQuotas(quotas?: Record<string, unknown>): { daily: string; weekly: string; monthly: string } {
   return {
@@ -55,6 +55,17 @@ type OpenAIOperations = {
   imagesApi: boolean;
   responsesImageGeneration: boolean;
 };
+
+type AccountTypePolicyInputs = Record<string, { allow: string; deny: string }>;
+
+const OPENAI_ACCOUNT_TYPE_POLICY_OPTIONS = [
+  { key: 'free', label: 'Free' },
+  { key: 'plus', label: 'Plus' },
+  { key: 'pro', label: 'Pro' },
+  { key: 'team', label: 'Team' },
+  { key: 'apikey', label: 'API Key' },
+  { key: 'oauth', label: 'OAuth' },
+];
 
 const IMAGE_PRICE_FIELDS: Array<{ key: keyof ImagePrices; setting: string; label: string }> = [
   { key: 'oneK', setting: 'image_price_1k', label: '1K' },
@@ -129,6 +140,57 @@ function buildOperationPolicies(
   return policies;
 }
 
+function modelPatternsToInput(patterns?: string[]): string {
+  return (patterns ?? []).join('\n');
+}
+
+function inputToModelPatterns(value: string): string[] | undefined {
+  const patterns = value
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return patterns.length > 0 ? patterns : undefined;
+}
+
+function parseAccountTypePolicyInputs(
+  policies?: Record<string, ModelPolicy>,
+): AccountTypePolicyInputs {
+  const inputs: AccountTypePolicyInputs = {};
+  for (const [key, policy] of Object.entries(policies ?? {})) {
+    inputs[key] = {
+      allow: modelPatternsToInput(policy.allow),
+      deny: modelPatternsToInput(policy.deny),
+    };
+  }
+  return inputs;
+}
+
+function buildAccountTypeModelPolicies(
+  inputs: AccountTypePolicyInputs,
+): Record<string, ModelPolicy> {
+  const policies: Record<string, ModelPolicy> = {};
+  for (const [key, value] of Object.entries(inputs)) {
+    const allow = inputToModelPatterns(value.allow);
+    const deny = inputToModelPatterns(value.deny);
+    if (!allow && !deny) continue;
+    policies[key] = {
+      ...(allow ? { allow } : {}),
+      ...(deny ? { deny } : {}),
+    };
+  }
+  return policies;
+}
+
+function accountTypePolicyOptions(inputs: AccountTypePolicyInputs) {
+  const defaults = [...OPENAI_ACCOUNT_TYPE_POLICY_OPTIONS];
+  const known = new Set(defaults.map((item) => item.key));
+  const custom = Object.keys(inputs)
+    .filter((key) => !known.has(key))
+    .sort()
+    .map((key) => ({ key, label: key }));
+  return [...defaults, ...custom];
+}
+
 export function GroupFormModal({
   open,
   title,
@@ -166,6 +228,9 @@ export function GroupFormModal({
   const [claudeCodeOnly, setClaudeCodeOnly] = useState(group?.plugin_settings?.claude?.claude_code_only === 'true');
   const [openaiOperations, setOpenAIOperations] = useState<OpenAIOperations>(() => parseOpenAIOperations(group?.operation_policies));
   const [imagePrices, setImagePrices] = useState<ImagePrices>(() => parseImagePrices(group?.plugin_settings));
+  const [accountTypePolicyInputs, setAccountTypePolicyInputs] = useState<AccountTypePolicyInputs>(() =>
+    parseAccountTypePolicyInputs(group?.account_type_model_policies),
+  );
   const [copyFromGroupIds, setCopyFromGroupIds] = useState<number[]>([]);
 
   const { data: copySourceData } = useQuery({
@@ -207,6 +272,7 @@ export function GroupFormModal({
   const rateMultiplierEmpty = isEmptyRateMultiplierInput(form.rate_multiplier);
   const rateMultiplierValid = rateMultiplierEmpty || isValidRateMultiplierValue(rateMultiplierValue);
   const imagePricingEnabled = openaiOperations.imagesApi || openaiOperations.responsesImageGeneration;
+  const openaiAccountTypePolicyOptions = accountTypePolicyOptions(accountTypePolicyInputs);
 
   const handleSubmit = () => {
     if (!isEdit && (!form.name || !form.platform)) return;
@@ -226,6 +292,9 @@ export function GroupFormModal({
     const operationPolicies = form.platform === 'openai'
       ? buildOperationPolicies(group?.operation_policies, openaiOperations)
       : group?.operation_policies;
+    const accountTypeModelPolicies = form.platform === 'openai'
+      ? buildAccountTypeModelPolicies(accountTypePolicyInputs)
+      : undefined;
 
     onSubmit({
       ...form,
@@ -233,6 +302,7 @@ export function GroupFormModal({
       note: form.note,
       rate_multiplier: rateMultiplier,
       operation_policies: operationPolicies,
+      ...(form.platform === 'openai' ? { account_type_model_policies: accountTypeModelPolicies } : {}),
       plugin_settings: Object.keys(pluginSettings).length > 0 ? pluginSettings : undefined,
       quotas: form.subscription_type === 'subscription' ? buildQuotas(quotas) : undefined,
       subscription_type: form.subscription_type as 'standard' | 'subscription',
@@ -509,6 +579,63 @@ export function GroupFormModal({
                     />
                   </HeroTextField>
                 ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
+                {t('groups.openai_account_type_model_policies')}
+              </p>
+              <p className="mb-2 text-[11px] text-text-tertiary">
+                {t('groups.openai_account_type_model_policies_hint')}
+              </p>
+              <div className="space-y-3">
+                {openaiAccountTypePolicyOptions.map((option) => {
+                  const value = accountTypePolicyInputs[option.key] ?? { allow: '', deny: '' };
+                  return (
+                    <div key={option.key} className="rounded-md border border-border-subtle p-3">
+                      <p className="mb-2 text-sm font-medium text-text">{option.label}</p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <HeroTextField fullWidth>
+                          <Label>{t('groups.model_allowlist')}</Label>
+                          <TextArea
+                            className="ag-model-policy-textarea"
+                            rows={3}
+                            value={value.allow}
+                            onChange={(e) =>
+                              setAccountTypePolicyInputs((current) => ({
+                                ...current,
+                                [option.key]: {
+                                  ...(current[option.key] ?? { allow: '', deny: '' }),
+                                  allow: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder={t('groups.model_policy_placeholder')}
+                          />
+                        </HeroTextField>
+                        <HeroTextField fullWidth>
+                          <Label>{t('groups.model_denylist')}</Label>
+                          <TextArea
+                            className="ag-model-policy-textarea"
+                            rows={3}
+                            value={value.deny}
+                            onChange={(e) =>
+                              setAccountTypePolicyInputs((current) => ({
+                                ...current,
+                                [option.key]: {
+                                  ...(current[option.key] ?? { allow: '', deny: '' }),
+                                  deny: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder={t('groups.model_policy_placeholder')}
+                          />
+                        </HeroTextField>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

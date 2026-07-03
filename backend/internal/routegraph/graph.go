@@ -83,6 +83,10 @@ var knownAccountCategoryAliases = map[string]struct{}{
 	"enterprise": {},
 }
 
+var accountCategoryTokenAliases = map[string][]string{
+	"k12": []string{"team"},
+}
+
 type UserNode struct {
 	ID             int
 	Email          string
@@ -968,6 +972,9 @@ func accountCategoryAliases(value string) []string {
 	}
 	aliases := make([]string, 0, len(tokens))
 	for _, token := range tokens {
+		if values, ok := accountCategoryTokenAliases[token]; ok {
+			aliases = append(aliases, values...)
+		}
 		if _, ok := knownAccountCategoryAliases[token]; ok {
 			aliases = append(aliases, token)
 		}

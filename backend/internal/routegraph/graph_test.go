@@ -612,11 +612,11 @@ func TestCloneAndCategoryHelpers(t *testing.T) {
 	}
 	account := &ent.Account{
 		Type:        "OAuth",
-		Credentials: map[string]string{"plan_type": "ChatGPT Plus", "account_category": "Builder-Id Pro"},
+		Credentials: map[string]string{"plan_type": "ChatGPT Plus", "account_category": "Builder-Id Pro", "plan": "k12"},
 		Extra:       map[string]interface{}{"subscription_type": "Team", "plan": 42},
 	}
 	keys := accountCategoryKeys(account)
-	for _, want := range []string{"oauth", "chatgptplus", "plus", "builderidpro", "pro", "team"} {
+	for _, want := range []string{"oauth", "chatgptplus", "plus", "builderidpro", "pro", "k12", "team"} {
 		if !containsString(keys, want) {
 			t.Fatalf("category keys = %v, missing %q", keys, want)
 		}

@@ -85,3 +85,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.ag-model-policy-textarea::placeholder {
+  color: color-mix(in oklab, var(--field-placeholder) 58%, transparent);
+  opacity: 1;
+}
