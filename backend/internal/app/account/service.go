@@ -1462,6 +1462,10 @@ func (s *Service) markAccountUsageError(ctx context.Context, accountID int, mess
 	if s.stateWriter == nil {
 		return
 	}
+	if httperrors.IsInactiveWorkspaceMemberError(message) {
+		s.stateWriter.MarkDisabled(ctx, accountID, message)
+		return
+	}
 	if httperrors.IsForbiddenError(message, 0) {
 		s.stateWriter.MarkDegraded(ctx, accountID, message)
 		return

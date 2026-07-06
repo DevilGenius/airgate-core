@@ -134,7 +134,7 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		sm.transition(ctx, accountID, account.StateRateLimited, &until, j.Reason)
 
 	case sdk.OutcomeAccountDead:
-		if httperrors.IsForbiddenError(j.Reason, j.UpstreamStatus) {
+		if httperrors.IsForbiddenError(j.Reason, j.UpstreamStatus) && !httperrors.IsInactiveWorkspaceMemberError(j.Reason) {
 			sm.applyTransientAvoidance(ctx, accountID, j, transientKindUnavailable)
 			return
 		}

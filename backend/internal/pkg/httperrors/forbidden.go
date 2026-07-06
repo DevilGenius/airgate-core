@@ -16,3 +16,8 @@ func IsForbiddenError(reason string, upstreamStatus int) bool {
 		strings.Contains(reason, "403 forbidden") ||
 		strings.Contains(reason, "403:")
 }
+
+func IsInactiveWorkspaceMemberError(reason string) bool {
+	reason = strings.ToLower(strings.TrimSpace(reason))
+	return strings.Contains(reason, "not an active member of the selected workspace")
+}
