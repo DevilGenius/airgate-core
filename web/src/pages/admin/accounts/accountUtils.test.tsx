@@ -93,6 +93,21 @@ describe('account credential schema utilities', () => {
     });
   });
 
+  it('hides email from schema-backed account modals', () => {
+    expect(getSchemaVisibleFields({
+      account_types: [{
+        key: 'oauth',
+        label: 'OAuth',
+        description: '',
+        fields: [
+          { key: 'email', label: 'Email', placeholder: '', required: false, type: 'text' },
+          { key: 'access_token', label: 'Token', placeholder: '', required: true, type: 'password' },
+        ],
+      }],
+      fields: [],
+    }, 'oauth').map((field) => field.key)).toEqual(['access_token']);
+  });
+
   it('accepts legacy array/envelope, v1 and v2 account import files', () => {
     const legacy = [{ name: 'legacy', platform: 'openai', credentials: { email: 'legacy@example.com' } }];
     expect(parseAccountImportItems(legacy)).toBe(legacy);

@@ -598,7 +598,10 @@ export default function AccountsPageContent() {
     mutationFn: (id: number) => accountsApi.delete(id),
     successMessage: t('accounts.delete_success'),
     queryKey: queryKeys.accounts(),
-    onSuccess: () => setDeletingAccount(null),
+    onSuccess: (_data, id) => {
+      selectionStore.setRow(id, false);
+      setDeletingAccount(null);
+    },
   });
 
   // 切换调度状态。这里做乐观更新，避免开关先跳回旧状态再等列表刷新。

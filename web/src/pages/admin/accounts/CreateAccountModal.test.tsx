@@ -193,6 +193,7 @@ describe('CreateAccountModal', () => {
 
     await user.selectOptions(screen.getByLabelText('accounts.platform'), 'openai');
     await waitFor(() => expect(screen.getByPlaceholderText('sk-...')).toBeTruthy());
+    expect(container.querySelector('input[name="email"]')).toBeNull();
 
     fireEvent.change(container.querySelector<HTMLInputElement>('input[name="name"]')!, {
       target: { value: 'Primary Account' },

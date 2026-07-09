@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Form, Input, Label, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
-import { IdCard, Hash, Gauge, Mail } from 'lucide-react';
+import { IdCard, Hash, Gauge } from 'lucide-react';
 import type {
   PluginBatchAccountInput,
   PluginBatchImportResult,
@@ -336,20 +336,6 @@ export function CreateAccountModal({
                       </div>
                     </HeroTextField>
 
-                    <HeroTextField fullWidth>
-                      <Label>{t('users.email')}</Label>
-                      <div className="relative">
-                        <Mail className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-                        <Input
-                          className="pl-9"
-                          name="email"
-                          type="email"
-                          autoComplete="email"
-                          value={form.email ?? ''}
-                          onChange={(event) => setForm({ ...form, email: event.target.value })}
-                        />
-                      </div>
-                    </HeroTextField>
                   </div>
                 </section>
 

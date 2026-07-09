@@ -9,7 +9,7 @@ import {
   TextField as HeroTextField,
   useOverlayState,
 } from '@heroui/react';
-import { Gauge, Hash, Layers, Mail } from 'lucide-react';
+import { Gauge, Hash, Layers } from 'lucide-react';
 import { accountsApi } from '../../../shared/api/accounts';
 import { groupsApi } from '../../../shared/api/groups';
 import { proxiesApi } from '../../../shared/api/proxies';
@@ -23,7 +23,6 @@ import {
   getSchemaSelectedAccountType,
   getSchemaVisibleFields,
   filterCredentialsForAccountType,
-  normalizeAccountEmailValue,
   syncAccountIdentity,
 } from './accountUtils';
 import { SchemaCredentialsForm } from './CredentialForm';
@@ -147,9 +146,6 @@ export function EditAccountModal({
 
   const handleCredentialsChange = (next: Record<string, string>) => {
     setCredentials(next);
-    if (Object.prototype.hasOwnProperty.call(next, 'email')) {
-      setForm((prev) => ({ ...prev, email: normalizeAccountEmailValue(next.email) }));
-    }
   };
 
   const handleSchemaAccountTypeChange = (type: string) => {
@@ -301,20 +297,6 @@ export function EditAccountModal({
                       </div>
                     </HeroTextField>
 
-                    <HeroTextField fullWidth>
-                      <Label>{t('users.email')}</Label>
-                      <div className="relative">
-                        <Mail className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-                        <Input
-                          className="pl-9"
-                          name="email"
-                          type="email"
-                          autoComplete="email"
-                          value={form.email ?? ''}
-                          onChange={(event) => setForm({ ...form, email: event.target.value })}
-                        />
-                      </div>
-                    </HeroTextField>
                   </div>
                 </section>
 

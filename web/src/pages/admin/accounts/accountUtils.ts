@@ -98,8 +98,8 @@ export function getSchemaVisibleFields(
   accountType: string,
 ): CredentialField[] {
   const selectedType = getSchemaSelectedAccountType(schema, accountType);
-  if (selectedType) return selectedType.fields;
-  return schema?.fields ?? [];
+  const fields = selectedType?.fields ?? schema?.fields ?? [];
+  return fields.filter((field) => field.key !== 'email');
 }
 
 export function filterCredentialsForAccountType(
