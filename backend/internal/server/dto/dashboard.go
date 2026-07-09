@@ -9,6 +9,7 @@ type DashboardStatsResp struct {
 	// 账号
 	TotalAccounts   int64 `json:"total_accounts"`
 	EnabledAccounts int64 `json:"enabled_accounts"`
+	ClosedAccounts  int64 `json:"closed_accounts"`
 	ErrorAccounts   int64 `json:"error_accounts"`
 
 	// 请求

@@ -379,10 +379,10 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 					MaxConcurrency: a.MaxConcurrency,
 				})
 			case entaccount.StateDisabled:
-				if a.ErrorMsg != "" {
-					stats.AccountError++
-				} else {
+				if isClosedAccountErrorMsg(a.ErrorMsg) {
 					stats.AccountDisabled++
+				} else {
+					stats.AccountError++
 				}
 			}
 			stats.AccountTotal++

@@ -278,7 +278,7 @@ export default function GroupsPage() {
                           {
                             color: row.account_error > 0 ? 'danger' as const : 'default' as const,
                             label: t('groups.account_error'),
-                            value: String(row.account_error),
+                            value: `${row.account_error}/${row.account_disabled}`,
                           },
                         ]}
                       />

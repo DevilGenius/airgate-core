@@ -513,9 +513,23 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
-	// "error" = disabled + 有错误信息（区分人工禁用和状态机自动禁用）。
+	// "closed" = 人工关闭；历史实现会把手动关闭原因写入 error_msg。
+	closedAccounts, err := s.db.Account.Query().
+		Where(
+			entaccount.StateEQ(entaccount.StateDisabled),
+			entaccount.ErrorMsgIn("", accountManualClosedReason),
+		).
+		Count(ctx)
+	if err != nil {
+		return appdashboard.StatsSnapshot{}, err
+	}
+	// "error" = disabled + 非手动关闭原因。
 	errorAccounts, err := s.db.Account.Query().
-		Where(entaccount.StateEQ(entaccount.StateDisabled), entaccount.ErrorMsgNEQ("")).
+		Where(
+			entaccount.StateEQ(entaccount.StateDisabled),
+			entaccount.ErrorMsgNEQ(""),
+			entaccount.ErrorMsgNEQ(accountManualClosedReason),
+		).
 		Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
@@ -565,6 +579,7 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		EnabledAPIKeys:          int64(enabledAPIKeys),
 		TotalAccounts:           int64(totalAccounts),
 		EnabledAccounts:         int64(enabledAccounts),
+		ClosedAccounts:          int64(closedAccounts),
 		ErrorAccounts:           int64(errorAccounts),
 		TotalUsers:              int64(totalUsers),
 		NewUsersToday:           int64(newUsersToday),

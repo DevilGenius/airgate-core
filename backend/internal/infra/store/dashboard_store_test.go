@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	entaccount "github.com/DevilGenius/airgate-core/ent/account"
 )
 
 func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
@@ -26,6 +28,28 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
+
+	createAccount := func(name string, state entaccount.State, errorMsg string) {
+		t.Helper()
+		builder := db.Account.Create().
+			SetName(name).
+			SetPlatform("openai").
+			SetType("apikey").
+			SetCredentials(map[string]string{"api_key": name}).
+			SetState(state)
+		if errorMsg != "" {
+			builder = builder.SetErrorMsg(errorMsg)
+		}
+		if _, err := builder.Save(ctx); err != nil {
+			t.Fatalf("create account %q: %v", name, err)
+		}
+	}
+	createAccount("active", entaccount.StateActive, "")
+	createAccount("limited", entaccount.StateRateLimited, "")
+	createAccount("degraded", entaccount.StateDegraded, "")
+	createAccount("closed-empty", entaccount.StateDisabled, "")
+	createAccount("closed-manual", entaccount.StateDisabled, accountManualClosedReason)
+	createAccount("error", entaccount.StateDisabled, "invalid credentials")
 
 	if _, err := db.UsageLog.Create().
 		SetBillingEventID("bill_dashboard_relation_stats").
@@ -69,6 +93,9 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 
 	if snapshot.TotalUsers != 1 || snapshot.NewUsersToday != 1 {
 		t.Fatalf("user counts = (%d, %d), want (1, 1)", snapshot.TotalUsers, snapshot.NewUsersToday)
+	}
+	if snapshot.TotalAccounts != 6 || snapshot.EnabledAccounts != 3 || snapshot.ClosedAccounts != 2 || snapshot.ErrorAccounts != 1 {
+		t.Fatalf("account counts = (%d, %d, %d, %d), want (6, 3, 2, 1)", snapshot.TotalAccounts, snapshot.EnabledAccounts, snapshot.ClosedAccounts, snapshot.ErrorAccounts)
 	}
 	if snapshot.TodayRequests != 2 || snapshot.TodayImageRequests != 1 || snapshot.TodayNonImageRequests != 1 {
 		t.Fatalf("today request counts = (%d, %d, %d), want (2, 1, 1)", snapshot.TodayRequests, snapshot.TodayImageRequests, snapshot.TodayNonImageRequests)

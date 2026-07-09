@@ -11,6 +11,7 @@ func toDashboardStatsResp(item appdashboard.Stats) dto.DashboardStatsResp {
 		EnabledAPIKeys:      item.EnabledAPIKeys,
 		TotalAccounts:       item.TotalAccounts,
 		EnabledAccounts:     item.EnabledAccounts,
+		ClosedAccounts:      item.ClosedAccounts,
 		ErrorAccounts:       item.ErrorAccounts,
 		TodayRequests:       item.TodayRequests,
 		TodayImageRequests:  item.TodayImageRequests,

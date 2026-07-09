@@ -252,7 +252,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         tone="emerald"
         title={t('dashboard.accounts')}
         value={stats.total_accounts}
-        meta={t('dashboard.accounts_status', { enabled: stats.enabled_accounts, errors: stats.error_accounts })}
+        meta={t('dashboard.accounts_status', { closed: stats.closed_accounts, enabled: stats.enabled_accounts, errors: stats.error_accounts })}
       />
       <MetricCard
         icon={<Activity className="h-5 w-5" />}

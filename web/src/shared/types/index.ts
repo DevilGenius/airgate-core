@@ -774,6 +774,7 @@ export interface DashboardStatsResp {
   enabled_api_keys: number;
   total_accounts: number;
   enabled_accounts: number;
+  closed_accounts: number;
   error_accounts: number;
   today_requests: number;
   today_image_requests: number;

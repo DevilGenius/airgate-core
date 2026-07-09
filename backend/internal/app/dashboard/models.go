@@ -17,6 +17,7 @@ type StatsSnapshot struct {
 	EnabledAPIKeys          int64
 	TotalAccounts           int64
 	EnabledAccounts         int64
+	ClosedAccounts          int64
 	ErrorAccounts           int64
 	TotalUsers              int64
 	NewUsersToday           int64
@@ -45,6 +46,7 @@ type Stats struct {
 	EnabledAPIKeys      int64
 	TotalAccounts       int64
 	EnabledAccounts     int64
+	ClosedAccounts      int64
 	ErrorAccounts       int64
 	TodayRequests       int64
 	TodayImageRequests  int64

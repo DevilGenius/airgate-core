@@ -76,6 +76,7 @@ func (s *Service) Stats(ctx context.Context, userID int, tz string) (Stats, erro
 		EnabledAPIKeys:      snapshot.EnabledAPIKeys,
 		TotalAccounts:       snapshot.TotalAccounts,
 		EnabledAccounts:     snapshot.EnabledAccounts,
+		ClosedAccounts:      snapshot.ClosedAccounts,
 		ErrorAccounts:       snapshot.ErrorAccounts,
 		TodayRequests:       snapshot.TodayRequests,
 		TodayImageRequests:  snapshot.TodayImageRequests,
