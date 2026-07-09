@@ -916,6 +916,7 @@ func accountCategoryKeys(account *ent.Account) []string {
 	}
 	seen := make(map[string]struct{}, 8)
 	var keys []string
+	typeKey := normalizeCategory(account.Type)
 	addNormalized := func(value string) {
 		key := normalizeCategory(value)
 		if key == "" {
@@ -933,12 +934,26 @@ func accountCategoryKeys(account *ent.Account) []string {
 			addNormalized(alias)
 		}
 	}
-	addNormalized(account.Type)
+	if typeKey != "oauth" {
+		addNormalized(account.Type)
+	}
 	for _, key := range categoryCredentialKeys() {
 		addCategoryValue(account.Credentials[key])
 		addCategoryValue(extraString(account.Extra, key))
 	}
+	if typeKey == "oauth" && !hasNonDefaultOAuthCategory(keys) {
+		addNormalized(account.Type)
+	}
 	return keys
+}
+
+func hasNonDefaultOAuthCategory(keys []string) bool {
+	for _, key := range keys {
+		if key != "" && key != "oauth" {
+			return true
+		}
+	}
+	return false
 }
 
 func categoryCredentialKeys() []string {

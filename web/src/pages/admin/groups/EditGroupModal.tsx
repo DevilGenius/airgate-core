@@ -64,7 +64,7 @@ const OPENAI_ACCOUNT_TYPE_POLICY_OPTIONS = [
   { key: 'pro', label: 'Pro' },
   { key: 'team', label: 'Team' },
   { key: 'apikey', label: 'API Key' },
-  { key: 'oauth', label: 'OAuth' },
+  { key: 'oauth', label: 'OAuth 缺省' },
 ];
 
 const IMAGE_PRICE_FIELDS: Array<{ key: keyof ImagePrices; setting: string; label: string }> = [

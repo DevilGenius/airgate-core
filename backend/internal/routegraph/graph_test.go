@@ -67,6 +67,36 @@ func TestAccountsForModelAppliesModelPolicies(t *testing.T) {
 	}
 }
 
+func TestAccountsForModelOAuthDefaultPolicyOnlyMatchesDefaultOAuth(t *testing.T) {
+	defaultOAuth := &ent.Account{ID: 1, Platform: "openai", Type: "oauth"}
+	teamOAuth := &ent.Account{
+		ID:          2,
+		Platform:    "openai",
+		Type:        "oauth",
+		Credentials: map[string]string{"plan_type": "k12"},
+	}
+	apiKey := &ent.Account{ID: 3, Platform: "openai", Type: "apikey"}
+	group := &ent.Group{
+		ID:       11,
+		Platform: "openai",
+		AccountTypeModelPolicies: map[string]modelpolicy.Policy{
+			"oauth": {Deny: []string{"default-blocked"}},
+			"team":  {Deny: []string{"team-blocked"}},
+		},
+	}
+	group.Edges.Accounts = []*ent.Account{defaultOAuth, teamOAuth, apiKey}
+	restore := SetSnapshotForTesting([]*ent.Group{group})
+	defer restore()
+
+	node := Group(group.ID)
+	if got := accountIDs(node.AccountsForModel("default-blocked")); !sameIDs(got, []int{2, 3}) {
+		t.Fatalf("default-blocked accounts = %v, want [2 3]", got)
+	}
+	if got := accountIDs(node.AccountsForModel("team-blocked")); !sameIDs(got, []int{1, 3}) {
+		t.Fatalf("team-blocked accounts = %v, want [1 3]", got)
+	}
+}
+
 func TestAccountsForModelAppliesGroupPriorityOverrides(t *testing.T) {
 	shared := &ent.Account{
 		ID:       1,
@@ -616,10 +646,17 @@ func TestCloneAndCategoryHelpers(t *testing.T) {
 		Extra:       map[string]interface{}{"subscription_type": "Team", "plan": 42},
 	}
 	keys := accountCategoryKeys(account)
-	for _, want := range []string{"oauth", "chatgptplus", "plus", "builderidpro", "pro", "k12", "team"} {
+	for _, want := range []string{"chatgptplus", "plus", "builderidpro", "pro", "k12", "team"} {
 		if !containsString(keys, want) {
 			t.Fatalf("category keys = %v, missing %q", keys, want)
 		}
+	}
+	if containsString(keys, "oauth") {
+		t.Fatalf("category keys = %v, should not include default oauth for typed OAuth account", keys)
+	}
+	defaultOAuthKeys := accountCategoryKeys(&ent.Account{Type: "OAuth"})
+	if !containsString(defaultOAuthKeys, "oauth") {
+		t.Fatalf("default OAuth category keys = %v, missing oauth", defaultOAuthKeys)
 	}
 	if got := extraString(nil, "plan"); got != "" {
 		t.Fatalf("extraString nil = %q", got)
