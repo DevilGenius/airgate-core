@@ -82,7 +82,6 @@ type PreparedUsageView = {
   credits: AccountUsageCredits | null;
   hasContent: boolean;
   hasTodayStats: boolean;
-  hideAccessLabel: boolean;
   missing: boolean;
   showImageCount: boolean;
   todayAccountCostText: string;
@@ -107,7 +106,6 @@ const AccountUsageMetricChip = memo(function AccountUsageMetricChip({
   label,
   labelSecondary,
   mutedLabel,
-  solo,
   title,
   tone,
   value,
@@ -117,7 +115,6 @@ const AccountUsageMetricChip = memo(function AccountUsageMetricChip({
   label: string;
   labelSecondary?: string;
   mutedLabel?: boolean;
-  solo?: boolean;
   title?: string;
   tone: UsageMetricTone;
   value: string;
@@ -128,24 +125,19 @@ const AccountUsageMetricChip = memo(function AccountUsageMetricChip({
   const labelClassName = mutedLabel
     ? 'ag-account-usage-metric-label text-text-secondary'
     : 'ag-account-usage-metric-label';
-  const valueClassName = solo
-    ? 'ag-account-usage-metric-value ag-account-usage-metric-value--solo'
-    : 'ag-account-usage-metric-value';
 
   return (
     <span className="ag-account-usage-metric" data-tone={tone} title={title}>
-      {solo ? null : (
-        <span className={labelClassName}>
-          {hasLabelSecondary ? <span className="ag-account-usage-metric-segment">{label}</span> : label}
-          {hasLabelSecondary ? (
-            <>
-              <span aria-hidden="true" className="ag-account-usage-metric-separator">/</span>
-              <span className="ag-account-usage-metric-segment">{labelSecondary}</span>
-            </>
-          ) : null}
-        </span>
-      )}
-      <span className={valueClassName}>
+      <span className={labelClassName}>
+        {hasLabelSecondary ? <span className="ag-account-usage-metric-segment">{label}</span> : label}
+        {hasLabelSecondary ? (
+          <>
+            <span aria-hidden="true" className="ag-account-usage-metric-separator">/</span>
+            <span className="ag-account-usage-metric-segment">{labelSecondary}</span>
+          </>
+        ) : null}
+      </span>
+      <span className="ag-account-usage-metric-value">
         {currency ? <span aria-hidden="true" className="ag-account-usage-metric-currency">$</span> : null}
         {hasValueSecondary ? <span className="ag-account-usage-metric-segment">{value}</span> : value}
         {hasValueSecondary ? (
@@ -164,7 +156,6 @@ const AccountUsageTodayMetricChips = memo(function AccountUsageTodayMetricChips(
   accessRequestsText,
   accessText,
   accountCostText,
-  hideAccessLabel,
   labels,
   showImageCount,
   tokensText,
@@ -174,7 +165,6 @@ const AccountUsageTodayMetricChips = memo(function AccountUsageTodayMetricChips(
   accessRequestsText: string;
   accessText: string;
   accountCostText: string;
-  hideAccessLabel: boolean;
   labels: AccountUsageMetricLabels;
   showImageCount: boolean;
   tokensText: string;
@@ -186,7 +176,6 @@ const AccountUsageTodayMetricChips = memo(function AccountUsageTodayMetricChips(
         label={labels.todayAccessCount}
         labelSecondary={showImageCount ? labels.imageCountInlineLabel : undefined}
         mutedLabel
-        solo={hideAccessLabel}
         title={showImageCount ? labels.imageCountTooltip : undefined}
         tone="info"
         value={showImageCount ? accessRequestsText : accessText}
@@ -303,7 +292,6 @@ function prepareUsageView(row: AccountResp, usage: AccountUsageInfo | undefined,
     credits,
     hasContent: windowRows.length > 0 || Boolean(credits) || hasTodayStats,
     hasTodayStats,
-    hideAccessLabel: showImageCount && accessText.length > '100/100'.length,
     missing,
     showImageCount,
     todayAccountCostText,
@@ -400,7 +388,6 @@ function usageViewsEqual(left: PreparedUsageView, right: PreparedUsageView) {
     && usageCreditsEqual(left.credits, right.credits)
     && left.hasContent === right.hasContent
     && left.hasTodayStats === right.hasTodayStats
-    && left.hideAccessLabel === right.hideAccessLabel
     && left.missing === right.missing
     && left.showImageCount === right.showImageCount
     && left.todayAccountCostText === right.todayAccountCostText
@@ -759,7 +746,6 @@ export function useAccountTableColumns({
                   accessRequestsText={prepared.accessRequestsText}
                   accessText={prepared.accessText}
                   accountCostText={prepared.todayAccountCostText}
-                  hideAccessLabel={prepared.hideAccessLabel}
                   labels={accountUsageLabels}
                   showImageCount={prepared.showImageCount}
                   tokensText={prepared.todayTokensText}
