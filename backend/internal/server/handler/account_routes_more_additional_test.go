@@ -63,14 +63,14 @@ func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 	}{
 		{name: "list", method: http.MethodGet, target: "/accounts?page=1&page_size=10&platform=custom&sort_by=priority&sort_dir=asc", fn: accountHandler.ListAccounts, want: `"total":1`},
 		{name: "export", method: http.MethodGet, target: "/accounts/export?platform=custom", fn: accountHandler.ExportAccounts, want: `"count":1`},
-		{name: "update", method: http.MethodPut, target: "/accounts/" + accountIDString, params: accountParams, body: `{"name":"primary-updated","priority":6,"max_concurrency":8,"rate_multiplier":1.4,"extra":{"region":"eu"}}`, fn: accountHandler.UpdateAccount, want: `"name":"primary-updated"`},
+		{name: "update", method: http.MethodPut, target: "/accounts/" + accountIDString, params: accountParams, body: `{"name":"primary-updated","priority":99996,"max_concurrency":8,"rate_multiplier":1.4,"extra":{"region":"eu"}}`, fn: accountHandler.UpdateAccount, want: `"name":"primary-updated"`},
 		{name: "models", method: http.MethodGet, target: "/accounts/" + accountIDString + "/models", params: accountParams, fn: accountHandler.GetAccountModels, want: `"id":"model-test"`},
 		{name: "usage", method: http.MethodGet, target: "/accounts/usage?platform=custom&ids=" + accountIDString, fn: accountHandler.GetAccountUsage, want: `"refreshing":false`},
 		{name: "capacity", method: http.MethodGet, target: "/accounts/capacity?ids=" + accountIDString + "," + accountIDString, fn: accountHandler.GetAccountCapacity, want: accountIDString},
 		{name: "single usage", method: http.MethodGet, target: "/accounts/" + accountIDString + "/usage", params: accountParams, fn: accountHandler.GetSingleAccountUsage, want: `"data":{`},
 		{name: "schema", method: http.MethodGet, target: "/accounts/schema/custom", params: gin.Params{{Key: "platform", Value: "custom"}}, fn: accountHandler.GetCredentialsSchema, want: `"key":"token"`},
 		{name: "stats", method: http.MethodGet, target: "/accounts/" + accountIDString + "/stats?tz=UTC", params: accountParams, fn: accountHandler.GetAccountStats, want: `"account_id":` + accountIDString},
-		{name: "bulk update", method: http.MethodPatch, target: "/accounts/bulk", body: fmt.Sprintf(`{"account_ids":[%d],"priority":9,"max_concurrency":9}`, accountID), fn: accountHandler.BulkUpdateAccounts, want: `"success":1`},
+		{name: "bulk update", method: http.MethodPatch, target: "/accounts/bulk", body: fmt.Sprintf(`{"account_ids":[%d],"priority_offset":3,"max_concurrency":9}`, accountID), fn: accountHandler.BulkUpdateAccounts, want: `"success":1`},
 		{name: "bulk clear cooldowns", method: http.MethodPost, target: "/accounts/cooldowns", body: fmt.Sprintf(`{"account_ids":[%d]}`, accountID), fn: accountHandler.BulkClearFamilyCooldowns, want: `"success":1`},
 	}
 	for _, tt := range routes {
@@ -81,6 +81,13 @@ func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 				t.Fatalf("%s body = %s, want %q", tt.name, w.Body.String(), tt.want)
 			}
 		})
+	}
+	updatedPriority, err := db.Account.Query().Only(ctx)
+	if err != nil {
+		t.Fatalf("query updated account: %v", err)
+	}
+	if updatedPriority.Priority != 99999 {
+		t.Fatalf("bulk priority offset result = %d, want 99999", updatedPriority.Priority)
 	}
 
 	w = invokeHandlerForValidation(http.MethodPost, "/accounts/"+accountIDString+"/quota", "", accountParams, nil, accountHandler.RefreshQuota)

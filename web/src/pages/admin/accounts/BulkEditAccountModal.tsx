@@ -8,7 +8,7 @@ import {
   TextField as HeroTextField,
   useOverlayState,
 } from '@heroui/react';
-import { Hash, Gauge } from 'lucide-react';
+import { Hash, Gauge, Diff } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
 import { proxiesApi } from '../../../shared/api/proxies';
 import { queryKeys } from '../../../shared/queryKeys';
@@ -30,10 +30,13 @@ import {
   ACCOUNT_GROUP_PRIORITIES_EXTRA_KEY,
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
+  commitAccountPriorityOffsetInput,
   commitAccountPriorityInput,
   DEFAULT_ACCOUNT_MAX_CONCURRENCY,
   DEFAULT_ACCOUNT_PRIORITY,
+  getAccountPriorityOffsetRange,
   isAccountPriorityDraft,
+  parseAccountPriorityOffsetInput,
   parseAccountPriorityInput,
   setAccountMessageLockEnabled,
 } from './accountDefaults';
@@ -49,6 +52,8 @@ export function BulkEditAccountModal({
   initialGroupPriorities,
   initialMaxConcurrency,
   initialPriority,
+  initialPriorityMax,
+  initialPriorityMin,
   initialRateMultiplier,
   onClose,
   onSubmit,
@@ -60,6 +65,8 @@ export function BulkEditAccountModal({
   initialGroupPriorities?: Record<number, number>;
   initialMaxConcurrency?: number;
   initialPriority?: number;
+  initialPriorityMax?: number;
+  initialPriorityMin?: number;
   initialRateMultiplier?: number;
   onClose: () => void;
   onSubmit: (data: Omit<BulkUpdateAccountsReq, 'account_ids'>) => void;
@@ -70,6 +77,7 @@ export function BulkEditAccountModal({
   // 每个字段独立的「启用」开关
   const [enableStatus, setEnableStatus] = useState(false);
   const [enablePriority, setEnablePriority] = useState(false);
+  const [enablePriorityOffset, setEnablePriorityOffset] = useState(false);
   const [enableConcurrency, setEnableConcurrency] = useState(false);
   const [enableRateMultiplier, setEnableRateMultiplier] = useState(false);
   const [enableGroups, setEnableGroups] = useState(false);
@@ -80,6 +88,7 @@ export function BulkEditAccountModal({
   const [status, setStatus] = useState<'active' | 'disabled'>('active');
   const [priority, setPriority] = useState(() => initialPriority ?? DEFAULT_ACCOUNT_PRIORITY);
   const [priorityInput, setPriorityInput] = useState(() => String(initialPriority ?? DEFAULT_ACCOUNT_PRIORITY));
+  const [priorityOffsetInput, setPriorityOffsetInput] = useState('');
   const [maxConcurrency, setMaxConcurrency] = useState(() => initialMaxConcurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY);
   const [rateMultiplier, setRateMultiplier] = useState(() => String(initialRateMultiplier ?? 1));
   const [groupIds, setGroupIds] = useState<number[]>(() => [...(initialGroupIds ?? [])]);
@@ -106,6 +115,7 @@ export function BulkEditAccountModal({
   const hasAnyField =
     enableStatus ||
     enablePriority ||
+    enablePriorityOffset ||
     enableConcurrency ||
     enableRateMultiplier ||
     enableGroups ||
@@ -115,7 +125,15 @@ export function BulkEditAccountModal({
   const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplier);
   const rateMultiplierValid =
     !enableRateMultiplier || rateMultiplierEmpty || isValidRateMultiplierValue(parsedRateMultiplier);
-  const canSubmit = hasAnyField && rateMultiplierValid && (!enableProxy || proxyId != null);
+  const priorityOffsetRange = getAccountPriorityOffsetRange(initialPriorityMin, initialPriorityMax);
+  const parsedPriorityOffset = parseAccountPriorityOffsetInput(priorityOffsetInput);
+  const priorityOffsetValid = !enablePriorityOffset || (
+    parsedPriorityOffset != null &&
+    parsedPriorityOffset !== 0 &&
+    parsedPriorityOffset >= priorityOffsetRange.min &&
+    parsedPriorityOffset <= priorityOffsetRange.max
+  );
+  const canSubmit = hasAnyField && priorityOffsetValid && rateMultiplierValid && (!enableProxy || proxyId != null);
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -123,6 +141,7 @@ export function BulkEditAccountModal({
     const patch: Omit<BulkUpdateAccountsReq, 'account_ids'> = {};
     if (enableStatus) patch.state = status;
     if (enablePriority) patch.priority = commitAccountPriorityInput(priorityInput, priority);
+    if (enablePriorityOffset && parsedPriorityOffset != null) patch.priority_offset = parsedPriorityOffset;
     if (enableConcurrency) patch.max_concurrency = maxConcurrency;
     if (enableRateMultiplier) {
       if (rateMultiplierEmpty) {
@@ -171,6 +190,26 @@ export function BulkEditAccountModal({
     const nextPriority = commitAccountPriorityInput(priorityInput, priority);
     setPriority(nextPriority);
     setPriorityInput(String(nextPriority));
+  };
+  const handlePriorityToggle = (enabled: boolean) => {
+    setEnablePriority(enabled);
+    if (enabled) setEnablePriorityOffset(false);
+  };
+  const handlePriorityOffsetToggle = (enabled: boolean) => {
+    setEnablePriorityOffset(enabled);
+    if (enabled) setEnablePriority(false);
+  };
+  const handlePriorityOffsetChange = (value: string) => {
+    if (!isAccountPriorityDraft(value)) return;
+    setPriorityOffsetInput(value);
+  };
+  const commitPriorityOffsetChange = () => {
+    const nextOffset = commitAccountPriorityOffsetInput(
+      priorityOffsetInput,
+      priorityOffsetRange.min,
+      priorityOffsetRange.max,
+    );
+    setPriorityOffsetInput(nextOffset == null ? '' : String(nextOffset));
   };
   const toggleGroup = (id: number) => {
     if (groupIds.includes(id)) {
@@ -237,7 +276,7 @@ export function BulkEditAccountModal({
         {/* 优先级 */}
         <FieldRow
           enabled={enablePriority}
-          onToggle={setEnablePriority}
+          onToggle={handlePriorityToggle}
           label={t('accounts.priority')}
         >
           <HeroTextField fullWidth isDisabled={!enablePriority}>
@@ -258,6 +297,41 @@ export function BulkEditAccountModal({
               />
             </div>
           </HeroTextField>
+        </FieldRow>
+
+        {/* 优先级偏移 */}
+        <FieldRow
+          enabled={enablePriorityOffset}
+          onToggle={handlePriorityOffsetToggle}
+          label={t('accounts.priority_offset')}
+        >
+          <div>
+            <HeroTextField fullWidth isDisabled={!enablePriorityOffset}>
+              <div className="relative">
+                <Diff className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                <Input
+                  className="pl-9"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="-?[0-9]*"
+                  min={priorityOffsetRange.min}
+                  max={priorityOffsetRange.max}
+                  step={1}
+                  value={priorityOffsetInput}
+                  disabled={!enablePriorityOffset}
+                  placeholder={t('accounts.priority_offset_placeholder')}
+                  onBlur={commitPriorityOffsetChange}
+                  onChange={(event) => handlePriorityOffsetChange(event.target.value)}
+                />
+              </div>
+            </HeroTextField>
+            <p className="mt-1 text-[11px] leading-4 text-text-tertiary">
+              {t('accounts.priority_offset_hint', {
+                min: priorityOffsetRange.min,
+                max: priorityOffsetRange.max,
+              })}
+            </p>
+          </div>
         </FieldRow>
 
         {/* 并发数 */}

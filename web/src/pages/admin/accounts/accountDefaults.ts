@@ -1,7 +1,9 @@
 export const DEFAULT_ACCOUNT_MAX_CONCURRENCY = 10;
 export const DEFAULT_ACCOUNT_PRIORITY = 50;
-export const ACCOUNT_PRIORITY_MIN = -999;
-export const ACCOUNT_PRIORITY_MAX = 999;
+export const ACCOUNT_PRIORITY_MIN = -99999;
+export const ACCOUNT_PRIORITY_MAX = 99999;
+export const ACCOUNT_PRIORITY_OFFSET_MIN = ACCOUNT_PRIORITY_MIN - ACCOUNT_PRIORITY_MAX;
+export const ACCOUNT_PRIORITY_OFFSET_MAX = ACCOUNT_PRIORITY_MAX - ACCOUNT_PRIORITY_MIN;
 export const ACCOUNT_MSG_LOCK_EXTRA_KEY = 'msg_lock_enabled';
 export const ACCOUNT_GROUP_PRIORITIES_EXTRA_KEY = 'group_priorities';
 
@@ -23,6 +25,29 @@ export function parseAccountPriorityInput(value: string) {
 
 export function commitAccountPriorityInput(value: string, fallback = DEFAULT_ACCOUNT_PRIORITY) {
   return parseAccountPriorityInput(value) ?? clampAccountPriority(fallback);
+}
+
+export function parseAccountPriorityOffsetInput(value: string) {
+  if (value === '' || value === '-') return null;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) return null;
+  return parsed;
+}
+
+export function getAccountPriorityOffsetRange(minPriority?: number, maxPriority?: number) {
+  if (minPriority == null || maxPriority == null) {
+    return { min: ACCOUNT_PRIORITY_OFFSET_MIN, max: ACCOUNT_PRIORITY_OFFSET_MAX };
+  }
+  return {
+    min: ACCOUNT_PRIORITY_MIN - clampAccountPriority(minPriority),
+    max: ACCOUNT_PRIORITY_MAX - clampAccountPriority(maxPriority),
+  };
+}
+
+export function commitAccountPriorityOffsetInput(value: string, min: number, max: number) {
+  const parsed = parseAccountPriorityOffsetInput(value);
+  if (parsed == null) return null;
+  return Math.max(min, Math.min(max, parsed));
 }
 
 export function getAccountMessageLockEnabled(extra?: Record<string, unknown>) {

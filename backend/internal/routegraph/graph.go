@@ -17,6 +17,7 @@ import (
 	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
 	entgroup "github.com/DevilGenius/airgate-core/ent/group"
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
+	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -66,8 +67,6 @@ type AccountNode struct {
 
 const (
 	accountGroupPrioritiesExtraKey = "group_priorities"
-	accountPriorityMin             = -999
-	accountPriorityMax             = 999
 )
 
 type compiledAccountTypePolicy struct {
@@ -756,13 +755,7 @@ func priorityValue(raw interface{}) (int, bool) {
 }
 
 func clampAccountPriority(value int) int {
-	if value < accountPriorityMin {
-		return accountPriorityMin
-	}
-	if value > accountPriorityMax {
-		return accountPriorityMax
-	}
-	return value
+	return accountpriority.Clamp(value)
 }
 
 func putGroupNode(snapshot *Snapshot, group *GroupNode) {

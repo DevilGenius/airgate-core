@@ -215,6 +215,7 @@ export interface BulkUpdateAccountsReq {
   account_ids: number[];
   state?: 'active' | 'disabled';
   priority?: number;
+  priority_offset?: number;
   max_concurrency?: number;
   rate_multiplier?: number | null;
   model_policy?: ModelPolicy | null;

@@ -127,6 +127,7 @@ type BulkUpdateAccountsReq struct {
 	AccountIDs     []int               `json:"account_ids" binding:"required,min=1"`
 	State          *string             `json:"state" binding:"omitempty,oneof=active disabled"`
 	Priority       *int                `json:"priority"`
+	PriorityOffset *int                `json:"priority_offset"`
 	MaxConcurrency *int                `json:"max_concurrency"`
 	RateMultiplier OptionalFloat       `json:"rate_multiplier"`
 	ModelPolicy    *modelpolicy.Policy `json:"model_policy"`

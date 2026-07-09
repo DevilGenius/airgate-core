@@ -6,6 +6,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 
+	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 )
 
@@ -36,7 +37,7 @@ func (Account) Fields() []ent.Field {
 		field.Time("state_until").Optional().Nillable().
 			Comment("state 的到期时间：rate_limited / degraded 到期自动恢复 active；disabled 无到期"),
 
-		field.Int("priority").Default(50).Min(-999).Max(999),
+		field.Int("priority").Default(50).Min(accountpriority.Min).Max(accountpriority.Max),
 		field.Int("max_concurrency").Default(10),
 		field.Float("rate_multiplier").Default(1.0).Min(0.01).Max(100),
 		field.String("error_msg").Default("").

@@ -21,6 +21,7 @@ import (
 
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
+	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
@@ -569,6 +570,12 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 // group_ids 为整体替换：若提供则覆盖账号原有分组，未提供则不触碰。
 func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkResult {
 	result := BulkResult{Results: make([]BulkResultItem, 0, len(input.IDs))}
+	if input.Priority != nil && input.PriorityOffset != nil {
+		for _, id := range input.IDs {
+			result.appendFailure(id, ErrConflictingPriorityUpdate)
+		}
+		return result
+	}
 	if input.RateMultiplier != nil {
 		if err := validateRateMultiplier(*input.RateMultiplier); err != nil {
 			for _, id := range input.IDs {
@@ -596,6 +603,24 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			RateMultiplier: input.RateMultiplier,
 			ModelPolicy:    input.ModelPolicy,
 		}
+		var existing *Account
+		needsExisting := input.HasExtra || (input.PriorityOffset != nil && *input.PriorityOffset != 0)
+		if needsExisting {
+			account, err := s.repo.FindByID(ctx, id, LoadOptions{})
+			if err != nil {
+				result.appendFailure(id, err)
+				continue
+			}
+			existing = &account
+		}
+		if input.PriorityOffset != nil && *input.PriorityOffset != 0 {
+			nextPriority, ok := accountpriority.AddOffset(existing.Priority, *input.PriorityOffset)
+			if !ok {
+				result.appendFailure(id, fmt.Errorf("%w：当前优先级 %d，偏移量 %+d", ErrInvalidPriorityOffset, existing.Priority, *input.PriorityOffset))
+				continue
+			}
+			patch.Priority = &nextPriority
+		}
 		if input.HasProxyID {
 			patch.ProxyID = input.ProxyID
 			patch.HasProxyID = true
@@ -605,11 +630,6 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			patch.HasGroupIDs = true
 		}
 		if input.HasExtra {
-			existing, err := s.repo.FindByID(ctx, id, LoadOptions{})
-			if err != nil {
-				result.appendFailure(id, err)
-				continue
-			}
 			patch.Extra = mergeAnyMap(existing.Extra, input.Extra)
 			patch.HasExtra = true
 		}

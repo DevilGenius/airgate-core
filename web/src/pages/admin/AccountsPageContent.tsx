@@ -1217,6 +1217,8 @@ export default function AccountsPageContent() {
           initialGroupPriorities={bulkEditSelection.initialValues.groupPriorities}
           initialMaxConcurrency={bulkEditSelection.initialValues.maxConcurrency}
           initialPriority={bulkEditSelection.initialValues.priority}
+          initialPriorityMax={bulkEditSelection.initialValues.priorityMax}
+          initialPriorityMin={bulkEditSelection.initialValues.priorityMin}
           initialRateMultiplier={bulkEditSelection.initialValues.rateMultiplier}
           onClose={() => setBulkEditSelection(null)}
           onSubmit={(patch) =>

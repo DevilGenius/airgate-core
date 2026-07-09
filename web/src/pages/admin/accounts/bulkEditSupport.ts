@@ -6,6 +6,8 @@ export type BulkEditInitialValues = {
   groupPriorities: Record<number, number>;
   maxConcurrency?: number;
   priority?: number;
+  priorityMax?: number;
+  priorityMin?: number;
   rateMultiplier?: number;
 };
 
@@ -53,11 +55,17 @@ export function getBulkEditInitialValues(rows: AccountResp[], selectedIds: numbe
   };
 
   const groupIds = firstGroupIds.filter((groupId) => commonGroupIds.has(groupId));
+  const priorities = selectedRows
+    .map((account) => account.priority)
+    .filter((priority) => typeof priority === 'number' && Number.isFinite(priority));
+  const hasCompletePriorityRange = selectedRows.length === selectedIds.length && priorities.length === selectedRows.length;
   return {
     groupIds,
     groupPriorities: getCommonGroupPriorities(selectedRows, groupIds),
     maxConcurrency: getCommonNumber((account) => account.max_concurrency),
     priority: getCommonNumber((account) => account.priority),
+    priorityMax: hasCompletePriorityRange ? Math.max(...priorities) : undefined,
+    priorityMin: hasCompletePriorityRange ? Math.min(...priorities) : undefined,
     rateMultiplier: getCommonNumber((account) => account.rate_multiplier),
   };
 }

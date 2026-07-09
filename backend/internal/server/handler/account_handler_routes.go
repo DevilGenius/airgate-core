@@ -272,6 +272,7 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		IDs:            req.AccountIDs,
 		State:          req.State,
 		Priority:       req.Priority,
+		PriorityOffset: req.PriorityOffset,
 		MaxConcurrency: req.MaxConcurrency,
 		RateMultiplier: req.RateMultiplier.PtrOrDefault(1),
 		ModelPolicy:    req.ModelPolicy,

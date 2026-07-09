@@ -168,6 +168,7 @@ type BulkUpdateInput struct {
 	IDs            []int
 	State          *string
 	Priority       *int
+	PriorityOffset *int
 	MaxConcurrency *int
 	RateMultiplier *float64
 	ModelPolicy    *modelpolicy.Policy

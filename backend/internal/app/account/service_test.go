@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -798,6 +799,74 @@ func TestBulkUpdateRoutesManualStateThroughStateWriter(t *testing.T) {
 	}
 	if got := writer.disabled[12]; got != "手动关闭" {
 		t.Fatalf("ManualDisable account 12 reason = %q, want 手动关闭", got)
+	}
+}
+
+func TestBulkUpdateAppliesPriorityOffsetPerAccount(t *testing.T) {
+	priorities := map[int]int{11: -20, 12: 90}
+	updated := make(map[int]int)
+	offset := 15
+	service := NewService(stubRepository{
+		findByID: func(_ context.Context, id int, _ LoadOptions) (Account, error) {
+			return Account{ID: id, Platform: "openai", Priority: priorities[id]}, nil
+		},
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			if input.Priority == nil {
+				t.Fatalf("repo.Update Priority = nil for account %d", id)
+			}
+			updated[id] = *input.Priority
+			return Account{ID: id, Platform: "openai", Priority: *input.Priority}, nil
+		},
+		listAll: func(_ context.Context, filter ListFilter) ([]Account, error) {
+			accounts := make([]Account, 0, len(filter.IDs))
+			for _, id := range filter.IDs {
+				accounts = append(accounts, Account{ID: id, Platform: "openai", Priority: updated[id]})
+			}
+			return accounts, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs:            []int{11, 12},
+		PriorityOffset: &offset,
+	})
+
+	if result.Success != 2 || result.Failed != 0 {
+		t.Fatalf("BulkUpdate result = %+v, want 2 success", result)
+	}
+	if updated[11] != -5 || updated[12] != 105 {
+		t.Fatalf("updated priorities = %v, want map[11:-5 12:105]", updated)
+	}
+}
+
+func TestBulkUpdateRejectsConflictingAndOutOfRangePriorityChanges(t *testing.T) {
+	priority := 10
+	offset := 1
+	service := NewService(stubRepository{
+		findByID: func(_ context.Context, id int, _ LoadOptions) (Account, error) {
+			return Account{ID: id, Platform: "openai", Priority: 99999}, nil
+		},
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	conflict := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs:            []int{21},
+		Priority:       &priority,
+		PriorityOffset: &offset,
+	})
+	if conflict.Failed != 1 || conflict.Results[0].Error != ErrConflictingPriorityUpdate.Error() {
+		t.Fatalf("conflicting priority result = %+v", conflict)
+	}
+
+	outOfRange := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs:            []int{22},
+		PriorityOffset: &offset,
+	})
+	if outOfRange.Failed != 1 || !strings.Contains(outOfRange.Results[0].Error, ErrInvalidPriorityOffset.Error()) {
+		t.Fatalf("out-of-range priority result = %+v", outOfRange)
 	}
 }
 

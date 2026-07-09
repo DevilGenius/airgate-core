@@ -52,4 +52,17 @@ describe('getBulkEditInitialValues', () => {
 
     expect(getBulkEditInitialValues(rows, [1, 2]).groupPriorities).toEqual({});
   });
+
+  it('captures the selected priority range for offset validation', () => {
+    const rows = [
+      account({ id: 1, priority: -25 }),
+      account({ id: 2, priority: 80 }),
+    ];
+
+    expect(getBulkEditInitialValues(rows, [1, 2])).toMatchObject({
+      priority: undefined,
+      priorityMin: -25,
+      priorityMax: 80,
+    });
+  });
 });
