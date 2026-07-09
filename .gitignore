@@ -19,6 +19,8 @@ backend/web
 
 # Frontend
 web/node_modules/
+web/.pnpm-store/
+web/.pnpm-store-tmp/
 web/dist/
 
 # 嵌入到二进制的前端构建产物（构建时由 Makefile / Dockerfile / release workflow 刷新）
