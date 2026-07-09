@@ -826,6 +826,7 @@ func TestCanDispatchCandidateFailoverAdvancesPlan(t *testing.T) {
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 
 	state := &forwardState{
+		requestPath: "/v1/images/generations",
 		dispatch: newDispatchChain([]sdk.DispatchPlan{
 			{SchedulingModel: "gpt-missing"},
 			{},
@@ -834,6 +835,7 @@ func TestCanDispatchCandidateFailoverAdvancesPlan(t *testing.T) {
 		dispatchPlan: sdk.DispatchPlan{SchedulingModel: "gpt-missing"},
 	}
 	state.dispatch.Select(0)
+	attempt := maxFailoverAttempts - 1
 
 	ok := (&Forwarder{}).canDispatchCandidateFailover(c, state, forwardExecution{
 		outcome: sdk.ForwardOutcome{
@@ -849,6 +851,9 @@ func TestCanDispatchCandidateFailoverAdvancesPlan(t *testing.T) {
 	}
 	if state.dispatchPlan.SchedulingModel != "gpt-fallback" {
 		t.Fatalf("dispatchPlan = %+v, want fallback", state.dispatchPlan)
+	}
+	if !canStartForwardAttempt(state, attempt) {
+		t.Fatal("dispatch candidate failover should not consume the failover attempt budget")
 	}
 }
 
@@ -940,12 +945,15 @@ func TestPickAccountRechecksPrimaryAfterFallbackWasSelectedForPoolMiss(t *testin
 	}
 }
 
-func TestCanStartForwardAttemptImagesExhaustAccounts(t *testing.T) {
+func TestCanStartForwardAttemptStopsImagesAtFailoverCap(t *testing.T) {
 	t.Parallel()
 
 	image := &forwardState{requestPath: "/v1/images/generations"}
-	if !canStartForwardAttempt(image, maxFailoverAttempts+5) {
-		t.Fatal("image submit attempts should continue past the default failover cap")
+	if !canStartForwardAttempt(image, maxFailoverAttempts-1) {
+		t.Fatal("image submit attempts below the cap should continue")
+	}
+	if canStartForwardAttempt(image, maxFailoverAttempts) {
+		t.Fatal("image submit attempts should stop at the default failover cap")
 	}
 
 	chat := &forwardState{requestPath: "/v1/chat/completions"}

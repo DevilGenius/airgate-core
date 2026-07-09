@@ -112,6 +112,32 @@ func TestStateMachineAccountDead403InactiveWorkspaceMemberDisables(t *testing.T)
 	}
 }
 
+func TestStateMachineAccountDead403InactiveOwnerDisables(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_account_dead_403_inactive_owner")
+	sm := NewStateMachine(db, nil)
+	criticalTransitions := 0
+	sm.onCriticalTransition = func(int) { criticalTransitions++ }
+	acc := createStateMachineAccount(ctx, db, "account dead inactive owner", false)
+
+	sm.Apply(ctx, acc.ID, Judgment{
+		Kind:           sdk.OutcomeAccountDead,
+		Reason:         "HTTP 403: Personal access token owner is inactive.",
+		UpstreamStatus: http.StatusForbidden,
+	})
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateDisabled {
+		t.Fatalf("state after inactive owner = %s, want disabled", fresh.State)
+	}
+	if fresh.StateUntil != nil {
+		t.Fatalf("state_until after inactive owner = %v, want nil", fresh.StateUntil)
+	}
+	if criticalTransitions != 1 {
+		t.Fatalf("critical transitions = %d, want 1", criticalTransitions)
+	}
+}
+
 func TestStateMachineAccountDead401StillDisables(t *testing.T) {
 	ctx := context.Background()
 	db := openStateMachineTestDB(t, "scheduler_account_dead_401_disables")

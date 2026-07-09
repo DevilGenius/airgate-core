@@ -1564,6 +1564,12 @@ func TestHandleSingleAccountUsageErrors(t *testing.T) {
 		t.Fatalf("inactive workspace member usage error should disable account, got %+v", writer.disabled)
 	}
 
+	inactiveOwner := "HTTP 403: Personal access token owner is inactive."
+	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{{ID: 7, Message: inactiveOwner}})
+	if writer.disabled[7] != inactiveOwner {
+		t.Fatalf("inactive owner usage error should disable account, got %+v", writer.disabled)
+	}
+
 	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 9, UpstreamIsPool: true}, []accountUsageError{{ID: 9, Message: "HTTP 401"}})
 	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 10, State: "disabled"}, []accountUsageError{{ID: 10, Message: "HTTP 401"}})
 	if _, ok := writer.disabled[9]; ok {

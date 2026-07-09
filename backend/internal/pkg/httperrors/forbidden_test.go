@@ -30,3 +30,24 @@ func TestIsForbiddenError(t *testing.T) {
 		})
 	}
 }
+
+func TestIsInactiveWorkspaceMemberError(t *testing.T) {
+	tests := []struct {
+		name   string
+		reason string
+		want   bool
+	}{
+		{name: "inactive workspace member", reason: "HTTP 403: Personal access token owner is not an active member of the selected workspace.", want: true},
+		{name: "inactive owner", reason: "HTTP 403: Personal access token owner is inactive.", want: true},
+		{name: "generic forbidden", reason: "HTTP 403: forbidden", want: false},
+		{name: "empty", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsInactiveWorkspaceMemberError(tt.reason); got != tt.want {
+				t.Fatalf("IsInactiveWorkspaceMemberError(%q) = %v, want %v", tt.reason, got, tt.want)
+			}
+		})
+	}
+}

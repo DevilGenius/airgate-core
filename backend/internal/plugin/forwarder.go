@@ -82,7 +82,7 @@ func (f *Forwarder) SetRequestMonitorRecorder(recorder requestmonitoring.Recorde
 	f.requestMonitor = recorder
 }
 
-// maxFailoverAttempts 非图片 429 场景的最大 failover 次数。
+// maxFailoverAttempts 单次请求的最大 failover 次数。
 const maxFailoverAttempts = 3
 
 // queueWaitTimeout 所有账号 slot 都被占满时，请求最多排队等多久再放弃。
@@ -102,8 +102,8 @@ const statusClientClosedRequest = 499
 // 给客户端一个保守的退避建议。1s 既能避免雪崩，又比 60s 更贴合"瞬时打满"的真实恢复节奏。
 const allRoutesFailedDefaultRetryAfter = time.Second
 
-// Forward 入口。失败时自动 failover 到其它账号；普通请求最多 maxFailoverAttempts 次，
-// 图片提交接口遇到账号 429 时会持续换号直到没有可用账号。
+// Forward 入口。失败时自动 failover 到其它账号；普通失败最多 maxFailoverAttempts 次，
+// dispatch candidate 降级（如 4k 降级）不消耗次数。
 //
 // Middleware：OnForwardBegin 只在首次 attempt 调用（避免 failover 污染审计计数），
 // OnForwardEnd 在最终一次 attempt（成功或放弃）触发，LIFO 降序。Begin DENY 会拒绝请求。
@@ -776,9 +776,6 @@ func (f *Forwarder) canDispatchCandidateFailover(c *gin.Context, state *forwardS
 }
 
 func canStartForwardAttempt(state *forwardState, attempt int) bool {
-	if state != nil && isImageSubmitAPIPath(state.requestPath) {
-		return true
-	}
 	return attempt < maxFailoverAttempts
 }
 
