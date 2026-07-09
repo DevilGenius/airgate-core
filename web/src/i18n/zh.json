@@ -805,6 +805,7 @@
     "api_key_plugin_call": "插件调用",
     "api_key_deleted": "已删除密钥",
     "user_deleted": "已删除用户",
+    "account_deleted": "已删除账号",
     "model_placeholder": "模型名称",
     "user_id": "用户 ID",
     "search_user": "搜索用户",

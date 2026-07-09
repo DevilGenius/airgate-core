@@ -1,6 +1,10 @@
 package dto
 
-import "github.com/DevilGenius/airgate-core/internal/modelpolicy"
+import (
+	"encoding/json"
+
+	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
+)
 
 // FamilyCooldownDTO 家族级限流冷却（Redis 侧），AccountResp.FamilyCooldowns 元素。
 //
@@ -23,6 +27,7 @@ type FamilyCooldownDTO struct {
 type AccountResp struct {
 	ID                 int64               `json:"id"`
 	Name               string              `json:"name"`
+	Email              *string             `json:"email"`
 	Platform           string              `json:"platform"`
 	Type               string              `json:"type"`
 	Credentials        map[string]string   `json:"credentials"`
@@ -38,6 +43,7 @@ type AccountResp struct {
 	UpstreamIsPool     bool                `json:"upstream_is_pool"`
 	Extra              map[string]any      `json:"extra,omitempty"`
 	LastUsedAt         *string             `json:"last_used_at,omitempty"`
+	DeletedAt          *string             `json:"deleted_at,omitempty"`
 	GroupIDs           []int64             `json:"group_ids"`
 	FamilyCooldowns    []FamilyCooldownDTO `json:"family_cooldowns,omitempty"`
 	TodayImageCount    *int64              `json:"today_image_count,omitempty"`
@@ -48,6 +54,7 @@ type AccountResp struct {
 // CreateAccountReq 创建账号请求
 type CreateAccountReq struct {
 	Name           string             `json:"name" binding:"required"`
+	Email          *string            `json:"email"`
 	Platform       string             `json:"platform" binding:"required"`
 	Type           string             `json:"type"` // 账号类型，如 "apikey", "oauth"
 	Credentials    map[string]string  `json:"credentials" binding:"required"`
@@ -66,6 +73,7 @@ type CreateAccountReq struct {
 // rate_limited / degraded 由状态机自动写入，不接受 API 显式赋值。
 type UpdateAccountReq struct {
 	Name           *string             `json:"name"`
+	Email          *string             `json:"email"`
 	Type           *string             `json:"type"`
 	Credentials    map[string]string   `json:"credentials"`
 	ModelPolicy    *modelpolicy.Policy `json:"model_policy"`
@@ -80,10 +88,10 @@ type UpdateAccountReq struct {
 	GroupIDs       []int64             `json:"group_ids"`
 }
 
-// AccountExportItem 导出文件中的单条账号。
-// group_ids / proxy_id 仅为兼容旧导入文件保留，导出时不会再写出，导入时也会被忽略。
+// AccountExportItem 导出文件中的单条账号，仅包含可跨环境迁移的字段。
 type AccountExportItem struct {
 	Name           string             `json:"name"`
+	Email          *string            `json:"email"`
 	Platform       string             `json:"platform"`
 	Type           string             `json:"type,omitempty"`
 	Credentials    map[string]string  `json:"credentials"`
@@ -91,8 +99,6 @@ type AccountExportItem struct {
 	Priority       int                `json:"priority"`
 	MaxConcurrency int                `json:"max_concurrency"`
 	RateMultiplier OptionalFloat      `json:"rate_multiplier"`
-	GroupIDs       []int64            `json:"group_ids,omitempty"`
-	ProxyID        *int64             `json:"proxy_id,omitempty"`
 }
 
 // AccountExportFile 导出文件结构，仅包含可跨环境迁移的账号本体字段。
@@ -105,7 +111,29 @@ type AccountExportFile struct {
 
 // ImportAccountsReq 批量导入请求
 type ImportAccountsReq struct {
-	Accounts []AccountExportItem `json:"accounts" binding:"required"`
+	Version  int                 `json:"version"`
+	Accounts []AccountExportItem `json:"accounts"`
+}
+
+// UnmarshalJSON 同时接受历史裸数组和版本化导入对象。
+func (r *ImportAccountsReq) UnmarshalJSON(data []byte) error {
+	var legacy []AccountExportItem
+	if err := json.Unmarshal(data, &legacy); err == nil {
+		r.Version = 0
+		r.Accounts = legacy
+		return nil
+	}
+
+	var envelope struct {
+		Version  int                 `json:"version"`
+		Accounts []AccountExportItem `json:"accounts"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return err
+	}
+	r.Version = envelope.Version
+	r.Accounts = envelope.Accounts
+	return nil
 }
 
 // ImportItemErrorResp 导入失败项响应

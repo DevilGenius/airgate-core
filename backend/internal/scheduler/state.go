@@ -9,6 +9,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/pkg/httperrors"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -209,7 +210,7 @@ func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID i
 	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	existing, err := sm.db.Account.Get(dbCtx, accountID)
+	existing, err := accountscope.QueryByID(sm.db, accountID).Only(dbCtx)
 	if err != nil {
 		slog.Warn("scheduler_transient_avoidance_load_failed",
 			sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
@@ -250,7 +251,7 @@ func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID i
 	until := now.Add(delay)
 	extra[transientAvoidStepExtraKey] = nextStep
 
-	err = sm.db.Account.UpdateOneID(accountID).
+	err = accountscope.UpdateOneID(sm.db, accountID).
 		SetState(account.StateDegraded).
 		SetStateUntil(until).
 		SetErrorMsg(truncateReason(j.Reason)).
@@ -323,13 +324,13 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 	defer cancel()
 
 	prevState := account.StateActive
-	existing, getErr := sm.db.Account.Get(dbCtx, accountID)
+	existing, getErr := accountscope.QueryByID(sm.db, accountID).Only(dbCtx)
 	if getErr == nil {
 		prevState = existing.State
 	}
 
 	if prevState == account.StateDisabled {
-		err := sm.db.Account.UpdateOneID(accountID).
+		err := accountscope.UpdateOneID(sm.db, accountID).
 			SetLastUsedAt(now).
 			Exec(dbCtx)
 		if err != nil {
@@ -346,7 +347,7 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 	}
 
 	if !force && isUnexpiredTemporaryState(existing, now) {
-		upd := sm.db.Account.UpdateOneID(accountID).
+		upd := accountscope.UpdateOneID(sm.db, accountID).
 			SetLastUsedAt(now)
 		var nextExtra map[string]interface{}
 		if hasTransientAvoidanceExtra(existing.Extra) {
@@ -364,7 +365,7 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 		return
 	}
 
-	upd := sm.db.Account.UpdateOneID(accountID).
+	upd := accountscope.UpdateOneID(sm.db, accountID).
 		SetState(account.StateActive).
 		ClearStateUntil().
 		SetErrorMsg("").
@@ -403,7 +404,7 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 	var existing *ent.Account
 	if newState != account.StateDisabled {
 		var err error
-		existing, err = sm.db.Account.Get(dbCtx, accountID)
+		existing, err = accountscope.QueryByID(sm.db, accountID).Only(dbCtx)
 		if err == nil {
 			if existing.State == account.StateDisabled {
 				slog.Info("scheduler_state_transition_ignored_disabled",
@@ -426,7 +427,7 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 		}
 	}
 
-	upd := sm.db.Account.UpdateOneID(accountID).
+	upd := accountscope.UpdateOneID(sm.db, accountID).
 		SetState(newState).
 		SetErrorMsg(truncateReason(reason))
 	if stateUntil == nil {
@@ -574,7 +575,7 @@ func (sm *StateMachine) loadAccountMonitorSnapshot(accountID int) *ent.Account {
 	}
 	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
-	snapshot, err := sm.db.Account.Get(dbCtx, accountID)
+	snapshot, err := accountscope.QueryByID(sm.db, accountID).Only(dbCtx)
 	if err != nil {
 		slog.Debug("scheduler_account_monitor_snapshot_load_failed",
 			sdk.LogFieldAccountID, accountID,

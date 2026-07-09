@@ -62,7 +62,7 @@ func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 		want   string
 	}{
 		{name: "list", method: http.MethodGet, target: "/accounts?page=1&page_size=10&platform=custom&sort_by=priority&sort_dir=asc", fn: accountHandler.ListAccounts, want: `"total":1`},
-		{name: "export", method: http.MethodGet, target: "/accounts/export?platform=custom", fn: accountHandler.ExportAccounts, want: `"count":1`},
+		{name: "export", method: http.MethodGet, target: "/accounts/export?platform=custom", fn: accountHandler.ExportAccounts, want: `"version":2`},
 		{name: "update", method: http.MethodPut, target: "/accounts/" + accountIDString, params: accountParams, body: `{"name":"primary-updated","priority":99996,"max_concurrency":8,"rate_multiplier":1.4,"extra":{"region":"eu"}}`, fn: accountHandler.UpdateAccount, want: `"name":"primary-updated"`},
 		{name: "models", method: http.MethodGet, target: "/accounts/" + accountIDString + "/models", params: accountParams, fn: accountHandler.GetAccountModels, want: `"id":"model-test"`},
 		{name: "usage", method: http.MethodGet, target: "/accounts/usage?platform=custom&ids=" + accountIDString, fn: accountHandler.GetAccountUsage, want: `"refreshing":false`},
@@ -105,7 +105,7 @@ func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 		t.Fatalf("bulk refresh quota body = status %d %s", w.Code, w.Body.String())
 	}
 
-	importBody := `{"accounts":[{"name":"imported","platform":"custom","type":"apikey","credentials":{"token":"imported"},"rate_multiplier":1.1}]}`
+	importBody := `{"version":1,"accounts":[{"name":"imported","platform":"custom","type":"oauth","credentials":{"token":"imported","email":" Legacy.Import@Example.COM "},"rate_multiplier":1.1}]}`
 	w = invokeHandlerForValidation(http.MethodPost, "/accounts/import", importBody, nil, nil, accountHandler.ImportAccounts)
 	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
 	if !strings.Contains(w.Body.String(), `"imported":1`) {
@@ -126,6 +126,13 @@ func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 	if importedID == 0 {
 		t.Fatalf("imported account id not found in %v", allIDs)
 	}
+	importedAccount, err := db.Account.Get(ctx, importedID)
+	if err != nil {
+		t.Fatalf("load imported account: %v", err)
+	}
+	if importedAccount.Email == nil || *importedAccount.Email != "legacy.import@example.com" || importedAccount.Credentials["email"] != "legacy.import@example.com" {
+		t.Fatalf("legacy import identity = %+v", importedAccount)
+	}
 	w = invokeHandlerForValidation(http.MethodDelete, "/accounts/bulk", fmt.Sprintf(`{"account_ids":[%d]}`, importedID), nil, nil, accountHandler.BulkDeleteAccounts)
 	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
 	if !strings.Contains(w.Body.String(), `"success":1`) {
@@ -134,6 +141,18 @@ func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 
 	w = invokeHandlerForValidation(http.MethodDelete, "/accounts/"+accountIDString, "", accountParams, nil, accountHandler.DeleteAccount)
 	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+	deletedAccounts, err := db.Account.Query().All(ctx)
+	if err != nil {
+		t.Fatalf("query soft-deleted accounts: %v", err)
+	}
+	if len(deletedAccounts) != 2 {
+		t.Fatalf("account rows after delete = %d, want 2", len(deletedAccounts))
+	}
+	for _, item := range deletedAccounts {
+		if item.DeletedAt == nil || len(item.Credentials) == 0 {
+			t.Fatalf("soft-deleted account lost data: %+v", item)
+		}
+	}
 }
 
 type accountHandlerPluginCatalogStub struct {

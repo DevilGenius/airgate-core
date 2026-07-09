@@ -150,6 +150,7 @@ export interface ModelPolicy {
 export interface AccountResp {
   id: number;
   name: string;
+  email: string | null;
   platform: string;
   type: string;
   credentials: Record<string, string>;
@@ -166,6 +167,7 @@ export interface AccountResp {
   upstream_is_pool: boolean;
   extra?: Record<string, unknown>;
   last_used_at?: string;
+  deleted_at?: string;
   group_ids: number[];
   /** 当前在 Redis 上仍生效的家族级限流冷却列表；后端 omitempty，没有冷却时缺省。 */
   family_cooldowns?: FamilyCooldownDTO[];
@@ -181,6 +183,7 @@ export interface AccountResp {
 
 export interface CreateAccountReq {
   name: string;
+  email?: string | null;
   platform: string;
   type?: string;
   credentials: Record<string, string>;
@@ -196,6 +199,7 @@ export interface CreateAccountReq {
 
 export interface UpdateAccountReq {
   name?: string;
+  email?: string | null;
   type?: string;
   credentials?: Record<string, string>;
   model_policy?: ModelPolicy | null;
@@ -243,6 +247,7 @@ export interface BulkOpResp {
 // 导出文件中的单条账号（精简字段，可被 import 还原）
 export interface AccountExportItem {
   name: string;
+  email?: string | null;
   platform: string;
   type?: string;
   credentials: Record<string, string>;
@@ -250,8 +255,6 @@ export interface AccountExportItem {
   priority: number;
   max_concurrency: number;
   rate_multiplier?: number | null;
-  group_ids?: number[];
-  proxy_id?: number;
 }
 
 // 导出文件结构
@@ -492,6 +495,7 @@ export interface UsageLogResp {
   account_id: number;
   account_name?: string;
   account_email?: string;
+  account_deleted?: boolean;
   group_id: number;
   platform: string;
   model: string;

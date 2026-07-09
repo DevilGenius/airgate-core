@@ -9,7 +9,7 @@ import {
   TextField as HeroTextField,
   useOverlayState,
 } from '@heroui/react';
-import { Gauge, Hash, Layers } from 'lucide-react';
+import { Gauge, Hash, Layers, Mail } from 'lucide-react';
 import { accountsApi } from '../../../shared/api/accounts';
 import { groupsApi } from '../../../shared/api/groups';
 import { proxiesApi } from '../../../shared/api/proxies';
@@ -23,6 +23,8 @@ import {
   getSchemaSelectedAccountType,
   getSchemaVisibleFields,
   filterCredentialsForAccountType,
+  normalizeAccountEmailValue,
+  syncAccountIdentity,
 } from './accountUtils';
 import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
@@ -72,6 +74,7 @@ export function EditAccountModal({
   const [accountType, setAccountType] = useState(initialAccountType);
   const [form, setForm] = useState<UpdateAccountReq>({
     name: account.name,
+    email: account.email,
     type: initialAccountType || undefined,
     priority: account.priority,
     max_concurrency: account.max_concurrency,
@@ -142,6 +145,13 @@ export function EditAccountModal({
     setForm((prev) => ({ ...prev, type: type || undefined }));
   };
 
+  const handleCredentialsChange = (next: Record<string, string>) => {
+    setCredentials(next);
+    if (Object.prototype.hasOwnProperty.call(next, 'email')) {
+      setForm((prev) => ({ ...prev, email: normalizeAccountEmailValue(next.email) }));
+    }
+  };
+
   const handleSchemaAccountTypeChange = (type: string) => {
     const selectedType = getSchemaSelectedAccountType(schema, type);
     handleAccountTypeChange(type);
@@ -169,13 +179,16 @@ export function EditAccountModal({
       ? undefined
       : dispatchEnabled ? 'active' : 'disabled';
 
+    const identity = syncAccountIdentity(merged, form.email);
+
     onSubmit({
       ...form,
+      email: identity.email,
       ...(nextState ? { state: nextState } : {}),
       priority,
       rate_multiplier: rateMultiplier,
       type: accountType || undefined,
-      credentials: merged,
+      credentials: identity.credentials,
       extra: extraWithGroupPriorities(form.extra, groupIds, groupPriorityInputs),
       group_ids: groupIds,
     });
@@ -287,6 +300,21 @@ export function EditAccountModal({
                         />
                       </div>
                     </HeroTextField>
+
+                    <HeroTextField fullWidth>
+                      <Label>{t('users.email')}</Label>
+                      <div className="relative">
+                        <Mail className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                        <Input
+                          className="pl-9"
+                          name="email"
+                          type="email"
+                          autoComplete="email"
+                          value={form.email ?? ''}
+                          onChange={(event) => setForm({ ...form, email: event.target.value })}
+                        />
+                      </div>
+                    </HeroTextField>
                   </div>
                 </section>
 
@@ -294,7 +322,7 @@ export function EditAccountModal({
                   <section className="ag-plugin-scope border-t border-border pt-4">
                     <PluginAccountForm
                       credentials={credentials}
-                      onChange={setCredentials}
+                      onChange={handleCredentialsChange}
                       mode="edit"
                       accountType={accountType}
                       onAccountTypeChange={handleAccountTypeChange}
@@ -307,7 +335,7 @@ export function EditAccountModal({
                     accountType={accountType}
                     onAccountTypeChange={handleSchemaAccountTypeChange}
                     credentials={credentials}
-                    onCredentialsChange={setCredentials}
+                    onCredentialsChange={handleCredentialsChange}
                     mode="edit"
                   />
                 ) : null}

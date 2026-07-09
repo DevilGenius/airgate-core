@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/predicate"
 	entproxy "github.com/DevilGenius/airgate-core/ent/proxy"
 	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
+	"github.com/DevilGenius/airgate-core/internal/accountidentity"
+	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
@@ -32,12 +35,7 @@ func NewAccountStore(db *ent.Client) *AccountStore {
 func accountKeywordMatches(keyword string) predicate.Account {
 	return entaccount.Or(
 		entaccount.NameContains(keyword),
-		entaccount.And(
-			entaccount.TypeEQ("oauth"),
-			func(s *sql.Selector) {
-				s.Where(sqljson.StringContains(entaccount.FieldCredentials, keyword, sqljson.Path("email")))
-			},
-		),
+		entaccount.EmailContainsFold(keyword),
 	)
 }
 
@@ -120,7 +118,7 @@ func nonEmptyStrings(values []string) []string {
 
 // List 查询账号列表。
 func (s *AccountStore) List(ctx context.Context, filter appaccount.ListFilter) ([]appaccount.Account, int64, error) {
-	query := applyAccountListFilters(s.db.Account.Query(), filter)
+	query := applyAccountListFilters(accountscope.Query(s.db), filter)
 
 	total, err := query.Count(ctx)
 	if err != nil {
@@ -142,7 +140,7 @@ func (s *AccountStore) List(ctx context.Context, filter appaccount.ListFilter) (
 
 // ListAll 查询符合筛选条件的全部账号（不分页，用于导出）。
 func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter) ([]appaccount.Account, error) {
-	query := applyAccountListFilters(s.db.Account.Query(), filter)
+	query := applyAccountListFilters(accountscope.Query(s.db), filter)
 
 	accounts, err := query.
 		WithGroups().
@@ -156,45 +154,167 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 	return mapAccounts(accounts), nil
 }
 
-// Create 创建账号。
+// Create 创建账号；同邮箱软删除账号会复用原行并恢复。
 func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput) (appaccount.Account, error) {
+	resolvedEmail, resolvedCredentials, identityErr := accountidentity.Resolve(input.Email, input.Credentials)
+	if identityErr != nil {
+		return appaccount.Account{}, mapAccountIdentityError(identityErr)
+	}
+	input.Email = resolvedEmail
+	input.Credentials = resolvedCredentials
+
 	rateMultiplier := accountRateMultiplierOrDefault(input.RateMultiplier)
-
-	builder := s.db.Account.Create().
-		SetName(input.Name).
-		SetPlatform(input.Platform).
-		SetType(input.Type).
-		SetCredentials(cloneCredentials(input.Credentials)).
-		SetModelPolicy(cloneModelPolicy(input.ModelPolicy)).
-		SetPriority(input.Priority).
-		SetMaxConcurrency(input.MaxConcurrency).
-		SetRateMultiplier(rateMultiplier).
-		SetUpstreamIsPool(input.UpstreamIsPool)
-
-	if input.Extra != nil {
-		builder = builder.SetExtra(input.Extra)
-	}
-	if len(input.GroupIDs) > 0 {
-		builder = builder.AddGroupIDs(toIntSlice(input.GroupIDs)...)
-	}
-	if input.ProxyID != nil {
-		builder = builder.SetProxyID(int(*input.ProxyID))
-	}
-
-	item, err := builder.Save(ctx)
+	tx, err := s.db.Tx(ctx)
 	if err != nil {
 		return appaccount.Account{}, err
 	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
-	return s.FindByID(ctx, item.ID, appaccount.LoadOptions{WithGroups: true, WithProxy: true})
+	accountID := 0
+	if input.Email != nil {
+		existing, queryErr := tx.Account.Query().
+			Where(entaccount.EmailEQ(*input.Email)).
+			Only(ctx)
+		switch {
+		case queryErr == nil:
+			if existing.DeletedAt == nil {
+				return appaccount.Account{}, appaccount.ErrAccountEmailExists
+			}
+			builder := tx.Account.UpdateOneID(existing.ID).
+				Where(entaccount.DeletedAtNotNil()).
+				SetName(input.Name).
+				SetEmail(*input.Email).
+				SetPlatform(input.Platform).
+				SetType(input.Type).
+				SetCredentials(cloneCredentials(input.Credentials)).
+				SetModelPolicy(cloneModelPolicy(input.ModelPolicy)).
+				SetState(entaccount.StateActive).
+				ClearStateUntil().
+				SetPriority(input.Priority).
+				SetMaxConcurrency(input.MaxConcurrency).
+				SetRateMultiplier(rateMultiplier).
+				SetErrorMsg("").
+				SetUpstreamIsPool(input.UpstreamIsPool).
+				ClearDeletedAt().
+				ClearGroups().
+				ClearProxy()
+			if input.Extra == nil {
+				builder = builder.SetExtra(map[string]interface{}{})
+			} else {
+				builder = builder.SetExtra(input.Extra)
+			}
+			if len(input.GroupIDs) > 0 {
+				builder = builder.AddGroupIDs(toIntSlice(input.GroupIDs)...)
+			}
+			if input.ProxyID != nil {
+				builder = builder.SetProxyID(int(*input.ProxyID))
+			}
+			item, saveErr := builder.Save(ctx)
+			if saveErr != nil {
+				if ent.IsNotFound(saveErr) {
+					return appaccount.Account{}, appaccount.ErrAccountEmailExists
+				}
+				return appaccount.Account{}, mapAccountEmailConstraint(saveErr)
+			}
+			accountID = item.ID
+		case ent.IsNotFound(queryErr):
+			// 继续创建新账号。
+		default:
+			return appaccount.Account{}, queryErr
+		}
+	}
+
+	if accountID == 0 {
+		builder := tx.Account.Create().
+			SetName(input.Name).
+			SetNillableEmail(input.Email).
+			SetPlatform(input.Platform).
+			SetType(input.Type).
+			SetCredentials(cloneCredentials(input.Credentials)).
+			SetModelPolicy(cloneModelPolicy(input.ModelPolicy)).
+			SetPriority(input.Priority).
+			SetMaxConcurrency(input.MaxConcurrency).
+			SetRateMultiplier(rateMultiplier).
+			SetUpstreamIsPool(input.UpstreamIsPool)
+
+		if input.Extra != nil {
+			builder = builder.SetExtra(input.Extra)
+		}
+		if len(input.GroupIDs) > 0 {
+			builder = builder.AddGroupIDs(toIntSlice(input.GroupIDs)...)
+		}
+		if input.ProxyID != nil {
+			builder = builder.SetProxyID(int(*input.ProxyID))
+		}
+
+		item, saveErr := builder.Save(ctx)
+		if saveErr != nil {
+			return appaccount.Account{}, mapAccountEmailConstraint(saveErr)
+		}
+		accountID = item.ID
+	}
+
+	if err := tx.Commit(); err != nil {
+		return appaccount.Account{}, err
+	}
+	return s.FindByID(ctx, accountID, appaccount.LoadOptions{WithGroups: true, WithProxy: true})
 }
 
 // Update 更新账号。
 func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.UpdateInput) (appaccount.Account, error) {
-	builder := s.db.Account.UpdateOneID(id)
+	if input.HasEmail || input.Credentials != nil {
+		var (
+			resolvedEmail       *string
+			resolvedCredentials map[string]string
+			identityErr         error
+		)
+		if input.HasEmail && input.Credentials != nil {
+			resolvedEmail, resolvedCredentials, identityErr = accountidentity.ResolveUpdate(
+				nil,
+				nil,
+				input.Email,
+				true,
+				input.Credentials,
+			)
+		} else {
+			current, queryErr := accountscope.QueryByID(s.db, id).
+				Select(entaccount.FieldEmail, entaccount.FieldCredentials).
+				Only(ctx)
+			if queryErr != nil {
+				if ent.IsNotFound(queryErr) {
+					return appaccount.Account{}, appaccount.ErrAccountNotFound
+				}
+				return appaccount.Account{}, queryErr
+			}
+			resolvedEmail, resolvedCredentials, identityErr = accountidentity.ResolveUpdate(
+				current.Email,
+				current.Credentials,
+				input.Email,
+				input.HasEmail,
+				input.Credentials,
+			)
+		}
+		if identityErr != nil {
+			return appaccount.Account{}, mapAccountIdentityError(identityErr)
+		}
+		input.Email = resolvedEmail
+		input.HasEmail = true
+		input.Credentials = resolvedCredentials
+	}
+
+	builder := accountscope.UpdateOneID(s.db, id)
 
 	if input.Name != nil {
 		builder = builder.SetName(*input.Name)
+	}
+	if input.HasEmail {
+		if input.Email == nil {
+			builder = builder.ClearEmail()
+		} else {
+			builder = builder.SetEmail(*input.Email)
+		}
 	}
 	if input.Type != nil {
 		builder = builder.SetType(*input.Type)
@@ -245,15 +365,19 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 		if ent.IsNotFound(err) {
 			return appaccount.Account{}, appaccount.ErrAccountNotFound
 		}
-		return appaccount.Account{}, err
+		return appaccount.Account{}, mapAccountEmailConstraint(err)
 	}
 
 	return s.FindByID(ctx, id, appaccount.LoadOptions{WithGroups: true, WithProxy: true})
 }
 
-// Delete 删除账号。
+// Delete 软删除账号。保留凭证和关联边，供历史 Usage Log 回溯。
 func (s *AccountStore) Delete(ctx context.Context, id int) error {
-	if err := s.db.Account.DeleteOneID(id).Exec(ctx); err != nil {
+	if err := accountscope.UpdateOneID(s.db, id).
+		SetDeletedAt(time.Now()).
+		SetState(entaccount.StateDisabled).
+		ClearStateUntil().
+		Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return appaccount.ErrAccountNotFound
 		}
@@ -264,7 +388,10 @@ func (s *AccountStore) Delete(ctx context.Context, id int) error {
 
 // FindByID 按 ID 查询账号。
 func (s *AccountStore) FindByID(ctx context.Context, id int, opts appaccount.LoadOptions) (appaccount.Account, error) {
-	query := s.db.Account.Query().Where(entaccount.IDEQ(id))
+	query := accountscope.QueryByID(s.db, id)
+	if opts.IncludeDeleted {
+		query = s.db.Account.Query().Where(entaccount.IDEQ(id))
+	}
 	if opts.WithGroups {
 		query = query.WithGroups()
 	}
@@ -284,7 +411,7 @@ func (s *AccountStore) FindByID(ctx context.Context, id int, opts appaccount.Loa
 
 // ListByPlatform 按平台查询账号。
 func (s *AccountStore) ListByPlatform(ctx context.Context, platform string) ([]appaccount.Account, error) {
-	accounts, err := s.db.Account.Query().
+	accounts, err := accountscope.Query(s.db).
 		Where(entaccount.PlatformEQ(platform)).
 		All(ctx)
 	if err != nil {
@@ -455,19 +582,6 @@ func (s *AccountStore) BatchImageStats(ctx context.Context, accountIDs []int, to
 	return result, nil
 }
 
-// SaveCredentials 保存账号凭证。
-func (s *AccountStore) SaveCredentials(ctx context.Context, id int, credentials map[string]string) error {
-	if err := s.db.Account.UpdateOneID(id).
-		SetCredentials(cloneCredentials(credentials)).
-		Exec(ctx); err != nil {
-		if ent.IsNotFound(err) {
-			return appaccount.ErrAccountNotFound
-		}
-		return err
-	}
-	return nil
-}
-
 func mapAccounts(accounts []*ent.Account) []appaccount.Account {
 	result := make([]appaccount.Account, 0, len(accounts))
 	for _, item := range accounts {
@@ -495,9 +609,17 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		UpdatedAt:      item.UpdatedAt,
 	}
 
+	if item.Email != nil {
+		value := *item.Email
+		result.Email = &value
+	}
 	if item.LastUsedAt != nil {
 		value := *item.LastUsedAt
 		result.LastUsedAt = &value
+	}
+	if item.DeletedAt != nil {
+		value := *item.DeletedAt
+		result.DeletedAt = &value
 	}
 	if item.StateUntil != nil {
 		value := *item.StateUntil
@@ -518,6 +640,30 @@ func mapAccount(item *ent.Account) appaccount.Account {
 	}
 
 	return result
+}
+
+func mapAccountEmailConstraint(err error) error {
+	if err == nil || !ent.IsConstraintError(err) {
+		return err
+	}
+	message := strings.ToLower(err.Error())
+	if strings.Contains(message, "account_email_key") || strings.Contains(message, "accounts.email") {
+		return appaccount.ErrAccountEmailExists
+	}
+	return err
+}
+
+func mapAccountIdentityError(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, accountidentity.ErrInvalidEmail):
+		return appaccount.ErrInvalidAccountEmail
+	case errors.Is(err, accountidentity.ErrEmailMismatch):
+		return appaccount.ErrAccountEmailMismatch
+	default:
+		return err
+	}
 }
 
 func toIntSlice(values []int64) []int {

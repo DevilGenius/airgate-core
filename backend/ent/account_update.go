@@ -46,6 +46,26 @@ func (au *AccountUpdate) SetNillableName(s *string) *AccountUpdate {
 	return au
 }
 
+// SetEmail sets the "email" field.
+func (au *AccountUpdate) SetEmail(s string) *AccountUpdate {
+	au.mutation.SetEmail(s)
+	return au
+}
+
+// SetNillableEmail sets the "email" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableEmail(s *string) *AccountUpdate {
+	if s != nil {
+		au.SetEmail(*s)
+	}
+	return au
+}
+
+// ClearEmail clears the value of the "email" field.
+func (au *AccountUpdate) ClearEmail() *AccountUpdate {
+	au.mutation.ClearEmail()
+	return au
+}
+
 // SetPlatform sets the "platform" field.
 func (au *AccountUpdate) SetPlatform(s string) *AccountUpdate {
 	au.mutation.SetPlatform(s)
@@ -263,6 +283,26 @@ func (au *AccountUpdate) ClearExtra() *AccountUpdate {
 	return au
 }
 
+// SetDeletedAt sets the "deleted_at" field.
+func (au *AccountUpdate) SetDeletedAt(t time.Time) *AccountUpdate {
+	au.mutation.SetDeletedAt(t)
+	return au
+}
+
+// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableDeletedAt(t *time.Time) *AccountUpdate {
+	if t != nil {
+		au.SetDeletedAt(*t)
+	}
+	return au
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (au *AccountUpdate) ClearDeletedAt() *AccountUpdate {
+	au.mutation.ClearDeletedAt()
+	return au
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (au *AccountUpdate) SetUpdatedAt(t time.Time) *AccountUpdate {
 	au.mutation.SetUpdatedAt(t)
@@ -452,6 +492,12 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := au.mutation.Name(); ok {
 		_spec.SetField(account.FieldName, field.TypeString, value)
 	}
+	if value, ok := au.mutation.Email(); ok {
+		_spec.SetField(account.FieldEmail, field.TypeString, value)
+	}
+	if au.mutation.EmailCleared() {
+		_spec.ClearField(account.FieldEmail, field.TypeString)
+	}
 	if value, ok := au.mutation.Platform(); ok {
 		_spec.SetField(account.FieldPlatform, field.TypeString, value)
 	}
@@ -514,6 +560,12 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if au.mutation.ExtraCleared() {
 		_spec.ClearField(account.FieldExtra, field.TypeJSON)
+	}
+	if value, ok := au.mutation.DeletedAt(); ok {
+		_spec.SetField(account.FieldDeletedAt, field.TypeTime, value)
+	}
+	if au.mutation.DeletedAtCleared() {
+		_spec.ClearField(account.FieldDeletedAt, field.TypeTime)
 	}
 	if value, ok := au.mutation.UpdatedAt(); ok {
 		_spec.SetField(account.FieldUpdatedAt, field.TypeTime, value)
@@ -668,6 +720,26 @@ func (auo *AccountUpdateOne) SetNillableName(s *string) *AccountUpdateOne {
 	if s != nil {
 		auo.SetName(*s)
 	}
+	return auo
+}
+
+// SetEmail sets the "email" field.
+func (auo *AccountUpdateOne) SetEmail(s string) *AccountUpdateOne {
+	auo.mutation.SetEmail(s)
+	return auo
+}
+
+// SetNillableEmail sets the "email" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableEmail(s *string) *AccountUpdateOne {
+	if s != nil {
+		auo.SetEmail(*s)
+	}
+	return auo
+}
+
+// ClearEmail clears the value of the "email" field.
+func (auo *AccountUpdateOne) ClearEmail() *AccountUpdateOne {
+	auo.mutation.ClearEmail()
 	return auo
 }
 
@@ -885,6 +957,26 @@ func (auo *AccountUpdateOne) SetExtra(m map[string]interface{}) *AccountUpdateOn
 // ClearExtra clears the value of the "extra" field.
 func (auo *AccountUpdateOne) ClearExtra() *AccountUpdateOne {
 	auo.mutation.ClearExtra()
+	return auo
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (auo *AccountUpdateOne) SetDeletedAt(t time.Time) *AccountUpdateOne {
+	auo.mutation.SetDeletedAt(t)
+	return auo
+}
+
+// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableDeletedAt(t *time.Time) *AccountUpdateOne {
+	if t != nil {
+		auo.SetDeletedAt(*t)
+	}
+	return auo
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (auo *AccountUpdateOne) ClearDeletedAt() *AccountUpdateOne {
+	auo.mutation.ClearDeletedAt()
 	return auo
 }
 
@@ -1107,6 +1199,12 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	if value, ok := auo.mutation.Name(); ok {
 		_spec.SetField(account.FieldName, field.TypeString, value)
 	}
+	if value, ok := auo.mutation.Email(); ok {
+		_spec.SetField(account.FieldEmail, field.TypeString, value)
+	}
+	if auo.mutation.EmailCleared() {
+		_spec.ClearField(account.FieldEmail, field.TypeString)
+	}
 	if value, ok := auo.mutation.Platform(); ok {
 		_spec.SetField(account.FieldPlatform, field.TypeString, value)
 	}
@@ -1169,6 +1267,12 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if auo.mutation.ExtraCleared() {
 		_spec.ClearField(account.FieldExtra, field.TypeJSON)
+	}
+	if value, ok := auo.mutation.DeletedAt(); ok {
+		_spec.SetField(account.FieldDeletedAt, field.TypeTime, value)
+	}
+	if auo.mutation.DeletedAtCleared() {
+		_spec.ClearField(account.FieldDeletedAt, field.TypeTime)
 	}
 	if value, ok := auo.mutation.UpdatedAt(); ok {
 		_spec.SetField(account.FieldUpdatedAt, field.TypeTime, value)

@@ -42,6 +42,7 @@ import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
 import { BulkRefreshProgressModal } from './accounts/BulkRefreshProgressModal';
 import { AccountsTableSection } from './accounts/AccountsTableSection';
 import { getBulkEditInitialValues, type BulkEditSelection } from './accounts/bulkEditSupport';
+import { parseAccountImportItems } from './accounts/accountUtils';
 import type {
   AccountResp,
   CreateAccountReq,
@@ -120,6 +121,7 @@ export default function AccountsPageContent() {
           matched = true;
           return {
             ...account,
+            ...(result.email !== undefined ? { email: result.email } : {}),
             credentials: {
               ...account.credentials,
               ...(result.plan_type !== undefined ? { plan_type: result.plan_type } : {}),
@@ -568,8 +570,8 @@ export default function AccountsPageContent() {
     reader.onload = () => {
       try {
         const parsed = JSON.parse(reader.result as string);
-        const accounts: AccountExportItem[] = Array.isArray(parsed) ? parsed : parsed.accounts;
-        if (!Array.isArray(accounts) || accounts.length === 0) {
+        const accounts = parseAccountImportItems(parsed);
+        if (!accounts) {
           toast('error', t('accounts.import_invalid'));
           return;
         }

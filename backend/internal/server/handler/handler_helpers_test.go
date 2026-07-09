@@ -206,9 +206,12 @@ func TestHandlerErrorMappings(t *testing.T) {
 		status int
 	}{
 		{appaccount.ErrAccountNotFound, 404},
+		{appaccount.ErrAccountEmailExists, 409},
 		{appaccount.ErrPluginNotFound, 500},
 		{appaccount.ErrReauthRequired, 422},
 		{appaccount.ErrModelRequired, 400},
+		{appaccount.ErrInvalidAccountEmail, 400},
+		{appaccount.ErrAccountEmailMismatch, 400},
 		{errors.New("other"), 500},
 	} {
 		if status, _ := accountHandler.handleError("account", "public", tt.err); status != tt.status {

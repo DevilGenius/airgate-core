@@ -30,6 +30,20 @@ func (ac *AccountCreate) SetName(s string) *AccountCreate {
 	return ac
 }
 
+// SetEmail sets the "email" field.
+func (ac *AccountCreate) SetEmail(s string) *AccountCreate {
+	ac.mutation.SetEmail(s)
+	return ac
+}
+
+// SetNillableEmail sets the "email" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableEmail(s *string) *AccountCreate {
+	if s != nil {
+		ac.SetEmail(*s)
+	}
+	return ac
+}
+
 // SetPlatform sets the "platform" field.
 func (ac *AccountCreate) SetPlatform(s string) *AccountCreate {
 	ac.mutation.SetPlatform(s)
@@ -185,6 +199,20 @@ func (ac *AccountCreate) SetNillableLastUsedAt(t *time.Time) *AccountCreate {
 // SetExtra sets the "extra" field.
 func (ac *AccountCreate) SetExtra(m map[string]interface{}) *AccountCreate {
 	ac.mutation.SetExtra(m)
+	return ac
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (ac *AccountCreate) SetDeletedAt(t time.Time) *AccountCreate {
+	ac.mutation.SetDeletedAt(t)
+	return ac
+}
+
+// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableDeletedAt(t *time.Time) *AccountCreate {
+	if t != nil {
+		ac.SetDeletedAt(*t)
+	}
 	return ac
 }
 
@@ -436,6 +464,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 		_spec.SetField(account.FieldName, field.TypeString, value)
 		_node.Name = value
 	}
+	if value, ok := ac.mutation.Email(); ok {
+		_spec.SetField(account.FieldEmail, field.TypeString, value)
+		_node.Email = &value
+	}
 	if value, ok := ac.mutation.Platform(); ok {
 		_spec.SetField(account.FieldPlatform, field.TypeString, value)
 		_node.Platform = value
@@ -487,6 +519,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
 		_node.Extra = value
+	}
+	if value, ok := ac.mutation.DeletedAt(); ok {
+		_spec.SetField(account.FieldDeletedAt, field.TypeTime, value)
+		_node.DeletedAt = &value
 	}
 	if value, ok := ac.mutation.CreatedAt(); ok {
 		_spec.SetField(account.FieldCreatedAt, field.TypeTime, value)

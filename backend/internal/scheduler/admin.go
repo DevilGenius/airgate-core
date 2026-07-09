@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -16,11 +17,11 @@ func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 	dbCtx, cancel := context.WithTimeout(ctx, dbTimeout)
 	defer cancel()
 
-	upd := s.db.Account.UpdateOneID(accountID).
+	upd := accountscope.UpdateOneID(s.db, accountID).
 		SetState(account.StateActive).
 		ClearStateUntil().
 		SetErrorMsg("")
-	if existing, getErr := s.db.Account.Get(dbCtx, accountID); getErr == nil {
+	if existing, getErr := accountscope.QueryByID(s.db, accountID).Only(dbCtx); getErr == nil {
 		if hasTransientAvoidanceExtra(existing.Extra) {
 			extra := cloneExtra(existing.Extra)
 			clearTransientAvoidanceExtra(extra)
@@ -41,7 +42,7 @@ func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 func (s *Scheduler) ManualDisable(ctx context.Context, accountID int, reason string) error {
 	dbCtx, cancel := context.WithTimeout(ctx, dbTimeout)
 	defer cancel()
-	err := s.db.Account.UpdateOneID(accountID).
+	err := accountscope.UpdateOneID(s.db, accountID).
 		SetState(account.StateDisabled).
 		ClearStateUntil().
 		SetErrorMsg(truncateReason(reason)).
@@ -68,7 +69,7 @@ func (s *Scheduler) ClearRateLimitMarkers(ctx context.Context, accountID int) in
 	cleared := s.ClearFamilyCooldowns(ctx, accountID)
 	dbCtx, cancel := context.WithTimeout(ctx, dbTimeout)
 	defer cancel()
-	item, err := s.db.Account.Get(dbCtx, accountID)
+	item, err := accountscope.QueryByID(s.db, accountID).Only(dbCtx)
 	if err != nil {
 		return cleared
 	}

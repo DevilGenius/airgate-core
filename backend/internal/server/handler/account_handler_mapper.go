@@ -9,6 +9,7 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 	resp := dto.AccountResp{
 		ID:                 int64(account.ID),
 		Name:               account.Name,
+		Email:              account.Email,
 		Platform:           account.Platform,
 		Type:               account.Type,
 		Credentials:        account.Credentials,
@@ -35,6 +36,10 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		lastUsedAt := account.LastUsedAt.Format("2006-01-02T15:04:05Z")
 		resp.LastUsedAt = &lastUsedAt
 	}
+	if account.DeletedAt != nil {
+		deletedAt := account.DeletedAt.UTC().Format("2006-01-02T15:04:05Z")
+		resp.DeletedAt = &deletedAt
+	}
 	if account.StateUntil != nil {
 		until := account.StateUntil.UTC().Format("2006-01-02T15:04:05Z")
 		resp.StateUntil = &until
@@ -57,6 +62,7 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 func toAccountExportItem(account appaccount.Account) dto.AccountExportItem {
 	return dto.AccountExportItem{
 		Name:           account.Name,
+		Email:          account.Email,
 		Platform:       account.Platform,
 		Type:           account.Type,
 		Credentials:    account.Credentials,

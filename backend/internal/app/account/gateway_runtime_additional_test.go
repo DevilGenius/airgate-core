@@ -124,6 +124,7 @@ func TestQuotaRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 	var mu sync.Mutex
 	requestedPaths := make([]string, 0, 2)
 	savedCredentials := map[string]string{}
+	savedEmail := ""
 	var quotaRequest quotaRefreshRequest
 	var probeRequest map[string]any
 
@@ -172,12 +173,24 @@ func TestQuotaRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 				Proxy:       &Proxy{Protocol: "http", Address: "127.0.0.1", Port: 65530},
 			}, nil
 		},
-		saveCredentials: func(_ context.Context, id int, credentials map[string]string) error {
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
 			if id != 9 {
-				t.Fatalf("SaveCredentials id = %d, want 9", id)
+				t.Fatalf("Update id = %d, want 9", id)
 			}
-			savedCredentials = cloneStringMap(credentials)
-			return nil
+			if !input.HasEmail || input.Email == nil {
+				t.Fatalf("Update email patch = %+v", input)
+			}
+			savedEmail = *input.Email
+			savedCredentials = cloneStringMap(input.Credentials)
+			return Account{
+				ID:          id,
+				Name:        "oauth",
+				Email:       input.Email,
+				Platform:    "openai",
+				Type:        "oauth",
+				Credentials: cloneStringMap(input.Credentials),
+				Proxy:       &Proxy{Protocol: "http", Address: "127.0.0.1", Port: 65530},
+			}, nil
 		},
 	}, accountGatewayCatalog{instances: map[string]*plugin.PluginInstance{"openai": runtime.instance}}, nil, writer)
 	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
@@ -191,7 +204,7 @@ func TestQuotaRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 		got.SubscriptionActiveUntil != "2026-07-01T00:00:00Z" || got.ReauthWarning != "soon" {
 		t.Fatalf("RefreshQuota() = %+v", got)
 	}
-	if savedCredentials["plan_type"] != "plus" || savedCredentials["email"] != "user@example.test" ||
+	if savedEmail != "user@example.test" || savedCredentials["plan_type"] != "plus" || savedCredentials["email"] != "user@example.test" ||
 		savedCredentials["subscription_active_until"] != "2026-07-01T00:00:00Z" ||
 		savedCredentials["refresh_warning"] != "" || savedCredentials["empty_ignored"] != "" {
 		t.Fatalf("saved credentials = %+v", savedCredentials)

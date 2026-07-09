@@ -254,11 +254,23 @@ func TestRefreshSyncAndIncrementalUpdates(t *testing.T) {
 	if got := accountIDs(Group(group.ID).AccountsForModel("anything")); !sameIDs(got, []int{account.ID}) {
 		t.Fatalf("accounts after platform mismatch = %v", got)
 	}
-	if err := db.Account.DeleteOneID(addedAccount.ID).Exec(ctx); err != nil {
-		t.Fatalf("delete added account: %v", err)
+	if err := db.Account.UpdateOneID(addedAccount.ID).SetPlatform("openai").Exec(ctx); err != nil {
+		t.Fatalf("restore account platform: %v", err)
+	}
+	if err := RefreshAccount(ctx, db, addedAccount.ID); err != nil {
+		t.Fatalf("RefreshAccount restored account returned error: %v", err)
+	}
+	if got := accountIDs(Group(group.ID).AccountsForModel("anything")); !sameIDs(got, []int{account.ID, addedAccount.ID}) {
+		t.Fatalf("accounts after platform restore = %v", got)
+	}
+	if err := db.Account.UpdateOneID(addedAccount.ID).SetDeletedAt(time.Now()).Exec(ctx); err != nil {
+		t.Fatalf("soft delete added account: %v", err)
 	}
 	if err := RefreshAccount(ctx, db, addedAccount.ID); err != nil {
 		t.Fatalf("RefreshAccount deleted returned error: %v", err)
+	}
+	if got := accountIDs(Group(group.ID).AccountsForModel("anything")); !sameIDs(got, []int{account.ID}) {
+		t.Fatalf("accounts after soft delete = %v", got)
 	}
 
 	newGroup, err := db.Group.Create().

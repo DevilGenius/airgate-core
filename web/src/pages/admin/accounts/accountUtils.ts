@@ -16,6 +16,7 @@ import { pluginsApi } from '../../../shared/api/plugins';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { loadPluginFrontend, onPluginFrontendCacheClear } from '../../../app/plugin-loader';
 import type {
+  AccountExportItem,
   CredentialField,
   AccountTypeResp,
   CredentialSchemaResp,
@@ -40,6 +41,43 @@ export function detectCredentialAccountType(credentials: Record<string, string>)
   if (credentials.api_key) return 'apikey';
   if (credentials.access_token) return 'oauth';
   return '';
+}
+
+export function normalizeAccountEmailValue(value: string | null | undefined): string | null {
+  const normalized = value?.trim().toLowerCase() ?? '';
+  return normalized || null;
+}
+
+export function syncAccountIdentity(
+  credentials: Record<string, string>,
+  emailValue: string | null | undefined,
+): {
+  email: string | null;
+  credentials: Record<string, string>;
+} {
+  const next = { ...credentials };
+  const email = normalizeAccountEmailValue(emailValue);
+  if (email) next.email = email;
+  else delete next.email;
+  return { email, credentials: next };
+}
+
+export function resolveAccountIdentity(credentials: Record<string, string>): {
+  email: string | null;
+  credentials: Record<string, string>;
+} {
+  return syncAccountIdentity(credentials, credentials.email);
+}
+
+export function parseAccountImportItems(value: unknown): AccountExportItem[] | null {
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value as AccountExportItem[] : null;
+  }
+  if (!value || typeof value !== 'object') return null;
+  const envelope = value as { version?: unknown; accounts?: unknown };
+  if (envelope.version !== undefined && envelope.version !== 1 && envelope.version !== 2) return null;
+  if (!Array.isArray(envelope.accounts) || envelope.accounts.length === 0) return null;
+  return envelope.accounts as AccountExportItem[];
 }
 
 export function getSchemaAccountTypes(schema?: CredentialSchemaResp): AccountTypeResp[] {

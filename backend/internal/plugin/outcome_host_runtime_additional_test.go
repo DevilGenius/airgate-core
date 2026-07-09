@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"strings"
 	"testing"
@@ -135,6 +136,7 @@ func TestForwarderUpdateAccountCredentialsMergesExistingValues(t *testing.T) {
 	forwarder := &Forwarder{db: db}
 	forwarder.updateAccountCredentials(accountEnt.ID, map[string]string{
 		"access_token": "new-access",
+		"email":        " OAuth.User@Example.COM ",
 		"expires_at":   "2026-06-20T00:00:00Z",
 	})
 
@@ -153,6 +155,21 @@ func TestForwarderUpdateAccountCredentialsMergesExistingValues(t *testing.T) {
 			t.Fatalf("credential %s = %q, want %q in %#v", key, updated.Credentials[key], value, updated.Credentials)
 		}
 	}
+	if updated.Email == nil || *updated.Email != "oauth.user@example.com" || updated.Credentials["email"] != "oauth.user@example.com" {
+		t.Fatalf("account email = %#v credentials=%#v", updated.Email, updated.Credentials)
+	}
+	forwarder.updateAccountCredentials(accountEnt.ID, map[string]string{
+		"access_token": "newer-access",
+		"email":        "not-an-email",
+	})
+	updated, err = db.Account.Get(ctx, accountEnt.ID)
+	if err != nil {
+		t.Fatalf("get account after invalid plugin email: %v", err)
+	}
+	if updated.Credentials["access_token"] != "newer-access" || updated.Credentials["email"] != "oauth.user@example.com" ||
+		updated.Email == nil || *updated.Email != "oauth.user@example.com" {
+		t.Fatalf("invalid plugin email should preserve identity and update other credentials: %+v", updated)
+	}
 
 	forwarder.updateAccountCredentials(accountEnt.ID+999, map[string]string{"access_token": "ignored"})
 
@@ -165,12 +182,27 @@ func TestForwarderUpdateAccountCredentialsMergesExistingValues(t *testing.T) {
 			t.Fatalf("get async updated account: %v", err)
 		}
 		if updated.Credentials["refresh_token"] == "async-refresh" {
+			if updated.Credentials["email"] != "oauth.user@example.com" {
+				t.Fatalf("async update lost credentials.email: %#v", updated.Credentials)
+			}
 			break
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("async credential update did not persist: %#v", updated.Credentials)
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+	if err := db.Account.UpdateOneID(accountEnt.ID).SetDeletedAt(time.Now()).Exec(ctx); err != nil {
+		t.Fatalf("soft delete account: %v", err)
+	}
+	credentialsBeforeDeletedUpdate := maps.Clone(updated.Credentials)
+	forwarder.updateAccountCredentials(accountEnt.ID, map[string]string{"access_token": "must-not-change"})
+	updated, err = db.Account.Get(ctx, accountEnt.ID)
+	if err != nil {
+		t.Fatalf("get soft-deleted account: %v", err)
+	}
+	if !maps.Equal(updated.Credentials, credentialsBeforeDeletedUpdate) {
+		t.Fatalf("soft-deleted credentials changed: before=%#v after=%#v", credentialsBeforeDeletedUpdate, updated.Credentials)
 	}
 }
 

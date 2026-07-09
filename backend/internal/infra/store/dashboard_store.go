@@ -20,6 +20,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/predicate"
 	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
+	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 )
@@ -502,19 +503,19 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		return appdashboard.StatsSnapshot{}, err
 	}
 
-	totalAccounts, err := s.db.Account.Query().Count(ctx)
+	totalAccounts, err := accountscope.Query(s.db).Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
 	// "enabled" = 任何非 disabled 状态（active / rate_limited / degraded 都能被调度）。
-	enabledAccounts, err := s.db.Account.Query().
+	enabledAccounts, err := accountscope.Query(s.db).
 		Where(entaccount.StateNEQ(entaccount.StateDisabled)).
 		Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
 	// "closed" = 人工关闭；历史实现会把手动关闭原因写入 error_msg。
-	closedAccounts, err := s.db.Account.Query().
+	closedAccounts, err := accountscope.Query(s.db).
 		Where(
 			entaccount.StateEQ(entaccount.StateDisabled),
 			entaccount.ErrorMsgIn("", accountManualClosedReason),
@@ -524,7 +525,7 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		return appdashboard.StatsSnapshot{}, err
 	}
 	// "error" = disabled + 非手动关闭原因。
-	errorAccounts, err := s.db.Account.Query().
+	errorAccounts, err := accountscope.Query(s.db).
 		Where(
 			entaccount.StateEQ(entaccount.StateDisabled),
 			entaccount.ErrorMsgNEQ(""),

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	entaccount "github.com/DevilGenius/airgate-core/ent/account"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
 	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
@@ -62,11 +63,13 @@ func TestAccountStoreCRUDListsAndAggregates(t *testing.T) {
 	store := NewAccountStore(db)
 	proxyID := int64(proxy.ID)
 	rate := 1.75
+	email := "account@example.com"
 	created, err := store.Create(ctx, appaccount.CreateInput{
 		Name:           "Primary Account",
+		Email:          &email,
 		Platform:       "openai",
 		Type:           "oauth",
-		Credentials:    map[string]string{"email": "account@example.com", "access_token": "token"},
+		Credentials:    map[string]string{"access_token": "token"},
 		ModelPolicy:    modelpolicy.Policy{Allow: []string{"gpt-*"}},
 		Priority:       80,
 		MaxConcurrency: 12,
@@ -81,30 +84,30 @@ func TestAccountStoreCRUDListsAndAggregates(t *testing.T) {
 	}
 	if created.RateMultiplier != rate || created.Proxy == nil || created.Proxy.ID != proxy.ID ||
 		len(created.GroupIDs) != 1 || created.GroupIDs[0] != int64(group.ID) ||
-		created.Credentials["email"] != "account@example.com" || created.ModelPolicy.Allow[0] != "gpt-*" ||
+		created.Email == nil || *created.Email != email || created.Credentials["email"] != email || created.ModelPolicy.Allow[0] != "gpt-*" ||
 		!created.UpstreamIsPool || created.Extra["max_rpm"] != float64(60) {
 		t.Fatalf("created account = %+v", created)
 	}
-	created.Credentials["email"] = "mutated@example.com"
+	*created.Email = "mutated@example.com"
 	created.ModelPolicy.Allow[0] = "mutated"
 	created.Extra["max_rpm"] = float64(0)
 	found, err := store.FindByID(ctx, created.ID, appaccount.LoadOptions{WithGroups: true, WithProxy: true})
 	if err != nil {
 		t.Fatalf("FindByID returned error: %v", err)
 	}
-	if found.Credentials["email"] != "account@example.com" || found.ModelPolicy.Allow[0] != "gpt-*" ||
+	if found.Email == nil || *found.Email != email || found.ModelPolicy.Allow[0] != "gpt-*" ||
 		found.Extra["max_rpm"] != float64(60) {
 		t.Fatalf("account clone leaked mutation: %+v", found)
 	}
 
 	defaulted, err := store.Create(ctx, appaccount.CreateInput{
-		Name: "Ungrouped Account", Platform: "openai", Type: "apikey",
+		Name: "Primary Account", Platform: "openai", Type: "apikey",
 		Credentials: map[string]string{"api_key": "sk-ungrouped"},
 	})
 	if err != nil {
 		t.Fatalf("Create ungrouped returned error: %v", err)
 	}
-	if defaulted.RateMultiplier != 1 {
+	if defaulted.RateMultiplier != 1 || defaulted.Email != nil {
 		t.Fatalf("default rate multiplier = %v, want 1", defaulted.RateMultiplier)
 	}
 
@@ -153,6 +156,20 @@ func TestAccountStoreCRUDListsAndAggregates(t *testing.T) {
 	if len(platformAccounts) != 2 {
 		t.Fatalf("ListByPlatform len = %d, want 2", len(platformAccounts))
 	}
+	clearedEmail, err := store.Update(ctx, created.ID, appaccount.UpdateInput{HasEmail: true})
+	if err != nil || clearedEmail.Email != nil {
+		t.Fatalf("clear account email = %+v, err %v", clearedEmail.Email, err)
+	}
+	if _, ok := clearedEmail.Credentials["email"]; ok {
+		t.Fatalf("cleared account credentials still contain email: %+v", clearedEmail.Credentials)
+	}
+	restoredEmail, err := store.Update(ctx, created.ID, appaccount.UpdateInput{Email: &email, HasEmail: true})
+	if err != nil || restoredEmail.Email == nil || *restoredEmail.Email != email || restoredEmail.Credentials["email"] != email {
+		t.Fatalf("restore account email = %+v, err %v", restoredEmail.Email, err)
+	}
+	if _, err := store.Update(ctx, defaulted.ID, appaccount.UpdateInput{Email: &email, HasEmail: true}); !errors.Is(err, appaccount.ErrAccountEmailExists) {
+		t.Fatalf("duplicate update email error = %v, want ErrAccountEmailExists", err)
+	}
 
 	newName := "Updated Account"
 	newType := "apikey"
@@ -198,18 +215,12 @@ func TestAccountStoreCRUDListsAndAggregates(t *testing.T) {
 		t.Fatalf("Update missing error = %v, want ErrAccountNotFound", err)
 	}
 
-	if err := store.SaveCredentials(ctx, created.ID, map[string]string{"api_key": "sk-saved"}); err != nil {
-		t.Fatalf("SaveCredentials returned error: %v", err)
-	}
-	saved, err := store.FindByID(ctx, created.ID, appaccount.LoadOptions{})
+	saved, err := store.Update(ctx, created.ID, appaccount.UpdateInput{Credentials: map[string]string{"api_key": "sk-saved"}})
 	if err != nil {
-		t.Fatalf("FindByID after SaveCredentials returned error: %v", err)
+		t.Fatalf("Update credentials returned error: %v", err)
 	}
-	if saved.Credentials["api_key"] != "sk-saved" {
+	if saved.Credentials["api_key"] != "sk-saved" || saved.Credentials["email"] != email || saved.Email == nil || *saved.Email != email {
 		t.Fatalf("saved credentials = %+v", saved.Credentials)
-	}
-	if err := store.SaveCredentials(ctx, 999999, map[string]string{"api_key": "missing"}); !errors.Is(err, appaccount.ErrAccountNotFound) {
-		t.Fatalf("SaveCredentials missing error = %v, want ErrAccountNotFound", err)
 	}
 
 	user := createTestUser(t, db, "account-usage@example.com")
@@ -256,10 +267,74 @@ func TestAccountStoreCRUDListsAndAggregates(t *testing.T) {
 		t.Fatalf("empty BatchImageStats = %+v err %v, want empty nil", emptyImages, err)
 	}
 
-	if err := store.Delete(ctx, defaulted.ID); err != nil {
+	if err := store.Delete(ctx, created.ID); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
-	if err := store.Delete(ctx, defaulted.ID); !errors.Is(err, appaccount.ErrAccountNotFound) {
+	rawDeleted, err := db.Account.Get(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("load soft-deleted account: %v", err)
+	}
+	if rawDeleted.DeletedAt == nil || rawDeleted.State != entaccount.StateDisabled ||
+		rawDeleted.Email == nil || *rawDeleted.Email != email || rawDeleted.Credentials["api_key"] != "sk-saved" || rawDeleted.Credentials["email"] != email {
+		t.Fatalf("soft-deleted account = %+v", rawDeleted)
+	}
+	if count, err := rawDeleted.QueryUsageLogs().Count(ctx); err != nil || count != 3 {
+		t.Fatalf("soft-deleted account usage logs = %d, err %v, want 3", count, err)
+	}
+	if _, err := store.FindByID(ctx, created.ID, appaccount.LoadOptions{}); !errors.Is(err, appaccount.ErrAccountNotFound) {
+		t.Fatalf("FindByID soft-deleted error = %v, want ErrAccountNotFound", err)
+	}
+	historical, err := store.FindByID(ctx, created.ID, appaccount.LoadOptions{IncludeDeleted: true})
+	if err != nil || historical.DeletedAt == nil || historical.Email == nil || *historical.Email != email || historical.Credentials["api_key"] != "sk-saved" {
+		t.Fatalf("FindByID IncludeDeleted = %+v, err %v", historical, err)
+	}
+	visible, total, err := store.List(ctx, appaccount.ListFilter{Page: 1, PageSize: 20, IDs: []int{created.ID}})
+	if err != nil || total != 0 || len(visible) != 0 {
+		t.Fatalf("List soft-deleted = total %d items %+v err %v", total, visible, err)
+	}
+	if _, err := store.Update(ctx, created.ID, appaccount.UpdateInput{Name: &newName}); !errors.Is(err, appaccount.ErrAccountNotFound) {
+		t.Fatalf("Update soft-deleted error = %v, want ErrAccountNotFound", err)
+	}
+	accountID := int64(created.ID)
+	usageRecords, _, _, err := NewUsageStore(db).ListAdmin(ctx, appusage.ListFilter{Page: 1, PageSize: 10, AccountID: &accountID})
+	if err != nil || len(usageRecords) != 3 {
+		t.Fatalf("usage records after soft delete = %+v, err %v", usageRecords, err)
+	}
+	for _, record := range usageRecords {
+		if !record.AccountDeleted || record.AccountID != accountID || record.AccountName != newName || record.AccountEmail != "account@example.com" {
+			t.Fatalf("usage record soft-deleted account = %+v", record)
+		}
+	}
+	restored, err := store.Create(ctx, appaccount.CreateInput{
+		Name:           "Restored Account",
+		Platform:       "openai",
+		Type:           "oauth",
+		Credentials:    map[string]string{"access_token": "restored-token", "email": " Account@Example.COM "},
+		Priority:       90,
+		MaxConcurrency: 8,
+	})
+	if err != nil {
+		t.Fatalf("restore soft-deleted account: %v", err)
+	}
+	if restored.ID != created.ID || restored.DeletedAt != nil || restored.State != entaccount.StateActive.String() ||
+		restored.Email == nil || *restored.Email != email || restored.Credentials["access_token"] != "restored-token" ||
+		restored.Credentials["email"] != email ||
+		len(restored.GroupIDs) != 0 || restored.Proxy != nil || len(restored.Extra) != 0 {
+		t.Fatalf("restored account = %+v", restored)
+	}
+	if _, err := store.Create(ctx, appaccount.CreateInput{
+		Name: "Duplicate Name Allowed", Email: &email, Platform: "openai", Type: "oauth", Credentials: map[string]string{"access_token": "duplicate"},
+	}); !errors.Is(err, appaccount.ErrAccountEmailExists) {
+		t.Fatalf("active duplicate email error = %v, want ErrAccountEmailExists", err)
+	}
+	usageRecords, _, _, err = NewUsageStore(db).ListAdmin(ctx, appusage.ListFilter{Page: 1, PageSize: 10, AccountID: &accountID})
+	if err != nil || len(usageRecords) != 3 || usageRecords[0].AccountDeleted || usageRecords[0].AccountName != "Restored Account" {
+		t.Fatalf("usage records after restore = %+v, err %v", usageRecords, err)
+	}
+	if err := store.Delete(ctx, created.ID); err != nil {
+		t.Fatalf("Delete restored account: %v", err)
+	}
+	if err := store.Delete(ctx, created.ID); !errors.Is(err, appaccount.ErrAccountNotFound) {
 		t.Fatalf("Delete missing error = %v, want ErrAccountNotFound", err)
 	}
 }
@@ -497,9 +572,10 @@ func TestUsageStoreSummariesStatsAndCursorFilters(t *testing.T) {
 	}
 	account, err := db.Account.Create().
 		SetName("Usage Account").
+		SetEmail("usage-account@example.com").
 		SetPlatform("openai").
 		SetType("oauth").
-		SetCredentials(map[string]string{"email": "usage-account@example.com"}).
+		SetCredentials(map[string]string{}).
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create usage account: %v", err)

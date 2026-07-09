@@ -118,6 +118,8 @@ func (h *AccountHandler) handleError(logMessage, publicMessage string, err error
 	switch {
 	case errors.Is(err, appaccount.ErrAccountNotFound):
 		return 404, err.Error()
+	case errors.Is(err, appaccount.ErrAccountEmailExists):
+		return 409, err.Error()
 	case errors.Is(err, appaccount.ErrPluginNotFound):
 		return 500, err.Error()
 	case errors.Is(err, appaccount.ErrReauthRequired):
@@ -131,6 +133,8 @@ func (h *AccountHandler) handleError(logMessage, publicMessage string, err error
 		errors.Is(err, appaccount.ErrInvalidDateRange),
 		errors.Is(err, appaccount.ErrInvalidState),
 		errors.Is(err, appaccount.ErrInvalidRateMultiplier),
+		errors.Is(err, appaccount.ErrInvalidAccountEmail),
+		errors.Is(err, appaccount.ErrAccountEmailMismatch),
 		errors.Is(err, appaccount.ErrInvalidModelPolicy):
 		return 400, err.Error()
 	default:
@@ -151,6 +155,19 @@ func (h *AccountHandler) refreshRouteGraphAccounts(ctx context.Context, accountI
 	}
 	for _, accountID := range accountIDs {
 		h.scheduler.RefreshRouteGraphAccount(ctx, accountID)
+	}
+}
+
+func (h *AccountHandler) activateCreatedAccount(ctx context.Context, accountID int) {
+	if h.scheduler != nil {
+		h.scheduler.ClearRateLimitMarkers(ctx, accountID)
+	}
+	h.refreshRouteGraphAccount(ctx, accountID)
+}
+
+func (h *AccountHandler) activateCreatedAccounts(ctx context.Context, accountIDs []int) {
+	for _, accountID := range accountIDs {
+		h.activateCreatedAccount(ctx, accountID)
 	}
 }
 

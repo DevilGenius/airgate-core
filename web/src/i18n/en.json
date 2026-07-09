@@ -800,6 +800,7 @@
     "api_key_plugin_call": "Plugin Call",
     "api_key_deleted": "Deleted API Key",
     "user_deleted": "Deleted User",
+    "account_deleted": "Deleted Account",
     "model_placeholder": "Model name",
     "user_id": "User ID",
     "search_user": "Search user",

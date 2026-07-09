@@ -131,6 +131,7 @@ const AccountTableCellContent = memo(function AccountTableCellContent({
 function sameAccountExceptCapacity(left: AccountResp, right: AccountResp) {
   return left.id === right.id
     && left.name === right.name
+    && left.email === right.email
     && left.platform === right.platform
     && left.type === right.type
     && left.credentials === right.credentials
@@ -159,7 +160,7 @@ function accountTableCellRowsEqual(columnKey: string, left: AccountResp, right: 
   switch (columnKey) {
     case 'name':
       return left.name === right.name
-        && left.credentials?.email === right.credentials?.email;
+        && left.email === right.email;
     case 'platform':
     case 'actions':
       return sameAccountExceptCapacity(left, right);

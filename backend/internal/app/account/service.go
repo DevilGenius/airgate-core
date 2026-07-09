@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"sort"
@@ -395,6 +396,10 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 	if err := validateModelPolicy(input.ModelPolicy); err != nil {
 		return Account{}, err
 	}
+	input.Email, input.Credentials, err = normalizeAccountIdentity(input.Email, input.Credentials)
+	if err != nil {
+		return Account{}, err
+	}
 
 	account, err := s.repo.Create(ctx, input)
 	if err != nil {
@@ -453,6 +458,16 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary
 			})
 			continue
 		}
+		input.Email, input.Credentials, err = normalizeAccountIdentity(input.Email, input.Credentials)
+		if err != nil {
+			summary.Failed++
+			summary.Errors = append(summary.Errors, ImportItemError{
+				Index:   index,
+				Name:    input.Name,
+				Message: err.Error(),
+			})
+			continue
+		}
 		input.GroupIDs = nil
 		input.ProxyID = nil
 		created, err := s.repo.Create(ctx, input)
@@ -477,6 +492,16 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary
 // Update 更新账号。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Account, error) {
 	logger := sdk.LoggerFromContext(ctx)
+	if input.HasEmail || input.Credentials != nil {
+		current, err := s.repo.FindByID(ctx, id, LoadOptions{})
+		if err != nil {
+			return Account{}, err
+		}
+		input, err = normalizeAccountIdentityUpdate(current, input)
+		if err != nil {
+			return Account{}, err
+		}
+	}
 	if input.RateMultiplier != nil {
 		if err := validateRateMultiplier(*input.RateMultiplier); err != nil {
 			return Account{}, err
@@ -711,6 +736,7 @@ func (r *BulkResult) appendFailure(id int, err error) {
 
 func hasUpdateInputChanges(input UpdateInput) bool {
 	return input.Name != nil ||
+		input.HasEmail ||
 		input.Type != nil ||
 		input.Credentials != nil ||
 		input.State != nil ||
@@ -2644,27 +2670,52 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 			delete(quota.Extra, "refresh_warning")
 		}
 	}
-
-	credentials := cloneStringMap(item.Credentials)
-	updated := false
-	for key, value := range quota.Extra {
-		if shouldPersistQuotaExtra(key, value) && credentials[key] != value {
-			credentials[key] = value
-			updated = true
+	resolvedEmail, resolvedCredentials, err := normalizeAccountIdentity(item.Email, item.Credentials)
+	if err != nil {
+		return QuotaRefreshResult{}, err
+	}
+	refreshedEmail := resolvedEmail
+	if rawEmail, ok := quota.Extra["email"]; ok {
+		delete(quota.Extra, "email")
+		normalizedEmail, normalizeErr := normalizeAccountEmail(&rawEmail)
+		if normalizeErr != nil {
+			return QuotaRefreshResult{}, normalizeErr
+		}
+		if normalizedEmail != nil {
+			refreshedEmail = normalizedEmail
 		}
 	}
-	if quota.ExpiresAt != "" && credentials["subscription_active_until"] != quota.ExpiresAt {
-		credentials["subscription_active_until"] = quota.ExpiresAt
-		updated = true
+
+	credentials := cloneStringMap(resolvedCredentials)
+	if credentials == nil {
+		credentials = map[string]string{}
 	}
-	if updated {
-		if err := s.repo.SaveCredentials(ctx, item.ID, credentials); err != nil {
+	for key, value := range quota.Extra {
+		if shouldPersistQuotaExtra(key, value) {
+			credentials[key] = value
+		}
+	}
+	if quota.ExpiresAt != "" {
+		credentials["subscription_active_until"] = quota.ExpiresAt
+	}
+	credentials = syncAccountCredentials(credentials, refreshedEmail)
+	credentialsChanged := !maps.Equal(item.Credentials, credentials)
+	emailChanged := !accountEmailsEqual(item.Email, refreshedEmail)
+	if credentialsChanged || emailChanged {
+		patch := UpdateInput{
+			Credentials: credentials,
+			Email:       refreshedEmail,
+			HasEmail:    true,
+		}
+		persisted, persistErr := s.repo.Update(ctx, item.ID, patch)
+		if persistErr != nil {
 			logger.Error("account_credential_persist_failed",
 				sdk.LogFieldAccountID, item.ID,
-				"op", "save_credentials",
-				sdk.LogFieldError, err)
-			return QuotaRefreshResult{}, err
+				"op", "update_credentials",
+				sdk.LogFieldError, persistErr)
+			return QuotaRefreshResult{}, persistErr
 		}
+		item = persisted
 		if s.stateWriter != nil {
 			s.stateWriter.RefreshRouteGraphAccount(ctx, item.ID)
 		}
@@ -2677,10 +2728,14 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 		s.triggerUsageProbe(ctx, inst, item.Platform, item.ID, credentials)
 	}
 	s.resolveAccountMonitorEvents(ctx, item.ID)
+	email := ""
+	if item.Email != nil {
+		email = *item.Email
+	}
 
 	return QuotaRefreshResult{
 		PlanType:                credentials["plan_type"],
-		Email:                   credentials["email"],
+		Email:                   email,
 		SubscriptionActiveUntil: credentials["subscription_active_until"],
 		ReauthWarning:           warning,
 	}, nil
@@ -2740,6 +2795,9 @@ func (s *Service) queryQuotaRefresh(ctx context.Context, inst *plugin.PluginInst
 }
 
 func shouldPersistQuotaExtra(key, value string) bool {
+	if key == "email" {
+		return false
+	}
 	if value != "" {
 		return true
 	}

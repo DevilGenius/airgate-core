@@ -17,6 +17,8 @@ const (
 	FieldID = "id"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
+	// FieldEmail holds the string denoting the email field in the database.
+	FieldEmail = "email"
 	// FieldPlatform holds the string denoting the platform field in the database.
 	FieldPlatform = "platform"
 	// FieldType holds the string denoting the type field in the database.
@@ -43,6 +45,8 @@ const (
 	FieldLastUsedAt = "last_used_at"
 	// FieldExtra holds the string denoting the extra field in the database.
 	FieldExtra = "extra"
+	// FieldDeletedAt holds the string denoting the deleted_at field in the database.
+	FieldDeletedAt = "deleted_at"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -80,6 +84,7 @@ const (
 var Columns = []string{
 	FieldID,
 	FieldName,
+	FieldEmail,
 	FieldPlatform,
 	FieldType,
 	FieldCredentials,
@@ -93,6 +98,7 @@ var Columns = []string{
 	FieldUpstreamIsPool,
 	FieldLastUsedAt,
 	FieldExtra,
+	FieldDeletedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -198,6 +204,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
 }
 
+// ByEmail orders the results by the email field.
+func ByEmail(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEmail, opts...).ToFunc()
+}
+
 // ByPlatform orders the results by the platform field.
 func ByPlatform(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPlatform, opts...).ToFunc()
@@ -246,6 +257,11 @@ func ByUpstreamIsPool(opts ...sql.OrderTermOption) OrderOption {
 // ByLastUsedAt orders the results by the last_used_at field.
 func ByLastUsedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastUsedAt, opts...).ToFunc()
+}
+
+// ByDeletedAt orders the results by the deleted_at field.
+func ByDeletedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDeletedAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

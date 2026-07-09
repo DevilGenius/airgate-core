@@ -11,6 +11,7 @@ import (
 	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	entusersubscription "github.com/DevilGenius/airgate-core/ent/usersubscription"
+	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -172,7 +173,7 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 
 	// 从源分组收集去重后的账号 ID。
 	accountIDs, err := tx.Account.Query().
-		Where(entaccount.HasGroupsWith(entgroup.IDIn(uniqueSourceGroupIDs...))).
+		Where(accountscope.NotDeleted(), entaccount.HasGroupsWith(entgroup.IDIn(uniqueSourceGroupIDs...))).
 		IDs(ctx)
 	if err != nil {
 		return appgroup.Group{}, err
@@ -361,6 +362,7 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 	groups, err := s.db.Group.Query().
 		Where(entgroup.IDIn(groupIDs...)).
 		WithAccounts(func(q *ent.AccountQuery) {
+			q.Where(accountscope.NotDeleted())
 			q.Select(entaccount.FieldState, entaccount.FieldMaxConcurrency, entaccount.FieldErrorMsg)
 		}).
 		All(ctx)

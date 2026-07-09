@@ -11,6 +11,10 @@ import {
   getSchemaAccountTypes,
   getSchemaSelectedAccountType,
   getSchemaVisibleFields,
+  normalizeAccountEmailValue,
+  parseAccountImportItems,
+  resolveAccountIdentity,
+  syncAccountIdentity,
   usePluginAccountForm,
 } from './accountUtils';
 import { loadPluginFrontend } from '../../../app/plugin-loader';
@@ -74,6 +78,29 @@ describe('account credential schema utilities', () => {
     expect(detectCredentialAccountType({ api_key: 'sk' })).toBe('apikey');
     expect(detectCredentialAccountType({ access_token: 'token' })).toBe('oauth');
     expect(detectCredentialAccountType({})).toBe('');
+  });
+
+  it('normalizes and mirrors account email in credentials', () => {
+    expect(normalizeAccountEmailValue(' User@Example.COM ')).toBe('user@example.com');
+    expect(normalizeAccountEmailValue('  ')).toBeNull();
+    expect(resolveAccountIdentity({ email: ' User@Example.COM ', access_token: 'token' })).toEqual({
+      email: 'user@example.com',
+      credentials: { access_token: 'token', email: 'user@example.com' },
+    });
+    expect(syncAccountIdentity({ email: 'old@example.com', access_token: 'token' }, null)).toEqual({
+      email: null,
+      credentials: { access_token: 'token' },
+    });
+  });
+
+  it('accepts legacy array/envelope, v1 and v2 account import files', () => {
+    const legacy = [{ name: 'legacy', platform: 'openai', credentials: { email: 'legacy@example.com' } }];
+    expect(parseAccountImportItems(legacy)).toBe(legacy);
+    expect(parseAccountImportItems({ accounts: legacy })).toBe(legacy);
+    expect(parseAccountImportItems({ version: 1, accounts: legacy })).toBe(legacy);
+    expect(parseAccountImportItems({ version: 2, accounts: legacy })).toBe(legacy);
+    expect(parseAccountImportItems({ version: 3, accounts: legacy })).toBeNull();
+    expect(parseAccountImportItems([])).toBeNull();
   });
 
   it('selects account type fields and filters credentials', () => {

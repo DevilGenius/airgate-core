@@ -89,7 +89,7 @@ func (h *AccountHandler) ExportAccounts(c *gin.Context) {
 	}
 
 	response.Success(c, dto.AccountExportFile{
-		Version:    1,
+		Version:    2,
 		ExportedAt: time.Now().In(beijingTZ).Format(time.RFC3339),
 		Count:      len(items),
 		Accounts:   items,
@@ -112,6 +112,10 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 		response.BindError(c, err)
 		return
 	}
+	if req.Version != 0 && req.Version != 1 && req.Version != 2 {
+		response.BadRequest(c, "不支持的导入文件版本")
+		return
+	}
 
 	if len(req.Accounts) == 0 {
 		response.BadRequest(c, "导入文件中没有账号数据")
@@ -122,6 +126,7 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 	for _, item := range req.Accounts {
 		inputs = append(inputs, appaccount.CreateInput{
 			Name:           item.Name,
+			Email:          item.Email,
 			Platform:       item.Platform,
 			Type:           item.Type,
 			Credentials:    item.Credentials,
@@ -134,7 +139,7 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 
 	summary := h.service.Import(c.Request.Context(), inputs)
 	if len(summary.SuccessIDs) > 0 {
-		h.refreshRouteGraphAccounts(c.Request.Context(), summary.SuccessIDs)
+		h.activateCreatedAccounts(c.Request.Context(), summary.SuccessIDs)
 	}
 
 	resp := dto.ImportAccountsResp{
@@ -161,6 +166,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 
 	item, err := h.service.Create(c.Request.Context(), appaccount.CreateInput{
 		Name:           req.Name,
+		Email:          req.Email,
 		Platform:       req.Platform,
 		Type:           req.Type,
 		Credentials:    req.Credentials,
@@ -178,7 +184,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	h.refreshRouteGraphAccount(c.Request.Context(), item.ID)
+	h.activateCreatedAccount(c.Request.Context(), item.ID)
 
 	resp := toAccountResp(item)
 	resp.FamilyCooldowns = h.familyCooldownsFor(c.Request.Context(), item.ID)
@@ -207,6 +213,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 
 	input := appaccount.UpdateInput{
 		Name:           req.Name,
+		Email:          req.Email,
 		Type:           req.Type,
 		Credentials:    req.Credentials,
 		ModelPolicy:    req.ModelPolicy,
@@ -217,6 +224,9 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		UpstreamIsPool: req.UpstreamIsPool,
 		GroupIDs:       req.GroupIDs,
 		HasGroupIDs:    req.GroupIDs != nil,
+	}
+	if _, ok := rawPayload["email"]; ok {
+		input.HasEmail = true
 	}
 	if _, ok := rawPayload["extra"]; ok {
 		input.HasExtra = true
@@ -580,8 +590,10 @@ func (h *AccountHandler) RefreshQuota(c *gin.Context) {
 
 	resp := gin.H{
 		"plan_type":                 result.PlanType,
-		"email":                     result.Email,
 		"subscription_active_until": result.SubscriptionActiveUntil,
+	}
+	if result.Email != "" {
+		resp["email"] = result.Email
 	}
 	if result.ReauthWarning != "" {
 		resp["reauth_warning"] = result.ReauthWarning

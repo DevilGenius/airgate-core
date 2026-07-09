@@ -22,6 +22,8 @@ type Account struct {
 	ID int `json:"id,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
+	// 账号唯一邮箱；API Key 等无邮箱账号为 NULL，写入前统一规范化为小写
+	Email *string `json:"email,omitempty"`
 	// Platform holds the value of the "platform" field.
 	Platform string `json:"platform,omitempty"`
 	// Type holds the value of the "type" field.
@@ -48,6 +50,8 @@ type Account struct {
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	// 扩展配置（max_rpm / max_window_cost / max_sessions 等）
 	Extra map[string]interface{} `json:"extra,omitempty"`
+	// 软删除时间；非空账号不再参与管理和调度，历史 usage log 关联保留
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -114,9 +118,9 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case account.FieldID, account.FieldPriority, account.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
-		case account.FieldName, account.FieldPlatform, account.FieldType, account.FieldState, account.FieldErrorMsg:
+		case account.FieldName, account.FieldEmail, account.FieldPlatform, account.FieldType, account.FieldState, account.FieldErrorMsg:
 			values[i] = new(sql.NullString)
-		case account.FieldStateUntil, account.FieldLastUsedAt, account.FieldCreatedAt, account.FieldUpdatedAt:
+		case account.FieldStateUntil, account.FieldLastUsedAt, account.FieldDeletedAt, account.FieldCreatedAt, account.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		case account.ForeignKeys[0]: // account_proxy
 			values[i] = new(sql.NullInt64)
@@ -146,6 +150,13 @@ func (a *Account) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
 			} else if value.Valid {
 				a.Name = value.String
+			}
+		case account.FieldEmail:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field email", values[i])
+			} else if value.Valid {
+				a.Email = new(string)
+				*a.Email = value.String
 			}
 		case account.FieldPlatform:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -233,6 +244,13 @@ func (a *Account) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field extra: %w", err)
 				}
 			}
+		case account.FieldDeletedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field deleted_at", values[i])
+			} else if value.Valid {
+				a.DeletedAt = new(time.Time)
+				*a.DeletedAt = value.Time
+			}
 		case account.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -306,6 +324,11 @@ func (a *Account) String() string {
 	builder.WriteString("name=")
 	builder.WriteString(a.Name)
 	builder.WriteString(", ")
+	if v := a.Email; v != nil {
+		builder.WriteString("email=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
 	builder.WriteString("platform=")
 	builder.WriteString(a.Platform)
 	builder.WriteString(", ")
@@ -348,6 +371,11 @@ func (a *Account) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("extra=")
 	builder.WriteString(fmt.Sprintf("%v", a.Extra))
+	builder.WriteString(", ")
+	if v := a.DeletedAt; v != nil {
+		builder.WriteString("deleted_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(a.CreatedAt.Format(time.ANSIC))

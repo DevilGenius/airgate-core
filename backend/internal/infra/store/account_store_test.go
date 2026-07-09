@@ -21,9 +21,10 @@ func TestAccountStoreKeywordSearchMatchesOAuthEmail(t *testing.T) {
 	ctx := context.Background()
 	if _, err := db.Account.Create().
 		SetName("Claude Key").
+		SetEmail("claude@example.com").
 		SetPlatform("openai").
 		SetType("oauth").
-		SetCredentials(map[string]string{"email": "claude@example.com", "access_token": "token"}).
+		SetCredentials(map[string]string{"access_token": "token"}).
 		Save(ctx); err != nil {
 		t.Fatalf("create oauth account: %v", err)
 	}
@@ -37,7 +38,7 @@ func TestAccountStoreKeywordSearchMatchesOAuthEmail(t *testing.T) {
 	}
 
 	store := NewAccountStore(db)
-	items, total, err := store.List(ctx, account.ListFilter{Page: 1, PageSize: 20, Keyword: "claude@"})
+	items, total, err := store.List(ctx, account.ListFilter{Page: 1, PageSize: 20, Keyword: "CLAUDE@"})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}

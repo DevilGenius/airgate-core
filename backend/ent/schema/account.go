@@ -25,6 +25,8 @@ type Account struct {
 func (Account) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
+		field.String("email").Optional().Nillable().
+			Comment("账号唯一邮箱；API Key 等无邮箱账号为 NULL，写入前统一规范化为小写"),
 		field.String("platform").NotEmpty(),
 		field.String("type").Default("").Optional(),
 		field.JSON("credentials", map[string]string{}).Default(map[string]string{}),
@@ -47,6 +49,8 @@ func (Account) Fields() []ent.Field {
 		field.Time("last_used_at").Optional().Nillable(),
 		field.JSON("extra", map[string]interface{}{}).Optional().Default(map[string]interface{}{}).
 			Comment("扩展配置（max_rpm / max_window_cost / max_sessions 等）"),
+		field.Time("deleted_at").Optional().Nillable().
+			Comment("软删除时间；非空账号不再参与管理和调度，历史 usage log 关联保留"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
 	}
@@ -62,6 +66,11 @@ func (Account) Edges() []ent.Edge {
 
 func (Account) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("email").
+			Unique().
+			StorageKey("account_email_key"),
+		index.Fields("deleted_at").
+			StorageKey("account_deleted_at"),
 		index.Fields("priority", "created_at").
 			StorageKey("account_priority_created_at"),
 	}

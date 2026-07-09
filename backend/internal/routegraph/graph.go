@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent"
-	entaccount "github.com/DevilGenius/airgate-core/ent/account"
 	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
 	entgroup "github.com/DevilGenius/airgate-core/ent/group"
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
+	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -172,6 +172,7 @@ func RefreshSync(ctx context.Context, db *ent.Client) error {
 			q.Select(entuser.FieldID)
 		}).
 		WithAccounts(func(q *ent.AccountQuery) {
+			q.Where(accountscope.NotDeleted())
 			q.WithProxy()
 		}).
 		All(ctx)
@@ -220,6 +221,7 @@ func RefreshGroup(ctx context.Context, db *ent.Client, groupID int) error {
 			q.Select(entuser.FieldID)
 		}).
 		WithAccounts(func(q *ent.AccountQuery) {
+			q.Where(accountscope.NotDeleted())
 			q.WithProxy()
 		}).
 		Only(ctx)
@@ -250,8 +252,7 @@ func RefreshAccount(ctx context.Context, db *ent.Client, accountID int) error {
 	if db == nil || accountID <= 0 {
 		return nil
 	}
-	account, err := db.Account.Query().
-		Where(entaccount.IDEQ(accountID)).
+	account, err := accountscope.QueryByID(db, accountID).
 		WithGroups().
 		WithProxy().
 		Only(ctx)

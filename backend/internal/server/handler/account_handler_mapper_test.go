@@ -14,9 +14,12 @@ import (
 func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 	lastUsed := time.Date(2026, 6, 20, 1, 2, 3, 0, time.UTC)
 	stateUntil := time.Date(2026, 6, 20, 9, 2, 3, 0, time.FixedZone("cst", 8*3600))
+	deletedAt := time.Date(2026, 6, 21, 9, 2, 3, 0, time.FixedZone("cst", 8*3600))
+	email := "oauth@example.com"
 	resp := toAccountResp(appaccount.Account{
 		ID:                 9,
 		Name:               "oauth",
+		Email:              &email,
 		Platform:           "openai",
 		Type:               "oauth",
 		Credentials:        map[string]string{"access_token": "tok"},
@@ -29,17 +32,21 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 		ErrorMsg:           "429",
 		UpstreamIsPool:     true,
 		LastUsedAt:         &lastUsed,
+		DeletedAt:          &deletedAt,
 		Proxy:              &appaccount.Proxy{ID: 7},
 		Extra:              map[string]any{"plan": "plus"},
 		ImageStats:         &appaccount.AccountImageStats{TodayCount: 5, TotalCount: 8},
 		CreatedAt:          lastUsed,
 		UpdatedAt:          lastUsed,
 	})
-	if resp.ID != 9 || resp.ProxyID == nil || *resp.ProxyID != 7 || resp.LastUsedAt == nil || *resp.LastUsedAt != "2026-06-20T01:02:03Z" {
+	if resp.ID != 9 || resp.Email == nil || *resp.Email != email || resp.ProxyID == nil || *resp.ProxyID != 7 || resp.LastUsedAt == nil || *resp.LastUsedAt != "2026-06-20T01:02:03Z" {
 		t.Fatalf("account response optional fields = %+v", resp)
 	}
 	if resp.StateUntil == nil || *resp.StateUntil != "2026-06-20T01:02:03Z" {
 		t.Fatalf("state until = %#v, want UTC formatted", resp.StateUntil)
+	}
+	if resp.DeletedAt == nil || *resp.DeletedAt != "2026-06-21T01:02:03Z" {
+		t.Fatalf("deleted at = %#v, want UTC formatted", resp.DeletedAt)
 	}
 	if resp.TodayImageCount == nil || *resp.TodayImageCount != 5 || resp.TotalImageCount == nil || *resp.TotalImageCount != 8 {
 		t.Fatalf("image counters = %#v/%#v", resp.TodayImageCount, resp.TotalImageCount)
@@ -62,9 +69,11 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 	}
 }
 
-func TestToAccountExportItemOmitsEnvironmentScopedIDs(t *testing.T) {
+func TestToAccountExportItemContainsOnlyPortableFields(t *testing.T) {
+	email := "demo@example.com"
 	item := toAccountExportItem(appaccount.Account{
 		Name:           "demo",
+		Email:          &email,
 		Platform:       "openai",
 		Type:           "apikey",
 		Credentials:    map[string]string{"api_key": "secret"},
@@ -79,11 +88,8 @@ func TestToAccountExportItemOmitsEnvironmentScopedIDs(t *testing.T) {
 		UpdatedAt: time.Now(),
 	})
 
-	if len(item.GroupIDs) != 0 {
-		t.Fatalf("expected export item group IDs to be empty, got %v", item.GroupIDs)
-	}
-	if item.ProxyID != nil {
-		t.Fatalf("expected export item proxy ID to be nil, got %v", *item.ProxyID)
+	if item.Email == nil || *item.Email != email {
+		t.Fatalf("expected export email %q, got %#v", email, item.Email)
 	}
 
 	payload, err := json.Marshal(item)

@@ -629,8 +629,9 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 	}
 	if item.Edges.Account != nil {
 		record.AccountID = int64(item.Edges.Account.ID)
-		if email, ok := item.Edges.Account.Credentials["email"]; ok && email != "" {
-			record.AccountEmail = email
+		record.AccountDeleted = item.Edges.Account.DeletedAt != nil
+		if item.Edges.Account.Email != nil {
+			record.AccountEmail = *item.Edges.Account.Email
 		}
 		record.AccountName = item.Edges.Account.Name
 	} else {

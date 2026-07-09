@@ -30,7 +30,7 @@ export const accountsApi = {
   },
   // 批量导入账号
   import: (accounts: AccountExportItem[]) =>
-    post<ImportAccountsResp>('/api/v1/admin/accounts/import', { accounts }),
+    post<ImportAccountsResp>('/api/v1/admin/accounts/import', { version: 2, accounts }),
   create: (data: CreateAccountReq) => post<AccountResp>('/api/v1/admin/accounts', data),
   update: (id: number, data: UpdateAccountReq) => put<void>(`/api/v1/admin/accounts/${id}`, data),
   delete: (id: number) => del<void>(`/api/v1/admin/accounts/${id}`),

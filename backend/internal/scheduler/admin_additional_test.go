@@ -117,4 +117,24 @@ func TestSchedulerAdminStateWriteEntrypoints(t *testing.T) {
 	if fresh.State != account.StateActive || fresh.StateUntil != nil {
 		t.Fatalf("ClearRateLimited account = state %s until %v", fresh.State, fresh.StateUntil)
 	}
+
+	deleted := db.Account.Create().
+		SetName("deleted").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{}).
+		SetState(account.StateDisabled).
+		SetDeletedAt(time.Now()).
+		SaveX(ctx)
+	if err := s.ManualRecover(ctx, deleted.ID); err == nil {
+		t.Fatal("ManualRecover(soft-deleted) error = nil")
+	}
+	if err := s.ManualDisable(ctx, deleted.ID, "ignored"); err == nil {
+		t.Fatal("ManualDisable(soft-deleted) error = nil")
+	}
+	s.MarkRateLimited(ctx, deleted.ID, time.Now().Add(time.Minute), "ignored")
+	fresh = db.Account.GetX(ctx, deleted.ID)
+	if fresh.State != account.StateDisabled || fresh.DeletedAt == nil {
+		t.Fatalf("soft-deleted account changed = state %s deleted_at %v", fresh.State, fresh.DeletedAt)
+	}
 }

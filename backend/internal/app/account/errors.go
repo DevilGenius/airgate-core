@@ -5,6 +5,12 @@ import "errors"
 var (
 	// ErrAccountNotFound 账号不存在。
 	ErrAccountNotFound = errors.New("账号不存在")
+	// ErrAccountEmailExists 账号邮箱已被未删除账号占用。
+	ErrAccountEmailExists = errors.New("账号邮箱已存在")
+	// ErrInvalidAccountEmail 账号邮箱格式非法。
+	ErrInvalidAccountEmail = errors.New("账号邮箱格式无效")
+	// ErrAccountEmailMismatch 顶层 email 与 credentials.email 不一致。
+	ErrAccountEmailMismatch = errors.New("账号 email 与 credentials.email 不一致")
 	// ErrPluginNotFound 未找到对应平台插件。
 	ErrPluginNotFound = errors.New("未找到对应平台插件")
 	// ErrModelRequired 缺少测试模型。

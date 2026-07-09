@@ -214,6 +214,7 @@ describe('CreateAccountModal', () => {
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       credentials: { api_key: 'sk-account' },
+      email: null,
       extra: { msg_lock_enabled: true },
       group_ids: [3],
       max_concurrency: 6,
@@ -260,7 +261,7 @@ describe('CreateAccountModal', () => {
         type="button"
         onClick={() => {
           onSuggestedName('Suggested Account');
-          onChange({ plugin_token: 'plugin-secret' });
+          onChange({ plugin_token: 'plugin-secret', email: ' Plugin@Example.COM ' });
         }}
       >
         Fill plugin form
@@ -283,7 +284,8 @@ describe('CreateAccountModal', () => {
     fireEvent.submit(formElement(container));
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
-      credentials: { plugin_token: 'plugin-secret' },
+      credentials: { email: 'plugin@example.com', plugin_token: 'plugin-secret' },
+      email: 'plugin@example.com',
       name: 'Suggested Account',
       platform: 'openai',
     }));

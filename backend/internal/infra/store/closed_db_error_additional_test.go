@@ -56,8 +56,9 @@ func TestStoresPropagateClosedDBErrors(t *testing.T) {
 			_, err := accountStore.BatchImageStats(ctx, []int{1}, now)
 			return err
 		}},
-		{name: "account save credentials", call: func() error {
-			return accountStore.SaveCredentials(ctx, 1, map[string]string{"token": "x"})
+		{name: "account update credentials", call: func() error {
+			_, err := accountStore.Update(ctx, 1, appaccount.UpdateInput{Credentials: map[string]string{"token": "x"}})
+			return err
 		}},
 		{name: "group list", call: func() error {
 			_, _, err := groupStore.List(ctx, appgroup.ListFilter{Page: 1, PageSize: 10})

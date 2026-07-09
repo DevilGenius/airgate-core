@@ -298,6 +298,9 @@ func TestShouldPersistQuotaExtraAllowsClearingPlanMetadata(t *testing.T) {
 	if shouldPersistQuotaExtra("email", "") {
 		t.Fatalf("empty non-plan metadata should not be persisted")
 	}
+	if shouldPersistQuotaExtra("email", "user@example.com") {
+		t.Fatalf("email must be persisted in the account email column, not credentials")
+	}
 }
 
 func TestQuotaRefreshCredentialsInjectsProxyURL(t *testing.T) {
@@ -492,7 +495,6 @@ type stubRepository struct {
 	findUsageLogs    func(context.Context, int, time.Time, time.Time) ([]UsageLog, error)
 	batchWindowStats func(context.Context, []int, time.Time) (map[int]AccountWindowStats, error)
 	batchImageStats  func(context.Context, []int, time.Time) (map[int]AccountImageStats, error)
-	saveCredentials  func(context.Context, int, map[string]string) error
 }
 
 type noOpConcurrency struct{}
@@ -573,13 +575,6 @@ func (s stubRepository) BatchImageStats(ctx context.Context, ids []int, start ti
 		return s.batchImageStats(ctx, ids, start)
 	}
 	return nil, nil
-}
-
-func (s stubRepository) SaveCredentials(ctx context.Context, id int, credentials map[string]string) error {
-	if s.saveCredentials != nil {
-		return s.saveCredentials(ctx, id, credentials)
-	}
-	return nil
 }
 
 // stubStateWriter 捕获 StateWriter 调用。

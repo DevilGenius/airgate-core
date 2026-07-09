@@ -50,6 +50,16 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	createAccount("closed-empty", entaccount.StateDisabled, "")
 	createAccount("closed-manual", entaccount.StateDisabled, accountManualClosedReason)
 	createAccount("error", entaccount.StateDisabled, "invalid credentials")
+	if _, err := db.Account.Create().
+		SetName("soft-deleted").
+		SetPlatform("openai").
+		SetType("apikey").
+		SetCredentials(map[string]string{"api_key": "soft-deleted"}).
+		SetState(entaccount.StateActive).
+		SetDeletedAt(todayStart.Add(time.Hour)).
+		Save(ctx); err != nil {
+		t.Fatalf("create soft-deleted account: %v", err)
+	}
 
 	if _, err := db.UsageLog.Create().
 		SetBillingEventID("bill_dashboard_relation_stats").

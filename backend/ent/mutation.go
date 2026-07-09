@@ -1885,6 +1885,7 @@ type AccountMutation struct {
 	typ                string
 	id                 *int
 	name               *string
+	email              *string
 	platform           *string
 	_type              *string
 	credentials        *map[string]string
@@ -1901,6 +1902,7 @@ type AccountMutation struct {
 	upstream_is_pool   *bool
 	last_used_at       *time.Time
 	extra              *map[string]interface{}
+	deleted_at         *time.Time
 	created_at         *time.Time
 	updated_at         *time.Time
 	clearedFields      map[string]struct{}
@@ -2049,6 +2051,55 @@ func (m *AccountMutation) OldName(ctx context.Context) (v string, err error) {
 // ResetName resets all changes to the "name" field.
 func (m *AccountMutation) ResetName() {
 	m.name = nil
+}
+
+// SetEmail sets the "email" field.
+func (m *AccountMutation) SetEmail(s string) {
+	m.email = &s
+}
+
+// Email returns the value of the "email" field in the mutation.
+func (m *AccountMutation) Email() (r string, exists bool) {
+	v := m.email
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEmail returns the old "email" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldEmail(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEmail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEmail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEmail: %w", err)
+	}
+	return oldValue.Email, nil
+}
+
+// ClearEmail clears the value of the "email" field.
+func (m *AccountMutation) ClearEmail() {
+	m.email = nil
+	m.clearedFields[account.FieldEmail] = struct{}{}
+}
+
+// EmailCleared returns if the "email" field was cleared in this mutation.
+func (m *AccountMutation) EmailCleared() bool {
+	_, ok := m.clearedFields[account.FieldEmail]
+	return ok
+}
+
+// ResetEmail resets all changes to the "email" field.
+func (m *AccountMutation) ResetEmail() {
+	m.email = nil
+	delete(m.clearedFields, account.FieldEmail)
 }
 
 // SetPlatform sets the "platform" field.
@@ -2644,6 +2695,55 @@ func (m *AccountMutation) ResetExtra() {
 	delete(m.clearedFields, account.FieldExtra)
 }
 
+// SetDeletedAt sets the "deleted_at" field.
+func (m *AccountMutation) SetDeletedAt(t time.Time) {
+	m.deleted_at = &t
+}
+
+// DeletedAt returns the value of the "deleted_at" field in the mutation.
+func (m *AccountMutation) DeletedAt() (r time.Time, exists bool) {
+	v := m.deleted_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeletedAt returns the old "deleted_at" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldDeletedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeletedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeletedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeletedAt: %w", err)
+	}
+	return oldValue.DeletedAt, nil
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (m *AccountMutation) ClearDeletedAt() {
+	m.deleted_at = nil
+	m.clearedFields[account.FieldDeletedAt] = struct{}{}
+}
+
+// DeletedAtCleared returns if the "deleted_at" field was cleared in this mutation.
+func (m *AccountMutation) DeletedAtCleared() bool {
+	_, ok := m.clearedFields[account.FieldDeletedAt]
+	return ok
+}
+
+// ResetDeletedAt resets all changes to the "deleted_at" field.
+func (m *AccountMutation) ResetDeletedAt() {
+	m.deleted_at = nil
+	delete(m.clearedFields, account.FieldDeletedAt)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *AccountMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -2897,9 +2997,12 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 18)
 	if m.name != nil {
 		fields = append(fields, account.FieldName)
+	}
+	if m.email != nil {
+		fields = append(fields, account.FieldEmail)
 	}
 	if m.platform != nil {
 		fields = append(fields, account.FieldPlatform)
@@ -2940,6 +3043,9 @@ func (m *AccountMutation) Fields() []string {
 	if m.extra != nil {
 		fields = append(fields, account.FieldExtra)
 	}
+	if m.deleted_at != nil {
+		fields = append(fields, account.FieldDeletedAt)
+	}
 	if m.created_at != nil {
 		fields = append(fields, account.FieldCreatedAt)
 	}
@@ -2956,6 +3062,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 	switch name {
 	case account.FieldName:
 		return m.Name()
+	case account.FieldEmail:
+		return m.Email()
 	case account.FieldPlatform:
 		return m.Platform()
 	case account.FieldType:
@@ -2982,6 +3090,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.LastUsedAt()
 	case account.FieldExtra:
 		return m.Extra()
+	case account.FieldDeletedAt:
+		return m.DeletedAt()
 	case account.FieldCreatedAt:
 		return m.CreatedAt()
 	case account.FieldUpdatedAt:
@@ -2997,6 +3107,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 	switch name {
 	case account.FieldName:
 		return m.OldName(ctx)
+	case account.FieldEmail:
+		return m.OldEmail(ctx)
 	case account.FieldPlatform:
 		return m.OldPlatform(ctx)
 	case account.FieldType:
@@ -3023,6 +3135,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldLastUsedAt(ctx)
 	case account.FieldExtra:
 		return m.OldExtra(ctx)
+	case account.FieldDeletedAt:
+		return m.OldDeletedAt(ctx)
 	case account.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case account.FieldUpdatedAt:
@@ -3042,6 +3156,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetName(v)
+		return nil
+	case account.FieldEmail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEmail(v)
 		return nil
 	case account.FieldPlatform:
 		v, ok := value.(string)
@@ -3134,6 +3255,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetExtra(v)
 		return nil
+	case account.FieldDeletedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeletedAt(v)
+		return nil
 	case account.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -3217,6 +3345,9 @@ func (m *AccountMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *AccountMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(account.FieldEmail) {
+		fields = append(fields, account.FieldEmail)
+	}
 	if m.FieldCleared(account.FieldType) {
 		fields = append(fields, account.FieldType)
 	}
@@ -3232,6 +3363,9 @@ func (m *AccountMutation) ClearedFields() []string {
 	if m.FieldCleared(account.FieldExtra) {
 		fields = append(fields, account.FieldExtra)
 	}
+	if m.FieldCleared(account.FieldDeletedAt) {
+		fields = append(fields, account.FieldDeletedAt)
+	}
 	return fields
 }
 
@@ -3246,6 +3380,9 @@ func (m *AccountMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *AccountMutation) ClearField(name string) error {
 	switch name {
+	case account.FieldEmail:
+		m.ClearEmail()
+		return nil
 	case account.FieldType:
 		m.ClearType()
 		return nil
@@ -3261,6 +3398,9 @@ func (m *AccountMutation) ClearField(name string) error {
 	case account.FieldExtra:
 		m.ClearExtra()
 		return nil
+	case account.FieldDeletedAt:
+		m.ClearDeletedAt()
+		return nil
 	}
 	return fmt.Errorf("unknown Account nullable field %s", name)
 }
@@ -3271,6 +3411,9 @@ func (m *AccountMutation) ResetField(name string) error {
 	switch name {
 	case account.FieldName:
 		m.ResetName()
+		return nil
+	case account.FieldEmail:
+		m.ResetEmail()
 		return nil
 	case account.FieldPlatform:
 		m.ResetPlatform()
@@ -3310,6 +3453,9 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldExtra:
 		m.ResetExtra()
+		return nil
+	case account.FieldDeletedAt:
+		m.ResetDeletedAt()
 		return nil
 	case account.FieldCreatedAt:
 		m.ResetCreatedAt()

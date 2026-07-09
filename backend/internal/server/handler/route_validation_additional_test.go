@@ -158,6 +158,7 @@ func TestCRUDHandlerValidationBranches(t *testing.T) {
 	}{
 		{name: "account list bind", method: http.MethodGet, target: "/accounts?page=0&page_size=1", fn: accountHandler.ListAccounts, status: http.StatusBadRequest},
 		{name: "account import bind", method: http.MethodPost, target: "/accounts/import", body: `{}`, fn: accountHandler.ImportAccounts, status: http.StatusBadRequest},
+		{name: "account import unknown version rejected", method: http.MethodPost, target: "/accounts/import", body: `{"version":3,"accounts":[{"name":"future"}]}`, fn: accountHandler.ImportAccounts, status: http.StatusBadRequest},
 		{name: "account create bind", method: http.MethodPost, target: "/accounts", body: `{}`, fn: accountHandler.CreateAccount, status: http.StatusBadRequest},
 		{name: "account update bad id", method: http.MethodPatch, target: "/accounts/bad", params: badID, body: `{}`, fn: accountHandler.UpdateAccount, status: http.StatusBadRequest},
 		{name: "account delete bad id", method: http.MethodDelete, target: "/accounts/bad", params: badID, fn: accountHandler.DeleteAccount, status: http.StatusBadRequest},

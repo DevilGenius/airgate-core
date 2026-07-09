@@ -476,11 +476,12 @@ export default function MonitorPage() {
 
   const accountFilterOption = useCallback((account: AccountResp) => {
     const label = account.name || `#${account.id}`;
+    const description = [account.email, account.platform].filter(Boolean).join(' · ');
     return {
       id: String(account.id),
       label,
-      textValue: label,
-      description: account.platform,
+      textValue: `${label} ${account.email ?? ''} ${account.platform}`.trim(),
+      description,
     };
   }, []);
 

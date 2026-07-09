@@ -6,6 +6,7 @@ function account(input: Partial<AccountResp> & Pick<AccountResp, 'id'>): Account
   return {
     id: input.id,
     name: input.name ?? `account-${input.id}`,
+    email: input.email ?? null,
     platform: input.platform ?? 'openai',
     type: input.type ?? 'oauth',
     credentials: input.credentials ?? {},

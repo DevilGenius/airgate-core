@@ -12,7 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/accountidentity"
+	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/safego"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
@@ -524,21 +525,48 @@ func (f *Forwarder) updateAccountCredentials(accountID int, updated map[string]s
 	lock.Lock()
 	defer lock.Unlock()
 
-	acc, err := f.db.Account.Query().Where(account.ID(accountID)).Only(ctx)
+	acc, err := accountscope.QueryByID(f.db, accountID).Only(ctx)
 	if err != nil {
 		slog.Error("更新凭证失败：查询账号", "account_id", accountID, "error", err)
 		return
 	}
 
-	merged := make(map[string]string, len(acc.Credentials)+len(updated))
-	for k, v := range acc.Credentials {
+	email, currentCredentials, identityErr := accountidentity.Resolve(acc.Email, acc.Credentials)
+	if identityErr != nil {
+		slog.Error("更新凭证失败：账号邮箱状态不一致", "account_id", accountID, "error", identityErr)
+		return
+	}
+	if rawEmail, ok := updated["email"]; ok {
+		normalized, normalizeErr := accountidentity.NormalizeOptional(&rawEmail)
+		if normalizeErr != nil {
+			slog.Error("更新凭证失败：插件返回的账号邮箱无效", "account_id", accountID, "error", normalizeErr)
+		} else {
+			email = normalized
+		}
+	}
+
+	merged := make(map[string]string, len(currentCredentials)+len(updated))
+	for k, v := range currentCredentials {
+		if k == "email" {
+			continue
+		}
 		merged[k] = v
 	}
 	for k, v := range updated {
+		if k == "email" {
+			continue
+		}
 		merged[k] = v
 	}
+	merged = accountidentity.SyncCredentials(merged, email)
 
-	if err := f.db.Account.UpdateOneID(accountID).SetCredentials(merged).Exec(ctx); err != nil {
+	builder := accountscope.UpdateOneID(f.db, accountID).SetCredentials(merged)
+	if email == nil {
+		builder = builder.ClearEmail()
+	} else {
+		builder = builder.SetEmail(*email)
+	}
+	if err := builder.Exec(ctx); err != nil {
 		slog.Error("更新凭证失败：写入数据库", "account_id", accountID, "error", err)
 		return
 	}

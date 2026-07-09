@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Form, Input, Label, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
-import { IdCard, Hash, Gauge } from 'lucide-react';
+import { IdCard, Hash, Gauge, Mail } from 'lucide-react';
 import type {
   PluginBatchAccountInput,
   PluginBatchImportResult,
@@ -19,6 +19,9 @@ import {
   getSchemaSelectedAccountType,
   getSchemaVisibleFields,
   filterCredentialsForAccountType,
+  normalizeAccountEmailValue,
+  resolveAccountIdentity,
+  syncAccountIdentity,
 } from './accountUtils';
 import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
@@ -70,6 +73,7 @@ export function CreateAccountModal({
   const [accountType, setAccountType] = useState('');
   const [form, setForm] = useState<Omit<CreateAccountReq, 'platform' | 'credentials' | 'type'>>({
     name: '',
+    email: null,
     priority: DEFAULT_ACCOUNT_PRIORITY,
     max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY,
     rate_multiplier: 1,
@@ -116,7 +120,7 @@ export function CreateAccountModal({
     if (open) return;
     setPlatform('');
     setAccountType('');
-    setForm({ name: '', priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
+    setForm({ name: '', email: null, priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
     setPriorityInput(String(DEFAULT_ACCOUNT_PRIORITY));
     setRateMultiplierInput('1');
     setCredentials({});
@@ -135,6 +139,13 @@ export function CreateAccountModal({
     setBatchMode(false);
   };
 
+  const handleCredentialsChange = (next: Record<string, string>) => {
+    setCredentials(next);
+    if (Object.prototype.hasOwnProperty.call(next, 'email')) {
+      setForm((prev) => ({ ...prev, email: normalizeAccountEmailValue(next.email) }));
+    }
+  };
+
   // 插件表单触发的批量导入：补全 platform/元数据后交给外层 import
   // 命名规则：
   //  1. 填了名称 → 作为前缀，生成 {prefix}1 / {prefix}2 / ...
@@ -149,17 +160,19 @@ export function CreateAccountModal({
     const rateMultiplier = isEmptyRateMultiplierInput(rateMultiplierInput)
       ? null
       : parseRateMultiplier(rateMultiplierInput) ?? 1;
-    const toImport: AccountExportItem[] = accounts.map((a, i) => ({
-      name: prefix ? `${prefix}${i + 1}` : a.name || `Claude Code ${i + 1}`,
-      platform,
-      type: a.type || 'oauth',
-      credentials: a.credentials,
-      priority,
-      max_concurrency: form.max_concurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY,
-      rate_multiplier: rateMultiplier,
-      group_ids: groupIds.length ? groupIds : undefined,
-      proxy_id: form.proxy_id,
-    }));
+    const toImport: AccountExportItem[] = accounts.map((a, i) => {
+      const identity = resolveAccountIdentity(a.credentials);
+      return {
+        name: prefix ? `${prefix}${i + 1}` : a.name || `Claude Code ${i + 1}`,
+        email: identity.email,
+        platform,
+        type: a.type || 'oauth',
+        credentials: identity.credentials,
+        priority,
+        max_concurrency: form.max_concurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY,
+        rate_multiplier: rateMultiplier,
+      };
+    });
     return onBatchImport(toImport);
   };
 
@@ -176,13 +189,15 @@ export function CreateAccountModal({
     const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplierInput);
     if (!rateMultiplierEmpty && !isValidRateMultiplierValue(rateMultiplierValue)) return;
     const rateMultiplier = rateMultiplierEmpty ? null : rateMultiplierValue;
+    const identity = syncAccountIdentity(credentials, form.email);
     onSubmit({
       ...form,
+      email: identity.email,
       priority,
       rate_multiplier: rateMultiplier,
       platform,
       type: accountType || undefined,
-      credentials,
+      credentials: identity.credentials,
       extra: extraWithGroupPriorities(form.extra, groupIds, groupPriorityInputs),
       group_ids: groupIds,
     });
@@ -191,7 +206,7 @@ export function CreateAccountModal({
   const handleClose = () => {
     setPlatform('');
     setAccountType('');
-    setForm({ name: '', priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
+    setForm({ name: '', email: null, priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
     setPriorityInput(String(DEFAULT_ACCOUNT_PRIORITY));
     setRateMultiplierInput('1');
     setCredentials({});
@@ -320,6 +335,21 @@ export function CreateAccountModal({
                         />
                       </div>
                     </HeroTextField>
+
+                    <HeroTextField fullWidth>
+                      <Label>{t('users.email')}</Label>
+                      <div className="relative">
+                        <Mail className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                        <Input
+                          className="pl-9"
+                          name="email"
+                          type="email"
+                          autoComplete="email"
+                          value={form.email ?? ''}
+                          onChange={(event) => setForm({ ...form, email: event.target.value })}
+                        />
+                      </div>
+                    </HeroTextField>
                   </div>
                 </section>
 
@@ -329,7 +359,7 @@ export function CreateAccountModal({
                   >
                     <PluginAccountForm
                       credentials={credentials}
-                      onChange={setCredentials}
+                      onChange={handleCredentialsChange}
                       mode="create"
                       accountType={accountType}
                       onAccountTypeChange={setAccountType}
@@ -347,7 +377,7 @@ export function CreateAccountModal({
                     accountType={accountType}
                     onAccountTypeChange={handleSchemaAccountTypeChange}
                     credentials={credentials}
-                    onCredentialsChange={setCredentials}
+                    onCredentialsChange={handleCredentialsChange}
                   />
                 ) : null}
 

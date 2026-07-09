@@ -25,6 +25,7 @@ type Proxy struct {
 type Account struct {
 	ID                 int
 	Name               string
+	Email              *string
 	Platform           string
 	Type               string
 	Credentials        map[string]string
@@ -40,6 +41,7 @@ type Account struct {
 	// UpstreamIsPool 上游是账号池时置 true：临时上游错误会进入退避 degraded，不永久标错。
 	UpstreamIsPool bool
 	LastUsedAt     *time.Time
+	DeletedAt      *time.Time
 	GroupIDs       []int64
 	Proxy          *Proxy
 	Extra          map[string]any
@@ -120,6 +122,7 @@ type ListResult struct {
 // CreateInput 创建账号输入。
 type CreateInput struct {
 	Name           string
+	Email          *string
 	Platform       string
 	Type           string
 	Credentials    map[string]string
@@ -139,6 +142,8 @@ type CreateInput struct {
 // 其它 state 值（rate_limited / degraded）由调度状态机自行维护，不由 API 写入。
 type UpdateInput struct {
 	Name           *string
+	Email          *string
+	HasEmail       bool
 	Type           *string
 	Credentials    map[string]string
 	ModelPolicy    *modelpolicy.Policy
@@ -326,8 +331,9 @@ func (t *ConnectivityTest) Run(ctx context.Context, writer http.ResponseWriter) 
 
 // LoadOptions 查询账号时的关联加载选项。
 type LoadOptions struct {
-	WithGroups bool
-	WithProxy  bool
+	WithGroups     bool
+	WithProxy      bool
+	IncludeDeleted bool
 }
 
 // ImportSummary 批量导入结果。
@@ -363,5 +369,4 @@ type Repository interface {
 	// BatchImageStats 批量统计指定账号的生图请求数（model 前缀 "gpt-image"）。
 	// 同时返回 [todayStart, now] 区间和 全部历史 两个计数。无记录的账号不出现在返回 map 中。
 	BatchImageStats(ctx context.Context, accountIDs []int, todayStart time.Time) (map[int]AccountImageStats, error)
-	SaveCredentials(context.Context, int, map[string]string) error
 }

@@ -775,12 +775,14 @@ export default function UsagePage() {
       render: (row) => {
         const name = row.account_name || '-';
         const email = row.account_email?.trim();
-        const title = email && name !== '-' ? `${name}\n${email}` : name;
+        const deletedLabel = row.account_deleted ? t('usage.account_deleted') : '';
+        const meta = [email, deletedLabel].filter(Boolean).join(' · ');
+        const title = meta && name !== '-' ? `${name}\n${meta}` : name;
         return (
           <div className="flex w-full min-w-0 flex-col items-center text-center" title={title}>
-            <span className="block max-w-full truncate text-xs font-medium text-text-secondary">{name}</span>
-            {email && name !== '-' ? (
-              <span className="block max-w-full truncate text-[11px] leading-tight text-text-tertiary">{email}</span>
+            <span className={`block max-w-full truncate text-xs font-medium ${row.account_deleted ? 'text-text-tertiary' : 'text-text-secondary'}`}>{name}</span>
+            {meta && name !== '-' ? (
+              <span className="block max-w-full truncate text-[11px] leading-tight text-text-tertiary">{meta}</span>
             ) : null}
           </div>
         );

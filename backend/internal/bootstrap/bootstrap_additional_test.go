@@ -170,6 +170,33 @@ SELECT $quoted$body;with;semicolons$quoted$;
 	assertSystemUpgradePanic(t, "panic with cause", errors.New("cause"))
 }
 
+func TestAccountEmailIdentityUpgradeDoesNotRewriteUsageHistory(t *testing.T) {
+	const upgradeID = "20260710090000_account_email_identity"
+
+	var sql string
+	for _, upgrade := range loadSystemUpgrades() {
+		if upgrade.ID == upgradeID {
+			sql = strings.ToLower(upgrade.SQL)
+			break
+		}
+	}
+	if sql == "" {
+		t.Fatalf("embedded upgrade %s not found", upgradeID)
+	}
+
+	for _, forbidden := range []string{"update public.usage_logs", "delete from public.usage_logs", "set account_usage_logs"} {
+		if strings.Contains(sql, forbidden) {
+			t.Fatalf("startup upgrade %s rewrites usage history with %q", upgradeID, forbidden)
+		}
+	}
+	if !strings.Contains(sql, "manual usage_log relink") {
+		t.Fatalf("startup upgrade %s must fail fast when the manual usage relink was skipped", upgradeID)
+	}
+	if !strings.Contains(sql, "delete from public.accounts") {
+		t.Fatalf("startup upgrade %s must hard-delete legacy duplicate accounts", upgradeID)
+	}
+}
+
 func assertSystemUpgradePanic(t *testing.T, action string, err error) {
 	t.Helper()
 	defer func() {

@@ -57,6 +57,7 @@ var (
 	AccountsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString},
+		{Name: "email", Type: field.TypeString, Nullable: true},
 		{Name: "platform", Type: field.TypeString},
 		{Name: "type", Type: field.TypeString, Nullable: true, Default: ""},
 		{Name: "credentials", Type: field.TypeJSON},
@@ -70,6 +71,7 @@ var (
 		{Name: "upstream_is_pool", Type: field.TypeBool, Default: false},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "extra", Type: field.TypeJSON, Nullable: true},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "account_proxy", Type: field.TypeInt, Nullable: true},
@@ -82,16 +84,26 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[17]},
+				Columns:    []*schema.Column{AccountsColumns[19]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 		},
 		Indexes: []*schema.Index{
 			{
+				Name:    "account_email_key",
+				Unique:  true,
+				Columns: []*schema.Column{AccountsColumns[2]},
+			},
+			{
+				Name:    "account_deleted_at",
+				Unique:  false,
+				Columns: []*schema.Column{AccountsColumns[16]},
+			},
+			{
 				Name:    "account_priority_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[8], AccountsColumns[15]},
+				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[17]},
 			},
 		},
 	}

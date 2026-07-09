@@ -498,7 +498,7 @@ export function useAccountTableColumns({
       width: '132px',
       mobileWidth: '112px',
       render: (row) => {
-        const email = row.credentials?.email;
+        const email = row.email;
         return (
           <div className="flex w-full min-w-0 flex-col items-center text-center">
             <span style={{ color: 'var(--ag-text)' }} className="max-w-full truncate font-medium" title={row.name}>

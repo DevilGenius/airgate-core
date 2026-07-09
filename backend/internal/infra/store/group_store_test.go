@@ -375,9 +375,12 @@ func TestGroupStoreStatsForGroupsAggregatesAccountsAndUsage(t *testing.T) {
 	activeID := createAccount("active", entaccount.StateActive, 3, "")
 	createAccount("limited", entaccount.StateRateLimited, 5, "")
 	createAccount("degraded", entaccount.StateDegraded, 7, "")
-	createAccount("disabled", entaccount.StateDisabled, 11, "")
+	deletedID := createAccount("disabled", entaccount.StateDisabled, 11, "")
 	createAccount("manual-closed", entaccount.StateDisabled, 12, accountManualClosedReason)
 	createAccount("error", entaccount.StateDisabled, 13, "bad credentials")
+	if err := db.Account.UpdateOneID(deletedID).SetDeletedAt(time.Now()).Exec(ctx); err != nil {
+		t.Fatalf("soft delete group account: %v", err)
+	}
 
 	todayStart := time.Date(2026, 6, 20, 0, 0, 0, 0, time.UTC)
 	for _, item := range []struct {
@@ -406,7 +409,7 @@ func TestGroupStoreStatsForGroupsAggregatesAccountsAndUsage(t *testing.T) {
 		t.Fatalf("StatsForGroups returned error: %v", err)
 	}
 	got := stats[group.ID]
-	if got.AccountTotal != 6 || got.AccountActive != 3 || got.AccountDisabled != 2 || got.AccountError != 1 ||
+	if got.AccountTotal != 5 || got.AccountActive != 3 || got.AccountDisabled != 1 || got.AccountError != 1 ||
 		got.CapacityTotal != 15 || got.TodayCost != 1.25 || got.TotalCost != 3.75 {
 		t.Fatalf("group stats = %+v", got)
 	}
