@@ -88,7 +88,7 @@ describe('accountsApi', () => {
 
     expect(get).toHaveBeenNthCalledWith(1, '/api/v1/admin/accounts', { page: 1, page_size: 10, platform: 'openai', sort_by: 'priority', sort_dir: 'desc' });
     expect(get).toHaveBeenNthCalledWith(2, '/api/v1/admin/accounts/export', { ids: '3,4', keyword: 'prod', platform: 'claude' });
-    expect(post).toHaveBeenNthCalledWith(1, '/api/v1/admin/accounts/import', { accounts: [{ credentials: { api_key: 'sk' }, max_concurrency: 10, name: 'one', platform: 'openai', priority: 50 }] });
+    expect(post).toHaveBeenNthCalledWith(1, '/api/v1/admin/accounts/import', { version: 2, accounts: [{ credentials: { api_key: 'sk' }, max_concurrency: 10, name: 'one', platform: 'openai', priority: 50 }] });
     expect(post).toHaveBeenNthCalledWith(2, '/api/v1/admin/accounts', { credentials: {}, name: 'new', platform: 'openai' });
     expect(put).toHaveBeenNthCalledWith(1, '/api/v1/admin/accounts/2', { name: 'updated' });
     expect(del).toHaveBeenNthCalledWith(1, '/api/v1/admin/accounts/3');
