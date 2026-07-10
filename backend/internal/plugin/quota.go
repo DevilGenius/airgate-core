@@ -106,6 +106,10 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 // pickAccount 调度选号并写到 state.account。失败时返回 error，由调用方决定如何处理
 // （例如主循环可以根据 softExclude 是否非空决定排队等待还是直接写 503）。
 func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs ...int) error {
+	return f.pickAccountPreferringDifferentType(c, state, "", excludeIDs...)
+}
+
+func (f *Forwarder) pickAccountPreferringDifferentType(c *gin.Context, state *forwardState, preferredDifferentType string, excludeIDs ...int) error {
 	var lastErr error
 	plans := state.dispatch.Plans()
 	for idx := state.dispatch.StartIndex(); idx < len(plans); idx++ {
@@ -124,6 +128,7 @@ func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs 
 				PreviousResponseID:          state.previousResponseID,
 				RequireContinuationAffinity: state.requireContinuationAffinity,
 				GroupNameSnapshot:           state.keyInfo.GroupName,
+				PreferDifferentAccountType:  preferredDifferentType,
 			},
 			excludeIDs...,
 		)

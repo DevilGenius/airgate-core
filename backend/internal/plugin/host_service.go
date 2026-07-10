@@ -733,8 +733,10 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 		}
 
 		chain := newDispatchChain(route.DispatchPlans)
+		var lastAttemptAccount *ent.Account
 		for attempt := 0; attempt < maxHostForwardAttempts; {
-			acc, candidate, err := h.pickHostAccountFrom(ctx, &chain, route.Platform, route.GroupID, "", hardExclude...)
+			preferredDifferentType := preferredDifferentAccountTypeForAttempt(attempt, maxHostForwardAttempts, lastAttemptAccount)
+			acc, candidate, err := h.pickHostAccountFromPreferringDifferentType(ctx, &chain, route.Platform, route.GroupID, "", preferredDifferentType, hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return nil, cerr
@@ -749,6 +751,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 				)
 				break
 			}
+			lastAttemptAccount = acc
 			plan := candidate.Plan
 			schedulingModel := candidate.SchedulingModel
 
@@ -911,8 +914,10 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 		}
 
 		chain := newDispatchChain(route.DispatchPlans)
+		var lastAttemptAccount *ent.Account
 		for attempt := 0; attempt < maxHostForwardAttempts; {
-			acc, candidate, err := h.pickHostAccountFrom(ctx, &chain, route.Platform, route.GroupID, "", hardExclude...)
+			preferredDifferentType := preferredDifferentAccountTypeForAttempt(attempt, maxHostForwardAttempts, lastAttemptAccount)
+			acc, candidate, err := h.pickHostAccountFromPreferringDifferentType(ctx, &chain, route.Platform, route.GroupID, "", preferredDifferentType, hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return cerr
@@ -927,6 +932,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 				)
 				break
 			}
+			lastAttemptAccount = acc
 			plan := candidate.Plan
 			schedulingModel := candidate.SchedulingModel
 
@@ -1579,6 +1585,10 @@ func (h *HostService) pickHostAccount(ctx context.Context, plans []sdk.DispatchP
 }
 
 func (h *HostService) pickHostAccountFrom(ctx context.Context, chain *dispatchChain, platform string, groupID int, sessionID string, excludeIDs ...int) (*ent.Account, dispatchCandidate, error) {
+	return h.pickHostAccountFromPreferringDifferentType(ctx, chain, platform, groupID, sessionID, "", excludeIDs...)
+}
+
+func (h *HostService) pickHostAccountFromPreferringDifferentType(ctx context.Context, chain *dispatchChain, platform string, groupID int, sessionID string, preferredDifferentType string, excludeIDs ...int) (*ent.Account, dispatchCandidate, error) {
 	plans := chain.Plans()
 	if len(plans) == 0 {
 		return nil, dispatchCandidate{}, scheduler.ErrNoAvailableAccount
@@ -1589,7 +1599,16 @@ func (h *HostService) pickHostAccountFrom(ctx context.Context, chain *dispatchCh
 		if candidate.SchedulingModel == "" {
 			continue
 		}
-		acc, err := h.scheduler.SelectAccount(ctx, platform, candidate.SchedulingModel, 0, groupID, sessionID, excludeIDs...)
+		acc, err := h.scheduler.SelectAccountWithOptions(
+			ctx,
+			platform,
+			candidate.SchedulingModel,
+			0,
+			groupID,
+			sessionID,
+			scheduler.AccountSelectionOptions{PreferDifferentAccountType: preferredDifferentType},
+			excludeIDs...,
+		)
 		if err == nil {
 			return acc, chain.Select(idx), nil
 		}

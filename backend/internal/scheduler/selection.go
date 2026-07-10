@@ -32,6 +32,9 @@ type AccountSelectionOptions struct {
 	PreviousResponseID          string
 	RequireContinuationAffinity bool
 	GroupNameSnapshot           string
+	// PreferDifferentAccountType 是 failover 的尽力偏好：存在其它正常可用类型时，
+	// 只在其它类型中选号；只有当前类型可用时自动回退，不会制造无账号错误。
+	PreferDifferentAccountType string
 }
 
 // SelectAccountWithOptions 在常规调度前优先按 previous_response_id 命中原账号。
@@ -77,6 +80,13 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		if opts.RequireContinuationAffinity && result.hardAffinity != NotSchedulable {
 			hardAffinityCandidates = append(hardAffinityCandidates, acc)
 		}
+	}
+	if !opts.RequireContinuationAffinity {
+		normalCandidates, stickyCandidates = preferDifferentAccountTypeCandidates(
+			normalCandidates,
+			stickyCandidates,
+			opts.PreferDifferentAccountType,
+		)
 	}
 
 	// 续链请求的 session sticky 是硬亲和；普通 session sticky 只是软粘连，
@@ -375,6 +385,74 @@ func excludeAccounts(candidates []*ent.Account, excludeIDs []int) []*ent.Account
 	filtered := make([]*ent.Account, 0, len(candidates))
 	for _, acc := range candidates {
 		if _, excluded := excludeSet[acc.ID]; !excluded {
+			filtered = append(filtered, acc)
+		}
+	}
+	return filtered
+}
+
+// AccountFailoverType 返回账号轮换使用的精确类型标识。
+// OAuth 账号优先使用套餐字段，并刻意不应用 routegraph 的类别别名，确保 k12 与 team
+// 在第三次 failover 时被视为不同类型；其它账号至少按实体 Type 区分。
+func AccountFailoverType(acc *ent.Account) string {
+	if acc == nil {
+		return ""
+	}
+	baseType := normalizeFailoverAccountType(acc.Type)
+	for _, key := range []string{"plan_type", "plan", "account_type", "account_category", "subscription_type"} {
+		value := strings.TrimSpace(acc.Credentials[key])
+		if value == "" {
+			value = strings.TrimSpace(ExtraString(acc.Extra, key))
+		}
+		subtype := normalizeFailoverAccountType(value)
+		if subtype == "" || subtype == baseType {
+			continue
+		}
+		if baseType == "" {
+			return subtype
+		}
+		return baseType + ":" + subtype
+	}
+	return baseType
+}
+
+func normalizeFailoverAccountType(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	var builder strings.Builder
+	builder.Grow(len(value))
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			builder.WriteRune(r)
+		}
+	}
+	return builder.String()
+}
+
+func preferDifferentAccountTypeCandidates(normalCandidates, stickyCandidates []*ent.Account, previousType string) ([]*ent.Account, []*ent.Account) {
+	previousType = strings.TrimSpace(previousType)
+	if previousType == "" {
+		return normalCandidates, stickyCandidates
+	}
+
+	preferredNormal := filterDifferentAccountType(normalCandidates, previousType)
+	if len(preferredNormal) > 0 {
+		return preferredNormal, filterDifferentAccountType(stickyCandidates, previousType)
+	}
+	// 不用其它类型的 StickyOnly 账号抢占当前类型的 Normal 账号；只有本来就没有
+	// Normal 候选时，才在 StickyOnly 兜底池中应用类型偏好。
+	if len(normalCandidates) == 0 {
+		if preferredSticky := filterDifferentAccountType(stickyCandidates, previousType); len(preferredSticky) > 0 {
+			return normalCandidates, preferredSticky
+		}
+	}
+	return normalCandidates, stickyCandidates
+}
+
+func filterDifferentAccountType(candidates []*ent.Account, previousType string) []*ent.Account {
+	filtered := make([]*ent.Account, 0, len(candidates))
+	for _, acc := range candidates {
+		candidateType := AccountFailoverType(acc)
+		if candidateType != "" && candidateType != previousType {
 			filtered = append(filtered, acc)
 		}
 	}

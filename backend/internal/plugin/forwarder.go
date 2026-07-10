@@ -85,6 +85,13 @@ func (f *Forwarder) SetRequestMonitorRecorder(recorder requestmonitoring.Recorde
 // maxFailoverAttempts 单次请求的最大 failover 次数。
 const maxFailoverAttempts = 3
 
+func preferredDifferentAccountTypeForAttempt(attempt, maxAttempts int, previousAccount *ent.Account) string {
+	if maxAttempts <= 1 || attempt != maxAttempts-1 {
+		return ""
+	}
+	return scheduler.AccountFailoverType(previousAccount)
+}
+
 // queueWaitTimeout 所有账号 slot 都被占满时，请求最多排队等多久再放弃。
 // 1 分钟对号池小 / 并发高的场景能把毛刺吸收掉；超过这个时长意味着号池真的不够用。
 const queueWaitTimeout = 60 * time.Second
@@ -176,6 +183,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 
 		softExclude := make([]int, 0, maxFailoverAttempts)
 		attempt := 0
+		var lastAttemptAccount *ent.Account
 		queueDeadline := time.Now().Add(queueWaitTimeout)
 		queuePollDelay := queuePollInterval
 
@@ -194,7 +202,8 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			exclude = append(exclude, hardExclude...)
 			exclude = append(exclude, softExclude...)
 
-			if err := f.pickAccount(c, state, exclude...); err != nil {
+			preferredDifferentType := preferredDifferentAccountTypeForAttempt(attempt, maxFailoverAttempts, lastAttemptAccount)
+			if err := f.pickAccountPreferringDifferentType(c, state, preferredDifferentType, exclude...); err != nil {
 				if status := canceledRequestStatus(ctx.Err()); status != 0 {
 					markCanceledRequest(c, status)
 					f.recordClientClosedRequest(c, state, status, totalAttempts)
@@ -307,6 +316,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			}
 
 			execution := f.callPlugin(c, state)
+			lastAttemptAccount = state.account
 			totalAttempts++
 
 			requestCanceled := canceledRequestStatus(ctx.Err())

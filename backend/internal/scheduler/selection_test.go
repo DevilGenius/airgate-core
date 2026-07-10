@@ -36,6 +36,99 @@ func TestExcludeAccountsDoesNotMutateCandidates(t *testing.T) {
 	}
 }
 
+func TestAccountFailoverTypeDistinguishesK12AndTeam(t *testing.T) {
+	t.Parallel()
+
+	k12 := &ent.Account{Type: "oauth", Credentials: map[string]string{"plan_type": "K12"}}
+	team := &ent.Account{Type: "oauth", Credentials: map[string]string{"plan_type": "Team"}}
+
+	if got := AccountFailoverType(k12); got != "oauth:k12" {
+		t.Fatalf("K12 failover type = %q, want oauth:k12", got)
+	}
+	if got := AccountFailoverType(team); got != "oauth:team" {
+		t.Fatalf("Team failover type = %q, want oauth:team", got)
+	}
+	if AccountFailoverType(k12) == AccountFailoverType(team) {
+		t.Fatal("K12 and Team must remain distinct failover account types")
+	}
+}
+
+func TestPreferDifferentAccountTypeCandidates(t *testing.T) {
+	t.Parallel()
+
+	teamType := AccountFailoverType(&ent.Account{Type: "oauth", Credentials: map[string]string{"plan_type": "team"}})
+	team := &ent.Account{ID: 1, Type: "oauth", Credentials: map[string]string{"plan_type": "team"}}
+	k12 := &ent.Account{ID: 2, Type: "oauth", Credentials: map[string]string{"plan_type": "k12"}}
+	apiKey := &ent.Account{ID: 3, Type: "apikey"}
+
+	normal, sticky := preferDifferentAccountTypeCandidates(
+		[]*ent.Account{team, k12, apiKey},
+		[]*ent.Account{team, k12, apiKey},
+		teamType,
+	)
+	if len(normal) != 2 || normal[0].ID != k12.ID || normal[1].ID != apiKey.ID {
+		t.Fatalf("preferred normal candidates = %+v, want K12 and API Key", normal)
+	}
+	if len(sticky) != 2 || sticky[0].ID != k12.ID || sticky[1].ID != apiKey.ID {
+		t.Fatalf("preferred sticky candidates = %+v, want K12 and API Key", sticky)
+	}
+
+	normal, sticky = preferDifferentAccountTypeCandidates([]*ent.Account{team}, []*ent.Account{team}, teamType)
+	if len(normal) != 1 || normal[0].ID != team.ID || len(sticky) != 1 || sticky[0].ID != team.ID {
+		t.Fatalf("single-type fallback changed candidates: normal=%+v sticky=%+v", normal, sticky)
+	}
+}
+
+func TestPreferDifferentAccountTypeDoesNotReplaceNormalWithStickyOnly(t *testing.T) {
+	t.Parallel()
+
+	team := &ent.Account{ID: 1, Type: "oauth", Credentials: map[string]string{"plan_type": "team"}}
+	k12 := &ent.Account{ID: 2, Type: "oauth", Credentials: map[string]string{"plan_type": "k12"}}
+	teamType := AccountFailoverType(team)
+
+	normal, sticky := preferDifferentAccountTypeCandidates([]*ent.Account{team}, []*ent.Account{team, k12}, teamType)
+	if len(normal) != 1 || normal[0].ID != team.ID || len(sticky) != 2 {
+		t.Fatalf("StickyOnly different type displaced Normal account: normal=%+v sticky=%+v", normal, sticky)
+	}
+}
+
+func TestSelectAccountWithOptionsPrefersDifferentTypeBeforePriority(t *testing.T) {
+	ctx := context.Background()
+	s := newSelectionTestScheduler(Normal)
+	groupID := 71
+
+	team := newSelectionTestAccount(10)
+	team.Type = "oauth"
+	team.Credentials = map[string]string{"plan_type": "team"}
+	team.Priority = 100
+	k12 := newSelectionTestAccount(20)
+	k12.Type = "oauth"
+	k12.Credentials = map[string]string{"plan_type": "k12"}
+	k12.Priority = 1
+	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{team, k12}, nil)
+
+	selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
+		PreferDifferentAccountType: AccountFailoverType(team),
+	})
+	if err != nil {
+		t.Fatalf("SelectAccountWithOptions() returned error: %v", err)
+	}
+	if selected.ID != k12.ID {
+		t.Fatalf("selected account ID = %d, want different-type K12 account %d", selected.ID, k12.ID)
+	}
+
+	s.sticky.Set(ctx, 1, "openai", "sticky-team", team.ID)
+	selected, err = s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "sticky-team", AccountSelectionOptions{
+		PreferDifferentAccountType: AccountFailoverType(team),
+	})
+	if err != nil {
+		t.Fatalf("SelectAccountWithOptions() with sticky session returned error: %v", err)
+	}
+	if selected.ID != k12.ID {
+		t.Fatalf("sticky selected account ID = %d, want different-type K12 account %d", selected.ID, k12.ID)
+	}
+}
+
 func TestSelectSoftStickyAccountHonorsHighestPriority(t *testing.T) {
 	t.Parallel()
 

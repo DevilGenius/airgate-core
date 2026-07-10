@@ -965,6 +965,22 @@ func TestCanStartForwardAttemptStopsImagesAtFailoverCap(t *testing.T) {
 	}
 }
 
+func TestPreferredDifferentAccountTypeOnlyAppliesToThirdAttempt(t *testing.T) {
+	t.Parallel()
+
+	previousAccount := &ent.Account{Type: "oauth", Credentials: map[string]string{"plan_type": "team"}}
+	const previousType = "oauth:team"
+	if got := preferredDifferentAccountTypeForAttempt(0, maxFailoverAttempts, previousAccount); got != "" {
+		t.Fatalf("first attempt preference = %q, want empty", got)
+	}
+	if got := preferredDifferentAccountTypeForAttempt(1, maxFailoverAttempts, previousAccount); got != "" {
+		t.Fatalf("second attempt preference = %q, want empty", got)
+	}
+	if got := preferredDifferentAccountTypeForAttempt(2, maxFailoverAttempts, previousAccount); got != previousType {
+		t.Fatalf("third attempt preference = %q, want %q", got, previousType)
+	}
+}
+
 func TestBuildPluginRequestRemovesPreviousResponseHeadersAfterRecovery(t *testing.T) {
 	t.Parallel()
 
