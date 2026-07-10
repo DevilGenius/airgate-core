@@ -51,7 +51,7 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		return
 	}
 
-	// 根据 scope 切换响应 DTO：end customer 走 CustomerUsageLogResp 剥离平台真实成本
+	// 根据 scope 切换响应 DTO：end customer 保留计费明细，仅剥离平台内部费用和中间倍率。
 	if scoped {
 		list := make([]dto.CustomerUsageLogResp, 0, len(result.List))
 		for _, item := range result.List {

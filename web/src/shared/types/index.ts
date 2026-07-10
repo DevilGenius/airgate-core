@@ -523,6 +523,8 @@ export interface UsageLogResp {
   rate_multiplier: number;
   /** 快照：本次请求生效的 sell_rate；0 表示客户侧免费，1 表示不加价 */
   sell_rate: number;
+  /** 客户最终倍率：rate_multiplier × sell_rate */
+  effective_rate: number;
   /** 快照：本次请求生效的 account_rate */
   account_rate_multiplier: number;
   service_tier?: string;
@@ -540,10 +542,10 @@ export interface UsageLogResp {
 }
 
 /**
- * CustomerUsageLogResp end customer 视角的精简响应。
+ * CustomerUsageLogResp end customer 视角的使用记录响应。
  *
  * 当请求来自 API Key 登录拿到的 scoped JWT 时，后端返回此结构，
- * 不暴露 actual_cost / total_cost / 单价 / rate_multiplier 等会泄漏 reseller 毛利的字段。
+ * 保留普通用户页需要的基础单价与分项成本；不暴露平台扣费、账号成本和中间倍率。
  */
 export interface CustomerUsageLogResp {
   id: number;
@@ -556,8 +558,19 @@ export interface CustomerUsageLogResp {
   /** 缓存创建总量；Claude 的 5m/1h 拆分在 usage_metadata 的 claude.* 中。 */
   cache_creation_tokens: number;
   reasoning_output_tokens: number;
+  input_price: number;
+  output_price: number;
+  cached_input_price: number;
+  cache_creation_price: number;
+  input_cost: number;
+  output_cost: number;
+  cached_input_cost: number;
+  cache_creation_cost: number;
+  total_cost: number;
   /** 客户视角："本次消耗 = X 美元" */
   cost: number;
+  /** 客户最终倍率，不暴露组成倍率 */
+  effective_rate: number;
   service_tier?: string;
   stream: boolean;
   duration_ms: number;

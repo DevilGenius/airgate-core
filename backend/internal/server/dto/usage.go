@@ -36,6 +36,7 @@ type UsageLogResp struct {
 	AccountCost           float64           `json:"account_cost"`            // 账号实际成本 = total × account_rate
 	RateMultiplier        float64           `json:"rate_multiplier"`         // 平台计费倍率快照
 	SellRate              float64           `json:"sell_rate"`               // 销售倍率快照
+	EffectiveRate         float64           `json:"effective_rate"`          // 客户最终倍率 = 平台计费倍率 × 销售倍率
 	AccountRateMultiplier float64           `json:"account_rate_multiplier"` // 账号倍率快照
 	ServiceTier           string            `json:"service_tier,omitempty"`
 	Stream                bool              `json:"stream"`
@@ -49,10 +50,11 @@ type UsageLogResp struct {
 	CreatedAt             string            `json:"created_at"`
 }
 
-// CustomerUsageLogResp 使用记录响应（end customer scope，剥离所有平台真实成本字段）
+// CustomerUsageLogResp 使用记录响应（end customer scope）
 //
 // 当请求来自 end customer（通过 API key 登录拿到的 scoped JWT）时返回此结构，
-// 不暴露 actual_cost / total_cost / 单价 / rate_multiplier 等会泄漏 reseller 毛利的字段。
+// 保留与普通用户使用记录一致的基础单价和分项成本明细；不暴露 actual_cost、
+// account_cost 以及组成最终计费的中间倍率，只返回客户最终倍率 effective_rate。
 type CustomerUsageLogResp struct {
 	ID                    int64             `json:"id"`
 	APIKeyID              int64             `json:"api_key_id"`
@@ -63,7 +65,17 @@ type CustomerUsageLogResp struct {
 	CachedInputTokens     int               `json:"cached_input_tokens"`
 	CacheCreationTokens   int               `json:"cache_creation_tokens"`
 	ReasoningOutputTokens int               `json:"reasoning_output_tokens"`
+	InputPrice            float64           `json:"input_price"`
+	OutputPrice           float64           `json:"output_price"`
+	CachedInputPrice      float64           `json:"cached_input_price"`
+	CacheCreationPrice    float64           `json:"cache_creation_price"`
+	InputCost             float64           `json:"input_cost"`
+	OutputCost            float64           `json:"output_cost"`
+	CachedInputCost       float64           `json:"cached_input_cost"`
+	CacheCreationCost     float64           `json:"cache_creation_cost"`
+	TotalCost             float64           `json:"total_cost"`
 	BilledCost            float64           `json:"cost"` // 客户视角："本次消耗 = X 美元"
+	EffectiveRate         float64           `json:"effective_rate"`
 	ServiceTier           string            `json:"service_tier,omitempty"`
 	Stream                bool              `json:"stream"`
 	DurationMs            int64             `json:"duration_ms"`

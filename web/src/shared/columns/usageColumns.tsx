@@ -202,6 +202,9 @@ const META_CHIP_LOW_COLOR = 'rgb(34,197,94)';
 const META_CHIP_MEDIUM_COLOR = 'rgb(59,130,246)';
 const META_CHIP_HIGH_COLOR = 'rgb(249,115,22)';
 const META_CHIP_XHIGH_COLOR = 'rgb(239,68,68)';
+const META_CHIP_MAX_COLOR = 'rgb(148,163,184)';
+const META_CHIP_ULTRA_COLOR = 'var(--ag-text)';
+const META_CHIP_FALLBACK_COLOR = 'var(--ag-text-secondary)';
 const META_CHIP_SERVICE_TIER_COLOR = 'rgb(168,85,247)';
 const IMAGE_TIER_1K_MAX_PIXELS = 1536 * 1024;
 const IMAGE_TIER_2K_MAX_PIXELS = 2048 * 2048;
@@ -211,7 +214,8 @@ const META_CHIP_EFFORT_COLORS: Record<string, string> = {
   medium: META_CHIP_MEDIUM_COLOR,
   high: META_CHIP_HIGH_COLOR,
   xhigh: META_CHIP_XHIGH_COLOR,
-  max: META_CHIP_XHIGH_COLOR,
+  max: META_CHIP_MAX_COLOR,
+  ultra: META_CHIP_ULTRA_COLOR,
 };
 
 const MODEL_META_SLOT_WIDTH_CLASS = 'w-[5.5rem]';
@@ -226,7 +230,7 @@ function isClaudeUsagePlatform(platform: string): boolean {
 
 function reasoningEffortMetaColor(reasoningEffort: string): string {
   const key = reasoningEffort.trim().toLowerCase().replace(/[\s_-]+/g, '');
-  return META_CHIP_EFFORT_COLORS[key] ?? 'rgb(148,163,184)';
+  return META_CHIP_EFFORT_COLORS[key] ?? META_CHIP_FALLBACK_COLOR;
 }
 
 function MetaChip({
@@ -513,8 +517,8 @@ function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
   return ctx;
 }
 
-function buildCostDetailContext(row: UsageLogResp, adminView: boolean) {
-  const ctx = buildUsageRecordContext(row, false);
+function buildCostDetailContext(row: UsageRow, adminView: boolean, customerScope = false) {
+  const ctx = buildUsageRecordContext(row, customerScope);
   ctx.adminView = adminView;
   return ctx;
 }
@@ -551,7 +555,71 @@ function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
   );
 }
 
-/** Reseller / admin 视角的成本列：包含完整的成本拆分与倍率信息 */
+function userVisibleCost(row: UsageRow) {
+  return 'cost' in row ? row.cost : row.billed_cost;
+}
+
+function FallbackCostDetail({ row, t, adminView }: { row: UsageRow; t: TFunction; adminView: boolean }) {
+  const cost = userVisibleCost(row);
+  const effectiveRate = Number.isFinite(row.effective_rate) ? row.effective_rate : undefined;
+  const fullRow = 'actual_cost' in row ? row : undefined;
+  const hasRateInfo = !!row.service_tier || (adminView ? !!fullRow : effectiveRate !== undefined);
+
+  return (
+    <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
+      <TooltipRow label={t('usage.input_cost')} value={`$${row.input_cost.toFixed(6)}`} />
+      {row.cached_input_cost > 0 && (
+        <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
+      )}
+      {row.cache_creation_cost > 0 && (
+        <TooltipRow label={t('usage.cache_creation_cost', '缓存创建成本')} value={`$${row.cache_creation_cost.toFixed(6)}`} />
+      )}
+      <TooltipRow label={t('usage.output_cost')} value={`$${row.output_cost.toFixed(6)}`} />
+      {row.input_price > 0 && (
+        <TooltipRow label={t('usage.input_unit_price')} value={`$${row.input_price.toFixed(4)} / 1M Token`} />
+      )}
+      {row.cached_input_price > 0 && (
+        <TooltipRow label={t('usage.cached_input_unit_price', '缓存读取单价')} value={`$${row.cached_input_price.toFixed(4)} / 1M Token`} />
+      )}
+      {row.cache_creation_price > 0 && (
+        <TooltipRow label={t('usage.cache_creation_unit_price', '缓存创建单价')} value={`$${row.cache_creation_price.toFixed(4)} / 1M Token`} />
+      )}
+      {row.output_price > 0 && (
+        <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
+      )}
+      <TooltipDivider />
+      {row.service_tier && (
+        <TooltipRow label={t('usage.service_tier')} value={<span className="capitalize">{row.service_tier}</span>} />
+      )}
+      {adminView && fullRow && (
+        <TooltipRow label={t('usage.rate_multiplier')} value={`${formatRateMultiplier(fullRow.rate_multiplier)}x`} />
+      )}
+      {adminView && fullRow && Number.isFinite(fullRow.account_rate_multiplier) && (
+        <TooltipRow label={t('usage.account_rate', '上游倍率')} value={`${formatRateMultiplier(fullRow.account_rate_multiplier)}x`} />
+      )}
+      {adminView && fullRow && Number.isFinite(fullRow.sell_rate) && fullRow.sell_rate !== 1 && (
+        <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={`${formatRateMultiplier(fullRow.sell_rate)}x`} />
+      )}
+      {!adminView && effectiveRate !== undefined && (
+        <TooltipRow label={t('usage.effective_rate', '倍率')} value={`${formatRateMultiplier(effectiveRate)}x`} />
+      )}
+      {hasRateInfo && <TooltipDivider />}
+      <TooltipRow label={t('usage.original_cost')} value={<CostValue value={row.total_cost} decimals={6} tone="standard" />} />
+      {adminView && fullRow && (
+        <TooltipRow label={t('usage.account_cost', '上游计费')} value={<CostValue value={fullRow.account_cost} decimals={6} />} />
+      )}
+      {adminView && fullRow && fullRow.billed_cost !== fullRow.actual_cost && (
+        <>
+          <TooltipRow label={t('usage.user_charged', '余额扣费')} value={<CostValue value={fullRow.actual_cost} decimals={6} />} />
+          <TooltipRow label={t('usage.profit', '利润')} value={<CostValue value={fullRow.billed_cost - fullRow.actual_cost} decimals={6} tone="success" />} />
+        </>
+      )}
+      <TooltipRow label={t('usage.billed_cost', '密钥计费')} value={<CostValue value={cost} decimals={6} tone="actual" />} tone="strong" />
+    </TooltipPanel>
+  );
+}
+
+/** 管理端保留完整成本分析；普通用户使用详细明细并仅展示最终倍率。 */
 function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnConfig<UsageRow> {
   return {
     key: 'cost',
@@ -570,45 +638,7 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 context={buildCostDetailContext(row, adminView)}
               />
             ) : (
-              <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
-                <TooltipRow label={t('usage.input_cost')} value={`$${row.input_cost.toFixed(6)}`} />
-                <TooltipRow label={t('usage.output_cost')} value={`$${row.output_cost.toFixed(6)}`} />
-                {row.input_price > 0 && (
-                  <TooltipRow label={t('usage.input_unit_price')} value={`$${row.input_price.toFixed(4)} / 1M Token`} />
-                )}
-                {row.output_price > 0 && (
-                  <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
-                )}
-                {row.cache_creation_price > 0 && (
-                  <TooltipRow label={t('usage.cache_creation_unit_price', '缓存创建单价')} value={`$${row.cache_creation_price.toFixed(4)} / 1M Token`} />
-                )}
-                {row.cached_input_cost > 0 && (
-                  <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
-                )}
-                <TooltipDivider />
-                {row.service_tier && (
-                  <TooltipRow label={t('usage.service_tier')} value={<span className="capitalize">{row.service_tier}</span>} />
-                )}
-                <TooltipRow label={t('usage.rate_multiplier')} value={`${formatRateMultiplier(row.rate_multiplier)}x`} />
-                {adminView && Number.isFinite(row.account_rate_multiplier) && (
-                  <TooltipRow label={t('usage.account_rate', '上游倍率')} value={`${formatRateMultiplier(row.account_rate_multiplier)}x`} />
-                )}
-                {Number.isFinite(row.sell_rate) && row.sell_rate !== 1 && (
-                  <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={`${row.sell_rate.toFixed(2)}x`} />
-                )}
-                <TooltipDivider />
-                <TooltipRow label={t('usage.original_cost')} value={<CostValue value={row.total_cost} decimals={6} tone="standard" />} />
-                {adminView && (
-                  <TooltipRow label={t('usage.account_cost', '上游计费')} value={<CostValue value={row.account_cost} decimals={6} />} />
-                )}
-                {row.billed_cost !== row.actual_cost && (
-                  <>
-                    <TooltipRow label={t('usage.user_charged', '余额扣费')} value={<CostValue value={row.actual_cost} decimals={6} />} />
-                    <TooltipRow label={t('usage.profit', '利润')} value={<CostValue value={row.billed_cost - row.actual_cost} decimals={6} tone="success" />} />
-                  </>
-                )}
-                <TooltipRow label={t('usage.billed_cost', '密钥计费')} value={<CostValue value={row.billed_cost} decimals={6} tone="actual" />} />
-              </TooltipPanel>
+              <FallbackCostDetail row={row} t={t} adminView={adminView} />
             )
           )}
         >
@@ -629,21 +659,27 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
   };
 }
 
-/** End customer 视角的成本列：只展示后端剥离过的 cost 字段 */
+/** End customer 复用普通用户的详细费用组件，仅传递最终倍率。 */
 function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
   return {
     key: 'cost',
     title: t('usage.cost'),
     width: '140px',
     render: (raw) => {
-      const cost = (raw as CustomerUsageLogResp).cost ?? 0;
+      const cost = userVisibleCost(raw);
+      const PluginUsageCostDetail = getPluginUsageCostDetail(raw.platform);
       return (
         <RichTooltip
           placement="right"
           content={() => (
-            <TooltipPanel title={t('usage.cost_detail')} subtitle={raw.model}>
-              <TooltipRow label={t('usage.cost')} value={<CostValue value={cost} decimals={6} tone="actual" />} tone="strong" />
-            </TooltipPanel>
+            PluginUsageCostDetail ? (
+              <PluginUsageCostDetail
+                recordId={raw.id}
+                context={buildCostDetailContext(raw, false, true)}
+              />
+            ) : (
+              <FallbackCostDetail row={raw} t={t} adminView={false} />
+            )
           )}
         >
           <div className="flex w-full flex-col items-center font-mono text-center text-xs">

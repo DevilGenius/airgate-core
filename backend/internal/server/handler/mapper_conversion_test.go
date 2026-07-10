@@ -115,17 +115,29 @@ func TestDashboardAndUsageMappers(t *testing.T) {
 		t.Fatalf("用量统计响应异常: %+v", usageResp)
 	}
 
-	logResp := toUsageLogResp(appusage.LogRecord{ID: 9, Model: "gpt", ActualCost: 1.2, BilledCost: 2.4, AccountDeleted: true})
+	logResp := toUsageLogResp(appusage.LogRecord{
+		ID: 9, Model: "gpt", ActualCost: 1.2, BilledCost: 2.4, RateMultiplier: 1.2, SellRate: 2, AccountDeleted: true,
+	})
 	customerResp := toCustomerUsageLogResp(appusage.LogRecord{
 		ID:                    9,
 		Model:                 "gpt",
+		InputPrice:            2.5,
+		CachedInputPrice:      0.25,
+		InputCost:             0.5,
+		CachedInputCost:       0.05,
+		TotalCost:             1,
 		ActualCost:            1.2,
 		BilledCost:            2.4,
+		RateMultiplier:        1.2,
+		SellRate:              2,
 		CacheCreationTokens:   11,
 		ReasoningOutputTokens: 22,
 		ReasoningEffort:       "high",
 	})
-	if logResp.ActualCost != 1.2 || !logResp.AccountDeleted || customerResp.BilledCost != 2.4 || customerResp.Model != "gpt" ||
+	if logResp.ActualCost != 1.2 || logResp.EffectiveRate != 2.4 || !logResp.AccountDeleted ||
+		customerResp.BilledCost != 2.4 || customerResp.EffectiveRate != 2.4 || customerResp.Model != "gpt" ||
+		customerResp.InputPrice != 2.5 || customerResp.CachedInputPrice != 0.25 ||
+		customerResp.InputCost != 0.5 || customerResp.CachedInputCost != 0.05 || customerResp.TotalCost != 1 ||
 		customerResp.CacheCreationTokens != 11 || customerResp.ReasoningOutputTokens != 22 || customerResp.ReasoningEffort != "high" {
 		t.Fatalf("用量日志响应异常: full=%+v customer=%+v", logResp, customerResp)
 	}

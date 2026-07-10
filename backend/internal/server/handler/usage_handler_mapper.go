@@ -42,6 +42,7 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		AccountCost:           record.AccountCost,
 		RateMultiplier:        record.RateMultiplier,
 		SellRate:              record.SellRate,
+		EffectiveRate:         customerAPIKeyRate(record.RateMultiplier, record.SellRate),
 		AccountRateMultiplier: record.AccountRateMultiplier,
 		ServiceTier:           record.ServiceTier,
 		Stream:                record.Stream,
@@ -56,9 +57,9 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 	}
 }
 
-// toCustomerUsageLogResp 转换为 end customer 视角的精简响应（仅 billed_cost，剥离所有平台真实成本字段）。
+// toCustomerUsageLogResp 转换为 end customer 视角的响应。
 //
-// 当请求来自 API Key 登录拿到的 scoped JWT 时使用，避免泄漏 reseller 与平台之间的差价。
+// 保留普通用户页需要的基础单价与分项成本，但剥离平台扣费、账号成本和中间倍率。
 func toCustomerUsageLogResp(record appusage.LogRecord) dto.CustomerUsageLogResp {
 	return dto.CustomerUsageLogResp{
 		ID:                    record.ID,
@@ -70,7 +71,17 @@ func toCustomerUsageLogResp(record appusage.LogRecord) dto.CustomerUsageLogResp 
 		CachedInputTokens:     record.CachedInputTokens,
 		CacheCreationTokens:   record.CacheCreationTokens,
 		ReasoningOutputTokens: record.ReasoningOutputTokens,
+		InputPrice:            record.InputPrice,
+		OutputPrice:           record.OutputPrice,
+		CachedInputPrice:      record.CachedInputPrice,
+		CacheCreationPrice:    record.CacheCreationPrice,
+		InputCost:             record.InputCost,
+		OutputCost:            record.OutputCost,
+		CachedInputCost:       record.CachedInputCost,
+		CacheCreationCost:     record.CacheCreationCost,
+		TotalCost:             record.TotalCost,
 		BilledCost:            record.BilledCost,
+		EffectiveRate:         customerAPIKeyRate(record.RateMultiplier, record.SellRate),
 		ServiceTier:           record.ServiceTier,
 		Stream:                record.Stream,
 		DurationMs:            record.DurationMs,
