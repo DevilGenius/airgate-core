@@ -774,15 +774,18 @@ export default function UsagePage() {
       hideOnMobile: true,
       render: (row) => {
         const name = row.account_name || '-';
+        const accountID = row.account_id > 0 ? `#${row.account_id}` : '';
+        const displayName = [accountID, name].filter(Boolean).join(' ');
         const email = row.account_email?.trim();
-        const deletedLabel = row.account_deleted ? t('usage.account_deleted') : '';
-        const meta = [email, deletedLabel].filter(Boolean).join(' · ');
-        const title = meta && name !== '-' ? `${name}\n${meta}` : name;
+        const title = email && name !== '-' ? `${displayName}\n${email}` : displayName;
         return (
           <div className="flex w-full min-w-0 flex-col items-center text-center" title={title}>
-            <span className={`block max-w-full truncate text-xs font-medium ${row.account_deleted ? 'text-text-tertiary' : 'text-text-secondary'}`}>{name}</span>
-            {meta && name !== '-' ? (
-              <span className="block max-w-full truncate text-[11px] leading-tight text-text-tertiary">{meta}</span>
+            <span className={`flex max-w-full items-center justify-center gap-1 text-xs font-medium ${row.account_deleted ? 'text-text-tertiary' : 'text-text-secondary'}`}>
+              {accountID ? <span className="shrink-0 font-mono text-[11px] text-warning">{accountID}</span> : null}
+              <span className="min-w-0 truncate">{name}</span>
+            </span>
+            {email && name !== '-' ? (
+              <span className={`block max-w-full truncate text-[11px] leading-tight text-text-tertiary ${row.account_deleted ? 'line-through' : ''}`}>{email}</span>
             ) : null}
           </div>
         );
