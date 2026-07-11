@@ -780,9 +780,9 @@ export default function UsagePage() {
         const title = email && name !== '-' ? `${displayName}\n${email}` : displayName;
         return (
           <div className="flex w-full min-w-0 flex-col items-center text-center" title={title}>
-            <span className={`flex max-w-full items-center justify-center gap-1 text-xs font-medium ${row.account_deleted ? 'text-text-tertiary' : 'text-text-secondary'}`}>
-              {accountID ? <span className="shrink-0 font-mono text-[11px] text-warning">{accountID}</span> : null}
-              <span className="min-w-0 truncate">{name}</span>
+            <span className={`flex w-full min-w-0 items-center gap-1 text-xs font-medium ${row.account_deleted ? 'text-text-tertiary' : 'text-text-secondary'}`}>
+              <span className="shrink-0 font-mono text-[11px] text-warning">{accountID}</span>
+              <span className={`min-w-0 truncate text-left ${row.account_deleted ? 'line-through' : ''}`}>{name}</span>
             </span>
             {email && name !== '-' ? (
               <span className={`block max-w-full truncate text-[11px] leading-tight text-text-tertiary ${row.account_deleted ? 'line-through' : ''}`}>{email}</span>
