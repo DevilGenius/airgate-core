@@ -145,12 +145,12 @@ function TooltipPanel({
   title: ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-[var(--radius)]">
-      <div className="border-b border-border bg-default px-2.5 py-1.5">
-        <div className="text-sm font-semibold leading-none text-text">{title}</div>
-        {subtitle ? <div className="mt-1 truncate text-xs text-text-tertiary">{subtitle}</div> : null}
+    <div className="ag-usage-tooltip-panel">
+      <div className="ag-usage-tooltip-header">
+        <div className="ag-usage-tooltip-title">{title}</div>
+        {subtitle ? <div className="ag-usage-tooltip-subtitle">{subtitle}</div> : null}
       </div>
-      <div className="space-y-0.5 p-2">{children}</div>
+      <div className="ag-usage-tooltip-body">{children}</div>
     </div>
   );
 }
@@ -181,10 +181,10 @@ function TooltipRow({
             : 'text-text-secondary';
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,max-content)] items-center gap-3 rounded-[var(--radius)] bg-surface px-2 py-1 text-xs">
-      <span className="min-w-0 truncate text-text-tertiary">{label}</span>
+    <div className="ag-usage-tooltip-row">
+      <span className="ag-usage-tooltip-row-label">{label}</span>
       <span
-        className={`min-w-0 max-w-[12rem] justify-self-end truncate text-right font-mono ${strong ? 'font-semibold' : 'font-medium'} ${toneClass}`}
+        className={`ag-usage-tooltip-row-value ${strong ? 'font-semibold' : 'font-medium'} ${toneClass}`}
         style={color ? { color } : undefined}
       >
         {value}
@@ -194,7 +194,7 @@ function TooltipRow({
 }
 
 function TooltipDivider() {
-  return <div className="my-0.5 border-t border-border" />;
+  return <div className="ag-usage-tooltip-divider" />;
 }
 
 const MODEL_META_IMAGE_COLOR = 'rgb(148,163,184)';
