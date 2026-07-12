@@ -11,6 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
@@ -65,15 +66,24 @@ type RuntimeSnapshot struct {
 }
 
 type RuntimeLatencyStats struct {
-	SampleCount int64   `json:"sample_count"`
-	FRTAvgMS    int64   `json:"frt_avg_ms"`
-	FRTP50MS    int64   `json:"frt_p50_ms"`
-	FRTP95MS    int64   `json:"frt_p95_ms"`
-	FRTP99MS    int64   `json:"frt_p99_ms"`
-	ErrorRate   float64 `json:"error_rate"`
-	ErrorCount  int64   `json:"error_count"`
-	Stale       bool    `json:"stale"`
-	LastError   string  `json:"last_error,omitempty"`
+	SampleCount        int64   `json:"sample_count"`
+	TextSampleCount    int64   `json:"text_sample_count"`
+	ImageSampleCount   int64   `json:"image_sample_count"`
+	FRTAvgMS           int64   `json:"frt_avg_ms"`
+	FRTP50MS           int64   `json:"frt_p50_ms"`
+	FRTP95MS           int64   `json:"frt_p95_ms"`
+	FRTP99MS           int64   `json:"frt_p99_ms"`
+	ImageDurationP50MS int64   `json:"image_duration_p50_ms"`
+	ImageDurationP95MS int64   `json:"image_duration_p95_ms"`
+	ImageDurationP99MS int64   `json:"image_duration_p99_ms"`
+	ErrorRate          float64 `json:"error_rate"`
+	ErrorCount         int64   `json:"error_count"`
+	TextErrorRate      float64 `json:"text_error_rate"`
+	TextErrorCount     int64   `json:"text_error_count"`
+	ImageErrorRate     float64 `json:"image_error_rate"`
+	ImageErrorCount    int64   `json:"image_error_count"`
+	Stale              bool    `json:"stale"`
+	LastError          string  `json:"last_error,omitempty"`
 }
 
 type RuntimeCapacityStats struct {
@@ -237,45 +247,78 @@ func (s *RuntimeSampler) queryLatency(parent context.Context, window time.Durati
 	defer cancel()
 
 	since := time.Now().Add(-window)
-	var sampleCount int64
+	imageModelPattern := usagemodel.ImagePrefix + "%"
+	var sampleCount, textSampleCount, imageSampleCount int64
 	var frtAvg, frtP50, frtP95, frtP99 float64
+	var imageDurationP50, imageDurationP95, imageDurationP99 float64
 	if err := s.sqlDB.QueryRowContext(ctx, `
 SELECT
 	COUNT(*)::bigint,
-	COALESCE(AVG(first_token_ms) FILTER (WHERE first_token_ms > 0), 0)::double precision,
-	COALESCE(percentile_cont(0.50) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms > 0), 0)::double precision,
-	COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms > 0), 0)::double precision,
-	COALESCE(percentile_cont(0.99) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms > 0), 0)::double precision
+	COUNT(*) FILTER (WHERE LOWER(BTRIM(model)) NOT LIKE $2)::bigint,
+	COUNT(*) FILTER (WHERE LOWER(BTRIM(model)) LIKE $2)::bigint,
+	COALESCE(AVG(first_token_ms) FILTER (WHERE first_token_ms > 0 AND LOWER(BTRIM(model)) NOT LIKE $2), 0)::double precision,
+	COALESCE(percentile_cont(0.50) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms > 0 AND LOWER(BTRIM(model)) NOT LIKE $2), 0)::double precision,
+	COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms > 0 AND LOWER(BTRIM(model)) NOT LIKE $2), 0)::double precision,
+	COALESCE(percentile_cont(0.99) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms > 0 AND LOWER(BTRIM(model)) NOT LIKE $2), 0)::double precision,
+	COALESCE(percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE duration_ms > 0 AND LOWER(BTRIM(model)) LIKE $2), 0)::double precision,
+	COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE duration_ms > 0 AND LOWER(BTRIM(model)) LIKE $2), 0)::double precision,
+	COALESCE(percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE duration_ms > 0 AND LOWER(BTRIM(model)) LIKE $2), 0)::double precision
 FROM usage_logs
 WHERE created_at >= $1
-`, since).Scan(&sampleCount, &frtAvg, &frtP50, &frtP95, &frtP99); err != nil {
+`, since, imageModelPattern).Scan(
+		&sampleCount,
+		&textSampleCount,
+		&imageSampleCount,
+		&frtAvg,
+		&frtP50,
+		&frtP95,
+		&frtP99,
+		&imageDurationP50,
+		&imageDurationP95,
+		&imageDurationP99,
+	); err != nil {
 		return RuntimeLatencyStats{}, err
 	}
 
-	var errorCount int64
+	var errorCount, textErrorCount, imageErrorCount int64
 	if err := s.sqlDB.QueryRowContext(ctx, `
-SELECT COUNT(*)::bigint
+SELECT
+	COUNT(*)::bigint,
+	COUNT(*) FILTER (WHERE LOWER(BTRIM(model)) NOT LIKE $2)::bigint,
+	COUNT(*) FILTER (WHERE LOWER(BTRIM(model)) LIKE $2)::bigint
 FROM monitor_request_events
 WHERE created_at >= $1 AND type <> 'client_closed_request'
-`, since).Scan(&errorCount); err != nil {
+`, since, imageModelPattern).Scan(&errorCount, &textErrorCount, &imageErrorCount); err != nil {
 		return RuntimeLatencyStats{}, err
 	}
 
-	total := sampleCount + errorCount
-	errorRate := 0.0
-	if total > 0 {
-		errorRate = float64(errorCount) / float64(total)
-	}
 	return RuntimeLatencyStats{
-		SampleCount: sampleCount,
-		FRTAvgMS:    roundMS(frtAvg),
-		FRTP50MS:    roundMS(frtP50),
-		FRTP95MS:    roundMS(frtP95),
-		FRTP99MS:    roundMS(frtP99),
-		ErrorRate:   errorRate,
-		ErrorCount:  errorCount,
-		Stale:       false,
+		SampleCount:        sampleCount,
+		TextSampleCount:    textSampleCount,
+		ImageSampleCount:   imageSampleCount,
+		FRTAvgMS:           roundMS(frtAvg),
+		FRTP50MS:           roundMS(frtP50),
+		FRTP95MS:           roundMS(frtP95),
+		FRTP99MS:           roundMS(frtP99),
+		ImageDurationP50MS: roundMS(imageDurationP50),
+		ImageDurationP95MS: roundMS(imageDurationP95),
+		ImageDurationP99MS: roundMS(imageDurationP99),
+		ErrorRate:          runtimeErrorRate(sampleCount, errorCount),
+		ErrorCount:         errorCount,
+		TextErrorRate:      runtimeErrorRate(textSampleCount, textErrorCount),
+		TextErrorCount:     textErrorCount,
+		ImageErrorRate:     runtimeErrorRate(imageSampleCount, imageErrorCount),
+		ImageErrorCount:    imageErrorCount,
+		Stale:              false,
 	}, nil
+}
+
+func runtimeErrorRate(sampleCount, errorCount int64) float64 {
+	total := sampleCount + errorCount
+	if total <= 0 {
+		return 0
+	}
+	return float64(errorCount) / float64(total)
 }
 
 func (s *RuntimeSampler) sampleCapacity(parent context.Context) RuntimeCapacityStats {

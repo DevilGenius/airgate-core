@@ -1037,12 +1037,21 @@ export interface MonitorRuntimeResp {
 
 export interface MonitorRuntimeLatencyResp {
   sample_count: number;
+  text_sample_count: number;
+  image_sample_count: number;
   frt_avg_ms: number;
   frt_p50_ms: number;
   frt_p95_ms: number;
   frt_p99_ms: number;
+  image_duration_p50_ms: number;
+  image_duration_p95_ms: number;
+  image_duration_p99_ms: number;
   error_rate: number;
   error_count: number;
+  text_error_rate: number;
+  text_error_count: number;
+  image_error_rate: number;
+  image_error_count: number;
   stale: boolean;
   last_error?: string;
 }

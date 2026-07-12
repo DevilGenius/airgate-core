@@ -95,7 +95,7 @@ function RuntimeCard({
   value: ReactNode;
 }) {
   return (
-    <Card className="ag-dashboard-metric h-[150px] 2xl:h-[156px]">
+    <Card className="ag-dashboard-metric h-[172px] 2xl:h-[180px]">
       <Card.Content className="flex h-full flex-col p-3 2xl:p-3.5">
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="min-w-0">
@@ -107,7 +107,7 @@ function RuntimeCard({
           <MetricIcon icon={icon} tone={tone} />
         </div>
         <div className="mt-auto min-w-0">
-          <div className="mt-1.5 space-y-0.5 text-xs leading-4 text-text-tertiary">
+          <div className="mt-1 space-y-0.5 text-xs leading-4 text-text-tertiary">
             {meta ? <div className="min-w-0 overflow-hidden">{meta}</div> : null}
             {details.map((detail, index) => (
               <div className="min-w-0 overflow-hidden" key={index}>{detail}</div>
@@ -178,7 +178,7 @@ function MonitorSummaryCard({
 }) {
   const { t } = useTranslation();
   return (
-    <Card className="ag-dashboard-metric h-[150px] 2xl:h-[156px]">
+    <Card className="ag-dashboard-metric h-[172px] 2xl:h-[180px]">
       <Card.Content className="flex h-full flex-col p-3 2xl:p-3.5">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
@@ -239,29 +239,61 @@ export function MonitorRuntimeStats({
     t('monitor.runtime_frt_avg'),
     formatDurationPairWithDelta(latency?.frt_avg_ms, latency1H?.frt_avg_ms),
   ].join(' ');
-  const latencySamples = `${t('monitor.runtime_samples')} ${fmtNum(latency?.sample_count ?? 0)}/${fmtNum(latency1H?.sample_count ?? 0)}`;
-  const latencyErrors = `${t('monitor.runtime_errors')} ${formatPercent(latency?.error_rate)}/${formatPercent(latency1H?.error_rate)}`;
+  const latencyTextSamples = `${t('monitor.runtime_text_samples')} ${fmtNum(latency?.text_sample_count ?? 0)}/${fmtNum(latency1H?.text_sample_count ?? 0)}`;
+  const latencyTextErrors = `${t('monitor.runtime_errors')} ${formatPercent(latency?.text_error_rate)}/${formatPercent(latency1H?.text_error_rate)}`;
+  const latencyImageSamples = `${t('monitor.runtime_image_samples')} ${fmtNum(latency?.image_sample_count ?? 0)}/${fmtNum(latency1H?.image_sample_count ?? 0)}`;
+  const latencyImageErrors = `${t('monitor.runtime_errors')} ${formatPercent(latency?.image_error_rate)}/${formatPercent(latency1H?.image_error_rate)}`;
+  const percentileDetail = (
+    percentile: 'P50' | 'P95' | 'P99',
+    textCurrent?: number,
+    textBaseline?: number,
+    imageCurrent?: number,
+    imageBaseline?: number,
+  ) => joinDetail([
+    `${t('monitor.runtime_text_frt')} ${percentile} ${formatDurationPairWithDelta(textCurrent, textBaseline)}`,
+    `${t('monitor.runtime_image_duration')} ${percentile} ${formatDurationPairWithDelta(imageCurrent, imageBaseline)}`,
+  ]);
+  const stale = latency?.stale || latency1H?.stale;
 
   return (
     <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
       <MonitorSummaryCard showActiveCounts={showActiveCounts} summary={summary} />
       <RuntimeCard
         details={[
-          `P95 ${formatDurationPairWithDelta(latency?.frt_p95_ms, latency1H?.frt_p95_ms)}`,
-          `P99 ${formatDurationPairWithDelta(latency?.frt_p99_ms, latency1H?.frt_p99_ms)}`,
+          percentileDetail(
+            'P95',
+            latency?.frt_p95_ms,
+            latency1H?.frt_p95_ms,
+            latency?.image_duration_p95_ms,
+            latency1H?.image_duration_p95_ms,
+          ),
+          percentileDetail(
+            'P99',
+            latency?.frt_p99_ms,
+            latency1H?.frt_p99_ms,
+            latency?.image_duration_p99_ms,
+            latency1H?.image_duration_p99_ms,
+          ),
           joinDetail([
-            latencySamples,
-            latencyErrors,
+            latencyTextSamples,
+            latencyTextErrors,
+          ]),
+          joinDetail([
+            latencyImageSamples,
+            latencyImageErrors,
           ]),
         ]}
         icon={<Activity className="h-5 w-5" />}
-        label={t('monitor.runtime_latency')}
-        meta={joinDetail([
-          `P50 ${formatDurationPairWithDelta(latency?.frt_p50_ms, latency1H?.frt_p50_ms)}`,
-          ...(latency?.stale || latency1H?.stale ? [t('monitor.runtime_stale')] : []),
-        ])}
+        label={`${t('monitor.runtime_latency')}${stale ? ` · ${t('monitor.runtime_stale')}` : ''}`}
+        meta={percentileDetail(
+          'P50',
+          latency?.frt_p50_ms,
+          latency1H?.frt_p50_ms,
+          latency?.image_duration_p50_ms,
+          latency1H?.image_duration_p50_ms,
+        )}
         tone="bg-sky-100 text-sky-700 ring-sky-200 dark:bg-sky-400/15 dark:text-sky-300 dark:ring-sky-400/25"
-        value={latencyFRTValue}
+        value={<span className="text-[17px] tracking-tight 2xl:text-xl">{latencyFRTValue}</span>}
       />
       <RuntimeCard
         details={[
