@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/internal/billing"
@@ -220,97 +221,175 @@ func (s *RuntimeSampler) sampleLatency(parent context.Context) {
 	snap.SampledAt = time.Now().UTC()
 	snap.WindowSeconds = int(s.latencyWindow / time.Second)
 
-	latency, err := s.queryLatency(parent, s.latencyWindow)
+	latency, longLatency, err := s.queryLatencyWindows(parent)
 	if err != nil {
 		snap.Latency.Stale = true
 		snap.Latency.LastError = truncateRuntimeError(err.Error())
-	} else {
-		snap.Latency = latency
-	}
-
-	longLatency, err := s.queryLatency(parent, defaultRuntimeLatencyLongWindow)
-	if err != nil {
 		snap.Latency1H.Stale = true
 		snap.Latency1H.LastError = truncateRuntimeError(err.Error())
 		s.snapshot.Store(snap)
 		return
 	}
+	snap.Latency = latency
 	snap.Latency1H = longLatency
 	s.snapshot.Store(snap)
 }
 
-func (s *RuntimeSampler) queryLatency(parent context.Context, window time.Duration) (RuntimeLatencyStats, error) {
+type runtimeLatencyAggregate struct {
+	sampleCount              int64
+	textSampleCount          int64
+	imageSampleCount         int64
+	frtAvg                   float64
+	frtPercentiles           pq.Float64Array
+	imageDurationPercentiles pq.Float64Array
+	errorCount               int64
+	textErrorCount           int64
+	imageErrorCount          int64
+}
+
+func (s *RuntimeSampler) queryLatencyWindows(parent context.Context) (RuntimeLatencyStats, RuntimeLatencyStats, error) {
 	if s.sqlDB == nil {
-		return RuntimeLatencyStats{Stale: true, LastError: "postgres unavailable"}, nil
+		unavailable := RuntimeLatencyStats{Stale: true, LastError: "postgres unavailable"}
+		return unavailable, unavailable, nil
 	}
+
+	now := time.Now()
+	shortSince := now.Add(-s.latencyWindow)
+	longSince := now.Add(-defaultRuntimeLatencyLongWindow)
+	imageModelPattern := usagemodel.ImagePrefix + "%"
+	var short, long runtimeLatencyAggregate
+
+	if err := s.queryUsageLatencyWindows(parent, longSince, shortSince, imageModelPattern, &short, &long); err != nil {
+		return RuntimeLatencyStats{}, RuntimeLatencyStats{}, err
+	}
+	if err := s.queryLatencyErrorWindows(parent, longSince, shortSince, imageModelPattern, &short, &long); err != nil {
+		return RuntimeLatencyStats{}, RuntimeLatencyStats{}, err
+	}
+
+	return short.stats(), long.stats(), nil
+}
+
+func (s *RuntimeSampler) queryUsageLatencyWindows(
+	parent context.Context,
+	longSince time.Time,
+	shortSince time.Time,
+	imageModelPattern string,
+	short *runtimeLatencyAggregate,
+	long *runtimeLatencyAggregate,
+) error {
 	ctx, cancel := context.WithTimeout(parent, defaultRuntimeQueryTimeout)
 	defer cancel()
 
-	since := time.Now().Add(-window)
-	imageModelPattern := usagemodel.ImagePrefix + "%"
-	var sampleCount, textSampleCount, imageSampleCount int64
-	var frtAvg, frtP50, frtP95, frtP99 float64
-	var imageDurationP50, imageDurationP95, imageDurationP99 float64
-	if err := s.sqlDB.QueryRowContext(ctx, `
+	return s.sqlDB.QueryRowContext(ctx, `
 SELECT
+	COUNT(*) FILTER (WHERE created_at >= $2)::bigint,
+	COUNT(*) FILTER (WHERE created_at >= $2 AND model NOT LIKE $3)::bigint,
+	COUNT(*) FILTER (WHERE created_at >= $2 AND model LIKE $3)::bigint,
+	COALESCE(AVG(first_token_ms) FILTER (WHERE created_at >= $2 AND first_token_ms > 0 AND model NOT LIKE $3), 0)::double precision,
+	COALESCE(
+		percentile_cont(ARRAY[0.50, 0.95, 0.99]::double precision[])
+			WITHIN GROUP (ORDER BY first_token_ms)
+			FILTER (WHERE created_at >= $2 AND first_token_ms > 0 AND model NOT LIKE $3),
+		ARRAY[0, 0, 0]::double precision[]
+	),
+	COALESCE(
+		percentile_cont(ARRAY[0.50, 0.95, 0.99]::double precision[])
+			WITHIN GROUP (ORDER BY duration_ms)
+			FILTER (WHERE created_at >= $2 AND duration_ms > 0 AND model LIKE $3),
+		ARRAY[0, 0, 0]::double precision[]
+	),
 	COUNT(*)::bigint,
-	COUNT(*) FILTER (WHERE LOWER(BTRIM(model)) NOT LIKE $2)::bigint,
-	COUNT(*) FILTER (WHERE LOWER(BTRIM(model)) LIKE $2)::bigint,
-	COALESCE(AVG(first_token_ms) FILTER (WHERE first_token_ms > 0 AND LOWER(BTRIM(model)) NOT LIKE $2), 0)::double precision,
-	COALESCE(percentile_cont(0.50) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms > 0 AND LOWER(BTRIM(model)) NOT LIKE $2), 0)::double precision,
-	COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms > 0 AND LOWER(BTRIM(model)) NOT LIKE $2), 0)::double precision,
-	COALESCE(percentile_cont(0.99) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms > 0 AND LOWER(BTRIM(model)) NOT LIKE $2), 0)::double precision,
-	COALESCE(percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE duration_ms > 0 AND LOWER(BTRIM(model)) LIKE $2), 0)::double precision,
-	COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE duration_ms > 0 AND LOWER(BTRIM(model)) LIKE $2), 0)::double precision,
-	COALESCE(percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE duration_ms > 0 AND LOWER(BTRIM(model)) LIKE $2), 0)::double precision
+	COUNT(*) FILTER (WHERE model NOT LIKE $3)::bigint,
+	COUNT(*) FILTER (WHERE model LIKE $3)::bigint,
+	COALESCE(AVG(first_token_ms) FILTER (WHERE first_token_ms > 0 AND model NOT LIKE $3), 0)::double precision,
+	COALESCE(
+		percentile_cont(ARRAY[0.50, 0.95, 0.99]::double precision[])
+			WITHIN GROUP (ORDER BY first_token_ms)
+			FILTER (WHERE first_token_ms > 0 AND model NOT LIKE $3),
+		ARRAY[0, 0, 0]::double precision[]
+	),
+	COALESCE(
+		percentile_cont(ARRAY[0.50, 0.95, 0.99]::double precision[])
+			WITHIN GROUP (ORDER BY duration_ms)
+			FILTER (WHERE duration_ms > 0 AND model LIKE $3),
+		ARRAY[0, 0, 0]::double precision[]
+	)
 FROM usage_logs
 WHERE created_at >= $1
-`, since, imageModelPattern).Scan(
-		&sampleCount,
-		&textSampleCount,
-		&imageSampleCount,
-		&frtAvg,
-		&frtP50,
-		&frtP95,
-		&frtP99,
-		&imageDurationP50,
-		&imageDurationP95,
-		&imageDurationP99,
-	); err != nil {
-		return RuntimeLatencyStats{}, err
-	}
+`, longSince, shortSince, imageModelPattern).Scan(
+		&short.sampleCount,
+		&short.textSampleCount,
+		&short.imageSampleCount,
+		&short.frtAvg,
+		&short.frtPercentiles,
+		&short.imageDurationPercentiles,
+		&long.sampleCount,
+		&long.textSampleCount,
+		&long.imageSampleCount,
+		&long.frtAvg,
+		&long.frtPercentiles,
+		&long.imageDurationPercentiles,
+	)
+}
 
-	var errorCount, textErrorCount, imageErrorCount int64
-	if err := s.sqlDB.QueryRowContext(ctx, `
+func (s *RuntimeSampler) queryLatencyErrorWindows(
+	parent context.Context,
+	longSince time.Time,
+	shortSince time.Time,
+	imageModelPattern string,
+	short *runtimeLatencyAggregate,
+	long *runtimeLatencyAggregate,
+) error {
+	ctx, cancel := context.WithTimeout(parent, defaultRuntimeQueryTimeout)
+	defer cancel()
+
+	return s.sqlDB.QueryRowContext(ctx, `
 SELECT
+	COUNT(*) FILTER (WHERE created_at >= $2)::bigint,
+	COUNT(*) FILTER (WHERE created_at >= $2 AND model NOT LIKE $3)::bigint,
+	COUNT(*) FILTER (WHERE created_at >= $2 AND model LIKE $3)::bigint,
 	COUNT(*)::bigint,
-	COUNT(*) FILTER (WHERE LOWER(BTRIM(model)) NOT LIKE $2)::bigint,
-	COUNT(*) FILTER (WHERE LOWER(BTRIM(model)) LIKE $2)::bigint
+	COUNT(*) FILTER (WHERE model NOT LIKE $3)::bigint,
+	COUNT(*) FILTER (WHERE model LIKE $3)::bigint
 FROM monitor_request_events
 WHERE created_at >= $1 AND type <> 'client_closed_request'
-`, since, imageModelPattern).Scan(&errorCount, &textErrorCount, &imageErrorCount); err != nil {
-		return RuntimeLatencyStats{}, err
-	}
+`, longSince, shortSince, imageModelPattern).Scan(
+		&short.errorCount,
+		&short.textErrorCount,
+		&short.imageErrorCount,
+		&long.errorCount,
+		&long.textErrorCount,
+		&long.imageErrorCount,
+	)
+}
 
+func (a runtimeLatencyAggregate) stats() RuntimeLatencyStats {
 	return RuntimeLatencyStats{
-		SampleCount:        sampleCount,
-		TextSampleCount:    textSampleCount,
-		ImageSampleCount:   imageSampleCount,
-		FRTAvgMS:           roundMS(frtAvg),
-		FRTP50MS:           roundMS(frtP50),
-		FRTP95MS:           roundMS(frtP95),
-		FRTP99MS:           roundMS(frtP99),
-		ImageDurationP50MS: roundMS(imageDurationP50),
-		ImageDurationP95MS: roundMS(imageDurationP95),
-		ImageDurationP99MS: roundMS(imageDurationP99),
-		ErrorRate:          runtimeErrorRate(sampleCount, errorCount),
-		ErrorCount:         errorCount,
-		TextErrorRate:      runtimeErrorRate(textSampleCount, textErrorCount),
-		TextErrorCount:     textErrorCount,
-		ImageErrorRate:     runtimeErrorRate(imageSampleCount, imageErrorCount),
-		ImageErrorCount:    imageErrorCount,
+		SampleCount:        a.sampleCount,
+		TextSampleCount:    a.textSampleCount,
+		ImageSampleCount:   a.imageSampleCount,
+		FRTAvgMS:           roundMS(a.frtAvg),
+		FRTP50MS:           roundMS(runtimePercentile(a.frtPercentiles, 0)),
+		FRTP95MS:           roundMS(runtimePercentile(a.frtPercentiles, 1)),
+		FRTP99MS:           roundMS(runtimePercentile(a.frtPercentiles, 2)),
+		ImageDurationP50MS: roundMS(runtimePercentile(a.imageDurationPercentiles, 0)),
+		ImageDurationP95MS: roundMS(runtimePercentile(a.imageDurationPercentiles, 1)),
+		ImageDurationP99MS: roundMS(runtimePercentile(a.imageDurationPercentiles, 2)),
+		ErrorRate:          runtimeErrorRate(a.sampleCount, a.errorCount),
+		ErrorCount:         a.errorCount,
+		TextErrorRate:      runtimeErrorRate(a.textSampleCount, a.textErrorCount),
+		TextErrorCount:     a.textErrorCount,
+		ImageErrorRate:     runtimeErrorRate(a.imageSampleCount, a.imageErrorCount),
+		ImageErrorCount:    a.imageErrorCount,
 		Stale:              false,
-	}, nil
+	}
+}
+
+func runtimePercentile(values pq.Float64Array, index int) float64 {
+	if index < 0 || index >= len(values) {
+		return 0
+	}
+	return values[index]
 }
 
 func runtimeErrorRate(sampleCount, errorCount int64) float64 {

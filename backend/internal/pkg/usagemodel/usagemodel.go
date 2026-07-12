@@ -10,8 +10,15 @@ import "strings"
 // "gpt-image-*" 规则一致。
 const ImagePrefix = "gpt-image"
 
+// Normalize returns the canonical model ID persisted by usage and request
+// monitoring. Keeping this invariant at write time lets read-side aggregates
+// use direct prefix matching without per-row normalization.
+func Normalize(model string) string {
+	return strings.ToLower(strings.TrimSpace(model))
+}
+
 // IsImageGen 判断给定 model ID 是否属于生图家族。
 // 不直接 import scheduler 包是为了让 stats / store 层不依赖调度模块。
 func IsImageGen(model string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), ImagePrefix)
+	return strings.HasPrefix(Normalize(model), ImagePrefix)
 }

@@ -471,6 +471,7 @@ func (r *Recorder) insertUsageLogs(ctx context.Context, tx *ent.Tx, batch []Usag
 
 	for _, rec := range batch {
 		rec = ensureBillingEventID(rec)
+		rec.Model = usagemodel.Normalize(rec.Model)
 		createdAt := usageRecordCreatedAt(rec, now)
 		if err := validateUsageRecordForInsert(rec); err != nil {
 			return nil, err

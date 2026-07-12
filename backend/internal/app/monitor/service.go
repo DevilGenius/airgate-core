@@ -17,6 +17,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
 )
 
@@ -419,7 +420,7 @@ func (s *Service) normalizeRequestInput(input requestmonitoring.EventInput) Queu
 		PluginID:            truncateString(input.PluginID, maxPlatformLength),
 		Method:              truncateString(strings.ToUpper(strings.TrimSpace(input.Method)), maxCodeLength),
 		Endpoint:            truncateString(input.Endpoint, maxEndpointLength),
-		Model:               truncateString(input.Model, maxPlatformLength),
+		Model:               truncateString(usagemodel.Normalize(input.Model), maxPlatformLength),
 		HTTPStatus:          cloneIntPtr(input.HTTPStatus),
 		UpstreamStatus:      cloneIntPtr(input.UpstreamStatus),
 		ErrorCode:           truncateString(input.ErrorCode, maxCodeLength),

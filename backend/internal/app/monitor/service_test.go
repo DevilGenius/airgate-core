@@ -89,6 +89,7 @@ func TestServiceOptionsRecordAndNormalize(t *testing.T) {
 		Severity:       "bad",
 		Source:         "",
 		Method:         " post ",
+		Model:          "  GPT-IMAGE-1  ",
 		Endpoint:       stringsOfLength("/v1/", maxEndpointLength+10),
 		RequestPath:    "/actual/request/path",
 		DurationMS:     -5,
@@ -99,7 +100,7 @@ func TestServiceOptionsRecordAndNormalize(t *testing.T) {
 	}).RequestEvent
 	if request.Type != requestmonitoring.TypeClientClosed || request.Severity != requestmonitoring.SeverityInfo ||
 		request.Source != monitoring.SourceForwarder || request.Method != "POST" || request.DurationMS != 0 ||
-		request.Detail["cookie"] != "[REDACTED]" || request.Detail["request_path"] != "/actual/request/path" {
+		request.Model != "gpt-image-1" || request.Detail["cookie"] != "[REDACTED]" || request.Detail["request_path"] != "/actual/request/path" {
 		t.Fatalf("normalized request = %+v detail=%+v", request, request.Detail)
 	}
 

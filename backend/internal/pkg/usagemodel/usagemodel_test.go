@@ -24,3 +24,9 @@ func TestIsImageGen(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalize(t *testing.T) {
+	if got := Normalize("  GPT-IMAGE-mini  "); got != "gpt-image-mini" {
+		t.Fatalf("Normalize() = %q, want %q", got, "gpt-image-mini")
+	}
+}

@@ -20,13 +20,13 @@ var (
 	runtimeLatencyTestFixtures   sync.Map
 )
 
-func TestRuntimeSamplerQueryLatencySplitsModelKinds(t *testing.T) {
+func TestRuntimeSamplerQueryLatencyWindowsSplitsModelKinds(t *testing.T) {
 	db, fixture := openRuntimeLatencyTestDB(t)
 	sampler := NewRuntimeSampler(db, nil, nil, nil, nil, nil)
 
-	stats, err := sampler.queryLatency(t.Context(), 5*time.Minute)
+	stats, longStats, err := sampler.queryLatencyWindows(t.Context())
 	if err != nil {
-		t.Fatalf("queryLatency() error = %v", err)
+		t.Fatalf("queryLatencyWindows() error = %v", err)
 	}
 
 	if stats.SampleCount != 9 || stats.TextSampleCount != 7 || stats.ImageSampleCount != 2 {
@@ -47,6 +47,21 @@ func TestRuntimeSamplerQueryLatencySplitsModelKinds(t *testing.T) {
 	if stats.Stale {
 		t.Fatal("successful latency sample marked stale")
 	}
+	if longStats.SampleCount != 90 || longStats.TextSampleCount != 70 || longStats.ImageSampleCount != 20 {
+		t.Fatalf("long sample counts = total:%d text:%d image:%d", longStats.SampleCount, longStats.TextSampleCount, longStats.ImageSampleCount)
+	}
+	if longStats.FRTAvgMS != 210 || longStats.FRTP50MS != 200 || longStats.FRTP95MS != 300 || longStats.FRTP99MS != 500 {
+		t.Fatalf("long text FRT stats = avg:%d p50:%d p95:%d p99:%d", longStats.FRTAvgMS, longStats.FRTP50MS, longStats.FRTP95MS, longStats.FRTP99MS)
+	}
+	if longStats.ImageDurationP50MS != 2000 || longStats.ImageDurationP95MS != 6001 || longStats.ImageDurationP99MS != 10001 {
+		t.Fatalf("long image duration stats = p50:%d p95:%d p99:%d", longStats.ImageDurationP50MS, longStats.ImageDurationP95MS, longStats.ImageDurationP99MS)
+	}
+	if longStats.ErrorCount != 8 || longStats.TextErrorCount != 6 || longStats.ImageErrorCount != 2 {
+		t.Fatalf("long error counts = total:%d text:%d image:%d", longStats.ErrorCount, longStats.TextErrorCount, longStats.ImageErrorCount)
+	}
+	assertRuntimeFloat(t, "long total error rate", longStats.ErrorRate, 8.0/98.0)
+	assertRuntimeFloat(t, "long text error rate", longStats.TextErrorRate, 6.0/76.0)
+	assertRuntimeFloat(t, "long image error rate", longStats.ImageErrorRate, 2.0/22.0)
 
 	fixture.mu.Lock()
 	defer fixture.mu.Unlock()
@@ -54,15 +69,33 @@ func TestRuntimeSamplerQueryLatencySplitsModelKinds(t *testing.T) {
 		t.Fatalf("query count = %d, want 2", len(fixture.queries))
 	}
 	usageQuery := fixture.queries[0]
-	if !strings.Contains(usageQuery, "first_token_ms > 0 AND LOWER(BTRIM(model)) NOT LIKE $2") {
+	if !strings.Contains(usageQuery, "first_token_ms > 0 AND model NOT LIKE $3") {
 		t.Fatal("text FRT query does not exclude image models")
 	}
-	if !strings.Contains(usageQuery, "duration_ms > 0 AND LOWER(BTRIM(model)) LIKE $2") {
+	if !strings.Contains(usageQuery, "duration_ms > 0 AND model LIKE $3") {
 		t.Fatal("image duration query does not select image models")
 	}
+	if strings.Contains(usageQuery, "LOWER(") || strings.Contains(usageQuery, "BTRIM(") {
+		t.Fatal("usage query still normalizes every model row")
+	}
+	if got := strings.Count(usageQuery, "percentile_cont(ARRAY["); got != 4 {
+		t.Fatalf("usage percentile array count = %d, want 4", got)
+	}
+	if strings.Contains(usageQuery, "percentile_cont(0.") {
+		t.Fatal("usage query still calculates percentiles separately")
+	}
+	errorQuery := fixture.queries[1]
+	if strings.Contains(errorQuery, "LOWER(") || strings.Contains(errorQuery, "BTRIM(") {
+		t.Fatal("error query still normalizes every model row")
+	}
 	for index, args := range fixture.args {
-		if len(args) != 2 || args[1].Value != "gpt-image%" {
+		if len(args) != 3 || args[2].Value != "gpt-image%" {
 			t.Fatalf("query %d model pattern args = %+v", index, args)
+		}
+		longSince, longOK := args[0].Value.(time.Time)
+		shortSince, shortOK := args[1].Value.(time.Time)
+		if !longOK || !shortOK || !longSince.Before(shortSince) {
+			t.Fatalf("query %d window args = %+v", index, args[:2])
 		}
 	}
 }
@@ -151,19 +184,24 @@ func (c *runtimeLatencyTestConn) QueryContext(_ context.Context, query string, a
 		return &runtimeLatencyTestRows{
 			columns: []string{
 				"sample_count", "text_sample_count", "image_sample_count",
-				"frt_avg", "frt_p50", "frt_p95", "frt_p99",
-				"image_duration_p50", "image_duration_p95", "image_duration_p99",
+				"frt_avg", "frt_percentiles", "image_duration_percentiles",
+				"long_sample_count", "long_text_sample_count", "long_image_sample_count",
+				"long_frt_avg", "long_frt_percentiles", "long_image_duration_percentiles",
 			},
 			values: []driver.Value{
 				int64(9), int64(7), int64(2),
-				110.4, 100.4, 199.6, 399.5,
-				1000.4, 5000.5, 9000.6,
+				110.4, []byte("{100.4,199.6,399.5}"), []byte("{1000.4,5000.5,9000.6}"),
+				int64(90), int64(70), int64(20),
+				210.4, []byte("{200.4,299.6,499.5}"), []byte("{2000.4,6000.5,10000.6}"),
 			},
 		}, nil
 	case strings.Contains(query, "FROM monitor_request_events"):
 		return &runtimeLatencyTestRows{
-			columns: []string{"error_count", "text_error_count", "image_error_count"},
-			values:  []driver.Value{int64(4), int64(3), int64(1)},
+			columns: []string{
+				"error_count", "text_error_count", "image_error_count",
+				"long_error_count", "long_text_error_count", "long_image_error_count",
+			},
+			values: []driver.Value{int64(4), int64(3), int64(1), int64(8), int64(6), int64(2)},
 		}, nil
 	default:
 		return nil, errors.New("unexpected runtime latency query")

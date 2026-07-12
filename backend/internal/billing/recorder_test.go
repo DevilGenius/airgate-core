@@ -49,7 +49,7 @@ func TestRecordSyncPersistsUserEmailSnapshot(t *testing.T) {
 		AccountID: account.ID,
 		GroupID:   group.ID,
 		Platform:  "openai",
-		Model:     "gpt-5",
+		Model:     "  GPT-IMAGE-1  ",
 	})
 	if err != nil {
 		t.Fatalf("RecordSync returned error: %v", err)
@@ -64,6 +64,9 @@ func TestRecordSyncPersistsUserEmailSnapshot(t *testing.T) {
 	}
 	if log.BillingEventID == "" {
 		t.Fatalf("billing_event_id should be generated")
+	}
+	if log.Model != "gpt-image-1" {
+		t.Fatalf("stored model = %q, want canonical model", log.Model)
 	}
 	if log.RateMultiplier != 1 || log.AccountRateMultiplier != 1 {
 		t.Fatalf("rate snapshots = (%v, %v), want defaults (1, 1)", log.RateMultiplier, log.AccountRateMultiplier)

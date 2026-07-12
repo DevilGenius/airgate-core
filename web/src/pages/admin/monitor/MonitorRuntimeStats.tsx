@@ -250,8 +250,8 @@ export function MonitorRuntimeStats({
     imageCurrent?: number,
     imageBaseline?: number,
   ) => joinDetail([
-    `${t('monitor.runtime_text_frt')} ${percentile} ${formatDurationPairWithDelta(textCurrent, textBaseline)}`,
-    `${t('monitor.runtime_image_duration')} ${percentile} ${formatDurationPairWithDelta(imageCurrent, imageBaseline)}`,
+    `${percentile} ${formatDurationPairWithDelta(textCurrent, textBaseline)}`,
+    `${percentile} ${formatDurationPairWithDelta(imageCurrent, imageBaseline)}`,
   ]);
   const stale = latency?.stale || latency1H?.stale;
 
