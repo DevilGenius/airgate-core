@@ -27,12 +27,12 @@ func TestStatsSummaryErrorBranches(t *testing.T) {
 	if _, err := NewService(repo).UserStatsWithModels(t.Context(), 1, StatsFilter{}); !errors.Is(err, repoErr) {
 		t.Fatalf("UserStatsWithModels() error = %v", err)
 	}
-	if _, err := NewService(repo).AdminStats(t.Context(), StatsFilter{}, "model"); !errors.Is(err, repoErr) {
+	if _, err := NewService(repo).AdminStats(t.Context(), StatsFilter{}, "model", true); !errors.Is(err, repoErr) {
 		t.Fatalf("AdminStats() error = %v", err)
 	}
 	emptyResult, err := NewService(&stubUsageRepository{
 		summaryAdminFn: func(context.Context, StatsFilter) (Summary, error) { return Summary{TotalRequests: 3}, nil },
-	}).AdminStats(t.Context(), StatsFilter{}, "")
+	}).AdminStats(t.Context(), StatsFilter{}, "", true)
 	if err != nil || emptyResult.TotalRequests != 3 {
 		t.Fatalf("AdminStats(empty groupBy) = %+v err=%v", emptyResult, err)
 	}
@@ -180,6 +180,24 @@ func TestUsageCachedResultRedisPaths(t *testing.T) {
 		})
 		if err != nil || got != 13 {
 			t.Fatalf("cached result = %d/%v", got, err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("redis expectations: %v", err)
+		}
+	})
+
+	t.Run("busy waiter does not run duplicate loader", func(t *testing.T) {
+		rdb, mock := redismock.NewClientMock()
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+		defer cancel()
+		mock.ExpectGet("key").RedisNil()
+		mock.Regexp().ExpectSetNX("key:lock", `[0-9a-f-]+`, usageCacheLockTTL).SetVal(false)
+		mock.ExpectGet("key").RedisNil()
+		if _, err := usageCachedResult[int](ctx, rdb, "key", time.Second, func(context.Context) (int, error) {
+			t.Fatal("loader should not run while another owner holds the lock")
+			return 0, nil
+		}); !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("busy cached result error = %v, want deadline exceeded", err)
 		}
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Fatalf("redis expectations: %v", err)

@@ -265,6 +265,7 @@ func (h *UsageHandler) AdminUsageStats(c *gin.Context) {
 		return
 	}
 
+	includeSummary := query.IncludeSummary == nil || *query.IncludeSummary
 	result, err := h.service.AdminStats(c.Request.Context(), appusage.StatsFilter{
 		UserID:    query.UserID,
 		APIKeyID:  query.APIKeyID,
@@ -273,7 +274,7 @@ func (h *UsageHandler) AdminUsageStats(c *gin.Context) {
 		StartDate: query.StartDate,
 		EndDate:   query.EndDate,
 		TZ:        c.Query("tz"),
-	}, query.GroupBy)
+	}, query.GroupBy, includeSummary)
 	if err != nil {
 		handleUsageError("查询管理员聚合统计失败", err)
 		response.InternalError(c, "统计失败")

@@ -33,6 +33,7 @@ export const STORAGE_KEYS = {
     adminUsageCardsCollapsed: 'ag:web:admin:usage:cards_collapsed',
     adminUsageColumns: 'ag:web:admin:usage:columns',
     adminUsageFilters: 'ag:web:admin:usage:filters',
+    apiKeyUsageFilters: 'ag:web:api_key:usage:filters',
     tableStatePrefix: 'ag:web:table:',
     userUsageAutoRefresh: 'ag:web:user:usage:auto_refresh',
     userUsageFilters: 'ag:web:user:usage:filters',

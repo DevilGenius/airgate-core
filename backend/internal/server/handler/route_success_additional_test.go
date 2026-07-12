@@ -183,6 +183,7 @@ func TestSettingsDashboardAndUsageRoutesSuccessWithSQLite(t *testing.T) {
 		{name: "user stats", target: "/usage/stats", setup: func(c *gin.Context) { c.Set("user_id", 7) }, fn: usageHandler.UserUsageStats},
 		{name: "user trend", target: "/usage/trend?granularity=day&tz=UTC", setup: func(c *gin.Context) { c.Set("user_id", 7) }, fn: usageHandler.UserUsageTrend},
 		{name: "admin usage", target: "/admin/usage?page=1&page_size=10", fn: usageHandler.AdminUsage},
+		{name: "admin summary stats", target: "/admin/usage/stats", fn: usageHandler.AdminUsageStats},
 		{name: "admin stats", target: "/admin/usage/stats?group_by=model,user", fn: usageHandler.AdminUsageStats},
 		{name: "admin trend", target: "/admin/usage/trend?granularity=day&tz=UTC", fn: usageHandler.AdminUsageTrend},
 	}

@@ -12,14 +12,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"golang.org/x/sync/singleflight"
 
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // Service 使用记录用例服务。
 type Service struct {
-	repo Repository
-	rdb  *redis.Client
+	repo        Repository
+	rdb         *redis.Client
+	cacheFlight singleflight.Group
 }
 
 // NewService 创建使用记录服务。
@@ -44,6 +46,15 @@ var usageCacheLockReleaseScript = redis.NewScript(`
 	local token = ARGV[1]
 	if redis.call('GET', key) == token then
 		return redis.call('DEL', key)
+	end
+	return 0
+`)
+
+var usageCacheLockRenewScript = redis.NewScript(`
+	local key = KEYS[1]
+	local token = ARGV[1]
+	if redis.call('GET', key) == token then
+		return redis.call('PEXPIRE', key, ARGV[2])
 	end
 	return 0
 `)
@@ -96,7 +107,7 @@ func (s *Service) UserStatsWithModels(ctx context.Context, userID int64, filter 
 		Filter StatsFilter
 	}{UserID: userID, Filter: filter})
 
-	return usageCachedResult(ctx, s.rdb, key, usageStatsCacheTTL, func(loadCtx context.Context) (UserStatsResult, error) {
+	return usageCachedResultWithFlight(ctx, &s.cacheFlight, s.rdb, key, usageStatsCacheTTL, func(loadCtx context.Context) (UserStatsResult, error) {
 		summary, err := s.repo.SummaryUser(loadCtx, userID, filter)
 		if err != nil {
 			sdk.LoggerFromContext(loadCtx).Error("usage_query_failed",
@@ -174,24 +185,28 @@ func (s *Service) StatsByModel(ctx context.Context, filter StatsFilter) ([]Model
 }
 
 // AdminStats 查询管理员聚合统计。
-func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy string) (StatsResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy string, includeSummary bool) (StatsResult, error) {
 	groupBy = normalizeStatsGroupBy(groupBy)
 	key := usageCacheKey("admin-stats", struct {
-		Filter  StatsFilter
-		GroupBy string
-	}{Filter: filter, GroupBy: groupBy})
+		Filter         StatsFilter
+		GroupBy        string
+		IncludeSummary bool
+	}{Filter: filter, GroupBy: groupBy, IncludeSummary: includeSummary})
 
-	return usageCachedResult(ctx, s.rdb, key, usageStatsCacheTTL, func(loadCtx context.Context) (StatsResult, error) {
-		summary, err := s.repo.SummaryAdmin(loadCtx, filter)
-		if err != nil {
-			logger.Error("usage_query_failed",
-				"scope", "admin_summary",
-				sdk.LogFieldError, err)
-			return StatsResult{}, err
+	return usageCachedResultWithFlight(ctx, &s.cacheFlight, s.rdb, key, usageStatsCacheTTL, func(loadCtx context.Context) (StatsResult, error) {
+		logger := sdk.LoggerFromContext(loadCtx)
+		result := StatsResult{}
+		var err error
+		if includeSummary {
+			result.Summary, err = s.repo.SummaryAdmin(loadCtx, filter)
+			if err != nil {
+				logger.Error("usage_query_failed",
+					"scope", "admin_summary",
+					sdk.LogFieldError, err)
+				return StatsResult{}, err
+			}
 		}
 
-		result := StatsResult{Summary: summary}
 		for _, dimension := range strings.Split(groupBy, ",") {
 			switch dimension {
 			case "model":
@@ -223,7 +238,7 @@ func (s *Service) AdminTrend(ctx context.Context, filter TrendFilter) ([]TrendBu
 	filter = normalizeTrendFilter(filter)
 	key := usageCacheKey("trend", filter)
 
-	return usageCachedResult(ctx, s.rdb, key, usageTrendCacheTTL, func(loadCtx context.Context) ([]TrendBucket, error) {
+	return usageCachedResultWithFlight(ctx, &s.cacheFlight, s.rdb, key, usageTrendCacheTTL, func(loadCtx context.Context) ([]TrendBucket, error) {
 		entries, err := s.repo.TrendEntries(loadCtx, filter)
 		if err != nil {
 			sdk.LoggerFromContext(loadCtx).Error("usage_query_failed",
@@ -279,6 +294,41 @@ func usageCacheKey(kind string, payload any) string {
 	return fmt.Sprintf("%s:%s:%s", usageCacheKeyPrefix, kind, hex.EncodeToString(sum[:]))
 }
 
+func usageCachedResultWithFlight[T any](ctx context.Context, flight *singleflight.Group, rdb *redis.Client, key string, ttl time.Duration, loader func(context.Context) (T, error)) (T, error) {
+	if err := ctx.Err(); err != nil {
+		var zero T
+		return zero, err
+	}
+	if rdb != nil {
+		if value, ok := usageLoadCache[T](ctx, rdb, key); ok {
+			return value, nil
+		}
+	}
+	if flight == nil {
+		return usageCachedResult(ctx, rdb, key, ttl, loader)
+	}
+
+	resultCh := flight.DoChan(key, func() (any, error) {
+		return usageCachedResult(ctx, rdb, key, ttl, loader)
+	})
+	select {
+	case <-ctx.Done():
+		var zero T
+		return zero, ctx.Err()
+	case result := <-resultCh:
+		if result.Err != nil {
+			var zero T
+			return zero, result.Err
+		}
+		value, ok := result.Val.(T)
+		if !ok {
+			var zero T
+			return zero, fmt.Errorf("usage cache result type mismatch for %s", key)
+		}
+		return value, nil
+	}
+}
+
 func usageCachedResult[T any](ctx context.Context, rdb *redis.Client, key string, ttl time.Duration, loader func(context.Context) (T, error)) (T, error) {
 	if rdb == nil {
 		return loader(ctx)
@@ -287,22 +337,35 @@ func usageCachedResult[T any](ctx context.Context, rdb *redis.Client, key string
 		return value, nil
 	}
 
-	if token, ok, busy := usageTryCacheLock(ctx, rdb, key); ok {
-		defer usageReleaseCacheLock(key, token, rdb)
-		if value, ok := usageLoadCache[T](ctx, rdb, key); ok {
-			return value, nil
-		}
-		value, err := loader(ctx)
-		if err != nil {
+	for {
+		if err := ctx.Err(); err != nil {
 			var zero T
 			return zero, err
 		}
-		usageStoreCache(rdb, key, value, ttl)
-		return value, nil
-	} else if busy {
-		if value, ok := usageWaitForCache[T](ctx, rdb, key, usageCacheLockWait); ok {
+
+		if token, ok, busy := usageTryCacheLock(ctx, rdb, key); ok {
+			stopRenewal := usageStartCacheLockRenewal(key, token, rdb)
+			defer func() {
+				stopRenewal()
+				usageReleaseCacheLock(key, token, rdb)
+			}()
+			if value, ok := usageLoadCache[T](ctx, rdb, key); ok {
+				return value, nil
+			}
+			value, err := loader(ctx)
+			if err != nil {
+				var zero T
+				return zero, err
+			}
+			usageStoreCache(rdb, key, value, ttl)
 			return value, nil
+		} else if busy {
+			if value, ok := usageWaitForCache[T](ctx, rdb, key, usageCacheLockWait); ok {
+				return value, nil
+			}
+			continue
 		}
+		break
 	}
 
 	value, err := loader(ctx)
@@ -357,6 +420,43 @@ func usageReleaseCacheLock(key, token string, rdb *redis.Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 	_, _ = usageCacheLockReleaseScript.Run(ctx, rdb, []string{key + ":lock"}, token).Result()
+}
+
+func usageStartCacheLockRenewal(key, token string, rdb *redis.Client) func() {
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	interval := usageCacheLockTTL / 3
+	if interval <= 0 {
+		interval = time.Second
+	}
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+				renewed, err := usageCacheLockRenewScript.Run(
+					ctx,
+					rdb,
+					[]string{key + ":lock"},
+					token,
+					usageCacheLockTTL.Milliseconds(),
+				).Int64()
+				cancel()
+				if err != nil || renewed == 0 {
+					return
+				}
+			}
+		}
+	}()
+	return func() {
+		close(stop)
+		<-done
+	}
 }
 
 func usageWaitForCache[T any](ctx context.Context, rdb *redis.Client, key string, timeout time.Duration) (T, bool) {

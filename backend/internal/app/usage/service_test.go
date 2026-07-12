@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -143,7 +145,7 @@ func TestAdminStatsBuildsRequestedDimensions(t *testing.T) {
 		},
 	}
 
-	result, err := NewService(repo).AdminStats(t.Context(), StatsFilter{Platform: "openai"}, "user,model,account,group,unknown,user")
+	result, err := NewService(repo).AdminStats(t.Context(), StatsFilter{Platform: "openai"}, "user,model,account,group,unknown,user", true)
 	if err != nil {
 		t.Fatalf("AdminStats() error = %v", err)
 	}
@@ -164,9 +166,78 @@ func TestAdminStatsPropagatesDimensionError(t *testing.T) {
 		statsByGroupFn: func(context.Context, StatsFilter) ([]GroupStats, error) { return nil, repoErr },
 	}
 
-	_, err := NewService(repo).AdminStats(t.Context(), StatsFilter{}, "group")
+	_, err := NewService(repo).AdminStats(t.Context(), StatsFilter{}, "group", true)
 	if !errors.Is(err, repoErr) {
 		t.Fatalf("AdminStats() error = %v", err)
+	}
+}
+
+func TestAdminStatsCanSkipSummary(t *testing.T) {
+	var summaryCalls atomic.Int32
+	repo := &stubUsageRepository{
+		summaryAdminFn: func(context.Context, StatsFilter) (Summary, error) {
+			summaryCalls.Add(1)
+			return Summary{}, errors.New("summary should be skipped")
+		},
+		statsByModelFn: func(context.Context, StatsFilter) ([]ModelStats, error) {
+			return []ModelStats{{Model: "gpt-5.4", Requests: 2}}, nil
+		},
+	}
+
+	result, err := NewService(repo).AdminStats(t.Context(), StatsFilter{}, "model", false)
+	if err != nil {
+		t.Fatalf("AdminStats(includeSummary=false) error = %v", err)
+	}
+	if summaryCalls.Load() != 0 || result.TotalRequests != 0 || len(result.ByModel) != 1 {
+		t.Fatalf("AdminStats(includeSummary=false) = %+v, summary calls = %d", result, summaryCalls.Load())
+	}
+}
+
+func TestAdminStatsMergesConcurrentLoads(t *testing.T) {
+	var summaryCalls atomic.Int32
+	started := make(chan struct{})
+	release := make(chan struct{})
+	repo := &stubUsageRepository{
+		summaryAdminFn: func(context.Context, StatsFilter) (Summary, error) {
+			if summaryCalls.Add(1) == 1 {
+				close(started)
+			}
+			<-release
+			return Summary{TotalRequests: 1}, nil
+		},
+	}
+	service := NewService(repo)
+
+	const callers = 12
+	start := make(chan struct{})
+	errs := make(chan error, callers)
+	var ready sync.WaitGroup
+	var done sync.WaitGroup
+	ready.Add(callers)
+	done.Add(callers)
+	for range callers {
+		go func() {
+			defer done.Done()
+			ready.Done()
+			<-start
+			_, err := service.AdminStats(context.Background(), StatsFilter{}, "", true)
+			errs <- err
+		}()
+	}
+	ready.Wait()
+	close(start)
+	<-started
+	time.Sleep(25 * time.Millisecond)
+	close(release)
+	done.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("AdminStats concurrent error = %v", err)
+		}
+	}
+	if summaryCalls.Load() != 1 {
+		t.Fatalf("summary calls = %d, want 1", summaryCalls.Load())
 	}
 }
 

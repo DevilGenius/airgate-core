@@ -167,13 +167,14 @@ type GroupStats struct {
 
 // UsageStatsQuery 统计查询参数
 type UsageStatsQuery struct {
-	GroupBy   string `form:"group_by" binding:"required"` // 聚合维度，支持逗号分隔多值（如 model,group）
-	UserID    *int64 `form:"user_id"`
-	APIKeyID  *int64 `form:"api_key_id"`
-	Platform  string `form:"platform"`
-	Model     string `form:"model"`
-	StartDate string `form:"start_date"`
-	EndDate   string `form:"end_date"`
+	GroupBy        string `form:"group_by"` // 聚合维度，支持逗号分隔多值（如 model,group）
+	IncludeSummary *bool  `form:"include_summary"`
+	UserID         *int64 `form:"user_id"`
+	APIKeyID       *int64 `form:"api_key_id"`
+	Platform       string `form:"platform"`
+	Model          string `form:"model"`
+	StartDate      string `form:"start_date"`
+	EndDate        string `form:"end_date"`
 }
 
 // UsageTrendQuery Token 趋势查询参数

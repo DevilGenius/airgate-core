@@ -11,7 +11,7 @@ import { useToast } from '../../shared/ui';
 import { Activity, DollarSign, Clock, Gauge, Percent, Sigma, Upload } from 'lucide-react';
 import type { UsageQuery } from '../../shared/types';
 import { useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
-import { getSessionAPIKey } from '../../shared/api/client';
+import { getSessionAPIKey, getTokenAPIKeyID } from '../../shared/api/client';
 import { CcsImportModal } from './userkeys/CcsImportModal';
 import { RecordsTable } from '../../shared/components/RecordsTable';
 import { TablePage } from '../../shared/components/TablePage';
@@ -35,6 +35,7 @@ const USER_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.userUsageFilters;
 type StoredUserUsageFilters = {
   api_key_id?: number;
   api_key_label?: string;
+  model?: string;
   platform?: string;
 };
 
@@ -52,20 +53,26 @@ function isStoredFilterRecord(value: unknown): value is Record<string, unknown> 
   return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function userUsageFilterStorageKey(customerScope: boolean) {
+  return customerScope ? STORAGE_KEYS.ui.apiKeyUsageFilters : USER_USAGE_FILTER_STORAGE_KEY;
+}
+
 function readUserUsageFilterState(customerScope: boolean): UserUsageFilterState {
   const fallback: UserUsageFilterState = { apiKeyLabel: '', filters: {} };
   if (typeof window === 'undefined') return fallback;
 
   try {
-    const raw = window.localStorage.getItem(USER_USAGE_FILTER_STORAGE_KEY);
+    const raw = window.localStorage.getItem(userUsageFilterStorageKey(customerScope));
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     if (!isStoredFilterRecord(parsed)) return fallback;
 
     const filters: Partial<UsageQuery> = {};
+    const model = typeof parsed.model === 'string' ? parsed.model.trim() : '';
     const platform = customerScope ? '' : (typeof parsed.platform === 'string' ? parsed.platform.trim() : '');
     const apiKeyID = customerScope ? undefined : readStoredPositiveID(parsed.api_key_id);
 
+    if (model) filters.model = model;
     if (platform) filters.platform = platform;
     if (apiKeyID != null) filters.api_key_id = apiKeyID;
 
@@ -82,6 +89,8 @@ function writeUserUsageFilterState(filters: Partial<UsageQuery>, apiKeyLabel: st
   if (typeof window === 'undefined') return;
 
   const stored: StoredUserUsageFilters = {};
+  const model = filters.model?.trim();
+  if (model) stored.model = model;
   if (!customerScope && filters.platform) stored.platform = filters.platform;
   if (!customerScope && filters.api_key_id != null && filters.api_key_id > 0) {
     stored.api_key_id = filters.api_key_id;
@@ -89,10 +98,11 @@ function writeUserUsageFilterState(filters: Partial<UsageQuery>, apiKeyLabel: st
   }
 
   try {
+    const storageKey = userUsageFilterStorageKey(customerScope);
     if (Object.keys(stored).length > 0) {
-      window.localStorage.setItem(USER_USAGE_FILTER_STORAGE_KEY, JSON.stringify(stored));
+      window.localStorage.setItem(storageKey, JSON.stringify(stored));
     } else {
-      window.localStorage.removeItem(USER_USAGE_FILTER_STORAGE_KEY);
+      window.localStorage.removeItem(storageKey);
     }
   } catch {
     // localStorage may be unavailable in restricted browser modes.
@@ -254,8 +264,8 @@ function APIKeyInfoBar() {
 
 export default function UserUsageContent() {
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const customerScope = !!user?.api_key_id;
+  const { user, isAPIKeySession } = useAuth();
+  const customerScope = isAPIKeySession || getTokenAPIKeyID() != null || !!user?.api_key_id;
   const { beforeId, page, setPage, pageSize, setPageSize, resetCursorPagination } = useCursorPagination(20, 'user.usage');
   const [initialFilterState] = useState(() => readUserUsageFilterState(customerScope));
   const [filters, setFilters] = useState<Partial<UsageQuery>>(() => initialFilterState.filters);
@@ -344,7 +354,7 @@ export default function UserUsageContent() {
 
   useEffect(() => {
     writeUserUsageFilterState(filters, selectedAPIKeyLabel, customerScope);
-  }, [customerScope, filters.api_key_id, filters.platform, selectedAPIKeyLabel]);
+  }, [customerScope, filters.api_key_id, filters.model, filters.platform, selectedAPIKeyLabel]);
 
   const list = data?.list ?? [];
   const total = data?.total ?? 0;

@@ -1,7 +1,7 @@
 import { lazy, memo, startTransition, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Card, Tabs } from '@heroui/react';
+import { Card, Skeleton, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
@@ -93,6 +93,24 @@ function StatCard({
   );
 }
 
+function StatsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]" key={index}>
+          <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+            <div className="ag-dashboard-metric-copy space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-6 w-24" />
+            </div>
+            <Skeleton className="hidden h-11 w-11 shrink-0 rounded-[var(--field-radius)] 2xl:block" />
+          </Card.Content>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 const ColumnVisibilityMenu = memo(function ColumnVisibilityMenu({
   label,
   onToggle,
@@ -147,7 +165,6 @@ const groupByHeaderKeys: Record<string, string> = {
   group: 'usage.by_group',
 };
 
-const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageAutoRefresh;
 const ADMIN_USAGE_CARDS_COLLAPSED_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageCardsCollapsed;
 const ADMIN_USAGE_COLUMN_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageColumns;
@@ -171,6 +188,7 @@ const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
 type StoredAdminUsageFilters = {
   api_key_id?: number;
   api_key_label?: string;
+  model?: string;
   platform?: string;
   user_id?: number;
   user_label?: string;
@@ -207,10 +225,12 @@ function readAdminUsageFilterState(): AdminUsageFilterState {
     if (!isStoredFilterRecord(parsed)) return fallback;
 
     const filters: Partial<UsageQuery> = {};
+    const model = typeof parsed.model === 'string' ? parsed.model.trim() : '';
     const platform = typeof parsed.platform === 'string' ? parsed.platform.trim() : '';
     const userID = readStoredPositiveID(parsed.user_id);
     const apiKeyID = readStoredPositiveID(parsed.api_key_id);
 
+    if (model) filters.model = model;
     if (platform) filters.platform = platform;
     if (userID != null) filters.user_id = userID;
     if (apiKeyID != null) filters.api_key_id = apiKeyID;
@@ -229,6 +249,8 @@ function writeAdminUsageFilterState(filters: Partial<UsageQuery>, userLabel: str
   if (typeof window === 'undefined') return;
 
   const stored: StoredAdminUsageFilters = {};
+  const model = filters.model?.trim();
+  if (model) stored.model = model;
   if (filters.platform) stored.platform = filters.platform;
   if (filters.user_id != null && filters.user_id > 0) {
     stored.user_id = filters.user_id;
@@ -582,23 +604,48 @@ export default function UsagePage() {
     placeholderData: keepPreviousData,
   });
 
+  const statsFilters = useMemo(() => ({
+    start_date: filters.start_date,
+    end_date: filters.end_date,
+    platform: filters.platform,
+    model: filters.model,
+    user_id: filters.user_id ? Number(filters.user_id) : undefined,
+    api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
+  }), [filters.api_key_id, filters.end_date, filters.model, filters.platform, filters.start_date, filters.user_id]);
+
   const {
-    data: stats,
-    isFetching: isStatsFetching,
-    isPlaceholderData: isStatsPlaceholderData,
-    refetch: refetchStats,
+    data: summaryStats,
+    isFetching: isSummaryStatsFetching,
+    isPlaceholderData: isSummaryStatsPlaceholderData,
+    refetch: refetchSummaryStats,
   } = useQuery({
-    queryKey: ['admin-usage-stats', filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id],
+    queryKey: ['admin-usage-stats', 'summary', statsFilters],
+    queryFn: ({ signal }) =>
+      usageApi.stats(statsFilters, { signal }),
+    meta: { globalLoading: false },
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+  });
+
+  const analysisGroupBy = useMemo(
+    () => Array.from(new Set(['model', 'group', statsGroupBy])).join(','),
+    [statsGroupBy],
+  );
+  const analysisStatsEnabled = !usageCardsCollapsed && summaryStats != null && !isSummaryStatsPlaceholderData;
+  const {
+    data: analysisStats,
+    isFetching: isAnalysisStatsFetching,
+    refetch: refetchAnalysisStats,
+  } = useQuery({
+    queryKey: ['admin-usage-stats', 'analysis', analysisGroupBy, statsFilters],
     queryFn: ({ signal }) =>
       usageApi.stats({
-        group_by: ADMIN_USAGE_STATS_GROUP_BY,
-        start_date: filters.start_date,
-        end_date: filters.end_date,
-        platform: filters.platform,
-        model: filters.model,
-        user_id: filters.user_id ? Number(filters.user_id) : undefined,
-        api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
+        ...statsFilters,
+        group_by: analysisGroupBy,
+        include_summary: false,
       }, { signal }),
+    enabled: analysisStatsEnabled,
     meta: { globalLoading: false },
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
@@ -624,14 +671,19 @@ export default function UsagePage() {
     placeholderData: keepPreviousData,
   });
 
+  const isStatsFetching = isSummaryStatsFetching || (analysisStatsEnabled && isAnalysisStatsFetching);
   const isRefreshing = isUsageFetching || isStatsFetching || isTrendFetching;
   const isUsageTableRefreshing = isUsageFetching;
 
   const handleManualRefresh = useCallback(() => {
     void refetchUsage({ cancelRefetch: false });
-    void refetchStats({ cancelRefetch: false });
     void refetchTrend({ cancelRefetch: false });
-  }, [refetchStats, refetchTrend, refetchUsage]);
+    void refetchSummaryStats({ cancelRefetch: false }).then((result) => {
+      if (!usageCardsCollapsed && result.isSuccess) {
+        void refetchAnalysisStats({ cancelRefetch: false });
+      }
+    });
+  }, [refetchAnalysisStats, refetchSummaryStats, refetchTrend, refetchUsage, usageCardsCollapsed]);
 
   const handleAutoRefresh = useCallback(() => {
     void refetchUsage({ cancelRefetch: false });
@@ -659,43 +711,43 @@ export default function UsagePage() {
 
   useEffect(() => {
     writeAdminUsageFilterState(filters, selectedUserLabel, selectedAPIKeyLabel);
-  }, [filters.api_key_id, filters.platform, filters.user_id, selectedAPIKeyLabel, selectedUserLabel]);
+  }, [filters.api_key_id, filters.model, filters.platform, filters.user_id, selectedAPIKeyLabel, selectedUserLabel]);
 
-  const activeStats = stats;
+  const activeStats = summaryStats;
 
   // 分布表格数据
   const modelDistribution: DistributionItem[] = useMemo(
-    () => (activeStats?.by_model ?? []).map((s) => ({
+    () => (analysisStats?.by_model ?? []).map((s) => ({
       name: s.model,
       requests: s.requests,
       tokens: s.tokens,
       totalCost: s.total_cost,
       actualCost: s.actual_cost,
     })),
-    [activeStats?.by_model],
+    [analysisStats?.by_model],
   );
 
   const groupDistribution: DistributionItem[] = useMemo(
-    () => (activeStats?.by_group ?? []).map((s) => ({
+    () => (analysisStats?.by_group ?? []).map((s) => ({
       name: s.name || `#${s.group_id}`,
       requests: s.requests,
       tokens: s.tokens,
       totalCost: s.total_cost,
       actualCost: s.actual_cost,
     })),
-    [activeStats?.by_group],
+    [analysisStats?.by_group],
   );
 
   const groupStatsRows: GroupStatsRow[] = useMemo(() => {
-    if (!activeStats) return [];
+    if (!analysisStats) return [];
     const dataMap: Record<string, GroupStatsRow[]> = {
-      account: activeStats.by_account?.map((s) => ({ key: s.account_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
-      group: activeStats.by_group?.map((s) => ({ key: s.group_id, name: s.name || `#${s.group_id}`, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
-      model: activeStats.by_model?.map((s) => ({ key: s.model, name: s.model, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
-      user: activeStats.by_user?.map((s) => ({ key: s.user_id, name: s.email, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      account: analysisStats.by_account?.map((s) => ({ key: s.account_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      group: analysisStats.by_group?.map((s) => ({ key: s.group_id, name: s.name || `#${s.group_id}`, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      model: analysisStats.by_model?.map((s) => ({ key: s.model, name: s.model, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      user: analysisStats.by_user?.map((s) => ({ key: s.user_id, name: s.email, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
     };
     return dataMap[statsGroupBy] ?? [];
-  }, [activeStats, statsGroupBy]);
+  }, [analysisStats, statsGroupBy]);
 
   const sharedColumns = useUsageColumns();
 
@@ -899,13 +951,13 @@ export default function UsagePage() {
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
   const canUseCursor = !isPlaceholderData;
-  const summaryTotal = activeStats && !isStatsPlaceholderData ? activeStats.total_requests : undefined;
+  const summaryTotal = activeStats && !isSummaryStatsPlaceholderData ? activeStats.total_requests : undefined;
 
   return (
     <div>
       {/* 聚合统计 */}
-      {activeStats && (
-        <div className="mb-6 space-y-4">
+      <div className="mb-6 space-y-4">
+        {activeStats ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
             <StatCard
               title={t('usage.total_requests')}
@@ -932,40 +984,42 @@ export default function UsagePage() {
               tone="emerald"
             />
           </div>
+        ) : (
+          <StatsSkeleton />
+        )}
 
-          {!usageCardsCollapsed ? (
-            <>
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <DistributionCard
-                  title={t('usage.model_distribution')}
-                  firstColumnTitle={t('usage.model')}
-                  firstColumnWidth="30%"
-                  data={modelDistribution}
-                />
-                <DistributionCard
-                  title={t('usage.group_distribution')}
-                  firstColumnTitle={t('groups.group')}
-                  firstColumnWidth="26%"
-                  data={groupDistribution}
-                />
-              </div>
+        {activeStats && !usageCardsCollapsed ? (
+          <>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <DistributionCard
+                title={t('usage.model_distribution')}
+                firstColumnTitle={t('usage.model')}
+                firstColumnWidth="30%"
+                data={modelDistribution}
+              />
+              <DistributionCard
+                title={t('usage.group_distribution')}
+                firstColumnTitle={t('groups.group')}
+                firstColumnWidth="26%"
+                data={groupDistribution}
+              />
+            </div>
 
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <TokenTrendCard
-                  data={trendData ?? []}
-                  granularity={granularity}
-                  onGranularityChange={setGranularity}
-                />
-                <GroupStatsCard
-                  activeKey={statsGroupBy}
-                  rows={groupStatsRows}
-                  onActiveKeyChange={setStatsGroupBy}
-                />
-              </div>
-            </>
-          ) : null}
-        </div>
-      )}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <TokenTrendCard
+                data={trendData ?? []}
+                granularity={granularity}
+                onGranularityChange={setGranularity}
+              />
+              <GroupStatsCard
+                activeKey={statsGroupBy}
+                rows={groupStatsRows}
+                onActiveKeyChange={setStatsGroupBy}
+              />
+            </div>
+          </>
+        ) : null}
+      </div>
 
       <TablePage
         className="ag-usage-page ag-toolbar-standard-page"

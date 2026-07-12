@@ -267,7 +267,7 @@ func TestPluginSettingsUsageAndUpgradeValidationBranches(t *testing.T) {
 		{name: "usage stats unauthorized", method: http.MethodGet, target: "/usage/stats", fn: usageHandler.UserUsageStats, status: http.StatusUnauthorized},
 		{name: "usage trend unauthorized", method: http.MethodGet, target: "/usage/trend", fn: usageHandler.UserUsageTrend, status: http.StatusUnauthorized},
 		{name: "usage admin bind", method: http.MethodGet, target: "/admin/usage?before_id=bad", fn: usageHandler.AdminUsage, status: http.StatusBadRequest},
-		{name: "usage admin stats bind", method: http.MethodGet, target: "/admin/usage/stats", fn: usageHandler.AdminUsageStats, status: http.StatusBadRequest},
+		{name: "usage admin stats bind", method: http.MethodGet, target: "/admin/usage/stats?include_summary=bad", fn: usageHandler.AdminUsageStats, status: http.StatusBadRequest},
 		{name: "usage admin trend bind", method: http.MethodGet, target: "/admin/usage/trend?granularity=bad", fn: usageHandler.AdminUsageTrend, status: http.StatusBadRequest},
 
 		{name: "upgrade run bind", method: http.MethodPost, target: "/upgrade/run", body: `{`, fn: upgradeHandler.Run, status: http.StatusBadRequest},

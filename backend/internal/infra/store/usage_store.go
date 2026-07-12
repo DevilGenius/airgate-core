@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -519,8 +520,20 @@ func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter
 	if filter.Platform != "" {
 		query = query.Where(entusagelog.PlatformEQ(filter.Platform))
 	}
-	if filter.Model != "" {
-		query = query.Where(entusagelog.ModelContains(filter.Model))
+	includeModels, excludeModels := parseUsageModelFilter(filter.Model)
+	if len(includeModels) > 0 {
+		includePredicates := make([]predicate.UsageLog, 0, len(includeModels))
+		for _, model := range includeModels {
+			includePredicates = append(includePredicates, entusagelog.ModelContains(model))
+		}
+		query = query.Where(entusagelog.Or(includePredicates...))
+	}
+	if len(excludeModels) > 0 {
+		excludePredicates := make([]predicate.UsageLog, 0, len(excludeModels))
+		for _, model := range excludeModels {
+			excludePredicates = append(excludePredicates, entusagelog.ModelContains(model))
+		}
+		query = query.Where(entusagelog.Not(entusagelog.Or(excludePredicates...)))
 	}
 	loc := timezone.Resolve(filter.TZ)
 	if filter.StartDate != "" {
@@ -536,13 +549,36 @@ func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter
 	return query
 }
 
-func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summary, error) {
-	totalRequests, err := query.Clone().Count(ctx)
-	if err != nil {
-		return appusage.Summary{}, err
-	}
+func parseUsageModelFilter(raw string) (includeModels, excludeModels []string) {
+	excludeNext := false
+	for _, term := range strings.Fields(raw) {
+		if term == "!" {
+			excludeNext = true
+			continue
+		}
 
+		if strings.HasPrefix(term, "!") {
+			term = strings.TrimPrefix(term, "!")
+			if term != "" {
+				excludeModels = append(excludeModels, term)
+			}
+			excludeNext = false
+			continue
+		}
+
+		if excludeNext {
+			excludeModels = append(excludeModels, term)
+			excludeNext = false
+			continue
+		}
+		includeModels = append(includeModels, term)
+	}
+	return includeModels, excludeModels
+}
+
+func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summary, error) {
 	var rows []struct {
+		TotalRequests       int64   `json:"total_requests"`
 		InputTokens         int64   `json:"input_tokens"`
 		OutputTokens        int64   `json:"output_tokens"`
 		CachedInputTokens   int64   `json:"cached_input_tokens"`
@@ -551,29 +587,37 @@ func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summar
 		ActualCost          float64 `json:"actual_cost"`
 		BilledCost          float64 `json:"billed_cost"`
 	}
-	err = query.Clone().
+	err := query.
 		Aggregate(
-			ent.As(ent.Sum(entusagelog.FieldInputTokens), "input_tokens"),
-			ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_tokens"),
-			ent.As(ent.Sum(entusagelog.FieldCachedInputTokens), "cached_input_tokens"),
-			ent.As(ent.Sum(entusagelog.FieldCacheCreationTokens), "cache_creation_tokens"),
-			ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost"),
-			ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost"),
-			ent.As(ent.Sum(entusagelog.FieldBilledCost), "billed_cost"),
+			ent.As(ent.Count(), "total_requests"),
+			ent.As(usageLogSum(entusagelog.FieldInputTokens), "input_tokens"),
+			ent.As(usageLogSum(entusagelog.FieldOutputTokens), "output_tokens"),
+			ent.As(usageLogSum(entusagelog.FieldCachedInputTokens), "cached_input_tokens"),
+			ent.As(usageLogSum(entusagelog.FieldCacheCreationTokens), "cache_creation_tokens"),
+			ent.As(usageLogSum(entusagelog.FieldTotalCost), "total_cost"),
+			ent.As(usageLogSum(entusagelog.FieldActualCost), "actual_cost"),
+			ent.As(usageLogSum(entusagelog.FieldBilledCost), "billed_cost"),
 		).
 		Scan(ctx, &rows)
 	if err != nil {
 		return appusage.Summary{}, err
 	}
 
-	summary := appusage.Summary{TotalRequests: int64(totalRequests)}
+	summary := appusage.Summary{}
 	if len(rows) > 0 {
+		summary.TotalRequests = rows[0].TotalRequests
 		summary.TotalTokens = rows[0].InputTokens + rows[0].OutputTokens + rows[0].CachedInputTokens + rows[0].CacheCreationTokens
 		summary.TotalCost = rows[0].TotalCost
 		summary.TotalActualCost = rows[0].ActualCost
 		summary.TotalBilledCost = rows[0].BilledCost
 	}
 	return summary, nil
+}
+
+func usageLogSum(field string) ent.AggregateFunc {
+	return func(s *sql.Selector) string {
+		return "COALESCE(SUM(" + s.C(field) + "), 0)"
+	}
 }
 
 func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
