@@ -779,13 +779,13 @@ export default function UsagePage() {
         const email = row.account_email?.trim();
         const title = email && name !== '-' ? `${displayName}\n${email}` : displayName;
         return (
-          <div className="flex w-full min-w-0 flex-col items-center text-center" title={title}>
+          <div className="flex w-full min-w-0 flex-col items-start text-left" title={title}>
             <span className={`flex w-full min-w-0 items-center gap-1 text-xs font-medium ${row.account_deleted ? 'text-text-tertiary' : 'text-text-secondary'}`}>
               <span className="shrink-0 font-mono text-[11px] text-warning">{accountID}</span>
               <span className={`min-w-0 truncate text-left ${row.account_deleted ? 'line-through' : ''}`}>{name}</span>
             </span>
             {email && name !== '-' ? (
-              <span className={`block max-w-full truncate text-[11px] leading-tight text-text-tertiary ${row.account_deleted ? 'line-through' : ''}`}>{email}</span>
+              <span className={`block w-full min-w-0 truncate text-left text-[11px] leading-tight text-text-tertiary ${row.account_deleted ? 'line-through' : ''}`}>{email}</span>
             ) : null}
           </div>
         );
