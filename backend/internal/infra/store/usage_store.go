@@ -529,7 +529,7 @@ func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter
 	if filter.Platform != "" {
 		query = query.Where(entusagelog.PlatformEQ(filter.Platform))
 	}
-	includeModels, excludeModels := parseUsageModelFilter(filter.Model)
+	includeModels, excludeModels := appusage.ParseModelFilter(filter.Model)
 	if len(includeModels) > 0 {
 		includePredicates := make([]predicate.UsageLog, 0, len(includeModels))
 		for _, model := range includeModels {
@@ -556,33 +556,6 @@ func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter
 		}
 	}
 	return query
-}
-
-func parseUsageModelFilter(raw string) (includeModels, excludeModels []string) {
-	excludeNext := false
-	for _, term := range strings.Fields(raw) {
-		if term == "!" {
-			excludeNext = true
-			continue
-		}
-
-		if strings.HasPrefix(term, "!") {
-			term = strings.TrimPrefix(term, "!")
-			if term != "" {
-				excludeModels = append(excludeModels, term)
-			}
-			excludeNext = false
-			continue
-		}
-
-		if excludeNext {
-			excludeModels = append(excludeModels, term)
-			excludeNext = false
-			continue
-		}
-		includeModels = append(includeModels, term)
-	}
-	return includeModels, excludeModels
 }
 
 func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summary, error) {

@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/go-redis/redismock/v9"
+	"golang.org/x/sync/singleflight"
 )
 
 func TestNewServiceAcceptsRedisClient(t *testing.T) {
@@ -65,11 +67,38 @@ func TestUsageRedisCacheHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("store cache and marshal error", func(t *testing.T) {
+	t.Run("publish cache atomically and reject invalid value", func(t *testing.T) {
 		rdb, mock := redismock.NewClientMock()
-		mock.ExpectSet("key", []byte("7"), time.Second).SetVal("OK")
-		usageStoreCache(rdb, "key", 7, time.Second)
-		usageStoreCache(rdb, "ignored", func() {}, time.Second)
+		mock.ExpectEvalSha(
+			usageCachePublishScript.Hash(),
+			[]string{"key:lock", "key"},
+			"token",
+			[]byte("7"),
+			time.Second.Milliseconds(),
+		).SetVal(int64(1))
+		if !usagePublishCache(rdb, "key", "token", 7, time.Second) {
+			t.Fatal("usagePublishCache success = false")
+		}
+		if usagePublishCache(rdb, "ignored", "token", func() {}, time.Second) {
+			t.Fatal("usagePublishCache marshal error = true")
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("redis expectations: %v", err)
+		}
+	})
+
+	t.Run("publish requires current lock token", func(t *testing.T) {
+		rdb, mock := redismock.NewClientMock()
+		mock.ExpectEvalSha(
+			usageCachePublishScript.Hash(),
+			[]string{"key:lock", "key"},
+			"stale-token",
+			[]byte("7"),
+			time.Second.Milliseconds(),
+		).SetVal(int64(0))
+		if usagePublishCache(rdb, "key", "stale-token", 7, time.Second) {
+			t.Fatal("usagePublishCache stale token = true")
+		}
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Fatalf("redis expectations: %v", err)
 		}
@@ -121,7 +150,60 @@ func TestUsageCachedResultRedisPaths(t *testing.T) {
 		mock.ExpectGet("key").RedisNil()
 		mock.Regexp().ExpectSetNX("key:lock", `[0-9a-f-]+`, usageCacheLockTTL).SetVal(true)
 		mock.ExpectGet("key").RedisNil()
-		mock.ExpectSet("key", []byte("9"), time.Second).SetVal("OK")
+		mock.Regexp().ExpectEvalSha(
+			usageCachePublishScript.Hash(),
+			[]string{"key:lock", "key"},
+			`[0-9a-f-]+`,
+			[]byte("9"),
+			time.Second.Milliseconds(),
+		).SetVal(int64(1))
+		got, err := usageCachedResult[int](t.Context(), rdb, "key", time.Second, func(context.Context) (int, error) {
+			return 9, nil
+		})
+		if err != nil || got != 9 {
+			t.Fatalf("cached result = %d/%v", got, err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("redis expectations: %v", err)
+		}
+	})
+
+	t.Run("lost lock does not let old owner overwrite cache", func(t *testing.T) {
+		rdb, mock := redismock.NewClientMock()
+		mock.ExpectGet("key").RedisNil()
+		mock.Regexp().ExpectSetNX("key:lock", `[0-9a-f-]+`, usageCacheLockTTL).SetVal(true)
+		mock.ExpectGet("key").RedisNil()
+		mock.Regexp().ExpectEvalSha(
+			usageCachePublishScript.Hash(),
+			[]string{"key:lock", "key"},
+			`[0-9a-f-]+`,
+			[]byte("9"),
+			time.Second.Milliseconds(),
+		).SetVal(int64(0))
+		mock.Regexp().ExpectEvalSha(usageCacheLockReleaseScript.Hash(), []string{"key:lock"}, `[0-9a-f-]+`).SetVal(int64(0))
+		got, err := usageCachedResult[int](t.Context(), rdb, "key", time.Second, func(context.Context) (int, error) {
+			return 9, nil
+		})
+		if err != nil || got != 9 {
+			t.Fatalf("cached result = %d/%v", got, err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("redis expectations: %v", err)
+		}
+	})
+
+	t.Run("publish error returns value without fallback write", func(t *testing.T) {
+		rdb, mock := redismock.NewClientMock()
+		mock.ExpectGet("key").RedisNil()
+		mock.Regexp().ExpectSetNX("key:lock", `[0-9a-f-]+`, usageCacheLockTTL).SetVal(true)
+		mock.ExpectGet("key").RedisNil()
+		mock.Regexp().ExpectEvalSha(
+			usageCachePublishScript.Hash(),
+			[]string{"key:lock", "key"},
+			`[0-9a-f-]+`,
+			[]byte("9"),
+			time.Second.Milliseconds(),
+		).SetErr(errors.New("publish failed"))
 		mock.Regexp().ExpectEvalSha(usageCacheLockReleaseScript.Hash(), []string{"key:lock"}, `[0-9a-f-]+`).SetVal(int64(1))
 		got, err := usageCachedResult[int](t.Context(), rdb, "key", time.Second, func(context.Context) (int, error) {
 			return 9, nil
@@ -204,11 +286,10 @@ func TestUsageCachedResultRedisPaths(t *testing.T) {
 		}
 	})
 
-	t.Run("lock error falls back and stores", func(t *testing.T) {
+	t.Run("lock error computes without publishing", func(t *testing.T) {
 		rdb, mock := redismock.NewClientMock()
 		mock.ExpectGet("key").RedisNil()
 		mock.Regexp().ExpectSetNX("key:lock", `[0-9a-f-]+`, usageCacheLockTTL).SetErr(errors.New("redis failed"))
-		mock.ExpectSet("key", []byte("15"), time.Second).SetVal("OK")
 		got, err := usageCachedResult[int](t.Context(), rdb, "key", time.Second, func(context.Context) (int, error) {
 			return 15, nil
 		})
@@ -234,6 +315,89 @@ func TestUsageCachedResultRedisPaths(t *testing.T) {
 			t.Fatalf("redis expectations: %v", err)
 		}
 	})
+}
+
+func TestUsageCachedResultWithFlightDetachesSharedLoadFromOwnerCancellation(t *testing.T) {
+	type contextKey struct{}
+
+	var loaderCalls atomic.Int32
+	loaderStarted := make(chan struct{})
+	releaseLoader := make(chan struct{})
+	loader := func(ctx context.Context) (int, error) {
+		if loaderCalls.Add(1) != 1 {
+			return 0, errors.New("loader called more than once")
+		}
+		close(loaderStarted)
+		if got := ctx.Value(contextKey{}); got != "owner-value" {
+			return 0, errors.New("loader context value was not preserved")
+		}
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			return 0, errors.New("loader context has no hard deadline")
+		}
+		remaining := time.Until(deadline)
+		if remaining < usageCacheLoadTimeout-time.Second || remaining > usageCacheLoadTimeout {
+			return 0, errors.New("loader context hard deadline is invalid")
+		}
+		<-releaseLoader
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		return 23, nil
+	}
+
+	flight := &singleflight.Group{}
+	ownerBase := context.WithValue(t.Context(), contextKey{}, "owner-value")
+	ownerDeadlineCtx, cancelDeadline := context.WithTimeout(ownerBase, 100*time.Millisecond)
+	defer cancelDeadline()
+	ownerCtx, cancelOwner := context.WithCancel(ownerDeadlineCtx)
+	ownerResult := make(chan error, 1)
+	go func() {
+		_, err := usageCachedResultWithFlight(ownerCtx, flight, nil, "key", time.Second, loader)
+		ownerResult <- err
+	}()
+	select {
+	case <-loaderStarted:
+	case <-time.After(time.Second):
+		t.Fatal("shared loader did not start")
+	}
+
+	waiterResult := make(chan struct {
+		value int
+		err   error
+	}, 1)
+	go func() {
+		value, err := usageCachedResultWithFlight(t.Context(), flight, nil, "key", time.Second, loader)
+		waiterResult <- struct {
+			value int
+			err   error
+		}{value: value, err: err}
+	}()
+
+	// Give the waiter time to join the still-running shared call before the
+	// owner returns. The loader remains blocked until after cancellation.
+	time.Sleep(25 * time.Millisecond)
+	cancelOwner()
+	select {
+	case err := <-ownerResult:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("owner error = %v, want context canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("owner did not stop waiting after cancellation")
+	}
+	close(releaseLoader)
+	select {
+	case result := <-waiterResult:
+		if result.err != nil || result.value != 23 {
+			t.Fatalf("waiter result = %d/%v", result.value, result.err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter did not receive shared result")
+	}
+	if got := loaderCalls.Load(); got != 1 {
+		t.Fatalf("loader calls = %d, want 1", got)
+	}
 }
 
 func TestUsageWaitForCacheTimeoutAndCanceled(t *testing.T) {

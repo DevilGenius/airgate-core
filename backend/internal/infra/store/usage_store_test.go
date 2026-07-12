@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -100,36 +99,6 @@ func assertLogIDs(t *testing.T, got []appusage.LogRecord, want ...int64) {
 		if item.ID != want[i] {
 			t.Fatalf("got[%d].ID = %d, want %d; got %+v", i, item.ID, want[i], got)
 		}
-	}
-}
-
-func TestParseUsageModelFilter(t *testing.T) {
-	tests := []struct {
-		raw          string
-		wantIncludes []string
-		wantExcludes []string
-	}{
-		{raw: ""},
-		{raw: "   "},
-		{raw: "!"},
-		{raw: " !  "},
-		{raw: "gpt-5.4-mini", wantIncludes: []string{"gpt-5.4-mini"}},
-		{raw: " gpt-5.4-mini ", wantIncludes: []string{"gpt-5.4-mini"}},
-		{raw: "gpt-5.4 gpt-5.5", wantIncludes: []string{"gpt-5.4", "gpt-5.5"}},
-		{raw: "gpt-5.4\t!gpt-5.4-mini\n!gpt-5.5-mini", wantIncludes: []string{"gpt-5.4"}, wantExcludes: []string{"gpt-5.4-mini", "gpt-5.5-mini"}},
-		{raw: "!gpt-5.4-mini", wantExcludes: []string{"gpt-5.4-mini"}},
-		{raw: " ! gpt-5.4-mini ", wantExcludes: []string{"gpt-5.4-mini"}},
-		{raw: "gpt!mini", wantIncludes: []string{"gpt!mini"}},
-		{raw: "!!foo", wantExcludes: []string{"!foo"}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.raw, func(t *testing.T) {
-			includes, excludes := parseUsageModelFilter(tt.raw)
-			if !slices.Equal(includes, tt.wantIncludes) || !slices.Equal(excludes, tt.wantExcludes) {
-				t.Fatalf("parseUsageModelFilter(%q) = includes %q, excludes %q; want includes %q, excludes %q", tt.raw, includes, excludes, tt.wantIncludes, tt.wantExcludes)
-			}
-		})
 	}
 }
 

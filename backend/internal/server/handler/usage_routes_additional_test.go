@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -254,6 +255,45 @@ func TestUsageRoutesMapServiceErrors(t *testing.T) {
 			w := invokeHandlerForValidation(http.MethodGet, tt.target, "", nil, tt.setup, tt.fn)
 			if w.Code != http.StatusInternalServerError {
 				t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusInternalServerError, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestUsageRoutesRejectOversizedModelFilters(t *testing.T) {
+	handler := NewUsageHandler(appusage.NewService(&usageRouteRepoStub{err: errors.New("repository must not be called")}))
+	withUser := func(c *gin.Context) { c.Set("user_id", 7) }
+	overTerms := strings.TrimSpace(strings.Repeat("gpt-5.4 ", 51))
+	overLength := strings.Repeat("x", 513)
+
+	tests := []struct {
+		name   string
+		target string
+		model  string
+		setup  func(*gin.Context)
+		fn     func(*gin.Context)
+	}{
+		{name: "user usage terms", target: "/usage?page=1&page_size=10", model: overTerms, setup: withUser, fn: handler.UserUsage},
+		{name: "user stats terms", target: "/usage/stats", model: overTerms, setup: withUser, fn: handler.UserUsageStats},
+		{name: "user trend terms", target: "/usage/trend?granularity=day", model: overTerms, setup: withUser, fn: handler.UserUsageTrend},
+		{name: "admin usage terms", target: "/admin/usage?page=1&page_size=10", model: overTerms, fn: handler.AdminUsage},
+		{name: "admin stats terms", target: "/admin/usage/stats?group_by=model", model: overTerms, fn: handler.AdminUsageStats},
+		{name: "admin trend terms", target: "/admin/usage/trend?granularity=day", model: overTerms, fn: handler.AdminUsageTrend},
+		{name: "raw length", target: "/admin/usage?page=1&page_size=10", model: overLength, fn: handler.AdminUsage},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			separator := "&"
+			if !strings.Contains(tt.target, "?") {
+				separator = "?"
+			}
+			w := invokeHandlerForValidation(http.MethodGet, tt.target+separator+"model="+url.QueryEscape(tt.model), "", nil, tt.setup, tt.fn)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusBadRequest, w.Body.String())
+			}
+			if !strings.Contains(w.Body.String(), appusage.ErrInvalidModelFilter.Error()) {
+				t.Fatalf("body = %s, want model filter validation message", w.Body.String())
 			}
 		})
 	}

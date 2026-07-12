@@ -22,6 +22,9 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		response.BindError(c, err)
 		return
 	}
+	if !validateUsageModelFilter(c, query.Model) {
+		return
+	}
 
 	// API Key 登录场景：强制只查该 Key 的记录，并打开 ScopedToKey 标志
 	apiKeyFilter := query.APIKeyID
@@ -84,6 +87,9 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 	var query dto.UsageFilterQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
 		response.BindError(c, err)
+		return
+	}
+	if !validateUsageModelFilter(c, query.Model) {
 		return
 	}
 
@@ -163,6 +169,9 @@ func (h *UsageHandler) UserUsageTrend(c *gin.Context) {
 		response.BindError(c, err)
 		return
 	}
+	if !validateUsageModelFilter(c, query.Model) {
+		return
+	}
 
 	granularity := c.DefaultQuery("granularity", "day")
 	uid64 := int64(userID)
@@ -222,6 +231,9 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 		response.BindError(c, err)
 		return
 	}
+	if !validateUsageModelFilter(c, query.Model) {
+		return
+	}
 
 	result, err := h.service.ListAdmin(c.Request.Context(), appusage.ListFilter{
 		Page:          query.Page,
@@ -265,6 +277,9 @@ func (h *UsageHandler) AdminUsageStats(c *gin.Context) {
 		response.BindError(c, err)
 		return
 	}
+	if !validateUsageModelFilter(c, query.Model) {
+		return
+	}
 
 	includeSummary := query.IncludeSummary == nil || *query.IncludeSummary
 	result, err := h.service.AdminStats(c.Request.Context(), appusage.StatsFilter{
@@ -291,6 +306,9 @@ func (h *UsageHandler) AdminUsageTrend(c *gin.Context) {
 	var query dto.UsageTrendQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
 		response.BindError(c, err)
+		return
+	}
+	if !validateUsageModelFilter(c, query.Model) {
 		return
 	}
 

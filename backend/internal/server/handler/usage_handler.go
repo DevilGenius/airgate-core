@@ -3,7 +3,10 @@ package handler
 import (
 	"log/slog"
 
+	"github.com/gin-gonic/gin"
+
 	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
+	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
 // UsageHandler 使用记录 Handler。
@@ -18,4 +21,12 @@ func NewUsageHandler(service *appusage.Service) *UsageHandler {
 
 func handleUsageError(logMessage string, err error) {
 	slog.Error(logMessage, "error", err)
+}
+
+func validateUsageModelFilter(c *gin.Context, raw string) bool {
+	if err := appusage.ValidateModelFilter(raw); err != nil {
+		response.BadRequest(c, err.Error())
+		return false
+	}
+	return true
 }

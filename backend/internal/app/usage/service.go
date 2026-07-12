@@ -34,11 +34,12 @@ func NewService(repo Repository, rdb ...*redis.Client) *Service {
 }
 
 const (
-	usageStatsCacheTTL  = 10 * time.Second
-	usageTrendCacheTTL  = 15 * time.Second
-	usageCacheLockTTL   = 5 * time.Second
-	usageCacheLockWait  = 1 * time.Second
-	usageCacheKeyPrefix = "ag:usage"
+	usageStatsCacheTTL    = 10 * time.Second
+	usageTrendCacheTTL    = 15 * time.Second
+	usageCacheLoadTimeout = 30 * time.Second
+	usageCacheLockTTL     = 5 * time.Second
+	usageCacheLockWait    = 1 * time.Second
+	usageCacheKeyPrefix   = "ag:usage"
 )
 
 var usageCacheLockReleaseScript = redis.NewScript(`
@@ -57,6 +58,18 @@ var usageCacheLockRenewScript = redis.NewScript(`
 		return redis.call('PEXPIRE', key, ARGV[2])
 	end
 	return 0
+`)
+
+var usageCachePublishScript = redis.NewScript(`
+	local lock_key = KEYS[1]
+	local cache_key = KEYS[2]
+	local token = ARGV[1]
+	if redis.call('GET', lock_key) ~= token then
+		return 0
+	end
+	redis.call('SET', cache_key, ARGV[2], 'PX', ARGV[3])
+	redis.call('DEL', lock_key)
+	return 1
 `)
 
 // ListUser 查询当前用户的使用记录。
@@ -309,7 +322,9 @@ func usageCachedResultWithFlight[T any](ctx context.Context, flight *singlefligh
 	}
 
 	resultCh := flight.DoChan(key, func() (any, error) {
-		return usageCachedResult(ctx, rdb, key, ttl, loader)
+		loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), usageCacheLoadTimeout)
+		defer cancel()
+		return usageCachedResult(loadCtx, rdb, key, ttl, loader)
 	})
 	select {
 	case <-ctx.Done():
@@ -345,9 +360,12 @@ func usageCachedResult[T any](ctx context.Context, rdb *redis.Client, key string
 
 		if token, ok, busy := usageTryCacheLock(ctx, rdb, key); ok {
 			stopRenewal := usageStartCacheLockRenewal(key, token, rdb)
+			lockReleased := false
 			defer func() {
 				stopRenewal()
-				usageReleaseCacheLock(key, token, rdb)
+				if !lockReleased {
+					usageReleaseCacheLock(key, token, rdb)
+				}
 			}()
 			if value, ok := usageLoadCache[T](ctx, rdb, key); ok {
 				return value, nil
@@ -357,7 +375,7 @@ func usageCachedResult[T any](ctx context.Context, rdb *redis.Client, key string
 				var zero T
 				return zero, err
 			}
-			usageStoreCache(rdb, key, value, ttl)
+			lockReleased = usagePublishCache(rdb, key, token, value, ttl)
 			return value, nil
 		} else if busy {
 			if value, ok := usageWaitForCache[T](ctx, rdb, key, usageCacheLockWait); ok {
@@ -373,7 +391,6 @@ func usageCachedResult[T any](ctx context.Context, rdb *redis.Client, key string
 		var zero T
 		return zero, err
 	}
-	usageStoreCache(rdb, key, value, ttl)
 	return value, nil
 }
 
@@ -391,14 +408,22 @@ func usageLoadCache[T any](ctx context.Context, rdb *redis.Client, key string) (
 	return value, true
 }
 
-func usageStoreCache[T any](rdb *redis.Client, key string, value T, ttl time.Duration) {
+func usagePublishCache[T any](rdb *redis.Client, key, token string, value T, ttl time.Duration) bool {
 	raw, err := json.Marshal(value)
 	if err != nil {
-		return
+		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
-	_ = rdb.Set(ctx, key, raw, ttl).Err()
+	published, err := usageCachePublishScript.Run(
+		ctx,
+		rdb,
+		[]string{key + ":lock", key},
+		token,
+		raw,
+		ttl.Milliseconds(),
+	).Int64()
+	return err == nil && published == 1
 }
 
 func usageTryCacheLock(ctx context.Context, rdb *redis.Client, key string) (string, bool, bool) {
