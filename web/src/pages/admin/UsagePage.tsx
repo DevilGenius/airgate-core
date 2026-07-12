@@ -14,6 +14,7 @@ import { TablePage } from '../../shared/components/TablePage';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
+import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
 import { UserSearchFilterComboBox } from '../../shared/components/UserSearchFilterComboBox';
 import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
 import { DISTRIBUTION_COLORS, PAGE_SIZE_OPTIONS } from '../../shared/constants';
@@ -186,6 +187,7 @@ const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
 ] as const;
 
 type StoredAdminUsageFilters = {
+  account?: string;
   api_key_id?: number;
   api_key_label?: string;
   model?: string;
@@ -225,11 +227,13 @@ function readAdminUsageFilterState(): AdminUsageFilterState {
     if (!isStoredFilterRecord(parsed)) return fallback;
 
     const filters: Partial<UsageQuery> = {};
+    const account = typeof parsed.account === 'string' ? parsed.account.trim() : '';
     const model = typeof parsed.model === 'string' ? parsed.model.trim() : '';
     const platform = typeof parsed.platform === 'string' ? parsed.platform.trim() : '';
     const userID = readStoredPositiveID(parsed.user_id);
     const apiKeyID = readStoredPositiveID(parsed.api_key_id);
 
+    if (account) filters.account = account;
     if (model) filters.model = model;
     if (platform) filters.platform = platform;
     if (userID != null) filters.user_id = userID;
@@ -249,7 +253,9 @@ function writeAdminUsageFilterState(filters: Partial<UsageQuery>, userLabel: str
   if (typeof window === 'undefined') return;
 
   const stored: StoredAdminUsageFilters = {};
+  const account = filters.account?.trim();
   const model = filters.model?.trim();
+  if (account) stored.account = account;
   if (model) stored.model = model;
   if (filters.platform) stored.platform = filters.platform;
   if (filters.user_id != null && filters.user_id > 0) {
@@ -579,6 +585,14 @@ export default function UsagePage() {
     });
   }, [resetCursorPagination]);
 
+  const handleAccountChange = useCallback((account: string) => {
+    const nextAccount = account.trim() || undefined;
+    startTransition(() => {
+      resetCursorPagination();
+      setFilters((prev) => (prev.account === nextAccount ? prev : { ...prev, account: nextAccount }));
+    });
+  }, [resetCursorPagination]);
+
   // 构建查询参数
   const queryParams = useMemo<UsageQuery>(() => ({
     page,
@@ -605,13 +619,14 @@ export default function UsagePage() {
   });
 
   const statsFilters = useMemo(() => ({
+    account: filters.account,
     start_date: filters.start_date,
     end_date: filters.end_date,
     platform: filters.platform,
     model: filters.model,
     user_id: filters.user_id ? Number(filters.user_id) : undefined,
     api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
-  }), [filters.api_key_id, filters.end_date, filters.model, filters.platform, filters.start_date, filters.user_id]);
+  }), [filters.account, filters.api_key_id, filters.end_date, filters.model, filters.platform, filters.start_date, filters.user_id]);
 
   const {
     data: summaryStats,
@@ -654,7 +669,7 @@ export default function UsagePage() {
 
   // Token 趋势
   const { data: trendData, isFetching: isTrendFetching, refetch: refetchTrend } = useQuery({
-    queryKey: ['admin-usage-trend', granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id],
+    queryKey: ['admin-usage-trend', granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.account, filters.user_id, filters.api_key_id],
     queryFn: ({ signal }) =>
       usageApi.trend({
         granularity,
@@ -662,6 +677,7 @@ export default function UsagePage() {
         end_date: filters.end_date,
         platform: filters.platform,
         model: filters.model,
+        account: filters.account,
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
         api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
       }, { signal }),
@@ -711,7 +727,7 @@ export default function UsagePage() {
 
   useEffect(() => {
     writeAdminUsageFilterState(filters, selectedUserLabel, selectedAPIKeyLabel);
-  }, [filters.api_key_id, filters.model, filters.platform, filters.user_id, selectedAPIKeyLabel, selectedUserLabel]);
+  }, [filters.account, filters.api_key_id, filters.model, filters.platform, filters.user_id, selectedAPIKeyLabel, selectedUserLabel]);
 
   const activeStats = summaryStats;
 
@@ -1090,15 +1106,23 @@ export default function UsagePage() {
             </div>
             <div className="w-full sm:w-48">
               <APIKeySearchFilterComboBox
-                ariaLabel={t('usage.search_api_key', '搜索 API Key')}
-                emptyPrompt={t('usage.search_api_key', '搜索 API Key')}
+                ariaLabel={t('usage.search_api_key', 'API-Key')}
+                emptyPrompt={t('usage.search_api_key', 'API-Key')}
                 loadingLabel={t('common.loading')}
                 noDataLabel={t('common.no_data')}
-                placeholder={t('usage.search_api_key', '搜索 API Key')}
+                placeholder={t('usage.search_api_key', 'API-Key')}
                 scope="admin"
                 selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
                 selectedLabel={selectedAPIKeyLabel}
                 onSelectionChange={handleAPIKeySelectionChange}
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <SearchFilterInput
+                ariaLabel={t('usage.upstream_credential')}
+                placeholder={t('usage.upstream_credential')}
+                value={filters.account ?? ''}
+                onSearchChange={handleAccountChange}
               />
             </div>
           </div>

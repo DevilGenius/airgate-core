@@ -10,12 +10,14 @@ type ListFilter struct {
 	UserID    *int64
 	APIKeyID  *int64
 	AccountID *int64
-	GroupID   *int64
-	Platform  string
-	Model     string
-	StartDate string
-	EndDate   string
-	TZ        string // IANA 时区名，用于解析 StartDate/EndDate
+	// AccountSearch 仅用于管理员按上游凭证名称或邮箱筛选使用记录。
+	AccountSearch string
+	GroupID       *int64
+	Platform      string
+	Model         string
+	StartDate     string
+	EndDate       string
+	TZ            string // IANA 时区名，用于解析 StartDate/EndDate
 	// ScopedToKey 标记当前查询是被某个 API Key（end customer）发起的。
 	// handler 必须根据 CtxKeyAPIKeyID 强制设置 APIKeyID 并打开此标志，
 	// 后续 mapper 据此切换到 CustomerUsageLogResp，避免泄漏平台真实成本。
@@ -24,14 +26,15 @@ type ListFilter struct {
 
 // StatsFilter 聚合统计筛选。
 type StatsFilter struct {
-	UserID      *int64
-	APIKeyID    *int64
-	Platform    string
-	Model       string
-	StartDate   string
-	EndDate     string
-	TZ          string // IANA 时区名，用于解析 StartDate/EndDate
-	ScopedToKey bool   // 与 ListFilter.ScopedToKey 同义
+	UserID        *int64
+	APIKeyID      *int64
+	AccountSearch string
+	Platform      string
+	Model         string
+	StartDate     string
+	EndDate       string
+	TZ            string // IANA 时区名，用于解析 StartDate/EndDate
+	ScopedToKey   bool   // 与 ListFilter.ScopedToKey 同义
 }
 
 // TrendFilter 趋势统计筛选。

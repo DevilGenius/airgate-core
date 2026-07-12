@@ -504,18 +504,27 @@ func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) 
 		query = query.Where(entusagelog.HasGroupWith(entgroup.IDEQ(int(*filter.GroupID))))
 	}
 	return applyUsageStatsFilter(query, appusage.StatsFilter{
-		Platform:    filter.Platform,
-		Model:       filter.Model,
-		StartDate:   filter.StartDate,
-		EndDate:     filter.EndDate,
-		TZ:          filter.TZ,
-		ScopedToKey: filter.ScopedToKey,
+		AccountSearch: filter.AccountSearch,
+		Platform:      filter.Platform,
+		Model:         filter.Model,
+		StartDate:     filter.StartDate,
+		EndDate:       filter.EndDate,
+		TZ:            filter.TZ,
+		ScopedToKey:   filter.ScopedToKey,
 	})
 }
 
 func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter) *ent.UsageLogQuery {
 	if filter.APIKeyID != nil {
 		query = query.Where(usageLogColumnEQ(entusagelog.APIKeyColumn, int(*filter.APIKeyID)))
+	}
+	if accountSearch := strings.TrimSpace(filter.AccountSearch); accountSearch != "" {
+		// 账号名称和邮箱只在 accounts 小表中匹配，再通过已有的账号外键索引过滤 usage_logs。
+		// 这里不使用 accountscope.Query，确保软删除账号的历史使用记录仍可搜索。
+		query = query.Where(entusagelog.HasAccountWith(entaccount.Or(
+			entaccount.NameContainsFold(accountSearch),
+			entaccount.EmailContainsFold(accountSearch),
+		)))
 	}
 	if filter.Platform != "" {
 		query = query.Where(entusagelog.PlatformEQ(filter.Platform))

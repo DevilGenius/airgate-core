@@ -200,26 +200,31 @@ func TestUsageRoutesReturnScopedAndAdminPayloads(t *testing.T) {
 		t.Fatalf("scoped trend body = %s", w.Body.String())
 	}
 
-	w = invokeHandlerForValidation(http.MethodGet, "/admin/usage?page=1&page_size=5&before_id=80&user_id=7&api_key_id=13&account_id=17&group_id=19&platform=openai&model=gpt-4.1&tz=UTC", "", nil, nil, handler.AdminUsage)
+	w = invokeHandlerForValidation(http.MethodGet, "/admin/usage?page=1&page_size=5&before_id=80&user_id=7&api_key_id=13&account_id=17&account=credential%40example.test&group_id=19&platform=openai&model=gpt-4.1&tz=UTC", "", nil, nil, handler.AdminUsage)
 	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
-	if repo.lastAdminFilter.UserID == nil || *repo.lastAdminFilter.UserID != 7 || repo.lastAdminFilter.BeforeID != 80 {
+	if repo.lastAdminFilter.UserID == nil || *repo.lastAdminFilter.UserID != 7 || repo.lastAdminFilter.BeforeID != 80 ||
+		repo.lastAdminFilter.AccountSearch != "credential@example.test" {
 		t.Fatalf("admin list filter = %+v", repo.lastAdminFilter)
 	}
 	if !strings.Contains(w.Body.String(), `"account_cost":0.6`) || !strings.Contains(w.Body.String(), `"account_rate_multiplier":1.3`) {
 		t.Fatalf("admin usage body = %s", w.Body.String())
 	}
 
-	w = invokeHandlerForValidation(http.MethodGet, "/admin/usage/stats?group_by=group,account,model,user&user_id=7&api_key_id=13&platform=openai&model=gpt-4.1&tz=UTC", "", nil, nil, handler.AdminUsageStats)
+	w = invokeHandlerForValidation(http.MethodGet, "/admin/usage/stats?group_by=group,account,model,user&user_id=7&api_key_id=13&account=upstream-credential&platform=openai&model=gpt-4.1&tz=UTC", "", nil, nil, handler.AdminUsageStats)
 	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+	if repo.lastStatsFilter.AccountSearch != "upstream-credential" {
+		t.Fatalf("admin stats filter = %+v", repo.lastStatsFilter)
+	}
 	for _, want := range []string{`"by_model"`, `"by_user"`, `"by_account"`, `"by_group"`} {
 		if !strings.Contains(w.Body.String(), want) {
 			t.Fatalf("admin stats body missing %s: %s", want, w.Body.String())
 		}
 	}
 
-	w = invokeHandlerForValidation(http.MethodGet, "/admin/usage/trend?granularity=day&user_id=7&api_key_id=13&platform=openai&model=gpt-4.1&tz=UTC", "", nil, nil, handler.AdminUsageTrend)
+	w = invokeHandlerForValidation(http.MethodGet, "/admin/usage/trend?granularity=day&user_id=7&api_key_id=13&account=upstream-credential&platform=openai&model=gpt-4.1&tz=UTC", "", nil, nil, handler.AdminUsageTrend)
 	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
-	if repo.lastTrendFilter.UserID == nil || *repo.lastTrendFilter.UserID != 7 || repo.lastTrendFilter.Granularity != "day" {
+	if repo.lastTrendFilter.UserID == nil || *repo.lastTrendFilter.UserID != 7 || repo.lastTrendFilter.Granularity != "day" ||
+		repo.lastTrendFilter.AccountSearch != "upstream-credential" {
 		t.Fatalf("admin trend filter = %+v", repo.lastTrendFilter)
 	}
 	if !strings.Contains(w.Body.String(), `"actual_cost":0.7`) || strings.Contains(w.Body.String(), `"billed_cost"`) {

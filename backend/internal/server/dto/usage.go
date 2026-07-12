@@ -93,6 +93,7 @@ type UsageQuery struct {
 	UserID    *int64 `form:"user_id"`
 	APIKeyID  *int64 `form:"api_key_id"`
 	AccountID *int64 `form:"account_id"`
+	Account   string `form:"account"`
 	GroupID   *int64 `form:"group_id"`
 	Platform  string `form:"platform"`
 	Model     string `form:"model"`
@@ -171,6 +172,7 @@ type UsageStatsQuery struct {
 	IncludeSummary *bool  `form:"include_summary"`
 	UserID         *int64 `form:"user_id"`
 	APIKeyID       *int64 `form:"api_key_id"`
+	Account        string `form:"account"`
 	Platform       string `form:"platform"`
 	Model          string `form:"model"`
 	StartDate      string `form:"start_date"`
@@ -182,6 +184,7 @@ type UsageTrendQuery struct {
 	Granularity string `form:"granularity" binding:"required,oneof=hour day"`
 	UserID      *int64 `form:"user_id"`
 	APIKeyID    *int64 `form:"api_key_id"`
+	Account     string `form:"account"`
 	Platform    string `form:"platform"`
 	Model       string `form:"model"`
 	StartDate   string `form:"start_date"`

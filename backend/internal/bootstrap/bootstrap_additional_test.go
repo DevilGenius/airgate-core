@@ -197,6 +197,34 @@ func TestAccountEmailIdentityUpgradeDoesNotRewriteUsageHistory(t *testing.T) {
 	}
 }
 
+func TestArchiveNumericAccountNamesUpgrade(t *testing.T) {
+	const upgradeID = "20260712200822_archive_numeric_account_names"
+
+	var sql string
+	for _, upgrade := range loadSystemUpgrades() {
+		if upgrade.ID == upgradeID {
+			sql = strings.ToLower(upgrade.SQL)
+			break
+		}
+	}
+	if sql == "" {
+		t.Fatalf("embedded upgrade %s not found", upgradeID)
+	}
+
+	for _, required := range []string{
+		"update public.accounts",
+		"name = 'archivedcredential'",
+		"generate_series(1, 200)",
+	} {
+		if !strings.Contains(sql, required) {
+			t.Fatalf("startup upgrade %s missing %q", upgradeID, required)
+		}
+	}
+	if strings.Contains(sql, "usage_logs") {
+		t.Fatalf("startup upgrade %s must not touch usage history", upgradeID)
+	}
+}
+
 func assertSystemUpgradePanic(t *testing.T, action string, err error) {
 	t.Helper()
 	defer func() {

@@ -588,6 +588,7 @@ export interface UsageQuery extends PageReq {
   user_id?: number;
   api_key_id?: number;
   account_id?: number;
+  account?: string;
   group_id?: number;
   platform?: string;
   model?: string;

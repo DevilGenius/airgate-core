@@ -224,18 +224,19 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 	}
 
 	result, err := h.service.ListAdmin(c.Request.Context(), appusage.ListFilter{
-		Page:      query.Page,
-		PageSize:  query.PageSize,
-		BeforeID:  ptrInt64Value(query.BeforeID),
-		UserID:    query.UserID,
-		APIKeyID:  query.APIKeyID,
-		AccountID: query.AccountID,
-		GroupID:   query.GroupID,
-		Platform:  query.Platform,
-		Model:     query.Model,
-		StartDate: query.StartDate,
-		EndDate:   query.EndDate,
-		TZ:        c.Query("tz"),
+		Page:          query.Page,
+		PageSize:      query.PageSize,
+		BeforeID:      ptrInt64Value(query.BeforeID),
+		UserID:        query.UserID,
+		APIKeyID:      query.APIKeyID,
+		AccountID:     query.AccountID,
+		AccountSearch: query.Account,
+		GroupID:       query.GroupID,
+		Platform:      query.Platform,
+		Model:         query.Model,
+		StartDate:     query.StartDate,
+		EndDate:       query.EndDate,
+		TZ:            c.Query("tz"),
 	})
 	if err != nil {
 		handleUsageError("查询管理员使用记录失败", err)
@@ -267,13 +268,14 @@ func (h *UsageHandler) AdminUsageStats(c *gin.Context) {
 
 	includeSummary := query.IncludeSummary == nil || *query.IncludeSummary
 	result, err := h.service.AdminStats(c.Request.Context(), appusage.StatsFilter{
-		UserID:    query.UserID,
-		APIKeyID:  query.APIKeyID,
-		Platform:  query.Platform,
-		Model:     query.Model,
-		StartDate: query.StartDate,
-		EndDate:   query.EndDate,
-		TZ:        c.Query("tz"),
+		UserID:        query.UserID,
+		APIKeyID:      query.APIKeyID,
+		AccountSearch: query.Account,
+		Platform:      query.Platform,
+		Model:         query.Model,
+		StartDate:     query.StartDate,
+		EndDate:       query.EndDate,
+		TZ:            c.Query("tz"),
 	}, query.GroupBy, includeSummary)
 	if err != nil {
 		handleUsageError("查询管理员聚合统计失败", err)
@@ -294,13 +296,14 @@ func (h *UsageHandler) AdminUsageTrend(c *gin.Context) {
 
 	result, err := h.service.AdminTrend(c.Request.Context(), appusage.TrendFilter{
 		StatsFilter: appusage.StatsFilter{
-			UserID:    query.UserID,
-			APIKeyID:  query.APIKeyID,
-			Platform:  query.Platform,
-			Model:     query.Model,
-			StartDate: query.StartDate,
-			EndDate:   query.EndDate,
-			TZ:        c.Query("tz"),
+			UserID:        query.UserID,
+			APIKeyID:      query.APIKeyID,
+			AccountSearch: query.Account,
+			Platform:      query.Platform,
+			Model:         query.Model,
+			StartDate:     query.StartDate,
+			EndDate:       query.EndDate,
+			TZ:            c.Query("tz"),
 		},
 		Granularity: query.Granularity,
 	})

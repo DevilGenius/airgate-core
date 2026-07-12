@@ -233,6 +233,126 @@ func TestUsageStoreModelFilterIncludeExclude(t *testing.T) {
 	}
 }
 
+func TestUsageStoreAdminAccountSearchIncludesSoftDeletedAccounts(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	user := createTestUser(t, db, "usage-account-search@example.com")
+	group, err := db.Group.Create().SetName("Account Search Group").SetPlatform("openai").Save(ctx)
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	activeAccount, err := db.Account.Create().
+		SetName("Primary OAuth Credential").
+		SetEmail("primary-credential@example.com").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{}).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create active account: %v", err)
+	}
+	deletedAccount, err := db.Account.Create().
+		SetName("Legacy Team Credential").
+		SetEmail("retired-credential@example.com").
+		SetPlatform("openai").
+		SetType("team").
+		SetCredentials(map[string]string{}).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create deleted account: %v", err)
+	}
+
+	createdAt := time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC)
+	for _, item := range []struct {
+		billingEventID string
+		model          string
+		accountID      int
+		cost           float64
+	}{
+		{billingEventID: "usage_account_search_active", model: "gpt-active", accountID: activeAccount.ID, cost: 1},
+		{billingEventID: "usage_account_search_deleted", model: "gpt-deleted", accountID: deletedAccount.ID, cost: 2},
+	} {
+		if _, err := db.UsageLog.Create().
+			SetBillingEventID(item.billingEventID).
+			SetPlatform("openai").
+			SetModel(item.model).
+			SetInputTokens(10).
+			SetOutputTokens(5).
+			SetTotalCost(item.cost).
+			SetActualCost(item.cost).
+			SetBilledCost(item.cost).
+			SetUserID(user.ID).
+			SetUserIDSnapshot(user.ID).
+			SetUserEmailSnapshot(user.Email).
+			SetAccountID(item.accountID).
+			SetGroupID(group.ID).
+			SetCreatedAt(createdAt).
+			Save(ctx); err != nil {
+			t.Fatalf("create usage log %s: %v", item.billingEventID, err)
+		}
+	}
+	if _, err := db.Account.UpdateOneID(deletedAccount.ID).SetDeletedAt(createdAt.Add(time.Hour)).Save(ctx); err != nil {
+		t.Fatalf("soft delete account: %v", err)
+	}
+
+	store := NewUsageStore(db)
+	records, hasMore, nextCursor, err := store.ListAdmin(ctx, appusage.ListFilter{
+		PageSize:      10,
+		AccountSearch: "  legacy TEAM  ",
+	})
+	if err != nil {
+		t.Fatalf("ListAdmin by account name returned error: %v", err)
+	}
+	if len(records) != 1 || hasMore || nextCursor != nil || records[0].AccountID != int64(deletedAccount.ID) ||
+		!records[0].AccountDeleted || records[0].AccountEmail != "retired-credential@example.com" {
+		t.Fatalf("ListAdmin by deleted account name = %+v hasMore=%v next=%v", records, hasMore, nextCursor)
+	}
+
+	filter := appusage.StatsFilter{AccountSearch: "RETIRED-CREDENTIAL@EXAMPLE.COM"}
+	summary, err := store.SummaryAdmin(ctx, filter)
+	if err != nil {
+		t.Fatalf("SummaryAdmin by account email returned error: %v", err)
+	}
+	if summary.TotalRequests != 1 || summary.TotalTokens != 15 || summary.TotalCost != 2 {
+		t.Fatalf("SummaryAdmin by account email = %+v", summary)
+	}
+	models, err := store.StatsByModel(ctx, filter)
+	if err != nil || len(models) != 1 || models[0].Model != "gpt-deleted" {
+		t.Fatalf("StatsByModel by account = %+v, err=%v", models, err)
+	}
+	users, err := store.StatsByUser(ctx, filter)
+	if err != nil || len(users) != 1 || users[0].UserID != int64(user.ID) || users[0].Requests != 1 {
+		t.Fatalf("StatsByUser by account = %+v, err=%v", users, err)
+	}
+	accounts, err := store.StatsByAccount(ctx, filter)
+	if err != nil || len(accounts) != 1 || accounts[0].AccountID != int64(deletedAccount.ID) || accounts[0].Name != deletedAccount.Name {
+		t.Fatalf("StatsByAccount by account = %+v, err=%v", accounts, err)
+	}
+	groups, err := store.StatsByGroup(ctx, filter)
+	if err != nil || len(groups) != 1 || groups[0].GroupID != int64(group.ID) || groups[0].Requests != 1 {
+		t.Fatalf("StatsByGroup by account = %+v, err=%v", groups, err)
+	}
+	trend, err := store.TrendEntries(ctx, appusage.TrendFilter{StatsFilter: filter})
+	if err != nil || len(trend) != 1 || trend[0].StandardCost != 2 {
+		t.Fatalf("TrendEntries by account = %+v, err=%v", trend, err)
+	}
+
+	activeRecords, _, _, err := store.ListAdmin(ctx, appusage.ListFilter{PageSize: 10, AccountSearch: "PRIMARY-CREDENTIAL@"})
+	if err != nil || len(activeRecords) != 1 || activeRecords[0].AccountID != int64(activeAccount.ID) {
+		t.Fatalf("ListAdmin by active account email = %+v, err=%v", activeRecords, err)
+	}
+	empty, err := store.SummaryAdmin(ctx, appusage.StatsFilter{AccountSearch: "missing credential"})
+	if err != nil || empty != (appusage.Summary{}) {
+		t.Fatalf("SummaryAdmin by missing account = %+v, err=%v", empty, err)
+	}
+}
+
 func TestUsageStoreEmptySummaryReturnsZero(t *testing.T) {
 	db := enttestOpen(t)
 	defer func() {
