@@ -44,7 +44,7 @@ services:
       - >-
         set -e;
         corepack enable;
-        corepack prepare pnpm@11.5.0 --activate;
+        corepack prepare pnpm@11.12.0 --activate;
         cd /workspace/airgate-core/web && pnpm install --frozen-lockfile && pnpm build
     restart: "no"
 
