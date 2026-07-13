@@ -59,54 +59,83 @@ function DetailSeparator() {
   return <span className="justify-self-center font-bold text-text-secondary">|</span>;
 }
 
-function SampleFailureValue({
-  errorCount,
-  errorRate,
-  sampleCount,
-}: {
-  errorCount?: number;
-  errorRate?: number;
-  sampleCount?: number;
-}) {
-  const failures = Math.max(0, errorCount ?? 0);
-  const effectiveSamples = Math.max(0, sampleCount ?? 0) + failures;
-  return (
-    <span>{fmtNum(failures)}/{fmtNum(effectiveSamples)}({formatPercent(errorRate)})</span>
-  );
-}
-
-function SampleFailureDetail({
-  baselineErrorCount,
-  baselineErrorRate,
-  baselineSampleCount,
+function SampleFailureColumn({
   currentErrorCount,
   currentErrorRate,
   currentSampleCount,
   label,
+  longErrorCount,
+  longErrorRate,
+  longSampleCount,
 }: {
-  baselineErrorCount?: number;
-  baselineErrorRate?: number;
-  baselineSampleCount?: number;
   currentErrorCount?: number;
   currentErrorRate?: number;
   currentSampleCount?: number;
   label: string;
+  longErrorCount?: number;
+  longErrorRate?: number;
+  longSampleCount?: number;
 }) {
-  return joinDetail([
-    <span className="inline-flex min-w-0 items-center gap-1">
-      <span className="shrink-0">{label}</span>
-      <SampleFailureValue
-        errorCount={currentErrorCount}
-        errorRate={currentErrorRate}
-        sampleCount={currentSampleCount}
+  const rows = [
+    { errorCount: currentErrorCount, errorRate: currentErrorRate, sampleCount: currentSampleCount, window: '5m' },
+    { errorCount: longErrorCount, errorRate: longErrorRate, sampleCount: longSampleCount, window: '1h' },
+  ];
+  return (
+    <span className="grid min-w-0 grid-cols-[auto_5ch_auto_5ch_minmax(0,1fr)] items-center gap-x-0.5">
+      {rows.map((row) => {
+        const failures = Math.max(0, row.errorCount ?? 0);
+        const effectiveSamples = Math.max(0, row.sampleCount ?? 0) + failures;
+        return (
+          <Fragment key={row.window}>
+            <span className="whitespace-nowrap">{label}{row.window}</span>
+            <span className="text-right tabular-nums">{fmtNum(failures)}</span>
+            <span className="justify-self-center">/</span>
+            <span className="text-right tabular-nums">{fmtNum(effectiveSamples)}</span>
+            <span className="min-w-0 truncate tabular-nums">({formatPercent(row.errorRate)})</span>
+          </Fragment>
+        );
+      })}
+    </span>
+  );
+}
+
+function SampleFailureDetails({
+  imageLabel,
+  latency,
+  latency1H,
+  textLabel,
+}: {
+  imageLabel: string;
+  latency?: MonitorRuntimeResp['latency'];
+  latency1H?: MonitorRuntimeResp['latency_1h'];
+  textLabel: string;
+}) {
+  return (
+    <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_0.75rem_minmax(0,1fr)] items-stretch">
+      <SampleFailureColumn
+        currentErrorCount={latency?.text_error_count}
+        currentErrorRate={latency?.text_error_rate}
+        currentSampleCount={latency?.text_sample_count}
+        label={textLabel}
+        longErrorCount={latency1H?.text_error_count}
+        longErrorRate={latency1H?.text_error_rate}
+        longSampleCount={latency1H?.text_sample_count}
       />
-    </span>,
-    <SampleFailureValue
-      errorCount={baselineErrorCount}
-      errorRate={baselineErrorRate}
-      sampleCount={baselineSampleCount}
-    />,
-  ]);
+      <span className="grid grid-rows-2 items-center">
+        <DetailSeparator />
+        <DetailSeparator />
+      </span>
+      <SampleFailureColumn
+        currentErrorCount={latency?.image_error_count}
+        currentErrorRate={latency?.image_error_rate}
+        currentSampleCount={latency?.image_sample_count}
+        label={imageLabel}
+        longErrorCount={latency1H?.image_error_count}
+        longErrorRate={latency1H?.image_error_rate}
+        longSampleCount={latency1H?.image_sample_count}
+      />
+    </span>
+  );
 }
 
 function joinDetail(parts: ReactNode[]) {
@@ -320,23 +349,11 @@ export function MonitorRuntimeStats({
             latency?.image_duration_p99_ms,
             latency1H?.image_duration_p99_ms,
           ),
-          <SampleFailureDetail
-            baselineErrorCount={latency1H?.text_error_count}
-            baselineErrorRate={latency1H?.text_error_rate}
-            baselineSampleCount={latency1H?.text_sample_count}
-            currentErrorCount={latency?.text_error_count}
-            currentErrorRate={latency?.text_error_rate}
-            currentSampleCount={latency?.text_sample_count}
-            label={t('monitor.runtime_text_samples')}
-          />,
-          <SampleFailureDetail
-            baselineErrorCount={latency1H?.image_error_count}
-            baselineErrorRate={latency1H?.image_error_rate}
-            baselineSampleCount={latency1H?.image_sample_count}
-            currentErrorCount={latency?.image_error_count}
-            currentErrorRate={latency?.image_error_rate}
-            currentSampleCount={latency?.image_sample_count}
-            label={t('monitor.runtime_image_samples')}
+          <SampleFailureDetails
+            imageLabel={t('monitor.runtime_image_samples')}
+            latency={latency}
+            latency1H={latency1H}
+            textLabel={t('monitor.runtime_text_samples')}
           />,
         ]}
         icon={<Activity className="h-5 w-5" />}
