@@ -1093,6 +1093,14 @@ export default function UsagePage() {
               />
             </div>
             <div className="w-full sm:w-48">
+              <SearchFilterInput
+                ariaLabel={t('usage.upstream_credential')}
+                placeholder={t('usage.upstream_credential')}
+                value={filters.account ?? ''}
+                onSearchChange={handleAccountChange}
+              />
+            </div>
+            <div className="w-full sm:w-48">
               <UserSearchFilterComboBox
                 ariaLabel={t('usage.search_user')}
                 emptyPrompt={t('usage.search_user')}
@@ -1115,14 +1123,6 @@ export default function UsagePage() {
                 selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
                 selectedLabel={selectedAPIKeyLabel}
                 onSelectionChange={handleAPIKeySelectionChange}
-              />
-            </div>
-            <div className="w-full sm:w-48">
-              <SearchFilterInput
-                ariaLabel={t('usage.upstream_credential')}
-                placeholder={t('usage.upstream_credential')}
-                value={filters.account ?? ''}
-                onSearchChange={handleAccountChange}
               />
             </div>
           </div>
