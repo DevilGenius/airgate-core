@@ -73,6 +73,7 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 	ctx := finalizeRequestContext(c.Request.Context())
 
 	f.applyOutcome(ctx, state, execution)
+	f.recordPluginExecutionFinalFailure(ctx, state, execution, forwardAttemptsFromGinContext(c))
 	f.persistUpdatedCredentials(state.account.ID, execution.outcome.UpdatedCredentials)
 
 	if execution.err != nil && execution.outcome.Kind != sdk.OutcomeClientError {
@@ -338,7 +339,6 @@ func (f *Forwarder) applyOutcome(ctx context.Context, state *forwardState, execu
 		Family: scheduler.ModelFamily(state.requestedPlatform, outcomeModel),
 	}
 	f.scheduler.Apply(ctx, state.account.ID, j)
-	f.recordPluginExecutionError(ctx, state, execution)
 
 	// Success 额外刷新会话（状态机内部已更新 last_used_at）
 	if execution.outcome.Kind == sdk.OutcomeSuccess {

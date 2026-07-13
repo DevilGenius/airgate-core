@@ -146,4 +146,12 @@ func TestMonitorSmallHelpers(t *testing.T) {
 	if got := intPtr(7); got == nil || *got != 7 {
 		t.Fatalf("intPtr(7) = %#v", got)
 	}
+	if retryCountForAttempts(1) != 0 || retryCountForAttempts(4) != 3 {
+		t.Fatal("retryCountForAttempts returned unexpected values")
+	}
+	c, _ := pluginTestContext(http.MethodPost, "/v1/responses")
+	c.Set(ginCtxKeyAttempts, int64(3))
+	if got := forwardAttemptsFromGinContext(c); got != 3 {
+		t.Fatalf("forwardAttemptsFromGinContext = %d, want 3", got)
+	}
 }

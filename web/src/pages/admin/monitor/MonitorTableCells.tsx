@@ -189,10 +189,11 @@ function detailJsonText(entries: DetailEntry[]): string {
 export function monitorDetailEntries(event: MonitorEventResp): DetailEntry[] {
   const detail = event.detail;
   const entries: DetailEntry[] = [];
+  appendDetail(entries, 'retry_count', detailValue(detail, 'retry_count'));
+  appendDetail(entries, 'attempts', detailValue(detail, 'attempts'));
   appendDetail(entries, 'model', detailValue(detail, 'model'));
   appendDetail(entries, 'client_model', detailValue(detail, 'client_model'));
   appendDetail(entries, 'http_status', detailValue(detail, 'http_status'));
-  appendDetail(entries, 'attempts', detailValue(detail, 'attempts'));
   appendDetail(entries, 'request_id', detailValue(detail, 'request_id'));
   appendDetail(entries, 'request_path', detailValue(detail, 'request_path'));
   appendDetail(entries, 'stage', detailValue(detail, 'stage'));
@@ -203,11 +204,13 @@ export function monitorDetailEntries(event: MonitorEventResp): DetailEntry[] {
 export function requestDetailEntries(event: MonitorRequestEventResp): DetailEntry[] {
   const detail = event.detail;
   const entries: DetailEntry[] = [];
+  appendDetail(entries, 'retry_count', detailValue(detail, 'retry_count'));
+  appendDetail(entries, 'attempts', detailValue(detail, 'attempts'));
+  appendDetail(entries, 'next_attempt', detailValue(detail, 'next_attempt'));
   appendDetail(entries, 'duration_ms', durationMsLabel(event.duration_ms || detailValue(detail, 'duration_ms')));
   appendDetail(entries, 'request_id', event.request_id);
   appendDetail(entries, 'fingerprint', event.fingerprint);
   appendDetail(entries, 'upstream_status', event.upstream_status && event.upstream_status !== event.http_status ? event.upstream_status : undefined);
-  appendDetail(entries, 'attempts', detailValue(detail, 'attempts'));
   appendDetail(entries, 'stage', detailValue(detail, 'stage'));
   appendDetail(entries, 'outcome_kind', detailValue(detail, 'outcome_kind'));
   appendDetail(entries, 'reason', detailValue(detail, 'reason'));

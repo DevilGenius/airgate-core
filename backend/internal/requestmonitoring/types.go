@@ -9,6 +9,7 @@ import (
 const (
 	TypeAPIRequestError    = "api_request_error"
 	TypePluginRouteError   = "plugin_route_error"
+	TypePluginForwardRetry = "plugin_forward_retry"
 	TypePluginForwardError = "plugin_forward_error"
 	TypeClientRequestError = "client_request_error"
 	TypeClientClosed       = "client_closed_request"

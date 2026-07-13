@@ -93,17 +93,25 @@ func TestPluginMonitorRecordsExecutionClientAndClosedEvents(t *testing.T) {
 	state := testForwardState()
 
 	forwarder.recordPluginRouteError(c, state.keyInfo, "openai", state.requestPath, "route_not_found", "unsupported route")
-	forwarder.recordPluginExecutionError(sdk.WithRequestID(context.Background(), "exec-request"), state, forwardExecution{
+	forwarder.recordPluginExecutionRetry(sdk.WithRequestID(context.Background(), "retry-request"), state, forwardExecution{
 		outcome: sdk.ForwardOutcome{
 			Kind:     sdk.OutcomeUpstreamTransient,
 			Upstream: sdk.UpstreamResponse{StatusCode: http.StatusBadGateway},
 			Reason:   "temporary failure",
 		},
 		duration: 15 * time.Millisecond,
-	})
-	forwarder.recordPluginExecutionError(context.Background(), state, forwardExecution{
+	}, 1)
+	forwarder.recordPluginExecutionFinalFailure(sdk.WithRequestID(context.Background(), "exec-request"), state, forwardExecution{
+		outcome: sdk.ForwardOutcome{
+			Kind:     sdk.OutcomeUpstreamTransient,
+			Upstream: sdk.UpstreamResponse{StatusCode: http.StatusBadGateway},
+			Reason:   "temporary failure",
+		},
+		duration: 15 * time.Millisecond,
+	}, 3)
+	forwarder.recordPluginExecutionFinalFailure(context.Background(), state, forwardExecution{
 		outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess},
-	})
+	}, 1)
 	forwarder.recordClientRequestError(c, state, forwardExecution{
 		outcome: sdk.ForwardOutcome{
 			Kind: sdk.OutcomeClientError,
@@ -118,8 +126,8 @@ func TestPluginMonitorRecordsExecutionClientAndClosedEvents(t *testing.T) {
 	forwarder.recordClientClosedRequest(c, state, statusClientClosedRequest, 3)
 	forwarder.recordClientClosedRequest(c, state, 0, 3)
 
-	if len(recorder.requestEvents) != 4 {
-		t.Fatalf("request events = %d, want 4: %+v", len(recorder.requestEvents), recorder.requestEvents)
+	if len(recorder.requestEvents) != 5 {
+		t.Fatalf("request events = %d, want 5: %+v", len(recorder.requestEvents), recorder.requestEvents)
 	}
 	route := recorder.requestEvents[0]
 	if route.Type != requestmonitoring.TypePluginRouteError || route.Method != http.MethodPatch ||
@@ -127,21 +135,30 @@ func TestPluginMonitorRecordsExecutionClientAndClosedEvents(t *testing.T) {
 		route.APIKeyID == nil || *route.APIKeyID != 11 {
 		t.Fatalf("route event = %+v", route)
 	}
-	exec := recorder.requestEvents[1]
+	retry := recorder.requestEvents[1]
+	if retry.Type != requestmonitoring.TypePluginForwardRetry || retry.Severity != requestmonitoring.SeverityInfo ||
+		retry.RequestID != "retry-request" || retry.Detail["retry_count"] != 1 || retry.Detail["attempts"] != 1 ||
+		retry.Detail["next_attempt"] != 2 || retry.Detail["final_failure"] != false {
+		t.Fatalf("retry event = %+v", retry)
+	}
+	exec := recorder.requestEvents[2]
 	if exec.Type != requestmonitoring.TypePluginForwardError || exec.RequestID != "exec-request" ||
+		exec.Severity != requestmonitoring.SeverityWarning ||
 		exec.PluginID != "openai-gateway" || exec.AccountID == nil || *exec.AccountID != 44 ||
 		exec.UpstreamStatus == nil || *exec.UpstreamStatus != http.StatusBadGateway ||
-		exec.Detail["stage"] != "plugin_forward" {
+		exec.Detail["stage"] != "plugin_forward" || exec.Detail["attempts"] != 3 ||
+		exec.Detail["retry_count"] != 2 || exec.Detail["final_failure"] != true {
 		t.Fatalf("execution event = %+v", exec)
 	}
-	client := recorder.requestEvents[2]
+	client := recorder.requestEvents[3]
 	if client.Type != requestmonitoring.TypeClientRequestError || client.HTTPStatus == nil ||
 		*client.HTTPStatus != http.StatusRequestEntityTooLarge || client.Message != imageTooLargeMessage {
 		t.Fatalf("client event = %+v", client)
 	}
-	closed := recorder.requestEvents[3]
+	closed := recorder.requestEvents[4]
 	if closed.Type != requestmonitoring.TypeClientClosed || closed.HTTPStatus == nil ||
-		*closed.HTTPStatus != statusClientClosedRequest || closed.Detail["attempts"] != 3 {
+		*closed.HTTPStatus != statusClientClosedRequest || closed.Detail["attempts"] != 3 ||
+		closed.Detail["retry_count"] != 2 {
 		t.Fatalf("closed event = %+v", closed)
 	}
 
@@ -189,6 +206,9 @@ func TestPluginMonitorNilAndPureHelperBranches(t *testing.T) {
 	}
 	if shouldRecordPluginExecutionError(forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeClientError}}) {
 		t.Fatal("client errors should not be plugin execution errors")
+	}
+	if !shouldRecordPluginExecutionError(forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountRateLimited}}) {
+		t.Fatal("final account failures should be recorded")
 	}
 }
 

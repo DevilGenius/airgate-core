@@ -88,6 +88,9 @@ func TestRuntimeSamplerQueryLatencyWindowsSplitsModelKinds(t *testing.T) {
 	if strings.Contains(errorQuery, "LOWER(") || strings.Contains(errorQuery, "BTRIM(") {
 		t.Fatal("error query still normalizes every model row")
 	}
+	if !strings.Contains(errorQuery, "'plugin_forward_retry'") {
+		t.Fatal("error query does not exclude informational retry events")
+	}
 	for index, args := range fixture.args {
 		if len(args) != 3 || args[2].Value != "gpt-image%" {
 			t.Fatalf("query %d model pattern args = %+v", index, args)

@@ -43,6 +43,10 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 		"http_error_class": httpErrorClassForStatus(status),
 		"error_code":       code,
 	}
+	if attempts := forwardAttemptsFromGinContext(c); attempts > 0 {
+		detail["attempts"] = attempts
+		detail["retry_count"] = retryCountForAttempts(attempts)
+	}
 	attachKeyInfoDetail(detail, keyInfo)
 	f.requestMonitor.RecordRequest(ctx, requestmonitoring.EventInput{
 		Type:               requestmonitoring.TypeAPIRequestError,
@@ -89,6 +93,7 @@ func (f *Forwarder) recordAllRoutesAccountUnavailable(c *gin.Context, state *for
 	subjectID := platform
 	detail := map[string]interface{}{
 		"attempts":            attempts,
+		"retry_count":         retryCountForAttempts(attempts),
 		"error_code":          response.code,
 		"http_status":         response.status,
 		"platform":            platform,
@@ -196,11 +201,53 @@ func (f *Forwarder) recordPluginRouteError(c *gin.Context, keyInfo *auth.APIKeyI
 	f.requestMonitor.RecordRequest(ctx, input)
 }
 
-func (f *Forwarder) recordPluginExecutionError(ctx context.Context, state *forwardState, execution forwardExecution) {
-	if f == nil || f.requestMonitor == nil || state == nil {
+func (f *Forwarder) recordPluginExecutionRetry(ctx context.Context, state *forwardState, execution forwardExecution, attempts int) {
+	if attempts < 1 {
+		attempts = 1
+	}
+	f.recordPluginExecutionEvent(ctx, state, execution, pluginExecutionMonitorEvent{
+		typeID:       requestmonitoring.TypePluginForwardRetry,
+		severity:     requestmonitoring.SeverityInfo,
+		title:        "Plugin forward retry",
+		stage:        "plugin_forward_retry",
+		attempts:     attempts,
+		retryCount:   attempts,
+		nextAttempt:  attempts + 1,
+		finalFailure: false,
+	})
+}
+
+func (f *Forwarder) recordPluginExecutionFinalFailure(ctx context.Context, state *forwardState, execution forwardExecution, attempts int) {
+	if !shouldRecordPluginExecutionError(execution) {
 		return
 	}
-	if !shouldRecordPluginExecutionError(execution) {
+	if attempts < 1 {
+		attempts = 1
+	}
+	f.recordPluginExecutionEvent(ctx, state, execution, pluginExecutionMonitorEvent{
+		typeID:       requestmonitoring.TypePluginForwardError,
+		severity:     requestmonitoring.SeverityWarning,
+		title:        "Plugin forward error",
+		stage:        "plugin_forward",
+		attempts:     attempts,
+		retryCount:   retryCountForAttempts(attempts),
+		finalFailure: true,
+	})
+}
+
+type pluginExecutionMonitorEvent struct {
+	typeID       string
+	severity     string
+	title        string
+	stage        string
+	attempts     int
+	retryCount   int
+	nextAttempt  int
+	finalFailure bool
+}
+
+func (f *Forwarder) recordPluginExecutionEvent(ctx context.Context, state *forwardState, execution forwardExecution, event pluginExecutionMonitorEvent) {
+	if f == nil || f.requestMonitor == nil || state == nil {
 		return
 	}
 	if ctx == nil {
@@ -220,8 +267,8 @@ func (f *Forwarder) recordPluginExecutionError(ctx context.Context, state *forwa
 		}
 	}
 	input := requestmonitoring.EventInput{
-		Type:           requestmonitoring.TypePluginForwardError,
-		Severity:       requestmonitoring.SeverityWarning,
+		Type:           event.typeID,
+		Severity:       event.severity,
 		Source:         requestmonitoring.SourceForwarder,
 		RequestID:      sdk.RequestIDFromContext(ctx),
 		Platform:       platform,
@@ -232,15 +279,21 @@ func (f *Forwarder) recordPluginExecutionError(ctx context.Context, state *forwa
 		Model:          state.model,
 		UpstreamStatus: intPtr(execution.outcome.Upstream.StatusCode),
 		ErrorCode:      code,
-		Title:          "Plugin forward error",
+		Title:          event.title,
 		Message:        message,
 		Detail: map[string]interface{}{
 			"outcome_kind":    execution.outcome.Kind.String(),
 			"duration_ms":     execution.duration.Milliseconds(),
 			"upstream_status": execution.outcome.Upstream.StatusCode,
 			"reason":          message,
-			"stage":           "plugin_forward",
+			"stage":           event.stage,
+			"attempts":        event.attempts,
+			"retry_count":     event.retryCount,
+			"final_failure":   event.finalFailure,
 		},
+	}
+	if event.nextAttempt > 0 {
+		input.Detail["next_attempt"] = event.nextAttempt
 	}
 	if state.keyInfo != nil {
 		attachRequestKeyInfo(&input, state.keyInfo)
@@ -282,6 +335,10 @@ func (f *Forwarder) recordClientRequestError(c *gin.Context, state *forwardState
 			"stage":            "client_request",
 		},
 	}
+	if attempts := forwardAttemptsFromGinContext(c); attempts > 0 {
+		input.Detail["attempts"] = attempts
+		input.Detail["retry_count"] = retryCountForAttempts(attempts)
+	}
 	if state.plugin != nil {
 		input.PluginID = state.plugin.Name
 		if input.Platform == "" {
@@ -321,8 +378,9 @@ func (f *Forwarder) recordClientClosedRequest(c *gin.Context, state *forwardStat
 		Title:       "Client closed request",
 		Message:     "Client disconnected before the request completed",
 		Detail: map[string]interface{}{
-			"attempts": attempts,
-			"stage":    "client_closed",
+			"attempts":    attempts,
+			"retry_count": retryCountForAttempts(attempts),
+			"stage":       "client_closed",
 		},
 	}
 	if state.plugin != nil {
@@ -393,6 +451,34 @@ func requestMethod(c *gin.Context, fallback string) string {
 	return c.Request.Method
 }
 
+func forwardAttemptsFromGinContext(c *gin.Context) int {
+	if c == nil {
+		return 0
+	}
+	value, ok := c.Get(ginCtxKeyAttempts)
+	if !ok {
+		return 0
+	}
+	switch attempts := value.(type) {
+	case int:
+		if attempts > 0 {
+			return attempts
+		}
+	case int64:
+		if attempts > 0 {
+			return int(attempts)
+		}
+	}
+	return 0
+}
+
+func retryCountForAttempts(attempts int) int {
+	if attempts <= 1 {
+		return 0
+	}
+	return attempts - 1
+}
+
 func timeSinceMilliseconds(startedAt time.Time) int64 {
 	if startedAt.IsZero() {
 		return 0
@@ -405,10 +491,10 @@ func shouldRecordPluginExecutionError(execution forwardExecution) bool {
 		return true
 	}
 	switch execution.outcome.Kind {
-	case sdk.OutcomeUpstreamTransient, sdk.OutcomeFamilyTransient, sdk.OutcomeStreamAborted, sdk.OutcomeUnknown:
-		return true
-	default:
+	case sdk.OutcomeSuccess, sdk.OutcomeClientError:
 		return false
+	default:
+		return true
 	}
 }
 

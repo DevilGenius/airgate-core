@@ -59,6 +59,56 @@ function DetailSeparator() {
   return <span className="justify-self-center font-bold text-text-secondary">|</span>;
 }
 
+function SampleFailureValue({
+  errorCount,
+  errorRate,
+  sampleCount,
+}: {
+  errorCount?: number;
+  errorRate?: number;
+  sampleCount?: number;
+}) {
+  const failures = Math.max(0, errorCount ?? 0);
+  const effectiveSamples = Math.max(0, sampleCount ?? 0) + failures;
+  return (
+    <span>{fmtNum(failures)}/{fmtNum(effectiveSamples)}({formatPercent(errorRate)})</span>
+  );
+}
+
+function SampleFailureDetail({
+  baselineErrorCount,
+  baselineErrorRate,
+  baselineSampleCount,
+  currentErrorCount,
+  currentErrorRate,
+  currentSampleCount,
+  label,
+}: {
+  baselineErrorCount?: number;
+  baselineErrorRate?: number;
+  baselineSampleCount?: number;
+  currentErrorCount?: number;
+  currentErrorRate?: number;
+  currentSampleCount?: number;
+  label: string;
+}) {
+  return joinDetail([
+    <span className="inline-flex min-w-0 items-center gap-1">
+      <span className="shrink-0">{label}</span>
+      <SampleFailureValue
+        errorCount={currentErrorCount}
+        errorRate={currentErrorRate}
+        sampleCount={currentSampleCount}
+      />
+    </span>,
+    <SampleFailureValue
+      errorCount={baselineErrorCount}
+      errorRate={baselineErrorRate}
+      sampleCount={baselineSampleCount}
+    />,
+  ]);
+}
+
 function joinDetail(parts: ReactNode[]) {
   if (parts.length <= 1) {
     return <span className="block min-w-0 truncate">{parts[0]}</span>;
@@ -239,10 +289,6 @@ export function MonitorRuntimeStats({
     t('monitor.runtime_frt_avg'),
     formatDurationPairWithDelta(latency?.frt_avg_ms, latency1H?.frt_avg_ms),
   ].join(' ');
-  const latencyTextSamples = `${t('monitor.runtime_text_samples')} ${fmtNum(latency?.text_sample_count ?? 0)}/${fmtNum(latency1H?.text_sample_count ?? 0)}`;
-  const latencyTextErrors = `${t('monitor.runtime_errors')} ${formatPercent(latency?.text_error_rate)}/${formatPercent(latency1H?.text_error_rate)}`;
-  const latencyImageSamples = `${t('monitor.runtime_image_samples')} ${fmtNum(latency?.image_sample_count ?? 0)}/${fmtNum(latency1H?.image_sample_count ?? 0)}`;
-  const latencyImageErrors = `${t('monitor.runtime_errors')} ${formatPercent(latency?.image_error_rate)}/${formatPercent(latency1H?.image_error_rate)}`;
   const percentileDetail = (
     percentile: 'P50' | 'P95' | 'P99',
     textCurrent?: number,
@@ -274,14 +320,24 @@ export function MonitorRuntimeStats({
             latency?.image_duration_p99_ms,
             latency1H?.image_duration_p99_ms,
           ),
-          joinDetail([
-            latencyTextSamples,
-            latencyTextErrors,
-          ]),
-          joinDetail([
-            latencyImageSamples,
-            latencyImageErrors,
-          ]),
+          <SampleFailureDetail
+            baselineErrorCount={latency1H?.text_error_count}
+            baselineErrorRate={latency1H?.text_error_rate}
+            baselineSampleCount={latency1H?.text_sample_count}
+            currentErrorCount={latency?.text_error_count}
+            currentErrorRate={latency?.text_error_rate}
+            currentSampleCount={latency?.text_sample_count}
+            label={t('monitor.runtime_text_samples')}
+          />,
+          <SampleFailureDetail
+            baselineErrorCount={latency1H?.image_error_count}
+            baselineErrorRate={latency1H?.image_error_rate}
+            baselineSampleCount={latency1H?.image_sample_count}
+            currentErrorCount={latency?.image_error_count}
+            currentErrorRate={latency?.image_error_rate}
+            currentSampleCount={latency?.image_sample_count}
+            label={t('monitor.runtime_image_samples')}
+          />,
         ]}
         icon={<Activity className="h-5 w-5" />}
         label={`${t('monitor.runtime_latency')}${stale ? ` · ${t('monitor.runtime_stale')}` : ''}`}

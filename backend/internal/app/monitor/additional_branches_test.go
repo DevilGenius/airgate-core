@@ -43,6 +43,7 @@ func TestAdditionalNormalizeAndSanitizeBranches(t *testing.T) {
 	}{
 		{requestmonitoring.TypeAPIRequestError, requestmonitoring.TypeAPIRequestError},
 		{requestmonitoring.TypePluginRouteError, requestmonitoring.TypePluginRouteError},
+		{requestmonitoring.TypePluginForwardRetry, requestmonitoring.TypePluginForwardRetry},
 		{requestmonitoring.TypePluginForwardError, requestmonitoring.TypePluginForwardError},
 		{requestmonitoring.TypeClientRequestError, requestmonitoring.TypeClientRequestError},
 		{requestmonitoring.TypeClientClosed, requestmonitoring.TypeClientClosed},
@@ -93,6 +94,7 @@ func TestAdditionalNormalizeAndSanitizeBranches(t *testing.T) {
 	}
 	for _, eventType := range []string{
 		requestmonitoring.TypePluginRouteError,
+		requestmonitoring.TypePluginForwardRetry,
 		requestmonitoring.TypePluginForwardError,
 		requestmonitoring.TypeClientRequestError,
 		requestmonitoring.TypeClientClosed,
@@ -117,6 +119,9 @@ func TestAdditionalNormalizeAndSanitizeBranches(t *testing.T) {
 	}
 	if got := defaultRequestHashMaterial(RequestEvent{Type: requestmonitoring.TypePluginForwardError, PluginID: "p", Endpoint: "/v1", ErrorCode: "e"}); !strings.Contains(got, "p") {
 		t.Fatalf("plugin forward request hash material = %q", got)
+	}
+	if got := defaultRequestHashMaterial(RequestEvent{Type: requestmonitoring.TypePluginForwardRetry, PluginID: "p", Endpoint: "/v1", ErrorCode: "e"}); !strings.Contains(got, "p") {
+		t.Fatalf("plugin forward retry hash material = %q", got)
 	}
 	if got := defaultRequestHashMaterial(RequestEvent{Type: requestmonitoring.TypeAPIRequestError, Method: "POST", Endpoint: "/v1", ErrorCode: "e"}); !strings.Contains(got, "POST") {
 		t.Fatalf("default request hash material = %q", got)

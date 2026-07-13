@@ -477,6 +477,8 @@ func normalizeRequestType(eventType string) string {
 		return requestmonitoring.TypeAPIRequestError
 	case requestmonitoring.TypePluginRouteError:
 		return requestmonitoring.TypePluginRouteError
+	case requestmonitoring.TypePluginForwardRetry:
+		return requestmonitoring.TypePluginForwardRetry
 	case requestmonitoring.TypePluginForwardError:
 		return requestmonitoring.TypePluginForwardError
 	case requestmonitoring.TypeClientRequestError:
@@ -576,7 +578,7 @@ func requestHashFor(material string, event RequestEvent) string {
 
 func defaultRequestHashMaterial(event RequestEvent) string {
 	switch event.Type {
-	case requestmonitoring.TypePluginForwardError:
+	case requestmonitoring.TypePluginForwardRetry, requestmonitoring.TypePluginForwardError:
 		return joinHashParts(event.Type, event.PluginID, intPtrValue(event.AccountID), event.Endpoint, event.ErrorCode)
 	case requestmonitoring.TypeClientClosed:
 		return joinHashParts(event.Type, intPtrValue(event.APIKeyID), event.Method, event.Endpoint)
@@ -632,6 +634,8 @@ func defaultRequestTitle(eventType string) string {
 	switch eventType {
 	case requestmonitoring.TypePluginRouteError:
 		return "Plugin route error"
+	case requestmonitoring.TypePluginForwardRetry:
+		return "Plugin forward retry"
 	case requestmonitoring.TypePluginForwardError:
 		return "Plugin forward error"
 	case requestmonitoring.TypeClientRequestError:

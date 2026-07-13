@@ -175,7 +175,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 
 	failureSummary := allRoutesFailureSummary{}
 
-	for _, route := range routes {
+	for routeIndex, route := range routes {
 		state.selectedRoute = route
 		state.keyInfo = keyInfoForRoute(state.keyInfo, route)
 		state.dispatch = newDispatchChain(route.DispatchPlans)
@@ -352,7 +352,8 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				if execution.err != nil {
 					attrs = append(attrs, sdk.LogFieldError, execution.err)
 				}
-				attemptLogger.Warn("forward_dispatch_candidate_failed", attrs...)
+				attemptLogger.Info("forward_dispatch_candidate_failed", attrs...)
+				f.recordPluginExecutionRetry(ctx, state, execution, totalAttempts)
 				releaseAccountSlot()
 				f.scheduler.DecrementRPM(context.Background(), accountID)
 				softExclude = softExclude[:0]
@@ -363,6 +364,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 
 			if requestCanceled == 0 && f.canFailover(c, state, execution) {
 				failureSummary.recordExecution(execution)
+				willRetry := canStartForwardAttempt(state, attempt) || routeIndex+1 < len(routes)
 				attrs := []any{
 					"attempt", attempt,
 					"kind", execution.outcome.Kind,
@@ -375,9 +377,16 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				if execution.err != nil {
 					attrs = append(attrs, sdk.LogFieldError, execution.err)
 				}
-				attemptLogger.Warn("forward_attempt_failed", attrs...)
+				attrs = append(attrs, "will_retry", willRetry)
+				if willRetry {
+					attrs = append(attrs, "retry_count", totalAttempts, "next_attempt", totalAttempts+1)
+				}
+				attemptLogger.Info("forward_attempt_failed", attrs...)
 				releaseAccountSlot()
 				f.applyOutcome(ctx, state, execution)
+				if willRetry {
+					f.recordPluginExecutionRetry(ctx, state, execution, totalAttempts)
+				}
 
 				if execution.outcome.Kind.IsAccountFault() || isImageSubmitAPIPath(state.requestPath) {
 					hardExclude = append(hardExclude, accountID)
@@ -387,12 +396,12 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				continue
 			}
 
-			f.runForwardEndChain(c, state, execution, mwBag)
-			f.writeResult(c, state, execution)
-			releaseAccountSlot()
 			// 总览写回 gin ctx，由 http_request 中间件统一输出，避免双行重复。
 			c.Set(ginCtxKeyAccountID, accountID)
 			c.Set(ginCtxKeyAttempts, totalAttempts)
+			f.runForwardEndChain(c, state, execution, mwBag)
+			f.writeResult(c, state, execution)
+			releaseAccountSlot()
 			// 仅在发生过 failover 时单独打 Info；正常一次成功只留 Debug，避免噪声。
 			if totalAttempts > 1 {
 				attemptLogger.Info("forward_request_completed_after_retry",
@@ -428,6 +437,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	}
 	logger.Error("forward_request_failed", failAttrs...)
 
+	c.Set(ginCtxKeyAttempts, totalAttempts)
 	response := selectAllRoutesFailureResponse(failureSummary)
 	f.recordAllRoutesAccountUnavailable(c, state, failureSummary, response, totalAttempts)
 	f.recordAPIRequestError(c, state, response.status, response.code, response.message)

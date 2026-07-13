@@ -1428,7 +1428,9 @@ func TestRecordAPIRequestErrorIncludesGroupSnapshotInDetail(t *testing.T) {
 		GroupName: "production",
 	}
 
-	forwarder.recordAPIRequestErrorForKey(nil, keyInfo, "openai", "/v1/chat/completions", "gpt-4.1", http.StatusTooManyRequests, "all_routes_account_unavailable", "当前模型暂无可用上游账号，请稍后重试")
+	c, _ := pluginTestContext(http.MethodPost, "/v1/chat/completions")
+	c.Set(ginCtxKeyAttempts, 4)
+	forwarder.recordAPIRequestErrorForKey(c, keyInfo, "openai", "/v1/chat/completions", "gpt-4.1", http.StatusTooManyRequests, "all_routes_account_unavailable", "当前模型暂无可用上游账号，请稍后重试")
 
 	if len(recorder.events) != 1 {
 		t.Fatalf("events = %d, want 1", len(recorder.events))
@@ -1442,6 +1444,12 @@ func TestRecordAPIRequestErrorIncludesGroupSnapshotInDetail(t *testing.T) {
 	}
 	if got := event.Detail["api_key_name"]; got != "default key" {
 		t.Fatalf("detail api_key_name = %#v, want default key", got)
+	}
+	if got := event.Detail["attempts"]; got != 4 {
+		t.Fatalf("detail attempts = %#v, want 4", got)
+	}
+	if got := event.Detail["retry_count"]; got != 3 {
+		t.Fatalf("detail retry_count = %#v, want 3", got)
 	}
 }
 

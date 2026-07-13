@@ -52,6 +52,7 @@ const MONITOR_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30, 60] as const;
 const MONITOR_REQUEST_TYPE_IDS = [
   'api_request_error',
   'plugin_route_error',
+  'plugin_forward_retry',
   'plugin_forward_error',
   'client_request_error',
   'client_closed_request',

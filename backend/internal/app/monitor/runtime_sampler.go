@@ -352,7 +352,7 @@ SELECT
 	COUNT(*) FILTER (WHERE model NOT LIKE $3)::bigint,
 	COUNT(*) FILTER (WHERE model LIKE $3)::bigint
 FROM monitor_request_events
-WHERE created_at >= $1 AND type <> 'client_closed_request'
+WHERE created_at >= $1 AND type NOT IN ('client_closed_request', 'plugin_forward_retry')
 `, longSince, shortSince, imageModelPattern).Scan(
 		&short.errorCount,
 		&short.textErrorCount,
