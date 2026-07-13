@@ -49,7 +49,7 @@ services:
     restart: "no"
 
   core:
-    image: golang:1.25-bookworm
+    image: golang:1.26.5-bookworm
     working_dir: /workspace/airgate-core/backend
     restart: unless-stopped
     depends_on:

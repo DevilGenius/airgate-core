@@ -82,7 +82,7 @@ type GatewayPlugin interface {
 
 | 层 | 技术 |
 |---|---|
-| 后端 | Go 1.26.3 · Gin · Ent ORM · PostgreSQL 17 · Redis 8 |
+| 后端 | Go 1.26.5 · Gin · Ent ORM · PostgreSQL 17 · Redis 8 |
 | 前端 | React 19 · Vite · TanStack Query · Tailwind CSS |
 | 插件协议 | hashicorp/go-plugin (gRPC) |
 | 部署 | Docker Compose · GitHub Container Registry · 多架构 (amd64/arm64) |
@@ -305,7 +305,7 @@ docker compose -f deploy/docker-compose.dev.yml up
 
 **B. 宿主机直跑**
 
-需要 Go 1.26.3+、Node 22+、本地 Postgres + Redis，以及兄弟目录 [`airgate-sdk`](https://github.com/DevilGenius/airgate-sdk)：
+需要 Go 1.26.5+、Node 22+、本地 Postgres + Redis，以及兄弟目录 [`airgate-sdk`](https://github.com/DevilGenius/airgate-sdk)：
 
 ```bash
 git clone https://github.com/DevilGenius/airgate-sdk.git
