@@ -27,7 +27,7 @@ import (
 
 const (
 	defaultGatewayBodyLimit = 10 << 20
-	imageGatewayBodyLimit   = 32 << 20
+	largeGatewayBodyLimit   = 32 << 20
 )
 
 // parseRequest 从 HTTP 请求构造 forwardState。认证 / body 读取 / 插件匹配失败时
@@ -41,7 +41,8 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	}
 
 	path := requestPath(c)
-	bodyLimit := gatewayBodyLimit(path, c.GetHeader("Content-Type"))
+	contentType := c.GetHeader("Content-Type")
+	bodyLimit := gatewayBodyLimit(path, contentType)
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, bodyLimit)
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
@@ -54,7 +55,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 				"limit_bytes", bodyLimit,
 			)
 			message := "请求体过大，请缩小后重试"
-			if bodyLimit == imageGatewayBodyLimit {
+			if isImageSubmitAPIPath(path) || isMultipartContentType(contentType) {
 				message = imageTooLargeMessage
 			}
 			openAIError(c, http.StatusRequestEntityTooLarge, "invalid_request_error", "request_too_large", message)
@@ -120,10 +121,30 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 }
 
 func gatewayBodyLimit(path, contentType string) int64 {
-	if isImageSubmitAPIPath(path) || strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "multipart/") {
-		return imageGatewayBodyLimit
+	if usesLargeGatewayBodyLimit(path) || isMultipartContentType(contentType) {
+		return largeGatewayBodyLimit
 	}
 	return defaultGatewayBodyLimit
+}
+
+func isMultipartContentType(contentType string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "multipart/")
+}
+
+func usesLargeGatewayBodyLimit(path string) bool {
+	if isImageSubmitAPIPath(path) {
+		return true
+	}
+	switch forwardpath.Normalize(path) {
+	case "/v1/responses", "/responses",
+		"/v1/responses/compact", "/responses/compact",
+		"/v1/chat/completions", "/chat/completions",
+		"/v1/messages", "/messages",
+		"/v1/messages/count_tokens", "/messages/count_tokens":
+		return true
+	default:
+		return false
+	}
 }
 
 func requireKeyInfo(c *gin.Context) (*auth.APIKeyInfo, bool) {
