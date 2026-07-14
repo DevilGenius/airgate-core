@@ -26,8 +26,9 @@ const (
 	// rateLimitedMax OAuth 某些限流可能长达数天，设上限防止异常值。
 	rateLimitedMax = 7 * 24 * time.Hour
 	// transientAvoidance* 统一处理 403 临时不可用和 5xx/网络抖动：
-	// 前三次写 degraded 短窗口，第四次起写 60s degraded。只要带瞬时退避标记且未过期，
-	// 调度都完全避让；普通 degraded 才允许 StickyOnly。
+	// 首次只记录错误、不退避；第二至第四次分别写 7.5s / 15s / 30s degraded 短窗口，
+	// 第五次起写 60s degraded。只要带生效中的瞬时退避标记且未过期，调度都完全避让；
+	// 普通 degraded 才允许 StickyOnly。
 	transientAvoidanceFirst  = 7500 * time.Millisecond
 	transientAvoidanceSecond = 15 * time.Second
 	transientAvoidanceThird  = 30 * time.Second
@@ -98,9 +99,9 @@ func (sm *StateMachine) notifyStateSnapshot(accountID int, state account.State, 
 //	Success             → state=active，清 state_until，last_used_at=now
 //	AccountRateLimited  → state=rate_limited，state_until=now+RetryAfter
 //	AccountDead         → 401 等确定性凭证失效才 disabled；403 只降级
-//	AccountUnavailable  → 瞬时避让；连续 403 只降级，不自动 disabled
-//	UpstreamTransient   → 瞬时避让；不会 disabled
-//	FamilyTransient     → (account, family) 维度瞬时避让；不改账号级 DB state
+//	AccountUnavailable  → 首次记错，第二次起瞬时避让；连续 403 只降级，不自动 disabled
+//	UpstreamTransient   → 首次记错，第二次起瞬时避让；不会 disabled
+//	FamilyTransient     → (account, family) 维度首次记错、第二次起瞬时避让；不改账号级 DB state
 //	ClientError / StreamAborted / Unknown → 不改状态（账号无辜）
 func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 	switch j.Kind {
@@ -186,6 +187,17 @@ func (sm *StateMachine) applyFamilyTransientAvoidance(ctx context.Context, accou
 	step := sm.familyCooldown.TransientStep(ctx, accountID, j.Family)
 	delay, degraded := transientAvoidanceDelay(step)
 	nextStep := nextTransientAvoidanceStep(step)
+	if delay <= 0 {
+		sm.familyCooldown.SetTransientStep(ctx, accountID, j.Family, nextStep)
+		slog.Warn("scheduler_family_transient_observed",
+			sdk.LogFieldAccountID, accountID,
+			"family", j.Family,
+			"step", nextStep,
+			"backoff", false,
+			sdk.LogFieldReason, j.Reason,
+		)
+		return
+	}
 	until := time.Now().Add(delay)
 	sm.familyCooldown.MarkTransient(ctx, accountID, j.Family, until, j.Reason, nextStep)
 
@@ -207,6 +219,16 @@ func (sm *StateMachine) applyFamilyTransientAvoidance(ctx context.Context, accou
 }
 
 func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID int, j Judgment, transientKind string) {
+	sm.applyTransientAvoidanceWithMinimumStep(ctx, accountID, j, transientKind, 0)
+}
+
+func (sm *StateMachine) applyTransientAvoidanceWithMinimumStep(
+	ctx context.Context,
+	accountID int,
+	j Judgment,
+	transientKind string,
+	minimumStep int,
+) {
 	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
@@ -246,10 +268,34 @@ func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID i
 
 	extra := cloneExtra(existing.Extra)
 	step := extraInt(extra, transientAvoidStepExtraKey)
+	if step < minimumStep {
+		step = minimumStep
+	}
 	delay, degraded := transientAvoidanceDelay(step)
 	nextStep := nextTransientAvoidanceStep(step)
-	until := now.Add(delay)
 	extra[transientAvoidStepExtraKey] = nextStep
+	if delay <= 0 {
+		err = accountscope.UpdateOneID(sm.db, accountID).
+			SetErrorMsg(truncateReason(j.Reason)).
+			SetExtra(extra).
+			Exec(dbCtx)
+		if err != nil {
+			slog.Error("scheduler_transient_observation_failed",
+				sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
+			return
+		}
+		slog.Warn("scheduler_transient_observed",
+			sdk.LogFieldAccountID, accountID,
+			"transient_kind", transientKind,
+			"step", nextStep,
+			"backoff", false,
+			sdk.LogFieldReason, j.Reason,
+		)
+		sm.notifyStateSnapshot(accountID, existing.State, existing.StateUntil, extra)
+		return
+	}
+
+	until := now.Add(delay)
 
 	err = accountscope.UpdateOneID(sm.db, accountID).
 		SetState(account.StateDegraded).
@@ -277,10 +323,12 @@ func (sm *StateMachine) applyTransientAvoidance(ctx context.Context, accountID i
 func transientAvoidanceDelay(step int) (time.Duration, bool) {
 	switch {
 	case step <= 0:
-		return transientAvoidanceFirst, false
+		return 0, false
 	case step == 1:
-		return transientAvoidanceSecond, false
+		return transientAvoidanceFirst, false
 	case step == 2:
+		return transientAvoidanceSecond, false
+	case step == 3:
 		return transientAvoidanceThird, false
 	default:
 		return transientDegradedWindow, true
@@ -627,11 +675,7 @@ func isTransientAvoidanceWindow(acc *ent.Account, now time.Time) bool {
 }
 
 func hasTransientAvoidanceMarker(extra map[string]interface{}) bool {
-	if extra == nil {
-		return false
-	}
-	_, ok := extra[transientAvoidStepExtraKey]
-	return ok
+	return extraInt(extra, transientAvoidStepExtraKey) >= 2
 }
 
 func schedulabilityWithTransientAvoidance(acc *ent.Account, now time.Time) Schedulability {

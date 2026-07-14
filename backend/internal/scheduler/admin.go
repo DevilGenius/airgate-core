@@ -85,10 +85,10 @@ func (s *Scheduler) MarkDisabled(ctx context.Context, accountID int, reason stri
 	s.state.transition(ctx, accountID, account.StateDisabled, nil, reason)
 }
 
-// MarkDegraded 把账号临时降级，不永久禁用；用于 403 等暂不可用信号。
+// MarkDegraded 把账号立即临时降级，不永久禁用；显式管理信号不走首次免退避。
 func (s *Scheduler) MarkDegraded(ctx context.Context, accountID int, reason string) {
-	s.state.applyTransientAvoidance(ctx, accountID, Judgment{
+	s.state.applyTransientAvoidanceWithMinimumStep(ctx, accountID, Judgment{
 		Kind:   sdk.OutcomeAccountUnavailable,
 		Reason: reason,
-	}, transientKindUnavailable)
+	}, transientKindUnavailable, 1)
 }

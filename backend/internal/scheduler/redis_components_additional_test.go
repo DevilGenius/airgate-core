@@ -40,6 +40,8 @@ func TestFamilyCooldownRedisPaths(t *testing.T) {
 	}
 	mock.ExpectDel(familyCooldownTransientStepKey(7, "gpt")).SetVal(1)
 	fc.ClearTransientStep(ctx, 7, "gpt")
+	mock.ExpectSet(familyCooldownTransientStepKey(7, "gpt"), "1", familyTransientStepTTL).SetVal("OK")
+	fc.SetTransientStep(ctx, 7, "gpt", 1)
 
 	mock.ExpectSet(reasonKey, "overloaded", time.Millisecond).SetVal("OK")
 	mock.ExpectZAdd(indexKey, redis.Z{Score: float64(until.UnixMilli()), Member: "gpt"}).SetVal(1)

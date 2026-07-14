@@ -27,27 +27,34 @@ func TestStateMachineTransientAvoidanceBackoffAnd403NeverDisables(t *testing.T) 
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh := db.Account.GetX(ctx, acc.ID)
-	assertShortDBAvoidance(t, fresh, 1, 7*time.Second, 8*time.Second)
+	assertDBTransientObservedWithoutBackoff(t, fresh, account.StateActive)
+	if fresh.StateUntil != nil {
+		t.Fatalf("state_until after first 403 = %v, want nil", fresh.StateUntil)
+	}
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
-	assertShortDBAvoidance(t, fresh, 2, 14*time.Second, 16*time.Second)
+	assertShortDBAvoidance(t, fresh, 2, 7*time.Second, 8*time.Second)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
-	assertShortDBAvoidance(t, fresh, 3, 29*time.Second, 31*time.Second)
+	assertShortDBAvoidance(t, fresh, 3, 14*time.Second, 16*time.Second)
+
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
+	fresh = db.Account.GetX(ctx, acc.ID)
+	assertShortDBAvoidance(t, fresh, 4, 29*time.Second, 31*time.Second)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
 	if fresh.State != account.StateDegraded {
-		t.Fatalf("state after fourth 403 = %s, want degraded", fresh.State)
+		t.Fatalf("state after fifth 403 = %s, want degraded", fresh.State)
 	}
 	assertDBDegraded(t, fresh, 59*time.Second, 61*time.Second)
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	fresh = db.Account.GetX(ctx, acc.ID)
 	if fresh.State != account.StateDegraded {
-		t.Fatalf("state after fifth 403 = %s, want degraded", fresh.State)
+		t.Fatalf("state after sixth 403 = %s, want degraded", fresh.State)
 	}
 	assertDBDegraded(t, fresh, 59*time.Second, 61*time.Second)
 
@@ -204,15 +211,15 @@ func TestStateMachineSuccessClearsTransientAvoidanceExtra(t *testing.T) {
 
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 	before := db.Account.GetX(ctx, acc.ID)
-	assertShortDBAvoidance(t, before, 1, 7*time.Second, 8*time.Second)
+	assertDBTransientObservedWithoutBackoff(t, before, account.StateActive)
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeSuccess})
 
 	fresh := db.Account.GetX(ctx, acc.ID)
-	if fresh.State != account.StateDegraded {
-		t.Fatalf("state after success during transient window = %s, want degraded", fresh.State)
+	if fresh.State != account.StateActive {
+		t.Fatalf("state after success = %s, want active", fresh.State)
 	}
-	if fresh.StateUntil == nil || !fresh.StateUntil.Equal(*before.StateUntil) {
-		t.Fatalf("state_until after success = %v, want %v", fresh.StateUntil, before.StateUntil)
+	if fresh.StateUntil != nil {
+		t.Fatalf("state_until after success = %v, want nil", fresh.StateUntil)
 	}
 	if fresh.ErrorMsg != "" {
 		t.Fatalf("error_msg after success = %q, want empty", fresh.ErrorMsg)
@@ -220,7 +227,7 @@ func TestStateMachineSuccessClearsTransientAvoidanceExtra(t *testing.T) {
 	assertTransientAvoidanceExtraCleared(t, fresh)
 }
 
-func TestStateMachineFamilyTransientDoesNotChangeAccountState(t *testing.T) {
+func TestStateMachineFirstFamilyTransientDoesNotBackoff(t *testing.T) {
 	ctx := context.Background()
 	db := openStateMachineTestDB(t, "scheduler_family_transient_state")
 	recorder := &captureMonitorRecorder{}
@@ -228,7 +235,6 @@ func TestStateMachineFamilyTransientDoesNotChangeAccountState(t *testing.T) {
 	sm.monitor = recorder
 	acc := createStateMachineAccount(ctx, db, "family overloaded", false)
 
-	start := time.Now()
 	sm.Apply(ctx, acc.ID, Judgment{
 		Kind:           sdk.OutcomeFamilyTransient,
 		Reason:         "Our servers are currently overloaded. Please try again later.",
@@ -247,28 +253,30 @@ func TestStateMachineFamilyTransientDoesNotChangeAccountState(t *testing.T) {
 	if fresh.ErrorMsg != "" {
 		t.Fatalf("error_msg after family transient = %q, want empty", fresh.ErrorMsg)
 	}
-	if len(recorder.events) != 1 {
-		t.Fatalf("monitor events = %d, want 1", len(recorder.events))
+	if len(recorder.events) != 0 {
+		t.Fatalf("monitor events = %d, want 0 before backoff starts", len(recorder.events))
 	}
-	event := recorder.events[0]
-	if event.ErrorCode != "account_family_transient" {
-		t.Fatalf("error_code = %q, want account_family_transient", event.ErrorCode)
+}
+
+func TestTransientAvoidanceDelayStartsOnSecondFailure(t *testing.T) {
+	tests := []struct {
+		step         int
+		wantDelay    time.Duration
+		wantDegraded bool
+	}{
+		{step: 0, wantDelay: 0},
+		{step: 1, wantDelay: 7500 * time.Millisecond},
+		{step: 2, wantDelay: 15 * time.Second},
+		{step: 3, wantDelay: 30 * time.Second},
+		{step: 4, wantDelay: 60 * time.Second, wantDegraded: true},
 	}
-	if got := event.Detail["family"]; got != "openai:gpt-5" {
-		t.Fatalf("family detail = %#v, want openai:gpt-5", got)
-	}
-	if got := event.Detail["step"]; got != 1 {
-		t.Fatalf("step detail = %#v, want 1", got)
-	}
-	if got := event.Detail["short_avoidance"]; got != true {
-		t.Fatalf("short_avoidance detail = %#v, want true", got)
-	}
-	if event.AutoResolveAt == nil {
-		t.Fatalf("auto_resolve_at should be set")
-	}
-	delay := event.AutoResolveAt.Sub(start)
-	if delay < 7*time.Second || delay > 8*time.Second {
-		t.Fatalf("family transient delay = %s, want about 7.5s", delay)
+
+	for _, tt := range tests {
+		delay, degraded := transientAvoidanceDelay(tt.step)
+		if delay != tt.wantDelay || degraded != tt.wantDegraded {
+			t.Fatalf("transientAvoidanceDelay(%d) = (%s, %v), want (%s, %v)",
+				tt.step, delay, degraded, tt.wantDelay, tt.wantDegraded)
+		}
 	}
 }
 
@@ -422,7 +430,7 @@ func TestStateMachineTransientAvoidanceTreatsExpiredRateLimitAsActive(t *testing
 	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeAccountUnavailable, Reason: "HTTP 403"})
 
 	fresh := db.Account.GetX(ctx, acc.ID)
-	assertShortDBAvoidance(t, fresh, 1, 7*time.Second, 8*time.Second)
+	assertDBTransientObservedWithoutBackoff(t, fresh, account.StateRateLimited)
 }
 
 func TestSchedulabilityWithTransientAvoidanceKeepsPlainDegradedStickyOnly(t *testing.T) {
@@ -503,6 +511,26 @@ func createStateMachineAccount(ctx context.Context, db *ent.Client, name string,
 func applyJudgmentN(ctx context.Context, sm *StateMachine, accountID int, j Judgment, n int) {
 	for i := 0; i < n; i++ {
 		sm.Apply(ctx, accountID, j)
+	}
+}
+
+func assertDBTransientObservedWithoutBackoff(t *testing.T, acc *ent.Account, wantState account.State) {
+	t.Helper()
+	now := time.Now()
+	if acc.State != wantState {
+		t.Fatalf("state = %s, want %s", acc.State, wantState)
+	}
+	if got := extraInt(acc.Extra, transientAvoidStepExtraKey); got != 1 {
+		t.Fatalf("avoid step = %d, want 1", got)
+	}
+	if isTransientAvoidanceWindow(acc, now) {
+		t.Fatalf("first transient error should not create an avoidance window: state=%s until=%v extra=%+v", acc.State, acc.StateUntil, acc.Extra)
+	}
+	if got := schedulabilityWithTransientAvoidance(acc, now); got != Normal {
+		t.Fatalf("first transient error schedulability = %v, want Normal", got)
+	}
+	if got := hardAffinitySchedulabilityWithTransientAvoidance(acc, now); got != Normal {
+		t.Fatalf("first transient error hard-affinity schedulability = %v, want Normal", got)
 	}
 }
 

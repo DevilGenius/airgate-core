@@ -218,7 +218,7 @@ func TestSelectionSnapshotCurrentLoadsAndCandidates(t *testing.T) {
 		nil,
 		{ID: 1, State: "active"},
 		{ID: 2, State: "disabled"},
-		{ID: 3, State: "degraded", StateUntil: &future, Extra: map[string]interface{}{transientAvoidStepExtraKey: 1}},
+		{ID: 3, State: "degraded", StateUntil: &future, Extra: map[string]interface{}{transientAvoidStepExtraKey: 2}},
 		{ID: 4, State: "degraded", StateUntil: &past},
 	}
 	runtime := runtimeConstraintCandidates(candidates, now)

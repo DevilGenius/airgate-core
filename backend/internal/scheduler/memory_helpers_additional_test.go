@@ -236,6 +236,10 @@ func TestStateHelperAdditionalBranches(t *testing.T) {
 		t.Fatal("degraded without marker should not be transient avoidance")
 	}
 	degradedFuture.Extra = map[string]interface{}{transientAvoidStepExtraKey: 1}
+	if isTransientAvoidanceWindow(degradedFuture, now) {
+		t.Fatal("first transient error should not be an avoidance window")
+	}
+	degradedFuture.Extra[transientAvoidStepExtraKey] = 2
 	if !isTransientAvoidanceWindow(degradedFuture, now) || isTransientAvoidanceWindow(degradedPast, now) {
 		t.Fatal("transient avoidance window mismatch")
 	}

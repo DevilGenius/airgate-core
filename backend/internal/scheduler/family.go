@@ -112,6 +112,18 @@ func (fc *FamilyCooldown) MarkTransient(ctx context.Context, accountID int, fami
 	fc.mark(ctx, accountID, family, until, reason, step, true)
 }
 
+// SetTransientStep 只记录瞬时错误升级 step，不创建冷却窗口。
+// 首次瞬时错误使用该路径，让下一次错误从 7.5s 开始退避。
+func (fc *FamilyCooldown) SetTransientStep(ctx context.Context, accountID int, family string, step int) {
+	if fc == nil || fc.rdb == nil || family == "" {
+		return
+	}
+	if err := fc.rdb.Set(ctx, familyCooldownTransientStepKey(accountID, family), strconv.Itoa(step), familyTransientStepTTL).Err(); err != nil {
+		slog.Debug("写入家族瞬时错误步数失败",
+			"account_id", accountID, "family", family, "step", step, "error", err)
+	}
+}
+
 func (fc *FamilyCooldown) mark(ctx context.Context, accountID int, family string, until time.Time, reason string, step int, transient bool) {
 	if fc == nil || fc.rdb == nil || family == "" {
 		return
