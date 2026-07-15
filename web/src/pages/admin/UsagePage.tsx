@@ -175,6 +175,7 @@ const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
   'created_at',
   'model',
   'stream',
+  'ws_dial_ms',
   'first_event_ms',
   'first_token_ms',
   'duration_ms',
@@ -920,6 +921,7 @@ export default function UsagePage() {
       ...adminColumns,
       ...leadingSharedColumns,
       ...(streamColumn ? [streamColumn] : []),
+      wsDialColumn,
       ...timingColumns,
       ...sharedColumnsAfterModel,
       endpointColumn,
@@ -927,7 +929,6 @@ export default function UsagePage() {
       accountColumn,
       ipAddressColumn,
       userAgentColumn,
-      wsDialColumn,
     ] as UsageColumnConfig<UsageLogResp>[];
   }, [sharedColumns, t]);
 
