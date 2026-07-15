@@ -39,7 +39,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	if !ok {
 		return nil, false
 	}
-	if f.requestTraceEnabled {
+	if f.RequestTraceEnabled() {
 		if trace := requestTraceFromGinContext(c); trace != nil {
 			trace.bindKeyInfo(keyInfo)
 		}
@@ -50,7 +50,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	bodyLimit := gatewayBodyLimit(path, contentType)
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, bodyLimit)
 	body, err := io.ReadAll(c.Request.Body)
-	if f.requestTraceEnabled {
+	if f.RequestTraceEnabled() {
 		if trace := requestTraceFromGinContext(c); trace != nil {
 			trace.captureRequestBody(body, contentType)
 		}
@@ -82,7 +82,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	parsed := parseBody(body, c.GetHeader("Content-Type"))
 	parsed.PreviousResponseID = firstNonEmpty(parsed.PreviousResponseID, previousResponseIDFromHeaders(c.Request.Header))
 	parsed.SessionID = resolveRequestSessionID(c.Request.Header, parsed)
-	if f.requestTraceEnabled {
+	if f.RequestTraceEnabled() {
 		if trace := requestTraceFromGinContext(c); trace != nil {
 			trace.captureParsedRequest(parsed)
 		}

@@ -210,6 +210,8 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/monitor/requests/summary", handlers.Monitor.MonitorRequestSummary)
 		adminGroup.GET("/monitor/requests", handlers.Monitor.ListMonitorRequestEvents)
 		adminGroup.DELETE("/monitor/requests", handlers.Monitor.ClearMonitorRequestEvents)
+		adminGroup.GET("/monitor/request-trace", handlers.Monitor.GetMonitorRequestTraceState)
+		adminGroup.PUT("/monitor/request-trace", handlers.Monitor.UpdateMonitorRequestTraceState)
 		adminGroup.GET("/monitor/request-traces/:hash", handlers.Monitor.GetMonitorRequestTrace)
 		adminGroup.GET("/monitor", handlers.Monitor.ListMonitorEvents)
 		adminGroup.GET("/monitor/:id", handlers.Monitor.GetMonitorEvent)

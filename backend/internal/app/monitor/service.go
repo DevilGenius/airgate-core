@@ -75,6 +75,7 @@ type Service struct {
 	rdb            *redis.Client
 	queue          chan queuedOperation
 	traceQueue     chan queuedRequestTrace
+	traceEnabled   atomic.Bool
 	recovery       *recoverySnapshot
 	retention      time.Duration
 	flushInterval  time.Duration
@@ -100,6 +101,7 @@ func NewService(repo Repository, opts ...Option) *Service {
 	s := &Service{
 		repo:           repo,
 		queue:          make(chan queuedOperation, defaultQueueSize),
+		traceQueue:     make(chan queuedRequestTrace, defaultTraceQueueSize),
 		recovery:       newRecoverySnapshot(),
 		retention:      defaultRetention,
 		flushInterval:  defaultFlushInterval,
@@ -121,6 +123,9 @@ func NewService(repo Repository, opts ...Option) *Service {
 	}
 	if s.queue == nil {
 		s.queue = make(chan queuedOperation, defaultQueueSize)
+	}
+	if s.traceQueue == nil {
+		s.traceQueue = make(chan queuedRequestTrace, defaultTraceQueueSize)
 	}
 	return s
 }
@@ -161,13 +166,11 @@ func WithRetention(retention time.Duration) Option {
 	}
 }
 
-// WithRequestTrace allocates the bounded raw-trace queue. When disabled the
-// queue remains nil and no trace worker or payload retention is active.
+// WithRequestTrace sets the initial runtime state. The bounded queue always
+// exists so an administrator can enable tracing without restarting Core.
 func WithRequestTrace(enabled bool) Option {
 	return func(s *Service) {
-		if enabled {
-			s.traceQueue = make(chan queuedRequestTrace, defaultTraceQueueSize)
-		}
+		s.traceEnabled.Store(enabled)
 	}
 }
 
@@ -260,7 +263,7 @@ func (s *Service) RecordRequestTrace(ctx context.Context, input requestmonitorin
 		s.enqueueRequestEvent(event)
 		return false
 	}
-	if s.traceQueue == nil {
+	if !s.RequestTraceEnabled() {
 		event.Detail["trace_dropped"] = "disabled"
 		s.enqueueRequestEvent(event)
 		return false
@@ -385,9 +388,17 @@ func (s *Service) GetRequestTrace(ctx context.Context, hash string) (RequestTrac
 	return decodeStoredRequestTrace(stored)
 }
 
-// RequestTraceEnabled reports whether the dedicated trace queue is active.
+// RequestTraceEnabled reports whether final-error request tracing is active.
 func (s *Service) RequestTraceEnabled() bool {
-	return s != nil && s.traceQueue != nil
+	return s != nil && s.traceEnabled.Load()
+}
+
+// SetRequestTraceEnabled changes tracing for new requests at runtime.
+func (s *Service) SetRequestTraceEnabled(enabled bool) {
+	if s == nil {
+		return
+	}
+	s.traceEnabled.Store(enabled)
 }
 
 // Summary returns the monitor event overview for future dashboard handlers.

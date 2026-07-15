@@ -1,10 +1,11 @@
-import { del, get, patch } from './client';
+import { del, get, patch, put } from './client';
 import type {
   MonitorListQuery,
   MonitorListResp,
   MonitorRequestClearResp,
   MonitorRequestListQuery,
   MonitorRequestListResp,
+  MonitorRequestTraceStateResp,
   MonitorRuntimeResp,
   MonitorSummaryResp,
 } from '../types';
@@ -26,5 +27,9 @@ export const monitorApi = {
     get<MonitorRequestListResp>('/api/v1/admin/monitor/requests', params, options),
   clearRequests: (before?: string) =>
     del<MonitorRequestClearResp>('/api/v1/admin/monitor/requests', before ? { before } : undefined),
+  requestTraceState: (options?: MonitorRequestOptions) =>
+    get<MonitorRequestTraceStateResp>('/api/v1/admin/monitor/request-trace', undefined, options),
+  updateRequestTraceState: (enabled: boolean) =>
+    put<MonitorRequestTraceStateResp>('/api/v1/admin/monitor/request-trace', { enabled }),
   resolve: (id: number) => patch<void>(`/api/v1/admin/monitor/${id}/resolve`),
 };

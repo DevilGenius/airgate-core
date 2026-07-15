@@ -51,7 +51,7 @@ type requestTraceSession struct {
 }
 
 func (f *Forwarder) beginRequestTrace(c *gin.Context) *requestTraceSession {
-	if f == nil || !f.requestTraceEnabled || f.requestMonitor == nil || c == nil {
+	if f == nil || !f.RequestTraceEnabled() || f.requestMonitor == nil || c == nil {
 		return nil
 	}
 	if _, ok := f.requestMonitor.(requestmonitoring.TraceRecorder); !ok {

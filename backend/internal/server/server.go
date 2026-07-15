@@ -160,6 +160,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		Events:      eventHub,
 		Recorder:    recorder,
 	})
+	if s.handlers.Monitor != nil {
+		s.handlers.Monitor.SetRequestTraceRuntime(newRequestTraceRuntime(monitorService, forwarder))
+	}
 	if s.handlers.AccountService != nil {
 		s.handlers.AccountService.SetMonitorRecorder(monitorService)
 	}
@@ -231,7 +234,7 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	safego.Go("asset_cleanup_loop", func() { plugin.StartAssetCleanupLoop(pluginCtx, s.db) })
 	safego.Go("monitor_aggregator_loop", func() { appmonitor.StartAggregatorLoop(pluginCtx, s.monitor) })
 	safego.Go("monitor_worker_loop", func() { appmonitor.StartWorkerLoop(pluginCtx, s.monitor) })
-	if s.monitor != nil && s.monitor.RequestTraceEnabled() {
+	if s.monitor != nil {
 		safego.Go("monitor_request_trace_loop", func() { appmonitor.StartRequestTraceLoop(pluginCtx, s.monitor) })
 	}
 	if s.runtime != nil {

@@ -140,6 +140,16 @@ type MonitorRequestClearResp struct {
 	Deleted int `json:"deleted"`
 }
 
+// MonitorRequestTraceStateResp is the current-instance runtime trace state.
+type MonitorRequestTraceStateResp struct {
+	Enabled bool `json:"enabled"`
+}
+
+// MonitorRequestTraceUpdateReq changes tracing for new requests at runtime.
+type MonitorRequestTraceUpdateReq struct {
+	Enabled bool `json:"enabled"`
+}
+
 // MonitorRequestTraceResp is one verified, decompressed raw request trace.
 type MonitorRequestTraceResp struct {
 	Hash           string          `json:"hash"`

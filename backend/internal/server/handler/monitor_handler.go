@@ -13,6 +13,13 @@ import (
 type MonitorHandler struct {
 	service        *appmonitor.Service
 	runtimeSampler *appmonitor.RuntimeSampler
+	requestTrace   RequestTraceRuntime
+}
+
+// RequestTraceRuntime controls final-error tracing for the current Core instance.
+type RequestTraceRuntime interface {
+	RequestTraceEnabled() bool
+	SetRequestTraceEnabled(bool)
 }
 
 // NewMonitorHandler creates a MonitorHandler.
@@ -22,6 +29,27 @@ func NewMonitorHandler(service *appmonitor.Service, runtimeSampler ...*appmonito
 		h.runtimeSampler = runtimeSampler[0]
 	}
 	return h
+}
+
+// SetRequestTraceRuntime injects the runtime trace controller.
+func (h *MonitorHandler) SetRequestTraceRuntime(runtime RequestTraceRuntime) {
+	if h == nil {
+		return
+	}
+	h.requestTrace = runtime
+}
+
+func (h *MonitorHandler) requestTraceRuntime() RequestTraceRuntime {
+	if h == nil {
+		return nil
+	}
+	if h.requestTrace != nil {
+		return h.requestTrace
+	}
+	if h.service != nil {
+		return h.service
+	}
+	return nil
 }
 
 func parseMonitorID(raw string) (int, error) {

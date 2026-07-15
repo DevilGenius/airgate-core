@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/hex"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -10,6 +11,32 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
+
+// GetMonitorRequestTraceState returns the current-instance runtime trace state.
+func (h *MonitorHandler) GetMonitorRequestTraceState(c *gin.Context) {
+	runtime := h.requestTraceRuntime()
+	if runtime == nil {
+		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "请求追踪运行时不可用")
+		return
+	}
+	response.Success(c, dto.MonitorRequestTraceStateResp{Enabled: runtime.RequestTraceEnabled()})
+}
+
+// UpdateMonitorRequestTraceState changes tracing for new requests immediately.
+func (h *MonitorHandler) UpdateMonitorRequestTraceState(c *gin.Context) {
+	var input dto.MonitorRequestTraceUpdateReq
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BindError(c, err)
+		return
+	}
+	runtime := h.requestTraceRuntime()
+	if runtime == nil {
+		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "请求追踪运行时不可用")
+		return
+	}
+	runtime.SetRequestTraceEnabled(input.Enabled)
+	response.Success(c, dto.MonitorRequestTraceStateResp{Enabled: runtime.RequestTraceEnabled()})
+}
 
 // GetMonitorRequestTrace returns one verified raw final-error trace by hash.
 func (h *MonitorHandler) GetMonitorRequestTrace(c *gin.Context) {

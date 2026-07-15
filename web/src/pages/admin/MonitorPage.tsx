@@ -10,6 +10,7 @@ import { subscribeAdminEvents } from '../../shared/api/adminEvents';
 import { queryKeys } from '../../shared/queryKeys';
 import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { RecordsTable } from '../../shared/components/RecordsTable';
 import { RemoteSearchFilterComboBox } from '../../shared/components/RemoteSearchFilterComboBox';
 import { TablePage } from '../../shared/components/TablePage';
@@ -292,6 +293,13 @@ export default function MonitorPage() {
   });
   const refetchRequestSummary = requestSummaryQuery.refetch;
 
+  const requestTraceQuery = useQuery({
+    queryKey: queryKeys.monitorRequestTrace(),
+    queryFn: ({ signal }) => monitorApi.requestTraceState({ signal }),
+    enabled: activeTable === 'events',
+    meta: { globalLoading: false },
+  });
+
   const {
     data,
     dataUpdatedAt,
@@ -349,6 +357,15 @@ export default function MonitorPage() {
       setRequestCursors({});
       setRequestPageState(1);
       invalidateRequestMonitor();
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  const requestTraceMutation = useMutation({
+    mutationFn: monitorApi.updateRequestTraceState,
+    onSuccess: (result) => {
+      queryClient.setQueryData(queryKeys.monitorRequestTrace(), result);
+      toast('success', t(result.enabled ? 'monitor.request_trace_enabled' : 'monitor.request_trace_disabled'));
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -676,6 +693,9 @@ export default function MonitorPage() {
   const activeRefreshBusy = isRequestTable
     ? isRequestFetching || requestSummaryQuery.isFetching
     : isFetching || summaryQuery.isFetching;
+  const requestTraceEnabled = requestTraceMutation.isPending && typeof requestTraceMutation.variables === 'boolean'
+    ? requestTraceMutation.variables
+    : requestTraceQuery.data?.enabled ?? false;
 
   return (
     <div>
@@ -839,6 +859,16 @@ export default function MonitorPage() {
               isAutoRefreshing={runtimeQuery.isFetching}
               isRefreshing={activeRefreshBusy || runtimeQuery.isFetching}
             />
+            {!isRequestTable ? (
+              <NativeSwitch
+                ariaLabel={t('monitor.request_trace')}
+                className="ag-page-toolbar-switch"
+                isDisabled={requestTraceQuery.isLoading || requestTraceMutation.isPending}
+                isSelected={requestTraceEnabled}
+                label={t('monitor.request_trace')}
+                onChange={(enabled) => requestTraceMutation.mutate(enabled)}
+              />
+            ) : null}
             {isRequestTable ? (
               <Button
                 isIconOnly

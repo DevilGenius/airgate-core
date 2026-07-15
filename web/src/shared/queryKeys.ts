@@ -23,6 +23,7 @@ export const queryKeys = {
   monitorRuntime: () => ['monitor-runtime'] as const,
   monitorSummary: () => ['monitor-summary'] as const,
   monitorRequests: (...args: unknown[]) => ['monitor-requests', ...args] as const,
+  monitorRequestTrace: () => ['monitor-request-trace'] as const,
   usage: (...args: unknown[]) => ['usage', ...args] as const,
   userUsage: (...args: unknown[]) => ['user-usage', ...args] as const,
   settings: () => ['settings'] as const,

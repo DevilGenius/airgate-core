@@ -1029,6 +1029,10 @@ export interface MonitorRequestClearResp {
   deleted: number;
 }
 
+export interface MonitorRequestTraceStateResp {
+  enabled: boolean;
+}
+
 export interface MonitorRuntimeResp {
   sampled_at: string;
   window_seconds: number;

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -39,7 +40,7 @@ type Forwarder struct {
 	recorder             *billing.Recorder
 	monitor              monitoring.Recorder
 	requestMonitor       requestmonitoring.Recorder
-	requestTraceEnabled  bool
+	requestTraceEnabled  atomic.Bool
 	credentialLocks      sync.Map
 	credentialPersistSem chan struct{}
 }
@@ -83,13 +84,17 @@ func (f *Forwarder) SetRequestMonitorRecorder(recorder requestmonitoring.Recorde
 	f.requestMonitor = recorder
 }
 
-// SetRequestTraceEnabled enables final-error raw tracing. The value is loaded
-// once at startup so the disabled hot path is a single boolean branch.
+// SetRequestTraceEnabled enables or disables final-error raw tracing at runtime.
 func (f *Forwarder) SetRequestTraceEnabled(enabled bool) {
 	if f == nil {
 		return
 	}
-	f.requestTraceEnabled = enabled
+	f.requestTraceEnabled.Store(enabled)
+}
+
+// RequestTraceEnabled reports the current runtime trace state.
+func (f *Forwarder) RequestTraceEnabled() bool {
+	return f != nil && f.requestTraceEnabled.Load()
 }
 
 // maxFailoverAttempts 单次请求的最大 failover 次数。
