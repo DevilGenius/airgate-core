@@ -15,8 +15,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
 	"github.com/zeebo/xxh3"
+
+	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
 )
 
 const (
