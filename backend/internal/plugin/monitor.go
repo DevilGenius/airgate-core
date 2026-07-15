@@ -48,7 +48,8 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 		detail["retry_count"] = retryCountForAttempts(attempts)
 	}
 	attachKeyInfoDetail(detail, keyInfo)
-	f.requestMonitor.RecordRequest(ctx, requestmonitoring.EventInput{
+	markRequestTraceError(c, "api_request", status, httpErrorClassForStatus(status), code, message)
+	input := requestmonitoring.EventInput{
 		Type:               requestmonitoring.TypeAPIRequestError,
 		Severity:           requestSeverityForStatus(status),
 		Source:             requestmonitoring.SourceForwarder,
@@ -68,7 +69,8 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 		Title:              "API request error",
 		Message:            message,
 		Detail:             detail,
-	})
+	}
+	f.recordRequestEvent(ctx, input, requestTraceFromGinContext(c), true)
 }
 
 func (f *Forwarder) recordAllRoutesAccountUnavailable(c *gin.Context, state *forwardState, summary allRoutesFailureSummary, response allRoutesFailureResponse, attempts int) {
@@ -198,7 +200,8 @@ func (f *Forwarder) recordPluginRouteError(c *gin.Context, keyInfo *auth.APIKeyI
 		},
 	}
 	attachRequestKeyInfo(&input, keyInfo)
-	f.requestMonitor.RecordRequest(ctx, input)
+	markRequestTraceError(c, "plugin_route", http.StatusServiceUnavailable, "server_error", code, message)
+	f.recordRequestEvent(ctx, input, requestTraceFromGinContext(c), true)
 }
 
 func (f *Forwarder) recordPluginExecutionRetry(ctx context.Context, state *forwardState, execution forwardExecution, attempts int) {
@@ -257,6 +260,9 @@ func (f *Forwarder) recordPluginExecutionEvent(ctx context.Context, state *forwa
 	if execution.outcome.Kind != sdk.OutcomeUnknown {
 		code = execution.outcome.Kind.String()
 	}
+	if upstreamCode := extractErrorCode(execution.outcome.Upstream.Body); upstreamCode != "" {
+		code = upstreamCode
+	}
 	message := judgmentReason(execution)
 	pluginID := ""
 	platform := state.requestedPlatform
@@ -295,6 +301,9 @@ func (f *Forwarder) recordPluginExecutionEvent(ctx context.Context, state *forwa
 	if event.nextAttempt > 0 {
 		input.Detail["next_attempt"] = event.nextAttempt
 	}
+	if upstreamRequestID := upstreamRequestIDFromHeaders(execution.outcome.Upstream.Headers); upstreamRequestID != "" {
+		input.Detail["upstream_request_id"] = upstreamRequestID
+	}
 	if state.keyInfo != nil {
 		attachRequestKeyInfo(&input, state.keyInfo)
 	}
@@ -303,7 +312,7 @@ func (f *Forwarder) recordPluginExecutionEvent(ctx context.Context, state *forwa
 		input.AccountID = &accountID
 		input.AccountNameSnapshot = state.account.Name
 	}
-	f.requestMonitor.RecordRequest(ctx, input)
+	f.recordRequestEvent(ctx, input, state.trace, event.finalFailure)
 }
 
 func (f *Forwarder) recordClientRequestError(c *gin.Context, state *forwardState, execution forwardExecution) {
@@ -312,6 +321,11 @@ func (f *Forwarder) recordClientRequestError(c *gin.Context, state *forwardState
 	}
 	status := sanitizedClientErrorStatus(execution.outcome)
 	message := sanitizedClientErrorMessage(execution.outcome)
+	markRequestTraceExecution(c, state, execution)
+	errorCode := extractErrorCode(execution.outcome.Upstream.Body)
+	if errorCode == "" {
+		errorCode = "invalid_request"
+	}
 	input := requestmonitoring.EventInput{
 		Type:           requestmonitoring.TypeClientRequestError,
 		Severity:       requestmonitoring.SeverityInfo,
@@ -324,7 +338,7 @@ func (f *Forwarder) recordClientRequestError(c *gin.Context, state *forwardState
 		Model:          state.model,
 		HTTPStatus:     intPtr(status),
 		UpstreamStatus: intPtr(execution.outcome.Upstream.StatusCode),
-		ErrorCode:      "invalid_request",
+		ErrorCode:      errorCode,
 		DurationMS:     execution.duration.Milliseconds(),
 		Title:          "Client request error",
 		Message:        message,
@@ -338,6 +352,9 @@ func (f *Forwarder) recordClientRequestError(c *gin.Context, state *forwardState
 	if attempts := forwardAttemptsFromGinContext(c); attempts > 0 {
 		input.Detail["attempts"] = attempts
 		input.Detail["retry_count"] = retryCountForAttempts(attempts)
+	}
+	if upstreamRequestID := upstreamRequestIDFromHeaders(execution.outcome.Upstream.Headers); upstreamRequestID != "" {
+		input.Detail["upstream_request_id"] = upstreamRequestID
 	}
 	if state.plugin != nil {
 		input.PluginID = state.plugin.Name
@@ -355,7 +372,7 @@ func (f *Forwarder) recordClientRequestError(c *gin.Context, state *forwardState
 	if c != nil && c.Request != nil {
 		recordCtx = c.Request.Context()
 	}
-	f.requestMonitor.RecordRequest(recordCtx, input)
+	f.recordRequestEvent(recordCtx, input, state.trace, true)
 }
 
 func (f *Forwarder) recordClientClosedRequest(c *gin.Context, state *forwardState, status int, attempts int) {
@@ -399,7 +416,8 @@ func (f *Forwarder) recordClientClosedRequest(c *gin.Context, state *forwardStat
 	if c != nil && c.Request != nil {
 		recordCtx = context.WithoutCancel(c.Request.Context())
 	}
-	f.requestMonitor.RecordRequest(recordCtx, input)
+	markRequestTraceError(c, "client_closed", status, "client_error", "client_closed_request", input.Message)
+	f.recordRequestEvent(recordCtx, input, state.trace, true)
 }
 
 func attachRequestKeyInfo(input *requestmonitoring.EventInput, keyInfo *auth.APIKeyInfo) {
@@ -514,6 +532,18 @@ func requestSeverityForStatus(status int) string {
 		return requestmonitoring.SeverityWarning
 	}
 	return requestmonitoring.SeverityInfo
+}
+
+func upstreamRequestIDFromHeaders(headers http.Header) string {
+	if headers == nil {
+		return ""
+	}
+	for _, name := range []string{"x-request-id", "request-id", "openai-request-id", "x-openai-request-id"} {
+		if value := headers.Get(name); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func intPtr(value int) *int {

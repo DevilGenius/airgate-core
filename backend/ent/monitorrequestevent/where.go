@@ -69,6 +69,11 @@ func Hash(v string) predicate.MonitorRequestEvent {
 	return predicate.MonitorRequestEvent(sql.FieldEQ(FieldHash, v))
 }
 
+// TraceHash applies equality check predicate on the "trace_hash" field. It's identical to TraceHashEQ.
+func TraceHash(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldEQ(FieldTraceHash, v))
+}
+
 // Fingerprint applies equality check predicate on the "fingerprint" field. It's identical to FingerprintEQ.
 func Fingerprint(v string) predicate.MonitorRequestEvent {
 	return predicate.MonitorRequestEvent(sql.FieldEQ(FieldFingerprint, v))
@@ -392,6 +397,71 @@ func HashEqualFold(v string) predicate.MonitorRequestEvent {
 // HashContainsFold applies the ContainsFold predicate on the "hash" field.
 func HashContainsFold(v string) predicate.MonitorRequestEvent {
 	return predicate.MonitorRequestEvent(sql.FieldContainsFold(FieldHash, v))
+}
+
+// TraceHashEQ applies the EQ predicate on the "trace_hash" field.
+func TraceHashEQ(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldEQ(FieldTraceHash, v))
+}
+
+// TraceHashNEQ applies the NEQ predicate on the "trace_hash" field.
+func TraceHashNEQ(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldNEQ(FieldTraceHash, v))
+}
+
+// TraceHashIn applies the In predicate on the "trace_hash" field.
+func TraceHashIn(vs ...string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldIn(FieldTraceHash, vs...))
+}
+
+// TraceHashNotIn applies the NotIn predicate on the "trace_hash" field.
+func TraceHashNotIn(vs ...string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldNotIn(FieldTraceHash, vs...))
+}
+
+// TraceHashGT applies the GT predicate on the "trace_hash" field.
+func TraceHashGT(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldGT(FieldTraceHash, v))
+}
+
+// TraceHashGTE applies the GTE predicate on the "trace_hash" field.
+func TraceHashGTE(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldGTE(FieldTraceHash, v))
+}
+
+// TraceHashLT applies the LT predicate on the "trace_hash" field.
+func TraceHashLT(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldLT(FieldTraceHash, v))
+}
+
+// TraceHashLTE applies the LTE predicate on the "trace_hash" field.
+func TraceHashLTE(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldLTE(FieldTraceHash, v))
+}
+
+// TraceHashContains applies the Contains predicate on the "trace_hash" field.
+func TraceHashContains(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldContains(FieldTraceHash, v))
+}
+
+// TraceHashHasPrefix applies the HasPrefix predicate on the "trace_hash" field.
+func TraceHashHasPrefix(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldHasPrefix(FieldTraceHash, v))
+}
+
+// TraceHashHasSuffix applies the HasSuffix predicate on the "trace_hash" field.
+func TraceHashHasSuffix(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldHasSuffix(FieldTraceHash, v))
+}
+
+// TraceHashEqualFold applies the EqualFold predicate on the "trace_hash" field.
+func TraceHashEqualFold(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldEqualFold(FieldTraceHash, v))
+}
+
+// TraceHashContainsFold applies the ContainsFold predicate on the "trace_hash" field.
+func TraceHashContainsFold(v string) predicate.MonitorRequestEvent {
+	return predicate.MonitorRequestEvent(sql.FieldContainsFold(FieldTraceHash, v))
 }
 
 // FingerprintEQ applies the EQ predicate on the "fingerprint" field.

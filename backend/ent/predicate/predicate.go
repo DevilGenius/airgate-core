@@ -24,6 +24,9 @@ type MonitorEvent func(*sql.Selector)
 // MonitorRequestEvent is the predicate function for monitorrequestevent builders.
 type MonitorRequestEvent func(*sql.Selector)
 
+// MonitorRequestTrace is the predicate function for monitorrequesttrace builders.
+type MonitorRequestTrace func(*sql.Selector)
+
 // Plugin is the predicate function for plugin builders.
 type Plugin func(*sql.Selector)
 

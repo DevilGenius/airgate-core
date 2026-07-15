@@ -24,6 +24,8 @@ type Tx struct {
 	MonitorEvent *MonitorEventClient
 	// MonitorRequestEvent is the client for interacting with the MonitorRequestEvent builders.
 	MonitorRequestEvent *MonitorRequestEventClient
+	// MonitorRequestTrace is the client for interacting with the MonitorRequestTrace builders.
+	MonitorRequestTrace *MonitorRequestTraceClient
 	// Plugin is the client for interacting with the Plugin builders.
 	Plugin *PluginClient
 	// PluginSource is the client for interacting with the PluginSource builders.
@@ -177,6 +179,7 @@ func (tx *Tx) init() {
 	tx.Group = NewGroupClient(tx.config)
 	tx.MonitorEvent = NewMonitorEventClient(tx.config)
 	tx.MonitorRequestEvent = NewMonitorRequestEventClient(tx.config)
+	tx.MonitorRequestTrace = NewMonitorRequestTraceClient(tx.config)
 	tx.Plugin = NewPluginClient(tx.config)
 	tx.PluginSource = NewPluginSourceClient(tx.config)
 	tx.Proxy = NewProxyClient(tx.config)

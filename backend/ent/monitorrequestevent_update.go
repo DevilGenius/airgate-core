@@ -84,6 +84,20 @@ func (mreu *MonitorRequestEventUpdate) SetNillableHash(s *string) *MonitorReques
 	return mreu
 }
 
+// SetTraceHash sets the "trace_hash" field.
+func (mreu *MonitorRequestEventUpdate) SetTraceHash(s string) *MonitorRequestEventUpdate {
+	mreu.mutation.SetTraceHash(s)
+	return mreu
+}
+
+// SetNillableTraceHash sets the "trace_hash" field if the given value is not nil.
+func (mreu *MonitorRequestEventUpdate) SetNillableTraceHash(s *string) *MonitorRequestEventUpdate {
+	if s != nil {
+		mreu.SetTraceHash(*s)
+	}
+	return mreu
+}
+
 // SetFingerprint sets the "fingerprint" field.
 func (mreu *MonitorRequestEventUpdate) SetFingerprint(s string) *MonitorRequestEventUpdate {
 	mreu.mutation.SetFingerprint(s)
@@ -543,6 +557,11 @@ func (mreu *MonitorRequestEventUpdate) check() error {
 			return &ValidationError{Name: "hash", err: fmt.Errorf(`ent: validator failed for field "MonitorRequestEvent.hash": %w`, err)}
 		}
 	}
+	if v, ok := mreu.mutation.TraceHash(); ok {
+		if err := monitorrequestevent.TraceHashValidator(v); err != nil {
+			return &ValidationError{Name: "trace_hash", err: fmt.Errorf(`ent: validator failed for field "MonitorRequestEvent.trace_hash": %w`, err)}
+		}
+	}
 	if v, ok := mreu.mutation.Fingerprint(); ok {
 		if err := monitorrequestevent.FingerprintValidator(v); err != nil {
 			return &ValidationError{Name: "fingerprint", err: fmt.Errorf(`ent: validator failed for field "MonitorRequestEvent.fingerprint": %w`, err)}
@@ -634,6 +653,9 @@ func (mreu *MonitorRequestEventUpdate) sqlSave(ctx context.Context) (n int, err 
 	}
 	if value, ok := mreu.mutation.Hash(); ok {
 		_spec.SetField(monitorrequestevent.FieldHash, field.TypeString, value)
+	}
+	if value, ok := mreu.mutation.TraceHash(); ok {
+		_spec.SetField(monitorrequestevent.FieldTraceHash, field.TypeString, value)
 	}
 	if value, ok := mreu.mutation.Fingerprint(); ok {
 		_spec.SetField(monitorrequestevent.FieldFingerprint, field.TypeString, value)
@@ -818,6 +840,20 @@ func (mreuo *MonitorRequestEventUpdateOne) SetHash(s string) *MonitorRequestEven
 func (mreuo *MonitorRequestEventUpdateOne) SetNillableHash(s *string) *MonitorRequestEventUpdateOne {
 	if s != nil {
 		mreuo.SetHash(*s)
+	}
+	return mreuo
+}
+
+// SetTraceHash sets the "trace_hash" field.
+func (mreuo *MonitorRequestEventUpdateOne) SetTraceHash(s string) *MonitorRequestEventUpdateOne {
+	mreuo.mutation.SetTraceHash(s)
+	return mreuo
+}
+
+// SetNillableTraceHash sets the "trace_hash" field if the given value is not nil.
+func (mreuo *MonitorRequestEventUpdateOne) SetNillableTraceHash(s *string) *MonitorRequestEventUpdateOne {
+	if s != nil {
+		mreuo.SetTraceHash(*s)
 	}
 	return mreuo
 }
@@ -1294,6 +1330,11 @@ func (mreuo *MonitorRequestEventUpdateOne) check() error {
 			return &ValidationError{Name: "hash", err: fmt.Errorf(`ent: validator failed for field "MonitorRequestEvent.hash": %w`, err)}
 		}
 	}
+	if v, ok := mreuo.mutation.TraceHash(); ok {
+		if err := monitorrequestevent.TraceHashValidator(v); err != nil {
+			return &ValidationError{Name: "trace_hash", err: fmt.Errorf(`ent: validator failed for field "MonitorRequestEvent.trace_hash": %w`, err)}
+		}
+	}
 	if v, ok := mreuo.mutation.Fingerprint(); ok {
 		if err := monitorrequestevent.FingerprintValidator(v); err != nil {
 			return &ValidationError{Name: "fingerprint", err: fmt.Errorf(`ent: validator failed for field "MonitorRequestEvent.fingerprint": %w`, err)}
@@ -1402,6 +1443,9 @@ func (mreuo *MonitorRequestEventUpdateOne) sqlSave(ctx context.Context) (_node *
 	}
 	if value, ok := mreuo.mutation.Hash(); ok {
 		_spec.SetField(monitorrequestevent.FieldHash, field.TypeString, value)
+	}
+	if value, ok := mreuo.mutation.TraceHash(); ok {
+		_spec.SetField(monitorrequestevent.FieldTraceHash, field.TypeString, value)
 	}
 	if value, ok := mreuo.mutation.Fingerprint(); ok {
 		_spec.SetField(monitorrequestevent.FieldFingerprint, field.TypeString, value)

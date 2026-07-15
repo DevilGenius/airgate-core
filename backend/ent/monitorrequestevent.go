@@ -26,6 +26,8 @@ type MonitorRequestEvent struct {
 	Source string `json:"source,omitempty"`
 	// Hash holds the value of the "hash" field.
 	Hash string `json:"hash,omitempty"`
+	// TraceHash holds the value of the "trace_hash" field.
+	TraceHash string `json:"trace_hash,omitempty"`
 	// Fingerprint holds the value of the "fingerprint" field.
 	Fingerprint string `json:"fingerprint,omitempty"`
 	// Title holds the value of the "title" field.
@@ -84,7 +86,7 @@ func (*MonitorRequestEvent) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case monitorrequestevent.FieldID, monitorrequestevent.FieldAPIKeyID, monitorrequestevent.FieldUserID, monitorrequestevent.FieldGroupID, monitorrequestevent.FieldAccountID, monitorrequestevent.FieldHTTPStatus, monitorrequestevent.FieldUpstreamStatus, monitorrequestevent.FieldDurationMs:
 			values[i] = new(sql.NullInt64)
-		case monitorrequestevent.FieldType, monitorrequestevent.FieldSeverity, monitorrequestevent.FieldSource, monitorrequestevent.FieldHash, monitorrequestevent.FieldFingerprint, monitorrequestevent.FieldTitle, monitorrequestevent.FieldMessage, monitorrequestevent.FieldRequestID, monitorrequestevent.FieldAPIKeyNameSnapshot, monitorrequestevent.FieldUserEmailSnapshot, monitorrequestevent.FieldAccountNameSnapshot, monitorrequestevent.FieldPlatform, monitorrequestevent.FieldPluginID, monitorrequestevent.FieldMethod, monitorrequestevent.FieldEndpoint, monitorrequestevent.FieldModel, monitorrequestevent.FieldErrorCode:
+		case monitorrequestevent.FieldType, monitorrequestevent.FieldSeverity, monitorrequestevent.FieldSource, monitorrequestevent.FieldHash, monitorrequestevent.FieldTraceHash, monitorrequestevent.FieldFingerprint, monitorrequestevent.FieldTitle, monitorrequestevent.FieldMessage, monitorrequestevent.FieldRequestID, monitorrequestevent.FieldAPIKeyNameSnapshot, monitorrequestevent.FieldUserEmailSnapshot, monitorrequestevent.FieldAccountNameSnapshot, monitorrequestevent.FieldPlatform, monitorrequestevent.FieldPluginID, monitorrequestevent.FieldMethod, monitorrequestevent.FieldEndpoint, monitorrequestevent.FieldModel, monitorrequestevent.FieldErrorCode:
 			values[i] = new(sql.NullString)
 		case monitorrequestevent.FieldCreatedAt, monitorrequestevent.FieldExpiresAt:
 			values[i] = new(sql.NullTime)
@@ -132,6 +134,12 @@ func (mre *MonitorRequestEvent) assignValues(columns []string, values []any) err
 				return fmt.Errorf("unexpected type %T for field hash", values[i])
 			} else if value.Valid {
 				mre.Hash = value.String
+			}
+		case monitorrequestevent.FieldTraceHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field trace_hash", values[i])
+			} else if value.Valid {
+				mre.TraceHash = value.String
 			}
 		case monitorrequestevent.FieldFingerprint:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -326,6 +334,9 @@ func (mre *MonitorRequestEvent) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("hash=")
 	builder.WriteString(mre.Hash)
+	builder.WriteString(", ")
+	builder.WriteString("trace_hash=")
+	builder.WriteString(mre.TraceHash)
 	builder.WriteString(", ")
 	builder.WriteString("fingerprint=")
 	builder.WriteString(mre.Fingerprint)

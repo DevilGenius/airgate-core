@@ -3,6 +3,7 @@
 package migrate
 
 import (
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/dialect/sql/schema"
 	"entgo.io/ent/schema/field"
 )
@@ -257,6 +258,7 @@ var (
 		{Name: "severity", Type: field.TypeEnum, Enums: []string{"info", "warning"}, Default: "info"},
 		{Name: "source", Type: field.TypeString, Size: 64, Default: ""},
 		{Name: "hash", Type: field.TypeString, Size: 64},
+		{Name: "trace_hash", Type: field.TypeString, Size: 64, Default: ""},
 		{Name: "fingerprint", Type: field.TypeString, Size: 128, Default: ""},
 		{Name: "title", Type: field.TypeString, Size: 160, Default: ""},
 		{Name: "message", Type: field.TypeString, Size: 500, Default: ""},
@@ -290,57 +292,94 @@ var (
 			{
 				Name:    "monitorrequestevent_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[25]},
+				Columns: []*schema.Column{MonitorRequestEventsColumns[26]},
 			},
 			{
 				Name:    "monitorrequestevent_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[26]},
+				Columns: []*schema.Column{MonitorRequestEventsColumns[27]},
 			},
 			{
 				Name:    "monitorrequestevent_type_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[1], MonitorRequestEventsColumns[25]},
+				Columns: []*schema.Column{MonitorRequestEventsColumns[1], MonitorRequestEventsColumns[26]},
 			},
 			{
 				Name:    "monitorrequestevent_api_key_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[9], MonitorRequestEventsColumns[25]},
+				Columns: []*schema.Column{MonitorRequestEventsColumns[10], MonitorRequestEventsColumns[26]},
 			},
 			{
 				Name:    "monitorrequestevent_group_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[13], MonitorRequestEventsColumns[25]},
+				Columns: []*schema.Column{MonitorRequestEventsColumns[14], MonitorRequestEventsColumns[26]},
 			},
 			{
 				Name:    "monitorrequestevent_account_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[14], MonitorRequestEventsColumns[25]},
+				Columns: []*schema.Column{MonitorRequestEventsColumns[15], MonitorRequestEventsColumns[26]},
 			},
 			{
 				Name:    "monitorrequestevent_endpoint_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[19], MonitorRequestEventsColumns[25]},
+				Columns: []*schema.Column{MonitorRequestEventsColumns[20], MonitorRequestEventsColumns[26]},
 			},
 			{
 				Name:    "monitorrequestevent_http_status_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[21], MonitorRequestEventsColumns[25]},
+				Columns: []*schema.Column{MonitorRequestEventsColumns[22], MonitorRequestEventsColumns[26]},
 			},
 			{
 				Name:    "monitorrequestevent_error_code_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[23], MonitorRequestEventsColumns[25]},
+				Columns: []*schema.Column{MonitorRequestEventsColumns[24], MonitorRequestEventsColumns[26]},
 			},
 			{
 				Name:    "monitorrequestevent_request_id",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[8]},
+				Columns: []*schema.Column{MonitorRequestEventsColumns[9]},
 			},
 			{
 				Name:    "monitorrequestevent_hash",
 				Unique:  false,
 				Columns: []*schema.Column{MonitorRequestEventsColumns[4]},
+			},
+			{
+				Name:    "monitorrequestevent_trace_hash",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorRequestEventsColumns[5]},
+			},
+		},
+	}
+	// MonitorRequestTraceColumns holds the columns for the "monitor_request_trace" table.
+	MonitorRequestTraceColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "hash", Type: field.TypeString, Unique: true, Size: 64},
+		{Name: "schema_version", Type: field.TypeInt, Default: 1},
+		{Name: "encoding", Type: field.TypeString, Size: 32, Default: "gzip-json"},
+		{Name: "payload", Type: field.TypeBytes},
+		{Name: "raw_size", Type: field.TypeInt64, Default: 0},
+		{Name: "compressed_size", Type: field.TypeInt64, Default: 0},
+		{Name: "seen_count", Type: field.TypeInt64, Default: 1},
+		{Name: "first_seen_at", Type: field.TypeTime},
+		{Name: "last_seen_at", Type: field.TypeTime},
+		{Name: "expires_at", Type: field.TypeTime},
+	}
+	// MonitorRequestTraceTable holds the schema information for the "monitor_request_trace" table.
+	MonitorRequestTraceTable = &schema.Table{
+		Name:       "monitor_request_trace",
+		Columns:    MonitorRequestTraceColumns,
+		PrimaryKey: []*schema.Column{MonitorRequestTraceColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "monitorrequesttrace_last_seen_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorRequestTraceColumns[9]},
+			},
+			{
+				Name:    "monitorrequesttrace_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorRequestTraceColumns[10]},
 			},
 		},
 	}
@@ -710,6 +749,7 @@ var (
 		GroupsTable,
 		MonitorEventsTable,
 		MonitorRequestEventsTable,
+		MonitorRequestTraceTable,
 		PluginsTable,
 		PluginSourcesTable,
 		ProxiesTable,
@@ -728,6 +768,9 @@ func init() {
 	APIKeysTable.ForeignKeys[1].RefTable = UsersTable
 	AccountsTable.ForeignKeys[0].RefTable = ProxiesTable
 	BalanceLogsTable.ForeignKeys[0].RefTable = UsersTable
+	MonitorRequestTraceTable.Annotation = &entsql.Annotation{
+		Table: "monitor_request_trace",
+	}
 	UsageLogsTable.ForeignKeys[0].RefTable = APIKeysTable
 	UsageLogsTable.ForeignKeys[1].RefTable = AccountsTable
 	UsageLogsTable.ForeignKeys[2].RefTable = GroupsTable

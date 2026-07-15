@@ -11,6 +11,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/group"
 	"github.com/DevilGenius/airgate-core/ent/monitorevent"
 	"github.com/DevilGenius/airgate-core/ent/monitorrequestevent"
+	"github.com/DevilGenius/airgate-core/ent/monitorrequesttrace"
 	"github.com/DevilGenius/airgate-core/ent/plugin"
 	"github.com/DevilGenius/airgate-core/ent/pluginsource"
 	"github.com/DevilGenius/airgate-core/ent/proxy"
@@ -406,100 +407,160 @@ func init() {
 			return nil
 		}
 	}()
+	// monitorrequesteventDescTraceHash is the schema descriptor for trace_hash field.
+	monitorrequesteventDescTraceHash := monitorrequesteventFields[4].Descriptor()
+	// monitorrequestevent.DefaultTraceHash holds the default value on creation for the trace_hash field.
+	monitorrequestevent.DefaultTraceHash = monitorrequesteventDescTraceHash.Default.(string)
+	// monitorrequestevent.TraceHashValidator is a validator for the "trace_hash" field. It is called by the builders before save.
+	monitorrequestevent.TraceHashValidator = monitorrequesteventDescTraceHash.Validators[0].(func(string) error)
 	// monitorrequesteventDescFingerprint is the schema descriptor for fingerprint field.
-	monitorrequesteventDescFingerprint := monitorrequesteventFields[4].Descriptor()
+	monitorrequesteventDescFingerprint := monitorrequesteventFields[5].Descriptor()
 	// monitorrequestevent.DefaultFingerprint holds the default value on creation for the fingerprint field.
 	monitorrequestevent.DefaultFingerprint = monitorrequesteventDescFingerprint.Default.(string)
 	// monitorrequestevent.FingerprintValidator is a validator for the "fingerprint" field. It is called by the builders before save.
 	monitorrequestevent.FingerprintValidator = monitorrequesteventDescFingerprint.Validators[0].(func(string) error)
 	// monitorrequesteventDescTitle is the schema descriptor for title field.
-	monitorrequesteventDescTitle := monitorrequesteventFields[5].Descriptor()
+	monitorrequesteventDescTitle := monitorrequesteventFields[6].Descriptor()
 	// monitorrequestevent.DefaultTitle holds the default value on creation for the title field.
 	monitorrequestevent.DefaultTitle = monitorrequesteventDescTitle.Default.(string)
 	// monitorrequestevent.TitleValidator is a validator for the "title" field. It is called by the builders before save.
 	monitorrequestevent.TitleValidator = monitorrequesteventDescTitle.Validators[0].(func(string) error)
 	// monitorrequesteventDescMessage is the schema descriptor for message field.
-	monitorrequesteventDescMessage := monitorrequesteventFields[6].Descriptor()
+	monitorrequesteventDescMessage := monitorrequesteventFields[7].Descriptor()
 	// monitorrequestevent.DefaultMessage holds the default value on creation for the message field.
 	monitorrequestevent.DefaultMessage = monitorrequesteventDescMessage.Default.(string)
 	// monitorrequestevent.MessageValidator is a validator for the "message" field. It is called by the builders before save.
 	monitorrequestevent.MessageValidator = monitorrequesteventDescMessage.Validators[0].(func(string) error)
 	// monitorrequesteventDescRequestID is the schema descriptor for request_id field.
-	monitorrequesteventDescRequestID := monitorrequesteventFields[7].Descriptor()
+	monitorrequesteventDescRequestID := monitorrequesteventFields[8].Descriptor()
 	// monitorrequestevent.DefaultRequestID holds the default value on creation for the request_id field.
 	monitorrequestevent.DefaultRequestID = monitorrequesteventDescRequestID.Default.(string)
 	// monitorrequestevent.RequestIDValidator is a validator for the "request_id" field. It is called by the builders before save.
 	monitorrequestevent.RequestIDValidator = monitorrequesteventDescRequestID.Validators[0].(func(string) error)
 	// monitorrequesteventDescAPIKeyNameSnapshot is the schema descriptor for api_key_name_snapshot field.
-	monitorrequesteventDescAPIKeyNameSnapshot := monitorrequesteventFields[9].Descriptor()
+	monitorrequesteventDescAPIKeyNameSnapshot := monitorrequesteventFields[10].Descriptor()
 	// monitorrequestevent.DefaultAPIKeyNameSnapshot holds the default value on creation for the api_key_name_snapshot field.
 	monitorrequestevent.DefaultAPIKeyNameSnapshot = monitorrequesteventDescAPIKeyNameSnapshot.Default.(string)
 	// monitorrequestevent.APIKeyNameSnapshotValidator is a validator for the "api_key_name_snapshot" field. It is called by the builders before save.
 	monitorrequestevent.APIKeyNameSnapshotValidator = monitorrequesteventDescAPIKeyNameSnapshot.Validators[0].(func(string) error)
 	// monitorrequesteventDescUserEmailSnapshot is the schema descriptor for user_email_snapshot field.
-	monitorrequesteventDescUserEmailSnapshot := monitorrequesteventFields[11].Descriptor()
+	monitorrequesteventDescUserEmailSnapshot := monitorrequesteventFields[12].Descriptor()
 	// monitorrequestevent.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
 	monitorrequestevent.DefaultUserEmailSnapshot = monitorrequesteventDescUserEmailSnapshot.Default.(string)
 	// monitorrequestevent.UserEmailSnapshotValidator is a validator for the "user_email_snapshot" field. It is called by the builders before save.
 	monitorrequestevent.UserEmailSnapshotValidator = monitorrequesteventDescUserEmailSnapshot.Validators[0].(func(string) error)
 	// monitorrequesteventDescAccountNameSnapshot is the schema descriptor for account_name_snapshot field.
-	monitorrequesteventDescAccountNameSnapshot := monitorrequesteventFields[14].Descriptor()
+	monitorrequesteventDescAccountNameSnapshot := monitorrequesteventFields[15].Descriptor()
 	// monitorrequestevent.DefaultAccountNameSnapshot holds the default value on creation for the account_name_snapshot field.
 	monitorrequestevent.DefaultAccountNameSnapshot = monitorrequesteventDescAccountNameSnapshot.Default.(string)
 	// monitorrequestevent.AccountNameSnapshotValidator is a validator for the "account_name_snapshot" field. It is called by the builders before save.
 	monitorrequestevent.AccountNameSnapshotValidator = monitorrequesteventDescAccountNameSnapshot.Validators[0].(func(string) error)
 	// monitorrequesteventDescPlatform is the schema descriptor for platform field.
-	monitorrequesteventDescPlatform := monitorrequesteventFields[15].Descriptor()
+	monitorrequesteventDescPlatform := monitorrequesteventFields[16].Descriptor()
 	// monitorrequestevent.DefaultPlatform holds the default value on creation for the platform field.
 	monitorrequestevent.DefaultPlatform = monitorrequesteventDescPlatform.Default.(string)
 	// monitorrequestevent.PlatformValidator is a validator for the "platform" field. It is called by the builders before save.
 	monitorrequestevent.PlatformValidator = monitorrequesteventDescPlatform.Validators[0].(func(string) error)
 	// monitorrequesteventDescPluginID is the schema descriptor for plugin_id field.
-	monitorrequesteventDescPluginID := monitorrequesteventFields[16].Descriptor()
+	monitorrequesteventDescPluginID := monitorrequesteventFields[17].Descriptor()
 	// monitorrequestevent.DefaultPluginID holds the default value on creation for the plugin_id field.
 	monitorrequestevent.DefaultPluginID = monitorrequesteventDescPluginID.Default.(string)
 	// monitorrequestevent.PluginIDValidator is a validator for the "plugin_id" field. It is called by the builders before save.
 	monitorrequestevent.PluginIDValidator = monitorrequesteventDescPluginID.Validators[0].(func(string) error)
 	// monitorrequesteventDescMethod is the schema descriptor for method field.
-	monitorrequesteventDescMethod := monitorrequesteventFields[17].Descriptor()
+	monitorrequesteventDescMethod := monitorrequesteventFields[18].Descriptor()
 	// monitorrequestevent.DefaultMethod holds the default value on creation for the method field.
 	monitorrequestevent.DefaultMethod = monitorrequesteventDescMethod.Default.(string)
 	// monitorrequestevent.MethodValidator is a validator for the "method" field. It is called by the builders before save.
 	monitorrequestevent.MethodValidator = monitorrequesteventDescMethod.Validators[0].(func(string) error)
 	// monitorrequesteventDescEndpoint is the schema descriptor for endpoint field.
-	monitorrequesteventDescEndpoint := monitorrequesteventFields[18].Descriptor()
+	monitorrequesteventDescEndpoint := monitorrequesteventFields[19].Descriptor()
 	// monitorrequestevent.DefaultEndpoint holds the default value on creation for the endpoint field.
 	monitorrequestevent.DefaultEndpoint = monitorrequesteventDescEndpoint.Default.(string)
 	// monitorrequestevent.EndpointValidator is a validator for the "endpoint" field. It is called by the builders before save.
 	monitorrequestevent.EndpointValidator = monitorrequesteventDescEndpoint.Validators[0].(func(string) error)
 	// monitorrequesteventDescModel is the schema descriptor for model field.
-	monitorrequesteventDescModel := monitorrequesteventFields[19].Descriptor()
+	monitorrequesteventDescModel := monitorrequesteventFields[20].Descriptor()
 	// monitorrequestevent.DefaultModel holds the default value on creation for the model field.
 	monitorrequestevent.DefaultModel = monitorrequesteventDescModel.Default.(string)
 	// monitorrequestevent.ModelValidator is a validator for the "model" field. It is called by the builders before save.
 	monitorrequestevent.ModelValidator = monitorrequesteventDescModel.Validators[0].(func(string) error)
 	// monitorrequesteventDescErrorCode is the schema descriptor for error_code field.
-	monitorrequesteventDescErrorCode := monitorrequesteventFields[22].Descriptor()
+	monitorrequesteventDescErrorCode := monitorrequesteventFields[23].Descriptor()
 	// monitorrequestevent.DefaultErrorCode holds the default value on creation for the error_code field.
 	monitorrequestevent.DefaultErrorCode = monitorrequesteventDescErrorCode.Default.(string)
 	// monitorrequestevent.ErrorCodeValidator is a validator for the "error_code" field. It is called by the builders before save.
 	monitorrequestevent.ErrorCodeValidator = monitorrequesteventDescErrorCode.Validators[0].(func(string) error)
 	// monitorrequesteventDescDurationMs is the schema descriptor for duration_ms field.
-	monitorrequesteventDescDurationMs := monitorrequesteventFields[23].Descriptor()
+	monitorrequesteventDescDurationMs := monitorrequesteventFields[24].Descriptor()
 	// monitorrequestevent.DefaultDurationMs holds the default value on creation for the duration_ms field.
 	monitorrequestevent.DefaultDurationMs = monitorrequesteventDescDurationMs.Default.(int64)
 	// monitorrequesteventDescCreatedAt is the schema descriptor for created_at field.
-	monitorrequesteventDescCreatedAt := monitorrequesteventFields[24].Descriptor()
+	monitorrequesteventDescCreatedAt := monitorrequesteventFields[25].Descriptor()
 	// monitorrequestevent.DefaultCreatedAt holds the default value on creation for the created_at field.
 	monitorrequestevent.DefaultCreatedAt = monitorrequesteventDescCreatedAt.Default.(func() time.Time)
 	// monitorrequesteventDescExpiresAt is the schema descriptor for expires_at field.
-	monitorrequesteventDescExpiresAt := monitorrequesteventFields[25].Descriptor()
+	monitorrequesteventDescExpiresAt := monitorrequesteventFields[26].Descriptor()
 	// monitorrequestevent.DefaultExpiresAt holds the default value on creation for the expires_at field.
 	monitorrequestevent.DefaultExpiresAt = monitorrequesteventDescExpiresAt.Default.(func() time.Time)
 	// monitorrequesteventDescDetail is the schema descriptor for detail field.
-	monitorrequesteventDescDetail := monitorrequesteventFields[26].Descriptor()
+	monitorrequesteventDescDetail := monitorrequesteventFields[27].Descriptor()
 	// monitorrequestevent.DefaultDetail holds the default value on creation for the detail field.
 	monitorrequestevent.DefaultDetail = monitorrequesteventDescDetail.Default.(map[string]interface{})
+	monitorrequesttraceFields := schema.MonitorRequestTrace{}.Fields()
+	_ = monitorrequesttraceFields
+	// monitorrequesttraceDescHash is the schema descriptor for hash field.
+	monitorrequesttraceDescHash := monitorrequesttraceFields[0].Descriptor()
+	// monitorrequesttrace.HashValidator is a validator for the "hash" field. It is called by the builders before save.
+	monitorrequesttrace.HashValidator = func() func(string) error {
+		validators := monitorrequesttraceDescHash.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(hash string) error {
+			for _, fn := range fns {
+				if err := fn(hash); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// monitorrequesttraceDescSchemaVersion is the schema descriptor for schema_version field.
+	monitorrequesttraceDescSchemaVersion := monitorrequesttraceFields[1].Descriptor()
+	// monitorrequesttrace.DefaultSchemaVersion holds the default value on creation for the schema_version field.
+	monitorrequesttrace.DefaultSchemaVersion = monitorrequesttraceDescSchemaVersion.Default.(int)
+	// monitorrequesttraceDescEncoding is the schema descriptor for encoding field.
+	monitorrequesttraceDescEncoding := monitorrequesttraceFields[2].Descriptor()
+	// monitorrequesttrace.DefaultEncoding holds the default value on creation for the encoding field.
+	monitorrequesttrace.DefaultEncoding = monitorrequesttraceDescEncoding.Default.(string)
+	// monitorrequesttrace.EncodingValidator is a validator for the "encoding" field. It is called by the builders before save.
+	monitorrequesttrace.EncodingValidator = monitorrequesttraceDescEncoding.Validators[0].(func(string) error)
+	// monitorrequesttraceDescRawSize is the schema descriptor for raw_size field.
+	monitorrequesttraceDescRawSize := monitorrequesttraceFields[4].Descriptor()
+	// monitorrequesttrace.DefaultRawSize holds the default value on creation for the raw_size field.
+	monitorrequesttrace.DefaultRawSize = monitorrequesttraceDescRawSize.Default.(int64)
+	// monitorrequesttraceDescCompressedSize is the schema descriptor for compressed_size field.
+	monitorrequesttraceDescCompressedSize := monitorrequesttraceFields[5].Descriptor()
+	// monitorrequesttrace.DefaultCompressedSize holds the default value on creation for the compressed_size field.
+	monitorrequesttrace.DefaultCompressedSize = monitorrequesttraceDescCompressedSize.Default.(int64)
+	// monitorrequesttraceDescSeenCount is the schema descriptor for seen_count field.
+	monitorrequesttraceDescSeenCount := monitorrequesttraceFields[6].Descriptor()
+	// monitorrequesttrace.DefaultSeenCount holds the default value on creation for the seen_count field.
+	monitorrequesttrace.DefaultSeenCount = monitorrequesttraceDescSeenCount.Default.(int64)
+	// monitorrequesttraceDescFirstSeenAt is the schema descriptor for first_seen_at field.
+	monitorrequesttraceDescFirstSeenAt := monitorrequesttraceFields[7].Descriptor()
+	// monitorrequesttrace.DefaultFirstSeenAt holds the default value on creation for the first_seen_at field.
+	monitorrequesttrace.DefaultFirstSeenAt = monitorrequesttraceDescFirstSeenAt.Default.(func() time.Time)
+	// monitorrequesttraceDescLastSeenAt is the schema descriptor for last_seen_at field.
+	monitorrequesttraceDescLastSeenAt := monitorrequesttraceFields[8].Descriptor()
+	// monitorrequesttrace.DefaultLastSeenAt holds the default value on creation for the last_seen_at field.
+	monitorrequesttrace.DefaultLastSeenAt = monitorrequesttraceDescLastSeenAt.Default.(func() time.Time)
+	// monitorrequesttraceDescExpiresAt is the schema descriptor for expires_at field.
+	monitorrequesttraceDescExpiresAt := monitorrequesttraceFields[9].Descriptor()
+	// monitorrequesttrace.DefaultExpiresAt holds the default value on creation for the expires_at field.
+	monitorrequesttrace.DefaultExpiresAt = monitorrequesttraceDescExpiresAt.Default.(func() time.Time)
 	pluginFields := schema.Plugin{}.Fields()
 	_ = pluginFields
 	// pluginDescName is the schema descriptor for name field.

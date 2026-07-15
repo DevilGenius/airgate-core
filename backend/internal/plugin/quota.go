@@ -229,12 +229,13 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 func (f *Forwarder) forwardMetadataOnly(c *gin.Context, state *forwardState) {
 	req := &sdk.ForwardRequest{
 		// Account 留空：插件对 metadata 路径的判断发生在访问 account 之前
-		Account:      &sdk.Account{Platform: state.requestedPlatform},
-		Body:         state.body,
-		Headers:      buildHeaders(c.Request.Header, state.keyInfo),
-		Model:        state.model,
-		DispatchPlan: state.dispatchPlan,
-		Stream:       false,
+		Account:         &sdk.Account{Platform: state.requestedPlatform},
+		Body:            state.body,
+		Headers:         buildHeaders(c.Request.Header, state.keyInfo),
+		Model:           state.model,
+		DispatchPlan:    state.dispatchPlan,
+		Stream:          false,
+		TraceFinalError: state.trace != nil,
 	}
 	req.Headers.Set("X-Forwarded-Path", state.requestPath)
 	req.Headers.Set("X-Forwarded-Method", requestTransportMethod(c.Request))
@@ -243,6 +244,9 @@ func (f *Forwarder) forwardMetadataOnly(c *gin.Context, state *forwardState) {
 	}
 
 	outcome, err := state.plugin.Forward(c.Request.Context(), req)
+	if state.trace != nil {
+		state.trace.addFailedAttempt(1, state, forwardExecution{outcome: outcome, err: err, duration: time.Since(state.startedAt)})
+	}
 	if err != nil {
 		slog.Error("metadata 请求插件失败", "plugin", state.plugin.Name, "path", state.requestPath, "error", err)
 		openAIError(c, http.StatusBadGateway, "server_error", "upstream_error", "metadata 请求插件失败")

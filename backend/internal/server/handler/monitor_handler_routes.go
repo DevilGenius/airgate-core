@@ -1,12 +1,32 @@
 package handler
 
 import (
+	"encoding/hex"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 
 	appmonitor "github.com/DevilGenius/airgate-core/internal/app/monitor"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
+
+// GetMonitorRequestTrace returns one verified raw final-error trace by hash.
+func (h *MonitorHandler) GetMonitorRequestTrace(c *gin.Context) {
+	hash := strings.ToLower(strings.TrimSpace(c.Param("hash")))
+	decoded, err := hex.DecodeString(hash)
+	if err != nil || len(decoded) != 16 {
+		response.BadRequest(c, "无效的请求追踪 hash")
+		return
+	}
+	item, err := h.service.GetRequestTrace(c.Request.Context(), hash)
+	if err != nil {
+		httpCode, message := handleMonitorError("查询请求追踪失败", "查询失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, toMonitorRequestTraceResp(item))
+}
 
 // MonitorSummary returns active monitor event aggregates.
 func (h *MonitorHandler) MonitorSummary(c *gin.Context) {

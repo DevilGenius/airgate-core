@@ -85,7 +85,11 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		appmonitor.WithRedis(rdb),
 		appmonitor.WithNotifier(monitorNotificationService),
 		appmonitor.WithEventPublisher(eventHub),
+		appmonitor.WithRequestTrace(cfg.Monitor.RequestTraceEnabled),
 	)
+	if cfg.Monitor.RequestTraceEnabled {
+		slog.Warn("monitor_request_trace_enabled", "retention", "7d", "raw_request_bodies", true)
+	}
 	runtimeSampler := appmonitor.NewRuntimeSampler(sqlDB, rdb, sched, concurrency, recorder, monitorService)
 	sched.SetMonitorRecorder(monitorService)
 	if err := routegraph.RefreshSync(context.Background(), db); err != nil {
@@ -103,6 +107,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched, concurrency, calculator, recorder))
 	forwarder := plugin.NewForwarder(db, pluginMgr, sched, concurrency, calculator, recorder)
 	forwarder.SetMonitorRecorder(monitorService)
+	forwarder.SetRequestTraceEnabled(cfg.Monitor.RequestTraceEnabled)
 
 	marketOpts := []plugin.MarketplaceOption{
 		plugin.WithGithubToken(cfg.Plugins.Marketplace.GithubToken),
@@ -226,6 +231,9 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	safego.Go("asset_cleanup_loop", func() { plugin.StartAssetCleanupLoop(pluginCtx, s.db) })
 	safego.Go("monitor_aggregator_loop", func() { appmonitor.StartAggregatorLoop(pluginCtx, s.monitor) })
 	safego.Go("monitor_worker_loop", func() { appmonitor.StartWorkerLoop(pluginCtx, s.monitor) })
+	if s.monitor != nil && s.monitor.RequestTraceEnabled() {
+		safego.Go("monitor_request_trace_loop", func() { appmonitor.StartRequestTraceLoop(pluginCtx, s.monitor) })
+	}
 	if s.runtime != nil {
 		safego.Go("monitor_runtime_sampler", func() { s.runtime.Start(pluginCtx) })
 	}

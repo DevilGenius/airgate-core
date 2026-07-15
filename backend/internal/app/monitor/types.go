@@ -13,6 +13,8 @@ const (
 	defaultQueueSize      = 4096
 	defaultFlushInterval  = time.Second
 	defaultFlushBatchSize = 500
+	defaultTraceQueueSize = 32
+	maxTraceQueueBytes    = 512 << 20
 	defaultListLimit      = 50
 	maxListLimit          = 100
 )
@@ -59,6 +61,7 @@ type RequestEvent struct {
 	Severity            string
 	Source              string
 	Hash                string
+	TraceHash           string
 	Fingerprint         string
 	Title               string
 	Message             string
@@ -82,6 +85,41 @@ type RequestEvent struct {
 	CreatedAt           time.Time
 	ExpiresAt           time.Time
 	Detail              map[string]interface{}
+}
+
+// StoredRequestTrace is one compressed content-addressed diagnostic payload.
+type StoredRequestTrace struct {
+	Hash           string
+	SchemaVersion  int
+	Encoding       string
+	Payload        []byte
+	RawSize        int64
+	CompressedSize int64
+	SeenCount      int64
+	FirstSeenAt    time.Time
+	LastSeenAt     time.Time
+	ExpiresAt      time.Time
+}
+
+// RequestTrace is the verified, decompressed trace returned to admin callers.
+type RequestTrace struct {
+	Hash           string
+	HashAlgorithm  string
+	SchemaVersion  int
+	Encoding       string
+	Payload        []byte
+	RawSize        int64
+	CompressedSize int64
+	SeenCount      int64
+	FirstSeenAt    time.Time
+	LastSeenAt     time.Time
+	ExpiresAt      time.Time
+}
+
+type queuedRequestTrace struct {
+	Trace requestmonitoring.TraceInput
+	Event QueuedRequestEvent
+	Bytes int64
 }
 
 // QueuedRequestEvent is a normalized request monitor event waiting for async persistence.
@@ -232,6 +270,15 @@ type Repository interface {
 	ListNotifyDue(context.Context, time.Time, int) ([]Event, error)
 	MarkNotified(context.Context, int, time.Time, time.Time) error
 	MarkNotifyFailed(context.Context, int, time.Time, string) error
+}
+
+// RequestTraceRepository is optional so existing monitor repositories and
+// tests remain compatible when raw request tracing is disabled.
+type RequestTraceRepository interface {
+	UpsertRequestTrace(context.Context, StoredRequestTrace, QueuedRequestEvent) error
+	GetRequestTrace(context.Context, string) (StoredRequestTrace, error)
+	ClearRequestTraces(context.Context, *time.Time) (int, error)
+	CleanupExpiredRequestTraces(context.Context, time.Time, int) (int, error)
 }
 
 var _ requestmonitoring.Recorder = (*Service)(nil)

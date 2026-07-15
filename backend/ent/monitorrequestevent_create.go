@@ -68,6 +68,20 @@ func (mrec *MonitorRequestEventCreate) SetHash(s string) *MonitorRequestEventCre
 	return mrec
 }
 
+// SetTraceHash sets the "trace_hash" field.
+func (mrec *MonitorRequestEventCreate) SetTraceHash(s string) *MonitorRequestEventCreate {
+	mrec.mutation.SetTraceHash(s)
+	return mrec
+}
+
+// SetNillableTraceHash sets the "trace_hash" field if the given value is not nil.
+func (mrec *MonitorRequestEventCreate) SetNillableTraceHash(s *string) *MonitorRequestEventCreate {
+	if s != nil {
+		mrec.SetTraceHash(*s)
+	}
+	return mrec
+}
+
 // SetFingerprint sets the "fingerprint" field.
 func (mrec *MonitorRequestEventCreate) SetFingerprint(s string) *MonitorRequestEventCreate {
 	mrec.mutation.SetFingerprint(s)
@@ -429,6 +443,10 @@ func (mrec *MonitorRequestEventCreate) defaults() {
 		v := monitorrequestevent.DefaultSource
 		mrec.mutation.SetSource(v)
 	}
+	if _, ok := mrec.mutation.TraceHash(); !ok {
+		v := monitorrequestevent.DefaultTraceHash
+		mrec.mutation.SetTraceHash(v)
+	}
 	if _, ok := mrec.mutation.Fingerprint(); !ok {
 		v := monitorrequestevent.DefaultFingerprint
 		mrec.mutation.SetFingerprint(v)
@@ -531,6 +549,14 @@ func (mrec *MonitorRequestEventCreate) check() error {
 	if v, ok := mrec.mutation.Hash(); ok {
 		if err := monitorrequestevent.HashValidator(v); err != nil {
 			return &ValidationError{Name: "hash", err: fmt.Errorf(`ent: validator failed for field "MonitorRequestEvent.hash": %w`, err)}
+		}
+	}
+	if _, ok := mrec.mutation.TraceHash(); !ok {
+		return &ValidationError{Name: "trace_hash", err: errors.New(`ent: missing required field "MonitorRequestEvent.trace_hash"`)}
+	}
+	if v, ok := mrec.mutation.TraceHash(); ok {
+		if err := monitorrequestevent.TraceHashValidator(v); err != nil {
+			return &ValidationError{Name: "trace_hash", err: fmt.Errorf(`ent: validator failed for field "MonitorRequestEvent.trace_hash": %w`, err)}
 		}
 	}
 	if _, ok := mrec.mutation.Fingerprint(); !ok {
@@ -687,6 +713,10 @@ func (mrec *MonitorRequestEventCreate) createSpec() (*MonitorRequestEvent, *sqlg
 	if value, ok := mrec.mutation.Hash(); ok {
 		_spec.SetField(monitorrequestevent.FieldHash, field.TypeString, value)
 		_node.Hash = value
+	}
+	if value, ok := mrec.mutation.TraceHash(); ok {
+		_spec.SetField(monitorrequestevent.FieldTraceHash, field.TypeString, value)
+		_node.TraceHash = value
 	}
 	if value, ok := mrec.mutation.Fingerprint(); ok {
 		_spec.SetField(monitorrequestevent.FieldFingerprint, field.TypeString, value)

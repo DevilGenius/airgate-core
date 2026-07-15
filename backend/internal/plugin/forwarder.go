@@ -39,6 +39,7 @@ type Forwarder struct {
 	recorder             *billing.Recorder
 	monitor              monitoring.Recorder
 	requestMonitor       requestmonitoring.Recorder
+	requestTraceEnabled  bool
 	credentialLocks      sync.Map
 	credentialPersistSem chan struct{}
 }
@@ -82,6 +83,15 @@ func (f *Forwarder) SetRequestMonitorRecorder(recorder requestmonitoring.Recorde
 	f.requestMonitor = recorder
 }
 
+// SetRequestTraceEnabled enables final-error raw tracing. The value is loaded
+// once at startup so the disabled hot path is a single boolean branch.
+func (f *Forwarder) SetRequestTraceEnabled(enabled bool) {
+	if f == nil {
+		return
+	}
+	f.requestTraceEnabled = enabled
+}
+
 // maxFailoverAttempts 单次请求的最大 failover 次数。
 const maxFailoverAttempts = 3
 
@@ -115,9 +125,17 @@ const allRoutesFailedDefaultRetryAfter = time.Second
 // Middleware：OnForwardBegin 只在首次 attempt 调用（避免 failover 污染审计计数），
 // OnForwardEnd 在最终一次 attempt（成功或放弃）触发，LIFO 降序。Begin DENY 会拒绝请求。
 func (f *Forwarder) Forward(c *gin.Context) {
+	trace := f.beginRequestTrace(c)
+	if trace != nil {
+		defer f.finishRequestTrace(c, trace)
+	}
 	state, ok := f.parseRequest(c)
 	if !ok {
 		return
+	}
+	if trace != nil {
+		trace.bindState(state)
+		state.trace = trace
 	}
 	if !f.checkBalance(c, state) {
 		return
@@ -318,6 +336,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			execution := f.callPlugin(c, state)
 			lastAttemptAccount = state.account
 			totalAttempts++
+			if trace != nil {
+				trace.addFailedAttempt(totalAttempts, state, execution)
+			}
 
 			requestCanceled := canceledRequestStatus(ctx.Err())
 			if requestCanceled != 0 {

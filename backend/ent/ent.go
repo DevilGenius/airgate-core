@@ -18,6 +18,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/group"
 	"github.com/DevilGenius/airgate-core/ent/monitorevent"
 	"github.com/DevilGenius/airgate-core/ent/monitorrequestevent"
+	"github.com/DevilGenius/airgate-core/ent/monitorrequesttrace"
 	"github.com/DevilGenius/airgate-core/ent/plugin"
 	"github.com/DevilGenius/airgate-core/ent/pluginsource"
 	"github.com/DevilGenius/airgate-core/ent/proxy"
@@ -92,6 +93,7 @@ func checkColumn(table, column string) error {
 			group.Table:               group.ValidColumn,
 			monitorevent.Table:        monitorevent.ValidColumn,
 			monitorrequestevent.Table: monitorrequestevent.ValidColumn,
+			monitorrequesttrace.Table: monitorrequesttrace.ValidColumn,
 			plugin.Table:              plugin.ValidColumn,
 			pluginsource.Table:        pluginsource.ValidColumn,
 			proxy.Table:               proxy.ValidColumn,

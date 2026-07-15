@@ -21,6 +21,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/group"
 	"github.com/DevilGenius/airgate-core/ent/monitorevent"
 	"github.com/DevilGenius/airgate-core/ent/monitorrequestevent"
+	"github.com/DevilGenius/airgate-core/ent/monitorrequesttrace"
 	"github.com/DevilGenius/airgate-core/ent/plugin"
 	"github.com/DevilGenius/airgate-core/ent/pluginsource"
 	"github.com/DevilGenius/airgate-core/ent/proxy"
@@ -48,6 +49,8 @@ type Client struct {
 	MonitorEvent *MonitorEventClient
 	// MonitorRequestEvent is the client for interacting with the MonitorRequestEvent builders.
 	MonitorRequestEvent *MonitorRequestEventClient
+	// MonitorRequestTrace is the client for interacting with the MonitorRequestTrace builders.
+	MonitorRequestTrace *MonitorRequestTraceClient
 	// Plugin is the client for interacting with the Plugin builders.
 	Plugin *PluginClient
 	// PluginSource is the client for interacting with the PluginSource builders.
@@ -81,6 +84,7 @@ func (c *Client) init() {
 	c.Group = NewGroupClient(c.config)
 	c.MonitorEvent = NewMonitorEventClient(c.config)
 	c.MonitorRequestEvent = NewMonitorRequestEventClient(c.config)
+	c.MonitorRequestTrace = NewMonitorRequestTraceClient(c.config)
 	c.Plugin = NewPluginClient(c.config)
 	c.PluginSource = NewPluginSourceClient(c.config)
 	c.Proxy = NewProxyClient(c.config)
@@ -187,6 +191,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Group:               NewGroupClient(cfg),
 		MonitorEvent:        NewMonitorEventClient(cfg),
 		MonitorRequestEvent: NewMonitorRequestEventClient(cfg),
+		MonitorRequestTrace: NewMonitorRequestTraceClient(cfg),
 		Plugin:              NewPluginClient(cfg),
 		PluginSource:        NewPluginSourceClient(cfg),
 		Proxy:               NewProxyClient(cfg),
@@ -220,6 +225,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Group:               NewGroupClient(cfg),
 		MonitorEvent:        NewMonitorEventClient(cfg),
 		MonitorRequestEvent: NewMonitorRequestEventClient(cfg),
+		MonitorRequestTrace: NewMonitorRequestTraceClient(cfg),
 		Plugin:              NewPluginClient(cfg),
 		PluginSource:        NewPluginSourceClient(cfg),
 		Proxy:               NewProxyClient(cfg),
@@ -258,8 +264,8 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.Account, c.BalanceLog, c.Group, c.MonitorEvent,
-		c.MonitorRequestEvent, c.Plugin, c.PluginSource, c.Proxy, c.Setting, c.Task,
-		c.UsageLog, c.User, c.UserSubscription,
+		c.MonitorRequestEvent, c.MonitorRequestTrace, c.Plugin, c.PluginSource,
+		c.Proxy, c.Setting, c.Task, c.UsageLog, c.User, c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -270,8 +276,8 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.Account, c.BalanceLog, c.Group, c.MonitorEvent,
-		c.MonitorRequestEvent, c.Plugin, c.PluginSource, c.Proxy, c.Setting, c.Task,
-		c.UsageLog, c.User, c.UserSubscription,
+		c.MonitorRequestEvent, c.MonitorRequestTrace, c.Plugin, c.PluginSource,
+		c.Proxy, c.Setting, c.Task, c.UsageLog, c.User, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -292,6 +298,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.MonitorEvent.mutate(ctx, m)
 	case *MonitorRequestEventMutation:
 		return c.MonitorRequestEvent.mutate(ctx, m)
+	case *MonitorRequestTraceMutation:
+		return c.MonitorRequestTrace.mutate(ctx, m)
 	case *PluginMutation:
 		return c.Plugin.mutate(ctx, m)
 	case *PluginSourceMutation:
@@ -1300,6 +1308,139 @@ func (c *MonitorRequestEventClient) mutate(ctx context.Context, m *MonitorReques
 		return (&MonitorRequestEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown MonitorRequestEvent mutation op: %q", m.Op())
+	}
+}
+
+// MonitorRequestTraceClient is a client for the MonitorRequestTrace schema.
+type MonitorRequestTraceClient struct {
+	config
+}
+
+// NewMonitorRequestTraceClient returns a client for the MonitorRequestTrace from the given config.
+func NewMonitorRequestTraceClient(c config) *MonitorRequestTraceClient {
+	return &MonitorRequestTraceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `monitorrequesttrace.Hooks(f(g(h())))`.
+func (c *MonitorRequestTraceClient) Use(hooks ...Hook) {
+	c.hooks.MonitorRequestTrace = append(c.hooks.MonitorRequestTrace, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `monitorrequesttrace.Intercept(f(g(h())))`.
+func (c *MonitorRequestTraceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MonitorRequestTrace = append(c.inters.MonitorRequestTrace, interceptors...)
+}
+
+// Create returns a builder for creating a MonitorRequestTrace entity.
+func (c *MonitorRequestTraceClient) Create() *MonitorRequestTraceCreate {
+	mutation := newMonitorRequestTraceMutation(c.config, OpCreate)
+	return &MonitorRequestTraceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MonitorRequestTrace entities.
+func (c *MonitorRequestTraceClient) CreateBulk(builders ...*MonitorRequestTraceCreate) *MonitorRequestTraceCreateBulk {
+	return &MonitorRequestTraceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MonitorRequestTraceClient) MapCreateBulk(slice any, setFunc func(*MonitorRequestTraceCreate, int)) *MonitorRequestTraceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MonitorRequestTraceCreateBulk{err: fmt.Errorf("calling to MonitorRequestTraceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MonitorRequestTraceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MonitorRequestTraceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MonitorRequestTrace.
+func (c *MonitorRequestTraceClient) Update() *MonitorRequestTraceUpdate {
+	mutation := newMonitorRequestTraceMutation(c.config, OpUpdate)
+	return &MonitorRequestTraceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MonitorRequestTraceClient) UpdateOne(mrt *MonitorRequestTrace) *MonitorRequestTraceUpdateOne {
+	mutation := newMonitorRequestTraceMutation(c.config, OpUpdateOne, withMonitorRequestTrace(mrt))
+	return &MonitorRequestTraceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MonitorRequestTraceClient) UpdateOneID(id int) *MonitorRequestTraceUpdateOne {
+	mutation := newMonitorRequestTraceMutation(c.config, OpUpdateOne, withMonitorRequestTraceID(id))
+	return &MonitorRequestTraceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MonitorRequestTrace.
+func (c *MonitorRequestTraceClient) Delete() *MonitorRequestTraceDelete {
+	mutation := newMonitorRequestTraceMutation(c.config, OpDelete)
+	return &MonitorRequestTraceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MonitorRequestTraceClient) DeleteOne(mrt *MonitorRequestTrace) *MonitorRequestTraceDeleteOne {
+	return c.DeleteOneID(mrt.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MonitorRequestTraceClient) DeleteOneID(id int) *MonitorRequestTraceDeleteOne {
+	builder := c.Delete().Where(monitorrequesttrace.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MonitorRequestTraceDeleteOne{builder}
+}
+
+// Query returns a query builder for MonitorRequestTrace.
+func (c *MonitorRequestTraceClient) Query() *MonitorRequestTraceQuery {
+	return &MonitorRequestTraceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMonitorRequestTrace},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MonitorRequestTrace entity by its id.
+func (c *MonitorRequestTraceClient) Get(ctx context.Context, id int) (*MonitorRequestTrace, error) {
+	return c.Query().Where(monitorrequesttrace.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MonitorRequestTraceClient) GetX(ctx context.Context, id int) *MonitorRequestTrace {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *MonitorRequestTraceClient) Hooks() []Hook {
+	return c.hooks.MonitorRequestTrace
+}
+
+// Interceptors returns the client interceptors.
+func (c *MonitorRequestTraceClient) Interceptors() []Interceptor {
+	return c.inters.MonitorRequestTrace
+}
+
+func (c *MonitorRequestTraceClient) mutate(ctx context.Context, m *MonitorRequestTraceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MonitorRequestTraceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MonitorRequestTraceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MonitorRequestTraceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MonitorRequestTraceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MonitorRequestTrace mutation op: %q", m.Op())
 	}
 }
 
@@ -2562,12 +2703,13 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Account, BalanceLog, Group, MonitorEvent, MonitorRequestEvent, Plugin,
-		PluginSource, Proxy, Setting, Task, UsageLog, User, UserSubscription []ent.Hook
+		APIKey, Account, BalanceLog, Group, MonitorEvent, MonitorRequestEvent,
+		MonitorRequestTrace, Plugin, PluginSource, Proxy, Setting, Task, UsageLog,
+		User, UserSubscription []ent.Hook
 	}
 	inters struct {
-		APIKey, Account, BalanceLog, Group, MonitorEvent, MonitorRequestEvent, Plugin,
-		PluginSource, Proxy, Setting, Task, UsageLog, User,
-		UserSubscription []ent.Interceptor
+		APIKey, Account, BalanceLog, Group, MonitorEvent, MonitorRequestEvent,
+		MonitorRequestTrace, Plugin, PluginSource, Proxy, Setting, Task, UsageLog,
+		User, UserSubscription []ent.Interceptor
 	}
 )

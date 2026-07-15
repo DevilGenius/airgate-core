@@ -22,6 +22,8 @@ const (
 	FieldSource = "source"
 	// FieldHash holds the string denoting the hash field in the database.
 	FieldHash = "hash"
+	// FieldTraceHash holds the string denoting the trace_hash field in the database.
+	FieldTraceHash = "trace_hash"
 	// FieldFingerprint holds the string denoting the fingerprint field in the database.
 	FieldFingerprint = "fingerprint"
 	// FieldTitle holds the string denoting the title field in the database.
@@ -79,6 +81,7 @@ var Columns = []string{
 	FieldSeverity,
 	FieldSource,
 	FieldHash,
+	FieldTraceHash,
 	FieldFingerprint,
 	FieldTitle,
 	FieldMessage,
@@ -125,6 +128,10 @@ var (
 	SourceValidator func(string) error
 	// HashValidator is a validator for the "hash" field. It is called by the builders before save.
 	HashValidator func(string) error
+	// DefaultTraceHash holds the default value on creation for the "trace_hash" field.
+	DefaultTraceHash string
+	// TraceHashValidator is a validator for the "trace_hash" field. It is called by the builders before save.
+	TraceHashValidator func(string) error
 	// DefaultFingerprint holds the default value on creation for the "fingerprint" field.
 	DefaultFingerprint string
 	// FingerprintValidator is a validator for the "fingerprint" field. It is called by the builders before save.
@@ -239,6 +246,11 @@ func BySource(opts ...sql.OrderTermOption) OrderOption {
 // ByHash orders the results by the hash field.
 func ByHash(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldHash, opts...).ToFunc()
+}
+
+// ByTraceHash orders the results by the trace_hash field.
+func ByTraceHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTraceHash, opts...).ToFunc()
 }
 
 // ByFingerprint orders the results by the fingerprint field.

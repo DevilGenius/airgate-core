@@ -231,6 +231,7 @@ func setMonitorRequestCreateFields(create *ent.MonitorRequestEventCreate, event 
 		SetSeverity(entmonitorrequestevent.Severity(event.Severity)).
 		SetSource(event.Source).
 		SetHash(event.Hash).
+		SetTraceHash(event.TraceHash).
 		SetFingerprint(event.Fingerprint).
 		SetTitle(event.Title).
 		SetMessage(event.Message).
@@ -270,6 +271,7 @@ func mapMonitorRequestEvent(row *ent.MonitorRequestEvent) appmonitor.RequestEven
 		Severity:            string(row.Severity),
 		Source:              row.Source,
 		Hash:                row.Hash,
+		TraceHash:           row.TraceHash,
 		Fingerprint:         row.Fingerprint,
 		Title:               row.Title,
 		Message:             row.Message,

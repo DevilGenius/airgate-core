@@ -20,6 +20,7 @@ func (MonitorRequestEvent) Fields() []ent.Field {
 			Default("info"),
 		field.String("source").Default("").MaxLen(64),
 		field.String("hash").NotEmpty().MaxLen(64),
+		field.String("trace_hash").Default("").MaxLen(64),
 		field.String("fingerprint").Default("").MaxLen(128),
 		field.String("title").Default("").MaxLen(160),
 		field.String("message").Default("").MaxLen(500),
@@ -61,5 +62,6 @@ func (MonitorRequestEvent) Indexes() []ent.Index {
 		index.Fields("error_code", "created_at"),
 		index.Fields("request_id"),
 		index.Fields("hash"),
+		index.Fields("trace_hash"),
 	}
 }

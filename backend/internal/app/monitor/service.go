@@ -74,6 +74,7 @@ type Service struct {
 	eventPublisher EventPublisher
 	rdb            *redis.Client
 	queue          chan queuedOperation
+	traceQueue     chan queuedRequestTrace
 	recovery       *recoverySnapshot
 	retention      time.Duration
 	flushInterval  time.Duration
@@ -85,10 +86,13 @@ type Service struct {
 	aggregatorPanics   atomic.Int64
 	workerPanics       atomic.Int64
 	lastDropLogUnixSec atomic.Int64
+	lastTraceDropLog   atomic.Int64
+	traceQueuedBytes   atomic.Int64
 }
 
 var _ monitoring.Recorder = (*Service)(nil)
 var _ monitoring.RecoveryRecorder = (*Service)(nil)
+var _ requestmonitoring.TraceRecorder = (*Service)(nil)
 
 // NewService creates a monitor service. It is safe for hot-path callers because
 // Record only normalizes input and performs a non-blocking queue send.
@@ -157,6 +161,16 @@ func WithRetention(retention time.Duration) Option {
 	}
 }
 
+// WithRequestTrace allocates the bounded raw-trace queue. When disabled the
+// queue remains nil and no trace worker or payload retention is active.
+func WithRequestTrace(enabled bool) Option {
+	return func(s *Service) {
+		if enabled {
+			s.traceQueue = make(chan queuedRequestTrace, defaultTraceQueueSize)
+		}
+	}
+}
+
 // WithNotifier enables monitor notifications through the existing notification service.
 func WithNotifier(notifier Notifier) Option {
 	return func(s *Service) {
@@ -208,12 +222,88 @@ func (s *Service) RecordRequest(ctx context.Context, input requestmonitoring.Eve
 		return
 	}
 	event := s.normalizeRequestInput(input)
+	s.enqueueRequestEvent(event)
+}
+
+func (s *Service) enqueueRequestEvent(event QueuedRequestEvent) bool {
+	if s == nil {
+		return false
+	}
 	select {
 	case s.queue <- queuedOperation{Kind: queuedOperationRecordRequest, RequestEvent: event}:
 		s.queuedEvents.Add(1)
+		return true
 	default:
 		dropped := s.droppedEvents.Add(1)
 		s.logDrop(dropped)
+		return false
+	}
+}
+
+// RecordRequestTrace queues a final-error event and its raw diagnostic as one
+// unit. Serialization, hashing, compression and database writes occur only in
+// the dedicated trace worker.
+func (s *Service) RecordRequestTrace(ctx context.Context, input requestmonitoring.EventInput, trace requestmonitoring.TraceInput) bool {
+	if s == nil {
+		return false
+	}
+	event := s.normalizeRequestInput(input)
+	if len(trace.Attempts) > 0 {
+		attemptDurations := make([]int64, 0, len(trace.Attempts))
+		for _, attempt := range trace.Attempts {
+			attemptDurations = append(attemptDurations, maxInt64(attempt.DurationMS, 0))
+		}
+		event.Detail["attempt_durations_ms"] = attemptDurations
+	}
+	if ctx != nil && ctx.Err() != nil {
+		event.Detail["trace_dropped"] = "context_canceled"
+		s.enqueueRequestEvent(event)
+		return false
+	}
+	if s.traceQueue == nil {
+		event.Detail["trace_dropped"] = "disabled"
+		s.enqueueRequestEvent(event)
+		return false
+	}
+	if _, ok := s.repo.(RequestTraceRepository); !ok {
+		event.Detail["trace_dropped"] = "repository_unsupported"
+		s.enqueueRequestEvent(event)
+		return false
+	}
+	queuedBytes := requestTraceReferencedBytes(trace)
+	if queuedBytes > maxRequestTraceRawBytes || !s.reserveTraceBytes(queuedBytes) {
+		event.Detail["trace_dropped"] = "capacity"
+		s.enqueueRequestEvent(event)
+		dropped := s.droppedEvents.Add(1)
+		s.logTraceDrop(dropped)
+		return false
+	}
+	select {
+	case s.traceQueue <- queuedRequestTrace{Trace: trace, Event: event, Bytes: queuedBytes}:
+		s.queuedEvents.Add(1)
+		return true
+	default:
+		s.traceQueuedBytes.Add(-queuedBytes)
+		event.Detail["trace_dropped"] = "queue_full"
+		s.enqueueRequestEvent(event)
+		dropped := s.droppedEvents.Add(1)
+		s.logTraceDrop(dropped)
+		return false
+	}
+}
+
+func (s *Service) reserveTraceBytes(size int64) bool {
+	if s == nil || size < 0 {
+		return false
+	}
+	for {
+		current := s.traceQueuedBytes.Load()
+		if current+size > maxTraceQueueBytes {
+			return false
+		}
+		if s.traceQueuedBytes.CompareAndSwap(current, current+size) {
+			return true
+		}
 	}
 }
 
@@ -270,8 +360,34 @@ func (s *Service) ClearRequestEvents(ctx context.Context, before *time.Time) (in
 	if err != nil {
 		return 0, err
 	}
+	if traceRepo, ok := s.repo.(RequestTraceRepository); ok {
+		if _, err := traceRepo.ClearRequestTraces(ctx, before); err != nil {
+			return deleted, err
+		}
+	}
 	s.publishMonitorChanged("request_cleared")
 	return deleted, nil
+}
+
+// GetRequestTrace returns a verified and decompressed trace by content hash.
+func (s *Service) GetRequestTrace(ctx context.Context, hash string) (RequestTrace, error) {
+	if s == nil || s.repo == nil {
+		return RequestTrace{}, ErrRequestTraceNotFound
+	}
+	repo, ok := s.repo.(RequestTraceRepository)
+	if !ok {
+		return RequestTrace{}, ErrRequestTraceNotFound
+	}
+	stored, err := repo.GetRequestTrace(ctx, hash)
+	if err != nil {
+		return RequestTrace{}, err
+	}
+	return decodeStoredRequestTrace(stored)
+}
+
+// RequestTraceEnabled reports whether the dedicated trace queue is active.
+func (s *Service) RequestTraceEnabled() bool {
+	return s != nil && s.traceQueue != nil
 }
 
 // Summary returns the monitor event overview for future dashboard handlers.
@@ -441,6 +557,23 @@ func (s *Service) logDrop(total int64) {
 	}
 	if s.lastDropLogUnixSec.CompareAndSwap(last, now) {
 		slog.Warn("monitor_event_queue_full", "dropped_total", total, "queue_len", len(s.queue), "queue_cap", cap(s.queue))
+	}
+}
+
+func (s *Service) logTraceDrop(total int64) {
+	now := time.Now().Unix()
+	last := s.lastTraceDropLog.Load()
+	if now-last < int64(dropLogInterval/time.Second) {
+		return
+	}
+	if s.lastTraceDropLog.CompareAndSwap(last, now) {
+		slog.Warn("monitor_request_trace_queue_full",
+			"dropped_total", total,
+			"queue_len", len(s.traceQueue),
+			"queue_cap", cap(s.traceQueue),
+			"queued_bytes", s.traceQueuedBytes.Load(),
+			"max_queued_bytes", maxTraceQueueBytes,
+		)
 	}
 }
 

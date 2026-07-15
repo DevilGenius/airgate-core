@@ -39,12 +39,22 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	if !ok {
 		return nil, false
 	}
+	if f.requestTraceEnabled {
+		if trace := requestTraceFromGinContext(c); trace != nil {
+			trace.bindKeyInfo(keyInfo)
+		}
+	}
 
 	path := requestPath(c)
 	contentType := c.GetHeader("Content-Type")
 	bodyLimit := gatewayBodyLimit(path, contentType)
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, bodyLimit)
 	body, err := io.ReadAll(c.Request.Body)
+	if f.requestTraceEnabled {
+		if trace := requestTraceFromGinContext(c); trace != nil {
+			trace.captureRequestBody(body, contentType)
+		}
+	}
 	if err != nil {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
@@ -69,13 +79,17 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		openAIError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request", "读取请求体失败")
 		return nil, false
 	}
-
 	parsed := parseBody(body, c.GetHeader("Content-Type"))
+	parsed.PreviousResponseID = firstNonEmpty(parsed.PreviousResponseID, previousResponseIDFromHeaders(c.Request.Header))
+	parsed.SessionID = resolveRequestSessionID(c.Request.Header, parsed)
+	if f.requestTraceEnabled {
+		if trace := requestTraceFromGinContext(c); trace != nil {
+			trace.captureParsedRequest(parsed)
+		}
+	}
 	if !validateRequestShape(c, keyInfo, path, parsed) {
 		return nil, false
 	}
-	parsed.PreviousResponseID = firstNonEmpty(parsed.PreviousResponseID, previousResponseIDFromHeaders(c.Request.Header))
-	parsed.SessionID = resolveRequestSessionID(c.Request.Header, parsed)
 	requestedPlatform := requestedPlatform(c, keyInfo)
 	inst := f.matchPlugin(c, keyInfo, requestedPlatform, path)
 	if inst == nil {
@@ -684,12 +698,13 @@ func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest
 	}
 
 	req := &sdk.ForwardRequest{
-		Account:      buildSDKAccount(state.account),
-		Body:         state.body,
-		Headers:      headers,
-		Model:        state.model,
-		DispatchPlan: state.dispatchPlan,
-		Stream:       state.stream,
+		Account:         buildSDKAccount(state.account),
+		Body:            state.body,
+		Headers:         headers,
+		Model:           state.model,
+		DispatchPlan:    state.dispatchPlan,
+		Stream:          state.stream,
+		TraceFinalError: state.trace != nil,
 	}
 	if state.realtime {
 		req.Writer = c.Writer

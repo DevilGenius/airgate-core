@@ -38,6 +38,22 @@ func toMonitorEventResp(item appmonitor.Event) dto.MonitorEventResp {
 	}
 }
 
+func toMonitorRequestTraceResp(item appmonitor.RequestTrace) dto.MonitorRequestTraceResp {
+	return dto.MonitorRequestTraceResp{
+		Hash:           item.Hash,
+		HashAlgorithm:  item.HashAlgorithm,
+		SchemaVersion:  item.SchemaVersion,
+		Encoding:       item.Encoding,
+		RawSize:        item.RawSize,
+		CompressedSize: item.CompressedSize,
+		SeenCount:      item.SeenCount,
+		FirstSeenAt:    monitorTimeString(item.FirstSeenAt),
+		LastSeenAt:     monitorTimeString(item.LastSeenAt),
+		ExpiresAt:      monitorTimeString(item.ExpiresAt),
+		Payload:        item.Payload,
+	}
+}
+
 func toMonitorListResp(result appmonitor.ListResult) dto.MonitorListResp {
 	items := make([]dto.MonitorEventResp, 0, len(result.List))
 	for _, item := range result.List {
@@ -78,6 +94,7 @@ func toMonitorRequestEventResp(item appmonitor.RequestEvent) dto.MonitorRequestE
 		Severity:            item.Severity,
 		Source:              item.Source,
 		Hash:                item.Hash,
+		TraceHash:           item.TraceHash,
 		Fingerprint:         item.Fingerprint,
 		Title:               item.Title,
 		Message:             item.Message,

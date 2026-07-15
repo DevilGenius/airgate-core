@@ -46,7 +46,7 @@ func parseMonitorTime(value string, endOfDay bool) (*time.Time, error) {
 }
 
 func handleMonitorError(logMessage, publicMessage string, err error) (int, string) {
-	if errors.Is(err, appmonitor.ErrEventNotFound) {
+	if errors.Is(err, appmonitor.ErrEventNotFound) || errors.Is(err, appmonitor.ErrRequestTraceNotFound) {
 		return 404, err.Error()
 	}
 	if errors.Is(err, appmonitor.ErrEventNotRecoverable) {

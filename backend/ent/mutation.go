@@ -17,6 +17,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/group"
 	"github.com/DevilGenius/airgate-core/ent/monitorevent"
 	"github.com/DevilGenius/airgate-core/ent/monitorrequestevent"
+	"github.com/DevilGenius/airgate-core/ent/monitorrequesttrace"
 	"github.com/DevilGenius/airgate-core/ent/plugin"
 	"github.com/DevilGenius/airgate-core/ent/pluginsource"
 	"github.com/DevilGenius/airgate-core/ent/predicate"
@@ -45,6 +46,7 @@ const (
 	TypeGroup               = "Group"
 	TypeMonitorEvent        = "MonitorEvent"
 	TypeMonitorRequestEvent = "MonitorRequestEvent"
+	TypeMonitorRequestTrace = "MonitorRequestTrace"
 	TypePlugin              = "Plugin"
 	TypePluginSource        = "PluginSource"
 	TypeProxy               = "Proxy"
@@ -8215,6 +8217,7 @@ type MonitorRequestEventMutation struct {
 	severity              *monitorrequestevent.Severity
 	source                *string
 	hash                  *string
+	trace_hash            *string
 	fingerprint           *string
 	title                 *string
 	message               *string
@@ -8491,6 +8494,42 @@ func (m *MonitorRequestEventMutation) OldHash(ctx context.Context) (v string, er
 // ResetHash resets all changes to the "hash" field.
 func (m *MonitorRequestEventMutation) ResetHash() {
 	m.hash = nil
+}
+
+// SetTraceHash sets the "trace_hash" field.
+func (m *MonitorRequestEventMutation) SetTraceHash(s string) {
+	m.trace_hash = &s
+}
+
+// TraceHash returns the value of the "trace_hash" field in the mutation.
+func (m *MonitorRequestEventMutation) TraceHash() (r string, exists bool) {
+	v := m.trace_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTraceHash returns the old "trace_hash" field's value of the MonitorRequestEvent entity.
+// If the MonitorRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestEventMutation) OldTraceHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTraceHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTraceHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTraceHash: %w", err)
+	}
+	return oldValue.TraceHash, nil
+}
+
+// ResetTraceHash resets all changes to the "trace_hash" field.
+func (m *MonitorRequestEventMutation) ResetTraceHash() {
+	m.trace_hash = nil
 }
 
 // SetFingerprint sets the "fingerprint" field.
@@ -9592,7 +9631,7 @@ func (m *MonitorRequestEventMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MonitorRequestEventMutation) Fields() []string {
-	fields := make([]string, 0, 27)
+	fields := make([]string, 0, 28)
 	if m._type != nil {
 		fields = append(fields, monitorrequestevent.FieldType)
 	}
@@ -9604,6 +9643,9 @@ func (m *MonitorRequestEventMutation) Fields() []string {
 	}
 	if m.hash != nil {
 		fields = append(fields, monitorrequestevent.FieldHash)
+	}
+	if m.trace_hash != nil {
+		fields = append(fields, monitorrequestevent.FieldTraceHash)
 	}
 	if m.fingerprint != nil {
 		fields = append(fields, monitorrequestevent.FieldFingerprint)
@@ -9690,6 +9732,8 @@ func (m *MonitorRequestEventMutation) Field(name string) (ent.Value, bool) {
 		return m.Source()
 	case monitorrequestevent.FieldHash:
 		return m.Hash()
+	case monitorrequestevent.FieldTraceHash:
+		return m.TraceHash()
 	case monitorrequestevent.FieldFingerprint:
 		return m.Fingerprint()
 	case monitorrequestevent.FieldTitle:
@@ -9753,6 +9797,8 @@ func (m *MonitorRequestEventMutation) OldField(ctx context.Context, name string)
 		return m.OldSource(ctx)
 	case monitorrequestevent.FieldHash:
 		return m.OldHash(ctx)
+	case monitorrequestevent.FieldTraceHash:
+		return m.OldTraceHash(ctx)
 	case monitorrequestevent.FieldFingerprint:
 		return m.OldFingerprint(ctx)
 	case monitorrequestevent.FieldTitle:
@@ -9835,6 +9881,13 @@ func (m *MonitorRequestEventMutation) SetField(name string, value ent.Value) err
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetHash(v)
+		return nil
+	case monitorrequestevent.FieldTraceHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTraceHash(v)
 		return nil
 	case monitorrequestevent.FieldFingerprint:
 		v, ok := value.(string)
@@ -10190,6 +10243,9 @@ func (m *MonitorRequestEventMutation) ResetField(name string) error {
 	case monitorrequestevent.FieldHash:
 		m.ResetHash()
 		return nil
+	case monitorrequestevent.FieldTraceHash:
+		m.ResetTraceHash()
+		return nil
 	case monitorrequestevent.FieldFingerprint:
 		m.ResetFingerprint()
 		return nil
@@ -10309,6 +10365,953 @@ func (m *MonitorRequestEventMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *MonitorRequestEventMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown MonitorRequestEvent edge %s", name)
+}
+
+// MonitorRequestTraceMutation represents an operation that mutates the MonitorRequestTrace nodes in the graph.
+type MonitorRequestTraceMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *int
+	hash               *string
+	schema_version     *int
+	addschema_version  *int
+	encoding           *string
+	payload            *[]byte
+	raw_size           *int64
+	addraw_size        *int64
+	compressed_size    *int64
+	addcompressed_size *int64
+	seen_count         *int64
+	addseen_count      *int64
+	first_seen_at      *time.Time
+	last_seen_at       *time.Time
+	expires_at         *time.Time
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*MonitorRequestTrace, error)
+	predicates         []predicate.MonitorRequestTrace
+}
+
+var _ ent.Mutation = (*MonitorRequestTraceMutation)(nil)
+
+// monitorrequesttraceOption allows management of the mutation configuration using functional options.
+type monitorrequesttraceOption func(*MonitorRequestTraceMutation)
+
+// newMonitorRequestTraceMutation creates new mutation for the MonitorRequestTrace entity.
+func newMonitorRequestTraceMutation(c config, op Op, opts ...monitorrequesttraceOption) *MonitorRequestTraceMutation {
+	m := &MonitorRequestTraceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeMonitorRequestTrace,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withMonitorRequestTraceID sets the ID field of the mutation.
+func withMonitorRequestTraceID(id int) monitorrequesttraceOption {
+	return func(m *MonitorRequestTraceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *MonitorRequestTrace
+		)
+		m.oldValue = func(ctx context.Context) (*MonitorRequestTrace, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().MonitorRequestTrace.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withMonitorRequestTrace sets the old MonitorRequestTrace of the mutation.
+func withMonitorRequestTrace(node *MonitorRequestTrace) monitorrequesttraceOption {
+	return func(m *MonitorRequestTraceMutation) {
+		m.oldValue = func(context.Context) (*MonitorRequestTrace, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m MonitorRequestTraceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m MonitorRequestTraceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *MonitorRequestTraceMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *MonitorRequestTraceMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().MonitorRequestTrace.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetHash sets the "hash" field.
+func (m *MonitorRequestTraceMutation) SetHash(s string) {
+	m.hash = &s
+}
+
+// Hash returns the value of the "hash" field in the mutation.
+func (m *MonitorRequestTraceMutation) Hash() (r string, exists bool) {
+	v := m.hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHash returns the old "hash" field's value of the MonitorRequestTrace entity.
+// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTraceMutation) OldHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHash: %w", err)
+	}
+	return oldValue.Hash, nil
+}
+
+// ResetHash resets all changes to the "hash" field.
+func (m *MonitorRequestTraceMutation) ResetHash() {
+	m.hash = nil
+}
+
+// SetSchemaVersion sets the "schema_version" field.
+func (m *MonitorRequestTraceMutation) SetSchemaVersion(i int) {
+	m.schema_version = &i
+	m.addschema_version = nil
+}
+
+// SchemaVersion returns the value of the "schema_version" field in the mutation.
+func (m *MonitorRequestTraceMutation) SchemaVersion() (r int, exists bool) {
+	v := m.schema_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSchemaVersion returns the old "schema_version" field's value of the MonitorRequestTrace entity.
+// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTraceMutation) OldSchemaVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSchemaVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSchemaVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSchemaVersion: %w", err)
+	}
+	return oldValue.SchemaVersion, nil
+}
+
+// AddSchemaVersion adds i to the "schema_version" field.
+func (m *MonitorRequestTraceMutation) AddSchemaVersion(i int) {
+	if m.addschema_version != nil {
+		*m.addschema_version += i
+	} else {
+		m.addschema_version = &i
+	}
+}
+
+// AddedSchemaVersion returns the value that was added to the "schema_version" field in this mutation.
+func (m *MonitorRequestTraceMutation) AddedSchemaVersion() (r int, exists bool) {
+	v := m.addschema_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSchemaVersion resets all changes to the "schema_version" field.
+func (m *MonitorRequestTraceMutation) ResetSchemaVersion() {
+	m.schema_version = nil
+	m.addschema_version = nil
+}
+
+// SetEncoding sets the "encoding" field.
+func (m *MonitorRequestTraceMutation) SetEncoding(s string) {
+	m.encoding = &s
+}
+
+// Encoding returns the value of the "encoding" field in the mutation.
+func (m *MonitorRequestTraceMutation) Encoding() (r string, exists bool) {
+	v := m.encoding
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEncoding returns the old "encoding" field's value of the MonitorRequestTrace entity.
+// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTraceMutation) OldEncoding(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEncoding is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEncoding requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEncoding: %w", err)
+	}
+	return oldValue.Encoding, nil
+}
+
+// ResetEncoding resets all changes to the "encoding" field.
+func (m *MonitorRequestTraceMutation) ResetEncoding() {
+	m.encoding = nil
+}
+
+// SetPayload sets the "payload" field.
+func (m *MonitorRequestTraceMutation) SetPayload(b []byte) {
+	m.payload = &b
+}
+
+// Payload returns the value of the "payload" field in the mutation.
+func (m *MonitorRequestTraceMutation) Payload() (r []byte, exists bool) {
+	v := m.payload
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPayload returns the old "payload" field's value of the MonitorRequestTrace entity.
+// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTraceMutation) OldPayload(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPayload is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPayload requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPayload: %w", err)
+	}
+	return oldValue.Payload, nil
+}
+
+// ResetPayload resets all changes to the "payload" field.
+func (m *MonitorRequestTraceMutation) ResetPayload() {
+	m.payload = nil
+}
+
+// SetRawSize sets the "raw_size" field.
+func (m *MonitorRequestTraceMutation) SetRawSize(i int64) {
+	m.raw_size = &i
+	m.addraw_size = nil
+}
+
+// RawSize returns the value of the "raw_size" field in the mutation.
+func (m *MonitorRequestTraceMutation) RawSize() (r int64, exists bool) {
+	v := m.raw_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRawSize returns the old "raw_size" field's value of the MonitorRequestTrace entity.
+// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTraceMutation) OldRawSize(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRawSize is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRawSize requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRawSize: %w", err)
+	}
+	return oldValue.RawSize, nil
+}
+
+// AddRawSize adds i to the "raw_size" field.
+func (m *MonitorRequestTraceMutation) AddRawSize(i int64) {
+	if m.addraw_size != nil {
+		*m.addraw_size += i
+	} else {
+		m.addraw_size = &i
+	}
+}
+
+// AddedRawSize returns the value that was added to the "raw_size" field in this mutation.
+func (m *MonitorRequestTraceMutation) AddedRawSize() (r int64, exists bool) {
+	v := m.addraw_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRawSize resets all changes to the "raw_size" field.
+func (m *MonitorRequestTraceMutation) ResetRawSize() {
+	m.raw_size = nil
+	m.addraw_size = nil
+}
+
+// SetCompressedSize sets the "compressed_size" field.
+func (m *MonitorRequestTraceMutation) SetCompressedSize(i int64) {
+	m.compressed_size = &i
+	m.addcompressed_size = nil
+}
+
+// CompressedSize returns the value of the "compressed_size" field in the mutation.
+func (m *MonitorRequestTraceMutation) CompressedSize() (r int64, exists bool) {
+	v := m.compressed_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCompressedSize returns the old "compressed_size" field's value of the MonitorRequestTrace entity.
+// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTraceMutation) OldCompressedSize(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCompressedSize is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCompressedSize requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCompressedSize: %w", err)
+	}
+	return oldValue.CompressedSize, nil
+}
+
+// AddCompressedSize adds i to the "compressed_size" field.
+func (m *MonitorRequestTraceMutation) AddCompressedSize(i int64) {
+	if m.addcompressed_size != nil {
+		*m.addcompressed_size += i
+	} else {
+		m.addcompressed_size = &i
+	}
+}
+
+// AddedCompressedSize returns the value that was added to the "compressed_size" field in this mutation.
+func (m *MonitorRequestTraceMutation) AddedCompressedSize() (r int64, exists bool) {
+	v := m.addcompressed_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCompressedSize resets all changes to the "compressed_size" field.
+func (m *MonitorRequestTraceMutation) ResetCompressedSize() {
+	m.compressed_size = nil
+	m.addcompressed_size = nil
+}
+
+// SetSeenCount sets the "seen_count" field.
+func (m *MonitorRequestTraceMutation) SetSeenCount(i int64) {
+	m.seen_count = &i
+	m.addseen_count = nil
+}
+
+// SeenCount returns the value of the "seen_count" field in the mutation.
+func (m *MonitorRequestTraceMutation) SeenCount() (r int64, exists bool) {
+	v := m.seen_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSeenCount returns the old "seen_count" field's value of the MonitorRequestTrace entity.
+// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTraceMutation) OldSeenCount(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSeenCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSeenCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSeenCount: %w", err)
+	}
+	return oldValue.SeenCount, nil
+}
+
+// AddSeenCount adds i to the "seen_count" field.
+func (m *MonitorRequestTraceMutation) AddSeenCount(i int64) {
+	if m.addseen_count != nil {
+		*m.addseen_count += i
+	} else {
+		m.addseen_count = &i
+	}
+}
+
+// AddedSeenCount returns the value that was added to the "seen_count" field in this mutation.
+func (m *MonitorRequestTraceMutation) AddedSeenCount() (r int64, exists bool) {
+	v := m.addseen_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSeenCount resets all changes to the "seen_count" field.
+func (m *MonitorRequestTraceMutation) ResetSeenCount() {
+	m.seen_count = nil
+	m.addseen_count = nil
+}
+
+// SetFirstSeenAt sets the "first_seen_at" field.
+func (m *MonitorRequestTraceMutation) SetFirstSeenAt(t time.Time) {
+	m.first_seen_at = &t
+}
+
+// FirstSeenAt returns the value of the "first_seen_at" field in the mutation.
+func (m *MonitorRequestTraceMutation) FirstSeenAt() (r time.Time, exists bool) {
+	v := m.first_seen_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFirstSeenAt returns the old "first_seen_at" field's value of the MonitorRequestTrace entity.
+// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTraceMutation) OldFirstSeenAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFirstSeenAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFirstSeenAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFirstSeenAt: %w", err)
+	}
+	return oldValue.FirstSeenAt, nil
+}
+
+// ResetFirstSeenAt resets all changes to the "first_seen_at" field.
+func (m *MonitorRequestTraceMutation) ResetFirstSeenAt() {
+	m.first_seen_at = nil
+}
+
+// SetLastSeenAt sets the "last_seen_at" field.
+func (m *MonitorRequestTraceMutation) SetLastSeenAt(t time.Time) {
+	m.last_seen_at = &t
+}
+
+// LastSeenAt returns the value of the "last_seen_at" field in the mutation.
+func (m *MonitorRequestTraceMutation) LastSeenAt() (r time.Time, exists bool) {
+	v := m.last_seen_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastSeenAt returns the old "last_seen_at" field's value of the MonitorRequestTrace entity.
+// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTraceMutation) OldLastSeenAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastSeenAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastSeenAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastSeenAt: %w", err)
+	}
+	return oldValue.LastSeenAt, nil
+}
+
+// ResetLastSeenAt resets all changes to the "last_seen_at" field.
+func (m *MonitorRequestTraceMutation) ResetLastSeenAt() {
+	m.last_seen_at = nil
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *MonitorRequestTraceMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *MonitorRequestTraceMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the MonitorRequestTrace entity.
+// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTraceMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *MonitorRequestTraceMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// Where appends a list predicates to the MonitorRequestTraceMutation builder.
+func (m *MonitorRequestTraceMutation) Where(ps ...predicate.MonitorRequestTrace) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the MonitorRequestTraceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *MonitorRequestTraceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.MonitorRequestTrace, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *MonitorRequestTraceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *MonitorRequestTraceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (MonitorRequestTrace).
+func (m *MonitorRequestTraceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *MonitorRequestTraceMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.hash != nil {
+		fields = append(fields, monitorrequesttrace.FieldHash)
+	}
+	if m.schema_version != nil {
+		fields = append(fields, monitorrequesttrace.FieldSchemaVersion)
+	}
+	if m.encoding != nil {
+		fields = append(fields, monitorrequesttrace.FieldEncoding)
+	}
+	if m.payload != nil {
+		fields = append(fields, monitorrequesttrace.FieldPayload)
+	}
+	if m.raw_size != nil {
+		fields = append(fields, monitorrequesttrace.FieldRawSize)
+	}
+	if m.compressed_size != nil {
+		fields = append(fields, monitorrequesttrace.FieldCompressedSize)
+	}
+	if m.seen_count != nil {
+		fields = append(fields, monitorrequesttrace.FieldSeenCount)
+	}
+	if m.first_seen_at != nil {
+		fields = append(fields, monitorrequesttrace.FieldFirstSeenAt)
+	}
+	if m.last_seen_at != nil {
+		fields = append(fields, monitorrequesttrace.FieldLastSeenAt)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, monitorrequesttrace.FieldExpiresAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *MonitorRequestTraceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case monitorrequesttrace.FieldHash:
+		return m.Hash()
+	case monitorrequesttrace.FieldSchemaVersion:
+		return m.SchemaVersion()
+	case monitorrequesttrace.FieldEncoding:
+		return m.Encoding()
+	case monitorrequesttrace.FieldPayload:
+		return m.Payload()
+	case monitorrequesttrace.FieldRawSize:
+		return m.RawSize()
+	case monitorrequesttrace.FieldCompressedSize:
+		return m.CompressedSize()
+	case monitorrequesttrace.FieldSeenCount:
+		return m.SeenCount()
+	case monitorrequesttrace.FieldFirstSeenAt:
+		return m.FirstSeenAt()
+	case monitorrequesttrace.FieldLastSeenAt:
+		return m.LastSeenAt()
+	case monitorrequesttrace.FieldExpiresAt:
+		return m.ExpiresAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *MonitorRequestTraceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case monitorrequesttrace.FieldHash:
+		return m.OldHash(ctx)
+	case monitorrequesttrace.FieldSchemaVersion:
+		return m.OldSchemaVersion(ctx)
+	case monitorrequesttrace.FieldEncoding:
+		return m.OldEncoding(ctx)
+	case monitorrequesttrace.FieldPayload:
+		return m.OldPayload(ctx)
+	case monitorrequesttrace.FieldRawSize:
+		return m.OldRawSize(ctx)
+	case monitorrequesttrace.FieldCompressedSize:
+		return m.OldCompressedSize(ctx)
+	case monitorrequesttrace.FieldSeenCount:
+		return m.OldSeenCount(ctx)
+	case monitorrequesttrace.FieldFirstSeenAt:
+		return m.OldFirstSeenAt(ctx)
+	case monitorrequesttrace.FieldLastSeenAt:
+		return m.OldLastSeenAt(ctx)
+	case monitorrequesttrace.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown MonitorRequestTrace field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MonitorRequestTraceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case monitorrequesttrace.FieldHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHash(v)
+		return nil
+	case monitorrequesttrace.FieldSchemaVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSchemaVersion(v)
+		return nil
+	case monitorrequesttrace.FieldEncoding:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEncoding(v)
+		return nil
+	case monitorrequesttrace.FieldPayload:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPayload(v)
+		return nil
+	case monitorrequesttrace.FieldRawSize:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRawSize(v)
+		return nil
+	case monitorrequesttrace.FieldCompressedSize:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCompressedSize(v)
+		return nil
+	case monitorrequesttrace.FieldSeenCount:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSeenCount(v)
+		return nil
+	case monitorrequesttrace.FieldFirstSeenAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFirstSeenAt(v)
+		return nil
+	case monitorrequesttrace.FieldLastSeenAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastSeenAt(v)
+		return nil
+	case monitorrequesttrace.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorRequestTrace field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *MonitorRequestTraceMutation) AddedFields() []string {
+	var fields []string
+	if m.addschema_version != nil {
+		fields = append(fields, monitorrequesttrace.FieldSchemaVersion)
+	}
+	if m.addraw_size != nil {
+		fields = append(fields, monitorrequesttrace.FieldRawSize)
+	}
+	if m.addcompressed_size != nil {
+		fields = append(fields, monitorrequesttrace.FieldCompressedSize)
+	}
+	if m.addseen_count != nil {
+		fields = append(fields, monitorrequesttrace.FieldSeenCount)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *MonitorRequestTraceMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case monitorrequesttrace.FieldSchemaVersion:
+		return m.AddedSchemaVersion()
+	case monitorrequesttrace.FieldRawSize:
+		return m.AddedRawSize()
+	case monitorrequesttrace.FieldCompressedSize:
+		return m.AddedCompressedSize()
+	case monitorrequesttrace.FieldSeenCount:
+		return m.AddedSeenCount()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MonitorRequestTraceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case monitorrequesttrace.FieldSchemaVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSchemaVersion(v)
+		return nil
+	case monitorrequesttrace.FieldRawSize:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRawSize(v)
+		return nil
+	case monitorrequesttrace.FieldCompressedSize:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCompressedSize(v)
+		return nil
+	case monitorrequesttrace.FieldSeenCount:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSeenCount(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorRequestTrace numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *MonitorRequestTraceMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *MonitorRequestTraceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *MonitorRequestTraceMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown MonitorRequestTrace nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *MonitorRequestTraceMutation) ResetField(name string) error {
+	switch name {
+	case monitorrequesttrace.FieldHash:
+		m.ResetHash()
+		return nil
+	case monitorrequesttrace.FieldSchemaVersion:
+		m.ResetSchemaVersion()
+		return nil
+	case monitorrequesttrace.FieldEncoding:
+		m.ResetEncoding()
+		return nil
+	case monitorrequesttrace.FieldPayload:
+		m.ResetPayload()
+		return nil
+	case monitorrequesttrace.FieldRawSize:
+		m.ResetRawSize()
+		return nil
+	case monitorrequesttrace.FieldCompressedSize:
+		m.ResetCompressedSize()
+		return nil
+	case monitorrequesttrace.FieldSeenCount:
+		m.ResetSeenCount()
+		return nil
+	case monitorrequesttrace.FieldFirstSeenAt:
+		m.ResetFirstSeenAt()
+		return nil
+	case monitorrequesttrace.FieldLastSeenAt:
+		m.ResetLastSeenAt()
+		return nil
+	case monitorrequesttrace.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorRequestTrace field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *MonitorRequestTraceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *MonitorRequestTraceMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *MonitorRequestTraceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *MonitorRequestTraceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *MonitorRequestTraceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *MonitorRequestTraceMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *MonitorRequestTraceMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown MonitorRequestTrace unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *MonitorRequestTraceMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown MonitorRequestTrace edge %s", name)
 }
 
 // PluginMutation represents an operation that mutates the Plugin nodes in the graph.

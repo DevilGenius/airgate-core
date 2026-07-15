@@ -41,6 +41,7 @@ type forwardState struct {
 	keyInfo *auth.APIKeyInfo
 	plugin  *PluginInstance
 	account *ent.Account
+	trace   *requestTraceSession
 }
 
 // forwardExecution 一次 plugin.Forward 调用的结果。

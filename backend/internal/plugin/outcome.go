@@ -25,6 +25,7 @@ const shouldRetryHeader = "X-Should-Retry"
 
 // openAIError 以 OpenAI 兼容格式返回错误，保证 Claude Code 等客户端能识别。
 func openAIError(c *gin.Context, status int, errType, code, message string) {
+	markRequestTraceError(c, "response", status, errType, code, message)
 	maybeDisableAutomaticRetry(c, status)
 	c.JSON(status, gin.H{
 		"error": gin.H{
@@ -71,6 +72,9 @@ func maybeDisableAutomaticRetry(c *gin.Context, status int) {
 //	账号级 / 上游抖动 / 流中断 → 未触发 failover 或最终失败时，返回脱敏失败响应
 func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution forwardExecution) {
 	ctx := finalizeRequestContext(c.Request.Context())
+	if execution.err != nil || execution.outcome.Kind != sdk.OutcomeSuccess {
+		markRequestTraceExecution(c, state, execution)
+	}
 
 	f.applyOutcome(ctx, state, execution)
 	f.recordPluginExecutionFinalFailure(ctx, state, execution, forwardAttemptsFromGinContext(c))

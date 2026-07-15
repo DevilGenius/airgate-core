@@ -1,5 +1,7 @@
 package dto
 
+import "encoding/json"
+
 // MonitorListQuery describes admin monitor event list filters.
 type MonitorListQuery struct {
 	Status          string `form:"status"`
@@ -94,6 +96,7 @@ type MonitorRequestEventResp struct {
 	Severity            string                 `json:"severity"`
 	Source              string                 `json:"source"`
 	Hash                string                 `json:"hash"`
+	TraceHash           string                 `json:"trace_hash,omitempty"`
 	Fingerprint         string                 `json:"fingerprint,omitempty"`
 	Title               string                 `json:"title"`
 	Message             string                 `json:"message"`
@@ -135,6 +138,21 @@ type MonitorRequestListResp struct {
 // MonitorRequestClearResp is returned after clearing request monitor rows.
 type MonitorRequestClearResp struct {
 	Deleted int `json:"deleted"`
+}
+
+// MonitorRequestTraceResp is one verified, decompressed raw request trace.
+type MonitorRequestTraceResp struct {
+	Hash           string          `json:"hash"`
+	HashAlgorithm  string          `json:"hash_algorithm"`
+	SchemaVersion  int             `json:"schema_version"`
+	Encoding       string          `json:"encoding"`
+	RawSize        int64           `json:"raw_size"`
+	CompressedSize int64           `json:"compressed_size"`
+	SeenCount      int64           `json:"seen_count"`
+	FirstSeenAt    string          `json:"first_seen_at"`
+	LastSeenAt     string          `json:"last_seen_at"`
+	ExpiresAt      string          `json:"expires_at"`
+	Payload        json.RawMessage `json:"payload"`
 }
 
 // MonitorTypeCountResp is a grouped count row.
