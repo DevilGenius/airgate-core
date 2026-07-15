@@ -850,7 +850,7 @@ export default function UsagePage() {
     };
     const accountColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'account_name',
-      title: t('usage.upstream_credential', '上游凭证'),
+      title: t('usage.upstream_credential', 'Credential'),
       width: '172px',
       hideOnMobile: true,
       render: (row) => {
@@ -913,7 +913,7 @@ export default function UsagePage() {
     };
     const wsDialColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'ws_dial_ms',
-      title: t('usage.ws_dial', '握手时间'),
+      title: t('usage.ws_dial', 'WS'),
       width: '64px',
       hideOnMobile: true,
       render: (row) => (
