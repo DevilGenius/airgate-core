@@ -88,11 +88,35 @@ func (s *MonitorStore) RequestSummary(ctx context.Context) (appmonitor.Summary, 
 	if s == nil || s.db == nil {
 		return appmonitor.Summary{}, nil
 	}
+	base := s.db.MonitorRequestEvent.Query()
+	severityCounts, err := s.requestSummarySeverityCounts(ctx, base.Clone())
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
+	now := time.Now()
+	shortSeverityCounts, err := s.requestSummarySeverityCounts(ctx, base.Clone().
+		Where(entmonitorrequestevent.CreatedAtGTE(now.Add(-monitorSummaryShortWindow))))
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
+	longSeverityCounts, err := s.requestSummarySeverityCounts(ctx, base.Clone().
+		Where(entmonitorrequestevent.CreatedAtGTE(now.Add(-monitorSummaryLongWindow))))
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
+	severityCounts.Warning5MTotal = shortSeverityCounts.WarningTotal
+	severityCounts.Warning1HTotal = longSeverityCounts.WarningTotal
+	severityCounts.Info5MTotal = shortSeverityCounts.InfoTotal
+	severityCounts.Info1HTotal = longSeverityCounts.InfoTotal
+	return severityCounts, nil
+}
+
+func (s *MonitorStore) requestSummarySeverityCounts(ctx context.Context, query *ent.MonitorRequestEventQuery) (appmonitor.Summary, error) {
 	var rows []struct {
 		Severity string `json:"severity"`
 		Count    int    `json:"count"`
 	}
-	err := s.db.MonitorRequestEvent.Query().
+	err := query.
 		GroupBy(entmonitorrequestevent.FieldSeverity).
 		Aggregate(ent.Count()).
 		Scan(ctx, &rows)

@@ -192,8 +192,12 @@ type Summary struct {
 	ErrorActiveTotal    int64
 	WarningTotal        int64
 	WarningActiveTotal  int64
+	Warning5MTotal      int64
+	Warning1HTotal      int64
 	InfoTotal           int64
 	InfoActiveTotal     int64
+	Info5MTotal         int64
+	Info1HTotal         int64
 	ByType              []TypeCount
 	TopAccounts         []SubjectCount
 	Recent              []Event

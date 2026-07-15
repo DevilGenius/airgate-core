@@ -159,8 +159,12 @@ type MonitorSummaryResp struct {
 	ErrorActiveTotal    int64                     `json:"error_active_total"`
 	WarningTotal        int64                     `json:"warning_total"`
 	WarningActiveTotal  int64                     `json:"warning_active_total"`
+	Warning5MTotal      int64                     `json:"warning_5m_total"`
+	Warning1HTotal      int64                     `json:"warning_1h_total"`
 	InfoTotal           int64                     `json:"info_total"`
 	InfoActiveTotal     int64                     `json:"info_active_total"`
+	Info5MTotal         int64                     `json:"info_5m_total"`
+	Info1HTotal         int64                     `json:"info_1h_total"`
 	ByType              []MonitorTypeCountResp    `json:"by_type"`
 	TopAccounts         []MonitorSubjectCountResp `json:"top_accounts"`
 	Recent              []MonitorEventResp        `json:"recent"`

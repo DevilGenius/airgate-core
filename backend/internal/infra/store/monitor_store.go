@@ -15,6 +15,8 @@ import (
 const (
 	monitorSummaryTopLimit    = 5
 	monitorSummaryRecentLimit = 10
+	monitorSummaryShortWindow = 5 * time.Minute
+	monitorSummaryLongWindow  = time.Hour
 )
 
 // MonitorStore persists temporary monitor events with Ent.
@@ -294,6 +296,17 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 	if err != nil {
 		return appmonitor.Summary{}, err
 	}
+	now := time.Now()
+	shortSeverityCounts, err := s.summarySeverityCounts(ctx, base.Clone().
+		Where(entmonitorevent.UpdatedAtGTE(now.Add(-monitorSummaryShortWindow))))
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
+	longSeverityCounts, err := s.summarySeverityCounts(ctx, base.Clone().
+		Where(entmonitorevent.UpdatedAtGTE(now.Add(-monitorSummaryLongWindow))))
+	if err != nil {
+		return appmonitor.Summary{}, err
+	}
 	byType, err := s.summaryByType(ctx, activeBase.Clone())
 	if err != nil {
 		return appmonitor.Summary{}, err
@@ -322,8 +335,12 @@ func (s *MonitorStore) Summary(ctx context.Context) (appmonitor.Summary, error) 
 		ErrorActiveTotal:    severityCounts.ErrorActiveTotal,
 		WarningTotal:        severityCounts.WarningTotal,
 		WarningActiveTotal:  severityCounts.WarningActiveTotal,
+		Warning5MTotal:      shortSeverityCounts.WarningTotal,
+		Warning1HTotal:      longSeverityCounts.WarningTotal,
 		InfoTotal:           severityCounts.InfoTotal,
 		InfoActiveTotal:     severityCounts.InfoActiveTotal,
+		Info5MTotal:         shortSeverityCounts.InfoTotal,
+		Info1HTotal:         longSeverityCounts.InfoTotal,
 		ByType:              byType,
 		TopAccounts:         topAccounts,
 		Recent:              recent,
