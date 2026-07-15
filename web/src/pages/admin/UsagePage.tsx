@@ -806,10 +806,15 @@ export default function UsagePage() {
     const modelIdx = sharedColumns.findIndex((c) => c.key === 'model');
     const streamColumn = sharedColumns.find((column) => column.key === 'stream');
     const timingKeys = new Set(['first_event_ms', 'first_token_ms', 'duration_ms']);
-    const timingColumns = sharedColumns.filter((column) => timingKeys.has(column.key));
+    const timingColumns = sharedColumns
+      .filter((column) => timingKeys.has(column.key))
+      .map((column) => ({
+        ...column,
+        width: '64px',
+      }));
     const leadingSharedColumns = sharedColumns
       .slice(0, modelIdx + 1)
-      .map((column) => (column.key === 'model' ? { ...column, width: '260px' } : column));
+      .map((column) => (column.key === 'model' ? { ...column, width: '224px' } : column));
     const sharedColumnsAfterModel = sharedColumns
       .slice(modelIdx + 1)
       .filter((column) => !timingKeys.has(column.key) && column.key !== 'stream')
@@ -817,7 +822,7 @@ export default function UsagePage() {
     const endpointColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'endpoint',
       title: t('usage.endpoint', '端点'),
-      width: '180px',
+      width: '156px',
       hideOnMobile: true,
       render: (row) => (
         <span className="block truncate font-mono text-xs leading-tight text-text-secondary" title={row.endpoint || '-'}>
@@ -828,7 +833,7 @@ export default function UsagePage() {
     const apiKeyColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'api_key',
       title: t('usage.api_key', 'API Key'),
-      width: '112px',
+      width: '104px',
       hideOnMobile: true,
       render: (row) => {
         if (row.api_key_id === 0) {
@@ -870,14 +875,14 @@ export default function UsagePage() {
     const userAgentColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'user_agent',
       title: t('usage.user_agent', 'User-Agent'),
-      width: '260px',
+      width: '184px',
       hideOnMobile: true,
       render: (row) => {
         const rawUserAgent = compactText(row.user_agent);
         const userAgent = displayUserAgent(row.user_agent);
         return (
           <span
-            className="block w-full min-w-0 max-w-full overflow-hidden text-left font-mono text-[11px] leading-tight text-text-secondary"
+            className="block w-full min-w-0 max-w-full overflow-hidden text-left font-mono text-[11px] leading-tight tracking-tight text-text-secondary"
             style={{
               display: '-webkit-box',
               overflowWrap: 'anywhere',
@@ -895,7 +900,7 @@ export default function UsagePage() {
     const ipAddressColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'ip_address',
       title: t('usage.ip_address', 'IP'),
-      width: '128px',
+      width: '108px',
       hideOnMobile: true,
       render: (row) => {
         const ipAddress = compactText(row.ip_address);
@@ -909,7 +914,7 @@ export default function UsagePage() {
     const wsDialColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'ws_dial_ms',
       title: t('usage.ws_dial', '握手时间'),
-      width: '86px',
+      width: '64px',
       hideOnMobile: true,
       render: (row) => (
         <span className="block text-center font-mono text-[13px] text-text-secondary">
