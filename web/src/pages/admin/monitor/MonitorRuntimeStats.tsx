@@ -63,7 +63,6 @@ function SampleFailureColumn({
   currentErrorCount,
   currentErrorRate,
   currentSampleCount,
-  label,
   longErrorCount,
   longErrorRate,
   longSampleCount,
@@ -71,7 +70,6 @@ function SampleFailureColumn({
   currentErrorCount?: number;
   currentErrorRate?: number;
   currentSampleCount?: number;
-  label: string;
   longErrorCount?: number;
   longErrorRate?: number;
   longSampleCount?: number;
@@ -81,16 +79,16 @@ function SampleFailureColumn({
     { errorCount: longErrorCount, errorRate: longErrorRate, sampleCount: longSampleCount, window: '1h' },
   ];
   return (
-    <span className="grid min-w-0 grid-cols-[auto_5ch_auto_5ch_minmax(0,1fr)] items-center gap-x-0.5">
+    <span className="grid min-w-0 grid-cols-[auto_auto_auto_auto_minmax(0,1fr)] items-center">
       {rows.map((row) => {
         const failures = Math.max(0, row.errorCount ?? 0);
         const effectiveSamples = Math.max(0, row.sampleCount ?? 0) + failures;
         return (
           <Fragment key={row.window}>
-            <span className="whitespace-nowrap">{label}{row.window}</span>
-            <span className="text-right tabular-nums">{fmtNum(failures)}</span>
+            <span className="whitespace-pre">{`${row.window}  `}</span>
+            <span className="text-right tabular-nums">{failures}</span>
             <span className="justify-self-center">/</span>
-            <span className="text-right tabular-nums">{fmtNum(effectiveSamples)}</span>
+            <span className="text-right tabular-nums">{effectiveSamples}</span>
             <span className="min-w-0 truncate tabular-nums">({formatPercent(row.errorRate)})</span>
           </Fragment>
         );
@@ -100,15 +98,11 @@ function SampleFailureColumn({
 }
 
 function SampleFailureDetails({
-  imageLabel,
   latency,
   latency1H,
-  textLabel,
 }: {
-  imageLabel: string;
   latency?: MonitorRuntimeResp['latency'];
   latency1H?: MonitorRuntimeResp['latency_1h'];
-  textLabel: string;
 }) {
   return (
     <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_0.75rem_minmax(0,1fr)] items-stretch">
@@ -116,7 +110,6 @@ function SampleFailureDetails({
         currentErrorCount={latency?.text_error_count}
         currentErrorRate={latency?.text_error_rate}
         currentSampleCount={latency?.text_sample_count}
-        label={textLabel}
         longErrorCount={latency1H?.text_error_count}
         longErrorRate={latency1H?.text_error_rate}
         longSampleCount={latency1H?.text_sample_count}
@@ -129,7 +122,6 @@ function SampleFailureDetails({
         currentErrorCount={latency?.image_error_count}
         currentErrorRate={latency?.image_error_rate}
         currentSampleCount={latency?.image_sample_count}
-        label={imageLabel}
         longErrorCount={latency1H?.image_error_count}
         longErrorRate={latency1H?.image_error_rate}
         longSampleCount={latency1H?.image_sample_count}
@@ -350,10 +342,8 @@ export function MonitorRuntimeStats({
             latency1H?.image_duration_p99_ms,
           ),
           <SampleFailureDetails
-            imageLabel={t('monitor.runtime_image_samples')}
             latency={latency}
             latency1H={latency1H}
-            textLabel={t('monitor.runtime_text_samples')}
           />,
         ]}
         icon={<Activity className="h-5 w-5" />}
