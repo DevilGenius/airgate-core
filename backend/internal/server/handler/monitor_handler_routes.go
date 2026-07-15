@@ -147,6 +147,17 @@ func (h *MonitorHandler) ClearMonitorRequestEvents(c *gin.Context) {
 	response.Success(c, dto.MonitorRequestClearResp{Deleted: deleted})
 }
 
+// ClearMonitorRequestTraces deletes all persisted raw request trace payloads.
+func (h *MonitorHandler) ClearMonitorRequestTraces(c *gin.Context) {
+	deleted, err := h.service.ClearRequestTraces(c.Request.Context())
+	if err != nil {
+		httpCode, message := handleMonitorError("清理请求追踪失败", "清理失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, dto.MonitorRequestClearResp{Deleted: deleted})
+}
+
 // GetMonitorEvent returns one monitor event.
 func (h *MonitorHandler) GetMonitorEvent(c *gin.Context) {
 	id, err := parseMonitorID(c.Param("id"))

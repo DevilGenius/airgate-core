@@ -183,8 +183,8 @@ const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
   'endpoint',
   'api_key',
   'account_name',
-  'user_agent',
   'ip_address',
+  'user_agent',
 ] as const;
 
 type StoredAdminUsageFilters = {
@@ -206,6 +206,11 @@ type AdminUsageFilterState = {
 function compactText(value: string | undefined, fallback = '-') {
   const trimmed = value?.trim();
   return trimmed || fallback;
+}
+
+function formatUsageTimingMs(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return '-';
+  return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${value}ms`;
 }
 
 function readStoredPositiveID(value: unknown) {
@@ -900,6 +905,17 @@ export default function UsagePage() {
         );
       },
     };
+    const wsDialColumn: UsageColumnConfig<UsageLogResp> = {
+      key: 'ws_dial_ms',
+      title: t('usage.ws_dial', '握手时间'),
+      width: '86px',
+      hideOnMobile: true,
+      render: (row) => (
+        <span className="block text-center font-mono text-[13px] text-text-secondary">
+          {formatUsageTimingMs(row.ws_dial_ms)}
+        </span>
+      ),
+    };
     return [
       ...adminColumns,
       ...leadingSharedColumns,
@@ -909,8 +925,9 @@ export default function UsagePage() {
       endpointColumn,
       apiKeyColumn,
       accountColumn,
-      userAgentColumn,
       ipAddressColumn,
+      userAgentColumn,
+      wsDialColumn,
     ] as UsageColumnConfig<UsageLogResp>[];
   }, [sharedColumns, t]);
 

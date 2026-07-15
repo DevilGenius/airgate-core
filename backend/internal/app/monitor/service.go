@@ -372,6 +372,23 @@ func (s *Service) ClearRequestEvents(ctx context.Context, before *time.Time) (in
 	return deleted, nil
 }
 
+// ClearRequestTraces deletes all persisted raw request trace payloads.
+func (s *Service) ClearRequestTraces(ctx context.Context) (int, error) {
+	if s == nil || s.repo == nil {
+		return 0, nil
+	}
+	traceRepo, ok := s.repo.(RequestTraceRepository)
+	if !ok {
+		return 0, nil
+	}
+	deleted, err := traceRepo.ClearRequestTraces(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	s.publishMonitorChanged("request_trace_cleared")
+	return deleted, nil
+}
+
 // GetRequestTrace returns a verified and decompressed trace by content hash.
 func (s *Service) GetRequestTrace(ctx context.Context, hash string) (RequestTrace, error) {
 	if s == nil || s.repo == nil {

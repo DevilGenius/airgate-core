@@ -27,6 +27,8 @@ export const monitorApi = {
     get<MonitorRequestListResp>('/api/v1/admin/monitor/requests', params, options),
   clearRequests: (before?: string) =>
     del<MonitorRequestClearResp>('/api/v1/admin/monitor/requests', before ? { before } : undefined),
+  clearRequestTraces: () =>
+    del<MonitorRequestClearResp>('/api/v1/admin/monitor/request-traces'),
   requestTraceState: (options?: MonitorRequestOptions) =>
     get<MonitorRequestTraceStateResp>('/api/v1/admin/monitor/request-trace', undefined, options),
   updateRequestTraceState: (enabled: boolean) =>

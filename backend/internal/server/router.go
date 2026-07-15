@@ -212,6 +212,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.DELETE("/monitor/requests", handlers.Monitor.ClearMonitorRequestEvents)
 		adminGroup.GET("/monitor/request-trace", handlers.Monitor.GetMonitorRequestTraceState)
 		adminGroup.PUT("/monitor/request-trace", handlers.Monitor.UpdateMonitorRequestTraceState)
+		adminGroup.DELETE("/monitor/request-traces", handlers.Monitor.ClearMonitorRequestTraces)
 		adminGroup.GET("/monitor/request-traces/:hash", handlers.Monitor.GetMonitorRequestTrace)
 		adminGroup.GET("/monitor", handlers.Monitor.ListMonitorEvents)
 		adminGroup.GET("/monitor/:id", handlers.Monitor.GetMonitorEvent)

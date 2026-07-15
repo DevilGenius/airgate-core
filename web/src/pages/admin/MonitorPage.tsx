@@ -361,6 +361,14 @@ export default function MonitorPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
+  const clearRequestTracesMutation = useMutation({
+    mutationFn: () => monitorApi.clearRequestTraces(),
+    onSuccess: (result) => {
+      toast('success', t('monitor.request_trace_clear_success', { count: result.deleted }));
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
   const requestTraceMutation = useMutation({
     mutationFn: monitorApi.updateRequestTraceState,
     onSuccess: (result) => {
@@ -845,6 +853,16 @@ export default function MonitorPage() {
           </div>
           <div className="ag-page-toolbar-actions">
             <AutoRefreshControl
+              beforeRefresh={!isRequestTable ? (
+                <NativeSwitch
+                  ariaLabel={t('monitor.request_trace')}
+                  className="ag-page-toolbar-switch"
+                  isDisabled={requestTraceQuery.isLoading || requestTraceMutation.isPending}
+                  isSelected={requestTraceEnabled}
+                  label={t('monitor.request_trace')}
+                  onChange={(enabled) => requestTraceMutation.mutate(enabled)}
+                />
+              ) : null}
               value={autoRefresh}
               options={MONITOR_AUTO_REFRESH_OPTIONS}
               label={autoRefreshLabel}
@@ -858,17 +876,20 @@ export default function MonitorPage() {
               onRefresh={handleManualRefresh}
               isAutoRefreshing={runtimeQuery.isFetching}
               isRefreshing={activeRefreshBusy || runtimeQuery.isFetching}
+              afterAutoRefresh={!isRequestTable ? (
+                <Button
+                  isIconOnly
+                  aria-label={t('monitor.clear_request_traces')}
+                  className="h-8 w-8 min-w-8"
+                  isDisabled={clearRequestTracesMutation.isPending}
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => clearRequestTracesMutation.mutate()}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              ) : null}
             />
-            {!isRequestTable ? (
-              <NativeSwitch
-                ariaLabel={t('monitor.request_trace')}
-                className="ag-page-toolbar-switch"
-                isDisabled={requestTraceQuery.isLoading || requestTraceMutation.isPending}
-                isSelected={requestTraceEnabled}
-                label={t('monitor.request_trace')}
-                onChange={(enabled) => requestTraceMutation.mutate(enabled)}
-              />
-            ) : null}
             {isRequestTable ? (
               <Button
                 isIconOnly

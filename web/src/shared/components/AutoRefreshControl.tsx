@@ -12,6 +12,7 @@ interface AutoRefreshControlProps {
   fastLabel?: string;
   beforeRefresh?: ReactNode;
   afterRefresh?: ReactNode;
+  afterAutoRefresh?: ReactNode;
   refreshButtonClassName?: string;
   triggerClassName?: string;
   ariaLabel: string;
@@ -162,6 +163,7 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   fastLabel,
   beforeRefresh,
   afterRefresh,
+  afterAutoRefresh,
   refreshButtonClassName,
   triggerClassName,
   ariaLabel,
@@ -284,6 +286,7 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
           </>
         )}
       </ToolbarMenu>
+      {afterAutoRefresh}
     </>
   );
 });
