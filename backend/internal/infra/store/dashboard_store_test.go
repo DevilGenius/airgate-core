@@ -72,7 +72,8 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 		SetActualCost(1.5).
 		SetTotalCost(2.0).
 		SetDurationMs(1200).
-		SetFirstTokenMs(300).
+		SetFirstEventMs(300).
+		SetFirstTokenMs(450).
 		SetUser(u).
 		SetCreatedAt(todayStart.Add(2 * time.Hour)).
 		Save(ctx); err != nil {
@@ -119,8 +120,8 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	if snapshot.AllTimeCost != 5.0 || snapshot.AllTimeStandardCost != 7.0 {
 		t.Fatalf("all-time costs = (%v, %v), want (5.0, 7.0)", snapshot.AllTimeCost, snapshot.AllTimeStandardCost)
 	}
-	if snapshot.TodayNonImageDurationMs != 1200 || snapshot.TodayFirstTokenRequests != 1 || snapshot.TodayFirstTokenMs != 300 || snapshot.TodayImageDurationMs != 2400 {
-		t.Fatalf("duration stats = (%d, %d, %d, %d), want (1200, 1, 300, 2400)", snapshot.TodayNonImageDurationMs, snapshot.TodayFirstTokenRequests, snapshot.TodayFirstTokenMs, snapshot.TodayImageDurationMs)
+	if snapshot.TodayNonImageDurationMs != 1200 || snapshot.TodayFirstEventRequests != 1 || snapshot.TodayFirstEventMs != 300 || snapshot.TodayFirstTokenRequests != 1 || snapshot.TodayFirstTokenMs != 450 || snapshot.TodayImageDurationMs != 2400 {
+		t.Fatalf("duration stats = (%d, %d, %d, %d, %d, %d), want (1200, 1, 300, 1, 450, 2400)", snapshot.TodayNonImageDurationMs, snapshot.TodayFirstEventRequests, snapshot.TodayFirstEventMs, snapshot.TodayFirstTokenRequests, snapshot.TodayFirstTokenMs, snapshot.TodayImageDurationMs)
 	}
 	if snapshot.ActiveUsers != 1 {
 		t.Fatalf("ActiveUsers = %d, want 1", snapshot.ActiveUsers)

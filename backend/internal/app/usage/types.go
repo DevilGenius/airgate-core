@@ -84,7 +84,9 @@ type LogRecord struct {
 	ServiceTier           string
 	Stream                bool
 	DurationMs            int64
+	FirstEventMs          int64
 	FirstTokenMs          int64
+	WSDialMs              int64
 	UserAgent             string
 	IPAddress             string
 	Endpoint              string

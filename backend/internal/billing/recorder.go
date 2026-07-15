@@ -102,7 +102,9 @@ type UsageRecord struct {
 	ServiceTier           string
 	Stream                bool
 	DurationMs            int64
+	FirstEventMs          int64
 	FirstTokenMs          int64
+	WSDialMs              int64
 	UserAgent             string
 	IPAddress             string
 	Endpoint              string
@@ -540,7 +542,9 @@ func usageLogInsertColumns() []string {
 		usagelog.FieldServiceTier,
 		usagelog.FieldStream,
 		usagelog.FieldDurationMs,
+		usagelog.FieldFirstEventMs,
 		usagelog.FieldFirstTokenMs,
+		usagelog.FieldWsDialMs,
 		usagelog.FieldUserAgent,
 		usagelog.FieldIPAddress,
 		usagelog.FieldEndpoint,
@@ -591,7 +595,9 @@ func usageLogInsertValues(rec UsageRecord, createdAt time.Time) ([]any, error) {
 		rec.ServiceTier,
 		rec.Stream,
 		rec.DurationMs,
+		rec.FirstEventMs,
 		rec.FirstTokenMs,
+		rec.WSDialMs,
 		rec.UserAgent,
 		rec.IPAddress,
 		rec.Endpoint,
@@ -684,6 +690,8 @@ INSERT INTO public.usage_hourly_rollups (
 	image_requests,
 	non_image_requests,
 	non_image_duration_ms,
+	first_event_requests,
+	first_event_ms,
 	first_token_requests,
 	first_token_ms,
 	image_duration_ms,
@@ -704,6 +712,8 @@ SELECT
 	COALESCE(SUM(CASE WHEN is_image THEN 1 ELSE 0 END), 0)::bigint,
 	COALESCE(SUM(CASE WHEN NOT is_image THEN 1 ELSE 0 END), 0)::bigint,
 	COALESCE(SUM(CASE WHEN NOT is_image THEN duration_ms ELSE 0 END), 0)::bigint,
+	COALESCE(SUM(CASE WHEN NOT is_image AND first_event_ms > 0 THEN 1 ELSE 0 END), 0)::bigint,
+	COALESCE(SUM(CASE WHEN NOT is_image AND first_event_ms > 0 THEN first_event_ms ELSE 0 END), 0)::bigint,
 	COALESCE(SUM(CASE WHEN NOT is_image AND first_token_ms > 0 THEN 1 ELSE 0 END), 0)::bigint,
 	COALESCE(SUM(CASE WHEN NOT is_image AND first_token_ms > 0 THEN first_token_ms ELSE 0 END), 0)::bigint,
 	COALESCE(SUM(CASE WHEN is_image THEN duration_ms ELSE 0 END), 0)::bigint,
@@ -725,6 +735,8 @@ ON CONFLICT (bucket_start, user_id, model) DO UPDATE SET
 	image_requests = public.usage_hourly_rollups.image_requests + EXCLUDED.image_requests,
 	non_image_requests = public.usage_hourly_rollups.non_image_requests + EXCLUDED.non_image_requests,
 	non_image_duration_ms = public.usage_hourly_rollups.non_image_duration_ms + EXCLUDED.non_image_duration_ms,
+	first_event_requests = public.usage_hourly_rollups.first_event_requests + EXCLUDED.first_event_requests,
+	first_event_ms = public.usage_hourly_rollups.first_event_ms + EXCLUDED.first_event_ms,
 	first_token_requests = public.usage_hourly_rollups.first_token_requests + EXCLUDED.first_token_requests,
 	first_token_ms = public.usage_hourly_rollups.first_token_ms + EXCLUDED.first_token_ms,
 	image_duration_ms = public.usage_hourly_rollups.image_duration_ms + EXCLUDED.image_duration_ms,
@@ -778,6 +790,7 @@ func usageHourlyRollupBatchFields(item insertedUsageLog) []usageHourlyRollupBatc
 		{name: "actual_cost", cast: "numeric", value: rec.ActualCost},
 		{name: "total_cost", cast: "numeric", value: rec.TotalCost},
 		{name: "duration_ms", cast: "bigint", value: rec.DurationMs},
+		{name: "first_event_ms", cast: "bigint", value: rec.FirstEventMs},
 		{name: "first_token_ms", cast: "bigint", value: rec.FirstTokenMs},
 		{name: "is_image", cast: "boolean", value: usagemodel.IsImageGen(rec.Model)},
 	}

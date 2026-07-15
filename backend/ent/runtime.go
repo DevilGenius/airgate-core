@@ -907,36 +907,44 @@ func init() {
 	usagelogDescDurationMs := usagelogFields[25].Descriptor()
 	// usagelog.DefaultDurationMs holds the default value on creation for the duration_ms field.
 	usagelog.DefaultDurationMs = usagelogDescDurationMs.Default.(int64)
+	// usagelogDescFirstEventMs is the schema descriptor for first_event_ms field.
+	usagelogDescFirstEventMs := usagelogFields[26].Descriptor()
+	// usagelog.DefaultFirstEventMs holds the default value on creation for the first_event_ms field.
+	usagelog.DefaultFirstEventMs = usagelogDescFirstEventMs.Default.(int64)
 	// usagelogDescFirstTokenMs is the schema descriptor for first_token_ms field.
-	usagelogDescFirstTokenMs := usagelogFields[26].Descriptor()
+	usagelogDescFirstTokenMs := usagelogFields[27].Descriptor()
 	// usagelog.DefaultFirstTokenMs holds the default value on creation for the first_token_ms field.
 	usagelog.DefaultFirstTokenMs = usagelogDescFirstTokenMs.Default.(int64)
+	// usagelogDescWsDialMs is the schema descriptor for ws_dial_ms field.
+	usagelogDescWsDialMs := usagelogFields[28].Descriptor()
+	// usagelog.DefaultWsDialMs holds the default value on creation for the ws_dial_ms field.
+	usagelog.DefaultWsDialMs = usagelogDescWsDialMs.Default.(int64)
 	// usagelogDescUserAgent is the schema descriptor for user_agent field.
-	usagelogDescUserAgent := usagelogFields[27].Descriptor()
+	usagelogDescUserAgent := usagelogFields[29].Descriptor()
 	// usagelog.DefaultUserAgent holds the default value on creation for the user_agent field.
 	usagelog.DefaultUserAgent = usagelogDescUserAgent.Default.(string)
 	// usagelogDescIPAddress is the schema descriptor for ip_address field.
-	usagelogDescIPAddress := usagelogFields[28].Descriptor()
+	usagelogDescIPAddress := usagelogFields[30].Descriptor()
 	// usagelog.DefaultIPAddress holds the default value on creation for the ip_address field.
 	usagelog.DefaultIPAddress = usagelogDescIPAddress.Default.(string)
 	// usagelogDescEndpoint is the schema descriptor for endpoint field.
-	usagelogDescEndpoint := usagelogFields[29].Descriptor()
+	usagelogDescEndpoint := usagelogFields[31].Descriptor()
 	// usagelog.DefaultEndpoint holds the default value on creation for the endpoint field.
 	usagelog.DefaultEndpoint = usagelogDescEndpoint.Default.(string)
 	// usagelogDescReasoningEffort is the schema descriptor for reasoning_effort field.
-	usagelogDescReasoningEffort := usagelogFields[30].Descriptor()
+	usagelogDescReasoningEffort := usagelogFields[32].Descriptor()
 	// usagelog.DefaultReasoningEffort holds the default value on creation for the reasoning_effort field.
 	usagelog.DefaultReasoningEffort = usagelogDescReasoningEffort.Default.(string)
 	// usagelogDescUserIDSnapshot is the schema descriptor for user_id_snapshot field.
-	usagelogDescUserIDSnapshot := usagelogFields[32].Descriptor()
+	usagelogDescUserIDSnapshot := usagelogFields[34].Descriptor()
 	// usagelog.DefaultUserIDSnapshot holds the default value on creation for the user_id_snapshot field.
 	usagelog.DefaultUserIDSnapshot = usagelogDescUserIDSnapshot.Default.(int)
 	// usagelogDescUserEmailSnapshot is the schema descriptor for user_email_snapshot field.
-	usagelogDescUserEmailSnapshot := usagelogFields[33].Descriptor()
+	usagelogDescUserEmailSnapshot := usagelogFields[35].Descriptor()
 	// usagelog.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
 	usagelog.DefaultUserEmailSnapshot = usagelogDescUserEmailSnapshot.Default.(string)
 	// usagelogDescCreatedAt is the schema descriptor for created_at field.
-	usagelogDescCreatedAt := usagelogFields[34].Descriptor()
+	usagelogDescCreatedAt := usagelogFields[36].Descriptor()
 	// usagelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	usagelog.DefaultCreatedAt = usagelogDescCreatedAt.Default.(func() time.Time)
 	userFields := schema.User{}.Fields()

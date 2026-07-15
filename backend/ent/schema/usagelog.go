@@ -60,7 +60,12 @@ func (UsageLog) Fields() []ent.Field {
 		field.String("service_tier").Default(""),
 		field.Bool("stream").Default(false),
 		field.Int64("duration_ms").Default(0),
-		field.Int64("first_token_ms").Default(0),
+		field.Int64("first_event_ms").Default(0).
+			Comment("请求进入插件到首个上游事件的耗时（FRT）"),
+		field.Int64("first_token_ms").Default(0).
+			Comment("请求进入插件到首个真实输出 token/工具调用内容的耗时（TTFT）"),
+		field.Int64("ws_dial_ms").Default(0).
+			Comment("WebSocket 建连耗时；非 WebSocket 上游为 0"),
 		field.String("user_agent").Default(""),
 		field.String("ip_address").Default(""),
 		// 请求端点。

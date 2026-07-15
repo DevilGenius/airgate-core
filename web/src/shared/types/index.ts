@@ -530,7 +530,9 @@ export interface UsageLogResp {
   service_tier?: string;
   stream: boolean;
   duration_ms: number;
+  first_event_ms: number;
   first_token_ms: number;
+  ws_dial_ms: number;
   user_agent?: string;
   ip_address?: string;
   /** 请求端点 */
@@ -574,7 +576,9 @@ export interface CustomerUsageLogResp {
   service_tier?: string;
   stream: boolean;
   duration_ms: number;
+  first_event_ms: number;
   first_token_ms: number;
+  ws_dial_ms: number;
   /** 请求端点 */
   endpoint?: string;
   /** 推理强度档位 */
@@ -808,6 +812,7 @@ export interface DashboardStatsResp {
   alltime_standard_cost: number;
   rpm: number;
   tpm: number;
+  avg_first_event_ms: number;
   avg_first_token_ms: number;
   avg_duration_ms: number;
   avg_image_duration_ms: number;

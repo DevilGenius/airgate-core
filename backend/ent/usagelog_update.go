@@ -528,6 +528,27 @@ func (ulu *UsageLogUpdate) AddDurationMs(i int64) *UsageLogUpdate {
 	return ulu
 }
 
+// SetFirstEventMs sets the "first_event_ms" field.
+func (ulu *UsageLogUpdate) SetFirstEventMs(i int64) *UsageLogUpdate {
+	ulu.mutation.ResetFirstEventMs()
+	ulu.mutation.SetFirstEventMs(i)
+	return ulu
+}
+
+// SetNillableFirstEventMs sets the "first_event_ms" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableFirstEventMs(i *int64) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetFirstEventMs(*i)
+	}
+	return ulu
+}
+
+// AddFirstEventMs adds i to the "first_event_ms" field.
+func (ulu *UsageLogUpdate) AddFirstEventMs(i int64) *UsageLogUpdate {
+	ulu.mutation.AddFirstEventMs(i)
+	return ulu
+}
+
 // SetFirstTokenMs sets the "first_token_ms" field.
 func (ulu *UsageLogUpdate) SetFirstTokenMs(i int64) *UsageLogUpdate {
 	ulu.mutation.ResetFirstTokenMs()
@@ -546,6 +567,27 @@ func (ulu *UsageLogUpdate) SetNillableFirstTokenMs(i *int64) *UsageLogUpdate {
 // AddFirstTokenMs adds i to the "first_token_ms" field.
 func (ulu *UsageLogUpdate) AddFirstTokenMs(i int64) *UsageLogUpdate {
 	ulu.mutation.AddFirstTokenMs(i)
+	return ulu
+}
+
+// SetWsDialMs sets the "ws_dial_ms" field.
+func (ulu *UsageLogUpdate) SetWsDialMs(i int64) *UsageLogUpdate {
+	ulu.mutation.ResetWsDialMs()
+	ulu.mutation.SetWsDialMs(i)
+	return ulu
+}
+
+// SetNillableWsDialMs sets the "ws_dial_ms" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableWsDialMs(i *int64) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetWsDialMs(*i)
+	}
+	return ulu
+}
+
+// AddWsDialMs adds i to the "ws_dial_ms" field.
+func (ulu *UsageLogUpdate) AddWsDialMs(i int64) *UsageLogUpdate {
+	ulu.mutation.AddWsDialMs(i)
 	return ulu
 }
 
@@ -964,11 +1006,23 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.AddedDurationMs(); ok {
 		_spec.AddField(usagelog.FieldDurationMs, field.TypeInt64, value)
 	}
+	if value, ok := ulu.mutation.FirstEventMs(); ok {
+		_spec.SetField(usagelog.FieldFirstEventMs, field.TypeInt64, value)
+	}
+	if value, ok := ulu.mutation.AddedFirstEventMs(); ok {
+		_spec.AddField(usagelog.FieldFirstEventMs, field.TypeInt64, value)
+	}
 	if value, ok := ulu.mutation.FirstTokenMs(); ok {
 		_spec.SetField(usagelog.FieldFirstTokenMs, field.TypeInt64, value)
 	}
 	if value, ok := ulu.mutation.AddedFirstTokenMs(); ok {
 		_spec.AddField(usagelog.FieldFirstTokenMs, field.TypeInt64, value)
+	}
+	if value, ok := ulu.mutation.WsDialMs(); ok {
+		_spec.SetField(usagelog.FieldWsDialMs, field.TypeInt64, value)
+	}
+	if value, ok := ulu.mutation.AddedWsDialMs(); ok {
+		_spec.AddField(usagelog.FieldWsDialMs, field.TypeInt64, value)
 	}
 	if value, ok := ulu.mutation.UserAgent(); ok {
 		_spec.SetField(usagelog.FieldUserAgent, field.TypeString, value)
@@ -1630,6 +1684,27 @@ func (uluo *UsageLogUpdateOne) AddDurationMs(i int64) *UsageLogUpdateOne {
 	return uluo
 }
 
+// SetFirstEventMs sets the "first_event_ms" field.
+func (uluo *UsageLogUpdateOne) SetFirstEventMs(i int64) *UsageLogUpdateOne {
+	uluo.mutation.ResetFirstEventMs()
+	uluo.mutation.SetFirstEventMs(i)
+	return uluo
+}
+
+// SetNillableFirstEventMs sets the "first_event_ms" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableFirstEventMs(i *int64) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetFirstEventMs(*i)
+	}
+	return uluo
+}
+
+// AddFirstEventMs adds i to the "first_event_ms" field.
+func (uluo *UsageLogUpdateOne) AddFirstEventMs(i int64) *UsageLogUpdateOne {
+	uluo.mutation.AddFirstEventMs(i)
+	return uluo
+}
+
 // SetFirstTokenMs sets the "first_token_ms" field.
 func (uluo *UsageLogUpdateOne) SetFirstTokenMs(i int64) *UsageLogUpdateOne {
 	uluo.mutation.ResetFirstTokenMs()
@@ -1648,6 +1723,27 @@ func (uluo *UsageLogUpdateOne) SetNillableFirstTokenMs(i *int64) *UsageLogUpdate
 // AddFirstTokenMs adds i to the "first_token_ms" field.
 func (uluo *UsageLogUpdateOne) AddFirstTokenMs(i int64) *UsageLogUpdateOne {
 	uluo.mutation.AddFirstTokenMs(i)
+	return uluo
+}
+
+// SetWsDialMs sets the "ws_dial_ms" field.
+func (uluo *UsageLogUpdateOne) SetWsDialMs(i int64) *UsageLogUpdateOne {
+	uluo.mutation.ResetWsDialMs()
+	uluo.mutation.SetWsDialMs(i)
+	return uluo
+}
+
+// SetNillableWsDialMs sets the "ws_dial_ms" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableWsDialMs(i *int64) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetWsDialMs(*i)
+	}
+	return uluo
+}
+
+// AddWsDialMs adds i to the "ws_dial_ms" field.
+func (uluo *UsageLogUpdateOne) AddWsDialMs(i int64) *UsageLogUpdateOne {
+	uluo.mutation.AddWsDialMs(i)
 	return uluo
 }
 
@@ -2096,11 +2192,23 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	if value, ok := uluo.mutation.AddedDurationMs(); ok {
 		_spec.AddField(usagelog.FieldDurationMs, field.TypeInt64, value)
 	}
+	if value, ok := uluo.mutation.FirstEventMs(); ok {
+		_spec.SetField(usagelog.FieldFirstEventMs, field.TypeInt64, value)
+	}
+	if value, ok := uluo.mutation.AddedFirstEventMs(); ok {
+		_spec.AddField(usagelog.FieldFirstEventMs, field.TypeInt64, value)
+	}
 	if value, ok := uluo.mutation.FirstTokenMs(); ok {
 		_spec.SetField(usagelog.FieldFirstTokenMs, field.TypeInt64, value)
 	}
 	if value, ok := uluo.mutation.AddedFirstTokenMs(); ok {
 		_spec.AddField(usagelog.FieldFirstTokenMs, field.TypeInt64, value)
+	}
+	if value, ok := uluo.mutation.WsDialMs(); ok {
+		_spec.SetField(usagelog.FieldWsDialMs, field.TypeInt64, value)
+	}
+	if value, ok := uluo.mutation.AddedWsDialMs(); ok {
+		_spec.AddField(usagelog.FieldWsDialMs, field.TypeInt64, value)
 	}
 	if value, ok := uluo.mutation.UserAgent(); ok {
 		_spec.SetField(usagelog.FieldUserAgent, field.TypeString, value)

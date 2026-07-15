@@ -74,8 +74,12 @@ type UsageLog struct {
 	Stream bool `json:"stream,omitempty"`
 	// DurationMs holds the value of the "duration_ms" field.
 	DurationMs int64 `json:"duration_ms,omitempty"`
-	// FirstTokenMs holds the value of the "first_token_ms" field.
+	// 请求进入插件到首个上游事件的耗时（FRT）
+	FirstEventMs int64 `json:"first_event_ms,omitempty"`
+	// 请求进入插件到首个真实输出 token/工具调用内容的耗时（TTFT）
 	FirstTokenMs int64 `json:"first_token_ms,omitempty"`
+	// WebSocket 建连耗时；非 WebSocket 上游为 0
+	WsDialMs int64 `json:"ws_dial_ms,omitempty"`
 	// UserAgent holds the value of the "user_agent" field.
 	UserAgent string `json:"user_agent,omitempty"`
 	// IPAddress holds the value of the "ip_address" field.
@@ -172,7 +176,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldCacheCreationPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldCacheCreationCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldBilledCost, usagelog.FieldAccountCost, usagelog.FieldRateMultiplier, usagelog.FieldSellRate, usagelog.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot:
+		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstEventMs, usagelog.FieldFirstTokenMs, usagelog.FieldWsDialMs, usagelog.FieldUserIDSnapshot:
 			values[i] = new(sql.NullInt64)
 		case usagelog.FieldBillingEventID, usagelog.FieldPlatform, usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldReasoningEffort, usagelog.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
@@ -363,11 +367,23 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.DurationMs = value.Int64
 			}
+		case usagelog.FieldFirstEventMs:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field first_event_ms", values[i])
+			} else if value.Valid {
+				ul.FirstEventMs = value.Int64
+			}
 		case usagelog.FieldFirstTokenMs:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field first_token_ms", values[i])
 			} else if value.Valid {
 				ul.FirstTokenMs = value.Int64
+			}
+		case usagelog.FieldWsDialMs:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field ws_dial_ms", values[i])
+			} else if value.Valid {
+				ul.WsDialMs = value.Int64
 			}
 		case usagelog.FieldUserAgent:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -581,8 +597,14 @@ func (ul *UsageLog) String() string {
 	builder.WriteString("duration_ms=")
 	builder.WriteString(fmt.Sprintf("%v", ul.DurationMs))
 	builder.WriteString(", ")
+	builder.WriteString("first_event_ms=")
+	builder.WriteString(fmt.Sprintf("%v", ul.FirstEventMs))
+	builder.WriteString(", ")
 	builder.WriteString("first_token_ms=")
 	builder.WriteString(fmt.Sprintf("%v", ul.FirstTokenMs))
+	builder.WriteString(", ")
+	builder.WriteString("ws_dial_ms=")
+	builder.WriteString(fmt.Sprintf("%v", ul.WsDialMs))
 	builder.WriteString(", ")
 	builder.WriteString("user_agent=")
 	builder.WriteString(ul.UserAgent)

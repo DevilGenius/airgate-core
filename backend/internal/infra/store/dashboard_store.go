@@ -256,6 +256,8 @@ type usageTodaySnapshot struct {
 	Cost               float64
 	StandardCost       float64
 	NonImageDurationMs int64
+	FirstEventRequests int64
+	FirstEventMs       int64
 	FirstTokenRequests int64
 	FirstTokenMs       int64
 	ImageDurationMs    int64
@@ -284,6 +286,8 @@ SELECT
 	COALESCE(SUM(actual_cost) FILTER (WHERE bucket_start >= $1), 0)::double precision AS today_cost,
 	COALESCE(SUM(total_cost) FILTER (WHERE bucket_start >= $1), 0)::double precision AS today_standard_cost,
 	COALESCE(SUM(non_image_duration_ms) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_non_image_duration_ms,
+	COALESCE(SUM(first_event_requests) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_first_event_requests,
+	COALESCE(SUM(first_event_ms) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_first_event_ms,
 	COALESCE(SUM(first_token_requests) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_first_token_requests,
 	COALESCE(SUM(first_token_ms) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_first_token_ms,
 	COALESCE(SUM(image_duration_ms) FILTER (WHERE bucket_start >= $1), 0)::bigint AS today_image_duration_ms,
@@ -320,6 +324,8 @@ WHERE $2::integer = 0 OR user_id = $2::integer`
 		&snapshot.Today.Cost,
 		&snapshot.Today.StandardCost,
 		&snapshot.Today.NonImageDurationMs,
+		&snapshot.Today.FirstEventRequests,
+		&snapshot.Today.FirstEventMs,
 		&snapshot.Today.FirstTokenRequests,
 		&snapshot.Today.FirstTokenMs,
 		&snapshot.Today.ImageDurationMs,
@@ -377,6 +383,8 @@ func queryTodayUsageSnapshot(ctx context.Context, query *ent.UsageLogQuery, toda
 		ImageRequests      int64   `json:"image_requests"`
 		NonImageRequests   int64   `json:"non_image_requests"`
 		NonImageDurationMs int64   `json:"non_image_duration_ms"`
+		FirstEventRequests int64   `json:"first_event_requests"`
+		FirstEventMs       int64   `json:"first_event_ms"`
 		FirstTokenRequests int64   `json:"first_token_requests"`
 		FirstTokenMs       int64   `json:"first_token_ms"`
 		ImageDurationMs    int64   `json:"image_duration_ms"`
@@ -395,6 +403,8 @@ func queryTodayUsageSnapshot(ctx context.Context, query *ent.UsageLogQuery, toda
 			ent.As(usageLogCountIf(usageLogImageCondition), "image_requests"),
 			ent.As(usageLogCountIf(usageLogNonImageCondition), "non_image_requests"),
 			ent.As(usageLogSumIf(usageLogNonImageCondition, entusagelog.FieldDurationMs), "non_image_duration_ms"),
+			ent.As(usageLogCountIf(usageLogFirstEventCondition), "first_event_requests"),
+			ent.As(usageLogSumIf(usageLogFirstEventCondition, entusagelog.FieldFirstEventMs), "first_event_ms"),
 			ent.As(usageLogCountIf(usageLogFirstTokenCondition), "first_token_requests"),
 			ent.As(usageLogSumIf(usageLogFirstTokenCondition, entusagelog.FieldFirstTokenMs), "first_token_ms"),
 			ent.As(usageLogSumIf(usageLogImageCondition, entusagelog.FieldDurationMs), "image_duration_ms"),
@@ -414,6 +424,8 @@ func queryTodayUsageSnapshot(ctx context.Context, query *ent.UsageLogQuery, toda
 		Cost:               rows[0].CostSum,
 		StandardCost:       rows[0].StandardCostSum,
 		NonImageDurationMs: rows[0].NonImageDurationMs,
+		FirstEventRequests: rows[0].FirstEventRequests,
+		FirstEventMs:       rows[0].FirstEventMs,
 		FirstTokenRequests: rows[0].FirstTokenRequests,
 		FirstTokenMs:       rows[0].FirstTokenMs,
 		ImageDurationMs:    rows[0].ImageDurationMs,
@@ -438,6 +450,10 @@ func usageLogNonImageCondition(s *entsql.Selector) string {
 
 func usageLogFirstTokenCondition(s *entsql.Selector) string {
 	return usageLogNonImageCondition(s) + " AND " + s.C(entusagelog.FieldFirstTokenMs) + " > 0"
+}
+
+func usageLogFirstEventCondition(s *entsql.Selector) string {
+	return usageLogNonImageCondition(s) + " AND " + s.C(entusagelog.FieldFirstEventMs) + " > 0"
 }
 
 func usageLogCountIf(condition func(*entsql.Selector) string) ent.AggregateFunc {
@@ -592,6 +608,8 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		TodayCost:               todayUsage.Cost,
 		TodayStandardCost:       todayUsage.StandardCost,
 		TodayNonImageDurationMs: todayUsage.NonImageDurationMs,
+		TodayFirstEventRequests: todayUsage.FirstEventRequests,
+		TodayFirstEventMs:       todayUsage.FirstEventMs,
 		TodayFirstTokenRequests: todayUsage.FirstTokenRequests,
 		TodayFirstTokenMs:       todayUsage.FirstTokenMs,
 		TodayImageDurationMs:    todayUsage.ImageDurationMs,

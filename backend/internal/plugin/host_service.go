@@ -1276,7 +1276,9 @@ func (h *HostService) recordHostForwardUsage(
 		ReasoningEffort:       reasoningEffort,
 		Stream:                req.Stream,
 		DurationMs:            duration.Milliseconds(),
+		FirstEventMs:          usageValues.FirstEventMs,
 		FirstTokenMs:          usageValues.FirstTokenMs,
+		WSDialMs:              usageValues.WSDialMs,
 		UsageMetadata:         usageMetadata,
 	}
 	if h.recorder == nil {

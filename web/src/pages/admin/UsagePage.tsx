@@ -175,6 +175,7 @@ const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
   'created_at',
   'model',
   'stream',
+  'first_event_ms',
   'first_token_ms',
   'duration_ms',
   'tokens',
@@ -798,13 +799,14 @@ export default function UsagePage() {
     ];
     const modelIdx = sharedColumns.findIndex((c) => c.key === 'model');
     const streamColumn = sharedColumns.find((column) => column.key === 'stream');
-    const timingColumns = sharedColumns.filter((column) => column.key === 'first_token_ms' || column.key === 'duration_ms');
+    const timingKeys = new Set(['first_event_ms', 'first_token_ms', 'duration_ms']);
+    const timingColumns = sharedColumns.filter((column) => timingKeys.has(column.key));
     const leadingSharedColumns = sharedColumns
       .slice(0, modelIdx + 1)
       .map((column) => (column.key === 'model' ? { ...column, width: '260px' } : column));
     const sharedColumnsAfterModel = sharedColumns
       .slice(modelIdx + 1)
-      .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream')
+      .filter((column) => !timingKeys.has(column.key) && column.key !== 'stream')
       .map((column) => (column.key === 'cost' ? { ...column, width: '120px' } : column));
     const endpointColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'endpoint',

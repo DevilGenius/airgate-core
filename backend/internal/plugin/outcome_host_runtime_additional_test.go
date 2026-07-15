@@ -291,7 +291,9 @@ func TestForwarderRecordUsagePersistsFallbackRecord(t *testing.T) {
 			OutputTokens:    20,
 			InputCost:       0.25,
 			OutputCost:      0.75,
-			FirstTokenMs:    123,
+			FirstEventMs:    123,
+			FirstTokenMs:    456,
+			WSDialMs:        23,
 			ReasoningEffort: "medium",
 			Metadata:        map[string]string{"openai.response_id": "resp_usage"},
 		}},
@@ -312,8 +314,8 @@ func TestForwarderRecordUsagePersistsFallbackRecord(t *testing.T) {
 	if log.Model != "gpt-4.1-mini" || log.Endpoint != "/v1/responses" || log.ReasoningEffort != "medium" {
 		t.Fatalf("usage log core fields = model:%q endpoint:%q reasoning:%q", log.Model, log.Endpoint, log.ReasoningEffort)
 	}
-	if log.InputTokens != 100 || log.OutputTokens != 20 || log.FirstTokenMs != 123 || !log.Stream {
-		t.Fatalf("usage log tokens/timing = input:%d output:%d first:%d stream:%v", log.InputTokens, log.OutputTokens, log.FirstTokenMs, log.Stream)
+	if log.InputTokens != 100 || log.OutputTokens != 20 || log.FirstEventMs != 123 || log.FirstTokenMs != 456 || log.WsDialMs != 23 || !log.Stream {
+		t.Fatalf("usage log tokens/timing = input:%d output:%d event:%d token:%d dial:%d stream:%v", log.InputTokens, log.OutputTokens, log.FirstEventMs, log.FirstTokenMs, log.WsDialMs, log.Stream)
 	}
 	if log.TotalCost != 1 || log.ActualCost != 1 || log.BilledCost != 2 || log.AccountCost != 1.5 {
 		t.Fatalf("usage log costs = total:%v actual:%v billed:%v account:%v", log.TotalCost, log.ActualCost, log.BilledCost, log.AccountCost)

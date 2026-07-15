@@ -69,7 +69,7 @@ func TestRuntimeSamplerQueryLatencyWindowsSplitsModelKinds(t *testing.T) {
 		t.Fatalf("query count = %d, want 2", len(fixture.queries))
 	}
 	usageQuery := fixture.queries[0]
-	if !strings.Contains(usageQuery, "first_token_ms > 0 AND model NOT LIKE $3") {
+	if !strings.Contains(usageQuery, "first_event_ms > 0 AND model NOT LIKE $3") {
 		t.Fatal("text FRT query does not exclude image models")
 	}
 	if !strings.Contains(usageQuery, "duration_ms > 0 AND model LIKE $3") {

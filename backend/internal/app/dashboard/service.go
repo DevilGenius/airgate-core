@@ -96,6 +96,9 @@ func (s *Service) Stats(ctx context.Context, userID int, tz string) (Stats, erro
 	if snapshot.TodayNonImageRequests > 0 {
 		result.AvgDurationMs = float64(snapshot.TodayNonImageDurationMs) / float64(snapshot.TodayNonImageRequests)
 	}
+	if snapshot.TodayFirstEventRequests > 0 {
+		result.AvgFirstEventMs = float64(snapshot.TodayFirstEventMs) / float64(snapshot.TodayFirstEventRequests)
+	}
 	if snapshot.TodayFirstTokenRequests > 0 {
 		result.AvgFirstTokenMs = float64(snapshot.TodayFirstTokenMs) / float64(snapshot.TodayFirstTokenRequests)
 	}

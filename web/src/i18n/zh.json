@@ -851,6 +851,7 @@
     "profit": "利润",
     "image_size": "图片尺寸",
     "endpoint": "端点",
+    "first_event": "首事件",
     "first_token": "首字",
     "stream": "流式",
     "type": "类型",

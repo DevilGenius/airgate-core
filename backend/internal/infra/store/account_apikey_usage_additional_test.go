@@ -739,7 +739,9 @@ func createAccountUsageLog(
 		SetBilledCost(billedCost).
 		SetAccountCost(billedCost).
 		SetDurationMs(123).
-		SetFirstTokenMs(45).
+		SetFirstEventMs(45).
+		SetFirstTokenMs(60).
+		SetWsDialMs(10).
 		SetUserAgent("store-test").
 		SetIPAddress("127.0.0.1").
 		SetEndpoint("/v1/chat/completions").

@@ -16211,8 +16211,12 @@ type UsageLogMutation struct {
 	stream                     *bool
 	duration_ms                *int64
 	addduration_ms             *int64
+	first_event_ms             *int64
+	addfirst_event_ms          *int64
 	first_token_ms             *int64
 	addfirst_token_ms          *int64
+	ws_dial_ms                 *int64
+	addws_dial_ms              *int64
 	user_agent                 *string
 	ip_address                 *string
 	endpoint                   *string
@@ -17690,6 +17694,62 @@ func (m *UsageLogMutation) ResetDurationMs() {
 	m.addduration_ms = nil
 }
 
+// SetFirstEventMs sets the "first_event_ms" field.
+func (m *UsageLogMutation) SetFirstEventMs(i int64) {
+	m.first_event_ms = &i
+	m.addfirst_event_ms = nil
+}
+
+// FirstEventMs returns the value of the "first_event_ms" field in the mutation.
+func (m *UsageLogMutation) FirstEventMs() (r int64, exists bool) {
+	v := m.first_event_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFirstEventMs returns the old "first_event_ms" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldFirstEventMs(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFirstEventMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFirstEventMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFirstEventMs: %w", err)
+	}
+	return oldValue.FirstEventMs, nil
+}
+
+// AddFirstEventMs adds i to the "first_event_ms" field.
+func (m *UsageLogMutation) AddFirstEventMs(i int64) {
+	if m.addfirst_event_ms != nil {
+		*m.addfirst_event_ms += i
+	} else {
+		m.addfirst_event_ms = &i
+	}
+}
+
+// AddedFirstEventMs returns the value that was added to the "first_event_ms" field in this mutation.
+func (m *UsageLogMutation) AddedFirstEventMs() (r int64, exists bool) {
+	v := m.addfirst_event_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFirstEventMs resets all changes to the "first_event_ms" field.
+func (m *UsageLogMutation) ResetFirstEventMs() {
+	m.first_event_ms = nil
+	m.addfirst_event_ms = nil
+}
+
 // SetFirstTokenMs sets the "first_token_ms" field.
 func (m *UsageLogMutation) SetFirstTokenMs(i int64) {
 	m.first_token_ms = &i
@@ -17744,6 +17804,62 @@ func (m *UsageLogMutation) AddedFirstTokenMs() (r int64, exists bool) {
 func (m *UsageLogMutation) ResetFirstTokenMs() {
 	m.first_token_ms = nil
 	m.addfirst_token_ms = nil
+}
+
+// SetWsDialMs sets the "ws_dial_ms" field.
+func (m *UsageLogMutation) SetWsDialMs(i int64) {
+	m.ws_dial_ms = &i
+	m.addws_dial_ms = nil
+}
+
+// WsDialMs returns the value of the "ws_dial_ms" field in the mutation.
+func (m *UsageLogMutation) WsDialMs() (r int64, exists bool) {
+	v := m.ws_dial_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWsDialMs returns the old "ws_dial_ms" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldWsDialMs(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWsDialMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWsDialMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWsDialMs: %w", err)
+	}
+	return oldValue.WsDialMs, nil
+}
+
+// AddWsDialMs adds i to the "ws_dial_ms" field.
+func (m *UsageLogMutation) AddWsDialMs(i int64) {
+	if m.addws_dial_ms != nil {
+		*m.addws_dial_ms += i
+	} else {
+		m.addws_dial_ms = &i
+	}
+}
+
+// AddedWsDialMs returns the value that was added to the "ws_dial_ms" field in this mutation.
+func (m *UsageLogMutation) AddedWsDialMs() (r int64, exists bool) {
+	v := m.addws_dial_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWsDialMs resets all changes to the "ws_dial_ms" field.
+func (m *UsageLogMutation) ResetWsDialMs() {
+	m.ws_dial_ms = nil
+	m.addws_dial_ms = nil
 }
 
 // SetUserAgent sets the "user_agent" field.
@@ -18257,7 +18373,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 35)
+	fields := make([]string, 0, 37)
 	if m.billing_event_id != nil {
 		fields = append(fields, usagelog.FieldBillingEventID)
 	}
@@ -18336,8 +18452,14 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.duration_ms != nil {
 		fields = append(fields, usagelog.FieldDurationMs)
 	}
+	if m.first_event_ms != nil {
+		fields = append(fields, usagelog.FieldFirstEventMs)
+	}
 	if m.first_token_ms != nil {
 		fields = append(fields, usagelog.FieldFirstTokenMs)
+	}
+	if m.ws_dial_ms != nil {
+		fields = append(fields, usagelog.FieldWsDialMs)
 	}
 	if m.user_agent != nil {
 		fields = append(fields, usagelog.FieldUserAgent)
@@ -18423,8 +18545,12 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.Stream()
 	case usagelog.FieldDurationMs:
 		return m.DurationMs()
+	case usagelog.FieldFirstEventMs:
+		return m.FirstEventMs()
 	case usagelog.FieldFirstTokenMs:
 		return m.FirstTokenMs()
+	case usagelog.FieldWsDialMs:
+		return m.WsDialMs()
 	case usagelog.FieldUserAgent:
 		return m.UserAgent()
 	case usagelog.FieldIPAddress:
@@ -18502,8 +18628,12 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldStream(ctx)
 	case usagelog.FieldDurationMs:
 		return m.OldDurationMs(ctx)
+	case usagelog.FieldFirstEventMs:
+		return m.OldFirstEventMs(ctx)
 	case usagelog.FieldFirstTokenMs:
 		return m.OldFirstTokenMs(ctx)
+	case usagelog.FieldWsDialMs:
+		return m.OldWsDialMs(ctx)
 	case usagelog.FieldUserAgent:
 		return m.OldUserAgent(ctx)
 	case usagelog.FieldIPAddress:
@@ -18711,12 +18841,26 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetDurationMs(v)
 		return nil
+	case usagelog.FieldFirstEventMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFirstEventMs(v)
+		return nil
 	case usagelog.FieldFirstTokenMs:
 		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetFirstTokenMs(v)
+		return nil
+	case usagelog.FieldWsDialMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWsDialMs(v)
 		return nil
 	case usagelog.FieldUserAgent:
 		v, ok := value.(string)
@@ -18845,8 +18989,14 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addduration_ms != nil {
 		fields = append(fields, usagelog.FieldDurationMs)
 	}
+	if m.addfirst_event_ms != nil {
+		fields = append(fields, usagelog.FieldFirstEventMs)
+	}
 	if m.addfirst_token_ms != nil {
 		fields = append(fields, usagelog.FieldFirstTokenMs)
+	}
+	if m.addws_dial_ms != nil {
+		fields = append(fields, usagelog.FieldWsDialMs)
 	}
 	if m.adduser_id_snapshot != nil {
 		fields = append(fields, usagelog.FieldUserIDSnapshot)
@@ -18901,8 +19051,12 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedAccountRateMultiplier()
 	case usagelog.FieldDurationMs:
 		return m.AddedDurationMs()
+	case usagelog.FieldFirstEventMs:
+		return m.AddedFirstEventMs()
 	case usagelog.FieldFirstTokenMs:
 		return m.AddedFirstTokenMs()
+	case usagelog.FieldWsDialMs:
+		return m.AddedWsDialMs()
 	case usagelog.FieldUserIDSnapshot:
 		return m.AddedUserIDSnapshot()
 	}
@@ -19061,12 +19215,26 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddDurationMs(v)
 		return nil
+	case usagelog.FieldFirstEventMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFirstEventMs(v)
+		return nil
 	case usagelog.FieldFirstTokenMs:
 		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddFirstTokenMs(v)
+		return nil
+	case usagelog.FieldWsDialMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWsDialMs(v)
 		return nil
 	case usagelog.FieldUserIDSnapshot:
 		v, ok := value.(int)
@@ -19189,8 +19357,14 @@ func (m *UsageLogMutation) ResetField(name string) error {
 	case usagelog.FieldDurationMs:
 		m.ResetDurationMs()
 		return nil
+	case usagelog.FieldFirstEventMs:
+		m.ResetFirstEventMs()
+		return nil
 	case usagelog.FieldFirstTokenMs:
 		m.ResetFirstTokenMs()
+		return nil
+	case usagelog.FieldWsDialMs:
+		m.ResetWsDialMs()
 		return nil
 	case usagelog.FieldUserAgent:
 		m.ResetUserAgent()

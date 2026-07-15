@@ -3,6 +3,8 @@
 .ag-usage-records-table {
   --ag-usage-table-header-height: 2.375rem;
   --ag-usage-table-row-height: 2.5rem;
+  container-name: usage-records;
+  container-type: inline-size;
 }
 
 .ag-usage-page {
@@ -509,12 +511,27 @@
   animation: ag-usage-row-new-enter 1.4s ease-out both;
 }
 
-@media (max-width: 1023px) {
+.ag-usage-date-label {
+  display: none;
+}
+
+.ag-usage-table :where([data-slot="td"].ag-usage-col-created_at:has(.ag-usage-time-only),
+  [data-slot="td"].ag-usage-col-first_token_ms) {
+  padding-inline: 0.25rem !important;
+}
+
+@container usage-records (min-width: 1440px) {
+  .ag-usage-date-label {
+    display: inline;
+  }
+}
+
+@container usage-records (max-width: 1439px) {
   .ag-usage-table {
     min-width: calc(var(--ag-usage-table-min-width) - var(--ag-usage-table-mobile-delta)) !important;
   }
 
-  .ag-usage-table .ag-usage-col-created_at {
+  .ag-usage-table:has(.ag-usage-date-label) .ag-usage-col-created_at {
     width: 92px !important;
     min-width: 92px !important;
     max-width: 92px !important;

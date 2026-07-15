@@ -29,6 +29,8 @@ type StatsSnapshot struct {
 	TodayCost               float64
 	TodayStandardCost       float64
 	TodayNonImageDurationMs int64
+	TodayFirstEventRequests int64
+	TodayFirstEventMs       int64
 	TodayFirstTokenRequests int64
 	TodayFirstTokenMs       int64
 	TodayImageDurationMs    int64
@@ -61,6 +63,7 @@ type Stats struct {
 	AllTimeStandardCost float64
 	RPM                 float64
 	TPM                 float64
+	AvgFirstEventMs     float64
 	AvgFirstTokenMs     float64
 	AvgDurationMs       float64
 	AvgImageDurationMs  float64

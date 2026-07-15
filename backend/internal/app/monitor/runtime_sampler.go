@@ -285,11 +285,11 @@ SELECT
 	COUNT(*) FILTER (WHERE created_at >= $2)::bigint,
 	COUNT(*) FILTER (WHERE created_at >= $2 AND model NOT LIKE $3)::bigint,
 	COUNT(*) FILTER (WHERE created_at >= $2 AND model LIKE $3)::bigint,
-	COALESCE(AVG(first_token_ms) FILTER (WHERE created_at >= $2 AND first_token_ms > 0 AND model NOT LIKE $3), 0)::double precision,
+	COALESCE(AVG(first_event_ms) FILTER (WHERE created_at >= $2 AND first_event_ms > 0 AND model NOT LIKE $3), 0)::double precision,
 	COALESCE(
 		percentile_cont(ARRAY[0.50, 0.95, 0.99]::double precision[])
-			WITHIN GROUP (ORDER BY first_token_ms)
-			FILTER (WHERE created_at >= $2 AND first_token_ms > 0 AND model NOT LIKE $3),
+			WITHIN GROUP (ORDER BY first_event_ms)
+			FILTER (WHERE created_at >= $2 AND first_event_ms > 0 AND model NOT LIKE $3),
 		ARRAY[0, 0, 0]::double precision[]
 	),
 	COALESCE(
@@ -301,11 +301,11 @@ SELECT
 	COUNT(*)::bigint,
 	COUNT(*) FILTER (WHERE model NOT LIKE $3)::bigint,
 	COUNT(*) FILTER (WHERE model LIKE $3)::bigint,
-	COALESCE(AVG(first_token_ms) FILTER (WHERE first_token_ms > 0 AND model NOT LIKE $3), 0)::double precision,
+	COALESCE(AVG(first_event_ms) FILTER (WHERE first_event_ms > 0 AND model NOT LIKE $3), 0)::double precision,
 	COALESCE(
 		percentile_cont(ARRAY[0.50, 0.95, 0.99]::double precision[])
-			WITHIN GROUP (ORDER BY first_token_ms)
-			FILTER (WHERE first_token_ms > 0 AND model NOT LIKE $3),
+			WITHIN GROUP (ORDER BY first_event_ms)
+			FILTER (WHERE first_event_ms > 0 AND model NOT LIKE $3),
 		ARRAY[0, 0, 0]::double precision[]
 	),
 	COALESCE(

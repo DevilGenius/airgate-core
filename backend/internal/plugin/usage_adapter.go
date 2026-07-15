@@ -31,7 +31,9 @@ type usageSnapshot struct {
 
 	ServiceTier  string
 	ImageSize    string
+	FirstEventMs int64
 	FirstTokenMs int64
+	WSDialMs     int64
 }
 
 func usageSnapshotFromSDK(usage *sdk.Usage) usageSnapshot {
@@ -52,7 +54,9 @@ func usageSnapshotFromSDK(usage *sdk.Usage) usageSnapshot {
 		OutputCost:            usage.OutputCost,
 		CachedInputCost:       usage.CachedInputCost,
 		CacheCreationCost:     usage.CacheCreationCost,
+		FirstEventMs:          usage.FirstEventMs,
 		FirstTokenMs:          usage.FirstTokenMs,
+		WSDialMs:              usage.WSDialMs,
 	}
 
 	meta := usage.Metadata

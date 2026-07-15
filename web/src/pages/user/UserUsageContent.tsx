@@ -367,10 +367,11 @@ export default function UserUsageContent() {
   const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
   const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
   const streamColumn = sharedColumns.find((column) => column.key === 'stream');
-  const timingColumns = sharedColumns.filter((column) => column.key === 'first_token_ms' || column.key === 'duration_ms');
+  const timingKeys = new Set(['first_event_ms', 'duration_ms']);
+  const timingColumns = sharedColumns.filter((column) => timingKeys.has(column.key));
   const sharedColumnsAfterModel = sharedColumns
     .slice(modelColumnIndex + 1)
-    .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream');
+    .filter((column) => !timingKeys.has(column.key) && column.key !== 'stream');
   const endpointColumn: UsageColumnConfig<UsageRow> = {
     key: 'endpoint',
     title: t('usage.endpoint', '端点'),

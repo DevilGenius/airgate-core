@@ -26,6 +26,7 @@ func toDashboardStatsResp(item appdashboard.Stats) dto.DashboardStatsResp {
 		AllTimeStandardCost: item.AllTimeStandardCost,
 		RPM:                 item.RPM,
 		TPM:                 item.TPM,
+		AvgFirstEventMs:     item.AvgFirstEventMs,
 		AvgFirstTokenMs:     item.AvgFirstTokenMs,
 		AvgDurationMs:       item.AvgDurationMs,
 		AvgImageDurationMs:  item.AvgImageDurationMs,

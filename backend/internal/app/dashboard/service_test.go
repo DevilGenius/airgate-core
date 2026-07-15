@@ -19,8 +19,10 @@ func TestStatsComputesDerivedMetrics(t *testing.T) {
 				TodayImageRequests:      2,
 				TodayNonImageRequests:   4,
 				TodayNonImageDurationMs: 1000,
+				TodayFirstEventRequests: 2,
+				TodayFirstEventMs:       300,
 				TodayFirstTokenRequests: 2,
-				TodayFirstTokenMs:       300,
+				TodayFirstTokenMs:       500,
 				TodayImageDurationMs:    240000,
 				RecentRequests:          10,
 				RecentTokens:            500,
@@ -35,8 +37,11 @@ func TestStatsComputesDerivedMetrics(t *testing.T) {
 	if result.AvgDurationMs != 250 {
 		t.Fatalf("AvgDurationMs = %v, want 250", result.AvgDurationMs)
 	}
-	if result.AvgFirstTokenMs != 150 {
-		t.Fatalf("AvgFirstTokenMs = %v, want 150", result.AvgFirstTokenMs)
+	if result.AvgFirstEventMs != 150 {
+		t.Fatalf("AvgFirstEventMs = %v, want 150", result.AvgFirstEventMs)
+	}
+	if result.AvgFirstTokenMs != 250 {
+		t.Fatalf("AvgFirstTokenMs = %v, want 250", result.AvgFirstTokenMs)
 	}
 	if result.AvgImageDurationMs != 120000 {
 		t.Fatalf("AvgImageDurationMs = %v, want 120000", result.AvgImageDurationMs)

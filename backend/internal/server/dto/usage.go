@@ -41,7 +41,9 @@ type UsageLogResp struct {
 	ServiceTier           string            `json:"service_tier,omitempty"`
 	Stream                bool              `json:"stream"`
 	DurationMs            int64             `json:"duration_ms"`
+	FirstEventMs          int64             `json:"first_event_ms"`
 	FirstTokenMs          int64             `json:"first_token_ms"`
+	WSDialMs              int64             `json:"ws_dial_ms"`
 	UserAgent             string            `json:"user_agent,omitempty"`
 	IPAddress             string            `json:"ip_address,omitempty"`
 	Endpoint              string            `json:"endpoint,omitempty"`
@@ -79,7 +81,9 @@ type CustomerUsageLogResp struct {
 	ServiceTier           string            `json:"service_tier,omitempty"`
 	Stream                bool              `json:"stream"`
 	DurationMs            int64             `json:"duration_ms"`
+	FirstEventMs          int64             `json:"first_event_ms"`
 	FirstTokenMs          int64             `json:"first_token_ms"`
+	WSDialMs              int64             `json:"ws_dial_ms"`
 	Endpoint              string            `json:"endpoint,omitempty"`
 	ReasoningEffort       string            `json:"reasoning_effort,omitempty"` // 推理强度档位
 	UsageMetadata         map[string]string `json:"usage_metadata,omitempty"`

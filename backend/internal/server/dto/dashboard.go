@@ -34,9 +34,9 @@ type DashboardStatsResp struct {
 	// 性能指标
 	RPM float64 `json:"rpm"`
 	TPM float64 `json:"tpm"`
-	// AvgFirstTokenMs 仅在非图像（chat / completion / streaming）请求上聚合：
-	// 图像生成是一次性返回不存在 first-token，纳入会拉高分母失真。前端展示时
-	// 默认按 chat 语境解读，不需要再带后缀。
+	// AvgFirstEventMs 是请求进入插件到首个上游事件的平均耗时（FRT）。
+	AvgFirstEventMs float64 `json:"avg_first_event_ms"`
+	// AvgFirstTokenMs 是首个真实输出 token/工具调用内容的平均耗时（TTFT）。
 	AvgFirstTokenMs float64 `json:"avg_first_token_ms"`
 	AvgDurationMs   float64 `json:"avg_duration_ms"`
 	// AvgImageDurationMs 仅在 gpt-image 家族请求上聚合，没有图像请求时为 0；

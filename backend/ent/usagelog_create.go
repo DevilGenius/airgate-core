@@ -364,6 +364,20 @@ func (ulc *UsageLogCreate) SetNillableDurationMs(i *int64) *UsageLogCreate {
 	return ulc
 }
 
+// SetFirstEventMs sets the "first_event_ms" field.
+func (ulc *UsageLogCreate) SetFirstEventMs(i int64) *UsageLogCreate {
+	ulc.mutation.SetFirstEventMs(i)
+	return ulc
+}
+
+// SetNillableFirstEventMs sets the "first_event_ms" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableFirstEventMs(i *int64) *UsageLogCreate {
+	if i != nil {
+		ulc.SetFirstEventMs(*i)
+	}
+	return ulc
+}
+
 // SetFirstTokenMs sets the "first_token_ms" field.
 func (ulc *UsageLogCreate) SetFirstTokenMs(i int64) *UsageLogCreate {
 	ulc.mutation.SetFirstTokenMs(i)
@@ -374,6 +388,20 @@ func (ulc *UsageLogCreate) SetFirstTokenMs(i int64) *UsageLogCreate {
 func (ulc *UsageLogCreate) SetNillableFirstTokenMs(i *int64) *UsageLogCreate {
 	if i != nil {
 		ulc.SetFirstTokenMs(*i)
+	}
+	return ulc
+}
+
+// SetWsDialMs sets the "ws_dial_ms" field.
+func (ulc *UsageLogCreate) SetWsDialMs(i int64) *UsageLogCreate {
+	ulc.mutation.SetWsDialMs(i)
+	return ulc
+}
+
+// SetNillableWsDialMs sets the "ws_dial_ms" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableWsDialMs(i *int64) *UsageLogCreate {
+	if i != nil {
+		ulc.SetWsDialMs(*i)
 	}
 	return ulc
 }
@@ -685,9 +713,17 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultDurationMs
 		ulc.mutation.SetDurationMs(v)
 	}
+	if _, ok := ulc.mutation.FirstEventMs(); !ok {
+		v := usagelog.DefaultFirstEventMs
+		ulc.mutation.SetFirstEventMs(v)
+	}
 	if _, ok := ulc.mutation.FirstTokenMs(); !ok {
 		v := usagelog.DefaultFirstTokenMs
 		ulc.mutation.SetFirstTokenMs(v)
+	}
+	if _, ok := ulc.mutation.WsDialMs(); !ok {
+		v := usagelog.DefaultWsDialMs
+		ulc.mutation.SetWsDialMs(v)
 	}
 	if _, ok := ulc.mutation.UserAgent(); !ok {
 		v := usagelog.DefaultUserAgent
@@ -829,8 +865,14 @@ func (ulc *UsageLogCreate) check() error {
 	if _, ok := ulc.mutation.DurationMs(); !ok {
 		return &ValidationError{Name: "duration_ms", err: errors.New(`ent: missing required field "UsageLog.duration_ms"`)}
 	}
+	if _, ok := ulc.mutation.FirstEventMs(); !ok {
+		return &ValidationError{Name: "first_event_ms", err: errors.New(`ent: missing required field "UsageLog.first_event_ms"`)}
+	}
 	if _, ok := ulc.mutation.FirstTokenMs(); !ok {
 		return &ValidationError{Name: "first_token_ms", err: errors.New(`ent: missing required field "UsageLog.first_token_ms"`)}
+	}
+	if _, ok := ulc.mutation.WsDialMs(); !ok {
+		return &ValidationError{Name: "ws_dial_ms", err: errors.New(`ent: missing required field "UsageLog.ws_dial_ms"`)}
 	}
 	if _, ok := ulc.mutation.UserAgent(); !ok {
 		return &ValidationError{Name: "user_agent", err: errors.New(`ent: missing required field "UsageLog.user_agent"`)}
@@ -983,9 +1025,17 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldDurationMs, field.TypeInt64, value)
 		_node.DurationMs = value
 	}
+	if value, ok := ulc.mutation.FirstEventMs(); ok {
+		_spec.SetField(usagelog.FieldFirstEventMs, field.TypeInt64, value)
+		_node.FirstEventMs = value
+	}
 	if value, ok := ulc.mutation.FirstTokenMs(); ok {
 		_spec.SetField(usagelog.FieldFirstTokenMs, field.TypeInt64, value)
 		_node.FirstTokenMs = value
+	}
+	if value, ok := ulc.mutation.WsDialMs(); ok {
+		_spec.SetField(usagelog.FieldWsDialMs, field.TypeInt64, value)
+		_node.WsDialMs = value
 	}
 	if value, ok := ulc.mutation.UserAgent(); ok {
 		_spec.SetField(usagelog.FieldUserAgent, field.TypeString, value)

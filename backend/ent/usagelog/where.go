@@ -185,9 +185,19 @@ func DurationMs(v int64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldDurationMs, v))
 }
 
+// FirstEventMs applies equality check predicate on the "first_event_ms" field. It's identical to FirstEventMsEQ.
+func FirstEventMs(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldFirstEventMs, v))
+}
+
 // FirstTokenMs applies equality check predicate on the "first_token_ms" field. It's identical to FirstTokenMsEQ.
 func FirstTokenMs(v int64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldFirstTokenMs, v))
+}
+
+// WsDialMs applies equality check predicate on the "ws_dial_ms" field. It's identical to WsDialMsEQ.
+func WsDialMs(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldWsDialMs, v))
 }
 
 // UserAgent applies equality check predicate on the "user_agent" field. It's identical to UserAgentEQ.
@@ -1335,6 +1345,46 @@ func DurationMsLTE(v int64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldDurationMs, v))
 }
 
+// FirstEventMsEQ applies the EQ predicate on the "first_event_ms" field.
+func FirstEventMsEQ(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldFirstEventMs, v))
+}
+
+// FirstEventMsNEQ applies the NEQ predicate on the "first_event_ms" field.
+func FirstEventMsNEQ(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldFirstEventMs, v))
+}
+
+// FirstEventMsIn applies the In predicate on the "first_event_ms" field.
+func FirstEventMsIn(vs ...int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldFirstEventMs, vs...))
+}
+
+// FirstEventMsNotIn applies the NotIn predicate on the "first_event_ms" field.
+func FirstEventMsNotIn(vs ...int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldFirstEventMs, vs...))
+}
+
+// FirstEventMsGT applies the GT predicate on the "first_event_ms" field.
+func FirstEventMsGT(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldFirstEventMs, v))
+}
+
+// FirstEventMsGTE applies the GTE predicate on the "first_event_ms" field.
+func FirstEventMsGTE(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldFirstEventMs, v))
+}
+
+// FirstEventMsLT applies the LT predicate on the "first_event_ms" field.
+func FirstEventMsLT(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldFirstEventMs, v))
+}
+
+// FirstEventMsLTE applies the LTE predicate on the "first_event_ms" field.
+func FirstEventMsLTE(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldFirstEventMs, v))
+}
+
 // FirstTokenMsEQ applies the EQ predicate on the "first_token_ms" field.
 func FirstTokenMsEQ(v int64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldFirstTokenMs, v))
@@ -1373,6 +1423,46 @@ func FirstTokenMsLT(v int64) predicate.UsageLog {
 // FirstTokenMsLTE applies the LTE predicate on the "first_token_ms" field.
 func FirstTokenMsLTE(v int64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldFirstTokenMs, v))
+}
+
+// WsDialMsEQ applies the EQ predicate on the "ws_dial_ms" field.
+func WsDialMsEQ(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldWsDialMs, v))
+}
+
+// WsDialMsNEQ applies the NEQ predicate on the "ws_dial_ms" field.
+func WsDialMsNEQ(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldWsDialMs, v))
+}
+
+// WsDialMsIn applies the In predicate on the "ws_dial_ms" field.
+func WsDialMsIn(vs ...int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldWsDialMs, vs...))
+}
+
+// WsDialMsNotIn applies the NotIn predicate on the "ws_dial_ms" field.
+func WsDialMsNotIn(vs ...int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldWsDialMs, vs...))
+}
+
+// WsDialMsGT applies the GT predicate on the "ws_dial_ms" field.
+func WsDialMsGT(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldWsDialMs, v))
+}
+
+// WsDialMsGTE applies the GTE predicate on the "ws_dial_ms" field.
+func WsDialMsGTE(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldWsDialMs, v))
+}
+
+// WsDialMsLT applies the LT predicate on the "ws_dial_ms" field.
+func WsDialMsLT(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldWsDialMs, v))
+}
+
+// WsDialMsLTE applies the LTE predicate on the "ws_dial_ms" field.
+func WsDialMsLTE(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldWsDialMs, v))
 }
 
 // UserAgentEQ applies the EQ predicate on the "user_agent" field.

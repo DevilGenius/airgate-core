@@ -39,6 +39,11 @@ const RICH_TOOLTIP_VIEWPORT_PADDING_PX = 8;
 const RICH_TOOLTIP_WIDTH_PX = 336;
 const RICH_TOOLTIP_ESTIMATED_HALF_HEIGHT_PX = 160;
 
+function formatTimingMs(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '-';
+  return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${value}ms`;
+}
+
 type RichTooltipPlacement = 'left' | 'right';
 type RichTooltipPosition = { left: number; top: number; width: number };
 
@@ -710,12 +715,24 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
 
   return useMemo(() => {
     const costColumn = customerScope ? buildCustomerCostColumn(t) : buildResellerCostColumn(t, adminView);
+    const firstTokenColumn: UsageColumnConfig<UsageRow> = {
+      key: 'first_token_ms',
+      title: t('usage.first_token'),
+      // 与管理端 72px 的纯时间列合计 142px，保持新增 TTFT 前的总列宽不变。
+      width: '70px',
+      hideOnMobile: true,
+      render: (row) => (
+        <span className="block text-center font-mono text-[13px] text-text-secondary">
+          {formatTimingMs(row.first_token_ms)}
+        </span>
+      ),
+    };
 
     return [
     {
       key: 'created_at',
       title: t('usage.time'),
-      width: '142px',
+      width: adminView ? '72px' : '142px',
       render: (row) => {
         const date = new Date(row.created_at);
         const timeLabel = USAGE_TIME_FORMATTER.format(date);
@@ -723,13 +740,15 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         const fullLabel = `${dateLabel} ${timeLabel}`;
 
         return (
-          <div className="flex min-w-0 items-center gap-1.5 font-mono text-xs" title={fullLabel}>
+          <div className={`flex min-w-0 items-center font-mono text-xs ${adminView ? 'ag-usage-time-only justify-center' : 'gap-1.5'}`} title={fullLabel}>
             <span className="shrink-0 font-mono text-[13px] font-medium text-text">
               {timeLabel}
             </span>
-            <span className="hidden shrink-0 font-light text-text-tertiary xl:inline">
-              {dateLabel}
-            </span>
+            {!adminView ? (
+              <span className="ag-usage-date-label shrink-0 font-light text-text-tertiary">
+                {dateLabel}
+              </span>
+            ) : null}
           </div>
         );
       },
@@ -894,16 +913,17 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       ),
     },
     {
-      key: 'first_token_ms',
-      title: t('usage.first_token'),
+      key: 'first_event_ms',
+      title: t('usage.first_event'),
       width: '78px',
       hideOnMobile: true,
       render: (row) => (
         <span className="block text-center font-mono text-[13px] text-text-secondary">
-          {row.first_token_ms > 0 ? (row.first_token_ms >= 1000 ? `${(row.first_token_ms / 1000).toFixed(2)}s` : `${row.first_token_ms}ms`) : '-'}
+          {formatTimingMs(row.first_event_ms)}
         </span>
       ),
     },
+    ...(adminView ? [firstTokenColumn] : []),
     {
       key: 'duration_ms',
       title: t('usage.duration'),

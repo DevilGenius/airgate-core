@@ -66,8 +66,12 @@ const (
 	FieldStream = "stream"
 	// FieldDurationMs holds the string denoting the duration_ms field in the database.
 	FieldDurationMs = "duration_ms"
+	// FieldFirstEventMs holds the string denoting the first_event_ms field in the database.
+	FieldFirstEventMs = "first_event_ms"
 	// FieldFirstTokenMs holds the string denoting the first_token_ms field in the database.
 	FieldFirstTokenMs = "first_token_ms"
+	// FieldWsDialMs holds the string denoting the ws_dial_ms field in the database.
+	FieldWsDialMs = "ws_dial_ms"
 	// FieldUserAgent holds the string denoting the user_agent field in the database.
 	FieldUserAgent = "user_agent"
 	// FieldIPAddress holds the string denoting the ip_address field in the database.
@@ -153,7 +157,9 @@ var Columns = []string{
 	FieldServiceTier,
 	FieldStream,
 	FieldDurationMs,
+	FieldFirstEventMs,
 	FieldFirstTokenMs,
+	FieldWsDialMs,
 	FieldUserAgent,
 	FieldIPAddress,
 	FieldEndpoint,
@@ -247,8 +253,12 @@ var (
 	DefaultStream bool
 	// DefaultDurationMs holds the default value on creation for the "duration_ms" field.
 	DefaultDurationMs int64
+	// DefaultFirstEventMs holds the default value on creation for the "first_event_ms" field.
+	DefaultFirstEventMs int64
 	// DefaultFirstTokenMs holds the default value on creation for the "first_token_ms" field.
 	DefaultFirstTokenMs int64
+	// DefaultWsDialMs holds the default value on creation for the "ws_dial_ms" field.
+	DefaultWsDialMs int64
 	// DefaultUserAgent holds the default value on creation for the "user_agent" field.
 	DefaultUserAgent string
 	// DefaultIPAddress holds the default value on creation for the "ip_address" field.
@@ -403,9 +413,19 @@ func ByDurationMs(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDurationMs, opts...).ToFunc()
 }
 
+// ByFirstEventMs orders the results by the first_event_ms field.
+func ByFirstEventMs(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFirstEventMs, opts...).ToFunc()
+}
+
 // ByFirstTokenMs orders the results by the first_token_ms field.
 func ByFirstTokenMs(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFirstTokenMs, opts...).ToFunc()
+}
+
+// ByWsDialMs orders the results by the ws_dial_ms field.
+func ByWsDialMs(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWsDialMs, opts...).ToFunc()
 }
 
 // ByUserAgent orders the results by the user_agent field.
