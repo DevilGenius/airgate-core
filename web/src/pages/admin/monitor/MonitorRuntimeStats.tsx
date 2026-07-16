@@ -55,6 +55,14 @@ function ratioText(used?: number, total?: number) {
   return `${left} / ${fmtNum(total)}`;
 }
 
+function formatCompactThousands(value?: number) {
+  const normalized = Math.max(0, Math.trunc(value ?? 0));
+  if (normalized < 1000) return `${normalized}`;
+  const thousands = normalized / 1000;
+  const precision = thousands >= 100 || Number.isInteger(thousands) ? 0 : 1;
+  return `${thousands.toFixed(precision)}k`;
+}
+
 function DetailSeparator() {
   return <span className="justify-self-center font-bold text-text-secondary">|</span>;
 }
@@ -126,6 +134,47 @@ function SampleFailureDetails({
         longErrorRate={latency1H?.image_error_rate}
         longSampleCount={latency1H?.image_sample_count}
       />
+    </span>
+  );
+}
+
+function SafetyCacheMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1">
+      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-pre">{label}</span>
+      <span className="whitespace-nowrap text-right tabular-nums">{value}</span>
+    </span>
+  );
+}
+
+function SafetyCacheDetails({
+  imageLabel,
+  requestLabel,
+  runtime,
+  textLabel,
+}: {
+  imageLabel: string;
+  requestLabel: string;
+  runtime?: MonitorRuntimeResp['runtime'];
+  textLabel: string;
+}) {
+  return (
+    <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_0.75rem_minmax(0,1fr)] items-center gap-y-0.5">
+      <SafetyCacheMetric
+        label={textLabel}
+        value={`${runtime?.text_safety_cache_len ?? 0}/${runtime?.text_safety_cache_cap ?? 0}`}
+      />
+      <DetailSeparator />
+      <SafetyCacheMetric
+        label={imageLabel}
+        value={`${runtime?.image_safety_cache_len ?? 0}/${runtime?.image_safety_cache_cap ?? 0}`}
+      />
+      <SafetyCacheMetric
+        label={requestLabel}
+        value={`${formatCompactThousands(runtime?.encrypted_content_retry_cache_len)}/${formatCompactThousands(runtime?.encrypted_content_retry_cache_cap)}`}
+      />
+      <DetailSeparator />
+      <span aria-hidden="true" />
     </span>
   );
 }
@@ -371,17 +420,15 @@ export function MonitorRuntimeStats({
             `${t('monitor.runtime_working')} ${fmtNum(capacity?.working_accounts ?? 0)}`,
           ]),
           joinDetail([
-            `${t('monitor.runtime_waiters')} ${fmtNum(capacity?.message_waiters ?? 0)} (p-max ${fmtNum(capacity?.max_account_waiters ?? 0)})`,
+            `${t('monitor.runtime_waiters')} ${fmtNum(capacity?.message_waiters ?? 0)} (${t('monitor.runtime_max_account_waiters')} ${fmtNum(capacity?.max_account_waiters ?? 0)})`,
             `reject +${fmtNum(capacity?.concurrency_reject_delta ?? 0)}`,
           ]),
-          joinDetail([
-            `billing ${runtime?.billing_queue_len ?? 0}/${runtime?.billing_queue_cap ?? 0}`,
-            `monitor ${runtime?.monitor_queue_len ?? 0}/${runtime?.monitor_queue_cap ?? 0}`,
-          ]),
-          joinDetail([
-            `${t('monitor.runtime_text_safety_cache')} ${runtime?.text_safety_cache_len ?? 0}/${runtime?.text_safety_cache_cap ?? 0}`,
-            `${t('monitor.runtime_image_safety_cache')} ${runtime?.image_safety_cache_len ?? 0}/${runtime?.image_safety_cache_cap ?? 0}`,
-          ]),
+          <SafetyCacheDetails
+            imageLabel={t('monitor.runtime_image_safety_cache')}
+            requestLabel={t('monitor.runtime_safety_request_cache')}
+            runtime={runtime}
+            textLabel={t('monitor.runtime_text_safety_cache')}
+          />,
         ]}
         icon={<Cpu className="h-5 w-5" />}
         label={t('monitor.runtime_process')}
@@ -401,6 +448,10 @@ export function MonitorRuntimeStats({
           joinDetail([
             `PG wait +${fmtNum(postgres?.wait_count_delta ?? 0)}`,
             `Redis timeout +${fmtNum(redis?.timeout_delta ?? 0)}`,
+          ]),
+          joinDetail([
+            `billing ${runtime?.billing_queue_len ?? 0}/${runtime?.billing_queue_cap ?? 0}`,
+            `monitor ${runtime?.monitor_queue_len ?? 0}/${runtime?.monitor_queue_cap ?? 0}`,
           ]),
         ]}
         icon={<Database className="h-5 w-5" />}
