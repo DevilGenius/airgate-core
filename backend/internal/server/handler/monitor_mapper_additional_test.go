@@ -188,7 +188,7 @@ func TestMonitorListFilterFromQuery(t *testing.T) {
 	c, _ := newHandlerTestContext()
 
 	filter, ok := monitorListFilterFromQuery(c, dto.MonitorListQuery{
-		Status: "active", Severity: "critical", Type: "quota", Source: "scheduler", SubjectType: "account",
+		Status: "active", Severity: "critical warning", Type: "quota system_error", Source: "scheduler", SubjectType: "account",
 		AccountID: &accountID, Platform: "openai", PluginID: "gateway-openai", TaskType: "refresh", ErrorCode: "429",
 		From: "2026-06-20T01:02:03Z", To: "2026-06-21", Limit: 25,
 		Cursor: "2026-06-20T00:00:00Z", CursorID: 99,
@@ -196,7 +196,7 @@ func TestMonitorListFilterFromQuery(t *testing.T) {
 	if !ok {
 		t.Fatal("monitor list filter rejected valid query")
 	}
-	if filter.Status != "active" || filter.Severity != "critical" || filter.Type != "quota" ||
+	if filter.Status != "active" || filter.Severity != "critical warning" || filter.Type != "quota system_error" ||
 		filter.Source != "scheduler" || filter.SubjectType != "account" || filter.AccountID == nil ||
 		*filter.AccountID != accountID || filter.Platform != "openai" || filter.PluginID != "gateway-openai" ||
 		filter.TaskType != "refresh" || filter.ErrorCode != "429" || filter.Limit != 25 {
@@ -240,24 +240,24 @@ func TestMonitorListFilterFromQuery(t *testing.T) {
 
 func TestMonitorRequestListFilterFromQuery(t *testing.T) {
 	apiKeyID, groupID, accountID := 1, 2, 3
-	httpStatus, upstreamStatus := 400, 429
+	upstreamStatus := 429
 	c, _ := newHandlerTestContext()
 
 	filter, ok := monitorRequestListFilterFromQuery(c, dto.MonitorRequestListQuery{
-		Severity: "warning", Type: "request_error", Source: "proxy", APIKeyID: &apiKeyID, GroupID: &groupID,
+		Severity: "warning info", Type: "request_error plugin_forward_error", Source: "proxy", APIKeyID: &apiKeyID, GroupID: &groupID,
 		AccountID: &accountID, Platform: "openai", PluginID: "gateway-openai", Method: http.MethodPost,
-		Endpoint: "/v1/responses", Model: "gpt-4.1", HTTPStatus: &httpStatus, UpstreamStatus: &upstreamStatus,
+		Endpoint: "/v1/responses", Model: "gpt-4.1", HTTPStatus: "4xx !404", UpstreamStatus: &upstreamStatus,
 		ErrorCode: "rate_limit", From: "2026-06-20T01:02:03Z", To: "2026-06-21", Limit: 30,
 		Cursor: "2026-06-20T00:00:00Z", CursorID: 88,
 	})
 	if !ok {
 		t.Fatal("request monitor filter rejected valid query")
 	}
-	if filter.Severity != "warning" || filter.Type != "request_error" || filter.Source != "proxy" ||
+	if filter.Severity != "warning info" || filter.Type != "request_error plugin_forward_error" || filter.Source != "proxy" ||
 		filter.APIKeyID == nil || *filter.APIKeyID != apiKeyID || filter.GroupID == nil || *filter.GroupID != groupID ||
 		filter.AccountID == nil || *filter.AccountID != accountID || filter.Platform != "openai" ||
 		filter.PluginID != "gateway-openai" || filter.Method != http.MethodPost || filter.Endpoint != "/v1/responses" ||
-		filter.Model != "gpt-4.1" || filter.HTTPStatus == nil || *filter.HTTPStatus != httpStatus ||
+		filter.Model != "gpt-4.1" || filter.HTTPStatus != "4xx !404" ||
 		filter.UpstreamStatus == nil || *filter.UpstreamStatus != upstreamStatus || filter.ErrorCode != "rate_limit" ||
 		filter.Limit != 30 || filter.Cursor == nil || filter.Cursor.ID != 88 {
 		t.Fatalf("request monitor filter did not copy fields: %+v", filter)

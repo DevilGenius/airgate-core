@@ -186,7 +186,7 @@ type RequestListFilter struct {
 	Method         string
 	Endpoint       string
 	Model          string
-	HTTPStatus     *int
+	HTTPStatus     string
 	UpstreamStatus *int
 	ErrorCode      string
 	From           *time.Time

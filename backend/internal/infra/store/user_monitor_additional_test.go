@@ -389,8 +389,10 @@ func TestMonitorStoreEventsLifecycleAndRequests(t *testing.T) {
 	from := now.Add(-time.Hour)
 	to := now.Add(2 * time.Hour)
 	list, err := store.List(ctx, appmonitor.ListFilter{
-		Status: monitoring.StatusActive, Severity: monitoring.SeverityError, Type: monitoring.TypeUpstreamAccountError,
-		Source: monitoring.SourceScheduler, SubjectType: monitoring.SubjectAccount, AccountID: &accountID,
+		Status:   monitoring.StatusActive,
+		Severity: monitoring.SeverityError + " " + monitoring.SeverityWarning,
+		Type:     monitoring.TypeUpstreamAccountError + " " + monitoring.TypeSystemError,
+		Source:   monitoring.SourceScheduler, SubjectType: monitoring.SubjectAccount, AccountID: &accountID,
 		Platform: "openai", PluginID: "openai", TaskType: "health_check", ErrorCode: "upstream_500",
 		From: &from, To: &to, Limit: 1,
 	})
@@ -572,10 +574,10 @@ func testMonitorRequestStore(t *testing.T, store *MonitorStore, now time.Time) {
 		t.Fatalf("InsertRequestBatch returned error: %v", err)
 	}
 	filtered, err := store.ListRequests(ctx, appmonitor.RequestListFilter{
-		Severity: "warning", Type: "api_request_error", Source: "forwarder", APIKeyID: &apiKeyID,
+		Severity: "warning info", Type: "api_request_error client_closed_request", Source: "forwarder", APIKeyID: &apiKeyID,
 		GroupID: &groupID, AccountID: &accountID, Platform: "openai", PluginID: "openai",
 		Method: "POST", Endpoint: "/v1/chat/completions", Model: "gpt-5",
-		HTTPStatus: &httpStatus, UpstreamStatus: &upstreamStatus, ErrorCode: "rate_limit",
+		HTTPStatus: "4xx !404", UpstreamStatus: &upstreamStatus, ErrorCode: "rate_limit",
 		From: storePtr(now.Add(-3 * time.Hour)), To: storePtr(now), Limit: 10,
 	})
 	if err != nil {
@@ -584,6 +586,13 @@ func testMonitorRequestStore(t *testing.T, store *MonitorStore, now time.Time) {
 	if len(filtered.List) != 1 || filtered.List[0].Hash != "req-hash-1" ||
 		filtered.List[0].Detail["retry"] != float64(1) {
 		t.Fatalf("filtered request list = %+v", filtered)
+	}
+	excluded, err := store.ListRequests(ctx, appmonitor.RequestListFilter{HTTPStatus: "!4xx", Limit: 10})
+	if err != nil {
+		t.Fatalf("ListRequests excluded status returned error: %v", err)
+	}
+	if len(excluded.List) != 1 || excluded.List[0].Hash != "req-hash-2" {
+		t.Fatalf("excluded request list = %+v", excluded)
 	}
 	firstPage, err := store.ListRequests(ctx, appmonitor.RequestListFilter{Limit: 1})
 	if err != nil {

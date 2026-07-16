@@ -120,11 +120,10 @@ export function requestEndpointContext(event: MonitorRequestEventResp): string {
 }
 
 export function requestStatusLabel(event: MonitorRequestEventResp): string {
-  const status = event.http_status ? String(event.http_status) : '-';
-  if (!event.upstream_status || event.upstream_status === event.http_status) {
-    return status;
+  if (event.http_status && event.upstream_status && event.upstream_status !== event.http_status) {
+    return `${event.http_status} / ${event.upstream_status}`;
   }
-  return `${status} / ${event.upstream_status}`;
+  return String(event.http_status || event.upstream_status || '-');
 }
 
 export function requestErrorCodeLabel(event: MonitorRequestEventResp): string {

@@ -354,6 +354,25 @@
   min-width: 0;
 }
 
+.ag-monitor-multi-filter .ag-toolbar-menu-popover {
+  width: max-content;
+  min-width: max(100%, 14rem);
+}
+
+.ag-monitor-multi-filter-group {
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid color-mix(in oklab, var(--border) 68%, transparent);
+}
+
+.ag-monitor-multi-filter-heading {
+  padding: 0.375rem 0.625rem 0.25rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .ag-monitor-page .ag-page-toolbar-filter-row {
   gap: 0.75rem;
 }

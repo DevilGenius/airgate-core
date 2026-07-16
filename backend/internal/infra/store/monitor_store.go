@@ -446,11 +446,27 @@ func applyMonitorListFilter(query *ent.MonitorEventQuery, filter appmonitor.List
 	if filter.Status != "" {
 		query = query.Where(entmonitorevent.StatusEQ(entmonitorevent.Status(filter.Status)))
 	}
-	if filter.Severity != "" {
-		query = query.Where(entmonitorevent.SeverityEQ(entmonitorevent.Severity(filter.Severity)))
+	if values := splitMonitorFilterValues(filter.Severity); len(values) > 0 {
+		if len(values) == 1 {
+			query = query.Where(entmonitorevent.SeverityEQ(entmonitorevent.Severity(values[0])))
+		} else {
+			severities := make([]entmonitorevent.Severity, 0, len(values))
+			for _, value := range values {
+				severities = append(severities, entmonitorevent.Severity(value))
+			}
+			query = query.Where(entmonitorevent.SeverityIn(severities...))
+		}
 	}
-	if filter.Type != "" {
-		query = query.Where(entmonitorevent.TypeEQ(entmonitorevent.Type(filter.Type)))
+	if values := splitMonitorFilterValues(filter.Type); len(values) > 0 {
+		if len(values) == 1 {
+			query = query.Where(entmonitorevent.TypeEQ(entmonitorevent.Type(values[0])))
+		} else {
+			types := make([]entmonitorevent.Type, 0, len(values))
+			for _, value := range values {
+				types = append(types, entmonitorevent.Type(value))
+			}
+			query = query.Where(entmonitorevent.TypeIn(types...))
+		}
 	}
 	if filter.Source != "" {
 		query = query.Where(entmonitorevent.SourceEQ(filter.Source))

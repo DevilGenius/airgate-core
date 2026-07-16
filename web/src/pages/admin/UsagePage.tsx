@@ -586,18 +586,14 @@ export default function UsagePage() {
 
   const handleModelChange = useCallback((model: string) => {
     const nextModel = model || undefined;
-    startTransition(() => {
-      resetCursorPagination();
-      setFilters((prev) => (prev.model === nextModel ? prev : { ...prev, model: nextModel }));
-    });
+    resetCursorPagination();
+    setFilters((prev) => (prev.model === nextModel ? prev : { ...prev, model: nextModel }));
   }, [resetCursorPagination]);
 
   const handleAccountChange = useCallback((account: string) => {
     const nextAccount = account.trim() || undefined;
-    startTransition(() => {
-      resetCursorPagination();
-      setFilters((prev) => (prev.account === nextAccount ? prev : { ...prev, account: nextAccount }));
-    });
+    resetCursorPagination();
+    setFilters((prev) => (prev.account === nextAccount ? prev : { ...prev, account: nextAccount }));
   }, [resetCursorPagination]);
 
   // 构建查询参数

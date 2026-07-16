@@ -23,7 +23,10 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { useToast } from '../../shared/ui';
 import { DEFAULT_PAGE_SIZE, MONITOR_TIME_RANGE_PRESETS } from './monitor/constants';
 import { MonitorCustomTimeRangeModal } from './monitor/MonitorCustomTimeRangeModal';
-import { MonitorFilterSelect as FilterSelect } from './monitor/MonitorFilterSelect';
+import {
+  MonitorFilterSelect as FilterSelect,
+  MonitorMultiFilterSelect as MultiFilterSelect,
+} from './monitor/MonitorFilterSelect';
 import { MonitorRuntimeStats } from './monitor/MonitorRuntimeStats';
 import { totalForCursorPage } from './monitor/pagination';
 import { monitorRangeLabel, presetTimeRange } from './monitor/timeRange';
@@ -60,6 +63,7 @@ const MONITOR_REQUEST_TYPE_IDS = [
 ];
 const MONITOR_EVENT_STATUS_IDS: readonly string[] = ['active', 'resolved'];
 const MONITOR_EVENT_SEVERITY_IDS: readonly string[] = ['critical', 'error', 'warning', 'info'];
+const MONITOR_REQUEST_SEVERITY_IDS: readonly string[] = ['warning', 'info'];
 const MONITOR_EVENT_TYPE_IDS: readonly string[] = [
   'scheduler_error',
   'upstream_account_error',
@@ -67,7 +71,6 @@ const MONITOR_EVENT_TYPE_IDS: readonly string[] = [
   'task_error',
   'system_error',
 ];
-const MONITOR_HTTP_STATUS_CODES: readonly string[] = ['400', '401', '403', '404', '408', '429', '499', '500', '502', '503', '504'];
 
 const MONITOR_FILTER_KEYS = {
   activeTable: `${MONITOR_FILTER_STORAGE_KEY}:active_table`,
@@ -88,6 +91,7 @@ const MONITOR_FILTER_KEYS = {
     groupID: `${MONITOR_FILTER_STORAGE_KEY}:requests:group_id`,
     groupLabel: `${MONITOR_FILTER_STORAGE_KEY}:requests:group_label`,
     httpStatus: `${MONITOR_FILTER_STORAGE_KEY}:requests:http_status`,
+    severity: `${MONITOR_FILTER_STORAGE_KEY}:requests:severity`,
     timeRange: `${MONITOR_FILTER_STORAGE_KEY}:requests:time_range`,
     to: `${MONITOR_FILTER_STORAGE_KEY}:requests:to`,
     type: `${MONITOR_FILTER_STORAGE_KEY}:requests:type`,
@@ -105,6 +109,7 @@ const MONITOR_REQUEST_FILTER_STORAGE_KEYS: Partial<Record<keyof MonitorRequestLi
   api_key_id: MONITOR_FILTER_KEYS.requests.apiKeyID,
   group_id: MONITOR_FILTER_KEYS.requests.groupID,
   http_status: MONITOR_FILTER_KEYS.requests.httpStatus,
+  severity: MONITOR_FILTER_KEYS.requests.severity,
   type: MONITOR_FILTER_KEYS.requests.type,
 };
 
@@ -141,9 +146,25 @@ function readStoredOption(key: string, allowedValues: readonly string[]) {
   return allowedValues.includes(value) ? value : undefined;
 }
 
-function readStoredHTTPStatus(key: string) {
-  const value = readStoredString(key);
-  return MONITOR_HTTP_STATUS_CODES.includes(value) ? Number(value) : undefined;
+function filterValues(value: string | undefined, allowedValues: readonly string[]) {
+  const selectedValues = new Set((value ?? '').split(/\s+/).filter(Boolean));
+  return allowedValues.filter((item) => selectedValues.has(item));
+}
+
+function readStoredOptions(key: string, allowedValues: readonly string[]) {
+  const values = filterValues(readStoredString(key), allowedValues);
+  return values.length > 0 ? values.join(' ') : undefined;
+}
+
+function toggleFilterValue(value: string | undefined, item: string, allowedValues: readonly string[]) {
+  const selectedValues = new Set(filterValues(value, allowedValues));
+  if (selectedValues.has(item)) {
+    selectedValues.delete(item);
+  } else {
+    selectedValues.add(item);
+  }
+  const nextValues = allowedValues.filter((candidate) => selectedValues.has(candidate));
+  return nextValues.length > 0 ? nextValues.join(' ') : undefined;
 }
 
 function storedIDLabel(id: number | undefined, label: string) {
@@ -191,19 +212,20 @@ function readInitialMonitorState() {
   const groupID = readStoredPositiveNumber(MONITOR_FILTER_KEYS.requests.groupID);
   const filters: Partial<MonitorListQuery> = {
     from: eventsTimeRange.from,
-    severity: readStoredOption(MONITOR_FILTER_KEYS.events.severity, MONITOR_EVENT_SEVERITY_IDS),
+    severity: readStoredOptions(MONITOR_FILTER_KEYS.events.severity, MONITOR_EVENT_SEVERITY_IDS),
     status: readStoredOption(MONITOR_FILTER_KEYS.events.status, MONITOR_EVENT_STATUS_IDS),
     to: eventsTimeRange.to,
-    type: readStoredOption(MONITOR_FILTER_KEYS.events.type, MONITOR_EVENT_TYPE_IDS),
+    type: readStoredOptions(MONITOR_FILTER_KEYS.events.type, MONITOR_EVENT_TYPE_IDS),
   };
   const requestFilters: Partial<MonitorRequestListQuery> = {
     account_id: accountID,
     api_key_id: apiKeyID,
     from: requestsTimeRange.from,
     group_id: groupID,
-    http_status: readStoredHTTPStatus(MONITOR_FILTER_KEYS.requests.httpStatus),
+    http_status: readStoredString(MONITOR_FILTER_KEYS.requests.httpStatus) || undefined,
+    severity: readStoredOptions(MONITOR_FILTER_KEYS.requests.severity, MONITOR_REQUEST_SEVERITY_IDS),
     to: requestsTimeRange.to,
-    type: readStoredOption(MONITOR_FILTER_KEYS.requests.type, MONITOR_REQUEST_TYPE_IDS),
+    type: readStoredOptions(MONITOR_FILTER_KEYS.requests.type, MONITOR_REQUEST_TYPE_IDS),
   };
 
   return {
@@ -391,11 +413,30 @@ export default function MonitorPage() {
   const updateFilter = useCallback((key: keyof MonitorListQuery, value: string | number | undefined) => {
     const nextValue = value === '' ? undefined : value;
     writeStoredString(MONITOR_EVENT_FILTER_STORAGE_KEYS[key], nextValue);
-    startTransition(() => {
-      setFilters((prev) => ({ ...prev, [key]: nextValue }));
-      resetPagination();
-    });
+    setFilters((prev) => ({ ...prev, [key]: nextValue }));
+    resetPagination();
   }, [resetPagination]);
+
+  const updateEventClassificationFilters = useCallback((type?: string, severity?: string) => {
+    writeStoredString(MONITOR_FILTER_KEYS.events.type, type);
+    writeStoredString(MONITOR_FILTER_KEYS.events.severity, severity);
+    setFilters((prev) => ({ ...prev, type, severity }));
+    resetPagination();
+  }, [resetPagination]);
+
+  const toggleEventClassificationFilter = useCallback((groupID: string, value: string) => {
+    if (groupID === 'severity') {
+      updateEventClassificationFilters(
+        filters.type,
+        toggleFilterValue(filters.severity, value, MONITOR_EVENT_SEVERITY_IDS),
+      );
+      return;
+    }
+    updateEventClassificationFilters(
+      toggleFilterValue(filters.type, value, MONITOR_EVENT_TYPE_IDS),
+      filters.severity,
+    );
+  }, [filters.severity, filters.type, updateEventClassificationFilters]);
 
   const applyMonitorTimeRange = useCallback((preset: MonitorTimeRangePreset, from?: string, to?: string) => {
     setTimeRangePreset(preset);
@@ -467,6 +508,34 @@ export default function MonitorPage() {
       setRequestFilters((prev) => ({ ...prev, [key]: nextValue }));
       resetRequestPagination();
     });
+  }, [resetRequestPagination]);
+
+  const updateRequestClassificationFilters = useCallback((type?: string, severity?: string) => {
+    writeStoredString(MONITOR_FILTER_KEYS.requests.type, type);
+    writeStoredString(MONITOR_FILTER_KEYS.requests.severity, severity);
+    setRequestFilters((prev) => ({ ...prev, type, severity }));
+    resetRequestPagination();
+  }, [resetRequestPagination]);
+
+  const toggleRequestClassificationFilter = useCallback((groupID: string, value: string) => {
+    if (groupID === 'severity') {
+      updateRequestClassificationFilters(
+        requestFilters.type,
+        toggleFilterValue(requestFilters.severity, value, MONITOR_REQUEST_SEVERITY_IDS),
+      );
+      return;
+    }
+    updateRequestClassificationFilters(
+      toggleFilterValue(requestFilters.type, value, MONITOR_REQUEST_TYPE_IDS),
+      requestFilters.severity,
+    );
+  }, [requestFilters.severity, requestFilters.type, updateRequestClassificationFilters]);
+
+  const updateRequestHTTPStatusFilter = useCallback((value: string) => {
+    const nextValue = value === '' ? undefined : value;
+    writeStoredString(MONITOR_FILTER_KEYS.requests.httpStatus, nextValue);
+    setRequestFilters((prev) => ({ ...prev, http_status: nextValue }));
+    resetRequestPagination();
   }, [resetRequestPagination]);
 
   const handleAPIKeySelectionChange = useCallback((value: string, label: string) => {
@@ -625,22 +694,21 @@ export default function MonitorPage() {
     ...MONITOR_EVENT_STATUS_IDS.map((id) => ({ id, label: t(`monitor.status_${id}`, id) })),
   ];
   const severityOptions: SelectOption[] = [
-    { id: '', label: t('common.all') },
     ...MONITOR_EVENT_SEVERITY_IDS.map((id) => ({ id, label: t(`monitor.severity_${id}`, id) })),
   ];
+  const requestSeverityOptions: SelectOption[] = [
+    ...MONITOR_REQUEST_SEVERITY_IDS.map((id) => ({ id, label: t(`monitor.request_severity_${id}`, id) })),
+  ];
   const typeOptions: SelectOption[] = [
-    { id: '', label: t('common.all') },
     ...MONITOR_EVENT_TYPE_IDS.map((id) => ({ id, label: t(`monitor.type_${id}`, id) })),
   ];
-
-  const httpStatusOptions: SelectOption[] = [
-    { id: '', label: t('common.all') },
-    ...MONITOR_HTTP_STATUS_CODES.map((code) => ({ id: code, label: code })),
-  ];
   const requestTypeOptions: SelectOption[] = [
-    { id: '', label: t('common.all') },
     ...MONITOR_REQUEST_TYPE_IDS.map((id) => ({ id, label: t(`monitor.type_${id}`, id) })),
   ];
+  const selectedEventTypes = filterValues(filters.type, MONITOR_EVENT_TYPE_IDS);
+  const selectedEventSeverities = filterValues(filters.severity, MONITOR_EVENT_SEVERITY_IDS);
+  const selectedRequestTypes = filterValues(requestFilters.type, MONITOR_REQUEST_TYPE_IDS);
+  const selectedRequestSeverities = filterValues(requestFilters.severity, MONITOR_REQUEST_SEVERITY_IDS);
 
   const columns = useMonitorColumns({
     onResolve: resolveMutation.mutate,
@@ -745,48 +813,38 @@ export default function MonitorPage() {
                     value={requestTimeRangePreset}
                     onChange={handleRequestTimeRangeSelection}
                   />
-                  <FilterSelect
+                  <MultiFilterSelect
+                    allLabel={t('common.all')}
                     ariaLabel={t('monitor.type')}
                     className={MONITOR_TOOLBAR_CONTROL_CLASS}
                     label={t('monitor.type')}
-                    options={requestTypeOptions}
-                    value={requestFilters.type || ''}
-                    onChange={(value) => updateRequestFilter('type', value)}
-                  />
-                  <FilterSelect
-                    ariaLabel={t('monitor.http_status_code')}
-                    className={MONITOR_TOOLBAR_CONTROL_CLASS}
-                    label={t('monitor.http_status_code')}
-                    options={httpStatusOptions}
-                    value={requestFilters.http_status ? String(requestFilters.http_status) : ''}
-                    onChange={(value) => updateRequestFilter('http_status', value ? Number(value) : undefined)}
+                    groups={[
+                      {
+                        id: 'type',
+                        label: t('monitor.type'),
+                        options: requestTypeOptions,
+                        selectedValues: selectedRequestTypes,
+                      },
+                      {
+                        id: 'severity',
+                        label: t('monitor.severity'),
+                        options: requestSeverityOptions,
+                        selectedValues: selectedRequestSeverities,
+                      },
+                    ]}
+                    onClear={() => updateRequestClassificationFilters()}
+                    onToggle={toggleRequestClassificationFilter}
                   />
                   <div className={MONITOR_TOOLBAR_CONTROL_CLASS}>
-                    <APIKeySearchFilterComboBox
-                      ariaLabel={t('monitor.search_api_key')}
-                      emptyPrompt={t('monitor.search_api_key')}
-                      loadingLabel={t('common.loading')}
-                      noDataLabel={t('common.no_data')}
-                      placeholder={t('monitor.search_api_key')}
-                      scope="admin"
-                      selectedKey={requestFilters.api_key_id ? String(requestFilters.api_key_id) : null}
-                      selectedLabel={selectedAPIKeyLabel}
-                      onSelectionChange={handleAPIKeySelectionChange}
-                    />
-                  </div>
-                  <div className={MONITOR_TOOLBAR_CONTROL_CLASS}>
-                    <RemoteSearchFilterComboBox
-                      ariaLabel={t('monitor.search_account')}
-                      buildQueryKey={(keyword) => queryKeys.accounts('monitor-filter', keyword)}
-                      emptyPrompt={t('monitor.search_account')}
-                      loadingLabel={t('common.loading')}
-                      mapItemToOption={accountFilterOption}
-                      noDataLabel={t('common.no_data')}
-                      placeholder={t('monitor.search_account')}
-                      queryItems={queryAccountFilterItems}
-                      selectedKey={requestFilters.account_id ? String(requestFilters.account_id) : null}
-                      selectedLabel={selectedAccountLabel}
-                      onSelectionChange={handleAccountSelectionChange}
+                    <input
+                      aria-label={t('monitor.http_status_code')}
+                      autoComplete="off"
+                      className="input input--sm w-full"
+                      placeholder={t('monitor.http_status_filter_placeholder')}
+                      spellCheck={false}
+                      title={t('monitor.http_status_filter_hint')}
+                      value={requestFilters.http_status ?? ''}
+                      onChange={(event) => updateRequestHTTPStatusFilter(event.target.value)}
                     />
                   </div>
                   <div className={MONITOR_TOOLBAR_CONTROL_CLASS}>
@@ -797,11 +855,39 @@ export default function MonitorPage() {
                       loadingLabel={t('common.loading')}
                       mapItemToOption={groupFilterOption}
                       noDataLabel={t('common.no_data')}
-                      placeholder={t('monitor.search_group')}
+                      placeholder={t('monitor.group_placeholder')}
                       queryItems={queryGroupFilterItems}
                       selectedKey={requestFilters.group_id ? String(requestFilters.group_id) : null}
                       selectedLabel={selectedGroupLabel}
                       onSelectionChange={handleGroupSelectionChange}
+                    />
+                  </div>
+                  <div className={MONITOR_TOOLBAR_CONTROL_CLASS}>
+                    <RemoteSearchFilterComboBox
+                      ariaLabel={t('monitor.search_account')}
+                      buildQueryKey={(keyword) => queryKeys.accounts('monitor-filter', keyword)}
+                      emptyPrompt={t('monitor.search_account')}
+                      loadingLabel={t('common.loading')}
+                      mapItemToOption={accountFilterOption}
+                      noDataLabel={t('common.no_data')}
+                      placeholder={t('monitor.account_placeholder')}
+                      queryItems={queryAccountFilterItems}
+                      selectedKey={requestFilters.account_id ? String(requestFilters.account_id) : null}
+                      selectedLabel={selectedAccountLabel}
+                      onSelectionChange={handleAccountSelectionChange}
+                    />
+                  </div>
+                  <div className={MONITOR_TOOLBAR_CONTROL_CLASS}>
+                    <APIKeySearchFilterComboBox
+                      ariaLabel={t('monitor.search_api_key')}
+                      emptyPrompt={t('monitor.search_api_key')}
+                      loadingLabel={t('common.loading')}
+                      noDataLabel={t('common.no_data')}
+                      placeholder={t('monitor.api_key_placeholder')}
+                      scope="admin"
+                      selectedKey={requestFilters.api_key_id ? String(requestFilters.api_key_id) : null}
+                      selectedLabel={selectedAPIKeyLabel}
+                      onSelectionChange={handleAPIKeySelectionChange}
                     />
                   </div>
                 </>
@@ -815,21 +901,27 @@ export default function MonitorPage() {
                     value={timeRangePreset}
                     onChange={handleTimeRangeSelection}
                   />
-                  <FilterSelect
+                  <MultiFilterSelect
+                    allLabel={t('common.all')}
                     ariaLabel={t('monitor.type')}
                     className={MONITOR_TOOLBAR_CONTROL_CLASS}
                     label={t('monitor.type')}
-                    options={typeOptions}
-                    value={filters.type || ''}
-                    onChange={(value) => updateFilter('type', value)}
-                  />
-                  <FilterSelect
-                    ariaLabel={t('monitor.severity')}
-                    className={MONITOR_TOOLBAR_CONTROL_CLASS}
-                    label={t('monitor.severity')}
-                    options={severityOptions}
-                    value={filters.severity || ''}
-                    onChange={(value) => updateFilter('severity', value)}
+                    groups={[
+                      {
+                        id: 'type',
+                        label: t('monitor.type'),
+                        options: typeOptions,
+                        selectedValues: selectedEventTypes,
+                      },
+                      {
+                        id: 'severity',
+                        label: t('monitor.severity'),
+                        options: severityOptions,
+                        selectedValues: selectedEventSeverities,
+                      },
+                    ]}
+                    onClear={() => updateEventClassificationFilters()}
+                    onToggle={toggleEventClassificationFilter}
                   />
                   <div className={MONITOR_TOOLBAR_CONTROL_CLASS}>
                     <input

@@ -1020,7 +1020,7 @@ export interface MonitorRequestListQuery {
   method?: string;
   endpoint?: string;
   model?: string;
-  http_status?: number;
+  http_status?: string;
   upstream_status?: number;
   error_code?: string;
   from?: string;

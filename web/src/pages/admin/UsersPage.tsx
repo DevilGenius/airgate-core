@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, EmptyState, Spinner } from '@heroui/react';
@@ -175,10 +175,8 @@ export default function UsersPage() {
   ];
   const selectedStatusLabel = statusOptions.find((item) => item.id === statusFilter)?.label ?? t('users.all_status');
   const handleKeywordChange = useCallback((nextKeyword: string) => {
-    startTransition(() => {
-      setKeyword(nextKeyword);
-      setPage(1);
-    });
+    setKeyword(nextKeyword);
+    setPage(1);
   }, [setPage]);
 
   return (

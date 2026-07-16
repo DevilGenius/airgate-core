@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Check, Copy, Plus, RefreshCw } from 'lucide-react';
@@ -106,10 +106,8 @@ export default function APIKeysPage() {
     setRevealedKey(null);
   };
   const handleKeywordChange = useCallback((nextKeyword: string) => {
-    startTransition(() => {
-      setKeyword(nextKeyword);
-      setPage(1);
-    });
+    setKeyword(nextKeyword);
+    setPage(1);
   }, [setPage]);
   const handleCopyRevealedKey = async () => {
     if (await copy(revealedKey ?? '')) {

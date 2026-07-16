@@ -78,7 +78,7 @@ type MonitorRequestListQuery struct {
 	Method          string `form:"method"`
 	Endpoint        string `form:"endpoint"`
 	Model           string `form:"model"`
-	HTTPStatus      *int   `form:"http_status"`
+	HTTPStatus      string `form:"http_status"`
 	UpstreamStatus  *int   `form:"upstream_status"`
 	ErrorCode       string `form:"error_code"`
 	From            string `form:"from"`

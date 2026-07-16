@@ -174,11 +174,23 @@ func (s *MonitorStore) CleanupExpiredRequests(ctx context.Context, cutoff time.T
 }
 
 func applyMonitorRequestListFilter(query *ent.MonitorRequestEventQuery, filter appmonitor.RequestListFilter) *ent.MonitorRequestEventQuery {
-	if filter.Severity != "" {
-		query = query.Where(entmonitorrequestevent.SeverityEQ(entmonitorrequestevent.Severity(filter.Severity)))
+	if values := splitMonitorFilterValues(filter.Severity); len(values) > 0 {
+		if len(values) == 1 {
+			query = query.Where(entmonitorrequestevent.SeverityEQ(entmonitorrequestevent.Severity(values[0])))
+		} else {
+			severities := make([]entmonitorrequestevent.Severity, 0, len(values))
+			for _, value := range values {
+				severities = append(severities, entmonitorrequestevent.Severity(value))
+			}
+			query = query.Where(entmonitorrequestevent.SeverityIn(severities...))
+		}
 	}
-	if filter.Type != "" {
-		query = query.Where(entmonitorrequestevent.TypeEQ(filter.Type))
+	if values := splitMonitorFilterValues(filter.Type); len(values) > 0 {
+		if len(values) == 1 {
+			query = query.Where(entmonitorrequestevent.TypeEQ(values[0]))
+		} else {
+			query = query.Where(entmonitorrequestevent.TypeIn(values...))
+		}
 	}
 	if filter.Source != "" {
 		query = query.Where(entmonitorrequestevent.SourceEQ(filter.Source))
@@ -207,8 +219,8 @@ func applyMonitorRequestListFilter(query *ent.MonitorRequestEventQuery, filter a
 	if filter.Model != "" {
 		query = query.Where(entmonitorrequestevent.ModelEQ(filter.Model))
 	}
-	if filter.HTTPStatus != nil {
-		query = query.Where(entmonitorrequestevent.HTTPStatusEQ(*filter.HTTPStatus))
+	if filter.HTTPStatus != "" {
+		query = applyMonitorHTTPStatusFilter(query, filter.HTTPStatus)
 	}
 	if filter.UpstreamStatus != nil {
 		query = query.Where(entmonitorrequestevent.UpstreamStatusEQ(*filter.UpstreamStatus))
