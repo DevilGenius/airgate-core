@@ -767,6 +767,8 @@
     "runtime_image_duration": "Image duration",
     "runtime_working": "working",
     "runtime_waiters": "waiters",
+    "runtime_text_safety_cache": "Text safety cache",
+    "runtime_image_safety_cache": "Image safety cache",
     "runtime_stale": "stale",
     "runtime_ok": "ok",
     "runtime_down": "down",

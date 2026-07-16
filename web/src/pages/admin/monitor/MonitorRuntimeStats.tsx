@@ -378,6 +378,10 @@ export function MonitorRuntimeStats({
             `billing ${runtime?.billing_queue_len ?? 0}/${runtime?.billing_queue_cap ?? 0}`,
             `monitor ${runtime?.monitor_queue_len ?? 0}/${runtime?.monitor_queue_cap ?? 0}`,
           ]),
+          joinDetail([
+            `${t('monitor.runtime_text_safety_cache')} ${runtime?.text_safety_cache_len ?? 0}/${runtime?.text_safety_cache_cap ?? 0}`,
+            `${t('monitor.runtime_image_safety_cache')} ${runtime?.image_safety_cache_len ?? 0}/${runtime?.image_safety_cache_cap ?? 0}`,
+          ]),
         ]}
         icon={<Cpu className="h-5 w-5" />}
         label={t('monitor.runtime_process')}

@@ -17,13 +17,14 @@ import (
 )
 
 const (
-	defaultRuntimeSampleInterval    = 5 * time.Second
-	defaultLatencySampleInterval    = 30 * time.Second
-	defaultRuntimeLatencyWindow     = 5 * time.Minute
-	defaultRuntimeLatencyLongWindow = time.Hour
-	defaultDependencyPingTimeout    = 300 * time.Millisecond
-	defaultRuntimeQueryTimeout      = time.Second
-	defaultRuntimeCapacityTimeout   = 500 * time.Millisecond
+	defaultRuntimeSampleInterval     = 5 * time.Second
+	defaultLatencySampleInterval     = 30 * time.Second
+	defaultRuntimeLatencyWindow      = 5 * time.Minute
+	defaultRuntimeLatencyLongWindow  = time.Hour
+	defaultDependencyPingTimeout     = 300 * time.Millisecond
+	defaultRuntimeQueryTimeout       = time.Second
+	defaultRuntimeCapacityTimeout    = 500 * time.Millisecond
+	defaultRuntimeSafetyCacheTimeout = 500 * time.Millisecond
 )
 
 // RuntimeSampler periodically collects low-cost operational signals and keeps
@@ -35,6 +36,7 @@ type RuntimeSampler struct {
 	concurrency *scheduler.ConcurrencyManager
 	recorder    *billing.Recorder
 	monitor     *Service
+	safetyCache SafetyCacheStatsReader
 
 	sampleInterval  time.Duration
 	latencyInterval time.Duration
@@ -53,6 +55,12 @@ type RuntimeSampler struct {
 	redisDeltaReady            bool
 	concurrencyDeltaReady      bool
 	waiterDeltaReady           bool
+}
+
+// SafetyCacheStatsReader provides runtime cache usage without coupling the
+// monitor package to the plugin manager implementation.
+type SafetyCacheStatsReader interface {
+	SafetyCacheStats(ctx context.Context) (textSize, textCapacity, imageSize, imageCapacity int, err error)
 }
 
 // RuntimeSnapshot is the complete payload returned by /admin/monitor/runtime.
@@ -140,6 +148,10 @@ type RuntimeProcessStats struct {
 	MonitorDropped   int64    `json:"monitor_dropped_total"`
 	MonitorQueued    int64    `json:"monitor_queued_total"`
 	MonitorFlushed   int64    `json:"monitor_flushed_total"`
+	TextSafetyLen    int      `json:"text_safety_cache_len"`
+	TextSafetyCap    int      `json:"text_safety_cache_cap"`
+	ImageSafetyLen   int      `json:"image_safety_cache_len"`
+	ImageSafetyCap   int      `json:"image_safety_cache_cap"`
 }
 
 // NewRuntimeSampler creates a runtime sampler. A nil dependency simply yields
@@ -167,6 +179,13 @@ func NewRuntimeSampler(sqlDB *stdsql.DB, rdb *redis.Client, sched *scheduler.Sch
 		},
 	})
 	return s
+}
+
+// SetSafetyCacheStatsReader injects the plugin runtime metrics reader.
+func (s *RuntimeSampler) SetSafetyCacheStatsReader(reader SafetyCacheStatsReader) {
+	if s != nil {
+		s.safetyCache = reader
+	}
 }
 
 // Start runs the sampler loop until ctx is cancelled.
@@ -212,7 +231,7 @@ func (s *RuntimeSampler) sampleRuntime(parent context.Context) {
 	snap.WindowSeconds = int(s.latencyWindow / time.Second)
 	snap.Capacity = s.sampleCapacity(parent)
 	snap.Dependencies = s.sampleDependencies(parent)
-	snap.Runtime = s.sampleProcess()
+	snap.Runtime = s.sampleProcess(parent)
 	s.snapshot.Store(snap)
 }
 
@@ -514,7 +533,7 @@ func (s *RuntimeSampler) sampleRedis(parent context.Context) RuntimeRedisStats {
 	return stats
 }
 
-func (s *RuntimeSampler) sampleProcess() RuntimeProcessStats {
+func (s *RuntimeSampler) sampleProcess(parent context.Context) RuntimeProcessStats {
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 
@@ -527,6 +546,19 @@ func (s *RuntimeSampler) sampleProcess() RuntimeProcessStats {
 		monitorStats = s.monitor.RuntimeStats()
 	}
 	cpuPercent, _ := s.cpuSampler.Percent()
+	textSafetyLen, textSafetyCap := 0, 0
+	imageSafetyLen, imageSafetyCap := 0, 0
+	if s.safetyCache != nil {
+		ctx, cancel := context.WithTimeout(parent, defaultRuntimeSafetyCacheTimeout)
+		textSize, textCapacity, imageSize, imageCapacity, err := s.safetyCache.SafetyCacheStats(ctx)
+		cancel()
+		if err == nil {
+			textSafetyLen = textSize
+			textSafetyCap = textCapacity
+			imageSafetyLen = imageSize
+			imageSafetyCap = imageCapacity
+		}
+	}
 
 	return RuntimeProcessStats{
 		CPUPercent:       cpuPercent,
@@ -543,6 +575,10 @@ func (s *RuntimeSampler) sampleProcess() RuntimeProcessStats {
 		MonitorDropped:   monitorStats.DroppedTotal,
 		MonitorQueued:    monitorStats.QueuedTotal,
 		MonitorFlushed:   monitorStats.FlushedTotal,
+		TextSafetyLen:    textSafetyLen,
+		TextSafetyCap:    textSafetyCap,
+		ImageSafetyLen:   imageSafetyLen,
+		ImageSafetyCap:   imageSafetyCap,
 	}
 }
 
