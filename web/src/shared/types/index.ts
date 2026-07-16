@@ -1126,8 +1126,8 @@ export interface MonitorRuntimeProcessResp {
   text_safety_cache_cap: number;
   image_safety_cache_len: number;
   image_safety_cache_cap: number;
-  encrypted_content_retry_cache_len: number;
-  encrypted_content_retry_cache_cap: number;
+  request_retry_cache_len: number;
+  request_retry_cache_cap: number;
 }
 
 // ==================== Setup ====================

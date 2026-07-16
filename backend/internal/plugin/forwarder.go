@@ -14,8 +14,10 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/billing"
+	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
@@ -99,6 +101,11 @@ func (f *Forwarder) RequestTraceEnabled() bool {
 
 // maxFailoverAttempts 单次请求的最大 failover 次数。
 const maxFailoverAttempts = 3
+
+// A plugin-controlled model reroute is a one-shot control transition, not an
+// account failover. Limiting it to one prevents a buggy plugin from cycling
+// models without consuming the normal failover budget.
+const maxModelReroutes = 1
 
 func preferredDifferentAccountTypeForAttempt(attempt, maxAttempts int, previousAccount *ent.Account) string {
 	if maxAttempts <= 1 || attempt != maxAttempts-1 {
@@ -341,7 +348,8 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			execution := f.callPlugin(c, state)
 			lastAttemptAccount = state.account
 			totalAttempts++
-			if trace != nil {
+			modelRerouteRequested := execution.outcome.FailoverScope == sdk.FailoverScopeModelReroute
+			if trace != nil && !modelRerouteRequested {
 				trace.addFailedAttempt(totalAttempts, state, execution)
 			}
 
@@ -384,6 +392,34 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				f.scheduler.DecrementRPM(context.Background(), accountID)
 				softExclude = softExclude[:0]
 				continue
+			}
+
+			if requestCanceled == 0 && modelRerouteRequested {
+				fromSchedulingModel := strings.TrimSpace(state.dispatchPlan.SchedulingModel)
+				targetClientModel, plans, requirements, ok := f.resolveModelReroute(c, state, execution)
+				if ok {
+					attemptLogger.Info("forward_model_reroute",
+						"attempt", totalAttempts,
+						"from_scheduling_model", fromSchedulingModel,
+						"reroute_client_model", targetClientModel,
+						sdk.LogFieldReason, judgmentReason(execution),
+					)
+					f.recordPluginExecutionRetry(ctx, state, execution, totalAttempts)
+					releaseAccountSlot()
+					f.scheduler.DecrementRPM(context.Background(), accountID)
+					applyModelReroute(state, plans, requirements)
+					softExclude = softExclude[:0]
+					lastAttemptAccount = nil
+					continue
+				}
+				attemptLogger.Warn("forward_model_reroute_rejected",
+					"attempt", totalAttempts,
+					"reroute_client_model", strings.TrimSpace(execution.outcome.RerouteClientModel),
+					sdk.LogFieldReason, judgmentReason(execution),
+				)
+			}
+			if trace != nil && modelRerouteRequested {
+				trace.addFailedAttempt(totalAttempts, state, execution)
 			}
 
 			attempt++
@@ -819,6 +855,60 @@ func (f *Forwarder) canDispatchCandidateFailover(c *gin.Context, state *forwardS
 		return false
 	}
 	return state.advanceDispatchCandidate()
+}
+
+func (f *Forwarder) resolveModelReroute(
+	c *gin.Context,
+	state *forwardState,
+	execution forwardExecution,
+) (string, []sdk.DispatchPlan, routing.Requirements, bool) {
+	if c == nil || state == nil || state.keyInfo == nil || state.modelReroutes >= maxModelReroutes || execution.err != nil {
+		return "", nil, routing.Requirements{}, false
+	}
+	targetClientModel, ok := execution.outcome.ModelRerouteClientTarget()
+	if !ok || (state.stream && c.Writer.Written()) {
+		return "", nil, routing.Requirements{}, false
+	}
+	// ModelReroute targets the model used to resolve DispatchPlan, not the final
+	// wire model. Different client models may intentionally map to the same wire
+	// model while selecting different rules, operations, or account pools.
+	currentClientModel := strings.TrimSpace(state.dispatchPlan.ClientModel)
+	if currentClientModel == "" {
+		currentClientModel = strings.TrimSpace(state.model)
+	}
+	if strings.EqualFold(currentClientModel, targetClientModel) {
+		return "", nil, routing.Requirements{}, false
+	}
+
+	plans := dispatchresolver.ResolveDispatchPlans(
+		state.requestedPlatform,
+		state.keyInfo.GroupDispatchResolver,
+		requestTransportMethod(c.Request),
+		state.requestPath,
+		targetClientModel,
+	)
+	if group := routegraph.Group(state.keyInfo.GroupID); group != nil {
+		plans = routing.FilterDispatchPlansByAccounts(group, plans)
+	}
+	if len(plans) == 0 {
+		return "", nil, routing.Requirements{}, false
+	}
+	requirements := routing.RequirementsFromDispatchPlans(plans)
+	if !routing.GroupMatchesRequirements(entGroupFromKeyInfo(state.keyInfo), requirements).OK {
+		return "", nil, routing.Requirements{}, false
+	}
+	return targetClientModel, plans, requirements, true
+}
+
+func applyModelReroute(state *forwardState, plans []sdk.DispatchPlan, requirements routing.Requirements) {
+	if state == nil {
+		return
+	}
+	state.dispatch = newDispatchChain(plans)
+	state.dispatchPlan = sdk.DispatchPlan{}
+	state.requirements = requirements
+	state.account = nil
+	state.modelReroutes++
 }
 
 func canStartForwardAttempt(state *forwardState, attempt int) bool {

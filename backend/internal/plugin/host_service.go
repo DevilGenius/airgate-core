@@ -718,7 +718,16 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 	hardExclude := make([]int, 0, maxHostForwardAttempts*len(routes))
 	var lastUpstream sdk.UpstreamResponse
 	hasLastUpstream := false
+	modelReroutes := 0
+	rerouteClientModel := ""
 	for _, route := range routes {
+		if rerouteClientModel != "" {
+			plans, ok := hostResolvedModelPlans(route, req, rerouteClientModel)
+			if !ok {
+				continue
+			}
+			route.DispatchPlans = plans
+		}
 		clientModel := h.resolveHostModel(route.Platform, req.Model)
 		if clientModel == "" {
 			slog.Warn("host_forward_no_model",
@@ -785,12 +794,30 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			outcome, fwdErr := inst.Forward(fwdCtx, fwdReq)
 			releaseCapacity()
 			duration := time.Since(start)
+			if cerr := hostContextError(fwdErr); cerr != nil {
+				return nil, cerr
+			}
+
+			if fwdErr == nil && modelReroutes < maxModelReroutes {
+				if targetClientModel, requested := outcome.ModelRerouteClientTarget(); requested {
+					if plans, ok := hostModelReroutePlans(route, req, plan.ClientModel, targetClientModel); ok {
+						chain = newDispatchChain(plans)
+						modelReroutes++
+						rerouteClientModel = targetClientModel
+						lastAttemptAccount = nil
+						slog.Info("host_forward_model_reroute",
+							sdk.LogFieldGroupID, route.GroupID,
+							sdk.LogFieldAccountID, acc.ID,
+							"from_scheduling_model", schedulingModel,
+							"reroute_client_model", targetClientModel,
+						)
+						continue
+					}
+				}
+			}
 			if returnableUpstream(outcome.Upstream) {
 				lastUpstream = outcome.Upstream
 				hasLastUpstream = true
-			}
-			if cerr := hostContextError(fwdErr); cerr != nil {
-				return nil, cerr
 			}
 
 			if next, ok := chain.AdvanceOnOutcome(outcome, false); ok {
@@ -898,8 +925,17 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 
 	sw := &hostStreamWriter{stream: stream}
 	hardExclude := make([]int, 0, maxHostForwardAttempts*len(routes))
+	modelReroutes := 0
+	rerouteClientModel := ""
 
 	for _, route := range routes {
+		if rerouteClientModel != "" {
+			plans, ok := hostResolvedModelPlans(route, req, rerouteClientModel)
+			if !ok {
+				continue
+			}
+			route.DispatchPlans = plans
+		}
 		clientModel := h.resolveHostModel(route.Platform, req.Model)
 		if clientModel == "" {
 			slog.Warn("host_forward_stream_no_model",
@@ -969,6 +1005,24 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 			duration := time.Since(start)
 			if cerr := hostContextError(fwdErr); cerr != nil {
 				return cerr
+			}
+
+			if !fw.committed && fwdErr == nil && modelReroutes < maxModelReroutes {
+				if targetClientModel, requested := outcome.ModelRerouteClientTarget(); requested {
+					if plans, ok := hostModelReroutePlans(route, req, plan.ClientModel, targetClientModel); ok {
+						chain = newDispatchChain(plans)
+						modelReroutes++
+						rerouteClientModel = targetClientModel
+						lastAttemptAccount = nil
+						slog.Info("host_forward_stream_model_reroute",
+							sdk.LogFieldGroupID, route.GroupID,
+							sdk.LogFieldAccountID, acc.ID,
+							"from_scheduling_model", schedulingModel,
+							"reroute_client_model", targetClientModel,
+						)
+						continue
+					}
+				}
 			}
 
 			if next, ok := chain.AdvanceOnOutcome(outcome, fw.committed); ok {
@@ -1714,6 +1768,41 @@ func dispatchSchedulingModels(plans []sdk.DispatchPlan, fallback string) []strin
 		return []string{fallback}
 	}
 	return out
+}
+
+func hostModelReroutePlans(route routing.Candidate, req hostForwardRequest, currentClientModel, targetClientModel string) ([]sdk.DispatchPlan, bool) {
+	targetClientModel = strings.TrimSpace(targetClientModel)
+	if targetClientModel == "" || strings.EqualFold(strings.TrimSpace(currentClientModel), targetClientModel) {
+		return nil, false
+	}
+	return hostResolvedModelPlans(route, req, targetClientModel)
+}
+
+func hostResolvedModelPlans(route routing.Candidate, req hostForwardRequest, targetClientModel string) ([]sdk.DispatchPlan, bool) {
+	targetClientModel = strings.TrimSpace(targetClientModel)
+	if targetClientModel == "" {
+		return nil, false
+	}
+	group := routegraph.Group(route.GroupID)
+	if group == nil {
+		return nil, false
+	}
+	plans := dispatchresolver.ResolveDispatchPlans(
+		route.Platform,
+		group.DispatchResolver,
+		hostForwardMethod(req),
+		req.Path,
+		targetClientModel,
+	)
+	plans = routing.FilterDispatchPlansByAccounts(group, plans)
+	if len(plans) == 0 {
+		return nil, false
+	}
+	entGroup := &ent.Group{ID: group.ID, Platform: group.Platform, OperationPolicies: group.OperationPolicies}
+	if !routing.GroupMatchesRequirements(entGroup, routing.RequirementsFromDispatchPlans(plans)).OK {
+		return nil, false
+	}
+	return plans, true
 }
 
 func (h *HostService) acquireHostForwardAccountCapacity(ctx context.Context, acc *ent.Account) (func(), bool) {

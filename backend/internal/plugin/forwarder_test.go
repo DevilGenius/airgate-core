@@ -16,6 +16,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
@@ -881,6 +882,152 @@ func TestCanDispatchCandidateFailoverRequiresScopeAndWritableStream(t *testing.T
 		outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeClientError, FailoverScope: sdk.FailoverScopeDispatchCandidate},
 	}) {
 		t.Fatal("written stream should not advance dispatch candidate")
+	}
+}
+
+func TestApplyModelRerouteRebuildsDispatchPlan(t *testing.T) {
+	restoreRouteGraph := routegraph.SetSnapshotForTesting(nil)
+	t.Cleanup(restoreRouteGraph)
+	longContextDSL := sdk.DispatchDSL{Rules: []sdk.DispatchRule{{
+		ID:   "long-context",
+		When: sdk.DispatchWhen{Models: []string{"gpt-long"}},
+		Candidates: []sdk.DispatchCandidate{{
+			Scheduling: "long-context-pool",
+			Wire:       "internal-long-wire",
+		}},
+	}}}
+	group := &ent.Group{ID: 7, Platform: "openai", DispatchDsl: longContextDSL}
+	group.Edges.Accounts = []*ent.Account{{
+		ID:          100,
+		Name:        "long-context",
+		Platform:    "openai",
+		State:       account.StateActive,
+		ModelPolicy: modelpolicy.Policy{Allow: []string{"long-context-pool"}},
+	}}
+	routegraph.SetSnapshotForTesting([]*ent.Group{group})
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	state := &forwardState{
+		requestPath:       "/v1/responses",
+		requestedPlatform: "openai",
+		keyInfo: &auth.APIKeyInfo{
+			GroupID:               7,
+			GroupPlatform:         "openai",
+			GroupDispatchResolver: dispatchresolver.Compile(longContextDSL),
+		},
+		dispatch: newDispatchChain([]sdk.DispatchPlan{{
+			ClientModel:     "gpt-short",
+			SchedulingModel: "short-context-pool",
+			WireModel:       "internal-long-wire",
+		}}),
+		dispatchPlan: sdk.DispatchPlan{
+			ClientModel:     "gpt-short",
+			SchedulingModel: "short-context-pool",
+			WireModel:       "internal-long-wire",
+		},
+		account: &ent.Account{ID: 99},
+	}
+
+	forwarder := &Forwarder{}
+	invalidExecution := forwardExecution{outcome: sdk.ForwardOutcome{
+		Kind:               sdk.OutcomeSuccess,
+		FailoverScope:      sdk.FailoverScopeModelReroute,
+		RerouteClientModel: "gpt-long",
+	}}
+	if _, _, _, ok := forwarder.resolveModelReroute(c, state, invalidExecution); ok {
+		t.Fatal("successful outcome must not request a model reroute")
+	}
+	alreadyLongState := *state
+	alreadyLongState.dispatchPlan = sdk.DispatchPlan{
+		ClientModel:     "gpt-long",
+		SchedulingModel: "long-context-pool",
+		WireModel:       "internal-long-wire",
+	}
+	alreadyLongExecution := forwardExecution{outcome: sdk.ForwardOutcome{
+		Kind:               sdk.OutcomeClientError,
+		FailoverScope:      sdk.FailoverScopeModelReroute,
+		RerouteClientModel: "gpt-long",
+	}}
+	if _, _, _, ok := forwarder.resolveModelReroute(c, &alreadyLongState, alreadyLongExecution); ok {
+		t.Fatal("a request already resolved from the long-context client model must not reroute")
+	}
+
+	execution := forwardExecution{outcome: sdk.ForwardOutcome{
+		Kind:               sdk.OutcomeClientError,
+		FailoverScope:      sdk.FailoverScopeModelReroute,
+		RerouteClientModel: "gpt-unavailable",
+	}}
+	if _, _, _, ok := forwarder.resolveModelReroute(c, state, execution); ok {
+		t.Fatal("model reroute must reject a target with no eligible account")
+	}
+	execution.outcome.RerouteClientModel = "gpt-long"
+	targetModel, plans, requirements, ok := forwarder.resolveModelReroute(c, state, execution)
+	if !ok {
+		t.Fatal("model reroute should be applied")
+	}
+	if targetModel != "gpt-long" {
+		t.Fatalf("reroute target = %q, want gpt-long", targetModel)
+	}
+	if state.account == nil || state.account.ID != 99 {
+		t.Fatal("resolving a reroute must preserve the current attempt account until cleanup")
+	}
+	applyModelReroute(state, plans, requirements)
+	if state.account != nil {
+		t.Fatal("model reroute must clear the previously selected account")
+	}
+	if state.dispatchPlan != (sdk.DispatchPlan{}) {
+		t.Fatalf("selected dispatch plan = %+v, want cleared", state.dispatchPlan)
+	}
+	reroutedPlans := state.dispatch.Plans()
+	if len(reroutedPlans) != 1 || reroutedPlans[0].ClientModel != "gpt-long" ||
+		reroutedPlans[0].SchedulingModel != "long-context-pool" || reroutedPlans[0].WireModel != "internal-long-wire" {
+		t.Fatalf("reroute plans = %+v, want mapped long-context plan", reroutedPlans)
+	}
+	if state.modelReroutes != 1 {
+		t.Fatalf("model reroute count = %d, want 1", state.modelReroutes)
+	}
+	execution.outcome.RerouteClientModel = "gpt-other"
+	if _, _, _, ok := forwarder.resolveModelReroute(c, state, execution); ok {
+		t.Fatal("a second model reroute must be rejected")
+	}
+}
+
+func TestHostModelReroutePlansRequireDifferentAvailableModel(t *testing.T) {
+	restoreRouteGraph := routegraph.SetSnapshotForTesting(nil)
+	t.Cleanup(restoreRouteGraph)
+
+	longContextDSL := sdk.DispatchDSL{Rules: []sdk.DispatchRule{{
+		ID:   "long-context",
+		When: sdk.DispatchWhen{Models: []string{"gpt-long"}},
+		Candidates: []sdk.DispatchCandidate{{
+			Scheduling: "long-context-pool",
+			Wire:       "internal-long-wire",
+		}},
+	}}}
+	group := &ent.Group{ID: 43, Platform: "openai", DispatchDsl: longContextDSL}
+	group.Edges.Accounts = []*ent.Account{{
+		ID:          101,
+		Name:        "long-context",
+		Platform:    "openai",
+		State:       account.StateActive,
+		ModelPolicy: modelpolicy.Policy{Allow: []string{"long-context-pool"}},
+	}}
+	routegraph.SetSnapshotForTesting([]*ent.Group{group})
+
+	route := routing.Candidate{GroupID: group.ID, Platform: group.Platform}
+	req := hostForwardRequest{Method: http.MethodPost, Path: "/v1/responses", Model: "gpt-short"}
+	plans, ok := hostModelReroutePlans(route, req, "gpt-short", "gpt-long")
+	if !ok || len(plans) != 1 || plans[0].ClientModel != "gpt-long" ||
+		plans[0].SchedulingModel != "long-context-pool" || plans[0].WireModel != "internal-long-wire" {
+		t.Fatalf("host reroute plans = %+v, ok=%v", plans, ok)
+	}
+	if _, ok := hostModelReroutePlans(route, req, "gpt-long", "gpt-long"); ok {
+		t.Fatal("host reroute must reject the currently selected model")
+	}
+	if _, ok := hostModelReroutePlans(route, req, "gpt-short", "gpt-unavailable"); ok {
+		t.Fatal("host reroute must reject a model with no eligible account")
 	}
 }
 

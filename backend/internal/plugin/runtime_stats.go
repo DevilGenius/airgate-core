@@ -10,9 +10,9 @@ import (
 const runtimeSafetyCacheStatsPath = "runtime/safety-cache"
 
 type runtimeSafetyCacheStatsResponse struct {
-	Text                  runtimeSafetyCacheStatsItem `json:"text"`
-	Image                 runtimeSafetyCacheStatsItem `json:"image"`
-	EncryptedContentRetry runtimeSafetyCacheStatsItem `json:"encrypted_content_retry"`
+	Text         runtimeSafetyCacheStatsItem `json:"text"`
+	Image        runtimeSafetyCacheStatsItem `json:"image"`
+	RequestRetry runtimeSafetyCacheStatsItem `json:"request_retry"`
 }
 
 type runtimeSafetyCacheStatsItem struct {
@@ -24,7 +24,7 @@ type runtimeSafetyCacheStatsItem struct {
 func (m *Manager) SafetyCacheStats(ctx context.Context) (
 	textSize, textCapacity,
 	imageSize, imageCapacity,
-	encryptedRetrySize, encryptedRetryCapacity int,
+	requestRetrySize, requestRetryCapacity int,
 	err error,
 ) {
 	if m == nil {
@@ -47,6 +47,6 @@ func (m *Manager) SafetyCacheStats(ctx context.Context) (
 	}
 	return stats.Text.Size, stats.Text.Capacity,
 		stats.Image.Size, stats.Image.Capacity,
-		stats.EncryptedContentRetry.Size, stats.EncryptedContentRetry.Capacity,
+		stats.RequestRetry.Size, stats.RequestRetry.Capacity,
 		nil
 }

@@ -31,6 +31,7 @@ type forwardState struct {
 	previousResponseID          string
 	requireContinuationAffinity bool
 	continuationRecoveryApplied bool
+	modelReroutes               int
 
 	// 推理强度档位快照。
 	reasoningEffort string
