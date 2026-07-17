@@ -285,3 +285,76 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* User and admin API key mobile cards (≤767px): CommonTable swaps to UserKeysMobileList. */
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-mobile-record-description .ag-api-key-prefix-chip {
+  margin-inline: 0;
+}
+
+/* Group and expiry share the first field row with equal-width columns. */
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-mobile-record-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-user-keys-mobile-field--group .ag-api-key-group-stack {
+  width: 100%;
+  min-width: 0;
+}
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-user-keys-mobile-field--group :is(.ag-api-key-group-line, .ag-api-key-rate-row) {
+  grid-template-columns: minmax(0, 1fr) 3.75rem;
+}
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-user-keys-mobile-field--group .ag-api-key-rate-row {
+  font-size: 0.6875rem;
+}
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-user-keys-mobile-field--expiry dd {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Metric chips: drop fixed desktop min-widths so chips fit the card. */
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-user-keys-mobile-field--chips dd {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-metric-chips--quota,
+.ag-api-keys-table.ag-user-keys-mobile .ag-metric-chips--markup,
+.ag-api-keys-table.ag-user-keys-mobile .ag-metric-chips--usage {
+  width: 100%;
+  min-width: 0;
+}
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-metric-chips--markup,
+.ag-api-keys-table.ag-user-keys-mobile .ag-metric-chips--usage {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-metric-chip {
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 0.25rem;
+  padding-inline: 0.375rem;
+}
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-metric-chip-value {
+  min-width: 0;
+}
+
+/* Card actions: stretch across the card with touch-friendly targets. */
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-mobile-record-actions .ag-table-row-actions {
+  width: 100%;
+  gap: 0.5rem;
+}
+
+.ag-api-keys-table.ag-user-keys-mobile .ag-mobile-record-actions .ag-table-row-actions > :where(.ag-table-row-native-action) {
+  height: 2.25rem;
+  min-height: 2.25rem;
+  flex: 1 1 0;
+  font-size: 0.75rem;
+}

@@ -21,11 +21,13 @@ import { TablePage } from '../../shared/components/TablePage';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { NativeStatusChip } from '../../shared/components/NativeStatusChip';
 import { TableRowActionButton } from '../../shared/components/TableRowActionButton';
-import { TableRowMoreMenu } from '../../shared/components/TableRowMoreMenu';
+import { TableRowMoreMenu, type TableRowMoreMenuItem } from '../../shared/components/TableRowMoreMenu';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import { CreateKeyModal } from './apikeys/CreateKeyModal';
 import { EditKeyModal } from './apikeys/EditKeyModal';
+import { UserKeysMobileList } from '../user/userkeys/UserKeysMobileList';
 import type { APIKeyResp, GroupResp } from '../../shared/types';
 
 const API_KEY_AMOUNT_DECIMALS = 3;
@@ -98,9 +100,12 @@ export default function APIKeysPage() {
   });
 
   const rows = data?.list ?? [];
-  const groupById = new Map((groupsData?.list ?? []).map((group: GroupResp) => [group.id, group]));
+  const groupById = new Map<number, GroupResp>(
+    (groupsData?.list ?? []).map((group: GroupResp) => [group.id, group]),
+  );
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
+  const isMobileLayout = useMediaQuery('(max-width: 767px)');
   const closeRevealedKeyModal = () => {
     resetRevealedKeyCopied();
     setRevealedKey(null);
@@ -126,6 +131,43 @@ export default function APIKeysPage() {
       if (!open) closeRevealedKeyModal();
     },
   });
+
+  const getKeyMoreMenuItems = (row: APIKeyResp): TableRowMoreMenuItem[] => [
+    {
+      key: 'delete',
+      label: t('common.delete'),
+      onSelect: () => setDeletingKey(row),
+      tone: 'danger',
+    },
+  ];
+
+  const renderKeyActions = (row: APIKeyResp, showMoreMenu = true) => (
+    <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
+      <TableRowActionButton
+        ariaBusy={revealMutation.isPending}
+        ariaLabel={t('api_keys.reveal')}
+        isDisabled={revealMutation.isPending}
+        title={t('api_keys.reveal')}
+        onClick={() => revealMutation.mutate(row.id)}
+      >
+        {t('api_keys.reveal_short', '查看')}
+      </TableRowActionButton>
+      <TableRowActionButton
+        ariaLabel={t('common.edit')}
+        title={t('common.edit')}
+        onClick={() => setEditingKey(row)}
+      >
+        {t('common.edit_short', '编辑')}
+      </TableRowActionButton>
+      {showMoreMenu ? (
+        <TableRowMoreMenu
+          ariaLabel={t('common.more')}
+          menuLabel={t('common.actions')}
+          items={getKeyMoreMenuItems(row)}
+        />
+      ) : null}
+    </div>
+  );
 
   return (
     <TablePage
@@ -173,6 +215,16 @@ export default function APIKeysPage() {
       isFetching={isFetching && !isLoading}
     >
 
+      {isMobileLayout ? (
+        <UserKeysMobileList
+          emptyTitle={t('common.no_data')}
+          getMoreMenuItems={getKeyMoreMenuItems}
+          groupMap={groupById}
+          isLoading={isLoading}
+          renderActions={renderKeyActions}
+          rows={rows}
+        />
+      ) : (
       <CommonTable
         ariaLabel={t('api_keys.title', 'API keys')}
         className="ag-api-keys-table"
@@ -305,36 +357,7 @@ export default function APIKeysPage() {
                     <span className="font-mono">{formatExpiry(row.expires_at)}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
-                      <TableRowActionButton
-                        ariaBusy={revealMutation.isPending}
-                        ariaLabel={t('api_keys.reveal')}
-                        isDisabled={revealMutation.isPending}
-                        title={t('api_keys.reveal')}
-                        onClick={() => revealMutation.mutate(row.id)}
-                      >
-                        {t('api_keys.reveal_short', '查看')}
-                      </TableRowActionButton>
-                      <TableRowActionButton
-                        ariaLabel={t('common.edit')}
-                        title={t('common.edit')}
-                        onClick={() => setEditingKey(row)}
-                      >
-                        {t('common.edit_short', '编辑')}
-                      </TableRowActionButton>
-                      <TableRowMoreMenu
-                        ariaLabel={t('common.more')}
-                        menuLabel={t('common.actions')}
-                        items={[
-                          {
-                            key: 'delete',
-                            label: t('common.delete'),
-                            onSelect: () => setDeletingKey(row),
-                            tone: 'danger',
-                          },
-                        ]}
-                      />
-                    </div>
+                    {renderKeyActions(row)}
                   </CommonTable.Cell>
                 </CommonTable.Row>
               );
@@ -342,6 +365,7 @@ export default function APIKeysPage() {
           )}
         </CommonTable.Body>
       </CommonTable>
+      )}
 
       <CreateKeyModal
         open={showCreateModal}

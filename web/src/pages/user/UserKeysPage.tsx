@@ -18,12 +18,12 @@ import { TablePage } from '../../shared/components/TablePage';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { NativeStatusChip } from '../../shared/components/NativeStatusChip';
 import { TableRowActionButton } from '../../shared/components/TableRowActionButton';
-import { TableRowMoreMenu } from '../../shared/components/TableRowMoreMenu';
-import { dateInputToLocalStartRFC3339, formatAPIKeyHint, formatDateInputValue, formatExpiry } from '../../shared/utils/format';
+import { TableRowMoreMenu, type TableRowMoreMenuItem } from '../../shared/components/TableRowMoreMenu';
+import { dateInputToLocalStartRFC3339, formatDateInputValue, formatExpiry } from '../../shared/utils/format';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import {
-  formatRateMultiplier,
   isValidRateMultiplierValue,
   isValidSellRateValue,
   parseRateMultiplier,
@@ -42,12 +42,15 @@ import { CreateKeyModal } from './userkeys/CreateKeyModal';
 import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
 import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
-
-const API_KEY_AMOUNT_DECIMALS = 3;
-
-function formatRateValue(rate: number | null | undefined) {
-  return formatRateMultiplier(rate);
-}
+import { UserKeysMobileList } from './userkeys/UserKeysMobileList';
+import {
+  KeyGroupRateStack,
+  buildMarkupChipItems,
+  buildQuotaChipItems,
+  buildUsageChipItems,
+  formatRateValue,
+  getUserKeyRowModel,
+} from './userkeys/keyRowModel';
 
 export default function UserKeysPage() {
   const { t } = useTranslation();
@@ -287,6 +290,7 @@ export default function UserKeysPage() {
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
+  const isMobileLayout = useMediaQuery('(max-width: 767px)');
   const closeRevealedKeyModal = () => {
     resetRevealedKeyCopied();
     setRevealedKey(null);
@@ -302,6 +306,63 @@ export default function UserKeysPage() {
       if (!open) closeRevealedKeyModal();
     },
   });
+
+  const getKeyMoreMenuItems = (row: APIKeyResp): TableRowMoreMenuItem[] => [
+    {
+      key: 'import_ccs',
+      label: t('user_keys.import_ccs'),
+      onSelect: () => openCcsModal(row),
+    },
+    {
+      key: 'toggle',
+      label: row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable'),
+      isDisabled: toggleStatusMutation.isPending,
+      onSelect: () => toggleStatusMutation.mutate({
+        id: row.id,
+        status: row.status === 'active' ? 'disabled' : 'active',
+      }),
+    },
+    {
+      key: 'use_key',
+      label: t('user_keys.use_key'),
+      onSelect: () => openUseKeyModal(row),
+    },
+    {
+      key: 'delete',
+      label: t('common.delete'),
+      onSelect: () => setDeleteTarget(row),
+      tone: 'danger',
+    },
+  ];
+
+  // 桌面保留更多按钮；移动端仅显示查看/编辑，更多操作由长按卡片触发。
+  const renderKeyActions = (row: APIKeyResp, showMoreMenu = true) => (
+    <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
+      <TableRowActionButton
+        ariaBusy={revealMutation.isPending}
+        ariaLabel={t('api_keys.reveal')}
+        isDisabled={revealMutation.isPending}
+        title={t('api_keys.reveal')}
+        onClick={() => revealMutation.mutate(row.id)}
+      >
+        {t('api_keys.reveal_short', '查看')}
+      </TableRowActionButton>
+      <TableRowActionButton
+        ariaLabel={t('common.edit')}
+        title={t('common.edit')}
+        onClick={() => openEdit(row)}
+      >
+        {t('common.edit_short', '编辑')}
+      </TableRowActionButton>
+      {showMoreMenu ? (
+        <TableRowMoreMenu
+          ariaLabel={t('common.more')}
+          menuLabel={t('common.actions')}
+          items={getKeyMoreMenuItems(row)}
+        />
+      ) : null}
+    </div>
+  );
 
   return (
     <TablePage
@@ -342,6 +403,17 @@ export default function UserKeysPage() {
       isFetching={isFetching && !isLoading}
     >
 
+      {isMobileLayout ? (
+        <UserKeysMobileList
+          emptyTitle={t('common.no_data')}
+          getMoreMenuItems={getKeyMoreMenuItems}
+          groupMap={groupMap}
+          isLoading={isLoading}
+          renderActions={renderKeyActions}
+          rows={rows}
+          userGroupRates={user?.group_rates}
+        />
+      ) : (
       <CommonTable
         ariaLabel={t('user_keys.title', 'API keys')}
         className="ag-api-keys-table"
@@ -373,28 +445,7 @@ export default function UserKeysPage() {
             </CommonTable.Row>
           ) : (
             rows.map((row) => {
-              const group = row.group_id == null ? null : groupMap.get(row.group_id);
-              const isGroupUnbound = row.group_id == null;
-              const groupName = isGroupUnbound
-                ? t('user_keys.group_unbound')
-                : group?.name || `#${row.group_id}`;
-              const sellRate = isValidSellRateValue(row.sell_rate ?? null) && row.sell_rate != null ? row.sell_rate : 1;
-              const hasSellRate = sellRate !== 1;
-              const userOverride = row.group_id == null ? undefined : user?.group_rates?.[row.group_id];
-              const hasUserOverride =
-                isValidRateMultiplierValue(userOverride ?? null);
-              const responseGroupRate =
-                isValidRateMultiplierValue(row.group_rate ?? null)
-                  ? row.group_rate
-                  : undefined;
-              const groupRate = responseGroupRate ?? (hasUserOverride ? userOverride : group?.rate_multiplier);
-              const normalizedGroupRate = isValidRateMultiplierValue(groupRate ?? null) ? groupRate : undefined;
-              const hasGroupRate = normalizedGroupRate != null;
-              const effectiveRate = hasGroupRate ? normalizedGroupRate * sellRate : undefined;
-              const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
-              const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
-              const displayStatus = isExpired ? 'expired' : row.status;
-              const keyHint = formatAPIKeyHint(row.key_prefix);
+              const model = getUserKeyRowModel(row, groupMap, user?.group_rates, t);
 
               return (
                 <CommonTable.Row id={String(row.id)} key={row.id}>
@@ -404,182 +455,40 @@ export default function UserKeysPage() {
                   <CommonTable.Cell>
                     <span
                       className="ag-api-key-prefix-chip inline-flex items-center text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono"
-                      title={keyHint}
+                      title={model.keyHint}
                     >
-                      {keyHint}
+                      {model.keyHint}
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <div className="ag-api-key-group-stack">
-                      <div className="ag-api-key-group-line">
-                        <span
-                          className="ag-api-key-group-name-chip inline-flex h-6 min-w-0 max-w-full items-center justify-center gap-1 rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none text-text-secondary"
-                          data-tone={isGroupUnbound ? 'warning' : 'default'}
-                          title={groupName}
-                        >
-                          {groupName}
-                        </span>
-                        {hasGroupRate ? (
-                          <span
-                            className="ag-api-key-effective-rate-chip"
-                            title={`${t('user_keys.effective_rate_short', '综合倍率')} ${formatRateValue(effectiveRate)}`}
-                          >
-                            {formatRateValue(effectiveRate)}
-                          </span>
-                        ) : null}
-                      </div>
-                      {(hasGroupRate || hasSellRate) && (
-                        <div
-                          className="ag-api-key-rate-row"
-                          title={`${t('user_keys.group_sell_rate_short', '分组倍率x销售倍率')} ${formatRateValue(normalizedGroupRate)}x${formatRateValue(sellRate)}`}
-                        >
-                          <span className="ag-api-key-rate-label">
-                            {t('user_keys.group_sell_rate_short', '分组倍率x销售倍率')}
-                          </span>
-                          <span className="ag-api-key-rate-value">
-                            {formatRateValue(normalizedGroupRate)}x{formatRateValue(sellRate)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <KeyGroupRateStack model={model} t={t} />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <NativeStatusChip status={displayStatus} />
+                    <NativeStatusChip status={model.displayStatus} />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <MetricChips
                       className="ag-metric-chips--quota"
-                      items={[
-                        {
-                          amount: row.used_quota,
-                          color: 'warning',
-                          decimals: API_KEY_AMOUNT_DECIMALS,
-                          highlightDollar: true,
-                          label: t('user_keys.quota_used_short', '使用'),
-                        },
-                        {
-                          amount: row.quota_usd > 0 ? row.quota_usd : undefined,
-                          color: 'success',
-                          decimals: API_KEY_AMOUNT_DECIMALS,
-                          label: t('user_keys.quota_total_short', '配额'),
-                          value: '∞',
-                        },
-                      ]}
+                      items={buildQuotaChipItems(row, t)}
                     />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <MetricChips
                       className="ag-metric-chips--stack ag-metric-chips--markup"
-                      items={[
-                        {
-                          amount: row.used_quota_actual || 0,
-                          color: 'default',
-                          decimals: API_KEY_AMOUNT_DECIMALS,
-                          dollarTone: 'warning',
-                          label: t('user_keys.cost_actual', '成本'),
-                        },
-                        {
-                          amount: profit,
-                          color: 'default',
-                          decimals: API_KEY_AMOUNT_DECIMALS,
-                          dollarTone: 'success',
-                          label: t('user_keys.profit', '利润'),
-                        },
-                      ]}
+                      items={buildMarkupChipItems(row, model, t)}
                     />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <MetricChips
                       className="ag-metric-chips--usage"
-                      items={[
-                        {
-                          amount: row.today_cost,
-                          color: 'warning',
-                          decimals: API_KEY_AMOUNT_DECIMALS,
-                          dollarTone: 'warning',
-                          label: t('api_keys.sales', '销售'),
-                          mutedWhenZero: true,
-                        },
-                        {
-                          amount: row.thirty_day_cost,
-                          color: 'warning',
-                          decimals: API_KEY_AMOUNT_DECIMALS,
-                          dollarTone: 'warning',
-                          label: t('api_keys.sales', '销售'),
-                          mutedWhenZero: true,
-                        },
-                        {
-                          amount: row.today_actual_cost ?? 0,
-                          color: 'warning',
-                          decimals: API_KEY_AMOUNT_DECIMALS,
-                          dollarTone: 'warning',
-                          label: t('api_keys.consumption', '消耗'),
-                          mutedWhenZero: true,
-                        },
-                        {
-                          amount: row.thirty_day_actual_cost ?? 0,
-                          color: 'warning',
-                          decimals: API_KEY_AMOUNT_DECIMALS,
-                          dollarTone: 'warning',
-                          label: t('api_keys.consumption', '消耗'),
-                          mutedWhenZero: true,
-                        },
-                      ]}
+                      items={buildUsageChipItems(row, t)}
                     />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     {formatExpiry(row.expires_at, t('user_keys.never_expire'))}
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <div className="ag-table-row-actions flex items-center justify-center gap-0.5">
-                      <TableRowActionButton
-                        ariaBusy={revealMutation.isPending}
-                        ariaLabel={t('api_keys.reveal')}
-                        isDisabled={revealMutation.isPending}
-                        title={t('api_keys.reveal')}
-                        onClick={() => revealMutation.mutate(row.id)}
-                      >
-                        {t('api_keys.reveal_short', '查看')}
-                      </TableRowActionButton>
-                      <TableRowActionButton
-                        ariaLabel={t('common.edit')}
-                        title={t('common.edit')}
-                        onClick={() => openEdit(row)}
-                      >
-                        {t('common.edit_short', '编辑')}
-                      </TableRowActionButton>
-                      <TableRowMoreMenu
-                        ariaLabel={t('common.more')}
-                        menuLabel={t('common.actions')}
-                        items={[
-                          {
-                            key: 'import_ccs',
-                            label: t('user_keys.import_ccs'),
-                            onSelect: () => openCcsModal(row),
-                          },
-                          {
-                            key: 'toggle',
-                            label: row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable'),
-                            isDisabled: toggleStatusMutation.isPending,
-                            onSelect: () => toggleStatusMutation.mutate({
-                              id: row.id,
-                              status: row.status === 'active' ? 'disabled' : 'active',
-                            }),
-                          },
-                          {
-                            key: 'use_key',
-                            label: t('user_keys.use_key'),
-                            onSelect: () => openUseKeyModal(row),
-                          },
-                          {
-                            key: 'delete',
-                            label: t('common.delete'),
-                            onSelect: () => setDeleteTarget(row),
-                            tone: 'danger',
-                          },
-                        ]}
-                      />
-                    </div>
+                    {renderKeyActions(row)}
                   </CommonTable.Cell>
                 </CommonTable.Row>
               );
@@ -587,6 +496,7 @@ export default function UserKeysPage() {
           )}
         </CommonTable.Body>
       </CommonTable>
+      )}
 
       {/* 创建/编辑弹窗 */}
       <EditKeyModal
