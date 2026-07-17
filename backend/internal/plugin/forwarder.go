@@ -223,7 +223,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				f.recordClientClosedRequest(c, state, status, totalAttempts)
 				logger.Debug("forward_request_canceled",
 					"status_code", status,
-					"attempts", totalAttempts,
+					"total_attempts", totalAttempts,
 				)
 				return
 			}
@@ -239,7 +239,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					f.recordClientClosedRequest(c, state, status, totalAttempts)
 					logger.Debug("forward_request_canceled",
 						"status_code", status,
-						"attempts", totalAttempts,
+						"total_attempts", totalAttempts,
 					)
 					return
 				}
@@ -290,7 +290,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 								f.recordClientClosedRequest(c, state, status, totalAttempts)
 								logger.Debug("forward_request_canceled",
 									"status_code", status,
-									"attempts", totalAttempts,
+									"total_attempts", totalAttempts,
 								)
 								return
 							}
@@ -364,7 +364,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					f.recordClientClosedRequest(c, state, requestCanceled, totalAttempts)
 					logger.Debug("forward_request_canceled",
 						"status_code", requestCanceled,
-						"attempts", totalAttempts,
+						"total_attempts", totalAttempts,
 					)
 					return
 				}
@@ -428,7 +428,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				failureSummary.recordExecution(execution)
 				willRetry := canStartForwardAttempt(state, attempt) || routeIndex+1 < len(routes)
 				attrs := []any{
-					"attempt", attempt,
+					"failed_attempt", totalAttempts,
 					"kind", execution.outcome.Kind,
 					sdk.LogFieldDurationMs, execution.duration.Milliseconds(),
 					sdk.LogFieldReason, judgmentReason(execution),
@@ -441,7 +441,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				}
 				attrs = append(attrs, "will_retry", willRetry)
 				if willRetry {
-					attrs = append(attrs, "retry_count", totalAttempts, "next_attempt", totalAttempts+1)
+					attrs = append(attrs, "retry_number", totalAttempts, "next_attempt", totalAttempts+1)
 				}
 				attemptLogger.Info("forward_attempt_failed", attrs...)
 				releaseAccountSlot()
@@ -469,7 +469,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				attemptLogger.Info("forward_request_completed_after_retry",
 					sdk.LogFieldStatus, execution.outcome.Upstream.StatusCode,
 					sdk.LogFieldDurationMs, time.Since(startedAt).Milliseconds(),
-					"attempts", totalAttempts,
+					"total_attempts", totalAttempts,
 				)
 			} else {
 				attemptLogger.Debug("forward_request_completed",
@@ -481,14 +481,14 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		}
 
 		logger.Debug("forward_route_failover_exhausted",
-			"attempts", attempt,
+			"route_attempts", attempt,
 			"scheduling_models", state.schedulingModelCandidates(),
 		)
 	}
 
 	failAttrs := []any{
 		sdk.LogFieldDurationMs, time.Since(startedAt).Milliseconds(),
-		"attempts", totalAttempts,
+		"total_attempts", totalAttempts,
 		"scheduling_models", state.schedulingModelCandidates(),
 	}
 	if len(hardExclude) > 0 {

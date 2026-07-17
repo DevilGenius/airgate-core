@@ -100,7 +100,7 @@ func TestPluginMonitorRecordsExecutionClientAndClosedEvents(t *testing.T) {
 			Reason:   "temporary failure",
 		},
 		duration: 15 * time.Millisecond,
-	}, 1)
+	}, 2)
 	forwarder.recordPluginExecutionFinalFailure(sdk.WithRequestID(context.Background(), "exec-request"), state, forwardExecution{
 		outcome: sdk.ForwardOutcome{
 			Kind:     sdk.OutcomeUpstreamTransient,
@@ -137,18 +137,30 @@ func TestPluginMonitorRecordsExecutionClientAndClosedEvents(t *testing.T) {
 	}
 	retry := recorder.requestEvents[1]
 	if retry.Type != requestmonitoring.TypePluginForwardRetry || retry.Severity != requestmonitoring.SeverityInfo ||
-		retry.RequestID != "retry-request" || retry.Detail["retry_count"] != 1 || retry.Detail["attempts"] != 1 ||
-		retry.Detail["next_attempt"] != 2 || retry.Detail["final_failure"] != false {
+		retry.RequestID != "retry-request" || retry.Detail["failed_attempt"] != 2 || retry.Detail["retry_number"] != 2 ||
+		retry.Detail["next_attempt"] != 3 || retry.Detail["final_failure"] != false {
 		t.Fatalf("retry event = %+v", retry)
+	}
+	if _, exists := retry.Detail["attempts"]; exists {
+		t.Fatalf("retry event retained attempts: %+v", retry.Detail)
+	}
+	if _, exists := retry.Detail["retry_count"]; exists {
+		t.Fatalf("retry event retained retry_count: %+v", retry.Detail)
 	}
 	exec := recorder.requestEvents[2]
 	if exec.Type != requestmonitoring.TypePluginForwardError || exec.RequestID != "exec-request" ||
 		exec.Severity != requestmonitoring.SeverityWarning ||
 		exec.PluginID != "openai-gateway" || exec.AccountID == nil || *exec.AccountID != 44 ||
 		exec.UpstreamStatus == nil || *exec.UpstreamStatus != http.StatusBadGateway ||
-		exec.Detail["stage"] != "plugin_forward" || exec.Detail["attempts"] != 3 ||
-		exec.Detail["retry_count"] != 2 || exec.Detail["final_failure"] != true {
+		exec.Detail["stage"] != "plugin_forward" || exec.Detail["total_attempts"] != 3 ||
+		exec.Detail["total_retries"] != 2 || exec.Detail["final_failure"] != true {
 		t.Fatalf("execution event = %+v", exec)
+	}
+	if _, exists := exec.Detail["attempts"]; exists {
+		t.Fatalf("execution event retained attempts: %+v", exec.Detail)
+	}
+	if _, exists := exec.Detail["retry_count"]; exists {
+		t.Fatalf("execution event retained retry_count: %+v", exec.Detail)
 	}
 	client := recorder.requestEvents[3]
 	if client.Type != requestmonitoring.TypeClientRequestError || client.HTTPStatus == nil ||
@@ -157,8 +169,8 @@ func TestPluginMonitorRecordsExecutionClientAndClosedEvents(t *testing.T) {
 	}
 	closed := recorder.requestEvents[4]
 	if closed.Type != requestmonitoring.TypeClientClosed || closed.HTTPStatus == nil ||
-		*closed.HTTPStatus != statusClientClosedRequest || closed.Detail["attempts"] != 3 ||
-		closed.Detail["retry_count"] != 2 {
+		*closed.HTTPStatus != statusClientClosedRequest || closed.Detail["total_attempts"] != 3 ||
+		closed.Detail["total_retries"] != 2 {
 		t.Fatalf("closed event = %+v", closed)
 	}
 

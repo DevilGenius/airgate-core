@@ -2,9 +2,13 @@ import type { ReactNode } from 'react';
 import type { MonitorEventResp, MonitorRequestEventResp } from '../../../shared/types';
 
 type DetailEntry = {
+  hidden?: boolean;
   key: string;
   value: string;
+  valueOnly?: boolean;
 };
+
+type DetailEntryOptions = Pick<DetailEntry, 'hidden' | 'valueOnly'>;
 
 const MONITOR_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   hour: '2-digit',
@@ -145,6 +149,14 @@ function detailValue(detail: Record<string, unknown> | undefined, key: string): 
   return '';
 }
 
+function ordinalLabel(value: string): string {
+  return value ? `#${value}` : '';
+}
+
+function retryLabel(value: string): string {
+  return value === '0' ? value : ordinalLabel(value);
+}
+
 function durationMsLabel(value?: number | string): string {
   const duration = typeof value === 'string' ? Number(value) : value;
   if (!duration || !Number.isFinite(duration) || duration <= 0) return '';
@@ -153,7 +165,12 @@ function durationMsLabel(value?: number | string): string {
   return `${duration}ms`;
 }
 
-function appendDetail(entries: DetailEntry[], key: string, value?: string | number | boolean) {
+function appendDetail(
+  entries: DetailEntry[],
+  key: string,
+  value?: string | number | boolean,
+  options: DetailEntryOptions = {},
+) {
   const normalized = typeof value === 'string'
     ? value.trim()
     : typeof value === 'number' && Number.isFinite(value)
@@ -163,11 +180,11 @@ function appendDetail(entries: DetailEntry[], key: string, value?: string | numb
         : '';
   if (!normalized) return;
   if (entries.some((item) => item.key === key && item.value === normalized)) return;
-  entries.push({ key, value: normalized });
+  entries.push({ key, value: normalized, ...options });
 }
 
 function detailText(entries: DetailEntry[]): string {
-  return entries.map((entry) => `${entry.key}=${entry.value}`).join(' › ');
+  return entries.map((entry) => entry.valueOnly ? entry.value : `${entry.key}=${entry.value}`).join(' › ');
 }
 
 function detailJsonText(entries: DetailEntry[]): string {
@@ -188,12 +205,12 @@ function detailJsonText(entries: DetailEntry[]): string {
 export function monitorDetailEntries(event: MonitorEventResp): DetailEntry[] {
   const detail = event.detail;
   const entries: DetailEntry[] = [];
-  appendDetail(entries, 'retry_count', detailValue(detail, 'retry_count'));
-  appendDetail(entries, 'attempts', detailValue(detail, 'attempts'));
+  appendDetail(entries, 'attempts', detailValue(detail, 'total_attempts'));
+  appendDetail(entries, 'retry', retryLabel(detailValue(detail, 'total_retries')));
   appendDetail(entries, 'model', detailValue(detail, 'model'));
   appendDetail(entries, 'client_model', detailValue(detail, 'client_model'));
   appendDetail(entries, 'http_status', detailValue(detail, 'http_status'));
-  appendDetail(entries, 'request_id', detailValue(detail, 'request_id'));
+  appendDetail(entries, 'request_id', detailValue(detail, 'request_id'), { hidden: true });
   appendDetail(entries, 'request_path', detailValue(detail, 'request_path'));
   appendDetail(entries, 'stage', detailValue(detail, 'stage'));
   appendDetail(entries, 'duration_ms', durationMsLabel(detailValue(detail, 'duration_ms')));
@@ -203,11 +220,16 @@ export function monitorDetailEntries(event: MonitorEventResp): DetailEntry[] {
 export function requestDetailEntries(event: MonitorRequestEventResp): DetailEntry[] {
   const detail = event.detail;
   const entries: DetailEntry[] = [];
-  appendDetail(entries, 'retry_count', detailValue(detail, 'retry_count'));
-  appendDetail(entries, 'attempts', detailValue(detail, 'attempts'));
-  appendDetail(entries, 'next_attempt', detailValue(detail, 'next_attempt'));
-  appendDetail(entries, 'duration_ms', durationMsLabel(event.duration_ms || detailValue(detail, 'duration_ms')));
-  appendDetail(entries, 'request_id', event.request_id);
+  const isRetryScheduled = event.type === 'plugin_forward_retry';
+  appendDetail(entries, 'duration_ms', durationMsLabel(event.duration_ms || detailValue(detail, 'duration_ms')), { valueOnly: true });
+  if (isRetryScheduled) {
+    appendDetail(entries, 'attempt', ordinalLabel(detailValue(detail, 'next_attempt')));
+    appendDetail(entries, 'retry', ordinalLabel(detailValue(detail, 'retry_number')));
+  } else {
+    appendDetail(entries, 'attempts', detailValue(detail, 'total_attempts'));
+    appendDetail(entries, 'retry', retryLabel(detailValue(detail, 'total_retries')));
+  }
+  appendDetail(entries, 'request_id', event.request_id, { hidden: true });
   appendDetail(entries, 'fingerprint', event.fingerprint);
   appendDetail(entries, 'upstream_status', event.upstream_status && event.upstream_status !== event.http_status ? event.upstream_status : undefined);
   appendDetail(entries, 'stage', detailValue(detail, 'stage'));
@@ -266,12 +288,14 @@ export function StatusPill({ className, label }: { className?: string; label: st
 }
 
 export function DetailCell({ entries }: { entries: DetailEntry[] }) {
-  if (entries.length === 0) {
+  const displayEntries = entries.filter((entry) => !entry.hidden);
+  if (displayEntries.length === 0) {
     return <span className="block w-full truncate text-left text-[13px] leading-none text-text-tertiary">-</span>;
   }
   const title = detailJsonText(entries);
-  const primary = detailText(entries.slice(0, 2));
-  const secondary = detailText(entries.slice(2));
+  const primaryEntryCount = displayEntries[0]?.valueOnly ? 3 : 2;
+  const primary = detailText(displayEntries.slice(0, primaryEntryCount));
+  const secondary = detailText(displayEntries.slice(primaryEntryCount));
   return (
     <StackCell
       mono

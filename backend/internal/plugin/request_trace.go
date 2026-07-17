@@ -308,11 +308,11 @@ func (s *requestTraceSession) genericEventInput() requestmonitoring.EventInput {
 		message = "request ended with an error"
 	}
 	detail := map[string]interface{}{
-		"stage":         s.final.Stage,
-		"final_failure": true,
-		"attempts":      len(s.attempts),
-		"retry_count":   retryCountForAttempts(len(s.attempts)),
-		"trace_enabled": true,
+		"stage":          s.final.Stage,
+		"final_failure":  true,
+		"total_attempts": len(s.attempts),
+		"total_retries":  totalRetriesForAttempts(len(s.attempts)),
+		"trace_enabled":  true,
 	}
 	var upstreamStatus *int
 	if len(s.attempts) > 0 {

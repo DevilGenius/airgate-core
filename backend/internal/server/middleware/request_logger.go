@@ -98,7 +98,7 @@ func RequestLogger() gin.HandlerFunc {
 		}
 		if v, ok := c.Get(CtxKeyAccessAttempts); ok {
 			if n, ok := v.(int); ok && n > 1 {
-				attrs = append(attrs, "attempts", n)
+				attrs = append(attrs, "total_attempts", n)
 			}
 		}
 		slog.Default().Log(c.Request.Context(), level, "http_request", attrs...)

@@ -1553,8 +1553,8 @@ func TestRecordAllRoutesAccountUnavailableWritesMonitorEvent(t *testing.T) {
 	if event.Message != "当前模型暂无可用上游账号，请稍后重试" {
 		t.Fatalf("message = %q, want account unavailable message", event.Message)
 	}
-	if got := event.Detail["attempts"]; got != 4 {
-		t.Fatalf("detail attempts = %#v, want 4", got)
+	if got := event.Detail["total_attempts"]; got != 4 {
+		t.Fatalf("detail total_attempts = %#v, want 4", got)
 	}
 	if got := event.Detail["group_name"]; got != "production" {
 		t.Fatalf("detail group_name = %#v, want production", got)
@@ -1592,11 +1592,11 @@ func TestRecordAPIRequestErrorIncludesGroupSnapshotInDetail(t *testing.T) {
 	if got := event.Detail["api_key_name"]; got != "default key" {
 		t.Fatalf("detail api_key_name = %#v, want default key", got)
 	}
-	if got := event.Detail["attempts"]; got != 4 {
-		t.Fatalf("detail attempts = %#v, want 4", got)
+	if got := event.Detail["total_attempts"]; got != 4 {
+		t.Fatalf("detail total_attempts = %#v, want 4", got)
 	}
-	if got := event.Detail["retry_count"]; got != 3 {
-		t.Fatalf("detail retry_count = %#v, want 3", got)
+	if got := event.Detail["total_retries"]; got != 3 {
+		t.Fatalf("detail total_retries = %#v, want 3", got)
 	}
 }
 

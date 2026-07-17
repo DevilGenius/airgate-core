@@ -44,8 +44,8 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 		"error_code":       code,
 	}
 	if attempts := forwardAttemptsFromGinContext(c); attempts > 0 {
-		detail["attempts"] = attempts
-		detail["retry_count"] = retryCountForAttempts(attempts)
+		detail["total_attempts"] = attempts
+		detail["total_retries"] = totalRetriesForAttempts(attempts)
 	}
 	attachKeyInfoDetail(detail, keyInfo)
 	markRequestTraceError(c, "api_request", status, httpErrorClassForStatus(status), code, message)
@@ -94,8 +94,8 @@ func (f *Forwarder) recordAllRoutesAccountUnavailable(c *gin.Context, state *for
 	}
 	subjectID := platform
 	detail := map[string]interface{}{
-		"attempts":            attempts,
-		"retry_count":         retryCountForAttempts(attempts),
+		"total_attempts":      attempts,
+		"total_retries":       totalRetriesForAttempts(attempts),
 		"error_code":          response.code,
 		"http_status":         response.status,
 		"platform":            platform,
@@ -209,14 +209,14 @@ func (f *Forwarder) recordPluginExecutionRetry(ctx context.Context, state *forwa
 		attempts = 1
 	}
 	f.recordPluginExecutionEvent(ctx, state, execution, pluginExecutionMonitorEvent{
-		typeID:       requestmonitoring.TypePluginForwardRetry,
-		severity:     requestmonitoring.SeverityInfo,
-		title:        "Plugin forward retry",
-		stage:        "plugin_forward_retry",
-		attempts:     attempts,
-		retryCount:   attempts,
-		nextAttempt:  attempts + 1,
-		finalFailure: false,
+		typeID:        requestmonitoring.TypePluginForwardRetry,
+		severity:      requestmonitoring.SeverityInfo,
+		title:         "Plugin forward retry",
+		stage:         "plugin_forward_retry",
+		failedAttempt: attempts,
+		retryNumber:   attempts,
+		nextAttempt:   attempts + 1,
+		finalFailure:  false,
 	})
 }
 
@@ -228,25 +228,27 @@ func (f *Forwarder) recordPluginExecutionFinalFailure(ctx context.Context, state
 		attempts = 1
 	}
 	f.recordPluginExecutionEvent(ctx, state, execution, pluginExecutionMonitorEvent{
-		typeID:       requestmonitoring.TypePluginForwardError,
-		severity:     requestmonitoring.SeverityWarning,
-		title:        "Plugin forward error",
-		stage:        "plugin_forward",
-		attempts:     attempts,
-		retryCount:   retryCountForAttempts(attempts),
-		finalFailure: true,
+		typeID:        requestmonitoring.TypePluginForwardError,
+		severity:      requestmonitoring.SeverityWarning,
+		title:         "Plugin forward error",
+		stage:         "plugin_forward",
+		totalAttempts: attempts,
+		totalRetries:  totalRetriesForAttempts(attempts),
+		finalFailure:  true,
 	})
 }
 
 type pluginExecutionMonitorEvent struct {
-	typeID       string
-	severity     string
-	title        string
-	stage        string
-	attempts     int
-	retryCount   int
-	nextAttempt  int
-	finalFailure bool
+	typeID        string
+	severity      string
+	title         string
+	stage         string
+	failedAttempt int
+	retryNumber   int
+	nextAttempt   int
+	totalAttempts int
+	totalRetries  int
+	finalFailure  bool
 }
 
 func (f *Forwarder) recordPluginExecutionEvent(ctx context.Context, state *forwardState, execution forwardExecution, event pluginExecutionMonitorEvent) {
@@ -293,13 +295,16 @@ func (f *Forwarder) recordPluginExecutionEvent(ctx context.Context, state *forwa
 			"upstream_status": execution.outcome.Upstream.StatusCode,
 			"reason":          message,
 			"stage":           event.stage,
-			"attempts":        event.attempts,
-			"retry_count":     event.retryCount,
 			"final_failure":   event.finalFailure,
 		},
 	}
 	if event.nextAttempt > 0 {
+		input.Detail["failed_attempt"] = event.failedAttempt
+		input.Detail["retry_number"] = event.retryNumber
 		input.Detail["next_attempt"] = event.nextAttempt
+	} else {
+		input.Detail["total_attempts"] = event.totalAttempts
+		input.Detail["total_retries"] = event.totalRetries
 	}
 	if upstreamRequestID := upstreamRequestIDFromHeaders(execution.outcome.Upstream.Headers); upstreamRequestID != "" {
 		input.Detail["upstream_request_id"] = upstreamRequestID
@@ -350,8 +355,8 @@ func (f *Forwarder) recordClientRequestError(c *gin.Context, state *forwardState
 		},
 	}
 	if attempts := forwardAttemptsFromGinContext(c); attempts > 0 {
-		input.Detail["attempts"] = attempts
-		input.Detail["retry_count"] = retryCountForAttempts(attempts)
+		input.Detail["total_attempts"] = attempts
+		input.Detail["total_retries"] = totalRetriesForAttempts(attempts)
 	}
 	if upstreamRequestID := upstreamRequestIDFromHeaders(execution.outcome.Upstream.Headers); upstreamRequestID != "" {
 		input.Detail["upstream_request_id"] = upstreamRequestID
@@ -395,9 +400,9 @@ func (f *Forwarder) recordClientClosedRequest(c *gin.Context, state *forwardStat
 		Title:       "Client closed request",
 		Message:     "Client disconnected before the request completed",
 		Detail: map[string]interface{}{
-			"attempts":    attempts,
-			"retry_count": retryCountForAttempts(attempts),
-			"stage":       "client_closed",
+			"total_attempts": attempts,
+			"total_retries":  totalRetriesForAttempts(attempts),
+			"stage":          "client_closed",
 		},
 	}
 	if state.plugin != nil {
@@ -490,7 +495,7 @@ func forwardAttemptsFromGinContext(c *gin.Context) int {
 	return 0
 }
 
-func retryCountForAttempts(attempts int) int {
+func totalRetriesForAttempts(attempts int) int {
 	if attempts <= 1 {
 		return 0
 	}
