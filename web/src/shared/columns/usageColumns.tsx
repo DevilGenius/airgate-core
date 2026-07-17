@@ -16,6 +16,7 @@ import {
 import type { UsageLogResp, CustomerUsageLogResp } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
 import { CostValue } from '../components/CostValue';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { formatRateMultiplier } from '../utils/rateMultiplier';
 
 /**
@@ -38,6 +39,7 @@ const RICH_TOOLTIP_OFFSET_PX = 8;
 const RICH_TOOLTIP_VIEWPORT_PADDING_PX = 8;
 const RICH_TOOLTIP_WIDTH_PX = 336;
 const RICH_TOOLTIP_ESTIMATED_HALF_HEIGHT_PX = 160;
+const RICH_TOOLTIP_CLOSE_DELAY_MS = 100;
 
 function formatTimingMs(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '-';
@@ -81,6 +83,16 @@ function RichTooltip({
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState<RichTooltipPosition | null>(null);
   const triggerRef = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  // 触屏设备使用点按开关；支持悬停时让触发元素和浮层共享同一个悬停区域。
+  const canHover = useMediaQuery('(hover: hover)');
+
+  const cancelScheduledClose = useCallback(() => {
+    if (closeTimerRef.current === null) return;
+    window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  }, []);
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -89,14 +101,29 @@ function RichTooltip({
   }, [placement]);
 
   const openTooltip = useCallback(() => {
+    cancelScheduledClose();
     updatePosition();
     setIsOpen(true);
-  }, [updatePosition]);
+  }, [cancelScheduledClose, updatePosition]);
 
   const closeTooltip = useCallback(() => {
+    cancelScheduledClose();
     setIsOpen(false);
     setPosition(null);
-  }, []);
+  }, [cancelScheduledClose]);
+
+  const scheduleTooltipClose = useCallback(() => {
+    cancelScheduledClose();
+    closeTimerRef.current = window.setTimeout(closeTooltip, RICH_TOOLTIP_CLOSE_DELAY_MS);
+  }, [cancelScheduledClose, closeTooltip]);
+
+  const toggleTooltip = useCallback(() => {
+    if (isOpen) {
+      closeTooltip();
+      return;
+    }
+    openTooltip();
+  }, [closeTooltip, isOpen, openTooltip]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -109,21 +136,39 @@ function RichTooltip({
     };
   }, [isOpen, updatePosition]);
 
+  useEffect(() => () => cancelScheduledClose(), [cancelScheduledClose]);
+
+  useEffect(() => {
+    if (!isOpen || canHover) return undefined;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (triggerRef.current?.contains(target) || tooltipRef.current?.contains(target)) return;
+      closeTooltip();
+    };
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [canHover, closeTooltip, isOpen]);
+
   return (
     <>
       <span
         ref={triggerRef}
         className={RICH_TOOLTIP_TRIGGER_CLASS}
-        onMouseEnter={openTooltip}
-        onMouseLeave={closeTooltip}
+        onClick={canHover ? undefined : toggleTooltip}
+        onMouseEnter={canHover ? openTooltip : undefined}
+        onMouseLeave={canHover ? scheduleTooltipClose : undefined}
       >
         {children}
       </span>
       {isOpen && position && typeof document !== 'undefined'
         ? createPortal(
           <div
+            ref={tooltipRef}
             className="ag-usage-rich-tooltip-content"
             data-placement={placement}
+            onMouseEnter={canHover ? cancelScheduledClose : undefined}
+            onMouseLeave={canHover ? scheduleTooltipClose : undefined}
             role="tooltip"
             style={{
               left: position.left,
@@ -740,15 +785,13 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         const fullLabel = `${dateLabel} ${timeLabel}`;
 
         return (
-          <div className={`flex min-w-0 items-center font-mono text-xs ${adminView ? 'ag-usage-time-only justify-center' : 'gap-1.5'}`} title={fullLabel}>
+          <div className={`flex min-w-0 items-center gap-1.5 font-mono text-xs ${adminView ? 'ag-usage-time-only' : ''}`} title={fullLabel}>
             <span className="shrink-0 font-mono text-[13px] font-medium text-text">
               {timeLabel}
             </span>
-            {!adminView ? (
-              <span className="ag-usage-date-label shrink-0 font-light text-text-tertiary">
-                {dateLabel}
-              </span>
-            ) : null}
+            <span className={`shrink-0 font-light text-text-tertiary ${adminView ? 'ag-usage-date-label--mobile' : 'ag-usage-date-label'}`}>
+              {dateLabel}
+            </span>
           </div>
         );
       },

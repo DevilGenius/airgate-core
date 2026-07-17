@@ -84,6 +84,24 @@
   width: 1.25rem;
 }
 
+/* 移动端筛选栏：日期范围独占一行，其余筛选两列排布，减少纵向占位。 */
+
+@media (max-width: 639px) {
+  .ag-usage-page .ag-page-toolbar-filter-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .ag-usage-page .ag-page-toolbar-filter-row > * {
+    flex: 1 1 40%;
+    width: auto;
+  }
+
+  .ag-usage-page .ag-page-toolbar-filter-row > :first-child {
+    flex-basis: 100%;
+  }
+}
+
 .ag-usage-rich-tooltip-content {
   --ag-usage-tooltip-header-padding: 0.25rem 0.5rem;
   --ag-usage-tooltip-subtitle-margin-top: 0.125rem;
@@ -298,6 +316,27 @@
   gap: 0.625rem 0.75rem;
 }
 
+/* 无 meta 的卡片（用户/API Key 端）：时间日期占满整行并左对齐。 */
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-head > :only-child {
+  grid-column: 1 / -1;
+}
+
+/* 管理端卡片：时间日期放最左侧，用户信息靠右对齐。 */
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-head > .ag-mobile-record-meta {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-head > :first-child:not(:only-child) {
+  grid-column: 2;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-head > :first-child:not(:only-child) .ag-mobile-record-title > * {
+  justify-content: flex-end;
+}
+
 .ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-meta {
   min-width: 0;
   justify-self: stretch;
@@ -306,13 +345,17 @@
 }
 
 .ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-meta > * {
-  justify-content: flex-start !important;
-  text-align: left !important;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-api_key {
   grid-column: 1;
   grid-row: 1;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-api_key dd {
+  text-align: center;
 }
 
 .ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-model {
@@ -326,7 +369,7 @@
 
 .ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-tokens {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
 }
 
 .ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-tokens dd {
@@ -352,11 +395,26 @@
 
 .ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-cost {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
 }
 
 .ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-cost-primary {
   grid-column: 1;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-first_event_ms {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-duration_ms {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-first_event_ms dd,
+.ag-usage-table-mobile .ag-mobile-record-card--usage-grid .ag-mobile-record-field--usage-duration_ms dd {
+  font-variant-numeric: tabular-nums;
 }
 
 .ag-usage-table-mobile .ag-mobile-record-title .ag-usage-model-cell,
@@ -372,6 +430,17 @@
   max-width: 3rem !important;
   overflow: hidden;
   --ag-usage-image-dot-size: 0;
+}
+
+/* 思考强度等 meta chips 与模型名称作为整体居中。 */
+
+.ag-usage-table-mobile .ag-mobile-record-field .ag-usage-model-cell {
+  display: flex !important;
+  justify-content: center;
+}
+
+.ag-usage-table-mobile .ag-mobile-record-field .ag-usage-model-cell > .ag-usage-model-meta-slot:empty {
+  display: none;
 }
 
 .ag-usage-table-mobile .ag-usage-model-meta-slot > :where(span, div),
@@ -515,6 +584,10 @@
   display: none;
 }
 
+.ag-usage-table-desktop .ag-usage-time-only {
+  justify-content: center;
+}
+
 .ag-usage-table :where([data-slot="td"].ag-usage-col-created_at:has(.ag-usage-time-only),
   [data-slot="td"].ag-usage-col-first_token_ms) {
   padding-inline: 0.25rem !important;
@@ -524,6 +597,19 @@
   .ag-usage-date-label {
     display: inline;
   }
+}
+
+/* 管理端桌面表格的时间列保持只显示时间（日期仅移动端卡片展示）。 */
+
+.ag-usage-date-label--mobile {
+  display: none;
+}
+
+/* 移动端卡片顶部：时间 + 日期。 */
+
+.ag-usage-table-mobile .ag-usage-date-label,
+.ag-usage-table-mobile .ag-usage-date-label--mobile {
+  display: inline;
 }
 
 @container usage-records (max-width: 1439px) {
