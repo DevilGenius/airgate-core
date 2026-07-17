@@ -171,7 +171,7 @@ function SafetyCacheDetails({
       />
       <SafetyCacheMetric
         label={requestLabel}
-        value={`${formatCompactThousands(runtime?.request_retry_cache_len)}/${formatCompactThousands(runtime?.request_retry_cache_cap)}`}
+        value={`${Math.max(0, Math.trunc(runtime?.request_retry_cache_len ?? 0))}/${formatCompactThousands(runtime?.request_retry_cache_cap)}`}
       />
       <DetailSeparator />
       <span aria-hidden="true" />
