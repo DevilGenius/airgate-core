@@ -5,10 +5,9 @@ type DetailEntry = {
   hidden?: boolean;
   key: string;
   value: string;
-  valueOnly?: boolean;
 };
 
-type DetailEntryOptions = Pick<DetailEntry, 'hidden' | 'valueOnly'>;
+type DetailEntryOptions = Pick<DetailEntry, 'hidden'>;
 
 const MONITOR_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   hour: '2-digit',
@@ -141,6 +140,10 @@ export function requestStatusToneClass(event: MonitorRequestEventResp): string {
   return 'text-text-secondary';
 }
 
+export function requestDurationLabel(event: MonitorRequestEventResp): string {
+  return durationMsLabel(event.duration_ms || detailValue(event.detail, 'duration_ms')) || '-';
+}
+
 function detailValue(detail: Record<string, unknown> | undefined, key: string): string {
   const value = detail?.[key];
   if (typeof value === 'string') return value.trim();
@@ -184,7 +187,7 @@ function appendDetail(
 }
 
 function detailText(entries: DetailEntry[]): string {
-  return entries.map((entry) => entry.valueOnly ? entry.value : `${entry.key}=${entry.value}`).join(' › ');
+  return entries.map((entry) => `${entry.key}=${entry.value}`).join(' › ');
 }
 
 function detailJsonText(entries: DetailEntry[]): string {
@@ -221,7 +224,6 @@ export function requestDetailEntries(event: MonitorRequestEventResp): DetailEntr
   const detail = event.detail;
   const entries: DetailEntry[] = [];
   const isRetryScheduled = event.type === 'plugin_forward_retry';
-  appendDetail(entries, 'duration_ms', durationMsLabel(event.duration_ms || detailValue(detail, 'duration_ms')), { valueOnly: true });
   if (isRetryScheduled) {
     appendDetail(entries, 'attempt', ordinalLabel(detailValue(detail, 'next_attempt')));
     appendDetail(entries, 'retry', ordinalLabel(detailValue(detail, 'retry_number')));
@@ -293,7 +295,7 @@ export function DetailCell({ entries }: { entries: DetailEntry[] }) {
     return <span className="block w-full truncate text-left text-[13px] leading-none text-text-tertiary">-</span>;
   }
   const title = detailJsonText(entries);
-  const primaryEntryCount = displayEntries[0]?.valueOnly ? 3 : 2;
+  const primaryEntryCount = 2;
   const primary = detailText(displayEntries.slice(0, primaryEntryCount));
   const secondary = detailText(displayEntries.slice(primaryEntryCount));
   return (

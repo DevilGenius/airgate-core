@@ -11,7 +11,6 @@ export const MONITOR_COLUMN_WIDTHS = {
   detail: '240px',
   status: '116px',
   actions: '96px',
-  statusActions: '212px',
 };
 
 export const SEVERITY_CLASSES: Record<string, string> = {

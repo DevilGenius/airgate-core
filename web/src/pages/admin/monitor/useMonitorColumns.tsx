@@ -17,6 +17,7 @@ import {
   monitorSubject,
   monitorSubjectContext,
   requestDetailEntries,
+  requestDurationLabel,
   requestEndpointContext,
   requestEndpointLabel,
   requestErrorCodeLabel,
@@ -58,7 +59,7 @@ export function useMonitorColumns({
 
   return useMemo<MonitorColumnConfig[]>(() => [
     {
-      key: 'updated_at',
+      key: 'time',
       title: t('monitor.updated_at'),
       width: MONITOR_COLUMN_WIDTHS.time,
       render: (row) => <TimeCell value={row.updated_at} />,
@@ -91,20 +92,11 @@ export function useMonitorColumns({
       ),
     },
     {
-      key: 'locator',
-      title: t('monitor.source'),
-      width: MONITOR_COLUMN_WIDTHS.source,
+      key: 'detail',
+      title: t('monitor.detail'),
+      width: MONITOR_COLUMN_WIDTHS.detail,
       hideOnMobile: true,
-      render: (row) => (
-        <StackCell
-          mono
-          primary={monitorLocatorContext(row) || '-'}
-          primaryClass="text-text-secondary"
-          primaryTitle={monitorLocatorContext(row) || undefined}
-          secondary={row.error_code || undefined}
-          secondaryTitle={row.error_code || undefined}
-        />
-      ),
+      render: (row) => <DetailCell entries={monitorDetailEntries(row)} />,
     },
     {
       key: 'subject',
@@ -121,11 +113,20 @@ export function useMonitorColumns({
       ),
     },
     {
-      key: 'detail',
-      title: t('monitor.detail'),
-      width: MONITOR_COLUMN_WIDTHS.detail,
+      key: 'locator',
+      title: t('monitor.source'),
+      width: MONITOR_COLUMN_WIDTHS.source,
       hideOnMobile: true,
-      render: (row) => <DetailCell entries={monitorDetailEntries(row)} />,
+      render: (row) => (
+        <StackCell
+          mono
+          primary={monitorLocatorContext(row) || '-'}
+          primaryClass="text-text-secondary"
+          primaryTitle={monitorLocatorContext(row) || undefined}
+          secondary={row.error_code || undefined}
+          secondaryTitle={row.error_code || undefined}
+        />
+      ),
     },
     {
       key: 'status',
@@ -169,7 +170,7 @@ export function useMonitorRequestColumns(): MonitorRequestColumnConfig[] {
 
   return useMemo<MonitorRequestColumnConfig[]>(() => [
     {
-      key: 'created_at',
+      key: 'time',
       title: t('monitor.time'),
       width: MONITOR_COLUMN_WIDTHS.time,
       render: (row) => <TimeCell value={row.created_at} />,
@@ -202,20 +203,11 @@ export function useMonitorRequestColumns(): MonitorRequestColumnConfig[] {
       ),
     },
     {
-      key: 'locator',
-      title: t('monitor.endpoint'),
-      width: MONITOR_COLUMN_WIDTHS.source,
+      key: 'detail',
+      title: t('monitor.detail'),
+      width: MONITOR_COLUMN_WIDTHS.detail,
       hideOnMobile: true,
-      render: (row) => (
-        <StackCell
-          mono
-          primary={<RequestEndpointPrimary event={row} />}
-          primaryClass="text-text-secondary"
-          primaryTitle={requestEndpointLabel(row)}
-          secondary={requestEndpointContext(row) || undefined}
-          secondaryTitle={requestEndpointContext(row) || undefined}
-        />
-      ),
+      render: (row) => <DetailCell entries={requestDetailEntries(row)} />,
     },
     {
       key: 'subject',
@@ -232,16 +224,25 @@ export function useMonitorRequestColumns(): MonitorRequestColumnConfig[] {
       ),
     },
     {
-      key: 'detail',
-      title: t('monitor.detail'),
-      width: MONITOR_COLUMN_WIDTHS.detail,
+      key: 'locator',
+      title: t('monitor.endpoint'),
+      width: MONITOR_COLUMN_WIDTHS.source,
       hideOnMobile: true,
-      render: (row) => <DetailCell entries={requestDetailEntries(row)} />,
+      render: (row) => (
+        <StackCell
+          mono
+          primary={<RequestEndpointPrimary event={row} />}
+          primaryClass="text-text-secondary"
+          primaryTitle={requestEndpointLabel(row)}
+          secondary={requestEndpointContext(row) || undefined}
+          secondaryTitle={requestEndpointContext(row) || undefined}
+        />
+      ),
     },
     {
       key: 'status_error_code',
       title: `${t('monitor.http_status')} / ${t('monitor.error_code')}`,
-      width: MONITOR_COLUMN_WIDTHS.statusActions,
+      width: MONITOR_COLUMN_WIDTHS.status,
       render: (row) => (
         <div className="flex h-full w-full min-w-0 flex-col items-center justify-center gap-1">
           <span className={`max-w-full truncate font-mono text-[13px] font-medium leading-none ${requestStatusToneClass(row)}`} title={requestStatusLabel(row)}>
@@ -251,6 +252,16 @@ export function useMonitorRequestColumns(): MonitorRequestColumnConfig[] {
             {requestErrorCodeLabel(row)}
           </span>
         </div>
+      ),
+    },
+    {
+      key: 'duration_ms',
+      title: t('monitor.duration_ms'),
+      width: MONITOR_COLUMN_WIDTHS.actions,
+      render: (row) => (
+        <span className="block max-w-full truncate text-center font-mono text-[13px] font-medium leading-none text-text-secondary" title={requestDurationLabel(row)}>
+          {requestDurationLabel(row)}
+        </span>
       ),
     },
   ], [t]);

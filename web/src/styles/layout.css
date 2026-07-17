@@ -436,9 +436,14 @@
   gap: 1.25rem;
 }
 
+.ag-main-scroll {
+  scrollbar-gutter: stable;
+}
+
 .ag-main:has([data-full-bleed]),
 .ag-main:has([data-full-bleed]) .ag-main-scroll {
   overflow: hidden;
+  scrollbar-gutter: auto;
 }
 
 .ag-main-content:has([data-full-bleed]) {
