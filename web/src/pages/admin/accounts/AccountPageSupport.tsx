@@ -15,6 +15,7 @@ export { AccountCapacityStore, AccountSelectionStore, runAfterInputFrame, useLat
 export {
   ACCOUNT_SELECTION_COLUMN_STYLE,
   AccountRowActions,
+  AccountRowSelectionCell,
   AccountSchedulingSwitch,
   AccountTableRow,
   AccountsTableLoadingRow,

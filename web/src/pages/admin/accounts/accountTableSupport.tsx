@@ -84,7 +84,7 @@ export function columnWidthStyle(column: AccountTableColumn): CSSProperties | un
   };
 }
 
-const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
+export const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
   ariaLabel,
   selectionStore,
   rowId,

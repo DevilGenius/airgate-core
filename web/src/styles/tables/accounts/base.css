@@ -281,3 +281,96 @@
   .table__body .table__row[data-hovered="true"] .table__cell) {
   background: var(--ag-table-row-hover-background) !important;
 }
+
+/* Account table mobile cards (≤767px): table swaps to MobileRecordList. */
+
+.ag-accounts-table-mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .ag-accounts-table-desktop {
+    display: none;
+  }
+
+  .ag-accounts-table-mobile {
+    display: block;
+  }
+}
+
+/* Card head: selection checkbox + name/email, left aligned. */
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-accounts-mobile-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-accounts-mobile-title .ag-table-selection-checkbox {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+}
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-accounts-mobile-title-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-accounts-mobile-title-text > div {
+  align-items: flex-start;
+  text-align: left;
+}
+
+/* Card fields: reuse cell renders but left-align them under the field label. */
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-mobile-record-field dd {
+  display: block;
+}
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-mobile-record-field dd > :where(.flex, .ag-account-group-list) {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-mobile-record-field .ag-account-group-list {
+  max-height: none;
+}
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-mobile-record-field .ag-native-switch {
+  margin-inline: 0;
+}
+
+/* Usage window field: full-width row, allow the multiline usage layout. */
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-accounts-mobile-field--usage dd {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+/* Card actions: stretch across the card with touch-friendly targets. */
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-mobile-record-actions {
+  margin-top: 0.75rem;
+}
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-mobile-record-actions .ag-account-row-actions {
+  width: 100%;
+  height: auto;
+  margin-inline: 0;
+  gap: 0.5rem;
+}
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-mobile-record-actions .ag-account-row-actions > :where(.button, .ag-account-row-action-button, .ag-account-row-more-trigger) {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 2.25rem !important;
+  min-height: 2.25rem !important;
+  flex: 1 1 0;
+}
+
+.ag-accounts-table .ag-accounts-table-mobile .ag-account-row-action-label {
+  font-size: 0.75rem;
+}

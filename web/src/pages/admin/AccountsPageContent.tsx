@@ -1053,7 +1053,7 @@ export default function AccountsPageContent() {
             isAutoRefreshing={isAccountsFetching || isUsageFetching}
           />
           <Button
-            className="ag-page-toolbar-button hidden sm:inline-flex"
+            className="ag-page-toolbar-button hidden md:inline-flex"
             variant="secondary"
             onPress={() => importInputRef.current?.click()}
             isDisabled={importMutation.isPending}
@@ -1063,7 +1063,7 @@ export default function AccountsPageContent() {
             {t('accounts.import')}
           </Button>
           <Button
-            className="ag-page-toolbar-button hidden sm:inline-flex"
+            className="ag-page-toolbar-button hidden md:inline-flex"
             variant="secondary"
             onPress={() => exportMutation.mutate()}
             isDisabled={exportMutation.isPending}

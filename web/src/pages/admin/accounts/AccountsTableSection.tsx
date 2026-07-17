@@ -1,10 +1,13 @@
-import { memo, useCallback, useSyncExternalStore } from 'react';
+import { memo, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { EmptyState } from '@heroui/react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { AccountResp } from '../../../shared/types';
+import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
+import { MobileRecordList, type MobileRecordField, type MobileRecordItem } from '../../../shared/components/MobileRecordList';
 import { BulkActionsBar } from './BulkActionsBar';
 import {
   ACCOUNT_SELECTION_COLUMN_STYLE,
+  AccountRowSelectionCell,
   AccountSelectionStore,
   AccountTableRow,
   AccountsTableLoadingRow,
@@ -15,6 +18,9 @@ import {
   type AccountTableSortDirection,
 } from './AccountPageSupport';
 
+// 移动端卡片字段顺序：两列网格依次排列，用量窗口独占整行。
+const ACCOUNT_MOBILE_FIELD_KEYS = ['platform', 'groups', 'capacity', 'scheduling', 'priority', 'last_used_at'] as const;
+
 const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
   onBulkClearRateLimitMarkers,
   onBulkDelete,
@@ -23,6 +29,7 @@ const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
   onBulkEnable,
   onBulkRefresh,
   onClearSelection,
+  overlay = true,
   selectionStore,
 }: {
   onBulkClearRateLimitMarkers: () => void;
@@ -32,6 +39,7 @@ const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
   onBulkEnable: () => void;
   onBulkRefresh: () => void;
   onClearSelection: () => void;
+  overlay?: boolean;
   selectionStore: AccountSelectionStore;
 }) {
   const selectedCount = useSyncExternalStore(
@@ -43,7 +51,7 @@ const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
   return (
     <div onClick={(event) => event.stopPropagation()}>
       <BulkActionsBar
-        overlay
+        overlay={overlay}
         isActive={selectedCount > 0}
         selectedCount={selectedCount}
         onClear={onClearSelection}
@@ -136,9 +144,82 @@ export const AccountsTableSection = memo(function AccountsTableSection({
   tableEmptyText: string;
   visibleRowIds: number[];
 }) {
+  const isMobileLayoutActive = useMediaQuery('(max-width: 767px)');
+  const mobileItems = useMemo<MobileRecordItem[]>(() => {
+    if (!isMobileLayoutActive) return [];
+    const columnByKey = new Map(columns.map((column) => [column.key, column]));
+    const nameColumn = columnByKey.get('name');
+    if (!nameColumn) return [];
+    const statusColumn = columnByKey.get('status');
+    const usageColumn = columnByKey.get('usage_window');
+    const actionsColumn = columnByKey.get('actions');
+    const fieldColumns = ACCOUNT_MOBILE_FIELD_KEYS
+      .map((key) => columnByKey.get(key))
+      .filter((column): column is AccountTableColumn => Boolean(column));
+
+    return rows.map((row) => {
+      const rowMeta = rowMetaById.get(row.id);
+      const fields: MobileRecordField[] = fieldColumns.map((column) => ({
+        label: column.title,
+        value: column.render(row, rowMeta),
+      }));
+      if (usageColumn) {
+        fields.push({
+          className: 'ag-mobile-record-field--wide ag-accounts-mobile-field--usage',
+          label: usageColumn.title,
+          value: usageColumn.render(row, rowMeta),
+        });
+      }
+      return {
+        id: row.id,
+        title: (
+          <div className="ag-accounts-mobile-title">
+            <AccountRowSelectionCell
+              ariaLabel={selectRowAriaLabel}
+              rowId={row.id}
+              selectionStore={selectionStore}
+              onSelectedChange={onRowSelected}
+            />
+            <div className="ag-accounts-mobile-title-text">
+              {nameColumn.render(row, rowMeta)}
+            </div>
+          </div>
+        ),
+        meta: statusColumn ? statusColumn.render(row, rowMeta) : undefined,
+        fields,
+        actions: actionsColumn ? actionsColumn.render(row, rowMeta) : undefined,
+      };
+    });
+  }, [columns, isMobileLayoutActive, onRowSelected, rowMetaById, rows, selectRowAriaLabel, selectionStore]);
+
+  if (isMobileLayoutActive) {
+    return (
+      <div className="ag-resource-table ag-accounts-table">
+        <div className="ag-accounts-table-mobile">
+          <AccountsBulkActionsOverlay
+            overlay={false}
+            selectionStore={selectionStore}
+            onClearSelection={onClearSelection}
+            onBulkEdit={onBulkEdit}
+            onBulkEnable={onBulkEnable}
+            onBulkDisable={onBulkDisable}
+            onBulkRefresh={onBulkRefresh}
+            onBulkClearRateLimitMarkers={onBulkClearRateLimitMarkers}
+            onBulkDelete={onBulkDelete}
+          />
+          <MobileRecordList
+            emptyTitle={tableEmptyText}
+            isLoading={isLoading}
+            items={mobileItems}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="ag-resource-table ag-accounts-table">
-      <div className="ag-resource-table-scroll" data-slot="wrapper">
+      <div className="ag-resource-table-scroll ag-accounts-table-desktop" data-slot="wrapper">
         <AccountsBulkActionsOverlay
           selectionStore={selectionStore}
           onClearSelection={onClearSelection}
