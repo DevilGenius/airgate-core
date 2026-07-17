@@ -498,6 +498,7 @@
     "auto_refresh_off": "关闭",
     "search_placeholder": "搜索账号名称...",
     "bulk_selected": "已选 {{count}} 条",
+    "bulk_select_all": "全选",
     "bulk_clear": "清除",
     "bulk_edit": "批量编辑",
     "bulk_delete": "批量删除",

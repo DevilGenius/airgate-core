@@ -1116,7 +1116,6 @@ export default function AccountsPageContent() {
             onBulkEdit={handleBulkEdit}
             onBulkEnable={handleBulkEnable}
             onBulkRefresh={handleBulkRefresh}
-            onClearSelection={clearSelection}
             onRowSelected={setRowSelected}
             onSortChange={handleSortChange}
             onVisibleRowsSelected={setVisibleRowsSelected}

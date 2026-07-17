@@ -497,6 +497,7 @@
     "auto_refresh_off": "Off",
     "search_placeholder": "Search accounts...",
     "bulk_selected": "{{count}} selected",
+    "bulk_select_all": "Select all",
     "bulk_clear": "Clear",
     "bulk_edit": "Bulk Edit",
     "bulk_delete": "Delete",

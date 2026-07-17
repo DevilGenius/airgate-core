@@ -28,6 +28,7 @@ export class AccountSelectionStore {
   private version = 0;
   private listeners = new Set<SelectionListener>();
   private notifyFrameId: number | null = null;
+  private rowCards = new Map<number, HTMLElement>();
   private rowInputs = new Map<number, HTMLInputElement>();
 
   subscribe = (listener: SelectionListener) => {
@@ -48,6 +49,15 @@ export class AccountSelectionStore {
     }
     this.rowInputs.set(id, input);
     input.checked = this.selectedIds.has(id);
+  }
+
+  registerRowCard(id: number, card: HTMLElement | null) {
+    if (!card) {
+      this.rowCards.delete(id);
+      return;
+    }
+    this.rowCards.set(id, card);
+    this.syncRowCard(id, card);
   }
 
   has(id: number) {
@@ -75,7 +85,7 @@ export class AccountSelectionStore {
     } else {
       this.selectedIds.delete(id);
     }
-    this.syncRowInputs([id]);
+    this.syncRowElements([id]);
     this.notify();
     return 1;
   }
@@ -93,7 +103,7 @@ export class AccountSelectionStore {
       changedIds.push(id);
     }
     if (changedIds.length > 0) {
-      this.syncRowInputs(changedIds);
+      this.syncRowElements(changedIds);
       this.notify();
     }
     return changedIds.length;
@@ -103,16 +113,28 @@ export class AccountSelectionStore {
     if (this.selectedIds.size === 0) return 0;
     const changedIds = Array.from(this.selectedIds);
     this.selectedIds.clear();
-    this.syncRowInputs(changedIds);
+    this.syncRowElements(changedIds);
     this.notify();
     return changedIds.length;
   }
 
-  private syncRowInputs(changedIds: number[]) {
+  private syncRowCard(id: number, card: HTMLElement) {
+    if (this.selectedIds.has(id)) {
+      card.dataset.selected = 'true';
+    } else {
+      delete card.dataset.selected;
+    }
+  }
+
+  private syncRowElements(changedIds: number[]) {
     for (const id of changedIds) {
       const input = this.rowInputs.get(id);
       if (input) {
         input.checked = this.selectedIds.has(id);
+      }
+      const card = this.rowCards.get(id);
+      if (card) {
+        this.syncRowCard(id, card);
       }
     }
   }

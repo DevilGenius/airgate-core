@@ -33,6 +33,7 @@ export interface MobileRecordField {
 }
 
 export interface MobileRecordItem {
+  cardRef?: (card: HTMLElement | null) => void;
   className?: string;
   onAnimationEnd?: AnimationEventHandler<HTMLElement>;
   id: string | number;
@@ -42,6 +43,8 @@ export interface MobileRecordItem {
   fields?: MobileRecordField[];
   actions?: ReactNode;
   longPressMenu?: MobileRecordLongPressMenu;
+  onClick?: () => void;
+  onLongPress?: () => void;
 }
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
@@ -52,8 +55,10 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 function MobileRecordCard({ item }: { item: MobileRecordItem }) {
   const longPressTimerRef = useRef<number | null>(null);
   const pointerStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const suppressNextClickRef = useRef(false);
   const [menuPosition, setMenuPosition] = useState<TableRowContextMenuPosition | null>(null);
   const menuEnabled = Boolean(item.longPressMenu?.items.length);
+  const longPressEnabled = menuEnabled || Boolean(item.onLongPress);
 
   const clearLongPress = useCallback(() => {
     if (longPressTimerRef.current !== null) {
@@ -76,7 +81,10 @@ function MobileRecordCard({ item }: { item: MobileRecordItem }) {
   useEffect(() => () => clearLongPress(), [clearLongPress]);
 
   const handlePointerDown: PointerEventHandler<HTMLElement> = (event) => {
-    if (!menuEnabled || !event.isPrimary || event.button !== 0 || isInteractiveTarget(event.target)) return;
+    if (event.isPrimary && event.button === 0) {
+      suppressNextClickRef.current = false;
+    }
+    if (!longPressEnabled || !event.isPrimary || event.button !== 0 || isInteractiveTarget(event.target)) return;
 
     clearLongPress();
     pointerStartRef.current = {
@@ -88,7 +96,13 @@ function MobileRecordCard({ item }: { item: MobileRecordItem }) {
       const pointerStart = pointerStartRef.current;
       longPressTimerRef.current = null;
       pointerStartRef.current = null;
-      if (pointerStart) openMenu(pointerStart.x, pointerStart.y);
+      if (!pointerStart) return;
+      suppressNextClickRef.current = true;
+      if (item.onLongPress) {
+        item.onLongPress();
+        return;
+      }
+      openMenu(pointerStart.x, pointerStart.y);
     }, LONG_PRESS_DURATION_MS);
   };
 
@@ -101,10 +115,27 @@ function MobileRecordCard({ item }: { item: MobileRecordItem }) {
   };
 
   const handleContextMenu: MouseEventHandler<HTMLElement> = (event) => {
-    if (!menuEnabled) return;
+    if (!longPressEnabled) return;
     event.preventDefault();
+    const pointerStart = pointerStartRef.current;
     clearLongPress();
+    if (item.onLongPress && pointerStart && !isInteractiveTarget(event.target)) {
+      suppressNextClickRef.current = true;
+      item.onLongPress();
+      return;
+    }
     if (!isInteractiveTarget(event.target)) openMenu(event.clientX, event.clientY);
+  };
+
+  const handleClick: MouseEventHandler<HTMLElement> = (event) => {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (!item.onClick || isInteractiveTarget(event.target)) return;
+    item.onClick();
   };
 
   const handleKeyDown: KeyboardEventHandler<HTMLElement> = (event) => {
@@ -117,9 +148,11 @@ function MobileRecordCard({ item }: { item: MobileRecordItem }) {
   return (
     <>
       <article
+        ref={item.cardRef}
         aria-haspopup={menuEnabled ? 'menu' : undefined}
         className={['ag-mobile-record-card', item.className].filter(Boolean).join(' ')}
         onAnimationEnd={item.onAnimationEnd}
+        onClick={handleClick}
         onContextMenu={handleContextMenu}
         onKeyDown={handleKeyDown}
         onPointerCancel={clearLongPress}

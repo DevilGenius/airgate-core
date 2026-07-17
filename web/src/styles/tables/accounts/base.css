@@ -323,6 +323,13 @@
   text-align: left;
 }
 
+.ag-accounts-table .ag-accounts-table-mobile .ag-mobile-record-card[data-selected="true"] {
+  border-color: color-mix(in oklab, var(--ag-primary) 72%, var(--border) 28%);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--ag-primary) 30%, transparent),
+    var(--surface-shadow);
+}
+
 /* Card fields: reuse cell renders but left-align them under the field label. */
 
 .ag-accounts-table .ag-accounts-table-mobile .ag-mobile-record-field dd {

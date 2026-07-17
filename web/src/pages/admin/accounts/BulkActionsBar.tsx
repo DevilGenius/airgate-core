@@ -1,35 +1,43 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eraser, Pencil, Power, PowerOff, RefreshCw, Trash2 } from 'lucide-react';
+import { TableSelectionCheckbox } from './accountTableSupport';
 
 /**
  * 批量操作工具栏：仅在 selectedCount > 0 时渲染。
+ * 不提供单独的"清除"按钮——再次点击全选复选框反选即清空选择。
  *
  * - inline:   内联在工具栏行内（挤占空间）
- * - overlay:  绝对定位覆盖在父容器上方，不推动表格（推荐）
+ * - overlay:  绝对定位覆盖在父容器上方，不推动表格（推荐）。
+ *             覆盖层从选择列右侧开始，全选复选框由表头常驻单元格承担，
+ *             因此 overlay 变体不渲染 selectAllControl。
  */
 export function BulkActionsBar({
+  allVisibleSelected,
   inline = false,
   isActive,
   overlay = false,
   selectedCount,
-  onClear,
+  someVisibleSelected,
   onEdit,
   onEnable,
   onDisable,
   onRefreshQuota,
+  onSelectAllChange,
   onClearRateLimitMarkers,
   onDelete,
 }: {
+  allVisibleSelected: boolean;
   inline?: boolean;
   isActive?: boolean;
   overlay?: boolean;
   selectedCount: number;
-  onClear: () => void;
+  someVisibleSelected: boolean;
   onEdit: () => void;
   onEnable: () => void;
   onDisable: () => void;
   onRefreshQuota: () => void;
+  onSelectAllChange: (isSelected: boolean) => void;
   onClearRateLimitMarkers: () => void;
   onDelete: () => void;
 }) {
@@ -54,6 +62,17 @@ export function BulkActionsBar({
       ) : null}
       <span>{selectedTextAfter}</span>
     </span>
+  );
+  const selectAllControl = (
+    <label className="ag-bulk-select-all">
+      <TableSelectionCheckbox
+        ariaLabel={t('accounts.bulk_select_all')}
+        isIndeterminate={someVisibleSelected}
+        isSelected={allVisibleSelected}
+        onChange={onSelectAllChange}
+      />
+      <span>{t('accounts.bulk_select_all')}</span>
+    </label>
   );
 
   const actionButtons = (
@@ -114,6 +133,7 @@ export function BulkActionsBar({
           backgroundColor: 'var(--background)',
         }}
       >
+        {selectAllControl}
         {selectedCountLabel}
         <div className="hidden h-5 w-px bg-border sm:block" />
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -125,23 +145,14 @@ export function BulkActionsBar({
 
   return (
     <div
-      className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius)] px-4 py-2.5"
+      className="mb-3 flex min-h-12 flex-wrap items-center gap-2 rounded-[var(--radius)] border border-border bg-background px-2 py-2"
       style={{
-        background: 'var(--ag-primary-subtle)',
-        border: '1px solid color-mix(in oklab, var(--ag-primary) 52%, transparent)',
+        background: 'linear-gradient(90deg, var(--surface-tertiary) 0%, var(--surface-secondary) 42%, var(--background) 100%)',
+        backgroundColor: 'var(--background)',
       }}
     >
-      <span className="text-sm font-medium" style={{ color: 'var(--ag-primary)' }}>
-        {t('accounts.bulk_selected', { count: selectedCount })}
-      </span>
-      <button
-        type="button"
-        className="ag-bulk-clear-button"
-        onClick={onClear}
-        aria-label={t('accounts.bulk_clear')}
-      >
-        {t('accounts.bulk_clear')}
-      </button>
+      {selectAllControl}
+      {selectedCountLabel}
 
       <div className="hidden h-5 w-px bg-border sm:block" />
 

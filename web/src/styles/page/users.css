@@ -1,0 +1,47 @@
+/* Users page: mobile toolbar layout and mobile record cards. */
+
+@media (max-width: 767px) {
+  /* Toolbar: search + status share the first row. */
+  .ag-users-page .ag-page-toolbar-filter-row {
+    flex-direction: row;
+  }
+
+  .ag-users-page .ag-users-toolbar-search {
+    flex: 3 1 0;
+    width: auto;
+  }
+
+  .ag-users-page .ag-users-toolbar-status {
+    flex: 2 1 0;
+    width: auto;
+  }
+
+  /* Actions: refresh stays fixed, create stretches to fill the row. */
+  .ag-users-page .ag-page-toolbar-actions {
+    flex-wrap: nowrap;
+  }
+
+  .ag-users-page .ag-page-toolbar-actions > .ag-page-toolbar-button:last-child {
+    flex: 1 1 auto;
+  }
+}
+
+/* Mobile user cards: touch-friendly three-column action grid. */
+
+.ag-users-mobile .ag-mobile-record-actions .ag-table-row-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  gap: 0.5rem;
+}
+
+.ag-users-mobile .ag-mobile-record-actions .ag-table-row-actions > .ag-table-row-native-action {
+  width: auto;
+  min-width: 0;
+  height: 2.25rem;
+  min-height: 2.25rem;
+}
+
+.ag-users-mobile .ag-mobile-record-actions .ag-table-row-native-action__label {
+  font-size: 0.75rem;
+}

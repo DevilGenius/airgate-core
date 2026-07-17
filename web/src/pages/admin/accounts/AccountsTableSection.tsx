@@ -28,9 +28,10 @@ const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
   onBulkEdit,
   onBulkEnable,
   onBulkRefresh,
-  onClearSelection,
+  onVisibleRowsSelected,
   overlay = true,
   selectionStore,
+  visibleRowIds,
 }: {
   onBulkClearRateLimitMarkers: () => void;
   onBulkDelete: () => void;
@@ -38,27 +39,37 @@ const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
   onBulkEdit: () => void;
   onBulkEnable: () => void;
   onBulkRefresh: () => void;
-  onClearSelection: () => void;
+  onVisibleRowsSelected: (isSelected: boolean) => void;
   overlay?: boolean;
   selectionStore: AccountSelectionStore;
+  visibleRowIds: number[];
 }) {
   const selectedCount = useSyncExternalStore(
     selectionStore.subscribe,
     selectionStore.getSelectedCount,
     selectionStore.getSelectedCount,
   );
+  const selectedVisibleCount = useSyncExternalStore(
+    useCallback((listener) => selectionStore.subscribe(listener), [selectionStore]),
+    useCallback(() => selectionStore.countVisible(visibleRowIds), [selectionStore, visibleRowIds]),
+    () => 0,
+  );
+  const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
+  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
 
   return (
     <div onClick={(event) => event.stopPropagation()}>
       <BulkActionsBar
         overlay={overlay}
+        allVisibleSelected={allVisibleSelected}
         isActive={selectedCount > 0}
         selectedCount={selectedCount}
-        onClear={onClearSelection}
+        someVisibleSelected={someVisibleSelected}
         onEdit={onBulkEdit}
         onEnable={onBulkEnable}
         onDisable={onBulkDisable}
         onRefreshQuota={onBulkRefresh}
+        onSelectAllChange={onVisibleRowsSelected}
         onClearRateLimitMarkers={onBulkClearRateLimitMarkers}
         onDelete={onBulkDelete}
       />
@@ -85,6 +96,7 @@ const AccountsSelectAllHeaderCell = memo(function AccountsSelectAllHeaderCell({
   const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length;
   const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
 
+  // 表头全选框常驻：批量栏只覆盖其右侧单元格，避免复选框被替换导致视觉漂移。
   return (
     <TableSelectionCheckbox
       ariaLabel={selectAllAriaLabel}
@@ -105,7 +117,6 @@ export const AccountsTableSection = memo(function AccountsTableSection({
   onBulkEdit,
   onBulkEnable,
   onBulkRefresh,
-  onClearSelection,
   onRowSelected,
   onSortChange,
   onVisibleRowsSelected,
@@ -129,7 +140,6 @@ export const AccountsTableSection = memo(function AccountsTableSection({
   onBulkEdit: () => void;
   onBulkEnable: () => void;
   onBulkRefresh: () => void;
-  onClearSelection: () => void;
   onRowSelected: (id: number, isSelected: boolean) => void;
   onSortChange?: (sortKey: string) => void;
   onVisibleRowsSelected: (isSelected: boolean) => void;
@@ -171,6 +181,7 @@ export const AccountsTableSection = memo(function AccountsTableSection({
         });
       }
       return {
+        cardRef: (card: HTMLElement | null) => selectionStore.registerRowCard(row.id, card),
         id: row.id,
         title: (
           <div className="ag-accounts-mobile-title">
@@ -188,6 +199,11 @@ export const AccountsTableSection = memo(function AccountsTableSection({
         meta: statusColumn ? statusColumn.render(row, rowMeta) : undefined,
         fields,
         actions: actionsColumn ? actionsColumn.render(row, rowMeta) : undefined,
+        onClick: () => {
+          if (selectionStore.getSelectedCount() === 0) return;
+          onRowSelected(row.id, !selectionStore.has(row.id));
+        },
+        onLongPress: () => onRowSelected(row.id, !selectionStore.has(row.id)),
       };
     });
   }, [columns, isMobileLayoutActive, onRowSelected, rowMetaById, rows, selectRowAriaLabel, selectionStore]);
@@ -199,11 +215,12 @@ export const AccountsTableSection = memo(function AccountsTableSection({
           <AccountsBulkActionsOverlay
             overlay={false}
             selectionStore={selectionStore}
-            onClearSelection={onClearSelection}
+            visibleRowIds={visibleRowIds}
             onBulkEdit={onBulkEdit}
             onBulkEnable={onBulkEnable}
             onBulkDisable={onBulkDisable}
             onBulkRefresh={onBulkRefresh}
+            onVisibleRowsSelected={onVisibleRowsSelected}
             onBulkClearRateLimitMarkers={onBulkClearRateLimitMarkers}
             onBulkDelete={onBulkDelete}
           />
@@ -222,11 +239,12 @@ export const AccountsTableSection = memo(function AccountsTableSection({
       <div className="ag-resource-table-scroll ag-accounts-table-desktop" data-slot="wrapper">
         <AccountsBulkActionsOverlay
           selectionStore={selectionStore}
-          onClearSelection={onClearSelection}
+          visibleRowIds={visibleRowIds}
           onBulkEdit={onBulkEdit}
           onBulkEnable={onBulkEnable}
           onBulkDisable={onBulkDisable}
           onBulkRefresh={onBulkRefresh}
+          onVisibleRowsSelected={onVisibleRowsSelected}
           onBulkClearRateLimitMarkers={onBulkClearRateLimitMarkers}
           onBulkDelete={onBulkDelete}
         />

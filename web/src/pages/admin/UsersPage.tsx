@@ -8,6 +8,7 @@ import { settingsApi } from '../../shared/api/settings';
 import { useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
@@ -16,7 +17,7 @@ import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { TablePage } from '../../shared/components/TablePage';
-import { TableRowMoreMenu } from '../../shared/components/TableRowMoreMenu';
+import { TableRowMoreMenu, type TableRowMoreMenuItem } from '../../shared/components/TableRowMoreMenu';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { getAvatarColor } from '../../shared/utils/avatar';
@@ -27,6 +28,7 @@ import { BalanceModal } from './users/BalanceModal';
 import { UserApiKeysModal } from './users/UserApiKeysModal';
 import { BalanceHistoryModal } from './users/BalanceHistoryModal';
 import { UserGroupsModal } from './users/UserGroupsModal';
+import { UsersMobileList } from './users/UsersMobileList';
 import type { UserResp } from '../../shared/types';
 import { Plus, RefreshCw } from 'lucide-react';
 
@@ -168,6 +170,7 @@ export default function UsersPage() {
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
+  const isMobileLayout = useMediaQuery('(max-width: 767px)');
   const statusOptions = [
     { id: '', label: t('users.all_status') },
     { id: 'active', label: t('status.active') },
@@ -179,12 +182,103 @@ export default function UsersPage() {
     setPage(1);
   }, [setPage]);
 
+  const getUserMoreMenuItems = (row: UserResp): TableRowMoreMenuItem[] => (
+    row.role === 'admin'
+      ? []
+      : [
+          {
+            key: 'delete',
+            label: t('common.delete'),
+            onSelect: () => setDeletingUser(row),
+            tone: 'danger',
+          },
+        ]
+  );
+
+  const renderUserStatus = (row: UserResp) => (
+    <NativeSwitch
+      ariaLabel={row.status === 'active' ? t('users.disable') : t('users.enable')}
+      isDisabled={row.role === 'admin'}
+      isSelected={row.status === 'active'}
+      contentClassName="text-xs"
+      contentStyle={{ color: row.status === 'active' ? 'var(--ag-success)' : 'var(--ag-text-tertiary)' }}
+      label={row.status === 'active' ? t('status.enabled') : t('status.disabled')}
+      onChange={(isSelected) => {
+        if (isSelected) {
+          toggleMutation.mutate(row.id);
+        } else {
+          setDisablingUser(row);
+        }
+      }}
+    />
+  );
+
+  const renderUserActions = (row: UserResp, showMoreMenu = true) => (
+    <div className="ag-table-row-actions ag-users-row-actions flex items-center justify-center gap-0.5">
+      <UserRowActionButton
+        ariaLabel={t('common.edit')}
+        title={t('common.edit')}
+        onClick={() => setEditingUser(row)}
+      >
+        {t('common.edit_short', '编辑')}
+      </UserRowActionButton>
+      <UserRowActionButton
+        ariaLabel={t('users.api_keys')}
+        title={t('users.api_keys')}
+        tone="primary"
+        onClick={() => setApiKeysUser(row)}
+      >
+        {t('users.api_keys_short', '密钥')}
+      </UserRowActionButton>
+      <UserRowActionButton
+        ariaLabel={t('users.groups')}
+        title={t('users.groups')}
+        tone="info"
+        onClick={() => setGroupsUser(row)}
+      >
+        {t('users.groups_short', '分组')}
+      </UserRowActionButton>
+      <UserRowActionButton
+        ariaLabel={t('users.topup')}
+        title={t('users.topup')}
+        tone="success"
+        isCircleSymbol
+        onClick={() => setBalanceUser({ user: row, defaultAction: 'add' })}
+      >
+        +
+      </UserRowActionButton>
+      <UserRowActionButton
+        ariaLabel={t('users.refund')}
+        title={t('users.refund')}
+        tone="warning"
+        isCircleSymbol
+        onClick={() => setBalanceUser({ user: row, defaultAction: 'subtract' })}
+      >
+        -
+      </UserRowActionButton>
+      <UserRowActionButton
+        ariaLabel={t('users.balance_history')}
+        title={t('users.balance_history')}
+        onClick={() => setBalanceHistoryUser(row)}
+      >
+        {t('users.balance_history_short', '记录')}
+      </UserRowActionButton>
+      {showMoreMenu ? (
+        <TableRowMoreMenu
+          ariaLabel={t('common.more')}
+          menuLabel={t('common.actions')}
+          items={getUserMoreMenuItems(row)}
+        />
+      ) : null}
+    </div>
+  );
+
   return (
     <TablePage
       className="ag-users-page ag-toolbar-standard-page"
       toolbar={(
         <div className="ag-page-toolbar-filter-row">
-            <div className="w-full sm:w-48">
+            <div className="ag-users-toolbar-search w-full sm:w-48">
               <SearchFilterInput
                 ariaLabel={t('users.search_placeholder')}
                 placeholder={t('users.search_placeholder')}
@@ -192,7 +286,7 @@ export default function UsersPage() {
                 onSearchChange={handleKeywordChange}
               />
             </div>
-            <div className="w-full sm:w-48">
+            <div className="ag-users-toolbar-status w-full sm:w-48">
               <SimpleSelect
                 ariaLabel={t('common.status')}
                 fullWidth
@@ -239,6 +333,16 @@ export default function UsersPage() {
       isFetching={isFetching && !isLoading}
     >
 
+      {isMobileLayout ? (
+        <UsersMobileList
+          emptyTitle={t('common.no_data')}
+          getMoreMenuItems={getUserMoreMenuItems}
+          isLoading={isLoading}
+          renderActions={(row) => renderUserActions(row, false)}
+          renderStatus={renderUserStatus}
+          rows={rows}
+        />
+      ) : (
       <CommonTable
         ariaLabel={t('users.title', 'Users')}
         minWidth={1180}
@@ -295,96 +399,20 @@ export default function UsersPage() {
                       <span className="font-mono">${row.balance.toFixed(2)}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <NativeSwitch
-                        ariaLabel={row.status === 'active' ? t('users.disable') : t('users.enable')}
-                        isDisabled={row.role === 'admin'}
-                        isSelected={row.status === 'active'}
-                        contentClassName="text-xs"
-                        contentStyle={{ color: row.status === 'active' ? 'var(--ag-success)' : 'var(--ag-text-tertiary)' }}
-                        label={row.status === 'active' ? t('status.enabled') : t('status.disabled')}
-                        onChange={(isSelected) => {
-                          if (isSelected) {
-                            toggleMutation.mutate(row.id);
-                          } else {
-                            setDisablingUser(row);
-                          }
-                        }}
-                      />
+                      {renderUserStatus(row)}
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <span className="text-xs text-text-secondary">{formatDateTime(row.created_at)}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <div className="ag-table-row-actions ag-users-row-actions flex items-center justify-center gap-0.5">
-                        <UserRowActionButton
-                          ariaLabel={t('common.edit')}
-                          title={t('common.edit')}
-                          onClick={() => setEditingUser(row)}
-                        >
-                          {t('common.edit_short', '编辑')}
-                        </UserRowActionButton>
-                        <UserRowActionButton
-                          ariaLabel={t('users.api_keys')}
-                          title={t('users.api_keys')}
-                          tone="primary"
-                          onClick={() => setApiKeysUser(row)}
-                        >
-                          {t('users.api_keys_short', '密钥')}
-                        </UserRowActionButton>
-                        <UserRowActionButton
-                          ariaLabel={t('users.groups')}
-                          title={t('users.groups')}
-                          tone="info"
-                          onClick={() => setGroupsUser(row)}
-                        >
-                          {t('users.groups_short', '分组')}
-                        </UserRowActionButton>
-                        <UserRowActionButton
-                          ariaLabel={t('users.topup')}
-                          title={t('users.topup')}
-                          tone="success"
-                          isCircleSymbol
-                          onClick={() => setBalanceUser({ user: row, defaultAction: 'add' })}
-                        >
-                          +
-                        </UserRowActionButton>
-                        <UserRowActionButton
-                          ariaLabel={t('users.refund')}
-                          title={t('users.refund')}
-                          tone="warning"
-                          isCircleSymbol
-                          onClick={() => setBalanceUser({ user: row, defaultAction: 'subtract' })}
-                        >
-                          -
-                        </UserRowActionButton>
-                        <UserRowActionButton
-                          ariaLabel={t('users.balance_history')}
-                          title={t('users.balance_history')}
-                          onClick={() => setBalanceHistoryUser(row)}
-                        >
-                          {t('users.balance_history_short', '记录')}
-                        </UserRowActionButton>
-                        {row.role !== 'admin' ? (
-                          <TableRowMoreMenu
-                            ariaLabel={t('common.more')}
-                            menuLabel={t('common.actions')}
-                            items={[
-                              {
-                                key: 'delete',
-                                label: t('common.delete'),
-                                onSelect: () => setDeletingUser(row),
-                                tone: 'danger',
-                              },
-                            ]}
-                          />
-                        ) : null}
-                      </div>
+                      {renderUserActions(row)}
                     </CommonTable.Cell>
                   </CommonTable.Row>
                 ))
               )}
             </CommonTable.Body>
       </CommonTable>
+      )}
 
       <CreateUserModal
         open={showCreateModal}
