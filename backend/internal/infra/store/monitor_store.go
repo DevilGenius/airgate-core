@@ -443,8 +443,16 @@ func (s *MonitorStore) summaryTopAccounts(ctx context.Context, query *ent.Monito
 }
 
 func applyMonitorListFilter(query *ent.MonitorEventQuery, filter appmonitor.ListFilter) *ent.MonitorEventQuery {
-	if filter.Status != "" {
-		query = query.Where(entmonitorevent.StatusEQ(entmonitorevent.Status(filter.Status)))
+	if values := splitMonitorFilterValues(filter.Status); len(values) > 0 {
+		if len(values) == 1 {
+			query = query.Where(entmonitorevent.StatusEQ(entmonitorevent.Status(values[0])))
+		} else {
+			statuses := make([]entmonitorevent.Status, 0, len(values))
+			for _, value := range values {
+				statuses = append(statuses, entmonitorevent.Status(value))
+			}
+			query = query.Where(entmonitorevent.StatusIn(statuses...))
+		}
 	}
 	if values := splitMonitorFilterValues(filter.Severity); len(values) > 0 {
 		if len(values) == 1 {

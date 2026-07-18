@@ -10,6 +10,7 @@ export type MonitorMultiFilterGroup = {
   options: SelectOption[];
   selectionMode?: 'multiple' | 'single';
   selectedValues: readonly string[];
+  showInSummary?: boolean;
   summaryLabel?: string;
 };
 
@@ -66,9 +67,12 @@ export function MonitorMultiFilterSelect({
     const selectedValues = new Set(group.selectedValues);
     const selectedOptions = group.options.filter((option) => selectedValues.has(option.id));
     const selectedOption = selectedOptions[0];
+    if (group.showInSummary === false) {
+      return [];
+    }
     if (
       group.selectionMode === 'single'
-      && group.defaultValue
+      && group.defaultValue !== undefined
       && selectedOptions.length === 1
       && selectedOption !== undefined
       && selectedOption.id === group.defaultValue

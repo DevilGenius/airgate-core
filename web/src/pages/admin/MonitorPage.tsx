@@ -147,11 +147,6 @@ function readStoredPositiveNumber(key: string) {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
 }
 
-function readStoredOption(key: string, allowedValues: readonly string[]) {
-  const value = readStoredString(key);
-  return allowedValues.includes(value) ? value : undefined;
-}
-
 function filterValues(value: string | undefined, allowedValues: readonly string[]) {
   const selectedValues = new Set((value ?? '').split(/\s+/).filter(Boolean));
   return allowedValues.filter((item) => selectedValues.has(item));
@@ -220,7 +215,7 @@ function readInitialMonitorState() {
   const filters: Partial<MonitorListQuery> = {
     from: eventsTimeRange.from,
     severity: readStoredOptions(MONITOR_FILTER_KEYS.events.severity, MONITOR_EVENT_SEVERITY_IDS),
-    status: readStoredOption(MONITOR_FILTER_KEYS.events.status, MONITOR_EVENT_STATUS_IDS),
+    status: readStoredOptions(MONITOR_FILTER_KEYS.events.status, MONITOR_EVENT_STATUS_IDS),
     to: eventsTimeRange.to,
     type: readStoredOptions(MONITOR_FILTER_KEYS.events.type, MONITOR_EVENT_TYPE_IDS),
   };
@@ -468,24 +463,37 @@ export default function MonitorPage() {
     applyMonitorTimeRange(preset, range.from, range.to);
   }, [applyMonitorTimeRange]);
 
+  const toggleEventStatusFilter = useCallback((value: string) => {
+    updateFilter(
+      'status',
+      toggleFilterValue(filters.status, value, MONITOR_EVENT_STATUS_IDS),
+    );
+  }, [filters.status, updateFilter]);
+
   const toggleEventFilter = useCallback((groupID: string, value: string) => {
     if (groupID === 'time_range') {
       handleTimeRangeSelection(value);
       return;
     }
+    if (groupID === 'status') {
+      toggleEventStatusFilter(value);
+      return;
+    }
     toggleEventClassificationFilter(groupID, value);
-  }, [handleTimeRangeSelection, toggleEventClassificationFilter]);
+  }, [handleTimeRangeSelection, toggleEventClassificationFilter, toggleEventStatusFilter]);
 
   const clearEventFilters = useCallback(() => {
     setTimeRangePreset('all');
     writeStoredString(MONITOR_FILTER_KEYS.events.type, undefined);
     writeStoredString(MONITOR_FILTER_KEYS.events.severity, undefined);
+    writeStoredString(MONITOR_FILTER_KEYS.events.status, undefined);
     writeStoredTimeRange(MONITOR_FILTER_KEYS.events, 'all');
     startTransition(() => {
       setFilters((prev) => ({
         ...prev,
         from: undefined,
         severity: undefined,
+        status: undefined,
         to: undefined,
         type: undefined,
       }));
@@ -776,7 +784,6 @@ export default function MonitorPage() {
   }, [refetch, refetchRequestSummary, refetchRequests, refetchSummary]);
 
   const statusOptions: SelectOption[] = [
-    { id: '', label: t('common.all') },
     ...MONITOR_EVENT_STATUS_IDS.map((id) => ({ id, label: t(`monitor.status_${id}`, id) })),
   ];
   const severityOptions: SelectOption[] = [
@@ -793,6 +800,7 @@ export default function MonitorPage() {
   ];
   const selectedEventTypes = filterValues(filters.type, MONITOR_EVENT_TYPE_IDS);
   const selectedEventSeverities = filterValues(filters.severity, MONITOR_EVENT_SEVERITY_IDS);
+  const selectedEventStatuses = filterValues(filters.status, MONITOR_EVENT_STATUS_IDS);
   const selectedRequestTypes = filterValues(requestFilters.type, MONITOR_REQUEST_TYPE_IDS);
   const selectedRequestSeverities = filterValues(requestFilters.severity, MONITOR_REQUEST_SEVERITY_IDS);
 
@@ -916,6 +924,7 @@ export default function MonitorPage() {
                         options: timeRangeOptions,
                         selectionMode: 'single',
                         selectedValues: [requestTimeRangePreset],
+                        showInSummary: false,
                         summaryLabel: requestTimeRangeSelectedLabel,
                       },
                     ]}
@@ -999,12 +1008,20 @@ export default function MonitorPage() {
                         selectedValues: selectedEventSeverities,
                       },
                       {
+                        id: 'status',
+                        label: t('monitor.status'),
+                        options: statusOptions,
+                        selectionMode: 'multiple',
+                        selectedValues: selectedEventStatuses,
+                      },
+                      {
                         defaultValue: 'all',
                         id: 'time_range',
                         label: t('monitor.time_range'),
                         options: timeRangeOptions,
                         selectionMode: 'single',
                         selectedValues: [timeRangePreset],
+                        showInSummary: false,
                         summaryLabel: timeRangeSelectedLabel,
                       },
                     ]}
@@ -1019,14 +1036,6 @@ export default function MonitorPage() {
                       onChange={(event) => updateFilter('source', event.target.value)}
                     />
                   </div>
-                  <FilterSelect
-                    ariaLabel={t('monitor.status')}
-                    className={MONITOR_TOOLBAR_CONTROL_CLASS}
-                    label={t('monitor.status')}
-                    options={statusOptions}
-                    value={filters.status || ''}
-                    onChange={(value) => updateFilter('status', value)}
-                  />
                 </>
               )}
             </div>
