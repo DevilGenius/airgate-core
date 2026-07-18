@@ -77,7 +77,9 @@
   justify-content: center;
   justify-self: start;
   overflow: hidden;
+  border: 1px solid var(--ag-glass-border);
   border-radius: 0.25rem;
+  background: var(--ag-bg-surface);
   padding: 0;
   font-size: 0.6875rem;
   font-weight: 600;
@@ -92,6 +94,7 @@
   min-width: 0;
   overflow: hidden;
   border-radius: 999px;
+  background: var(--ag-glass-border);
 }
 
 .ag-accounts-table .ag-account-usage-bar::before {
@@ -101,6 +104,30 @@
   border-radius: inherit;
   background: var(--ag-account-usage-bar-color, var(--ag-success));
   content: "";
+}
+
+/* 用量窗口按类型着色：5h 蓝色、7d 紫色（轨道与填充保留原样式），一眼区分。 */
+
+.ag-accounts-table .ag-account-usage-window-row[data-slot="5h"] .ag-account-usage-window-label {
+  border-color: color-mix(in srgb, var(--ag-info) 32%, transparent);
+  background: color-mix(in srgb, var(--ag-info) 12%, transparent);
+  color: var(--ag-info);
+}
+
+.ag-accounts-table .ag-account-usage-window-row[data-slot="7d"] .ag-account-usage-window-label {
+  border-color: color-mix(in srgb, rgb(139, 92, 246) 34%, transparent);
+  background: color-mix(in srgb, rgb(139, 92, 246) 13%, transparent);
+  color: rgb(139, 92, 246);
+}
+
+/* 7d 填充叠加细斜纹，形状层面也能区分（色盲友好）。 */
+
+.ag-accounts-table .ag-account-usage-window-row[data-slot="7d"] .ag-account-usage-bar::before {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, white 34%, transparent) 0 2px,
+    transparent 2px 6px
+  );
 }
 
 .ag-accounts-table .ag-account-usage-percent,

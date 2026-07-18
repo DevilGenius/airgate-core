@@ -21,7 +21,7 @@ import {
   type AccountUsageTodayStats,
   type AccountUsageWindow,
 } from './AccountPageSupport';
-import { buildWindowRows, getWindowDisplay, shouldExpandUsageWindows } from './accountUsageRows';
+import { buildWindowRows, getWindowDisplay, getWindowSlot, shouldExpandUsageWindows } from './accountUsageRows';
 
 type QuotaRefreshResult = Awaited<ReturnType<typeof accountsApi.refreshQuota>>;
 
@@ -71,6 +71,7 @@ type PreparedUsageWindowRow = {
   label: string;
   percent: number;
   resetText: string;
+  slot: string;
   title: string;
 };
 
@@ -265,6 +266,7 @@ function prepareUsageView(row: AccountResp, usage: AccountUsageInfo | undefined,
     const percent = Math.round(item.window.used_percent);
     const display = getWindowDisplay(item.window);
     const color = usageColor(item.window.used_percent);
+    const { slot } = getWindowSlot(item.window);
     return {
       barPercent: Math.max(0, Math.min(100, percent)),
       color,
@@ -272,6 +274,7 @@ function prepareUsageView(row: AccountResp, usage: AccountUsageInfo | undefined,
       label: display.label,
       percent,
       resetText: formatReset(getResetSeconds(item.window, resetNow)),
+      slot,
       title: display.title,
     };
   });
@@ -709,8 +712,8 @@ export function useAccountTableColumns({
             <div className={hasTodayMetricChips ? 'ag-account-usage-layout' : 'ag-account-usage-layout ag-account-usage-layout--centered'}>
               <div className={prepared.windowsClassName}>
                 {prepared.windowRows.map((item) => (
-                  <div key={item.id} className="ag-account-usage-window-row">
-                    <span className="ag-account-usage-window-label text-text-secondary" style={ACCOUNT_USAGE_BADGE_STYLE} title={item.title}>
+                  <div key={item.id} className="ag-account-usage-window-row" data-slot={item.slot}>
+                    <span className="ag-account-usage-window-label text-text-secondary" title={item.title}>
                       {item.label}
                     </span>
                     <div
@@ -718,7 +721,6 @@ export function useAccountTableColumns({
                       style={{
                         '--ag-account-usage-bar-color': item.color,
                         '--ag-account-usage-bar-width': `${item.barPercent}%`,
-                        background: 'var(--ag-glass-border)',
                       } as CSSProperties}
                     />
                     <span className="ag-account-usage-percent" style={{ color: item.color }}>
