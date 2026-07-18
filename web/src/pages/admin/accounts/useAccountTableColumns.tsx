@@ -174,13 +174,13 @@ const AccountUsageTodayMetricChips = memo(function AccountUsageTodayMetricChips(
   return (
     <div className="ag-account-usage-metrics" title={labels.todayStatsTooltip}>
       <AccountUsageMetricChip
-        label={labels.todayAccessCount}
-        labelSecondary={showImageCount ? labels.imageCountInlineLabel : undefined}
+        label={showImageCount ? labels.imageCountInlineLabel : labels.todayAccessCount}
+        labelSecondary={showImageCount ? labels.todayAccessCount : undefined}
         mutedLabel
         title={showImageCount ? labels.imageCountTooltip : undefined}
         tone="info"
-        value={showImageCount ? accessRequestsText : accessText}
-        valueSecondary={showImageCount ? accessImageText : undefined}
+        value={showImageCount ? accessImageText : accessText}
+        valueSecondary={showImageCount ? accessRequestsText : undefined}
       />
       <AccountUsageMetricChip
         label="Token"
