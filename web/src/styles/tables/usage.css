@@ -128,6 +128,12 @@
   box-shadow: var(--shadow-lg);
 }
 
+/* 窄屏时浮层可能覆盖触发单元格；悬停模式下忽略命中，避免 mouseleave/open 循环闪烁。 */
+
+.ag-usage-rich-tooltip-content[data-hover-mode="true"] {
+  pointer-events: none;
+}
+
 .ag-usage-tooltip-panel {
   overflow: hidden;
   border-radius: var(--radius);

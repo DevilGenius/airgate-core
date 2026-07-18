@@ -39,7 +39,6 @@ const RICH_TOOLTIP_OFFSET_PX = 8;
 const RICH_TOOLTIP_VIEWPORT_PADDING_PX = 8;
 const RICH_TOOLTIP_WIDTH_PX = 336;
 const RICH_TOOLTIP_ESTIMATED_HALF_HEIGHT_PX = 160;
-const RICH_TOOLTIP_CLOSE_DELAY_MS = 100;
 
 function formatTimingMs(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '-';
@@ -84,15 +83,8 @@ function RichTooltip({
   const [position, setPosition] = useState<RichTooltipPosition | null>(null);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const closeTimerRef = useRef<number | null>(null);
-  // 触屏设备使用点按开关；支持悬停时让触发元素和浮层共享同一个悬停区域。
+  // 触屏设备使用点按开关；悬停设备由触发元素独占鼠标命中，避免窄屏浮层覆盖触发元素时闪烁。
   const canHover = useMediaQuery('(hover: hover)');
-
-  const cancelScheduledClose = useCallback(() => {
-    if (closeTimerRef.current === null) return;
-    window.clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = null;
-  }, []);
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -101,21 +93,14 @@ function RichTooltip({
   }, [placement]);
 
   const openTooltip = useCallback(() => {
-    cancelScheduledClose();
     updatePosition();
     setIsOpen(true);
-  }, [cancelScheduledClose, updatePosition]);
+  }, [updatePosition]);
 
   const closeTooltip = useCallback(() => {
-    cancelScheduledClose();
     setIsOpen(false);
     setPosition(null);
-  }, [cancelScheduledClose]);
-
-  const scheduleTooltipClose = useCallback(() => {
-    cancelScheduledClose();
-    closeTimerRef.current = window.setTimeout(closeTooltip, RICH_TOOLTIP_CLOSE_DELAY_MS);
-  }, [cancelScheduledClose, closeTooltip]);
+  }, []);
 
   const toggleTooltip = useCallback(() => {
     if (isOpen) {
@@ -136,8 +121,6 @@ function RichTooltip({
     };
   }, [isOpen, updatePosition]);
 
-  useEffect(() => () => cancelScheduledClose(), [cancelScheduledClose]);
-
   useEffect(() => {
     if (!isOpen || canHover) return undefined;
     const handlePointerDown = (event: PointerEvent) => {
@@ -157,7 +140,7 @@ function RichTooltip({
         className={RICH_TOOLTIP_TRIGGER_CLASS}
         onClick={canHover ? undefined : toggleTooltip}
         onMouseEnter={canHover ? openTooltip : undefined}
-        onMouseLeave={canHover ? scheduleTooltipClose : undefined}
+        onMouseLeave={canHover ? closeTooltip : undefined}
       >
         {children}
       </span>
@@ -166,9 +149,8 @@ function RichTooltip({
           <div
             ref={tooltipRef}
             className="ag-usage-rich-tooltip-content"
+            data-hover-mode={canHover ? 'true' : undefined}
             data-placement={placement}
-            onMouseEnter={canHover ? cancelScheduledClose : undefined}
-            onMouseLeave={canHover ? scheduleTooltipClose : undefined}
             role="tooltip"
             style={{
               left: position.left,
