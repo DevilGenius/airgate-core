@@ -579,12 +579,21 @@ func (s stubRepository) BatchImageStats(ctx context.Context, ids []int, start ti
 
 // stubStateWriter 捕获 StateWriter 调用。
 type stubStateWriter struct {
-	rateLimited    map[int]*time.Time
-	cleared        map[int]bool
-	disabled       map[int]string
-	degraded       map[int]string
-	recovered      map[int]bool
-	routeRefreshed map[int]bool
+	accountTestOutcomes []accountTestOutcomeCall
+	rateLimited         map[int]*time.Time
+	cleared             map[int]bool
+	disabled            map[int]string
+	degraded            map[int]string
+	recovered           map[int]bool
+	routeRefreshed      map[int]bool
+}
+
+type accountTestOutcomeCall struct {
+	accountID int
+	platform  string
+	model     string
+	outcome   sdk.ForwardOutcome
+	isPool    bool
 }
 
 func newStubStateWriter() *stubStateWriter {
@@ -596,6 +605,16 @@ func newStubStateWriter() *stubStateWriter {
 		recovered:      map[int]bool{},
 		routeRefreshed: map[int]bool{},
 	}
+}
+
+func (s *stubStateWriter) ApplyAccountTestOutcome(_ context.Context, accountID int, platform, model string, outcome sdk.ForwardOutcome, isPool bool) {
+	s.accountTestOutcomes = append(s.accountTestOutcomes, accountTestOutcomeCall{
+		accountID: accountID,
+		platform:  platform,
+		model:     model,
+		outcome:   outcome,
+		isPool:    isPool,
+	})
 }
 
 func (s *stubStateWriter) MarkRateLimited(_ context.Context, accountID int, until time.Time, _ string) {

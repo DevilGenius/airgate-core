@@ -350,6 +350,7 @@ func TestUsageProbeThroughGatewayBatchAndFallback(t *testing.T) {
 
 func TestPrepareConnectivityTestRunsGatewayOutcomes(t *testing.T) {
 	recorder := &captureMonitorRecorder{}
+	stateWriter := newStubStateWriter()
 	runtime := newAccountGatewayRuntime(t, &accountFakeGatewayPlugin{
 		platform: "openai",
 		models:   []sdk.ModelInfo{{ID: "gpt-test"}},
@@ -374,7 +375,7 @@ func TestPrepareConnectivityTestRunsGatewayOutcomes(t *testing.T) {
 	}, accountGatewayCatalog{
 		stubPluginCatalog: stubPluginCatalog{models: []sdk.ModelInfo{{ID: "gpt-test"}}},
 		instances:         map[string]*plugin.PluginInstance{"openai": runtime.instance},
-	}, nil, nil)
+	}, nil, stateWriter)
 	service.SetMonitorRecorder(recorder)
 
 	ct, err := service.PrepareConnectivityTest(t.Context(), 11, "")
@@ -387,6 +388,10 @@ func TestPrepareConnectivityTestRunsGatewayOutcomes(t *testing.T) {
 	}
 	if rr.Code != http.StatusAccepted || rr.Body.String() != "streamed" {
 		t.Fatalf("recorder code=%d body=%q", rr.Code, rr.Body.String())
+	}
+	if len(stateWriter.accountTestOutcomes) != 1 || stateWriter.accountTestOutcomes[0].accountID != 11 ||
+		stateWriter.accountTestOutcomes[0].outcome.Kind != sdk.OutcomeSuccess {
+		t.Fatalf("success state outcome = %+v", stateWriter.accountTestOutcomes)
 	}
 	if len(recorder.resolved) != 1 || recorder.resolved[0].SubjectID != "11" {
 		t.Fatalf("resolved monitor events = %+v", recorder.resolved)
@@ -405,6 +410,7 @@ func TestPrepareConnectivityTestRunsGatewayOutcomes(t *testing.T) {
 	})
 	defer runtime.cleanup()
 
+	stateWriter = newStubStateWriter()
 	service = NewService(stubRepository{
 		findByID: func(context.Context, int, LoadOptions) (Account, error) {
 			return Account{ID: 12, Name: "oauth", Platform: "openai", Type: "oauth"}, nil
@@ -412,7 +418,7 @@ func TestPrepareConnectivityTestRunsGatewayOutcomes(t *testing.T) {
 	}, accountGatewayCatalog{
 		stubPluginCatalog: stubPluginCatalog{models: []sdk.ModelInfo{{ID: "gpt-test"}}},
 		instances:         map[string]*plugin.PluginInstance{"openai": runtime.instance},
-	}, nil, nil)
+	}, nil, stateWriter)
 	service.SetMonitorRecorder(recorder)
 
 	ct, err = service.PrepareConnectivityTest(t.Context(), 12, "")
@@ -422,6 +428,10 @@ func TestPrepareConnectivityTestRunsGatewayOutcomes(t *testing.T) {
 	err = ct.Run(t.Context(), httptest.NewRecorder())
 	if err == nil || !strings.Contains(err.Error(), "HTTP 400: bad model") {
 		t.Fatalf("ConnectivityTest.Run failure error = %v", err)
+	}
+	if len(stateWriter.accountTestOutcomes) != 1 || stateWriter.accountTestOutcomes[0].accountID != 12 ||
+		stateWriter.accountTestOutcomes[0].outcome.Kind != sdk.OutcomeClientError {
+		t.Fatalf("failure state outcome = %+v", stateWriter.accountTestOutcomes)
 	}
 	if len(recorder.records) == 0 || recorder.records[len(recorder.records)-1].SubjectID != "12" {
 		t.Fatalf("monitor failure records = %+v", recorder.records)

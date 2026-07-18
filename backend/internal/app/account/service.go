@@ -89,6 +89,9 @@ type accountProfileCachePayload struct {
 // StateWriter 管理员巡检场景下对账号状态的写入口。
 // 由 scheduler 包实现；让 account service 不直接依赖 scheduler。
 type StateWriter interface {
+	// ApplyAccountTestOutcome 使用与调度请求相同的状态机规则处理账号测试结果。
+	// 账号测试不占用调度 RPM，因此实现方不应执行调度请求专用的 RPM 回退。
+	ApplyAccountTestOutcome(ctx context.Context, accountID int, platform, model string, outcome sdk.ForwardOutcome, isPool bool)
 	// MarkRateLimited 把账号打入 rate_limited 状态直到 until。
 	MarkRateLimited(ctx context.Context, accountID int, until time.Time, reason string)
 	// ClearRateLimited 账号已从限流中恢复，回到 active。
@@ -922,12 +925,14 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			req.Writer = writer
 			outcome, forwardErr := inst.Gateway.Forward(runCtx, &req)
 			if forwardErr != nil {
+				s.applyConnectivityTestOutcome(runCtx, item, modelID, outcome, forwardErr)
 				s.recordConnectivityTestFailure(runCtx, item, modelID, "plugin_forward_error", forwardErr)
 				return forwardErr
 			}
 			// 测试路径严格判定：只有 OutcomeSuccess 算通过；任何其它 Kind 都报告失败。
 			// 这是管理员工具，失败原因要保留真实上游诊断，方便直接排查账号态 / 上游态问题。
 			if outcome.Kind == sdk.OutcomeSuccess {
+				s.applyConnectivityTestOutcome(runCtx, item, modelID, outcome, nil)
 				s.resolveAccountMonitorEvents(runCtx, item.ID)
 				return nil
 			}
@@ -939,10 +944,21 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 				msg = fmt.Sprintf("plugin returned %s", outcome.Kind)
 			}
 			err := errors.New(msg)
+			s.applyConnectivityTestOutcome(runCtx, item, modelID, outcome, err)
 			s.recordConnectivityTestFailure(runCtx, item, modelID, outcome.Kind.String(), err)
 			return err
 		},
 	}, nil
+}
+
+func (s *Service) applyConnectivityTestOutcome(ctx context.Context, item Account, modelID string, outcome sdk.ForwardOutcome, forwardErr error) {
+	if s == nil || s.stateWriter == nil || item.ID <= 0 {
+		return
+	}
+	if strings.TrimSpace(outcome.Reason) == "" && forwardErr != nil {
+		outcome.Reason = forwardErr.Error()
+	}
+	s.stateWriter.ApplyAccountTestOutcome(ctx, item.ID, item.Platform, modelID, outcome, item.UpstreamIsPool)
 }
 
 func connectivityTestErrorMessage(outcome sdk.ForwardOutcome) string {

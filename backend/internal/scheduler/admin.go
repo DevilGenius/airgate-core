@@ -12,6 +12,23 @@ import (
 // 管理员 / 配额巡检的状态写入口。这些调用不经过 Apply —— 它们是"外部已知事实"
 // 的直接落库，不需要 RPM 回退、失败计数等逻辑。
 
+// ApplyAccountTestOutcome 使用与正常调度请求相同的账号状态机判定处理管理员账号测试结果。
+// 账号测试没有先递增调度 RPM，因此直接进入 StateMachine，不能调用 Scheduler.Apply 的 RPM 回退。
+func (s *Scheduler) ApplyAccountTestOutcome(ctx context.Context, accountID int, platform, model string, outcome sdk.ForwardOutcome, isPool bool) {
+	if s == nil || s.state == nil || accountID <= 0 {
+		return
+	}
+	s.state.Apply(ctx, accountID, Judgment{
+		Kind:           outcome.Kind,
+		RetryAfter:     outcome.RetryAfter,
+		Reason:         outcome.Reason,
+		Duration:       outcome.Duration,
+		IsPool:         isPool,
+		UpstreamStatus: outcome.Upstream.StatusCode,
+		Family:         ModelFamily(platform, model),
+	})
+}
+
 // ManualRecover 运维手动把账号恢复到 active：清状态、清到期、清原因，并立即刷新 RouteGraph。
 func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 	dbCtx, cancel := context.WithTimeout(ctx, dbTimeout)
