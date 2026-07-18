@@ -19,6 +19,7 @@ interface ItemState {
   name: string;
   status: ItemStatus;
   error?: string;
+  text?: string;
 }
 
 interface AccountTestGroup {
@@ -54,10 +55,19 @@ export function BulkAccountTestModal({
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const textRef = useRef<Map<number, string>>(new Map());
+
+  const flushTexts = useCallback(() => {
+    setItems((previous) => previous.map((item) => {
+      const text = textRef.current.get(item.id);
+      return text !== undefined && text !== item.text ? { ...item, text } : item;
+    }));
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     abortRef.current?.abort();
+    textRef.current.clear();
     setItems(accounts.map((account) => ({
       groupKey: accountTestGroupKey(account),
       id: account.id,
@@ -149,6 +159,7 @@ export function BulkAccountTestModal({
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+    textRef.current.clear();
     setItems(accounts.map((account) => ({
       groupKey: accountTestGroupKey(account),
       id: account.id,
@@ -161,27 +172,39 @@ export function BulkAccountTestModal({
     setFinished(false);
     setRunning(true);
 
-    await Promise.all(accounts.map(async (account) => {
-      const modelId = groupModels[accountTestGroupKey(account)]?.selectedModel ?? '';
-      try {
-        const result = await runAccountConnectivityTest({
-          accountId: account.id,
-          fallbackError: t('accounts.test_error'),
-          modelId,
-          signal: controller.signal,
-        });
-        if (!controller.signal.aborted) recordResult(account.id, result);
-      } catch (error) {
-        if ((error as Error).name === 'AbortError' || controller.signal.aborted) return;
-        recordResult(account.id, { success: false, error: (error as Error).message });
-      }
-    }));
+    const flushTimer = window.setInterval(flushTexts, 150);
+    try {
+      await Promise.all(accounts.map(async (account) => {
+        const modelId = groupModels[accountTestGroupKey(account)]?.selectedModel ?? '';
+        try {
+          const result = await runAccountConnectivityTest({
+            accountId: account.id,
+            fallbackError: t('accounts.test_error'),
+            handlers: {
+              onTextDelta: (delta) => {
+                const previous = textRef.current.get(account.id) ?? '';
+                textRef.current.set(account.id, (previous + delta).slice(-4000));
+              },
+            },
+            modelId,
+            signal: controller.signal,
+          });
+          if (!controller.signal.aborted) recordResult(account.id, result);
+        } catch (error) {
+          if ((error as Error).name === 'AbortError' || controller.signal.aborted) return;
+          recordResult(account.id, { success: false, error: (error as Error).message });
+        }
+      }));
+    } finally {
+      window.clearInterval(flushTimer);
+      flushTexts();
+    }
 
     if (!controller.signal.aborted) {
       setRunning(false);
       setFinished(true);
     }
-  }, [accounts, canStart, groupModels, recordResult, running, t]);
+  }, [accounts, canStart, flushTexts, groupModels, recordResult, running, t]);
 
   const handleClose = useCallback(() => {
     abortRef.current?.abort();
@@ -194,11 +217,23 @@ export function BulkAccountTestModal({
     },
   });
   const progress = accounts.length > 0 ? Math.round((done / accounts.length) * 100) : 0;
+  const successPercent = accounts.length > 0 ? (success / accounts.length) * 100 : 0;
+  const failedPercent = accounts.length > 0 ? (failed / accounts.length) * 100 : 0;
+  const groupStats = useMemo(() => {
+    const stats = new Map<string, number>();
+    for (const item of items) {
+      if (item.status === 'success' || item.status === 'error') {
+        stats.set(item.groupKey, (stats.get(item.groupKey) ?? 0) + 1);
+      }
+    }
+    return stats;
+  }, [items]);
 
   return (
     <CommonModal
       className="ag-account-page-modal"
-      dialogStyle={{ maxWidth: '680px', width: 'min(100%, calc(100vw - 2rem))' }}
+      description={t('accounts.bulk_test_desc')}
+      dialogStyle={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
       footer={(
         <div className="flex w-full justify-end gap-2">
           <Button variant="secondary" onPress={handleClose}>
@@ -221,7 +256,7 @@ export function BulkAccountTestModal({
       title={t('accounts.bulk_test_title')}
     >
       <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className={`grid gap-3 ${groups.length > 1 ? 'md:grid-cols-2' : ''}`}>
           {groups.map((group) => {
             const state = groupModels[group.key];
             const options = state?.loading
@@ -268,53 +303,76 @@ export function BulkAccountTestModal({
           })}
         </div>
 
-        <div>
-          <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--ag-text-secondary)]">
-            <span>{t('accounts.bulk_test_progress', { done, total: accounts.length })}</span>
-            <span className="font-mono">{progress}%</span>
+        <div className="space-y-2 rounded-lg border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] px-3 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+            <span className="text-[var(--ag-text-secondary)]">
+              {t('accounts.bulk_test_progress', { done, total: accounts.length })}
+            </span>
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1 text-success">
+                <Check className="w-3.5 h-3.5" />
+                {t('accounts.bulk_test_success_count', { count: success })}
+              </span>
+              <span className="inline-flex items-center gap-1 text-danger">
+                <X className="w-3.5 h-3.5" />
+                {t('accounts.bulk_test_failed_count', { count: failed })}
+              </span>
+              <span className="font-mono tabular-nums text-[var(--ag-text-secondary)]">
+                {progress}%
+              </span>
+            </div>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--ag-glass-border)]">
-            <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
+          <div className="flex h-1.5 overflow-hidden rounded-full bg-[var(--ag-glass-border)]">
+            <div
+              className="h-full bg-success transition-[width] duration-300"
+              style={{ width: `${successPercent}%` }}
+            />
+            <div
+              className="h-full bg-danger transition-[width] duration-300"
+              style={{ width: `${failedPercent}%` }}
+            />
           </div>
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-[var(--ag-text-secondary)]">
-          <span className="inline-flex items-center gap-1">
-            <Check className="w-3.5 h-3.5 text-success" />
-            {t('accounts.bulk_test_success_count', { count: success })}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <X className="w-3.5 h-3.5 text-danger" />
-            {t('accounts.bulk_test_failed_count', { count: failed })}
-          </span>
-        </div>
-
-        <div className="max-h-72 overflow-y-auto rounded-lg border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)]">
-          {groups.map((group) => (
-            <div key={group.key}>
-              <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-[var(--ag-border-subtle)] bg-[var(--ag-bg-surface)] px-3 py-2 text-xs font-medium">
-                <span>{group.platform.toUpperCase()}</span>
-                {group.type ? <span className="text-[var(--ag-text-secondary)]">{group.type}</span> : null}
-                <span className="truncate text-[var(--ag-text-tertiary)]">
-                  {groupModels[group.key]?.selectedModel ?? ''}
-                </span>
-              </div>
-              {items.filter((item) => item.groupKey === group.key).map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-2 border-b border-[var(--ag-border-subtle)] px-3 py-2 text-xs last:border-b-0"
-                >
-                  <TestStatusIcon status={item.status} />
-                  <span className="min-w-0 flex-1 truncate text-[var(--ag-text)]">{item.name}</span>
-                  {item.error ? (
-                    <span className="max-w-[260px] truncate text-danger" title={item.error}>
-                      {item.error}
+        <div className="max-h-80 overflow-y-auto rounded-lg border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)]">
+          {groups.map((group) => {
+            const groupDone = groupStats.get(group.key) ?? 0;
+            return (
+              <div key={group.key}>
+                <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-[var(--ag-border-subtle)] bg-[var(--ag-bg-surface)] px-3 py-2 text-xs font-medium">
+                  <span>{group.platform.toUpperCase()}</span>
+                  {group.type ? <span className="text-[var(--ag-text-secondary)]">{group.type}</span> : null}
+                  <span className="min-w-0 truncate text-[var(--ag-text-tertiary)]">
+                    {groupModels[group.key]?.selectedModel ?? ''}
+                  </span>
+                  {groupDone > 0 ? (
+                    <span className="ml-auto shrink-0 font-mono tabular-nums text-[var(--ag-text-tertiary)]">
+                      {groupDone}/{group.accounts.length}
                     </span>
                   ) : null}
                 </div>
-              ))}
-            </div>
-          ))}
+                {items.filter((item) => item.groupKey === group.key).map((item) => {
+                  const message = item.status === 'error' ? item.error : item.text;
+                  return (
+                    <div
+                      key={item.id}
+                      className="border-b border-[var(--ag-border-subtle)] px-3 py-2 text-xs last:border-b-0"
+                    >
+                      <div className="flex items-center gap-2">
+                        <TestStatusIcon status={item.status} />
+                        <span className="min-w-0 flex-1 truncate text-[var(--ag-text)]">{item.name}</span>
+                      </div>
+                      <StreamMessage
+                        placeholder={t('accounts.bulk_test_waiting')}
+                        status={item.status}
+                        text={message ?? ''}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
     </CommonModal>
@@ -344,6 +402,40 @@ function accountTestGroupKey(account: AccountResp): string {
   return `${account.platform}\u0000${account.type ?? ''}`;
 }
 
+function StreamMessage({
+  placeholder,
+  status,
+  text,
+}: {
+  placeholder: string;
+  status: ItemStatus;
+  text: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [text]);
+
+  const colorClass = !text
+    ? 'text-[var(--ag-text-tertiary)]'
+    : status === 'error'
+      ? 'text-danger'
+      : status === 'success'
+        ? 'text-success'
+        : 'text-[var(--ag-text-secondary)]';
+
+  return (
+    <div
+      ref={ref}
+      className={`mt-1.5 h-8 overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-[var(--ag-border-subtle)] bg-[var(--ag-bg)] px-2 py-1.5 font-mono text-[11px] leading-relaxed ${colorClass}`}
+    >
+      {text || placeholder}
+    </div>
+  );
+}
+
 function TestStatusIcon({ status }: { status: ItemStatus }) {
   if (status === 'running') {
     return <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />;
@@ -354,5 +446,5 @@ function TestStatusIcon({ status }: { status: ItemStatus }) {
   if (status === 'error') {
     return <X className="w-3.5 h-3.5 text-danger" />;
   }
-  return <span className="h-3.5 w-3.5 rounded-full bg-[var(--ag-glass-border)]" />;
+  return <span className="h-3 w-3 rounded-full border border-[var(--ag-glass-border)]" />;
 }
