@@ -208,7 +208,7 @@ function detailJsonText(entries: DetailEntry[]): string {
 export function monitorDetailEntries(event: MonitorEventResp): DetailEntry[] {
   const detail = event.detail;
   const entries: DetailEntry[] = [];
-  appendDetail(entries, 'attempts', detailValue(detail, 'total_attempts'));
+  appendDetail(entries, 'attempt', detailValue(detail, 'total_attempts'));
   appendDetail(entries, 'retry', retryLabel(detailValue(detail, 'total_retries')));
   appendDetail(entries, 'model', detailValue(detail, 'model'));
   appendDetail(entries, 'client_model', detailValue(detail, 'client_model'));

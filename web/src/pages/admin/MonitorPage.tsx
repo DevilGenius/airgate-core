@@ -65,6 +65,15 @@ const MONITOR_REQUEST_TYPE_IDS = [
   'client_closed_request',
 ];
 const MONITOR_EVENT_STATUS_IDS: readonly string[] = ['active', 'resolved'];
+const MONITOR_EVENT_SOURCE_IDS: readonly string[] = [
+  'forwarder',
+  'scheduler',
+  'account_checker',
+  'quota_refresh',
+  'task_runner',
+  'plugin_manager',
+  'monitor_worker',
+];
 const MONITOR_EVENT_SEVERITY_IDS: readonly string[] = ['critical', 'error', 'warning', 'info'];
 const MONITOR_REQUEST_SEVERITY_IDS: readonly string[] = ['warning', 'info'];
 const MONITOR_EVENT_TYPE_IDS: readonly string[] = [
@@ -81,6 +90,7 @@ const MONITOR_FILTER_KEYS = {
     from: `${MONITOR_FILTER_STORAGE_KEY}:events:from`,
     severity: `${MONITOR_FILTER_STORAGE_KEY}:events:severity`,
     status: `${MONITOR_FILTER_STORAGE_KEY}:events:status`,
+    source: `${MONITOR_FILTER_STORAGE_KEY}:events:source`,
     timeRange: `${MONITOR_FILTER_STORAGE_KEY}:events:time_range`,
     to: `${MONITOR_FILTER_STORAGE_KEY}:events:to`,
     type: `${MONITOR_FILTER_STORAGE_KEY}:events:type`,
@@ -106,6 +116,7 @@ const MONITOR_FILTER_KEYS = {
 const MONITOR_EVENT_FILTER_STORAGE_KEYS: Partial<Record<keyof MonitorListQuery, string>> = {
   severity: MONITOR_FILTER_KEYS.events.severity,
   status: MONITOR_FILTER_KEYS.events.status,
+  source: MONITOR_FILTER_KEYS.events.source,
   type: MONITOR_FILTER_KEYS.events.type,
 };
 
@@ -216,6 +227,7 @@ function readInitialMonitorState() {
     from: eventsTimeRange.from,
     severity: readStoredOptions(MONITOR_FILTER_KEYS.events.severity, MONITOR_EVENT_SEVERITY_IDS),
     status: readStoredOptions(MONITOR_FILTER_KEYS.events.status, MONITOR_EVENT_STATUS_IDS),
+    source: readStoredOptions(MONITOR_FILTER_KEYS.events.source, MONITOR_EVENT_SOURCE_IDS),
     to: eventsTimeRange.to,
     type: readStoredOptions(MONITOR_FILTER_KEYS.events.type, MONITOR_EVENT_TYPE_IDS),
   };
@@ -470,6 +482,18 @@ export default function MonitorPage() {
     );
   }, [filters.status, updateFilter]);
 
+  const toggleEventSourceFilter = useCallback((groupID: string, value: string) => {
+    if (groupID !== 'source') return;
+    updateFilter(
+      'source',
+      toggleFilterValue(filters.source, value, MONITOR_EVENT_SOURCE_IDS),
+    );
+  }, [filters.source, updateFilter]);
+
+  const clearEventSourceFilter = useCallback(() => {
+    updateFilter('source', undefined);
+  }, [updateFilter]);
+
   const toggleEventFilter = useCallback((groupID: string, value: string) => {
     if (groupID === 'time_range') {
       handleTimeRangeSelection(value);
@@ -487,6 +511,7 @@ export default function MonitorPage() {
     writeStoredString(MONITOR_FILTER_KEYS.events.type, undefined);
     writeStoredString(MONITOR_FILTER_KEYS.events.severity, undefined);
     writeStoredString(MONITOR_FILTER_KEYS.events.status, undefined);
+    writeStoredString(MONITOR_FILTER_KEYS.events.source, undefined);
     writeStoredTimeRange(MONITOR_FILTER_KEYS.events, 'all');
     startTransition(() => {
       setFilters((prev) => ({
@@ -494,6 +519,7 @@ export default function MonitorPage() {
         from: undefined,
         severity: undefined,
         status: undefined,
+        source: undefined,
         to: undefined,
         type: undefined,
       }));
@@ -786,6 +812,9 @@ export default function MonitorPage() {
   const statusOptions: SelectOption[] = [
     ...MONITOR_EVENT_STATUS_IDS.map((id) => ({ id, label: t(`monitor.status_${id}`, id) })),
   ];
+  const sourceOptions: SelectOption[] = [
+    ...MONITOR_EVENT_SOURCE_IDS.map((id) => ({ id, label: t(`monitor.source_${id}`, id) })),
+  ];
   const severityOptions: SelectOption[] = [
     ...MONITOR_EVENT_SEVERITY_IDS.map((id) => ({ id, label: t(`monitor.severity_${id}`, id) })),
   ];
@@ -801,6 +830,7 @@ export default function MonitorPage() {
   const selectedEventTypes = filterValues(filters.type, MONITOR_EVENT_TYPE_IDS);
   const selectedEventSeverities = filterValues(filters.severity, MONITOR_EVENT_SEVERITY_IDS);
   const selectedEventStatuses = filterValues(filters.status, MONITOR_EVENT_STATUS_IDS);
+  const selectedEventSources = filterValues(filters.source, MONITOR_EVENT_SOURCE_IDS);
   const selectedRequestTypes = filterValues(requestFilters.type, MONITOR_REQUEST_TYPE_IDS);
   const selectedRequestSeverities = filterValues(requestFilters.severity, MONITOR_REQUEST_SEVERITY_IDS);
 
@@ -1028,14 +1058,21 @@ export default function MonitorPage() {
                     onClear={clearEventFilters}
                     onToggle={toggleEventFilter}
                   />
-                  <div className={MONITOR_TOOLBAR_CONTROL_CLASS}>
-                    <input
-                      className="input input--sm w-full"
-                      placeholder={t('monitor.source')}
-                      value={filters.source ?? ''}
-                      onChange={(event) => updateFilter('source', event.target.value)}
-                    />
-                  </div>
+                  <MultiFilterSelect
+                    allLabel={t('common.all')}
+                    ariaLabel={t('monitor.source')}
+                    className={MONITOR_TOOLBAR_CONTROL_CLASS}
+                    label={t('monitor.source')}
+                    groups={[{
+                      id: 'source',
+                      label: t('monitor.source'),
+                      options: sourceOptions,
+                      selectionMode: 'multiple',
+                      selectedValues: selectedEventSources,
+                    }]}
+                    onClear={clearEventSourceFilter}
+                    onToggle={toggleEventSourceFilter}
+                  />
                 </>
               )}
             </div>

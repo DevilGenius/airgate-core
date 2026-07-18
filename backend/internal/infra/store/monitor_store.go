@@ -476,8 +476,12 @@ func applyMonitorListFilter(query *ent.MonitorEventQuery, filter appmonitor.List
 			query = query.Where(entmonitorevent.TypeIn(types...))
 		}
 	}
-	if filter.Source != "" {
-		query = query.Where(entmonitorevent.SourceEQ(filter.Source))
+	if values := splitMonitorFilterValues(filter.Source); len(values) > 0 {
+		if len(values) == 1 {
+			query = query.Where(entmonitorevent.SourceEQ(values[0]))
+		} else {
+			query = query.Where(entmonitorevent.SourceIn(values...))
+		}
 	}
 	if filter.SubjectType != "" {
 		query = query.Where(entmonitorevent.SubjectTypeEQ(filter.SubjectType))
