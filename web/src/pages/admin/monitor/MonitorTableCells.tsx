@@ -228,7 +228,7 @@ export function requestDetailEntries(event: MonitorRequestEventResp): DetailEntr
     appendDetail(entries, 'attempt', ordinalLabel(detailValue(detail, 'next_attempt')));
     appendDetail(entries, 'retry', ordinalLabel(detailValue(detail, 'retry_number')));
   } else {
-    appendDetail(entries, 'attempts', detailValue(detail, 'total_attempts'));
+    appendDetail(entries, 'attempt', detailValue(detail, 'total_attempts'));
     appendDetail(entries, 'retry', retryLabel(detailValue(detail, 'total_retries')));
   }
   appendDetail(entries, 'request_id', event.request_id, { hidden: true });
