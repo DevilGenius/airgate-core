@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type Animation
 import { Inbox } from 'lucide-react';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getTotalPages } from '../utils/pagination';
-import { MobileRecordList } from './MobileRecordList';
+import { MobileRecordList, type MobileRecordItem } from './MobileRecordList';
 import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
 
@@ -250,7 +250,7 @@ export function RecordsTable<T extends RecordRow>({
   }, [columns, isMobileLayoutActive, mobileLayout]);
   // 基础 items 只依赖行数据与列定义；新行高亮合并到下方单独的廉价 memo 中，
   // 避免每次自动刷新（markedRowIds 变化）都重新执行全量 column.render。
-  const mobileBaseItems = useMemo(() => {
+  const mobileBaseItems = useMemo<MobileRecordItem[]>(() => {
     if (!isMobileLayoutActive) return [];
 
     if (mobileLayout === 'usageGrid' || mobileLayout === 'usageGridWithUser') {
