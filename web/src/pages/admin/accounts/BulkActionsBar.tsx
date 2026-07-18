@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eraser, Pencil, Power, PowerOff, RefreshCw, Trash2 } from 'lucide-react';
+import { Eraser, Pencil, Play, Power, PowerOff, RefreshCw, Trash2 } from 'lucide-react';
 import { TableSelectionCheckbox } from './accountTableSupport';
 
 /**
@@ -22,6 +22,7 @@ export function BulkActionsBar({
   onEdit,
   onEnable,
   onDisable,
+  onTest,
   onRefreshQuota,
   onSelectAllChange,
   onClearRateLimitMarkers,
@@ -36,6 +37,7 @@ export function BulkActionsBar({
   onEdit: () => void;
   onEnable: () => void;
   onDisable: () => void;
+  onTest: () => void;
   onRefreshQuota: () => void;
   onSelectAllChange: (isSelected: boolean) => void;
   onClearRateLimitMarkers: () => void;
@@ -80,6 +82,7 @@ export function BulkActionsBar({
       <ActionButton disabled={!active} icon={<Pencil className="w-3.5 h-3.5" />} label={t('accounts.bulk_edit')} onClick={onEdit} />
       <ActionButton disabled={!active} icon={<Power className="w-3.5 h-3.5" />} label={t('accounts.bulk_enable')} onClick={onEnable} />
       <ActionButton disabled={!active} icon={<PowerOff className="w-3.5 h-3.5" />} label={t('accounts.bulk_disable')} onClick={onDisable} />
+      <ActionButton disabled={!active} icon={<Play className="w-3.5 h-3.5 text-primary" />} label={t('accounts.bulk_test')} onClick={onTest} />
       <ActionButton
         disabled={!active}
         icon={<RefreshCw className="w-3.5 h-3.5 text-success" />}

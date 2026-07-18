@@ -3,10 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Button, Chip, Label, useOverlayState } from '@heroui/react';
 import { Play, RotateCcw, Copy, Check, X } from 'lucide-react';
 import { accountsApi } from '../../shared/api/accounts';
-import { getToken } from '../../shared/api/client';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { CommonModal } from '../../shared/components/CommonModal';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
+import {
+  filterConnectivityTestModels,
+  runAccountConnectivityTest,
+} from './accounts/accountTestRunner';
 import type { AccountResp, ModelInfo } from '../../shared/types';
 
 type TestStatus = 'idle' | 'connecting' | 'streaming' | 'success' | 'error';
@@ -20,9 +23,15 @@ interface AccountTestModalProps {
   open: boolean;
   account: AccountResp | null;
   onClose: () => void;
+  onTestComplete?: (accountId: number, success: boolean) => void;
 }
 
-export function AccountTestModal({ open, account, onClose }: AccountTestModalProps) {
+export function AccountTestModal({
+  open,
+  account,
+  onClose,
+  onTestComplete,
+}: AccountTestModalProps) {
   const { t } = useTranslation();
 
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -38,39 +47,50 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
   const terminalRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const streamingRef = useRef('');
+  const accountId = account?.id;
 
   // 加载模型列表
   useEffect(() => {
-    if (!open || !account) return;
+    if (!open || !accountId) return;
+    let active = true;
+    setModels([]);
+    setSelectedModel('');
     setLoadingModels(true);
-    accountsApi.models(account.id)
+    accountsApi.models(accountId)
       .then((list) => {
+        if (!active) return;
         // 过滤掉生图专用模型：测试流程发的是 chat 格式 {messages:[{role:user,content:"hi"}]}，
         // ChatGPT OAuth 对 gpt-image-* 系列的 chat 调用会直接报 "not supported"。
         // 账号能跑普通 chat 就一定能跑图（图像走派生的 image_generation tool 通道），
         // 不必在测试里单独验证生图。
-        const items = (list ?? []).filter(
-          (m) => !m.id.toLowerCase().startsWith('gpt-image-'),
-        );
+        const items = filterConnectivityTestModels(list);
         setModels(items);
         if (items.length > 0) setSelectedModel(items[0]!.id);
       })
-      .catch(() => setModels([]))
-      .finally(() => setLoadingModels(false));
-  }, [open, account]);
+      .catch(() => {
+        if (active) setModels([]);
+      })
+      .finally(() => {
+        if (active) setLoadingModels(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, accountId]);
 
-  // 重置状态
+  // 关闭弹窗或切换账号时，重置为完整的单账号测试初始态。
   useEffect(() => {
-    if (!open) {
-      setStatus('idle');
-      setOutputLines([]);
-      setStreamingContent('');
-      setErrorMessage('');
-      setSelectedModel('');
-      setModels([]);
-      setCopied(false);
-    }
-  }, [open]);
+    abortRef.current?.abort();
+    streamingRef.current = '';
+    setStatus('idle');
+    setOutputLines([]);
+    setStreamingContent('');
+    setErrorMessage('');
+    setSelectedModel('');
+    setModels([]);
+    setLoadingModels(Boolean(open && accountId));
+    setCopied(false);
+  }, [open, accountId]);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -101,183 +121,49 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
     abortRef.current = controller;
 
     try {
-      const url = new URL(
-        accountsApi.testUrl(account.id),
-        window.location.origin,
-      );
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      const token = getToken();
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch(url.toString(), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ model_id: selectedModel }),
+      const result = await runAccountConnectivityTest({
+        accountId: account.id,
+        fallbackError: t('accounts.test_error'),
+        modelId: selectedModel,
         signal: controller.signal,
+        handlers: {
+          onStart: (model) => {
+            addLine(t('accounts.test_connected'), 'text-green-400');
+            addLine(t('accounts.test_model_used', { model }), 'text-cyan-400');
+            addLine(t('accounts.test_sending'), 'text-gray-400');
+            addLine(t('accounts.test_response'), 'text-yellow-400');
+            setStatus('streaming');
+          },
+          onTextDelta: (text) => {
+            streamingRef.current += text;
+            setStreamingContent(streamingRef.current);
+            scrollToBottom();
+          },
+          onRawError: (message) => addLine(message, 'text-red-400'),
+        },
       });
 
-      if (!res.ok || !res.body) {
+      if (streamingRef.current) {
+        addLine(streamingRef.current, 'text-green-300');
+        streamingRef.current = '';
+        setStreamingContent('');
+      }
+      if (result.success) {
+        setStatus('success');
+      } else {
         setStatus('error');
-        setErrorMessage(`HTTP ${res.status}`);
-        addLine(`HTTP ${res.status}`, 'text-red-400');
-        return;
+        setErrorMessage(result.error || t('accounts.test_error'));
       }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          // 收集本行中所有 SSE data 片段。
-          // 正常情况每行只有一个 "data: {...}"，但上游插件可能在 data: 前
-          // 写入非 SSE 内容（如原始错误 JSON），导致一行里出现：
-          //   {"error":...}data: {"type":"test_complete",...}
-          // 因此需要把 "data: " 之后的 JSON 全部提取出来。
-          const ssePayloads: string[] = [];
-          let rawNonSSE = '';
-          const dataPrefix = 'data: ';
-          const firstDataIdx = trimmed.indexOf(dataPrefix);
-
-          if (firstDataIdx < 0) {
-            // 整行没有 data: 前缀，可能是上游直接写的错误 JSON
-            rawNonSSE = trimmed;
-          } else {
-            if (firstDataIdx > 0) {
-              rawNonSSE = trimmed.slice(0, firstDataIdx).trim();
-            }
-            // 提取所有 data: 片段
-            let idx = firstDataIdx;
-            while (idx >= 0 && idx < trimmed.length) {
-              const payloadStart = idx + dataPrefix.length;
-              const nextIdx = trimmed.indexOf(dataPrefix, payloadStart);
-              const payloadStr = nextIdx >= 0
-                ? trimmed.slice(payloadStart, nextIdx).trim()
-                : trimmed.slice(payloadStart).trim();
-              if (payloadStr && payloadStr !== '[DONE]') {
-                ssePayloads.push(payloadStr);
-              }
-              idx = nextIdx;
-            }
-          }
-
-          // 处理非 SSE 的原始错误 JSON（上游插件直写的 error 响应）
-          // 仅在没有后续 SSE data 片段时才显示（有 test_complete 时由它统一展示）
-          if (rawNonSSE && ssePayloads.length === 0) {
-            try {
-              const raw = JSON.parse(rawNonSSE);
-              let errMsg = '';
-              if (raw?.error) {
-                errMsg = typeof raw.error === 'string'
-                  ? raw.error
-                  : raw.error.message || JSON.stringify(raw.error);
-              } else if (raw?.message) {
-                errMsg = raw.code ? `${raw.code}: ${raw.message}` : raw.message;
-              }
-              if (errMsg) {
-                addLine(errMsg, 'text-red-400');
-              }
-            } catch {
-              // 非 JSON，忽略
-            }
-          }
-
-          for (const payload of ssePayloads) {
-            try {
-              const data = JSON.parse(payload);
-
-              // 自定义事件（Core 包装）
-              if (data.type === 'test_start') {
-                addLine(t('accounts.test_connected'), 'text-green-400');
-                addLine(t('accounts.test_model_used', { model: data.model }), 'text-cyan-400');
-                addLine(t('accounts.test_sending'), 'text-gray-400');
-                addLine(t('accounts.test_response'), 'text-yellow-400');
-                setStatus('streaming');
-                continue;
-              }
-
-              if (data.type === 'test_complete') {
-                if (streamingRef.current) {
-                  addLine(streamingRef.current, 'text-green-300');
-                  streamingRef.current = '';
-                  setStreamingContent('');
-                }
-                if (data.success) {
-                  setStatus('success');
-                } else {
-                  // 失败消息只设置到底部 status 行（带 ✗ 图标，和成功的
-                  // ✓ 测试完成! 对称），不要再 addLine 到终端输出区，否则
-                  // 同一条错误会被画两次。
-                  setStatus('error');
-                  setErrorMessage(data.error || t('accounts.test_error'));
-                }
-                continue;
-              }
-
-              // 插件原始 SSE：Responses API 格式
-              if (data?.type === 'response.output_text.delta' && data?.delta) {
-                streamingRef.current += data.delta;
-                setStreamingContent(streamingRef.current);
-                scrollToBottom();
-                continue;
-              }
-
-              // 插件原始 SSE：Chat Completions API 格式
-              if (data?.object === 'chat.completion.chunk') {
-                const content = data.choices?.[0]?.delta?.content;
-                if (content) {
-                  streamingRef.current += content;
-                  setStreamingContent(streamingRef.current);
-                  scrollToBottom();
-                }
-                continue;
-              }
-
-              // 插件原始 SSE：Anthropic Messages API 格式
-              if (data?.type === 'content_block_delta' && data?.delta?.type === 'text_delta') {
-                const text = data.delta.text;
-                if (text) {
-                  streamingRef.current += text;
-                  setStreamingContent(streamingRef.current);
-                  scrollToBottom();
-                }
-              }
-            } catch {
-              // 非 JSON，忽略
-            }
-          }
-        }
-      }
-
-      // 流结束后，如果仍处于 connecting/streaming 说明没收到 test_complete，
-      // 强制标记为错误，避免 UI 卡死。
-      setStatus((prev) => {
-        if (prev === 'connecting' || prev === 'streaming') {
-          const fallbackMsg = buffer.trim() || t('accounts.test_error');
-          setErrorMessage(fallbackMsg);
-          addLine(fallbackMsg, 'text-red-400');
-          return 'error';
-        }
-        return prev;
-      });
+      onTestComplete?.(account.id, result.success);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       setStatus('error');
       const msg = (err as Error).message;
       setErrorMessage(msg);
       addLine(msg, 'text-red-400');
+      onTestComplete?.(account.id, false);
     }
-  }, [account, selectedModel, addLine, scrollToBottom, t]);
+  }, [account, selectedModel, addLine, onTestComplete, scrollToBottom, t]);
 
   const handleClose = () => {
     abortRef.current?.abort();

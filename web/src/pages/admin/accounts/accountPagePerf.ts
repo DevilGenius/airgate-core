@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-export type AccountModalPerfTarget = 'create' | 'edit' | 'delete' | 'bulk-edit' | 'bulk-delete' | 'bulk-refresh' | 'test' | 'stats';
+export type AccountModalPerfTarget = 'create' | 'edit' | 'delete' | 'bulk-edit' | 'bulk-delete' | 'bulk-refresh' | 'bulk-test' | 'test' | 'stats';
 
 type AccountModalPerfSample = {
   rows: number;

@@ -28,6 +28,7 @@ const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
   onBulkEdit,
   onBulkEnable,
   onBulkRefresh,
+  onBulkTest,
   onVisibleRowsSelected,
   overlay = true,
   selectionStore,
@@ -39,6 +40,7 @@ const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
   onBulkEdit: () => void;
   onBulkEnable: () => void;
   onBulkRefresh: () => void;
+  onBulkTest: () => void;
   onVisibleRowsSelected: (isSelected: boolean) => void;
   overlay?: boolean;
   selectionStore: AccountSelectionStore;
@@ -68,6 +70,7 @@ const AccountsBulkActionsOverlay = memo(function AccountsBulkActionsOverlay({
         onEdit={onBulkEdit}
         onEnable={onBulkEnable}
         onDisable={onBulkDisable}
+        onTest={onBulkTest}
         onRefreshQuota={onBulkRefresh}
         onSelectAllChange={onVisibleRowsSelected}
         onClearRateLimitMarkers={onBulkClearRateLimitMarkers}
@@ -117,6 +120,7 @@ export const AccountsTableSection = memo(function AccountsTableSection({
   onBulkEdit,
   onBulkEnable,
   onBulkRefresh,
+  onBulkTest,
   onRowSelected,
   onSortChange,
   onVisibleRowsSelected,
@@ -140,6 +144,7 @@ export const AccountsTableSection = memo(function AccountsTableSection({
   onBulkEdit: () => void;
   onBulkEnable: () => void;
   onBulkRefresh: () => void;
+  onBulkTest: () => void;
   onRowSelected: (id: number, isSelected: boolean) => void;
   onSortChange?: (sortKey: string) => void;
   onVisibleRowsSelected: (isSelected: boolean) => void;
@@ -220,6 +225,7 @@ export const AccountsTableSection = memo(function AccountsTableSection({
             onBulkEnable={onBulkEnable}
             onBulkDisable={onBulkDisable}
             onBulkRefresh={onBulkRefresh}
+            onBulkTest={onBulkTest}
             onVisibleRowsSelected={onVisibleRowsSelected}
             onBulkClearRateLimitMarkers={onBulkClearRateLimitMarkers}
             onBulkDelete={onBulkDelete}
@@ -244,6 +250,7 @@ export const AccountsTableSection = memo(function AccountsTableSection({
           onBulkEnable={onBulkEnable}
           onBulkDisable={onBulkDisable}
           onBulkRefresh={onBulkRefresh}
+          onBulkTest={onBulkTest}
           onVisibleRowsSelected={onVisibleRowsSelected}
           onBulkClearRateLimitMarkers={onBulkClearRateLimitMarkers}
           onBulkDelete={onBulkDelete}

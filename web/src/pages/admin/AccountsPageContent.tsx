@@ -39,6 +39,7 @@ import { EditAccountModal } from './accounts/EditAccountModal';
 import { AccountTypeFilterSelect } from './accounts/AccountTypeFilterSelect';
 import { useAccountTableColumns } from './accounts/useAccountTableColumns';
 import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
+import { BulkAccountTestModal } from './accounts/BulkAccountTestModal';
 import { BulkRefreshProgressModal } from './accounts/BulkRefreshProgressModal';
 import { AccountsTableSection } from './accounts/AccountsTableSection';
 import { getBulkEditInitialValues, type BulkEditSelection } from './accounts/bulkEditSupport';
@@ -175,6 +176,7 @@ export default function AccountsPageContent() {
   const [editingAccount, setEditingAccount] = useState<AccountResp | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<AccountResp | null>(null);
   const [testingAccount, setTestingAccount] = useState<AccountResp | null>(null);
+  const [bulkTestAccounts, setBulkTestAccounts] = useState<AccountResp[] | null>(null);
   const [statsAccountId, setStatsAccountId] = useState<number | null>(null);
 
   // 批量选择状态
@@ -200,6 +202,7 @@ export default function AccountsPageContent() {
     || bulkEditSelection !== null
     || bulkDeleteIds !== null
     || bulkRefreshTargets !== null
+    || bulkTestAccounts !== null
     || testingAccount !== null
     || statsAccountId !== null;
   useAccountModalRootIsolation(isAnyAccountModalOpen);
@@ -707,6 +710,7 @@ export default function AccountsPageContent() {
   }, [markModalOpenStart, rows.length]);
   const handleTestAccount = useCallback((row: AccountResp) => {
     markModalOpenStart('test', rows.length);
+    setBulkTestAccounts(null);
     setTestingAccount(row);
   }, [markModalOpenStart, rows.length]);
   const handleStatsAccount = useCallback((id: number) => {
@@ -815,6 +819,33 @@ export default function AccountsPageContent() {
     if (selectedAccountIds.length === 0) return;
     bulkClearRateLimitMarkersMutateRef.current(selectedAccountIds);
   }, [bulkClearRateLimitMarkersMutateRef, selectionStore]);
+
+  const handleBulkTest = useCallback(() => {
+    const selectedAccountIds = selectionStore.getSelectedIds();
+    if (selectedAccountIds.length === 0) return;
+    const selectedAccounts = selectedAccountIds
+      .map((id) => accountSnapshotRef.current.get(id))
+      .filter((account): account is AccountResp => account != null);
+    if (selectedAccounts.length === 0) return;
+    markModalOpenStart('bulk-test', rows.length);
+    setTestingAccount(null);
+    setBulkTestAccounts(selectedAccounts);
+  }, [markModalOpenStart, rows.length, selectionStore]);
+
+  const handleCloseAccountTest = useCallback(() => {
+    setTestingAccount(null);
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+  }, [queryClient]);
+
+  const handleCloseBulkTest = useCallback(() => {
+    setBulkTestAccounts(null);
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+    clearSelection();
+  }, [clearSelection, queryClient]);
+
+  const handleAccountTestComplete = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+  }, [queryClient]);
 
   // 批量刷新令牌：只有 OAuth 类型账号支持，预先过滤后开进度弹窗
   const handleBulkRefresh = useCallback(() => {
@@ -1116,6 +1147,7 @@ export default function AccountsPageContent() {
             onBulkEdit={handleBulkEdit}
             onBulkEnable={handleBulkEnable}
             onBulkRefresh={handleBulkRefresh}
+            onBulkTest={handleBulkTest}
             onRowSelected={setRowSelected}
             onSortChange={handleSortChange}
             onVisibleRowsSelected={setVisibleRowsSelected}
@@ -1283,12 +1315,22 @@ export default function AccountsPageContent() {
         />
       )}
 
-      {/* 测试连接 */}
+      {/* 批量测试：按平台和账号类型分组选择模型，同类账号并发复用单账号测试接口。 */}
+      {bulkTestAccounts ? (
+        <BulkAccountTestModal
+          open
+          accounts={bulkTestAccounts}
+          onClose={handleCloseBulkTest}
+        />
+      ) : null}
+
+      {/* 单账号测试连接 */}
       {testingAccount ? (
         <AccountTestModal
           open
           account={testingAccount}
-          onClose={() => setTestingAccount(null)}
+          onClose={handleCloseAccountTest}
+          onTestComplete={handleAccountTestComplete}
         />
       ) : null}
 
