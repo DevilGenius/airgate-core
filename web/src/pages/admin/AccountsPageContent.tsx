@@ -87,6 +87,7 @@ const ACCOUNT_MODAL_TABLE_PLACEHOLDER_MIN_HEIGHT = 320;
 const ACCOUNT_WORKING_STATE_FILTER = 'working';
 const ACCOUNT_WORKING_REFETCH_THROTTLE_MS = 750;
 const ACCOUNT_USAGE_SNAPSHOT_MAX_ACCOUNTS = 5000;
+const EMPTY_ACCOUNT_ROWS: AccountResp[] = [];
 
 function accountUsageInfoHasContent(usage: AccountUsageInfo | undefined) {
   if (!usage) return false;
@@ -103,7 +104,9 @@ export default function AccountsPageContent() {
   const { platforms, platformName: resolvePlatformName, oauthPlanFilters, isLoading: platformsLoading } = usePlatforms();
   const platformNameRef = useLatestRef(resolvePlatformName);
   const platformName = useCallback((platform: string) => platformNameRef.current(platform), [platformNameRef]);
-  const platformsKey = platforms.join('\u0000');
+  // 平台显示名（插件 display_name）更新时，query 结构共享可能保持 platforms 数组身份不变；
+  // key 中编入解析出的名称，确保依赖它的 memo（筛选选项、表格列）在名称变化时也会重算。
+  const platformsKey = platforms.map((platform) => `${platform}${platformName(platform)}`).join('\u0000');
   const { toast } = useToast();
   useSyncExternalStore(subscribeAccountIdentityChange, getAccountIdentityVersion);
 
@@ -139,19 +142,19 @@ export default function AccountsPageContent() {
     );
   }, [queryClient]);
 
-  const PLATFORM_OPTIONS = [
+  const PLATFORM_OPTIONS = useMemo(() => [
     { id: '', label: t('accounts.all_platforms') },
     ...platforms.map((p) => ({ id: p, label: platformName(p) })),
-  ];
+  ], [platformName, platforms, platformsKey, t]);
 
-  const STATE_OPTIONS = [
+  const STATE_OPTIONS = useMemo(() => [
     { id: '', label: t('users.all_status') },
     { id: ACCOUNT_WORKING_STATE_FILTER, label: t('status.working', '工作中') },
     { id: 'active', label: t('status.active') },
     { id: 'rate_limited', label: t('status.rate_limited', '限流中') },
     { id: 'degraded', label: t('status.degraded', '降级中') },
     { id: 'disabled', label: t('status.disabled') },
-  ];
+  ], [t]);
 
   // 筛选状态
   const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.accounts');
@@ -273,7 +276,7 @@ export default function AccountsPageContent() {
       workingRefetchTimerRef.current = null;
     }
   }, []);
-  const rows = data?.list ?? [];
+  const rows = data?.list ?? EMPTY_ACCOUNT_ROWS;
   const handleToolbarMenuOpenChange = useCallback((target: AccountToolbarMenuPerfTarget, isOpen: boolean) => {
     if (!isOpen) return;
     markToolbarMenuOpenStart(target, rows.length);
@@ -942,9 +945,12 @@ export default function AccountsPageContent() {
   const selectedStateLabel = stateFilter
     ? (STATE_OPTIONS.find((item) => item.id === stateFilter)?.label ?? stateFilter)
     : t('users.all_status');
-  const selectedTypeOption = typeOptions.find((item) => item.id === typeFilter)
-    ?? oauthPlanOptions.find((item) => item.id === typeFilter)
-    ?? (typeFilter ? { id: typeFilter, label: typeFilter } : undefined);
+  const selectedTypeOption = useMemo(
+    () => typeOptions.find((item) => item.id === typeFilter)
+      ?? oauthPlanOptions.find((item) => item.id === typeFilter)
+      ?? (typeFilter ? { id: typeFilter, label: typeFilter } : undefined),
+    [oauthPlanOptions, typeFilter, typeOptions],
+  );
   const selectedGroupLabel = groupFilter
     ? (groupOptions.find((item) => item.id === groupFilter)?.label ?? (groupFilter === UNGROUPED_GROUP_FILTER ? t('accounts.ungrouped') : `#${groupFilter}`))
     : t('accounts.all_groups');
@@ -959,7 +965,7 @@ export default function AccountsPageContent() {
     setTypeFilter(typeFilter.startsWith('oauth_plan:') ? 'oauth' : '');
     setPage(1);
   }, [oauthPlanOptions, platformsLoading, setPage, typeFilter, typeOptions]);
-  const toolbarFilters = [
+  const toolbarFilters = useMemo(() => [
     {
       key: 'platform',
       perfTarget: 'platform' as const,
@@ -1010,116 +1016,175 @@ export default function AccountsPageContent() {
       setValue: setProxyFilter,
       widthClass: 'w-full sm:w-48',
     },
-  ];
+  ], [
+    PLATFORM_OPTIONS,
+    STATE_OPTIONS,
+    groupFilter,
+    groupOptions,
+    platformFilter,
+    proxyFilter,
+    proxyOptions,
+    selectedGroupLabel,
+    selectedPlatformLabel,
+    selectedProxyLabel,
+    selectedStateLabel,
+    selectedTypeOption,
+    setGroupFilter,
+    setPlatformFilter,
+    setProxyFilter,
+    setStateFilter,
+    setTypeFilter,
+    stateFilter,
+    t,
+    typeFilter,
+    typeOptions,
+  ]);
+  // toolbar/actions/footer 整体记忆化：用量轮询（refreshing 时 1s 一次）和 fetch 状态
+  // 切换会频繁重渲染页面，保持这些子树的元素身份稳定可让 memoized SimpleSelect 等整体跳过。
+  // useMutation 每次渲染都返回新展开的结果对象，只解构稳定的 mutate/isPending 作为依赖。
+  const { isPending: isExportPending, mutate: runExportMutation } = exportMutation;
+  const isImportPending = importMutation.isPending;
+  const toolbarNode = useMemo(() => (
+    <div className="ag-page-toolbar-filter-row">
+      <div className="w-full sm:w-48">
+        <HeroTextField fullWidth aria-label={t('accounts.search_placeholder', '搜索账号名称...')}>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+            <Input
+              className="pl-9"
+              value={keyword}
+              onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+              placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
+            />
+          </div>
+        </HeroTextField>
+      </div>
+
+      {toolbarFilters.map((filter) => (
+        <div
+          key={filter.key}
+          className={filter.widthClass}
+        >
+          {filter.key === 'type' ? (
+            <AccountTypeFilterSelect
+              oauthPlanOptions={oauthPlanOptions}
+              platformsLoading={platformsLoading}
+              selectedOption={selectedTypeOption}
+              typeOptions={typeOptions}
+              onOpenChange={(isOpen) => handleToolbarMenuOpenChange(filter.perfTarget, isOpen)}
+              onSelect={(nextValue) => {
+                setTypeFilter(nextValue);
+                setPage(1);
+              }}
+            />
+          ) : (
+            <SimpleSelect
+              ariaLabel={filter.label}
+              fullWidth
+              items={filter.options.map((item) => ({ key: item.id, label: item.label }))}
+              selectedKey={filter.value}
+              selectedLabel={filter.selectedLabel}
+              onOpenChange={(isOpen) => handleToolbarMenuOpenChange(filter.perfTarget, isOpen)}
+              onSelectionChange={(key) => {
+                filter.setValue(key);
+                setPage(1);
+              }}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  ), [
+    handleToolbarMenuOpenChange,
+    keyword,
+    oauthPlanOptions,
+    platformsLoading,
+    selectedTypeOption,
+    setKeyword,
+    setPage,
+    setTypeFilter,
+    t,
+    toolbarFilters,
+    typeOptions,
+  ]);
+
+  const actionsNode = useMemo(() => (
+    <>
+      <AutoRefreshControl
+        value={autoRefresh}
+        options={ACCOUNT_AUTO_REFRESH_OPTIONS}
+        label={autoRefreshLabel}
+        offLabel={autoRefreshOffLabel}
+        refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
+        triggerClassName="ag-auto-refresh-trigger--account-fixed"
+        ariaLabel={t('accounts.auto_refresh')}
+        refreshAriaLabel={t('common.refresh')}
+        onChange={setAutoRefresh}
+        onAutoRefresh={refreshAccountOverview}
+        onMenuOpenChange={(isOpen) => handleToolbarMenuOpenChange('auto-refresh', isOpen)}
+        onRefresh={refreshAccountOverview}
+        isRefreshing={isAccountsFetching}
+        isAutoRefreshing={isAccountsFetching || isUsageFetching}
+      />
+      <Button
+        className="ag-page-toolbar-button hidden md:inline-flex"
+        variant="secondary"
+        onPress={() => importInputRef.current?.click()}
+        isDisabled={isImportPending}
+        aria-busy={isImportPending}
+      >
+        <Download className="h-4 w-4" />
+        {t('accounts.import')}
+      </Button>
+      <Button
+        className="ag-page-toolbar-button hidden md:inline-flex"
+        variant="secondary"
+        onPress={() => runExportMutation()}
+        isDisabled={isExportPending}
+        aria-busy={isExportPending}
+      >
+        <Upload className="h-4 w-4" />
+        {t('accounts.export')}
+      </Button>
+      <Button className="ag-page-toolbar-button" variant="primary" onPress={handleCreateAccount}>
+        <Plus className="h-4 w-4" />
+        {t('accounts.create')}
+      </Button>
+    </>
+  ), [
+    autoRefresh,
+    autoRefreshLabel,
+    autoRefreshOffLabel,
+    handleCreateAccount,
+    handleToolbarMenuOpenChange,
+    isAccountsFetching,
+    isExportPending,
+    isImportPending,
+    isUsageFetching,
+    refreshAccountOverview,
+    runExportMutation,
+    setAutoRefresh,
+    t,
+  ]);
+
+  const footerNode = useMemo(() => (
+    <TablePaginationFooter
+      page={page}
+      pageSize={pageSize}
+      pageSizeOptions={PAGE_SIZE_OPTIONS}
+      setPage={setPage}
+      setPageSize={setPageSize}
+      total={total}
+      totalPages={totalPages}
+    />
+  ), [page, pageSize, setPage, setPageSize, total, totalPages]);
+
   return (
     <TablePage
       className="ag-accounts-page ag-toolbar-standard-page"
-      toolbar={(
-        <div className="ag-page-toolbar-filter-row">
-          <div className="w-full sm:w-48">
-            <HeroTextField fullWidth aria-label={t('accounts.search_placeholder', '搜索账号名称...')}>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-                <Input
-                  className="pl-9"
-                  value={keyword}
-                  onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-                  placeholder={t('accounts.search_placeholder', '搜索账号名称...')}
-                />
-              </div>
-            </HeroTextField>
-          </div>
-
-          {toolbarFilters.map((filter) => (
-            <div
-              key={filter.key}
-              className={filter.widthClass}
-            >
-              {filter.key === 'type' ? (
-                <AccountTypeFilterSelect
-                  oauthPlanOptions={oauthPlanOptions}
-                  platformsLoading={platformsLoading}
-                  selectedOption={selectedTypeOption}
-                  typeOptions={typeOptions}
-                  onOpenChange={(isOpen) => handleToolbarMenuOpenChange(filter.perfTarget, isOpen)}
-                  onSelect={(nextValue) => {
-                    setTypeFilter(nextValue);
-                    setPage(1);
-                  }}
-                />
-              ) : (
-                <SimpleSelect
-                  ariaLabel={filter.label}
-                  fullWidth
-                  items={filter.options.map((item) => ({ key: item.id, label: item.label }))}
-                  selectedKey={filter.value}
-                  selectedLabel={filter.selectedLabel}
-                  onOpenChange={(isOpen) => handleToolbarMenuOpenChange(filter.perfTarget, isOpen)}
-                  onSelectionChange={(key) => {
-                    filter.setValue(key);
-                    setPage(1);
-                  }}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      actions={(
-        <>
-          <AutoRefreshControl
-            value={autoRefresh}
-            options={ACCOUNT_AUTO_REFRESH_OPTIONS}
-            label={autoRefreshLabel}
-            offLabel={autoRefreshOffLabel}
-            refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
-            triggerClassName="ag-auto-refresh-trigger--account-fixed"
-            ariaLabel={t('accounts.auto_refresh')}
-            refreshAriaLabel={t('common.refresh')}
-            onChange={setAutoRefresh}
-            onAutoRefresh={refreshAccountOverview}
-            onMenuOpenChange={(isOpen) => handleToolbarMenuOpenChange('auto-refresh', isOpen)}
-            onRefresh={refreshAccountOverview}
-            isRefreshing={isAccountsFetching}
-            isAutoRefreshing={isAccountsFetching || isUsageFetching}
-          />
-          <Button
-            className="ag-page-toolbar-button hidden md:inline-flex"
-            variant="secondary"
-            onPress={() => importInputRef.current?.click()}
-            isDisabled={importMutation.isPending}
-            aria-busy={importMutation.isPending}
-          >
-            <Download className="h-4 w-4" />
-            {t('accounts.import')}
-          </Button>
-          <Button
-            className="ag-page-toolbar-button hidden md:inline-flex"
-            variant="secondary"
-            onPress={() => exportMutation.mutate()}
-            isDisabled={exportMutation.isPending}
-            aria-busy={exportMutation.isPending}
-          >
-            <Upload className="h-4 w-4" />
-            {t('accounts.export')}
-          </Button>
-          <Button className="ag-page-toolbar-button" variant="primary" onPress={handleCreateAccount}>
-            <Plus className="h-4 w-4" />
-            {t('accounts.create')}
-          </Button>
-        </>
-      )}
-      footer={(
-        <TablePaginationFooter
-          page={page}
-          pageSize={pageSize}
-          pageSizeOptions={PAGE_SIZE_OPTIONS}
-          setPage={setPage}
-          setPageSize={setPageSize}
-          total={total}
-          totalPages={totalPages}
-        />
-      )}
+      toolbar={toolbarNode}
+      actions={actionsNode}
+      footer={footerNode}
       isFetching={isAccountsPlaceholderData && isAccountsFetching && !isLoading}
     >
       {/* 隐藏的文件选择器（供导入按钮触发） */}

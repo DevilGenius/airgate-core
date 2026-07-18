@@ -237,10 +237,12 @@ function formatAccountCapacityDisplay(value: number): AccountCapacityDisplay {
   };
 }
 
+// 滚动数字动画每次触发都会查询一次；缓存 MQL 避免重复创建 matchMedia 对象。
+let reducedMotionMediaQueryList: MediaQueryList | null = null;
 function prefersReducedMotion() {
-  return typeof window !== 'undefined'
-    && typeof window.matchMedia === 'function'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  reducedMotionMediaQueryList ??= window.matchMedia('(prefers-reduced-motion: reduce)');
+  return reducedMotionMediaQueryList.matches;
 }
 
 /**
