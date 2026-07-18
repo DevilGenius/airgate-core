@@ -36,98 +36,143 @@ func splitMonitorFilterValues(raw string) []string {
 	return values
 }
 
+// applyMonitorHTTPStatusFilter accepts both HTTP status expressions and error
+// code terms because the admin UI exposes them through one search field.
 func applyMonitorHTTPStatusFilter(query *ent.MonitorRequestEventQuery, raw string) *ent.MonitorRequestEventQuery {
-	includeRanges, excludeRanges := parseMonitorHTTPStatusFilter(raw)
-	if len(includeRanges) == 0 && len(excludeRanges) == 0 {
+	includeRanges, excludeRanges, includeErrorCodes, excludeErrorCodes := parseMonitorHTTPStatusAndErrorCodeFilter(raw)
+	includePredicates := append(
+		monitorHTTPStatusPredicates(includeRanges),
+		monitorErrorCodePredicates(includeErrorCodes)...,
+	)
+	excludeStatusPredicates := monitorHTTPStatusPredicates(excludeRanges)
+	excludeErrorPredicates := monitorErrorCodePredicates(excludeErrorCodes)
+
+	if len(includePredicates) == 0 && len(excludeStatusPredicates) == 0 && len(excludeErrorPredicates) == 0 {
 		if len(strings.Fields(raw)) == 0 {
 			return query
 		}
 		// Only an empty expression means "all". A non-empty expression with no
-		// valid terms must not silently broaden the result set.
+		// usable terms must not silently broaden the result set.
 		return query.Where(entmonitorrequestevent.HTTPStatusEQ(-1))
 	}
-	if len(includeRanges) > 0 {
-		query = query.Where(entmonitorrequestevent.Or(monitorHTTPStatusPredicates(includeRanges)...))
+	if len(includePredicates) > 0 {
+		query = query.Where(entmonitorrequestevent.Or(includePredicates...))
 	}
-	if len(excludeRanges) == 0 {
-		return query
+	if len(excludeStatusPredicates) > 0 {
+		// SQL NOT does not match NULL. Keep rows without an HTTP status when
+		// excluding status ranges, while checking both displayed status fields.
+		query = query.Where(monitorHTTPStatusExclusionPredicate(excludeRanges))
 	}
-
-	excluded := entmonitorrequestevent.Or(monitorHTTPStatusPredicates(excludeRanges)...)
-	if len(includeRanges) > 0 {
-		return query.Where(entmonitorrequestevent.Not(excluded))
+	if len(excludeErrorPredicates) > 0 {
+		query = query.Where(entmonitorrequestevent.Not(entmonitorrequestevent.Or(excludeErrorPredicates...)))
 	}
-	// SQL NOT does not match NULL. With exclusion-only filters, a missing status
-	// did not match the excluded expression and therefore remains visible.
-	return query.Where(entmonitorrequestevent.Or(
-		entmonitorrequestevent.HTTPStatusIsNil(),
-		entmonitorrequestevent.Not(excluded),
-	))
+	return query
 }
 
 func parseMonitorHTTPStatusFilter(raw string) (includeRanges, excludeRanges []monitorHTTPStatusRange) {
+	includeRanges, excludeRanges, _, _ = parseMonitorHTTPStatusAndErrorCodeFilter(raw)
+	return includeRanges, excludeRanges
+}
+
+func parseMonitorHTTPStatusAndErrorCodeFilter(raw string) (
+	includeRanges, excludeRanges []monitorHTTPStatusRange,
+	includeErrorCodes, excludeErrorCodes []string,
+) {
 	for _, rawTerm := range strings.Fields(raw) {
 		term := rawTerm
 		excluded := strings.HasPrefix(term, "!")
 		if excluded {
 			term = strings.TrimPrefix(term, "!")
 		}
-		statusRange, ok := parseMonitorHTTPStatusRange(term)
-		if !ok {
+		if term == "" {
+			continue
+		}
+		statusRanges, ok := parseMonitorHTTPStatusPattern(term)
+		if ok {
+			for _, statusRange := range statusRanges {
+				if excluded {
+					excludeRanges = appendUniqueMonitorHTTPStatusRange(excludeRanges, statusRange)
+				} else {
+					includeRanges = appendUniqueMonitorHTTPStatusRange(includeRanges, statusRange)
+				}
+			}
 			continue
 		}
 		if excluded {
-			excludeRanges = appendUniqueMonitorHTTPStatusRange(excludeRanges, statusRange)
+			excludeErrorCodes = appendUniqueMonitorErrorCode(excludeErrorCodes, term)
 		} else {
-			includeRanges = appendUniqueMonitorHTTPStatusRange(includeRanges, statusRange)
+			includeErrorCodes = appendUniqueMonitorErrorCode(includeErrorCodes, term)
 		}
 	}
-	return includeRanges, excludeRanges
+	return includeRanges, excludeRanges, includeErrorCodes, excludeErrorCodes
 }
 
-func parseMonitorHTTPStatusRange(raw string) (monitorHTTPStatusRange, bool) {
-	term := strings.ToLower(strings.TrimSpace(raw))
-	if len(term) == 3 {
-		if code, err := strconv.Atoi(term); err == nil {
-			if code >= monitorHTTPStatusMin && code <= monitorHTTPStatusMax {
-				return monitorHTTPStatusRange{min: code, max: code}, true
-			}
-			return monitorHTTPStatusRange{}, false
+func parseMonitorHTTPStatusPattern(raw string) ([]monitorHTTPStatusRange, bool) {
+	term := strings.TrimSpace(raw)
+	if term == "" {
+		return nil, false
+	}
+	for _, char := range term {
+		if (char < '0' || char > '9') && char != '*' && char != '?' {
+			return nil, false
 		}
 	}
 
-	prefix := ""
-	if strings.HasSuffix(term, "*") && len(term) <= 3 {
-		prefix = strings.TrimRight(term, "*")
-	} else if len(term) == 3 {
-		wildcardAt := strings.IndexAny(term, "x*")
-		if wildcardAt > 0 && strings.Trim(term[wildcardAt:], "x*") == "" {
-			prefix = term[:wildcardAt]
+	matches := make([]int, 0)
+	for code := monitorHTTPStatusMin; code <= monitorHTTPStatusMax; code++ {
+		if monitorWildcardMatch(term, strconv.Itoa(code)) {
+			matches = append(matches, code)
 		}
 	}
-	if prefix == "" || len(prefix) > 2 {
-		return monitorHTTPStatusRange{}, false
-	}
-	for _, char := range prefix {
-		if char < '0' || char > '9' {
-			return monitorHTTPStatusRange{}, false
-		}
-	}
+	return compactMonitorHTTPStatusRanges(matches), true
+}
 
-	prefixValue, err := strconv.Atoi(prefix)
-	if err != nil {
-		return monitorHTTPStatusRange{}, false
+func monitorWildcardMatch(pattern, value string) bool {
+	patternIndex, valueIndex := 0, 0
+	lastStarIndex, starMatchIndex := -1, 0
+	for valueIndex < len(value) {
+		if patternIndex < len(pattern) &&
+			(pattern[patternIndex] == '?' || pattern[patternIndex] == value[valueIndex]) {
+			patternIndex++
+			valueIndex++
+			continue
+		}
+		if patternIndex < len(pattern) && pattern[patternIndex] == '*' {
+			lastStarIndex = patternIndex
+			starMatchIndex = valueIndex
+			patternIndex++
+			continue
+		}
+		if lastStarIndex < 0 {
+			return false
+		}
+		patternIndex = lastStarIndex + 1
+		starMatchIndex++
+		valueIndex = starMatchIndex
 	}
-	scale := 10
-	if len(prefix) == 1 {
-		scale = 100
+	for patternIndex < len(pattern) && pattern[patternIndex] == '*' {
+		patternIndex++
 	}
-	minStatus := prefixValue * scale
-	maxStatus := minStatus + scale - 1
-	if minStatus < monitorHTTPStatusMin || maxStatus > monitorHTTPStatusMax {
-		return monitorHTTPStatusRange{}, false
+	return patternIndex == len(pattern)
+}
+
+func compactMonitorHTTPStatusRanges(values []int) []monitorHTTPStatusRange {
+	if len(values) == 0 {
+		// Keep a recognized pattern that matches no HTTP status as a false
+		// predicate instead of treating it as an error-code search.
+		return []monitorHTTPStatusRange{{min: 1, max: 0}}
 	}
-	return monitorHTTPStatusRange{min: minStatus, max: maxStatus}, true
+	ranges := make([]monitorHTTPStatusRange, 0, len(values))
+	start, end := values[0], values[0]
+	for _, value := range values[1:] {
+		if value == end+1 {
+			end = value
+			continue
+		}
+		ranges = append(ranges, monitorHTTPStatusRange{min: start, max: end})
+		start, end = value, value
+	}
+	return append(ranges, monitorHTTPStatusRange{min: start, max: end})
 }
 
 func appendUniqueMonitorHTTPStatusRange(ranges []monitorHTTPStatusRange, candidate monitorHTTPStatusRange) []monitorHTTPStatusRange {
@@ -139,17 +184,68 @@ func appendUniqueMonitorHTTPStatusRange(ranges []monitorHTTPStatusRange, candida
 	return append(ranges, candidate)
 }
 
+func appendUniqueMonitorErrorCode(codes []string, candidate string) []string {
+	for _, code := range codes {
+		if code == candidate {
+			return codes
+		}
+	}
+	return append(codes, candidate)
+}
+
 func monitorHTTPStatusPredicates(ranges []monitorHTTPStatusRange) []predicate.MonitorRequestEvent {
 	predicates := make([]predicate.MonitorRequestEvent, 0, len(ranges))
 	for _, statusRange := range ranges {
-		if statusRange.min == statusRange.max {
-			predicates = append(predicates, entmonitorrequestevent.HTTPStatusEQ(statusRange.min))
-			continue
-		}
-		predicates = append(predicates, entmonitorrequestevent.And(
-			entmonitorrequestevent.HTTPStatusGTE(statusRange.min),
-			entmonitorrequestevent.HTTPStatusLTE(statusRange.max),
+		predicates = append(predicates, entmonitorrequestevent.Or(
+			monitorHTTPStatusFieldPredicate(statusRange, false),
+			monitorHTTPStatusFieldPredicate(statusRange, true),
 		))
+	}
+	return predicates
+}
+
+func monitorHTTPStatusFieldPredicate(statusRange monitorHTTPStatusRange, upstream bool) predicate.MonitorRequestEvent {
+	if statusRange.min == statusRange.max {
+		if upstream {
+			return entmonitorrequestevent.UpstreamStatusEQ(statusRange.min)
+		}
+		return entmonitorrequestevent.HTTPStatusEQ(statusRange.min)
+	}
+	if upstream {
+		return entmonitorrequestevent.And(
+			entmonitorrequestevent.UpstreamStatusGTE(statusRange.min),
+			entmonitorrequestevent.UpstreamStatusLTE(statusRange.max),
+		)
+	}
+	return entmonitorrequestevent.And(
+		entmonitorrequestevent.HTTPStatusGTE(statusRange.min),
+		entmonitorrequestevent.HTTPStatusLTE(statusRange.max),
+	)
+}
+
+func monitorHTTPStatusExclusionPredicate(ranges []monitorHTTPStatusRange) predicate.MonitorRequestEvent {
+	httpPredicates := make([]predicate.MonitorRequestEvent, 0, len(ranges))
+	upstreamPredicates := make([]predicate.MonitorRequestEvent, 0, len(ranges))
+	for _, statusRange := range ranges {
+		httpPredicates = append(httpPredicates, monitorHTTPStatusFieldPredicate(statusRange, false))
+		upstreamPredicates = append(upstreamPredicates, monitorHTTPStatusFieldPredicate(statusRange, true))
+	}
+	return entmonitorrequestevent.And(
+		entmonitorrequestevent.Or(
+			entmonitorrequestevent.HTTPStatusIsNil(),
+			entmonitorrequestevent.Not(entmonitorrequestevent.Or(httpPredicates...)),
+		),
+		entmonitorrequestevent.Or(
+			entmonitorrequestevent.UpstreamStatusIsNil(),
+			entmonitorrequestevent.Not(entmonitorrequestevent.Or(upstreamPredicates...)),
+		),
+	)
+}
+
+func monitorErrorCodePredicates(codes []string) []predicate.MonitorRequestEvent {
+	predicates := make([]predicate.MonitorRequestEvent, 0, len(codes))
+	for _, code := range codes {
+		predicates = append(predicates, entmonitorrequestevent.ErrorCodeContainsFold(code))
 	}
 	return predicates
 }

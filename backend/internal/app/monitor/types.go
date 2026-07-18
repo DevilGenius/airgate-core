@@ -179,6 +179,7 @@ type RequestListFilter struct {
 	Type           string
 	Source         string
 	APIKeyID       *int
+	UserID         *int
 	GroupID        *int
 	AccountID      *int
 	Platform       string

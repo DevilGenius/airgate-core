@@ -15,8 +15,10 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
-import { UserSearchFilterComboBox } from '../../shared/components/UserSearchFilterComboBox';
-import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
+import {
+  UserOrAPIKeySearchFilterComboBox,
+  type UserOrAPIKeySearchSelection,
+} from '../../shared/components/UserOrAPIKeySearchFilterComboBox';
 import { DISTRIBUTION_COLORS, PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
@@ -718,15 +720,36 @@ export default function UsagePage() {
     });
   }, [resetCursorPagination]);
 
-  const handleUserSelectionChange = useCallback((value: string, label: string) => {
-    setSelectedUserLabel(value ? label : '');
-    updateFilter('user_id', value);
-  }, [updateFilter]);
+  const handleUserOrAPIKeySelectionChange = useCallback((selection: UserOrAPIKeySearchSelection | null) => {
+    const userID = selection?.kind === 'user' ? selection.id : '';
+    const apiKeyID = selection?.kind === 'api_key' ? selection.id : '';
+    setSelectedUserLabel(selection?.kind === 'user' ? selection.label : '');
+    setSelectedAPIKeyLabel(selection?.kind === 'api_key' ? selection.label : '');
+    startTransition(() => {
+      setFilters((prev) => ({
+        ...prev,
+        api_key_id: apiKeyID ? Number(apiKeyID) : undefined,
+        user_id: userID ? Number(userID) : undefined,
+      }));
+      resetCursorPagination();
+    });
+  }, [resetCursorPagination]);
 
-  const handleAPIKeySelectionChange = useCallback((value: string, label: string) => {
-    setSelectedAPIKeyLabel(value ? label : '');
-    updateFilter('api_key_id', value);
-  }, [updateFilter]);
+  const selectedSearchKind = filters.user_id != null
+    ? 'user'
+    : filters.api_key_id != null
+      ? 'api_key'
+      : undefined;
+  const selectedSearchKey = selectedSearchKind === 'user'
+    ? String(filters.user_id)
+    : selectedSearchKind === 'api_key'
+      ? String(filters.api_key_id)
+      : null;
+  const selectedSearchLabel = selectedSearchKind === 'user'
+    ? selectedUserLabel
+    : selectedSearchKind === 'api_key'
+      ? selectedAPIKeyLabel
+      : '';
 
   useEffect(() => {
     writeAdminUsageFilterState(filters, selectedUserLabel, selectedAPIKeyLabel);
@@ -1122,28 +1145,16 @@ export default function UsagePage() {
               />
             </div>
             <div className="w-full sm:w-48">
-              <UserSearchFilterComboBox
-                ariaLabel={t('usage.search_user')}
-                emptyPrompt={t('usage.search_user')}
+              <UserOrAPIKeySearchFilterComboBox
+                ariaLabel={t('usage.search_user_or_api_key')}
+                emptyPrompt={t('usage.search_user_or_api_key')}
                 loadingLabel={t('common.loading')}
                 noDataLabel={t('common.no_data')}
-                placeholder={t('usage.search_user')}
-                selectedKey={filters.user_id ? String(filters.user_id) : null}
-                selectedLabel={selectedUserLabel}
-                onSelectionChange={handleUserSelectionChange}
-              />
-            </div>
-            <div className="w-full sm:w-48">
-              <APIKeySearchFilterComboBox
-                ariaLabel={t('usage.search_api_key', 'API-Key')}
-                emptyPrompt={t('usage.search_api_key', 'API-Key')}
-                loadingLabel={t('common.loading')}
-                noDataLabel={t('common.no_data')}
-                placeholder={t('usage.search_api_key', 'API-Key')}
-                scope="admin"
-                selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
-                selectedLabel={selectedAPIKeyLabel}
-                onSelectionChange={handleAPIKeySelectionChange}
+                placeholder={t('usage.search_api_key')}
+                selectedKey={selectedSearchKey}
+                selectedKind={selectedSearchKind}
+                selectedLabel={selectedSearchLabel}
+                onSelectionChange={handleUserOrAPIKeySelectionChange}
               />
             </div>
           </div>

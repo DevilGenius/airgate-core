@@ -1013,6 +1013,7 @@ export interface MonitorRequestListQuery {
   type?: string;
   source?: string;
   api_key_id?: number;
+  user_id?: number;
   group_id?: number;
   account_id?: number;
   platform?: string;

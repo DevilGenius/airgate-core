@@ -246,7 +246,7 @@ func TestMonitorRequestListFilterFromQuery(t *testing.T) {
 	filter, ok := monitorRequestListFilterFromQuery(c, dto.MonitorRequestListQuery{
 		Severity: "warning info", Type: "request_error plugin_forward_error", Source: "proxy", APIKeyID: &apiKeyID, GroupID: &groupID,
 		AccountID: &accountID, Platform: "openai", PluginID: "gateway-openai", Method: http.MethodPost,
-		Endpoint: "/v1/responses", Model: "gpt-4.1", HTTPStatus: "4xx !404", UpstreamStatus: &upstreamStatus,
+		Endpoint: "/v1/responses", Model: "gpt-4.1", HTTPStatus: "4* !404", UpstreamStatus: &upstreamStatus,
 		ErrorCode: "rate_limit", From: "2026-06-20T01:02:03Z", To: "2026-06-21", Limit: 30,
 		Cursor: "2026-06-20T00:00:00Z", CursorID: 88,
 	})
@@ -257,7 +257,7 @@ func TestMonitorRequestListFilterFromQuery(t *testing.T) {
 		filter.APIKeyID == nil || *filter.APIKeyID != apiKeyID || filter.GroupID == nil || *filter.GroupID != groupID ||
 		filter.AccountID == nil || *filter.AccountID != accountID || filter.Platform != "openai" ||
 		filter.PluginID != "gateway-openai" || filter.Method != http.MethodPost || filter.Endpoint != "/v1/responses" ||
-		filter.Model != "gpt-4.1" || filter.HTTPStatus != "4xx !404" ||
+		filter.Model != "gpt-4.1" || filter.HTTPStatus != "4* !404" ||
 		filter.UpstreamStatus == nil || *filter.UpstreamStatus != upstreamStatus || filter.ErrorCode != "rate_limit" ||
 		filter.Limit != 30 || filter.Cursor == nil || filter.Cursor.ID != 88 {
 		t.Fatalf("request monitor filter did not copy fields: %+v", filter)

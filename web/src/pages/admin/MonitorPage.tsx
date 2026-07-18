@@ -8,7 +8,10 @@ import { groupsApi } from '../../shared/api/groups';
 import { monitorApi } from '../../shared/api/monitor';
 import { subscribeAdminEvents } from '../../shared/api/adminEvents';
 import { queryKeys } from '../../shared/queryKeys';
-import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
+import {
+  UserOrAPIKeySearchFilterComboBox,
+  type UserOrAPIKeySearchSelection,
+} from '../../shared/components/UserOrAPIKeySearchFilterComboBox';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { RecordsTable } from '../../shared/components/RecordsTable';
@@ -95,6 +98,8 @@ const MONITOR_FILTER_KEYS = {
     timeRange: `${MONITOR_FILTER_STORAGE_KEY}:requests:time_range`,
     to: `${MONITOR_FILTER_STORAGE_KEY}:requests:to`,
     type: `${MONITOR_FILTER_STORAGE_KEY}:requests:type`,
+    userID: `${MONITOR_FILTER_STORAGE_KEY}:requests:user_id`,
+    userLabel: `${MONITOR_FILTER_STORAGE_KEY}:requests:user_label`,
   },
 } as const;
 
@@ -111,6 +116,7 @@ const MONITOR_REQUEST_FILTER_STORAGE_KEYS: Partial<Record<keyof MonitorRequestLi
   http_status: MONITOR_FILTER_KEYS.requests.httpStatus,
   severity: MONITOR_FILTER_KEYS.requests.severity,
   type: MONITOR_FILTER_KEYS.requests.type,
+  user_id: MONITOR_FILTER_KEYS.requests.userID,
 };
 
 function readStoredString(key: string) {
@@ -210,6 +216,7 @@ function readInitialMonitorState() {
   const apiKeyID = readStoredPositiveNumber(MONITOR_FILTER_KEYS.requests.apiKeyID);
   const accountID = readStoredPositiveNumber(MONITOR_FILTER_KEYS.requests.accountID);
   const groupID = readStoredPositiveNumber(MONITOR_FILTER_KEYS.requests.groupID);
+  const userID = readStoredPositiveNumber(MONITOR_FILTER_KEYS.requests.userID);
   const filters: Partial<MonitorListQuery> = {
     from: eventsTimeRange.from,
     severity: readStoredOptions(MONITOR_FILTER_KEYS.events.severity, MONITOR_EVENT_SEVERITY_IDS),
@@ -226,6 +233,7 @@ function readInitialMonitorState() {
     severity: readStoredOptions(MONITOR_FILTER_KEYS.requests.severity, MONITOR_REQUEST_SEVERITY_IDS),
     to: requestsTimeRange.to,
     type: readStoredOptions(MONITOR_FILTER_KEYS.requests.type, MONITOR_REQUEST_TYPE_IDS),
+    user_id: userID,
   };
 
   return {
@@ -236,6 +244,7 @@ function readInitialMonitorState() {
     selectedAPIKeyLabel: storedIDLabel(apiKeyID, readStoredString(MONITOR_FILTER_KEYS.requests.apiKeyLabel)),
     selectedAccountLabel: storedIDLabel(accountID, readStoredString(MONITOR_FILTER_KEYS.requests.accountLabel)),
     selectedGroupLabel: storedIDLabel(groupID, readStoredString(MONITOR_FILTER_KEYS.requests.groupLabel)),
+    selectedUserLabel: storedIDLabel(userID, readStoredString(MONITOR_FILTER_KEYS.requests.userLabel)),
     timeRangePreset: eventsTimeRange.preset,
   };
 }
@@ -271,6 +280,7 @@ export default function MonitorPage() {
   const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState(initialMonitorState.selectedAPIKeyLabel);
   const [selectedAccountLabel, setSelectedAccountLabel] = useState(initialMonitorState.selectedAccountLabel);
   const [selectedGroupLabel, setSelectedGroupLabel] = useState(initialMonitorState.selectedGroupLabel);
+  const [selectedUserLabel, setSelectedUserLabel] = useState(initialMonitorState.selectedUserLabel);
   const [timeRangePreset, setTimeRangePreset] = useState<MonitorTimeRangePreset>(initialMonitorState.timeRangePreset);
   const [requestTimeRangePreset, setRequestTimeRangePreset] = useState<MonitorTimeRangePreset>(initialMonitorState.requestTimeRangePreset);
   const [customTimeRangeTarget, setCustomTimeRangeTarget] = useState<MonitorTableKey>('events');
@@ -458,6 +468,31 @@ export default function MonitorPage() {
     applyMonitorTimeRange(preset, range.from, range.to);
   }, [applyMonitorTimeRange]);
 
+  const toggleEventFilter = useCallback((groupID: string, value: string) => {
+    if (groupID === 'time_range') {
+      handleTimeRangeSelection(value);
+      return;
+    }
+    toggleEventClassificationFilter(groupID, value);
+  }, [handleTimeRangeSelection, toggleEventClassificationFilter]);
+
+  const clearEventFilters = useCallback(() => {
+    setTimeRangePreset('all');
+    writeStoredString(MONITOR_FILTER_KEYS.events.type, undefined);
+    writeStoredString(MONITOR_FILTER_KEYS.events.severity, undefined);
+    writeStoredTimeRange(MONITOR_FILTER_KEYS.events, 'all');
+    startTransition(() => {
+      setFilters((prev) => ({
+        ...prev,
+        from: undefined,
+        severity: undefined,
+        to: undefined,
+        type: undefined,
+      }));
+      resetPagination();
+    });
+  }, [resetPagination]);
+
   const resetRequestPagination = useCallback(() => {
     setRequestCursors({});
     setRequestPageState(1);
@@ -482,6 +517,23 @@ export default function MonitorPage() {
     const range = presetTimeRange(preset);
     applyRequestTimeRange(preset, range.from, range.to);
   }, [applyRequestTimeRange]);
+
+  const clearRequestFilters = useCallback(() => {
+    setRequestTimeRangePreset('all');
+    writeStoredString(MONITOR_FILTER_KEYS.requests.type, undefined);
+    writeStoredString(MONITOR_FILTER_KEYS.requests.severity, undefined);
+    writeStoredTimeRange(MONITOR_FILTER_KEYS.requests, 'all');
+    startTransition(() => {
+      setRequestFilters((prev) => ({
+        ...prev,
+        from: undefined,
+        severity: undefined,
+        to: undefined,
+        type: undefined,
+      }));
+      resetRequestPagination();
+    });
+  }, [resetRequestPagination]);
 
   const handleCustomTimeRangeApply = useCallback((from?: string, to?: string) => {
     if (customTimeRangeTarget === 'requests') {
@@ -531,6 +583,14 @@ export default function MonitorPage() {
     );
   }, [requestFilters.severity, requestFilters.type, updateRequestClassificationFilters]);
 
+  const toggleRequestFilter = useCallback((groupID: string, value: string) => {
+    if (groupID === 'time_range') {
+      handleRequestTimeRangeSelection(value);
+      return;
+    }
+    toggleRequestClassificationFilter(groupID, value);
+  }, [handleRequestTimeRangeSelection, toggleRequestClassificationFilter]);
+
   const updateRequestHTTPStatusFilter = useCallback((value: string) => {
     const nextValue = value === '' ? undefined : value;
     writeStoredString(MONITOR_FILTER_KEYS.requests.httpStatus, nextValue);
@@ -538,12 +598,22 @@ export default function MonitorPage() {
     resetRequestPagination();
   }, [resetRequestPagination]);
 
-  const handleAPIKeySelectionChange = useCallback((value: string, label: string) => {
-    const nextLabel = value ? label : '';
-    setSelectedAPIKeyLabel(nextLabel);
-    writeStoredString(MONITOR_FILTER_KEYS.requests.apiKeyLabel, nextLabel);
-    updateRequestFilter('api_key_id', value ? Number(value) : undefined);
-  }, [updateRequestFilter]);
+  const handleUserOrAPIKeySelectionChange = useCallback((selection: UserOrAPIKeySearchSelection | null) => {
+    const userID = selection?.kind === 'user' ? Number(selection.id) : undefined;
+    const apiKeyID = selection?.kind === 'api_key' ? Number(selection.id) : undefined;
+    const userLabel = selection?.kind === 'user' ? selection.label : '';
+    const apiKeyLabel = selection?.kind === 'api_key' ? selection.label : '';
+    setSelectedUserLabel(userLabel);
+    setSelectedAPIKeyLabel(apiKeyLabel);
+    writeStoredString(MONITOR_FILTER_KEYS.requests.userLabel, userLabel);
+    writeStoredString(MONITOR_FILTER_KEYS.requests.apiKeyLabel, apiKeyLabel);
+    writeStoredString(MONITOR_FILTER_KEYS.requests.userID, userID);
+    writeStoredString(MONITOR_FILTER_KEYS.requests.apiKeyID, apiKeyID);
+    startTransition(() => {
+      setRequestFilters((prev) => ({ ...prev, api_key_id: apiKeyID, user_id: userID }));
+      resetRequestPagination();
+    });
+  }, [resetRequestPagination]);
 
   const handleAccountSelectionChange = useCallback((value: string, label: string) => {
     const nextLabel = value ? label : '';
@@ -589,6 +659,22 @@ export default function MonitorPage() {
       description: group.platform,
     };
   }, []);
+
+  const selectedSearchKind = requestFilters.user_id != null
+    ? 'user'
+    : requestFilters.api_key_id != null
+      ? 'api_key'
+      : undefined;
+  const selectedSearchKey = selectedSearchKind === 'user'
+    ? String(requestFilters.user_id)
+    : selectedSearchKind === 'api_key'
+      ? String(requestFilters.api_key_id)
+      : null;
+  const selectedSearchLabel = selectedSearchKind === 'user'
+    ? selectedUserLabel
+    : selectedSearchKind === 'api_key'
+      ? selectedAPIKeyLabel
+      : '';
 
   const setPage = useCallback((nextPage: number) => {
     if (nextPage <= 1) {
@@ -805,14 +891,6 @@ export default function MonitorPage() {
               />
               {isRequestTable ? (
                 <>
-                  <FilterSelect
-                    ariaLabel={t('monitor.time_range')}
-                    className={MONITOR_TOOLBAR_CONTROL_CLASS}
-                    options={timeRangeOptions}
-                    selectedLabel={requestTimeRangeSelectedLabel}
-                    value={requestTimeRangePreset}
-                    onChange={handleRequestTimeRangeSelection}
-                  />
                   <MultiFilterSelect
                     allLabel={t('common.all')}
                     ariaLabel={t('monitor.type')}
@@ -831,13 +909,22 @@ export default function MonitorPage() {
                         options: requestSeverityOptions,
                         selectedValues: selectedRequestSeverities,
                       },
+                      {
+                        defaultValue: 'all',
+                        id: 'time_range',
+                        label: t('monitor.time_range'),
+                        options: timeRangeOptions,
+                        selectionMode: 'single',
+                        selectedValues: [requestTimeRangePreset],
+                        summaryLabel: requestTimeRangeSelectedLabel,
+                      },
                     ]}
-                    onClear={() => updateRequestClassificationFilters()}
-                    onToggle={toggleRequestClassificationFilter}
+                    onClear={clearRequestFilters}
+                    onToggle={toggleRequestFilter}
                   />
                   <div className={MONITOR_TOOLBAR_CONTROL_CLASS}>
                     <input
-                      aria-label={t('monitor.http_status_code')}
+                      aria-label={t('monitor.error_code')}
                       autoComplete="off"
                       className="input input--sm w-full"
                       placeholder={t('monitor.http_status_filter_placeholder')}
@@ -878,29 +965,21 @@ export default function MonitorPage() {
                     />
                   </div>
                   <div className={MONITOR_TOOLBAR_CONTROL_CLASS}>
-                    <APIKeySearchFilterComboBox
-                      ariaLabel={t('monitor.search_api_key')}
-                      emptyPrompt={t('monitor.search_api_key')}
+                    <UserOrAPIKeySearchFilterComboBox
+                      ariaLabel={t('monitor.search_user_or_api_key')}
+                      emptyPrompt={t('monitor.search_user_or_api_key')}
                       loadingLabel={t('common.loading')}
                       noDataLabel={t('common.no_data')}
                       placeholder={t('monitor.api_key_placeholder')}
-                      scope="admin"
-                      selectedKey={requestFilters.api_key_id ? String(requestFilters.api_key_id) : null}
-                      selectedLabel={selectedAPIKeyLabel}
-                      onSelectionChange={handleAPIKeySelectionChange}
+                      selectedKey={selectedSearchKey}
+                      selectedKind={selectedSearchKind}
+                      selectedLabel={selectedSearchLabel}
+                      onSelectionChange={handleUserOrAPIKeySelectionChange}
                     />
                   </div>
                 </>
               ) : (
                 <>
-                  <FilterSelect
-                    ariaLabel={t('monitor.time_range')}
-                    className={MONITOR_TOOLBAR_CONTROL_CLASS}
-                    options={timeRangeOptions}
-                    selectedLabel={timeRangeSelectedLabel}
-                    value={timeRangePreset}
-                    onChange={handleTimeRangeSelection}
-                  />
                   <MultiFilterSelect
                     allLabel={t('common.all')}
                     ariaLabel={t('monitor.type')}
@@ -919,9 +998,18 @@ export default function MonitorPage() {
                         options: severityOptions,
                         selectedValues: selectedEventSeverities,
                       },
+                      {
+                        defaultValue: 'all',
+                        id: 'time_range',
+                        label: t('monitor.time_range'),
+                        options: timeRangeOptions,
+                        selectionMode: 'single',
+                        selectedValues: [timeRangePreset],
+                        summaryLabel: timeRangeSelectedLabel,
+                      },
                     ]}
-                    onClear={() => updateEventClassificationFilters()}
-                    onToggle={toggleEventClassificationFilter}
+                    onClear={clearEventFilters}
+                    onToggle={toggleEventFilter}
                   />
                   <div className={MONITOR_TOOLBAR_CONTROL_CLASS}>
                     <input

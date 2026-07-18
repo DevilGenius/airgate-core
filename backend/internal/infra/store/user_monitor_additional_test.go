@@ -577,7 +577,7 @@ func testMonitorRequestStore(t *testing.T, store *MonitorStore, now time.Time) {
 		Severity: "warning info", Type: "api_request_error client_closed_request", Source: "forwarder", APIKeyID: &apiKeyID,
 		GroupID: &groupID, AccountID: &accountID, Platform: "openai", PluginID: "openai",
 		Method: "POST", Endpoint: "/v1/chat/completions", Model: "gpt-5",
-		HTTPStatus: "4xx !404", UpstreamStatus: &upstreamStatus, ErrorCode: "rate_limit",
+		HTTPStatus: "4* !404", UpstreamStatus: &upstreamStatus, ErrorCode: "rate_limit",
 		From: storePtr(now.Add(-3 * time.Hour)), To: storePtr(now), Limit: 10,
 	})
 	if err != nil {
@@ -587,7 +587,21 @@ func testMonitorRequestStore(t *testing.T, store *MonitorStore, now time.Time) {
 		filtered.List[0].Detail["retry"] != float64(1) {
 		t.Fatalf("filtered request list = %+v", filtered)
 	}
-	excluded, err := store.ListRequests(ctx, appmonitor.RequestListFilter{HTTPStatus: "!4xx", Limit: 10})
+	upstreamFiltered, err := store.ListRequests(ctx, appmonitor.RequestListFilter{HTTPStatus: "503", Limit: 10})
+	if err != nil {
+		t.Fatalf("ListRequests upstream status filter returned error: %v", err)
+	}
+	if len(upstreamFiltered.List) != 1 || upstreamFiltered.List[0].Hash != "req-hash-1" {
+		t.Fatalf("upstream status filter = %+v", upstreamFiltered)
+	}
+	partialErrorCode, err := store.ListRequests(ctx, appmonitor.RequestListFilter{HTTPStatus: "rate", Limit: 10})
+	if err != nil {
+		t.Fatalf("ListRequests partial error-code filter returned error: %v", err)
+	}
+	if len(partialErrorCode.List) != 1 || partialErrorCode.List[0].Hash != "req-hash-1" {
+		t.Fatalf("partial error-code filter = %+v", partialErrorCode)
+	}
+	excluded, err := store.ListRequests(ctx, appmonitor.RequestListFilter{HTTPStatus: "!4*", Limit: 10})
 	if err != nil {
 		t.Fatalf("ListRequests excluded status returned error: %v", err)
 	}

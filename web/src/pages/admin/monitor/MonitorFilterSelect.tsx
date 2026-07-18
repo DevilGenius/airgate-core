@@ -4,10 +4,13 @@ import { ToolbarMenu, ToolbarMenuItem } from '../../../shared/components/Toolbar
 import type { SelectOption } from './types';
 
 export type MonitorMultiFilterGroup = {
+  defaultValue?: string;
   id: string;
   label: string;
   options: SelectOption[];
+  selectionMode?: 'multiple' | 'single';
   selectedValues: readonly string[];
+  summaryLabel?: string;
 };
 
 export function MonitorFilterSelect({
@@ -61,9 +64,21 @@ export function MonitorMultiFilterSelect({
 }) {
   const selectedLabels = groups.flatMap((group) => {
     const selectedValues = new Set(group.selectedValues);
-    return group.options
-      .filter((option) => selectedValues.has(option.id))
-      .map((option) => option.label);
+    const selectedOptions = group.options.filter((option) => selectedValues.has(option.id));
+    const selectedOption = selectedOptions[0];
+    if (
+      group.selectionMode === 'single'
+      && group.defaultValue
+      && selectedOptions.length === 1
+      && selectedOption !== undefined
+      && selectedOption.id === group.defaultValue
+    ) {
+      return [];
+    }
+    if (group.summaryLabel && selectedOptions.length > 0) {
+      return [group.summaryLabel];
+    }
+    return selectedOptions.map((option) => option.label);
   });
   const selectionSummary = selectedLabels.length > 0 ? selectedLabels.join(', ') : allLabel;
 
@@ -75,7 +90,7 @@ export function MonitorMultiFilterSelect({
         label={<span title={selectionSummary}>{label}: {selectionSummary}</span>}
         rootClassName="ag-simple-select ag-simple-select--full ag-monitor-multi-filter"
       >
-        {() => (
+        {(close) => (
           <>
             <ToolbarMenuItem
               isSelected={selectedLabels.length === 0}
@@ -86,6 +101,7 @@ export function MonitorMultiFilterSelect({
             </ToolbarMenuItem>
             {groups.map((group) => {
               const selectedValues = new Set(group.selectedValues);
+              const isSingleSelect = group.selectionMode === 'single';
               return (
                 <div
                   aria-label={group.label}
@@ -98,8 +114,11 @@ export function MonitorMultiFilterSelect({
                     <ToolbarMenuItem
                       isSelected={selectedValues.has(option.id)}
                       key={option.id}
-                      role="menuitemcheckbox"
-                      onSelect={() => onToggle(group.id, option.id)}
+                      role={isSingleSelect ? 'menuitemradio' : 'menuitemcheckbox'}
+                      onSelect={() => {
+                        onToggle(group.id, option.id);
+                        if (isSingleSelect) close();
+                      }}
                     >
                       {option.label}
                     </ToolbarMenuItem>
