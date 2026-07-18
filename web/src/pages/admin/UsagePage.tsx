@@ -6,7 +6,7 @@ import { usageApi } from '../../shared/api/usage';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { Activity, ChevronDown, ChevronUp, Columns3, DollarSign, Sigma } from 'lucide-react';
-import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
+import { UsageRichTooltipProvider, useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { RecordsTable } from '../../shared/components/RecordsTable';
@@ -28,6 +28,7 @@ import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
+import { createPagedRowsStructuralSharing } from '../../shared/utils/structuralSharing';
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../../shared/ui/metricTones';
 
 const UsageTokenTrendChart = lazy(() =>
@@ -35,6 +36,7 @@ const UsageTokenTrendChart = lazy(() =>
 );
 
 const EMPTY_USAGE_ROWS: UsageLogResp[] = [];
+const shareAdminUsageRows = createPagedRowsStructuralSharing<UsageLogResp>();
 
 const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 
@@ -635,6 +637,7 @@ export default function UsagePage() {
     refetchOnReconnect: autoRefreshEnabled,
     refetchOnWindowFocus: autoRefreshEnabled,
     placeholderData: keepPreviousData,
+    structuralSharing: shareAdminUsageRows,
   });
 
   const statsFilters = useMemo(() => ({
@@ -1216,29 +1219,31 @@ export default function UsagePage() {
       </div>
 
       {/* 使用记录表格 */}
-      <RecordsTable
-        ariaLabel={t('usage.title', 'Usage')}
-        columns={columns}
-        dataVersion={dataUpdatedAt}
-        emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
-        emptyTitle={t('common.no_data')}
-        footer={false}
-        highlightNewRows={autoRefreshEnabled && page === 1}
-        highlightResetKey={highlightResetKey}
-        hasMore={canUseCursor ? data?.has_more : false}
-        isLoading={isLoading}
-        mobileLayout="usageGridWithUser"
-        page={page}
-        pageSize={pageSize}
-        rows={data?.list ?? EMPTY_USAGE_ROWS}
-        setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
-        setPageSize={setPageSize}
-        summaryTotal={summaryTotal}
-        summaryTotalExact={summaryTotal != null ? true : undefined}
-        suppressHighlight={isPlaceholderData}
-        total={total}
-        totalExact={canUseCursor ? data?.total_exact : true}
-      />
+      <UsageRichTooltipProvider>
+        <RecordsTable
+          ariaLabel={t('usage.title', 'Usage')}
+          columns={columns}
+          dataVersion={dataUpdatedAt}
+          emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
+          emptyTitle={t('common.no_data')}
+          footer={false}
+          highlightNewRows={autoRefreshEnabled && page === 1}
+          highlightResetKey={highlightResetKey}
+          hasMore={canUseCursor ? data?.has_more : false}
+          isLoading={isLoading}
+          mobileLayout="usageGridWithUser"
+          page={page}
+          pageSize={pageSize}
+          rows={data?.list ?? EMPTY_USAGE_ROWS}
+          setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
+          setPageSize={setPageSize}
+          summaryTotal={summaryTotal}
+          summaryTotalExact={summaryTotal != null ? true : undefined}
+          suppressHighlight={isPlaceholderData}
+          total={total}
+          totalExact={canUseCursor ? data?.total_exact : true}
+        />
+      </UsageRichTooltipProvider>
       </TablePage>
     </div>
   );

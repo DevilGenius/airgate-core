@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
   getPluginUsageCostDetail,
@@ -46,12 +46,39 @@ function formatTimingMs(value: number): string {
 
 type RichTooltipPlacement = 'left' | 'right';
 type RichTooltipPosition = { left: number; top: number; width: number };
+type RichTooltipOwner = symbol;
 
-/**
- * 全表共享一个 (hover: hover) matchMedia 订阅。
- * 页面上可能同时存在上百个 RichTooltip 实例，逐实例 useMediaQuery
- * 会为每个实例各建一个 MQL + change 监听，这里收敛为单例。
- */
+interface RichTooltipRequest {
+  content: ReactNode;
+  owner: RichTooltipOwner;
+  placement: RichTooltipPlacement;
+  position: RichTooltipPosition;
+  trigger: HTMLElement;
+}
+
+interface RichTooltipState extends RichTooltipRequest {
+  open: boolean;
+}
+
+interface RichTooltipContextValue {
+  canHover: boolean;
+  hideTooltip: (owner: RichTooltipOwner) => void;
+  releaseTooltip: (owner: RichTooltipOwner) => void;
+  showTooltip: (request: RichTooltipRequest) => void;
+  toggleTooltip: (request: RichTooltipRequest) => void;
+}
+
+const RichTooltipContext = createContext<RichTooltipContextValue | null>(null);
+
+function useRichTooltipContext(): RichTooltipContextValue {
+  const context = useContext(RichTooltipContext);
+  if (!context) {
+    throw new Error('RichTooltip must be rendered inside UsageRichTooltipProvider');
+  }
+  return context;
+}
+
+/** 全表共享一个 (hover: hover) matchMedia 订阅。 */
 const HOVER_MEDIA_QUERY = '(hover: hover)';
 let hoverMediaQueryList: MediaQueryList | null = null;
 const hoverCapabilityListeners = new Set<() => void>();
@@ -108,56 +135,64 @@ function getRichTooltipPosition(trigger: HTMLElement, placement: RichTooltipPlac
   return { left, top, width };
 }
 
-function RichTooltip({
-  children,
-  content,
-  placement = 'right',
-}: {
-  children: ReactNode;
-  content: () => ReactNode;
-  placement?: RichTooltipPlacement;
-}) {
-  // 打开状态与定位合并为单一 state：开/关各只需一次 setState，
-  // 且关闭即丢弃定位，避免两次 setState 带来的额外渲染。
-  const [position, setPosition] = useState<RichTooltipPosition | null>(null);
-  const isOpen = position !== null;
-  const triggerRef = useRef<HTMLSpanElement>(null);
+function richTooltipPositionsEqual(left: RichTooltipPosition, right: RichTooltipPosition): boolean {
+  return left.left === right.left && left.top === right.top && left.width === right.width;
+}
+
+/**
+ * 计量与费用共用一个持久 Portal。
+ * 关闭时只隐藏而不卸载最后一棵明细树，跨行重新打开时 React 可以复用同类型组件和 DOM，
+ * 避免每个单元格各自执行 Portal/插件组件的销毁与重新挂载。
+ */
+export function UsageRichTooltipProvider({ children }: { children: ReactNode }) {
+  const [tooltip, setTooltip] = useState<RichTooltipState | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const repositionFrameRef = useRef(0);
-  // 触屏设备使用点按开关；悬停设备由触发元素独占鼠标命中，避免窄屏浮层覆盖触发元素时闪烁。
   const canHover = useCanHover();
 
-  const openTooltip = useCallback(() => {
-    const trigger = triggerRef.current;
-    if (!trigger || typeof window === 'undefined') return;
-    setPosition(getRichTooltipPosition(trigger, placement));
-  }, [placement]);
-
-  const closeTooltip = useCallback(() => {
-    setPosition(null);
+  const showTooltip = useCallback((request: RichTooltipRequest) => {
+    setTooltip({ ...request, open: true });
   }, []);
 
-  const toggleTooltip = useCallback(() => {
-    if (isOpen) {
-      closeTooltip();
-      return;
-    }
-    openTooltip();
-  }, [closeTooltip, isOpen, openTooltip]);
+  const hideTooltip = useCallback((owner: RichTooltipOwner) => {
+    setTooltip((current) => (
+      current?.owner === owner && current.open
+        ? { ...current, open: false }
+        : current
+    ));
+  }, []);
 
-  // 滚动/缩放时用 rAF 合并定位更新：capture 阶段的 scroll 事件每个帧可能触发多次，
-  // 逐事件 getBoundingClientRect + setState 会造成布局抖动。
+  const releaseTooltip = useCallback((owner: RichTooltipOwner) => {
+    setTooltip((current) => (current?.owner === owner ? null : current));
+  }, []);
+
+  const toggleTooltip = useCallback((request: RichTooltipRequest) => {
+    setTooltip((current) => (
+      current?.owner === request.owner && current.open
+        ? { ...current, open: false }
+        : { ...request, open: true }
+    ));
+  }, []);
+
+  // 滚动/缩放时仅由共享浮层执行一次定位更新。
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!tooltip?.open) return undefined;
+
     const scheduleReposition = () => {
       if (repositionFrameRef.current !== 0) return;
       repositionFrameRef.current = window.requestAnimationFrame(() => {
         repositionFrameRef.current = 0;
-        const trigger = triggerRef.current;
-        if (!trigger) return;
-        setPosition((current) => (current ? getRichTooltipPosition(trigger, placement) : current));
+        setTooltip((current) => {
+          if (!current?.open) return current;
+          if (!current.trigger.isConnected) return { ...current, open: false };
+          const position = getRichTooltipPosition(current.trigger, current.placement);
+          return richTooltipPositionsEqual(position, current.position)
+            ? current
+            : { ...current, position };
+        });
       });
     };
+
     window.addEventListener('resize', scheduleReposition);
     window.addEventListener('scroll', scheduleReposition, true);
     return () => {
@@ -168,55 +203,104 @@ function RichTooltip({
         repositionFrameRef.current = 0;
       }
     };
-  }, [isOpen, placement]);
+  }, [tooltip?.open]);
 
   useEffect(() => {
-    if (!isOpen || canHover) return undefined;
+    if (!tooltip?.open || canHover) return undefined;
+
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (!(target instanceof Node)) return;
-      if (triggerRef.current?.contains(target) || tooltipRef.current?.contains(target)) return;
-      closeTooltip();
+      if (tooltip.trigger.contains(target) || tooltipRef.current?.contains(target)) return;
+      hideTooltip(tooltip.owner);
     };
+
     document.addEventListener('pointerdown', handlePointerDown, true);
     return () => document.removeEventListener('pointerdown', handlePointerDown, true);
-  }, [canHover, closeTooltip, isOpen]);
+  }, [canHover, hideTooltip, tooltip]);
 
-  // 明细内容只在打开或行数据变化（render 闭包随之更新）时重建；
-  // 滚动引起的重新定位不再重复渲染整棵明细树。
-  const tooltipContent = useMemo(() => (isOpen ? content() : null), [content, isOpen]);
+  const contextValue = useMemo<RichTooltipContextValue>(() => ({
+    canHover,
+    hideTooltip,
+    releaseTooltip,
+    showTooltip,
+    toggleTooltip,
+  }), [canHover, hideTooltip, releaseTooltip, showTooltip, toggleTooltip]);
 
   return (
-    <>
-      <span
-        ref={triggerRef}
-        className={RICH_TOOLTIP_TRIGGER_CLASS}
-        onClick={canHover ? undefined : toggleTooltip}
-        onMouseEnter={canHover ? openTooltip : undefined}
-        onMouseLeave={canHover ? closeTooltip : undefined}
-      >
-        {children}
-      </span>
-      {position && typeof document !== 'undefined'
+    <RichTooltipContext.Provider value={contextValue}>
+      {children}
+      {tooltip && typeof document !== 'undefined'
         ? createPortal(
           <div
             ref={tooltipRef}
+            aria-hidden={tooltip.open ? undefined : true}
             className="ag-usage-rich-tooltip-content"
             data-hover-mode={canHover ? 'true' : undefined}
-            data-placement={placement}
-            role="tooltip"
+            data-placement={tooltip.placement}
+            hidden={!tooltip.open}
+            role={tooltip.open ? 'tooltip' : undefined}
             style={{
-              left: position.left,
-              top: position.top,
-              width: position.width,
+              left: tooltip.position.left,
+              top: tooltip.position.top,
+              width: tooltip.position.width,
             }}
           >
-            {tooltipContent}
+            {tooltip.content}
           </div>,
           document.body,
         )
         : null}
-    </>
+    </RichTooltipContext.Provider>
+  );
+}
+
+function RichTooltip({
+  children,
+  content,
+  placement = 'right',
+}: {
+  children: ReactNode;
+  content: () => ReactNode;
+  placement?: RichTooltipPlacement;
+}) {
+  const { canHover, hideTooltip, releaseTooltip, showTooltip, toggleTooltip } = useRichTooltipContext();
+  const ownerRef = useRef<RichTooltipOwner>(Symbol('usage-rich-tooltip'));
+  const triggerRef = useRef<HTMLSpanElement>(null);
+
+  const createRequest = (): RichTooltipRequest | null => {
+    const trigger = triggerRef.current;
+    if (!trigger || typeof window === 'undefined') return null;
+    return {
+      content: content(),
+      owner: ownerRef.current,
+      placement,
+      position: getRichTooltipPosition(trigger, placement),
+      trigger,
+    };
+  };
+
+  useEffect(() => {
+    const owner = ownerRef.current;
+    return () => releaseTooltip(owner);
+  }, [releaseTooltip]);
+
+  return (
+    <span
+      ref={triggerRef}
+      className={RICH_TOOLTIP_TRIGGER_CLASS}
+      onClick={canHover ? undefined : () => {
+        const request = createRequest();
+        if (request) toggleTooltip(request);
+      }}
+      onMouseEnter={canHover ? () => {
+        const request = createRequest();
+        if (request) showTooltip(request);
+      } : undefined}
+      onMouseLeave={canHover ? () => hideTooltip(ownerRef.current) : undefined}
+    >
+      {children}
+    </span>
   );
 }
 

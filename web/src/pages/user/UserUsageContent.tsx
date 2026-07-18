@@ -10,7 +10,7 @@ import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
 import { Activity, DollarSign, Clock, Gauge, Percent, Sigma, Upload } from 'lucide-react';
 import type { UsageQuery } from '../../shared/types';
-import { useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
+import { UsageRichTooltipProvider, useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
 import { getSessionAPIKey, getTokenAPIKeyID } from '../../shared/api/client';
 import { CcsImportModal } from './userkeys/CcsImportModal';
 import { RecordsTable } from '../../shared/components/RecordsTable';
@@ -26,12 +26,14 @@ import { PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { USER_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
+import { createPagedRowsStructuralSharing } from '../../shared/utils/structuralSharing';
 import { formatRateMultiplier } from '../../shared/utils/rateMultiplier';
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../../shared/ui/metricTones';
 
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.userUsageAutoRefresh;
 const USER_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.userUsageFilters;
 const EMPTY_USAGE_ROWS: UsageRow[] = [];
+const shareUserUsageRows = createPagedRowsStructuralSharing<UsageRow>();
 
 type StoredUserUsageFilters = {
   api_key_id?: number;
@@ -312,6 +314,7 @@ export default function UserUsageContent() {
     refetchOnReconnect: autoRefreshEnabled,
     refetchOnWindowFocus: autoRefreshEnabled,
     placeholderData: keepPreviousData,
+    structuralSharing: shareUserUsageRows,
   });
 
   // 聚合统计（跟随筛选条件，独立于分页）
@@ -560,29 +563,31 @@ export default function UserUsageContent() {
       </div>
 
       {/* 使用记录表格 */}
-      <RecordsTable
-        ariaLabel={t('usage.title', 'Usage')}
-        columns={columns}
-        dataVersion={dataUpdatedAt}
-        emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
-        emptyTitle={t('common.no_data')}
-        footer={false}
-        highlightNewRows={autoRefreshEnabled && page === 1}
-        highlightResetKey={highlightResetKey}
-        hasMore={canUseCursor ? data?.has_more : false}
-        isLoading={isLoading}
-        mobileLayout="usageGrid"
-        page={page}
-        pageSize={pageSize}
-        rows={list}
-        setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
-        setPageSize={setPageSize}
-        summaryTotal={summaryTotal}
-        summaryTotalExact={summaryTotal != null ? true : undefined}
-        suppressHighlight={isPlaceholderData}
-        total={total}
-        totalExact={canUseCursor ? data?.total_exact : true}
-      />
+      <UsageRichTooltipProvider>
+        <RecordsTable
+          ariaLabel={t('usage.title', 'Usage')}
+          columns={columns}
+          dataVersion={dataUpdatedAt}
+          emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
+          emptyTitle={t('common.no_data')}
+          footer={false}
+          highlightNewRows={autoRefreshEnabled && page === 1}
+          highlightResetKey={highlightResetKey}
+          hasMore={canUseCursor ? data?.has_more : false}
+          isLoading={isLoading}
+          mobileLayout="usageGrid"
+          page={page}
+          pageSize={pageSize}
+          rows={list}
+          setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
+          setPageSize={setPageSize}
+          summaryTotal={summaryTotal}
+          summaryTotalExact={summaryTotal != null ? true : undefined}
+          suppressHighlight={isPlaceholderData}
+          total={total}
+          totalExact={canUseCursor ? data?.total_exact : true}
+        />
+      </UsageRichTooltipProvider>
       </TablePage>
     </div>
   );
