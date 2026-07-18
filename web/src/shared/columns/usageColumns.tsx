@@ -16,7 +16,6 @@ import {
 import type { UsageLogResp, CustomerUsageLogResp } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
 import { CostValue } from '../components/CostValue';
-import { useMediaQuery } from '../hooks/useMediaQuery';
 import { formatRateMultiplier } from '../utils/rateMultiplier';
 
 /**
@@ -47,6 +46,45 @@ function formatTimingMs(value: number): string {
 
 type RichTooltipPlacement = 'left' | 'right';
 type RichTooltipPosition = { left: number; top: number; width: number };
+
+/**
+ * 全表共享一个 (hover: hover) matchMedia 订阅。
+ * 页面上可能同时存在上百个 RichTooltip 实例，逐实例 useMediaQuery
+ * 会为每个实例各建一个 MQL + change 监听，这里收敛为单例。
+ */
+const HOVER_MEDIA_QUERY = '(hover: hover)';
+let hoverMediaQueryList: MediaQueryList | null = null;
+const hoverCapabilityListeners = new Set<() => void>();
+
+function notifyHoverCapabilityListeners() {
+  hoverCapabilityListeners.forEach((listener) => listener());
+}
+
+function subscribeHoverCapability(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  if (!hoverMediaQueryList) {
+    hoverMediaQueryList = window.matchMedia(HOVER_MEDIA_QUERY);
+    hoverMediaQueryList.addEventListener('change', notifyHoverCapabilityListeners);
+  }
+  hoverCapabilityListeners.add(listener);
+  return () => {
+    hoverCapabilityListeners.delete(listener);
+    if (hoverCapabilityListeners.size === 0 && hoverMediaQueryList) {
+      hoverMediaQueryList.removeEventListener('change', notifyHoverCapabilityListeners);
+      hoverMediaQueryList = null;
+    }
+  };
+}
+
+function getHoverCapabilitySnapshot(): boolean {
+  if (hoverMediaQueryList) return hoverMediaQueryList.matches;
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia(HOVER_MEDIA_QUERY).matches;
+}
+
+function useCanHover(): boolean {
+  return useSyncExternalStore(subscribeHoverCapability, getHoverCapabilitySnapshot, () => false);
+}
 
 function getRichTooltipPosition(trigger: HTMLElement, placement: RichTooltipPlacement): RichTooltipPosition {
   const rect = trigger.getBoundingClientRect();
@@ -79,26 +117,23 @@ function RichTooltip({
   content: () => ReactNode;
   placement?: RichTooltipPlacement;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  // 打开状态与定位合并为单一 state：开/关各只需一次 setState，
+  // 且关闭即丢弃定位，避免两次 setState 带来的额外渲染。
   const [position, setPosition] = useState<RichTooltipPosition | null>(null);
+  const isOpen = position !== null;
   const triggerRef = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const repositionFrameRef = useRef(0);
   // 触屏设备使用点按开关；悬停设备由触发元素独占鼠标命中，避免窄屏浮层覆盖触发元素时闪烁。
-  const canHover = useMediaQuery('(hover: hover)');
+  const canHover = useCanHover();
 
-  const updatePosition = useCallback(() => {
+  const openTooltip = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger || typeof window === 'undefined') return;
     setPosition(getRichTooltipPosition(trigger, placement));
   }, [placement]);
 
-  const openTooltip = useCallback(() => {
-    updatePosition();
-    setIsOpen(true);
-  }, [updatePosition]);
-
   const closeTooltip = useCallback(() => {
-    setIsOpen(false);
     setPosition(null);
   }, []);
 
@@ -110,16 +145,30 @@ function RichTooltip({
     openTooltip();
   }, [closeTooltip, isOpen, openTooltip]);
 
+  // 滚动/缩放时用 rAF 合并定位更新：capture 阶段的 scroll 事件每个帧可能触发多次，
+  // 逐事件 getBoundingClientRect + setState 会造成布局抖动。
   useEffect(() => {
     if (!isOpen) return undefined;
-    updatePosition();
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
-    return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
+    const scheduleReposition = () => {
+      if (repositionFrameRef.current !== 0) return;
+      repositionFrameRef.current = window.requestAnimationFrame(() => {
+        repositionFrameRef.current = 0;
+        const trigger = triggerRef.current;
+        if (!trigger) return;
+        setPosition((current) => (current ? getRichTooltipPosition(trigger, placement) : current));
+      });
     };
-  }, [isOpen, updatePosition]);
+    window.addEventListener('resize', scheduleReposition);
+    window.addEventListener('scroll', scheduleReposition, true);
+    return () => {
+      window.removeEventListener('resize', scheduleReposition);
+      window.removeEventListener('scroll', scheduleReposition, true);
+      if (repositionFrameRef.current !== 0) {
+        window.cancelAnimationFrame(repositionFrameRef.current);
+        repositionFrameRef.current = 0;
+      }
+    };
+  }, [isOpen, placement]);
 
   useEffect(() => {
     if (!isOpen || canHover) return undefined;
@@ -133,6 +182,10 @@ function RichTooltip({
     return () => document.removeEventListener('pointerdown', handlePointerDown, true);
   }, [canHover, closeTooltip, isOpen]);
 
+  // 明细内容只在打开或行数据变化（render 闭包随之更新）时重建；
+  // 滚动引起的重新定位不再重复渲染整棵明细树。
+  const tooltipContent = useMemo(() => (isOpen ? content() : null), [content, isOpen]);
+
   return (
     <>
       <span
@@ -144,7 +197,7 @@ function RichTooltip({
       >
         {children}
       </span>
-      {isOpen && position && typeof document !== 'undefined'
+      {position && typeof document !== 'undefined'
         ? createPortal(
           <div
             ref={tooltipRef}
@@ -158,7 +211,7 @@ function RichTooltip({
               width: position.width,
             }}
           >
-            {content()}
+            {tooltipContent}
           </div>,
           document.body,
         )
@@ -402,9 +455,11 @@ function firstText(...values: unknown[]): string | undefined {
 }
 
 function usageMetadataValue(metadata: Record<string, string>, keys: string[]): string | undefined {
-  const normalizedKeys = new Set(keys.map(normalizeUsageKey));
+  // keys 是 1~2 个元素的小数组，直接线性比较即可；
+  // 该函数在每行渲染路径上被多次调用，避免每次分配 Set。
+  const normalizedKeys = keys.map(normalizeUsageKey);
   for (const [key, value] of Object.entries(metadata)) {
-    if (!normalizedKeys.has(normalizeUsageKey(key))) continue;
+    if (!normalizedKeys.includes(normalizeUsageKey(key))) continue;
     const text = firstText(value);
     if (text) return text;
   }

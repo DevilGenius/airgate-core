@@ -248,21 +248,10 @@ export function RecordsTable<T extends RecordRow>({
     if (mobileLayout === 'usageGrid' || mobileLayout === 'usageGridWithUser') return columns;
     return columns.filter((column) => !column.hideOnMobile);
   }, [columns, isMobileLayoutActive, mobileLayout]);
-  const mobileItems = useMemo(() => {
+  // 基础 items 只依赖行数据与列定义；新行高亮合并到下方单独的廉价 memo 中，
+  // 避免每次自动刷新（markedRowIds 变化）都重新执行全量 column.render。
+  const mobileBaseItems = useMemo(() => {
     if (!isMobileLayoutActive) return [];
-    const mobileNewRowProps = (row: T, className?: string) => {
-      const rowId = String(row.id);
-      const isNew = markedRowIds.has(rowId);
-      return {
-        className: cx(className, isNew && 'ag-mobile-record-card--new'),
-        onAnimationEnd: isNew
-          ? (event: AnimationEvent<HTMLElement>) => {
-              if (event.animationName !== NEW_ROW_ANIMATION_NAME) return;
-              clearMarkedRowId(rowId);
-            }
-          : undefined,
-      };
-    };
 
     if (mobileLayout === 'usageGrid' || mobileLayout === 'usageGridWithUser') {
       const showUserInHeader = mobileLayout === 'usageGridWithUser';
@@ -277,7 +266,7 @@ export function RecordsTable<T extends RecordRow>({
 
       if (userColumn || timeColumn || fieldColumns.length > 0) {
         return rows.map((row) => ({
-          ...mobileNewRowProps(row, 'ag-mobile-record-card--usage-grid'),
+          className: 'ag-mobile-record-card--usage-grid',
           id: row.id,
           title: showUserInHeader
             ? userColumn?.render(row) ?? timeColumn?.render(row) ?? '-'
@@ -309,7 +298,6 @@ export function RecordsTable<T extends RecordRow>({
       : undefined;
 
     return rows.map((row) => ({
-      ...mobileNewRowProps(row),
       id: row.id,
       title: primaryColumn.render(row),
       fields: fieldColumns.map((column) => ({
@@ -321,7 +309,22 @@ export function RecordsTable<T extends RecordRow>({
         value: column.render(row),
       })),
     }));
-  }, [clearMarkedRowId, isMobileLayoutActive, markedRowIds, mobileColumns, mobileLayout, rows]);
+  }, [isMobileLayoutActive, mobileColumns, mobileLayout, rows]);
+  const mobileItems = useMemo(() => {
+    if (!isMobileLayoutActive || markedRowIds.size === 0) return mobileBaseItems;
+    return mobileBaseItems.map((item) => {
+      const rowId = String(item.id);
+      if (!markedRowIds.has(rowId)) return item;
+      return {
+        ...item,
+        className: cx(item.className, 'ag-mobile-record-card--new'),
+        onAnimationEnd: (event: AnimationEvent<HTMLElement>) => {
+          if (event.animationName !== NEW_ROW_ANIMATION_NAME) return;
+          clearMarkedRowId(rowId);
+        },
+      };
+    });
+  }, [clearMarkedRowId, isMobileLayoutActive, markedRowIds, mobileBaseItems]);
 
   const emptyState = (
     <div className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 text-center">

@@ -52,7 +52,7 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
     && target.closest('a, button, input, select, textarea, [role="button"], [role="menuitem"]') !== null;
 }
 
-function MobileRecordCard({ item }: { item: MobileRecordItem }) {
+const MobileRecordCard = memo(function MobileRecordCard({ item }: { item: MobileRecordItem }) {
   const longPressTimerRef = useRef<number | null>(null);
   const pointerStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const suppressNextClickRef = useRef(false);
@@ -190,7 +190,7 @@ function MobileRecordCard({ item }: { item: MobileRecordItem }) {
       ) : null}
     </>
   );
-}
+});
 
 export const MobileRecordList = memo(function MobileRecordList({
   emptyDescription,

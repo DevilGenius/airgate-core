@@ -34,6 +34,8 @@ const UsageTokenTrendChart = lazy(() =>
   import('./usage/UsageCharts').then((m) => ({ default: m.UsageTokenTrendChart })),
 );
 
+const EMPTY_USAGE_ROWS: UsageLogResp[] = [];
+
 const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 
 interface ColumnVisibilityOption {
@@ -309,9 +311,16 @@ function writeAdminUsageColumnKeys(keys: Set<string>) {
   }
 }
 
+// UA 串在行渲染路径上高度重复，正则裁剪结果做有界缓存，避免每行每次渲染都跑正则链。
+const USER_AGENT_DISPLAY_CACHE_LIMIT = 500;
+const userAgentDisplayCache = new Map<string, string>();
+
 function displayUserAgent(value: string | undefined) {
   const raw = compactText(value);
   if (raw === '-') return raw;
+
+  const cached = userAgentDisplayCache.get(raw);
+  if (cached !== undefined) return cached;
 
   const display = raw
     .replace(/^Mozilla\/5\.0\s*(?:\([^)]*\)\s*)?/i, '')
@@ -320,7 +329,12 @@ function displayUserAgent(value: string | undefined) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  return display || raw;
+  const result = display || raw;
+  if (userAgentDisplayCache.size >= USER_AGENT_DISPLAY_CACHE_LIMIT) {
+    userAgentDisplayCache.clear();
+  }
+  userAgentDisplayCache.set(raw, result);
+  return result;
 }
 
 // ==================== 分布表格卡片 ====================
@@ -1012,6 +1026,10 @@ export default function UsagePage() {
   const totalPages = getTotalPages(total, pageSize);
   const canUseCursor = !isPlaceholderData;
   const summaryTotal = activeStats && !isSummaryStatsPlaceholderData ? activeStats.total_requests : undefined;
+  const highlightResetKey = useMemo(
+    () => JSON.stringify({ ...filters, page, pageSize }),
+    [filters, page, pageSize],
+  );
 
   return (
     <div>
@@ -1206,13 +1224,13 @@ export default function UsagePage() {
         emptyTitle={t('common.no_data')}
         footer={false}
         highlightNewRows={autoRefreshEnabled && page === 1}
-        highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
+        highlightResetKey={highlightResetKey}
         hasMore={canUseCursor ? data?.has_more : false}
         isLoading={isLoading}
         mobileLayout="usageGridWithUser"
         page={page}
         pageSize={pageSize}
-        rows={data?.list ?? []}
+        rows={data?.list ?? EMPTY_USAGE_ROWS}
         setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
         setPageSize={setPageSize}
         summaryTotal={summaryTotal}

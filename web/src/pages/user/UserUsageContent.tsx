@@ -31,6 +31,7 @@ import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../../
 
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.userUsageAutoRefresh;
 const USER_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.userUsageFilters;
+const EMPTY_USAGE_ROWS: UsageRow[] = [];
 
 type StoredUserUsageFilters = {
   api_key_id?: number;
@@ -356,72 +357,78 @@ export default function UserUsageContent() {
     writeUserUsageFilterState(filters, selectedAPIKeyLabel, customerScope);
   }, [customerScope, filters.api_key_id, filters.model, filters.platform, selectedAPIKeyLabel]);
 
-  const list = data?.list ?? [];
+  const list = data?.list ?? EMPTY_USAGE_ROWS;
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
   const summaryTotal = stats?.total_requests;
   const canUseCursor = !isPlaceholderData;
   const visibleActualCost = customerScope ? (stats?.total_billed_cost ?? 0) : (stats?.total_actual_cost ?? 0);
+  const highlightResetKey = useMemo(
+    () => JSON.stringify({ ...filters, page, pageSize }),
+    [filters, page, pageSize],
+  );
 
   const sharedColumns = useUsageColumns({ customerScope, adminView: false });
-  const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
-  const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
-  const streamColumn = sharedColumns.find((column) => column.key === 'stream');
-  const timingKeys = new Set(['first_event_ms', 'duration_ms']);
-  const timingColumns = sharedColumns.filter((column) => timingKeys.has(column.key));
-  const sharedColumnsAfterModel = sharedColumns
-    .slice(modelColumnIndex + 1)
-    .filter((column) => !timingKeys.has(column.key) && column.key !== 'stream');
-  const endpointColumn: UsageColumnConfig<UsageRow> = {
-    key: 'endpoint',
-    title: t('usage.endpoint', '端点'),
-    width: '180px',
-    hideOnMobile: true,
-    render: (row) => {
-      const endpoint = 'endpoint' in row && row.endpoint ? row.endpoint : '-';
+  const columns = useMemo(() => {
+    const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
+    const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
+    const streamColumn = sharedColumns.find((column) => column.key === 'stream');
+    const timingKeys = new Set(['first_event_ms', 'duration_ms']);
+    const timingColumns = sharedColumns.filter((column) => timingKeys.has(column.key));
+    const sharedColumnsAfterModel = sharedColumns
+      .slice(modelColumnIndex + 1)
+      .filter((column) => !timingKeys.has(column.key) && column.key !== 'stream');
+    const endpointColumn: UsageColumnConfig<UsageRow> = {
+      key: 'endpoint',
+      title: t('usage.endpoint', '端点'),
+      width: '180px',
+      hideOnMobile: true,
+      render: (row) => {
+        const endpoint = 'endpoint' in row && row.endpoint ? row.endpoint : '-';
 
-      return (
-        <span className="block truncate font-mono text-xs leading-tight text-text-secondary" title={endpoint}>
-          {endpoint}
-        </span>
-      );
-    },
-  };
-  const apiKeyColumn: UsageColumnConfig<UsageRow> = {
-    key: 'api_key',
-    title: 'API Key',
-    width: '96px',
-    hideOnMobile: true,
-    render: (row) => {
-      if (row.api_key_id === 0) {
-        return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_plugin_call')}</span>;
-      }
-      if ('api_key_deleted' in row && row.api_key_deleted) {
-        return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_deleted')}</span>;
-      }
+        return (
+          <span className="block truncate font-mono text-xs leading-tight text-text-secondary" title={endpoint}>
+            {endpoint}
+          </span>
+        );
+      },
+    };
+    const apiKeyColumn: UsageColumnConfig<UsageRow> = {
+      key: 'api_key',
+      title: 'API Key',
+      width: '96px',
+      hideOnMobile: true,
+      render: (row) => {
+        if (row.api_key_id === 0) {
+          return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_plugin_call')}</span>;
+        }
+        if ('api_key_deleted' in row && row.api_key_deleted) {
+          return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_deleted')}</span>;
+        }
 
-      const name = 'api_key_name' in row && row.api_key_name ? row.api_key_name : '-';
+        const name = 'api_key_name' in row && row.api_key_name ? row.api_key_name : '-';
 
-      return (
-        <span className="block max-w-full truncate text-xs text-text-secondary" title={name}>{name}</span>
-      );
-    },
-  };
-  const columns = modelColumnIndex >= 0
-    ? [
-        ...sharedColumns.slice(0, timeColumnIndex + 1),
-        ...(customerScope ? [] : [apiKeyColumn]),
-        ...sharedColumns.slice(timeColumnIndex + 1, modelColumnIndex + 1),
-        ...(streamColumn ? [streamColumn] : []),
-        ...timingColumns,
-        ...sharedColumnsAfterModel,
-        endpointColumn,
-      ]
-    : [
-        ...sharedColumns,
-        endpointColumn,
-        ...(customerScope ? [] : [apiKeyColumn]),
-      ];
+        return (
+          <span className="block max-w-full truncate text-xs text-text-secondary" title={name}>{name}</span>
+        );
+      },
+    };
+    return modelColumnIndex >= 0
+      ? [
+          ...sharedColumns.slice(0, timeColumnIndex + 1),
+          ...(customerScope ? [] : [apiKeyColumn]),
+          ...sharedColumns.slice(timeColumnIndex + 1, modelColumnIndex + 1),
+          ...(streamColumn ? [streamColumn] : []),
+          ...timingColumns,
+          ...sharedColumnsAfterModel,
+          endpointColumn,
+        ]
+      : [
+          ...sharedColumns,
+          endpointColumn,
+          ...(customerScope ? [] : [apiKeyColumn]),
+        ];
+  }, [customerScope, sharedColumns, t]);
 
   return (
     <div>
@@ -561,7 +568,7 @@ export default function UserUsageContent() {
         emptyTitle={t('common.no_data')}
         footer={false}
         highlightNewRows={autoRefreshEnabled && page === 1}
-        highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
+        highlightResetKey={highlightResetKey}
         hasMore={canUseCursor ? data?.has_more : false}
         isLoading={isLoading}
         mobileLayout="usageGrid"
