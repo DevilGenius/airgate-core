@@ -883,7 +883,7 @@
     "image_size": "图片尺寸",
     "metrics": "计量",
     "endpoint": "端点",
-    "first_event": "首事件",
+    "first_event": "响应",
     "first_token": "首字",
     "ws_dial": "握手",
     "stream": "流式",
