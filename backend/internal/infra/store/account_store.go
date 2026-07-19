@@ -154,7 +154,7 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 	return mapAccounts(accounts), nil
 }
 
-// Create 创建账号；同邮箱软删除账号会复用原行并恢复。
+// Create 创建账号；同邮箱软删除账号会复用原行并恢复，同平台 OAuth 账号会刷新凭证。
 func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput) (appaccount.Account, error) {
 	resolvedEmail, resolvedCredentials, identityErr := accountidentity.Resolve(input.Email, input.Credentials)
 	if identityErr != nil {
@@ -180,7 +180,24 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 		switch {
 		case queryErr == nil:
 			if existing.DeletedAt == nil {
-				return appaccount.Account{}, appaccount.ErrAccountEmailExists
+				if !sameOAuthAccount(existing, input) {
+					return appaccount.Account{}, appaccount.ErrAccountEmailExists
+				}
+				item, saveErr := tx.Account.UpdateOneID(existing.ID).
+					Where(entaccount.DeletedAtIsNil()).
+					SetCredentials(cloneCredentials(input.Credentials)).
+					SetState(entaccount.StateActive).
+					ClearStateUntil().
+					SetErrorMsg("").
+					Save(ctx)
+				if saveErr != nil {
+					if ent.IsNotFound(saveErr) {
+						return appaccount.Account{}, appaccount.ErrAccountEmailExists
+					}
+					return appaccount.Account{}, mapAccountEmailConstraint(saveErr)
+				}
+				accountID = item.ID
+				break
 			}
 			builder := tx.Account.UpdateOneID(existing.ID).
 				Where(entaccount.DeletedAtNotNil()).
@@ -260,6 +277,12 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 		return appaccount.Account{}, err
 	}
 	return s.FindByID(ctx, accountID, appaccount.LoadOptions{WithGroups: true, WithProxy: true})
+}
+
+func sameOAuthAccount(existing *ent.Account, input appaccount.CreateInput) bool {
+	return strings.EqualFold(strings.TrimSpace(existing.Platform), strings.TrimSpace(input.Platform)) &&
+		strings.EqualFold(strings.TrimSpace(existing.Type), "oauth") &&
+		strings.EqualFold(strings.TrimSpace(input.Type), "oauth")
 }
 
 // Update 更新账号。

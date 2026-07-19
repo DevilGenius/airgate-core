@@ -322,10 +322,15 @@ func TestAccountStoreCRUDListsAndAggregates(t *testing.T) {
 		len(restored.GroupIDs) != 0 || restored.Proxy != nil || len(restored.Extra) != 0 {
 		t.Fatalf("restored account = %+v", restored)
 	}
-	if _, err := store.Create(ctx, appaccount.CreateInput{
+	refreshed, err := store.Create(ctx, appaccount.CreateInput{
 		Name: "Duplicate Name Allowed", Email: &email, Platform: "openai", Type: "oauth", Credentials: map[string]string{"access_token": "duplicate"},
-	}); !errors.Is(err, appaccount.ErrAccountEmailExists) {
-		t.Fatalf("active duplicate email error = %v, want ErrAccountEmailExists", err)
+	})
+	if err != nil {
+		t.Fatalf("refresh active OAuth account: %v", err)
+	}
+	if refreshed.ID != restored.ID || refreshed.Name != "Restored Account" || refreshed.Credentials["access_token"] != "duplicate" ||
+		refreshed.Credentials["email"] != email || refreshed.State != entaccount.StateActive.String() {
+		t.Fatalf("refreshed active OAuth account = %+v", refreshed)
 	}
 	usageRecords, _, _, err = NewUsageStore(db).ListAdmin(ctx, appusage.ListFilter{Page: 1, PageSize: 10, AccountID: &accountID})
 	if err != nil || len(usageRecords) != 3 || usageRecords[0].AccountDeleted || usageRecords[0].AccountName != "Restored Account" {

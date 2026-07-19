@@ -2,13 +2,134 @@ package store
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	entaccount "github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/ent/migrate"
 	"github.com/DevilGenius/airgate-core/internal/app/account"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
 )
+
+func TestAccountStoreCreateRefreshesExistingOAuthByEmail(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	group, err := db.Group.Create().
+		SetName("OAuth Group").
+		SetPlatform("openai").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	proxy, err := db.Proxy.Create().
+		SetName("OAuth Proxy").
+		SetAddress("127.0.0.1").
+		SetPort(8080).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+
+	store := NewAccountStore(db)
+	email := "oauth@example.com"
+	proxyID := int64(proxy.ID)
+	rate := 2.5
+	existing, err := store.Create(ctx, account.CreateInput{
+		Name:           "Keep Custom Name",
+		Email:          &email,
+		Platform:       "openai",
+		Type:           "oauth",
+		Credentials:    map[string]string{"access_token": "old-access", "old_only": "remove-me"},
+		Priority:       88,
+		MaxConcurrency: 7,
+		ProxyID:        &proxyID,
+		RateMultiplier: &rate,
+		GroupIDs:       []int64{int64(group.ID)},
+		UpstreamIsPool: true,
+		Extra:          map[string]any{"label": "keep"},
+	})
+	if err != nil {
+		t.Fatalf("create existing OAuth account: %v", err)
+	}
+	stateUntil := time.Now().Add(time.Hour)
+	if _, err := db.Account.UpdateOneID(existing.ID).
+		SetState(entaccount.StateDisabled).
+		SetStateUntil(stateUntil).
+		SetErrorMsg("expired credentials").
+		Save(ctx); err != nil {
+		t.Fatalf("disable existing OAuth account: %v", err)
+	}
+
+	incomingEmail := " OAuth@Example.COM "
+	incomingRate := 1.0
+	refreshed, err := store.Create(ctx, account.CreateInput{
+		Name:           "New OAuth Suggested Name",
+		Email:          &incomingEmail,
+		Platform:       "openai",
+		Type:           "OAUTH",
+		Credentials:    map[string]string{"access_token": "new-access", "refresh_token": "new-refresh"},
+		Priority:       50,
+		MaxConcurrency: 10,
+		RateMultiplier: &incomingRate,
+	})
+	if err != nil {
+		t.Fatalf("refresh existing OAuth account: %v", err)
+	}
+	if refreshed.ID != existing.ID || refreshed.Name != existing.Name || refreshed.Email == nil || *refreshed.Email != email {
+		t.Fatalf("refreshed identity = %+v, want existing account identity", refreshed)
+	}
+	if refreshed.Credentials["access_token"] != "new-access" || refreshed.Credentials["refresh_token"] != "new-refresh" ||
+		refreshed.Credentials["email"] != email {
+		t.Fatalf("refreshed credentials = %+v", refreshed.Credentials)
+	}
+	if _, ok := refreshed.Credentials["old_only"]; ok {
+		t.Fatalf("stale credentials were retained: %+v", refreshed.Credentials)
+	}
+	if refreshed.State != entaccount.StateActive.String() || refreshed.StateUntil != nil || refreshed.ErrorMsg != "" {
+		t.Fatalf("refreshed state = %q until=%v error=%q", refreshed.State, refreshed.StateUntil, refreshed.ErrorMsg)
+	}
+	if refreshed.Priority != existing.Priority || refreshed.MaxConcurrency != existing.MaxConcurrency ||
+		refreshed.RateMultiplier != existing.RateMultiplier || !refreshed.UpstreamIsPool ||
+		len(refreshed.GroupIDs) != 1 || refreshed.GroupIDs[0] != int64(group.ID) ||
+		refreshed.Proxy == nil || refreshed.Proxy.ID != proxy.ID || refreshed.Extra["label"] != "keep" {
+		t.Fatalf("existing routing configuration was not preserved: %+v", refreshed)
+	}
+}
+
+func TestAccountStoreCreateDoesNotOverwriteIncompatibleEmailAccount(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	store := NewAccountStore(db)
+	email := "shared@example.com"
+	if _, err := store.Create(ctx, account.CreateInput{
+		Name: "OpenAI OAuth", Email: &email, Platform: "openai", Type: "oauth", Credentials: map[string]string{"access_token": "keep"},
+	}); err != nil {
+		t.Fatalf("create existing account: %v", err)
+	}
+
+	for _, input := range []account.CreateInput{
+		{Name: "Claude OAuth", Email: &email, Platform: "claude", Type: "oauth", Credentials: map[string]string{"access_token": "claude"}},
+		{Name: "OpenAI API Key", Email: &email, Platform: "openai", Type: "apikey", Credentials: map[string]string{"api_key": "sk-test"}},
+	} {
+		if _, err := store.Create(ctx, input); !errors.Is(err, account.ErrAccountEmailExists) {
+			t.Fatalf("Create(%s/%s) error = %v, want ErrAccountEmailExists", input.Platform, input.Type, err)
+		}
+	}
+}
 
 func TestAccountStoreKeywordSearchMatchesOAuthEmail(t *testing.T) {
 	db := enttestOpen(t)
