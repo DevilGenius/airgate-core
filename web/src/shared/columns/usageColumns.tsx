@@ -44,6 +44,10 @@ function formatTimingMs(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${value}ms`;
 }
 
+function isImageGenerationModel(model: string): boolean {
+  return model.trim().toLowerCase().startsWith('gpt-image');
+}
+
 type RichTooltipPlacement = 'left' | 'right';
 type RichTooltipPosition = { left: number; top: number; width: number };
 type RichTooltipOwner = symbol;
@@ -1083,7 +1087,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       hideOnMobile: true,
       render: (row) => (
         <span className="block text-center font-mono text-[13px] text-text-secondary">
-          {formatTimingMs(row.first_event_ms)}
+          {customerScope && isImageGenerationModel(row.model) ? '-' : formatTimingMs(row.first_event_ms)}
         </span>
       ),
     },
