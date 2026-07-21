@@ -1,25 +1,26 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"strconv"
 	"time"
 
 	appmonitor "github.com/DevilGenius/airgate-core/internal/app/monitor"
+	"github.com/DevilGenius/airgate-core/internal/runtimefeatures"
 )
 
 // MonitorHandler handles admin monitor event APIs.
 type MonitorHandler struct {
-	service        *appmonitor.Service
-	runtimeSampler *appmonitor.RuntimeSampler
-	requestTrace   RequestTraceRuntime
+	service         *appmonitor.Service
+	runtimeSampler  *appmonitor.RuntimeSampler
+	runtimeFeatures RuntimeFeatureController
 }
 
-// RequestTraceRuntime controls final-error tracing for the current Core instance.
-type RequestTraceRuntime interface {
-	RequestTraceEnabled() bool
-	SetRequestTraceEnabled(bool)
+type RuntimeFeatureController interface {
+	State() runtimefeatures.State
+	Update(context.Context, runtimefeatures.Patch) (runtimefeatures.State, error)
 }
 
 // NewMonitorHandler creates a MonitorHandler.
@@ -31,25 +32,19 @@ func NewMonitorHandler(service *appmonitor.Service, runtimeSampler ...*appmonito
 	return h
 }
 
-// SetRequestTraceRuntime injects the runtime trace controller.
-func (h *MonitorHandler) SetRequestTraceRuntime(runtime RequestTraceRuntime) {
+// SetRuntimeFeatures injects the database-backed runtime feature controller.
+func (h *MonitorHandler) SetRuntimeFeatures(runtime RuntimeFeatureController) {
 	if h == nil {
 		return
 	}
-	h.requestTrace = runtime
+	h.runtimeFeatures = runtime
 }
 
-func (h *MonitorHandler) requestTraceRuntime() RequestTraceRuntime {
+func (h *MonitorHandler) runtimeFeatureController() RuntimeFeatureController {
 	if h == nil {
 		return nil
 	}
-	if h.requestTrace != nil {
-		return h.requestTrace
-	}
-	if h.service != nil {
-		return h.service
-	}
-	return nil
+	return h.runtimeFeatures
 }
 
 func parseMonitorID(raw string) (int, error) {

@@ -49,13 +49,7 @@ type Config struct {
 	JWT      JWTConfig      `yaml:"jwt"`
 	Security SecurityConfig `yaml:"security"`
 	Log      LogConfig      `yaml:"log"`
-	Monitor  MonitorConfig  `yaml:"monitor"`
 	Plugins  PluginsConfig  `yaml:"plugins"`
-}
-
-// MonitorConfig controls optional diagnostics that are disabled by default.
-type MonitorConfig struct {
-	RequestTraceEnabled bool `yaml:"request_trace_enabled"`
 }
 
 // LogConfig 日志配置
@@ -272,9 +266,6 @@ func applyEnvOverrides(cfg *Config) {
 	// 日志
 	envStr("LOG_LEVEL", &cfg.Log.Level)
 	envStr("LOG_FORMAT", &cfg.Log.Format)
-
-	// 监控
-	envBool("MONITOR_REQUEST_TRACE_ENABLED", &cfg.Monitor.RequestTraceEnabled)
 
 	// 安全
 	envStr("API_KEY_SECRET", &cfg.Security.APIKeySecret)

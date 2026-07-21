@@ -32,9 +32,6 @@ log:
   format: "text"                 # text（人看）/ json（对接 Loki / ELK / Datadog）
                                  # 或设置环境变量 LOG_FORMAT
 
-monitor:
-  request_trace_enabled: false   # 最终错误原始请求追踪；也可用 MONITOR_REQUEST_TRACE_ENABLED=true
-
 plugins:
   dir: data/plugins
   dev: []

@@ -1035,8 +1035,16 @@ export interface MonitorRequestClearResp {
   deleted: number;
 }
 
-export interface MonitorRequestTraceStateResp {
-  enabled: boolean;
+export interface MonitorRuntimeFeatureStateResp {
+  request_trace_enabled: boolean;
+  text_hash_enabled: boolean;
+  image_hash_enabled: boolean;
+}
+
+export interface MonitorRuntimeFeatureUpdateReq {
+  request_trace_enabled?: boolean;
+  text_hash_enabled?: boolean;
+  image_hash_enabled?: boolean;
 }
 
 export interface MonitorRuntimeResp {

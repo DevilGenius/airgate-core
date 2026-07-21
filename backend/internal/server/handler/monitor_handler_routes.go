@@ -2,40 +2,63 @@ package handler
 
 import (
 	"encoding/hex"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	appmonitor "github.com/DevilGenius/airgate-core/internal/app/monitor"
+	"github.com/DevilGenius/airgate-core/internal/runtimefeatures"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
-// GetMonitorRequestTraceState returns the current-instance runtime trace state.
-func (h *MonitorHandler) GetMonitorRequestTraceState(c *gin.Context) {
-	runtime := h.requestTraceRuntime()
+// GetMonitorRuntimeFeatures returns the database-backed runtime feature state.
+func (h *MonitorHandler) GetMonitorRuntimeFeatures(c *gin.Context) {
+	runtime := h.runtimeFeatureController()
 	if runtime == nil {
-		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "请求追踪运行时不可用")
+		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "运行时功能设置不可用")
 		return
 	}
-	response.Success(c, dto.MonitorRequestTraceStateResp{Enabled: runtime.RequestTraceEnabled()})
+	response.Success(c, toMonitorRuntimeFeatureStateResp(runtime.State()))
 }
 
-// UpdateMonitorRequestTraceState changes tracing for new requests immediately.
-func (h *MonitorHandler) UpdateMonitorRequestTraceState(c *gin.Context) {
-	var input dto.MonitorRequestTraceUpdateReq
+// UpdateMonitorRuntimeFeatures applies and persists runtime feature changes.
+func (h *MonitorHandler) UpdateMonitorRuntimeFeatures(c *gin.Context) {
+	var input dto.MonitorRuntimeFeatureUpdateReq
 	if err := c.ShouldBindJSON(&input); err != nil {
 		response.BindError(c, err)
 		return
 	}
-	runtime := h.requestTraceRuntime()
-	if runtime == nil {
-		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "请求追踪运行时不可用")
+	if input.RequestTraceEnabled == nil && input.TextHashEnabled == nil && input.ImageHashEnabled == nil {
+		response.BadRequest(c, "至少需要指定一个运行时功能开关")
 		return
 	}
-	runtime.SetRequestTraceEnabled(input.Enabled)
-	response.Success(c, dto.MonitorRequestTraceStateResp{Enabled: runtime.RequestTraceEnabled()})
+	runtime := h.runtimeFeatureController()
+	if runtime == nil {
+		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "运行时功能设置不可用")
+		return
+	}
+	state, err := runtime.Update(c.Request.Context(), runtimefeatures.Patch{
+		RequestTraceEnabled: input.RequestTraceEnabled,
+		TextHashEnabled:     input.TextHashEnabled,
+		ImageHashEnabled:    input.ImageHashEnabled,
+	})
+	if err != nil {
+		slog.Error("更新运行时功能设置失败", "error", err)
+		response.Error(c, http.StatusInternalServerError, http.StatusInternalServerError, "更新运行时功能设置失败")
+		return
+	}
+	response.Success(c, toMonitorRuntimeFeatureStateResp(state))
+}
+
+func toMonitorRuntimeFeatureStateResp(state runtimefeatures.State) dto.MonitorRuntimeFeatureStateResp {
+	return dto.MonitorRuntimeFeatureStateResp{
+		RequestTraceEnabled: state.RequestTraceEnabled,
+		TextHashEnabled:     state.TextHashEnabled,
+		ImageHashEnabled:    state.ImageHashEnabled,
+	}
 }
 
 // GetMonitorRequestTrace returns one verified raw final-error trace by hash.

@@ -551,6 +551,13 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		}
 	}
 
+	releaseRuntimeHashState, err := m.prepareRuntimeHashForPublish(ctx, gateway, platform)
+	if err != nil {
+		client.Kill()
+		m.cleanupStartHostHandle(canonicalName, start)
+		return "", fmt.Errorf("配置插件运行时 Hash 失败: %w", err)
+	}
+
 	m.mu.Lock()
 	old, oldIdle := m.replaceInstanceLocked(canonicalName, instance, start)
 	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
@@ -570,6 +577,7 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		delete(m.frontendPageCache, canonicalName)
 	}
 	m.mu.Unlock()
+	releaseRuntimeHashState()
 	m.retireReplacedPlugin(old, oldIdle)
 
 	dispatchresolver.RegisterPlatformDSL(platform, info.DispatchDSL)

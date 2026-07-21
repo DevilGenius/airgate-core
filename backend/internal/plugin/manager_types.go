@@ -152,6 +152,10 @@ type Manager struct {
 	credCache         map[string][]sdk.CredentialField
 	accountTypeCache  map[string][]sdk.AccountType
 	frontendPageCache map[string][]sdk.FrontendPage
+
+	runtimeHashMu         sync.RWMutex
+	runtimeHashState      RuntimeHashState
+	runtimeHashConfigured bool
 }
 
 // SetHostService 注入 Core 实现的 HostService 工厂。
@@ -203,20 +207,22 @@ type PluginMeta struct {
 // 走 HTTP + admin key 回调 core。
 func NewManager(pluginDir, logLevel, coreDSN string, db *ent.Client) *Manager {
 	m := &Manager{
-		pluginDir:         pluginDir,
-		logLevel:          logLevel,
-		coreDSN:           coreDSN,
-		db:                db,
-		hostHandles:       make(map[string]*pluginHostHandle),
-		instances:         make(map[string]*PluginInstance),
-		stopping:          make(map[string]chan struct{}),
-		aliases:           make(map[string]string),
-		devPaths:          make(map[string]string),
-		modelCache:        make(map[string][]sdk.ModelInfo),
-		routeCache:        make(map[string][]sdk.RouteDefinition),
-		credCache:         make(map[string][]sdk.CredentialField),
-		accountTypeCache:  make(map[string][]sdk.AccountType),
-		frontendPageCache: make(map[string][]sdk.FrontendPage),
+		pluginDir:             pluginDir,
+		logLevel:              logLevel,
+		coreDSN:               coreDSN,
+		db:                    db,
+		hostHandles:           make(map[string]*pluginHostHandle),
+		instances:             make(map[string]*PluginInstance),
+		stopping:              make(map[string]chan struct{}),
+		aliases:               make(map[string]string),
+		devPaths:              make(map[string]string),
+		modelCache:            make(map[string][]sdk.ModelInfo),
+		routeCache:            make(map[string][]sdk.RouteDefinition),
+		credCache:             make(map[string][]sdk.CredentialField),
+		accountTypeCache:      make(map[string][]sdk.AccountType),
+		frontendPageCache:     make(map[string][]sdk.FrontendPage),
+		runtimeHashState:      DefaultRuntimeHashState(),
+		runtimeHashConfigured: true,
 	}
 	if coreDSN != "" && db != nil {
 		m.pluginDB = newPluginDSNProvisioner(db, coreDSN)

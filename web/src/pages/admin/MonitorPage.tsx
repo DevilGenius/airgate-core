@@ -41,6 +41,7 @@ import type {
   MonitorListQuery,
   MonitorRequestCursorResp,
   MonitorRequestListQuery,
+  MonitorRuntimeFeatureUpdateReq,
 } from '../../shared/types';
 import type {
   MonitorTableColumnConfig,
@@ -332,9 +333,9 @@ export default function MonitorPage() {
   });
   const refetchRequestSummary = requestSummaryQuery.refetch;
 
-  const requestTraceQuery = useQuery({
-    queryKey: queryKeys.monitorRequestTrace(),
-    queryFn: ({ signal }) => monitorApi.requestTraceState({ signal }),
+  const runtimeFeaturesQuery = useQuery({
+    queryKey: queryKeys.monitorRuntimeFeatures(),
+    queryFn: ({ signal }) => monitorApi.runtimeFeatures({ signal }),
     enabled: activeTable === 'events',
     meta: { globalLoading: false },
   });
@@ -408,11 +409,17 @@ export default function MonitorPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  const requestTraceMutation = useMutation({
-    mutationFn: monitorApi.updateRequestTraceState,
-    onSuccess: (result) => {
-      queryClient.setQueryData(queryKeys.monitorRequestTrace(), result);
-      toast('success', t(result.enabled ? 'monitor.request_trace_enabled' : 'monitor.request_trace_disabled'));
+  const runtimeFeaturesMutation = useMutation({
+    mutationFn: monitorApi.updateRuntimeFeatures,
+    onSuccess: (result, input: MonitorRuntimeFeatureUpdateReq) => {
+      queryClient.setQueryData(queryKeys.monitorRuntimeFeatures(), result);
+      if (typeof input.text_hash_enabled === 'boolean') {
+        toast('success', t(input.text_hash_enabled ? 'monitor.text_hash_enabled' : 'monitor.text_hash_disabled'));
+      } else if (typeof input.image_hash_enabled === 'boolean') {
+        toast('success', t(input.image_hash_enabled ? 'monitor.image_hash_enabled' : 'monitor.image_hash_disabled'));
+      } else if (typeof input.request_trace_enabled === 'boolean') {
+        toast('success', t(input.request_trace_enabled ? 'monitor.request_trace_enabled' : 'monitor.request_trace_disabled'));
+      }
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -893,9 +900,18 @@ export default function MonitorPage() {
   const activeRefreshBusy = isRequestTable
     ? isRequestFetching || requestSummaryQuery.isFetching
     : isFetching || summaryQuery.isFetching;
-  const requestTraceEnabled = requestTraceMutation.isPending && typeof requestTraceMutation.variables === 'boolean'
-    ? requestTraceMutation.variables
-    : requestTraceQuery.data?.enabled ?? false;
+  const pendingRuntimeFeatures = runtimeFeaturesMutation.isPending
+    ? runtimeFeaturesMutation.variables
+    : undefined;
+  const textHashEnabled = pendingRuntimeFeatures?.text_hash_enabled
+    ?? runtimeFeaturesQuery.data?.text_hash_enabled
+    ?? true;
+  const imageHashEnabled = pendingRuntimeFeatures?.image_hash_enabled
+    ?? runtimeFeaturesQuery.data?.image_hash_enabled
+    ?? true;
+  const requestTraceEnabled = pendingRuntimeFeatures?.request_trace_enabled
+    ?? runtimeFeaturesQuery.data?.request_trace_enabled
+    ?? false;
 
   return (
     <div>
@@ -1080,14 +1096,32 @@ export default function MonitorPage() {
           <div className="ag-page-toolbar-actions">
             <AutoRefreshControl
               beforeRefresh={!isRequestTable ? (
-                <NativeSwitch
-                  ariaLabel={t('monitor.request_trace')}
-                  className="ag-page-toolbar-switch"
-                  isDisabled={requestTraceQuery.isLoading || requestTraceMutation.isPending}
-                  isSelected={requestTraceEnabled}
-                  label={t('monitor.request_trace')}
-                  onChange={(enabled) => requestTraceMutation.mutate(enabled)}
-                />
+                <div className="flex items-center gap-2">
+                  <NativeSwitch
+                    ariaLabel={t('monitor.text_hash')}
+                    className="ag-page-toolbar-switch"
+                    isDisabled={runtimeFeaturesQuery.isLoading || runtimeFeaturesMutation.isPending}
+                    isSelected={textHashEnabled}
+                    label={t('monitor.text_hash')}
+                    onChange={(enabled) => runtimeFeaturesMutation.mutate({ text_hash_enabled: enabled })}
+                  />
+                  <NativeSwitch
+                    ariaLabel={t('monitor.image_hash')}
+                    className="ag-page-toolbar-switch"
+                    isDisabled={runtimeFeaturesQuery.isLoading || runtimeFeaturesMutation.isPending}
+                    isSelected={imageHashEnabled}
+                    label={t('monitor.image_hash')}
+                    onChange={(enabled) => runtimeFeaturesMutation.mutate({ image_hash_enabled: enabled })}
+                  />
+                  <NativeSwitch
+                    ariaLabel={t('monitor.request_trace')}
+                    className="ag-page-toolbar-switch"
+                    isDisabled={runtimeFeaturesQuery.isLoading || runtimeFeaturesMutation.isPending}
+                    isSelected={requestTraceEnabled}
+                    label={t('monitor.request_trace')}
+                    onChange={(enabled) => runtimeFeaturesMutation.mutate({ request_trace_enabled: enabled })}
+                  />
+                </div>
               ) : null}
               value={autoRefresh}
               options={MONITOR_AUTO_REFRESH_OPTIONS}

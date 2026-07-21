@@ -24,6 +24,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
+	"github.com/DevilGenius/airgate-core/internal/runtimefeatures"
 	"github.com/DevilGenius/airgate-core/internal/safego"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
@@ -45,14 +46,15 @@ type Server struct {
 	extensionProxy *plugin.ExtensionProxy
 
 	// 核心服务组件
-	scheduler   *scheduler.Scheduler
-	concurrency *scheduler.ConcurrencyManager
-	calculator  *billing.Calculator
-	recorder    *billing.Recorder
-	monitor     *appmonitor.Service
-	runtime     *appmonitor.RuntimeSampler
-	events      *adminevents.Hub
-	handlers    *bootstrap.HTTPHandlers
+	scheduler       *scheduler.Scheduler
+	concurrency     *scheduler.ConcurrencyManager
+	calculator      *billing.Calculator
+	recorder        *billing.Recorder
+	monitor         *appmonitor.Service
+	runtime         *appmonitor.RuntimeSampler
+	runtimeFeatures *runtimefeatures.Controller
+	events          *adminevents.Hub
+	handlers        *bootstrap.HTTPHandlers
 
 	pluginStartCancel context.CancelFunc
 }
@@ -79,16 +81,20 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	monitorStore := store.NewMonitorStore(db)
 	monitorSettingsStore := store.NewSettingsStore(db)
 	monitorSettingsService := appsettings.NewService(monitorSettingsStore)
+	runtimeFeatureState, err := runtimefeatures.LoadOrInitialize(context.Background(), monitorSettingsService)
+	if err != nil {
+		return nil, fmt.Errorf("初始化运行时功能设置失败: %w", err)
+	}
 	monitorNotificationService := appnotification.NewService(monitorSettingsService)
 	monitorService := appmonitor.NewService(
 		monitorStore,
 		appmonitor.WithRedis(rdb),
 		appmonitor.WithNotifier(monitorNotificationService),
 		appmonitor.WithEventPublisher(eventHub),
-		appmonitor.WithRequestTrace(cfg.Monitor.RequestTraceEnabled),
+		appmonitor.WithRequestTrace(runtimeFeatureState.RequestTraceEnabled),
 	)
-	if cfg.Monitor.RequestTraceEnabled {
-		slog.Warn("monitor_request_trace_enabled", "retention", "7d", "raw_request_bodies", true)
+	if runtimeFeatureState.RequestTraceEnabled {
+		slog.Warn("monitor_request_trace_enabled", "retention", "7d", "raw_request_bodies", true, "source", "system_settings")
 	}
 	runtimeSampler := appmonitor.NewRuntimeSampler(sqlDB, rdb, sched, concurrency, recorder, monitorService)
 	sched.SetMonitorRecorder(monitorService)
@@ -102,13 +108,24 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		pluginDir = "data/plugins"
 	}
 	pluginMgr := plugin.NewManager(pluginDir, cfg.Log.Level, cfg.Database.DSN(), db)
+	if err := pluginMgr.SetRuntimeHashState(context.Background(), plugin.RuntimeHashState{
+		TextEnabled:  runtimeFeatureState.TextHashEnabled,
+		ImageEnabled: runtimeFeatureState.ImageHashEnabled,
+	}); err != nil {
+		return nil, fmt.Errorf("初始化插件运行时 Hash 失败: %w", err)
+	}
 	runtimeSampler.SetSafetyCacheStatsReader(pluginMgr)
 	// HostService 通过 hashicorp/go-plugin GRPCBroker 暴露给所有插件子进程，
 	// 替代旧的 admin HTTP API + admin_api_key 模式。必须在加载任何插件之前注入。
 	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched, concurrency, calculator, recorder))
 	forwarder := plugin.NewForwarder(db, pluginMgr, sched, concurrency, calculator, recorder)
 	forwarder.SetMonitorRecorder(monitorService)
-	forwarder.SetRequestTraceEnabled(cfg.Monitor.RequestTraceEnabled)
+	forwarder.SetRequestTraceEnabled(runtimeFeatureState.RequestTraceEnabled)
+	runtimeFeatureController := runtimefeatures.NewController(
+		monitorSettingsService,
+		newRuntimeFeatureApplier(monitorService, forwarder, pluginMgr),
+		runtimeFeatureState,
+	)
 
 	marketOpts := []plugin.MarketplaceOption{
 		plugin.WithGithubToken(cfg.Plugins.Marketplace.GithubToken),
@@ -132,19 +149,20 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		rdb:    rdb,
 		jwtMgr: jwtMgr,
 		// gin.New 不挂默认 Logger/Recovery，由我们的中间件接管以便接入结构化日志
-		engine:         engine,
-		pluginMgr:      pluginMgr,
-		forwarder:      forwarder,
-		marketplace:    marketplace,
-		dynamicRouter:  dynamicRouter,
-		extensionProxy: extensionProxy,
-		scheduler:      sched,
-		concurrency:    concurrency,
-		calculator:     calculator,
-		recorder:       recorder,
-		monitor:        monitorService,
-		runtime:        runtimeSampler,
-		events:         eventHub,
+		engine:          engine,
+		pluginMgr:       pluginMgr,
+		forwarder:       forwarder,
+		marketplace:     marketplace,
+		dynamicRouter:   dynamicRouter,
+		extensionProxy:  extensionProxy,
+		scheduler:       sched,
+		concurrency:     concurrency,
+		calculator:      calculator,
+		recorder:        recorder,
+		monitor:         monitorService,
+		runtime:         runtimeSampler,
+		runtimeFeatures: runtimeFeatureController,
+		events:          eventHub,
 	}
 
 	s.handlers = bootstrap.NewHTTPHandlers(bootstrap.HTTPDependencies{
@@ -162,7 +180,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		Recorder:    recorder,
 	})
 	if s.handlers.Monitor != nil {
-		s.handlers.Monitor.SetRequestTraceRuntime(newRequestTraceRuntime(monitorService, forwarder))
+		s.handlers.Monitor.SetRuntimeFeatures(runtimeFeatureController)
 	}
 	if s.handlers.AccountService != nil {
 		s.handlers.AccountService.SetMonitorRecorder(monitorService)

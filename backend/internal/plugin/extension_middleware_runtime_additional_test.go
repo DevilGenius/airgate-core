@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -53,6 +54,22 @@ func (p *pluginRuntimeGateway) ValidateAccount(context.Context, map[string]strin
 }
 func (p *pluginRuntimeGateway) HandleWebSocket(context.Context, sdk.WebSocketConn) (sdk.ForwardOutcome, error) {
 	return sdk.ForwardOutcome{}, sdk.ErrNotSupported
+}
+func (p *pluginRuntimeGateway) HandleRequest(
+	_ context.Context,
+	method, path, _ string,
+	_ http.Header,
+	body []byte,
+) (int, http.Header, []byte, error) {
+	if method != http.MethodPut || path != runtimeHashPath {
+		return http.StatusNotFound, nil, nil, nil
+	}
+	var state RuntimeHashState
+	if err := json.Unmarshal(body, &state); err != nil {
+		return http.StatusBadRequest, nil, nil, nil
+	}
+	responseBody, _ := json.Marshal(state)
+	return http.StatusOK, nil, responseBody, nil
 }
 
 type pluginRuntimeExtension struct {

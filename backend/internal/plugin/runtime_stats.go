@@ -7,8 +7,6 @@ import (
 	"net/http"
 )
 
-const runtimeSafetyCacheStatsPath = "runtime/safety-cache"
-
 type runtimeSafetyCacheStatsResponse struct {
 	Text         runtimeSafetyCacheStatsItem `json:"text"`
 	Image        runtimeSafetyCacheStatsItem `json:"image"`
@@ -34,7 +32,7 @@ func (m *Manager) SafetyCacheStats(ctx context.Context) (
 	if inst == nil || inst.Gateway == nil {
 		return 0, 0, 0, 0, 0, 0, fmt.Errorf("openai gateway is unavailable")
 	}
-	status, _, body, err := inst.Gateway.HandleHTTPRequest(ctx, http.MethodGet, runtimeSafetyCacheStatsPath, "", nil, nil)
+	status, _, body, err := inst.Gateway.HandleHTTPRequest(ctx, http.MethodGet, runtimeHashPath, "", nil, nil)
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, fmt.Errorf("query openai safety cache stats: %w", err)
 	}
