@@ -369,7 +369,11 @@ func TestPrepareConnectivityTestRunsGatewayOutcomes(t *testing.T) {
 			}
 			req.Writer.WriteHeader(http.StatusAccepted)
 			_, _ = req.Writer.Write([]byte("streamed"))
-			return sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess}, nil
+			return sdk.ForwardOutcome{
+				Kind:     sdk.OutcomeSuccess,
+				Usage:    &sdk.Usage{FirstEventMs: 125},
+				Duration: 480 * time.Millisecond,
+			}, nil
 		},
 	})
 	defer runtime.cleanup()
@@ -389,8 +393,12 @@ func TestPrepareConnectivityTestRunsGatewayOutcomes(t *testing.T) {
 		t.Fatalf("PrepareConnectivityTest() error = %v", err)
 	}
 	rr := httptest.NewRecorder()
-	if err := ct.Run(t.Context(), rr); err != nil {
+	timing, err := ct.RunWithTiming(t.Context(), rr)
+	if err != nil {
 		t.Fatalf("ConnectivityTest.Run() error = %v", err)
+	}
+	if timing.FirstEventMs != 125 || timing.DurationMs != 480 {
+		t.Fatalf("ConnectivityTest timing = %+v", timing)
 	}
 	if rr.Code != http.StatusAccepted || rr.Body.String() != "streamed" {
 		t.Fatalf("recorder code=%d body=%q", rr.Code, rr.Body.String())

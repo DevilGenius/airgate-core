@@ -19,6 +19,16 @@ interface OutputLine {
   color: string; // tailwind text color class
 }
 
+interface TestTiming {
+  firstEventMs: number | null;
+  durationMs: number;
+}
+
+function formatTimingMs(value: number | null): string {
+  if (value === null || !Number.isFinite(value) || value <= 0) return '-';
+  return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${value}ms`;
+}
+
 interface AccountTestModalProps {
   open: boolean;
   account: AccountResp | null;
@@ -42,6 +52,7 @@ export function AccountTestModal({
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [timing, setTiming] = useState<TestTiming | null>(null);
   const [copied, setCopied] = useState(false);
 
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -86,6 +97,7 @@ export function AccountTestModal({
     setOutputLines([]);
     setStreamingContent('');
     setErrorMessage('');
+    setTiming(null);
     setSelectedModel('');
     setModels([]);
     setLoadingModels(Boolean(open && accountId));
@@ -113,6 +125,7 @@ export function AccountTestModal({
     setStreamingContent('');
     streamingRef.current = '';
     setErrorMessage('');
+    setTiming(null);
     setStatus('connecting');
 
     addLine(t('accounts.test_connecting'), 'text-yellow-400');
@@ -149,14 +162,20 @@ export function AccountTestModal({
         setStreamingContent('');
       }
       if (result.success) {
+        setTiming({
+          firstEventMs: result.firstEventMs ?? null,
+          durationMs: result.durationMs ?? 0,
+        });
         setStatus('success');
       } else {
+        setTiming(null);
         setStatus('error');
         setErrorMessage(result.error || t('accounts.test_error'));
       }
       onTestComplete?.(account.id, result.success);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
+      setTiming(null);
       setStatus('error');
       const msg = (err as Error).message;
       setErrorMessage(msg);
@@ -273,9 +292,19 @@ export function AccountTestModal({
                           </span>
                         )}
                         {status === 'success' && (
-                          <div className="text-green-400 mt-1">
-                            <Check className="w-3.5 h-3.5 inline mr-1" />
-                            {t('accounts.test_done')}
+                          <div className="mt-1">
+                            <div className="text-green-400">
+                              <Check className="w-3.5 h-3.5 inline mr-1" />
+                              {t('accounts.test_done')}
+                            </div>
+                            {timing && (
+                              <div className="mt-0.5 text-gray-400">
+                                {t('accounts.test_timing', {
+                                  firstEvent: formatTimingMs(timing.firstEventMs),
+                                  duration: formatTimingMs(timing.durationMs),
+                                })}
+                              </div>
+                            )}
                           </div>
                         )}
                         {status === 'error' && (

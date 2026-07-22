@@ -168,6 +168,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.PUT("/proxies/:id", handlers.Proxy.UpdateProxy)
 		adminGroup.DELETE("/proxies/:id", handlers.Proxy.DeleteProxy)
 		adminGroup.POST("/proxies/:id/test", handlers.Proxy.TestProxy)
+		adminGroup.POST("/proxies/:id/lookup-ip", handlers.Proxy.LookupProxyIP)
 
 		// 使用记录（管理员）
 		adminGroup.GET("/usage", handlers.Usage.AdminUsage)

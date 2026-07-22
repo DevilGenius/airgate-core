@@ -479,18 +479,23 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 		"account_type": testPlan.AccountType,
 	})
 
-	if err := testPlan.Run(c.Request.Context(), c.Writer); err != nil {
+	timing, err := testPlan.RunWithTiming(c.Request.Context(), c.Writer)
+	if err != nil {
 		sendSSEEvent(c.Writer, map[string]any{
-			"type":    "test_complete",
-			"success": false,
-			"error":   err.Error(),
+			"type":           "test_complete",
+			"success":        false,
+			"error":          err.Error(),
+			"first_event_ms": timing.FirstEventMs,
+			"duration_ms":    timing.DurationMs,
 		})
 		return
 	}
 
 	sendSSEEvent(c.Writer, map[string]any{
-		"type":    "test_complete",
-		"success": true,
+		"type":           "test_complete",
+		"success":        true,
+		"first_event_ms": timing.FirstEventMs,
+		"duration_ms":    timing.DurationMs,
 	})
 }
 

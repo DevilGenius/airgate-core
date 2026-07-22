@@ -72,6 +72,30 @@ func TestTestUsesConfiguredProber(t *testing.T) {
 	}
 }
 
+func TestLookupIPUsesConfiguredProber(t *testing.T) {
+	service := NewService(proxyStubRepository{
+		findByID: func(_ context.Context, id int) (Proxy, error) {
+			return Proxy{ID: id, Name: "p1"}, nil
+		},
+	})
+	service.prober = stubProber{
+		lookupIP: func(_ context.Context, item Proxy) TestResult {
+			if item.ID != 9 {
+				t.Fatalf("prober got proxy id=%d, want 9", item.ID)
+			}
+			return TestResult{Success: true, IPAddress: "1.2.3.4"}
+		},
+	}
+
+	result, err := service.LookupIP(t.Context(), 9)
+	if err != nil {
+		t.Fatalf("LookupIP() returned error: %v", err)
+	}
+	if !result.Success || result.IPAddress != "1.2.3.4" {
+		t.Fatalf("LookupIP() result = %+v", result)
+	}
+}
+
 func TestCreateUpdateDeleteDelegateToRepository(t *testing.T) {
 	service := NewService(proxyStubRepository{
 		create: func(_ context.Context, input CreateInput) (Proxy, error) {
@@ -132,6 +156,9 @@ func TestRepositoryErrorsPropagate(t *testing.T) {
 	}
 	if _, err := service.Test(t.Context(), 1); !errors.Is(err, repoErr) {
 		t.Fatalf("Test error = %v", err)
+	}
+	if _, err := service.LookupIP(t.Context(), 1); !errors.Is(err, repoErr) {
+		t.Fatalf("LookupIP error = %v", err)
 	}
 }
 
@@ -278,8 +305,7 @@ func TestDefaultProberFallsBackToProviderHeadProbe(t *testing.T) {
 		if req.Method == http.MethodHead && req.URL.Host == "api.openai.com" {
 			return stringResponse(http.StatusNoContent, ""), nil
 		}
-		t.Fatalf("unexpected request %s %s", req.Method, req.URL.String())
-		return nil, nil
+		return nil, io.EOF
 	})
 	defer restore()
 
@@ -299,8 +325,7 @@ func TestDefaultProberHandlesHTTPBinParseFailureBeforeHeadFallback(t *testing.T)
 		case req.Method == http.MethodHead && req.URL.Host == "api.openai.com":
 			return stringResponse(http.StatusNoContent, ""), nil
 		default:
-			t.Fatalf("unexpected request %s %s", req.Method, req.URL.String())
-			return nil, nil
+			return nil, io.EOF
 		}
 	})
 	defer restore()
@@ -308,6 +333,62 @@ func TestDefaultProberHandlesHTTPBinParseFailureBeforeHeadFallback(t *testing.T)
 	result := DefaultProber{}.Probe(t.Context(), Proxy{Protocol: "http", Address: "127.0.0.1", Port: 8080})
 	if !result.Success || result.IPAddress != "" {
 		t.Fatalf("Probe() = %+v", result)
+	}
+}
+
+func TestDefaultProberFallsBackToHTTPConnectivityTarget(t *testing.T) {
+	restore := replaceProbeHTTPClient(func(req *http.Request) (*http.Response, error) {
+		if req.Method == http.MethodHead && req.URL.Host == "cp.cloudflare.com" {
+			return stringResponse(http.StatusNoContent, ""), nil
+		}
+		return nil, io.EOF
+	})
+	defer restore()
+
+	result := DefaultProber{}.Probe(t.Context(), Proxy{Protocol: "http", Address: "127.0.0.1", Port: 8080})
+	if !result.Success || result.IPAddress != "" {
+		t.Fatalf("Probe() = %+v, want connectivity-only success", result)
+	}
+}
+
+func TestDefaultProberUsesIPEndpointResponseAsConnectivityFallback(t *testing.T) {
+	restore := replaceProbeHTTPClient(func(req *http.Request) (*http.Response, error) {
+		if req.Method == http.MethodGet && req.URL.Host == "ip-api.com" {
+			return stringResponse(http.StatusForbidden, "access denied"), nil
+		}
+		return nil, io.EOF
+	})
+	defer restore()
+
+	result := DefaultProber{}.Probe(t.Context(), Proxy{Protocol: "http", Address: "127.0.0.1", Port: 8080})
+	if !result.Success || result.IPAddress != "" {
+		t.Fatalf("Probe() = %+v, want connectivity-only success", result)
+	}
+}
+
+func TestDefaultProberDoesNotTreatProxyAuthFailureAsConnectivity(t *testing.T) {
+	oldEndpoints := proxyProbeEndpoints
+	oldFallbackTargets := proxyProbeFallbackTargets
+	proxyProbeEndpoints = []probeEndpoint{{
+		url: "http://probe.local/ip",
+		parse: func([]byte) (string, string, string, string) {
+			return "", "", "", ""
+		},
+	}}
+	proxyProbeFallbackTargets = []string{"http://fallback.local"}
+	defer func() {
+		proxyProbeEndpoints = oldEndpoints
+		proxyProbeFallbackTargets = oldFallbackTargets
+	}()
+
+	restore := replaceProbeHTTPClient(func(*http.Request) (*http.Response, error) {
+		return stringResponse(http.StatusProxyAuthRequired, "proxy authentication required"), nil
+	})
+	defer restore()
+
+	result := DefaultProber{}.Probe(t.Context(), Proxy{Protocol: "http", Address: "127.0.0.1", Port: 8080})
+	if result.Success || !strings.Contains(result.ErrorMsg, "HTTP 407") {
+		t.Fatalf("Probe() = %+v, want proxy authentication failure", result)
 	}
 }
 
@@ -393,10 +474,26 @@ func TestBuildProxyTransportSOCKS5DialContextUsesDialer(t *testing.T) {
 }
 
 type stubProber struct {
-	probe func(context.Context, Proxy) TestResult
+	probe             func(context.Context, Proxy) TestResult
+	probeConnectivity func(context.Context, Proxy) TestResult
+	lookupIP          func(context.Context, Proxy) TestResult
 }
 
 func (s stubProber) Probe(ctx context.Context, p Proxy) TestResult {
+	return s.probe(ctx, p)
+}
+
+func (s stubProber) ProbeConnectivity(ctx context.Context, p Proxy) TestResult {
+	if s.probeConnectivity != nil {
+		return s.probeConnectivity(ctx, p)
+	}
+	return s.probe(ctx, p)
+}
+
+func (s stubProber) LookupIP(ctx context.Context, p Proxy) TestResult {
+	if s.lookupIP != nil {
+		return s.lookupIP(ctx, p)
+	}
 	return s.probe(ctx, p)
 }
 

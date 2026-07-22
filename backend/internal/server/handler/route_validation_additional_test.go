@@ -195,6 +195,7 @@ func TestCRUDHandlerValidationBranches(t *testing.T) {
 		{name: "proxy update bad id", method: http.MethodPatch, target: "/proxies/bad", params: badID, body: `{}`, fn: proxyHandler.UpdateProxy, status: http.StatusBadRequest},
 		{name: "proxy delete bad id", method: http.MethodDelete, target: "/proxies/bad", params: badID, fn: proxyHandler.DeleteProxy, status: http.StatusBadRequest},
 		{name: "proxy test bad id", method: http.MethodPost, target: "/proxies/bad/test", params: badID, fn: proxyHandler.TestProxy, status: http.StatusBadRequest},
+		{name: "proxy lookup ip bad id", method: http.MethodPost, target: "/proxies/bad/lookup-ip", params: badID, fn: proxyHandler.LookupProxyIP, status: http.StatusBadRequest},
 
 		{name: "user me unauthorized", method: http.MethodGet, target: "/me", fn: userHandler.GetMe, status: http.StatusUnauthorized},
 		{name: "user profile unauthorized", method: http.MethodPatch, target: "/me", body: `{}`, fn: userHandler.UpdateProfile, status: http.StatusUnauthorized},

@@ -937,21 +937,22 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 		AccountName: item.Name,
 		AccountType: item.Type,
 		ModelID:     modelID,
-		run: func(runCtx context.Context, writer http.ResponseWriter) error {
+		run: func(runCtx context.Context, writer http.ResponseWriter) (ConnectivityTestTiming, error) {
 			req := *forwardReq
 			req.Writer = writer
 			outcome, forwardErr := inst.Gateway.Forward(runCtx, &req)
+			timing := connectivityTestTiming(outcome)
 			if forwardErr != nil {
 				s.applyConnectivityTestOutcome(runCtx, item, modelID, outcome, forwardErr)
 				s.recordConnectivityTestFailure(runCtx, item, modelID, "plugin_forward_error", forwardErr)
-				return forwardErr
+				return timing, forwardErr
 			}
 			// 测试路径严格判定：只有 OutcomeSuccess 算通过；任何其它 Kind 都报告失败。
 			// 这是管理员工具，失败原因要保留真实上游诊断，方便直接排查账号态 / 上游态问题。
 			if outcome.Kind == sdk.OutcomeSuccess {
 				s.applyConnectivityTestOutcome(runCtx, item, modelID, outcome, nil)
 				s.resolveAccountMonitorEvents(runCtx, item.ID)
-				return nil
+				return timing, nil
 			}
 			msg := connectivityTestErrorMessage(outcome)
 			if msg == "" && outcome.Upstream.StatusCode > 0 {
@@ -963,9 +964,17 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			err := errors.New(msg)
 			s.applyConnectivityTestOutcome(runCtx, item, modelID, outcome, err)
 			s.recordConnectivityTestFailure(runCtx, item, modelID, outcome.Kind.String(), err)
-			return err
+			return timing, err
 		},
 	}, nil
+}
+
+func connectivityTestTiming(outcome sdk.ForwardOutcome) ConnectivityTestTiming {
+	timing := ConnectivityTestTiming{DurationMs: outcome.Duration.Milliseconds()}
+	if outcome.Usage != nil {
+		timing.FirstEventMs = outcome.Usage.FirstEventMs
+	}
+	return timing
 }
 
 func (s *Service) applyConnectivityTestOutcome(ctx context.Context, item Account, modelID string, outcome sdk.ForwardOutcome, forwardErr error) {

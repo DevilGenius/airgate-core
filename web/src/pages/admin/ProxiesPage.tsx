@@ -39,7 +39,7 @@ const emptyForm: ProxyForm = {
 
 export default function ProxiesPage() {
   const { t } = useTranslation();
-  const { toast } = useToast();
+  const { toast, updateToast } = useToast();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.proxies');
   const [modalOpen, setModalOpen] = useState(false);
@@ -80,16 +80,48 @@ export default function ProxiesPage() {
     onSuccess: () => setDeleteTarget(null),
   });
 
+  // 出口 IP 查询独立执行，不阻塞连通性测试。
+  const ipLookupMutation = useMutation({
+    mutationFn: ({ id }: { id: number; latencyMs: number; toastId: string }) => proxiesApi.lookupIP(id),
+    onSuccess: (result, { latencyMs, toastId }) => {
+      const parts = [`${latencyMs}ms`];
+      if (!result.success || !result.ip_address) {
+        parts.push(t('proxies.ip_lookup_failed'));
+        updateToast(toastId, t('proxies.test_success', { detail: parts.join('  |  ') }));
+        return;
+      }
+      const location = [result.country, result.city].filter(Boolean).join(' · ');
+      parts.push(result.ip_address);
+      if (location) parts.push(location);
+      updateToast(toastId, t('proxies.test_success', { detail: parts.join('  |  ') }));
+    },
+    onError: (_error, { latencyMs, toastId }) => {
+      const detail = [`${latencyMs}ms`, t('proxies.ip_lookup_failed')].join('  |  ');
+      updateToast(toastId, t('proxies.test_success', { detail }));
+    },
+  });
+
   // 测试连通性
   const testMutation = useMutation({
     mutationFn: (id: number) => proxiesApi.test(id),
-    onSuccess: (result) => {
+    onSuccess: (result, id) => {
       if (result.success) {
         const location = [result.country, result.city].filter(Boolean).join(' · ');
         const parts = [`${result.latency_ms}ms`];
         if (result.ip_address) parts.push(result.ip_address);
         if (location) parts.push(location);
-        toast('success', t('proxies.test_success', { detail: parts.join('  |  ') }));
+        if (!result.ip_address) {
+          parts.push(t('proxies.ip_lookup_pending'));
+          const toastId = toast(
+            'success',
+            t('proxies.test_success', { detail: parts.join('  |  ') }),
+            undefined,
+            { timeout: 0 },
+          );
+          ipLookupMutation.mutate({ id, latencyMs: result.latency_ms, toastId });
+        } else {
+          toast('success', t('proxies.test_success', { detail: parts.join('  |  ') }));
+        }
       } else {
         toast('error', t('proxies.test_failed', { error: result.error_msg || '' }));
       }

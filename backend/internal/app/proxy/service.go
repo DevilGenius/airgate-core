@@ -26,7 +26,8 @@ type Service struct {
 
 // Prober 定义代理探测能力。
 type Prober interface {
-	Probe(context.Context, Proxy) TestResult
+	ProbeConnectivity(context.Context, Proxy) TestResult
+	LookupIP(context.Context, Proxy) TestResult
 }
 
 type probeEndpoint struct {
@@ -65,8 +66,13 @@ var (
 			},
 		},
 	}
-	proxyProbeFallbackTargets = []string{"https://api.openai.com", "https://api.anthropic.com"}
-	newProxyProbeClient       = func(transport http.RoundTripper, timeout time.Duration) *http.Client {
+	proxyProbeFallbackTargets = []string{
+		"https://api.openai.com",
+		"https://api.anthropic.com",
+		"http://cp.cloudflare.com/generate_204",
+		"http://www.msftconnecttest.com/connecttest.txt",
+	}
+	newProxyProbeClient = func(transport http.RoundTripper, timeout time.Duration) *http.Client {
 		return &http.Client{Transport: transport, Timeout: timeout}
 	}
 	newProxyProbeRequest = http.NewRequestWithContext
@@ -160,9 +166,32 @@ func (s *Service) Test(ctx context.Context, id int) (TestResult, error) {
 			sdk.LogFieldError, err)
 		return TestResult{}, err
 	}
-	result := s.prober.Probe(ctx, item)
+	result := s.prober.ProbeConnectivity(ctx, item)
 	if !result.Success {
 		logger.Warn("proxy_test_failed",
+			"proxy_id", id,
+			"protocol", item.Protocol,
+			"address", item.Address,
+			sdk.LogFieldReason, result.ErrorMsg)
+	}
+	return result, nil
+}
+
+// LookupIP 通过代理查询出口 IP，不影响连通性测试结果。
+func (s *Service) LookupIP(ctx context.Context, id int) (TestResult, error) {
+	logger := sdk.LoggerFromContext(ctx)
+	item, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		logger.Error("proxy_config_persist_failed",
+			"op", "find_by_id",
+			"proxy_id", id,
+			sdk.LogFieldError, err)
+		return TestResult{}, err
+	}
+
+	result := s.prober.LookupIP(ctx, item)
+	if !result.Success {
+		logger.Info("proxy_ip_lookup_unavailable",
 			"proxy_id", id,
 			"protocol", item.Protocol,
 			"address", item.Address,
@@ -174,17 +203,65 @@ func (s *Service) Test(ctx context.Context, id int) (TestResult, error) {
 // DefaultProber 是默认代理探测器。
 type DefaultProber struct{}
 
-// Probe 通过代理发起探测请求并返回结果。
+// Probe 兼容完整探测：优先查询出口 IP，失败后再验证基础连通性。
 func (DefaultProber) Probe(ctx context.Context, p Proxy) TestResult {
+	client, err := createProxyProbeClient(p)
+	if err != nil {
+		return TestResult{Success: false, ErrorMsg: "构建代理传输失败: " + err.Error()}
+	}
+
+	ipResult, connectivityFallback := probeIPAddress(ctx, client)
+	if ipResult.Success {
+		return ipResult
+	}
+
+	connectivityResult := probeProxyConnectivity(ctx, client)
+	if connectivityResult.Success {
+		return connectivityResult
+	}
+	if connectivityFallback != nil {
+		return *connectivityFallback
+	}
+	if connectivityResult.ErrorMsg != "" {
+		return connectivityResult
+	}
+	return ipResult
+}
+
+// ProbeConnectivity 并发验证代理连通性，不等待出口 IP 查询。
+func (DefaultProber) ProbeConnectivity(ctx context.Context, p Proxy) TestResult {
+	client, err := createProxyProbeClient(p)
+	if err != nil {
+		return TestResult{Success: false, ErrorMsg: "构建代理传输失败: " + err.Error()}
+	}
+	return probeProxyConnectivity(ctx, client)
+}
+
+// LookupIP 通过代理查询出口 IP。
+func (DefaultProber) LookupIP(ctx context.Context, p Proxy) TestResult {
+	client, err := createProxyProbeClient(p)
+	if err != nil {
+		return TestResult{Success: false, ErrorMsg: "构建代理传输失败: " + err.Error()}
+	}
+	result, _ := probeIPAddress(ctx, client)
+	return result
+}
+
+func createProxyProbeClient(p Proxy) (*http.Client, error) {
 	const timeout = 15 * time.Second
 
 	transport, err := buildProxyTransport(p)
 	if err != nil {
-		return TestResult{Success: false, ErrorMsg: "构建代理传输失败: " + err.Error()}
+		return nil, err
 	}
-	client := newProxyProbeClient(transport, timeout)
+	return newProxyProbeClient(transport, timeout), nil
+}
 
-	var lastErr string
+func probeIPAddress(ctx context.Context, client *http.Client) (TestResult, *TestResult) {
+	var (
+		lastErr              string
+		connectivityFallback *TestResult
+	)
 	for _, ep := range proxyProbeEndpoints {
 		req, reqErr := newProxyProbeRequest(ctx, http.MethodGet, ep.url, nil)
 		if reqErr != nil {
@@ -203,6 +280,12 @@ func (DefaultProber) Probe(ctx context.Context, p Proxy) TestResult {
 
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		_ = resp.Body.Close()
+		if isProxyProbeConnectivityResponse(resp.StatusCode) && connectivityFallback == nil {
+			connectivityFallback = &TestResult{
+				Success: true,
+				Latency: latency,
+			}
+		}
 		if resp.StatusCode != http.StatusOK {
 			lastErr = fmt.Sprintf("[%s] HTTP %d", ep.url, resp.StatusCode)
 			continue
@@ -221,28 +304,75 @@ func (DefaultProber) Probe(ctx context.Context, p Proxy) TestResult {
 			Country:     country,
 			CountryCode: countryCode,
 			City:        city,
-		}
+		}, nil
 	}
 
-	for _, target := range proxyProbeFallbackTargets {
-		req, reqErr := newProxyProbeRequest(ctx, http.MethodHead, target, nil)
-		if reqErr != nil {
-			continue
-		}
-		start := time.Now()
-		resp, doErr := client.Do(req)
-		latency := time.Since(start).Milliseconds()
-		if doErr != nil {
-			continue
-		}
-		_ = resp.Body.Close()
-		return TestResult{
-			Success: true,
-			Latency: latency,
-		}
+	return TestResult{Success: false, ErrorMsg: lastErr}, connectivityFallback
+}
+
+func probeProxyConnectivity(ctx context.Context, client *http.Client) TestResult {
+	targets := make([]string, 0, len(proxyProbeEndpoints)+len(proxyProbeFallbackTargets))
+	for _, endpoint := range proxyProbeEndpoints {
+		targets = append(targets, endpoint.url)
+	}
+	targets = append(targets, proxyProbeFallbackTargets...)
+	if len(targets) == 0 {
+		return TestResult{Success: false, ErrorMsg: "未配置代理连通性探测地址"}
 	}
 
+	probeCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	results := make(chan TestResult, len(targets))
+	for _, target := range targets {
+		target := target
+		go func() {
+			results <- probeProxyConnectivityTarget(probeCtx, client, target)
+		}()
+	}
+
+	var lastErr string
+	for range targets {
+		result := <-results
+		if result.Success {
+			return result
+		}
+		if result.ErrorMsg != "" {
+			lastErr = result.ErrorMsg
+		}
+	}
 	return TestResult{Success: false, ErrorMsg: lastErr}
+}
+
+func probeProxyConnectivityTarget(ctx context.Context, client *http.Client, target string) TestResult {
+	req, reqErr := newProxyProbeRequest(ctx, http.MethodHead, target, nil)
+	if reqErr != nil {
+		return TestResult{Success: false, ErrorMsg: fmt.Sprintf("[%s] 创建请求失败: %v", target, reqErr)}
+	}
+
+	start := time.Now()
+	resp, doErr := client.Do(req)
+	latency := time.Since(start).Milliseconds()
+	if doErr != nil {
+		if ctx.Err() == nil {
+			slog.Warn("proxy_probe_fallback_failed", "url", target, sdk.LogFieldError, doErr)
+		}
+		return TestResult{Success: false, ErrorMsg: fmt.Sprintf("[%s] 请求失败: %v", target, doErr)}
+	}
+	_ = resp.Body.Close()
+	if !isProxyProbeConnectivityResponse(resp.StatusCode) {
+		return TestResult{Success: false, ErrorMsg: fmt.Sprintf("[%s] HTTP %d", target, resp.StatusCode)}
+	}
+	return TestResult{
+		Success: true,
+		Latency: latency,
+	}
+}
+
+func isProxyProbeConnectivityResponse(statusCode int) bool {
+	return statusCode >= http.StatusOK &&
+		statusCode < http.StatusInternalServerError &&
+		statusCode != http.StatusProxyAuthRequired
 }
 
 func buildProxyTransport(p Proxy) (*http.Transport, error) {

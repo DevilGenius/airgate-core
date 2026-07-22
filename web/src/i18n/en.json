@@ -415,6 +415,7 @@
     "test_sending": "Sending test message: \"hi\"",
     "test_response": "Response:",
     "test_done": "Test complete!",
+    "test_timing": "Response time: {{firstEvent}} Duration: {{duration}}",
     "test_error": "Test failed",
     "subscription": "Subscription",
     "subscription_expired": "Expired",
@@ -709,7 +710,10 @@
     "update_success": "Proxy updated successfully",
     "delete_success": "Proxy deleted",
     "test_success": "Connection test passed: {{detail}}",
-    "test_failed": "Connection test failed: {{error}}"
+    "test_failed": "Connection test failed: {{error}}",
+    "ip_lookup_pending": "Looking up exit IP…",
+    "ip_lookup_success": "Exit IP lookup completed: {{detail}}",
+    "ip_lookup_failed": "Exit IP lookup is unavailable"
   },
 
   "monitor": {

@@ -126,3 +126,21 @@ func (h *ProxyHandler) TestProxy(c *gin.Context) {
 
 	response.Success(c, toTestProxyRespFromDomain(result))
 }
+
+// LookupProxyIP 异步查询代理出口 IP。
+func (h *ProxyHandler) LookupProxyIP(c *gin.Context) {
+	id, err := parseProxyID(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的代理 ID")
+		return
+	}
+
+	result, err := h.service.LookupIP(c.Request.Context(), id)
+	if err != nil {
+		httpCode, message := h.handleError("查询代理出口 IP 失败", "查询失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	response.Success(c, toTestProxyRespFromDomain(result))
+}

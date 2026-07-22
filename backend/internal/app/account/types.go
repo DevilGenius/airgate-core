@@ -316,16 +316,28 @@ type StatsResult struct {
 	PeakRequestDay PeakDay
 }
 
+// ConnectivityTestTiming 连通性测试的首事件和总耗时。
+type ConnectivityTestTiming struct {
+	FirstEventMs int64
+	DurationMs   int64
+}
+
 // ConnectivityTest 账号连通性测试计划。
 type ConnectivityTest struct {
 	AccountName string
 	AccountType string
 	ModelID     string
-	run         func(context.Context, http.ResponseWriter) error
+	run         func(context.Context, http.ResponseWriter) (ConnectivityTestTiming, error)
 }
 
 // Run 执行连通性测试。
 func (t *ConnectivityTest) Run(ctx context.Context, writer http.ResponseWriter) error {
+	_, err := t.run(ctx, writer)
+	return err
+}
+
+// RunWithTiming 执行连通性测试并返回与使用记录一致的首事件和总耗时。
+func (t *ConnectivityTest) RunWithTiming(ctx context.Context, writer http.ResponseWriter) (ConnectivityTestTiming, error) {
 	return t.run(ctx, writer)
 }
 

@@ -195,7 +195,9 @@ func TestPrepareConnectivityTestValidationBranches(t *testing.T) {
 		t.Fatalf("PrepareConnectivityTest plugin error = %v, want ErrPluginNotFound", err)
 	}
 
-	ct := &ConnectivityTest{run: func(context.Context, http.ResponseWriter) error { return errors.New("run failed") }}
+	ct := &ConnectivityTest{run: func(context.Context, http.ResponseWriter) (ConnectivityTestTiming, error) {
+		return ConnectivityTestTiming{}, errors.New("run failed")
+	}}
 	if err := ct.Run(t.Context(), nil); err == nil {
 		t.Fatal("ConnectivityTest.Run should return runner error")
 	}

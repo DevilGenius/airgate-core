@@ -5,6 +5,8 @@ import type { ModelInfo } from '../../../shared/types';
 export interface AccountTestRunResult {
   success: boolean;
   error?: string;
+  firstEventMs?: number;
+  durationMs?: number;
 }
 
 export interface AccountTestStreamHandlers {
@@ -91,9 +93,13 @@ export async function runAccountConnectivityTest({
           continue;
         }
         if (event.type === 'test_complete') {
+          const timing = {
+            ...(Number.isFinite(event.first_event_ms) ? { firstEventMs: event.first_event_ms as number } : {}),
+            ...(Number.isFinite(event.duration_ms) ? { durationMs: event.duration_ms as number } : {}),
+          };
           result = event.success
-            ? { success: true }
-            : { success: false, error: event.error || fallbackError };
+            ? { success: true, ...timing }
+            : { success: false, error: event.error || fallbackError, ...timing };
           continue;
         }
         const delta = accountTestTextDelta(event);
