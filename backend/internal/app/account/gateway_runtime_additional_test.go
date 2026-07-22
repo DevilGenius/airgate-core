@@ -215,6 +215,10 @@ func TestTokenRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 	if probeRequest["id"].(float64) != 9 {
 		t.Fatalf("probe request = %+v", probeRequest)
 	}
+	probeCredentials, ok := probeRequest["credentials"].(map[string]any)
+	if !ok || probeCredentials["proxy_url"] != "http://127.0.0.1:65530" {
+		t.Fatalf("probe request credentials = %+v", probeRequest["credentials"])
+	}
 	if !writer.routeRefreshed[9] {
 		t.Fatalf("state writer refreshed=%+v", writer.routeRefreshed)
 	}
@@ -304,9 +308,9 @@ func TestUsageProbeThroughGatewayBatchAndFallback(t *testing.T) {
 	service.now = func() time.Time { return time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC) }
 
 	usage, err := service.fetchUpstreamUsageForAccounts(t.Context(), []Account{
-		{ID: 1, Platform: "openai", Type: "oauth", State: "active", Credentials: map[string]string{"access_token": "a"}},
+		{ID: 1, Platform: "openai", Type: "oauth", State: "active", Credentials: map[string]string{"access_token": "a"}, Proxy: &Proxy{Protocol: "http", Address: "127.0.0.1", Port: 7890}},
 		{ID: 2, Platform: "openai", Type: "oauth", State: "disabled", Credentials: map[string]string{"access_token": "b"}},
-		{ID: 3, Platform: "openai", Type: "oauth", State: "active", UpstreamIsPool: true, Credentials: map[string]string{"access_token": "c"}},
+		{ID: 3, Platform: "openai", Type: "oauth", State: "active", UpstreamIsPool: true, Credentials: map[string]string{"access_token": "c", "proxy_url": "http://override:8080"}, Proxy: &Proxy{Protocol: "http", Address: "127.0.0.1", Port: 7891}},
 		{ID: 4, Platform: "openai", Type: "apikey", State: "active", Credentials: map[string]string{"api_key": "sk"}},
 		{ID: 5, Platform: "", Type: "oauth", State: "active", Credentials: map[string]string{"access_token": "d"}},
 	})
@@ -321,7 +325,9 @@ func TestUsageProbeThroughGatewayBatchAndFallback(t *testing.T) {
 		t.Fatalf("disabled markers = %+v", writer.disabled)
 	}
 	if len(seenBodies) == 0 || !strings.Contains(string(seenBodies[0]), `"id":1`) ||
-		strings.Contains(string(seenBodies[0]), `"id":2`) || strings.Contains(string(seenBodies[0]), `"id":4`) {
+		strings.Contains(string(seenBodies[0]), `"id":2`) || strings.Contains(string(seenBodies[0]), `"id":4`) ||
+		!strings.Contains(string(seenBodies[0]), `"proxy_url":"http://127.0.0.1:7890"`) ||
+		!strings.Contains(string(seenBodies[0]), `"proxy_url":"http://override:8080"`) {
 		t.Fatalf("usage/accounts body = %s", string(seenBodies[0]))
 	}
 

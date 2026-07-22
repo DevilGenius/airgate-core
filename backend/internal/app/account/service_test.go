@@ -303,7 +303,7 @@ func TestShouldPersistTokenRefreshExtraAllowsClearingPlanMetadata(t *testing.T) 
 	}
 }
 
-func TestTokenRefreshCredentialsInjectsProxyURL(t *testing.T) {
+func TestAccountMaintenanceCredentialsInjectsProxyURL(t *testing.T) {
 	proxy := &Proxy{Protocol: "http", Address: "10.0.0.1", Port: 7890}
 	proxyWithAuth := &Proxy{Protocol: "socks5", Address: "10.0.0.2", Port: 1080, Username: "u", Password: "p"}
 
@@ -361,7 +361,7 @@ func TestTokenRefreshCredentialsInjectsProxyURL(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := tokenRefreshCredentials(tc.item)
+			got := accountMaintenanceCredentials(tc.item)
 			if len(got) != len(tc.want) {
 				t.Fatalf("len = %d, want %d (got %v)", len(got), len(tc.want), got)
 			}
@@ -374,15 +374,15 @@ func TestTokenRefreshCredentialsInjectsProxyURL(t *testing.T) {
 	}
 }
 
-func TestTokenRefreshCredentialsDoesNotMutateInput(t *testing.T) {
+func TestAccountMaintenanceCredentialsDoesNotMutateInput(t *testing.T) {
 	original := map[string]string{"refresh_token": "rt"}
 	item := Account{
 		Credentials: original,
 		Proxy:       &Proxy{Protocol: "http", Address: "10.0.0.1", Port: 7890},
 	}
-	_ = tokenRefreshCredentials(item)
+	_ = accountMaintenanceCredentials(item)
 	if _, exists := original["proxy_url"]; exists {
-		t.Fatalf("tokenRefreshCredentials mutated input credentials: %v", original)
+		t.Fatalf("accountMaintenanceCredentials mutated input credentials: %v", original)
 	}
 }
 

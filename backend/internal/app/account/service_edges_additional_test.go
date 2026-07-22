@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -105,9 +106,13 @@ func TestImportCollectsValidationAndRepositoryFailures(t *testing.T) {
 }
 
 func TestGetSingleAccountUsageFetchesAndCachesGatewayResult(t *testing.T) {
+	var probeRequest accountUsageRequest
 	runtime := newAccountGatewayRuntime(t, &accountFakeGatewayPlugin{
 		platform: "openai",
-		handle: func(context.Context, string, string, string, http.Header, []byte) (int, http.Header, []byte, error) {
+		handle: func(_ context.Context, _ string, _ string, _ string, _ http.Header, body []byte) (int, http.Header, []byte, error) {
+			if err := json.Unmarshal(body, &probeRequest); err != nil {
+				t.Fatalf("usage probe request body: %v", err)
+			}
 			return http.StatusOK, nil, []byte(`{"credits":{"balance":6.25},"windows":[{"key":"5h","used_percent":40,"reset_after_seconds":1800}]}`), nil
 		},
 	})
@@ -115,10 +120,17 @@ func TestGetSingleAccountUsageFetchesAndCachesGatewayResult(t *testing.T) {
 
 	service := NewService(stubRepository{
 		findByID: func(_ context.Context, id int, opts LoadOptions) (Account, error) {
-			if opts.WithGroups || opts.WithProxy {
-				t.Fatalf("FindByID opts = %+v, want empty", opts)
+			if opts.WithGroups || !opts.WithProxy {
+				t.Fatalf("FindByID opts = %+v, want proxy only", opts)
 			}
-			return Account{ID: id, Platform: "openai", Type: "oauth", State: "active"}, nil
+			return Account{
+				ID:          id,
+				Platform:    "openai",
+				Type:        "oauth",
+				State:       "active",
+				Credentials: map[string]string{"access_token": "token"},
+				Proxy:       &Proxy{Protocol: "http", Address: "127.0.0.1", Port: 7890},
+			}, nil
 		},
 	}, accountGatewayCatalog{instances: map[string]*plugin.PluginInstance{"openai": runtime.instance}}, nil, nil)
 	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
@@ -134,6 +146,9 @@ func TestGetSingleAccountUsageFetchesAndCachesGatewayResult(t *testing.T) {
 	}
 	if info, ok := service.getUsageInfoForAccount(t.Context(), 44); !ok || info.Credits == nil || info.Credits.Balance != 6.25 {
 		t.Fatalf("cached usage info=%+v ok=%v", info, ok)
+	}
+	if probeRequest.Credentials["proxy_url"] != "http://127.0.0.1:7890" {
+		t.Fatalf("usage probe credentials = %+v", probeRequest.Credentials)
 	}
 
 	repoErr := errors.New("missing account")

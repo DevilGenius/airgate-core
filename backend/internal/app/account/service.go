@@ -1282,7 +1282,7 @@ func (s *Service) GetAccountUsage(ctx context.Context, platform string, accountI
 // 自动刷新路径使用批量 ids 接口；refresh=true 供凭证管理页手动刷新单个账号的
 // 用量窗口。用量探测只写用量缓存和限流状态，不会更新账号 credentials（包括 plan_type）。
 func (s *Service) GetSingleAccountUsage(ctx context.Context, id int, refresh bool) (map[string]any, error) {
-	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
+	item, err := s.repo.FindByID(ctx, id, LoadOptions{WithProxy: true})
 	if err != nil {
 		return nil, err
 	}
@@ -1361,7 +1361,7 @@ func (s *Service) fetchUpstreamUsageForAccounts(ctx context.Context, accounts []
 			allowedIDs[key] = struct{}{}
 			reqList = append(reqList, accountUsageRequest{
 				ID:          item.ID,
-				Credentials: cloneStringMap(item.Credentials),
+				Credentials: accountMaintenanceCredentials(item),
 			})
 		}
 		if len(reqList) == 0 {
@@ -1476,7 +1476,7 @@ func (s *Service) fetchSingleAccountUsage(ctx context.Context, item Account) (Ac
 
 	req := accountUsageRequest{
 		ID:          item.ID,
-		Credentials: cloneStringMap(item.Credentials),
+		Credentials: accountMaintenanceCredentials(item),
 	}
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -2733,6 +2733,13 @@ func (s *Service) refreshToken(ctx context.Context, item Account, probeUsage boo
 		credentials["subscription_active_until"] = result.ExpiresAt
 	}
 	credentials = syncAccountCredentials(credentials, refreshedEmail)
+	var usageProbeCredentials map[string]string
+	if probeUsage {
+		usageProbeCredentials = accountMaintenanceCredentials(Account{
+			Credentials: credentials,
+			Proxy:       item.Proxy,
+		})
+	}
 	credentialsChanged := !maps.Equal(item.Credentials, credentials)
 	emailChanged := !accountEmailsEqual(item.Email, refreshedEmail)
 	if credentialsChanged || emailChanged {
@@ -2759,7 +2766,7 @@ func (s *Service) refreshToken(ctx context.Context, item Account, probeUsage boo
 		// 顺手触发一次用量强制重探测：账号令牌刷新只负责刷订阅信息（plan_type / 过期时间），
 		// 不动用量窗口缓存。用户点"刷新"时如果账号从没探测过，还是看不到 5h/7d 进度条。
 		// 主动调一次 usage/probe 并写入该账号缓存；失败不阻断主流程。
-		s.triggerUsageProbe(ctx, inst, item.Platform, item.ID, credentials)
+		s.triggerUsageProbe(ctx, inst, item.Platform, item.ID, usageProbeCredentials)
 	}
 	s.resolveAccountMonitorEvents(ctx, item.ID)
 	email := ""
@@ -2791,7 +2798,7 @@ type tokenRefreshResponse struct {
 func (s *Service) queryTokenRefresh(ctx context.Context, inst *plugin.PluginInstance, item Account) (tokenRefreshResponse, error) {
 	reqBody, err := json.Marshal(tokenRefreshRequest{
 		ID:          item.ID,
-		Credentials: tokenRefreshCredentials(item),
+		Credentials: accountMaintenanceCredentials(item),
 	})
 	if err != nil {
 		return tokenRefreshResponse{}, err
@@ -2915,13 +2922,13 @@ func buildProxyURL(proxyInfo *Proxy) string {
 	return fmt.Sprintf("%s://%s:%d", proxyInfo.Protocol, proxyInfo.Address, proxyInfo.Port)
 }
 
-// tokenRefreshCredentials 克隆账号 credentials 并把绑定 Proxy 拼出来的 URL
-// 写到 "proxy_url" key，让插件 RefreshToken 这条心跳路径也走代理。
-// 真实转发/连通性测试走 sdk.Account.ProxyURL，与本路径独立；这里只刷新令牌。
+// accountMaintenanceCredentials 克隆账号 credentials 并把绑定 Proxy 拼出来的
+// URL 写到 "proxy_url" key，让 token refresh、usage probe 等账号维护请求走代理。
+// 真实转发/连通性测试走 sdk.Account.ProxyURL，与这些独立维护路径无关。
 //
 // 用户手填 credentials["proxy_url"] 时不覆盖——既然用户主动设置了，认为是
 // 有意覆写绑定的代理（也许测试用别的出口）。
-func tokenRefreshCredentials(item Account) map[string]string {
+func accountMaintenanceCredentials(item Account) map[string]string {
 	creds := cloneStringMap(item.Credentials)
 	if creds == nil {
 		creds = map[string]string{}

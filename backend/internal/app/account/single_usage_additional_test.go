@@ -11,8 +11,8 @@ func TestGetSingleAccountUsageSkipsAPIKeyProbe(t *testing.T) {
 			if id != 42 {
 				t.Fatalf("FindByID id = %d, want 42", id)
 			}
-			if opts.WithGroups || opts.WithProxy {
-				t.Fatalf("FindByID opts = %+v, want empty", opts)
+			if opts.WithGroups || !opts.WithProxy {
+				t.Fatalf("FindByID opts = %+v, want proxy only", opts)
 			}
 			return Account{ID: id, Platform: "custom", Type: "apikey", State: "active"}, nil
 		},
