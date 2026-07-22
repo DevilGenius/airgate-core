@@ -58,8 +58,8 @@ type AccountUsageMetricLabels = {
   todayAccessCount: string;
   todayStatsTooltip: string;
   userCostShort: string;
-  windowAccountCost: string;
-  windowUserCost: string;
+  accountCostTooltip: string;
+  userCostTooltip: string;
 };
 
 type PreparedUsageWindowRow = {
@@ -189,14 +189,14 @@ const AccountUsageTodayMetricChips = memo(function AccountUsageTodayMetricChips(
       <AccountUsageMetricChip
         currency
         label={labels.userCostShort}
-        title={labels.windowUserCost}
+        title={labels.userCostTooltip}
         tone="warning"
         value={userCostText}
       />
       <AccountUsageMetricChip
         currency
         label={labels.accountCostShort}
-        title={labels.windowAccountCost}
+        title={labels.accountCostTooltip}
         tone="success"
         value={accountCostText}
       />
@@ -478,15 +478,15 @@ export function useAccountTableColumns({
   const accountUsageLabels = useMemo<AccountUsageMetricLabels>(() => ({
     accountCostShort: t('accounts.account_cost_short', '成本'),
     imageCountInlineLabel: t('accounts.image_count_inline_label', '图').trim(),
-    imageCountTooltip: t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）'),
+    imageCountTooltip: t('accounts.image_count_tooltip', '生图请求数/总请求数'),
     refreshUsage: t('accounts.refresh_usage', '点击刷新用量'),
     refreshUsageFailed: t('accounts.refresh_usage_failed', '用量刷新失败'),
     refreshUsageSuccess: t('accounts.refresh_usage_success', '用量刷新成功'),
     todayAccessCount: t('accounts.today_access_count', '访问'),
     todayStatsTooltip: t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）'),
     userCostShort: t('accounts.user_cost_short', '消费'),
-    windowAccountCost: t('accounts.window_account_cost', '账号成本（上游计费）'),
-    windowUserCost: t('accounts.window_user_cost', '用户消耗（平台计费）'),
+    accountCostTooltip: t('usage.account_cost', '上游计费'),
+    userCostTooltip: t('usage.user_charged', '余额扣费'),
   }), [t]);
 
   const columns = useMemo<AccountTableColumn[]>(() => {
