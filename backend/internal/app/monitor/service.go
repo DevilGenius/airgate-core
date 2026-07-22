@@ -956,6 +956,8 @@ func isSensitiveKey(key string) bool {
 		strings.Contains(k, "refresh_token") ||
 		strings.Contains(k, "id_token") ||
 		strings.Contains(k, "token") ||
+		strings.Contains(k, "private_key") ||
+		strings.Contains(k, "privatekey") ||
 		strings.Contains(k, "secret") ||
 		strings.Contains(k, "cookie") ||
 		strings.Contains(k, "session")

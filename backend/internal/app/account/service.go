@@ -213,6 +213,23 @@ func shouldAutoRefreshToken(item Account) bool {
 	if accountType == "apikey" || accountType == "api_key" {
 		return false
 	}
+	mode := strings.ToLower(strings.TrimSpace(item.Credentials["auth_mode"]))
+	if mode == "" {
+		mode = strings.ToLower(strings.TrimSpace(item.Credentials["authMode"]))
+	}
+	mode = strings.ReplaceAll(mode, "_", "")
+	runtimeID := item.Credentials["agent_runtime_id"]
+	if strings.TrimSpace(runtimeID) == "" {
+		runtimeID = item.Credentials["agentRuntimeId"]
+	}
+	privateKey := item.Credentials["agent_private_key"]
+	if strings.TrimSpace(privateKey) == "" {
+		privateKey = item.Credentials["agentPrivateKey"]
+	}
+	if mode == "agentidentity" ||
+		(strings.TrimSpace(runtimeID) != "" && strings.TrimSpace(privateKey) != "") {
+		return true
+	}
 	return strings.TrimSpace(item.Credentials["access_token"]) != "" ||
 		strings.TrimSpace(item.Credentials["refresh_token"]) != ""
 }

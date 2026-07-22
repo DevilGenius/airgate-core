@@ -368,7 +368,9 @@ func judgmentReason(execution forwardExecution) string {
 	return ""
 }
 
-// persistUpdatedCredentials 插件在 Forward 中刷新了凭证（OAuth 轮转）时异步落库。
+// persistUpdatedCredentials 插件在 Forward 中刷新了凭证（OAuth 轮转或
+// Agent Identity task 恢复）时异步落库。凭证内容不参与路由选择，因此这里
+// 不触发 RouteGraph 刷新，避免把一次凭证更新放大成路由快照复制。
 func (f *Forwarder) persistUpdatedCredentials(accountID int, updated map[string]string) {
 	if len(updated) == 0 {
 		return
@@ -565,6 +567,25 @@ func (f *Forwarder) updateAccountCredentials(accountID int, updated map[string]s
 		merged[k] = v
 	}
 	merged = accountidentity.SyncCredentials(merged, email)
+	credentialsChanged := len(merged) != len(acc.Credentials)
+	if !credentialsChanged {
+		for key, value := range merged {
+			if acc.Credentials[key] != value {
+				credentialsChanged = true
+				break
+			}
+		}
+	}
+	emailChanged := (acc.Email == nil) != (email == nil)
+	if !emailChanged && acc.Email != nil && email != nil {
+		emailChanged = *acc.Email != *email
+	}
+	if !credentialsChanged && !emailChanged {
+		// 多个请求可能同时携带同一个已回写的 task/token；避免无变化的
+		// UPDATE 和后台持久化工作反复排队。
+		slog.Debug("插件回传凭证无变化，跳过持久化", "account_id", accountID)
+		return
+	}
 
 	builder := accountscope.UpdateOneID(f.db, accountID).SetCredentials(merged)
 	if email == nil {
