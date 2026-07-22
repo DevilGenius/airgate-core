@@ -90,9 +90,9 @@ func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 		t.Fatalf("bulk priority offset result = %d, want 99999", updatedPriority.Priority)
 	}
 
-	w = invokeHandlerForValidation(http.MethodPost, "/accounts/"+accountIDString+"/quota", "", accountParams, nil, accountHandler.RefreshQuota)
+	w = invokeHandlerForValidation(http.MethodPost, "/accounts/"+accountIDString+"/refresh-token", "", accountParams, nil, accountHandler.RefreshToken)
 	if w.Code != http.StatusBadRequest {
-		t.Fatalf("refresh quota status = %d, body=%s", w.Code, w.Body.String())
+		t.Fatalf("refresh token status = %d, body=%s", w.Code, w.Body.String())
 	}
 
 	w = invokeHandlerForValidation(http.MethodPost, "/accounts/"+accountIDString+"/test", `{"model_id":"model-test"}`, accountParams, nil, accountHandler.TestAccount)
@@ -100,9 +100,9 @@ func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 		t.Fatalf("test account status = %d, body=%s", w.Code, w.Body.String())
 	}
 
-	w = invokeHandlerForValidation(http.MethodPost, "/accounts/quota/bulk", fmt.Sprintf(`{"account_ids":[%d]}`, accountID), nil, nil, accountHandler.BulkRefreshQuota)
+	w = invokeHandlerForValidation(http.MethodPost, "/accounts/bulk-refresh-token", fmt.Sprintf(`{"account_ids":[%d]}`, accountID), nil, nil, accountHandler.BulkRefreshToken)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"failed":1`) {
-		t.Fatalf("bulk refresh quota body = status %d %s", w.Code, w.Body.String())
+		t.Fatalf("bulk refresh token body = status %d %s", w.Code, w.Body.String())
 	}
 
 	importBody := `{"version":1,"accounts":[{"name":"imported","platform":"custom","type":"oauth","credentials":{"token":"imported","email":" Legacy.Import@Example.COM "},"rate_multiplier":1.1}]}`

@@ -110,9 +110,9 @@ export default function AccountsPageContent() {
   const { toast } = useToast();
   useSyncExternalStore(subscribeAccountIdentityChange, getAccountIdentityVersion);
 
-  const applyQuotaRefreshResult = useCallback((
+  const applyTokenRefreshResult = useCallback((
     id: number,
-    result: Awaited<ReturnType<typeof accountsApi.refreshQuota>>,
+    result: Awaited<ReturnType<typeof accountsApi.refreshToken>>,
   ) => {
     queryClient.setQueriesData<PagedData<AccountResp>>(
       { queryKey: queryKeys.accounts() },
@@ -667,16 +667,16 @@ export default function AccountsPageContent() {
 
   // 刷新令牌：后端在 refresh_token 已失效但能从 access_token JWT 解析到 plan_type
   // 时，会以 reauth_warning 形式回传降级提示；此时提示用户重新授权而不是弹 success。
-  const refreshQuotaMutation = useMutation({
-    mutationFn: (id: number) => accountsApi.refreshQuota(id),
+  const refreshTokenMutation = useMutation({
+    mutationFn: (id: number) => accountsApi.refreshToken(id),
     onSuccess: (res, id) => {
-      applyQuotaRefreshResult(id, res);
+      applyTokenRefreshResult(id, res);
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
       queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
       if (res?.reauth_warning) {
-        toast('warning', t('accounts.refresh_quota_reauth_warning'));
+        toast('warning', t('accounts.refresh_token_reauth_warning'));
       } else {
-        toast('success', t('accounts.refresh_quota_success'));
+        toast('success', t('accounts.refresh_token_success'));
       }
     },
     onError: (err: Error) => toast('error', err.message),
@@ -693,7 +693,7 @@ export default function AccountsPageContent() {
   });
 
   const toggleSchedulingMutateRef = useLatestRef(toggleMutation.mutate);
-  const refreshQuotaMutateRef = useLatestRef(refreshQuotaMutation.mutate);
+  const refreshTokenMutateRef = useLatestRef(refreshTokenMutation.mutate);
   const clearRateLimitMarkersMutateRef = useLatestRef(clearRateLimitMarkersMutation.mutate);
   const handleCreateAccount = useCallback(() => {
     markModalOpenStart('create', rows.length);
@@ -720,9 +720,9 @@ export default function AccountsPageContent() {
     markModalOpenStart('stats', rows.length);
     setStatsAccountId(id);
   }, [markModalOpenStart, rows.length]);
-  const handleRefreshQuota = useCallback((id: number) => {
-    refreshQuotaMutateRef.current(id);
-  }, [refreshQuotaMutateRef]);
+  const handleRefreshToken = useCallback((id: number) => {
+    refreshTokenMutateRef.current(id);
+  }, [refreshTokenMutateRef]);
   const handleClearRateLimitMarkers = useCallback((id: number) => {
     clearRateLimitMarkersMutateRef.current(id);
   }, [clearRateLimitMarkersMutateRef]);
@@ -873,13 +873,12 @@ export default function AccountsPageContent() {
   }, [data?.list, markModalOpenStart, rows.length, selectionStore, t, toast]);
 
   const { columns, rowMetaById } = useAccountTableColumns({
-    applyQuotaRefreshResult,
     capacityStore,
     groupMap,
     onClearRateLimitMarkers: handleClearRateLimitMarkers,
     onDeleteAccount: handleDeleteAccount,
     onEditAccount: handleEditAccount,
-    onRefreshQuota: handleRefreshQuota,
+    onRefreshToken: handleRefreshToken,
     onStatsAccount: handleStatsAccount,
     onTestAccount: handleTestAccount,
     onToggleScheduling: handleToggleScheduling,

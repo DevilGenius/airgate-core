@@ -65,7 +65,7 @@ const usageAccountsProbeBatchSize = 10
 
 const usageCacheWriteTimeout = 5 * time.Second
 
-const autoQuotaRefreshInterval = 6 * time.Hour
+const autoTokenRefreshInterval = 6 * time.Hour
 
 type accountProfileCachePayload struct {
 	ID             int     `json:"id"`
@@ -154,31 +154,31 @@ func (s *Service) SetMonitorRecorder(recorder monitoring.Recorder) {
 	s.monitor = recorder
 }
 
-// StartQuotaRefreshLoop periodically refreshes OAuth account plan metadata written into credentials.
-func (s *Service) StartQuotaRefreshLoop(ctx context.Context) {
-	safego.Go("account_quota_refresh_loop", func() { s.runQuotaRefreshLoop(ctx) })
+// StartTokenRefreshLoop periodically refreshes OAuth tokens and account plan metadata written into credentials.
+func (s *Service) StartTokenRefreshLoop(ctx context.Context) {
+	safego.Go("account_token_refresh_loop", func() { s.runTokenRefreshLoop(ctx) })
 }
 
-func (s *Service) runQuotaRefreshLoop(ctx context.Context) {
-	s.refreshAllOAuthQuotas(ctx)
+func (s *Service) runTokenRefreshLoop(ctx context.Context) {
+	s.refreshAllOAuthTokens(ctx)
 
-	ticker := time.NewTicker(autoQuotaRefreshInterval)
+	ticker := time.NewTicker(autoTokenRefreshInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.refreshAllOAuthQuotas(ctx)
+			s.refreshAllOAuthTokens(ctx)
 		}
 	}
 }
 
-func (s *Service) refreshAllOAuthQuotas(ctx context.Context) {
+func (s *Service) refreshAllOAuthTokens(ctx context.Context) {
 	logger := sdk.LoggerFromContext(ctx)
 	accounts, err := s.repo.ListAll(ctx, ListFilter{})
 	if err != nil {
-		logger.Warn("account_quota_auto_refresh_list_failed", sdk.LogFieldError, err)
+		logger.Warn("account_token_auto_refresh_list_failed", sdk.LogFieldError, err)
 		return
 	}
 
@@ -187,13 +187,13 @@ func (s *Service) refreshAllOAuthQuotas(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		if !shouldAutoRefreshQuota(item) {
+		if !shouldAutoRefreshToken(item) {
 			skipped++
 			continue
 		}
-		if _, err := s.refreshQuota(ctx, item, false); err != nil {
+		if _, err := s.refreshToken(ctx, item, false); err != nil {
 			failed++
-			logger.Warn("account_quota_auto_refresh_failed",
+			logger.Warn("account_token_auto_refresh_failed",
 				sdk.LogFieldAccountID, item.ID,
 				sdk.LogFieldPlatform, item.Platform,
 				sdk.LogFieldError, err)
@@ -202,10 +202,10 @@ func (s *Service) refreshAllOAuthQuotas(ctx context.Context) {
 		success++
 	}
 
-	logger.Info("account_quota_auto_refresh_complete", "success", success, "failed", failed, "skipped", skipped)
+	logger.Info("account_token_auto_refresh_complete", "success", success, "failed", failed, "skipped", skipped)
 }
 
-func shouldAutoRefreshQuota(item Account) bool {
+func shouldAutoRefreshToken(item Account) bool {
 	if len(item.Credentials) == 0 {
 		return false
 	}
@@ -1262,8 +1262,9 @@ func (s *Service) GetAccountUsage(ctx context.Context, platform string, accountI
 
 // GetSingleAccountUsage 查询单个账号当前用量视图。
 //
-// 自动刷新路径使用批量 ids 接口；这个接口保留给手动单账号刷新和未来按需查询。
-func (s *Service) GetSingleAccountUsage(ctx context.Context, id int) (map[string]any, error) {
+// 自动刷新路径使用批量 ids 接口；refresh=true 供凭证管理页手动刷新单个账号的
+// 用量窗口。用量探测只写用量缓存和限流状态，不会更新账号 credentials（包括 plan_type）。
+func (s *Service) GetSingleAccountUsage(ctx context.Context, id int, refresh bool) (map[string]any, error) {
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
 	if err != nil {
 		return nil, err
@@ -1278,7 +1279,7 @@ func (s *Service) GetSingleAccountUsage(ctx context.Context, id int) (map[string
 		accountUsage = accountUsageInfoToMap(info)
 	}
 
-	if item.Type != "apikey" && !hasCachedInfo {
+	if item.Type != "apikey" && (refresh || !hasCachedInfo) {
 		info, usageErrors, ok := s.fetchSingleAccountUsageDedup(ctx, item)
 
 		s.handleSingleAccountUsageErrors(ctx, item, usageErrors)
@@ -2622,80 +2623,80 @@ func (s *Service) GetCredentialsSchema(platform string) CredentialSchema {
 	}
 }
 
-// RefreshQuota 刷新账号额度。
-func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult, error) {
+// RefreshToken 刷新账号令牌及订阅元数据。
+func (s *Service) RefreshToken(ctx context.Context, id int) (TokenRefreshResult, error) {
 	logger := sdk.LoggerFromContext(ctx)
-	// WithProxy: 让 queryQuotaRefresh 能把账号绑定的代理 URL 注入到 credentials
-	// 里给插件使用，否则代理只对真实转发/连通性测试生效，刷额度这条独立心跳
+	// WithProxy: 让 queryTokenRefresh 能把账号绑定的代理 URL 注入到 credentials
+	// 里给插件使用，否则代理只对真实转发/连通性测试生效，刷新令牌这条独立心跳
 	// 路径会直连上游 (OpenAI auth / chatgpt.com session 端点)。
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{WithProxy: true})
 	if err != nil {
 		logger.Error("account_lookup_failed",
 			sdk.LogFieldAccountID, id,
 			sdk.LogFieldError, err)
-		return QuotaRefreshResult{}, err
+		return TokenRefreshResult{}, err
 	}
 
-	return s.refreshQuota(ctx, item, true)
+	return s.refreshToken(ctx, item, true)
 }
 
-func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage bool) (QuotaRefreshResult, error) {
+func (s *Service) refreshToken(ctx context.Context, item Account, probeUsage bool) (TokenRefreshResult, error) {
 	logger := sdk.LoggerFromContext(ctx)
 	inst := s.plugins.GetPluginByPlatform(item.Platform)
 	if inst == nil || inst.Gateway == nil {
 		logger.Warn("account_credential_validation_failed",
 			sdk.LogFieldAccountID, item.ID,
 			sdk.LogFieldPlatform, item.Platform,
-			sdk.LogFieldReason, "quota_refresh_unsupported")
-		return QuotaRefreshResult{}, ErrQuotaRefreshUnsupported
+			sdk.LogFieldReason, "token_refresh_unsupported")
+		return TokenRefreshResult{}, ErrTokenRefreshUnsupported
 	}
 
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	quota, err := s.queryQuotaRefresh(callCtx, inst, item)
+	result, err := s.queryTokenRefresh(callCtx, inst, item)
 	if err != nil {
-		if errors.Is(err, ErrQuotaRefreshUnsupported) {
+		if errors.Is(err, ErrTokenRefreshUnsupported) {
 			logger.Warn("account_credential_validation_failed",
 				sdk.LogFieldAccountID, item.ID,
 				sdk.LogFieldPlatform, item.Platform,
-				sdk.LogFieldReason, "quota_refresh_unsupported")
-			return QuotaRefreshResult{}, ErrQuotaRefreshUnsupported
+				sdk.LogFieldReason, "token_refresh_unsupported")
+			return TokenRefreshResult{}, ErrTokenRefreshUnsupported
 		}
 		if errors.Is(err, ErrReauthRequired) {
 			logger.Warn("account_credential_validation_failed",
 				sdk.LogFieldAccountID, item.ID,
 				sdk.LogFieldPlatform, item.Platform,
 				sdk.LogFieldReason, "reauth_required")
-			s.recordQuotaRefreshFailure(ctx, item, "reauth_required", err, monitoring.SeverityCritical)
-			return QuotaRefreshResult{}, ErrReauthRequired
+			s.recordTokenRefreshFailure(ctx, item, "reauth_required", err, monitoring.SeverityCritical)
+			return TokenRefreshResult{}, ErrReauthRequired
 		}
 		logger.Error("account_credential_validation_failed",
 			sdk.LogFieldAccountID, item.ID,
 			sdk.LogFieldPlatform, item.Platform,
 			sdk.LogFieldError, err)
-		s.recordQuotaRefreshFailure(ctx, item, "quota_refresh_failed", err, monitoring.SeverityError)
-		return QuotaRefreshResult{}, fmt.Errorf("刷新额度失败: %w", err)
+		s.recordTokenRefreshFailure(ctx, item, "token_refresh_failed", err, monitoring.SeverityError)
+		return TokenRefreshResult{}, fmt.Errorf("刷新令牌失败: %w", err)
 	}
 
 	// refresh_warning 是降级信号，不落库；取出后从 Extra 删除，避免写入 credentials。
-	warning := quota.ReauthWarning
-	if quota.Extra != nil {
-		if w, ok := quota.Extra["refresh_warning"]; ok {
+	warning := result.ReauthWarning
+	if result.Extra != nil {
+		if w, ok := result.Extra["refresh_warning"]; ok {
 			warning = w
-			delete(quota.Extra, "refresh_warning")
+			delete(result.Extra, "refresh_warning")
 		}
 	}
 	resolvedEmail, resolvedCredentials, err := normalizeAccountIdentity(item.Email, item.Credentials)
 	if err != nil {
-		return QuotaRefreshResult{}, err
+		return TokenRefreshResult{}, err
 	}
 	refreshedEmail := resolvedEmail
-	if rawEmail, ok := quota.Extra["email"]; ok {
-		delete(quota.Extra, "email")
+	if rawEmail, ok := result.Extra["email"]; ok {
+		delete(result.Extra, "email")
 		normalizedEmail, normalizeErr := normalizeAccountEmail(&rawEmail)
 		if normalizeErr != nil {
-			return QuotaRefreshResult{}, normalizeErr
+			return TokenRefreshResult{}, normalizeErr
 		}
 		if normalizedEmail != nil {
 			refreshedEmail = normalizedEmail
@@ -2706,13 +2707,13 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 	if credentials == nil {
 		credentials = map[string]string{}
 	}
-	for key, value := range quota.Extra {
-		if shouldPersistQuotaExtra(key, value) {
+	for key, value := range result.Extra {
+		if shouldPersistTokenRefreshExtra(key, value) {
 			credentials[key] = value
 		}
 	}
-	if quota.ExpiresAt != "" {
-		credentials["subscription_active_until"] = quota.ExpiresAt
+	if result.ExpiresAt != "" {
+		credentials["subscription_active_until"] = result.ExpiresAt
 	}
 	credentials = syncAccountCredentials(credentials, refreshedEmail)
 	credentialsChanged := !maps.Equal(item.Credentials, credentials)
@@ -2729,7 +2730,7 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 				sdk.LogFieldAccountID, item.ID,
 				"op", "update_credentials",
 				sdk.LogFieldError, persistErr)
-			return QuotaRefreshResult{}, persistErr
+			return TokenRefreshResult{}, persistErr
 		}
 		item = persisted
 		if s.stateWriter != nil {
@@ -2738,7 +2739,7 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 	}
 
 	if probeUsage {
-		// 顺手触发一次用量强制重探测：账号额度刷新只负责刷订阅信息（plan_type / 过期时间），
+		// 顺手触发一次用量强制重探测：账号令牌刷新只负责刷订阅信息（plan_type / 过期时间），
 		// 不动用量窗口缓存。用户点"刷新"时如果账号从没探测过，还是看不到 5h/7d 进度条。
 		// 主动调一次 usage/probe 并写入该账号缓存；失败不阻断主流程。
 		s.triggerUsageProbe(ctx, inst, item.Platform, item.ID, credentials)
@@ -2749,7 +2750,7 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 		email = *item.Email
 	}
 
-	return QuotaRefreshResult{
+	return TokenRefreshResult{
 		PlanType:                credentials["plan_type"],
 		Email:                   email,
 		SubscriptionActiveUntil: credentials["subscription_active_until"],
@@ -2757,12 +2758,12 @@ func (s *Service) refreshQuota(ctx context.Context, item Account, probeUsage boo
 	}, nil
 }
 
-type quotaRefreshRequest struct {
+type tokenRefreshRequest struct {
 	ID          int               `json:"id"`
 	Credentials map[string]string `json:"credentials"`
 }
 
-type quotaRefreshResponse struct {
+type tokenRefreshResponse struct {
 	ExpiresAt     string            `json:"expires_at"`
 	Extra         map[string]string `json:"extra"`
 	ErrorCode     string            `json:"error_code"`
@@ -2770,47 +2771,47 @@ type quotaRefreshResponse struct {
 	ReauthWarning string            `json:"reauth_warning"`
 }
 
-func (s *Service) queryQuotaRefresh(ctx context.Context, inst *plugin.PluginInstance, item Account) (quotaRefreshResponse, error) {
-	reqBody, err := json.Marshal(quotaRefreshRequest{
+func (s *Service) queryTokenRefresh(ctx context.Context, inst *plugin.PluginInstance, item Account) (tokenRefreshResponse, error) {
+	reqBody, err := json.Marshal(tokenRefreshRequest{
 		ID:          item.ID,
-		Credentials: quotaRefreshCredentials(item),
+		Credentials: tokenRefreshCredentials(item),
 	})
 	if err != nil {
-		return quotaRefreshResponse{}, err
+		return tokenRefreshResponse{}, err
 	}
 
-	statusCode, _, respBody, err := inst.Gateway.HandleHTTPRequest(ctx, "POST", "accounts/quota", "", nil, reqBody)
+	statusCode, _, respBody, err := inst.Gateway.HandleHTTPRequest(ctx, "POST", "accounts/token-refresh", "", nil, reqBody)
 	if err != nil {
-		return quotaRefreshResponse{}, err
+		return tokenRefreshResponse{}, err
 	}
 	if statusCode == http.StatusNotFound || statusCode == http.StatusMethodNotAllowed {
-		return quotaRefreshResponse{}, ErrQuotaRefreshUnsupported
+		return tokenRefreshResponse{}, ErrTokenRefreshUnsupported
 	}
 	if statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden {
-		var resp quotaRefreshResponse
+		var resp tokenRefreshResponse
 		_ = json.Unmarshal(respBody, &resp)
 		if resp.ErrorCode == "reauth_required" {
-			return quotaRefreshResponse{}, ErrReauthRequired
+			return tokenRefreshResponse{}, ErrReauthRequired
 		}
-		return quotaRefreshResponse{}, ErrReauthRequired
+		return tokenRefreshResponse{}, ErrReauthRequired
 	}
 	if statusCode < http.StatusOK || statusCode >= http.StatusMultipleChoices {
-		return quotaRefreshResponse{}, fmt.Errorf("刷新额度失败: HTTP %d", statusCode)
+		return tokenRefreshResponse{}, fmt.Errorf("刷新令牌失败: HTTP %d", statusCode)
 	}
 
-	var resp quotaRefreshResponse
+	var resp tokenRefreshResponse
 	if len(respBody) > 0 {
 		if err := json.Unmarshal(respBody, &resp); err != nil {
-			return quotaRefreshResponse{}, fmt.Errorf("刷新额度失败: %w", err)
+			return tokenRefreshResponse{}, fmt.Errorf("刷新令牌失败: %w", err)
 		}
 	}
 	if resp.ErrorCode == "reauth_required" {
-		return quotaRefreshResponse{}, ErrReauthRequired
+		return tokenRefreshResponse{}, ErrReauthRequired
 	}
 	return resp, nil
 }
 
-func shouldPersistQuotaExtra(key, value string) bool {
+func shouldPersistTokenRefreshExtra(key, value string) bool {
 	if key == "email" {
 		return false
 	}
@@ -2897,13 +2898,13 @@ func buildProxyURL(proxyInfo *Proxy) string {
 	return fmt.Sprintf("%s://%s:%d", proxyInfo.Protocol, proxyInfo.Address, proxyInfo.Port)
 }
 
-// quotaRefreshCredentials 克隆账号 credentials 并把绑定 Proxy 拼出来的 URL
-// 写到 "proxy_url" key，让插件 QueryQuota 这条心跳路径也走代理。
-// 真实转发/连通性测试走 sdk.Account.ProxyURL，与本路径独立；这里只补刷额度。
+// tokenRefreshCredentials 克隆账号 credentials 并把绑定 Proxy 拼出来的 URL
+// 写到 "proxy_url" key，让插件 RefreshToken 这条心跳路径也走代理。
+// 真实转发/连通性测试走 sdk.Account.ProxyURL，与本路径独立；这里只刷新令牌。
 //
 // 用户手填 credentials["proxy_url"] 时不覆盖——既然用户主动设置了，认为是
 // 有意覆写绑定的代理（也许测试用别的出口）。
-func quotaRefreshCredentials(item Account) map[string]string {
+func tokenRefreshCredentials(item Account) map[string]string {
 	creds := cloneStringMap(item.Credentials)
 	if creds == nil {
 		creds = map[string]string{}

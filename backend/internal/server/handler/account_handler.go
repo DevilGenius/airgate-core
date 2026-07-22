@@ -129,7 +129,7 @@ func (h *AccountHandler) handleError(logMessage, publicMessage string, err error
 		// 因账号状态无法处理。
 		return 422, err.Error()
 	case errors.Is(err, appaccount.ErrModelRequired),
-		errors.Is(err, appaccount.ErrQuotaRefreshUnsupported),
+		errors.Is(err, appaccount.ErrTokenRefreshUnsupported),
 		errors.Is(err, appaccount.ErrInvalidDateRange),
 		errors.Is(err, appaccount.ErrInvalidState),
 		errors.Is(err, appaccount.ErrInvalidRateMultiplier),

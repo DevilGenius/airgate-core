@@ -70,7 +70,7 @@ const MONITOR_EVENT_SOURCE_IDS: readonly string[] = [
   'forwarder',
   'scheduler',
   'account_checker',
-  'quota_refresh',
+  'token_refresh',
   'task_runner',
   'plugin_manager',
   'monitor_worker',

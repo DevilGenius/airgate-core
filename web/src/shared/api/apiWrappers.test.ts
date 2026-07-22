@@ -79,9 +79,9 @@ describe('accountsApi', () => {
     accountsApi.models(8);
     accountsApi.usage('openai', [9, 10], { refresh: true });
     accountsApi.capacity([11, 12]);
-    accountsApi.usageOne(13, { signal: new AbortController().signal });
+    accountsApi.usageOne(13, { refresh: true, signal: new AbortController().signal });
     accountsApi.credentialsSchema('claude');
-    accountsApi.refreshQuota(14);
+    accountsApi.refreshToken(14);
     accountsApi.bulkUpdate({ account_ids: [15], priority: 20 });
     accountsApi.bulkDelete([16]);
     accountsApi.stats(17, { end_date: '2026-06-20', start_date: '2026-06-01' });
@@ -98,13 +98,13 @@ describe('accountsApi', () => {
     expect(get).toHaveBeenNthCalledWith(3, '/api/v1/admin/accounts/8/models');
     expect(get).toHaveBeenNthCalledWith(4, '/api/v1/admin/accounts/usage', { ids: '9,10', platform: 'openai', refresh: 'true' });
     expect(get).toHaveBeenNthCalledWith(5, '/api/v1/admin/accounts/capacity', { ids: '11,12' });
-    expect(get).toHaveBeenNthCalledWith(6, '/api/v1/admin/accounts/13/usage', undefined, expect.any(Object));
+    expect(get).toHaveBeenNthCalledWith(6, '/api/v1/admin/accounts/13/usage', { refresh: 'true' }, expect.any(Object));
     expect(get).toHaveBeenNthCalledWith(7, '/api/v1/admin/accounts/credentials-schema/claude');
-    expect(post).toHaveBeenNthCalledWith(4, '/api/v1/admin/accounts/14/refresh-quota');
+    expect(post).toHaveBeenNthCalledWith(4, '/api/v1/admin/accounts/14/refresh-token');
     expect(post).toHaveBeenNthCalledWith(5, '/api/v1/admin/accounts/bulk-update', { account_ids: [15], priority: 20 });
     expect(post).toHaveBeenNthCalledWith(6, '/api/v1/admin/accounts/bulk-delete', { account_ids: [16] });
     expect(get).toHaveBeenNthCalledWith(8, '/api/v1/admin/accounts/17/stats', { end_date: '2026-06-20', start_date: '2026-06-01' });
     expect(accountsApi.testUrl(18)).toBe('/api/v1/admin/accounts/18/test');
-    expect(accountsApi.bulkRefreshQuotaUrl()).toBe('/api/v1/admin/accounts/bulk-refresh-quota');
+    expect(accountsApi.bulkRefreshTokenUrl()).toBe('/api/v1/admin/accounts/bulk-refresh-token');
   });
 });

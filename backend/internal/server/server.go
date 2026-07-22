@@ -288,7 +288,7 @@ func (s *Server) StartPlugins(ctx context.Context) {
 		}
 
 		if s.handlers != nil && s.handlers.AccountService != nil && pluginCtx.Err() == nil {
-			s.handlers.AccountService.StartQuotaRefreshLoop(pluginCtx)
+			s.handlers.AccountService.StartTokenRefreshLoop(pluginCtx)
 		}
 
 		// 启动插件市场后台同步（默认开启，配置 plugins.marketplace.disabled=true 可关闭）

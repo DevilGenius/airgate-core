@@ -124,7 +124,7 @@ func TestGetSingleAccountUsageFetchesAndCachesGatewayResult(t *testing.T) {
 	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
 	service.now = func() time.Time { return now }
 
-	got, err := service.GetSingleAccountUsage(t.Context(), 44)
+	got, err := service.GetSingleAccountUsage(t.Context(), 44, false)
 	if err != nil {
 		t.Fatalf("GetSingleAccountUsage() error = %v", err)
 	}
@@ -142,8 +142,79 @@ func TestGetSingleAccountUsageFetchesAndCachesGatewayResult(t *testing.T) {
 			return Account{}, repoErr
 		},
 	}, nil, nil, nil)
-	if _, err := service.GetSingleAccountUsage(t.Context(), 45); !errors.Is(err, repoErr) {
+	if _, err := service.GetSingleAccountUsage(t.Context(), 45, false); !errors.Is(err, repoErr) {
 		t.Fatalf("GetSingleAccountUsage() error = %v, want %v", err, repoErr)
+	}
+}
+
+func TestGetSingleAccountUsageRefreshesCachedUsageWithoutUpdatingCredentials(t *testing.T) {
+	probeCalls := 0
+	runtime := newAccountGatewayRuntime(t, &accountFakeGatewayPlugin{
+		platform: "openai",
+		handle: func(_ context.Context, method, path, _ string, _ http.Header, _ []byte) (int, http.Header, []byte, error) {
+			if method != http.MethodPost || path != "usage/probe" {
+				return http.StatusNotFound, nil, nil, nil
+			}
+			probeCalls++
+			if probeCalls == 1 {
+				return http.StatusOK, nil, []byte(`{"credits":{"balance":6.25},"windows":[{"key":"5h","used_percent":40,"reset_after_seconds":1800}]}`), nil
+			}
+			return http.StatusOK, nil, []byte(`{"credits":{"balance":8.5},"windows":[{"key":"5h","used_percent":55,"reset_after_seconds":1800}]}`), nil
+		},
+	})
+	defer runtime.cleanup()
+
+	credentials := map[string]string{"access_token": "token", "plan_type": "free"}
+	updateCalled := false
+	service := NewService(stubRepository{
+		findByID: func(_ context.Context, id int, _ LoadOptions) (Account, error) {
+			return Account{
+				ID:          id,
+				Platform:    "openai",
+				Type:        "oauth",
+				State:       "active",
+				Credentials: credentials,
+			}, nil
+		},
+		update: func(context.Context, int, UpdateInput) (Account, error) {
+			updateCalled = true
+			return Account{}, nil
+		},
+	}, accountGatewayCatalog{instances: map[string]*plugin.PluginInstance{"openai": runtime.instance}}, nil, nil)
+	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
+	service.now = func() time.Time { return now }
+
+	first, err := service.GetSingleAccountUsage(t.Context(), 46, false)
+	if err != nil {
+		t.Fatalf("initial GetSingleAccountUsage() error = %v", err)
+	}
+	second, err := service.GetSingleAccountUsage(t.Context(), 46, false)
+	if err != nil {
+		t.Fatalf("cached GetSingleAccountUsage() error = %v", err)
+	}
+	refreshed, err := service.GetSingleAccountUsage(t.Context(), 46, true)
+	if err != nil {
+		t.Fatalf("refreshed GetSingleAccountUsage() error = %v", err)
+	}
+
+	for name, result := range map[string]map[string]any{"initial": first, "cached": second} {
+		credits, ok := result["credits"].(map[string]any)
+		if !ok || credits["balance"] != 6.25 {
+			t.Fatalf("%s usage result = %#v", name, result)
+		}
+	}
+	credits, ok := refreshed["credits"].(map[string]any)
+	if !ok || credits["balance"] != 8.5 {
+		t.Fatalf("refreshed usage result = %#v", refreshed)
+	}
+	if probeCalls != 2 {
+		t.Fatalf("usage probe calls = %d, want 2", probeCalls)
+	}
+	if updateCalled {
+		t.Fatal("manual usage refresh must not persist account credentials")
+	}
+	if credentials["plan_type"] != "free" {
+		t.Fatalf("plan_type = %q, want unchanged free", credentials["plan_type"])
 	}
 }
 

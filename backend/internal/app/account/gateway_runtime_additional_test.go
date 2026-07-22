@@ -120,12 +120,12 @@ func (c accountGatewayCatalog) GetPluginByPlatform(platform string) *plugin.Plug
 	return c.instances[platform]
 }
 
-func TestQuotaRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
+func TestTokenRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 	var mu sync.Mutex
 	requestedPaths := make([]string, 0, 2)
 	savedCredentials := map[string]string{}
 	savedEmail := ""
-	var quotaRequest quotaRefreshRequest
+	var tokenRequest tokenRefreshRequest
 	var probeRequest map[string]any
 
 	runtime := newAccountGatewayRuntime(t, &accountFakeGatewayPlugin{
@@ -138,9 +138,9 @@ func TestQuotaRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 			requestedPaths = append(requestedPaths, path)
 			mu.Unlock()
 			switch path {
-			case "accounts/quota":
-				if err := json.Unmarshal(body, &quotaRequest); err != nil {
-					t.Fatalf("quota request body: %v", err)
+			case "accounts/token-refresh":
+				if err := json.Unmarshal(body, &tokenRequest); err != nil {
+					t.Fatalf("token refresh request body: %v", err)
 				}
 				return http.StatusOK, nil, []byte(`{
 					"expires_at":"2026-07-01T00:00:00Z",
@@ -196,21 +196,21 @@ func TestQuotaRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
 	service.now = func() time.Time { return now }
 
-	got, err := service.RefreshQuota(t.Context(), 9)
+	got, err := service.RefreshToken(t.Context(), 9)
 	if err != nil {
-		t.Fatalf("RefreshQuota() error = %v", err)
+		t.Fatalf("RefreshToken() error = %v", err)
 	}
 	if got.PlanType != "plus" || got.Email != "user@example.test" ||
 		got.SubscriptionActiveUntil != "2026-07-01T00:00:00Z" || got.ReauthWarning != "soon" {
-		t.Fatalf("RefreshQuota() = %+v", got)
+		t.Fatalf("RefreshToken() = %+v", got)
 	}
 	if savedEmail != "user@example.test" || savedCredentials["plan_type"] != "plus" || savedCredentials["email"] != "user@example.test" ||
 		savedCredentials["subscription_active_until"] != "2026-07-01T00:00:00Z" ||
 		savedCredentials["refresh_warning"] != "" || savedCredentials["empty_ignored"] != "" {
 		t.Fatalf("saved credentials = %+v", savedCredentials)
 	}
-	if quotaRequest.Credentials["proxy_url"] == "" {
-		t.Fatalf("quota request credentials should include proxy_url: %+v", quotaRequest.Credentials)
+	if tokenRequest.Credentials["proxy_url"] == "" {
+		t.Fatalf("token refresh request credentials should include proxy_url: %+v", tokenRequest.Credentials)
 	}
 	if probeRequest["id"].(float64) != 9 {
 		t.Fatalf("probe request = %+v", probeRequest)
@@ -224,19 +224,19 @@ func TestQuotaRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 	mu.Lock()
 	paths := strings.Join(requestedPaths, ",")
 	mu.Unlock()
-	if paths != "accounts/quota,usage/probe" {
+	if paths != "accounts/token-refresh,usage/probe" {
 		t.Fatalf("requested paths = %s", paths)
 	}
 }
 
-func TestQuotaRefreshGatewayErrorsAndWarnings(t *testing.T) {
+func TestTokenRefreshGatewayErrorsAndWarnings(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		statusCode int
 		body       string
 		wantErr    error
 	}{
-		{name: "unsupported", statusCode: http.StatusNotFound, wantErr: ErrQuotaRefreshUnsupported},
+		{name: "unsupported", statusCode: http.StatusNotFound, wantErr: ErrTokenRefreshUnsupported},
 		{name: "reauth status", statusCode: http.StatusForbidden, body: `{"error_code":"other"}`, wantErr: ErrReauthRequired},
 		{name: "reauth body", statusCode: http.StatusOK, body: `{"error_code":"reauth_required"}`, wantErr: ErrReauthRequired},
 		{name: "http error", statusCode: http.StatusBadGateway, body: `{}`, wantErr: nil},
@@ -255,17 +255,17 @@ func TestQuotaRefreshGatewayErrorsAndWarnings(t *testing.T) {
 			service := NewService(stubRepository{}, accountGatewayCatalog{instances: map[string]*plugin.PluginInstance{"openai": runtime.instance}}, nil, nil)
 			service.SetMonitorRecorder(recorder)
 
-			_, err := service.refreshQuota(t.Context(), Account{
+			_, err := service.refreshToken(t.Context(), Account{
 				ID: 7, Name: "oauth", Platform: "openai", Type: "oauth", Credentials: map[string]string{"access_token": "tok"},
 			}, false)
 			if tc.wantErr != nil {
 				if !errors.Is(err, tc.wantErr) {
-					t.Fatalf("refreshQuota() error = %v, want %v", err, tc.wantErr)
+					t.Fatalf("refreshToken() error = %v, want %v", err, tc.wantErr)
 				}
 				return
 			}
 			if err == nil {
-				t.Fatal("refreshQuota() should fail")
+				t.Fatal("refreshToken() should fail")
 			}
 			if len(recorder.records) != 1 {
 				t.Fatalf("monitor records = %+v, want one failure", recorder.records)

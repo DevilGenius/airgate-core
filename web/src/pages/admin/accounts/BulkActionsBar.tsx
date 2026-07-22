@@ -23,7 +23,7 @@ export function BulkActionsBar({
   onEnable,
   onDisable,
   onTest,
-  onRefreshQuota,
+  onRefreshToken,
   onSelectAllChange,
   onClearRateLimitMarkers,
   onDelete,
@@ -38,7 +38,7 @@ export function BulkActionsBar({
   onEnable: () => void;
   onDisable: () => void;
   onTest: () => void;
-  onRefreshQuota: () => void;
+  onRefreshToken: () => void;
   onSelectAllChange: (isSelected: boolean) => void;
   onClearRateLimitMarkers: () => void;
   onDelete: () => void;
@@ -86,8 +86,8 @@ export function BulkActionsBar({
       <ActionButton
         disabled={!active}
         icon={<RefreshCw className="w-3.5 h-3.5 text-success" />}
-        label={t('accounts.bulk_refresh_quota')}
-        onClick={onRefreshQuota}
+        label={t('accounts.bulk_refresh_token')}
+        onClick={onRefreshToken}
       />
       <ActionButton
         disabled={!active}

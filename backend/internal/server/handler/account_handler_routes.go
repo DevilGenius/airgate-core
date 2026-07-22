@@ -336,12 +336,12 @@ func (h *AccountHandler) BulkClearFamilyCooldowns(c *gin.Context) {
 	response.Success(c, toBulkOpResp(result))
 }
 
-// BulkRefreshQuota 批量刷新账号额度/令牌，使用 SSE 流式返回进度。
+// BulkRefreshToken 批量刷新账号令牌，使用 SSE 流式返回进度。
 // 事件类型：
 //   - {type:"start", total}
 //   - {type:"progress", id, done, total, success, error?, plan_type?}
 //   - {type:"complete", success, failed}
-func (h *AccountHandler) BulkRefreshQuota(c *gin.Context) {
+func (h *AccountHandler) BulkRefreshToken(c *gin.Context) {
 	var req dto.BulkAccountIDsReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BindError(c, err)
@@ -370,7 +370,7 @@ func (h *AccountHandler) BulkRefreshQuota(c *gin.Context) {
 			"done":  i + 1,
 			"total": total,
 		}
-		result, err := h.service.RefreshQuota(ctx, id)
+		result, err := h.service.RefreshToken(ctx, id)
 		if err != nil {
 			failed++
 			evt["success"] = false
@@ -543,7 +543,7 @@ func (h *AccountHandler) GetSingleAccountUsage(c *gin.Context) {
 		return
 	}
 
-	usage, err := h.service.GetSingleAccountUsage(c.Request.Context(), id)
+	usage, err := h.service.GetSingleAccountUsage(c.Request.Context(), id, parseOptionalBool(c.Query("refresh")))
 	if err != nil {
 		httpCode, message := h.handleError("查询账号额度失败", "查询失败", err)
 		response.Error(c, httpCode, httpCode, message)
@@ -574,16 +574,16 @@ func (h *AccountHandler) ClearFamilyCooldowns(c *gin.Context) {
 	response.Success(c, gin.H{"cleared": cleared})
 }
 
-func (h *AccountHandler) RefreshQuota(c *gin.Context) {
+func (h *AccountHandler) RefreshToken(c *gin.Context) {
 	id, err := parseAccountID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的账号 ID")
 		return
 	}
 
-	result, err := h.service.RefreshQuota(c.Request.Context(), id)
+	result, err := h.service.RefreshToken(c.Request.Context(), id)
 	if err != nil {
-		httpCode, message := h.handleError("刷新账号额度失败", "刷新额度失败", err)
+		httpCode, message := h.handleError("刷新账号令牌失败", "刷新令牌失败", err)
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}

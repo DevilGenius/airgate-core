@@ -29,7 +29,7 @@ const (
 	SourceForwarder      = "forwarder"
 	SourceScheduler      = "scheduler"
 	SourceAccountChecker = "account_checker"
-	SourceQuotaRefresh   = "quota_refresh"
+	SourceTokenRefresh   = "token_refresh"
 	SourceTaskRunner     = "task_runner"
 	SourcePluginManager  = "plugin_manager"
 	SourceMonitorWorker  = "monitor_worker"

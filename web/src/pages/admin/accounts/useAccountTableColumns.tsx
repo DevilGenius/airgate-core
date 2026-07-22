@@ -23,8 +23,6 @@ import {
 } from './AccountPageSupport';
 import { buildWindowRows, getWindowDisplay, getWindowSlot, shouldExpandUsageWindows } from './accountUsageRows';
 
-type QuotaRefreshResult = Awaited<ReturnType<typeof accountsApi.refreshQuota>>;
-
 const ACCOUNT_GROUP_CARD_STYLE: CSSProperties = {
   background: 'var(--ag-bg-surface)',
   boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--ag-primary) 28%, transparent)',
@@ -328,13 +326,12 @@ function prepareLastUsed(lastUsedAt: string | undefined, now: number, t: (key: s
 }
 
 type UseAccountTableColumnsArgs = {
-  applyQuotaRefreshResult: (id: number, result: QuotaRefreshResult) => void;
   capacityStore: AccountCapacityStore;
   groupMap: Map<number, string>;
   onClearRateLimitMarkers: (id: number) => void;
   onDeleteAccount: (row: AccountResp) => void;
   onEditAccount: (row: AccountResp) => void;
-  onRefreshQuota: (id: number) => void;
+  onRefreshToken: (id: number) => void;
   onStatsAccount: (id: number) => void;
   onTestAccount: (row: AccountResp) => void;
   onToggleScheduling: (id: number) => void;
@@ -412,13 +409,12 @@ function accountRowRenderMetaEqual(left: AccountRowRenderMeta | undefined, right
 }
 
 export function useAccountTableColumns({
-  applyQuotaRefreshResult,
   capacityStore,
   groupMap,
   onClearRateLimitMarkers,
   onDeleteAccount,
   onEditAccount,
-  onRefreshQuota,
+  onRefreshToken,
   onStatsAccount,
   onTestAccount,
   onToggleScheduling,
@@ -472,7 +468,7 @@ export function useAccountTableColumns({
     edit: t('common.edit'),
     editShort: t('common.edit'),
     more: t('common.more'),
-    refreshQuota: t('accounts.refresh_quota'),
+    refreshToken: t('accounts.refresh_token'),
     stats: t('accounts.view_stats'),
     statsShort: t('accounts.stats_short', '统计'),
     test: t('accounts.test_connection'),
@@ -649,10 +645,17 @@ export function useAccountTableColumns({
           target.style.opacity = '0.5';
           target.style.pointerEvents = 'none';
           try {
-            const result = await accountsApi.refreshQuota(row.id);
-            applyQuotaRefreshResult(row.id, result);
-            queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-            queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
+            const usage = await accountsApi.usageOne(row.id, { refresh: true });
+            queryClient.setQueriesData<AccountUsageData>(
+              { queryKey: queryKeys.accountUsage(platformFilter) },
+              (current) => ({
+                ...current,
+                accounts: {
+                  ...current?.accounts,
+                  [String(row.id)]: usage as AccountUsageInfo,
+                },
+              }),
+            );
             toast('success', accountUsageLabels.refreshUsageSuccess);
           } catch (err) {
             const message = err instanceof Error && err.message ? err.message : accountUsageLabels.refreshUsageFailed;
@@ -791,7 +794,7 @@ export function useAccountTableColumns({
           onDelete={onDeleteAccount}
           onTest={onTestAccount}
           onStats={onStatsAccount}
-          onRefreshQuota={onRefreshQuota}
+          onRefreshToken={onRefreshToken}
           onClearCooldowns={onClearRateLimitMarkers}
         />
       ),
@@ -801,12 +804,11 @@ export function useAccountTableColumns({
   }, [
     accountActionLabels,
     accountUsageLabels,
-    applyQuotaRefreshResult,
     capacityStore,
     onClearRateLimitMarkers,
     onDeleteAccount,
     onEditAccount,
-    onRefreshQuota,
+    onRefreshToken,
     onStatsAccount,
     onTestAccount,
     onToggleScheduling,

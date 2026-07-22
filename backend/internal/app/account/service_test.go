@@ -288,22 +288,22 @@ func TestGetModelsUsesPluginModelsForOAuthAccount(t *testing.T) {
 	}
 }
 
-func TestShouldPersistQuotaExtraAllowsClearingPlanMetadata(t *testing.T) {
-	if !shouldPersistQuotaExtra("plan_type", "") {
+func TestShouldPersistTokenRefreshExtraAllowsClearingPlanMetadata(t *testing.T) {
+	if !shouldPersistTokenRefreshExtra("plan_type", "") {
 		t.Fatalf("empty plan_type should be persisted to clear stale subscription data")
 	}
-	if !shouldPersistQuotaExtra("subscription_active_until", "") {
+	if !shouldPersistTokenRefreshExtra("subscription_active_until", "") {
 		t.Fatalf("empty subscription_active_until should be persisted to clear stale subscription data")
 	}
-	if shouldPersistQuotaExtra("email", "") {
+	if shouldPersistTokenRefreshExtra("email", "") {
 		t.Fatalf("empty non-plan metadata should not be persisted")
 	}
-	if shouldPersistQuotaExtra("email", "user@example.com") {
+	if shouldPersistTokenRefreshExtra("email", "user@example.com") {
 		t.Fatalf("email must be persisted in the account email column, not credentials")
 	}
 }
 
-func TestQuotaRefreshCredentialsInjectsProxyURL(t *testing.T) {
+func TestTokenRefreshCredentialsInjectsProxyURL(t *testing.T) {
 	proxy := &Proxy{Protocol: "http", Address: "10.0.0.1", Port: 7890}
 	proxyWithAuth := &Proxy{Protocol: "socks5", Address: "10.0.0.2", Port: 1080, Username: "u", Password: "p"}
 
@@ -361,7 +361,7 @@ func TestQuotaRefreshCredentialsInjectsProxyURL(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := quotaRefreshCredentials(tc.item)
+			got := tokenRefreshCredentials(tc.item)
 			if len(got) != len(tc.want) {
 				t.Fatalf("len = %d, want %d (got %v)", len(got), len(tc.want), got)
 			}
@@ -374,19 +374,19 @@ func TestQuotaRefreshCredentialsInjectsProxyURL(t *testing.T) {
 	}
 }
 
-func TestQuotaRefreshCredentialsDoesNotMutateInput(t *testing.T) {
+func TestTokenRefreshCredentialsDoesNotMutateInput(t *testing.T) {
 	original := map[string]string{"refresh_token": "rt"}
 	item := Account{
 		Credentials: original,
 		Proxy:       &Proxy{Protocol: "http", Address: "10.0.0.1", Port: 7890},
 	}
-	_ = quotaRefreshCredentials(item)
+	_ = tokenRefreshCredentials(item)
 	if _, exists := original["proxy_url"]; exists {
-		t.Fatalf("quotaRefreshCredentials mutated input credentials: %v", original)
+		t.Fatalf("tokenRefreshCredentials mutated input credentials: %v", original)
 	}
 }
 
-func TestShouldAutoRefreshQuotaSkipsPureAPIKeyAccounts(t *testing.T) {
+func TestShouldAutoRefreshTokenSkipsPureAPIKeyAccounts(t *testing.T) {
 	cases := []struct {
 		name string
 		item Account
@@ -415,8 +415,8 @@ func TestShouldAutoRefreshQuotaSkipsPureAPIKeyAccounts(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := shouldAutoRefreshQuota(tc.item); got != tc.want {
-				t.Fatalf("shouldAutoRefreshQuota() = %v, want %v", got, tc.want)
+			if got := shouldAutoRefreshToken(tc.item); got != tc.want {
+				t.Fatalf("shouldAutoRefreshToken() = %v, want %v", got, tc.want)
 			}
 		})
 	}

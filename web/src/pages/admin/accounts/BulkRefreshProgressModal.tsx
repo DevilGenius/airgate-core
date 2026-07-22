@@ -71,7 +71,7 @@ export function BulkRefreshProgressModal({
         const token = getToken();
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const res = await fetch(accountsApi.bulkRefreshQuotaUrl(), {
+        const res = await fetch(accountsApi.bulkRefreshTokenUrl(), {
           method: 'POST',
           headers,
           body: JSON.stringify({ account_ids: accounts.map((a) => a.id) }),
@@ -263,7 +263,7 @@ export function BulkRefreshProgressModal({
                   style={{ color: 'var(--ag-warning)' }}
                   title={item.warning}
                 >
-                  {t('accounts.refresh_quota_reauth_warning_short', '需重新授权')}
+                  {t('accounts.refresh_token_reauth_warning_short', '需重新授权')}
                 </span>
               )}
             </div>

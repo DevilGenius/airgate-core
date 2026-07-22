@@ -171,7 +171,7 @@ func TestCRUDHandlerValidationBranches(t *testing.T) {
 		{name: "account single usage bad id", method: http.MethodGet, target: "/accounts/bad/usage", params: badID, fn: accountHandler.GetSingleAccountUsage, status: http.StatusBadRequest},
 		{name: "account clear cooldown bad id", method: http.MethodPost, target: "/accounts/bad/cooldown", params: badID, fn: accountHandler.ClearFamilyCooldowns, status: http.StatusBadRequest},
 		{name: "account clear cooldown no scheduler", method: http.MethodPost, target: "/accounts/7/cooldown", params: validID, fn: accountHandler.ClearFamilyCooldowns, status: http.StatusServiceUnavailable},
-		{name: "account refresh quota bad id", method: http.MethodPost, target: "/accounts/bad/quota", params: badID, fn: accountHandler.RefreshQuota, status: http.StatusBadRequest},
+		{name: "account refresh token bad id", method: http.MethodPost, target: "/accounts/bad/refresh-token", params: badID, fn: accountHandler.RefreshToken, status: http.StatusBadRequest},
 		{name: "account stats bad id", method: http.MethodGet, target: "/accounts/bad/stats", params: badID, fn: accountHandler.GetAccountStats, status: http.StatusBadRequest},
 
 		{name: "apikey list unauthorized", method: http.MethodGet, target: "/keys", fn: apiKeyHandler.ListKeys, status: http.StatusUnauthorized},

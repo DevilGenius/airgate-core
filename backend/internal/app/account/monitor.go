@@ -7,7 +7,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 )
 
-func (s *Service) recordQuotaRefreshFailure(ctx context.Context, item Account, code string, err error, severity string) {
+func (s *Service) recordTokenRefreshFailure(ctx context.Context, item Account, code string, err error, severity string) {
 	if s == nil || s.monitor == nil || item.ID <= 0 {
 		return
 	}
@@ -19,20 +19,20 @@ func (s *Service) recordQuotaRefreshFailure(ctx context.Context, item Account, c
 	s.monitor.Record(ctx, monitoring.EventInput{
 		Type:                monitoring.TypeUpstreamAccountError,
 		Severity:            severity,
-		Source:              monitoring.SourceQuotaRefresh,
+		Source:              monitoring.SourceTokenRefresh,
 		SubjectType:         monitoring.SubjectAccount,
 		SubjectID:           strconv.Itoa(item.ID),
 		AccountID:           &accountID,
 		AccountNameSnapshot: item.Name,
 		Platform:            item.Platform,
 		ErrorCode:           code,
-		Title:               "Account quota refresh failed",
+		Title:               "Account token refresh failed",
 		Message:             message,
 		Detail: map[string]interface{}{
 			"account_type": item.Type,
 			"state":        item.State,
 			"error_code":   code,
-			"operation":    "quota_refresh",
+			"operation":    "token_refresh",
 		},
 	})
 }

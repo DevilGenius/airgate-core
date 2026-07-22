@@ -56,8 +56,8 @@ func TestMonitorRecorderHelpersRecordAndResolve(t *testing.T) {
 	service.SetMonitorRecorder(recorder)
 
 	ctx := t.Context()
-	service.recordQuotaRefreshFailure(ctx, Account{ID: 0}, "ignored", errors.New("ignored"), monitoring.SeverityError)
-	service.recordQuotaRefreshFailure(ctx, Account{
+	service.recordTokenRefreshFailure(ctx, Account{ID: 0}, "ignored", errors.New("ignored"), monitoring.SeverityError)
+	service.recordTokenRefreshFailure(ctx, Account{
 		ID: 7, Name: "oauth", Platform: "openai", Type: "oauth", State: "active",
 	}, "reauth_required", errors.New("expired"), monitoring.SeverityCritical)
 	service.recordConnectivityTestFailure(ctx, Account{
@@ -70,11 +70,11 @@ func TestMonitorRecorderHelpersRecordAndResolve(t *testing.T) {
 		t.Fatalf("records = %d, want 2", len(recorder.records))
 	}
 	first := recorder.records[0]
-	if first.Source != monitoring.SourceQuotaRefresh || first.Severity != monitoring.SeverityCritical ||
+	if first.Source != monitoring.SourceTokenRefresh || first.Severity != monitoring.SeverityCritical ||
 		first.SubjectID != "7" || first.AccountID == nil || *first.AccountID != 7 ||
 		first.ErrorCode != "reauth_required" || first.Message != "expired" ||
-		first.Detail["operation"] != "quota_refresh" {
-		t.Fatalf("quota monitor record = %+v", first)
+		first.Detail["operation"] != "token_refresh" {
+		t.Fatalf("token monitor record = %+v", first)
 	}
 	second := recorder.records[1]
 	if second.Source != monitoring.SourceAccountChecker || second.Message != "" ||
@@ -87,14 +87,14 @@ func TestMonitorRecorderHelpersRecordAndResolve(t *testing.T) {
 	}
 }
 
-func TestQuotaRefreshLoopBranchesWithoutPlugin(t *testing.T) {
+func TestTokenRefreshLoopBranchesWithoutPlugin(t *testing.T) {
 	listErr := errors.New("list failed")
 	service := NewService(stubRepository{
 		listAll: func(context.Context, ListFilter) ([]Account, error) {
 			return nil, listErr
 		},
 	}, stubPluginCatalog{}, nil, nil)
-	service.refreshAllOAuthQuotas(t.Context())
+	service.refreshAllOAuthTokens(t.Context())
 
 	calls := 0
 	canceled, cancel := context.WithCancel(t.Context())
@@ -110,17 +110,17 @@ func TestQuotaRefreshLoopBranchesWithoutPlugin(t *testing.T) {
 		},
 	}, stubPluginCatalog{}, nil, nil)
 
-	service.runQuotaRefreshLoop(canceled)
+	service.runTokenRefreshLoop(canceled)
 	if calls != 1 {
-		t.Fatalf("runQuotaRefreshLoop list calls = %d, want 1", calls)
+		t.Fatalf("runTokenRefreshLoop list calls = %d, want 1", calls)
 	}
 
-	_, err := service.RefreshQuota(t.Context(), 3)
-	if !errors.Is(err, ErrQuotaRefreshUnsupported) {
-		t.Fatalf("RefreshQuota error = %v, want ErrQuotaRefreshUnsupported", err)
+	_, err := service.RefreshToken(t.Context(), 3)
+	if !errors.Is(err, ErrTokenRefreshUnsupported) {
+		t.Fatalf("RefreshToken error = %v, want ErrTokenRefreshUnsupported", err)
 	}
-	if _, err := service.refreshQuota(t.Context(), Account{ID: 4, Platform: "openai"}, false); !errors.Is(err, ErrQuotaRefreshUnsupported) {
-		t.Fatalf("refreshQuota unsupported error = %v", err)
+	if _, err := service.refreshToken(t.Context(), Account{ID: 4, Platform: "openai"}, false); !errors.Is(err, ErrTokenRefreshUnsupported) {
+		t.Fatalf("refreshToken unsupported error = %v", err)
 	}
 	service.triggerUsageProbe(t.Context(), nil, "openai", 4, map[string]string{"access_token": "tok"})
 }

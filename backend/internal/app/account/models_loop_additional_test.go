@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestStartQuotaRefreshLoopRunsInitialRefresh(t *testing.T) {
+func TestStartTokenRefreshLoopRunsInitialRefresh(t *testing.T) {
 	called := make(chan struct{})
 	service := NewService(stubRepository{
 		listAll: func(context.Context, ListFilter) ([]Account, error) {
@@ -21,12 +21,12 @@ func TestStartQuotaRefreshLoopRunsInitialRefresh(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	service.StartQuotaRefreshLoop(ctx)
+	service.StartTokenRefreshLoop(ctx)
 
 	select {
 	case <-called:
 	case <-time.After(2 * time.Second):
-		t.Fatal("quota refresh loop did not run initial refresh")
+		t.Fatal("token refresh loop did not run initial refresh")
 	}
 }
 

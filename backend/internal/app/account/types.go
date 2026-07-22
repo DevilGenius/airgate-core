@@ -231,8 +231,8 @@ type CredentialSchema struct {
 	AccountTypes []AccountType
 }
 
-// QuotaRefreshResult 刷新额度结果。
-type QuotaRefreshResult struct {
+// TokenRefreshResult 刷新令牌结果。
+type TokenRefreshResult struct {
 	PlanType                string
 	Email                   string
 	SubscriptionActiveUntil string

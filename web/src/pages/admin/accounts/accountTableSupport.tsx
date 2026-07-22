@@ -262,7 +262,7 @@ export const AccountRowActions = memo(function AccountRowActions({
   onDelete,
   onTest,
   onStats,
-  onRefreshQuota,
+  onRefreshToken,
   onClearCooldowns,
 }: {
   row: AccountResp;
@@ -273,7 +273,7 @@ export const AccountRowActions = memo(function AccountRowActions({
     edit: string;
     editShort: string;
     more: string;
-    refreshQuota: string;
+    refreshToken: string;
     stats: string;
     statsShort: string;
     test: string;
@@ -283,7 +283,7 @@ export const AccountRowActions = memo(function AccountRowActions({
   onDelete: (row: AccountResp) => void;
   onTest: (row: AccountResp) => void;
   onStats: (id: number) => void;
-  onRefreshQuota: (id: number) => void;
+  onRefreshToken: (id: number) => void;
   onClearCooldowns: (id: number) => void;
 }) {
   return (
@@ -328,7 +328,7 @@ export const AccountRowActions = memo(function AccountRowActions({
         row={row}
         labels={labels}
         onDelete={onDelete}
-        onRefreshQuota={onRefreshQuota}
+        onRefreshToken={onRefreshToken}
         onClearCooldowns={onClearCooldowns}
       />
     </div>
@@ -340,7 +340,7 @@ export const AccountRowActions = memo(function AccountRowActions({
   && prev.onDelete === next.onDelete
   && prev.onTest === next.onTest
   && prev.onStats === next.onStats
-  && prev.onRefreshQuota === next.onRefreshQuota
+  && prev.onRefreshToken === next.onRefreshToken
   && prev.onClearCooldowns === next.onClearCooldowns
 ));
 
@@ -375,7 +375,7 @@ const AccountRowOverflowMenu = memo(function AccountRowOverflowMenu({
   row,
   labels,
   onDelete,
-  onRefreshQuota,
+  onRefreshToken,
   onClearCooldowns,
 }: {
   row: AccountResp;
@@ -384,10 +384,10 @@ const AccountRowOverflowMenu = memo(function AccountRowOverflowMenu({
     clearCooldowns: string;
     delete: string;
     more: string;
-    refreshQuota: string;
+    refreshToken: string;
   };
   onDelete: (row: AccountResp) => void;
-  onRefreshQuota: (id: number) => void;
+  onRefreshToken: (id: number) => void;
   onClearCooldowns: (id: number) => void;
 }) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -470,10 +470,10 @@ const AccountRowOverflowMenu = memo(function AccountRowOverflowMenu({
               type="button"
               role="menuitem"
               className="ag-account-row-menu-item"
-              onClick={runAction(() => onRefreshQuota(row.id))}
+              onClick={runAction(() => onRefreshToken(row.id))}
             >
               <RefreshCw className="w-3.5 h-3.5 ag-account-row-menu-icon ag-account-row-menu-icon--success" />
-              <span>{labels.refreshQuota}</span>
+              <span>{labels.refreshToken}</span>
             </button>
           ) : null}
           <button
@@ -503,7 +503,7 @@ const AccountRowOverflowMenu = memo(function AccountRowOverflowMenu({
   prev.row === next.row
   && prev.labels === next.labels
   && prev.onDelete === next.onDelete
-  && prev.onRefreshQuota === next.onRefreshQuota
+  && prev.onRefreshToken === next.onRefreshToken
   && prev.onClearCooldowns === next.onClearCooldowns
 ));
 

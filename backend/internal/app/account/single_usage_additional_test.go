@@ -18,7 +18,7 @@ func TestGetSingleAccountUsageSkipsAPIKeyProbe(t *testing.T) {
 		},
 	}, nil, nil, nil)
 
-	got, err := service.GetSingleAccountUsage(t.Context(), 42)
+	got, err := service.GetSingleAccountUsage(t.Context(), 42, true)
 	if err != nil {
 		t.Fatalf("GetSingleAccountUsage() error = %v", err)
 	}

@@ -55,29 +55,33 @@ export const accountsApi = {
     get<{ accounts: Record<string, number> }>('/api/v1/admin/accounts/capacity', {
       ids: ids.join(','),
     }),
-  // 获取单个账号用量窗口。保留给手动单账号刷新等按需场景，账号页自动刷新走批量 ids 接口。
-  usageOne: (id: number, options?: { signal?: AbortSignal }) =>
-    get<Record<string, any>>(`/api/v1/admin/accounts/${id}/usage`, undefined, options),
+  // 获取单个账号用量窗口。refresh=true 时强制探测上游；账号页自动刷新走批量 ids 接口。
+  usageOne: (id: number, options?: { refresh?: boolean; signal?: AbortSignal }) =>
+    get<Record<string, any>>(
+      `/api/v1/admin/accounts/${id}/usage`,
+      options?.refresh ? { refresh: 'true' } : undefined,
+      { signal: options?.signal },
+    ),
   credentialsSchema: (platform: string) =>
     get<CredentialSchemaResp>(`/api/v1/admin/accounts/credentials-schema/${platform}`),
-  // 手动刷新账号额度（调用插件 QueryQuota）。
+  // 手动刷新账号令牌及订阅元数据。
   // reauth_warning 非空表示 refresh_token 已失效、本次是从存量 access_token 降级解析得到，
   // 前端需提示用户尽快重新授权。
-  refreshQuota: (id: number) =>
+  refreshToken: (id: number) =>
     post<{
       plan_type?: string;
       email?: string;
       subscription_active_until?: string;
       reauth_warning?: string;
-    }>(`/api/v1/admin/accounts/${id}/refresh-quota`),
+    }>(`/api/v1/admin/accounts/${id}/refresh-token`),
   // 批量更新账号字段（group_ids 为追加模式）
   bulkUpdate: (data: BulkUpdateAccountsReq) =>
     post<BulkOpResp>('/api/v1/admin/accounts/bulk-update', data),
   // 批量删除账号
   bulkDelete: (ids: number[]) =>
     post<BulkOpResp>('/api/v1/admin/accounts/bulk-delete', { account_ids: ids }),
-  // 批量刷新账号令牌/额度 —— SSE 流式接口，前端 URL，由调用方用 fetch 消费
-  bulkRefreshQuotaUrl: () => '/api/v1/admin/accounts/bulk-refresh-quota',
+  // 批量刷新账号令牌 —— SSE 流式接口，前端 URL，由调用方用 fetch 消费
+  bulkRefreshTokenUrl: () => '/api/v1/admin/accounts/bulk-refresh-token',
   // 获取账号使用统计（可选时间范围）
   stats: (id: number, params?: { start_date?: string; end_date?: string }) =>
     get<AccountStatsResp>(`/api/v1/admin/accounts/${id}/stats`, params),
