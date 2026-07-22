@@ -134,12 +134,16 @@ onPluginFrontendCacheClear(clearPluginAccountFormCache);
 export function usePluginAccountForm(platform: string, mode: AccountFormProps['mode'] = 'create') {
   const [Form, setForm] = useState<ComponentType<AccountFormProps> | null>(null);
   const [pluginId, setPluginId] = useState('');
+  // loaded 表示插件表单探测已结束（有表单、无表单或无插件），
+  // 调用方据此避免在插件表单加载完成前误判为「无插件表单」。
+  const [loaded, setLoaded] = useState(false);
   const loadedRef = useRef('');
 
   useEffect(() => {
     if (!platform) {
       setForm(null);
       setPluginId('');
+      setLoaded(true);
       loadedRef.current = '';
       return;
     }
@@ -147,6 +151,7 @@ export function usePluginAccountForm(platform: string, mode: AccountFormProps['m
     const loadKey = `${platform}:${mode}`;
     if (loadedRef.current === loadKey) return;
     loadedRef.current = loadKey;
+    setLoaded(false);
     let cancelled = false;
 
     getPlatformPluginMap().then((map) => {
@@ -157,12 +162,14 @@ export function usePluginAccountForm(platform: string, mode: AccountFormProps['m
 
       if (!resolvedPluginId) {
         setForm(null);
+        setLoaded(true);
         return;
       }
       const cacheKey = `${resolvedPluginId}:${mode}`;
       if (pluginFormCache.has(cacheKey)) {
         const cachedForm = pluginFormCache.get(cacheKey) ?? null;
         setForm(() => cachedForm);
+        setLoaded(true);
         return;
       }
       loadPluginFrontend(resolvedPluginId).then((mod) => {
@@ -172,7 +179,14 @@ export function usePluginAccountForm(platform: string, mode: AccountFormProps['m
           : (mod?.accountCreate ?? null);
         pluginFormCache.set(cacheKey, form);
         setForm(() => form);
+        setLoaded(true);
+      }).catch(() => {
+        if (cancelled) return;
+        setLoaded(true);
       });
+    }).catch(() => {
+      if (cancelled) return;
+      setLoaded(true);
     });
 
     return () => {
@@ -181,7 +195,7 @@ export function usePluginAccountForm(platform: string, mode: AccountFormProps['m
     };
   }, [platform, mode]);
 
-  return { Form, pluginId };
+  return { Form, pluginId, loaded };
 }
 
 export function createPluginOAuthBridge(pluginId: string): OAuthBridgeWithSession | undefined {

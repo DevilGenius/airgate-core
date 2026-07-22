@@ -112,13 +112,14 @@ export function EditAccountModal({
     queryFn: () => proxiesApi.list(FETCH_ALL_PARAMS),
   });
 
-  const { Form: PluginAccountForm, pluginId } = usePluginAccountForm(account.platform, 'edit');
+  const { Form: PluginAccountForm, pluginId, loaded: pluginFormLoaded } = usePluginAccountForm(account.platform, 'edit');
   const pluginOAuth = createPluginOAuthBridge(pluginId);
   const passwordFieldsCleared = useRef(false);
 
   useEffect(() => {
-    // 插件有自定义表单时，由插件自己控制脱敏展示，不清空 password 字段
-    if (PluginAccountForm || !schema || passwordFieldsCleared.current) return;
+    // 插件有自定义表单时，由插件自己控制脱敏展示，不清空 password 字段；
+    // 插件表单异步加载，需等探测结束再判断，避免加载完成前误清空已有凭证值。
+    if (!pluginFormLoaded || PluginAccountForm || !schema || passwordFieldsCleared.current) return;
     const passwordKeys = getSchemaVisibleFields(schema, accountType)
       .filter((field) => field.type === 'password')
       .map((field) => field.key);
@@ -130,7 +131,7 @@ export function EditAccountModal({
       for (const key of passwordKeys) next[key] = '';
       return next;
     });
-  }, [schema, accountType, PluginAccountForm]);
+  }, [schema, accountType, PluginAccountForm, pluginFormLoaded]);
 
   useEffect(() => {
     const selectedType = getSchemaSelectedAccountType(schema, accountType);
