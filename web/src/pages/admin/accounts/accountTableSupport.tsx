@@ -31,9 +31,11 @@ export function TableSelectionCheckbox({
   inputRef?: (input: HTMLInputElement | null) => void;
   isIndeterminate?: boolean;
   isSelected?: boolean;
-  onChange: (isSelected: boolean) => void;
+  onChange: (isSelected: boolean, shiftKey: boolean) => void;
 }) {
   const checkboxRef = useRef<HTMLInputElement>(null);
+  // change 事件拿不到键盘/鼠标修饰键，先在 click 阶段记录 shiftKey
+  const shiftKeyRef = useRef(false);
   const setCheckboxRef = useCallback((input: HTMLInputElement | null) => {
     checkboxRef.current = input;
     inputRef?.(input);
@@ -55,8 +57,11 @@ export function TableSelectionCheckbox({
       aria-label={ariaLabel}
       defaultChecked={defaultSelected ?? isSelected ?? false}
       className="ag-table-selection-checkbox"
-      onClick={(event) => event.stopPropagation()}
-      onChange={(event) => onChange(event.currentTarget.checked)}
+      onClick={(event) => {
+        event.stopPropagation();
+        shiftKeyRef.current = event.shiftKey;
+      }}
+      onChange={(event) => onChange(event.currentTarget.checked, shiftKeyRef.current)}
     />
   );
 }
@@ -93,10 +98,10 @@ export const AccountRowSelectionCell = memo(function AccountRowSelectionCell({
   ariaLabel: string;
   selectionStore: AccountSelectionStore;
   rowId: number;
-  onSelectedChange: (id: number, isSelected: boolean) => void;
+  onSelectedChange: (id: number, isSelected: boolean, shiftKey: boolean) => void;
 }) {
-  const handleChange = useCallback((nextSelected: boolean) => {
-    onSelectedChange(rowId, nextSelected);
+  const handleChange = useCallback((nextSelected: boolean, shiftKey: boolean) => {
+    onSelectedChange(rowId, nextSelected, shiftKey);
   }, [onSelectedChange, rowId]);
   const registerInput = useCallback((input: HTMLInputElement | null) => {
     selectionStore.registerRowInput?.(rowId, input);
@@ -522,7 +527,7 @@ export const AccountTableRow = memo(function AccountTableRow({
   rowMeta?: unknown;
   selectRowAriaLabel: string;
   selectionStore: AccountSelectionStore;
-  onSelectedChange: (id: number, isSelected: boolean) => void;
+  onSelectedChange: (id: number, isSelected: boolean, shiftKey?: boolean) => void;
 }) {
   return (
     <tr data-slot="tr" data-key={row.id} data-usage-expanded={isUsageExpanded ? 'true' : undefined}>

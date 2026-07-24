@@ -8,7 +8,7 @@ type AccountModalPerfSample = {
   target: AccountModalPerfTarget;
 };
 
-export type AccountSelectionPerfAction = 'select-visible' | 'select-row';
+export type AccountSelectionPerfAction = 'select-visible' | 'select-row' | 'select-range';
 
 export type AccountToolbarMenuPerfTarget = 'platform' | 'state' | 'type' | 'group' | 'proxy' | 'auto-refresh';
 

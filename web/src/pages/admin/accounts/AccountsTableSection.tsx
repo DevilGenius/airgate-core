@@ -145,7 +145,7 @@ export const AccountsTableSection = memo(function AccountsTableSection({
   onBulkEnable: () => void;
   onBulkRefresh: () => void;
   onBulkTest: () => void;
-  onRowSelected: (id: number, isSelected: boolean) => void;
+  onRowSelected: (id: number, isSelected: boolean, shiftKey?: boolean) => void;
   onSortChange?: (sortKey: string) => void;
   onVisibleRowsSelected: (isSelected: boolean) => void;
   rows: AccountResp[];

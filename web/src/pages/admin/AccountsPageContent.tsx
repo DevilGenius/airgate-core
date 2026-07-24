@@ -903,11 +903,28 @@ export default function AccountsPageContent() {
       selectionStore.setRows(visibleRowIds, isSelected)
     ));
   }, [runSelectionPerf, selectionStore, visibleRowIds]);
-  const setRowSelected = useCallback((id: number, isSelected: boolean) => {
+  const selectionAnchorRef = useRef<number | null>(null);
+  const setRowSelected = useCallback((id: number, isSelected: boolean, shiftKey = false) => {
+    // Shift+点击：以最近一次勾选行为锚点，批量选中锚点到当前行的连续区间
+    const anchor = selectionAnchorRef.current;
+    selectionAnchorRef.current = id;
+    if (shiftKey && anchor != null && anchor !== id) {
+      const anchorIndex = visibleRowIds.indexOf(anchor);
+      const targetIndex = visibleRowIds.indexOf(id);
+      if (anchorIndex !== -1 && targetIndex !== -1) {
+        const from = Math.min(anchorIndex, targetIndex);
+        const to = Math.max(anchorIndex, targetIndex);
+        const rangeIds = visibleRowIds.slice(from, to + 1);
+        runSelectionPerf('select-range', rangeIds.length, isSelected, () => (
+          selectionStore.setRows(rangeIds, isSelected)
+        ));
+        return;
+      }
+    }
     runSelectionPerf('select-row', visibleRowIds.length, isSelected, () => (
       selectionStore.setRow(id, isSelected)
     ));
-  }, [runSelectionPerf, selectionStore, visibleRowIds.length]);
+  }, [runSelectionPerf, selectionStore, visibleRowIds]);
   const typeOptions = useMemo<AccountTypeFilterOption[]>(() => [
     { id: '', label: t('accounts.all_types', '全部类型') },
     { id: 'oauth', label: 'OAuth' },
