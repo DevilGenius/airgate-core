@@ -6,12 +6,14 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
+	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
@@ -853,9 +855,60 @@ func TestBulkUpdateAppliesPriorityOffsetPerAccount(t *testing.T) {
 	}
 }
 
+func TestBulkUpdateAppliesPrioritySequenceInRequestOrder(t *testing.T) {
+	ids := []int{11, 12, 13, 14, 15, 16, 17}
+	updated := make([]int, 0, len(ids))
+	sequence := &PrioritySequenceInput{Initial: 1000, Step: -2, GroupSize: 3}
+	service := NewService(stubRepository{
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			if input.Priority == nil {
+				t.Fatalf("repo.Update Priority = nil for account %d", id)
+			}
+			updated = append(updated, *input.Priority)
+			return Account{ID: id, Platform: "openai", Priority: *input.Priority}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs:              ids,
+		PrioritySequence: sequence,
+	})
+
+	if result.Success != len(ids) || result.Failed != 0 {
+		t.Fatalf("BulkUpdate result = %+v, want %d success", result, len(ids))
+	}
+	want := []int{1000, 1000, 1000, 998, 998, 998, 996}
+	if !slices.Equal(updated, want) {
+		t.Fatalf("updated priorities = %v, want %v", updated, want)
+	}
+}
+
+func TestBulkUpdateRejectsInvalidPrioritySequenceBeforeUpdating(t *testing.T) {
+	service := NewService(stubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs: []int{21, 22},
+		PrioritySequence: &PrioritySequenceInput{
+			Initial:   accountpriority.Max,
+			Step:      1,
+			GroupSize: 1,
+		},
+	})
+
+	if result.Failed != 2 || !strings.Contains(result.Results[0].Error, ErrInvalidPrioritySequence.Error()) {
+		t.Fatalf("invalid priority sequence result = %+v", result)
+	}
+}
+
 func TestBulkUpdateRejectsConflictingAndOutOfRangePriorityChanges(t *testing.T) {
 	priority := 10
 	offset := 1
+	sequence := &PrioritySequenceInput{Initial: 1000, Step: -1, GroupSize: 5}
 	service := NewService(stubRepository{
 		findByID: func(_ context.Context, id int, _ LoadOptions) (Account, error) {
 			return Account{ID: id, Platform: "openai", Priority: 99999}, nil
@@ -873,6 +926,15 @@ func TestBulkUpdateRejectsConflictingAndOutOfRangePriorityChanges(t *testing.T) 
 	})
 	if conflict.Failed != 1 || conflict.Results[0].Error != ErrConflictingPriorityUpdate.Error() {
 		t.Fatalf("conflicting priority result = %+v", conflict)
+	}
+
+	sequenceConflict := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs:              []int{21},
+		PriorityOffset:   &offset,
+		PrioritySequence: sequence,
+	})
+	if sequenceConflict.Failed != 1 || sequenceConflict.Results[0].Error != ErrConflictingPriorityUpdate.Error() {
+		t.Fatalf("conflicting priority sequence result = %+v", sequenceConflict)
 	}
 
 	outOfRange := service.BulkUpdate(t.Context(), BulkUpdateInput{

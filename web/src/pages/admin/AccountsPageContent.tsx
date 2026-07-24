@@ -42,7 +42,11 @@ import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
 import { BulkAccountTestModal } from './accounts/BulkAccountTestModal';
 import { BulkRefreshProgressModal } from './accounts/BulkRefreshProgressModal';
 import { AccountsTableSection } from './accounts/AccountsTableSection';
-import { getBulkEditInitialValues, type BulkEditSelection } from './accounts/bulkEditSupport';
+import {
+  getBulkEditInitialValues,
+  orderSelectedAccountIdsByCreatedAt,
+  type BulkEditSelection,
+} from './accounts/bulkEditSupport';
 import { parseAccountImportItems } from './accounts/accountUtils';
 import type {
   AccountResp,
@@ -801,10 +805,11 @@ export default function AccountsPageContent() {
     if (selectedRows.length < selectedAccountIds.length) {
       void refetchAccounts({ cancelRefetch: false });
     }
+    const orderedAccountIds = orderSelectedAccountIdsByCreatedAt(selectedRows, selectedAccountIds);
     markModalOpenStart('bulk-edit', rows.length);
     setBulkEditSelection({
-      ids: selectedAccountIds,
-      initialValues: getBulkEditInitialValues(selectedRows.length > 0 ? selectedRows : rows, selectedAccountIds),
+      ids: orderedAccountIds,
+      initialValues: getBulkEditInitialValues(selectedRows.length > 0 ? selectedRows : rows, orderedAccountIds),
     });
   }, [markModalOpenStart, refetchAccounts, rows, selectionStore]);
   const handleBulkDelete = useCallback(() => {

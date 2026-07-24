@@ -5,10 +5,14 @@ import {
   ACCOUNT_PRIORITY_OFFSET_MAX,
   ACCOUNT_PRIORITY_OFFSET_MIN,
   DEFAULT_ACCOUNT_PRIORITY,
+  DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_GROUP_SIZE,
+  DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_INITIAL,
+  DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_STEP,
   clampAccountPriority,
   commitAccountPriorityOffsetInput,
   commitAccountPriorityInput,
   getAccountPriorityOffsetRange,
+  getAccountPrioritySequencePreview,
   getAccountGroupPriorities,
   getAccountMessageLockEnabled,
   isAccountPriorityDraft,
@@ -42,6 +46,22 @@ describe('account default helpers', () => {
     expect(parseAccountPriorityOffsetInput('1.5')).toBeNull();
     expect(getAccountPriorityOffsetRange(-50, 100)).toEqual({ min: -99949, max: 99899 });
     expect(commitAccountPriorityOffsetInput('99999', -200, 300)).toBe(300);
+  });
+
+  it('previews grouped priority sequences and rejects out-of-range results', () => {
+    expect(DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_INITIAL).toBe(1000);
+    expect(DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_STEP).toBe(-1);
+    expect(DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_GROUP_SIZE).toBe(5);
+    expect(getAccountPrioritySequencePreview(100, 1000, -1, 5)).toEqual({
+      initial: 1000,
+      step: -1,
+      groupSize: 5,
+      levels: 20,
+      last: 981,
+      lastGroupSize: 5,
+    });
+    expect(getAccountPrioritySequencePreview(6, ACCOUNT_PRIORITY_MAX, 1, 5)).toBeNull();
+    expect(getAccountPrioritySequencePreview(10, 1000, 0, 5)).toBeNull();
   });
 
   it('reads and writes message lock flags in account extra data', () => {

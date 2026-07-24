@@ -615,9 +615,26 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 // group_ids 为整体替换：若提供则覆盖账号原有分组，未提供则不触碰。
 func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkResult {
 	result := BulkResult{Results: make([]BulkResultItem, 0, len(input.IDs))}
-	if input.Priority != nil && input.PriorityOffset != nil {
+	priorityModeCount := 0
+	if input.Priority != nil {
+		priorityModeCount++
+	}
+	if input.PriorityOffset != nil {
+		priorityModeCount++
+	}
+	if input.PrioritySequence != nil {
+		priorityModeCount++
+	}
+	if priorityModeCount > 1 {
 		for _, id := range input.IDs {
 			result.appendFailure(id, ErrConflictingPriorityUpdate)
+		}
+		return result
+	}
+	sequencePriorities, err := buildPrioritySequence(input.PrioritySequence, len(input.IDs))
+	if err != nil {
+		for _, id := range input.IDs {
+			result.appendFailure(id, err)
 		}
 		return result
 	}
@@ -640,10 +657,14 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 		input.ModelPolicy = &policy
 	}
 	mutated := false
-	for _, id := range input.IDs {
+	for index, id := range input.IDs {
+		priority := input.Priority
+		if sequencePriorities != nil {
+			priority = &sequencePriorities[index]
+		}
 		patch := UpdateInput{
 			State:          input.State,
-			Priority:       input.Priority,
+			Priority:       priority,
 			MaxConcurrency: input.MaxConcurrency,
 			RateMultiplier: input.RateMultiplier,
 			ModelPolicy:    input.ModelPolicy,
@@ -723,6 +744,35 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 		s.InvalidateUsageCache("")
 	}
 	return result
+}
+
+func buildPrioritySequence(input *PrioritySequenceInput, count int) ([]int, error) {
+	if input == nil {
+		return nil, nil
+	}
+	if input.GroupSize <= 0 {
+		return nil, fmt.Errorf("%w：每组账号数必须大于 0", ErrInvalidPrioritySequence)
+	}
+	if input.Step == 0 {
+		return nil, fmt.Errorf("%w：步进不能为 0", ErrInvalidPrioritySequence)
+	}
+	if input.Initial < accountpriority.Min || input.Initial > accountpriority.Max {
+		return nil, fmt.Errorf("%w：初始值必须在 %d 到 %d 范围内", ErrInvalidPrioritySequence, accountpriority.Min, accountpriority.Max)
+	}
+
+	priorities := make([]int, count)
+	current := input.Initial
+	for index := range priorities {
+		if index > 0 && index%input.GroupSize == 0 {
+			next, ok := accountpriority.AddOffset(current, input.Step)
+			if !ok {
+				return nil, fmt.Errorf("%w：第 %d 组优先级超出 %d 到 %d 范围", ErrInvalidPrioritySequence, index/input.GroupSize+1, accountpriority.Min, accountpriority.Max)
+			}
+			current = next
+		}
+		priorities[index] = current
+	}
+	return priorities, nil
 }
 
 // BulkDelete 批量删除账号。

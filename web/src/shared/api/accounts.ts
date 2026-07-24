@@ -74,7 +74,7 @@ export const accountsApi = {
       subscription_active_until?: string;
       reauth_warning?: string;
     }>(`/api/v1/admin/accounts/${id}/refresh-token`),
-  // 批量更新账号字段（group_ids 为追加模式）
+  // 批量更新账号字段（group_ids 为整体替换模式）
   bulkUpdate: (data: BulkUpdateAccountsReq) =>
     post<BulkOpResp>('/api/v1/admin/accounts/bulk-update', data),
   // 批量删除账号

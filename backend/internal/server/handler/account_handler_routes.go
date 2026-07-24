@@ -270,28 +270,37 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// BulkUpdateAccounts 批量更新账号字段（group_ids 为追加模式）。
+// BulkUpdateAccounts 批量更新账号字段（group_ids 为整体替换模式）。
 func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 	var req dto.BulkUpdateAccountsReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BindError(c, err)
 		return
 	}
+	var prioritySequence *appaccount.PrioritySequenceInput
+	if req.PrioritySequence != nil {
+		prioritySequence = &appaccount.PrioritySequenceInput{
+			Initial:   req.PrioritySequence.Initial,
+			Step:      req.PrioritySequence.Step,
+			GroupSize: req.PrioritySequence.GroupSize,
+		}
+	}
 
 	result := h.service.BulkUpdate(c.Request.Context(), appaccount.BulkUpdateInput{
-		IDs:            req.AccountIDs,
-		State:          req.State,
-		Priority:       req.Priority,
-		PriorityOffset: req.PriorityOffset,
-		MaxConcurrency: req.MaxConcurrency,
-		RateMultiplier: req.RateMultiplier.PtrOrDefault(1),
-		ModelPolicy:    req.ModelPolicy,
-		GroupIDs:       req.GroupIDs,
-		HasGroupIDs:    req.GroupIDs != nil,
-		ProxyID:        req.ProxyID,
-		HasProxyID:     req.ProxyID != nil,
-		Extra:          req.Extra,
-		HasExtra:       req.Extra != nil,
+		IDs:              req.AccountIDs,
+		State:            req.State,
+		Priority:         req.Priority,
+		PriorityOffset:   req.PriorityOffset,
+		PrioritySequence: prioritySequence,
+		MaxConcurrency:   req.MaxConcurrency,
+		RateMultiplier:   req.RateMultiplier.PtrOrDefault(1),
+		ModelPolicy:      req.ModelPolicy,
+		GroupIDs:         req.GroupIDs,
+		HasGroupIDs:      req.GroupIDs != nil,
+		ProxyID:          req.ProxyID,
+		HasProxyID:       req.ProxyID != nil,
+		Extra:            req.Extra,
+		HasExtra:         req.Extra != nil,
 	})
 	if result.Success > 0 {
 		h.refreshRouteGraphAccounts(c.Request.Context(), result.SuccessIDs)

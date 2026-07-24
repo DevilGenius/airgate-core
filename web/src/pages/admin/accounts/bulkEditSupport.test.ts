@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AccountResp } from '../../../shared/types';
-import { getBulkEditInitialValues } from './bulkEditSupport';
+import { getBulkEditInitialValues, orderSelectedAccountIdsByCreatedAt } from './bulkEditSupport';
 
 function account(input: Partial<AccountResp> & Pick<AccountResp, 'id'>): AccountResp {
   return {
@@ -24,7 +24,17 @@ function account(input: Partial<AccountResp> & Pick<AccountResp, 'id'>): Account
   };
 }
 
-describe('getBulkEditInitialValues', () => {
+describe('bulk edit support', () => {
+  it('orders selected accounts from oldest to newest for priority sequences', () => {
+    const rows = [
+      account({ id: 3, created_at: '2026-01-03T00:00:00Z' }),
+      account({ id: 2, created_at: '2026-01-02T00:00:00Z' }),
+      account({ id: 1, created_at: '2026-01-01T00:00:00Z' }),
+    ];
+
+    expect(orderSelectedAccountIdsByCreatedAt(rows, [3, 1, 2])).toEqual([1, 2, 3]);
+  });
+
   it('prefills common group priorities only when every selected account matches', () => {
     const rows = [
       account({

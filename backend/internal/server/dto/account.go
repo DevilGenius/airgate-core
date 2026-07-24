@@ -152,16 +152,24 @@ type ImportAccountsResp struct {
 
 // BulkUpdateAccountsReq 批量更新账号请求。
 type BulkUpdateAccountsReq struct {
-	AccountIDs     []int               `json:"account_ids" binding:"required,min=1"`
-	State          *string             `json:"state" binding:"omitempty,oneof=active disabled"`
-	Priority       *int                `json:"priority"`
-	PriorityOffset *int                `json:"priority_offset"`
-	MaxConcurrency *int                `json:"max_concurrency"`
-	RateMultiplier OptionalFloat       `json:"rate_multiplier"`
-	ModelPolicy    *modelpolicy.Policy `json:"model_policy"`
-	GroupIDs       []int64             `json:"group_ids"`
-	ProxyID        *int64              `json:"proxy_id"`
-	Extra          map[string]any      `json:"extra,omitempty"`
+	AccountIDs       []int                    `json:"account_ids" binding:"required,min=1"`
+	State            *string                  `json:"state" binding:"omitempty,oneof=active disabled"`
+	Priority         *int                     `json:"priority"`
+	PriorityOffset   *int                     `json:"priority_offset"`
+	PrioritySequence *BulkPrioritySequenceReq `json:"priority_sequence"`
+	MaxConcurrency   *int                     `json:"max_concurrency"`
+	RateMultiplier   OptionalFloat            `json:"rate_multiplier"`
+	ModelPolicy      *modelpolicy.Policy      `json:"model_policy"`
+	GroupIDs         []int64                  `json:"group_ids"`
+	ProxyID          *int64                   `json:"proxy_id"`
+	Extra            map[string]any           `json:"extra,omitempty"`
+}
+
+// BulkPrioritySequenceReq 按账号请求顺序生成分组优先级序列。
+type BulkPrioritySequenceReq struct {
+	Initial   int `json:"initial"`
+	Step      int `json:"step"`
+	GroupSize int `json:"group_size"`
 }
 
 // BulkAccountIDsReq 仅携带账号 ID 列表的批量请求（用于删除、刷新令牌等）。

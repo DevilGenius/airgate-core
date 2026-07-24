@@ -23,10 +23,12 @@ var (
 	ErrInvalidState = errors.New("账号状态无效")
 	// ErrInvalidRateMultiplier 账号倍率非法。
 	ErrInvalidRateMultiplier = errors.New("账号倍率必须是有限正数，范围为 0.01 到 100")
-	// ErrConflictingPriorityUpdate 同时提交固定优先级和优先级偏移。
-	ErrConflictingPriorityUpdate = errors.New("不能同时设置优先级和优先级偏移")
+	// ErrConflictingPriorityUpdate 同时提交多个优先级更新模式。
+	ErrConflictingPriorityUpdate = errors.New("固定优先级、优先级偏移和优先级序列只能设置一种")
 	// ErrInvalidPriorityOffset 优先级偏移后的结果超出支持范围。
 	ErrInvalidPriorityOffset = errors.New("优先级偏移后的结果必须在 -99999 到 99999 范围内")
+	// ErrInvalidPrioritySequence 优先级序列配置非法或生成结果越界。
+	ErrInvalidPrioritySequence = errors.New("优先级序列参数无效")
 	// ErrInvalidModelPolicy 模型黑白名单策略非法。
 	ErrInvalidModelPolicy = errors.New("模型策略无效")
 	// ErrReauthRequired OAuth 凭证已失效，需要重新授权（refresh_token 失效且无法本地降级）。

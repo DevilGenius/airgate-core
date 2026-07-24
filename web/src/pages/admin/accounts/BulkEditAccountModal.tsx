@@ -30,11 +30,15 @@ import {
   ACCOUNT_GROUP_PRIORITIES_EXTRA_KEY,
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
+  DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_GROUP_SIZE,
+  DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_INITIAL,
+  DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_STEP,
   commitAccountPriorityOffsetInput,
   commitAccountPriorityInput,
   DEFAULT_ACCOUNT_MAX_CONCURRENCY,
   DEFAULT_ACCOUNT_PRIORITY,
   getAccountPriorityOffsetRange,
+  getAccountPrioritySequencePreview,
   isAccountPriorityDraft,
   parseAccountPriorityOffsetInput,
   parseAccountPriorityInput,
@@ -77,6 +81,7 @@ export function BulkEditAccountModal({
   // 每个字段独立的「启用」开关
   const [enableStatus, setEnableStatus] = useState(false);
   const [enablePriority, setEnablePriority] = useState(false);
+  const [enablePrioritySequence, setEnablePrioritySequence] = useState(false);
   const [enablePriorityOffset, setEnablePriorityOffset] = useState(false);
   const [enableConcurrency, setEnableConcurrency] = useState(false);
   const [enableRateMultiplier, setEnableRateMultiplier] = useState(false);
@@ -88,6 +93,15 @@ export function BulkEditAccountModal({
   const [status, setStatus] = useState<'active' | 'disabled'>('active');
   const [priority, setPriority] = useState(() => initialPriority ?? DEFAULT_ACCOUNT_PRIORITY);
   const [priorityInput, setPriorityInput] = useState(() => String(initialPriority ?? DEFAULT_ACCOUNT_PRIORITY));
+  const [prioritySequenceInitialInput, setPrioritySequenceInitialInput] = useState(
+    String(DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_INITIAL),
+  );
+  const [prioritySequenceStepInput, setPrioritySequenceStepInput] = useState(
+    String(DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_STEP),
+  );
+  const [prioritySequenceGroupSizeInput, setPrioritySequenceGroupSizeInput] = useState(
+    String(DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_GROUP_SIZE),
+  );
   const [priorityOffsetInput, setPriorityOffsetInput] = useState('');
   const [maxConcurrency, setMaxConcurrency] = useState(() => initialMaxConcurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY);
   const [rateMultiplier, setRateMultiplier] = useState(() => String(initialRateMultiplier ?? 1));
@@ -115,6 +129,7 @@ export function BulkEditAccountModal({
   const hasAnyField =
     enableStatus ||
     enablePriority ||
+    enablePrioritySequence ||
     enablePriorityOffset ||
     enableConcurrency ||
     enableRateMultiplier ||
@@ -133,7 +148,18 @@ export function BulkEditAccountModal({
     parsedPriorityOffset >= priorityOffsetRange.min &&
     parsedPriorityOffset <= priorityOffsetRange.max
   );
-  const canSubmit = hasAnyField && priorityOffsetValid && rateMultiplierValid && (!enableProxy || proxyId != null);
+  const prioritySequencePreview = getAccountPrioritySequencePreview(
+    count,
+    parseAccountPriorityOffsetInput(prioritySequenceInitialInput),
+    parseAccountPriorityOffsetInput(prioritySequenceStepInput),
+    parseAccountPriorityOffsetInput(prioritySequenceGroupSizeInput),
+  );
+  const prioritySequenceValid = !enablePrioritySequence || prioritySequencePreview != null;
+  const canSubmit = hasAnyField
+    && priorityOffsetValid
+    && prioritySequenceValid
+    && rateMultiplierValid
+    && (!enableProxy || proxyId != null);
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -141,6 +167,13 @@ export function BulkEditAccountModal({
     const patch: Omit<BulkUpdateAccountsReq, 'account_ids'> = {};
     if (enableStatus) patch.state = status;
     if (enablePriority) patch.priority = commitAccountPriorityInput(priorityInput, priority);
+    if (enablePrioritySequence && prioritySequencePreview) {
+      patch.priority_sequence = {
+        initial: prioritySequencePreview.initial,
+        step: prioritySequencePreview.step,
+        group_size: prioritySequencePreview.groupSize,
+      };
+    }
     if (enablePriorityOffset && parsedPriorityOffset != null) patch.priority_offset = parsedPriorityOffset;
     if (enableConcurrency) patch.max_concurrency = maxConcurrency;
     if (enableRateMultiplier) {
@@ -193,11 +226,24 @@ export function BulkEditAccountModal({
   };
   const handlePriorityToggle = (enabled: boolean) => {
     setEnablePriority(enabled);
-    if (enabled) setEnablePriorityOffset(false);
+    if (enabled) {
+      setEnablePrioritySequence(false);
+      setEnablePriorityOffset(false);
+    }
+  };
+  const handlePrioritySequenceToggle = (enabled: boolean) => {
+    setEnablePrioritySequence(enabled);
+    if (enabled) {
+      setEnablePriority(false);
+      setEnablePriorityOffset(false);
+    }
   };
   const handlePriorityOffsetToggle = (enabled: boolean) => {
     setEnablePriorityOffset(enabled);
-    if (enabled) setEnablePriority(false);
+    if (enabled) {
+      setEnablePriority(false);
+      setEnablePrioritySequence(false);
+    }
   };
   const handlePriorityOffsetChange = (value: string) => {
     if (!isAccountPriorityDraft(value)) return;
@@ -297,6 +343,84 @@ export function BulkEditAccountModal({
               />
             </div>
           </HeroTextField>
+        </FieldRow>
+
+        {/* 优先级序列 */}
+        <FieldRow
+          enabled={enablePrioritySequence}
+          onToggle={handlePrioritySequenceToggle}
+          label={t('accounts.priority_sequence')}
+        >
+          <div className="space-y-2">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="min-w-0">
+                <span className="block text-[11px] leading-4 text-text-tertiary">
+                  {t('accounts.priority_sequence_initial')}
+                </span>
+                <Input
+                  aria-label={t('accounts.priority_sequence_initial')}
+                  className="mt-1"
+                  disabled={!enablePrioritySequence}
+                  inputMode="numeric"
+                  max={ACCOUNT_PRIORITY_MAX}
+                  min={ACCOUNT_PRIORITY_MIN}
+                  pattern="-?[0-9]*"
+                  type="text"
+                  value={prioritySequenceInitialInput}
+                  onChange={(event) => {
+                    if (isAccountPriorityDraft(event.target.value)) {
+                      setPrioritySequenceInitialInput(event.target.value);
+                    }
+                  }}
+                />
+              </label>
+              <label className="min-w-0">
+                <span className="block text-[11px] leading-4 text-text-tertiary">
+                  {t('accounts.priority_sequence_step')}
+                </span>
+                <Input
+                  aria-label={t('accounts.priority_sequence_step')}
+                  className="mt-1"
+                  disabled={!enablePrioritySequence}
+                  inputMode="numeric"
+                  pattern="-?[0-9]*"
+                  type="text"
+                  value={prioritySequenceStepInput}
+                  onChange={(event) => {
+                    if (isAccountPriorityDraft(event.target.value)) {
+                      setPrioritySequenceStepInput(event.target.value);
+                    }
+                  }}
+                />
+              </label>
+              <label className="min-w-0">
+                <span className="block text-[11px] leading-4 text-text-tertiary">
+                  {t('accounts.priority_sequence_group_size')}
+                </span>
+                <Input
+                  aria-label={t('accounts.priority_sequence_group_size')}
+                  className="mt-1"
+                  disabled={!enablePrioritySequence}
+                  inputMode="numeric"
+                  min={1}
+                  pattern="[0-9]*"
+                  step={1}
+                  type="text"
+                  value={prioritySequenceGroupSizeInput}
+                  onChange={(event) => {
+                    if (/^\d*$/.test(event.target.value)) {
+                      setPrioritySequenceGroupSizeInput(event.target.value);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            {enablePrioritySequence && !prioritySequencePreview ? (
+              <p className="text-[11px] leading-4 text-danger">
+                {t('accounts.priority_sequence_invalid')}
+              </p>
+            ) : null}
+          </div>
         </FieldRow>
 
         {/* 优先级偏移 */}

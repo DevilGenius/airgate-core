@@ -170,19 +170,27 @@ type ToggleResult struct {
 // 所有可选字段使用指针/HasXxx 标记：未设置表示「不修改」。
 // GroupIDs 采用整体替换语义：HasGroupIDs=true 时会用新列表覆盖账号原有分组。
 type BulkUpdateInput struct {
-	IDs            []int
-	State          *string
-	Priority       *int
-	PriorityOffset *int
-	MaxConcurrency *int
-	RateMultiplier *float64
-	ModelPolicy    *modelpolicy.Policy
-	GroupIDs       []int64
-	HasGroupIDs    bool
-	ProxyID        *int64
-	HasProxyID     bool
-	Extra          map[string]any
-	HasExtra       bool
+	IDs              []int
+	State            *string
+	Priority         *int
+	PriorityOffset   *int
+	PrioritySequence *PrioritySequenceInput
+	MaxConcurrency   *int
+	RateMultiplier   *float64
+	ModelPolicy      *modelpolicy.Policy
+	GroupIDs         []int64
+	HasGroupIDs      bool
+	ProxyID          *int64
+	HasProxyID       bool
+	Extra            map[string]any
+	HasExtra         bool
+}
+
+// PrioritySequenceInput 按 IDs 顺序每 GroupSize 个账号推进一次 Step。
+type PrioritySequenceInput struct {
+	Initial   int
+	Step      int
+	GroupSize int
 }
 
 // BulkResultItem 批量操作单条结果。

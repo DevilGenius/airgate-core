@@ -16,6 +16,18 @@ export type BulkEditSelection = {
   initialValues: BulkEditInitialValues;
 };
 
+export function orderSelectedAccountIdsByCreatedAt(rows: AccountResp[], selectedIds: number[]) {
+  const rowsByID = new Map(rows.map((row) => [row.id, row]));
+  return [...selectedIds].sort((leftID, rightID) => {
+    const left = rowsByID.get(leftID);
+    const right = rowsByID.get(rightID);
+    if (!left) return right ? 1 : leftID - rightID;
+    if (!right) return -1;
+    const createdAtOrder = left.created_at.localeCompare(right.created_at);
+    return createdAtOrder || leftID - rightID;
+  });
+}
+
 export function normalizeAccountGroupIds(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
   return value

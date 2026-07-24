@@ -220,6 +220,11 @@ export interface BulkUpdateAccountsReq {
   state?: 'active' | 'disabled';
   priority?: number;
   priority_offset?: number;
+  priority_sequence?: {
+    initial: number;
+    step: number;
+    group_size: number;
+  };
   max_concurrency?: number;
   rate_multiplier?: number | null;
   model_policy?: ModelPolicy | null;
