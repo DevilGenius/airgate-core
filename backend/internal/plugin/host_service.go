@@ -627,7 +627,7 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 		resp["success"] = false
 		resp["error_kind"] = "rate_limited"
 		resp["error_msg"] = truncateProbeErr(outcome.Reason)
-	case sdk.OutcomeAccountDead:
+	case sdk.OutcomeAccountDead, sdk.OutcomeAccountQuotaExhausted:
 		resp["success"] = false
 		resp["error_kind"] = "account_error"
 		resp["error_msg"] = truncateProbeErr(outcome.Reason)

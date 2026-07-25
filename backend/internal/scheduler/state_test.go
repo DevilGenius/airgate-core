@@ -145,6 +145,33 @@ func TestStateMachineAccountDead403InactiveOwnerDisables(t *testing.T) {
 	}
 }
 
+func TestStateMachineAccountQuotaExhaustedDisablesImmediately(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_account_quota_exhausted")
+	sm := NewStateMachine(db, nil)
+	criticalTransitions := 0
+	sm.onCriticalTransition = func(int) { criticalTransitions++ }
+	acc := createStateMachineAccount(ctx, db, "quota exhausted api key", true)
+
+	sm.Apply(ctx, acc.ID, Judgment{
+		Kind:           sdk.OutcomeAccountQuotaExhausted,
+		Reason:         "HTTP 403: 预扣费额度失败",
+		UpstreamStatus: http.StatusForbidden,
+		IsPool:         true,
+	})
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateDisabled {
+		t.Fatalf("state = %s, want disabled", fresh.State)
+	}
+	if fresh.StateUntil != nil {
+		t.Fatalf("state_until = %v, want nil", fresh.StateUntil)
+	}
+	if criticalTransitions != 1 {
+		t.Fatalf("critical transitions = %d, want 1", criticalTransitions)
+	}
+}
+
 func TestStateMachineAccountDead401StillDisables(t *testing.T) {
 	ctx := context.Background()
 	db := openStateMachineTestDB(t, "scheduler_account_dead_401_disables")

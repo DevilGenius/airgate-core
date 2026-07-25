@@ -1471,6 +1471,14 @@ func TestConnectivityTestErrorMessage(t *testing.T) {
 			},
 			want: "上游账号403暂不可用: HTTP 403: 访问被拒绝，账号暂不可用或无权限",
 		},
+		{
+			name: "账号额度耗尽使用统一提示",
+			outcome: sdk.ForwardOutcome{
+				Kind:   sdk.OutcomeAccountQuotaExhausted,
+				Reason: "HTTP 403: 预扣费额度失败",
+			},
+			want: "上游账号额度不足: HTTP 403: 预扣费额度失败",
+		},
 	}
 
 	for _, c := range cases {

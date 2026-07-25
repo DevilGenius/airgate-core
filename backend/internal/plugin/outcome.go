@@ -296,7 +296,8 @@ func writeFailureResponse(c *gin.Context, state *forwardState, execution forward
 			sanitizedMessage(execution.outcome.Kind), execution.outcome.RetryAfter)
 		return
 	}
-	if execution.outcome.Kind == sdk.OutcomeAccountUnavailable {
+	if execution.outcome.Kind == sdk.OutcomeAccountUnavailable ||
+		execution.outcome.Kind == sdk.OutcomeAccountQuotaExhausted {
 		openAIRateLimitError(c, http.StatusTooManyRequests, "upstream_account_unavailable",
 			sanitizedMessage(execution.outcome.Kind), allRoutesFailedDefaultRetryAfter)
 		return
@@ -312,6 +313,8 @@ func sanitizedMessage(kind sdk.OutcomeKind) string {
 		return "上游账号不可用，请联系管理员"
 	case sdk.OutcomeAccountUnavailable:
 		return "上游账号403暂不可用，请稍后重试"
+	case sdk.OutcomeAccountQuotaExhausted:
+		return "上游账号暂不可用，请稍后重试"
 	case sdk.OutcomeStreamAborted:
 		return "响应流中断"
 	case sdk.OutcomeFamilyTransient:

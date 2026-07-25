@@ -19,7 +19,7 @@ const successRecoveryFallbackWindow = time.Hour
 
 var recoverySchedulerErrorCodes = []string{
 	"no_available_account",
-	"all_routes_account_unavailable",
+	"account_attempts_exhausted",
 }
 
 type recoverySnapshot struct {

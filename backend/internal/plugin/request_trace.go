@@ -245,7 +245,7 @@ func markRequestTraceExecution(c *gin.Context, state *forwardState, execution fo
 		status = http.StatusTooManyRequests
 		errType = "rate_limit_error"
 		code = "upstream_rate_limit"
-	case sdk.OutcomeAccountUnavailable:
+	case sdk.OutcomeAccountUnavailable, sdk.OutcomeAccountQuotaExhausted:
 		status = http.StatusTooManyRequests
 		errType = "rate_limit_error"
 		code = "upstream_account_unavailable"

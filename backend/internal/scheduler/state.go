@@ -99,6 +99,7 @@ func (sm *StateMachine) notifyStateSnapshot(accountID int, state account.State, 
 //	Success             → state=active，清 state_until，last_used_at=now
 //	AccountRateLimited  → state=rate_limited，state_until=now+RetryAfter
 //	AccountDead         → 401 等确定性凭证失效才 disabled；403 只降级
+//	AccountQuotaExhausted → 余额或配额耗尽，直接 disabled，不进入冷却
 //	AccountUnavailable  → 首次记错，第二次起瞬时避让；连续 403 只降级，不自动 disabled
 //	UpstreamTransient   → 首次记错，第二次起瞬时避让；不会 disabled
 //	FamilyTransient     → (account, family) 维度首次记错、第二次起瞬时避让；不改账号级 DB state
@@ -145,6 +146,9 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 			// 401 表示池子自身的凭证无效，仍需禁用并说明原因。
 			return
 		}
+		sm.transition(ctx, accountID, account.StateDisabled, nil, j.Reason)
+
+	case sdk.OutcomeAccountQuotaExhausted:
 		sm.transition(ctx, accountID, account.StateDisabled, nil, j.Reason)
 
 	case sdk.OutcomeAccountUnavailable:

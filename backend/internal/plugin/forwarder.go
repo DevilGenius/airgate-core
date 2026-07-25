@@ -501,7 +501,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 
 	c.Set(ginCtxKeyAttempts, totalAttempts)
 	response := selectAllRoutesFailureResponse(failureSummary)
-	f.recordAllRoutesAccountUnavailable(c, state, failureSummary, response, totalAttempts)
+	f.recordAccountAvailabilityFailure(c, state, failureSummary, response, totalAttempts)
 	f.recordAPIRequestError(c, state, response.status, response.code, response.message)
 	writeAllRoutesFailedResponse(c, response)
 }
@@ -589,7 +589,7 @@ func (s *allRoutesFailureSummary) recordExecution(execution forwardExecution) {
 		s.recordRetryAfter(execution.outcome.RetryAfter)
 	case sdk.OutcomeAccountDead:
 		s.accountDeadSeen = true
-	case sdk.OutcomeAccountUnavailable:
+	case sdk.OutcomeAccountUnavailable, sdk.OutcomeAccountQuotaExhausted:
 		s.accountUnavailable = true
 	case sdk.OutcomeUpstreamTransient:
 		if isTimeoutFailure(execution) {
@@ -684,7 +684,7 @@ func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFa
 		return allRoutesFailureResponse{
 			status:     http.StatusTooManyRequests,
 			errType:    "rate_limit_error",
-			code:       "all_routes_rate_limited",
+			code:       "account_rate_limited",
 			message:    "上游账号当前被限流，请稍后重试",
 			retryAfter: retryAfter,
 		}
@@ -702,7 +702,7 @@ func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFa
 		return allRoutesFailureResponse{
 			status:     http.StatusTooManyRequests,
 			errType:    "rate_limit_error",
-			code:       "all_routes_capacity_exhausted",
+			code:       "account_capacity_exhausted",
 			message:    "上游容量暂时不足，请稍后重试",
 			retryAfter: allRoutesFailedDefaultRetryAfter,
 		}
@@ -727,8 +727,8 @@ func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFa
 		return allRoutesFailureResponse{
 			status:     http.StatusTooManyRequests,
 			errType:    "rate_limit_error",
-			code:       "all_routes_account_unavailable",
-			message:    "当前模型暂无可用上游账号，请稍后重试",
+			code:       "account_attempts_exhausted",
+			message:    "上游账号尝试已耗尽，请稍后重试",
 			retryAfter: allRoutesFailedDefaultRetryAfter,
 		}
 	}

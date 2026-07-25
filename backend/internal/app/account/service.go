@@ -1063,6 +1063,11 @@ func connectivityTestErrorMessage(outcome sdk.ForwardOutcome) string {
 			return "上游账号不可用: " + reason
 		}
 		return "上游账号不可用，请检查凭证或账号状态"
+	case sdk.OutcomeAccountQuotaExhausted:
+		if reason != "" {
+			return "上游账号额度不足: " + reason
+		}
+		return "上游账号额度不足，请充值或更换账号"
 	case sdk.OutcomeAccountUnavailable:
 		if reason != "" {
 			return "上游账号403暂不可用: " + reason

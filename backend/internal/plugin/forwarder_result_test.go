@@ -254,6 +254,24 @@ func TestWriteFailureResponse_AccountUnavailableReturns429(t *testing.T) {
 	}
 }
 
+func TestWriteFailureResponse_AccountQuotaExhaustedReturns429(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+
+	writeFailureResponse(c, fakeState(false), forwardExecution{
+		outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountQuotaExhausted},
+	})
+
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusTooManyRequests)
+	}
+	if body := recorder.Body.String(); !strings.Contains(body, "upstream_account_unavailable") {
+		t.Fatalf("body = %q, want upstream_account_unavailable", body)
+	}
+}
+
 func TestSanitizedClientErrorMessage_ImageTooLarge(t *testing.T) {
 	t.Parallel()
 

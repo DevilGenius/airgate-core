@@ -80,6 +80,7 @@ func TestOutcomeExtractionAndSanitizationEdges(t *testing.T) {
 		{sdk.OutcomeAccountRateLimited, "上游账号当前被限流，请稍后重试"},
 		{sdk.OutcomeAccountDead, "上游账号不可用，请联系管理员"},
 		{sdk.OutcomeAccountUnavailable, "上游账号403暂不可用，请稍后重试"},
+		{sdk.OutcomeAccountQuotaExhausted, "上游账号暂不可用，请稍后重试"},
 		{sdk.OutcomeStreamAborted, "响应流中断"},
 		{sdk.OutcomeFamilyTransient, "上游模型当前过载，请稍后重试"},
 		{sdk.OutcomeUpstreamTransient, "上游服务暂不可用，请稍后重试"},

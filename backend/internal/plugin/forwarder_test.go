@@ -1406,7 +1406,7 @@ func TestSelectAllRoutesFailureResponse(t *testing.T) {
 				upstreamFailureSeen:   true,
 			},
 			wantStatus: http.StatusTooManyRequests,
-			wantCode:   "all_routes_rate_limited",
+			wantCode:   "account_rate_limited",
 		},
 		{
 			name: "continuation unavailable",
@@ -1424,7 +1424,7 @@ func TestSelectAllRoutesFailureResponse(t *testing.T) {
 				upstreamFailureSeen: true,
 			},
 			wantStatus: http.StatusTooManyRequests,
-			wantCode:   "all_routes_capacity_exhausted",
+			wantCode:   "account_capacity_exhausted",
 		},
 		{
 			name: "upstream timeout",
@@ -1450,7 +1450,7 @@ func TestSelectAllRoutesFailureResponse(t *testing.T) {
 				accountUnavailable: true,
 			},
 			wantStatus: http.StatusTooManyRequests,
-			wantCode:   "all_routes_account_unavailable",
+			wantCode:   "account_attempts_exhausted",
 		},
 		{
 			name: "account unavailable by pick error",
@@ -1458,7 +1458,7 @@ func TestSelectAllRoutesFailureResponse(t *testing.T) {
 				accountUnavailable: true,
 			},
 			wantStatus: http.StatusTooManyRequests,
-			wantCode:   "all_routes_account_unavailable",
+			wantCode:   "account_attempts_exhausted",
 		},
 		{
 			name: "account dead only",
@@ -1497,7 +1497,7 @@ func TestSelectAllRoutesFailureResponse_AccountUnavailableIsRateLimited(t *testi
 	if got.errType != "rate_limit_error" {
 		t.Fatalf("errType = %q, want rate_limit_error", got.errType)
 	}
-	if got.message != "当前模型暂无可用上游账号，请稍后重试" {
+	if got.message != "上游账号尝试已耗尽，请稍后重试" {
 		t.Fatalf("message = %q, want account unavailable message", got.message)
 	}
 	if got.retryAfter != allRoutesFailedDefaultRetryAfter {
@@ -1505,7 +1505,19 @@ func TestSelectAllRoutesFailureResponse_AccountUnavailableIsRateLimited(t *testi
 	}
 }
 
-func TestRecordAllRoutesAccountUnavailableWritesMonitorEvent(t *testing.T) {
+func TestSelectAllRoutesFailureResponse_QuotaExhaustedIsAggregated(t *testing.T) {
+	t.Parallel()
+
+	summary := allRoutesFailureSummary{}
+	summary.recordExecution(forwardExecution{outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeAccountQuotaExhausted}})
+
+	response := selectAllRoutesFailureResponse(summary)
+	if response.code != "account_attempts_exhausted" {
+		t.Fatalf("code = %q, want account_attempts_exhausted", response.code)
+	}
+}
+
+func TestRecordAccountAvailabilityFailureWritesMonitorEvent(t *testing.T) {
 	t.Parallel()
 
 	recorder := &captureMonitorRecorder{}
@@ -1525,11 +1537,11 @@ func TestRecordAllRoutesAccountUnavailableWritesMonitorEvent(t *testing.T) {
 	}
 	response := allRoutesFailureResponse{
 		status:  http.StatusTooManyRequests,
-		code:    "all_routes_account_unavailable",
-		message: "当前模型暂无可用上游账号，请稍后重试",
+		code:    "account_attempts_exhausted",
+		message: "上游账号尝试已耗尽，请稍后重试",
 	}
 
-	forwarder.recordAllRoutesAccountUnavailable(nil, state, allRoutesFailureSummary{accountUnavailable: true}, response, 4)
+	forwarder.recordAccountAvailabilityFailure(nil, state, allRoutesFailureSummary{accountUnavailable: true}, response, 4)
 
 	if len(recorder.events) != 1 {
 		t.Fatalf("events = %d, want 1", len(recorder.events))
@@ -1547,10 +1559,10 @@ func TestRecordAllRoutesAccountUnavailableWritesMonitorEvent(t *testing.T) {
 	if event.Platform != "openai" || event.PluginID != "openai" {
 		t.Fatalf("locator = %q/%q, want openai/openai", event.Platform, event.PluginID)
 	}
-	if event.ErrorCode != "all_routes_account_unavailable" {
-		t.Fatalf("errorCode = %q, want all_routes_account_unavailable", event.ErrorCode)
+	if event.ErrorCode != "account_attempts_exhausted" {
+		t.Fatalf("errorCode = %q, want account_attempts_exhausted", event.ErrorCode)
 	}
-	if event.Message != "当前模型暂无可用上游账号，请稍后重试" {
+	if event.Message != "上游账号尝试已耗尽，请稍后重试" {
 		t.Fatalf("message = %q, want account unavailable message", event.Message)
 	}
 	if got := event.Detail["total_attempts"]; got != 4 {
@@ -1577,7 +1589,7 @@ func TestRecordAPIRequestErrorIncludesGroupSnapshotInDetail(t *testing.T) {
 
 	c, _ := pluginTestContext(http.MethodPost, "/v1/chat/completions")
 	c.Set(ginCtxKeyAttempts, 4)
-	forwarder.recordAPIRequestErrorForKey(c, keyInfo, "openai", "/v1/chat/completions", "gpt-4.1", http.StatusTooManyRequests, "all_routes_account_unavailable", "当前模型暂无可用上游账号，请稍后重试")
+	forwarder.recordAPIRequestErrorForKey(c, keyInfo, "openai", "/v1/chat/completions", "gpt-4.1", http.StatusTooManyRequests, "account_attempts_exhausted", "上游账号尝试已耗尽，请稍后重试")
 
 	if len(recorder.events) != 1 {
 		t.Fatalf("events = %d, want 1", len(recorder.events))

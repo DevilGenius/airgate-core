@@ -73,11 +73,11 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 	f.recordRequestEvent(ctx, input, requestTraceFromGinContext(c), true)
 }
 
-func (f *Forwarder) recordAllRoutesAccountUnavailable(c *gin.Context, state *forwardState, summary allRoutesFailureSummary, response allRoutesFailureResponse, attempts int) {
+func (f *Forwarder) recordAccountAvailabilityFailure(c *gin.Context, state *forwardState, summary allRoutesFailureSummary, response allRoutesFailureResponse, attempts int) {
 	if f == nil || f.monitor == nil || state == nil {
 		return
 	}
-	if response.code != "all_routes_account_unavailable" && response.code != "no_available_account" {
+	if response.code != "account_attempts_exhausted" && response.code != "no_available_account" {
 		return
 	}
 	ctx := context.Background()
@@ -133,7 +133,7 @@ func (f *Forwarder) recordAllRoutesAccountUnavailable(c *gin.Context, state *for
 		Platform:    platform,
 		PluginID:    pluginID,
 		ErrorCode:   response.code,
-		Title:       "All upstream accounts unavailable",
+		Title:       "Account attempts exhausted",
 		Message:     response.message,
 		Detail:      detail,
 	})

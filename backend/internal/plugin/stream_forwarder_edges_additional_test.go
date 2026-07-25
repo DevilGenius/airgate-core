@@ -170,12 +170,12 @@ func TestAllRoutesFailureResponsesAndFailoverDecisions(t *testing.T) {
 	}{
 		{name: "context too large", summary: allRoutesFailureSummary{contextTooLargeSeen: true}, status: http.StatusRequestEntityTooLarge, code: "context_too_large"},
 		{name: "continuation affinity missing", summary: allRoutesFailureSummary{continuationAffinityMissing: true}, status: http.StatusBadRequest, code: "continuation_affinity_missing"},
-		{name: "rate limited", summary: allRoutesFailureSummary{rateLimitedSeen: true, rateLimitedRetryAfter: 1500 * time.Millisecond}, status: http.StatusTooManyRequests, code: "all_routes_rate_limited", retryHeader: true},
+		{name: "rate limited", summary: allRoutesFailureSummary{rateLimitedSeen: true, rateLimitedRetryAfter: 1500 * time.Millisecond}, status: http.StatusTooManyRequests, code: "account_rate_limited", retryHeader: true},
 		{name: "continuation unavailable", summary: allRoutesFailureSummary{continuationUnavailable: true}, status: http.StatusTooManyRequests, code: "continuation_unavailable", retryHeader: true},
-		{name: "local capacity", summary: allRoutesFailureSummary{localCapacitySeen: true}, status: http.StatusTooManyRequests, code: "all_routes_capacity_exhausted", retryHeader: true},
+		{name: "local capacity", summary: allRoutesFailureSummary{localCapacitySeen: true}, status: http.StatusTooManyRequests, code: "account_capacity_exhausted", retryHeader: true},
 		{name: "upstream timeout", summary: allRoutesFailureSummary{upstreamTimeoutSeen: true}, status: http.StatusGatewayTimeout, code: "upstream_timeout"},
 		{name: "upstream failure", summary: allRoutesFailureSummary{upstreamFailureSeen: true}, status: http.StatusBadGateway, code: "upstream_error"},
-		{name: "account unavailable", summary: allRoutesFailureSummary{accountUnavailable: true}, status: http.StatusTooManyRequests, code: "all_routes_account_unavailable", retryHeader: true},
+		{name: "account unavailable", summary: allRoutesFailureSummary{accountUnavailable: true}, status: http.StatusTooManyRequests, code: "account_attempts_exhausted", retryHeader: true},
 		{name: "account dead", summary: allRoutesFailureSummary{accountDeadSeen: true}, status: http.StatusServiceUnavailable, code: "no_available_account"},
 		{name: "default", summary: allRoutesFailureSummary{}, status: http.StatusServiceUnavailable, code: "all_routes_failed"},
 	}
