@@ -274,7 +274,7 @@ function summaryValue(active: number, total: number, showActiveRatio: boolean) {
 function summaryWindowValue(shortTotal?: number, longTotal?: number) {
   const short = Math.max(0, Math.trunc(shortTotal ?? 0));
   const long = Math.max(0, Math.trunc(longTotal ?? 0));
-  return `${short}/${long}`;
+  return `${short} / ${long}`;
 }
 
 function SummaryMiniStat({
@@ -327,6 +327,16 @@ function MonitorSummaryCard({
             label={t('monitor.error')}
             tone="bg-rose-100 text-rose-600 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/25"
             value={summaryValue(summary?.error_active_total ?? 0, summary?.error_total ?? 0, showActiveCounts)}
+          />
+          <SummaryMiniStat
+            label={t('monitor.warning')}
+            tone="bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25"
+            value={fmtNum(summary?.warning_total ?? 0)}
+          />
+          <SummaryMiniStat
+            label={t('monitor.severity_info')}
+            tone="bg-sky-100 text-sky-600 ring-sky-200 dark:bg-sky-400/15 dark:text-sky-300 dark:ring-sky-400/25"
+            value={fmtNum(summary?.info_total ?? 0)}
           />
           <SummaryMiniStat
             label={`${t('monitor.warning')}(5m/1h)`}
