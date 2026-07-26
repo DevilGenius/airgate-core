@@ -244,7 +244,7 @@ export default function ProxiesPage() {
         ariaLabel={t('proxies.title', 'Proxies')}
         className="ag-proxies-table"
         contentClassName="ag-proxies-table-content"
-        minWidth={980}
+        minWidth={944}
       >
             <CommonTable.Header>
               <CommonTable.Column id="id" style={{ width: 64 }}>
@@ -255,7 +255,7 @@ export default function ProxiesPage() {
               <CommonTable.Column id="endpoint" style={{ width: 224 }}>{t('proxies.address')}</CommonTable.Column>
               <CommonTable.Column id="username" style={{ width: 144 }}>{t('proxies.username')}</CommonTable.Column>
               <CommonTable.Column id="status" style={{ width: 96 }}>{t('common.status')}</CommonTable.Column>
-              <CommonTable.Column id="actions" style={{ width: 204 }}>{t('common.actions')}</CommonTable.Column>
+              <CommonTable.Column id="actions" style={{ width: 168 }}>{t('common.actions')}</CommonTable.Column>
             </CommonTable.Header>
             <CommonTable.Body>
               {isLoading ? (
@@ -317,13 +317,14 @@ export default function ProxiesPage() {
                           {t('common.test')}
                         </Button>
                         <Button
+                          isIconOnly
+                          aria-label={t('common.delete')}
                           size="sm"
                           variant="danger-soft"
                           className="text-danger"
                           onPress={() => setDeleteTarget(row)}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          {t('common.delete')}
                         </Button>
                       </div>
                     </CommonTable.Cell>
