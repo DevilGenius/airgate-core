@@ -113,7 +113,7 @@ func (s *Service) flushBatch(ctx context.Context, batch []QueuedEvent) error {
 	}
 	s.persistRecoveryEvents(ctx, batch)
 	s.flushedEvents.Add(int64(len(batch)))
-	s.publishMonitorChanged("recorded")
+	s.broadcastMonitorChanged("recorded")
 	return nil
 }
 
@@ -128,7 +128,7 @@ func (s *Service) flushRequestBatch(ctx context.Context, batch []QueuedRequestEv
 		return err
 	}
 	s.flushedEvents.Add(int64(len(batch)))
-	s.publishMonitorChanged("request_recorded")
+	s.broadcastMonitorChanged("request_recorded")
 	return nil
 }
 
@@ -141,7 +141,7 @@ func (s *Service) resolveBySubject(ctx context.Context, query monitoring.Resolve
 		return
 	}
 	s.forgetRecoveryQuery(ctx, query)
-	s.publishMonitorChanged("resolved")
+	s.broadcastMonitorChanged("resolved")
 }
 
 func (s *Service) superviseLoop(ctx context.Context, name string, counter *atomic.Int64, run func()) {

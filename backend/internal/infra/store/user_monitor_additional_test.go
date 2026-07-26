@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -299,10 +298,6 @@ func TestMonitorStoreEventsLifecycleAndRequests(t *testing.T) {
 	if got := mapMonitorEvent(nil); got.ID != 0 || got.Detail != nil {
 		t.Fatalf("mapMonitorEvent(nil) = %+v", got)
 	}
-	if truncateStoreString("abcdef", 3) != "abc" || truncateStoreString("abcdef", 0) != "abcdef" {
-		t.Fatal("truncateStoreString returned unexpected values")
-	}
-
 	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
 	accountID := 101
 	event := appmonitor.QueuedEvent{Event: appmonitor.Event{
@@ -410,34 +405,7 @@ func TestMonitorStoreEventsLifecycleAndRequests(t *testing.T) {
 		len(summary.TopAccounts) == 0 || len(summary.Recent) == 0 {
 		t.Fatalf("Summary = %+v", summary)
 	}
-	due, err := store.ListNotifyDue(ctx, now.Add(2*time.Minute), 0)
-	if err != nil {
-		t.Fatalf("ListNotifyDue returned error: %v", err)
-	}
-	if len(due) != 1 || due[0].Hash != "monitor-hash" {
-		t.Fatalf("ListNotifyDue = %+v", due)
-	}
-	if err := store.MarkNotified(ctx, due[0].ID, now.Add(2*time.Minute), now.Add(time.Hour)); err != nil {
-		t.Fatalf("MarkNotified returned error: %v", err)
-	}
-	if err := store.MarkNotifyFailed(ctx, due[0].ID, now.Add(30*time.Minute), strings.Repeat("x", 600)); err != nil {
-		t.Fatalf("MarkNotifyFailed returned error: %v", err)
-	}
-	failed, err := db.MonitorEvent.Get(ctx, due[0].ID)
-	if err != nil {
-		t.Fatalf("get failed notification event: %v", err)
-	}
-	if len([]rune(failed.NotifyError)) != 500 {
-		t.Fatalf("NotifyError len = %d, want 500", len([]rune(failed.NotifyError)))
-	}
-	if err := store.MarkNotified(ctx, 0, now, now); err != nil {
-		t.Fatalf("MarkNotified invalid returned error: %v", err)
-	}
-	if err := store.MarkNotifyFailed(ctx, 0, now, "ignored"); err != nil {
-		t.Fatalf("MarkNotifyFailed invalid returned error: %v", err)
-	}
-
-	if err := store.Resolve(ctx, due[0].ID); err != nil {
+	if err := store.Resolve(ctx, active.ID); err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
 	if err := store.Resolve(ctx, 999999); !errors.Is(err, appmonitor.ErrEventNotFound) {

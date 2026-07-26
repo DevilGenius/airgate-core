@@ -15,7 +15,6 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/adminevents"
 	appmonitor "github.com/DevilGenius/airgate-core/internal/app/monitor"
-	appnotification "github.com/DevilGenius/airgate-core/internal/app/notification"
 	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/billing"
@@ -85,12 +84,10 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	if err != nil {
 		return nil, fmt.Errorf("初始化运行时功能设置失败: %w", err)
 	}
-	monitorNotificationService := appnotification.NewService(monitorSettingsService)
 	monitorService := appmonitor.NewService(
 		monitorStore,
 		appmonitor.WithRedis(rdb),
-		appmonitor.WithNotifier(monitorNotificationService),
-		appmonitor.WithEventPublisher(eventHub),
+		appmonitor.WithMonitorChangeBroadcaster(eventHub),
 		appmonitor.WithRequestTrace(runtimeFeatureState.RequestTraceEnabled),
 	)
 	if runtimeFeatureState.RequestTraceEnabled {

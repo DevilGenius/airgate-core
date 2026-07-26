@@ -79,5 +79,5 @@ func (s *Service) persistRequestTrace(ctx context.Context, item queuedRequestTra
 		return
 	}
 	s.flushedEvents.Add(1)
-	s.publishMonitorChanged("request_trace_recorded")
+	s.broadcastMonitorChanged("request_trace_recorded")
 }

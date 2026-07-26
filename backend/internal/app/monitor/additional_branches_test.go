@@ -258,24 +258,6 @@ func TestAdditionalQueueRecoveryAndRedisBranches(t *testing.T) {
 		t.Fatalf("persist recovery expectations: %v", err)
 	}
 
-	rdb, mock = redismock.NewClientMock()
-	redisService = NewService(nil, WithRedis(rdb))
-	mock.Regexp().ExpectSetNX(monitorNotifyLockKey(12), ".+", notifyLockTTL).SetVal(true)
-	claimed, token := redisService.claimNotify(t.Context(), 12)
-	if !claimed || token == "" {
-		t.Fatalf("claimNotify = %v %q, want claimed token", claimed, token)
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("claim notify expectations: %v", err)
-	}
-
-	rdb, mock = redismock.NewClientMock()
-	redisService = NewService(nil, WithRedis(rdb))
-	mock.Regexp().ExpectSetNX(monitorNotifyLockKey(13), ".+", notifyLockTTL).SetErr(errors.New("redis down"))
-	claimed, token = redisService.claimNotify(t.Context(), 13)
-	if claimed || token != "" {
-		t.Fatalf("claimNotify error = %v %q, want false blank", claimed, token)
-	}
 }
 
 func TestAdditionalWorkerErrorBranches(t *testing.T) {
@@ -305,29 +287,4 @@ func TestAdditionalWorkerErrorBranches(t *testing.T) {
 	cancel()
 	service.runAutoResolveOnce(canceled)
 	service.runCleanupExpiredOnce(canceled)
-
-	notifier := &monitorNotifierStub{configured: false}
-	service = NewService(&monitorRepoStub{}, WithNotifier(notifier))
-	service.runNotifyOnce(t.Context())
-
-	notifier = &monitorNotifierStub{configured: true, err: errors.New("send failed")}
-	repo = &monitorRepoStub{notifyDue: []Event{{ID: 21, Severity: monitoring.SeverityError, Title: "failed notify"}}}
-	service = NewService(repo, WithNotifier(notifier))
-	service.runNotifyOnce(t.Context())
-	if repo.markedNotifiedID != 0 {
-		t.Fatalf("failed notify should not mark notified, got %d", repo.markedNotifiedID)
-	}
-
-	accountID := 77
-	last := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
-	next := last.Add(time.Hour)
-	values := monitorNotificationValues(Event{
-		ID: 22, Severity: monitoring.SeverityWarning, Title: "Warning", Message: "message",
-		SubjectID: "subject", AccountID: &accountID, AccountNameSnapshot: "Account 77",
-		LastNotifiedAt: &last, NextNotifyAt: &next,
-	})
-	if values["subject"] != "Account 77" || values["account_id"] != strconv.Itoa(accountID) ||
-		values["last_notified_at"] == "" || values["next_notify_at"] == "" {
-		t.Fatalf("notification values = %+v", values)
-	}
 }

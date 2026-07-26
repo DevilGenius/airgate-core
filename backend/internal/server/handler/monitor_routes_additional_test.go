@@ -232,15 +232,3 @@ func (h *handlerMonitorRepoStub) CleanupExpiredRequests(context.Context, time.Ti
 func (h *handlerMonitorRepoStub) AutoResolveDue(context.Context, time.Time, int) (int, error) {
 	return 0, nil
 }
-
-func (h *handlerMonitorRepoStub) ListNotifyDue(context.Context, time.Time, int) ([]appmonitor.Event, error) {
-	return nil, nil
-}
-
-func (h *handlerMonitorRepoStub) MarkNotified(context.Context, int, time.Time, time.Time) error {
-	return nil
-}
-
-func (h *handlerMonitorRepoStub) MarkNotifyFailed(context.Context, int, time.Time, string) error {
-	return nil
-}

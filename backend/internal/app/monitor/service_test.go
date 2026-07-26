@@ -143,8 +143,8 @@ func TestRepositoryPassthroughResolveAndFlush(t *testing.T) {
 		summary:            func(context.Context) (Summary, error) { return Summary{ActiveTotal: 4}, nil },
 		requestSummary:     func(context.Context) (Summary, error) { return Summary{ActiveTotal: 5}, nil },
 	}
-	publisher := &monitorPublisherStub{}
-	service := NewService(repo, WithEventPublisher(publisher))
+	broadcaster := &monitorChangeBroadcasterStub{}
+	service := NewService(repo, WithMonitorChangeBroadcaster(broadcaster))
 
 	if _, err := service.Get(t.Context(), 7); err != nil {
 		t.Fatalf("Get returned error: %v", err)
@@ -155,8 +155,8 @@ func TestRepositoryPassthroughResolveAndFlush(t *testing.T) {
 	if list, err := service.ListRequests(t.Context(), RequestListFilter{}); err != nil || len(list.List) != 1 {
 		t.Fatalf("ListRequests = %+v err=%v", list, err)
 	}
-	if deleted, err := service.ClearRequestEvents(t.Context(), nil); err != nil || deleted != 3 || publisher.reasons[len(publisher.reasons)-1] != "request_cleared" {
-		t.Fatalf("ClearRequestEvents deleted=%d err=%v reasons=%v", deleted, err, publisher.reasons)
+	if deleted, err := service.ClearRequestEvents(t.Context(), nil); err != nil || deleted != 3 || broadcaster.reasons[len(broadcaster.reasons)-1] != "request_cleared" {
+		t.Fatalf("ClearRequestEvents deleted=%d err=%v reasons=%v", deleted, err, broadcaster.reasons)
 	}
 	if summary, err := service.Summary(t.Context()); err != nil || summary.ActiveTotal != 4 {
 		t.Fatalf("Summary = %+v err=%v", summary, err)
@@ -167,8 +167,8 @@ func TestRepositoryPassthroughResolveAndFlush(t *testing.T) {
 	if err := service.Resolve(t.Context(), 7); err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if repo.resolvedID != 7 || publisher.reasons[len(publisher.reasons)-1] != "resolved" {
-		t.Fatalf("resolvedID=%d reasons=%v", repo.resolvedID, publisher.reasons)
+	if repo.resolvedID != 7 || broadcaster.reasons[len(broadcaster.reasons)-1] != "resolved" {
+		t.Fatalf("resolvedID=%d reasons=%v", repo.resolvedID, broadcaster.reasons)
 	}
 
 	if err := service.flushBatch(t.Context(), []QueuedEvent{{Event: Event{Hash: "h"}}}); err != nil {
@@ -256,50 +256,23 @@ func TestRecoverySnapshotAndQueries(t *testing.T) {
 	}
 }
 
-func TestWorkerNotifyAndNotificationHelpers(t *testing.T) {
+func TestWorkerAndChangeBroadcaster(t *testing.T) {
 	repo := &monitorRepoStub{
 		autoResolve: []int{workerBatchSize, 2},
 		cleanup:     []int{workerBatchSize, 1},
 		cleanupReq:  []int{3},
-		notifyDue: []Event{{
-			ID: 9, Severity: monitoring.SeverityCritical, Type: monitoring.TypePluginError, Status: monitoring.StatusActive,
-			Source: monitoring.SourcePluginManager, SubjectType: monitoring.SubjectPlugin, SubjectID: "subject",
-			Title: "Plugin failed", Message: "", PluginID: "gateway-openai", CreatedAt: time.Date(2026, 6, 20, 1, 0, 0, 0, time.UTC),
-			UpdatedAt: time.Date(2026, 6, 20, 2, 0, 0, 0, time.UTC),
-		}},
 	}
-	publisher := &monitorPublisherStub{}
-	notifier := &monitorNotifierStub{configured: true}
-	service := NewService(repo, WithNotifier(notifier), WithEventPublisher(publisher))
+	broadcaster := &monitorChangeBroadcasterStub{}
+	service := NewService(repo, WithMonitorChangeBroadcaster(broadcaster))
 
 	service.runAutoResolveOnce(t.Context())
 	service.runCleanupExpiredOnce(t.Context())
-	service.runNotifyOnce(t.Context())
 
 	if repo.autoResolveCalls != 2 || repo.cleanupCalls != 2 || repo.cleanupReqCalls != 1 {
 		t.Fatalf("worker calls auto=%d cleanup=%d cleanupReq=%d", repo.autoResolveCalls, repo.cleanupCalls, repo.cleanupReqCalls)
 	}
-	if !containsReason(publisher.reasons, "auto_resolved") || !containsReason(publisher.reasons, "cleanup") {
-		t.Fatalf("publisher reasons = %v", publisher.reasons)
-	}
-	if len(notifier.sent) != 1 || notifier.sent[0]["subject"] != "gateway-openai" || notifier.sent[0]["content"] != "Plugin failed" {
-		t.Fatalf("notifier sent = %+v", notifier.sent)
-	}
-	if repo.markedNotifiedID != 9 {
-		t.Fatalf("markedNotifiedID = %d, want 9", repo.markedNotifiedID)
-	}
-	if ok, token := service.claimNotify(t.Context(), 9); !ok || token != "" {
-		t.Fatalf("claimNotify without redis = %v %q", ok, token)
-	}
-	service.releaseNotify(t.Context(), 9, "")
-	if monitorNotifyLockKey(7) != "monitor:notify:7" {
-		t.Fatalf("monitorNotifyLockKey = %q", monitorNotifyLockKey(7))
-	}
-	if notificationCooldown(monitoring.SeverityCritical) != 10*time.Minute || notificationCooldown(monitoring.SeverityWarning) != 30*time.Minute {
-		t.Fatal("notificationCooldown mismatch")
-	}
-	if intToString(nil) != "" || timePtrToString(nil) != "" || timePtrToString(&time.Time{}) != "" {
-		t.Fatal("nil/zero formatting helpers should return blank")
+	if !containsReason(broadcaster.reasons, "auto_resolved") || !containsReason(broadcaster.reasons, "cleanup") {
+		t.Fatalf("broadcaster reasons = %v", broadcaster.reasons)
 	}
 }
 
@@ -332,11 +305,6 @@ type monitorRepoStub struct {
 	cleanupReq       []int
 	cleanupReqErr    error
 	cleanupReqCalls  int
-	notifyDue        []Event
-	notifyErr        error
-	markedNotifiedID int
-	markNotifiedErr  error
-	markFailedErr    error
 }
 
 func (m *monitorRepoStub) InsertBatch(_ context.Context, events []QueuedEvent) error {
@@ -428,44 +396,12 @@ func (m *monitorRepoStub) AutoResolveDue(context.Context, time.Time, int) (int, 
 	return popInt(&m.autoResolve), nil
 }
 
-func (m *monitorRepoStub) ListNotifyDue(context.Context, time.Time, int) ([]Event, error) {
-	if m.notifyErr != nil {
-		return nil, m.notifyErr
-	}
-	return m.notifyDue, nil
-}
-
-func (m *monitorRepoStub) MarkNotified(_ context.Context, id int, _ time.Time, _ time.Time) error {
-	m.markedNotifiedID = id
-	return m.markNotifiedErr
-}
-
-func (m *monitorRepoStub) MarkNotifyFailed(context.Context, int, time.Time, string) error {
-	return m.markFailedErr
-}
-
-type monitorPublisherStub struct {
+type monitorChangeBroadcasterStub struct {
 	reasons []string
 }
 
-func (m *monitorPublisherStub) PublishMonitorChanged(reason string) {
+func (m *monitorChangeBroadcasterStub) BroadcastMonitorChanged(reason string) {
 	m.reasons = append(m.reasons, reason)
-}
-
-type monitorNotifierStub struct {
-	configured bool
-	sent       []map[string]string
-	err        error
-	configErr  error
-}
-
-func (m *monitorNotifierStub) IsConfigured(context.Context) (bool, error) {
-	return m.configured, m.configErr
-}
-
-func (m *monitorNotifierStub) Send(_ context.Context, values map[string]string) error {
-	m.sent = append(m.sent, values)
-	return m.err
 }
 
 func popInt(values *[]int) int {

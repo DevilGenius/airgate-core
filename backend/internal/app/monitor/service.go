@@ -39,13 +39,6 @@ const (
 	dropLogInterval = time.Minute
 )
 
-var monitorNotifyUnlockScript = redis.NewScript(`
-if redis.call("GET", KEYS[1]) == ARGV[1] then
-	return redis.call("DEL", KEYS[1])
-end
-return 0
-`)
-
 var (
 	bearerPattern = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+`)
 	skKeyPattern  = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{8,}\b`)
@@ -56,30 +49,24 @@ var (
 // Option customizes the monitor service.
 type Option func(*Service)
 
-// Notifier is the existing notification service surface used by monitor alerts.
-type Notifier interface {
-	IsConfigured(context.Context) (bool, error)
-	Send(context.Context, map[string]string) error
-}
-
-// EventPublisher receives best-effort monitor change notifications.
-type EventPublisher interface {
-	PublishMonitorChanged(reason string)
+// MonitorChangeBroadcaster sends best-effort monitor change signals to admin clients.
+// It is not a durable application event publisher.
+type MonitorChangeBroadcaster interface {
+	BroadcastMonitorChanged(reason string)
 }
 
 // Service provides best-effort temporary monitoring.
 type Service struct {
-	repo           Repository
-	notifier       Notifier
-	eventPublisher EventPublisher
-	rdb            *redis.Client
-	queue          chan queuedOperation
-	traceQueue     chan queuedRequestTrace
-	traceEnabled   atomic.Bool
-	recovery       *recoverySnapshot
-	retention      time.Duration
-	flushInterval  time.Duration
-	flushBatchSize int
+	repo              Repository
+	changeBroadcaster MonitorChangeBroadcaster
+	rdb               *redis.Client
+	queue             chan queuedOperation
+	traceQueue        chan queuedRequestTrace
+	traceEnabled      atomic.Bool
+	recovery          *recoverySnapshot
+	retention         time.Duration
+	flushInterval     time.Duration
+	flushBatchSize    int
 
 	droppedEvents      atomic.Int64
 	queuedEvents       atomic.Int64
@@ -174,21 +161,14 @@ func WithRequestTrace(enabled bool) Option {
 	}
 }
 
-// WithNotifier enables monitor notifications through the existing notification service.
-func WithNotifier(notifier Notifier) Option {
+// WithMonitorChangeBroadcaster broadcasts monitor list/summary changes.
+func WithMonitorChangeBroadcaster(broadcaster MonitorChangeBroadcaster) Option {
 	return func(s *Service) {
-		s.notifier = notifier
+		s.changeBroadcaster = broadcaster
 	}
 }
 
-// WithEventPublisher publishes monitor list/summary change notifications.
-func WithEventPublisher(publisher EventPublisher) Option {
-	return func(s *Service) {
-		s.eventPublisher = publisher
-	}
-}
-
-// WithRedis enables cross-instance monitor notification claiming.
+// WithRedis enables cross-instance recovery state sharing.
 func WithRedis(rdb *redis.Client) Option {
 	return func(s *Service) {
 		s.rdb = rdb
@@ -368,7 +348,7 @@ func (s *Service) ClearRequestEvents(ctx context.Context, before *time.Time) (in
 			return deleted, err
 		}
 	}
-	s.publishMonitorChanged("request_cleared")
+	s.broadcastMonitorChanged("request_cleared")
 	return deleted, nil
 }
 
@@ -385,7 +365,7 @@ func (s *Service) ClearRequestTraces(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	s.publishMonitorChanged("request_trace_cleared")
+	s.broadcastMonitorChanged("request_trace_cleared")
 	return deleted, nil
 }
 
@@ -467,15 +447,15 @@ func (s *Service) Resolve(ctx context.Context, id int) error {
 		return err
 	}
 	s.forgetRecoveryEvent(ctx, event)
-	s.publishMonitorChanged("resolved")
+	s.broadcastMonitorChanged("resolved")
 	return nil
 }
 
-func (s *Service) publishMonitorChanged(reason string) {
-	if s == nil || s.eventPublisher == nil {
+func (s *Service) broadcastMonitorChanged(reason string) {
+	if s == nil || s.changeBroadcaster == nil {
 		return
 	}
-	s.eventPublisher.PublishMonitorChanged(reason)
+	s.changeBroadcaster.BroadcastMonitorChanged(reason)
 }
 
 func (s *Service) normalizeInput(input monitoring.EventInput) QueuedEvent {

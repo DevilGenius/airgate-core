@@ -268,9 +268,6 @@ type Repository interface {
 	CleanupExpired(context.Context, time.Time, int) (int, error)
 	CleanupExpiredRequests(context.Context, time.Time, int) (int, error)
 	AutoResolveDue(context.Context, time.Time, int) (int, error)
-	ListNotifyDue(context.Context, time.Time, int) ([]Event, error)
-	MarkNotified(context.Context, int, time.Time, time.Time) error
-	MarkNotifyFailed(context.Context, int, time.Time, string) error
 }
 
 // RequestTraceRepository is optional so existing monitor repositories and

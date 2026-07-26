@@ -95,8 +95,8 @@ func (h *Hub) PublishAccountCapacityChanged(accountID int, currentConcurrency in
 	})
 }
 
-// PublishMonitorChanged reports that monitor list/summary data changed.
-func (h *Hub) PublishMonitorChanged(reason string) {
+// BroadcastMonitorChanged reports that monitor list/summary data changed.
+func (h *Hub) BroadcastMonitorChanged(reason string) {
 	if h == nil {
 		return
 	}

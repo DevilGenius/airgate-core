@@ -22,12 +22,12 @@ func TestAdditionalAggregatorLoopProcessesOperations(t *testing.T) {
 		insertRequestCh: make(chan struct{}, 1),
 		resolveCh:       make(chan struct{}, 1),
 	}
-	publisher := &monitorPublisherStub{}
+	broadcaster := &monitorChangeBroadcasterStub{}
 	service := NewService(repo,
 		WithQueueSize(8),
 		WithFlushBatchSize(1),
 		WithFlushInterval(time.Hour),
-		WithEventPublisher(publisher),
+		WithMonitorChangeBroadcaster(broadcaster),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -54,8 +54,8 @@ func TestAdditionalAggregatorLoopProcessesOperations(t *testing.T) {
 		t.Fatalf("aggregator state flushed=%d inserted=%d requests=%d resolved=%d",
 			service.flushedEvents.Load(), len(repo.inserted), len(repo.insertedRequests), len(repo.resolvedQueries))
 	}
-	if !containsReason(publisher.reasons, "recorded") || !containsReason(publisher.reasons, "request_recorded") || !containsReason(publisher.reasons, "resolved") {
-		t.Fatalf("publisher reasons = %v", publisher.reasons)
+	if !containsReason(broadcaster.reasons, "recorded") || !containsReason(broadcaster.reasons, "request_recorded") || !containsReason(broadcaster.reasons, "resolved") {
+		t.Fatalf("broadcaster reasons = %v", broadcaster.reasons)
 	}
 }
 
@@ -101,21 +101,21 @@ func TestAdditionalAggregatorTailFlushAndErrorBranches(t *testing.T) {
 }
 
 func TestAdditionalServiceOptionsAndPassthroughErrors(t *testing.T) {
-	publisher := &monitorPublisherStub{}
+	broadcaster := &monitorChangeBroadcasterStub{}
 	service := NewService(nil,
 		nil,
 		WithFlushBatchSize(3),
 		WithFlushInterval(2*time.Second),
 		WithRetention(3*time.Hour),
-		WithEventPublisher(publisher),
+		WithMonitorChangeBroadcaster(broadcaster),
 		func(s *Service) { s.queue = nil },
 	)
 	if service.flushBatchSize != 3 || service.flushInterval != 2*time.Second || service.retention != 3*time.Hour || service.queue == nil {
 		t.Fatalf("NewService options = batch=%d interval=%s retention=%s queue=%v", service.flushBatchSize, service.flushInterval, service.retention, service.queue)
 	}
-	service.publishMonitorChanged("manual")
-	if !containsReason(publisher.reasons, "manual") {
-		t.Fatalf("publish reasons = %v", publisher.reasons)
+	service.broadcastMonitorChanged("manual")
+	if !containsReason(broadcaster.reasons, "manual") {
+		t.Fatalf("broadcast reasons = %v", broadcaster.reasons)
 	}
 
 	var nilService *Service
@@ -216,49 +216,13 @@ func TestAdditionalRecoveryRedisBranches(t *testing.T) {
 		t.Fatalf("forget recovery expectations: %v", err)
 	}
 
-	rdb, mock = redismock.NewClientMock()
-	service = NewService(nil, WithRedis(rdb))
-	mock.ExpectEvalSha(monitorNotifyUnlockScript.Hash(), []string{monitorNotifyLockKey(42)}, "token").SetVal(int64(1))
-	service.releaseNotify(t.Context(), 42, "token")
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("release notify expectations: %v", err)
-	}
 }
 
-func TestAdditionalWorkerLoopAndNotifyBranches(t *testing.T) {
+func TestAdditionalWorkerLoopBranches(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	NewService(nil).runWorkerLoop(ctx)
 	NewService(&monitorRepoStub{}).runWorkerLoop(ctx)
-
-	service := NewService(&monitorRepoStub{notifyErr: errors.New("scan failed")}, WithNotifier(&monitorNotifierStub{configured: true}))
-	service.runNotifyOnce(t.Context())
-
-	service = NewService(&monitorRepoStub{}, WithNotifier(&monitorNotifierStub{configErr: errors.New("config failed")}))
-	service.runNotifyOnce(t.Context())
-
-	rdb, mock := redismock.NewClientMock()
-	repo := &monitorRepoStub{notifyDue: []Event{{ID: 31, Severity: monitoring.SeverityError, Title: "skip"}}}
-	service = NewService(repo, WithNotifier(&monitorNotifierStub{configured: true}), WithRedis(rdb))
-	mock.Regexp().ExpectSetNX(monitorNotifyLockKey(31), ".+", notifyLockTTL).SetVal(false)
-	service.runNotifyOnce(t.Context())
-	if repo.markedNotifiedID != 0 {
-		t.Fatalf("unclaimed notification marked notified: %d", repo.markedNotifiedID)
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("claim false expectations: %v", err)
-	}
-
-	repo = &monitorRepoStub{notifyDue: []Event{{ID: 32, Severity: monitoring.SeverityError, Title: "fail"}}, markFailedErr: errors.New("mark failed")}
-	service = NewService(repo, WithNotifier(&monitorNotifierStub{configured: true, err: errors.New("send failed")}))
-	service.runNotifyOnce(t.Context())
-
-	repo = &monitorRepoStub{notifyDue: []Event{{ID: 33, Severity: monitoring.SeverityError, Title: "success"}}, markNotifiedErr: errors.New("mark notified failed")}
-	service = NewService(repo, WithNotifier(&monitorNotifierStub{configured: true}))
-	service.runNotifyOnce(t.Context())
-	if repo.markedNotifiedID != 33 {
-		t.Fatalf("mark notified error branch id = %d", repo.markedNotifiedID)
-	}
 }
 
 func TestAdditionalSuperviseLoopAndSanitizerBranches(t *testing.T) {

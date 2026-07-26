@@ -69,19 +69,19 @@ func TestHubSubscribeContextCancel(t *testing.T) {
 	}
 }
 
-func TestHubPublishMonitorChangedAndIgnoresInvalidEvents(t *testing.T) {
+func TestHubBroadcastMonitorChangedAndIgnoresInvalidEvents(t *testing.T) {
 	hub := NewHub(1)
 	ch, cancel := hub.Subscribe(context.Background())
 	defer cancel()
 
 	var nilHub *Hub
 	nilHub.Publish(Event{Type: "ignored"})
-	nilHub.PublishMonitorChanged("ignored")
+	nilHub.BroadcastMonitorChanged("ignored")
 	nilHub.PublishAccountCapacityChanged(1, 1)
 
 	hub.Publish(Event{})
 	hub.PublishAccountCapacityChanged(0, 1)
-	hub.PublishMonitorChanged("refresh")
+	hub.BroadcastMonitorChanged("refresh")
 
 	event := <-ch
 	if event.Type != TypeMonitorChanged || event.Reason != "refresh" {
