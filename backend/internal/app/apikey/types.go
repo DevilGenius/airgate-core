@@ -16,6 +16,8 @@ type Key struct {
 	KeyEncrypted          string
 	PlainKey              string
 	UserID                int
+	UserEmail             string
+	Username              string
 	GroupID               *int
 	GroupRate             float64 // 所属分组对该用户生效的实际扣费倍率（未绑定分组时为 0）
 	IPWhitelist           []string

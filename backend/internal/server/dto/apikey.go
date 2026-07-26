@@ -7,6 +7,8 @@ type APIKeyResp struct {
 	Key                   string   `json:"key,omitempty"` // 仅创建时返回完整密钥
 	KeyPrefix             string   `json:"key_prefix"`    // sk-xxxx...xxxx 脱敏展示
 	UserID                int64    `json:"user_id"`
+	UserEmail             string   `json:"user_email,omitempty"`
+	Username              string   `json:"username,omitempty"`
 	GroupID               *int64   `json:"group_id"`
 	GroupRate             float64  `json:"group_rate"` // 所属分组对该用户生效的实际扣费倍率
 	IPWhitelist           []string `json:"ip_whitelist,omitempty"`

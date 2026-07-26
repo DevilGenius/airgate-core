@@ -448,6 +448,8 @@ func mapAPIKey(item *ent.APIKey) appapikey.Key {
 	}
 	if item.Edges.User != nil {
 		result.UserID = item.Edges.User.ID
+		result.UserEmail = item.Edges.User.Email
+		result.Username = item.Edges.User.Username
 	}
 	if item.Edges.Group != nil {
 		groupID := item.Edges.Group.ID

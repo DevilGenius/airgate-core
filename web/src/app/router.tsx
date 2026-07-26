@@ -14,6 +14,7 @@ import { FullPageLoading, PageLoading } from '../shared/components/PageLoading';
 import { checkAdmin, withSetupCheck } from './routeGuards';
 import {
   AccountsPage,
+  APIKeysPage,
   DashboardPage,
   DocsPage,
   GroupsPage,
@@ -153,6 +154,7 @@ function renderPage(Page: ElementType) {
 }
 
 const adminUsersRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/users', component: renderPage(UsersPage) });
+const adminAPIKeysRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/api-keys', component: renderPage(APIKeysPage) });
 const adminAccountsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/accounts', component: renderPage(AccountsPage) });
 const adminGroupsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/groups', component: renderPage(GroupsPage) });
 const adminMonitorRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/monitor', component: renderPage(MonitorPage) });
@@ -227,6 +229,7 @@ const routeTree = rootRoute.addChildren([
     dashboardRoute,
     adminLayout.addChildren([
       adminUsersRoute,
+      adminAPIKeysRoute,
       adminAccountsRoute,
       adminGroupsRoute,
       adminMonitorRoute,

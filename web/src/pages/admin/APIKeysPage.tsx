@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, Copy, Plus, RefreshCw } from 'lucide-react';
 import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
@@ -11,7 +11,8 @@ import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
-import { formatAPIKeyHint, formatExpiry } from '../../shared/utils/format';
+import { formatExpiry } from '../../shared/utils/format';
+import { getAvatarColor } from '../../shared/utils/avatar';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
@@ -25,16 +26,20 @@ import { TableRowMoreMenu, type TableRowMoreMenuItem } from '../../shared/compon
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
+import { useToast } from '../../shared/ui';
 import { CreateKeyModal } from './apikeys/CreateKeyModal';
 import { EditKeyModal } from './apikeys/EditKeyModal';
 import { UserKeysMobileList } from '../user/userkeys/UserKeysMobileList';
+import { KeyGroupRateStack, getUserKeyRowModel } from '../user/userkeys/keyRowModel';
 import type { APIKeyResp, GroupResp } from '../../shared/types';
 
 const API_KEY_AMOUNT_DECIMALS = 3;
 
 export default function APIKeysPage() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const copy = useClipboard();
+  const queryClient = useQueryClient();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
   const [keyword, setKeyword] = useUrlQueryParam('q');
@@ -99,6 +104,21 @@ export default function APIKeysPage() {
     },
   });
 
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: 'active' | 'disabled' }) =>
+      apikeysApi.adminUpdate(id, { status }),
+    onSuccess: (_resp, variables) => {
+      toast(
+        'success',
+        variables.status === 'active'
+          ? t('user_keys.enable_success')
+          : t('user_keys.disable_success'),
+      );
+      queryClient.invalidateQueries({ queryKey: queryKeys.apikeys() });
+    },
+    onError: (error: Error) => toast('error', error.message),
+  });
+
   const rows = data?.list ?? [];
   const groupById = new Map<number, GroupResp>(
     (groupsData?.list ?? []).map((group: GroupResp) => [group.id, group]),
@@ -134,6 +154,15 @@ export default function APIKeysPage() {
 
   const getKeyMoreMenuItems = (row: APIKeyResp): TableRowMoreMenuItem[] => [
     {
+      key: 'toggle',
+      label: row.status === 'active' ? t('user_keys.disable') : t('user_keys.enable'),
+      isDisabled: toggleStatusMutation.isPending,
+      onSelect: () => toggleStatusMutation.mutate({
+        id: row.id,
+        status: row.status === 'active' ? 'disabled' : 'active',
+      }),
+    },
+    {
       key: 'delete',
       label: t('common.delete'),
       onSelect: () => setDeletingKey(row),
@@ -168,6 +197,24 @@ export default function APIKeysPage() {
       ) : null}
     </div>
   );
+
+  const renderKeyOwner = (row: APIKeyResp) => {
+    const email = row.user_email || `#${row.user_id}`;
+    const username = row.username || `#${row.user_id}`;
+    return (
+      <div className="flex min-w-0 items-center gap-2" title={username}>
+        <span
+          className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+          style={{ backgroundColor: getAvatarColor(email) }}
+        >
+          {(email[0] ?? '?').toUpperCase()}
+        </span>
+        <span className="min-w-0 truncate text-[13px] font-medium text-text">
+          <span className="text-text-tertiary">#{row.user_id}</span> {email}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <TablePage
@@ -222,21 +269,23 @@ export default function APIKeysPage() {
           groupMap={groupById}
           isLoading={isLoading}
           renderActions={renderKeyActions}
+          renderOwner={renderKeyOwner}
           rows={rows}
         />
       ) : (
       <CommonTable
         ariaLabel={t('api_keys.title', 'API keys')}
         className="ag-api-keys-table"
-        minWidth={1160}
+        minWidth={1264}
       >
         <CommonTable.Header>
           <CommonTable.Column id="id" style={{ width: 72 }}>
             {t('common.id')}
           </CommonTable.Column>
-          <CommonTable.Column id="name" style={{ minWidth: '10.5rem', width: '10.5rem' }}>{t('common.name')}</CommonTable.Column>
-          <CommonTable.Column id="key_prefix" style={{ minWidth: '10rem', width: '10rem' }}>{t('api_keys.key_prefix')}</CommonTable.Column>
-          <CommonTable.Column id="group_id">{t('api_keys.group')}</CommonTable.Column>
+          <CommonTable.Column id="name" style={{ minWidth: '8.5rem', width: '8.5rem' }}>{t('common.name')}</CommonTable.Column>
+          <CommonTable.Column id="user" style={{ minWidth: '11rem', width: '11rem' }}>{t('common.user')}</CommonTable.Column>
+          <CommonTable.Column id="key_prefix" style={{ minWidth: '10rem', width: '10rem' }}>{t('user_keys.key_table_header', '密钥')}</CommonTable.Column>
+          <CommonTable.Column id="group_id" style={{ width: '15rem' }}>{t('user_keys.group')}</CommonTable.Column>
           <CommonTable.Column id="status" style={{ width: '5.5rem' }}>{t('common.status')}</CommonTable.Column>
           <CommonTable.Column id="quota" style={{ width: '18.5rem' }}>{t('api_keys.quota_used')}</CommonTable.Column>
           <CommonTable.Column id="usage" style={{ width: '20.875rem' }}>{t('api_keys.usage_window', '用量(今日/30天)')}</CommonTable.Column>
@@ -245,10 +294,10 @@ export default function APIKeysPage() {
         </CommonTable.Header>
         <CommonTable.Body>
           {isLoading ? (
-            <TableLoadingRow colSpan={9} />
+            <TableLoadingRow colSpan={10} />
           ) : rows.length === 0 ? (
             <CommonTable.Row id="empty">
-              <CommonTable.Cell colSpan={9}>
+              <CommonTable.Cell colSpan={10}>
                 <EmptyState>
                   <div className="text-sm text-default-500">{t('common.no_data')}</div>
                 </EmptyState>
@@ -256,10 +305,7 @@ export default function APIKeysPage() {
             </CommonTable.Row>
           ) : (
             rows.map((row: APIKeyResp) => {
-              const group = row.group_id == null
-                ? null
-                : groupById.get(row.group_id);
-              const keyHint = formatAPIKeyHint(row.key_prefix);
+              const model = getUserKeyRowModel(row, groupById, undefined, t);
 
               return (
                 <CommonTable.Row id={String(row.id)} key={row.id}>
@@ -272,26 +318,21 @@ export default function APIKeysPage() {
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <code
-                      className="ag-api-key-prefix-chip text-xs px-2 py-0.5 rounded"
-                      title={keyHint}
-                      style={{
-                        fontFamily: 'var(--ag-font-mono)',
-                        background: 'var(--ag-bg-surface)',
-                        color: 'var(--ag-text-secondary)',
-                        border: '1px solid var(--ag-border-subtle)',
-                      }}
-                    >
-                      {keyHint}
-                    </code>
+                    {renderKeyOwner(row)}
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <span className="ag-api-key-group-text" title={row.group_id == null ? t('api_keys.group_unbound') : group ? group.name : `#${row.group_id}`}>
-                      {row.group_id == null ? t('api_keys.group_unbound') : group ? group.name : `#${row.group_id}`}
+                    <span
+                      className="ag-api-key-prefix-chip inline-flex items-center text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono"
+                      title={model.keyHint}
+                    >
+                      {model.keyHint}
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <NativeStatusChip status={row.status} />
+                    <KeyGroupRateStack model={model} t={t} />
+                  </CommonTable.Cell>
+                  <CommonTable.Cell>
+                    <NativeStatusChip status={model.displayStatus} />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <MetricChips

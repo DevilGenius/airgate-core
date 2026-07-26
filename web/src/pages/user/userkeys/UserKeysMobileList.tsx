@@ -24,6 +24,7 @@ export function UserKeysMobileList({
   groupMap,
   isLoading,
   renderActions,
+  renderOwner,
   rows,
   userGroupRates,
 }: {
@@ -32,6 +33,7 @@ export function UserKeysMobileList({
   groupMap: Map<number, GroupResp>;
   isLoading: boolean;
   renderActions: (row: APIKeyResp, showMoreMenu: boolean) => ReactNode;
+  renderOwner?: (row: APIKeyResp) => ReactNode;
   rows: APIKeyResp[];
   userGroupRates?: Record<number, number>;
 }) {
@@ -51,6 +53,11 @@ export function UserKeysMobileList({
       ),
       meta: <NativeStatusChip status={model.displayStatus} />,
       fields: [
+        ...(renderOwner ? [{
+          className: 'ag-user-keys-mobile-field--owner',
+          label: t('common.user'),
+          value: renderOwner(row),
+        }] : []),
         {
           className: 'ag-user-keys-mobile-field--group',
           label: t('user_keys.group'),

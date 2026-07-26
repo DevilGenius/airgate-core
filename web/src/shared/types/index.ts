@@ -386,6 +386,8 @@ export interface APIKeyResp {
   key?: string;
   key_prefix: string;
   user_id: number;
+  user_email?: string;
+  username?: string;
   group_id: number | null;
   /** 所属分组对该用户生效的实际扣费倍率 */
   group_rate?: number;

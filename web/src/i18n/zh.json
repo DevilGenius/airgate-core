@@ -117,7 +117,7 @@
     "users": "用户管理",
     "accounts": "凭证管理",
     "groups": "分组管理",
-    "api_keys": "密钥",
+    "api_keys": "密钥管理",
     "subscriptions": "订阅管理",
     "proxies": "代理管理",
     "usage": "使用记录",

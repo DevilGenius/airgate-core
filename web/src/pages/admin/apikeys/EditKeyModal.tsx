@@ -38,7 +38,6 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     balance_alert_enabled: apiKey.balance_alert_enabled,
     balance_alert_email: apiKey.balance_alert_email || '',
     balance_alert_threshold: apiKey.balance_alert_threshold || 0,
-    status: apiKey.status as 'active' | 'disabled',
   });
   const [sellRateInput, setSellRateInput] = useState(String(apiKey.sell_rate ?? 1));
   const [ipWhitelist, setIpWhitelist] = useState(formatIpList(apiKey.ip_whitelist));
@@ -78,11 +77,6 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     })),
   ];
   const selectedGroupLabel = groupOptions.find((item) => item.id === String(groupId))?.label ?? t('api_keys.group_unbound');
-  const statusOptions = [
-    { id: 'active', label: t('status.active') },
-    { id: 'disabled', label: t('status.disabled') },
-  ];
-  const selectedStatusLabel = statusOptions.find((item) => item.id === (form.status ?? 'active'))?.label ?? t('status.active');
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -208,20 +202,6 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
           value={formatDateInputValue(form.expires_at)}
           onChange={(value) => setForm({ ...form, expires_at: dateInputToLocalStartRFC3339(value) })}
         />
-
-        <div className="space-y-1.5">
-          <Label>{t('common.status')}</Label>
-          <SimpleSelect
-            ariaLabel={t('common.status')}
-          fullWidth
-            items={statusOptions.map((item) => ({ key: item.id, label: item.label }))}
-          selectedKey={form.status ?? 'active'}
-          onSelectionChange={(key) =>
-            setForm({ ...form, status: (key || 'active') as 'active' | 'disabled' })
-          }
-            selectedLabel={selectedStatusLabel}
-          />
-        </div>
 
         <HeroTextField fullWidth>
           <Label>{t('api_keys.ip_whitelist')}</Label>
