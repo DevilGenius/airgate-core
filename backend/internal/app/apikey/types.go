@@ -53,6 +53,8 @@ type UsageCosts struct {
 type ListFilter struct {
 	Page         int
 	PageSize     int
+	UserID       *int
+	APIKeyID     *int
 	Keyword      string
 	SearchScope  string
 	IncludeUsage bool

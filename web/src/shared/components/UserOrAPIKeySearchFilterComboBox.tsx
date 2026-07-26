@@ -68,7 +68,7 @@ function mapAPIKeyToSearchItem(key: APIKeyResp): UserOrAPIKeySearchItem {
     description: [
       `#${key.id}`,
       keyHint,
-      key.user_id ? `User #${key.user_id}` : '',
+      key.user_email || (key.user_id ? `User #${key.user_id}` : ''),
     ].filter(Boolean).join(' · '),
     id: String(key.id),
     kind: 'api_key',

@@ -52,6 +52,8 @@ func (h *APIKeyHandler) AdminListKeys(c *gin.Context) {
 	result, err := h.service.ListAdmin(c.Request.Context(), appapikey.ListFilter{
 		Page:         query.Page,
 		PageSize:     query.PageSize,
+		UserID:       query.UserID,
+		APIKeyID:     query.APIKeyID,
 		Keyword:      query.Keyword,
 		SearchScope:  query.SearchScope,
 		IncludeUsage: query.IncludeUsage,

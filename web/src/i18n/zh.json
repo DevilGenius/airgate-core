@@ -631,6 +631,7 @@
     "create": "创建密钥",
     "edit": "编辑密钥",
     "key_prefix": "密钥前缀",
+    "user_search_placeholder": "邮箱或用户名",
     "group": "分组",
     "select_group": "请选择分组",
     "quota_used": "配额/已用",

@@ -626,6 +626,7 @@
     "create": "Create Key",
     "edit": "Edit Key",
     "key_prefix": "Key Prefix",
+    "user_search_placeholder": "Email or username",
     "group": "Group",
     "select_group": "Select group",
     "quota_used": "Quota / Used",

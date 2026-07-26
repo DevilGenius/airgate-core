@@ -6,7 +6,6 @@ import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { groupsApi } from '../../shared/api/groups';
-import { useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
@@ -15,7 +14,8 @@ import { formatExpiry } from '../../shared/utils/format';
 import { getAvatarColor } from '../../shared/utils/avatar';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
-import { SearchFilterInput } from '../../shared/components/SearchFilterInput';
+import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
+import { UserSearchFilterComboBox } from '../../shared/components/UserSearchFilterComboBox';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { TablePage } from '../../shared/components/TablePage';
@@ -42,7 +42,10 @@ export default function APIKeysPage() {
   const queryClient = useQueryClient();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
-  const [keyword, setKeyword] = useUrlQueryParam('q');
+  const [selectedAPIKeyID, setSelectedAPIKeyID] = useState('');
+  const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState('');
+  const [selectedUserID, setSelectedUserID] = useState('');
+  const [selectedUserLabel, setSelectedUserLabel] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
   const [deletingKey, setDeletingKey] = useState<APIKeyResp | null>(null);
@@ -55,12 +58,12 @@ export default function APIKeysPage() {
   } = useCopyFeedback();
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: queryKeys.apikeys(page, pageSize, keyword),
+    queryKey: queryKeys.apikeys(page, pageSize, selectedAPIKeyID, selectedUserID),
     queryFn: ({ signal }) => apikeysApi.adminList({
       page,
       page_size: pageSize,
-      keyword: keyword || undefined,
-      search_scope: 'api_key',
+      user_id: selectedUserID ? Number(selectedUserID) : undefined,
+      api_key_id: selectedAPIKeyID ? Number(selectedAPIKeyID) : undefined,
       include_usage: true,
     }, { signal }),
     placeholderData: keepPreviousData,
@@ -130,8 +133,14 @@ export default function APIKeysPage() {
     resetRevealedKeyCopied();
     setRevealedKey(null);
   };
-  const handleKeywordChange = useCallback((nextKeyword: string) => {
-    setKeyword(nextKeyword);
+  const handleAPIKeySelectionChange = useCallback((value: string, label: string) => {
+    setSelectedAPIKeyID(value);
+    setSelectedAPIKeyLabel(label);
+    setPage(1);
+  }, [setPage]);
+  const handleUserSelectionChange = useCallback((value: string, label: string) => {
+    setSelectedUserID(value);
+    setSelectedUserLabel(label);
     setPage(1);
   }, [setPage]);
   const handleCopyRevealedKey = async () => {
@@ -222,11 +231,28 @@ export default function APIKeysPage() {
       toolbar={(
         <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-56">
-              <SearchFilterInput
+              <APIKeySearchFilterComboBox
                 ariaLabel={t('usage.search_api_key', '搜索 API Key')}
+                emptyPrompt={t('usage.search_api_key', '搜索 API Key')}
+                loadingLabel={t('common.loading')}
+                noDataLabel={t('common.no_data')}
                 placeholder={t('usage.search_api_key', '搜索 API Key')}
-                value={keyword}
-                onSearchChange={handleKeywordChange}
+                scope="admin"
+                selectedKey={selectedAPIKeyID || null}
+                selectedLabel={selectedAPIKeyLabel}
+                onSelectionChange={handleAPIKeySelectionChange}
+              />
+            </div>
+            <div className="w-full sm:w-56">
+              <UserSearchFilterComboBox
+                ariaLabel={t('api_keys.user_search_placeholder')}
+                emptyPrompt={t('api_keys.user_search_placeholder')}
+                loadingLabel={t('common.loading')}
+                noDataLabel={t('common.no_data')}
+                placeholder={t('api_keys.user_search_placeholder')}
+                selectedKey={selectedUserID || null}
+                selectedLabel={selectedUserLabel}
+                onSelectionChange={handleUserSelectionChange}
               />
             </div>
         </div>

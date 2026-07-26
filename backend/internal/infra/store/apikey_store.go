@@ -58,7 +58,14 @@ func (s *APIKeyStore) ListByUser(ctx context.Context, userID int, filter appapik
 
 // ListAdmin 查询全局 API Key 列表。
 func (s *APIKeyStore) ListAdmin(ctx context.Context, filter appapikey.ListFilter) ([]appapikey.Key, int64, error) {
-	query := applyAPIKeyKeyword(s.db.APIKey.Query().WithUser().WithGroup(), filter.Keyword, filter.SearchScope)
+	query := s.db.APIKey.Query().WithUser().WithGroup()
+	if filter.UserID != nil && *filter.UserID > 0 {
+		query.Where(entapikey.HasUserWith(entuser.IDEQ(*filter.UserID)))
+	}
+	if filter.APIKeyID != nil && *filter.APIKeyID > 0 {
+		query.Where(entapikey.IDEQ(*filter.APIKeyID))
+	}
+	query = applyAPIKeyKeyword(query, filter.Keyword, filter.SearchScope)
 
 	total, err := query.Count(ctx)
 	if err != nil {

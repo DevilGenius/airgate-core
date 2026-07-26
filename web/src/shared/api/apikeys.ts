@@ -6,6 +6,8 @@ type APIKeyRequestOptions = {
 };
 
 type APIKeyListParams = PageReq & {
+  user_id?: number;
+  api_key_id?: number;
   search_scope?: 'api_key';
   include_usage?: boolean;
 };

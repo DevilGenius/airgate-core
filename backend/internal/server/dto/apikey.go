@@ -33,6 +33,8 @@ type APIKeyResp struct {
 // APIKeyListQuery API Key 列表查询参数。
 type APIKeyListQuery struct {
 	PageReq
+	UserID       *int   `form:"user_id"`
+	APIKeyID     *int   `form:"api_key_id"`
 	SearchScope  string `form:"search_scope"`
 	IncludeUsage bool   `form:"include_usage"`
 }

@@ -26,7 +26,7 @@ function mapAPIKeyToOption(key: APIKeyResp) {
     description: [
       `#${key.id}`,
       keyHint,
-      key.user_id ? `User #${key.user_id}` : '',
+      key.user_email || (key.user_id ? `User #${key.user_id}` : ''),
     ].filter(Boolean).join(' · '),
     textValue: `${key.name || ''} ${keyHint || ''} ${key.id || ''}`,
   };
