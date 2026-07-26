@@ -9,6 +9,13 @@ export interface AdminServerEvent {
   account_id?: number;
   current_concurrency?: number;
   reason?: string;
+  state?: string;
+  state_until?: string;
+  error_msg?: string;
+  family_cooldown_action?: 'upsert' | 'clear';
+  family?: string;
+  family_until?: string;
+  family_reason?: string;
   [key: string]: unknown;
 }
 

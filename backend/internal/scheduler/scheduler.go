@@ -335,5 +335,9 @@ func (s *Scheduler) ClearFamilyCooldowns(ctx context.Context, accountID int) int
 	if s.familyCooldown == nil {
 		return 0
 	}
-	return s.familyCooldown.ClearAccount(ctx, accountID)
+	cleared := s.familyCooldown.ClearAccount(ctx, accountID)
+	if cleared > 0 {
+		s.state.publishAccountFamilyCooldownClear(accountID)
+	}
+	return cleared
 }

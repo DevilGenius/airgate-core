@@ -58,9 +58,10 @@ type Judgment struct {
 //
 // 确定性的账号级信号仍由 state 记录；临时 403 和 5xx 共享瞬时避让策略。
 type StateMachine struct {
-	db             *ent.Client
-	familyCooldown *FamilyCooldown
-	monitor        monitoring.Recorder
+	db              *ent.Client
+	familyCooldown  *FamilyCooldown
+	monitor         monitoring.Recorder
+	statusPublisher AccountStatusEventPublisher
 
 	// onCriticalTransition Active ↔ Disabled 转移后的回调（由 Scheduler 注入）。
 	// 用来刷新 RouteGraph，让下次 SelectAccount 立刻看到新状态；
@@ -125,6 +126,7 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		// 无 Family（admin 巡检 / 老插件）保留账号级 rate_limited 兜底，行为与改造前一致。
 		if j.Family != "" && sm.familyCooldown != nil {
 			sm.familyCooldown.Mark(ctx, accountID, j.Family, until, j.Reason)
+			sm.publishAccountFamilyCooldownUpsert(accountID, j.Family, until, j.Reason)
 			slog.Info("scheduler_family_cooldown",
 				sdk.LogFieldAccountID, accountID,
 				"family", j.Family,
@@ -204,6 +206,7 @@ func (sm *StateMachine) applyFamilyTransientAvoidance(ctx context.Context, accou
 	}
 	until := time.Now().Add(delay)
 	sm.familyCooldown.MarkTransient(ctx, accountID, j.Family, until, j.Reason, nextStep)
+	sm.publishAccountFamilyCooldownUpsert(accountID, j.Family, until, j.Reason)
 
 	slog.Warn("scheduler_family_transient_cooldown",
 		sdk.LogFieldAccountID, accountID,
@@ -321,6 +324,7 @@ func (sm *StateMachine) applyTransientAvoidanceWithMinimumStep(
 		sdk.LogFieldReason, j.Reason,
 	)
 	sm.notifyStateSnapshot(accountID, account.StateDegraded, &until, extra)
+	sm.publishAccountStateChanged(accountID, string(account.StateDegraded), &until, truncateReason(j.Reason))
 	sm.recordAccountStateEvent(ctx, accountID, existing, account.StateDegraded, &until, j.Reason, j)
 }
 
@@ -443,6 +447,7 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 	}
 	sm.notifyStateSnapshot(accountID, account.StateActive, nil, extra)
 	if prevState != account.StateActive {
+		sm.publishAccountStateChanged(accountID, string(account.StateActive), nil, "")
 		sm.resolveAccountEvents(ctx, accountID)
 		sm.notifyCritical(accountID)
 	}
@@ -507,6 +512,7 @@ func (sm *StateMachine) transition(ctx context.Context, accountID int, newState 
 		clearTransientAvoidanceExtra(nextExtra)
 	}
 	sm.notifyStateSnapshot(accountID, newState, stateUntil, nextExtra)
+	sm.publishAccountStateChanged(accountID, string(newState), stateUntil, truncateReason(reason))
 	slog.Info("scheduler_state_transition",
 		sdk.LogFieldAccountID, accountID,
 		"state", newState,

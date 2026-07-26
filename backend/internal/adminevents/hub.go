@@ -9,6 +9,7 @@ import (
 
 const (
 	TypeAccountCapacityChanged = "account_capacity.changed"
+	TypeAccountStatusChanged   = "account_status.changed"
 	TypeMonitorChanged         = "monitor.changed"
 )
 
@@ -18,11 +19,18 @@ const (
 
 // Event is one admin-only server event delivered over SSE.
 type Event struct {
-	Type               string `json:"type"`
-	TS                 string `json:"ts"`
-	AccountID          int    `json:"account_id,omitempty"`
-	CurrentConcurrency int    `json:"current_concurrency"`
-	Reason             string `json:"reason,omitempty"`
+	Type               string  `json:"type"`
+	TS                 string  `json:"ts"`
+	AccountID          int     `json:"account_id,omitempty"`
+	CurrentConcurrency int     `json:"current_concurrency"`
+	Reason             string  `json:"reason,omitempty"`
+	AccountState       string  `json:"state,omitempty"`
+	StateUntil         *string `json:"state_until,omitempty"`
+	ErrorMsg           *string `json:"error_msg,omitempty"`
+	FamilyAction       string  `json:"family_cooldown_action,omitempty"`
+	Family             string  `json:"family,omitempty"`
+	FamilyUntil        string  `json:"family_until,omitempty"`
+	FamilyReason       string  `json:"family_reason,omitempty"`
 }
 
 // Hub fans out admin events to connected SSE clients. Publishing never blocks
@@ -92,6 +100,51 @@ func (h *Hub) PublishAccountCapacityChanged(accountID int, currentConcurrency in
 		Type:               TypeAccountCapacityChanged,
 		AccountID:          accountID,
 		CurrentConcurrency: currentConcurrency,
+	})
+}
+
+// PublishAccountStateChanged reports a persisted scheduling-state snapshot.
+// Pointer fields preserve the distinction between "not included" and an
+// explicit empty value that clears state_until/error_msg on the client.
+func (h *Hub) PublishAccountStateChanged(accountID int, state string, stateUntil *time.Time, errorMsg string) {
+	if h == nil || accountID <= 0 {
+		return
+	}
+	var stateUntilValue *string
+	if stateUntil != nil {
+		value := stateUntil.UTC().Format(time.RFC3339Nano)
+		stateUntilValue = &value
+	} else {
+		value := ""
+		stateUntilValue = &value
+	}
+	errorMsgValue := errorMsg
+	h.Publish(Event{
+		Type:         TypeAccountStatusChanged,
+		AccountID:    accountID,
+		AccountState: state,
+		StateUntil:   stateUntilValue,
+		ErrorMsg:     &errorMsgValue,
+	})
+}
+
+// PublishAccountFamilyCooldownChanged reports an upsert or clear delta for the
+// Redis-backed model-family cooldown list without reading the account table.
+func (h *Hub) PublishAccountFamilyCooldownChanged(accountID int, action, family string, until *time.Time, reason string) {
+	if h == nil || accountID <= 0 || (action != "upsert" && action != "clear") {
+		return
+	}
+	untilValue := ""
+	if until != nil {
+		untilValue = until.UTC().Format(time.RFC3339Nano)
+	}
+	h.Publish(Event{
+		Type:         TypeAccountStatusChanged,
+		AccountID:    accountID,
+		FamilyAction: action,
+		Family:       family,
+		FamilyUntil:  untilValue,
+		FamilyReason: reason,
 	})
 }
 

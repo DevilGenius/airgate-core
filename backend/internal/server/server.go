@@ -69,6 +69,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	// 核心服务组件
 	eventHub := adminevents.NewHub(0)
 	sched := scheduler.NewScheduler(db, rdb)
+	sched.SetAccountStatusEventPublisher(eventHub)
 	concurrency := scheduler.NewConcurrencyManager(rdb)
 	concurrency.SetCapacityEventPublisher(eventHub)
 	calculator := billing.NewCalculator()

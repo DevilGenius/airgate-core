@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../shared/ui';
 import { accountsApi } from '../../shared/api/accounts';
-import { subscribeAdminEvents } from '../../shared/api/adminEvents';
+import { subscribeAdminEvents, type AdminServerEvent } from '../../shared/api/adminEvents';
 import { groupsApi } from '../../shared/api/groups';
 import { proxiesApi } from '../../shared/api/proxies';
 import { AccountTestModal } from './AccountTestModal';
@@ -102,6 +102,54 @@ function accountUsageInfoHasContent(usage: AccountUsageInfo | undefined) {
   );
 }
 
+function isAccountState(value: unknown): value is AccountResp['state'] {
+  return value === 'active' || value === 'rate_limited' || value === 'degraded' || value === 'disabled';
+}
+
+function applyAccountStatusEventToRow(row: AccountResp, event: AdminServerEvent): AccountResp {
+  let next = row;
+  if (isAccountState(event.state)) {
+    next = {
+      ...next,
+      state: event.state,
+      state_until: typeof event.state_until === 'string' && event.state_until ? event.state_until : undefined,
+      error_msg: typeof event.error_msg === 'string' && event.error_msg ? event.error_msg : undefined,
+    };
+  }
+
+  if (event.family_cooldown_action === 'clear') {
+    if (next.family_cooldowns?.length) {
+      next = { ...next, family_cooldowns: undefined };
+    }
+  } else if (
+    event.family_cooldown_action === 'upsert'
+    && typeof event.family === 'string'
+    && event.family
+    && typeof event.family_until === 'string'
+    && event.family_until
+  ) {
+    const familyCooldown = {
+      family: event.family,
+      until: event.family_until,
+      ...(typeof event.family_reason === 'string' && event.family_reason
+        ? { reason: event.family_reason }
+        : {}),
+    };
+    const now = Date.now();
+    next = {
+      ...next,
+      family_cooldowns: [
+        ...(next.family_cooldowns ?? []).filter(
+          (item) => item.family !== event.family && Date.parse(item.until) > now,
+        ),
+        familyCooldown,
+      ],
+    };
+  }
+
+  return next;
+}
+
 export default function AccountsPageContent() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -141,6 +189,24 @@ export default function AccountsPageContent() {
           };
         });
 
+        return matched ? { ...old, list } : old;
+      },
+    );
+  }, [queryClient]);
+
+  const applyAccountStatusEvent = useCallback((event: AdminServerEvent) => {
+    const accountId = Number(event.account_id);
+    if (!Number.isFinite(accountId) || accountId <= 0) return;
+    queryClient.setQueriesData<PagedData<AccountResp>>(
+      { queryKey: queryKeys.accounts() },
+      (old) => {
+        if (!old?.list?.length) return old;
+        let matched = false;
+        const list = old.list.map((account) => {
+          if (account.id !== accountId) return account;
+          matched = true;
+          return applyAccountStatusEventToRow(account, event);
+        });
         return matched ? { ...old, list } : old;
       },
     );
@@ -355,8 +421,15 @@ export default function AccountsPageContent() {
     }
     return subscribeAdminEvents((event) => {
       if (event.type === 'admin_events.reconnected') {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
         void refreshVisibleCapacity();
-        scheduleWorkingAccountsRefresh();
+        return;
+      }
+      if (event.type === 'account_status.changed') {
+        applyAccountStatusEvent(event);
+        if (isAccountState(event.state) && stateFilterRef.current) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+        }
         return;
       }
       if (event.type !== 'account_capacity.changed') return;
@@ -369,7 +442,7 @@ export default function AccountsPageContent() {
       if (!visibleAccountIdSetRef.current.has(accountId)) return;
       queueCapacityUpdate(accountId, currentConcurrency);
     });
-  }, [queueCapacityUpdate, refreshVisibleCapacity, scheduleWorkingAccountsRefresh, stateFilterRef]);
+  }, [applyAccountStatusEvent, queryClient, queueCapacityUpdate, refreshVisibleCapacity, scheduleWorkingAccountsRefresh, stateFilterRef]);
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -665,7 +738,6 @@ export default function AccountsPageContent() {
         next.delete(id);
         return next;
       });
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
     },
   });
 
@@ -689,7 +761,6 @@ export default function AccountsPageContent() {
   const clearRateLimitMarkersMutation = useMutation({
     mutationFn: (id: number) => accountsApi.clearFamilyCooldowns(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
       queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
       toast('success', t('accounts.clear_family_cooldowns_success'));
     },
@@ -741,8 +812,10 @@ export default function AccountsPageContent() {
   }, [setPage]);
 
   // 批量操作通用的结果处理：全部成功 → success toast；部分成功 → warning；全部失败 → error。
-  const handleBulkResult = (res: BulkOpResp, okKey: string) => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+  const handleBulkResult = (res: BulkOpResp, okKey: string, refreshAccounts = true) => {
+    if (refreshAccounts) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+    }
     const total = res.success + res.failed;
     if (res.failed === 0) {
       toast('success', t(okKey, { count: res.success }));
@@ -757,8 +830,10 @@ export default function AccountsPageContent() {
   // 批量更新
   const bulkUpdateMutation = useMutation({
     mutationFn: (data: BulkUpdateAccountsReq) => accountsApi.bulkUpdate(data),
-    onSuccess: (res) => {
-      handleBulkResult(res, 'accounts.bulk_update_success');
+    onSuccess: (res, data) => {
+      const statusOnly = data.state != null
+        && Object.keys(data).every((key) => key === 'account_ids' || key === 'state');
+      handleBulkResult(res, 'accounts.bulk_update_success', !statusOnly);
       setBulkEditSelection(null);
     },
     onError: (err: Error) => toast('error', err.message),
@@ -777,7 +852,7 @@ export default function AccountsPageContent() {
   const bulkClearRateLimitMarkersMutation = useMutation({
     mutationFn: (ids: number[]) => accountsApi.bulkClearFamilyCooldowns(ids),
     onSuccess: (res) => {
-      handleBulkResult(res, 'accounts.bulk_clear_family_cooldowns_success');
+      handleBulkResult(res, 'accounts.bulk_clear_family_cooldowns_success', false);
       queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
     },
     onError: (err: Error) => toast('error', err.message),
@@ -842,18 +917,16 @@ export default function AccountsPageContent() {
 
   const handleCloseAccountTest = useCallback(() => {
     setTestingAccount(null);
-    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-  }, [queryClient]);
+  }, []);
 
   const handleCloseBulkTest = useCallback(() => {
     setBulkTestAccounts(null);
-    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
     clearSelection();
-  }, [clearSelection, queryClient]);
+  }, [clearSelection]);
 
   const handleAccountTestComplete = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-  }, [queryClient]);
+    // Account state changes are applied by account_status.changed SSE events.
+  }, []);
 
   // 批量刷新令牌：只有 OAuth 类型账号支持，预先过滤后开进度弹窗
   const handleBulkRefresh = useCallback(() => {

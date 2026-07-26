@@ -51,6 +51,7 @@ func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 		s.state.resolveAccountEvents(ctx, accountID)
 		s.stateCache.Store(accountID, account.StateActive, nil, nil)
 		s.RefreshRouteGraphAccount(ctx, accountID)
+		s.state.publishAccountStateChanged(accountID, string(account.StateActive), nil, "")
 	}
 	return err
 }
@@ -67,6 +68,7 @@ func (s *Scheduler) ManualDisable(ctx context.Context, accountID int, reason str
 	if err == nil {
 		s.stateCache.Store(accountID, account.StateDisabled, nil, nil)
 		s.RefreshRouteGraphAccount(ctx, accountID)
+		s.state.publishAccountStateChanged(accountID, string(account.StateDisabled), nil, truncateReason(reason))
 	}
 	return err
 }

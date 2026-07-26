@@ -45,6 +45,22 @@ func TestHubPublishesTimestampedEventsAndCancelIsIdempotent(t *testing.T) {
 		t.Fatalf("pushed = %d, want 1", pushed)
 	}
 
+	until := now.Add(time.Hour)
+	hub.PublishAccountStateChanged(7, "rate_limited", &until, "limited")
+	statusEvent := <-ch
+	if statusEvent.Type != TypeAccountStatusChanged || statusEvent.AccountID != 7 ||
+		statusEvent.AccountState != "rate_limited" || statusEvent.StateUntil == nil ||
+		*statusEvent.StateUntil != until.Format(time.RFC3339Nano) || statusEvent.ErrorMsg == nil || *statusEvent.ErrorMsg != "limited" {
+		t.Fatalf("status event = %#v", statusEvent)
+	}
+
+	hub.PublishAccountFamilyCooldownChanged(7, "upsert", "gpt-5.6-sol", &until, "subscription")
+	cooldownEvent := <-ch
+	if cooldownEvent.Type != TypeAccountStatusChanged || cooldownEvent.FamilyAction != "upsert" ||
+		cooldownEvent.Family != "gpt-5.6-sol" || cooldownEvent.FamilyUntil != until.Format(time.RFC3339Nano) {
+		t.Fatalf("cooldown event = %#v", cooldownEvent)
+	}
+
 	cancel()
 	cancel()
 	if _, ok := <-ch; ok {
@@ -78,9 +94,14 @@ func TestHubBroadcastMonitorChangedAndIgnoresInvalidEvents(t *testing.T) {
 	nilHub.Publish(Event{Type: "ignored"})
 	nilHub.BroadcastMonitorChanged("ignored")
 	nilHub.PublishAccountCapacityChanged(1, 1)
+	nilHub.PublishAccountStateChanged(1, "active", nil, "")
+	nilHub.PublishAccountFamilyCooldownChanged(1, "clear", "", nil, "")
 
 	hub.Publish(Event{})
 	hub.PublishAccountCapacityChanged(0, 1)
+	hub.PublishAccountStateChanged(0, "active", nil, "")
+	hub.PublishAccountFamilyCooldownChanged(0, "clear", "", nil, "")
+	hub.PublishAccountFamilyCooldownChanged(1, "invalid", "", nil, "")
 	hub.BroadcastMonitorChanged("refresh")
 
 	event := <-ch
