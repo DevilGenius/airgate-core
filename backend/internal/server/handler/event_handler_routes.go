@@ -18,14 +18,15 @@ func (h *EventHandler) StreamAdminEvents(c *gin.Context) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 
+	events, unsubscribe, baseline := h.hub.SubscribeWithSequence(c.Request.Context())
+	defer unsubscribe()
+
 	_, _ = w.Write([]byte("retry: 5000\n\n"))
 	sendSSEEvent(w, gin.H{
 		"type": "connected",
 		"ts":   time.Now().UTC().Format(time.RFC3339Nano),
+		"seq":  baseline,
 	})
-
-	events, unsubscribe := h.hub.Subscribe(c.Request.Context())
-	defer unsubscribe()
 
 	ticker := time.NewTicker(adminEventsPingInterval)
 	defer ticker.Stop()

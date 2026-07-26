@@ -212,11 +212,6 @@ var (
 				Columns: []*schema.Column{MonitorEventsColumns[2], MonitorEventsColumns[18]},
 			},
 			{
-				Name:    "monitorevent_status_severity",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2]},
-			},
-			{
 				Name:    "monitorevent_status_severity_updated_at",
 				Unique:  false,
 				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[18]},

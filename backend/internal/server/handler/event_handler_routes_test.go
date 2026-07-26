@@ -30,4 +30,7 @@ func TestStreamAdminEventsSendsInitialEvent(t *testing.T) {
 	if body := w.Body.String(); !strings.Contains(body, `"type":"connected"`) {
 		t.Fatalf("expected connected event, got %q", body)
 	}
+	if body := w.Body.String(); !strings.Contains(body, `"seq":0`) {
+		t.Fatalf("expected sequence baseline, got %q", body)
+	}
 }

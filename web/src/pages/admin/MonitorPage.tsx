@@ -802,7 +802,7 @@ export default function MonitorPage() {
     };
 
     const unsubscribe = subscribeAdminEvents((event) => {
-      if ((event.type !== 'monitor.changed' && event.type !== 'admin_events.reconnected') || timeoutId !== undefined) return;
+      if ((event.type !== 'monitor.changed' && event.type !== 'admin_events.reconnected' && event.type !== 'admin_events.gap') || timeoutId !== undefined) return;
       timeoutId = window.setTimeout(refreshFromEvent, 250);
     });
     document.addEventListener('visibilitychange', handleVisibilityChange);

@@ -324,7 +324,10 @@ func (sm *StateMachine) applyTransientAvoidanceWithMinimumStep(
 		sdk.LogFieldReason, j.Reason,
 	)
 	sm.notifyStateSnapshot(accountID, account.StateDegraded, &until, extra)
-	sm.publishAccountStateChanged(accountID, string(account.StateDegraded), &until, truncateReason(j.Reason))
+	// Short avoidance lasts only seconds; its event noise outweighs its UI value, and the next real state transition converges the UI.
+	if degraded {
+		sm.publishAccountStateChanged(accountID, string(account.StateDegraded), &until, truncateReason(j.Reason))
+	}
 	sm.recordAccountStateEvent(ctx, accountID, existing, account.StateDegraded, &until, j.Reason, j)
 }
 

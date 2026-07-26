@@ -90,6 +90,8 @@ const ACCOUNT_PRIORITY_SORT_KEY = 'priority';
 const ACCOUNT_MODAL_TABLE_PLACEHOLDER_MIN_HEIGHT = 320;
 const ACCOUNT_WORKING_STATE_FILTER = 'working';
 const ACCOUNT_WORKING_REFETCH_THROTTLE_MS = 750;
+const ACCOUNT_STATUS_FILTER_REFETCH_THROTTLE_MS = 750;
+const ACCOUNT_STATUS_BATCH_FALLBACK_MS = 250;
 const ACCOUNT_USAGE_SNAPSHOT_MAX_ACCOUNTS = 5000;
 const EMPTY_ACCOUNT_ROWS: AccountResp[] = [];
 
@@ -189,24 +191,6 @@ export default function AccountsPageContent() {
           };
         });
 
-        return matched ? { ...old, list } : old;
-      },
-    );
-  }, [queryClient]);
-
-  const applyAccountStatusEvent = useCallback((event: AdminServerEvent) => {
-    const accountId = Number(event.account_id);
-    if (!Number.isFinite(accountId) || accountId <= 0) return;
-    queryClient.setQueriesData<PagedData<AccountResp>>(
-      { queryKey: queryKeys.accounts() },
-      (old) => {
-        if (!old?.list?.length) return old;
-        let matched = false;
-        const list = old.list.map((account) => {
-          if (account.id !== accountId) return account;
-          matched = true;
-          return applyAccountStatusEventToRow(account, event);
-        });
         return matched ? { ...old, list } : old;
       },
     );
@@ -330,6 +314,7 @@ export default function AccountsPageContent() {
   }, [refetchAccounts]);
   const stateFilterRef = useLatestRef(stateFilter);
   const workingRefetchTimerRef = useRef<number | null>(null);
+  const statusFilterRefetchTimerRef = useRef<number | null>(null);
   const scheduleWorkingAccountsRefresh = useCallback(() => {
     if (typeof window === 'undefined') return;
     if (stateFilterRef.current !== ACCOUNT_WORKING_STATE_FILTER) return;
@@ -340,10 +325,27 @@ export default function AccountsPageContent() {
       void refetchAccounts({ cancelRefetch: false });
     }, ACCOUNT_WORKING_REFETCH_THROTTLE_MS);
   }, [refetchAccounts, stateFilterRef]);
+  const scheduleStatusFilteredAccountsRefresh = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (!stateFilterRef.current) return;
+    if (statusFilterRefetchTimerRef.current != null) return;
+    statusFilterRefetchTimerRef.current = window.setTimeout(() => {
+      statusFilterRefetchTimerRef.current = null;
+      if (!stateFilterRef.current) return;
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.accounts(),
+        refetchType: 'active',
+      });
+    }, ACCOUNT_STATUS_FILTER_REFETCH_THROTTLE_MS);
+  }, [queryClient, stateFilterRef]);
   useEffect(() => () => {
     if (workingRefetchTimerRef.current != null) {
       window.clearTimeout(workingRefetchTimerRef.current);
       workingRefetchTimerRef.current = null;
+    }
+    if (statusFilterRefetchTimerRef.current != null) {
+      window.clearTimeout(statusFilterRefetchTimerRef.current);
+      statusFilterRefetchTimerRef.current = null;
     }
   }, []);
   const rows = data?.list ?? EMPTY_ACCOUNT_ROWS;
@@ -398,6 +400,62 @@ export default function AccountsPageContent() {
     }
     pendingCapacityUpdatesRef.current.clear();
   }, []);
+  const pendingStatusEventsRef = useRef<Map<number, AdminServerEvent[]>>(new Map());
+  const statusUpdateFrameRef = useRef<number | null>(null);
+  const statusUpdateFallbackTimerRef = useRef<number | null>(null);
+  const cancelPendingStatusFlush = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (statusUpdateFrameRef.current != null) {
+      window.cancelAnimationFrame(statusUpdateFrameRef.current);
+      statusUpdateFrameRef.current = null;
+    }
+    if (statusUpdateFallbackTimerRef.current != null) {
+      window.clearTimeout(statusUpdateFallbackTimerRef.current);
+      statusUpdateFallbackTimerRef.current = null;
+    }
+  }, []);
+  const flushPendingStatusEvents = useCallback(() => {
+    cancelPendingStatusFlush();
+    const updates = pendingStatusEventsRef.current;
+    if (updates.size === 0) return;
+    pendingStatusEventsRef.current = new Map();
+    queryClient.setQueriesData<PagedData<AccountResp>>(
+      { queryKey: queryKeys.accounts() },
+      (old) => {
+        if (!old?.list?.length) return old;
+        let matched = false;
+        const list = old.list.map((account) => {
+          const events = updates.get(account.id);
+          if (!events?.length) return account;
+          matched = true;
+          return events.reduce(applyAccountStatusEventToRow, account);
+        });
+        return matched ? { ...old, list } : old;
+      },
+    );
+  }, [cancelPendingStatusFlush, queryClient]);
+  const queueStatusEvent = useCallback((accountId: number, event: AdminServerEvent) => {
+    const pending = pendingStatusEventsRef.current.get(accountId);
+    if (pending) {
+      pending.push(event);
+    } else {
+      pendingStatusEventsRef.current.set(accountId, [event]);
+    }
+    if (typeof window === 'undefined') {
+      flushPendingStatusEvents();
+      return;
+    }
+    if (statusUpdateFrameRef.current != null) return;
+    statusUpdateFrameRef.current = window.requestAnimationFrame(flushPendingStatusEvents);
+    statusUpdateFallbackTimerRef.current = window.setTimeout(
+      flushPendingStatusEvents,
+      ACCOUNT_STATUS_BATCH_FALLBACK_MS,
+    );
+  }, [flushPendingStatusEvents]);
+  useEffect(() => () => {
+    cancelPendingStatusFlush();
+    pendingStatusEventsRef.current.clear();
+  }, [cancelPendingStatusFlush]);
 
   const applyCapacityData = useCallback((nextData: { accounts: Record<string, number> }) => {
     capacityStore.setCounts(nextData.accounts);
@@ -420,16 +478,18 @@ export default function AccountsPageContent() {
       return undefined;
     }
     return subscribeAdminEvents((event) => {
-      if (event.type === 'admin_events.reconnected') {
+      if (event.type === 'admin_events.reconnected' || event.type === 'admin_events.gap') {
+        cancelPendingStatusFlush();
+        pendingStatusEventsRef.current.clear();
         void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
         void refreshVisibleCapacity();
         return;
       }
       if (event.type === 'account_status.changed') {
-        applyAccountStatusEvent(event);
-        if (isAccountState(event.state) && stateFilterRef.current) {
-          void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-        }
+        const accountId = Number(event.account_id);
+        if (!Number.isFinite(accountId) || accountId <= 0) return;
+        queueStatusEvent(accountId, event);
+        if (isAccountState(event.state)) scheduleStatusFilteredAccountsRefresh();
         return;
       }
       if (event.type !== 'account_capacity.changed') return;
@@ -442,7 +502,7 @@ export default function AccountsPageContent() {
       if (!visibleAccountIdSetRef.current.has(accountId)) return;
       queueCapacityUpdate(accountId, currentConcurrency);
     });
-  }, [applyAccountStatusEvent, queryClient, queueCapacityUpdate, refreshVisibleCapacity, scheduleWorkingAccountsRefresh, stateFilterRef]);
+  }, [cancelPendingStatusFlush, queryClient, queueCapacityUpdate, queueStatusEvent, refreshVisibleCapacity, scheduleStatusFilteredAccountsRefresh, scheduleWorkingAccountsRefresh, stateFilterRef]);
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -812,10 +872,8 @@ export default function AccountsPageContent() {
   }, [setPage]);
 
   // 批量操作通用的结果处理：全部成功 → success toast；部分成功 → warning；全部失败 → error。
-  const handleBulkResult = (res: BulkOpResp, okKey: string, refreshAccounts = true) => {
-    if (refreshAccounts) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-    }
+  const handleBulkResult = (res: BulkOpResp, okKey: string) => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
     const total = res.success + res.failed;
     if (res.failed === 0) {
       toast('success', t(okKey, { count: res.success }));
@@ -830,10 +888,8 @@ export default function AccountsPageContent() {
   // 批量更新
   const bulkUpdateMutation = useMutation({
     mutationFn: (data: BulkUpdateAccountsReq) => accountsApi.bulkUpdate(data),
-    onSuccess: (res, data) => {
-      const statusOnly = data.state != null
-        && Object.keys(data).every((key) => key === 'account_ids' || key === 'state');
-      handleBulkResult(res, 'accounts.bulk_update_success', !statusOnly);
+    onSuccess: (res) => {
+      handleBulkResult(res, 'accounts.bulk_update_success');
       setBulkEditSelection(null);
     },
     onError: (err: Error) => toast('error', err.message),
@@ -852,7 +908,7 @@ export default function AccountsPageContent() {
   const bulkClearRateLimitMarkersMutation = useMutation({
     mutationFn: (ids: number[]) => accountsApi.bulkClearFamilyCooldowns(ids),
     onSuccess: (res) => {
-      handleBulkResult(res, 'accounts.bulk_clear_family_cooldowns_success', false);
+      handleBulkResult(res, 'accounts.bulk_clear_family_cooldowns_success');
       queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
     },
     onError: (err: Error) => toast('error', err.message),

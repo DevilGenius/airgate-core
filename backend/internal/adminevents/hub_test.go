@@ -8,8 +8,11 @@ import (
 
 func TestNilHubSubscribeReturnsClosedChannel(t *testing.T) {
 	var hub *Hub
-	ch, cancel := hub.Subscribe(context.Background())
+	ch, cancel, baseline := hub.SubscribeWithSequence(context.Background())
 	cancel()
+	if baseline != 0 {
+		t.Fatalf("nil hub baseline = %d, want 0", baseline)
+	}
 
 	if _, ok := <-ch; ok {
 		t.Fatal("nil hub subscriber channel is open")
@@ -38,6 +41,9 @@ func TestHubPublishesTimestampedEventsAndCancelIsIdempotent(t *testing.T) {
 	if event.AccountID != 7 || event.CurrentConcurrency != 3 {
 		t.Fatalf("event payload = %#v", event)
 	}
+	if event.Seq != 1 {
+		t.Fatalf("event seq = %d, want 1", event.Seq)
+	}
 	if event.TS != now.Format(time.RFC3339Nano) {
 		t.Fatalf("event timestamp = %q", event.TS)
 	}
@@ -49,6 +55,7 @@ func TestHubPublishesTimestampedEventsAndCancelIsIdempotent(t *testing.T) {
 	hub.PublishAccountStateChanged(7, "rate_limited", &until, "limited")
 	statusEvent := <-ch
 	if statusEvent.Type != TypeAccountStatusChanged || statusEvent.AccountID != 7 ||
+		statusEvent.Seq != 2 ||
 		statusEvent.AccountState != "rate_limited" || statusEvent.StateUntil == nil ||
 		*statusEvent.StateUntil != until.Format(time.RFC3339Nano) || statusEvent.ErrorMsg == nil || *statusEvent.ErrorMsg != "limited" {
 		t.Fatalf("status event = %#v", statusEvent)
@@ -57,6 +64,7 @@ func TestHubPublishesTimestampedEventsAndCancelIsIdempotent(t *testing.T) {
 	hub.PublishAccountFamilyCooldownChanged(7, "upsert", "gpt-5.6-sol", &until, "subscription")
 	cooldownEvent := <-ch
 	if cooldownEvent.Type != TypeAccountStatusChanged || cooldownEvent.FamilyAction != "upsert" ||
+		cooldownEvent.Seq != 3 ||
 		cooldownEvent.Family != "gpt-5.6-sol" || cooldownEvent.FamilyUntil != until.Format(time.RFC3339Nano) {
 		t.Fatalf("cooldown event = %#v", cooldownEvent)
 	}
@@ -65,6 +73,23 @@ func TestHubPublishesTimestampedEventsAndCancelIsIdempotent(t *testing.T) {
 	cancel()
 	if _, ok := <-ch; ok {
 		t.Fatal("subscriber channel remains open after cancel")
+	}
+}
+
+func TestHubSubscribeWithSequenceReturnsAtomicBaseline(t *testing.T) {
+	hub := NewHub(1)
+	hub.Publish(Event{Type: TypeMonitorChanged})
+
+	ch, cancel, baseline := hub.SubscribeWithSequence(context.Background())
+	defer cancel()
+	if baseline != 1 {
+		t.Fatalf("baseline = %d, want 1", baseline)
+	}
+
+	hub.Publish(Event{Type: TypeMonitorChanged})
+	event := <-ch
+	if event.Seq != 2 {
+		t.Fatalf("event seq = %d, want 2", event.Seq)
 	}
 }
 
@@ -137,10 +162,13 @@ func TestHubSlowSubscriberReceivesNewestBufferedEvent(t *testing.T) {
 	hub.Publish(Event{Type: TypeMonitorChanged, Reason: "new", TS: "2"})
 
 	event := <-ch
-	if event.Reason != "new" {
+	if event.Reason != "new" || event.Seq != 2 {
 		t.Fatalf("event reason = %q, want newest event", event.Reason)
 	}
 	if pushed := hub.pushed.Load(); pushed != 2 {
 		t.Fatalf("pushed = %d, want 2", pushed)
+	}
+	if dropped := hub.dropped.Load(); dropped != 1 {
+		t.Fatalf("dropped = %d, want 1", dropped)
 	}
 }

@@ -21,6 +21,7 @@ const (
 type Event struct {
 	Type               string  `json:"type"`
 	TS                 string  `json:"ts"`
+	Seq                uint64  `json:"seq"`
 	AccountID          int     `json:"account_id,omitempty"`
 	CurrentConcurrency int     `json:"current_concurrency"`
 	Reason             string  `json:"reason,omitempty"`
@@ -36,13 +37,14 @@ type Event struct {
 // Hub fans out admin events to connected SSE clients. Publishing never blocks
 // request hot paths; a slow subscriber drops older buffered events.
 type Hub struct {
-	mu      sync.RWMutex
+	mu      sync.Mutex
 	nextID  atomic.Uint64
 	buffer  int
 	subs    map[uint64]chan Event
 	now     func() time.Time
 	dropped atomic.Int64
 	pushed  atomic.Int64
+	seq     atomic.Uint64
 }
 
 // NewHub creates an admin event hub.
@@ -60,10 +62,19 @@ func NewHub(buffer int) *Hub {
 // Subscribe registers one event subscriber. The returned cancel function is
 // idempotent and should be called when the client disconnects.
 func (h *Hub) Subscribe(ctx context.Context) (<-chan Event, func()) {
+	ch, cancel, _ := h.SubscribeWithSequence(ctx)
+	return ch, cancel
+}
+
+// SubscribeWithSequence registers a subscriber and returns the last sequence
+// that was fully published before registration. The handler sends this as the
+// connection baseline so clients can detect subscriber-buffer drops even when
+// the first delivered event already follows a burst.
+func (h *Hub) SubscribeWithSequence(ctx context.Context) (<-chan Event, func(), uint64) {
 	if h == nil {
 		ch := make(chan Event)
 		close(ch)
-		return ch, func() {}
+		return ch, func() {}, 0
 	}
 
 	id := h.nextID.Add(1)
@@ -71,6 +82,7 @@ func (h *Hub) Subscribe(ctx context.Context) (<-chan Event, func()) {
 
 	h.mu.Lock()
 	h.subs[id] = ch
+	baseline := h.seq.Load()
 	h.mu.Unlock()
 
 	var once sync.Once
@@ -88,7 +100,7 @@ func (h *Hub) Subscribe(ctx context.Context) (<-chan Event, func()) {
 			cancel()
 		}()
 	}
-	return ch, cancel
+	return ch, cancel, baseline
 }
 
 // PublishAccountCapacityChanged reports one account's current concurrency.
@@ -168,11 +180,18 @@ func (h *Hub) Publish(event Event) {
 		event.TS = h.now().UTC().Format(time.RFC3339Nano)
 	}
 
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	// Serialize sequence assignment and channel delivery so subscribers observe
+	// the same monotonic order even when multiple producers publish concurrently.
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	event.Seq = h.seq.Add(1)
 
 	for _, ch := range h.subs {
-		if h.trySend(ch, event) {
+		sent, droppedOldest := h.trySend(ch, event)
+		if droppedOldest {
+			h.dropped.Add(1)
+		}
+		if sent {
 			h.pushed.Add(1)
 		} else {
 			h.dropped.Add(1)
@@ -180,20 +199,22 @@ func (h *Hub) Publish(event Event) {
 	}
 }
 
-func (h *Hub) trySend(ch chan Event, event Event) bool {
+func (h *Hub) trySend(ch chan Event, event Event) (bool, bool) {
 	select {
 	case ch <- event:
-		return true
+		return true, false
 	default:
 	}
+	droppedOldest := false
 	select {
 	case <-ch:
+		droppedOldest = true
 	default:
 	}
 	select {
 	case ch <- event:
-		return true
+		return true, droppedOldest
 	default:
-		return false
+		return false, droppedOldest
 	}
 }

@@ -52,15 +52,14 @@ func (MonitorEvent) Fields() []ent.Field {
 // column is paid on the aggregator flush path. Filtering by type alone proved
 // unused in production, so those two indexes are intentionally absent.
 //
-// (status, severity) stays narrow on purpose: the summary aggregates over the
-// whole table and an index-only scan on the smallest covering index is what
-// keeps it cheap.
+// The narrow (status, severity) summary index is intentionally absent here.
+// It is created by the versioned SQL upgrade with CREATE INDEX CONCURRENTLY so
+// startup auto-migration cannot take a blocking index build on monitor_events.
 func (MonitorEvent) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("updated_at"),
 		index.Fields("status", "updated_at"),
 		index.Fields("severity", "updated_at"),
-		index.Fields("status", "severity"),
 		index.Fields("status", "severity", "updated_at"),
 		index.Fields("hash"),
 		index.Fields("status", "auto_resolve_at"),

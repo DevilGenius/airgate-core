@@ -53,6 +53,7 @@ type Server struct {
 	runtime         *appmonitor.RuntimeSampler
 	runtimeFeatures *runtimefeatures.Controller
 	events          *adminevents.Hub
+	statusEvents    *adminevents.CoalescingStatusPublisher
 	handlers        *bootstrap.HTTPHandlers
 
 	pluginStartCancel context.CancelFunc
@@ -68,8 +69,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 
 	// 核心服务组件
 	eventHub := adminevents.NewHub(0)
+	statusEvents := adminevents.NewCoalescingStatusPublisher(eventHub)
 	sched := scheduler.NewScheduler(db, rdb)
-	sched.SetAccountStatusEventPublisher(eventHub)
+	sched.SetAccountStatusEventPublisher(statusEvents)
 	concurrency := scheduler.NewConcurrencyManager(rdb)
 	concurrency.SetCapacityEventPublisher(eventHub)
 	calculator := billing.NewCalculator()
@@ -161,6 +163,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		runtime:         runtimeSampler,
 		runtimeFeatures: runtimeFeatureController,
 		events:          eventHub,
+		statusEvents:    statusEvents,
 	}
 
 	s.handlers = bootstrap.NewHTTPHandlers(bootstrap.HTTPDependencies{
@@ -247,6 +250,9 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	pluginCtx, cancel := context.WithCancel(ctx)
 	s.pluginStartCancel = cancel
 
+	if s.statusEvents != nil {
+		safego.Go("admin_status_event_coalescer", func() { s.statusEvents.Run(pluginCtx) })
+	}
 	safego.Go("asset_migration_loop", func() { plugin.StartAssetMigrationLoop(pluginCtx, s.db) })
 	safego.Go("asset_cleanup_loop", func() { plugin.StartAssetCleanupLoop(pluginCtx, s.db) })
 	safego.Go("monitor_aggregator_loop", func() { appmonitor.StartAggregatorLoop(pluginCtx, s.monitor) })

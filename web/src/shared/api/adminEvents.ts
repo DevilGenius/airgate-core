@@ -6,6 +6,7 @@ const ADMIN_EVENTS_PATH = '/api/v1/admin/events';
 export interface AdminServerEvent {
   type: string;
   ts?: string;
+  seq?: number;
   account_id?: number;
   current_concurrency?: number;
   reason?: string;
@@ -16,6 +17,8 @@ export interface AdminServerEvent {
   family?: string;
   family_until?: string;
   family_reason?: string;
+  expected_seq?: number;
+  received_seq?: number;
   [key: string]: unknown;
 }
 
@@ -50,6 +53,8 @@ class AdminEventStream {
   private listeners = new Set<AdminEventListener>();
   private controller: AbortController | null = null;
   private generation = 0;
+  private hasSequenceBaseline = false;
+  private lastSequence = 0;
   private running = false;
 
   subscribe(listener: AdminEventListener) {
@@ -76,6 +81,8 @@ class AdminEventStream {
     this.generation += 1;
     this.controller?.abort();
     this.controller = null;
+    this.hasSequenceBaseline = false;
+    this.lastSequence = 0;
   }
 
   private async run(generation: number) {
@@ -105,6 +112,8 @@ class AdminEventStream {
         }
         connectedOnce = true;
         retryDelayMs = 1000;
+        this.hasSequenceBaseline = false;
+        this.lastSequence = 0;
         await this.readStream(res.body, controller.signal);
       } catch (err) {
         if (!this.running || this.generation !== generation || controller.signal.aborted || isAbortError(err)) {
@@ -168,6 +177,27 @@ class AdminEventStream {
       return;
     }
     if (!event.type) return;
+
+    const sequence = Number(event.seq);
+    if (event.type === 'connected') {
+      this.hasSequenceBaseline = Number.isSafeInteger(sequence) && sequence >= 0;
+      this.lastSequence = this.hasSequenceBaseline ? sequence : 0;
+      this.emit(event);
+      return;
+    }
+    if (Number.isSafeInteger(sequence) && sequence > 0) {
+      const expectedSequence = this.lastSequence + 1;
+      if (this.hasSequenceBaseline && sequence !== expectedSequence) {
+        this.emit({
+          type: 'admin_events.gap',
+          ts: new Date().toISOString(),
+          expected_seq: expectedSequence,
+          received_seq: sequence,
+        });
+      }
+      this.hasSequenceBaseline = true;
+      this.lastSequence = sequence;
+    }
 
     this.emit(event);
   }
