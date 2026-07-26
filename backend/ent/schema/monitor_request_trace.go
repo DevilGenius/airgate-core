@@ -30,9 +30,10 @@ func (MonitorRequestTrace) Fields() []ent.Field {
 	}
 }
 
+// Lookups go through the unique hash; retention sweeps go through expires_at.
+// last_seen_at is written on every occurrence but never queried.
 func (MonitorRequestTrace) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("last_seen_at"),
 		index.Fields("expires_at"),
 	}
 }

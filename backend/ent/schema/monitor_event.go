@@ -41,26 +41,29 @@ func (MonitorEvent) Fields() []ent.Field {
 		field.Time("resolved_at").Optional().Nillable(),
 		field.Time("auto_resolve_at").Optional().Nillable(),
 		field.Time("expires_at").Default(timeNow),
-		field.Time("last_notified_at").Optional().Nillable(),
-		field.Time("next_notify_at").Optional().Nillable(),
-		field.String("notify_error").Default("").MaxLen(500),
 		field.JSON("detail", map[string]interface{}{}).
 			Optional().
 			Default(map[string]interface{}{}),
 	}
 }
 
+// Indexes are kept to what admin listing, summary and the worker loops actually
+// scan. Every repeated event updates updated_at, so each extra index on that
+// column is paid on the aggregator flush path. Filtering by type alone proved
+// unused in production, so those two indexes are intentionally absent.
+//
+// (status, severity) stays narrow on purpose: the summary aggregates over the
+// whole table and an index-only scan on the smallest covering index is what
+// keeps it cheap.
 func (MonitorEvent) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("updated_at"),
 		index.Fields("status", "updated_at"),
 		index.Fields("severity", "updated_at"),
-		index.Fields("type", "updated_at"),
+		index.Fields("status", "severity"),
 		index.Fields("status", "severity", "updated_at"),
-		index.Fields("status", "type", "updated_at"),
 		index.Fields("hash"),
 		index.Fields("status", "auto_resolve_at"),
 		index.Fields("expires_at"),
-		index.Fields("status", "severity", "next_notify_at"),
 	}
 }

@@ -329,8 +329,8 @@ func TestMonitorStoreEventsLifecycleAndRequests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("query active monitor event: %v", err)
 	}
-	if active.NextNotifyAt == nil || !active.NextNotifyAt.Equal(now) {
-		t.Fatalf("created NextNotifyAt = %v, want %v", active.NextNotifyAt, now)
+	if active.Status != entmonitorevent.StatusActive || active.Hash != "monitor-hash" {
+		t.Fatalf("created event status/hash = %v/%q, want active/monitor-hash", active.Status, active.Hash)
 	}
 	if _, err := db.MonitorEvent.Create().
 		SetType(entmonitorevent.TypeUpstreamAccountError).

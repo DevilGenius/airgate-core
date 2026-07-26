@@ -90,8 +90,6 @@ func (s *MonitorStore) resolveDuplicateActiveMonitorEvents(ctx context.Context, 
 		SetStatus(entmonitorevent.StatusResolved).
 		SetResolvedAt(resolvedAt).
 		ClearAutoResolveAt().
-		ClearNextNotifyAt().
-		SetNotifyError("").
 		Save(ctx)
 	return err
 }
@@ -149,8 +147,6 @@ func (s *MonitorStore) Resolve(ctx context.Context, id int) error {
 		SetStatus(entmonitorevent.StatusResolved).
 		SetResolvedAt(now).
 		ClearAutoResolveAt().
-		ClearNextNotifyAt().
-		SetNotifyError("").
 		Exec(ctx)
 	if ent.IsNotFound(err) {
 		return appmonitor.ErrEventNotFound
@@ -639,9 +635,6 @@ func mapMonitorEvent(row *ent.MonitorEvent) appmonitor.Event {
 		ResolvedAt:          row.ResolvedAt,
 		AutoResolveAt:       row.AutoResolveAt,
 		ExpiresAt:           row.ExpiresAt,
-		LastNotifiedAt:      row.LastNotifiedAt,
-		NextNotifyAt:        row.NextNotifyAt,
-		NotifyError:         row.NotifyError,
 		Detail:              detail,
 	}
 }

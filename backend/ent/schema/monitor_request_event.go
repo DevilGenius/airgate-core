@@ -49,19 +49,21 @@ func (MonitorRequestEvent) Fields() []ent.Field {
 	}
 }
 
+// This is the highest-volume monitor table, so every index is paid on each
+// insert. Only the listing order, the retention sweep and the filters that are
+// actually exercised keep an index; the rest fall back to a sequential scan,
+// which is acceptable for infrequent admin queries.
+//
+// hash and trace_hash carry no index on purpose: rows here are append-only and
+// never coalesced by hash, and traces are looked up from monitor_request_trace
+// by its own unique hash rather than from this side.
 func (MonitorRequestEvent) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("created_at"),
 		index.Fields("expires_at"),
 		index.Fields("type", "created_at"),
 		index.Fields("api_key_id", "created_at"),
-		index.Fields("group_id", "created_at"),
-		index.Fields("account_id", "created_at"),
-		index.Fields("endpoint", "created_at"),
 		index.Fields("http_status", "created_at"),
-		index.Fields("error_code", "created_at"),
 		index.Fields("request_id"),
-		index.Fields("hash"),
-		index.Fields("trace_hash"),
 	}
 }

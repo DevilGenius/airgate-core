@@ -56,12 +56,6 @@ const (
 	FieldAutoResolveAt = "auto_resolve_at"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
-	// FieldLastNotifiedAt holds the string denoting the last_notified_at field in the database.
-	FieldLastNotifiedAt = "last_notified_at"
-	// FieldNextNotifyAt holds the string denoting the next_notify_at field in the database.
-	FieldNextNotifyAt = "next_notify_at"
-	// FieldNotifyError holds the string denoting the notify_error field in the database.
-	FieldNotifyError = "notify_error"
 	// FieldDetail holds the string denoting the detail field in the database.
 	FieldDetail = "detail"
 	// Table holds the table name of the monitorevent in the database.
@@ -92,9 +86,6 @@ var Columns = []string{
 	FieldResolvedAt,
 	FieldAutoResolveAt,
 	FieldExpiresAt,
-	FieldLastNotifiedAt,
-	FieldNextNotifyAt,
-	FieldNotifyError,
 	FieldDetail,
 }
 
@@ -157,10 +148,6 @@ var (
 	DefaultUpdatedAt func() time.Time
 	// DefaultExpiresAt holds the default value on creation for the "expires_at" field.
 	DefaultExpiresAt func() time.Time
-	// DefaultNotifyError holds the default value on creation for the "notify_error" field.
-	DefaultNotifyError string
-	// NotifyErrorValidator is a validator for the "notify_error" field. It is called by the builders before save.
-	NotifyErrorValidator func(string) error
 	// DefaultDetail holds the default value on creation for the "detail" field.
 	DefaultDetail map[string]interface{}
 )
@@ -384,19 +371,4 @@ func ByAutoResolveAt(opts ...sql.OrderTermOption) OrderOption {
 // ByExpiresAt orders the results by the expires_at field.
 func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldExpiresAt, opts...).ToFunc()
-}
-
-// ByLastNotifiedAt orders the results by the last_notified_at field.
-func ByLastNotifiedAt(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldLastNotifiedAt, opts...).ToFunc()
-}
-
-// ByNextNotifyAt orders the results by the next_notify_at field.
-func ByNextNotifyAt(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldNextNotifyAt, opts...).ToFunc()
-}
-
-// ByNotifyError orders the results by the notify_error field.
-func ByNotifyError(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldNotifyError, opts...).ToFunc()
 }

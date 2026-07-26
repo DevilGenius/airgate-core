@@ -46,9 +46,6 @@ type MonitorEventResp struct {
 	ResolvedAt          *string                `json:"resolved_at,omitempty"`
 	AutoResolveAt       *string                `json:"auto_resolve_at,omitempty"`
 	ExpiresAt           string                 `json:"expires_at"`
-	LastNotifiedAt      *string                `json:"last_notified_at,omitempty"`
-	NextNotifyAt        *string                `json:"next_notify_at,omitempty"`
-	NotifyError         string                 `json:"notify_error,omitempty"`
 	Detail              map[string]interface{} `json:"detail,omitempty"`
 }
 

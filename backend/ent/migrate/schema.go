@@ -188,9 +188,6 @@ var (
 		{Name: "resolved_at", Type: field.TypeTime, Nullable: true},
 		{Name: "auto_resolve_at", Type: field.TypeTime, Nullable: true},
 		{Name: "expires_at", Type: field.TypeTime},
-		{Name: "last_notified_at", Type: field.TypeTime, Nullable: true},
-		{Name: "next_notify_at", Type: field.TypeTime, Nullable: true},
-		{Name: "notify_error", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "detail", Type: field.TypeJSON, Nullable: true},
 	}
 	// MonitorEventsTable holds the schema information for the "monitor_events" table.
@@ -215,19 +212,14 @@ var (
 				Columns: []*schema.Column{MonitorEventsColumns[2], MonitorEventsColumns[18]},
 			},
 			{
-				Name:    "monitorevent_type_updated_at",
+				Name:    "monitorevent_status_severity",
 				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[1], MonitorEventsColumns[18]},
+				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2]},
 			},
 			{
 				Name:    "monitorevent_status_severity_updated_at",
 				Unique:  false,
 				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[18]},
-			},
-			{
-				Name:    "monitorevent_status_type_updated_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[1], MonitorEventsColumns[18]},
 			},
 			{
 				Name:    "monitorevent_hash",
@@ -243,11 +235,6 @@ var (
 				Name:    "monitorevent_expires_at",
 				Unique:  false,
 				Columns: []*schema.Column{MonitorEventsColumns[21]},
-			},
-			{
-				Name:    "monitorevent_status_severity_next_notify_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorEventsColumns[3], MonitorEventsColumns[2], MonitorEventsColumns[23]},
 			},
 		},
 	}
@@ -310,44 +297,14 @@ var (
 				Columns: []*schema.Column{MonitorRequestEventsColumns[10], MonitorRequestEventsColumns[26]},
 			},
 			{
-				Name:    "monitorrequestevent_group_id_created_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[14], MonitorRequestEventsColumns[26]},
-			},
-			{
-				Name:    "monitorrequestevent_account_id_created_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[15], MonitorRequestEventsColumns[26]},
-			},
-			{
-				Name:    "monitorrequestevent_endpoint_created_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[20], MonitorRequestEventsColumns[26]},
-			},
-			{
 				Name:    "monitorrequestevent_http_status_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{MonitorRequestEventsColumns[22], MonitorRequestEventsColumns[26]},
 			},
 			{
-				Name:    "monitorrequestevent_error_code_created_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[24], MonitorRequestEventsColumns[26]},
-			},
-			{
 				Name:    "monitorrequestevent_request_id",
 				Unique:  false,
 				Columns: []*schema.Column{MonitorRequestEventsColumns[9]},
-			},
-			{
-				Name:    "monitorrequestevent_hash",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[4]},
-			},
-			{
-				Name:    "monitorrequestevent_trace_hash",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestEventsColumns[5]},
 			},
 		},
 	}
@@ -371,11 +328,6 @@ var (
 		Columns:    MonitorRequestTraceColumns,
 		PrimaryKey: []*schema.Column{MonitorRequestTraceColumns[0]},
 		Indexes: []*schema.Index{
-			{
-				Name:    "monitorrequesttrace_last_seen_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestTraceColumns[9]},
-			},
 			{
 				Name:    "monitorrequesttrace_expires_at",
 				Unique:  false,

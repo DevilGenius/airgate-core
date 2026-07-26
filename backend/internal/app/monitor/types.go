@@ -43,9 +43,6 @@ type Event struct {
 	ResolvedAt          *time.Time
 	AutoResolveAt       *time.Time
 	ExpiresAt           time.Time
-	LastNotifiedAt      *time.Time
-	NextNotifyAt        *time.Time
-	NotifyError         string
 	Detail              map[string]interface{}
 }
 

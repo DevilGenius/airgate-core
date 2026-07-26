@@ -908,9 +908,6 @@ export interface MonitorEventResp {
   resolved_at?: string;
   auto_resolve_at?: string;
   expires_at: string;
-  last_notified_at?: string;
-  next_notify_at?: string;
-  notify_error?: string;
   detail?: Record<string, unknown>;
 }
 

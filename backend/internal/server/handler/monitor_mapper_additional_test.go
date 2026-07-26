@@ -23,8 +23,6 @@ func TestMonitorMapperAdditionalCoverage(t *testing.T) {
 	resolvedAt := createdAt.Add(2 * time.Minute)
 	autoResolveAt := createdAt.Add(3 * time.Minute)
 	expiresAt := createdAt.Add(time.Hour)
-	lastNotifiedAt := createdAt.Add(4 * time.Minute)
-	nextNotifyAt := createdAt.Add(5 * time.Minute)
 	detail := map[string]interface{}{"reason": "rate-limit"}
 
 	event := appmonitor.Event{
@@ -50,9 +48,6 @@ func TestMonitorMapperAdditionalCoverage(t *testing.T) {
 		ResolvedAt:          &resolvedAt,
 		AutoResolveAt:       &autoResolveAt,
 		ExpiresAt:           expiresAt,
-		LastNotifiedAt:      &lastNotifiedAt,
-		NextNotifyAt:        &nextNotifyAt,
-		NotifyError:         "smtp failed",
 		Detail:              detail,
 	}
 
@@ -62,7 +57,7 @@ func TestMonitorMapperAdditionalCoverage(t *testing.T) {
 		resp.SubjectID != event.SubjectID || resp.Hash != event.Hash || resp.Title != event.Title || resp.Message != event.Message ||
 		resp.AccountID == nil || *resp.AccountID != accountID || resp.AccountNameSnapshot != event.AccountNameSnapshot ||
 		resp.Platform != event.Platform || resp.PluginID != event.PluginID || resp.TaskType != event.TaskType ||
-		resp.ErrorCode != event.ErrorCode || resp.NotifyError != event.NotifyError || resp.Detail["reason"] != "rate-limit" {
+		resp.ErrorCode != event.ErrorCode || resp.Detail["reason"] != "rate-limit" {
 		t.Fatalf("monitor event response did not copy fields: %+v", resp)
 	}
 	if resp.CreatedAt != "2026-06-20T01:02:03Z" || resp.UpdatedAt != "2026-06-20T01:03:03Z" ||
@@ -70,9 +65,7 @@ func TestMonitorMapperAdditionalCoverage(t *testing.T) {
 		t.Fatalf("monitor event time fields = %+v", resp)
 	}
 	if resp.ResolvedAt == nil || *resp.ResolvedAt != "2026-06-20T01:04:03Z" ||
-		resp.AutoResolveAt == nil || *resp.AutoResolveAt != "2026-06-20T01:05:03Z" ||
-		resp.LastNotifiedAt == nil || *resp.LastNotifiedAt != "2026-06-20T01:06:03Z" ||
-		resp.NextNotifyAt == nil || *resp.NextNotifyAt != "2026-06-20T01:07:03Z" {
+		resp.AutoResolveAt == nil || *resp.AutoResolveAt != "2026-06-20T01:05:03Z" {
 		t.Fatalf("monitor event pointer time fields = %+v", resp)
 	}
 

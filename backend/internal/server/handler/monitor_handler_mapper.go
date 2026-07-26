@@ -31,9 +31,6 @@ func toMonitorEventResp(item appmonitor.Event) dto.MonitorEventResp {
 		ResolvedAt:          monitorTimePtrString(item.ResolvedAt),
 		AutoResolveAt:       monitorTimePtrString(item.AutoResolveAt),
 		ExpiresAt:           monitorTimeString(item.ExpiresAt),
-		LastNotifiedAt:      monitorTimePtrString(item.LastNotifiedAt),
-		NextNotifyAt:        monitorTimePtrString(item.NextNotifyAt),
-		NotifyError:         item.NotifyError,
 		Detail:              item.Detail,
 	}
 }
