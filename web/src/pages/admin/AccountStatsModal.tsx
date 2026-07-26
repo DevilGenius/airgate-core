@@ -21,6 +21,7 @@ import { CommonDatePicker } from '../../shared/components/CommonDatePicker';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { CommonModal } from '../../shared/components/CommonModal';
 import { DISTRIBUTION_COLORS } from '../../shared/constants';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 
 const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 
@@ -234,7 +235,7 @@ function AccountStatsSkeleton() {
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {Array.from({ length: 6 }, (_, index) => (
           <div className="space-y-3 rounded-lg border border-border-subtle p-3.5" key={index}>
             <SkeletonBlock className="h-4 w-24 rounded" />
@@ -274,7 +275,7 @@ function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; li
   return (
     <div className="space-y-5">
       {/* 头部信息 */}
-      <div className="flex items-center gap-3 p-4 rounded-lg bg-gradient-to-r from-primary-subtle/50 to-transparent border border-border-subtle">
+      <div className="flex flex-wrap items-center gap-3 p-4 rounded-lg bg-gradient-to-r from-primary-subtle/50 to-transparent border border-border-subtle">
         <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-subtle">
           <PlatformIcon platform={data.platform} className="w-5 h-5" />
         </div>
@@ -324,7 +325,7 @@ function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; li
       </div>
 
       {/* 中间 3 个信息卡片 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {/* 今日概览 */}
         <InfoCard title={t('accounts.stats_today')} icon={<Clock className="w-4 h-4" />} color="var(--ag-info)">
           <InfoRow label={t('accounts.stats_cost')} value={fmtCost(data.today.account_cost)} />
@@ -357,7 +358,7 @@ function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; li
       </div>
 
       {/* 下方 3 个信息卡片 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {/* 累计 Token */}
         <InfoCard title={t('accounts.stats_total_tokens')} icon={<Cpu className="w-4 h-4" />} color="var(--ag-primary)">
           <InfoRow label={t('accounts.stats_range_total')} value={fmtNum(totalTokens)} />
@@ -453,6 +454,7 @@ function InfoRow({ label, value, highlight }: { label: string; value: string; hi
 
 function TrendChart({ data }: { data: AccountStatsResp }) {
   const { t } = useTranslation();
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   const chartData = useMemo(() =>
     (data.daily_trend ?? []).map((d) => ({
@@ -470,8 +472,8 @@ function TrendChart({ data }: { data: AccountStatsResp }) {
   return (
     <div className="rounded-lg border border-border-subtle p-4">
       <h4 className="text-xs font-semibold text-text mb-3">{t('accounts.stats_trend_title')}</h4>
-      <ResponsiveContainer width="100%" height={260} debounce={80}>
-        <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+      <ResponsiveContainer width="100%" height={isMobile ? 200 : 260} debounce={80}>
+        <LineChart data={chartData} margin={isMobile ? { top: 5, right: 4, left: 0, bottom: 5 } : { top: 5, right: 20, left: 10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--ag-border-subtle)" />
           <XAxis
             dataKey="date"
@@ -515,7 +517,7 @@ function TrendChart({ data }: { data: AccountStatsResp }) {
           <Line yAxisId="count" type="monotone" dataKey="count" stroke="#f59e0b" strokeWidth={2} dot={false} isAnimationActive={false} name="count" />
         </LineChart>
       </ResponsiveContainer>
-      <div className="flex items-center justify-center gap-4 mt-2">
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-2">
         <LegendDot color="#3b82f6" label={`${t('accounts.stats_total_cost_label')} (USD)`} />
         <LegendDot color="#10b981" label={`${t('accounts.stats_actual_cost_label')} (USD)`} />
         <LegendDot color="#f59e0b" label={t('accounts.stats_requests')} />
