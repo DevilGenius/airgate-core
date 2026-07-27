@@ -8,6 +8,7 @@ import type {
 
 export type AccountListFilter = {
   platform?: string;
+  /** Comma-separated union of persisted and runtime account states. */
   state?: string;
   account_type?: string;
   group_id?: number;

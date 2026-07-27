@@ -90,7 +90,7 @@ type ListFilter struct {
 	PageSize    int
 	Keyword     string
 	Platform    string
-	State       string // active / rate_limited / degraded / disabled / working(list-only)
+	State       string // 逗号分隔并集：active / rate_limited / degraded / disabled / working / family_limited（后两项仅列表筛选）
 	AccountType string
 	Credential  *CredentialStringFilter
 	GroupID     *int

@@ -142,10 +142,9 @@ func (s *AccountStore) List(ctx context.Context, filter appaccount.ListFilter) (
 func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter) ([]appaccount.Account, error) {
 	query := applyAccountListFilters(accountscope.Query(s.db), filter)
 
-	accounts, err := query.
+	accounts, err := applyAccountListOrder(query, filter).
 		WithGroups().
 		WithProxy().
-		Order(ent.Desc(entaccount.FieldCreatedAt)).
 		All(ctx)
 	if err != nil {
 		return nil, err

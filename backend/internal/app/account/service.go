@@ -255,9 +255,7 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	if err != nil {
 		return ListResult{}, err
 	}
-	s.hydrateAccountListRuntimeData(ctx, accounts, workingCounts)
-
-	s.cacheAccountProfiles(ctx, accounts)
+	s.hydrateAndCacheAccountListRuntimeData(ctx, accounts, workingCounts)
 
 	return ListResult{
 		List:     accounts,
@@ -265,6 +263,17 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 		Page:     page,
 		PageSize: pageSize,
 	}, nil
+}
+
+// HydrateAccountListRuntimeData fills runtime-only list fields after callers
+// perform a non-DB filter such as Redis-backed family cooldown filtering.
+func (s *Service) HydrateAccountListRuntimeData(ctx context.Context, accounts []Account) {
+	s.hydrateAndCacheAccountListRuntimeData(ctx, accounts, nil)
+}
+
+func (s *Service) hydrateAndCacheAccountListRuntimeData(ctx context.Context, accounts []Account, workingCounts map[int]int) {
+	s.hydrateAccountListRuntimeData(ctx, accounts, workingCounts)
+	s.cacheAccountProfiles(ctx, accounts)
 }
 
 func (s *Service) hydrateAccountListRuntimeData(ctx context.Context, accounts []Account, workingCounts map[int]int) {
@@ -365,6 +374,12 @@ func (s *Service) workingConcurrencyCounts(ctx context.Context) map[int]int {
 	return s.concurrency.GetWorkingCounts(ctx)
 }
 
+// WorkingAccountIDs returns accounts with live concurrency for overlapping
+// admin state filters such as working + active.
+func (s *Service) WorkingAccountIDs(ctx context.Context) []int {
+	return mapKeys(s.workingConcurrencyCounts(ctx))
+}
+
 func mapKeys(values map[int]int) []int {
 	keys := make([]int, 0, len(values))
 	for key := range values {
@@ -442,6 +457,11 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 
 // ExportAll 查询符合筛选条件的全部账号（用于导出，不分页、不带并发计数）。
 func (s *Service) ExportAll(ctx context.Context, filter ListFilter) ([]Account, error) {
+	return s.ListAll(ctx, filter)
+}
+
+// ListAll 查询符合筛选条件的全部账号，不填充列表运行态字段。
+func (s *Service) ListAll(ctx context.Context, filter ListFilter) ([]Account, error) {
 	filter = s.normalizeListFilter(filter)
 	if isWorkingStateFilter(filter.State) {
 		nextFilter, _, empty := s.applyWorkingStateFilter(ctx, filter)

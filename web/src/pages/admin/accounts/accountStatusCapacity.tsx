@@ -85,15 +85,15 @@ function useCooldownClock(enabled: boolean): number {
 }
 /**
  * AccountStatusCell 渲染账号状态徽标，按 state + state_until 动态展示：
- *   active       → 绿色 "活跃"
- *   rate_limited → 橙色 "限流中 Xh Ym"（state_until 倒计时）
- *   degraded     → 黄色 "降级 Xm"（上游退避，倒计时）
- *   disabled     → 红色 "已禁用"（tooltip 显示 error_msg）
+ *   active         → 绿色 "活跃"
+ *   family_limited → 橙色 "家族限流中"（由 family_cooldowns 派生，不改变调度状态）
+ *   rate_limited   → 橙色 "限流中 Xh Ym"（state_until 倒计时）
+ *   degraded       → 黄色 "降级 Xm"（上游退避，倒计时）
+ *   disabled       → 红色 "已禁用"（tooltip 显示 error_msg）
  * 到期的 rate_limited / degraded 视作 active（后端 lazy 回收，前端可先显示 active）。
  *
- * 同一行还会叠加家族级冷却（family_cooldowns）：账号 state 可能仍是 active，
- * 但某个 family（如 gpt-image）在 Redis 上仍处冷却中。用一个橙色小 pill
- * 标出"限流家族数"，hover tooltip 列出每个家族剩余时间。
+ * family_limited 仅是 Redis family_cooldowns 派生的展示状态；账号级状态优先时，
+ * 仍用附加 pill 标出限流家族数，hover tooltip 列出每个家族剩余时间。
  */
 export function AccountStatusCell({ row }: { row: AccountResp }) {
   const { t } = useTranslation();
@@ -111,6 +111,13 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   const liveFamilyCooldowns = (row.family_cooldowns || []).filter(
     (fc) => Date.parse(fc.until) > now,
   );
+  const familyTooltip = liveFamilyCooldowns
+    .map((fc) => {
+      const ms = Date.parse(fc.until) - now;
+      const reason = fc.reason ? ` — ${fc.reason.slice(0, 80)}` : '';
+      return `${fc.family} ${formatCountdown(ms)}${reason}`;
+    })
+    .join('\n');
 
   const pill = (label: string, bg: string, fg: string, tooltip?: string) => (
     <span
@@ -138,6 +145,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
 
   // 主 state 徽标
   let mainBadge: ReactElement;
+  let familyCooldownIsMain = false;
   if (row.state === 'rate_limited' && hasCountdown) {
     mainBadge = pill(
       `${t('accounts.rate_limited_label', '限流中')} ${formatCountdown(remainingMs)}`,
@@ -164,12 +172,20 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
         )}
       </div>
     );
+  } else if (liveFamilyCooldowns.length > 0) {
+    familyCooldownIsMain = true;
+    mainBadge = pill(
+      t('accounts.family_limited_label', '家族限流中'),
+      'var(--ag-warning-subtle)',
+      'var(--ag-warning)',
+      familyTooltip,
+    );
   } else {
     // active，或 rate_limited/degraded 已到期（lazy 恢复）
     mainBadge = <StatusPill label={t('status.active')} status="active" />;
   }
 
-  if (liveFamilyCooldowns.length === 0) {
+  if (liveFamilyCooldowns.length === 0 || familyCooldownIsMain) {
     if (!freezeCooldownHoverProps) return mainBadge;
     return (
       <span className="inline-flex max-w-full" {...freezeCooldownHoverProps}>
@@ -177,15 +193,6 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
       </span>
     );
   }
-
-  // tooltip 多行：每个家族 + 剩余时间，rate-limit 原因截断到 80 字符避免过宽
-  const familyTooltip = liveFamilyCooldowns
-    .map((fc) => {
-      const ms = Date.parse(fc.until) - now;
-      const reason = fc.reason ? ` — ${fc.reason.slice(0, 80)}` : '';
-      return `${fc.family} ${formatCountdown(ms)}${reason}`;
-    })
-    .join('\n');
 
   const familyLabel = t(
     'accounts.family_cooldown_label',

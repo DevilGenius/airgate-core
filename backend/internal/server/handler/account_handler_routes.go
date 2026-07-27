@@ -26,7 +26,7 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 	groupID := parseOptionalInt(c.Query("group_id"))
 	ungrouped := groupID == nil && parseOptionalBool(c.Query("ungrouped"))
 
-	result, err := h.service.List(c.Request.Context(), appaccount.ListFilter{
+	result, familyCooldowns, err := h.listAccountsWithStateFilters(c.Request.Context(), appaccount.ListFilter{
 		Page:        page.Page,
 		PageSize:    page.PageSize,
 		Keyword:     page.Keyword,
@@ -45,12 +45,6 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 		return
 	}
 
-	accountIDs := make([]int, 0, len(result.List))
-	for _, item := range result.List {
-		accountIDs = append(accountIDs, item.ID)
-	}
-	familyCooldowns := h.familyCooldownsForAccounts(c.Request.Context(), accountIDs)
-
 	list := make([]dto.AccountResp, 0, len(result.List))
 	for _, item := range result.List {
 		resp := toAccountResp(item)
@@ -67,7 +61,7 @@ func (h *AccountHandler) ExportAccounts(c *gin.Context) {
 	groupID := parseOptionalInt(c.Query("group_id"))
 	ungrouped := groupID == nil && parseOptionalBool(c.Query("ungrouped"))
 
-	accounts, err := h.service.ExportAll(c.Request.Context(), appaccount.ListFilter{
+	filter := appaccount.ListFilter{
 		Keyword:     c.Query("keyword"),
 		Platform:    c.Query("platform"),
 		State:       c.Query("state"),
@@ -76,7 +70,12 @@ func (h *AccountHandler) ExportAccounts(c *gin.Context) {
 		Ungrouped:   ungrouped,
 		ProxyID:     parseOptionalInt(c.Query("proxy_id")),
 		IDs:         parseIDList(c.Query("ids")),
-	})
+	}
+	accounts, _, err := h.listAllAccountsWithStateFilters(
+		c.Request.Context(),
+		filter,
+		parseAccountStateFilters(filter.State),
+	)
 	if err != nil {
 		httpCode, message := h.handleError("导出账号失败", "导出失败", err)
 		response.Error(c, httpCode, httpCode, message)

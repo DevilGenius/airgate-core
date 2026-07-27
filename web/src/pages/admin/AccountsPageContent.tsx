@@ -31,6 +31,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
+import { SimpleMultiSelect } from '../../shared/components/SimpleMultiSelect';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { TablePage } from '../../shared/components/TablePage';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
@@ -89,11 +90,35 @@ const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 const ACCOUNT_PRIORITY_SORT_KEY = 'priority';
 const ACCOUNT_MODAL_TABLE_PLACEHOLDER_MIN_HEIGHT = 320;
 const ACCOUNT_WORKING_STATE_FILTER = 'working';
+const ACCOUNT_FAMILY_LIMITED_STATE_FILTER = 'family_limited';
 const ACCOUNT_WORKING_REFETCH_THROTTLE_MS = 750;
 const ACCOUNT_STATUS_FILTER_REFETCH_THROTTLE_MS = 750;
 const ACCOUNT_STATUS_BATCH_FALLBACK_MS = 250;
 const ACCOUNT_USAGE_SNAPSHOT_MAX_ACCOUNTS = 5000;
 const EMPTY_ACCOUNT_ROWS: AccountResp[] = [];
+const ACCOUNT_STATE_FILTER_ORDER = [
+  ACCOUNT_WORKING_STATE_FILTER,
+  'active',
+  ACCOUNT_FAMILY_LIMITED_STATE_FILTER,
+  'rate_limited',
+  'degraded',
+  'disabled',
+] as const;
+const ACCOUNT_STATE_FILTER_SET = new Set<string>(ACCOUNT_STATE_FILTER_ORDER);
+
+function parseAccountStateFilters(value: string): string[] {
+  const selected = new Set(
+    value
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => ACCOUNT_STATE_FILTER_SET.has(item)),
+  );
+  return ACCOUNT_STATE_FILTER_ORDER.filter((item) => selected.has(item));
+}
+
+function accountStateFilterIncludes(value: string, state: string): boolean {
+  return value.split(',').some((item) => item.trim() === state);
+}
 
 function accountUsageInfoHasContent(usage: AccountUsageInfo | undefined) {
   if (!usage) return false;
@@ -202,9 +227,9 @@ export default function AccountsPageContent() {
   ], [platformName, platforms, platformsKey, t]);
 
   const STATE_OPTIONS = useMemo(() => [
-    { id: '', label: t('users.all_status') },
     { id: ACCOUNT_WORKING_STATE_FILTER, label: t('status.working', '工作中') },
     { id: 'active', label: t('status.active') },
+    { id: ACCOUNT_FAMILY_LIMITED_STATE_FILTER, label: t('accounts.family_limited_label', '家族限流中') },
     { id: 'rate_limited', label: t('status.rate_limited', '限流中') },
     { id: 'degraded', label: t('status.degraded', '降级中') },
     { id: 'disabled', label: t('status.disabled') },
@@ -219,6 +244,7 @@ export default function AccountsPageContent() {
   const [typeFilter, setTypeFilter] = usePersistentUrlQueryParam('type', `${ACCOUNT_FILTER_STORAGE_KEY}:type`);
   const [groupFilter, setGroupFilter] = usePersistentUrlQueryParam('group', `${ACCOUNT_FILTER_STORAGE_KEY}:group`);
   const [proxyFilter, setProxyFilter] = usePersistentUrlQueryParam('proxy', `${ACCOUNT_FILTER_STORAGE_KEY}:proxy`);
+  const selectedStateFilters = useMemo(() => parseAccountStateFilters(stateFilter), [stateFilter]);
   const [prioritySortDir, setPrioritySortDir] = useState<AccountTableSortDirection | ''>('');
   const sortBy = prioritySortDir ? ACCOUNT_PRIORITY_SORT_KEY : '';
   const sortDir: AccountTableSortDirection = prioritySortDir || 'desc';
@@ -317,11 +343,11 @@ export default function AccountsPageContent() {
   const statusFilterRefetchTimerRef = useRef<number | null>(null);
   const scheduleWorkingAccountsRefresh = useCallback(() => {
     if (typeof window === 'undefined') return;
-    if (stateFilterRef.current !== ACCOUNT_WORKING_STATE_FILTER) return;
+    if (!accountStateFilterIncludes(stateFilterRef.current, ACCOUNT_WORKING_STATE_FILTER)) return;
     if (workingRefetchTimerRef.current != null) return;
     workingRefetchTimerRef.current = window.setTimeout(() => {
       workingRefetchTimerRef.current = null;
-      if (stateFilterRef.current !== ACCOUNT_WORKING_STATE_FILTER) return;
+      if (!accountStateFilterIncludes(stateFilterRef.current, ACCOUNT_WORKING_STATE_FILTER)) return;
       void refetchAccounts({ cancelRefetch: false });
     }, ACCOUNT_WORKING_REFETCH_THROTTLE_MS);
   }, [refetchAccounts, stateFilterRef]);
@@ -489,14 +515,23 @@ export default function AccountsPageContent() {
         const accountId = Number(event.account_id);
         if (!Number.isFinite(accountId) || accountId <= 0) return;
         queueStatusEvent(accountId, event);
-        if (isAccountState(event.state)) scheduleStatusFilteredAccountsRefresh();
+        const familyCooldownChangesFilteredState = (
+          event.family_cooldown_action === 'upsert'
+          || event.family_cooldown_action === 'clear'
+        ) && (
+          accountStateFilterIncludes(stateFilterRef.current, 'active')
+          || accountStateFilterIncludes(stateFilterRef.current, ACCOUNT_FAMILY_LIMITED_STATE_FILTER)
+        );
+        if (isAccountState(event.state) || familyCooldownChangesFilteredState) {
+          scheduleStatusFilteredAccountsRefresh();
+        }
         return;
       }
       if (event.type !== 'account_capacity.changed') return;
       const accountId = Number(event.account_id);
       const currentConcurrency = Number(event.current_concurrency);
       if (!Number.isFinite(accountId) || !Number.isFinite(currentConcurrency)) return;
-      if (stateFilterRef.current === ACCOUNT_WORKING_STATE_FILTER) {
+      if (accountStateFilterIncludes(stateFilterRef.current, ACCOUNT_WORKING_STATE_FILTER)) {
         scheduleWorkingAccountsRefresh();
       }
       if (!visibleAccountIdSetRef.current.has(accountId)) return;
@@ -1092,9 +1127,16 @@ export default function AccountsPageContent() {
   const selectedPlatformLabel = platformFilter
     ? (PLATFORM_OPTIONS.find((item) => item.id === platformFilter)?.label ?? platformName(platformFilter))
     : t('accounts.all_platforms');
-  const selectedStateLabel = stateFilter
-    ? (STATE_OPTIONS.find((item) => item.id === stateFilter)?.label ?? stateFilter)
+  const selectedStateLabel = selectedStateFilters.length > 0
+    ? selectedStateFilters
+      .map((state) => STATE_OPTIONS.find((item) => item.id === state)?.label ?? state)
+      .join(', ')
     : t('users.all_status');
+  const updateStateFilters = useCallback((nextStates: string[]) => {
+    const selected = new Set(nextStates);
+    setStateFilter(ACCOUNT_STATE_FILTER_ORDER.filter((state) => selected.has(state)).join(','));
+    setPage(1);
+  }, [setPage, setStateFilter]);
   const selectedTypeOption = useMemo(
     () => typeOptions.find((item) => item.id === typeFilter)
       ?? oauthPlanOptions.find((item) => item.id === typeFilter)
@@ -1215,7 +1257,18 @@ export default function AccountsPageContent() {
           key={filter.key}
           className={filter.widthClass}
         >
-          {filter.key === 'type' ? (
+          {filter.key === 'state' ? (
+            <SimpleMultiSelect
+              allLabel={t('users.all_status')}
+              ariaLabel={filter.label}
+              fullWidth
+              items={STATE_OPTIONS.map((item) => ({ key: item.id, label: item.label }))}
+              selectedKeys={selectedStateFilters}
+              selectedLabel={selectedStateLabel}
+              onOpenChange={(isOpen) => handleToolbarMenuOpenChange(filter.perfTarget, isOpen)}
+              onSelectionChange={updateStateFilters}
+            />
+          ) : filter.key === 'type' ? (
             <AccountTypeFilterSelect
               oauthPlanOptions={oauthPlanOptions}
               platformsLoading={platformsLoading}
@@ -1245,17 +1298,21 @@ export default function AccountsPageContent() {
       ))}
     </div>
   ), [
+    STATE_OPTIONS,
     handleToolbarMenuOpenChange,
     keyword,
     oauthPlanOptions,
     platformsLoading,
     selectedTypeOption,
+    selectedStateFilters,
+    selectedStateLabel,
     setKeyword,
     setPage,
     setTypeFilter,
     t,
     toolbarFilters,
     typeOptions,
+    updateStateFilters,
   ]);
 
   const actionsNode = useMemo(() => (
