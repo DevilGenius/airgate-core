@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { ToolbarMenu, ToolbarMenuItem } from './ToolbarMenu';
 import type { SimpleSelectOption } from './SimpleSelect';
 
@@ -34,20 +34,39 @@ export const SimpleMultiSelect = memo(function SimpleMultiSelect({
     : allLabel;
   const displayLabel = selectedLabel ?? fallbackLabel;
 
+  // 记录最近一次非空选择：已处于"全部"状态时再次点击"全部"，还原为之前的选择。
+  const lastNonEmptySelectionRef = useRef<string[]>([]);
+  useEffect(() => {
+    if (selectedKeys.length > 0) {
+      lastNonEmptySelectionRef.current = [...selectedKeys];
+    }
+  }, [selectedKeys]);
+  const handleAllSelect = useCallback(() => {
+    if (selectedKeys.length > 0) {
+      onSelectionChange([]);
+      return;
+    }
+    const restore = lastNonEmptySelectionRef.current;
+    if (restore.length > 0) {
+      onSelectionChange(restore);
+    }
+  }, [onSelectionChange, selectedKeys.length]);
+
   return (
     <ToolbarMenu
       ariaLabel={ariaLabel}
       className={['ag-simple-select-trigger select__trigger', triggerClassName].filter(Boolean).join(' ')}
       label={displayLabel}
       onOpenChange={onOpenChange}
-      rootClassName={['ag-simple-select', fullWidth && 'ag-simple-select--full', className].filter(Boolean).join(' ')}
+      rootClassName={['ag-simple-select', 'ag-simple-multi-select', fullWidth && 'ag-simple-select--full', className].filter(Boolean).join(' ')}
     >
       {() => (
         <div className="ag-simple-select-popover-content">
           <ToolbarMenuItem
             isSelected={selected.size === 0}
             role="menuitemcheckbox"
-            onSelect={() => onSelectionChange([])}
+            showCheckIndicator={false}
+            onSelect={handleAllSelect}
           >
             {allLabel}
           </ToolbarMenuItem>
@@ -57,6 +76,7 @@ export const SimpleMultiSelect = memo(function SimpleMultiSelect({
               isDisabled={item.isDisabled}
               isSelected={selected.has(item.key)}
               role="menuitemcheckbox"
+              showCheckIndicator={false}
               onSelect={() => {
                 if (item.isDisabled) return;
                 const next = new Set(selected);

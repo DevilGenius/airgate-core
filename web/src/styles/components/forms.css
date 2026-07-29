@@ -153,6 +153,22 @@
   display: contents;
 }
 
+/* 多选下拉：选中态用背景高亮表达，不渲染右侧勾选列。 */
+.ag-simple-multi-select .ag-toolbar-menu-item--no-check {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ag-simple-multi-select .ag-toolbar-menu-item[aria-checked="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-soft-foreground);
+}
+
+.ag-simple-multi-select .ag-toolbar-menu-item[aria-checked="true"]:hover,
+.ag-simple-multi-select .ag-toolbar-menu-item[aria-checked="true"]:focus-visible {
+  background: color-mix(in oklab, var(--accent) 24%, var(--accent-soft) 76%);
+  color: var(--accent-soft-foreground);
+}
+
 .ag-simple-select-option-copy {
   display: flex;
   min-width: 0;

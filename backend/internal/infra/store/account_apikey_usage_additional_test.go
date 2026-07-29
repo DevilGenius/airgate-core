@@ -134,7 +134,7 @@ func TestAccountStoreCRUDListsAndAggregates(t *testing.T) {
 	groupID := group.ID
 	proxyFilterID := proxy.ID
 	list, total, err := store.List(ctx, appaccount.ListFilter{
-		Page: 1, PageSize: 20, GroupID: &groupID, ProxyID: &proxyFilterID, State: "active", IDs: []int{created.ID},
+		Page: 1, PageSize: 20, GroupIDs: []int{groupID}, ProxyIDs: []int{proxyFilterID}, State: "active", IDs: []int{created.ID},
 	})
 	if err != nil {
 		t.Fatalf("List grouped/proxied returned error: %v", err)

@@ -7,13 +7,17 @@ import type {
 } from '../types';
 
 export type AccountListFilter = {
+  /** Comma-separated union of platforms. */
   platform?: string;
   /** Comma-separated union of persisted and runtime account states. */
   state?: string;
+  /** Comma-separated union of account types and oauth_plan virtual filters. */
   account_type?: string;
-  group_id?: number;
+  /** Comma-separated union of group ids. */
+  group_id?: number | string;
   ungrouped?: boolean;
-  proxy_id?: number;
+  /** Comma-separated union of proxy ids. */
+  proxy_id?: number | string;
   sort_by?: 'priority';
   sort_dir?: 'asc' | 'desc';
 };

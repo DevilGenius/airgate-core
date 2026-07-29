@@ -43,30 +43,61 @@ func applyAccountListFilters(query *ent.AccountQuery, filter appaccount.ListFilt
 	if filter.Keyword != "" {
 		query = query.Where(accountKeywordMatches(filter.Keyword))
 	}
-	if filter.Platform != "" {
-		query = query.Where(entaccount.PlatformEQ(filter.Platform))
+	if platforms := splitCommaSeparated(filter.Platform); len(platforms) > 0 {
+		query = query.Where(entaccount.PlatformIn(platforms...))
 	}
 	if filter.State != "" {
 		query = query.Where(entaccount.StateEQ(entaccount.State(filter.State)))
 	}
-	if filter.AccountType != "" {
-		query = query.Where(entaccount.TypeEQ(filter.AccountType))
+	// 账号类型与 credentials 筛选共同构成 OR 并集：
+	// 选中多个类型 / OAuth 套餐时任一匹配即可。
+	typePredicates := make([]predicate.Account, 0, 1+len(filter.Credentials))
+	if types := splitCommaSeparated(filter.AccountType); len(types) > 0 {
+		typePredicates = append(typePredicates, entaccount.TypeIn(types...))
 	}
-	if filter.Credential != nil {
-		query = query.Where(accountCredentialStringMatches(*filter.Credential))
+	for _, credential := range filter.Credentials {
+		typePredicates = append(typePredicates, accountCredentialStringMatches(credential))
 	}
-	if filter.GroupID != nil {
-		query = query.Where(entaccount.HasGroupsWith(entgroup.ID(*filter.GroupID)))
-	} else if filter.Ungrouped {
-		query = query.Where(entaccount.Not(entaccount.HasGroups()))
+	if len(typePredicates) == 1 {
+		query = query.Where(typePredicates[0])
+	} else if len(typePredicates) > 1 {
+		query = query.Where(entaccount.Or(typePredicates...))
 	}
-	if filter.ProxyID != nil {
-		query = query.Where(entaccount.HasProxyWith(entproxy.IDEQ(*filter.ProxyID)))
+	// 分组并集：属于任一选中分组，或与"未分组"组合时取 OR。
+	groupPredicates := make([]predicate.Account, 0, 2)
+	if len(filter.GroupIDs) > 0 {
+		groupPredicates = append(groupPredicates, entaccount.HasGroupsWith(entgroup.IDIn(filter.GroupIDs...)))
+	}
+	if filter.Ungrouped {
+		groupPredicates = append(groupPredicates, entaccount.Not(entaccount.HasGroups()))
+	}
+	if len(groupPredicates) == 1 {
+		query = query.Where(groupPredicates[0])
+	} else if len(groupPredicates) > 1 {
+		query = query.Where(entaccount.Or(groupPredicates...))
+	}
+	if len(filter.ProxyIDs) > 0 {
+		query = query.Where(entaccount.HasProxyWith(entproxy.IDIn(filter.ProxyIDs...)))
 	}
 	if len(filter.IDs) > 0 {
 		query = query.Where(entaccount.IDIn(filter.IDs...))
 	}
 	return query
+}
+
+// splitCommaSeparated 拆分逗号分隔的筛选值（去空白、去空项）。
+func splitCommaSeparated(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if value := strings.TrimSpace(part); value != "" {
+			values = append(values, value)
+		}
+	}
+	return values
 }
 
 func applyAccountListOrder(query *ent.AccountQuery, filter appaccount.ListFilter) *ent.AccountQuery {

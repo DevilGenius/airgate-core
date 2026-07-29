@@ -89,13 +89,13 @@ type ListFilter struct {
 	Page        int
 	PageSize    int
 	Keyword     string
-	Platform    string
+	Platform    string // 逗号分隔并集：多平台取 OR
 	State       string // 逗号分隔并集：active / rate_limited / degraded / disabled / working / family_limited（后两项仅列表筛选）
-	AccountType string
-	Credential  *CredentialStringFilter
-	GroupID     *int
+	AccountType string // 逗号分隔并集：oauth / apikey / oauth_plan:<platform>:<key>，取 OR
+	Credentials []CredentialStringFilter
+	GroupIDs    []int // 并集：属于任一分组即匹配；与 Ungrouped 组合时取 OR
 	Ungrouped   bool
-	ProxyID     *int
+	ProxyIDs    []int // 并集：使用任一代理即匹配
 	IDs         []int
 	SortBy      string
 	SortDir     string

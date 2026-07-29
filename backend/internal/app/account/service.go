@@ -2384,6 +2384,7 @@ func (s *Service) loadAccountProfilesForUsage(ctx context.Context, platform stri
 	accounts := make([]Account, 0, len(accountIDs))
 	missing := make([]int, 0)
 	staleKeys := make([]string, 0)
+	platformFilters := splitCommaValues(platform)
 	for index, accountID := range accountIDs {
 		raw, ok := redisValueBytes(values[index])
 		if !ok {
@@ -2397,7 +2398,7 @@ func (s *Service) loadAccountProfilesForUsage(ctx context.Context, platform stri
 			continue
 		}
 		account, ok := accountProfileCacheToAccount(payload)
-		if !ok || (platform != "" && account.Platform != platform) {
+		if !ok || !accountPlatformMatches(account.Platform, platformFilters) {
 			missing = append(missing, accountID)
 			continue
 		}

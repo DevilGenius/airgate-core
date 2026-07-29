@@ -452,16 +452,17 @@ func TestListResolvesPluginOAuthPlanFilter(t *testing.T) {
 	if captured.AccountType != "" {
 		t.Fatalf("captured AccountType = %q, want empty after virtual filter resolution", captured.AccountType)
 	}
-	if captured.Credential == nil {
-		t.Fatal("captured Credential is nil")
+	if len(captured.Credentials) != 1 {
+		t.Fatalf("captured Credentials = %+v, want exactly one resolved credential filter", captured.Credentials)
 	}
-	if captured.Credential.Platform != "kiro" ||
-		captured.Credential.AccountType != "oauth" ||
-		captured.Credential.Key != "plan_type" ||
-		captured.Credential.MatchMode != "contains" ||
-		len(captured.Credential.Values) != 1 ||
-		captured.Credential.Values[0] != "Builder Id Pro" {
-		t.Fatalf("captured Credential = %+v", captured.Credential)
+	credential := captured.Credentials[0]
+	if credential.Platform != "kiro" ||
+		credential.AccountType != "oauth" ||
+		credential.Key != "plan_type" ||
+		credential.MatchMode != "contains" ||
+		len(credential.Values) != 1 ||
+		credential.Values[0] != "Builder Id Pro" {
+		t.Fatalf("captured Credentials[0] = %+v", credential)
 	}
 }
 
@@ -481,8 +482,8 @@ func TestListKeepsUnknownOAuthPlanFilterExact(t *testing.T) {
 	if captured.AccountType != oauthPlanFilterID("openai", "plus") {
 		t.Fatalf("captured AccountType = %q, want unresolved virtual filter to remain exact", captured.AccountType)
 	}
-	if captured.Credential != nil {
-		t.Fatalf("captured Credential = %+v, want nil", captured.Credential)
+	if len(captured.Credentials) != 0 {
+		t.Fatalf("captured Credentials = %+v, want empty", captured.Credentials)
 	}
 }
 

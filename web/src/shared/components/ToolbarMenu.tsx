@@ -19,6 +19,8 @@ interface ToolbarMenuItemProps {
   isSelected?: boolean;
   onSelect: () => void;
   role?: 'menuitem' | 'menuitemcheckbox' | 'menuitemradio';
+  /** 为 false 时不渲染右侧勾选列（选中态可改用背景高亮表达）。 */
+  showCheckIndicator?: boolean;
 }
 
 export const ToolbarMenu = memo(function ToolbarMenu({
@@ -118,6 +120,7 @@ export const ToolbarMenuItem = memo(function ToolbarMenuItem({
   isSelected = false,
   onSelect,
   role = 'menuitem',
+  showCheckIndicator = true,
 }: ToolbarMenuItemProps) {
   const selectedOnPointerDownRef = useRef(false);
 
@@ -144,16 +147,22 @@ export const ToolbarMenuItem = memo(function ToolbarMenuItem({
       type="button"
       aria-checked={role === 'menuitem' ? undefined : isSelected}
       aria-disabled={isDisabled || undefined}
-      className={['ag-toolbar-menu-item', className].filter(Boolean).join(' ')}
+      className={[
+        'ag-toolbar-menu-item',
+        !showCheckIndicator && 'ag-toolbar-menu-item--no-check',
+        className,
+      ].filter(Boolean).join(' ')}
       disabled={isDisabled}
       role={role}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
     >
       <span className="ag-toolbar-menu-item-label">{children}</span>
-      <span className="ag-toolbar-menu-item-check">
-        {isSelected ? <Check className="h-3.5 w-3.5 text-primary" aria-hidden="true" /> : null}
-      </span>
+      {showCheckIndicator ? (
+        <span className="ag-toolbar-menu-item-check">
+          {isSelected ? <Check className="h-3.5 w-3.5 text-primary" aria-hidden="true" /> : null}
+        </span>
+      ) : null}
     </button>
   );
 });

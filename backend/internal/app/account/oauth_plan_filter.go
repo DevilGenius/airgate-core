@@ -132,17 +132,61 @@ func (s *Service) resolveOAuthPlanFilter(value string) (oauthPlanFilter, bool) {
 }
 
 func (s *Service) normalizeListFilter(filter ListFilter) ListFilter {
-	plan, ok := s.resolveOAuthPlanFilter(filter.AccountType)
-	if !ok {
+	values := splitCommaValues(filter.AccountType)
+	if len(values) == 0 {
 		return filter
 	}
-	filter.AccountType = ""
-	filter.Credential = &CredentialStringFilter{
-		Platform:    plan.Platform,
-		AccountType: "oauth",
-		Key:         plan.CredentialKey,
-		Values:      plan.Matches,
-		MatchMode:   plan.MatchMode,
+	types := make([]string, 0, len(values))
+	credentials := make([]CredentialStringFilter, 0, len(values))
+	for _, value := range values {
+		plan, ok := s.resolveOAuthPlanFilter(value)
+		if !ok {
+			types = append(types, value)
+			continue
+		}
+		credentials = append(credentials, CredentialStringFilter{
+			Platform:    plan.Platform,
+			AccountType: "oauth",
+			Key:         plan.CredentialKey,
+			Values:      plan.Matches,
+			MatchMode:   plan.MatchMode,
+		})
 	}
+	filter.AccountType = strings.Join(types, ",")
+	filter.Credentials = append(filter.Credentials, credentials...)
 	return filter
+}
+
+// splitCommaValues 拆分逗号分隔的筛选值，去空白、去空项、去重并保持顺序。
+func splitCommaValues(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	values := make([]string, 0)
+	for _, part := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(part)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		values = append(values, value)
+	}
+	return values
+}
+
+// accountPlatformMatches 判断账号平台是否命中逗号分隔的平台并集；空并集表示不筛选。
+func accountPlatformMatches(platform string, filterPlatforms []string) bool {
+	if len(filterPlatforms) == 0 {
+		return true
+	}
+	for _, filterPlatform := range filterPlatforms {
+		if platform == filterPlatform {
+			return true
+		}
+	}
+	return false
 }

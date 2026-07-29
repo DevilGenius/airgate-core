@@ -207,13 +207,13 @@ func TestAccountStoreCredentialStringFilterMatchesPluginDeclaredPlan(t *testing.
 	items, total, err := store.List(ctx, account.ListFilter{
 		Page:     1,
 		PageSize: 20,
-		Credential: &account.CredentialStringFilter{
+		Credentials: []account.CredentialStringFilter{{
 			Platform:    "claude",
 			AccountType: "oauth",
 			Key:         "plan_type",
 			Values:      []string{"Claude Plus"},
 			MatchMode:   "exact",
-		},
+		}},
 	})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
@@ -226,13 +226,13 @@ func TestAccountStoreCredentialStringFilterMatchesPluginDeclaredPlan(t *testing.
 		Page:     1,
 		PageSize: 20,
 		Platform: "kiro",
-		Credential: &account.CredentialStringFilter{
+		Credentials: []account.CredentialStringFilter{{
 			Platform:    "kiro",
 			AccountType: "oauth",
 			Key:         "plan_type",
 			Values:      []string{"Pro"},
 			MatchMode:   "contains",
-		},
+		}},
 	})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
@@ -245,13 +245,13 @@ func TestAccountStoreCredentialStringFilterMatchesPluginDeclaredPlan(t *testing.
 		Page:     1,
 		PageSize: 20,
 		Platform: "openai",
-		Credential: &account.CredentialStringFilter{
+		Credentials: []account.CredentialStringFilter{{
 			Platform:    "claude",
 			AccountType: "oauth",
 			Key:         "plan_type",
 			Values:      []string{"Claude Plus"},
 			MatchMode:   "exact",
-		},
+		}},
 	})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
@@ -269,13 +269,13 @@ func TestAccountStoreCredentialStringFilterMatchesPluginDeclaredPlan(t *testing.
 	}
 
 	all, err := store.ListAll(ctx, account.ListFilter{
-		Credential: &account.CredentialStringFilter{
+		Credentials: []account.CredentialStringFilter{{
 			Platform:    "openai",
 			AccountType: "oauth",
 			Key:         "plan_type",
 			Values:      []string{"free"},
 			MatchMode:   "exact",
-		},
+		}},
 	})
 	if err != nil {
 		t.Fatalf("ListAll returned error: %v", err)
