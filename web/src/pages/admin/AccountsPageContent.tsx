@@ -7,9 +7,11 @@ import {
   Search,
   Download,
   Upload,
+  FileJson2,
 } from 'lucide-react';
 import { useToast } from '../../shared/ui';
 import { accountsApi } from '../../shared/api/accounts';
+import { pluginsApi } from '../../shared/api/plugins';
 import { subscribeAdminEvents, type AdminServerEvent } from '../../shared/api/adminEvents';
 import { groupsApi } from '../../shared/api/groups';
 import { proxiesApi } from '../../shared/api/proxies';
@@ -41,13 +43,22 @@ import { useAccountTableColumns } from './accounts/useAccountTableColumns';
 import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
 import { BulkAccountTestModal } from './accounts/BulkAccountTestModal';
 import { BulkRefreshProgressModal } from './accounts/BulkRefreshProgressModal';
+import {
+  CompatImportModal,
+  type CompatImportFormat,
+  type CompatImportInput,
+} from './accounts/CompatImportModal';
 import { AccountsTableSection } from './accounts/AccountsTableSection';
 import {
   getBulkEditInitialValues,
   orderSelectedAccountIdsByCreatedAt,
   type BulkEditSelection,
 } from './accounts/bulkEditSupport';
-import { parseAccountImportItems } from './accounts/accountUtils';
+import { getPlatformPluginMap, parseAccountImportItems } from './accounts/accountUtils';
+import {
+  DEFAULT_ACCOUNT_MAX_CONCURRENCY,
+  DEFAULT_ACCOUNT_PRIORITY,
+} from './accounts/accountDefaults';
 import type {
   AccountResp,
   CreateAccountReq,
@@ -89,6 +100,29 @@ const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 const ACCOUNT_PRIORITY_SORT_KEY = 'priority';
 const ACCOUNT_MODAL_TABLE_PLACEHOLDER_MIN_HEIGHT = 320;
+
+type CompatImportIssue = {
+  file: string;
+  index?: number;
+  level: string;
+  message: string;
+};
+
+type CompatImportResponse = {
+  format: string;
+  renamed: boolean;
+  accounts: Array<{
+    name: string;
+    email?: string | null;
+    type?: string;
+    credentials: Record<string, string>;
+    priority?: number;
+    max_concurrency?: number;
+    rate_multiplier?: number;
+  }>;
+  issues?: CompatImportIssue[];
+};
+
 const ACCOUNT_WORKING_STATE_FILTER = 'working';
 const ACCOUNT_FAMILY_LIMITED_STATE_FILTER = 'family_limited';
 const ACCOUNT_WORKING_REFETCH_THROTTLE_MS = 750;
@@ -208,6 +242,7 @@ export default function AccountsPageContent() {
   // 平台显示名（插件 display_name）更新时，query 结构共享可能保持 platforms 数组身份不变；
   // key 中编入解析出的名称，确保依赖它的 memo（筛选选项、表格列）在名称变化时也会重算。
   const platformsKey = platforms.map((platform) => `${platform}${platformName(platform)}`).join('\u0000');
+  const openAICompatImportEnabled = platforms.includes('openai');
   const { toast } = useToast();
   useSyncExternalStore(subscribeAccountIdentityChange, getAccountIdentityVersion);
 
@@ -289,6 +324,7 @@ export default function AccountsPageContent() {
 
   // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCompatImportModal, setShowCompatImportModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountResp | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<AccountResp | null>(null);
   const [testingAccount, setTestingAccount] = useState<AccountResp | null>(null);
@@ -313,6 +349,7 @@ export default function AccountsPageContent() {
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
   const isAnyAccountModalOpen = showCreateModal
+    || showCompatImportModal
     || editingAccount !== null
     || deletingAccount !== null
     || bulkEditSelection !== null
@@ -717,6 +754,7 @@ export default function AccountsPageContent() {
 
   // 导出账号：有选中项时仅导出选中账号；否则按当前筛选条件导出。
   const importInputRef = useRef<HTMLInputElement>(null);
+  const [isCompatImportPending, setIsCompatImportPending] = useState(false);
   const exportMutation = useMutation({
     mutationFn: () => {
       const selectedAccountIds = selectionStore.getSelectedIds();
@@ -771,28 +809,76 @@ export default function AccountsPageContent() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     // 重置 input，允许重复选择同一文件
     if (importInputRef.current) importInputRef.current.value = '';
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(reader.result as string);
-        const accounts = parseAccountImportItems(parsed);
-        if (!accounts) {
-          toast('error', t('accounts.import_invalid'));
-          return;
-        }
-        importMutation.mutate(accounts);
-      } catch {
+    try {
+      const parsed = JSON.parse(await file.text());
+      const accounts = parseAccountImportItems(parsed);
+      if (!accounts) {
         toast('error', t('accounts.import_invalid'));
+        return;
       }
-    };
-    reader.onerror = () => toast('error', t('accounts.import_invalid'));
-    reader.readAsText(file);
+      importMutation.mutate(accounts);
+    } catch {
+      toast('error', t('accounts.import_invalid'));
+    }
+  }
+
+  async function handleCompatImport(
+    format: CompatImportFormat,
+    inputs: CompatImportInput[],
+  ): Promise<boolean> {
+    setIsCompatImportPending(true);
+    try {
+      const pluginMap = await getPlatformPluginMap();
+      const openAIPluginID = pluginMap.get('openai');
+      if (!openAIPluginID) {
+        toast('error', t('accounts.import_invalid'));
+        return false;
+      }
+
+      const result = await pluginsApi.rpc<CompatImportResponse>(
+        openAIPluginID,
+        'accounts/import/compat',
+        { format, files: inputs },
+      );
+      if (!result.accounts?.length) {
+        toast('error', t('accounts.import_invalid'));
+        return false;
+      }
+
+      if (result.issues?.length) {
+        toast('warning', t('accounts.import_compat_issues', {
+          count: result.issues.length,
+        }));
+      }
+
+      const accounts: AccountExportItem[] = result.accounts.map((account) => ({
+        name: account.name,
+        email: account.email ?? null,
+        platform: 'openai',
+        type: account.type || 'oauth',
+        credentials: account.credentials,
+        priority: account.priority ?? DEFAULT_ACCOUNT_PRIORITY,
+        max_concurrency: account.max_concurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY,
+        rate_multiplier: account.rate_multiplier ?? 1,
+      }));
+      try {
+        await importMutation.mutateAsync(accounts);
+        return true;
+      } catch {
+        return false;
+      }
+    } catch (error) {
+      toast('error', error instanceof Error ? error.message : t('accounts.import_invalid'));
+      return false;
+    } finally {
+      setIsCompatImportPending(false);
+    }
   }
 
   // 更新账号
@@ -1336,6 +1422,7 @@ export default function AccountsPageContent() {
   // useMutation 每次渲染都返回新展开的结果对象，只解构稳定的 mutate/isPending 作为依赖。
   const { isPending: isExportPending, mutate: runExportMutation } = exportMutation;
   const isImportPending = importMutation.isPending;
+  const isAnyImportPending = isImportPending || isCompatImportPending;
   const toolbarNode = useMemo(() => (
     <div className="ag-page-toolbar-filter-row">
       <div className="w-full sm:w-48">
@@ -1401,7 +1488,7 @@ export default function AccountsPageContent() {
         className="ag-page-toolbar-button hidden md:inline-flex"
         variant="secondary"
         onPress={() => importInputRef.current?.click()}
-        isDisabled={isImportPending}
+        isDisabled={isAnyImportPending}
         aria-busy={isImportPending}
       >
         <Download className="h-4 w-4" />
@@ -1417,6 +1504,18 @@ export default function AccountsPageContent() {
         <Upload className="h-4 w-4" />
         {t('accounts.export')}
       </Button>
+      {openAICompatImportEnabled ? (
+        <Button
+          className="ag-page-toolbar-button hidden md:inline-flex"
+          variant="secondary"
+          onPress={() => setShowCompatImportModal(true)}
+          isDisabled={isAnyImportPending}
+          aria-busy={isCompatImportPending}
+        >
+          <FileJson2 className="h-4 w-4" />
+          {t('accounts.compat_import')}
+        </Button>
+      ) : null}
       <Button className="ag-page-toolbar-button" variant="primary" onPress={handleCreateAccount}>
         <Plus className="h-4 w-4" />
         {t('accounts.create')}
@@ -1429,9 +1528,12 @@ export default function AccountsPageContent() {
     handleCreateAccount,
     handleToolbarMenuOpenChange,
     isAccountsFetching,
+    isAnyImportPending,
+    isCompatImportPending,
     isExportPending,
     isImportPending,
     isUsageFetching,
+    openAICompatImportEnabled,
     refreshAccountOverview,
     runExportMutation,
     setAutoRefresh,
@@ -1527,6 +1629,15 @@ export default function AccountsPageContent() {
           }}
           loading={createMutation.isPending}
           platforms={platforms}
+        />
+      ) : null}
+
+      {showCompatImportModal ? (
+        <CompatImportModal
+          open
+          loading={isCompatImportPending || importMutation.isPending}
+          onClose={() => setShowCompatImportModal(false)}
+          onSubmit={handleCompatImport}
         />
       ) : null}
 
