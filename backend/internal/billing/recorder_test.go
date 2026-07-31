@@ -73,6 +73,64 @@ func TestRecordSyncPersistsUserEmailSnapshot(t *testing.T) {
 	}
 }
 
+func TestUsageRecordingUpdatesAccountLastUsedAtForAccessAndImage(t *testing.T) {
+	db := testdb.OpenMemoryEnt(t, "billing_recorder_last_used", schema.WithGlobalUniqueID(false))
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	user := createBillingTestUser(t, ctx, db, "billing-last-used@example.com")
+	group := db.Group.Create().SetName("OpenAI").SetPlatform("openai").SaveX(ctx)
+	account := db.Account.Create().SetName("acc").SetPlatform("openai").SaveX(ctx)
+	recorder := NewRecorder(db, 1)
+
+	accessAt := time.Date(2026, 7, 31, 8, 0, 0, 0, time.UTC)
+	if _, err := recorder.RecordSync(ctx, UsageRecord{
+		BillingEventID: "bill_last_used_access",
+		UserID:         user.ID,
+		AccountID:      account.ID,
+		GroupID:        group.ID,
+		Platform:       "openai",
+		Model:          "gpt-5",
+		OccurredAt:     accessAt,
+	}); err != nil {
+		t.Fatalf("record access usage: %v", err)
+	}
+
+	imageAt := accessAt.Add(time.Hour)
+	if _, err := recorder.RecordSync(ctx, UsageRecord{
+		BillingEventID: "bill_last_used_image",
+		UserID:         user.ID,
+		AccountID:      account.ID,
+		GroupID:        group.ID,
+		Platform:       "openai",
+		Model:          "gpt-image-1",
+		OccurredAt:     imageAt,
+	}); err != nil {
+		t.Fatalf("record image usage: %v", err)
+	}
+
+	if _, err := recorder.RecordSync(ctx, UsageRecord{
+		BillingEventID: "bill_last_used_older",
+		UserID:         user.ID,
+		AccountID:      account.ID,
+		GroupID:        group.ID,
+		Platform:       "openai",
+		Model:          "gpt-4.1",
+		OccurredAt:     accessAt.Add(-time.Hour),
+	}); err != nil {
+		t.Fatalf("record older usage: %v", err)
+	}
+
+	fresh := db.Account.GetX(ctx, account.ID)
+	if fresh.LastUsedAt == nil || !fresh.LastUsedAt.Equal(imageAt) {
+		t.Fatalf("last_used_at = %v, want %v", fresh.LastUsedAt, imageAt)
+	}
+}
+
 func TestBatchInsertIsIdempotentByBillingEventID(t *testing.T) {
 	db := testdb.OpenMemoryEnt(t, "billing_recorder_idempotent", schema.WithGlobalUniqueID(false))
 	defer func() {

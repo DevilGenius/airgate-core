@@ -151,6 +151,7 @@ function sameAccountExceptCapacity(left: AccountResp, right: AccountResp) {
     && left.upstream_is_pool === right.upstream_is_pool
     && left.extra === right.extra
     && left.last_used_at === right.last_used_at
+    && left.last_probe_at === right.last_probe_at
     && left.group_ids === right.group_ids
     && left.family_cooldowns === right.family_cooldowns
     && left.today_image_count === right.today_image_count
@@ -217,12 +218,23 @@ function accountTableCellMetaEqual(columnKey: string, left: unknown, right: unkn
     case 'usage_window':
       return (left as { usage?: unknown } | undefined)?.usage === (right as { usage?: unknown } | undefined)?.usage;
     case 'last_used_at':
-      return Boolean(left && right)
-        && (left as { lastUsedRelative?: string }).lastUsedRelative === (right as { lastUsedRelative?: string }).lastUsedRelative
-        && (left as { lastUsedTitle?: string }).lastUsedTitle === (right as { lastUsedTitle?: string }).lastUsedTitle;
+      return accountRequestTimesEqual(left, right);
     default:
       return true;
   }
+}
+
+function accountRequestTimesEqual(left: unknown, right: unknown) {
+  if (!left || !right) return false;
+  const leftMeta = left as {
+    lastAccessTime?: { display?: string; iso?: string };
+    lastProbeTime?: { display?: string; iso?: string };
+  };
+  const rightMeta = right as typeof leftMeta;
+  return leftMeta.lastAccessTime?.display === rightMeta.lastAccessTime?.display
+    && leftMeta.lastAccessTime?.iso === rightMeta.lastAccessTime?.iso
+    && leftMeta.lastProbeTime?.display === rightMeta.lastProbeTime?.display
+    && leftMeta.lastProbeTime?.iso === rightMeta.lastProbeTime?.iso;
 }
 
 function stringListEqual(left: string[] | undefined, right: string[] | undefined) {

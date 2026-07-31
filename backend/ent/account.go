@@ -46,8 +46,10 @@ type Account struct {
 	ErrorMsg string `json:"error_msg,omitempty"`
 	// 上游是账号池：403/5xx 走退避 degraded；池自身凭证无效才 disabled
 	UpstreamIsPool bool `json:"upstream_is_pool,omitempty"`
-	// LastUsedAt holds the value of the "last_used_at" field.
+	// 最近一次真实业务访问或生图用量落库时间
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	// 最近一次健康探测完成时间；不包含账号测试和状态回报
+	LastProbeAt *time.Time `json:"last_probe_at,omitempty"`
 	// 扩展配置（max_rpm / max_window_cost / max_sessions 等）
 	Extra map[string]interface{} `json:"extra,omitempty"`
 	// 软删除时间；非空账号不再参与管理和调度，历史 usage log 关联保留
@@ -120,7 +122,7 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case account.FieldName, account.FieldEmail, account.FieldPlatform, account.FieldType, account.FieldState, account.FieldErrorMsg:
 			values[i] = new(sql.NullString)
-		case account.FieldStateUntil, account.FieldLastUsedAt, account.FieldDeletedAt, account.FieldCreatedAt, account.FieldUpdatedAt:
+		case account.FieldStateUntil, account.FieldLastUsedAt, account.FieldLastProbeAt, account.FieldDeletedAt, account.FieldCreatedAt, account.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		case account.ForeignKeys[0]: // account_proxy
 			values[i] = new(sql.NullInt64)
@@ -235,6 +237,13 @@ func (a *Account) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				a.LastUsedAt = new(time.Time)
 				*a.LastUsedAt = value.Time
+			}
+		case account.FieldLastProbeAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field last_probe_at", values[i])
+			} else if value.Valid {
+				a.LastProbeAt = new(time.Time)
+				*a.LastProbeAt = value.Time
 			}
 		case account.FieldExtra:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -366,6 +375,11 @@ func (a *Account) String() string {
 	builder.WriteString(", ")
 	if v := a.LastUsedAt; v != nil {
 		builder.WriteString("last_used_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := a.LastProbeAt; v != nil {
+		builder.WriteString("last_probe_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")

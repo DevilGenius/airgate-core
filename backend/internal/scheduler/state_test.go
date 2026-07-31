@@ -252,6 +252,9 @@ func TestStateMachineSuccessClearsTransientAvoidanceExtra(t *testing.T) {
 		t.Fatalf("error_msg after success = %q, want empty", fresh.ErrorMsg)
 	}
 	assertTransientAvoidanceExtraCleared(t, fresh)
+	if fresh.LastUsedAt != nil {
+		t.Fatalf("last_used_at after state success = %v, want nil", fresh.LastUsedAt)
+	}
 }
 
 func TestStateMachineFirstFamilyTransientDoesNotBackoff(t *testing.T) {
@@ -345,8 +348,8 @@ func TestStateMachineSuccessDoesNotClearUnexpiredTemporaryStates(t *testing.T) {
 			t.Fatalf("state_until after success = %v, want %v", fresh.StateUntil, before.StateUntil)
 		}
 		assertTransientAvoidanceExtraCleared(t, fresh)
-		if fresh.LastUsedAt == nil {
-			t.Fatalf("last_used_at should be updated after success")
+		if fresh.LastUsedAt != nil {
+			t.Fatalf("last_used_at after state success = %v, want nil", fresh.LastUsedAt)
 		}
 	})
 
@@ -370,8 +373,8 @@ func TestStateMachineSuccessDoesNotClearUnexpiredTemporaryStates(t *testing.T) {
 		if fresh.StateUntil == nil || !fresh.StateUntil.Equal(*before.StateUntil) {
 			t.Fatalf("state_until after success = %v, want %v", fresh.StateUntil, before.StateUntil)
 		}
-		if fresh.LastUsedAt == nil {
-			t.Fatalf("last_used_at should be updated after success")
+		if fresh.LastUsedAt != nil {
+			t.Fatalf("last_used_at after state success = %v, want nil", fresh.LastUsedAt)
 		}
 	})
 }

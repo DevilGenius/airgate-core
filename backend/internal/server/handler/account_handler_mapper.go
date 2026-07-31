@@ -33,8 +33,12 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 	}
 
 	if account.LastUsedAt != nil {
-		lastUsedAt := account.LastUsedAt.Format("2006-01-02T15:04:05Z")
+		lastUsedAt := account.LastUsedAt.UTC().Format("2006-01-02T15:04:05Z")
 		resp.LastUsedAt = &lastUsedAt
+	}
+	if account.LastProbeAt != nil {
+		lastProbeAt := account.LastProbeAt.UTC().Format("2006-01-02T15:04:05Z")
+		resp.LastProbeAt = &lastProbeAt
 	}
 	if account.DeletedAt != nil {
 		deletedAt := account.DeletedAt.UTC().Format("2006-01-02T15:04:05Z")

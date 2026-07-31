@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent/account"
@@ -27,6 +28,31 @@ func (s *Scheduler) ApplyAccountTestOutcome(ctx context.Context, accountID int, 
 		UpstreamStatus: outcome.Upstream.StatusCode,
 		Family:         ModelFamily(platform, model),
 	})
+}
+
+// RecordHealthProbeResult 记录健康探测完成时间。
+// 该字段只服务账号管理页展示，不包含管理员账号测试或 scheduler 状态回报。
+func (s *Scheduler) RecordHealthProbeResult(ctx context.Context, accountID int) {
+	if s == nil || s.db == nil || accountID <= 0 {
+		return
+	}
+	baseCtx := context.Background()
+	if ctx != nil {
+		baseCtx = context.WithoutCancel(ctx)
+	}
+	dbCtx, cancel := context.WithTimeout(baseCtx, dbTimeout)
+	defer cancel()
+
+	now := time.Now().UTC()
+	if err := accountscope.UpdateOneID(s.db, accountID).
+		Where(account.Or(account.LastProbeAtIsNil(), account.LastProbeAtLT(now))).
+		SetLastProbeAt(now).
+		Exec(dbCtx); err != nil {
+		slog.Debug("account_health_probe_time_update_failed",
+			sdk.LogFieldAccountID, accountID,
+			sdk.LogFieldError, err,
+		)
+	}
 }
 
 // ManualRecover 运维手动把账号恢复到 active：清状态、清到期、清原因，并立即刷新 RouteGraph。

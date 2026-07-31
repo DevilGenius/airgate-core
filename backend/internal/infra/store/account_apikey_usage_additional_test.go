@@ -112,9 +112,11 @@ func TestAccountStoreCRUDListsAndAggregates(t *testing.T) {
 	}
 
 	lastUsedAt := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
+	lastProbeAt := lastUsedAt.Add(30 * time.Minute)
 	stateUntil := lastUsedAt.Add(time.Hour)
 	if _, err := db.Account.UpdateOneID(created.ID).
 		SetLastUsedAt(lastUsedAt).
+		SetLastProbeAt(lastProbeAt).
 		SetStateUntil(stateUntil).
 		Save(ctx); err != nil {
 		t.Fatalf("set account pointer fields: %v", err)
@@ -124,8 +126,9 @@ func TestAccountStoreCRUDListsAndAggregates(t *testing.T) {
 		t.Fatalf("FindByID without edges returned error: %v", err)
 	}
 	if found.LastUsedAt == nil || !found.LastUsedAt.Equal(lastUsedAt) ||
+		found.LastProbeAt == nil || !found.LastProbeAt.Equal(lastProbeAt) ||
 		found.StateUntil == nil || !found.StateUntil.Equal(stateUntil) {
-		t.Fatalf("pointer fields = last %v until %v", found.LastUsedAt, found.StateUntil)
+		t.Fatalf("pointer fields = last %v probe %v until %v", found.LastUsedAt, found.LastProbeAt, found.StateUntil)
 	}
 	if _, err := store.FindByID(ctx, 999999, appaccount.LoadOptions{}); !errors.Is(err, appaccount.ErrAccountNotFound) {
 		t.Fatalf("FindByID missing error = %v, want ErrAccountNotFound", err)

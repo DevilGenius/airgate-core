@@ -43,6 +43,8 @@ const (
 	FieldUpstreamIsPool = "upstream_is_pool"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
 	FieldLastUsedAt = "last_used_at"
+	// FieldLastProbeAt holds the string denoting the last_probe_at field in the database.
+	FieldLastProbeAt = "last_probe_at"
 	// FieldExtra holds the string denoting the extra field in the database.
 	FieldExtra = "extra"
 	// FieldDeletedAt holds the string denoting the deleted_at field in the database.
@@ -97,6 +99,7 @@ var Columns = []string{
 	FieldErrorMsg,
 	FieldUpstreamIsPool,
 	FieldLastUsedAt,
+	FieldLastProbeAt,
 	FieldExtra,
 	FieldDeletedAt,
 	FieldCreatedAt,
@@ -257,6 +260,11 @@ func ByUpstreamIsPool(opts ...sql.OrderTermOption) OrderOption {
 // ByLastUsedAt orders the results by the last_used_at field.
 func ByLastUsedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastUsedAt, opts...).ToFunc()
+}
+
+// ByLastProbeAt orders the results by the last_probe_at field.
+func ByLastProbeAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastProbeAt, opts...).ToFunc()
 }
 
 // ByDeletedAt orders the results by the deleted_at field.

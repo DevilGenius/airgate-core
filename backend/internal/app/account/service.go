@@ -80,6 +80,7 @@ type accountProfileCachePayload struct {
 	ErrorMsg       string  `json:"error_msg,omitempty"`
 	UpstreamIsPool bool    `json:"upstream_is_pool"`
 	LastUsedAt     string  `json:"last_used_at,omitempty"`
+	LastProbeAt    string  `json:"last_probe_at,omitempty"`
 	GroupIDs       []int64 `json:"group_ids,omitempty"`
 	ProxyID        *int    `json:"proxy_id,omitempty"`
 	CreatedAt      string  `json:"created_at"`
@@ -2500,6 +2501,9 @@ func accountProfileCacheFromAccount(item Account) accountProfileCachePayload {
 	if item.LastUsedAt != nil {
 		payload.LastUsedAt = item.LastUsedAt.UTC().Format(time.RFC3339)
 	}
+	if item.LastProbeAt != nil {
+		payload.LastProbeAt = item.LastProbeAt.UTC().Format(time.RFC3339)
+	}
 	if item.Proxy != nil {
 		proxyID := item.Proxy.ID
 		payload.ProxyID = &proxyID
@@ -2535,6 +2539,10 @@ func accountProfileCacheToAccount(payload accountProfileCachePayload) (Account, 
 	if payload.LastUsedAt != "" {
 		parsed := parseAccountProfileCacheTime(payload.LastUsedAt)
 		account.LastUsedAt = &parsed
+	}
+	if payload.LastProbeAt != "" {
+		parsed := parseAccountProfileCacheTime(payload.LastProbeAt)
+		account.LastProbeAt = &parsed
 	}
 	if payload.ProxyID != nil {
 		account.Proxy = &Proxy{ID: *payload.ProxyID}

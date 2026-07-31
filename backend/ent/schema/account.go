@@ -46,7 +46,10 @@ func (Account) Fields() []ent.Field {
 			Comment("进入当前状态的原因（给运维看）"),
 		field.Bool("upstream_is_pool").Default(false).
 			Comment("上游是账号池：403/5xx 走退避 degraded；池自身凭证无效才 disabled"),
-		field.Time("last_used_at").Optional().Nillable(),
+		field.Time("last_used_at").Optional().Nillable().
+			Comment("最近一次真实业务访问或生图用量落库时间"),
+		field.Time("last_probe_at").Optional().Nillable().
+			Comment("最近一次健康探测完成时间；不包含账号测试和状态回报"),
 		field.JSON("extra", map[string]interface{}{}).Optional().Default(map[string]interface{}{}).
 			Comment("扩展配置（max_rpm / max_window_cost / max_sessions 等）"),
 		field.Time("deleted_at").Optional().Nillable().

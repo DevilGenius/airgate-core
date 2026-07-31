@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent/account"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestSchedulerAdminStateWriteEntrypoints(t *testing.T) {
@@ -20,6 +21,24 @@ func TestSchedulerAdminStateWriteEntrypoints(t *testing.T) {
 	}
 
 	until := time.Now().Add(time.Hour).UTC()
+	probeAccount := db.Account.Create().
+		SetName("probe").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{}).
+		SaveX(ctx)
+	s.RecordHealthProbeResult(ctx, probeAccount.ID)
+	fresh := db.Account.GetX(ctx, probeAccount.ID)
+	if fresh.LastProbeAt == nil {
+		t.Fatal("health probe should update last_probe_at")
+	}
+	lastProbeAt := *fresh.LastProbeAt
+	s.ApplyAccountTestOutcome(ctx, probeAccount.ID, "openai", "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeClientError}, false)
+	fresh = db.Account.GetX(ctx, probeAccount.ID)
+	if fresh.LastProbeAt == nil || !fresh.LastProbeAt.Equal(lastProbeAt) {
+		t.Fatalf("account test changed last_probe_at: before %v after %v", lastProbeAt, fresh.LastProbeAt)
+	}
+
 	recoverAccount := db.Account.Create().
 		SetName("recover").
 		SetPlatform("openai").
@@ -34,7 +53,7 @@ func TestSchedulerAdminStateWriteEntrypoints(t *testing.T) {
 	if err := s.ManualRecover(ctx, recoverAccount.ID); err != nil {
 		t.Fatalf("ManualRecover() error = %v", err)
 	}
-	fresh := db.Account.GetX(ctx, recoverAccount.ID)
+	fresh = db.Account.GetX(ctx, recoverAccount.ID)
 	if fresh.State != account.StateActive || fresh.StateUntil != nil || fresh.ErrorMsg != "" {
 		t.Fatalf("manual recovered account = state %s until %v err %q", fresh.State, fresh.StateUntil, fresh.ErrorMsg)
 	}

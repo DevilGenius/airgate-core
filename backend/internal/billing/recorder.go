@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,6 +19,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DevilGenius/airgate-core/ent"
+	entaccount "github.com/DevilGenius/airgate-core/ent/account"
 	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
@@ -234,6 +236,9 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 		if err := upsertUsageHourlyRollups(ctx, tx, inserted); err != nil {
 			return 0, fmt.Errorf("更新 UsageLog 聚合失败: %w", err)
 		}
+		if err := updateAccountLastUsedAt(ctx, tx, inserted); err != nil {
+			return 0, fmt.Errorf("更新账号最近访问时间失败: %w", err)
+		}
 		if err := applyUsageCharges(ctx, tx, insertedBatch); err != nil {
 			return 0, err
 		}
@@ -431,6 +436,9 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 
 	if err := upsertUsageHourlyRollups(ctx, tx, inserted); err != nil {
 		return fmt.Errorf("更新 UsageLog 聚合失败: %w", err)
+	}
+	if err := updateAccountLastUsedAt(ctx, tx, inserted); err != nil {
+		return fmt.Errorf("更新账号最近访问时间失败: %w", err)
 	}
 
 	if err := applyUsageCharges(ctx, tx, insertedBatch); err != nil {
@@ -651,6 +659,42 @@ func insertedUsageRecords(inserted []insertedUsageLog) []UsageRecord {
 		records = append(records, item.Record)
 	}
 	return records
+}
+
+// updateAccountLastUsedAt 让账号列表的“访问”时间与真实业务使用记录保持一致。
+// 普通访问和生图都会写 usage_logs；健康探测单独写 last_probe_at，账号测试和
+// 状态回报不记录在这两个时间中。条件更新同时避免乱序批次把时间回退。
+func updateAccountLastUsedAt(ctx context.Context, tx *ent.Tx, inserted []insertedUsageLog) error {
+	latestByAccount := make(map[int]time.Time)
+	for _, item := range inserted {
+		accountID := item.Record.AccountID
+		if accountID <= 0 {
+			continue
+		}
+		if latest, ok := latestByAccount[accountID]; !ok || item.CreatedAt.After(latest) {
+			latestByAccount[accountID] = item.CreatedAt
+		}
+	}
+
+	accountIDs := make([]int, 0, len(latestByAccount))
+	for accountID := range latestByAccount {
+		accountIDs = append(accountIDs, accountID)
+	}
+	sort.Ints(accountIDs)
+	for _, accountID := range accountIDs {
+		usedAt := latestByAccount[accountID]
+		if _, err := tx.Account.Update().
+			Where(
+				entaccount.IDEQ(accountID),
+				entaccount.DeletedAtIsNil(),
+				entaccount.Or(entaccount.LastUsedAtIsNil(), entaccount.LastUsedAtLT(usedAt)),
+			).
+			SetLastUsedAt(usedAt).
+			Save(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type usageHourlyRollupBatchField struct {

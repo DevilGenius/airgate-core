@@ -146,6 +146,10 @@ func TestHostServiceSchedulerProbeAndForwardRuntime(t *testing.T) {
 	if err != nil || probe["success"] != true || int(probe["account_id"].(int64)) != account.ID {
 		t.Fatalf("probe success = %+v, %v", probe, err)
 	}
+	probedAccount := db.Account.GetX(ctx, account.ID)
+	if probedAccount.LastProbeAt == nil {
+		t.Fatal("probeForward should update last_probe_at")
+	}
 
 	routes, email, err := host.hostForwardRoutes(ctx, hostForwardRequest{
 		UserID: int64(user.ID),

@@ -43,6 +43,7 @@ type AccountResp struct {
 	UpstreamIsPool     bool                `json:"upstream_is_pool"`
 	Extra              map[string]any      `json:"extra,omitempty"`
 	LastUsedAt         *string             `json:"last_used_at,omitempty"`
+	LastProbeAt        *string             `json:"last_probe_at,omitempty"`
 	DeletedAt          *string             `json:"deleted_at,omitempty"`
 	GroupIDs           []int64             `json:"group_ids"`
 	FamilyCooldowns    []FamilyCooldownDTO `json:"family_cooldowns,omitempty"`

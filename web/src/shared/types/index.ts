@@ -167,6 +167,7 @@ export interface AccountResp {
   upstream_is_pool: boolean;
   extra?: Record<string, unknown>;
   last_used_at?: string;
+  last_probe_at?: string;
   deleted_at?: string;
   group_ids: number[];
   /** 当前在 Redis 上仍生效的家族级限流冷却列表；后端 omitempty，没有冷却时缺省。 */

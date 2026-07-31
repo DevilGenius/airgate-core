@@ -196,6 +196,20 @@ func (ac *AccountCreate) SetNillableLastUsedAt(t *time.Time) *AccountCreate {
 	return ac
 }
 
+// SetLastProbeAt sets the "last_probe_at" field.
+func (ac *AccountCreate) SetLastProbeAt(t time.Time) *AccountCreate {
+	ac.mutation.SetLastProbeAt(t)
+	return ac
+}
+
+// SetNillableLastProbeAt sets the "last_probe_at" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableLastProbeAt(t *time.Time) *AccountCreate {
+	if t != nil {
+		ac.SetLastProbeAt(*t)
+	}
+	return ac
+}
+
 // SetExtra sets the "extra" field.
 func (ac *AccountCreate) SetExtra(m map[string]interface{}) *AccountCreate {
 	ac.mutation.SetExtra(m)
@@ -515,6 +529,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.LastUsedAt(); ok {
 		_spec.SetField(account.FieldLastUsedAt, field.TypeTime, value)
 		_node.LastUsedAt = &value
+	}
+	if value, ok := ac.mutation.LastProbeAt(); ok {
+		_spec.SetField(account.FieldLastProbeAt, field.TypeTime, value)
+		_node.LastProbeAt = &value
 	}
 	if value, ok := ac.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)

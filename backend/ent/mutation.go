@@ -1903,6 +1903,7 @@ type AccountMutation struct {
 	error_msg          *string
 	upstream_is_pool   *bool
 	last_used_at       *time.Time
+	last_probe_at      *time.Time
 	extra              *map[string]interface{}
 	deleted_at         *time.Time
 	created_at         *time.Time
@@ -2648,6 +2649,55 @@ func (m *AccountMutation) ResetLastUsedAt() {
 	delete(m.clearedFields, account.FieldLastUsedAt)
 }
 
+// SetLastProbeAt sets the "last_probe_at" field.
+func (m *AccountMutation) SetLastProbeAt(t time.Time) {
+	m.last_probe_at = &t
+}
+
+// LastProbeAt returns the value of the "last_probe_at" field in the mutation.
+func (m *AccountMutation) LastProbeAt() (r time.Time, exists bool) {
+	v := m.last_probe_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastProbeAt returns the old "last_probe_at" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldLastProbeAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastProbeAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastProbeAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastProbeAt: %w", err)
+	}
+	return oldValue.LastProbeAt, nil
+}
+
+// ClearLastProbeAt clears the value of the "last_probe_at" field.
+func (m *AccountMutation) ClearLastProbeAt() {
+	m.last_probe_at = nil
+	m.clearedFields[account.FieldLastProbeAt] = struct{}{}
+}
+
+// LastProbeAtCleared returns if the "last_probe_at" field was cleared in this mutation.
+func (m *AccountMutation) LastProbeAtCleared() bool {
+	_, ok := m.clearedFields[account.FieldLastProbeAt]
+	return ok
+}
+
+// ResetLastProbeAt resets all changes to the "last_probe_at" field.
+func (m *AccountMutation) ResetLastProbeAt() {
+	m.last_probe_at = nil
+	delete(m.clearedFields, account.FieldLastProbeAt)
+}
+
 // SetExtra sets the "extra" field.
 func (m *AccountMutation) SetExtra(value map[string]interface{}) {
 	m.extra = &value
@@ -2999,7 +3049,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.name != nil {
 		fields = append(fields, account.FieldName)
 	}
@@ -3041,6 +3091,9 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m.last_used_at != nil {
 		fields = append(fields, account.FieldLastUsedAt)
+	}
+	if m.last_probe_at != nil {
+		fields = append(fields, account.FieldLastProbeAt)
 	}
 	if m.extra != nil {
 		fields = append(fields, account.FieldExtra)
@@ -3090,6 +3143,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.UpstreamIsPool()
 	case account.FieldLastUsedAt:
 		return m.LastUsedAt()
+	case account.FieldLastProbeAt:
+		return m.LastProbeAt()
 	case account.FieldExtra:
 		return m.Extra()
 	case account.FieldDeletedAt:
@@ -3135,6 +3190,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldUpstreamIsPool(ctx)
 	case account.FieldLastUsedAt:
 		return m.OldLastUsedAt(ctx)
+	case account.FieldLastProbeAt:
+		return m.OldLastProbeAt(ctx)
 	case account.FieldExtra:
 		return m.OldExtra(ctx)
 	case account.FieldDeletedAt:
@@ -3250,6 +3307,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetLastUsedAt(v)
 		return nil
+	case account.FieldLastProbeAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastProbeAt(v)
+		return nil
 	case account.FieldExtra:
 		v, ok := value.(map[string]interface{})
 		if !ok {
@@ -3362,6 +3426,9 @@ func (m *AccountMutation) ClearedFields() []string {
 	if m.FieldCleared(account.FieldLastUsedAt) {
 		fields = append(fields, account.FieldLastUsedAt)
 	}
+	if m.FieldCleared(account.FieldLastProbeAt) {
+		fields = append(fields, account.FieldLastProbeAt)
+	}
 	if m.FieldCleared(account.FieldExtra) {
 		fields = append(fields, account.FieldExtra)
 	}
@@ -3396,6 +3463,9 @@ func (m *AccountMutation) ClearField(name string) error {
 		return nil
 	case account.FieldLastUsedAt:
 		m.ClearLastUsedAt()
+		return nil
+	case account.FieldLastProbeAt:
+		m.ClearLastProbeAt()
 		return nil
 	case account.FieldExtra:
 		m.ClearExtra()
@@ -3452,6 +3522,9 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldLastUsedAt:
 		m.ResetLastUsedAt()
+		return nil
+	case account.FieldLastProbeAt:
+		m.ResetLastProbeAt()
 		return nil
 	case account.FieldExtra:
 		m.ResetExtra()

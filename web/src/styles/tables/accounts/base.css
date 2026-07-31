@@ -71,6 +71,35 @@
   }
 }
 
+/* Recent access and health-probe timestamps. */
+
+.ag-accounts-table .ag-account-request-times {
+  display: inline-flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.0625rem;
+  color: var(--ag-text-secondary);
+  font-size: 0.6875rem;
+  line-height: 0.875rem;
+}
+
+.ag-accounts-table .ag-account-request-time {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.ag-accounts-table .ag-account-request-time-value {
+  overflow: hidden;
+  font-family: var(--ag-font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ag-accounts-table .ag-accounts-table-sort-button {
   display: inline-flex;
   width: 100%;

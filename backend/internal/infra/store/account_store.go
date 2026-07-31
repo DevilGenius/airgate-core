@@ -670,6 +670,10 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		value := *item.LastUsedAt
 		result.LastUsedAt = &value
 	}
+	if item.LastProbeAt != nil {
+		value := *item.LastProbeAt
+		result.LastProbeAt = &value
+	}
 	if item.DeletedAt != nil {
 		value := *item.DeletedAt
 		result.DeletedAt = &value

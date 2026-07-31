@@ -71,6 +71,7 @@ var (
 		{Name: "error_msg", Type: field.TypeString, Default: ""},
 		{Name: "upstream_is_pool", Type: field.TypeBool, Default: false},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_probe_at", Type: field.TypeTime, Nullable: true},
 		{Name: "extra", Type: field.TypeJSON, Nullable: true},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
@@ -85,7 +86,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[19]},
+				Columns:    []*schema.Column{AccountsColumns[20]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -99,12 +100,12 @@ var (
 			{
 				Name:    "account_deleted_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[16]},
+				Columns: []*schema.Column{AccountsColumns[17]},
 			},
 			{
 				Name:    "account_priority_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[17]},
+				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[18]},
 			},
 		},
 	}

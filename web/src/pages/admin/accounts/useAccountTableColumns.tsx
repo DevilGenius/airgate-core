@@ -91,11 +91,16 @@ type PreparedUsageView = {
   windowsClassName: string;
 };
 
+type PreparedRequestTime = {
+  display: string;
+  iso: string;
+};
+
 type AccountRowRenderMeta = {
   groupNames: string[];
   hiddenGroupCount: number;
-  lastUsedRelative: string;
-  lastUsedTitle: string;
+  lastAccessTime: PreparedRequestTime;
+  lastProbeTime: PreparedRequestTime;
   usage: PreparedUsageView;
   visibleGroups: string[];
 };
@@ -306,22 +311,14 @@ function prepareUsageView(row: AccountResp, usage: AccountUsageInfo | undefined,
   };
 }
 
-function prepareLastUsed(lastUsedAt: string | undefined, now: number, t: (key: string, options?: Record<string, unknown>) => string) {
-  if (!lastUsedAt) return { relative: '', title: '' };
-  const parsed = new Date(lastUsedAt);
-  const diff = now - parsed.getTime();
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  let relative: string;
-  if (seconds < 60) relative = t('accounts.just_now');
-  else if (minutes < 60) relative = t('accounts.minutes_ago', { n: minutes });
-  else if (hours < 24) relative = t('accounts.hours_ago', { n: hours });
-  else relative = t('accounts.days_ago', { n: days });
+function prepareRequestTime(value: string | undefined): PreparedRequestTime {
+  if (!value) return { display: '-', iso: '' };
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return { display: '-', iso: '' };
+  const pad = (part: number) => String(part).padStart(2, '0');
   return {
-    relative,
-    title: parsed.toLocaleString(),
+    display: `${pad(parsed.getHours())}:${pad(parsed.getMinutes())} ${pad(parsed.getMonth() + 1)}/${pad(parsed.getDate())}`,
+    iso: parsed.toISOString(),
   };
 }
 
@@ -401,8 +398,10 @@ function usageViewsEqual(left: PreparedUsageView, right: PreparedUsageView) {
 function accountRowRenderMetaEqual(left: AccountRowRenderMeta | undefined, right: AccountRowRenderMeta) {
   if (!left) return false;
   return left.hiddenGroupCount === right.hiddenGroupCount
-    && left.lastUsedRelative === right.lastUsedRelative
-    && left.lastUsedTitle === right.lastUsedTitle
+    && left.lastAccessTime.display === right.lastAccessTime.display
+    && left.lastAccessTime.iso === right.lastAccessTime.iso
+    && left.lastProbeTime.display === right.lastProbeTime.display
+    && left.lastProbeTime.iso === right.lastProbeTime.iso
     && stringArraysEqual(left.groupNames, right.groupNames)
     && stringArraysEqual(left.visibleGroups, right.visibleGroups)
     && usageViewsEqual(left.usage, right.usage);
@@ -431,7 +430,6 @@ export function useAccountTableColumns({
   const rowMetaCacheRef = useRef<Map<number, AccountRowRenderMeta>>(new Map());
 
   const rowMetaById = useMemo(() => {
-    const now = Date.now();
     const usageAccounts: Record<string, AccountUsageInfo> = usageData?.accounts ?? {};
     const previousMetaById = rowMetaCacheRef.current;
     const nextMeta = new Map<number, AccountRowRenderMeta>();
@@ -439,13 +437,14 @@ export function useAccountTableColumns({
     for (const row of rows) {
       const groupNames = (row.group_ids ?? []).map((gid) => groupMap.get(gid) ?? `#${gid}`);
       const visibleGroups = groupNames.length > 3 ? groupNames.slice(0, 2) : groupNames.slice(0, 3);
-      const lastUsed = prepareLastUsed(row.last_used_at, now, t);
+      const lastAccessTime = prepareRequestTime(row.last_used_at);
+      const lastProbeTime = prepareRequestTime(row.last_probe_at);
 
       const rowMeta: AccountRowRenderMeta = {
         groupNames,
         hiddenGroupCount: Math.max(0, groupNames.length - visibleGroups.length),
-        lastUsedRelative: lastUsed.relative,
-        lastUsedTitle: lastUsed.title,
+        lastAccessTime,
+        lastProbeTime,
         usage: prepareUsageView(row, usageAccounts[String(row.id)], resetNow),
         visibleGroups,
       };
@@ -770,13 +769,22 @@ export function useAccountTableColumns({
       align: 'center',
       render: (_row, rowMeta) => {
         const meta = rowMeta as AccountRowRenderMeta | undefined;
-        if (!meta?.lastUsedRelative) {
-          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
-        }
+        const access = meta?.lastAccessTime ?? { display: '-', iso: '' };
+        const probe = meta?.lastProbeTime ?? { display: '-', iso: '' };
+        const detail = `${t('accounts.last_access')}: ${access.display}\n${t('accounts.last_probe')}: ${probe.display}`;
         return (
-          <span className="text-xs" style={{ color: 'var(--ag-text-secondary)' }} title={meta.lastUsedTitle}>
-            {meta.lastUsedRelative}
-          </span>
+          <div className="ag-account-request-times" title={detail}>
+            <div className="ag-account-request-time">
+              <time className="ag-account-request-time-value" dateTime={access.iso || undefined}>
+                {access.display}
+              </time>
+            </div>
+            <div className="ag-account-request-time">
+              <time className="ag-account-request-time-value" dateTime={probe.iso || undefined}>
+                {probe.display}
+              </time>
+            </div>
+          </div>
         );
       },
     },

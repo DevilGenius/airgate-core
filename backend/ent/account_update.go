@@ -271,6 +271,26 @@ func (au *AccountUpdate) ClearLastUsedAt() *AccountUpdate {
 	return au
 }
 
+// SetLastProbeAt sets the "last_probe_at" field.
+func (au *AccountUpdate) SetLastProbeAt(t time.Time) *AccountUpdate {
+	au.mutation.SetLastProbeAt(t)
+	return au
+}
+
+// SetNillableLastProbeAt sets the "last_probe_at" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableLastProbeAt(t *time.Time) *AccountUpdate {
+	if t != nil {
+		au.SetLastProbeAt(*t)
+	}
+	return au
+}
+
+// ClearLastProbeAt clears the value of the "last_probe_at" field.
+func (au *AccountUpdate) ClearLastProbeAt() *AccountUpdate {
+	au.mutation.ClearLastProbeAt()
+	return au
+}
+
 // SetExtra sets the "extra" field.
 func (au *AccountUpdate) SetExtra(m map[string]interface{}) *AccountUpdate {
 	au.mutation.SetExtra(m)
@@ -554,6 +574,12 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if au.mutation.LastUsedAtCleared() {
 		_spec.ClearField(account.FieldLastUsedAt, field.TypeTime)
+	}
+	if value, ok := au.mutation.LastProbeAt(); ok {
+		_spec.SetField(account.FieldLastProbeAt, field.TypeTime, value)
+	}
+	if au.mutation.LastProbeAtCleared() {
+		_spec.ClearField(account.FieldLastProbeAt, field.TypeTime)
 	}
 	if value, ok := au.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
@@ -948,6 +974,26 @@ func (auo *AccountUpdateOne) ClearLastUsedAt() *AccountUpdateOne {
 	return auo
 }
 
+// SetLastProbeAt sets the "last_probe_at" field.
+func (auo *AccountUpdateOne) SetLastProbeAt(t time.Time) *AccountUpdateOne {
+	auo.mutation.SetLastProbeAt(t)
+	return auo
+}
+
+// SetNillableLastProbeAt sets the "last_probe_at" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableLastProbeAt(t *time.Time) *AccountUpdateOne {
+	if t != nil {
+		auo.SetLastProbeAt(*t)
+	}
+	return auo
+}
+
+// ClearLastProbeAt clears the value of the "last_probe_at" field.
+func (auo *AccountUpdateOne) ClearLastProbeAt() *AccountUpdateOne {
+	auo.mutation.ClearLastProbeAt()
+	return auo
+}
+
 // SetExtra sets the "extra" field.
 func (auo *AccountUpdateOne) SetExtra(m map[string]interface{}) *AccountUpdateOne {
 	auo.mutation.SetExtra(m)
@@ -1261,6 +1307,12 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if auo.mutation.LastUsedAtCleared() {
 		_spec.ClearField(account.FieldLastUsedAt, field.TypeTime)
+	}
+	if value, ok := auo.mutation.LastProbeAt(); ok {
+		_spec.SetField(account.FieldLastProbeAt, field.TypeTime, value)
+	}
+	if auo.mutation.LastProbeAtCleared() {
+		_spec.ClearField(account.FieldLastProbeAt, field.TypeTime)
 	}
 	if value, ok := auo.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)

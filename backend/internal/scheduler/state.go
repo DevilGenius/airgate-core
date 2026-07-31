@@ -53,7 +53,7 @@ type Judgment struct {
 // StateMachine 账号状态机。所有状态转移必须通过 Apply 入口。
 //
 // 职责：
-//   - 把 forwarder 的 Judgment 翻译成 DB 字段变更（state / state_until / error_msg / last_used_at）
+//   - 把 forwarder 的 Judgment 翻译成 DB 字段变更（state / state_until / error_msg）
 //   - 关键转移（Active ↔ Disabled）通知上游刷新 RouteGraph
 //
 // 确定性的账号级信号仍由 state 记录；临时 403 和 5xx 共享瞬时避让策略。
@@ -97,7 +97,7 @@ func (sm *StateMachine) notifyStateSnapshot(accountID int, state account.State, 
 //
 // 语义：
 //
-//	Success             → state=active，清 state_until，last_used_at=now
+//	Success             → state=active，清 state_until
 //	AccountRateLimited  → state=rate_limited，state_until=now+RetryAfter
 //	AccountDead         → 401 等确定性凭证失效才 disabled；403 只降级
 //	AccountQuotaExhausted → 余额或配额耗尽，直接 disabled，不进入冷却
@@ -370,13 +370,13 @@ func hasTransientAvoidanceExtra(extra map[string]interface{}) bool {
 	return false
 }
 
-// transitionActive 成功时回到 active：清 state_until、清 reason、清失败计数、更新 last_used_at。
+// transitionActive 成功时回到 active：清 state_until、清 reason、清失败计数。
 //
 // disabled 状态受保护：只有管理员操作（ManualRecover / ToggleScheduling）才能解除，
 // forwarder 的 Success 判决不会覆盖它——防止在飞请求的成功回调把手动禁用的账号重新激活。
 //
-// force=false 时，未到期的 rate_limited / degraded 也受保护：成功判决只更新 last_used_at，
-// 不提前结束完整冷却窗口。force=true 仅给管理员/配额巡检的显式清除入口使用。
+// force=false 时，未到期的 rate_limited / degraded 也受保护，不提前结束完整冷却窗口。
+// force=true 仅给管理员/配额巡检的显式清除入口使用。
 func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, force bool) {
 	now := time.Now()
 	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
@@ -389,33 +389,22 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 	}
 
 	if prevState == account.StateDisabled {
-		err := accountscope.UpdateOneID(sm.db, accountID).
-			SetLastUsedAt(now).
-			Exec(dbCtx)
-		if err != nil {
-			slog.Debug("scheduler_state_success_ignored_disabled_touch_failed",
-				sdk.LogFieldAccountID, accountID,
-				sdk.LogFieldError, err,
-			)
-		} else {
-			slog.Debug("scheduler_state_success_ignored_disabled",
-				sdk.LogFieldAccountID, accountID,
-			)
-		}
+		slog.Debug("scheduler_state_success_ignored_disabled",
+			sdk.LogFieldAccountID, accountID,
+		)
 		return
 	}
 
 	if !force && isUnexpiredTemporaryState(existing, now) {
-		upd := accountscope.UpdateOneID(sm.db, accountID).
-			SetLastUsedAt(now)
-		var nextExtra map[string]interface{}
-		if hasTransientAvoidanceExtra(existing.Extra) {
-			nextExtra = cloneExtra(existing.Extra)
-			clearTransientAvoidanceExtra(nextExtra)
-			upd = upd.SetExtra(nextExtra).
-				SetErrorMsg("")
+		if !hasTransientAvoidanceExtra(existing.Extra) {
+			return
 		}
-		if err := upd.Exec(dbCtx); err != nil {
+		nextExtra := cloneExtra(existing.Extra)
+		clearTransientAvoidanceExtra(nextExtra)
+		if err := accountscope.UpdateOneID(sm.db, accountID).
+			SetExtra(nextExtra).
+			SetErrorMsg("").
+			Exec(dbCtx); err != nil {
 			slog.Warn("scheduler_state_active_touch_failed",
 				sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
 		} else {
@@ -427,8 +416,7 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int, for
 	upd := accountscope.UpdateOneID(sm.db, accountID).
 		SetState(account.StateActive).
 		ClearStateUntil().
-		SetErrorMsg("").
-		SetLastUsedAt(now)
+		SetErrorMsg("")
 	if getErr == nil {
 		if hasTransientAvoidanceExtra(existing.Extra) {
 			extra := cloneExtra(existing.Extra)

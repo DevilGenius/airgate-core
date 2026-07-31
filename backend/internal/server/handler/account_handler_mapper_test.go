@@ -13,6 +13,7 @@ import (
 
 func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 	lastUsed := time.Date(2026, 6, 20, 1, 2, 3, 0, time.UTC)
+	lastProbe := time.Date(2026, 6, 20, 10, 3, 4, 0, time.FixedZone("cst", 8*3600))
 	stateUntil := time.Date(2026, 6, 20, 9, 2, 3, 0, time.FixedZone("cst", 8*3600))
 	deletedAt := time.Date(2026, 6, 21, 9, 2, 3, 0, time.FixedZone("cst", 8*3600))
 	email := "oauth@example.com"
@@ -32,6 +33,7 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 		ErrorMsg:           "429",
 		UpstreamIsPool:     true,
 		LastUsedAt:         &lastUsed,
+		LastProbeAt:        &lastProbe,
 		DeletedAt:          &deletedAt,
 		Proxy:              &appaccount.Proxy{ID: 7},
 		Extra:              map[string]any{"plan": "plus"},
@@ -39,7 +41,7 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 		CreatedAt:          lastUsed,
 		UpdatedAt:          lastUsed,
 	})
-	if resp.ID != 9 || resp.Email == nil || *resp.Email != email || resp.ProxyID == nil || *resp.ProxyID != 7 || resp.LastUsedAt == nil || *resp.LastUsedAt != "2026-06-20T01:02:03Z" {
+	if resp.ID != 9 || resp.Email == nil || *resp.Email != email || resp.ProxyID == nil || *resp.ProxyID != 7 || resp.LastUsedAt == nil || *resp.LastUsedAt != "2026-06-20T01:02:03Z" || resp.LastProbeAt == nil || *resp.LastProbeAt != "2026-06-20T02:03:04Z" {
 		t.Fatalf("account response optional fields = %+v", resp)
 	}
 	if resp.StateUntil == nil || *resp.StateUntil != "2026-06-20T01:02:03Z" {

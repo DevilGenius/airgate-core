@@ -110,6 +110,11 @@ func LastUsedAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldLastUsedAt, v))
 }
 
+// LastProbeAt applies equality check predicate on the "last_probe_at" field. It's identical to LastProbeAtEQ.
+func LastProbeAt(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldLastProbeAt, v))
+}
+
 // DeletedAt applies equality check predicate on the "deleted_at" field. It's identical to DeletedAtEQ.
 func DeletedAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldDeletedAt, v))
@@ -728,6 +733,56 @@ func LastUsedAtIsNil() predicate.Account {
 // LastUsedAtNotNil applies the NotNil predicate on the "last_used_at" field.
 func LastUsedAtNotNil() predicate.Account {
 	return predicate.Account(sql.FieldNotNull(FieldLastUsedAt))
+}
+
+// LastProbeAtEQ applies the EQ predicate on the "last_probe_at" field.
+func LastProbeAtEQ(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldLastProbeAt, v))
+}
+
+// LastProbeAtNEQ applies the NEQ predicate on the "last_probe_at" field.
+func LastProbeAtNEQ(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldLastProbeAt, v))
+}
+
+// LastProbeAtIn applies the In predicate on the "last_probe_at" field.
+func LastProbeAtIn(vs ...time.Time) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldLastProbeAt, vs...))
+}
+
+// LastProbeAtNotIn applies the NotIn predicate on the "last_probe_at" field.
+func LastProbeAtNotIn(vs ...time.Time) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldLastProbeAt, vs...))
+}
+
+// LastProbeAtGT applies the GT predicate on the "last_probe_at" field.
+func LastProbeAtGT(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldLastProbeAt, v))
+}
+
+// LastProbeAtGTE applies the GTE predicate on the "last_probe_at" field.
+func LastProbeAtGTE(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldLastProbeAt, v))
+}
+
+// LastProbeAtLT applies the LT predicate on the "last_probe_at" field.
+func LastProbeAtLT(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldLastProbeAt, v))
+}
+
+// LastProbeAtLTE applies the LTE predicate on the "last_probe_at" field.
+func LastProbeAtLTE(v time.Time) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldLastProbeAt, v))
+}
+
+// LastProbeAtIsNil applies the IsNil predicate on the "last_probe_at" field.
+func LastProbeAtIsNil() predicate.Account {
+	return predicate.Account(sql.FieldIsNull(FieldLastProbeAt))
+}
+
+// LastProbeAtNotNil applies the NotNil predicate on the "last_probe_at" field.
+func LastProbeAtNotNil() predicate.Account {
+	return predicate.Account(sql.FieldNotNull(FieldLastProbeAt))
 }
 
 // ExtraIsNil applies the IsNil predicate on the "extra" field.

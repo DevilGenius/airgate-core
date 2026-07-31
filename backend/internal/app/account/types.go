@@ -41,6 +41,7 @@ type Account struct {
 	// UpstreamIsPool 上游是账号池时置 true：临时上游错误会进入退避 degraded，不永久标错。
 	UpstreamIsPool bool
 	LastUsedAt     *time.Time
+	LastProbeAt    *time.Time
 	DeletedAt      *time.Time
 	GroupIDs       []int64
 	Proxy          *Proxy

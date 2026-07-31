@@ -347,7 +347,7 @@ func (f *Forwarder) applyOutcome(ctx context.Context, state *forwardState, execu
 	}
 	f.scheduler.Apply(ctx, state.account.ID, j)
 
-	// Success 额外刷新会话（状态机内部已更新 last_used_at）
+	// Success 额外刷新会话；last_used_at 由真实 usage_log 落库时更新。
 	if execution.outcome.Kind == sdk.OutcomeSuccess {
 		f.scheduler.RefreshSession(ctx, state.account.ID, state.sessionID, state.account.Extra)
 		f.recordMonitorRecoverySuccess(ctx, state)

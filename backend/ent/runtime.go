@@ -178,15 +178,15 @@ func init() {
 	// account.DefaultUpstreamIsPool holds the default value on creation for the upstream_is_pool field.
 	account.DefaultUpstreamIsPool = accountDescUpstreamIsPool.Default.(bool)
 	// accountDescExtra is the schema descriptor for extra field.
-	accountDescExtra := accountFields[14].Descriptor()
+	accountDescExtra := accountFields[15].Descriptor()
 	// account.DefaultExtra holds the default value on creation for the extra field.
 	account.DefaultExtra = accountDescExtra.Default.(map[string]interface{})
 	// accountDescCreatedAt is the schema descriptor for created_at field.
-	accountDescCreatedAt := accountFields[16].Descriptor()
+	accountDescCreatedAt := accountFields[17].Descriptor()
 	// account.DefaultCreatedAt holds the default value on creation for the created_at field.
 	account.DefaultCreatedAt = accountDescCreatedAt.Default.(func() time.Time)
 	// accountDescUpdatedAt is the schema descriptor for updated_at field.
-	accountDescUpdatedAt := accountFields[17].Descriptor()
+	accountDescUpdatedAt := accountFields[18].Descriptor()
 	// account.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	account.DefaultUpdatedAt = accountDescUpdatedAt.Default.(func() time.Time)
 	// account.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

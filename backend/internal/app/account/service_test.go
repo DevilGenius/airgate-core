@@ -1826,9 +1826,10 @@ func TestUsageWindowNumberAndResetHelpers(t *testing.T) {
 func TestAccountProfileCacheAndRedisValueHelpers(t *testing.T) {
 	stateUntil := time.Date(2026, 6, 20, 11, 0, 0, 0, time.FixedZone("CST", 8*3600))
 	lastUsed := stateUntil.Add(-time.Hour)
+	lastProbe := stateUntil.Add(-30 * time.Minute)
 	item := Account{
 		ID: 8, Name: "profile", Platform: "openai", Type: "oauth", State: "rate_limited",
-		StateUntil: &stateUntil, LastUsedAt: &lastUsed, Priority: 9, MaxConcurrency: 10,
+		StateUntil: &stateUntil, LastUsedAt: &lastUsed, LastProbeAt: &lastProbe, Priority: 9, MaxConcurrency: 10,
 		RateMultiplier: 1.5, ErrorMsg: "limited", UpstreamIsPool: true, GroupIDs: []int64{1, 2},
 		Proxy: &Proxy{ID: 77}, CreatedAt: lastUsed, UpdatedAt: stateUntil,
 	}
@@ -1843,7 +1844,7 @@ func TestAccountProfileCacheAndRedisValueHelpers(t *testing.T) {
 	}
 	account, ok := accountProfileCacheToAccount(decoded)
 	if !ok || account.ID != item.ID || account.Proxy == nil || account.Proxy.ID != 77 ||
-		account.StateUntil == nil || account.LastUsedAt == nil || account.Credentials == nil {
+		account.StateUntil == nil || account.LastUsedAt == nil || account.LastProbeAt == nil || account.Credentials == nil {
 		t.Fatalf("accountProfileCacheToAccount = %+v ok=%v", account, ok)
 	}
 	if _, ok := decodeAccountProfileCache([]byte(`{bad`), item.ID); ok {
