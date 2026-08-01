@@ -201,6 +201,11 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/settings/admin-api-key", handlers.Settings.GenerateAdminAPIKey)
 		adminGroup.DELETE("/settings/admin-api-key", handlers.Settings.DeleteAdminAPIKey)
 
+		// 凭证管理 API Key（当前先提供设置管理，后续接入账号管理路由的独立鉴权）
+		adminGroup.GET("/settings/cred-key", handlers.Settings.GetCredKey)
+		adminGroup.POST("/settings/cred-key", handlers.Settings.GenerateCredKey)
+		adminGroup.DELETE("/settings/cred-key", handlers.Settings.DeleteCredKey)
+
 		// 仪表盘（管理员）
 		adminGroup.GET("/dashboard/stats", handlers.Dashboard.Stats)
 		adminGroup.GET("/dashboard/trend", handlers.Dashboard.Trend)

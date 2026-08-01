@@ -135,6 +135,7 @@ func TestSettingsDashboardAndUsageRoutesSuccessWithSQLite(t *testing.T) {
 		{name: "public settings", target: "/settings/public", fn: settingsHandler.GetPublicSettings, want: "AirGate Test"},
 		{name: "all settings", target: "/settings?group=site", fn: settingsHandler.GetSettings, want: "site_name"},
 		{name: "admin key empty", target: "/settings/admin-api-key", fn: settingsHandler.GetAdminAPIKey},
+		{name: "credential key empty", target: "/settings/cred-key", fn: settingsHandler.GetCredKey},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			w := invokeHandlerForValidation(http.MethodGet, tt.target, "", nil, nil, tt.fn)
@@ -156,6 +157,19 @@ func TestSettingsDashboardAndUsageRoutesSuccessWithSQLite(t *testing.T) {
 		t.Fatalf("admin key hint body = %s", w.Body.String())
 	}
 	w = invokeHandlerForValidation(http.MethodDelete, "/settings/admin-api-key", "", nil, nil, settingsHandler.DeleteAdminAPIKey)
+	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+
+	w = invokeHandlerForValidation(http.MethodPost, "/settings/cred-key", "", nil, nil, settingsHandler.GenerateCredKey)
+	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+	if !strings.Contains(w.Body.String(), `"key":"cred-`) {
+		t.Fatalf("generate credential key body = %s", w.Body.String())
+	}
+	w = invokeHandlerForValidation(http.MethodGet, "/settings/cred-key", "", nil, nil, settingsHandler.GetCredKey)
+	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+	if !strings.Contains(w.Body.String(), `"hint":"cred-`) {
+		t.Fatalf("credential key hint body = %s", w.Body.String())
+	}
+	w = invokeHandlerForValidation(http.MethodDelete, "/settings/cred-key", "", nil, nil, settingsHandler.DeleteCredKey)
 	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
 
 	dashboardHandler := NewDashboardHandler(appdashboard.NewService(store.NewDashboardStore(db, nil)))

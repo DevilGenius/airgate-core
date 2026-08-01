@@ -270,7 +270,7 @@ func TestJWTAuthAcceptsAndRejectsAdminAPIKeys(t *testing.T) {
 	adminKey := "admin-middleware-valid"
 	if _, err := db.Setting.Create().
 		SetGroup("security").
-		SetKey("admin_api_key_hash").
+		SetKey(coreauth.AdminAPIKeyHashSettingKey).
 		SetValue(coreauth.HashAPIKey(adminKey)).
 		Save(ctx); err != nil {
 		t.Fatalf("create admin key setting: %v", err)

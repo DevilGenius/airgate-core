@@ -251,79 +251,119 @@ func (h *SettingsHandler) UploadFile(c *gin.Context) {
 	response.Success(c, map[string]string{"url": url})
 }
 
-// settings key 常量（管理员 API Key）
-const (
-	settingAdminKeyHint      = "admin_api_key_hint"
-	settingAdminKeyHash      = "admin_api_key_hash"
-	settingAdminKeyEncrypted = "admin_api_key_encrypted"
-	settingGroupSecurity     = "security"
+const settingGroupSecurity = "security"
+
+type managedAPIKeyDefinition struct {
+	hintSettingKey      string
+	hashSettingKey      string
+	encryptedSettingKey string
+	displayName         string
+	generate            func() (string, string, error)
+}
+
+var (
+	adminAPIKeyDefinition = managedAPIKeyDefinition{
+		hintSettingKey:      auth.AdminAPIKeyHintSettingKey,
+		hashSettingKey:      auth.AdminAPIKeyHashSettingKey,
+		encryptedSettingKey: auth.AdminAPIKeyEncryptedSettingKey,
+		displayName:         "管理员 API Key",
+		generate:            auth.GenerateAdminAPIKey,
+	}
+	credKeyDefinition = managedAPIKeyDefinition{
+		hintSettingKey:      auth.CredKeyHintSettingKey,
+		hashSettingKey:      auth.CredKeyHashSettingKey,
+		encryptedSettingKey: auth.CredKeyEncryptedSettingKey,
+		displayName:         "凭证管理 API Key",
+		generate:            auth.GenerateCredKey,
+	}
 )
 
 // GetAdminAPIKey 获取管理员 API Key 信息（仅返回脱敏 hint）。
 func (h *SettingsHandler) GetAdminAPIKey(c *gin.Context) {
-	list, err := h.service.List(c.Request.Context(), settingGroupSecurity)
-	if err != nil {
-		slog.Error("查询管理员 API Key 失败", "error", err)
-		response.InternalError(c, "查询失败")
-		return
-	}
-
-	var hint string
-	for _, item := range list {
-		if item.Key == settingAdminKeyHint {
-			hint = item.Value
-		}
-	}
-	if hint == "" {
-		response.Success(c, nil)
-		return
-	}
-
-	response.Success(c, dto.AdminAPIKeyResp{Hint: hint})
+	h.getManagedAPIKey(c, adminAPIKeyDefinition)
 }
 
 // GenerateAdminAPIKey 生成（或重新生成）管理员 API Key。
 func (h *SettingsHandler) GenerateAdminAPIKey(c *gin.Context) {
-	plainKey, hash, err := auth.GenerateAdminAPIKey()
+	h.generateManagedAPIKey(c, adminAPIKeyDefinition)
+}
+
+// DeleteAdminAPIKey 删除管理员 API Key。
+func (h *SettingsHandler) DeleteAdminAPIKey(c *gin.Context) {
+	h.deleteManagedAPIKey(c, adminAPIKeyDefinition)
+}
+
+// GetCredKey 获取凭证管理 API Key 信息（仅返回脱敏 hint）。
+func (h *SettingsHandler) GetCredKey(c *gin.Context) {
+	h.getManagedAPIKey(c, credKeyDefinition)
+}
+
+// GenerateCredKey 生成（或重新生成）凭证管理 API Key。
+func (h *SettingsHandler) GenerateCredKey(c *gin.Context) {
+	h.generateManagedAPIKey(c, credKeyDefinition)
+}
+
+// DeleteCredKey 删除凭证管理 API Key。
+func (h *SettingsHandler) DeleteCredKey(c *gin.Context) {
+	h.deleteManagedAPIKey(c, credKeyDefinition)
+}
+
+func (h *SettingsHandler) getManagedAPIKey(c *gin.Context, definition managedAPIKeyDefinition) {
+	list, err := h.service.List(c.Request.Context(), settingGroupSecurity)
 	if err != nil {
-		slog.Error("生成管理员 API Key 失败", "error", err)
+		slog.Error("查询管理 API Key 失败", "type", definition.displayName, "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	for _, item := range list {
+		if item.Key == definition.hintSettingKey && item.Value != "" {
+			response.Success(c, dto.ManagedAPIKeyResp{Hint: item.Value})
+			return
+		}
+	}
+
+	response.Success(c, nil)
+}
+
+func (h *SettingsHandler) generateManagedAPIKey(c *gin.Context, definition managedAPIKeyDefinition) {
+	plainKey, hash, err := definition.generate()
+	if err != nil {
+		slog.Error("生成管理 API Key 失败", "type", definition.displayName, "error", err)
 		response.InternalError(c, "生成密钥失败")
 		return
 	}
 
 	encrypted, err := auth.EncryptAPIKey(plainKey, h.apiKeySecret)
 	if err != nil {
-		slog.Error("加密管理员 API Key 失败", "error", err)
+		slog.Error("加密管理 API Key 失败", "type", definition.displayName, "error", err)
 		response.InternalError(c, "加密密钥失败")
 		return
 	}
 
-	hint := auth.AdminKeyHint(plainKey)
-
+	hint := auth.ManagedKeyHint(plainKey)
 	items := []appsettings.ItemInput{
-		{Key: settingAdminKeyHint, Value: hint, Group: settingGroupSecurity},
-		{Key: settingAdminKeyHash, Value: hash, Group: settingGroupSecurity},
-		{Key: settingAdminKeyEncrypted, Value: encrypted, Group: settingGroupSecurity},
+		{Key: definition.hintSettingKey, Value: hint, Group: settingGroupSecurity},
+		{Key: definition.hashSettingKey, Value: hash, Group: settingGroupSecurity},
+		{Key: definition.encryptedSettingKey, Value: encrypted, Group: settingGroupSecurity},
 	}
 	if err := h.service.Update(c.Request.Context(), items); err != nil {
-		slog.Error("保存管理员 API Key 失败", "error", err)
+		slog.Error("保存管理 API Key 失败", "type", definition.displayName, "error", err)
 		response.InternalError(c, "保存密钥失败")
 		return
 	}
 
-	response.Success(c, dto.AdminAPIKeyResp{Hint: hint, Key: plainKey})
+	response.Success(c, dto.ManagedAPIKeyResp{Hint: hint, Key: plainKey})
 }
 
-// DeleteAdminAPIKey 删除管理员 API Key。
-func (h *SettingsHandler) DeleteAdminAPIKey(c *gin.Context) {
-	// 将三个 key 置空即可
+func (h *SettingsHandler) deleteManagedAPIKey(c *gin.Context, definition managedAPIKeyDefinition) {
 	items := []appsettings.ItemInput{
-		{Key: settingAdminKeyHint, Value: "", Group: settingGroupSecurity},
-		{Key: settingAdminKeyHash, Value: "", Group: settingGroupSecurity},
-		{Key: settingAdminKeyEncrypted, Value: "", Group: settingGroupSecurity},
+		{Key: definition.hintSettingKey, Value: "", Group: settingGroupSecurity},
+		{Key: definition.hashSettingKey, Value: "", Group: settingGroupSecurity},
+		{Key: definition.encryptedSettingKey, Value: "", Group: settingGroupSecurity},
 	}
 	if err := h.service.Update(c.Request.Context(), items); err != nil {
-		slog.Error("删除管理员 API Key 失败", "error", err)
+		slog.Error("删除管理 API Key 失败", "type", definition.displayName, "error", err)
 		response.InternalError(c, "删除密钥失败")
 		return
 	}

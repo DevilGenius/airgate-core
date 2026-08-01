@@ -28,6 +28,7 @@ export const queryKeys = {
   userUsage: (...args: unknown[]) => ['user-usage', ...args] as const,
   settings: () => ['settings'] as const,
   adminApiKey: () => ['admin-api-key'] as const,
+  credKey: () => ['cred-key'] as const,
   userMe: () => ['user-me'] as const,
   userUsageStats: (...args: unknown[]) => ['user-usage-stats', ...args] as const,
 } as const;

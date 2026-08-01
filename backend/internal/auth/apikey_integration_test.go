@@ -317,7 +317,7 @@ func TestValidateAdminAPIKey(t *testing.T) {
 	}
 	if _, err := db.Setting.Create().
 		SetGroup("security").
-		SetKey("admin_api_key_hash").
+		SetKey(AdminAPIKeyHashSettingKey).
 		SetValue(hash).
 		Save(ctx); err != nil {
 		t.Fatalf("create admin key setting: %v", err)

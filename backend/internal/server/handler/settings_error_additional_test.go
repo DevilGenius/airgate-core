@@ -33,6 +33,9 @@ func TestSettingsHandlerServiceErrorBranches(t *testing.T) {
 		{name: "get admin api key", method: http.MethodGet, target: "/settings/admin-api-key", fn: handler.GetAdminAPIKey},
 		{name: "generate admin api key", method: http.MethodPost, target: "/settings/admin-api-key", fn: handler.GenerateAdminAPIKey},
 		{name: "delete admin api key", method: http.MethodDelete, target: "/settings/admin-api-key", fn: handler.DeleteAdminAPIKey},
+		{name: "get credential api key", method: http.MethodGet, target: "/settings/cred-key", fn: handler.GetCredKey},
+		{name: "generate credential api key", method: http.MethodPost, target: "/settings/cred-key", fn: handler.GenerateCredKey},
+		{name: "delete credential api key", method: http.MethodDelete, target: "/settings/cred-key", fn: handler.DeleteCredKey},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

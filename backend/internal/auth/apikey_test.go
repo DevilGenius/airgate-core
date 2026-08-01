@@ -36,6 +36,17 @@ func TestGenerateAPIKeyPrefixesAndHashes(t *testing.T) {
 	if adminHash != HashAPIKey(adminKey) {
 		t.Fatalf("admin hash = %q, want HashAPIKey(adminKey)", adminHash)
 	}
+
+	credentialKey, credentialHash, err := GenerateCredKey()
+	if err != nil {
+		t.Fatalf("GenerateCredKey error: %v", err)
+	}
+	if !strings.HasPrefix(credentialKey, credKeyPrefix) {
+		t.Fatalf("credential key prefix = %q, want %q", credentialKey[:len(credKeyPrefix)], credKeyPrefix)
+	}
+	if credentialHash != HashAPIKey(credentialKey) {
+		t.Fatalf("credential hash = %q, want HashAPIKey(key)", credentialHash)
+	}
 }
 
 func TestGenerateAPIKeyReturnsRandomReaderError(t *testing.T) {
@@ -82,6 +93,15 @@ func TestAdminKeyHelpers(t *testing.T) {
 	}
 	if IsAdminAPIKey("admin-") || IsAdminAPIKey("sk-abc") {
 		t.Fatal("IsAdminAPIKey accepted invalid key")
+	}
+	if got := ManagedKeyHint("cred-1234567890abcdef"); got != "cred-1234...cdef" {
+		t.Fatalf("ManagedKeyHint credential = %q", got)
+	}
+	if !IsCredKey("cred-abc") {
+		t.Fatal("IsCredKey cred-abc = false")
+	}
+	if IsCredKey("cred-") || IsCredKey("admin-abc") {
+		t.Fatal("IsCredKey accepted invalid key")
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -84,7 +85,18 @@ var (
 
 const apiKeyPrefix = "sk-"
 const adminKeyPrefix = "admin-"
+const credKeyPrefix = "cred-"
 const apiKeyRedisCacheTTL = apiKeyCacheTTL
+
+const (
+	AdminAPIKeyHintSettingKey      = "admin_api_key_hint"
+	AdminAPIKeyHashSettingKey      = "admin_api_key_hash"
+	AdminAPIKeyEncryptedSettingKey = "admin_api_key_encrypted"
+
+	CredKeyHintSettingKey      = "cred_key_hint"
+	CredKeyHashSettingKey      = "cred_key_hash"
+	CredKeyEncryptedSettingKey = "cred_key_encrypted"
+)
 
 type apiKeyRedisEntry struct {
 	Info *APIKeyInfo `json:"info,omitempty"`
@@ -151,6 +163,11 @@ func GenerateAdminAPIKey() (key string, hash string, err error) {
 	return generatePrefixedAPIKey(adminKeyPrefix)
 }
 
+// GenerateCredKey 生成凭证管理 API Key，返回明文密钥和哈希。
+func GenerateCredKey() (key string, hash string, err error) {
+	return generatePrefixedAPIKey(credKeyPrefix)
+}
+
 func generatePrefixedAPIKey(prefix string) (key string, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err = io.ReadFull(apiKeyRandom, b); err != nil {
@@ -167,17 +184,29 @@ func HashAPIKey(key string) string {
 	return hex.EncodeToString(h[:])
 }
 
-// AdminKeyHint 生成管理员 API Key 的显示提示（前缀 + 前4位...后4位）。
-func AdminKeyHint(key string) string {
-	if len(key) <= 12 {
+// ManagedKeyHint 生成管理 API Key 的显示提示（前缀 + 前4位...后4位）。
+func ManagedKeyHint(key string) string {
+	prefixEnd := strings.IndexByte(key, '-') + 1
+	visibleEnd := prefixEnd + 4
+	if prefixEnd <= 0 || len(key) <= visibleEnd+4 {
 		return key
 	}
-	return key[:10] + "..." + key[len(key)-4:]
+	return key[:visibleEnd] + "..." + key[len(key)-4:]
+}
+
+// AdminKeyHint 保留管理员 API Key 提示函数，供现有调用兼容。
+func AdminKeyHint(key string) string {
+	return ManagedKeyHint(key)
 }
 
 // IsAdminAPIKey 判断是否为管理员 API Key 格式。
 func IsAdminAPIKey(key string) bool {
 	return len(key) > len(adminKeyPrefix) && key[:len(adminKeyPrefix)] == adminKeyPrefix
+}
+
+// IsCredKey 判断是否为凭证管理 API Key 格式。
+func IsCredKey(key string) bool {
+	return len(key) > len(credKeyPrefix) && key[:len(credKeyPrefix)] == credKeyPrefix
 }
 
 // ValidateAPIKeyForLogin 验证 API Key 用于 Web 登录（不要求绑定分组）。
@@ -479,12 +508,22 @@ func deleteAllAPIKeyRedisCache() {
 
 // ValidateAdminAPIKey 验证管理员 API Key，返回 nil 表示验证通过。
 func ValidateAdminAPIKey(ctx context.Context, db *ent.Client, key string) error {
+	return validateManagedAPIKey(ctx, db, AdminAPIKeyHashSettingKey, key)
+}
+
+// ValidateCredKey 验证凭证管理 API Key。
+// 该函数供后续凭证管理路由接入独立权限中间件时复用。
+func ValidateCredKey(ctx context.Context, db *ent.Client, key string) error {
+	return validateManagedAPIKey(ctx, db, CredKeyHashSettingKey, key)
+}
+
+func validateManagedAPIKey(ctx context.Context, db *ent.Client, hashSettingKey, key string) error {
 	hash := HashAPIKey(key)
 
-	// 从 settings 表查询 admin_api_key_hash
+	// 从 settings 表读取平铺保存的 hash 设置项。
 	s, err := db.Setting.Query().
 		Where(
-			entsetting.KeyEQ("admin_api_key_hash"),
+			entsetting.KeyEQ(hashSettingKey),
 			entsetting.GroupEQ("security"),
 		).
 		Only(ctx)

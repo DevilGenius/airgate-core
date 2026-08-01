@@ -4,7 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDialog, Button, Card, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { settingsApi } from '../../shared/api/settings';
-import { adminApiKeyApi, type AdminAPIKeyResp } from '../../shared/api/adminApiKey';
+import {
+  adminApiKeyApi,
+  credKeyApi,
+  type ManagedAPIKeyResp,
+} from '../../shared/api/adminApiKey';
 import { defaultLogoUrl } from '../../app/providers/SiteSettingsProvider';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useClipboard } from '../../shared/hooks/useClipboard';
@@ -12,7 +16,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Download, Database,
+  ShieldCheck, Copy, Trash2, KeyRound, Download, Database, TriangleAlert,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq, TestNotificationReq } from '../../shared/types';
 import { SystemUpdatePanel } from './SystemUpdatePanel';
@@ -701,6 +705,104 @@ function SmtpTestModal({
 
 function SecurityPanel() {
   const { t } = useTranslation();
+
+  return (
+    <SettingsSection
+      description={t('settings.security_api_keys_desc')}
+      title={t('settings.security_api_keys')}
+    >
+      <div className="divide-y divide-border/60">
+        <ManagedAPIKeySetting
+          api={adminApiKeyApi}
+          labels={{
+            title: t('settings.security_admin_key'),
+            description: t('settings.security_admin_key_desc'),
+            warning: t('settings.security_admin_key_warning'),
+            current: t('settings.security_admin_key_current'),
+            none: t('settings.security_admin_key_none'),
+            generate: t('settings.security_admin_key_generate'),
+            regenerate: t('settings.security_admin_key_regenerate'),
+            delete: t('settings.security_admin_key_delete'),
+            generated: t('settings.security_admin_key_generated'),
+            regenerated: t('settings.security_admin_key_regenerated'),
+            deleted: t('settings.security_admin_key_deleted'),
+            showTitle: t('settings.security_admin_key_show_title'),
+            showHint: t('settings.security_admin_key_show_hint'),
+            copy: t('settings.security_admin_key_copy'),
+            regenerateConfirmTitle: t('settings.security_admin_key_regenerate_confirm_title'),
+            regenerateConfirmMessage: t('settings.security_admin_key_regenerate_confirm_msg'),
+            deleteConfirmTitle: t('settings.security_admin_key_delete_confirm_title'),
+            deleteConfirmMessage: t('settings.security_admin_key_delete_confirm_msg'),
+          }}
+          queryKey={queryKeys.adminApiKey()}
+        />
+
+        <ManagedAPIKeySetting
+          api={credKeyApi}
+          labels={{
+            title: t('settings.security_credential_key'),
+            description: t('settings.security_credential_key_desc'),
+            warning: t('settings.security_credential_key_warning'),
+            current: t('settings.security_credential_key_current'),
+            none: t('settings.security_credential_key_none'),
+            generate: t('settings.security_credential_key_generate'),
+            regenerate: t('settings.security_credential_key_regenerate'),
+            delete: t('settings.security_credential_key_delete'),
+            generated: t('settings.security_credential_key_generated'),
+            regenerated: t('settings.security_credential_key_regenerated'),
+            deleted: t('settings.security_credential_key_deleted'),
+            showTitle: t('settings.security_credential_key_show_title'),
+            showHint: t('settings.security_credential_key_show_hint'),
+            copy: t('settings.security_credential_key_copy'),
+            regenerateConfirmTitle: t('settings.security_credential_key_regenerate_confirm_title'),
+            regenerateConfirmMessage: t('settings.security_credential_key_regenerate_confirm_msg'),
+            deleteConfirmTitle: t('settings.security_credential_key_delete_confirm_title'),
+            deleteConfirmMessage: t('settings.security_credential_key_delete_confirm_msg'),
+          }}
+          queryKey={queryKeys.credKey()}
+        />
+      </div>
+    </SettingsSection>
+  );
+}
+
+interface ManagedAPIKeyClient {
+  get: () => Promise<ManagedAPIKeyResp | null>;
+  generate: () => Promise<ManagedAPIKeyResp>;
+  remove: () => Promise<null>;
+}
+
+interface ManagedAPIKeyLabels {
+  title: string;
+  description: string;
+  warning: string;
+  current: string;
+  none: string;
+  generate: string;
+  regenerate: string;
+  delete: string;
+  generated: string;
+  regenerated: string;
+  deleted: string;
+  showTitle: string;
+  showHint: string;
+  copy: string;
+  regenerateConfirmTitle: string;
+  regenerateConfirmMessage: string;
+  deleteConfirmTitle: string;
+  deleteConfirmMessage: string;
+}
+
+function ManagedAPIKeySetting({
+  api,
+  labels,
+  queryKey,
+}: {
+  api: ManagedAPIKeyClient;
+  labels: ManagedAPIKeyLabels;
+  queryKey: readonly unknown[];
+}) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const copy = useClipboard();
@@ -711,37 +813,32 @@ function SecurityPanel() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: queryKeys.adminApiKey(),
-    queryFn: () => adminApiKeyApi.get(),
+    queryKey,
+    queryFn: () => api.get(),
   });
 
   const hasKey = !!data?.hint;
 
   const generateMutation = useMutation({
-    mutationFn: () => adminApiKeyApi.generate(),
-    onSuccess: (resp: AdminAPIKeyResp) => {
-      queryClient.setQueryData(queryKeys.adminApiKey(), { hint: resp.hint });
-      queryClient.invalidateQueries({ queryKey: queryKeys.adminApiKey() });
+    mutationFn: () => api.generate(),
+    onSuccess: (resp: ManagedAPIKeyResp) => {
+      queryClient.setQueryData(queryKey, { hint: resp.hint });
+      queryClient.invalidateQueries({ queryKey });
       setPlainKey(resp.key ?? '');
       setShowKeyModal(true);
       setConfirmRegen(false);
-      toast(
-        'success',
-        hasKey
-          ? t('settings.security_admin_key_regenerated')
-          : t('settings.security_admin_key_generated'),
-      );
+      toast('success', hasKey ? labels.regenerated : labels.generated);
     },
     onError: (err: Error) => toast('error', err.message),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => adminApiKeyApi.remove(),
+    mutationFn: () => api.remove(),
     onSuccess: () => {
-      queryClient.setQueryData(queryKeys.adminApiKey(), null);
-      queryClient.invalidateQueries({ queryKey: queryKeys.adminApiKey() });
+      queryClient.setQueryData(queryKey, null);
+      queryClient.invalidateQueries({ queryKey });
       setConfirmDelete(false);
-      toast('success', t('settings.security_admin_key_deleted'));
+      toast('success', labels.deleted);
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -757,28 +854,26 @@ function SecurityPanel() {
 
   return (
     <>
-      <SettingsSection
-        description={t('settings.security_admin_key_desc')}
-        title={t('settings.security_admin_key')}
-      >
-        <div className="mb-4">
-          <Alert status="warning">
-            <Alert.Content>
-              <Alert.Description>{t('settings.security_admin_key_warning')}</Alert.Description>
-            </Alert.Content>
-          </Alert>
+      <div className="py-5 first:pt-1 last:pb-1">
+        <div className="min-w-0">
+          <h4 className="text-[13px] font-semibold text-text">{labels.title}</h4>
+          <p className="mt-1 text-[12px] leading-5 text-text-tertiary">{labels.description}</p>
+          <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-5 text-warning">
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>{labels.warning}</span>
+          </p>
         </div>
 
         {isLoading ? (
-          <div className="flex items-center py-4 text-text-tertiary text-sm">
+          <div className="mt-3 flex items-center py-1 text-text-tertiary text-sm">
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
             {t('common.loading')}
           </div>
         ) : (
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div className="mt-3 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-[12px] text-text-tertiary mb-1.5">
-                {t('settings.security_admin_key_current')}
+                {labels.current}
               </div>
               {hasKey ? (
                 <code className="inline-block px-2.5 py-1.5 rounded-md bg-surface border border-glass-border text-[13px] font-mono text-text break-all">
@@ -786,7 +881,7 @@ function SecurityPanel() {
                 </code>
               ) : (
                 <span className="text-[13px] text-text-tertiary">
-                  {t('settings.security_admin_key_none')}
+                  {labels.none}
                 </span>
               )}
             </div>
@@ -802,7 +897,7 @@ function SecurityPanel() {
                     aria-busy={generateMutation.isPending}
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    {t('settings.security_admin_key_regenerate')}
+                    {labels.regenerate}
                   </Button>
                   <Button
                     size="sm"
@@ -812,7 +907,7 @@ function SecurityPanel() {
                     aria-busy={deleteMutation.isPending}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    {t('settings.security_admin_key_delete')}
+                    {labels.delete}
                   </Button>
                 </>
               ) : (
@@ -823,13 +918,13 @@ function SecurityPanel() {
                   aria-busy={generateMutation.isPending}
                 >
                   <KeyRound className="w-3.5 h-3.5" />
-                  {t('settings.security_admin_key_generate')}
+                  {labels.generate}
                 </Button>
               )}
             </div>
           </div>
         )}
-      </SettingsSection>
+      </div>
 
       <Modal state={showKeyModalState}>
         <DialogTriggerShim />
@@ -840,14 +935,14 @@ function SecurityPanel() {
               style={{ maxWidth: '520px', width: 'min(100%, calc(100vw - 2rem))' }}
             >
               <Modal.Header>
-                <Modal.Heading>{t('settings.security_admin_key_show_title')}</Modal.Heading>
+                <Modal.Heading>{labels.showTitle}</Modal.Heading>
                 <Modal.CloseTrigger />
               </Modal.Header>
               <Modal.Body>
                 <div className="space-y-3">
                   <Alert status="warning">
                     <Alert.Content>
-                      <Alert.Description>{t('settings.security_admin_key_show_hint')}</Alert.Description>
+                      <Alert.Description>{labels.showHint}</Alert.Description>
                     </Alert.Content>
                   </Alert>
                   <div className="flex items-center gap-2">
@@ -860,7 +955,7 @@ function SecurityPanel() {
                       onPress={() => copy(plainKey)}
                     >
                       <Copy className="w-3.5 h-3.5" />
-                      {t('settings.security_admin_key_copy')}
+                      {labels.copy}
                     </Button>
                   </div>
                 </div>
@@ -887,9 +982,9 @@ function SecurityPanel() {
             <AlertDialog.Dialog className="ag-elevation-modal">
               <AlertDialog.Header>
                 <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('settings.security_admin_key_regenerate_confirm_title')}</AlertDialog.Heading>
+                <AlertDialog.Heading>{labels.regenerateConfirmTitle}</AlertDialog.Heading>
               </AlertDialog.Header>
-              <AlertDialog.Body>{t('settings.security_admin_key_regenerate_confirm_msg')}</AlertDialog.Body>
+              <AlertDialog.Body>{labels.regenerateConfirmMessage}</AlertDialog.Body>
               <AlertDialog.Footer>
                 <Button variant="secondary" onPress={() => setConfirmRegen(false)}>
                   {t('common.cancel')}
@@ -916,9 +1011,9 @@ function SecurityPanel() {
             <AlertDialog.Dialog className="ag-elevation-modal">
               <AlertDialog.Header>
                 <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('settings.security_admin_key_delete_confirm_title')}</AlertDialog.Heading>
+                <AlertDialog.Heading>{labels.deleteConfirmTitle}</AlertDialog.Heading>
               </AlertDialog.Header>
-              <AlertDialog.Body>{t('settings.security_admin_key_delete_confirm_msg')}</AlertDialog.Body>
+              <AlertDialog.Body>{labels.deleteConfirmMessage}</AlertDialog.Body>
               <AlertDialog.Footer>
                 <Button variant="secondary" onPress={() => setConfirmDelete(false)}>
                   {t('common.cancel')}
