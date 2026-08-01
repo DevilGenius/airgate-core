@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
-  Label,
-  Spinner,
-  TextArea,
-  TextField as HeroTextField,
-  useOverlayState,
+  Button, Label, Spinner, TextArea, TextField as HeroTextField, useOverlayState,
 } from '@heroui/react';
-import { FileJson2, Files, FolderOpen, Trash2 } from 'lucide-react';
+import { Check, FileJson2, Files, FolderOpen, Trash2, X } from 'lucide-react';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 
@@ -24,6 +19,13 @@ export type CompatImportFormat =
 export type CompatImportInput = {
   name: string;
   content: string;
+};
+
+export type CompatImportProgress = {
+  done: number;
+  failed: number;
+  success: number;
+  total: number;
 };
 
 type CompatImportSelection = CompatImportFormat | 'json_input';
@@ -51,7 +53,11 @@ export function CompatImportModal({
   open: boolean;
   loading: boolean;
   onClose: () => void;
-  onSubmit: (format: CompatImportFormat, inputs: CompatImportInput[]) => Promise<boolean>;
+  onSubmit: (
+    format: CompatImportFormat,
+    inputs: CompatImportInput[],
+    onProgress: (progress: CompatImportProgress) => void,
+  ) => Promise<boolean>;
 }) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,6 +67,7 @@ export function CompatImportModal({
   const [lineInputText, setLineInputText] = useState('');
   const [readError, setReadError] = useState('');
   const [isPreparing, setIsPreparing] = useState(false);
+  const [progress, setProgress] = useState<CompatImportProgress | null>(null);
   const busy = loading || isPreparing;
   const modalState = useOverlayState({
     isOpen: open,
@@ -112,6 +119,15 @@ export function CompatImportModal({
   const tooManyInputs = totalInputs > MAX_COMPAT_IMPORT_INPUTS;
   const tooLarge = totalBytes > MAX_COMPAT_IMPORT_BYTES;
   const canSubmit = Boolean(selection) && totalInputs > 0 && !tooManyInputs && !tooLarge && !busy;
+  const progressPercent = progress && progress.total > 0
+    ? Math.round((progress.done / progress.total) * 100)
+    : 0;
+  const successPercent = progress && progress.total > 0
+    ? (progress.success / progress.total) * 100
+    : 0;
+  const failedPercent = progress && progress.total > 0
+    ? (progress.failed / progress.total) * 100
+    : 0;
 
   const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(event.target.files ?? []);
@@ -124,6 +140,12 @@ export function CompatImportModal({
   const handleSubmit = async () => {
     if (!canSubmit || !selection) return;
     setReadError('');
+    setProgress(isRTInput ? {
+      done: 0,
+      failed: 0,
+      success: 0,
+      total: activeInputLines.length,
+    } : null);
     setIsPreparing(true);
     try {
       const fileInputs = await Promise.all(activeFiles.map(async (file) => ({
@@ -137,7 +159,7 @@ export function CompatImportModal({
         content,
       }));
       const format: CompatImportFormat = selection === 'json_input' ? 'account_json' : selection;
-      const imported = await onSubmit(format, [...fileInputs, ...pastedInputs]);
+      const imported = await onSubmit(format, [...fileInputs, ...pastedInputs], setProgress);
       if (imported) onClose();
     } catch {
       setReadError(t('accounts.compat_import_read_failed'));
@@ -151,7 +173,7 @@ export function CompatImportModal({
       className="ag-account-page-modal"
       description={t('accounts.compat_import_description')}
       dialogStyle={{
-        height: 'min(620px, calc(100dvh - 2rem))',
+        height: 'min(720px, calc(100dvh - 2rem))',
         maxWidth: '700px',
         width: 'min(100%, calc(100vw - 2rem))',
       }}
@@ -187,7 +209,10 @@ export function CompatImportModal({
             popoverClassName="max-h-80 overflow-y-auto"
             selectedKey={selection}
             selectedLabel={selectedFormatLabel}
-            onSelectionChange={(key) => setSelection(key as CompatImportSelection)}
+            onSelectionChange={(key) => {
+              setProgress(null);
+              setSelection(key as CompatImportSelection);
+            }}
           />
           <p className="text-xs leading-5 text-text-tertiary">
             {t('accounts.compat_import_format_hint')}
@@ -232,7 +257,7 @@ export function CompatImportModal({
         ) : null}
 
         {isLineInput ? (
-          <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
+          <section className="space-y-3">
             <HeroTextField fullWidth>
               <Label>
                 {isRTInput
@@ -242,6 +267,7 @@ export function CompatImportModal({
               <TextArea
                 value={lineInputText}
                 rows={8}
+                wrap="off"
                 placeholder={isRTInput
                   ? t('accounts.compat_import_rt_placeholder')
                   : t('accounts.compat_import_json_placeholder')}
@@ -258,6 +284,39 @@ export function CompatImportModal({
                 : t('accounts.compat_import_json_hint')}
             </p>
           </section>
+        ) : null}
+
+        {isRTInput && progress ? (
+          <div className="space-y-2 rounded-lg border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] px-3 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+              <span className="text-[var(--ag-text-secondary)]">
+                {t('accounts.compat_import_rt_progress', { done: progress.done, total: progress.total })}
+              </span>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1 text-success">
+                  <Check className="h-3.5 w-3.5" />
+                  {t('accounts.compat_import_rt_success_count', { count: progress.success })}
+                </span>
+                <span className="inline-flex items-center gap-1 text-danger">
+                  <X className="h-3.5 w-3.5" />
+                  {t('accounts.compat_import_rt_failed_count', { count: progress.failed })}
+                </span>
+                <span className="font-mono tabular-nums text-[var(--ag-text-secondary)]">
+                  {progressPercent}%
+                </span>
+              </div>
+            </div>
+            <div className="flex h-1.5 overflow-hidden rounded-full bg-[var(--ag-glass-border)]">
+              <div
+                className="h-full bg-success transition-[width] duration-300"
+                style={{ width: `${successPercent}%` }}
+              />
+              <div
+                className="h-full bg-danger transition-[width] duration-300"
+                style={{ width: `${failedPercent}%` }}
+              />
+            </div>
+          </div>
         ) : null}
 
         {selection ? (
