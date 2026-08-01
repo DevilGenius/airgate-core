@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AccountResp } from '../../../shared/types';
+import type { AccountResp, FamilyCooldownDTO } from '../../../shared/types';
 import { AccountCapacityStore } from './accountRuntimeStores';
 import { NativeSoftChip } from './accountNativeChip';
 
@@ -45,6 +45,12 @@ function accountHasLiveCooldown(row: AccountResp, now: number): boolean {
   return (row.family_cooldowns || []).some((fc) => Date.parse(fc.until) > now);
 }
 
+const OAUTH_MODEL_UNSUPPORTED_REASON = 'not supported when using codex with a chatgpt account';
+
+function isModelUnsupportedCooldown(cooldown: FamilyCooldownDTO): boolean {
+  return cooldown.reason?.toLowerCase().includes(OAUTH_MODEL_UNSUPPORTED_REASON) ?? false;
+}
+
 let cooldownClockNow = Date.now();
 let cooldownClockTimer: number | null = null;
 const cooldownClockListeners = new Set<() => void>();
@@ -87,6 +93,7 @@ function useCooldownClock(enabled: boolean): number {
  * AccountStatusCell 渲染账号状态徽标，按 state + state_until 动态展示：
  *   active         → 绿色 "活跃"
  *   family_limited → 橙色 "家族限流中"（由 family_cooldowns 派生，不改变调度状态）
+ *   model_unsupported → 橙色 "家族退避中"（OAuth 账号不具备该模型权限，阶梯退避）
  *   rate_limited   → 橙色 "限流中 Xh Ym"（state_until 倒计时）
  *   degraded       → 黄色 "降级 Xm"（上游退避，倒计时）
  *   disabled       → 红色 "已禁用"（tooltip 显示 error_msg）
@@ -111,13 +118,19 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   const liveFamilyCooldowns = (row.family_cooldowns || []).filter(
     (fc) => Date.parse(fc.until) > now,
   );
-  const familyTooltip = liveFamilyCooldowns
+  const modelUnsupportedCooldowns = liveFamilyCooldowns.filter(isModelUnsupportedCooldown);
+  const rateLimitedFamilyCooldowns = liveFamilyCooldowns.filter(
+    (cooldown) => !isModelUnsupportedCooldown(cooldown),
+  );
+  const cooldownTooltip = (cooldowns: FamilyCooldownDTO[]) => cooldowns
     .map((fc) => {
       const ms = Date.parse(fc.until) - now;
       const reason = fc.reason ? ` — ${fc.reason.slice(0, 80)}` : '';
       return `${fc.family} ${formatCountdown(ms)}${reason}`;
     })
     .join('\n');
+  const familyTooltip = cooldownTooltip(rateLimitedFamilyCooldowns);
+  const modelUnsupportedTooltip = cooldownTooltip(modelUnsupportedCooldowns);
 
   const pill = (label: string, bg: string, fg: string, tooltip?: string) => (
     <span
@@ -145,7 +158,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
 
   // 主 state 徽标
   let mainBadge: ReactElement;
-  let familyCooldownIsMain = false;
+  let mainFamilyCooldownType: 'rate_limited' | 'model_unsupported' | null = null;
   if (row.state === 'rate_limited' && hasCountdown) {
     mainBadge = pill(
       `${t('accounts.rate_limited_label', '限流中')} ${formatCountdown(remainingMs)}`,
@@ -172,20 +185,56 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
         )}
       </div>
     );
-  } else if (liveFamilyCooldowns.length > 0) {
-    familyCooldownIsMain = true;
+  } else if (rateLimitedFamilyCooldowns.length > 0) {
+    mainFamilyCooldownType = 'rate_limited';
     mainBadge = pill(
       t('accounts.family_limited_label', '家族限流中'),
       'var(--ag-warning-subtle)',
       'var(--ag-warning)',
       familyTooltip,
     );
+  } else if (modelUnsupportedCooldowns.length > 0) {
+    mainFamilyCooldownType = 'model_unsupported';
+    mainBadge = pill(
+      t('accounts.model_unsupported_label', '家族退避中'),
+      'var(--ag-warning-subtle)',
+      'var(--ag-warning)',
+      modelUnsupportedTooltip,
+    );
   } else {
     // active，或 rate_limited/degraded 已到期（lazy 恢复）
     mainBadge = <StatusPill label={t('status.active')} status="active" />;
   }
 
-  if (liveFamilyCooldowns.length === 0 || familyCooldownIsMain) {
+  const supplementalBadges: Array<{ key: string; badge: ReactElement }> = [];
+  if (rateLimitedFamilyCooldowns.length > 0 && mainFamilyCooldownType !== 'rate_limited') {
+    supplementalBadges.push({
+      key: 'rate_limited',
+      badge: pill(
+        t(
+          'accounts.family_cooldown_label',
+          '{{count}} 家族限流',
+          { count: rateLimitedFamilyCooldowns.length },
+        ),
+        'var(--ag-warning-subtle)',
+        'var(--ag-warning)',
+        familyTooltip,
+      ),
+    });
+  }
+  if (modelUnsupportedCooldowns.length > 0 && mainFamilyCooldownType !== 'model_unsupported') {
+    supplementalBadges.push({
+      key: 'model_unsupported',
+      badge: pill(
+        t('accounts.model_unsupported_label', '家族退避中'),
+        'var(--ag-warning-subtle)',
+        'var(--ag-warning)',
+        modelUnsupportedTooltip,
+      ),
+    });
+  }
+
+  if (supplementalBadges.length === 0) {
     if (!freezeCooldownHoverProps) return mainBadge;
     return (
       <span className="inline-flex max-w-full" {...freezeCooldownHoverProps}>
@@ -194,24 +243,15 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
     );
   }
 
-  const familyLabel = t(
-    'accounts.family_cooldown_label',
-    '{{count}} 家族限流',
-    { count: liveFamilyCooldowns.length },
-  );
-
   return (
     <div
       className="flex w-full max-w-full flex-wrap items-center justify-center gap-1 text-center"
       {...freezeCooldownHoverProps}
     >
       {mainBadge}
-      {pill(
-        familyLabel,
-        'var(--ag-warning-subtle)',
-        'var(--ag-warning)',
-        familyTooltip,
-      )}
+      {supplementalBadges.map((item) => (
+        <span key={item.key}>{item.badge}</span>
+      ))}
     </div>
   );
 }

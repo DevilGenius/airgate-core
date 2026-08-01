@@ -381,6 +381,7 @@
     "rate_limited_auto_recover": "auto recovery",
     "rate_limited_tooltip": "Upstream rate-limited. Auto-recovers at reset time; schedule toggle is unaffected.",
     "family_limited_label": "Family limited",
+    "model_unsupported_label": "Family backing off",
     "family_cooldown_label_one": "{{count}} family cooling",
     "family_cooldown_label_other": "{{count}} families cooling",
     "clear_family_cooldowns": "Clear rate-limit markers",

@@ -381,6 +381,7 @@
     "rate_limited_auto_recover": "自动恢复",
     "rate_limited_tooltip": "上游限流，到期自动恢复，不影响调度开关",
     "family_limited_label": "家族限流中",
+    "model_unsupported_label": "家族退避中",
     "degraded_label": "降级",
     "degraded_tooltip": "退避中，暂停调度，到期自动恢复",
     "family_cooldown_label": "{{count}} 家族限流",
