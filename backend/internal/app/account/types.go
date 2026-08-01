@@ -109,7 +109,7 @@ type CredentialStringFilter struct {
 	AccountType string
 	Key         string
 	Values      []string
-	MatchMode   string // exact / contains
+	MatchMode   string // exact / contains / empty（匹配字段缺失或为空）
 }
 
 // ListResult 账号列表结果。

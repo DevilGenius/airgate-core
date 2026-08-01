@@ -283,6 +283,23 @@ func TestAccountStoreCredentialStringFilterMatchesPluginDeclaredPlan(t *testing.
 	if len(all) != 1 || all[0].Name != "OpenAI OAuth Free" {
 		t.Fatalf("ListAll credential filter items = %+v, want only OpenAI OAuth Free", all)
 	}
+
+	items, total, err = store.List(ctx, account.ListFilter{
+		Page:     1,
+		PageSize: 20,
+		Credentials: []account.CredentialStringFilter{{
+			Platform:    "claude",
+			AccountType: "oauth",
+			Key:         "plan_type",
+			MatchMode:   "empty",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if total != 1 || len(items) != 1 || items[0].Name != "Claude OAuth Unknown" {
+		t.Fatalf("empty credential filter items = %+v total = %d, want only Claude OAuth Unknown", items, total)
+	}
 }
 
 func TestAccountStoreListSortsByPriority(t *testing.T) {

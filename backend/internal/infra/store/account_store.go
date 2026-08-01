@@ -111,8 +111,7 @@ func applyAccountListOrder(query *ent.AccountQuery, filter appaccount.ListFilter
 }
 
 func accountCredentialStringMatches(filter appaccount.CredentialStringFilter) predicate.Account {
-	values := nonEmptyStrings(filter.Values)
-	if filter.Key == "" || len(values) == 0 {
+	if filter.Key == "" {
 		return entaccount.IDEQ(-1)
 	}
 
@@ -122,6 +121,21 @@ func accountCredentialStringMatches(filter appaccount.CredentialStringFilter) pr
 	}
 	if filter.AccountType != "" {
 		predicates = append(predicates, entaccount.TypeEQ(filter.AccountType))
+	}
+	if filter.MatchMode == "empty" {
+		predicates = append(predicates, func(s *sql.Selector) {
+			s.Where(sql.Or(
+				sql.Not(sqljson.HasKey(entaccount.FieldCredentials, sqljson.Path(filter.Key))),
+				sqljson.ValueIsNull(entaccount.FieldCredentials, sqljson.Path(filter.Key)),
+				sqljson.ValueEQ(entaccount.FieldCredentials, "", sqljson.Path(filter.Key)),
+			))
+		})
+		return entaccount.And(predicates...)
+	}
+
+	values := nonEmptyStrings(filter.Values)
+	if len(values) == 0 {
+		return entaccount.IDEQ(-1)
 	}
 	predicates = append(predicates, func(s *sql.Selector) {
 		valuePredicates := make([]*sql.Predicate, 0, len(values))

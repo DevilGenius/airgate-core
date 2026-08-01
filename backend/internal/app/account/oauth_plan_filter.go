@@ -69,13 +69,15 @@ func pluginOAuthPlanFilters(meta plugin.PluginMeta) []oauthPlanFilter {
 		if credentialKey == "" {
 			credentialKey = defaultOAuthPlanCredential
 		}
-		matches := normalizedPlanMatches(item.Matches, key)
-		if len(matches) == 0 {
-			continue
-		}
 		matchMode := strings.ToLower(strings.TrimSpace(item.MatchMode))
-		if matchMode != "contains" {
+		if matchMode != "contains" && matchMode != "empty" {
 			matchMode = "exact"
+		}
+		matches := normalizedPlanMatches(item.Matches, key)
+		if matchMode == "empty" {
+			matches = nil
+		} else if len(matches) == 0 {
+			continue
 		}
 		label := strings.TrimSpace(item.Label)
 		if label == "" {
