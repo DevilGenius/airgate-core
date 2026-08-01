@@ -124,6 +124,16 @@ type CompatImportResponse = {
   issues?: CompatImportIssue[];
 };
 
+type RefreshTokenImportResponse = {
+  results: Array<{
+    account_type?: string;
+    account_name?: string;
+    credentials?: Record<string, string>;
+    status: string;
+    error?: string;
+  }>;
+};
+
 const ACCOUNT_WORKING_STATE_FILTER = 'working';
 const ACCOUNT_FAMILY_LIMITED_STATE_FILTER = 'family_limited';
 const ACCOUNT_WORKING_REFETCH_THROTTLE_MS = 750;
@@ -842,10 +852,41 @@ export default function AccountsPageContent() {
         return false;
       }
 
+      let compatFormat: CompatImportFormat = format;
+      let compatInputs = inputs;
+      if (format === 'refresh_token') {
+        const refreshTokens = inputs.map((input) => input.content.trim()).filter(Boolean);
+        const refreshResult = await pluginsApi.rpc<RefreshTokenImportResponse>(
+          openAIPluginID,
+          'oauth/batch-import-refresh',
+          { refresh_tokens: refreshTokens },
+        );
+        compatInputs = refreshResult.results.flatMap((item, index) => {
+          if (item.status !== 'ok' || !item.credentials) return [];
+          return [{
+            name: `refresh-token-${String(index + 1).padStart(3, '0')}.json`,
+            content: JSON.stringify({
+              name: item.account_name || item.credentials.email || `openai-rt-${String(index + 1).padStart(3, '0')}`,
+              type: item.account_type || 'oauth',
+              credentials: item.credentials,
+            }),
+          }];
+        });
+        const failedCount = refreshResult.results.length - compatInputs.length;
+        if (!compatInputs.length) {
+          toast('error', t('accounts.import_invalid'));
+          return false;
+        }
+        if (failedCount > 0) {
+          toast('warning', t('accounts.import_rt_issues', { count: failedCount }));
+        }
+        compatFormat = 'account_json';
+      }
+
       const result = await pluginsApi.rpc<CompatImportResponse>(
         openAIPluginID,
         'accounts/import/compat',
-        { format, files: inputs },
+        { format: compatFormat, files: compatInputs },
       );
       if (!result.accounts?.length) {
         toast('error', t('accounts.import_invalid'));

@@ -18,7 +18,8 @@ export type CompatImportFormat =
   | 'codex'
   | 'cockpit'
   | 'agent_identity'
-  | 'account_json';
+  | 'account_json'
+  | 'refresh_token';
 
 export type CompatImportInput = {
   name: string;
@@ -57,7 +58,7 @@ export function CompatImportModal({
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [selection, setSelection] = useState<CompatImportSelection>('sub2api');
   const [files, setFiles] = useState<File[]>([]);
-  const [jsonLinesText, setJsonLinesText] = useState('');
+  const [lineInputText, setLineInputText] = useState('');
   const [readError, setReadError] = useState('');
   const [isPreparing, setIsPreparing] = useState(false);
   const busy = loading || isPreparing;
@@ -83,27 +84,30 @@ export function CompatImportModal({
     { key: 'agent_identity', label: 'Agent Identity' },
     { key: 'account_json', label: t('accounts.compat_import_format_json_file') },
     { key: 'json_input', label: t('accounts.compat_import_format_json_input') },
+    { key: 'refresh_token', label: t('accounts.compat_import_format_rt_input') },
   ], [t]);
   const selectedFormatLabel = formatOptions.find((option) => option.key === selection)?.label;
-  const jsonLines = useMemo(
-    () => jsonLinesText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
-    [jsonLinesText],
+  const inputLines = useMemo(
+    () => lineInputText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+    [lineInputText],
   );
   const isJSONInput = selection === 'json_input';
-  const activeFiles = selection && !isJSONInput ? files : [];
-  const activeJSONLines = isJSONInput ? jsonLines : [];
-  const totalInputs = activeFiles.length + activeJSONLines.length;
+  const isRTInput = selection === 'refresh_token';
+  const isLineInput = isJSONInput || isRTInput;
+  const activeFiles = selection && !isLineInput ? files : [];
+  const activeInputLines = isLineInput ? inputLines : [];
+  const totalInputs = activeFiles.length + activeInputLines.length;
   const totalBytes = useMemo(
     () => {
-      if (selection && !isJSONInput) {
+      if (selection && !isLineInput) {
         return files.reduce((total, file) => total + file.size, 0);
       }
-      if (isJSONInput) {
-        return jsonLines.reduce((total, line) => total + new TextEncoder().encode(line).byteLength, 0);
+      if (isLineInput) {
+        return inputLines.reduce((total, line) => total + new TextEncoder().encode(line).byteLength, 0);
       }
       return 0;
     },
-    [files, isJSONInput, jsonLines, selection],
+    [files, inputLines, isLineInput, selection],
   );
   const tooManyInputs = totalInputs > MAX_COMPAT_IMPORT_INPUTS;
   const tooLarge = totalBytes > MAX_COMPAT_IMPORT_BYTES;
@@ -126,8 +130,10 @@ export function CompatImportModal({
         name: file.webkitRelativePath || file.name,
         content: await file.text(),
       })));
-      const pastedInputs = activeJSONLines.map((content, index) => ({
-        name: `pasted-account-${String(index + 1).padStart(3, '0')}.json`,
+      const pastedInputs = activeInputLines.map((content, index) => ({
+        name: isRTInput
+          ? `refresh-token-${String(index + 1).padStart(3, '0')}.txt`
+          : `pasted-account-${String(index + 1).padStart(3, '0')}.json`,
         content,
       }));
       const format: CompatImportFormat = selection === 'json_input' ? 'account_json' : selection;
@@ -188,7 +194,7 @@ export function CompatImportModal({
           </p>
         </div>
 
-        {selection && !isJSONInput ? (
+        {selection && !isLineInput ? (
           <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
             <div>
               <h3 className="text-sm font-semibold text-text">{t('accounts.compat_import_files')}</h3>
@@ -225,23 +231,31 @@ export function CompatImportModal({
           </section>
         ) : null}
 
-        {isJSONInput ? (
+        {isLineInput ? (
           <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
             <HeroTextField fullWidth>
-              <Label>{t('accounts.compat_import_json_lines')}</Label>
+              <Label>
+                {isRTInput
+                  ? t('accounts.compat_import_rt_lines')
+                  : t('accounts.compat_import_json_lines')}
+              </Label>
               <TextArea
-                value={jsonLinesText}
+                value={lineInputText}
                 rows={8}
-                placeholder={t('accounts.compat_import_json_placeholder')}
+                placeholder={isRTInput
+                  ? t('accounts.compat_import_rt_placeholder')
+                  : t('accounts.compat_import_json_placeholder')}
                 disabled={busy}
                 onChange={(event) => {
                   setReadError('');
-                  setJsonLinesText(event.target.value);
+                  setLineInputText(event.target.value);
                 }}
               />
             </HeroTextField>
             <p className="text-xs leading-5 text-text-tertiary">
-              {t('accounts.compat_import_json_hint')}
+              {isRTInput
+                ? t('accounts.compat_import_rt_hint')
+                : t('accounts.compat_import_json_hint')}
             </p>
           </section>
         ) : null}
@@ -249,8 +263,10 @@ export function CompatImportModal({
         {selection ? (
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-secondary">
             <span>
-              {isJSONInput
-                ? t('accounts.compat_import_json_count', { count: jsonLines.length })
+              {isRTInput
+                ? t('accounts.compat_import_rt_count', { count: inputLines.length })
+                : isJSONInput
+                  ? t('accounts.compat_import_json_count', { count: inputLines.length })
                 : t('accounts.compat_import_file_count', { count: files.length })}
             </span>
             <span>{t('accounts.compat_import_input_limit', {
