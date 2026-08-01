@@ -16,7 +16,11 @@ export interface AccountTestStreamHandlers {
 }
 
 export function filterConnectivityTestModels(models: ModelInfo[] | null | undefined): ModelInfo[] {
-  return (models ?? []).filter((model) => !model.id.toLowerCase().startsWith('gpt-image-'));
+  const filtered = (models ?? []).filter((model) => !model.id.toLowerCase().startsWith('gpt-image-'));
+  const lunaIndex = filtered.findIndex((model) => model.id.toLowerCase() === 'gpt-5.6-luna');
+  if (lunaIndex <= 0) return filtered;
+  const [luna] = filtered.splice(lunaIndex, 1);
+  return luna ? [luna, ...filtered] : filtered;
 }
 
 export async function runAccountConnectivityTest({
