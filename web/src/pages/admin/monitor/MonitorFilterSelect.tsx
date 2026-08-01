@@ -50,6 +50,7 @@ export function MonitorMultiFilterSelect({
   allLabel,
   ariaLabel,
   className,
+  collapsePlaceholder = false,
   groups,
   label,
   onClear,
@@ -58,7 +59,7 @@ export function MonitorMultiFilterSelect({
   allLabel: string;
   ariaLabel: string;
   className?: string;
-  groups: MonitorMultiFilterGroup[];
+  collapsePlaceholder?: boolean;  groups: MonitorMultiFilterGroup[];
   label: string;
   onClear: () => void;
   onToggle: (groupID: string, value: string) => void;
@@ -85,13 +86,16 @@ export function MonitorMultiFilterSelect({
     return selectedOptions.map((option) => option.label);
   });
   const selectionSummary = selectedLabels.length > 0 ? selectedLabels.join(', ') : allLabel;
+  const triggerLabel = collapsePlaceholder
+    ? selectionSummary
+    : `${label}: ${selectionSummary}`;
 
   return (
     <div className={className}>
       <ToolbarMenu
         ariaLabel={ariaLabel}
         className="ag-simple-select-trigger select__trigger"
-        label={<span title={selectionSummary}>{label}: {selectionSummary}</span>}
+        label={<span title={selectionSummary}>{triggerLabel}</span>}
         rootClassName="ag-simple-select ag-simple-select--full ag-monitor-multi-filter"
       >
         {(close) => (

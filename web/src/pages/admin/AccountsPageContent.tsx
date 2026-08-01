@@ -35,6 +35,7 @@ import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { SimpleMultiSelect } from '../../shared/components/SimpleMultiSelect';
 import type { SimpleSelectOption } from '../../shared/components/SimpleSelect';
+import { MonitorMultiFilterSelect as MultiFilterSelect } from './monitor/MonitorFilterSelect';
 import { TablePage } from '../../shared/components/TablePage';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
@@ -1244,30 +1245,20 @@ export default function AccountsPageContent() {
   const proxyOptions = useMemo(() => [
     ...(allProxiesData?.list ?? []).map((p) => ({ id: String(p.id), label: p.name })),
   ], [allProxiesData?.list]);
-  const platformLabelByKey = useMemo(
-    () => new Map(PLATFORM_ITEMS.map((item) => [item.key, item.textValue ?? item.key])),
-    [PLATFORM_ITEMS],
-  );
   const typeLabelByKey = useMemo(() => new Map([
     ...typeOptions.map((option) => [option.id, option.label] as const),
     ...oauthPlanOptions.map((option) => [option.id, option.label] as const),
   ]), [oauthPlanOptions, typeOptions]);
-  const groupLabelByKey = useMemo(
-    () => new Map(groupOptions.map((option) => [option.id, option.label])),
-    [groupOptions],
-  );
   const proxyLabelByKey = useMemo(
     () => new Map(proxyOptions.map((option) => [option.id, option.label])),
     [proxyOptions],
   );
-  const selectedPlatformLabel = joinAccountFilterLabels(selectedPlatformFilters, platformLabelByKey, t('accounts.all_platforms'));
   const selectedStateLabel = selectedStateFilters.length > 0
     ? selectedStateFilters
       .map((state) => STATE_OPTIONS.find((item) => item.id === state)?.label ?? state)
       .join(', ')
     : t('users.all_status');
   const selectedTypeLabel = joinAccountFilterLabels(selectedTypeFilters, typeLabelByKey, t('accounts.all_types', '全部类型'));
-  const selectedGroupLabel = joinAccountFilterLabels(selectedGroupFilters, groupLabelByKey, t('accounts.all_groups'), (key) => `#${key}`);
   const selectedProxyLabel = joinAccountFilterLabels(selectedProxyFilters, proxyLabelByKey, t('accounts.all_proxies'), (key) => `#${key}`);
   const updateStateFilters = useCallback((nextStates: string[]) => {
     const selected = new Set(nextStates);
@@ -1290,6 +1281,26 @@ export default function AccountsPageContent() {
     setProxyFilter(nextKeys.join(','));
     setPage(1);
   }, [setPage, setProxyFilter]);
+  const platformGroupFilterOptions = useMemo(() => ({
+    platform: PLATFORM_ITEMS.map((item) => ({ id: item.key, label: item.textValue ?? item.key })),
+    group: groupOptions,
+  }), [PLATFORM_ITEMS, groupOptions]);
+  const clearPlatformGroupFilters = useCallback(() => {
+    setPlatformFilter('');
+    setGroupFilter('');
+    setPage(1);
+  }, [setGroupFilter, setPage, setPlatformFilter]);
+  const togglePlatformGroupFilter = useCallback((groupID: string, value: string) => {
+    const current = groupID === 'platform' ? selectedPlatformFilters : selectedGroupFilters;
+    const next = current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value];
+    if (groupID === 'platform') {
+      updatePlatformFilters(next);
+    } else {
+      updateGroupFilters(next);
+    }
+  }, [selectedGroupFilters, selectedPlatformFilters, updateGroupFilters, updatePlatformFilters]);
   // 多选类型筛选的失效选项清理：未解析的 oauth_plan 降级为 oauth，其余直接移除；
   // 全部取消选择时自然回退为不筛选（全部类型）。
   useEffect(() => {
@@ -1340,17 +1351,6 @@ export default function AccountsPageContent() {
   }, [oauthPlanOptions, platformsLoading, t, typeOptions]);
   const toolbarFilters = useMemo(() => [
     {
-      key: 'platform',
-      perfTarget: 'platform' as const,
-      label: t('groups.platform'),
-      allLabel: t('accounts.all_platforms'),
-      selectedLabel: selectedPlatformLabel,
-      items: PLATFORM_ITEMS,
-      selectedKeys: selectedPlatformFilters,
-      onSelectionChange: updatePlatformFilters,
-      widthClass: 'w-full sm:w-48',
-    },
-    {
       key: 'state',
       perfTarget: 'state' as const,
       label: t('common.status'),
@@ -1373,17 +1373,6 @@ export default function AccountsPageContent() {
       widthClass: 'w-full sm:w-48',
     },
     {
-      key: 'group',
-      perfTarget: 'group' as const,
-      label: t('accounts.group'),
-      allLabel: t('accounts.all_groups'),
-      selectedLabel: selectedGroupLabel,
-      items: groupOptions.map((item) => ({ key: item.id, label: item.label, textValue: item.label })),
-      selectedKeys: selectedGroupFilters,
-      onSelectionChange: updateGroupFilters,
-      widthClass: 'w-full sm:w-48',
-    },
-    {
       key: 'proxy',
       perfTarget: 'proxy' as const,
       label: t('accounts.proxy'),
@@ -1395,14 +1384,8 @@ export default function AccountsPageContent() {
       widthClass: 'w-full sm:w-48',
     },
   ], [
-    PLATFORM_ITEMS,
     STATE_OPTIONS,
-    groupOptions,
     proxyOptions,
-    selectedGroupFilters,
-    selectedGroupLabel,
-    selectedPlatformFilters,
-    selectedPlatformLabel,
     selectedProxyFilters,
     selectedProxyLabel,
     selectedStateFilters,
@@ -1411,8 +1394,6 @@ export default function AccountsPageContent() {
     selectedTypeLabel,
     t,
     typeFilterItems,
-    updateGroupFilters,
-    updatePlatformFilters,
     updateProxyFilters,
     updateStateFilters,
     updateTypeFilters,
@@ -1439,6 +1420,30 @@ export default function AccountsPageContent() {
         </HeroTextField>
       </div>
 
+      <MultiFilterSelect
+        allLabel={t('accounts.all_groups')}
+        ariaLabel={`${t('groups.platform')} / ${t('accounts.group')}`}
+        className="w-full sm:w-56"
+        collapsePlaceholder
+        label={`${t('groups.platform')} / ${t('accounts.group')}`}
+        groups={[
+          {
+            id: 'platform',
+            label: t('groups.platform'),
+            options: platformGroupFilterOptions.platform,
+            selectedValues: selectedPlatformFilters,
+          },
+          {
+            id: 'group',
+            label: t('accounts.group'),
+            options: platformGroupFilterOptions.group,
+            selectedValues: selectedGroupFilters,
+          },
+        ]}
+        onClear={clearPlatformGroupFilters}
+        onToggle={togglePlatformGroupFilter}
+      />
+
       {toolbarFilters.map((filter) => (
         <div
           key={filter.key}
@@ -1458,11 +1463,16 @@ export default function AccountsPageContent() {
       ))}
     </div>
   ), [
+    clearPlatformGroupFilters,
     handleToolbarMenuOpenChange,
     keyword,
+    platformGroupFilterOptions,
+    selectedGroupFilters,
+    selectedPlatformFilters,
     setKeyword,
     setPage,
     t,
+    togglePlatformGroupFilter,
     toolbarFilters,
   ]);
 
