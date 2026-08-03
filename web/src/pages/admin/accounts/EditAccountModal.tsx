@@ -6,6 +6,7 @@ import {
   Form,
   Input,
   Label,
+  TextArea,
   TextField as HeroTextField,
   useOverlayState,
 } from '@heroui/react';
@@ -38,7 +39,7 @@ import {
   isValidRateMultiplierValue,
   parseRateMultiplier,
 } from '../../../shared/utils/rateMultiplier';
-import type { AccountResp, UpdateAccountReq } from '../../../shared/types';
+import type { AccountResp, ModelPolicy, UpdateAccountReq } from '../../../shared/types';
 import {
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
@@ -96,6 +97,12 @@ export function EditAccountModal({
   const [dispatchEnabled, setDispatchEnabled] = useState(initialDispatchEnabled);
   const [priorityInput, setPriorityInput] = useState(String(account.priority ?? DEFAULT_ACCOUNT_PRIORITY));
   const [rateMultiplierInput, setRateMultiplierInput] = useState(String(account.rate_multiplier ?? 1));
+  const [modelAllowlistInput, setModelAllowlistInput] = useState(() =>
+    modelPatternsToInput(account.model_policy?.allow),
+  );
+  const [modelDenylistInput, setModelDenylistInput] = useState(() =>
+    modelPatternsToInput(account.model_policy?.deny),
+  );
 
   const { data: schema } = useQuery({
     queryKey: queryKeys.credentialsSchema(account.platform),
@@ -186,6 +193,7 @@ export function EditAccountModal({
       rate_multiplier: rateMultiplier,
       type: accountType || undefined,
       credentials: identity.credentials,
+      model_policy: buildModelPolicy(modelAllowlistInput, modelDenylistInput),
       extra: extraWithGroupPriorities(form.extra, groupIds, groupPriorityInputs),
       group_ids: groupIds,
     });
@@ -251,7 +259,7 @@ export function EditAccountModal({
 
   return (
     <CommonModal
-      className="ag-account-page-modal ag-create-account-modal"
+      className="ag-account-page-modal ag-create-account-modal ag-edit-account-modal"
       footer={(
         <div className="flex w-full justify-end gap-2">
           <Button variant="secondary" onPress={onClose}>
@@ -455,6 +463,43 @@ export function EditAccountModal({
                       </div>
                     </div>
                   )}
+
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm font-medium text-text">
+                        {t('accounts.model_policy')}
+                      </p>
+                      <p className="text-[11px] text-text-tertiary">
+                        {t('accounts.model_policy_hint')}
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <HeroTextField fullWidth>
+                        <Label className="text-xs font-medium text-text-secondary">
+                          {t('accounts.model_allowlist')}
+                        </Label>
+                        <TextArea
+                          aria-label={t('accounts.model_allowlist')}
+                          rows={3}
+                          value={modelAllowlistInput}
+                          onChange={(event) => setModelAllowlistInput(event.target.value)}
+                          placeholder={t('accounts.model_policy_placeholder')}
+                        />
+                      </HeroTextField>
+                      <HeroTextField fullWidth>
+                        <Label className="text-xs font-medium text-text-secondary">
+                          {t('accounts.model_denylist')}
+                        </Label>
+                        <TextArea
+                          aria-label={t('accounts.model_denylist')}
+                          rows={3}
+                          value={modelDenylistInput}
+                          onChange={(event) => setModelDenylistInput(event.target.value)}
+                          placeholder={t('accounts.model_policy_placeholder')}
+                        />
+                      </HeroTextField>
+                    </div>
+                  </div>
                 </section>
               </Form>
     </CommonModal>
@@ -478,4 +523,25 @@ function omitGroupPriorityInput(values: Record<number, string>, groupID: number)
   const next = { ...values };
   delete next[groupID];
   return next;
+}
+
+function modelPatternsToInput(patterns?: string[]) {
+  return (patterns ?? []).join('\n');
+}
+
+function inputToModelPatterns(value: string): string[] | undefined {
+  const patterns = value
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return patterns.length > 0 ? patterns : undefined;
+}
+
+function buildModelPolicy(allowInput: string, denyInput: string): ModelPolicy {
+  const allow = inputToModelPatterns(allowInput);
+  const deny = inputToModelPatterns(denyInput);
+  return {
+    ...(allow ? { allow } : {}),
+    ...(deny ? { deny } : {}),
+  };
 }

@@ -583,7 +583,7 @@ export function GroupFormModal({
             </div>
 
             <div>
-              <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
+              <p className="mb-1.5 text-sm font-medium text-text">
                 {t('groups.openai_account_type_model_policies')}
               </p>
               <p className="mb-2 text-[11px] text-text-tertiary">
@@ -593,11 +593,12 @@ export function GroupFormModal({
                 {openaiAccountTypePolicyOptions.map((option) => {
                   const value = accountTypePolicyInputs[option.key] ?? { allow: '', deny: '' };
                   return (
-                    <div key={option.key} className="rounded-md border border-border-subtle p-3">
-                      <p className="mb-2 text-sm font-medium text-text">{option.label}</p>
+                    <div key={option.key}>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <HeroTextField fullWidth>
-                          <Label>{t('groups.model_allowlist')}</Label>
+                          <Label className="text-xs font-medium text-text-secondary">
+                            {t('groups.model_allowlist')}({option.label})
+                          </Label>
                           <TextArea
                             className="ag-model-policy-textarea"
                             rows={3}
@@ -615,7 +616,9 @@ export function GroupFormModal({
                           />
                         </HeroTextField>
                         <HeroTextField fullWidth>
-                          <Label>{t('groups.model_denylist')}</Label>
+                          <Label className="text-xs font-medium text-text-secondary">
+                            {t('groups.model_denylist')}({option.label})
+                          </Label>
                           <TextArea
                             className="ag-model-policy-textarea"
                             rows={3}

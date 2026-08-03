@@ -18,7 +18,12 @@
 .ag-elevation-modal.ag-create-account-modal,
 .ag-elevation-modal.modal__dialog--lg.ag-create-account-modal {
   --ag-modal-width: var(--ag-modal-lg-width);
-  max-height: min(88dvh, 58rem) !important;
+  max-height: min(88dvh, 58rem);
+}
+
+.ag-elevation-modal.ag-create-account-modal.ag-edit-account-modal,
+.ag-elevation-modal.modal__dialog--lg.ag-create-account-modal.ag-edit-account-modal {
+  max-height: min(92dvh, 64rem);
 }
 
 .ag-create-account-modal .modal__body {
