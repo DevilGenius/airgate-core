@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -391,7 +392,7 @@ func TestUpdateAdminDoesNotCheckGroupAccess(t *testing.T) {
 		},
 	}, testAPIKeySecret)
 
-	item, err := service.UpdateAdmin(t.Context(), 13, UpdateInput{GroupID: &groupID})
+	item, err := service.UpdateAdmin(t.Context(), 13, AdminUpdateInput{UpdateInput: UpdateInput{GroupID: &groupID}})
 	if err != nil {
 		t.Fatalf("管理员更新失败: %v", err)
 	}
@@ -405,13 +406,69 @@ func TestUpdateAdminDoesNotCheckGroupAccess(t *testing.T) {
 
 func TestUpdateAdminBuildMutationErrors(t *testing.T) {
 	badExpires := "2026-01-01"
-	if _, err := NewService(apiKeyStubRepository{}, testAPIKeySecret).UpdateAdmin(t.Context(), 1, UpdateInput{ExpiresAt: &badExpires}); !errors.Is(err, ErrInvalidExpiresAt) {
+	if _, err := NewService(apiKeyStubRepository{}, testAPIKeySecret).UpdateAdmin(t.Context(), 1, AdminUpdateInput{UpdateInput: UpdateInput{ExpiresAt: &badExpires}}); !errors.Is(err, ErrInvalidExpiresAt) {
 		t.Fatalf("UpdateAdmin invalid expires error = %v", err)
 	}
 
 	badSellRate := -1.0
-	if _, err := NewService(apiKeyStubRepository{}, testAPIKeySecret).UpdateAdmin(t.Context(), 1, UpdateInput{SellRate: &badSellRate}); !errors.Is(err, ErrInvalidSellRate) {
+	if _, err := NewService(apiKeyStubRepository{}, testAPIKeySecret).UpdateAdmin(t.Context(), 1, AdminUpdateInput{UpdateInput: UpdateInput{SellRate: &badSellRate}}); !errors.Is(err, ErrInvalidSellRate) {
 		t.Fatalf("UpdateAdmin invalid sell rate error = %v", err)
+	}
+}
+
+func TestUpdateAdminSetsCustomKey(t *testing.T) {
+	rawKey := "sk-" + strings.Repeat("a", CustomAPIKeyMinPayloadLength)
+	var captured Mutation
+	var checkedHash string
+	var excludedID int
+	service := NewService(apiKeyStubRepository{
+		apiKeyHashExists: func(_ context.Context, hash string, excludeID int) (bool, error) {
+			checkedHash = hash
+			excludedID = excludeID
+			return false, nil
+		},
+		updateAdmin: func(_ context.Context, id int, mutation Mutation) (Key, error) {
+			captured = mutation
+			return Key{ID: id, UserID: 42, KeyHash: derefString(mutation.KeyHash)}, nil
+		},
+	}, testAPIKeySecret)
+
+	if _, err := service.UpdateAdmin(t.Context(), 13, AdminUpdateInput{CustomKey: &rawKey}); err != nil {
+		t.Fatalf("管理员自定义密钥更新失败: %v", err)
+	}
+	wantHash := corauth.HashAPIKey(rawKey)
+	if checkedHash != wantHash || excludedID != 13 {
+		t.Fatalf("重复检查参数 = %q/%d，期望 %q/13", checkedHash, excludedID, wantHash)
+	}
+	if derefString(captured.KeyHash) != wantHash || derefString(captured.KeyHint) != buildKeyHint(rawKey) {
+		t.Fatalf("自定义密钥 mutation 异常: %+v", captured)
+	}
+	plain, err := corauth.DecryptAPIKey(derefString(captured.KeyEncrypted), testAPIKeySecret)
+	if err != nil || plain != rawKey {
+		t.Fatalf("自定义密钥密文解密 = %q, %v", plain, err)
+	}
+}
+
+func TestUpdateAdminRejectsInvalidOrDuplicateCustomKey(t *testing.T) {
+	service := NewService(apiKeyStubRepository{}, testAPIKeySecret)
+	invalidKeys := []string{
+		"sk-" + strings.Repeat("a", CustomAPIKeyMinPayloadLength-1),
+		"xx-" + strings.Repeat("a", CustomAPIKeyMinPayloadLength),
+		"sk-" + strings.Repeat("a", CustomAPIKeyMinPayloadLength-1) + ".",
+		"sk-" + strings.Repeat("a", CustomAPIKeyMaxLength),
+	}
+	for _, rawKey := range invalidKeys {
+		if _, err := service.UpdateAdmin(t.Context(), 1, AdminUpdateInput{CustomKey: &rawKey}); !errors.Is(err, ErrInvalidCustomKey) {
+			t.Fatalf("自定义密钥 %q error = %v，期望 ErrInvalidCustomKey", rawKey, err)
+		}
+	}
+
+	duplicate := "sk-" + strings.Repeat("b", CustomAPIKeyMinPayloadLength)
+	duplicateService := NewService(apiKeyStubRepository{
+		apiKeyHashExists: func(context.Context, string, int) (bool, error) { return true, nil },
+	}, testAPIKeySecret)
+	if _, err := duplicateService.UpdateAdmin(t.Context(), 1, AdminUpdateInput{CustomKey: &duplicate}); !errors.Is(err, ErrDuplicateAPIKey) {
+		t.Fatalf("重复自定义密钥 error = %v，期望 ErrDuplicateAPIKey", err)
 	}
 }
 
@@ -524,7 +581,7 @@ func TestUpdateAndResetErrorBranches(t *testing.T) {
 	}
 	if _, err := NewService(apiKeyStubRepository{
 		updateAdmin: func(context.Context, int, Mutation) (Key, error) { return Key{}, repoErr },
-	}, testAPIKeySecret).UpdateAdmin(t.Context(), 1, UpdateInput{}); !errors.Is(err, repoErr) {
+	}, testAPIKeySecret).UpdateAdmin(t.Context(), 1, AdminUpdateInput{}); !errors.Is(err, repoErr) {
 		t.Fatalf("UpdateAdmin persist error = %v", err)
 	}
 	if _, err := NewService(apiKeyStubRepository{
@@ -593,16 +650,17 @@ func TestNormalizeOptionalHelpers(t *testing.T) {
 }
 
 type apiKeyStubRepository struct {
-	listByUser      func(context.Context, int, ListFilter) ([]Key, int64, error)
-	listAdmin       func(context.Context, ListFilter) ([]Key, int64, error)
-	keyUsage        func(context.Context, []int, time.Time) (map[int]UsageCosts, error)
-	groupAccess     func(context.Context, int, int) (GroupAccess, error)
-	create          func(context.Context, Mutation) (Key, error)
-	updateOwned     func(context.Context, int, int, Mutation) (Key, error)
-	updateAdmin     func(context.Context, int, Mutation) (Key, error)
-	resetUsageAdmin func(context.Context, int) (Key, error)
-	deleteOwned     func(context.Context, int, int) (Key, error)
-	findOwned       func(context.Context, int, int) (Key, error)
+	listByUser       func(context.Context, int, ListFilter) ([]Key, int64, error)
+	listAdmin        func(context.Context, ListFilter) ([]Key, int64, error)
+	keyUsage         func(context.Context, []int, time.Time) (map[int]UsageCosts, error)
+	groupAccess      func(context.Context, int, int) (GroupAccess, error)
+	apiKeyHashExists func(context.Context, string, int) (bool, error)
+	create           func(context.Context, Mutation) (Key, error)
+	updateOwned      func(context.Context, int, int, Mutation) (Key, error)
+	updateAdmin      func(context.Context, int, Mutation) (Key, error)
+	resetUsageAdmin  func(context.Context, int) (Key, error)
+	deleteOwned      func(context.Context, int, int) (Key, error)
+	findOwned        func(context.Context, int, int) (Key, error)
 }
 
 func (s apiKeyStubRepository) ListByUser(ctx context.Context, userID int, filter ListFilter) ([]Key, int64, error) {
@@ -631,6 +689,13 @@ func (s apiKeyStubRepository) GetGroupAccess(ctx context.Context, userID, groupI
 		return GroupAccess{Exists: true, Allowed: true}, nil
 	}
 	return s.groupAccess(ctx, userID, groupID)
+}
+
+func (s apiKeyStubRepository) APIKeyHashExists(ctx context.Context, hash string, excludeID int) (bool, error) {
+	if s.apiKeyHashExists == nil {
+		return false, nil
+	}
+	return s.apiKeyHashExists(ctx, hash, excludeID)
 }
 
 func (s apiKeyStubRepository) Create(ctx context.Context, mutation Mutation) (Key, error) {

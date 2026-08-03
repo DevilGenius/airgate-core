@@ -35,9 +35,12 @@ func (h *APIKeyHandler) handleError(logMessage, publicMessage string, err error)
 		return 403, err.Error()
 	case errors.Is(err, appapikey.ErrInvalidExpiresAt),
 		errors.Is(err, appapikey.ErrInvalidSellRate),
+		errors.Is(err, appapikey.ErrInvalidCustomKey),
 		errors.Is(err, appapikey.ErrLegacyKeyNotReveal),
 		errors.Is(err, appapikey.ErrKeyDecryptFailed):
 		return 400, err.Error()
+	case errors.Is(err, appapikey.ErrDuplicateAPIKey):
+		return 409, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage

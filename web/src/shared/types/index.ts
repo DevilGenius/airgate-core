@@ -456,6 +456,11 @@ export interface UpdateAPIKeyReq {
   status?: 'active' | 'disabled';
 }
 
+/** 管理员更新 API Key；key 仅管理员接口接受，用户接口不会修改密钥原文。 */
+export interface AdminUpdateAPIKeyReq extends UpdateAPIKeyReq {
+  key?: string;
+}
+
 // ==================== Subscription ====================
 
 export interface SubscriptionResp {

@@ -141,6 +141,15 @@ func (s *APIKeyStore) GetGroupAccess(ctx context.Context, userID, groupID int) (
 	return appapikey.GroupAccess{Exists: true, Allowed: allowed}, nil
 }
 
+// APIKeyHashExists 检查自定义密钥 hash 是否已被其他记录使用。
+func (s *APIKeyStore) APIKeyHashExists(ctx context.Context, hash string, excludeID int) (bool, error) {
+	query := s.db.APIKey.Query().Where(entapikey.KeyHashEQ(hash))
+	if excludeID > 0 {
+		query.Where(entapikey.IDNEQ(excludeID))
+	}
+	return query.Exist(ctx)
+}
+
 // Create 创建 API Key。
 func (s *APIKeyStore) Create(ctx context.Context, mutation appapikey.Mutation) (appapikey.Key, error) {
 	builder := s.db.APIKey.Create()
@@ -382,6 +391,15 @@ func applyAPIKeyMutationCreate(builder *ent.APIKeyCreate, mutation appapikey.Mut
 }
 
 func applyAPIKeyMutationUpdate(builder *ent.APIKeyUpdateOne, mutation appapikey.Mutation) {
+	if mutation.KeyHint != nil {
+		builder.SetKeyHint(*mutation.KeyHint)
+	}
+	if mutation.KeyHash != nil {
+		builder.SetKeyHash(*mutation.KeyHash)
+	}
+	if mutation.KeyEncrypted != nil {
+		builder.SetKeyEncrypted(*mutation.KeyEncrypted)
+	}
 	if mutation.Name != nil {
 		builder.SetName(*mutation.Name)
 	}

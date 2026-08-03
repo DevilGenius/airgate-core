@@ -193,21 +193,24 @@ func (h *APIKeyHandler) AdminUpdateKey(c *gin.Context) {
 		return
 	}
 
-	item, err := h.service.UpdateAdmin(c.Request.Context(), id, appapikey.UpdateInput{
-		Name:                  req.Name,
-		GroupID:               req.GroupID,
-		IPWhitelist:           req.IPWhitelist,
-		HasIPWhitelist:        req.IPWhitelist != nil,
-		IPBlacklist:           req.IPBlacklist,
-		HasIPBlacklist:        req.IPBlacklist != nil,
-		QuotaUSD:              req.QuotaUSD,
-		SellRate:              req.SellRate,
-		MaxConcurrency:        req.MaxConcurrency,
-		BalanceAlertEnabled:   req.BalanceAlertEnabled,
-		BalanceAlertEmail:     req.BalanceAlertEmail,
-		BalanceAlertThreshold: req.BalanceAlertThreshold,
-		ExpiresAt:             req.ExpiresAt,
-		Status:                req.Status,
+	item, err := h.service.UpdateAdmin(c.Request.Context(), id, appapikey.AdminUpdateInput{
+		CustomKey: req.Key,
+		UpdateInput: appapikey.UpdateInput{
+			Name:                  req.Name,
+			GroupID:               req.GroupID,
+			IPWhitelist:           req.IPWhitelist,
+			HasIPWhitelist:        req.IPWhitelist != nil,
+			IPBlacklist:           req.IPBlacklist,
+			HasIPBlacklist:        req.IPBlacklist != nil,
+			QuotaUSD:              req.QuotaUSD,
+			SellRate:              req.SellRate,
+			MaxConcurrency:        req.MaxConcurrency,
+			BalanceAlertEnabled:   req.BalanceAlertEnabled,
+			BalanceAlertEmail:     req.BalanceAlertEmail,
+			BalanceAlertThreshold: req.BalanceAlertThreshold,
+			ExpiresAt:             req.ExpiresAt,
+			Status:                req.Status,
+		},
 	})
 	if err != nil {
 		httpCode, message := h.handleError("管理员更新 API 密钥失败", "更新失败", err)

@@ -73,4 +73,5 @@ type UpdateAPIKeyReq struct {
 // AdminUpdateAPIKeyReq 管理员更新密钥请求
 type AdminUpdateAPIKeyReq struct {
 	UpdateAPIKeyReq
+	Key *string `json:"key"`
 }

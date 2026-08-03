@@ -102,6 +102,12 @@ type UpdateInput struct {
 	Status                *string
 }
 
+// AdminUpdateInput 管理员更新 API Key 输入；CustomKey 不暴露给用户更新入口。
+type AdminUpdateInput struct {
+	UpdateInput
+	CustomKey *string
+}
+
 // GroupAccess 分组可用性检查结果。
 type GroupAccess struct {
 	Exists  bool
@@ -140,6 +146,7 @@ type Repository interface {
 	// todayStart 必须由调用方按用户时区计算好。
 	KeyUsage(ctx context.Context, keyIDs []int, todayStart time.Time) (map[int]UsageCosts, error)
 	GetGroupAccess(context.Context, int, int) (GroupAccess, error)
+	APIKeyHashExists(context.Context, string, int) (bool, error)
 	Create(context.Context, Mutation) (Key, error)
 	UpdateOwned(context.Context, int, int, Mutation) (Key, error)
 	UpdateAdmin(context.Context, int, Mutation) (Key, error)

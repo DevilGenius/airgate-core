@@ -1,5 +1,5 @@
 import { get, post, put, del } from './client';
-import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq, PageReq, PagedData } from '../types';
+import type { APIKeyResp, AdminUpdateAPIKeyReq, CreateAPIKeyReq, UpdateAPIKeyReq, PageReq, PagedData } from '../types';
 
 type APIKeyRequestOptions = {
   signal?: AbortSignal;
@@ -24,7 +24,7 @@ export const apikeysApi = {
   // 管理员接口
   adminList: (params?: APIKeyListParams, options?: APIKeyRequestOptions) =>
     get<PagedData<APIKeyResp>>('/api/v1/admin/api-keys', params, options),
-  adminUpdate: (id: number, data: UpdateAPIKeyReq) =>
+  adminUpdate: (id: number, data: AdminUpdateAPIKeyReq) =>
     put<void>(`/api/v1/admin/api-keys/${id}`, data),
   adminResetUsage: (id: number) =>
     post<APIKeyResp>(`/api/v1/admin/api-keys/${id}/reset-usage`),

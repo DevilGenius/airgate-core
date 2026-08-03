@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Description, Input, Label, Modal, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Description, FieldError, Input, Label, Modal, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { KeyRound } from 'lucide-react';
 import { parseIpList, formatIpList } from '../../../shared/utils/ip';
@@ -15,14 +15,25 @@ import {
   parseRateMultiplier,
 } from '../../../shared/utils/rateMultiplier';
 import { useToast } from '../../../shared/ui';
-import type { APIKeyResp, UpdateAPIKeyReq, GroupResp } from '../../../shared/types';
+import type { AdminUpdateAPIKeyReq, APIKeyResp, UpdateAPIKeyReq, GroupResp } from '../../../shared/types';
+
+const CUSTOM_KEY_PREFIX = 'sk-';
+const CUSTOM_KEY_MIN_PAYLOAD_LENGTH = 48;
+const CUSTOM_KEY_MAX_LENGTH = 256;
+const CUSTOM_KEY_PATTERN = /^sk-[A-Za-z0-9_-]+$/;
+
+function isValidCustomKey(value: string): boolean {
+  return value.length >= CUSTOM_KEY_PREFIX.length + CUSTOM_KEY_MIN_PAYLOAD_LENGTH
+    && value.length <= CUSTOM_KEY_MAX_LENGTH
+    && CUSTOM_KEY_PATTERN.test(value);
+}
 
 interface EditKeyModalProps {
   open: boolean;
   apiKey: APIKeyResp;
   groups: GroupResp[];
   onClose: () => void;
-  onSubmit: (data: UpdateAPIKeyReq) => void;
+  onSubmit: (data: AdminUpdateAPIKeyReq) => void;
   loading: boolean;
 }
 
@@ -40,6 +51,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     balance_alert_threshold: apiKey.balance_alert_threshold || 0,
   });
   const [sellRateInput, setSellRateInput] = useState(String(apiKey.sell_rate ?? 1));
+  const [customKey, setCustomKey] = useState('');
   const [ipWhitelist, setIpWhitelist] = useState(formatIpList(apiKey.ip_whitelist));
   const [ipBlacklist, setIpBlacklist] = useState(formatIpList(apiKey.ip_blacklist));
 
@@ -47,9 +59,14 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
   const sellRateValid = isValidSellRateValue(parsedSellRate);
   const balanceAlertEmail = form.balance_alert_email?.trim() || '';
   const balanceAlertThreshold = Number(form.balance_alert_threshold ?? 0);
+  const customKeyValid = customKey === '' || isValidCustomKey(customKey);
 
   const handleSubmit = () => {
     if (!sellRateValid) return;
+    if (!customKeyValid) {
+      toast('error', t('api_keys.custom_key_invalid'));
+      return;
+    }
     if (form.balance_alert_enabled && !balanceAlertEmail) {
       toast('error', t('api_keys.balance_alert_email_required'));
       return;
@@ -60,6 +77,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     }
     onSubmit({
       ...form,
+      ...(customKey ? { key: customKey } : {}),
       group_id: groupId !== apiKey.group_id ? groupId : undefined,
       ip_blacklist: parseIpList(ipBlacklist),
       ip_whitelist: parseIpList(ipWhitelist),
@@ -109,6 +127,23 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
+        </HeroTextField>
+
+        <HeroTextField fullWidth isInvalid={!customKeyValid}>
+          <Label>{t('api_keys.custom_key')}</Label>
+          <Input
+            className="font-mono"
+            value={customKey}
+            maxLength={CUSTOM_KEY_MAX_LENGTH}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={t('api_keys.custom_key_placeholder')}
+            aria-invalid={!customKeyValid || undefined}
+            onChange={(e) => setCustomKey(e.target.value)}
+          />
+          {!customKeyValid
+            ? <FieldError>{t('api_keys.custom_key_invalid')}</FieldError>
+            : <Description>{t('api_keys.custom_key_hint')}</Description>}
         </HeroTextField>
 
         <div className="space-y-1.5">
@@ -230,7 +265,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
               <Button variant="secondary" onPress={onClose}>
                 {t('common.cancel')}
               </Button>
-              <Button variant="primary" isDisabled={loading || !sellRateValid} onPress={handleSubmit}>
+              <Button variant="primary" isDisabled={loading || !sellRateValid || !customKeyValid} onPress={handleSubmit}>
                 {loading ? <Spinner size="sm" /> : null}
                 {t('common.save')}
               </Button>

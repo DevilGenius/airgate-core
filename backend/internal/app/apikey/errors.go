@@ -13,6 +13,10 @@ var (
 	ErrInvalidExpiresAt = errors.New("过期时间格式错误")
 	// ErrInvalidSellRate 销售倍率无效。
 	ErrInvalidSellRate = errors.New("销售倍率必须是有限非负数；0 表示免费，正数范围为 0.01 到 100")
+	// ErrInvalidCustomKey 自定义 API Key 格式无效。
+	ErrInvalidCustomKey = errors.New("自定义密钥必须以 sk- 开头，前缀后至少 48 个字符，总长度不超过 256 个字符，且只能包含英文字母、数字、短横线和下划线")
+	// ErrDuplicateAPIKey 自定义 API Key 已被其他密钥使用。
+	ErrDuplicateAPIKey = errors.New("该 API Key 已存在")
 	// ErrLegacyKeyNotReveal 旧密钥无法查看原文。
 	ErrLegacyKeyNotReveal = errors.New("该密钥创建于加密存储启用前，无法查看原文")
 	// ErrKeyDecryptFailed 密钥解密失败。

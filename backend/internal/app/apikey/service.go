@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"regexp"
 	"strings"
 	"time"
 
@@ -14,9 +15,14 @@ import (
 )
 
 const (
-	defaultPage     = 1
-	defaultPageSize = 20
+	defaultPage                  = 1
+	defaultPageSize              = 20
+	customAPIKeyPrefix           = "sk-"
+	CustomAPIKeyMinPayloadLength = 48
+	CustomAPIKeyMaxLength        = 256
 )
+
+var customAPIKeyPattern = regexp.MustCompile(`^sk-[A-Za-z0-9_-]+$`)
 
 // Service API Key 应用服务。
 type Service struct {
@@ -248,11 +254,20 @@ func (s *Service) UpdateOwned(ctx context.Context, userID, id int, input UpdateI
 }
 
 // UpdateAdmin 管理员更新 API Key。
-func (s *Service) UpdateAdmin(ctx context.Context, id int, input UpdateInput) (Key, error) {
+func (s *Service) UpdateAdmin(ctx context.Context, id int, input AdminUpdateInput) (Key, error) {
 	logger := sdk.LoggerFromContext(ctx)
-	mutation, err := s.buildMutation(ctx, 0, input, false)
+	mutation, err := s.buildMutation(ctx, 0, input.UpdateInput, false)
 	if err != nil {
 		return Key{}, err
+	}
+	if input.CustomKey != nil {
+		customKeyMutation, err := s.buildCustomKeyMutation(ctx, id, *input.CustomKey)
+		if err != nil {
+			return Key{}, err
+		}
+		mutation.KeyHint = customKeyMutation.KeyHint
+		mutation.KeyHash = customKeyMutation.KeyHash
+		mutation.KeyEncrypted = customKeyMutation.KeyEncrypted
 	}
 	updated, err := s.repo.UpdateAdmin(ctx, id, mutation)
 	if err != nil {
@@ -264,7 +279,13 @@ func (s *Service) UpdateAdmin(ctx context.Context, id int, input UpdateInput) (K
 		return Key{}, err
 	}
 	logApiKeyMutationOutcome(logger, updated.UserID, id, mutation)
-	auth.InvalidateAPIKeyHashCache(updated.KeyHash)
+	if mutation.KeyHash != nil {
+		// 修改原文后旧 hash 已无法从更新结果获取；这是低频管理员操作，
+		// 清空全部短 TTL 缓存，保证旧密钥立即失效。
+		auth.InvalidateAPIKeyCache("")
+	} else {
+		auth.InvalidateAPIKeyHashCache(updated.KeyHash)
+	}
 	return updated, nil
 }
 
@@ -346,6 +367,12 @@ func (s *Service) RevealOwned(ctx context.Context, userID, id int) (Key, error) 
 // logApiKeyMutationOutcome 根据本次更新涉及的字段，输出对应的成功事件。
 // 不打印 key 明文/hash，仅打印 ID 与变更类型。
 func logApiKeyMutationOutcome(logger *slog.Logger, userID, keyID int, mutation Mutation) {
+	if mutation.KeyHash != nil {
+		logger.Info("api_key_secret_updated",
+			sdk.LogFieldUserID, userID,
+			sdk.LogFieldAPIKeyID, keyID,
+		)
+	}
 	if mutation.Status != nil {
 		logger.Info("api_key_status_changed",
 			sdk.LogFieldUserID, userID,
@@ -359,6 +386,35 @@ func logApiKeyMutationOutcome(logger *slog.Logger, userID, keyID int, mutation M
 			sdk.LogFieldAPIKeyID, keyID,
 		)
 	}
+}
+
+func (s *Service) buildCustomKeyMutation(ctx context.Context, keyID int, rawKey string) (Mutation, error) {
+	if !isValidCustomAPIKey(rawKey) {
+		return Mutation{}, ErrInvalidCustomKey
+	}
+	keyHash := auth.HashAPIKey(rawKey)
+	exists, err := s.repo.APIKeyHashExists(ctx, keyHash, keyID)
+	if err != nil {
+		return Mutation{}, err
+	}
+	if exists {
+		return Mutation{}, ErrDuplicateAPIKey
+	}
+	encrypted, err := encryptAPIKey(rawKey, s.secret)
+	if err != nil {
+		return Mutation{}, err
+	}
+	return Mutation{
+		KeyHint:      stringPtr(buildKeyHint(rawKey)),
+		KeyHash:      stringPtr(keyHash),
+		KeyEncrypted: stringPtr(encrypted),
+	}, nil
+}
+
+func isValidCustomAPIKey(key string) bool {
+	return len(key) >= len(customAPIKeyPrefix)+CustomAPIKeyMinPayloadLength &&
+		len(key) <= CustomAPIKeyMaxLength &&
+		customAPIKeyPattern.MatchString(key)
 }
 
 func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInput, enforceGroupAccess bool) (Mutation, error) {
