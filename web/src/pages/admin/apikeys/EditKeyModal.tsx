@@ -31,13 +31,14 @@ function isValidCustomKey(value: string): boolean {
 interface EditKeyModalProps {
   open: boolean;
   apiKey: APIKeyResp;
+  originalKey: string;
   groups: GroupResp[];
   onClose: () => void;
   onSubmit: (data: AdminUpdateAPIKeyReq) => void;
   loading: boolean;
 }
 
-export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading }: EditKeyModalProps) {
+export function EditKeyModal({ open, apiKey, originalKey, groups, onClose, onSubmit, loading }: EditKeyModalProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [groupId, setGroupId] = useState<number>(apiKey.group_id ?? 0);
@@ -51,7 +52,8 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     balance_alert_threshold: apiKey.balance_alert_threshold || 0,
   });
   const [sellRateInput, setSellRateInput] = useState(String(apiKey.sell_rate ?? 1));
-  const [customKey, setCustomKey] = useState('');
+  const [customKeyEnabled, setCustomKeyEnabled] = useState(false);
+  const [customKey, setCustomKey] = useState(originalKey);
   const [ipWhitelist, setIpWhitelist] = useState(formatIpList(apiKey.ip_whitelist));
   const [ipBlacklist, setIpBlacklist] = useState(formatIpList(apiKey.ip_blacklist));
 
@@ -59,7 +61,8 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
   const sellRateValid = isValidSellRateValue(parsedSellRate);
   const balanceAlertEmail = form.balance_alert_email?.trim() || '';
   const balanceAlertThreshold = Number(form.balance_alert_threshold ?? 0);
-  const customKeyValid = customKey === '' || isValidCustomKey(customKey);
+  const customKeyChanged = customKeyEnabled && customKey !== originalKey;
+  const customKeyValid = !customKeyEnabled || !customKeyChanged || isValidCustomKey(customKey);
 
   const handleSubmit = () => {
     if (!sellRateValid) return;
@@ -77,7 +80,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     }
     onSubmit({
       ...form,
-      ...(customKey ? { key: customKey } : {}),
+      ...(customKeyChanged ? { key: customKey } : {}),
       group_id: groupId !== apiKey.group_id ? groupId : undefined,
       ip_blacklist: parseIpList(ipBlacklist),
       ip_whitelist: parseIpList(ipWhitelist),
@@ -129,8 +132,19 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
           </div>
         </HeroTextField>
 
-        <HeroTextField fullWidth isInvalid={!customKeyValid}>
-          <Label>{t('api_keys.custom_key')}</Label>
+        <div className="flex items-center justify-between gap-4">
+          <div className="text-sm font-medium text-text">{t('api_keys.custom_key_enabled')}</div>
+          <NativeSwitch
+            ariaLabel={t('api_keys.custom_key_enabled')}
+            isSelected={customKeyEnabled}
+            onChange={(value) => {
+              setCustomKeyEnabled(value);
+              if (!value) setCustomKey(originalKey);
+            }}
+          />
+        </div>
+
+        <HeroTextField fullWidth isDisabled={!customKeyEnabled} isInvalid={!customKeyValid}>
           <Input
             className="font-mono"
             value={customKey}

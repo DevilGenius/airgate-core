@@ -35,6 +35,16 @@ import type { APIKeyResp, GroupResp } from '../../shared/types';
 
 const API_KEY_AMOUNT_DECIMALS = 3;
 
+type EditingKeyState = {
+  apiKey: APIKeyResp;
+  originalKey: string;
+};
+
+type RevealKeyRequest = {
+  row: APIKeyResp;
+  target: 'view' | 'edit';
+};
+
 export default function APIKeysPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -47,7 +57,7 @@ export default function APIKeysPage() {
   const [selectedUserID, setSelectedUserID] = useState('');
   const [selectedUserLabel, setSelectedUserLabel] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
+  const [editingKey, setEditingKey] = useState<EditingKeyState | null>(null);
   const [deletingKey, setDeletingKey] = useState<APIKeyResp | null>(null);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
@@ -99,11 +109,22 @@ export default function APIKeysPage() {
     onSuccess: () => setDeletingKey(null),
   });
 
-  const revealMutation = useCrudMutation({
-    mutationFn: apikeysApi.reveal,
-    queryKey: queryKeys.apikeys(),
-    onSuccess: (resp) => {
-      if (resp.key) setRevealedKey(resp.key);
+  const revealMutation = useMutation({
+    mutationFn: async ({ row, target }: RevealKeyRequest) => ({
+      row,
+      target,
+      revealed: await apikeysApi.reveal(row.id),
+    }),
+    onSuccess: ({ row, target, revealed }) => {
+      const originalKey = revealed.key ?? '';
+      if (target === 'edit') {
+        setEditingKey({ apiKey: row, originalKey });
+      } else if (originalKey) {
+        setRevealedKey(originalKey);
+      }
+    },
+    onError: (error: Error) => {
+      toast('error', error.message);
     },
   });
 
@@ -186,14 +207,16 @@ export default function APIKeysPage() {
         ariaLabel={t('api_keys.reveal')}
         isDisabled={revealMutation.isPending}
         title={t('api_keys.reveal')}
-        onClick={() => revealMutation.mutate(row.id)}
+        onClick={() => revealMutation.mutate({ row, target: 'view' })}
       >
         {t('api_keys.reveal_short', '查看')}
       </TableRowActionButton>
       <TableRowActionButton
+        ariaBusy={revealMutation.isPending}
         ariaLabel={t('common.edit')}
+        isDisabled={revealMutation.isPending}
         title={t('common.edit')}
-        onClick={() => setEditingKey(row)}
+        onClick={() => revealMutation.mutate({ row, target: 'edit' })}
       >
         {t('common.edit_short', '编辑')}
       </TableRowActionButton>
@@ -529,10 +552,11 @@ export default function APIKeysPage() {
       {editingKey && (
         <EditKeyModal
           open
-          apiKey={editingKey}
+          apiKey={editingKey.apiKey}
+          originalKey={editingKey.originalKey}
           groups={groupsData?.list ?? []}
           onClose={() => setEditingKey(null)}
-          onSubmit={(data) => updateMutation.mutate({ id: editingKey.id, data })}
+          onSubmit={(data) => updateMutation.mutate({ id: editingKey.apiKey.id, data })}
           loading={updateMutation.isPending}
         />
       )}
