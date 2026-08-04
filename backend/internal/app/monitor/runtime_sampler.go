@@ -17,26 +17,26 @@ import (
 )
 
 const (
-	defaultRuntimeSampleInterval     = 5 * time.Second
-	defaultLatencySampleInterval     = 30 * time.Second
-	defaultRuntimeLatencyWindow      = 5 * time.Minute
-	defaultRuntimeLatencyLongWindow  = time.Hour
-	defaultDependencyPingTimeout     = 300 * time.Millisecond
-	defaultRuntimeQueryTimeout       = time.Second
-	defaultRuntimeCapacityTimeout    = 500 * time.Millisecond
-	defaultRuntimeSafetyCacheTimeout = 500 * time.Millisecond
+	defaultRuntimeSampleInterval    = 5 * time.Second
+	defaultLatencySampleInterval    = 30 * time.Second
+	defaultRuntimeLatencyWindow     = 5 * time.Minute
+	defaultRuntimeLatencyLongWindow = time.Hour
+	defaultDependencyPingTimeout    = 300 * time.Millisecond
+	defaultRuntimeQueryTimeout      = time.Second
+	defaultRuntimeCapacityTimeout   = 500 * time.Millisecond
+	defaultRuntimeCacheTimeout      = 500 * time.Millisecond
 )
 
 // RuntimeSampler periodically collects low-cost operational signals and keeps
 // the latest snapshot in memory for the admin monitor API.
 type RuntimeSampler struct {
-	sqlDB       *stdsql.DB
-	rdb         *redis.Client
-	scheduler   *scheduler.Scheduler
-	concurrency *scheduler.ConcurrencyManager
-	recorder    *billing.Recorder
-	monitor     *Service
-	safetyCache SafetyCacheStatsReader
+	sqlDB        *stdsql.DB
+	rdb          *redis.Client
+	scheduler    *scheduler.Scheduler
+	concurrency  *scheduler.ConcurrencyManager
+	recorder     *billing.Recorder
+	monitor      *Service
+	runtimeCache RuntimeCacheStatsReader
 
 	sampleInterval  time.Duration
 	latencyInterval time.Duration
@@ -57,13 +57,14 @@ type RuntimeSampler struct {
 	waiterDeltaReady           bool
 }
 
-// SafetyCacheStatsReader provides runtime cache usage without coupling the
+// RuntimeCacheStatsReader provides runtime cache usage without coupling the
 // monitor package to the plugin manager implementation.
-type SafetyCacheStatsReader interface {
-	SafetyCacheStats(ctx context.Context) (
-		textSize, textCapacity,
-		imageSize, imageCapacity,
-		requestRetrySize, requestRetryCapacity int,
+type RuntimeCacheStatsReader interface {
+	RuntimeCacheStats(ctx context.Context) (
+		textRejectionSize, textRejectionCapacity,
+		imageRejectionSize, imageRejectionCapacity,
+		encryptedContentSize, encryptedContentCapacity,
+		contextWindowSize, contextWindowCapacity int,
 		err error,
 	)
 }
@@ -139,26 +140,28 @@ type RuntimeRedisStats struct {
 }
 
 type RuntimeProcessStats struct {
-	CPUPercent       *float64 `json:"cpu_percent,omitempty"`
-	HeapAllocBytes   uint64   `json:"heap_alloc_bytes"`
-	SysBytes         uint64   `json:"sys_bytes"`
-	Goroutines       int      `json:"goroutines"`
-	BillingQueueLen  int      `json:"billing_queue_len"`
-	BillingQueueCap  int      `json:"billing_queue_cap"`
-	BillingRetryLen  int      `json:"billing_retry_len"`
-	BillingRetryCap  int      `json:"billing_retry_cap"`
-	BillingDeadTotal int64    `json:"billing_dead_letter_total"`
-	MonitorQueueLen  int      `json:"monitor_queue_len"`
-	MonitorQueueCap  int      `json:"monitor_queue_cap"`
-	MonitorDropped   int64    `json:"monitor_dropped_total"`
-	MonitorQueued    int64    `json:"monitor_queued_total"`
-	MonitorFlushed   int64    `json:"monitor_flushed_total"`
-	TextSafetyLen    int      `json:"text_safety_cache_len"`
-	TextSafetyCap    int      `json:"text_safety_cache_cap"`
-	ImageSafetyLen   int      `json:"image_safety_cache_len"`
-	ImageSafetyCap   int      `json:"image_safety_cache_cap"`
-	RequestRetryLen  int      `json:"request_retry_cache_len"`
-	RequestRetryCap  int      `json:"request_retry_cache_cap"`
+	CPUPercent          *float64 `json:"cpu_percent,omitempty"`
+	HeapAllocBytes      uint64   `json:"heap_alloc_bytes"`
+	SysBytes            uint64   `json:"sys_bytes"`
+	Goroutines          int      `json:"goroutines"`
+	BillingQueueLen     int      `json:"billing_queue_len"`
+	BillingQueueCap     int      `json:"billing_queue_cap"`
+	BillingRetryLen     int      `json:"billing_retry_len"`
+	BillingRetryCap     int      `json:"billing_retry_cap"`
+	BillingDeadTotal    int64    `json:"billing_dead_letter_total"`
+	MonitorQueueLen     int      `json:"monitor_queue_len"`
+	MonitorQueueCap     int      `json:"monitor_queue_cap"`
+	MonitorDropped      int64    `json:"monitor_dropped_total"`
+	MonitorQueued       int64    `json:"monitor_queued_total"`
+	MonitorFlushed      int64    `json:"monitor_flushed_total"`
+	TextRejectionLen    int      `json:"text_rejection_cache_len"`
+	TextRejectionCap    int      `json:"text_rejection_cache_cap"`
+	ImageRejectionLen   int      `json:"image_rejection_cache_len"`
+	ImageRejectionCap   int      `json:"image_rejection_cache_cap"`
+	EncryptedContentLen int      `json:"encrypted_content_cache_len"`
+	EncryptedContentCap int      `json:"encrypted_content_cache_cap"`
+	ContextWindowLen    int      `json:"context_window_cache_len"`
+	ContextWindowCap    int      `json:"context_window_cache_cap"`
 }
 
 // NewRuntimeSampler creates a runtime sampler. A nil dependency simply yields
@@ -188,10 +191,10 @@ func NewRuntimeSampler(sqlDB *stdsql.DB, rdb *redis.Client, sched *scheduler.Sch
 	return s
 }
 
-// SetSafetyCacheStatsReader injects the plugin runtime metrics reader.
-func (s *RuntimeSampler) SetSafetyCacheStatsReader(reader SafetyCacheStatsReader) {
+// SetRuntimeCacheStatsReader injects the plugin runtime metrics reader.
+func (s *RuntimeSampler) SetRuntimeCacheStatsReader(reader RuntimeCacheStatsReader) {
 	if s != nil {
-		s.safetyCache = reader
+		s.runtimeCache = reader
 	}
 }
 
@@ -553,47 +556,53 @@ func (s *RuntimeSampler) sampleProcess(parent context.Context) RuntimeProcessSta
 		monitorStats = s.monitor.RuntimeStats()
 	}
 	cpuPercent, _ := s.cpuSampler.Percent()
-	textSafetyLen, textSafetyCap := 0, 0
-	imageSafetyLen, imageSafetyCap := 0, 0
-	requestRetryLen, requestRetryCap := 0, 0
-	if s.safetyCache != nil {
-		ctx, cancel := context.WithTimeout(parent, defaultRuntimeSafetyCacheTimeout)
+	textRejectionLen, textRejectionCap := 0, 0
+	imageRejectionLen, imageRejectionCap := 0, 0
+	encryptedContentLen, encryptedContentCap := 0, 0
+	contextWindowLen, contextWindowCap := 0, 0
+	if s.runtimeCache != nil {
+		ctx, cancel := context.WithTimeout(parent, defaultRuntimeCacheTimeout)
 		textSize, textCapacity,
 			imageSize, imageCapacity,
-			requestRetrySize, requestRetryCapacity,
-			err := s.safetyCache.SafetyCacheStats(ctx)
+			encryptedSize, encryptedCapacity,
+			contextSize, contextCapacity,
+			err := s.runtimeCache.RuntimeCacheStats(ctx)
 		cancel()
 		if err == nil {
-			textSafetyLen = textSize
-			textSafetyCap = textCapacity
-			imageSafetyLen = imageSize
-			imageSafetyCap = imageCapacity
-			requestRetryLen = requestRetrySize
-			requestRetryCap = requestRetryCapacity
+			textRejectionLen = textSize
+			textRejectionCap = textCapacity
+			imageRejectionLen = imageSize
+			imageRejectionCap = imageCapacity
+			encryptedContentLen = encryptedSize
+			encryptedContentCap = encryptedCapacity
+			contextWindowLen = contextSize
+			contextWindowCap = contextCapacity
 		}
 	}
 
 	return RuntimeProcessStats{
-		CPUPercent:       cpuPercent,
-		HeapAllocBytes:   mem.HeapAlloc,
-		SysBytes:         mem.Sys,
-		Goroutines:       runtime.NumGoroutine(),
-		BillingQueueLen:  billingStats.QueueLen,
-		BillingQueueCap:  billingStats.QueueCap,
-		BillingRetryLen:  billingStats.RetryQueueLen,
-		BillingRetryCap:  billingStats.RetryQueueCap,
-		BillingDeadTotal: billingStats.DeadLetterTotal,
-		MonitorQueueLen:  monitorStats.QueueLen,
-		MonitorQueueCap:  monitorStats.QueueCap,
-		MonitorDropped:   monitorStats.DroppedTotal,
-		MonitorQueued:    monitorStats.QueuedTotal,
-		MonitorFlushed:   monitorStats.FlushedTotal,
-		TextSafetyLen:    textSafetyLen,
-		TextSafetyCap:    textSafetyCap,
-		ImageSafetyLen:   imageSafetyLen,
-		ImageSafetyCap:   imageSafetyCap,
-		RequestRetryLen:  requestRetryLen,
-		RequestRetryCap:  requestRetryCap,
+		CPUPercent:          cpuPercent,
+		HeapAllocBytes:      mem.HeapAlloc,
+		SysBytes:            mem.Sys,
+		Goroutines:          runtime.NumGoroutine(),
+		BillingQueueLen:     billingStats.QueueLen,
+		BillingQueueCap:     billingStats.QueueCap,
+		BillingRetryLen:     billingStats.RetryQueueLen,
+		BillingRetryCap:     billingStats.RetryQueueCap,
+		BillingDeadTotal:    billingStats.DeadLetterTotal,
+		MonitorQueueLen:     monitorStats.QueueLen,
+		MonitorQueueCap:     monitorStats.QueueCap,
+		MonitorDropped:      monitorStats.DroppedTotal,
+		MonitorQueued:       monitorStats.QueuedTotal,
+		MonitorFlushed:      monitorStats.FlushedTotal,
+		TextRejectionLen:    textRejectionLen,
+		TextRejectionCap:    textRejectionCap,
+		ImageRejectionLen:   imageRejectionLen,
+		ImageRejectionCap:   imageRejectionCap,
+		EncryptedContentLen: encryptedContentLen,
+		EncryptedContentCap: encryptedContentCap,
+		ContextWindowLen:    contextWindowLen,
+		ContextWindowCap:    contextWindowCap,
 	}
 }
 

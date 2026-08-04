@@ -1141,12 +1141,14 @@ export interface MonitorRuntimeProcessResp {
   monitor_dropped_total: number;
   monitor_queued_total: number;
   monitor_flushed_total: number;
-  text_safety_cache_len: number;
-  text_safety_cache_cap: number;
-  image_safety_cache_len: number;
-  image_safety_cache_cap: number;
-  request_retry_cache_len: number;
-  request_retry_cache_cap: number;
+  text_rejection_cache_len: number;
+  text_rejection_cache_cap: number;
+  image_rejection_cache_len: number;
+  image_rejection_cache_cap: number;
+  encrypted_content_cache_len: number;
+  encrypted_content_cache_cap: number;
+  context_window_cache_len: number;
+  context_window_cache_cap: number;
 }
 
 // ==================== Setup ====================

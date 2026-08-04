@@ -138,7 +138,7 @@ function SampleFailureDetails({
   );
 }
 
-function SafetyCacheMetric({ label, value }: { label: string; value: string }) {
+function RuntimeCacheMetric({ label, value }: { label: string; value: string }) {
   return (
     <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1">
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-pre">{label}</span>
@@ -147,34 +147,39 @@ function SafetyCacheMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SafetyCacheDetails({
+function RuntimeCacheDetails({
+  contextLabel,
+  encryptedLabel,
   imageLabel,
-  requestLabel,
   runtime,
   textLabel,
 }: {
+  contextLabel: string;
+  encryptedLabel: string;
   imageLabel: string;
-  requestLabel: string;
   runtime?: MonitorRuntimeResp['runtime'];
   textLabel: string;
 }) {
   return (
     <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_0.75rem_minmax(0,1fr)] items-center gap-y-0.5">
-      <SafetyCacheMetric
+      <RuntimeCacheMetric
         label={textLabel}
-        value={`${runtime?.text_safety_cache_len ?? 0}/${runtime?.text_safety_cache_cap ?? 0}`}
+        value={`${runtime?.text_rejection_cache_len ?? 0}/${runtime?.text_rejection_cache_cap ?? 0}`}
       />
       <DetailSeparator />
-      <SafetyCacheMetric
+      <RuntimeCacheMetric
         label={imageLabel}
-        value={`${runtime?.image_safety_cache_len ?? 0}/${runtime?.image_safety_cache_cap ?? 0}`}
+        value={`${runtime?.image_rejection_cache_len ?? 0}/${runtime?.image_rejection_cache_cap ?? 0}`}
       />
-      <SafetyCacheMetric
-        label={requestLabel}
-        value={`${Math.max(0, Math.trunc(runtime?.request_retry_cache_len ?? 0))}/${formatCompactThousands(runtime?.request_retry_cache_cap)}`}
+      <RuntimeCacheMetric
+        label={encryptedLabel}
+        value={`${Math.max(0, Math.trunc(runtime?.encrypted_content_cache_len ?? 0))}/${formatCompactThousands(runtime?.encrypted_content_cache_cap)}`}
       />
       <DetailSeparator />
-      <span aria-hidden="true" />
+      <RuntimeCacheMetric
+        label={contextLabel}
+        value={`${Math.max(0, Math.trunc(runtime?.context_window_cache_len ?? 0))}/${formatCompactThousands(runtime?.context_window_cache_cap)}`}
+      />
     </span>
   );
 }
@@ -433,11 +438,12 @@ export function MonitorRuntimeStats({
             `${t('monitor.runtime_waiters')} ${fmtNum(capacity?.message_waiters ?? 0)} (${t('monitor.runtime_max_account_waiters')} ${fmtNum(capacity?.max_account_waiters ?? 0)})`,
             `reject +${fmtNum(capacity?.concurrency_reject_delta ?? 0)}`,
           ]),
-          <SafetyCacheDetails
-            imageLabel={t('monitor.runtime_image_safety_cache')}
-            requestLabel={t('monitor.runtime_safety_request_cache')}
+          <RuntimeCacheDetails
+            contextLabel={t('monitor.runtime_context_window_cache')}
+            encryptedLabel={t('monitor.runtime_encrypted_content_cache')}
+            imageLabel={t('monitor.runtime_image_rejection_cache')}
             runtime={runtime}
-            textLabel={t('monitor.runtime_text_safety_cache')}
+            textLabel={t('monitor.runtime_text_rejection_cache')}
           />,
         ]}
         icon={<Cpu className="h-5 w-5" />}

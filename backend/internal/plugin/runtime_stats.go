@@ -7,44 +7,47 @@ import (
 	"net/http"
 )
 
-type runtimeSafetyCacheStatsResponse struct {
-	Text         runtimeSafetyCacheStatsItem `json:"text"`
-	Image        runtimeSafetyCacheStatsItem `json:"image"`
-	RequestRetry runtimeSafetyCacheStatsItem `json:"request_retry"`
+type runtimeCacheStatsResponse struct {
+	TextRejection    runtimeCacheStatsItem `json:"text_rejection"`
+	ImageRejection   runtimeCacheStatsItem `json:"image_rejection"`
+	EncryptedContent runtimeCacheStatsItem `json:"encrypted_content"`
+	ContextWindow    runtimeCacheStatsItem `json:"context_window"`
 }
 
-type runtimeSafetyCacheStatsItem struct {
+type runtimeCacheStatsItem struct {
 	Size     int `json:"size"`
 	Capacity int `json:"capacity"`
 }
 
-// SafetyCacheStats reads the OpenAI gateway's in-process safety cache usage.
-func (m *Manager) SafetyCacheStats(ctx context.Context) (
-	textSize, textCapacity,
-	imageSize, imageCapacity,
-	requestRetrySize, requestRetryCapacity int,
+// RuntimeCacheStats reads the OpenAI gateway's in-process cache usage.
+func (m *Manager) RuntimeCacheStats(ctx context.Context) (
+	textRejectionSize, textRejectionCapacity,
+	imageRejectionSize, imageRejectionCapacity,
+	encryptedContentSize, encryptedContentCapacity,
+	contextWindowSize, contextWindowCapacity int,
 	err error,
 ) {
 	if m == nil {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("plugin manager is unavailable")
+		return 0, 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("plugin manager is unavailable")
 	}
 	inst := m.GetPluginByPlatform("openai")
 	if inst == nil || inst.Gateway == nil {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("openai gateway is unavailable")
+		return 0, 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("openai gateway is unavailable")
 	}
 	status, _, body, err := inst.Gateway.HandleHTTPRequest(ctx, http.MethodGet, runtimeHashPath, "", nil, nil)
 	if err != nil {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("query openai safety cache stats: %w", err)
+		return 0, 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("query openai runtime cache stats: %w", err)
 	}
 	if status != http.StatusOK {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("query openai safety cache stats: status %d", status)
+		return 0, 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("query openai runtime cache stats: status %d", status)
 	}
-	var stats runtimeSafetyCacheStatsResponse
+	var stats runtimeCacheStatsResponse
 	if err := json.Unmarshal(body, &stats); err != nil {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("decode openai safety cache stats: %w", err)
+		return 0, 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("decode openai runtime cache stats: %w", err)
 	}
-	return stats.Text.Size, stats.Text.Capacity,
-		stats.Image.Size, stats.Image.Capacity,
-		stats.RequestRetry.Size, stats.RequestRetry.Capacity,
+	return stats.TextRejection.Size, stats.TextRejection.Capacity,
+		stats.ImageRejection.Size, stats.ImageRejection.Capacity,
+		stats.EncryptedContent.Size, stats.EncryptedContent.Capacity,
+		stats.ContextWindow.Size, stats.ContextWindow.Capacity,
 		nil
 }

@@ -114,7 +114,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	}); err != nil {
 		return nil, fmt.Errorf("初始化插件运行时 Hash 失败: %w", err)
 	}
-	runtimeSampler.SetSafetyCacheStatsReader(pluginMgr)
+	runtimeSampler.SetRuntimeCacheStatsReader(pluginMgr)
 	// HostService 通过 hashicorp/go-plugin GRPCBroker 暴露给所有插件子进程，
 	// 替代旧的 admin HTTP API + admin_api_key 模式。必须在加载任何插件之前注入。
 	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched, concurrency, calculator, recorder))
