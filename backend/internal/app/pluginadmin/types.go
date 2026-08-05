@@ -78,3 +78,10 @@ type ProxyResult struct {
 	Headers    http.Header
 	Body       []byte
 }
+
+// CapabilityTarget 是按平台和能力解析出的内部插件目标。
+// 插件名称只在 Core 内部使用，不进入公开 API 契约。
+type CapabilityTarget struct {
+	PluginName string
+	Metadata   string
+}

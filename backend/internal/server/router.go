@@ -125,6 +125,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/accounts/import-config", handlers.Account.GetImportConfig)
 		adminGroup.PUT("/accounts/import-config", handlers.Account.UpdateImportConfig)
 		adminGroup.POST("/accounts/import", handlers.Account.ImportAccounts)
+		adminGroup.POST("/accounts/import/compat", middleware.PublicRateLimit(20, time.Minute), handlers.CredentialImport.ImportCompatibleAccounts)
 		adminGroup.POST("/accounts/bulk-update", handlers.Account.BulkUpdateAccounts)
 		adminGroup.POST("/accounts/bulk-delete", handlers.Account.BulkDeleteAccounts)
 		adminGroup.POST("/accounts/bulk-clear-family-cooldowns", handlers.Account.BulkClearFamilyCooldowns)
@@ -233,6 +234,13 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/upgrade/info", handlers.Upgrade.GetInfo)
 		adminGroup.GET("/upgrade/status", handlers.Upgrade.GetStatus)
 		adminGroup.POST("/upgrade/run", handlers.Upgrade.Run)
+	}
+
+	// === 凭证管理 API（仅支持 cred- 专用密钥，按端点显式授权） ===
+	credentialGroup := v1.Group("/credentials")
+	credentialGroup.Use(middleware.PublicRateLimit(20, time.Minute), middleware.CredentialKeyAuth(s.db))
+	{
+		credentialGroup.POST("/accounts/import/compat", handlers.CredentialImport.ImportCompatibleAccounts)
 	}
 
 	// === Extension 插件 API 路由（JWT 认证 + 管理员权限，支持 admin- 管理员 API Key） ===

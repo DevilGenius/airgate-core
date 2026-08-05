@@ -23,6 +23,7 @@ const (
 	CtxKeyEmail    = "email"
 	CtxKeyKeyInfo  = "api_key_info"
 	CtxKeyAPIKeyID = "jwt_api_key_id" // JWT 中的 API Key ID（API Key 登录场景）
+	CtxKeyAuthKind = "auth_kind"
 )
 
 // JWTAuth JWT 认证中间件
@@ -49,6 +50,7 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 			c.Set(CtxKeyUserID, 0)
 			c.Set(CtxKeyRole, "admin")
 			c.Set(CtxKeyEmail, "")
+			c.Set(CtxKeyAuthKind, "admin_key")
 
 			ctx := c.Request.Context()
 			logger := sdk.LoggerFromContext(ctx).With(sdk.LogFieldUserID, 0, "role", "admin")
@@ -79,6 +81,7 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 		c.Set(CtxKeyUserID, claims.UserID)
 		c.Set(CtxKeyRole, claims.Role)
 		c.Set(CtxKeyEmail, claims.Email)
+		c.Set(CtxKeyAuthKind, "jwt")
 		if claims.APIKeyID > 0 {
 			c.Set(CtxKeyAPIKeyID, claims.APIKeyID)
 		}
@@ -88,6 +91,35 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 		if claims.APIKeyID > 0 {
 			logger = logger.With(sdk.LogFieldAPIKeyID, claims.APIKeyID)
 		}
+		c.Request = c.Request.WithContext(sdk.WithLogger(ctx, logger))
+		c.Next()
+	}
+}
+
+// CredentialKeyAuth 仅允许 cred- 凭证管理 API Key 访问明确挂载的凭证接口。
+// 它不会赋予管理员角色，也不能访问通用插件 RPC 或其它管理员路由。
+func CredentialKeyAuth(db *ent.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		key := extractBearerToken(c)
+		if !auth.IsCredKey(key) {
+			slog.Warn("credential_key_validation_failed", sdk.LogFieldReason, "missing_or_invalid_format", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			response.Unauthorized(c, "凭证管理 API Key 无效")
+			c.Abort()
+			return
+		}
+		if db == nil || auth.ValidateCredKey(c.Request.Context(), db, key) != nil {
+			slog.Warn("credential_key_validation_failed", sdk.LogFieldReason, "invalid_credential_key", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			response.Unauthorized(c, "凭证管理 API Key 无效")
+			c.Abort()
+			return
+		}
+
+		c.Set(CtxKeyUserID, 0)
+		c.Set(CtxKeyRole, "credential")
+		c.Set(CtxKeyEmail, "")
+		c.Set(CtxKeyAuthKind, "credential_key")
+		ctx := c.Request.Context()
+		logger := sdk.LoggerFromContext(ctx).With(sdk.LogFieldUserID, 0, "role", "credential")
 		c.Request = c.Request.WithContext(sdk.WithLogger(ctx, logger))
 		c.Next()
 	}

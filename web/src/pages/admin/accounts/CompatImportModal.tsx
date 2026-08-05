@@ -21,9 +21,18 @@ export type CompatImportInput = {
   content: string;
 };
 
+export type CompatImportRTResult = {
+  index: number;
+  name: string;
+  status: 'ok' | 'failed';
+  accountName?: string;
+  error?: string;
+};
+
 export type CompatImportProgress = {
   done: number;
   failed: number;
+  results: CompatImportRTResult[];
   success: number;
   total: number;
 };
@@ -42,6 +51,22 @@ function mergeFiles(current: File[], added: File[]): File[] {
   const merged = new Map(current.map((file) => [fileIdentity(file), file]));
   for (const file of added) merged.set(fileIdentity(file), file);
   return Array.from(merged.values());
+}
+
+type RTFailureKind = 'format' | 'expired' | 'network' | 'exchange';
+
+function classifyRTFailure(message: string): RTFailureKind {
+  const normalized = message.toLowerCase();
+  if (/invalid_grant|expired|revoked|invalid refresh|token.*invalid|失效|过期|撤销/.test(normalized)) {
+    return 'expired';
+  }
+  if (/json|format|missing|empty|required|不能为空|缺少|格式/.test(normalized)) {
+    return 'format';
+  }
+  if (/timeout|timed out|network|connection|connect|dns|eof|超时|网络|连接/.test(normalized)) {
+    return 'network';
+  }
+  return 'exchange';
 }
 
 export function CompatImportModal({
@@ -118,7 +143,8 @@ export function CompatImportModal({
   );
   const tooManyInputs = totalInputs > MAX_COMPAT_IMPORT_INPUTS;
   const tooLarge = totalBytes > MAX_COMPAT_IMPORT_BYTES;
-  const canSubmit = Boolean(selection) && totalInputs > 0 && !tooManyInputs && !tooLarge && !busy;
+  const rtCompleted = isRTInput && progress != null && progress.total > 0 && progress.done >= progress.total;
+  const canSubmit = Boolean(selection) && totalInputs > 0 && !tooManyInputs && !tooLarge && !busy && !rtCompleted;
   const progressPercent = progress && progress.total > 0
     ? Math.round((progress.done / progress.total) * 100)
     : 0;
@@ -143,6 +169,7 @@ export function CompatImportModal({
     setProgress(isRTInput ? {
       done: 0,
       failed: 0,
+      results: [],
       success: 0,
       total: activeInputLines.length,
     } : null);
@@ -170,10 +197,10 @@ export function CompatImportModal({
 
   return (
     <CommonModal
-      className="ag-account-page-modal"
+      className="ag-account-page-modal ag-compat-import-modal"
       description={t('accounts.compat_import_description')}
       dialogStyle={{
-        height: 'min(720px, calc(100dvh - 2rem))',
+        height: 'min(800px, calc(100dvh - 2rem))',
         maxWidth: '700px',
         width: 'min(100%, calc(100vw - 2rem))',
       }}
@@ -198,7 +225,7 @@ export function CompatImportModal({
       surface={false}
       title={t('accounts.compat_import_title')}
     >
-      <div className="space-y-5">
+      <div className="ag-compat-import">
         <div className="space-y-1.5">
           <Label>{t('accounts.compat_import_format')}</Label>
           <SimpleSelect
@@ -265,8 +292,8 @@ export function CompatImportModal({
                   : t('accounts.compat_import_json_lines')}
               </Label>
               <TextArea
+                className="ag-compat-import-lines-input"
                 value={lineInputText}
-                rows={8}
                 wrap="off"
                 placeholder={isRTInput
                   ? t('accounts.compat_import_rt_placeholder')
@@ -274,6 +301,7 @@ export function CompatImportModal({
                 disabled={busy}
                 onChange={(event) => {
                   setReadError('');
+                  setProgress(null);
                   setLineInputText(event.target.value);
                 }}
               />
@@ -286,27 +314,30 @@ export function CompatImportModal({
           </section>
         ) : null}
 
-        {isRTInput && progress ? (
-          <div className="space-y-2 rounded-lg border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] px-3 py-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
-              <span className="text-[var(--ag-text-secondary)]">
-                {t('accounts.compat_import_rt_progress', { done: progress.done, total: progress.total })}
+        {isRTInput ? (
+          <div className="space-y-2 rounded-lg border border-border bg-surface px-3 py-2.5">
+            <div className="grid min-w-0 gap-1.5 text-xs sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <span className="min-w-0 break-words text-text-secondary">
+                {t('accounts.compat_import_rt_progress', {
+                  done: progress?.done ?? 0,
+                  total: progress?.total ?? inputLines.length,
+                })}
               </span>
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-1 text-success">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 sm:justify-end">
+                <span className="inline-flex shrink-0 items-center gap-1 text-success">
                   <Check className="h-3.5 w-3.5" />
-                  {t('accounts.compat_import_rt_success_count', { count: progress.success })}
+                  {t('accounts.compat_import_rt_success_count', { count: progress?.success ?? 0 })}
                 </span>
-                <span className="inline-flex items-center gap-1 text-danger">
+                <span className="inline-flex shrink-0 items-center gap-1 text-danger">
                   <X className="h-3.5 w-3.5" />
-                  {t('accounts.compat_import_rt_failed_count', { count: progress.failed })}
+                  {t('accounts.compat_import_rt_failed_count', { count: progress?.failed ?? 0 })}
                 </span>
-                <span className="font-mono tabular-nums text-[var(--ag-text-secondary)]">
+                <span className="shrink-0 font-mono font-semibold tabular-nums text-text-secondary">
                   {progressPercent}%
                 </span>
               </div>
             </div>
-            <div className="flex h-1.5 overflow-hidden rounded-full bg-[var(--ag-glass-border)]">
+            <div className="flex h-1.5 overflow-hidden rounded-full bg-border">
               <div
                 className="h-full bg-success transition-[width] duration-300"
                 style={{ width: `${successPercent}%` }}
@@ -317,6 +348,59 @@ export function CompatImportModal({
               />
             </div>
           </div>
+        ) : null}
+
+        {isRTInput ? (
+          <section className="ag-compat-import-results">
+            <p className="px-0.5 text-xs font-medium text-text-secondary">
+              {t('accounts.compat_import_rt_results')}
+            </p>
+            <div className="ag-compat-import-results-list divide-y divide-border rounded-lg border border-border bg-surface">
+              {progress?.results.length ? progress.results.map((result) => {
+                const failureKind = result.status === 'failed'
+                  ? classifyRTFailure(result.error ?? '')
+                  : null;
+                const failureLabel = failureKind
+                  ? t(`accounts.compat_import_rt_failure_${failureKind}`)
+                  : '';
+                const detail = result.status === 'ok'
+                  ? (result.accountName || t('accounts.compat_import_rt_unknown_account'))
+                  : (result.error || t('accounts.compat_import_rt_failure_exchange'));
+                return (
+                  <div
+                    key={`${result.index}-${result.name}`}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs"
+                    title={detail}
+                  >
+                    <span className="shrink-0 font-medium tabular-nums text-text-secondary">
+                      {t('accounts.compat_import_rt_item', { index: result.index })}
+                    </span>
+                    {result.status === 'ok'
+                      ? <Check className="h-3.5 w-3.5 shrink-0 text-success" />
+                      : <X className="h-3.5 w-3.5 shrink-0 text-danger" />}
+                    <span className={result.status === 'ok'
+                      ? 'min-w-0 flex-1 truncate text-text-tertiary'
+                      : 'min-w-0 flex-1 truncate text-danger'}
+                    >
+                      {detail}
+                    </span>
+                    <span className={result.status === 'ok'
+                      ? 'shrink-0 text-success'
+                      : 'shrink-0 text-danger'}
+                    >
+                      {result.status === 'ok'
+                        ? t('accounts.compat_import_rt_result_success')
+                        : failureLabel}
+                    </span>
+                  </div>
+                );
+              }) : (
+                <div className="flex h-full items-center justify-center px-4 text-center text-xs text-text-tertiary">
+                  {t('accounts.compat_import_rt_results_empty')}
+                </div>
+              )}
+            </div>
+          </section>
         ) : null}
 
         {selection ? (

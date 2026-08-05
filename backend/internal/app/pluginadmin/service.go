@@ -201,6 +201,27 @@ func (s *Service) Proxy(ctx context.Context, input ProxyInput) (ProxyResult, err
 	}, nil
 }
 
+// ResolveGatewayCapability 按平台查找声明指定能力的运行中网关插件。
+// 外部调用方只需稳定使用 platform，插件改名或替换不会影响公开接口。
+func (s *Service) ResolveGatewayCapability(platform, capability string) (CapabilityTarget, error) {
+	platform = strings.TrimSpace(platform)
+	capability = strings.TrimSpace(capability)
+	if platform == "" || capability == "" {
+		return CapabilityTarget{}, ErrPluginCapabilityUnavailable
+	}
+	for _, meta := range s.manager.GetAllPluginMeta() {
+		if meta.Type != "gateway" || !strings.EqualFold(strings.TrimSpace(meta.Platform), platform) {
+			continue
+		}
+		value := strings.TrimSpace(meta.Metadata[capability])
+		if value == "" {
+			continue
+		}
+		return CapabilityTarget{PluginName: meta.Name, Metadata: value}, nil
+	}
+	return CapabilityTarget{}, ErrPluginCapabilityUnavailable
+}
+
 // RefreshMarketplace 强制从 GitHub 同步市场列表。
 func (s *Service) RefreshMarketplace(ctx context.Context) error {
 	return s.marketplace.SyncFromGithub(ctx)

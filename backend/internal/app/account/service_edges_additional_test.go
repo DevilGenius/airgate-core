@@ -90,8 +90,8 @@ func TestImportCollectsValidationAndRepositoryFailures(t *testing.T) {
 	summary := service.Import(t.Context(), []CreateInput{
 		{Name: "bad-rate", RateMultiplier: &badRate},
 		{Name: "bad-policy", RateMultiplier: &goodRate, ModelPolicy: modelpolicy.Policy{Allow: []string{"["}}},
-		{Name: "repo-fail", RateMultiplier: &goodRate},
-		{Name: "ok", Platform: "openai", RateMultiplier: &goodRate, GroupIDs: []int64{1}, ProxyID: &proxyID},
+		{Name: "repo-fail", Platform: "openai", Credentials: map[string]string{"api_key": "sk-fail"}, RateMultiplier: &goodRate},
+		{Name: "ok", Platform: "openai", Credentials: map[string]string{"api_key": "sk-ok"}, RateMultiplier: &goodRate, GroupIDs: []int64{1}, ProxyID: &proxyID},
 	})
 
 	if summary.Imported != 1 || summary.Failed != 3 || len(summary.SuccessIDs) != 1 || summary.SuccessIDs[0] == 0 {

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -23,6 +24,19 @@ type AccountHandler struct {
 	service         *appaccount.Service
 	scheduler       *scheduler.Scheduler
 	settingsService *appsettings.Service
+}
+
+type configuredImportError struct {
+	client bool
+	err    error
+}
+
+func (e *configuredImportError) Error() string { return e.err.Error() }
+func (e *configuredImportError) Unwrap() error { return e.err }
+
+func isConfiguredImportClientError(err error) bool {
+	var target *configuredImportError
+	return errors.As(err, &target) && target.client
 }
 
 // NewAccountHandler 创建 AccountHandler。sched 可为 nil（旧测试入口），
@@ -52,6 +66,43 @@ func (h *AccountHandler) accountImportDSL(ctx context.Context) (string, error) {
 		}
 	}
 	return accountimportdsl.DefaultConfigJSON, nil
+}
+
+func (h *AccountHandler) applyConfiguredImport(
+	ctx context.Context,
+	inputs []appaccount.CreateInput,
+) ([]appaccount.CreateInput, error) {
+	rawConfig, err := h.accountImportDSL(ctx)
+	if err != nil {
+		return nil, &configuredImportError{err: fmt.Errorf("读取导入配置失败: %w", err)}
+	}
+	config, err := accountimportdsl.Parse(rawConfig)
+	if err != nil {
+		return nil, &configuredImportError{err: fmt.Errorf("导入配置无效: %w", err)}
+	}
+	var occupiedPriorities []int
+	if config.UsesPrioritySequence() {
+		occupiedPriorities, err = h.service.OccupiedPriorities(ctx)
+		if err != nil {
+			return nil, &configuredImportError{err: fmt.Errorf("读取已占用优先级失败: %w", err)}
+		}
+	}
+	inputs, err = config.ApplyWithOccupiedPriorities(inputs, occupiedPriorities)
+	if err != nil {
+		return nil, &configuredImportError{client: true, err: fmt.Errorf("应用导入配置失败: %w", err)}
+	}
+	return inputs, nil
+}
+
+func (h *AccountHandler) importConfiguredAccounts(
+	ctx context.Context,
+	inputs []appaccount.CreateInput,
+) appaccount.ImportSummary {
+	summary := h.service.ImportConfigured(ctx, inputs)
+	if len(summary.SuccessIDs) > 0 {
+		h.activateCreatedAccounts(ctx, summary.SuccessIDs)
+	}
+	return summary
 }
 
 // familyCooldownsFor 拉取指定账号在 Redis 上仍生效的家族冷却，转成 DTO。

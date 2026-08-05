@@ -491,10 +491,26 @@ func (s *Service) ImportConfigured(ctx context.Context, items []CreateInput) Imp
 	return s.importAccounts(ctx, items, true)
 }
 
+// ValidateConfiguredImport 使用正式导入相同的字段归一化和校验逻辑检查账号草稿，
+// 但不访问持久化层，也不会写入数据库。
+func (s *Service) ValidateConfiguredImport(_ context.Context, items []CreateInput) []ImportItemError {
+	errors := make([]ImportItemError, 0)
+	for index, input := range items {
+		if _, err := prepareImportAccount(input, true); err != nil {
+			errors = append(errors, ImportItemError{
+				Index:   index,
+				Name:    input.Name,
+				Message: err.Error(),
+			})
+		}
+	}
+	return errors
+}
+
 func (s *Service) importAccounts(ctx context.Context, items []CreateInput, preserveGroupIDs bool) ImportSummary {
 	summary := ImportSummary{}
 	for index, input := range items {
-		rateMultiplier, err := normalizeCreateRateMultiplier(input.RateMultiplier)
+		prepared, err := prepareImportAccount(input, preserveGroupIDs)
 		if err != nil {
 			summary.Failed++
 			summary.Errors = append(summary.Errors, ImportItemError{
@@ -504,32 +520,7 @@ func (s *Service) importAccounts(ctx context.Context, items []CreateInput, prese
 			})
 			continue
 		}
-		input.RateMultiplier = &rateMultiplier
-		input.ModelPolicy = modelpolicy.Normalize(input.ModelPolicy)
-		if err := validateModelPolicy(input.ModelPolicy); err != nil {
-			summary.Failed++
-			summary.Errors = append(summary.Errors, ImportItemError{
-				Index:   index,
-				Name:    input.Name,
-				Message: err.Error(),
-			})
-			continue
-		}
-		input.Email, input.Credentials, err = normalizeAccountIdentity(input.Email, input.Credentials)
-		if err != nil {
-			summary.Failed++
-			summary.Errors = append(summary.Errors, ImportItemError{
-				Index:   index,
-				Name:    input.Name,
-				Message: err.Error(),
-			})
-			continue
-		}
-		if !preserveGroupIDs {
-			input.GroupIDs = nil
-		}
-		input.ProxyID = nil
-		created, err := s.repo.Create(ctx, input)
+		created, err := s.repo.Create(ctx, prepared)
 		if err != nil {
 			summary.Failed++
 			summary.Errors = append(summary.Errors, ImportItemError{
@@ -546,6 +537,51 @@ func (s *Service) importAccounts(ctx context.Context, items []CreateInput, prese
 		s.InvalidateUsageCache("")
 	}
 	return summary
+}
+
+func prepareImportAccount(input CreateInput, preserveGroupIDs bool) (CreateInput, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.Platform = strings.ToLower(strings.TrimSpace(input.Platform))
+	input.Type = strings.ToLower(strings.TrimSpace(input.Type))
+	if input.Name == "" {
+		return CreateInput{}, errors.New("账号名称不能为空")
+	}
+	if input.Platform == "" {
+		return CreateInput{}, errors.New("账号平台不能为空")
+	}
+	if len(input.Credentials) == 0 {
+		return CreateInput{}, errors.New("账号凭证不能为空")
+	}
+	if input.Type == "" {
+		if strings.TrimSpace(input.Credentials["api_key"]) != "" {
+			input.Type = "apikey"
+		} else {
+			input.Type = "oauth"
+		}
+	}
+	if input.MaxConcurrency < 0 {
+		return CreateInput{}, errors.New("账号容量不能小于 0")
+	}
+	input.Priority = accountpriority.Clamp(input.Priority)
+
+	rateMultiplier, err := normalizeCreateRateMultiplier(input.RateMultiplier)
+	if err != nil {
+		return CreateInput{}, err
+	}
+	input.RateMultiplier = &rateMultiplier
+	input.ModelPolicy = modelpolicy.Normalize(input.ModelPolicy)
+	if err := validateModelPolicy(input.ModelPolicy); err != nil {
+		return CreateInput{}, err
+	}
+	input.Email, input.Credentials, err = normalizeAccountIdentity(input.Email, input.Credentials)
+	if err != nil {
+		return CreateInput{}, err
+	}
+	if !preserveGroupIDs {
+		input.GroupIDs = nil
+	}
+	input.ProxyID = nil
+	return input, nil
 }
 
 // Update 更新账号。

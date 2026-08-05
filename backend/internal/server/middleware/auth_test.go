@@ -316,6 +316,56 @@ func TestJWTAuthAcceptsAndRejectsAdminAPIKeys(t *testing.T) {
 	}
 }
 
+func TestCredentialKeyAuthOnlyAcceptsCredentialKey(t *testing.T) {
+	db := openMiddlewareAuthDB(t, "middleware_credential_key")
+	defer closeMiddlewareAuthDB(t, db)
+	ctx := context.Background()
+
+	credentialKey := "cred-middleware-valid"
+	if _, err := db.Setting.Create().
+		SetGroup("security").
+		SetKey(coreauth.CredKeyHashSettingKey).
+		SetValue(coreauth.HashAPIKey(credentialKey)).
+		Save(ctx); err != nil {
+		t.Fatalf("create credential key setting: %v", err)
+	}
+
+	router := gin.New()
+	router.Use(CredentialKeyAuth(db))
+	router.POST("/credentials/accounts/import/compat", func(c *gin.Context) {
+		if got := c.GetString(CtxKeyRole); got != "credential" {
+			t.Fatalf("role = %q, want credential", got)
+		}
+		if got := c.GetString(CtxKeyAuthKind); got != "credential_key" {
+			t.Fatalf("auth kind = %q, want credential_key", got)
+		}
+		c.String(http.StatusOK, "ok")
+	})
+
+	for _, tt := range []struct {
+		name   string
+		key    string
+		status int
+	}{
+		{name: "credential key", key: credentialKey, status: http.StatusOK},
+		{name: "wrong credential key", key: "cred-wrong", status: http.StatusUnauthorized},
+		{name: "admin key forbidden", key: "admin-valid", status: http.StatusUnauthorized},
+		{name: "missing", status: http.StatusUnauthorized},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/credentials/accounts/import/compat", nil)
+			if tt.key != "" {
+				req.Header.Set("Authorization", "Bearer "+tt.key)
+			}
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			if w.Code != tt.status {
+				t.Fatalf("status = %d, want %d; body=%s", w.Code, tt.status, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestAPIKeyAuthRejectsMissingAndInvalidFormat(t *testing.T) {
 	tests := []struct {
 		name          string

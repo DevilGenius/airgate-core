@@ -51,6 +51,7 @@ import {
   type CompatImportFormat,
   type CompatImportInput,
   type CompatImportProgress,
+  type CompatImportRTResult,
 } from './accounts/CompatImportModal';
 import { AccountsTableSection } from './accounts/AccountsTableSection';
 import {
@@ -147,12 +148,9 @@ type CompatImportResponse = {
   issues?: CompatImportIssue[];
 };
 
-type RefreshTokenExchangeResult = {
+type RefreshTokenExchangeResult = CompatImportRTResult & {
   accountType?: string;
-  accountName?: string;
   credentials?: Record<string, string>;
-  status: 'ok' | 'failed';
-  error?: string;
 };
 
 const ACCOUNT_WORKING_STATE_FILTER = 'working';
@@ -893,42 +891,60 @@ export default function AccountsPageContent() {
 
       let compatFormat: CompatImportFormat = format;
       let compatInputs = inputs;
+      let refreshFailedCount = 0;
       if (format === 'refresh_token') {
-        const refreshTokens = inputs.map((input) => input.content.trim()).filter(Boolean);
+        const refreshTokens = inputs.flatMap((input, index) => {
+          const token = input.content.trim();
+          return token ? [{ index: index + 1, name: input.name, token }] : [];
+        });
         let done = 0;
         let success = 0;
         let failed = 0;
-        onProgress({ done, failed, success, total: refreshTokens.length });
-        const refreshResults = await mapWithConcurrency<string, RefreshTokenExchangeResult>(
+        const progressResults: Array<CompatImportRTResult | undefined> = Array.from({ length: refreshTokens.length });
+        const emitProgress = () => onProgress({
+          done,
+          failed,
+          results: progressResults.filter((item): item is CompatImportRTResult => item != null),
+          success,
+          total: refreshTokens.length,
+        });
+        emitProgress();
+        const refreshResults = await mapWithConcurrency<(typeof refreshTokens)[number], RefreshTokenExchangeResult>(
           refreshTokens,
           RT_IMPORT_CONCURRENCY,
-          async (refreshToken) => {
+          async (item, resultIndex) => {
             let result: RefreshTokenExchangeResult;
             try {
               const imported = await pluginsApi.rpc<{
                 account_type?: string;
                 account_name?: string;
                 credentials?: Record<string, string>;
-              }>(openAIPluginID, 'oauth/import-refresh', { refresh_token: refreshToken });
+              }>(openAIPluginID, 'oauth/import-refresh', { refresh_token: item.token });
               if (!imported.credentials) {
                 throw new Error(t('accounts.import_invalid'));
               }
               success += 1;
               result = {
+                index: item.index,
+                name: item.name,
                 accountType: imported.account_type,
-                accountName: imported.account_name,
+                accountName: imported.account_name || imported.credentials.email,
                 credentials: imported.credentials,
                 status: 'ok',
               };
             } catch (error) {
               failed += 1;
+              const rawMessage = error instanceof Error ? error.message : t('accounts.import_invalid');
               result = {
+                index: item.index,
+                name: item.name,
                 status: 'failed',
-                error: error instanceof Error ? error.message : t('accounts.import_invalid'),
+                error: item.token ? rawMessage.split(item.token).join('[redacted]') : rawMessage,
               };
             }
             done += 1;
-            onProgress({ done, failed, success, total: refreshTokens.length });
+            progressResults[resultIndex] = result;
+            emitProgress();
             return result;
           },
         );
@@ -943,13 +959,13 @@ export default function AccountsPageContent() {
             }),
           }];
         });
-        const failedCount = refreshResults.length - compatInputs.length;
+        refreshFailedCount = refreshResults.length - compatInputs.length;
         if (!compatInputs.length) {
           toast('error', t('accounts.import_invalid'));
           return false;
         }
-        if (failedCount > 0) {
-          toast('warning', t('accounts.import_rt_issues', { count: failedCount }));
+        if (refreshFailedCount > 0) {
+          toast('warning', t('accounts.import_rt_issues', { count: refreshFailedCount }));
         }
         compatFormat = 'account_json';
       }
@@ -982,7 +998,7 @@ export default function AccountsPageContent() {
       }));
       try {
         await importMutation.mutateAsync(accounts);
-        return true;
+        return format !== 'refresh_token';
       } catch {
         return false;
       }

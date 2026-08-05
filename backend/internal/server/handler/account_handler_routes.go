@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/DevilGenius/airgate-core/internal/accountimportdsl"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 	"github.com/DevilGenius/airgate-core/internal/server/response"
@@ -133,34 +132,17 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 			RateMultiplier: item.RateMultiplier.Ptr(),
 		})
 	}
-	rawConfig, err := h.accountImportDSL(c.Request.Context())
+	inputs, err := h.applyConfiguredImport(c.Request.Context(), inputs)
 	if err != nil {
-		response.InternalError(c, "读取导入配置失败")
-		return
-	}
-	config, err := accountimportdsl.Parse(rawConfig)
-	if err != nil {
-		response.InternalError(c, "导入配置无效: "+err.Error())
-		return
-	}
-	var occupiedPriorities []int
-	if config.UsesPrioritySequence() {
-		occupiedPriorities, err = h.service.OccupiedPriorities(c.Request.Context())
-		if err != nil {
-			response.InternalError(c, "读取已占用优先级失败")
-			return
+		if isConfiguredImportClientError(err) {
+			response.BadRequest(c, err.Error())
+		} else {
+			response.InternalError(c, err.Error())
 		}
-	}
-	inputs, err = config.ApplyWithOccupiedPriorities(inputs, occupiedPriorities)
-	if err != nil {
-		response.BadRequest(c, "应用导入配置失败: "+err.Error())
 		return
 	}
 
-	summary := h.service.ImportConfigured(c.Request.Context(), inputs)
-	if len(summary.SuccessIDs) > 0 {
-		h.activateCreatedAccounts(c.Request.Context(), summary.SuccessIDs)
-	}
+	summary := h.importConfiguredAccounts(c.Request.Context(), inputs)
 
 	resp := dto.ImportAccountsResp{
 		Imported: summary.Imported,

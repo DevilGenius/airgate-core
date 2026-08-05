@@ -70,6 +70,25 @@ func TestListCopiesMetadataAndHandlesNilMarketplace(t *testing.T) {
 	}
 }
 
+func TestResolveGatewayCapabilityUsesPlatformAndMetadata(t *testing.T) {
+	service := NewService(pluginAdminManagerStub{
+		allMeta: []plugin.PluginMeta{
+			{Name: "other", Type: "gateway", Platform: "claude", Metadata: map[string]string{"account_import.v1": `{"formats":["claude"]}`}},
+			{Name: "renamed-openai-plugin", Type: "gateway", Platform: "OpenAI", Metadata: map[string]string{"account_import.v1": `{"formats":["codex"]}`}},
+		},
+	}, nil)
+	target, err := service.ResolveGatewayCapability(" openai ", "account_import.v1")
+	if err != nil {
+		t.Fatalf("ResolveGatewayCapability() error = %v", err)
+	}
+	if target.PluginName != "renamed-openai-plugin" || !strings.Contains(target.Metadata, "codex") {
+		t.Fatalf("ResolveGatewayCapability() = %+v", target)
+	}
+	if _, err := service.ResolveGatewayCapability("kiro", "account_import.v1"); err != ErrPluginCapabilityUnavailable {
+		t.Fatalf("missing capability error = %v, want %v", err, ErrPluginCapabilityUnavailable)
+	}
+}
+
 func TestListDisplaysTaggedPluginWithShortHash(t *testing.T) {
 	commitSHA := "1234567890abcdef1234567890abcdef12345678"
 	service := NewService(pluginAdminManagerStub{

@@ -66,12 +66,35 @@ func TestImportConfiguredPreservesDSLGroupIDs(t *testing.T) {
 	proxyID := int64(99)
 	summary := service.ImportConfigured(t.Context(), []CreateInput{{
 		Name:        "configured",
+		Platform:    "openai",
+		Type:        "oauth",
 		GroupIDs:    []int64{2, 1},
 		ProxyID:     &proxyID,
-		Credentials: map[string]string{},
+		Credentials: map[string]string{"access_token": "token"},
 	}})
 	if summary.Imported != 1 || summary.Failed != 0 {
 		t.Fatalf("unexpected configured import summary: %+v", summary)
+	}
+}
+
+func TestValidateConfiguredImportUsesImportNormalizationWithoutWriting(t *testing.T) {
+	createCalls := 0
+	service := NewService(stubRepository{
+		create: func(context.Context, CreateInput) (Account, error) {
+			createCalls++
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	errors := service.ValidateConfiguredImport(t.Context(), []CreateInput{
+		{Name: " valid ", Platform: "OpenAI", Credentials: map[string]string{"api_key": "sk-test"}, Priority: accountpriority.Max + 1},
+		{Name: "missing credentials", Platform: "openai"},
+	})
+	if len(errors) != 1 || errors[0].Index != 1 {
+		t.Fatalf("validation errors = %+v", errors)
+	}
+	if createCalls != 0 {
+		t.Fatalf("ValidateConfiguredImport wrote %d account(s)", createCalls)
 	}
 }
 

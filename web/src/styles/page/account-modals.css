@@ -498,3 +498,53 @@
     max-height: 10rem;
   }
 }
+
+/* Admin accounts: 兼容导入弹窗布局 */
+
+.ag-elevation-modal.ag-compat-import-modal .modal__body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding-block: 0.75rem 1rem;
+}
+
+.ag-compat-import {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 1rem;
+  padding-inline: 0.75rem;
+}
+
+.ag-compat-import > * {
+  flex: none;
+}
+
+.ag-compat-import-lines-input {
+  height: 9rem;
+  resize: none;
+}
+
+.ag-compat-import > .ag-compat-import-results {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 6rem;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.ag-compat-import-results-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-height: 720px) {
+  .ag-compat-import-lines-input {
+    height: 5.5rem;
+  }
+}

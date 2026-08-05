@@ -16,6 +16,7 @@ import (
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
 	appauth "github.com/DevilGenius/airgate-core/internal/app/auth"
+	appcredentialimport "github.com/DevilGenius/airgate-core/internal/app/credentialimport"
 	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 	appgroup "github.com/DevilGenius/airgate-core/internal/app/group"
 	appmonitor "github.com/DevilGenius/airgate-core/internal/app/monitor"
@@ -55,21 +56,22 @@ type HTTPDependencies struct {
 
 // HTTPHandlers 聚合所有 HTTP 处理器。
 type HTTPHandlers struct {
-	Auth         *handler.AuthHandler
-	User         *handler.UserHandler
-	Account      *handler.AccountHandler
-	Group        *handler.GroupHandler
-	APIKey       *handler.APIKeyHandler
-	Subscription *handler.SubscriptionHandler
-	Usage        *handler.UsageHandler
-	Proxy        *handler.ProxyHandler
-	Settings     *handler.SettingsHandler
-	Dashboard    *handler.DashboardHandler
-	Plugin       *handler.PluginHandler
-	Version      *handler.VersionHandler
-	Upgrade      *handler.UpgradeHandler
-	Monitor      *handler.MonitorHandler
-	Event        *handler.EventHandler
+	Auth             *handler.AuthHandler
+	User             *handler.UserHandler
+	Account          *handler.AccountHandler
+	CredentialImport *handler.CredentialImportHandler
+	Group            *handler.GroupHandler
+	APIKey           *handler.APIKeyHandler
+	Subscription     *handler.SubscriptionHandler
+	Usage            *handler.UsageHandler
+	Proxy            *handler.ProxyHandler
+	Settings         *handler.SettingsHandler
+	Dashboard        *handler.DashboardHandler
+	Plugin           *handler.PluginHandler
+	Version          *handler.VersionHandler
+	Upgrade          *handler.UpgradeHandler
+	Monitor          *handler.MonitorHandler
+	Event            *handler.EventHandler
 
 	AccountService *appaccount.Service
 }
@@ -94,6 +96,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	dashboardStore := store.NewDashboardStore(dep.DB, dep.Redis)
 	dashboardService := appdashboard.NewService(dashboardStore, dep.Redis)
 	pluginAdminService := apppluginadmin.NewService(dep.PluginMgr, dep.Marketplace)
+	credentialImportService := appcredentialimport.NewService(pluginAdminService)
 	settingsStore := store.NewSettingsStore(dep.DB)
 	settingsService := appsettings.NewService(settingsStore)
 	notificationService := appnotification.NewService(settingsService)
@@ -119,23 +122,25 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 
 	upgradeService := upgrade.NewService(upgrade.DetectMode(), dep.Redis)
 
+	accountHandler := handler.NewAccountHandler(accountService, dep.Scheduler, settingsService)
 	return &HTTPHandlers{
-		Auth:           handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
-		User:           handler.NewUserHandler(userService, settingsService, dep.Scheduler),
-		Account:        handler.NewAccountHandler(accountService, dep.Scheduler, settingsService),
-		Group:          handler.NewGroupHandler(groupService, dep.Scheduler),
-		APIKey:         handler.NewAPIKeyHandler(apiKeyService, dep.Scheduler),
-		Subscription:   handler.NewSubscriptionHandler(subscriptionService),
-		Usage:          handler.NewUsageHandler(usageService),
-		Proxy:          handler.NewProxyHandler(proxyService),
-		Settings:       handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret(), notificationService),
-		Dashboard:      handler.NewDashboardHandler(dashboardService),
-		Plugin:         handler.NewPluginHandler(pluginAdminService),
-		Version:        handler.NewVersionHandler(),
-		Upgrade:        handler.NewUpgradeHandler(upgradeService),
-		Monitor:        handler.NewMonitorHandler(monitorService, dep.Runtime),
-		Event:          handler.NewEventHandler(dep.Events),
-		AccountService: accountService,
+		Auth:             handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
+		User:             handler.NewUserHandler(userService, settingsService, dep.Scheduler),
+		Account:          accountHandler,
+		CredentialImport: handler.NewCredentialImportHandler(accountHandler, credentialImportService),
+		Group:            handler.NewGroupHandler(groupService, dep.Scheduler),
+		APIKey:           handler.NewAPIKeyHandler(apiKeyService, dep.Scheduler),
+		Subscription:     handler.NewSubscriptionHandler(subscriptionService),
+		Usage:            handler.NewUsageHandler(usageService),
+		Proxy:            handler.NewProxyHandler(proxyService),
+		Settings:         handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret(), notificationService),
+		Dashboard:        handler.NewDashboardHandler(dashboardService),
+		Plugin:           handler.NewPluginHandler(pluginAdminService),
+		Version:          handler.NewVersionHandler(),
+		Upgrade:          handler.NewUpgradeHandler(upgradeService),
+		Monitor:          handler.NewMonitorHandler(monitorService, dep.Runtime),
+		Event:            handler.NewEventHandler(dep.Events),
+		AccountService:   accountService,
 	}
 }
 
