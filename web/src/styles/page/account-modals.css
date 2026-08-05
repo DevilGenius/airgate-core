@@ -296,3 +296,174 @@
 .ag-account-test-model-select .ag-toolbar-menu-item {
   min-height: 2.25rem;
 }
+
+/* Admin accounts: 导入配置弹窗布局 */
+
+.ag-elevation-modal.ag-import-config-modal .modal__body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding-block: 0.75rem 1rem;
+}
+
+.ag-import-config {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-inline: 0.75rem;
+}
+
+.ag-import-config-toolbar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.ag-import-config-body {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.ag-import-config-sidebar {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  border-radius: var(--field-radius);
+  background: color-mix(in oklab, var(--surface-secondary) 60%, var(--background));
+}
+
+.ag-import-config-sidebar-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--separator) 76%, transparent);
+  padding: 0.625rem 0.75rem;
+}
+
+.ag-import-config-rule-list {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.5rem;
+}
+
+.ag-import-config-rule {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0.125rem;
+  border-radius: calc(var(--field-radius) - 0.125rem);
+}
+
+.ag-import-config-rule[data-dragging="true"] {
+  opacity: 0.55;
+}
+
+.ag-import-config-rule[data-drop-position]::before {
+  position: absolute;
+  z-index: 1;
+  right: 0.25rem;
+  left: 0.25rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  content: "";
+  pointer-events: none;
+}
+
+.ag-import-config-rule[data-drop-position="before"]::before {
+  top: -0.1875rem;
+}
+
+.ag-import-config-rule[data-drop-position="after"]::before {
+  bottom: -0.1875rem;
+}
+
+.ag-import-config-rule .ag-toolbar-menu-item {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ag-import-config-rule-grip {
+  display: inline-flex;
+  flex: none;
+  width: 1rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--field-radius) - 0.25rem);
+  color: var(--muted);
+  cursor: grab;
+  opacity: 0.5;
+}
+
+.ag-import-config-rule:hover .ag-import-config-rule-grip,
+.ag-import-config-rule[data-dragging="true"] .ag-import-config-rule-grip {
+  opacity: 1;
+}
+
+.ag-import-config-rule-grip:active {
+  cursor: grabbing;
+}
+
+.ag-import-config-sidebar-footer {
+  flex: none;
+  border-top: 1px solid color-mix(in oklab, var(--separator) 76%, transparent);
+  padding: 0.5rem;
+}
+
+.ag-import-config-editor {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.25rem;
+}
+
+.ag-import-config-dsl {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ag-import-config-dsl .textfield {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ag-import-config-dsl .ag-import-config-dsl-input {
+  flex: 1 1 auto;
+  min-height: 10rem;
+  resize: none;
+}
+
+@media (max-width: 767px) {
+  .ag-import-config-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .ag-import-config-rule-list {
+    max-height: 10rem;
+  }
+}

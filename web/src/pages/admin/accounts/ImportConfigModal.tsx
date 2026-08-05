@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Button, Input, Label, Spinner, TextArea, TextField as HeroTextField, useOverlayState,
+  Button, Input, Label, Spinner, Tabs, TextArea, TextField as HeroTextField, useOverlayState,
 } from '@heroui/react';
 import {
-  ArrowDown, ArrowUp, Braces, CopyPlus, Plus, RotateCcw, Trash2,
+  Braces, CopyPlus, GripVertical, Plus, RotateCcw, Trash2,
 } from 'lucide-react';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
@@ -19,7 +19,6 @@ import {
   cloneImportConfig,
   createImportRule,
   parseImportConfigDSL,
-  prioritySequencePreview,
   serializeImportConfigDSL,
   type ImportCondition,
   type ImportConditionOp,
@@ -127,6 +126,8 @@ export function ImportConfigModal({
   const [selectedRuleIndex, setSelectedRuleIndex] = useState(0);
   const [dslValue, setDSLValue] = useState(() => serializeImportConfigDSL(EMPTY_IMPORT_CONFIG));
   const [dslError, setDSLError] = useState('');
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<{ index: number; position: 'before' | 'after' } | null>(null);
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -253,16 +254,52 @@ export function ImportConfigModal({
     setSelectedRuleIndex(Math.max(0, selectedRuleIndex - 1));
   };
 
-  const moveRule = (offset: -1 | 1) => {
-    const target = selectedRuleIndex + offset;
-    if (!selectedRule || target < 0 || target >= config.rules.length) return;
+  const reorderRule = (from: number, insertBefore: number) => {
+    if (from === insertBefore || from + 1 === insertBefore) return;
+    const target = insertBefore > from ? insertBefore - 1 : insertBefore;
     setConfig((current) => {
+      if (!current.rules[from]) return current;
       const next = cloneImportConfig(current);
-      const [moved] = next.rules.splice(selectedRuleIndex, 1);
-      if (moved) next.rules.splice(target, 0, moved);
+      const [moved] = next.rules.splice(from, 1);
+      if (!moved) return current;
+      next.rules.splice(target, 0, moved);
       return next;
     });
     setSelectedRuleIndex(target);
+  };
+
+  const resetRuleDrag = () => {
+    setDraggingIndex(null);
+    setDropIndicator(null);
+  };
+
+  const handleRuleDragStart = (index: number) => (event: DragEvent<HTMLDivElement>) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(index));
+    setDraggingIndex(index);
+  };
+
+  const handleRuleDragOver = (index: number) => (event: DragEvent<HTMLDivElement>) => {
+    if (draggingIndex === null) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const rect = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    setDropIndicator((current) => (
+      current && current.index === index && current.position === position
+        ? current
+        : { index, position }
+    ));
+  };
+
+  const handleRuleDrop = (index: number) => (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (draggingIndex !== null) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+      reorderRule(draggingIndex, position === 'before' ? index : index + 1);
+    }
+    resetRuleDrag();
   };
 
   const updateCondition = (conditionIndex: number, updater: (condition: ImportCondition) => ImportCondition) => {
@@ -324,7 +361,7 @@ export function ImportConfigModal({
 
   return (
     <CommonModal
-      className="ag-account-page-modal"
+      className="ag-account-page-modal ag-import-config-modal"
       description={t('accounts.import_config_description')}
       dialogStyle={{
         height: 'min(820px, calc(100dvh - 2rem))',
@@ -352,25 +389,27 @@ export function ImportConfigModal({
       surface={false}
       title={t('accounts.import_config_title')}
     >
-      <div className="flex min-h-0 flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex gap-2">
-            <Button
-              variant={view === 'form' ? 'primary' : 'secondary'}
-              onPress={() => switchView('form')}
-              isDisabled={loading}
-            >
-              {t('accounts.import_config_graphical')}
-            </Button>
-            <Button
-              variant={view === 'dsl' ? 'primary' : 'secondary'}
-              onPress={() => switchView('dsl')}
-              isDisabled={loading}
-            >
-              <Braces className="h-4 w-4" />
-              {t('accounts.import_config_advanced')}
-            </Button>
-          </div>
+      <div className="ag-import-config">
+        <div className="ag-import-config-toolbar">
+          <Tabs
+            className="ag-segmented-tabs ag-segmented-tabs-compact ag-segmented-tabs-auto"
+            isDisabled={loading}
+            selectedKey={view}
+            onSelectionChange={(key) => switchView(key as 'form' | 'dsl')}
+          >
+            <Tabs.List>
+              <Tabs.Tab id="form">
+                <Tabs.Indicator />
+                <span>{t('accounts.import_config_graphical')}</span>
+              </Tabs.Tab>
+              <Tabs.Tab id="dsl">
+                <Tabs.Separator />
+                <Tabs.Indicator />
+                <Braces />
+                <span>{t('accounts.import_config_advanced')}</span>
+              </Tabs.Tab>
+            </Tabs.List>
+          </Tabs>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onPress={() => loadConfig(ACCOUNT_IMPORT_DSL_EXAMPLE)} isDisabled={loading}>
               {t('accounts.import_config_load_example')}
@@ -387,12 +426,11 @@ export function ImportConfigModal({
         </div>
 
         {view === 'dsl' ? (
-          <div className="space-y-2">
+          <div className="ag-import-config-dsl">
             <HeroTextField fullWidth isInvalid={dslError !== ''}>
               <Label>{t('accounts.import_config_dsl')}</Label>
               <TextArea
-                className="font-mono text-xs leading-5"
-                rows={28}
+                className="ag-import-config-dsl-input font-mono text-xs leading-5"
                 wrap="off"
                 value={dslValue}
                 disabled={loading}
@@ -410,29 +448,45 @@ export function ImportConfigModal({
             {dslError ? <p className="text-sm text-danger">{dslError}</p> : null}
           </div>
         ) : (
-          <div className="grid min-h-0 gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
-            <aside className="min-h-0 rounded-lg border border-border bg-surface p-2">
-              <div className="flex items-center justify-between px-2 py-1.5">
+          <div className="ag-import-config-body">
+            <aside className="ag-import-config-sidebar">
+              <div className="ag-import-config-sidebar-header">
                 <span className="text-xs font-medium text-text-secondary">{t('accounts.import_config_rules')}</span>
                 <span className="text-[11px] text-text-tertiary">{t('accounts.import_config_first_match')}</span>
               </div>
-              <div className="ag-simple-multi-select max-h-[540px] space-y-1 overflow-y-auto">
+              <div className="ag-import-config-rule-list ag-simple-multi-select">
                 {config.rules.map((rule, index) => (
-                  <ToolbarMenuItem
+                  <div
                     key={`${rule.name}-${index}`}
-                    isSelected={index === selectedRuleIndex}
-                    role="menuitemradio"
-                    showCheckIndicator={false}
-                    onSelect={() => setSelectedRuleIndex(index)}
+                    className="ag-import-config-rule"
+                    data-dragging={draggingIndex === index ? 'true' : undefined}
+                    data-drop-position={
+                      dropIndicator?.index === index ? dropIndicator.position : undefined
+                    }
+                    draggable
+                    onDragEnd={resetRuleDrag}
+                    onDragOver={handleRuleDragOver(index)}
+                    onDragStart={handleRuleDragStart(index)}
+                    onDrop={handleRuleDrop(index)}
                   >
-                    <span className="flex min-w-0 items-center justify-between gap-2">
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm">{rule.name}</span>
-                        <span className="block truncate text-[11px] opacity-70">{ruleSummary(rule)}</span>
-                      </span>
-                      <span className="text-[11px] tabular-nums opacity-70">{index + 1}</span>
+                    <span className="ag-import-config-rule-grip" aria-hidden="true">
+                      <GripVertical className="h-3.5 w-3.5" />
                     </span>
-                  </ToolbarMenuItem>
+                    <ToolbarMenuItem
+                      isSelected={index === selectedRuleIndex}
+                      role="menuitemradio"
+                      showCheckIndicator={false}
+                      onSelect={() => setSelectedRuleIndex(index)}
+                    >
+                      <span className="flex min-w-0 items-center justify-between gap-2">
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm">{rule.name}</span>
+                          <span className="block truncate text-[11px] opacity-70">{ruleSummary(rule)}</span>
+                        </span>
+                        <span className="text-[11px] tabular-nums opacity-70">{index + 1}</span>
+                      </span>
+                    </ToolbarMenuItem>
+                  </div>
                 ))}
                 {config.rules.length === 0 ? (
                   <p className="px-2 py-6 text-center text-xs text-text-tertiary">
@@ -440,16 +494,19 @@ export function ImportConfigModal({
                   </p>
                 ) : null}
               </div>
-              <Button className="mt-2 w-full" variant="secondary" onPress={addRule} isDisabled={loading}>
-                <Plus className="h-4 w-4" />
-                {t('accounts.import_config_add_rule')}
-              </Button>
+              <div className="ag-import-config-sidebar-footer">
+                <Button className="w-full" variant="secondary" onPress={addRule} isDisabled={loading}>
+                  <Plus className="h-4 w-4" />
+                  {t('accounts.import_config_add_rule')}
+                </Button>
+              </div>
             </aside>
 
-            <div className="min-w-0 space-y-4 overflow-y-auto pr-1">
+            <div className="ag-import-config-editor">
+              <div className="space-y-4 pb-1">
               {selectedRule ? (
                 <>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
                     <div className="min-w-[220px] flex-1">
                       <HeroTextField fullWidth>
                         <Label>{t('accounts.import_config_rule_name')}</Label>
@@ -459,18 +516,12 @@ export function ImportConfigModal({
                         />
                       </HeroTextField>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1 pt-6">
+                    <div className="flex flex-wrap items-center gap-1 pb-0.5">
                       <NativeSwitch
                         isSelected={selectedRule.enabled !== false}
                         label={t('accounts.import_config_rule_enabled')}
                         onChange={(enabled) => updateSelectedRule((rule) => { rule.enabled = enabled; })}
                       />
-                      <Button isIconOnly variant="ghost" aria-label={t('accounts.import_config_move_up')} onPress={() => moveRule(-1)} isDisabled={selectedRuleIndex === 0}>
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
-                      <Button isIconOnly variant="ghost" aria-label={t('accounts.import_config_move_down')} onPress={() => moveRule(1)} isDisabled={selectedRuleIndex >= config.rules.length - 1}>
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
                       <Button isIconOnly variant="ghost" aria-label={t('accounts.import_config_duplicate_rule')} onPress={duplicateRule}>
                         <CopyPlus className="h-4 w-4" />
                       </Button>
@@ -502,44 +553,41 @@ export function ImportConfigModal({
                     {selectedRule.when.map((condition, conditionIndex) => {
                       const operator = CONDITION_OPERATORS.find((item) => item.key === condition.op);
                       return (
-                        <div key={conditionIndex} className="grid gap-2 rounded-md bg-surface px-3 py-2.5 sm:grid-cols-[1.2fr_0.8fr_1.4fr_auto]">
-                          <HeroTextField fullWidth>
-                            <Label>{t('accounts.import_config_field')}</Label>
-                            <Input
-                              list="account-import-condition-fields"
-                              value={condition.field}
-                              onChange={(event) => updateCondition(conditionIndex, (current) => ({
-                                ...current, field: event.target.value,
-                              }))}
-                            />
-                          </HeroTextField>
-                          <div className="space-y-1.5">
-                            <Label>{t('accounts.import_config_operator')}</Label>
-                            <SimpleSelect
-                              ariaLabel={t('accounts.import_config_operator')}
-                              fullWidth
-                              items={CONDITION_OPERATORS.map((item) => ({ key: item.key, label: t(item.labelKey) }))}
-                              selectedKey={condition.op}
-                              selectedLabel={operator ? t(operator.labelKey) : condition.op}
-                              onSelectionChange={(key) => setConditionOperator(conditionIndex, key as ImportConditionOp)}
-                            />
-                          </div>
+                        <div key={conditionIndex} className="grid items-center gap-2 rounded-md bg-surface px-3 py-2.5 sm:grid-cols-[1.2fr_0.8fr_1.4fr_auto]">
+                          <Input
+                            aria-label={t('accounts.import_config_field')}
+                            className="w-full"
+                            list="account-import-condition-fields"
+                            placeholder={t('accounts.import_config_field')}
+                            value={condition.field}
+                            onChange={(event) => updateCondition(conditionIndex, (current) => ({
+                              ...current, field: event.target.value,
+                            }))}
+                          />
+                          <SimpleSelect
+                            ariaLabel={t('accounts.import_config_operator')}
+                            fullWidth
+                            items={CONDITION_OPERATORS.map((item) => ({ key: item.key, label: t(item.labelKey) }))}
+                            selectedKey={condition.op}
+                            selectedLabel={operator ? t(operator.labelKey) : condition.op}
+                            onSelectionChange={(key) => setConditionOperator(conditionIndex, key as ImportConditionOp)}
+                          />
                           {condition.op === 'empty' || condition.op === 'not_empty' ? <div /> : (
-                            <HeroTextField fullWidth>
-                              <Label>{t('accounts.import_config_value')}</Label>
-                              <Input
-                                value={conditionDisplayValue(condition)}
-                                placeholder={condition.op === 'in' ? t('accounts.import_config_values_placeholder') : undefined}
-                                onChange={(event) => updateCondition(conditionIndex, (current) => (
-                                  current.op === 'in'
-                                    ? { ...current, values: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) }
-                                    : { ...current, value: event.target.value }
-                                ))}
-                              />
-                            </HeroTextField>
+                            <Input
+                              aria-label={t('accounts.import_config_value')}
+                              className="w-full"
+                              placeholder={condition.op === 'in'
+                                ? t('accounts.import_config_values_placeholder')
+                                : t('accounts.import_config_value')}
+                              value={conditionDisplayValue(condition)}
+                              onChange={(event) => updateCondition(conditionIndex, (current) => (
+                                current.op === 'in'
+                                  ? { ...current, values: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) }
+                                  : { ...current, value: event.target.value }
+                              ))}
+                            />
                           )}
                           <Button
-                            className="self-end"
                             isIconOnly
                             variant="ghost"
                             aria-label={t('accounts.import_config_delete_condition')}
@@ -556,7 +604,7 @@ export function ImportConfigModal({
                     <h3 className="text-sm font-semibold text-text">{t('accounts.import_config_assignments')}</h3>
 
                     <div className="grid gap-4 rounded-md bg-surface px-3 py-3 sm:grid-cols-2">
-                      <div className="space-y-2">
+                      <div className="flex flex-col items-start gap-2">
                         <NativeSwitch
                           isSelected={selectedRule.set.max_concurrency != null}
                           label={t('accounts.import_config_capacity')}
@@ -568,6 +616,7 @@ export function ImportConfigModal({
                         {selectedRule.set.max_concurrency != null ? (
                           <Input
                             aria-label={t('accounts.import_config_capacity')}
+                            className="w-full"
                             type="number"
                             min={0}
                             value={String(selectedRule.set.max_concurrency)}
@@ -577,7 +626,7 @@ export function ImportConfigModal({
                           />
                         ) : null}
                       </div>
-                      <div className="space-y-2">
+                      <div className="flex flex-col items-start gap-2">
                         <NativeSwitch
                           isSelected={selectedRule.set.priority != null}
                           label={t('accounts.import_config_priority')}
@@ -618,32 +667,27 @@ export function ImportConfigModal({
                         </div>
                       ) : null}
                       {selectedRule.set.priority?.mode === 'sequence' ? (
-                        <div className="space-y-2 border-t border-border pt-3 sm:col-span-2">
-                          <div className="grid gap-2 sm:grid-cols-5">
-                            <HeroTextField fullWidth>
-                              <Label>{t('accounts.priority_sequence_initial')}</Label>
-                              <Input type="number" value={String(selectedRule.set.priority.initial)} onChange={(event) => setSequenceValue('initial', parseNumber(event.target.value, 0))} />
-                            </HeroTextField>
-                            <HeroTextField fullWidth>
-                              <Label>{t('accounts.priority_sequence_step')}</Label>
-                              <Input type="number" value={String(selectedRule.set.priority.step)} onChange={(event) => setSequenceValue('step', parseNumber(event.target.value, 0))} />
-                            </HeroTextField>
-                            <HeroTextField fullWidth>
-                              <Label>{t('accounts.priority_sequence_group_size')}</Label>
-                              <Input type="number" min={1} value={String(selectedRule.set.priority.group_size)} onChange={(event) => setSequenceValue('group_size', Math.max(1, parseNumber(event.target.value, 1)))} />
-                            </HeroTextField>
-                            <HeroTextField fullWidth>
-                              <Label>{t('accounts.import_config_priority_min')}</Label>
-                              <Input type="number" min={IMPORT_PRIORITY_MIN} max={IMPORT_PRIORITY_MAX} value={String(selectedRule.set.priority.min ?? IMPORT_PRIORITY_MIN)} onChange={(event) => setSequenceValue('min', parseNumber(event.target.value, IMPORT_PRIORITY_MIN))} />
-                            </HeroTextField>
-                            <HeroTextField fullWidth>
-                              <Label>{t('accounts.import_config_priority_max')}</Label>
-                              <Input type="number" min={IMPORT_PRIORITY_MIN} max={IMPORT_PRIORITY_MAX} value={String(selectedRule.set.priority.max ?? IMPORT_PRIORITY_MAX)} onChange={(event) => setSequenceValue('max', parseNumber(event.target.value, IMPORT_PRIORITY_MAX))} />
-                            </HeroTextField>
-                          </div>
-                          <p className="font-mono text-[11px] text-text-tertiary">
-                            {t('accounts.import_config_priority_preview')}: {prioritySequencePreview(selectedRule.set.priority).join(' → ')}
-                          </p>
+                        <div className="grid gap-2 border-t border-border pt-3 sm:col-span-2 sm:grid-cols-5">
+                          <HeroTextField fullWidth>
+                            <Label>{t('accounts.priority_sequence_initial')}</Label>
+                            <Input type="number" value={String(selectedRule.set.priority.initial)} onChange={(event) => setSequenceValue('initial', parseNumber(event.target.value, 0))} />
+                          </HeroTextField>
+                          <HeroTextField fullWidth>
+                            <Label>{t('accounts.priority_sequence_step')}</Label>
+                            <Input type="number" value={String(selectedRule.set.priority.step)} onChange={(event) => setSequenceValue('step', parseNumber(event.target.value, 0))} />
+                          </HeroTextField>
+                          <HeroTextField fullWidth>
+                            <Label>{t('accounts.priority_sequence_group_size')}</Label>
+                            <Input type="number" min={1} value={String(selectedRule.set.priority.group_size)} onChange={(event) => setSequenceValue('group_size', Math.max(1, parseNumber(event.target.value, 1)))} />
+                          </HeroTextField>
+                          <HeroTextField fullWidth>
+                            <Label>{t('accounts.import_config_priority_min')}</Label>
+                            <Input type="number" min={IMPORT_PRIORITY_MIN} max={IMPORT_PRIORITY_MAX} value={String(selectedRule.set.priority.min ?? IMPORT_PRIORITY_MIN)} onChange={(event) => setSequenceValue('min', parseNumber(event.target.value, IMPORT_PRIORITY_MIN))} />
+                          </HeroTextField>
+                          <HeroTextField fullWidth>
+                            <Label>{t('accounts.import_config_priority_max')}</Label>
+                            <Input type="number" min={IMPORT_PRIORITY_MIN} max={IMPORT_PRIORITY_MAX} value={String(selectedRule.set.priority.max ?? IMPORT_PRIORITY_MAX)} onChange={(event) => setSequenceValue('max', parseNumber(event.target.value, IMPORT_PRIORITY_MAX))} />
+                          </HeroTextField>
                         </div>
                       ) : null}
                     </div>
@@ -689,7 +733,7 @@ export function ImportConfigModal({
                   ) : null}
                 </>
               ) : (
-                <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-text-tertiary">
+                <div className="flex h-full min-h-64 flex-col items-center justify-center gap-3 text-text-tertiary">
                   <p className="text-sm">{t('accounts.import_config_no_rules')}</p>
                   <Button variant="secondary" onPress={addRule}>
                     <Plus className="h-4 w-4" />
@@ -697,6 +741,7 @@ export function ImportConfigModal({
                   </Button>
                 </div>
               )}
+              </div>
             </div>
           </div>
         )}
