@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Chip, Label, useOverlayState } from '@heroui/react';
-import { Check, Loader2, Play, RotateCcw, X } from 'lucide-react';
+import { AlertTriangle, Check, Loader2, Play, RotateCcw, X } from 'lucide-react';
 import { accountsApi } from '../../../shared/api/accounts';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
@@ -11,7 +11,7 @@ import {
   runAccountConnectivityTest,
 } from './accountTestRunner';
 
-type ItemStatus = 'pending' | 'running' | 'success' | 'error';
+type ItemStatus = 'pending' | 'running' | 'success' | 'warning' | 'error';
 
 interface ItemState {
   groupKey: string;
@@ -51,6 +51,7 @@ export function BulkAccountTestModal({
   const [items, setItems] = useState<ItemState[]>([]);
   const [done, setDone] = useState(0);
   const [success, setSuccess] = useState(0);
+  const [warning, setWarning] = useState(0);
   const [failed, setFailed] = useState(0);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
@@ -76,6 +77,7 @@ export function BulkAccountTestModal({
     })));
     setDone(0);
     setSuccess(0);
+    setWarning(0);
     setFailed(0);
     setRunning(false);
     setFinished(false);
@@ -139,13 +141,19 @@ export function BulkAccountTestModal({
   }, []);
 
   const recordResult = useCallback((accountId: number, result: { success: boolean; error?: string }) => {
+    const status: ItemStatus = result.success
+      ? 'success'
+      : isRateLimitWarning(result.error)
+        ? 'warning'
+        : 'error';
     setItems((previous) => previous.map((item) => (
       item.id === accountId
-        ? { ...item, status: result.success ? 'success' : 'error', error: result.error }
+        ? { ...item, status, error: result.error }
         : item
     )));
     setDone((value) => value + 1);
-    if (result.success) setSuccess((value) => value + 1);
+    if (status === 'success') setSuccess((value) => value + 1);
+    else if (status === 'warning') setWarning((value) => value + 1);
     else setFailed((value) => value + 1);
   }, []);
 
@@ -168,6 +176,7 @@ export function BulkAccountTestModal({
     })));
     setDone(0);
     setSuccess(0);
+    setWarning(0);
     setFailed(0);
     setFinished(false);
     setRunning(true);
@@ -218,11 +227,12 @@ export function BulkAccountTestModal({
   });
   const progress = accounts.length > 0 ? Math.round((done / accounts.length) * 100) : 0;
   const successPercent = accounts.length > 0 ? (success / accounts.length) * 100 : 0;
+  const warningPercent = accounts.length > 0 ? (warning / accounts.length) * 100 : 0;
   const failedPercent = accounts.length > 0 ? (failed / accounts.length) * 100 : 0;
   const groupStats = useMemo(() => {
     const stats = new Map<string, number>();
     for (const item of items) {
-      if (item.status === 'success' || item.status === 'error') {
+      if (item.status === 'success' || item.status === 'warning' || item.status === 'error') {
         stats.set(item.groupKey, (stats.get(item.groupKey) ?? 0) + 1);
       }
     }
@@ -313,6 +323,10 @@ export function BulkAccountTestModal({
                 <Check className="w-3.5 h-3.5" />
                 {t('accounts.bulk_test_success_count', { count: success })}
               </span>
+              <span className="inline-flex items-center gap-1 text-warning">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {t('accounts.bulk_test_warning_count', { count: warning })}
+              </span>
               <span className="inline-flex items-center gap-1 text-danger">
                 <X className="w-3.5 h-3.5" />
                 {t('accounts.bulk_test_failed_count', { count: failed })}
@@ -326,6 +340,10 @@ export function BulkAccountTestModal({
             <div
               className="h-full bg-success transition-[width] duration-300"
               style={{ width: `${successPercent}%` }}
+            />
+            <div
+              className="h-full bg-warning transition-[width] duration-300"
+              style={{ width: `${warningPercent}%` }}
             />
             <div
               className="h-full bg-danger transition-[width] duration-300"
@@ -352,7 +370,7 @@ export function BulkAccountTestModal({
                   ) : null}
                 </div>
                 {items.filter((item) => item.groupKey === group.key).map((item) => {
-                  const message = item.status === 'error' ? item.error : item.text;
+                  const message = item.status === 'error' || item.status === 'warning' ? item.error : item.text;
                   return (
                     <div
                       key={item.id}
@@ -422,6 +440,8 @@ function StreamMessage({
     ? 'text-[var(--ag-text-tertiary)]'
     : status === 'error'
       ? 'text-danger'
+      : status === 'warning'
+        ? 'text-warning'
       : status === 'success'
         ? 'text-success'
         : 'text-[var(--ag-text-secondary)]';
@@ -443,8 +463,16 @@ function TestStatusIcon({ status }: { status: ItemStatus }) {
   if (status === 'success') {
     return <Check className="w-3.5 h-3.5 text-success" />;
   }
+  if (status === 'warning') {
+    return <AlertTriangle className="w-3.5 h-3.5 text-warning" />;
+  }
   if (status === 'error') {
     return <X className="w-3.5 h-3.5 text-danger" />;
   }
   return <span className="h-3 w-3 rounded-full border border-[var(--ag-glass-border)]" />;
+}
+
+function isRateLimitWarning(error?: string): boolean {
+  if (!error) return false;
+  return /\b429\b|rate[\s_-]*limit(?:ed|ing)?|too many requests/i.test(error);
 }

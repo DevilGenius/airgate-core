@@ -600,6 +600,7 @@
     "bulk_test_group_count": "{{count}} accounts",
     "bulk_test_progress": "Progress {{done}} / {{total}}",
     "bulk_test_success_count": "Success {{count}}",
+    "bulk_test_warning_count": "Warnings {{count}}",
     "bulk_test_failed_count": "Failed {{count}}",
     "bulk_test_models_error": "Unable to load test models for this platform",
     "bulk_test_waiting": "Waiting…",

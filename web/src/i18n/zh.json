@@ -601,6 +601,7 @@
     "bulk_test_group_count": "{{count}} 个账号",
     "bulk_test_progress": "进度 {{done}} / {{total}}",
     "bulk_test_success_count": "成功 {{count}}",
+    "bulk_test_warning_count": "限流 {{count}}",
     "bulk_test_failed_count": "失败 {{count}}",
     "bulk_test_models_error": "无法加载该平台的测试模型",
     "bulk_test_waiting": "等待测试…",
