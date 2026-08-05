@@ -407,7 +407,7 @@
     "import_config_clear": "清空规则",
     "import_config_invalid_json": "请输入 version=1 且包含 rules 数组的有效 JSON。",
     "import_config_syntax": "DSL 语法",
-    "import_config_syntax_hint": "规则支持 enabled；when 支持 platform、type、name、email、credentials.*、extra.*；set 支持 max_concurrency、priority 和 group_ids。序列优先级支持 initial、step、group_size、min、max。",
+    "import_config_syntax_hint": "规则支持 enabled；when 支持 platform、type、name、email、credentials.*、extra.*；set 支持容量、优先级、分组及各自的 enabled 标记。序列优先级支持 initial、step、group_size、min、max。",
     "import_config_groups": "可用分组 ID",
     "import_config_no_groups": "当前没有可用分组",
     "import_config_saved": "导入配置已保存",

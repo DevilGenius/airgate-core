@@ -23,8 +23,11 @@ export type ImportPriority =
 
 export interface ImportAssignment {
   max_concurrency?: number;
+  max_concurrency_enabled?: boolean;
   priority?: ImportPriority;
+  priority_enabled?: boolean;
   group_ids?: number[];
+  group_ids_enabled?: boolean;
 }
 
 export interface ImportRule {
@@ -143,7 +146,19 @@ function parseRule(value: unknown, ruleIndex: number): ImportRule {
     }
     assignment.max_concurrency = Number(set.max_concurrency);
   }
+  if (set.max_concurrency_enabled != null) {
+    if (typeof set.max_concurrency_enabled !== 'boolean' || assignment.max_concurrency == null) {
+      throw new Error(`rules[${ruleIndex}].set.max_concurrency_enabled is invalid`);
+    }
+    assignment.max_concurrency_enabled = set.max_concurrency_enabled;
+  }
   if (set.priority != null) assignment.priority = parsePriority(set.priority, ruleIndex);
+  if (set.priority_enabled != null) {
+    if (typeof set.priority_enabled !== 'boolean' || assignment.priority == null) {
+      throw new Error(`rules[${ruleIndex}].set.priority_enabled is invalid`);
+    }
+    assignment.priority_enabled = set.priority_enabled;
+  }
   if (set.group_ids != null) {
     if (!Array.isArray(set.group_ids)
       || set.group_ids.some((id) => !Number.isSafeInteger(id) || Number(id) <= 0)) {
@@ -154,6 +169,12 @@ function parseRule(value: unknown, ruleIndex: number): ImportRule {
       throw new Error(`rules[${ruleIndex}].set.group_ids contains duplicates`);
     }
     assignment.group_ids = groupIDs;
+  }
+  if (set.group_ids_enabled != null) {
+    if (typeof set.group_ids_enabled !== 'boolean' || assignment.group_ids == null) {
+      throw new Error(`rules[${ruleIndex}].set.group_ids_enabled is invalid`);
+    }
+    assignment.group_ids_enabled = set.group_ids_enabled;
   }
   if (assignment.max_concurrency == null && assignment.priority == null && assignment.group_ids == null) {
     throw new Error(`rules[${ruleIndex}].set must configure at least one field`);

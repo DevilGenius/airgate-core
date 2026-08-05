@@ -16,8 +16,11 @@ describe('importConfigDsl', () => {
           when: [{ field: 'credentials.plan_type', op: 'in', values: ['plus'] }],
           set: {
             max_concurrency: 20,
+            max_concurrency_enabled: false,
             priority: { mode: 'sequence', initial: 1000, step: -10, group_size: 5, min: 900, max: 1000 },
+            priority_enabled: true,
             group_ids: [2],
+            group_ids_enabled: false,
           },
         },
       ],

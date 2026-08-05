@@ -474,6 +474,11 @@ func (s *Service) ListAll(ctx context.Context, filter ListFilter) ([]Account, er
 	return s.repo.ListAll(ctx, filter)
 }
 
+// OccupiedPriorities 返回现有账号已使用的优先级。
+func (s *Service) OccupiedPriorities(ctx context.Context) ([]int, error) {
+	return s.repo.OccupiedPriorities(ctx)
+}
+
 // Import 批量导入账号，逐条创建并收集失败信息（不使用事务，允许部分成功）。
 func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary {
 	return s.importAccounts(ctx, items, false)

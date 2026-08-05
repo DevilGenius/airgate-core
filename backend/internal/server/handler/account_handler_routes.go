@@ -143,7 +143,15 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 		response.InternalError(c, "导入配置无效: "+err.Error())
 		return
 	}
-	inputs, err = config.Apply(inputs)
+	var occupiedPriorities []int
+	if config.UsesPrioritySequence() {
+		occupiedPriorities, err = h.service.OccupiedPriorities(c.Request.Context())
+		if err != nil {
+			response.InternalError(c, "读取已占用优先级失败")
+			return
+		}
+	}
+	inputs, err = config.ApplyWithOccupiedPriorities(inputs, occupiedPriorities)
 	if err != nil {
 		response.BadRequest(c, "应用导入配置失败: "+err.Error())
 		return

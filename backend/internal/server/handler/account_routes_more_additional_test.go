@@ -34,6 +34,19 @@ func TestImportAccountsAppliesConfiguredDSL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create group: %v", err)
 	}
+	for index, priority := range []int{1000, 990} {
+		if _, err := db.Account.Create().
+			SetName(fmt.Sprintf("occupied-%d", index)).
+			SetPlatform("openai").
+			SetType("oauth").
+			SetCredentials(map[string]string{"access_token": fmt.Sprintf("occupied-%d", index)}).
+			SetPriority(priority).
+			SetMaxConcurrency(1).
+			SetRateMultiplier(1).
+			Save(ctx); err != nil {
+			t.Fatalf("create occupied account: %v", err)
+		}
+	}
 	settingsService := appsettings.NewService(store.NewSettingsStore(db))
 	dsl := fmt.Sprintf(`{
   "version": 1,
@@ -67,7 +80,7 @@ func TestImportAccountsAppliesConfiguredDSL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load imported account: %v", err)
 	}
-	if imported.Priority != 1000 || imported.MaxConcurrency != 20 {
+	if imported.Priority != 980 || imported.MaxConcurrency != 20 {
 		t.Fatalf("configured priority/capacity = %d/%d", imported.Priority, imported.MaxConcurrency)
 	}
 	groups, err := imported.QueryGroups().IDs(ctx)

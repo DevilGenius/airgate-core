@@ -519,6 +519,7 @@ type stubRepository struct {
 	findByID         func(context.Context, int, LoadOptions) (Account, error)
 	list             func(context.Context, ListFilter) ([]Account, int64, error)
 	listAll          func(context.Context, ListFilter) ([]Account, error)
+	occupiedPriority func(context.Context) ([]int, error)
 	listByPlatform   func(context.Context, string) ([]Account, error)
 	findUsageLogs    func(context.Context, int, time.Time, time.Time) ([]UsageLog, error)
 	batchWindowStats func(context.Context, []int, time.Time) (map[int]AccountWindowStats, error)
@@ -545,6 +546,13 @@ func (s stubRepository) List(ctx context.Context, filter ListFilter) ([]Account,
 func (s stubRepository) ListAll(ctx context.Context, filter ListFilter) ([]Account, error) {
 	if s.listAll != nil {
 		return s.listAll(ctx, filter)
+	}
+	return nil, nil
+}
+
+func (s stubRepository) OccupiedPriorities(ctx context.Context) ([]int, error) {
+	if s.occupiedPriority != nil {
+		return s.occupiedPriority(ctx)
 	}
 	return nil, nil
 }

@@ -159,6 +159,13 @@ export function ImportConfigModal({
     [groups],
   );
   const selectedRule = config.rules[selectedRuleIndex];
+  const displayedPriority: ImportPriority = selectedRule?.set.priority ?? { mode: 'fixed', value: 50 };
+  const capacityEnabled = selectedRule?.set.max_concurrency != null
+    && selectedRule.set.max_concurrency_enabled !== false;
+  const priorityEnabled = selectedRule?.set.priority != null
+    && selectedRule.set.priority_enabled !== false;
+  const groupsEnabled = selectedRule?.set.group_ids != null
+    && selectedRule.set.group_ids_enabled !== false;
   const validationError = useMemo(() => validateConfig(config), [config]);
   const selectedPlatform = selectedRule?.when.find(
     (condition) => condition.field === 'platform' && condition.op === 'eq',
@@ -622,57 +629,56 @@ export function ImportConfigModal({
                     <div className="grid gap-4 rounded-md bg-surface px-3 py-3 sm:grid-cols-2">
                       <div className="flex flex-col items-start gap-2">
                         <NativeSwitch
-                          isSelected={selectedRule.set.max_concurrency != null}
+                          isSelected={capacityEnabled}
                           label={t('accounts.import_config_capacity')}
                           onChange={(enabled) => updateSelectedRule((rule) => {
-                            if (enabled) rule.set.max_concurrency = rule.set.max_concurrency ?? 10;
-                            else delete rule.set.max_concurrency;
+                            rule.set.max_concurrency = rule.set.max_concurrency ?? 10;
+                            rule.set.max_concurrency_enabled = enabled;
                           })}
                         />
-                        {selectedRule.set.max_concurrency != null ? (
-                          <Input
-                            aria-label={t('accounts.import_config_capacity')}
-                            className="w-full"
-                            type="number"
-                            min={0}
-                            value={String(selectedRule.set.max_concurrency)}
-                            onChange={(event) => updateSelectedRule((rule) => {
-                              rule.set.max_concurrency = Math.max(0, parseNumber(event.target.value, 0));
-                            })}
-                          />
-                        ) : null}
+                        <Input
+                          aria-label={t('accounts.import_config_capacity')}
+                          className="w-full"
+                          type="number"
+                          min={0}
+                          disabled={!capacityEnabled}
+                          value={String(selectedRule.set.max_concurrency ?? 10)}
+                          onChange={(event) => updateSelectedRule((rule) => {
+                            rule.set.max_concurrency = Math.max(0, parseNumber(event.target.value, 0));
+                          })}
+                        />
                       </div>
                       <div className="flex flex-col items-start gap-2">
                         <NativeSwitch
-                          isSelected={selectedRule.set.priority != null}
+                          isSelected={priorityEnabled}
                           label={t('accounts.import_config_priority')}
                           onChange={(enabled) => updateSelectedRule((rule) => {
-                            if (enabled) rule.set.priority = rule.set.priority ?? { mode: 'fixed', value: 50 };
-                            else delete rule.set.priority;
+                            rule.set.priority = rule.set.priority ?? { mode: 'fixed', value: 50 };
+                            rule.set.priority_enabled = enabled;
                           })}
                         />
-                        {selectedRule.set.priority ? (
-                          <SimpleSelect
-                            ariaLabel={t('accounts.import_config_priority_mode')}
-                            fullWidth
-                            items={[
-                              { key: 'fixed', label: t('accounts.import_config_priority_fixed') },
-                              { key: 'sequence', label: t('accounts.priority_sequence') },
-                            ]}
-                            selectedKey={selectedRule.set.priority.mode}
-                            onSelectionChange={(key) => setPriorityMode(key as 'fixed' | 'sequence')}
-                          />
-                        ) : null}
+                        <SimpleSelect
+                          ariaLabel={t('accounts.import_config_priority_mode')}
+                          fullWidth
+                          isDisabled={!priorityEnabled}
+                          items={[
+                            { key: 'fixed', label: t('accounts.import_config_priority_fixed') },
+                            { key: 'sequence', label: t('accounts.priority_sequence') },
+                          ]}
+                          selectedKey={displayedPriority.mode}
+                          onSelectionChange={(key) => setPriorityMode(key as 'fixed' | 'sequence')}
+                        />
                       </div>
-                      {selectedRule.set.priority?.mode === 'fixed' ? (
+                      {displayedPriority.mode === 'fixed' ? (
                         <div className="grid gap-2 border-t border-border pt-3 sm:col-span-2 sm:grid-cols-3">
-                          <HeroTextField fullWidth>
+                          <HeroTextField fullWidth isDisabled={!priorityEnabled}>
                             <Label>{t('accounts.priority')}</Label>
                             <Input
                               type="number"
                               min={IMPORT_PRIORITY_MIN}
                               max={IMPORT_PRIORITY_MAX}
-                              value={String(selectedRule.set.priority.value)}
+                              disabled={!priorityEnabled}
+                              value={String(displayedPriority.value)}
                               onChange={(event) => updateSelectedRule((rule) => {
                                 if (rule.set.priority?.mode === 'fixed') {
                                   rule.set.priority.value = parseNumber(event.target.value, 0);
@@ -682,27 +688,27 @@ export function ImportConfigModal({
                           </HeroTextField>
                         </div>
                       ) : null}
-                      {selectedRule.set.priority?.mode === 'sequence' ? (
+                      {displayedPriority.mode === 'sequence' ? (
                         <div className="grid gap-2 border-t border-border pt-3 sm:col-span-2 sm:grid-cols-5">
-                          <HeroTextField fullWidth>
+                          <HeroTextField fullWidth isDisabled={!priorityEnabled}>
                             <Label>{t('accounts.priority_sequence_initial')}</Label>
-                            <Input type="number" value={String(selectedRule.set.priority.initial)} onChange={(event) => setSequenceValue('initial', parseNumber(event.target.value, 0))} />
+                            <Input disabled={!priorityEnabled} type="number" value={String(displayedPriority.initial)} onChange={(event) => setSequenceValue('initial', parseNumber(event.target.value, 0))} />
                           </HeroTextField>
-                          <HeroTextField fullWidth>
+                          <HeroTextField fullWidth isDisabled={!priorityEnabled}>
                             <Label>{t('accounts.priority_sequence_step')}</Label>
-                            <Input type="number" value={String(selectedRule.set.priority.step)} onChange={(event) => setSequenceValue('step', parseNumber(event.target.value, 0))} />
+                            <Input disabled={!priorityEnabled} type="number" value={String(displayedPriority.step)} onChange={(event) => setSequenceValue('step', parseNumber(event.target.value, 0))} />
                           </HeroTextField>
-                          <HeroTextField fullWidth>
+                          <HeroTextField fullWidth isDisabled={!priorityEnabled}>
                             <Label>{t('accounts.priority_sequence_group_size')}</Label>
-                            <Input type="number" min={1} value={String(selectedRule.set.priority.group_size)} onChange={(event) => setSequenceValue('group_size', Math.max(1, parseNumber(event.target.value, 1)))} />
+                            <Input disabled={!priorityEnabled} type="number" min={1} value={String(displayedPriority.group_size)} onChange={(event) => setSequenceValue('group_size', Math.max(1, parseNumber(event.target.value, 1)))} />
                           </HeroTextField>
-                          <HeroTextField fullWidth>
+                          <HeroTextField fullWidth isDisabled={!priorityEnabled}>
                             <Label>{t('accounts.import_config_priority_min')}</Label>
-                            <Input type="number" min={IMPORT_PRIORITY_MIN} max={IMPORT_PRIORITY_MAX} value={String(selectedRule.set.priority.min ?? IMPORT_PRIORITY_MIN)} onChange={(event) => setSequenceValue('min', parseNumber(event.target.value, IMPORT_PRIORITY_MIN))} />
+                            <Input disabled={!priorityEnabled} type="number" min={IMPORT_PRIORITY_MIN} max={IMPORT_PRIORITY_MAX} value={String(displayedPriority.min ?? IMPORT_PRIORITY_MIN)} onChange={(event) => setSequenceValue('min', parseNumber(event.target.value, IMPORT_PRIORITY_MIN))} />
                           </HeroTextField>
-                          <HeroTextField fullWidth>
+                          <HeroTextField fullWidth isDisabled={!priorityEnabled}>
                             <Label>{t('accounts.import_config_priority_max')}</Label>
-                            <Input type="number" min={IMPORT_PRIORITY_MIN} max={IMPORT_PRIORITY_MAX} value={String(selectedRule.set.priority.max ?? IMPORT_PRIORITY_MAX)} onChange={(event) => setSequenceValue('max', parseNumber(event.target.value, IMPORT_PRIORITY_MAX))} />
+                            <Input disabled={!priorityEnabled} type="number" min={IMPORT_PRIORITY_MIN} max={IMPORT_PRIORITY_MAX} value={String(displayedPriority.max ?? IMPORT_PRIORITY_MAX)} onChange={(event) => setSequenceValue('max', parseNumber(event.target.value, IMPORT_PRIORITY_MAX))} />
                           </HeroTextField>
                         </div>
                       ) : null}
@@ -710,37 +716,36 @@ export function ImportConfigModal({
 
                     <div className="space-y-3 rounded-md bg-surface px-3 py-3">
                       <NativeSwitch
-                        isSelected={selectedRule.set.group_ids != null}
+                        isSelected={groupsEnabled}
                         label={t('accounts.import_config_groups_assignment')}
                         onChange={(enabled) => updateSelectedRule((rule) => {
-                          if (enabled) rule.set.group_ids = rule.set.group_ids ?? [];
-                          else delete rule.set.group_ids;
+                          rule.set.group_ids = rule.set.group_ids ?? [];
+                          rule.set.group_ids_enabled = enabled;
                         })}
                       />
-                      {selectedRule.set.group_ids != null ? (
-                        <div className="grid max-h-44 gap-2 overflow-y-auto sm:grid-cols-2">
-                          {visibleGroups.map((group) => (
-                            <NativeCheckbox
-                              key={group.id}
-                              isSelected={selectedRule.set.group_ids?.includes(group.id) ?? false}
-                              onChange={(selected) => updateSelectedRule((rule) => {
-                                const ids = rule.set.group_ids ?? [];
-                                rule.set.group_ids = selected
-                                  ? Array.from(new Set([...ids, group.id]))
-                                  : ids.filter((id) => id !== group.id);
-                              })}
-                            >
-                              <span className="text-sm text-text">
-                                {group.name}
-                                <span className="ml-1 text-xs text-text-tertiary">#{group.id} · {group.platform}</span>
-                              </span>
-                            </NativeCheckbox>
-                          ))}
-                          {visibleGroups.length === 0 ? (
-                            <p className="text-xs text-text-tertiary">{t('accounts.import_config_no_groups')}</p>
-                          ) : null}
-                        </div>
-                      ) : null}
+                      <div className="grid max-h-44 gap-2 overflow-y-auto sm:grid-cols-2">
+                        {visibleGroups.map((group) => (
+                          <NativeCheckbox
+                            key={group.id}
+                            isDisabled={!groupsEnabled}
+                            isSelected={selectedRule.set.group_ids?.includes(group.id) ?? false}
+                            onChange={(selected) => updateSelectedRule((rule) => {
+                              const ids = rule.set.group_ids ?? [];
+                              rule.set.group_ids = selected
+                                ? Array.from(new Set([...ids, group.id]))
+                                : ids.filter((id) => id !== group.id);
+                            })}
+                          >
+                            <span className={!groupsEnabled ? 'text-sm text-text-tertiary' : 'text-sm text-text'}>
+                              {group.name}
+                              <span className="ml-1 text-xs text-text-tertiary">#{group.id} · {group.platform}</span>
+                            </span>
+                          </NativeCheckbox>
+                        ))}
+                        {visibleGroups.length === 0 ? (
+                          <p className="text-xs text-text-tertiary">{t('accounts.import_config_no_groups')}</p>
+                        ) : null}
+                      </div>
                     </div>
                   </section>
 

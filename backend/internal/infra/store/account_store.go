@@ -198,6 +198,13 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 	return mapAccounts(accounts), nil
 }
 
+// OccupiedPriorities 返回现有未删除账号使用中的优先级，用于导入序列跳过已占用档位。
+func (s *AccountStore) OccupiedPriorities(ctx context.Context) ([]int, error) {
+	return accountscope.Query(s.db).
+		Select(entaccount.FieldPriority).
+		Ints(ctx)
+}
+
 // Create 创建账号；同邮箱软删除账号会复用原行并恢复，同平台 OAuth 账号会刷新凭证。
 func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput) (appaccount.Account, error) {
 	resolvedEmail, resolvedCredentials, identityErr := accountidentity.Resolve(input.Email, input.Credentials)

@@ -406,7 +406,7 @@
     "import_config_clear": "Clear rules",
     "import_config_invalid_json": "Enter valid JSON with version=1 and a rules array.",
     "import_config_syntax": "DSL Syntax",
-    "import_config_syntax_hint": "Rules support enabled. when supports platform, type, name, email, credentials.*, and extra.*. set supports max_concurrency, priority, and group_ids. Sequence priority supports initial, step, group_size, min, and max.",
+    "import_config_syntax_hint": "Rules support enabled. when supports platform, type, name, email, credentials.*, and extra.*. set supports capacity, priority, groups, and their enabled flags. Sequence priority supports initial, step, group_size, min, and max.",
     "import_config_groups": "Available Group IDs",
     "import_config_no_groups": "No groups are currently available",
     "import_config_saved": "Import configuration saved",

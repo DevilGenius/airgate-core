@@ -42,9 +42,12 @@ type Condition struct {
 }
 
 type Assignment struct {
-	MaxConcurrency *int                `json:"max_concurrency,omitempty"`
-	Priority       *PriorityAssignment `json:"priority,omitempty"`
-	GroupIDs       []int64             `json:"group_ids,omitempty"`
+	MaxConcurrency        *int                `json:"max_concurrency,omitempty"`
+	MaxConcurrencyEnabled *bool               `json:"max_concurrency_enabled,omitempty"`
+	Priority              *PriorityAssignment `json:"priority,omitempty"`
+	PriorityEnabled       *bool               `json:"priority_enabled,omitempty"`
+	GroupIDs              []int64             `json:"group_ids,omitempty"`
+	GroupIDsEnabled       *bool               `json:"group_ids_enabled,omitempty"`
 }
 
 type PriorityAssignment struct {
@@ -116,6 +119,15 @@ func validateRule(index int, rule Rule) error {
 	}
 	if rule.Set.MaxConcurrency != nil && *rule.Set.MaxConcurrency < 0 {
 		return fmt.Errorf("%s 的 max_concurrency 不能小于 0", label)
+	}
+	if rule.Set.MaxConcurrency == nil && rule.Set.MaxConcurrencyEnabled != nil {
+		return fmt.Errorf("%s 设置 max_concurrency_enabled 时必须提供 max_concurrency", label)
+	}
+	if rule.Set.Priority == nil && rule.Set.PriorityEnabled != nil {
+		return fmt.Errorf("%s 设置 priority_enabled 时必须提供 priority", label)
+	}
+	if rule.Set.GroupIDs == nil && rule.Set.GroupIDsEnabled != nil {
+		return fmt.Errorf("%s 设置 group_ids_enabled 时必须提供 group_ids", label)
 	}
 	if err := validatePriority(label, rule.Set.Priority); err != nil {
 		return err
@@ -219,9 +231,39 @@ func validPriority(priority int) bool {
 	return priority >= PriorityMin && priority <= PriorityMax
 }
 
+func (c Config) UsesPrioritySequence() bool {
+	for _, rule := range c.Rules {
+		if rule.Enabled != nil && !*rule.Enabled {
+			continue
+		}
+		if rule.Set.Priority != nil && assignmentEnabled(rule.Set.PriorityEnabled) &&
+			strings.EqualFold(strings.TrimSpace(rule.Set.Priority.Mode), "sequence") {
+			return true
+		}
+	}
+	return false
+}
+
 func (c Config) Apply(items []appaccount.CreateInput) ([]appaccount.CreateInput, error) {
+	return c.ApplyWithOccupiedPriorities(items, nil)
+}
+
+type sequencePriorityState struct {
+	current     int
+	assigned    int
+	initialized bool
+}
+
+func (c Config) ApplyWithOccupiedPriorities(
+	items []appaccount.CreateInput,
+	occupiedPriorities []int,
+) ([]appaccount.CreateInput, error) {
 	result := append([]appaccount.CreateInput(nil), items...)
-	matchCounts := make([]int, len(c.Rules))
+	occupied := make(map[int]struct{}, len(occupiedPriorities)+len(c.Rules))
+	for _, priority := range occupiedPriorities {
+		occupied[priority] = struct{}{}
+	}
+	sequenceStates := make([]sequencePriorityState, len(c.Rules))
 	for itemIndex := range result {
 		for ruleIndex, rule := range c.Rules {
 			if rule.Enabled != nil && !*rule.Enabled {
@@ -230,10 +272,9 @@ func (c Config) Apply(items []appaccount.CreateInput) ([]appaccount.CreateInput,
 			if !ruleMatches(rule, result[itemIndex]) {
 				continue
 			}
-			if err := applyAssignment(&result[itemIndex], rule.Set, matchCounts[ruleIndex]); err != nil {
+			if err := applyAssignment(&result[itemIndex], rule.Set, occupied, &sequenceStates[ruleIndex]); err != nil {
 				return nil, fmt.Errorf("%s 应用于账号[%d] %q 失败: %w", ruleLabel(ruleIndex, rule.Name), itemIndex, result[itemIndex].Name, err)
 			}
-			matchCounts[ruleIndex]++
 			break
 		}
 	}
@@ -323,41 +364,93 @@ func conditionMatches(value string, condition Condition) bool {
 	}
 }
 
-func applyAssignment(item *appaccount.CreateInput, assignment Assignment, matchIndex int) error {
-	if assignment.MaxConcurrency != nil {
+func applyAssignment(
+	item *appaccount.CreateInput,
+	assignment Assignment,
+	occupied map[int]struct{},
+	sequenceState *sequencePriorityState,
+) error {
+	if assignment.MaxConcurrency != nil && assignmentEnabled(assignment.MaxConcurrencyEnabled) {
 		item.MaxConcurrency = *assignment.MaxConcurrency
 	}
-	if assignment.Priority != nil {
-		priority, err := assignedPriority(*assignment.Priority, matchIndex)
+	if assignment.Priority != nil && assignmentEnabled(assignment.PriorityEnabled) {
+		priority, err := assignedPriority(*assignment.Priority, occupied, sequenceState)
 		if err != nil {
 			return err
 		}
 		item.Priority = priority
 	}
-	if assignment.GroupIDs != nil {
+	if assignment.GroupIDs != nil && assignmentEnabled(assignment.GroupIDsEnabled) {
 		item.GroupIDs = append([]int64(nil), assignment.GroupIDs...)
 	}
 	return nil
 }
 
-func assignedPriority(assignment PriorityAssignment, matchIndex int) (int, error) {
+func assignmentEnabled(enabled *bool) bool {
+	return enabled == nil || *enabled
+}
+
+func assignedPriority(
+	assignment PriorityAssignment,
+	occupied map[int]struct{},
+	sequenceState *sequencePriorityState,
+) (int, error) {
 	switch strings.ToLower(strings.TrimSpace(assignment.Mode)) {
 	case "fixed":
 		return *assignment.Value, nil
 	case "sequence":
-		level := int64(matchIndex / *assignment.GroupSize)
-		value := int64(*assignment.Initial) + level*int64(*assignment.Step)
-		minimum, maximum, err := priorityBounds(&assignment)
-		if err != nil {
-			return 0, err
-		}
-		if value < int64(minimum) || value > int64(maximum) {
-			return 0, fmt.Errorf("生成的优先级 %d 超出 %d～%d 范围", value, minimum, maximum)
-		}
-		return int(value), nil
+		return nextSequencePriority(assignment, occupied, sequenceState)
 	default:
 		return 0, fmt.Errorf("不支持的优先级模式 %q", assignment.Mode)
 	}
+}
+
+func nextSequencePriority(
+	assignment PriorityAssignment,
+	occupied map[int]struct{},
+	state *sequencePriorityState,
+) (int, error) {
+	if state == nil {
+		return 0, errors.New("缺少优先级序列状态")
+	}
+	if state.initialized && state.assigned < *assignment.GroupSize {
+		state.assigned++
+		return state.current, nil
+	}
+
+	minimum, maximum, err := priorityBounds(&assignment)
+	if err != nil {
+		return 0, err
+	}
+	candidate := int64(*assignment.Initial)
+	if state.initialized {
+		candidate = int64(state.current) + int64(*assignment.Step)
+	}
+	for {
+		if candidate < int64(minimum) {
+			return commitSequencePriority(minimum, occupied, state), nil
+		}
+		if candidate > int64(maximum) {
+			return commitSequencePriority(maximum, occupied, state), nil
+		}
+		priority := int(candidate)
+		if _, exists := occupied[priority]; !exists {
+			return commitSequencePriority(priority, occupied, state), nil
+		}
+		candidate += int64(*assignment.Step)
+	}
+}
+
+func commitSequencePriority(
+	priority int,
+	occupied map[int]struct{},
+	state *sequencePriorityState,
+) int {
+	occupied[priority] = struct{}{}
+	state.current = priority
+	state.assigned = 1
+	state.initialized = true
+	return priority
 }
 
 func ruleLabel(index int, name string) string {

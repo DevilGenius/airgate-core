@@ -379,6 +379,7 @@ type ImportItemError struct {
 type Repository interface {
 	List(context.Context, ListFilter) ([]Account, int64, error)
 	ListAll(context.Context, ListFilter) ([]Account, error)
+	OccupiedPriorities(context.Context) ([]int, error)
 	Create(context.Context, CreateInput) (Account, error)
 	Update(context.Context, int, UpdateInput) (Account, error)
 	Delete(context.Context, int) error
