@@ -299,6 +299,11 @@
 
 /* Admin accounts: 导入配置弹窗布局 */
 
+.ag-elevation-modal.modal__dialog--lg.ag-import-config-modal {
+  height: min(57.5rem, calc(100dvh - 2rem));
+  max-height: calc(100dvh - 2rem) !important;
+}
+
 .ag-elevation-modal.ag-import-config-modal .modal__body {
   display: flex;
   flex: 1 1 auto;
@@ -431,11 +436,52 @@
 }
 
 .ag-import-config-editor {
+  --ag-import-config-row-action-size: 2.25rem;
+  --ag-import-config-row-gap: 0.5rem;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 0.25rem;
+}
+
+.ag-import-config-rule-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.75rem;
+  padding-inline: 0.625rem;
+}
+
+.ag-import-config-rule-name,
+.ag-import-config-rule-name .textfield {
+  min-width: 0;
+}
+
+.ag-import-config-rule-name-label {
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+}
+
+.ag-import-config-rule-actions {
+  min-width: calc(var(--ag-import-config-row-action-size) * 2 + var(--ag-import-config-row-gap));
+  align-self: end;
+}
+
+.ag-import-config-conditions-header {
+  padding-left: 0.625rem;
+  padding-right: calc(0.625rem + var(--ag-import-config-row-action-size) + var(--ag-import-config-row-gap));
+}
+
+.ag-import-config-section-title {
+  padding-inline: 0.625rem;
+}
+
+.ag-import-config-sequence-fields .label {
+  font-size: 0.75rem;
+  line-height: 1rem;
 }
 
 .ag-import-config-dsl {
@@ -489,6 +535,18 @@
 }
 
 @media (max-width: 767px) {
+  .ag-import-config-editor {
+    --ag-import-config-row-action-size: 2.5rem;
+  }
+
+  .ag-import-config-rule-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ag-import-config-rule-actions {
+    justify-self: end;
+  }
+
   .ag-import-config-body {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
