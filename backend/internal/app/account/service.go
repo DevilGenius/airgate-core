@@ -476,6 +476,17 @@ func (s *Service) ListAll(ctx context.Context, filter ListFilter) ([]Account, er
 
 // Import 批量导入账号，逐条创建并收集失败信息（不使用事务，允许部分成功）。
 func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary {
+	return s.importAccounts(ctx, items, false)
+}
+
+// ImportConfigured 批量导入已由 Core 导入 DSL 生成的账号。
+// GroupIDs 只来自服务端保存并校验过的 DSL，因此允许写入；普通文件导入仍使用 Import，
+// 继续清空跨环境的分组和代理引用。
+func (s *Service) ImportConfigured(ctx context.Context, items []CreateInput) ImportSummary {
+	return s.importAccounts(ctx, items, true)
+}
+
+func (s *Service) importAccounts(ctx context.Context, items []CreateInput, preserveGroupIDs bool) ImportSummary {
 	summary := ImportSummary{}
 	for index, input := range items {
 		rateMultiplier, err := normalizeCreateRateMultiplier(input.RateMultiplier)
@@ -509,7 +520,9 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary
 			})
 			continue
 		}
-		input.GroupIDs = nil
+		if !preserveGroupIDs {
+			input.GroupIDs = nil
+		}
 		input.ProxyID = nil
 		created, err := s.repo.Create(ctx, input)
 		if err != nil {

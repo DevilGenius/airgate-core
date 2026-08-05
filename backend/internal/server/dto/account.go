@@ -151,6 +151,14 @@ type ImportAccountsResp struct {
 	Errors   []ImportItemErrorResp `json:"errors,omitempty"`
 }
 
+type AccountImportConfigResp struct {
+	DSL string `json:"dsl"`
+}
+
+type UpdateAccountImportConfigReq struct {
+	DSL string `json:"dsl" binding:"required"`
+}
+
 // BulkUpdateAccountsReq 批量更新账号请求。
 type BulkUpdateAccountsReq struct {
 	AccountIDs       []int                    `json:"account_ids" binding:"required,min=1"`

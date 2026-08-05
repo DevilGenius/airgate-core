@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
+	"github.com/DevilGenius/airgate-core/internal/accountimportdsl"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 	"github.com/DevilGenius/airgate-core/internal/server/response"
@@ -132,8 +133,23 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 			RateMultiplier: item.RateMultiplier.Ptr(),
 		})
 	}
+	rawConfig, err := h.accountImportDSL(c.Request.Context())
+	if err != nil {
+		response.InternalError(c, "读取导入配置失败")
+		return
+	}
+	config, err := accountimportdsl.Parse(rawConfig)
+	if err != nil {
+		response.InternalError(c, "导入配置无效: "+err.Error())
+		return
+	}
+	inputs, err = config.Apply(inputs)
+	if err != nil {
+		response.BadRequest(c, "应用导入配置失败: "+err.Error())
+		return
+	}
 
-	summary := h.service.Import(c.Request.Context(), inputs)
+	summary := h.service.ImportConfigured(c.Request.Context(), inputs)
 	if len(summary.SuccessIDs) > 0 {
 		h.activateCreatedAccounts(c.Request.Context(), summary.SuccessIDs)
 	}

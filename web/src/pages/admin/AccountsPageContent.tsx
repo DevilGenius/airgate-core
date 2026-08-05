@@ -8,6 +8,7 @@ import {
   Download,
   Upload,
   FileJson2,
+  Settings2,
 } from 'lucide-react';
 import { useToast } from '../../shared/ui';
 import { accountsApi } from '../../shared/api/accounts';
@@ -44,6 +45,7 @@ import { useAccountTableColumns } from './accounts/useAccountTableColumns';
 import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
 import { BulkAccountTestModal } from './accounts/BulkAccountTestModal';
 import { BulkRefreshProgressModal } from './accounts/BulkRefreshProgressModal';
+import { ImportConfigModal } from './accounts/ImportConfigModal';
 import {
   CompatImportModal,
   type CompatImportFormat,
@@ -354,6 +356,7 @@ export default function AccountsPageContent() {
 
   // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showImportConfigModal, setShowImportConfigModal] = useState(false);
   const [showCompatImportModal, setShowCompatImportModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountResp | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<AccountResp | null>(null);
@@ -379,6 +382,7 @@ export default function AccountsPageContent() {
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [bulkRefreshTargets, setBulkRefreshTargets] = useState<{ id: number; name: string }[] | null>(null);
   const isAnyAccountModalOpen = showCreateModal
+    || showImportConfigModal
     || showCompatImportModal
     || editingAccount !== null
     || deletingAccount !== null
@@ -647,6 +651,21 @@ export default function AccountsPageContent() {
     () => new Map((allGroupsData?.list ?? []).map((g) => [g.id, g.name])),
     [allGroupsData?.list],
   );
+
+  const importConfigQuery = useQuery({
+    queryKey: queryKeys.accountImportConfig(),
+    queryFn: accountsApi.getImportConfig,
+    enabled: showImportConfigModal,
+  });
+  const importConfigMutation = useMutation({
+    mutationFn: accountsApi.updateImportConfig,
+    onSuccess: (result) => {
+      queryClient.setQueryData(queryKeys.accountImportConfig(), result);
+      toast('success', t('accounts.import_config_saved'));
+      setShowImportConfigModal(false);
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
 
   // 查询代理列表（用于表格中 ID→名称映射）
   // 代理列表（只用于顶部筛选器；之前的"代理"列已移除）
@@ -1590,6 +1609,14 @@ export default function AccountsPageContent() {
       <Button
         className="ag-page-toolbar-button hidden md:inline-flex"
         variant="secondary"
+        onPress={() => setShowImportConfigModal(true)}
+      >
+        <Settings2 className="h-4 w-4" />
+        {t('accounts.import_config')}
+      </Button>
+      <Button
+        className="ag-page-toolbar-button hidden md:inline-flex"
+        variant="secondary"
         onPress={() => importInputRef.current?.click()}
         isDisabled={isAnyImportPending}
         aria-busy={isImportPending}
@@ -1640,6 +1667,7 @@ export default function AccountsPageContent() {
     refreshAccountOverview,
     runExportMutation,
     setAutoRefresh,
+    setShowImportConfigModal,
     t,
   ]);
 
@@ -1741,6 +1769,17 @@ export default function AccountsPageContent() {
           loading={isCompatImportPending || importMutation.isPending}
           onClose={() => setShowCompatImportModal(false)}
           onSubmit={handleCompatImport}
+        />
+      ) : null}
+
+      {showImportConfigModal ? (
+        <ImportConfigModal
+          open
+          dsl={importConfigQuery.data?.dsl ?? ''}
+          groups={allGroupsData?.list ?? []}
+          loading={importConfigQuery.isLoading || importConfigMutation.isPending}
+          onClose={() => setShowImportConfigModal(false)}
+          onSubmit={(dsl) => importConfigMutation.mutate(dsl)}
         />
       ) : null}
 

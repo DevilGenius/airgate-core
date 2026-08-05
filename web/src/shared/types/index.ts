@@ -278,6 +278,10 @@ export interface ImportAccountsResp {
   errors?: { index: number; name: string; message: string }[];
 }
 
+export interface AccountImportConfigResp {
+  dsl: string;
+}
+
 export interface CredentialField {
   key: string;
   label: string;

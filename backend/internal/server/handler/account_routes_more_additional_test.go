@@ -10,13 +10,74 @@ import (
 	"entgo.io/ent/dialect/sql/schema"
 	"github.com/gin-gonic/gin"
 
+	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/accountimportdsl"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
+
+func TestImportAccountsAppliesConfiguredDSL(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.OpenMemoryEnt(t, "handler_account_import_dsl", schema.WithGlobalUniqueID(false))
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	group, err := db.Group.Create().SetName("Plus Pool").SetPlatform("openai").Save(ctx)
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	settingsService := appsettings.NewService(store.NewSettingsStore(db))
+	dsl := fmt.Sprintf(`{
+  "version": 1,
+  "rules": [{
+    "name": "OpenAI OAuth Plus",
+    "when": [
+      {"field":"platform","op":"eq","value":"openai"},
+      {"field":"type","op":"eq","value":"oauth"},
+      {"field":"credentials.plan_type","op":"in","values":["plus"]}
+    ],
+    "set": {
+      "max_concurrency": 20,
+      "priority": {"mode":"sequence","initial":1000,"step":-10,"group_size":2},
+      "group_ids": [%d]
+    }
+  }]
+}`, group.ID)
+	if err := settingsService.Update(ctx, []appsettings.ItemInput{{
+		Key: accountimportdsl.SettingKey, Value: dsl, Group: accountimportdsl.SettingGroup,
+	}}); err != nil {
+		t.Fatalf("save import DSL: %v", err)
+	}
+
+	accountService := appaccount.NewService(store.NewAccountStore(db), accountHandlerPluginCatalogStub{}, scheduler.NewConcurrencyManager(nil), nil)
+	accountHandler := NewAccountHandler(accountService, scheduler.NewScheduler(db, nil), settingsService)
+	importBody := `{"version":2,"accounts":[{"name":"plus-import","platform":"openai","type":"oauth","credentials":{"access_token":"token","plan_type":"Plus"},"priority":1,"max_concurrency":1,"rate_multiplier":1}]}`
+	w := invokeHandlerForValidation(http.MethodPost, "/accounts/import", importBody, nil, nil, accountHandler.ImportAccounts)
+	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+
+	imported, err := db.Account.Query().Where(account.NameEQ("plus-import")).WithGroups().Only(ctx)
+	if err != nil {
+		t.Fatalf("load imported account: %v", err)
+	}
+	if imported.Priority != 1000 || imported.MaxConcurrency != 20 {
+		t.Fatalf("configured priority/capacity = %d/%d", imported.Priority, imported.MaxConcurrency)
+	}
+	groups, err := imported.QueryGroups().IDs(ctx)
+	if err != nil {
+		t.Fatalf("load imported groups: %v", err)
+	}
+	if len(groups) != 1 || groups[0] != group.ID {
+		t.Fatalf("configured groups = %v, want [%d]", groups, group.ID)
+	}
+}
 
 func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 	ctx := context.Background()

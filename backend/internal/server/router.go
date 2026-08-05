@@ -122,6 +122,8 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/accounts/usage", handlers.Account.GetAccountUsage)
 		adminGroup.GET("/accounts/capacity", handlers.Account.GetAccountCapacity)
 		adminGroup.GET("/accounts/export", handlers.Account.ExportAccounts)
+		adminGroup.GET("/accounts/import-config", handlers.Account.GetImportConfig)
+		adminGroup.PUT("/accounts/import-config", handlers.Account.UpdateImportConfig)
 		adminGroup.POST("/accounts/import", handlers.Account.ImportAccounts)
 		adminGroup.POST("/accounts/bulk-update", handlers.Account.BulkUpdateAccounts)
 		adminGroup.POST("/accounts/bulk-delete", handlers.Account.BulkDeleteAccounts)

@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DevilGenius/airgate-core/internal/accountimportdsl"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
@@ -18,14 +20,38 @@ import (
 // scheduler 用来读家族级限流冷却（Redis 侧的瞬态状态，不在 DB 里），
 // 后台账号列表/详情会带上 family_cooldowns 字段。允许 nil 退化为不展示冷却信息。
 type AccountHandler struct {
-	service   *appaccount.Service
-	scheduler *scheduler.Scheduler
+	service         *appaccount.Service
+	scheduler       *scheduler.Scheduler
+	settingsService *appsettings.Service
 }
 
 // NewAccountHandler 创建 AccountHandler。sched 可为 nil（旧测试入口），
 // 此时 family_cooldowns 字段会缺省为空。
-func NewAccountHandler(service *appaccount.Service, sched *scheduler.Scheduler) *AccountHandler {
-	return &AccountHandler{service: service, scheduler: sched}
+func NewAccountHandler(service *appaccount.Service, sched *scheduler.Scheduler, settings ...*appsettings.Service) *AccountHandler {
+	handler := &AccountHandler{service: service, scheduler: sched}
+	if len(settings) > 0 {
+		handler.settingsService = settings[0]
+	}
+	return handler
+}
+
+func (h *AccountHandler) accountImportDSL(ctx context.Context) (string, error) {
+	if h.settingsService == nil {
+		return accountimportdsl.DefaultConfigJSON, nil
+	}
+	items, err := h.settingsService.List(ctx, accountimportdsl.SettingGroup)
+	if err != nil {
+		return "", err
+	}
+	for _, item := range items {
+		if item.Key == accountimportdsl.SettingKey {
+			if strings.TrimSpace(item.Value) == "" {
+				return accountimportdsl.DefaultConfigJSON, nil
+			}
+			return item.Value, nil
+		}
+	}
+	return accountimportdsl.DefaultConfigJSON, nil
 }
 
 // familyCooldownsFor 拉取指定账号在 Redis 上仍生效的家族冷却，转成 DTO。

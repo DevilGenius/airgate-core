@@ -2,6 +2,7 @@ import { get, post, put, del, patch } from './client';
 import type {
   AccountResp, CreateAccountReq, UpdateAccountReq,
   AccountExportFile, ImportAccountsResp, AccountExportItem,
+  AccountImportConfigResp,
   BulkUpdateAccountsReq, BulkOpResp,
   CredentialSchemaResp, ModelInfo, PageReq, PagedData,
 } from '../types';
@@ -36,6 +37,10 @@ export const accountsApi = {
   // 批量导入账号
   import: (accounts: AccountExportItem[]) =>
     post<ImportAccountsResp>('/api/v1/admin/accounts/import', { version: 2, accounts }),
+  getImportConfig: () =>
+    get<AccountImportConfigResp>('/api/v1/admin/accounts/import-config'),
+  updateImportConfig: (dsl: string) =>
+    put<AccountImportConfigResp>('/api/v1/admin/accounts/import-config', { dsl }),
   create: (data: CreateAccountReq) => post<AccountResp>('/api/v1/admin/accounts', data),
   update: (id: number, data: UpdateAccountReq) => put<void>(`/api/v1/admin/accounts/${id}`, data),
   delete: (id: number) => del<void>(`/api/v1/admin/accounts/${id}`),

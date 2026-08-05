@@ -50,6 +50,31 @@ func TestImportIgnoresEnvironmentScopedIDs(t *testing.T) {
 	}
 }
 
+func TestImportConfiguredPreservesDSLGroupIDs(t *testing.T) {
+	service := NewService(stubRepository{
+		create: func(_ context.Context, input CreateInput) (Account, error) {
+			if !slices.Equal(input.GroupIDs, []int64{2, 1}) {
+				t.Fatalf("configured import group IDs = %v", input.GroupIDs)
+			}
+			if input.ProxyID != nil {
+				t.Fatalf("configured import must still clear proxy ID, got %v", *input.ProxyID)
+			}
+			return Account{ID: 1, Name: input.Name}, nil
+		},
+	}, nil, nil, nil)
+
+	proxyID := int64(99)
+	summary := service.ImportConfigured(t.Context(), []CreateInput{{
+		Name:        "configured",
+		GroupIDs:    []int64{2, 1},
+		ProxyID:     &proxyID,
+		Credentials: map[string]string{},
+	}})
+	if summary.Imported != 1 || summary.Failed != 0 {
+		t.Fatalf("unexpected configured import summary: %+v", summary)
+	}
+}
+
 func TestCreateDefaultsMissingRateMultiplierToOne(t *testing.T) {
 	var captured *float64
 	service := NewService(stubRepository{

@@ -13,6 +13,7 @@ export const queryKeys = {
   marketplace: () => ['marketplace'] as const,
   platforms: () => ['installed-platforms'] as const,
   accounts: (...args: unknown[]) => ['accounts', ...args] as const,
+  accountImportConfig: () => ['account-import-config'] as const,
   accountUsage: (...args: unknown[]) => ['account-usage', ...args] as const,
   accountCapacity: (...args: unknown[]) => ['account-capacity', ...args] as const,
   credentialsSchema: (...args: unknown[]) => ['credentials-schema', ...args] as const,
