@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Button, Input, Label, Spinner, Tabs, TextArea, TextField as HeroTextField, useOverlayState,
+  Button, ComboBox, Input, Label, ListBox, Spinner, Tabs, TextArea, TextField as HeroTextField, useOverlayState,
 } from '@heroui/react';
 import {
   Braces, CopyPlus, GripVertical, Plus, RotateCcw, Trash2,
@@ -531,7 +531,7 @@ export function ImportConfigModal({
                     </div>
                   </div>
 
-                  <section className="space-y-3 border-t border-border pt-4">
+                  <section className="space-y-2 border-t border-border pt-4">
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <h3 className="text-sm font-semibold text-text">{t('accounts.import_config_conditions')}</h3>
@@ -547,23 +547,39 @@ export function ImportConfigModal({
                         {t('accounts.import_config_add_condition')}
                       </Button>
                     </div>
-                    <datalist id="account-import-condition-fields">
-                      {CONDITION_FIELD_SUGGESTIONS.map((field) => <option key={field} value={field} />)}
-                    </datalist>
                     {selectedRule.when.map((condition, conditionIndex) => {
                       const operator = CONDITION_OPERATORS.find((item) => item.key === condition.op);
                       return (
-                        <div key={conditionIndex} className="grid items-center gap-2 rounded-md bg-surface px-3 py-2.5 sm:grid-cols-[1.2fr_0.8fr_1.4fr_auto]">
-                          <Input
+                        <div key={conditionIndex} className="ag-import-config-condition grid items-center gap-2 rounded-md bg-surface px-2.5 py-2 sm:grid-cols-[1.2fr_0.8fr_1.4fr_auto]">
+                          <ComboBox
+                            fullWidth
+                            allowsCustomValue
                             aria-label={t('accounts.import_config_field')}
-                            className="w-full"
-                            list="account-import-condition-fields"
-                            placeholder={t('accounts.import_config_field')}
-                            value={condition.field}
-                            onChange={(event) => updateCondition(conditionIndex, (current) => ({
-                              ...current, field: event.target.value,
+                            inputValue={condition.field}
+                            onInputChange={(value) => updateCondition(conditionIndex, (current) => ({
+                              ...current, field: value,
                             }))}
-                          />
+                            onSelectionChange={(key) => {
+                              if (key == null) return;
+                              updateCondition(conditionIndex, (current) => ({
+                                ...current, field: String(key),
+                              }));
+                            }}
+                          >
+                            <ComboBox.InputGroup>
+                              <Input placeholder={t('accounts.import_config_field')} />
+                              <ComboBox.Trigger />
+                            </ComboBox.InputGroup>
+                            <ComboBox.Popover className="ag-import-config-field-popover">
+                              <ListBox>
+                                {CONDITION_FIELD_SUGGESTIONS.map((field) => (
+                                  <ListBox.Item key={field} id={field} textValue={field}>
+                                    {field}
+                                  </ListBox.Item>
+                                ))}
+                              </ListBox>
+                            </ComboBox.Popover>
+                          </ComboBox>
                           <SimpleSelect
                             ariaLabel={t('accounts.import_config_operator')}
                             fullWidth

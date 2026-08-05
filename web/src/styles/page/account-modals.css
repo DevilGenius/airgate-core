@@ -457,6 +457,37 @@
   resize: none;
 }
 
+.ag-import-config-field-popover {
+  z-index: 220;
+}
+
+/* 导入配置弹窗：输入控件高度统一 */
+
+.ag-import-config .input,
+.ag-import-config .ag-simple-select-trigger {
+  box-sizing: border-box;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding-block: 0;
+}
+
+/* 字段 combo 触发器与比较符下拉样式统一：不渲染独立框体 */
+
+.ag-import-config .combo-box__trigger,
+.ag-import-config .combo-box__trigger:hover,
+.ag-import-config .combo-box__trigger[data-hovered="true"],
+.ag-import-config .combo-box__trigger[data-open="true"] {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.ag-import-config .combo-box__trigger:focus-visible,
+.ag-import-config .combo-box__trigger[data-focus-visible="true"] {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
 @media (max-width: 767px) {
   .ag-import-config-body {
     grid-template-columns: minmax(0, 1fr);
