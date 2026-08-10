@@ -27,7 +27,6 @@ import {
 } from '../../../shared/utils/rateMultiplier';
 import type { BulkUpdateAccountsReq } from '../../../shared/types';
 import {
-  ACCOUNT_GROUP_PRIORITIES_EXTRA_KEY,
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
   DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_GROUP_SIZE,
@@ -53,7 +52,6 @@ export function BulkEditAccountModal({
   open,
   count,
   initialGroupIds,
-  initialGroupPriorities,
   initialMaxConcurrency,
   initialPriority,
   initialPriorityMax,
@@ -66,7 +64,6 @@ export function BulkEditAccountModal({
   open: boolean;
   count: number;
   initialGroupIds?: number[];
-  initialGroupPriorities?: Record<number, number>;
   initialMaxConcurrency?: number;
   initialPriority?: number;
   initialPriorityMax?: number;
@@ -106,13 +103,6 @@ export function BulkEditAccountModal({
   const [maxConcurrency, setMaxConcurrency] = useState(() => initialMaxConcurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY);
   const [rateMultiplier, setRateMultiplier] = useState(() => String(initialRateMultiplier ?? 1));
   const [groupIds, setGroupIds] = useState<number[]>(() => [...(initialGroupIds ?? [])]);
-  const [groupPriorityInputs, setGroupPriorityInputs] = useState<Record<number, string>>(() => {
-    const inputs: Record<number, string> = {};
-    for (const [groupID, priority] of Object.entries(initialGroupPriorities ?? {})) {
-      inputs[Number(groupID)] = String(priority);
-    }
-    return inputs;
-  });
   const [proxyId, setProxyId] = useState<number | null>(null);
   const [messageLockEnabled, setMessageLockEnabled] = useState(false);
 
@@ -186,9 +176,6 @@ export function BulkEditAccountModal({
     if (enableGroups) patch.group_ids = groupIds;
     if (enableProxy && proxyId != null) patch.proxy_id = proxyId;
     let extraPatch: Record<string, unknown> | undefined;
-    if (enableGroups) {
-      extraPatch = groupPrioritiesExtraPatch(groupIds, groupPriorityInputs);
-    }
     if (enableMessageLock) {
       extraPatch = setAccountMessageLockEnabled(extraPatch, messageLockEnabled);
     }
@@ -260,22 +247,9 @@ export function BulkEditAccountModal({
   const toggleGroup = (id: number) => {
     if (groupIds.includes(id)) {
       setGroupIds((prev) => prev.filter((groupId) => groupId !== id));
-      setGroupPriorityInputs((inputs) => omitGroupPriorityInput(inputs, id));
       return;
     }
     setGroupIds((prev) => [...prev, id]);
-  };
-  const handleGroupPriorityChange = (groupID: number, value: string) => {
-    if (!isAccountPriorityDraft(value)) return;
-    setGroupPriorityInputs((prev) => ({ ...prev, [groupID]: value }));
-  };
-  const commitGroupPriorityChange = (groupID: number) => {
-    const value = groupPriorityInputs[groupID] ?? '';
-    const priority = parseAccountPriorityInput(value);
-    setGroupPriorityInputs((prev) => {
-      if (priority == null) return omitGroupPriorityInput(prev, groupID);
-      return { ...prev, [groupID]: String(priority) };
-    });
   };
 
   return (
@@ -526,18 +500,6 @@ export function BulkEditAccountModal({
                       </span>
                     </span>
                   </NativeCheckbox>
-                  <Input
-                    aria-label={t('accounts.group_priority')}
-                    className="ag-create-account-group-priority-input"
-                    disabled={!enableGroups || !selected}
-                    inputMode="numeric"
-                    pattern="-?[0-9]*"
-                    placeholder={t('accounts.group_priority_fallback')}
-                    type="text"
-                    value={groupPriorityInputs[group.id] ?? ''}
-                    onBlur={() => commitGroupPriorityChange(group.id)}
-                    onChange={(event) => handleGroupPriorityChange(group.id, event.target.value)}
-                  />
                 </div>
               );
             })}
@@ -584,21 +546,6 @@ export function BulkEditAccountModal({
       </Form>
     </CommonModal>
   );
-}
-
-function groupPrioritiesExtraPatch(groupIds: number[], priorityInputs: Record<number, string>) {
-  const priorities: Record<string, number> = {};
-  for (const groupID of groupIds) {
-    const priority = parseAccountPriorityInput(priorityInputs[groupID] ?? '');
-    if (priority != null) priorities[String(groupID)] = priority;
-  }
-  return { [ACCOUNT_GROUP_PRIORITIES_EXTRA_KEY]: priorities };
-}
-
-function omitGroupPriorityInput(values: Record<number, string>, groupID: number) {
-  const next = { ...values };
-  delete next[groupID];
-  return next;
 }
 
 function FieldRow({

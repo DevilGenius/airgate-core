@@ -8,7 +8,6 @@ export const ACCOUNT_PRIORITY_MAX = 99999;
 export const ACCOUNT_PRIORITY_OFFSET_MIN = ACCOUNT_PRIORITY_MIN - ACCOUNT_PRIORITY_MAX;
 export const ACCOUNT_PRIORITY_OFFSET_MAX = ACCOUNT_PRIORITY_MAX - ACCOUNT_PRIORITY_MIN;
 export const ACCOUNT_MSG_LOCK_EXTRA_KEY = 'msg_lock_enabled';
-export const ACCOUNT_GROUP_PRIORITIES_EXTRA_KEY = 'group_priorities';
 
 export function clampAccountPriority(value: number) {
   if (!Number.isFinite(value)) return DEFAULT_ACCOUNT_PRIORITY;
@@ -111,38 +110,4 @@ export function setAccountMessageLockEnabled(
     ...(extra ?? {}),
     [ACCOUNT_MSG_LOCK_EXTRA_KEY]: enabled,
   };
-}
-
-export function getAccountGroupPriorities(extra?: Record<string, unknown>) {
-  const raw = extra?.[ACCOUNT_GROUP_PRIORITIES_EXTRA_KEY];
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const result: Record<number, number> = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    const groupID = Number(key);
-    if (!Number.isInteger(groupID) || groupID <= 0) continue;
-    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
-    result[groupID] = clampAccountPriority(Math.round(value));
-  }
-  return result;
-}
-
-export function setAccountGroupPriorities(
-  extra: Record<string, unknown> | undefined,
-  priorities: Record<number, number | null | undefined>,
-) {
-  const normalized: Record<string, number> = {};
-  for (const [key, value] of Object.entries(priorities)) {
-    const groupID = Number(key);
-    if (!Number.isInteger(groupID) || groupID <= 0) continue;
-    if (value == null || !Number.isFinite(value)) continue;
-    normalized[String(groupID)] = clampAccountPriority(Math.round(value));
-  }
-
-  const next = { ...(extra ?? {}) };
-  if (Object.keys(normalized).length === 0) {
-    delete next[ACCOUNT_GROUP_PRIORITIES_EXTRA_KEY];
-  } else {
-    next[ACCOUNT_GROUP_PRIORITIES_EXTRA_KEY] = normalized;
-  }
-  return next;
 }

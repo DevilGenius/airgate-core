@@ -365,8 +365,6 @@
     "priority_sequence_step": "Step",
     "priority_sequence_group_size": "Accounts per Group",
     "priority_sequence_invalid": "Enter valid integers. Step cannot be 0, and every generated priority must be between -99999 and 99999.",
-    "group_priority": "Group Priority",
-    "group_priority_fallback": "Group Priority",
     "concurrency": "Concurrency",
     "rate_multiplier": "Rate Multiplier",
     "upstream_is_pool": "Pool mode",

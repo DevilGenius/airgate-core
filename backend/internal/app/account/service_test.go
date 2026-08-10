@@ -187,11 +187,21 @@ func TestCreateNormalizesModelPolicyBeforePersist(t *testing.T) {
 	if _, err := service.Create(t.Context(), CreateInput{
 		Platform:    "openai",
 		ModelPolicy: modelpolicy.Policy{Allow: []string{" GPT-5* ", ""}},
+		Extra: map[string]any{
+			"keep":                            true,
+			deprecatedGroupPrioritiesExtraKey: map[string]any{"10": 80},
+		},
 	}); err != nil {
 		t.Fatalf("Create() returned error: %v", err)
 	}
 	if len(captured.ModelPolicy.Allow) != 1 || captured.ModelPolicy.Allow[0] != "GPT-5*" {
 		t.Fatalf("captured policy = %#v, want trimmed single allow", captured.ModelPolicy)
+	}
+	if captured.Extra["keep"] != true {
+		t.Fatalf("captured extra = %#v, want unrelated values preserved", captured.Extra)
+	}
+	if _, exists := captured.Extra[deprecatedGroupPrioritiesExtraKey]; exists {
+		t.Fatalf("captured extra retained deprecated group priorities: %#v", captured.Extra)
 	}
 }
 
@@ -1670,7 +1680,11 @@ func TestBulkUpdateMergesExtraPatch(t *testing.T) {
 	var captured UpdateInput
 	service := NewService(stubRepository{
 		findByID: func(_ context.Context, id int, _ LoadOptions) (Account, error) {
-			return Account{ID: id, Extra: map[string]any{"keep": "old", "replace": "old"}}, nil
+			return Account{ID: id, Extra: map[string]any{
+				"keep":                            "old",
+				"replace":                         "old",
+				deprecatedGroupPrioritiesExtraKey: map[string]any{"10": 80},
+			}}, nil
 		},
 		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
 			captured = input
@@ -1682,8 +1696,12 @@ func TestBulkUpdateMergesExtraPatch(t *testing.T) {
 	}, nil, nil, nil)
 
 	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
-		IDs:      []int{7},
-		Extra:    map[string]any{"replace": "new", "added": float64(3)},
+		IDs: []int{7},
+		Extra: map[string]any{
+			"replace":                         "new",
+			"added":                           float64(3),
+			deprecatedGroupPrioritiesExtraKey: map[string]any{"20": 90},
+		},
 		HasExtra: true,
 	})
 	if result.Success != 1 || result.Failed != 0 {
@@ -1691,6 +1709,9 @@ func TestBulkUpdateMergesExtraPatch(t *testing.T) {
 	}
 	if !captured.HasExtra || captured.Extra["keep"] != "old" || captured.Extra["replace"] != "new" || captured.Extra["added"] != float64(3) {
 		t.Fatalf("captured Extra = %+v", captured.Extra)
+	}
+	if _, exists := captured.Extra[deprecatedGroupPrioritiesExtraKey]; exists {
+		t.Fatalf("captured Extra retained deprecated group priorities: %+v", captured.Extra)
 	}
 
 	merged := mergeAnyMap(map[string]any{"a": 1, "b": 2}, map[string]any{"b": 3})

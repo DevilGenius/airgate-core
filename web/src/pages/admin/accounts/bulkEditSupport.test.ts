@@ -35,33 +35,13 @@ describe('bulk edit support', () => {
     expect(orderSelectedAccountIdsByCreatedAt(rows, [3, 1, 2])).toEqual([1, 2, 3]);
   });
 
-  it('prefills common group priorities only when every selected account matches', () => {
+  it('prefills only groups shared by every selected account', () => {
     const rows = [
-      account({
-        id: 1,
-        group_ids: [10, 20],
-        extra: { group_priorities: { 10: 80, 20: 30 } },
-      }),
-      account({
-        id: 2,
-        group_ids: [10, 20, 30],
-        extra: { group_priorities: { 10: 80, 20: 40, 30: 90 } },
-      }),
+      account({ id: 1, group_ids: [10, 20] }),
+      account({ id: 2, group_ids: [10, 20, 30] }),
     ];
 
-    expect(getBulkEditInitialValues(rows, [1, 2])).toMatchObject({
-      groupIds: [10, 20],
-      groupPriorities: { 10: 80 },
-    });
-  });
-
-  it('leaves group priorities empty when the common group has no shared override', () => {
-    const rows = [
-      account({ id: 1, group_ids: [10], extra: { group_priorities: { 10: 80 } } }),
-      account({ id: 2, group_ids: [10], extra: {} }),
-    ];
-
-    expect(getBulkEditInitialValues(rows, [1, 2]).groupPriorities).toEqual({});
+    expect(getBulkEditInitialValues(rows, [1, 2]).groupIds).toEqual([10, 20]);
   });
 
   it('captures the selected priority range for offset validation', () => {

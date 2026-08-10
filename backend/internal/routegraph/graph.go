@@ -2,8 +2,6 @@ package routegraph
 
 import (
 	"context"
-	"encoding/json"
-	"math"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -16,7 +14,6 @@ import (
 	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
 	entgroup "github.com/DevilGenius/airgate-core/ent/group"
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
-	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
@@ -64,10 +61,6 @@ type AccountNode struct {
 	modelPolicy  modelpolicy.Compiled
 	categoryKeys []string
 }
-
-const (
-	accountGroupPrioritiesExtraKey = "group_priorities"
-)
 
 type compiledAccountTypePolicy struct {
 	key    string
@@ -678,85 +671,13 @@ func withAccountNodes(group *GroupNode, accounts []*AccountNode) *GroupNode {
 			next.Accounts = append(next.Accounts, account)
 			continue
 		}
-		groupAccount := accountNodeForGroup(next.ID, account)
-		next.Accounts = append(next.Accounts, groupAccount)
-		next.accountRefs = append(next.accountRefs, groupAccount.Account)
-		if groupAccount.modelPolicy.Restricts() {
+		next.Accounts = append(next.Accounts, account)
+		next.accountRefs = append(next.accountRefs, account.Account)
+		if account.modelPolicy.Restricts() {
 			next.hasModelConstraints = true
 		}
 	}
 	return &next
-}
-
-func accountNodeForGroup(groupID int, account *AccountNode) *AccountNode {
-	if account == nil || account.Account == nil {
-		return account
-	}
-	priority, ok := accountGroupPriorityOverride(account.Account.Extra, groupID)
-	if !ok || priority == account.Account.Priority {
-		return account
-	}
-	entAccount := *account.Account
-	entAccount.Priority = priority
-	next := *account
-	next.Account = &entAccount
-	return &next
-}
-
-func accountGroupPriorityOverride(extra map[string]interface{}, groupID int) (int, bool) {
-	if len(extra) == 0 || groupID <= 0 {
-		return 0, false
-	}
-	raw, ok := extra[accountGroupPrioritiesExtraKey]
-	if !ok {
-		return 0, false
-	}
-	priority, ok := groupPriorityValue(raw, strconv.Itoa(groupID))
-	if !ok {
-		return 0, false
-	}
-	return clampAccountPriority(priority), true
-}
-
-func groupPriorityValue(raw interface{}, groupID string) (int, bool) {
-	switch values := raw.(type) {
-	case map[string]interface{}:
-		return priorityValue(values[groupID])
-	case map[string]int:
-		priority, ok := values[groupID]
-		return priority, ok
-	case map[string]int64:
-		priority, ok := values[groupID]
-		return int(priority), ok
-	case map[string]float64:
-		priority, ok := values[groupID]
-		return int(math.Round(priority)), ok
-	default:
-		return 0, false
-	}
-}
-
-func priorityValue(raw interface{}) (int, bool) {
-	switch value := raw.(type) {
-	case int:
-		return value, true
-	case int64:
-		return int(value), true
-	case float64:
-		return int(math.Round(value)), true
-	case json.Number:
-		parsed, err := value.Int64()
-		if err != nil {
-			return 0, false
-		}
-		return int(parsed), true
-	default:
-		return 0, false
-	}
-}
-
-func clampAccountPriority(value int) int {
-	return accountpriority.Clamp(value)
 }
 
 func putGroupNode(snapshot *Snapshot, group *GroupNode) {

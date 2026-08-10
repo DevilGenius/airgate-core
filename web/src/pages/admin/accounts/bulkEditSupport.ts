@@ -1,9 +1,7 @@
 import type { AccountResp } from '../../../shared/types';
-import { getAccountGroupPriorities } from './accountDefaults';
 
 export type BulkEditInitialValues = {
   groupIds: number[];
-  groupPriorities: Record<number, number>;
   maxConcurrency?: number;
   priority?: number;
   priorityMax?: number;
@@ -37,14 +35,14 @@ export function normalizeAccountGroupIds(value: unknown): number[] {
 
 export function getBulkEditInitialValues(rows: AccountResp[], selectedIds: number[]): BulkEditInitialValues {
   if (selectedIds.length === 0) {
-    return { groupIds: [], groupPriorities: {} };
+    return { groupIds: [] };
   }
 
   const selectedIdSet = new Set(selectedIds);
   const selectedRows = rows.filter((row) => selectedIdSet.has(row.id));
   const firstSelectedRow = selectedRows[0];
   if (!firstSelectedRow) {
-    return { groupIds: [], groupPriorities: {} };
+    return { groupIds: [] };
   }
 
   const firstGroupIds = normalizeAccountGroupIds(firstSelectedRow.group_ids);
@@ -73,29 +71,10 @@ export function getBulkEditInitialValues(rows: AccountResp[], selectedIds: numbe
   const hasCompletePriorityRange = selectedRows.length === selectedIds.length && priorities.length === selectedRows.length;
   return {
     groupIds,
-    groupPriorities: getCommonGroupPriorities(selectedRows, groupIds),
     maxConcurrency: getCommonNumber((account) => account.max_concurrency),
     priority: getCommonNumber((account) => account.priority),
     priorityMax: hasCompletePriorityRange ? Math.max(...priorities) : undefined,
     priorityMin: hasCompletePriorityRange ? Math.min(...priorities) : undefined,
     rateMultiplier: getCommonNumber((account) => account.rate_multiplier),
   };
-}
-
-function getCommonGroupPriorities(rows: AccountResp[], groupIds: number[]) {
-  const result: Record<number, number> = {};
-  if (rows.length === 0 || groupIds.length === 0) return result;
-
-  const prioritiesByRow = rows.map((row) => getAccountGroupPriorities(row.extra));
-  const firstPriorities = prioritiesByRow[0];
-  if (!firstPriorities) return result;
-
-  for (const groupId of groupIds) {
-    const firstPriority = firstPriorities[groupId];
-    if (firstPriority == null) continue;
-    if (prioritiesByRow.every((priorities) => priorities[groupId] === firstPriority)) {
-      result[groupId] = firstPriority;
-    }
-  }
-  return result;
 }

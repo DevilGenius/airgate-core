@@ -174,7 +174,7 @@ type BulkUpdateAccountsReq struct {
 	Extra            map[string]any           `json:"extra,omitempty"`
 }
 
-// BulkPrioritySequenceReq 按账号请求顺序生成分组优先级序列。
+// BulkPrioritySequenceReq 按账号请求顺序生成账号优先级序列。
 type BulkPrioritySequenceReq struct {
 	Initial   int `json:"initial"`
 	Step      int `json:"step"`

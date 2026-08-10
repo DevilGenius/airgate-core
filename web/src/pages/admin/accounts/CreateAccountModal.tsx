@@ -46,7 +46,6 @@ import {
   getAccountMessageLockEnabled,
   isAccountPriorityDraft,
   parseAccountPriorityInput,
-  setAccountGroupPriorities,
   setAccountMessageLockEnabled,
 } from './accountDefaults';
 
@@ -80,7 +79,6 @@ export function CreateAccountModal({
   });
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [groupIds, setGroupIds] = useState<number[]>([]);
-  const [groupPriorityInputs, setGroupPriorityInputs] = useState<Record<number, string>>({});
   const [batchMode, setBatchMode] = useState(false);
   const [priorityInput, setPriorityInput] = useState(String(DEFAULT_ACCOUNT_PRIORITY));
   const [rateMultiplierInput, setRateMultiplierInput] = useState('1');
@@ -125,7 +123,6 @@ export function CreateAccountModal({
     setRateMultiplierInput('1');
     setCredentials({});
     setGroupIds([]);
-    setGroupPriorityInputs({});
     setBatchMode(false);
   }, [open]);
 
@@ -135,7 +132,6 @@ export function CreateAccountModal({
     setCredentials({});
     setAccountType('');
     setGroupIds([]);
-    setGroupPriorityInputs({});
     setBatchMode(false);
   };
 
@@ -198,7 +194,7 @@ export function CreateAccountModal({
       platform,
       type: accountType || undefined,
       credentials: identity.credentials,
-      extra: extraWithGroupPriorities(form.extra, groupIds, groupPriorityInputs),
+      extra: form.extra,
       group_ids: groupIds,
     });
   };
@@ -211,7 +207,6 @@ export function CreateAccountModal({
     setRateMultiplierInput('1');
     setCredentials({});
     setGroupIds([]);
-    setGroupPriorityInputs({});
     setBatchMode(false);
     onClose();
   };
@@ -249,22 +244,9 @@ export function CreateAccountModal({
   const toggleGroup = (id: number) => {
     if (groupIds.includes(id)) {
       setGroupIds((prev) => prev.filter((groupId) => groupId !== id));
-      setGroupPriorityInputs((inputs) => omitGroupPriorityInput(inputs, id));
       return;
     }
     setGroupIds((prev) => [...prev, id]);
-  };
-  const handleGroupPriorityChange = (groupID: number, value: string) => {
-    if (!isAccountPriorityDraft(value)) return;
-    setGroupPriorityInputs((prev) => ({ ...prev, [groupID]: value }));
-  };
-  const commitGroupPriorityChange = (groupID: number) => {
-    const value = groupPriorityInputs[groupID] ?? '';
-    const priority = parseAccountPriorityInput(value);
-    setGroupPriorityInputs((prev) => {
-      if (priority == null) return omitGroupPriorityInput(prev, groupID);
-      return { ...prev, [groupID]: String(priority) };
-    });
   };
   const modalState = useOverlayState({
     isOpen: open,
@@ -475,18 +457,6 @@ export function CreateAccountModal({
                                   </span>
                                 </span>
                               </NativeCheckbox>
-                              <Input
-                                aria-label={t('accounts.group_priority')}
-                                className="ag-create-account-group-priority-input"
-                                disabled={!selected}
-                                inputMode="numeric"
-                                pattern="-?[0-9]*"
-                                placeholder={t('accounts.group_priority_fallback')}
-                                type="text"
-                                value={groupPriorityInputs[group.id] ?? ''}
-                                onBlur={() => commitGroupPriorityChange(group.id)}
-                                onChange={(event) => handleGroupPriorityChange(group.id, event.target.value)}
-                              />
                             </div>
                           );
                         })}
@@ -497,23 +467,4 @@ export function CreateAccountModal({
       </Form>
     </CommonModal>
   );
-}
-
-function extraWithGroupPriorities(
-  extra: Record<string, unknown> | undefined,
-  groupIds: number[],
-  priorityInputs: Record<number, string>,
-) {
-  const priorities: Record<number, number> = {};
-  for (const groupID of groupIds) {
-    const priority = parseAccountPriorityInput(priorityInputs[groupID] ?? '');
-    if (priority != null) priorities[groupID] = priority;
-  }
-  return setAccountGroupPriorities(extra, priorities);
-}
-
-function omitGroupPriorityInput(values: Record<number, string>, groupID: number) {
-  const next = { ...values };
-  delete next[groupID];
-  return next;
 }

@@ -67,6 +67,8 @@ const usageCacheWriteTimeout = 5 * time.Second
 
 const autoTokenRefreshInterval = 6 * time.Hour
 
+const deprecatedGroupPrioritiesExtraKey = "group_priorities"
+
 type accountProfileCachePayload struct {
 	ID             int     `json:"id"`
 	Name           string  `json:"name"`
@@ -436,6 +438,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 	if err != nil {
 		return Account{}, err
 	}
+	input.Extra = stripDeprecatedAccountExtra(input.Extra)
 
 	account, err := s.repo.Create(ctx, input)
 	if err != nil {
@@ -581,6 +584,7 @@ func prepareImportAccount(input CreateInput, preserveGroupIDs bool) (CreateInput
 		input.GroupIDs = nil
 	}
 	input.ProxyID = nil
+	input.Extra = stripDeprecatedAccountExtra(input.Extra)
 	return input, nil
 }
 
@@ -608,6 +612,9 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 			return Account{}, err
 		}
 		input.ModelPolicy = &policy
+	}
+	if input.HasExtra {
+		input.Extra = stripDeprecatedAccountExtra(input.Extra)
 	}
 	repoInput := input
 	manualState, routeManualState, err := s.routedManualState(input.State)
@@ -771,7 +778,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			patch.HasGroupIDs = true
 		}
 		if input.HasExtra {
-			patch.Extra = mergeAnyMap(existing.Extra, input.Extra)
+			patch.Extra = stripDeprecatedAccountExtra(mergeAnyMap(existing.Extra, input.Extra))
 			patch.HasExtra = true
 		}
 
@@ -929,6 +936,15 @@ func mergeAnyMap(base, patch map[string]any) map[string]any {
 		merged[key] = value
 	}
 	return merged
+}
+
+func stripDeprecatedAccountExtra(extra map[string]any) map[string]any {
+	if _, exists := extra[deprecatedGroupPrioritiesExtraKey]; !exists {
+		return extra
+	}
+	cleaned := maps.Clone(extra)
+	delete(cleaned, deprecatedGroupPrioritiesExtraKey)
+	return cleaned
 }
 
 func (s *Service) routedManualState(state *string) (string, bool, error) {
