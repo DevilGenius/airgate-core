@@ -426,5 +426,9 @@ export const AccountCapacityLiveChip = memo(function AccountCapacityLiveChip({
     () => current,
   );
 
-  return <AccountCapacityChip current={liveCurrent} max={max} />;
+  // 首次用实时值替换列表 fallback 时通过 remount 直接跳变，不播放滚动动画：
+  // 页面切回时列表缓存值与首个容量快照之间几乎必然存在差值，
+  // 没有这一步会把"最后一次容量变化"在每次切换页面时重复播放一遍。
+  const isLive = store.has(rowId);
+  return <AccountCapacityChip key={isLive ? 'live' : 'seed'} current={liveCurrent} max={max} />;
 });

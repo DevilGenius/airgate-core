@@ -176,6 +176,10 @@ export class AccountCapacityStore {
     return this.counts.get(id) ?? fallback;
   }
 
+  has(id: number) {
+    return this.counts.has(id);
+  }
+
   setCount(id: number, count: number) {
     if (!Number.isFinite(id) || !Number.isFinite(count)) return;
     const normalizedCount = Math.max(0, Math.trunc(count));
