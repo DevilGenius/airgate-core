@@ -18,6 +18,8 @@ type APIKeyResp struct {
 	UsedQuotaActual       float64  `json:"used_quota_actual"`       // 真实成本已用（reseller 看板对比用，sum(actual_cost)）
 	SellRate              float64  `json:"sell_rate"`               // 销售倍率，0 表示客户侧免费，1 表示不加价
 	MaxConcurrency        int      `json:"max_concurrency"`         // API Key 级并发上限，0 表示不限制
+	MaxRPM                int      `json:"max_rpm"`                 // 总 RPM 上限，0 表示不限制
+	MaxNonResponsesRPM    int      `json:"max_non_responses_rpm"`   // 非 Responses 接口 RPM 上限，0 表示不限制
 	BalanceAlertEnabled   bool     `json:"balance_alert_enabled"`   // API Key 剩余额度邮件提醒开关
 	BalanceAlertEmail     string   `json:"balance_alert_email"`     // API Key 剩余额度提醒接收邮箱
 	BalanceAlertThreshold float64  `json:"balance_alert_threshold"` // API Key 剩余额度提醒阈值
@@ -46,8 +48,10 @@ type CreateAPIKeyReq struct {
 	IPWhitelist           []string `json:"ip_whitelist"`
 	IPBlacklist           []string `json:"ip_blacklist"`
 	QuotaUSD              float64  `json:"quota_usd"`
-	SellRate              *float64 `json:"sell_rate"`                       // 可选，默认 1；0 表示客户侧免费；按 actual_cost 叠加客户侧计费
-	MaxConcurrency        int      `json:"max_concurrency" binding:"gte=0"` // 0 表示不限制并发
+	SellRate              *float64 `json:"sell_rate"`                             // 可选，默认 1；0 表示客户侧免费；按 actual_cost 叠加客户侧计费
+	MaxConcurrency        int      `json:"max_concurrency" binding:"gte=0"`       // 0 表示不限制并发
+	MaxRPM                int      `json:"max_rpm" binding:"gte=0"`               // 总 RPM 上限，0 表示不限制
+	MaxNonResponsesRPM    int      `json:"max_non_responses_rpm" binding:"gte=0"` // 非 Responses 接口 RPM 上限，0 表示不限制
 	BalanceAlertEnabled   bool     `json:"balance_alert_enabled"`
 	BalanceAlertEmail     string   `json:"balance_alert_email"`
 	BalanceAlertThreshold float64  `json:"balance_alert_threshold" binding:"gte=0"`
@@ -61,8 +65,10 @@ type UpdateAPIKeyReq struct {
 	IPWhitelist           []string `json:"ip_whitelist"`
 	IPBlacklist           []string `json:"ip_blacklist"`
 	QuotaUSD              *float64 `json:"quota_usd"`
-	SellRate              *float64 `json:"sell_rate"`                                 // 动态调整：随时可改，不影响历史 used_quota 累加值
-	MaxConcurrency        *int     `json:"max_concurrency" binding:"omitempty,gte=0"` // 0 关闭并发限制
+	SellRate              *float64 `json:"sell_rate"`                                       // 动态调整：随时可改，不影响历史 used_quota 累加值
+	MaxConcurrency        *int     `json:"max_concurrency" binding:"omitempty,gte=0"`       // 0 关闭并发限制
+	MaxRPM                *int     `json:"max_rpm" binding:"omitempty,gte=0"`               // 0 关闭总 RPM 限制
+	MaxNonResponsesRPM    *int     `json:"max_non_responses_rpm" binding:"omitempty,gte=0"` // 0 关闭非 Responses RPM 限制
 	BalanceAlertEnabled   *bool    `json:"balance_alert_enabled"`
 	BalanceAlertEmail     *string  `json:"balance_alert_email"`
 	BalanceAlertThreshold *float64 `json:"balance_alert_threshold" binding:"omitempty,gte=0"`

@@ -235,6 +235,48 @@ func (aku *APIKeyUpdate) AddMaxConcurrency(i int) *APIKeyUpdate {
 	return aku
 }
 
+// SetMaxRpm sets the "max_rpm" field.
+func (aku *APIKeyUpdate) SetMaxRpm(i int) *APIKeyUpdate {
+	aku.mutation.ResetMaxRpm()
+	aku.mutation.SetMaxRpm(i)
+	return aku
+}
+
+// SetNillableMaxRpm sets the "max_rpm" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableMaxRpm(i *int) *APIKeyUpdate {
+	if i != nil {
+		aku.SetMaxRpm(*i)
+	}
+	return aku
+}
+
+// AddMaxRpm adds i to the "max_rpm" field.
+func (aku *APIKeyUpdate) AddMaxRpm(i int) *APIKeyUpdate {
+	aku.mutation.AddMaxRpm(i)
+	return aku
+}
+
+// SetMaxNonResponsesRpm sets the "max_non_responses_rpm" field.
+func (aku *APIKeyUpdate) SetMaxNonResponsesRpm(i int) *APIKeyUpdate {
+	aku.mutation.ResetMaxNonResponsesRpm()
+	aku.mutation.SetMaxNonResponsesRpm(i)
+	return aku
+}
+
+// SetNillableMaxNonResponsesRpm sets the "max_non_responses_rpm" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableMaxNonResponsesRpm(i *int) *APIKeyUpdate {
+	if i != nil {
+		aku.SetMaxNonResponsesRpm(*i)
+	}
+	return aku
+}
+
+// AddMaxNonResponsesRpm adds i to the "max_non_responses_rpm" field.
+func (aku *APIKeyUpdate) AddMaxNonResponsesRpm(i int) *APIKeyUpdate {
+	aku.mutation.AddMaxNonResponsesRpm(i)
+	return aku
+}
+
 // SetBalanceAlertEnabled sets the "balance_alert_enabled" field.
 func (aku *APIKeyUpdate) SetBalanceAlertEnabled(b bool) *APIKeyUpdate {
 	aku.mutation.SetBalanceAlertEnabled(b)
@@ -479,6 +521,16 @@ func (aku *APIKeyUpdate) check() error {
 			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_concurrency": %w`, err)}
 		}
 	}
+	if v, ok := aku.mutation.MaxRpm(); ok {
+		if err := apikey.MaxRpmValidator(v); err != nil {
+			return &ValidationError{Name: "max_rpm", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_rpm": %w`, err)}
+		}
+	}
+	if v, ok := aku.mutation.MaxNonResponsesRpm(); ok {
+		if err := apikey.MaxNonResponsesRpmValidator(v); err != nil {
+			return &ValidationError{Name: "max_non_responses_rpm", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_non_responses_rpm": %w`, err)}
+		}
+	}
 	if v, ok := aku.mutation.BalanceAlertEmail(); ok {
 		if err := apikey.BalanceAlertEmailValidator(v); err != nil {
 			return &ValidationError{Name: "balance_alert_email", err: fmt.Errorf(`ent: validator failed for field "APIKey.balance_alert_email": %w`, err)}
@@ -573,6 +625,18 @@ func (aku *APIKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := aku.mutation.AddedMaxConcurrency(); ok {
 		_spec.AddField(apikey.FieldMaxConcurrency, field.TypeInt, value)
+	}
+	if value, ok := aku.mutation.MaxRpm(); ok {
+		_spec.SetField(apikey.FieldMaxRpm, field.TypeInt, value)
+	}
+	if value, ok := aku.mutation.AddedMaxRpm(); ok {
+		_spec.AddField(apikey.FieldMaxRpm, field.TypeInt, value)
+	}
+	if value, ok := aku.mutation.MaxNonResponsesRpm(); ok {
+		_spec.SetField(apikey.FieldMaxNonResponsesRpm, field.TypeInt, value)
+	}
+	if value, ok := aku.mutation.AddedMaxNonResponsesRpm(); ok {
+		_spec.AddField(apikey.FieldMaxNonResponsesRpm, field.TypeInt, value)
 	}
 	if value, ok := aku.mutation.BalanceAlertEnabled(); ok {
 		_spec.SetField(apikey.FieldBalanceAlertEnabled, field.TypeBool, value)
@@ -927,6 +991,48 @@ func (akuo *APIKeyUpdateOne) AddMaxConcurrency(i int) *APIKeyUpdateOne {
 	return akuo
 }
 
+// SetMaxRpm sets the "max_rpm" field.
+func (akuo *APIKeyUpdateOne) SetMaxRpm(i int) *APIKeyUpdateOne {
+	akuo.mutation.ResetMaxRpm()
+	akuo.mutation.SetMaxRpm(i)
+	return akuo
+}
+
+// SetNillableMaxRpm sets the "max_rpm" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableMaxRpm(i *int) *APIKeyUpdateOne {
+	if i != nil {
+		akuo.SetMaxRpm(*i)
+	}
+	return akuo
+}
+
+// AddMaxRpm adds i to the "max_rpm" field.
+func (akuo *APIKeyUpdateOne) AddMaxRpm(i int) *APIKeyUpdateOne {
+	akuo.mutation.AddMaxRpm(i)
+	return akuo
+}
+
+// SetMaxNonResponsesRpm sets the "max_non_responses_rpm" field.
+func (akuo *APIKeyUpdateOne) SetMaxNonResponsesRpm(i int) *APIKeyUpdateOne {
+	akuo.mutation.ResetMaxNonResponsesRpm()
+	akuo.mutation.SetMaxNonResponsesRpm(i)
+	return akuo
+}
+
+// SetNillableMaxNonResponsesRpm sets the "max_non_responses_rpm" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableMaxNonResponsesRpm(i *int) *APIKeyUpdateOne {
+	if i != nil {
+		akuo.SetMaxNonResponsesRpm(*i)
+	}
+	return akuo
+}
+
+// AddMaxNonResponsesRpm adds i to the "max_non_responses_rpm" field.
+func (akuo *APIKeyUpdateOne) AddMaxNonResponsesRpm(i int) *APIKeyUpdateOne {
+	akuo.mutation.AddMaxNonResponsesRpm(i)
+	return akuo
+}
+
 // SetBalanceAlertEnabled sets the "balance_alert_enabled" field.
 func (akuo *APIKeyUpdateOne) SetBalanceAlertEnabled(b bool) *APIKeyUpdateOne {
 	akuo.mutation.SetBalanceAlertEnabled(b)
@@ -1184,6 +1290,16 @@ func (akuo *APIKeyUpdateOne) check() error {
 			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_concurrency": %w`, err)}
 		}
 	}
+	if v, ok := akuo.mutation.MaxRpm(); ok {
+		if err := apikey.MaxRpmValidator(v); err != nil {
+			return &ValidationError{Name: "max_rpm", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_rpm": %w`, err)}
+		}
+	}
+	if v, ok := akuo.mutation.MaxNonResponsesRpm(); ok {
+		if err := apikey.MaxNonResponsesRpmValidator(v); err != nil {
+			return &ValidationError{Name: "max_non_responses_rpm", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_non_responses_rpm": %w`, err)}
+		}
+	}
 	if v, ok := akuo.mutation.BalanceAlertEmail(); ok {
 		if err := apikey.BalanceAlertEmailValidator(v); err != nil {
 			return &ValidationError{Name: "balance_alert_email", err: fmt.Errorf(`ent: validator failed for field "APIKey.balance_alert_email": %w`, err)}
@@ -1295,6 +1411,18 @@ func (akuo *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err er
 	}
 	if value, ok := akuo.mutation.AddedMaxConcurrency(); ok {
 		_spec.AddField(apikey.FieldMaxConcurrency, field.TypeInt, value)
+	}
+	if value, ok := akuo.mutation.MaxRpm(); ok {
+		_spec.SetField(apikey.FieldMaxRpm, field.TypeInt, value)
+	}
+	if value, ok := akuo.mutation.AddedMaxRpm(); ok {
+		_spec.AddField(apikey.FieldMaxRpm, field.TypeInt, value)
+	}
+	if value, ok := akuo.mutation.MaxNonResponsesRpm(); ok {
+		_spec.SetField(apikey.FieldMaxNonResponsesRpm, field.TypeInt, value)
+	}
+	if value, ok := akuo.mutation.AddedMaxNonResponsesRpm(); ok {
+		_spec.AddField(apikey.FieldMaxNonResponsesRpm, field.TypeInt, value)
 	}
 	if value, ok := akuo.mutation.BalanceAlertEnabled(); ok {
 		_spec.SetField(apikey.FieldBalanceAlertEnabled, field.TypeBool, value)

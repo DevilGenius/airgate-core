@@ -23,6 +23,8 @@ var (
 		{Name: "used_quota_actual", Type: field.TypeFloat64, Default: 0},
 		{Name: "sell_rate", Type: field.TypeFloat64, Default: 1},
 		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
+		{Name: "max_rpm", Type: field.TypeInt, Default: 0},
+		{Name: "max_non_responses_rpm", Type: field.TypeInt, Default: 0},
 		{Name: "balance_alert_enabled", Type: field.TypeBool, Default: false},
 		{Name: "balance_alert_email", Type: field.TypeString, Size: 255, Default: ""},
 		{Name: "balance_alert_threshold", Type: field.TypeFloat64, Default: 0},
@@ -42,13 +44,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "api_keys_groups_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[20]},
+				Columns:    []*schema.Column{APIKeysColumns[22]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "api_keys_users_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[21]},
+				Columns:    []*schema.Column{APIKeysColumns[23]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},

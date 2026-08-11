@@ -178,7 +178,7 @@ describe('admin CreateKeyModal', () => {
     await user.click(screen.getByLabelText('api_keys.balance_alert_enabled'));
     await user.type(screen.getByPlaceholderText('name@example.com'), 'ops@example.com');
     const updatedNumberInputs = container.querySelectorAll<HTMLInputElement>('input[type="number"]');
-    fireEvent.change(updatedNumberInputs[3]!, { target: { value: '3.5' } });
+    fireEvent.change(updatedNumberInputs[5]!, { target: { value: '3.5' } });
 
     const ipInputs = screen.getAllByPlaceholderText('api_keys.ip_placeholder');
     fireEvent.change(ipInputs[0]!, { target: { value: '10.0.0.1\n\n10.0.0.2' } });
@@ -195,6 +195,8 @@ describe('admin CreateKeyModal', () => {
       ip_blacklist: ['192.168.1.1'],
       ip_whitelist: ['10.0.0.1', '10.0.0.2'],
       max_concurrency: 4,
+      max_rpm: 0,
+      max_non_responses_rpm: 0,
       name: 'Production',
       quota_usd: 25.5,
       sell_rate: 1.5,
@@ -228,7 +230,7 @@ describe('admin CreateKeyModal', () => {
     await user.click(screen.getByRole('button', { name: /common\.create/ }));
     expect(mocks.toast).toHaveBeenLastCalledWith('error', 'api_keys.balance_alert_threshold_required');
 
-    const thresholdInput = container.querySelectorAll<HTMLInputElement>('input[type="number"]')[3]!;
+    const thresholdInput = container.querySelectorAll<HTMLInputElement>('input[type="number"]')[5]!;
     fireEvent.change(thresholdInput, { target: { value: '1' } });
     await user.click(screen.getByRole('button', { name: /common\.create/ }));
     expect(onSubmit).toHaveBeenCalled();

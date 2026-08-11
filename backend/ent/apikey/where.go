@@ -100,6 +100,16 @@ func MaxConcurrency(v int) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldMaxConcurrency, v))
 }
 
+// MaxRpm applies equality check predicate on the "max_rpm" field. It's identical to MaxRpmEQ.
+func MaxRpm(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldMaxRpm, v))
+}
+
+// MaxNonResponsesRpm applies equality check predicate on the "max_non_responses_rpm" field. It's identical to MaxNonResponsesRpmEQ.
+func MaxNonResponsesRpm(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldMaxNonResponsesRpm, v))
+}
+
 // BalanceAlertEnabled applies equality check predicate on the "balance_alert_enabled" field. It's identical to BalanceAlertEnabledEQ.
 func BalanceAlertEnabled(v bool) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldBalanceAlertEnabled, v))
@@ -623,6 +633,86 @@ func MaxConcurrencyLT(v int) predicate.APIKey {
 // MaxConcurrencyLTE applies the LTE predicate on the "max_concurrency" field.
 func MaxConcurrencyLTE(v int) predicate.APIKey {
 	return predicate.APIKey(sql.FieldLTE(FieldMaxConcurrency, v))
+}
+
+// MaxRpmEQ applies the EQ predicate on the "max_rpm" field.
+func MaxRpmEQ(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldMaxRpm, v))
+}
+
+// MaxRpmNEQ applies the NEQ predicate on the "max_rpm" field.
+func MaxRpmNEQ(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldMaxRpm, v))
+}
+
+// MaxRpmIn applies the In predicate on the "max_rpm" field.
+func MaxRpmIn(vs ...int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldMaxRpm, vs...))
+}
+
+// MaxRpmNotIn applies the NotIn predicate on the "max_rpm" field.
+func MaxRpmNotIn(vs ...int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldMaxRpm, vs...))
+}
+
+// MaxRpmGT applies the GT predicate on the "max_rpm" field.
+func MaxRpmGT(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldMaxRpm, v))
+}
+
+// MaxRpmGTE applies the GTE predicate on the "max_rpm" field.
+func MaxRpmGTE(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldMaxRpm, v))
+}
+
+// MaxRpmLT applies the LT predicate on the "max_rpm" field.
+func MaxRpmLT(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldMaxRpm, v))
+}
+
+// MaxRpmLTE applies the LTE predicate on the "max_rpm" field.
+func MaxRpmLTE(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldMaxRpm, v))
+}
+
+// MaxNonResponsesRpmEQ applies the EQ predicate on the "max_non_responses_rpm" field.
+func MaxNonResponsesRpmEQ(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldMaxNonResponsesRpm, v))
+}
+
+// MaxNonResponsesRpmNEQ applies the NEQ predicate on the "max_non_responses_rpm" field.
+func MaxNonResponsesRpmNEQ(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldMaxNonResponsesRpm, v))
+}
+
+// MaxNonResponsesRpmIn applies the In predicate on the "max_non_responses_rpm" field.
+func MaxNonResponsesRpmIn(vs ...int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldMaxNonResponsesRpm, vs...))
+}
+
+// MaxNonResponsesRpmNotIn applies the NotIn predicate on the "max_non_responses_rpm" field.
+func MaxNonResponsesRpmNotIn(vs ...int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldMaxNonResponsesRpm, vs...))
+}
+
+// MaxNonResponsesRpmGT applies the GT predicate on the "max_non_responses_rpm" field.
+func MaxNonResponsesRpmGT(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldMaxNonResponsesRpm, v))
+}
+
+// MaxNonResponsesRpmGTE applies the GTE predicate on the "max_non_responses_rpm" field.
+func MaxNonResponsesRpmGTE(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldMaxNonResponsesRpm, v))
+}
+
+// MaxNonResponsesRpmLT applies the LT predicate on the "max_non_responses_rpm" field.
+func MaxNonResponsesRpmLT(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldMaxNonResponsesRpm, v))
+}
+
+// MaxNonResponsesRpmLTE applies the LTE predicate on the "max_non_responses_rpm" field.
+func MaxNonResponsesRpmLTE(v int) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldMaxNonResponsesRpm, v))
 }
 
 // BalanceAlertEnabledEQ applies the EQ predicate on the "balance_alert_enabled" field.

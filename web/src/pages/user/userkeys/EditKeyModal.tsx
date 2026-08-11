@@ -123,16 +123,41 @@ export function EditKeyModal({
           />
           <Description>{t('user_keys.sell_rate_hint', '1.2 表示加价 20%，1 表示不加价，0 表示客户侧免费，最大 100')}</Description>
         </HeroTextField>
-        <HeroTextField fullWidth>
-          <Label>{t('user_keys.max_concurrency_label', '最大并发数')}</Label>
-          <Input
-            type="number"
-            value={form.max_concurrency}
-            onChange={(e) => setForm({ ...form, max_concurrency: e.target.value })}
-            placeholder="0"
-          />
-          <Description>{t('user_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
-        </HeroTextField>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <HeroTextField fullWidth>
+            <Label>{t('user_keys.max_concurrency_label', '最大并发数')}</Label>
+            <Input
+              type="number"
+              step="1"
+              min="0"
+              value={form.max_concurrency || '0'}
+              onChange={(e) => setForm({ ...form, max_concurrency: e.target.value })}
+            />
+            <Description>{t('user_keys.max_concurrency_hint', '0 表示不限制')}</Description>
+          </HeroTextField>
+          <HeroTextField fullWidth>
+            <Label>{t('user_keys.max_rpm_label', '总 RPM')}</Label>
+            <Input
+              type="number"
+              step="1"
+              min="0"
+              value={form.max_rpm || '0'}
+              onChange={(e) => setForm({ ...form, max_rpm: e.target.value })}
+            />
+            <Description>{t('user_keys.max_rpm_hint', '每分钟总请求数')}</Description>
+          </HeroTextField>
+          <HeroTextField fullWidth>
+            <Label>{t('user_keys.max_non_responses_rpm_label', '非 Responses 接口 RPM')}</Label>
+            <Input
+              type="number"
+              step="1"
+              min="0"
+              value={form.max_non_responses_rpm || '0'}
+              onChange={(e) => setForm({ ...form, max_non_responses_rpm: e.target.value })}
+            />
+            <Description>{t('user_keys.max_non_responses_rpm_hint', '每分钟非 Responses 请求数')}</Description>
+          </HeroTextField>
+        </div>
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="text-sm font-medium text-text">{t('user_keys.balance_alert_enabled')}</div>

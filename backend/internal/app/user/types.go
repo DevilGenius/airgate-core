@@ -122,6 +122,9 @@ type APIKey struct {
 	QuotaUSD              float64
 	UsedQuota             float64
 	UsedQuotaActual       float64
+	MaxConcurrency        int
+	MaxRPM                int
+	MaxNonResponsesRPM    int
 	BalanceAlertEnabled   bool
 	BalanceAlertEmail     string
 	BalanceAlertThreshold float64

@@ -28,6 +28,10 @@ func (APIKey) Fields() []ent.Field {
 			Comment("销售倍率：0 表示客户侧免费，1 表示不加价；billed_cost = actual_cost × sell_rate，不影响余额扣费"),
 		field.Int("max_concurrency").Default(0).Min(0).
 			Comment("API Key 级并发上限：同一把 key 同时在途的请求数。0 表示不限制（默认）。达到上限时返回 429 + apikey_concurrency_limit，保护单个客户端不因并发过高被自己打死或耗光上游账号的并发预算。"),
+		field.Int("max_rpm").Default(0).Min(0).
+			Comment("API Key 级总 RPM 上限：按固定分钟窗口统计所有请求数。0 表示不限制（默认）。"),
+		field.Int("max_non_responses_rpm").Default(0).Min(0).
+			Comment("API Key 级非 Responses 接口 RPM 上限：按固定分钟窗口统计非 Responses 请求数。0 表示不限制（默认）。"),
 		field.Bool("balance_alert_enabled").Default(false).
 			Comment("API Key 剩余额度邮件提醒开关。"),
 		field.String("balance_alert_email").Default("").MaxLen(255).

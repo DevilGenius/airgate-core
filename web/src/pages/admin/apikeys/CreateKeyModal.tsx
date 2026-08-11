@@ -32,6 +32,8 @@ const defaultForm: CreateAPIKeyReq = {
   expires_at: '',
   group_id: 0,
   max_concurrency: 0,
+  max_rpm: 0,
+  max_non_responses_rpm: 0,
   name: '',
   quota_usd: 0,
   balance_alert_enabled: false,
@@ -78,6 +80,8 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
       ip_blacklist: parseIpList(ipBlacklist),
       ip_whitelist: parseIpList(ipWhitelist),
       max_concurrency: form.max_concurrency ?? 0,
+      max_rpm: form.max_rpm ?? 0,
+      max_non_responses_rpm: form.max_non_responses_rpm ?? 0,
       quota_usd: form.quota_usd || undefined,
       sell_rate: parsedSellRate ?? 1,
       balance_alert_enabled: form.balance_alert_enabled,
@@ -192,17 +196,43 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
           </div>
 
           <div className="space-y-5">
-            <HeroTextField fullWidth>
-              <Label>{t('api_keys.max_concurrency_label', '最大并发数')}</Label>
-              <Input
-                type="number"
-                step="1"
-                min="0"
-                value={String(form.max_concurrency ?? 0)}
-                onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
-              />
-              <Description>{t('api_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
-            </HeroTextField>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <HeroTextField fullWidth>
+                <Label>{t('api_keys.max_concurrency_label', '最大并发数')}</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={String(form.max_concurrency ?? 0)}
+                  onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
+                />
+                <Description>{t('api_keys.max_concurrency_hint', '0 表示不限制')}</Description>
+              </HeroTextField>
+
+              <HeroTextField fullWidth>
+                <Label>{t('api_keys.max_rpm_label', '总 RPM')}</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={String(form.max_rpm ?? 0)}
+                  onChange={(e) => setForm({ ...form, max_rpm: Number(e.target.value) })}
+                />
+                <Description>{t('api_keys.max_rpm_hint', '每分钟总请求数')}</Description>
+              </HeroTextField>
+
+              <HeroTextField fullWidth>
+                <Label>{t('api_keys.max_non_responses_rpm_label', '非 Responses 接口 RPM')}</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={String(form.max_non_responses_rpm ?? 0)}
+                  onChange={(e) => setForm({ ...form, max_non_responses_rpm: Number(e.target.value) })}
+                />
+                <Description>{t('api_keys.max_non_responses_rpm_hint', '每分钟非 Responses 请求数')}</Description>
+              </HeroTextField>
+            </div>
 
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">

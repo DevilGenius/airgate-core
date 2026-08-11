@@ -43,6 +43,8 @@ type Forwarder struct {
 	monitor              monitoring.Recorder
 	requestMonitor       requestmonitoring.Recorder
 	requestTraceEnabled  atomic.Bool
+	clientLimiter        *clientLimiter
+	clientLimiterOnce    sync.Once
 	credentialLocks      sync.Map
 	credentialPersistSem chan struct{}
 }
@@ -63,8 +65,21 @@ func NewForwarder(
 		concurrency:          concurrency,
 		calculator:           calculator,
 		recorder:             recorder,
+		clientLimiter:        newClientLimiter(),
 		credentialPersistSem: make(chan struct{}, 32),
 	}
+}
+
+func (f *Forwarder) getClientLimiter() *clientLimiter {
+	if f == nil {
+		return nil
+	}
+	f.clientLimiterOnce.Do(func() {
+		if f.clientLimiter == nil {
+			f.clientLimiter = newClientLimiter()
+		}
+	})
+	return f.clientLimiter
 }
 
 // SetMonitorRecorder injects the best-effort monitor event recorder.
@@ -150,6 +165,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		state.trace = trace
 	}
 	if !f.checkBalance(c, state) {
+		return
+	}
+	if (state.keyInfo.KeyMaxRPM > 0 || state.keyInfo.KeyMaxNonResponsesRPM > 0) && !f.checkAPIKeyRPM(c, state) {
 		return
 	}
 

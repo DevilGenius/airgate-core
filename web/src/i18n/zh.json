@@ -789,7 +789,13 @@
     "balance_alert_threshold": "提醒阈值 (USD)",
     "balance_alert_hint": "剩余额度低于阈值时发送邮件",
     "balance_alert_email_required": "请填写额度提醒接收邮箱",
-    "balance_alert_threshold_required": "请填写大于 0 的额度提醒阈值"
+    "balance_alert_threshold_required": "请填写大于 0 的额度提醒阈值",
+    "max_concurrency_label": "最大并发数",
+    "max_concurrency_hint": "0 表示不限制",
+    "max_rpm_label": "总 RPM",
+    "max_rpm_hint": "每分钟总请求数",
+    "max_non_responses_rpm_label": "非 Responses 接口 RPM",
+    "max_non_responses_rpm_hint": "每分钟非 Responses 请求数"
   },
 
   "subscriptions": {
@@ -1378,7 +1384,13 @@
     "ccs_codex_desc": "OpenAI Codex CLI 编码助手",
     "ccs_not_installed": "未检测到 CC-Switch，请先安装 CC-Switch 客户端。",
     "ccs_session_expired": "登录会话已失效，请重新使用 API 密钥登录后再尝试导入",
-    "codex_config_toml_hint": "请确保以下内容位于 config.toml 文件的开头部分"
+    "codex_config_toml_hint": "请确保以下内容位于 config.toml 文件的开头部分",
+    "max_concurrency_label": "最大并发数",
+    "max_concurrency_hint": "0 表示不限制",
+    "max_rpm_label": "总 RPM",
+    "max_rpm_hint": "每分钟总请求数",
+    "max_non_responses_rpm_label": "非 Responses 接口 RPM",
+    "max_non_responses_rpm_hint": "每分钟非 Responses 请求数"
   },
 
   "setup": {

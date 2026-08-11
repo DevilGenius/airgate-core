@@ -145,6 +145,34 @@ func (akc *APIKeyCreate) SetNillableMaxConcurrency(i *int) *APIKeyCreate {
 	return akc
 }
 
+// SetMaxRpm sets the "max_rpm" field.
+func (akc *APIKeyCreate) SetMaxRpm(i int) *APIKeyCreate {
+	akc.mutation.SetMaxRpm(i)
+	return akc
+}
+
+// SetNillableMaxRpm sets the "max_rpm" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableMaxRpm(i *int) *APIKeyCreate {
+	if i != nil {
+		akc.SetMaxRpm(*i)
+	}
+	return akc
+}
+
+// SetMaxNonResponsesRpm sets the "max_non_responses_rpm" field.
+func (akc *APIKeyCreate) SetMaxNonResponsesRpm(i int) *APIKeyCreate {
+	akc.mutation.SetMaxNonResponsesRpm(i)
+	return akc
+}
+
+// SetNillableMaxNonResponsesRpm sets the "max_non_responses_rpm" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableMaxNonResponsesRpm(i *int) *APIKeyCreate {
+	if i != nil {
+		akc.SetMaxNonResponsesRpm(*i)
+	}
+	return akc
+}
+
 // SetBalanceAlertEnabled sets the "balance_alert_enabled" field.
 func (akc *APIKeyCreate) SetBalanceAlertEnabled(b bool) *APIKeyCreate {
 	akc.mutation.SetBalanceAlertEnabled(b)
@@ -361,6 +389,14 @@ func (akc *APIKeyCreate) defaults() {
 		v := apikey.DefaultMaxConcurrency
 		akc.mutation.SetMaxConcurrency(v)
 	}
+	if _, ok := akc.mutation.MaxRpm(); !ok {
+		v := apikey.DefaultMaxRpm
+		akc.mutation.SetMaxRpm(v)
+	}
+	if _, ok := akc.mutation.MaxNonResponsesRpm(); !ok {
+		v := apikey.DefaultMaxNonResponsesRpm
+		akc.mutation.SetMaxNonResponsesRpm(v)
+	}
 	if _, ok := akc.mutation.BalanceAlertEnabled(); !ok {
 		v := apikey.DefaultBalanceAlertEnabled
 		akc.mutation.SetBalanceAlertEnabled(v)
@@ -435,6 +471,22 @@ func (akc *APIKeyCreate) check() error {
 	if v, ok := akc.mutation.MaxConcurrency(); ok {
 		if err := apikey.MaxConcurrencyValidator(v); err != nil {
 			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_concurrency": %w`, err)}
+		}
+	}
+	if _, ok := akc.mutation.MaxRpm(); !ok {
+		return &ValidationError{Name: "max_rpm", err: errors.New(`ent: missing required field "APIKey.max_rpm"`)}
+	}
+	if v, ok := akc.mutation.MaxRpm(); ok {
+		if err := apikey.MaxRpmValidator(v); err != nil {
+			return &ValidationError{Name: "max_rpm", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_rpm": %w`, err)}
+		}
+	}
+	if _, ok := akc.mutation.MaxNonResponsesRpm(); !ok {
+		return &ValidationError{Name: "max_non_responses_rpm", err: errors.New(`ent: missing required field "APIKey.max_non_responses_rpm"`)}
+	}
+	if v, ok := akc.mutation.MaxNonResponsesRpm(); ok {
+		if err := apikey.MaxNonResponsesRpmValidator(v); err != nil {
+			return &ValidationError{Name: "max_non_responses_rpm", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_non_responses_rpm": %w`, err)}
 		}
 	}
 	if _, ok := akc.mutation.BalanceAlertEnabled(); !ok {
@@ -540,6 +592,14 @@ func (akc *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := akc.mutation.MaxConcurrency(); ok {
 		_spec.SetField(apikey.FieldMaxConcurrency, field.TypeInt, value)
 		_node.MaxConcurrency = value
+	}
+	if value, ok := akc.mutation.MaxRpm(); ok {
+		_spec.SetField(apikey.FieldMaxRpm, field.TypeInt, value)
+		_node.MaxRpm = value
+	}
+	if value, ok := akc.mutation.MaxNonResponsesRpm(); ok {
+		_spec.SetField(apikey.FieldMaxNonResponsesRpm, field.TypeInt, value)
+		_node.MaxNonResponsesRpm = value
 	}
 	if value, ok := akc.mutation.BalanceAlertEnabled(); ok {
 		_spec.SetField(apikey.FieldBalanceAlertEnabled, field.TypeBool, value)

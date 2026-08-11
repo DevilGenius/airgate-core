@@ -81,6 +81,10 @@ type APIKeyMutation struct {
 	addsell_rate               *float64
 	max_concurrency            *int
 	addmax_concurrency         *int
+	max_rpm                    *int
+	addmax_rpm                 *int
+	max_non_responses_rpm      *int
+	addmax_non_responses_rpm   *int
 	balance_alert_enabled      *bool
 	balance_alert_email        *string
 	balance_alert_threshold    *float64
@@ -768,6 +772,118 @@ func (m *APIKeyMutation) ResetMaxConcurrency() {
 	m.addmax_concurrency = nil
 }
 
+// SetMaxRpm sets the "max_rpm" field.
+func (m *APIKeyMutation) SetMaxRpm(i int) {
+	m.max_rpm = &i
+	m.addmax_rpm = nil
+}
+
+// MaxRpm returns the value of the "max_rpm" field in the mutation.
+func (m *APIKeyMutation) MaxRpm() (r int, exists bool) {
+	v := m.max_rpm
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaxRpm returns the old "max_rpm" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldMaxRpm(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaxRpm is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaxRpm requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaxRpm: %w", err)
+	}
+	return oldValue.MaxRpm, nil
+}
+
+// AddMaxRpm adds i to the "max_rpm" field.
+func (m *APIKeyMutation) AddMaxRpm(i int) {
+	if m.addmax_rpm != nil {
+		*m.addmax_rpm += i
+	} else {
+		m.addmax_rpm = &i
+	}
+}
+
+// AddedMaxRpm returns the value that was added to the "max_rpm" field in this mutation.
+func (m *APIKeyMutation) AddedMaxRpm() (r int, exists bool) {
+	v := m.addmax_rpm
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetMaxRpm resets all changes to the "max_rpm" field.
+func (m *APIKeyMutation) ResetMaxRpm() {
+	m.max_rpm = nil
+	m.addmax_rpm = nil
+}
+
+// SetMaxNonResponsesRpm sets the "max_non_responses_rpm" field.
+func (m *APIKeyMutation) SetMaxNonResponsesRpm(i int) {
+	m.max_non_responses_rpm = &i
+	m.addmax_non_responses_rpm = nil
+}
+
+// MaxNonResponsesRpm returns the value of the "max_non_responses_rpm" field in the mutation.
+func (m *APIKeyMutation) MaxNonResponsesRpm() (r int, exists bool) {
+	v := m.max_non_responses_rpm
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaxNonResponsesRpm returns the old "max_non_responses_rpm" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldMaxNonResponsesRpm(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaxNonResponsesRpm is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaxNonResponsesRpm requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaxNonResponsesRpm: %w", err)
+	}
+	return oldValue.MaxNonResponsesRpm, nil
+}
+
+// AddMaxNonResponsesRpm adds i to the "max_non_responses_rpm" field.
+func (m *APIKeyMutation) AddMaxNonResponsesRpm(i int) {
+	if m.addmax_non_responses_rpm != nil {
+		*m.addmax_non_responses_rpm += i
+	} else {
+		m.addmax_non_responses_rpm = &i
+	}
+}
+
+// AddedMaxNonResponsesRpm returns the value that was added to the "max_non_responses_rpm" field in this mutation.
+func (m *APIKeyMutation) AddedMaxNonResponsesRpm() (r int, exists bool) {
+	v := m.addmax_non_responses_rpm
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetMaxNonResponsesRpm resets all changes to the "max_non_responses_rpm" field.
+func (m *APIKeyMutation) ResetMaxNonResponsesRpm() {
+	m.max_non_responses_rpm = nil
+	m.addmax_non_responses_rpm = nil
+}
+
 // SetBalanceAlertEnabled sets the "balance_alert_enabled" field.
 func (m *APIKeyMutation) SetBalanceAlertEnabled(b bool) {
 	m.balance_alert_enabled = &b
@@ -1255,7 +1371,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 21)
 	if m.name != nil {
 		fields = append(fields, apikey.FieldName)
 	}
@@ -1288,6 +1404,12 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.max_concurrency != nil {
 		fields = append(fields, apikey.FieldMaxConcurrency)
+	}
+	if m.max_rpm != nil {
+		fields = append(fields, apikey.FieldMaxRpm)
+	}
+	if m.max_non_responses_rpm != nil {
+		fields = append(fields, apikey.FieldMaxNonResponsesRpm)
 	}
 	if m.balance_alert_enabled != nil {
 		fields = append(fields, apikey.FieldBalanceAlertEnabled)
@@ -1343,6 +1465,10 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.SellRate()
 	case apikey.FieldMaxConcurrency:
 		return m.MaxConcurrency()
+	case apikey.FieldMaxRpm:
+		return m.MaxRpm()
+	case apikey.FieldMaxNonResponsesRpm:
+		return m.MaxNonResponsesRpm()
 	case apikey.FieldBalanceAlertEnabled:
 		return m.BalanceAlertEnabled()
 	case apikey.FieldBalanceAlertEmail:
@@ -1390,6 +1516,10 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldSellRate(ctx)
 	case apikey.FieldMaxConcurrency:
 		return m.OldMaxConcurrency(ctx)
+	case apikey.FieldMaxRpm:
+		return m.OldMaxRpm(ctx)
+	case apikey.FieldMaxNonResponsesRpm:
+		return m.OldMaxNonResponsesRpm(ctx)
 	case apikey.FieldBalanceAlertEnabled:
 		return m.OldBalanceAlertEnabled(ctx)
 	case apikey.FieldBalanceAlertEmail:
@@ -1492,6 +1622,20 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMaxConcurrency(v)
 		return nil
+	case apikey.FieldMaxRpm:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaxRpm(v)
+		return nil
+	case apikey.FieldMaxNonResponsesRpm:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaxNonResponsesRpm(v)
+		return nil
 	case apikey.FieldBalanceAlertEnabled:
 		v, ok := value.(bool)
 		if !ok {
@@ -1571,6 +1715,12 @@ func (m *APIKeyMutation) AddedFields() []string {
 	if m.addmax_concurrency != nil {
 		fields = append(fields, apikey.FieldMaxConcurrency)
 	}
+	if m.addmax_rpm != nil {
+		fields = append(fields, apikey.FieldMaxRpm)
+	}
+	if m.addmax_non_responses_rpm != nil {
+		fields = append(fields, apikey.FieldMaxNonResponsesRpm)
+	}
 	if m.addbalance_alert_threshold != nil {
 		fields = append(fields, apikey.FieldBalanceAlertThreshold)
 	}
@@ -1592,6 +1742,10 @@ func (m *APIKeyMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedSellRate()
 	case apikey.FieldMaxConcurrency:
 		return m.AddedMaxConcurrency()
+	case apikey.FieldMaxRpm:
+		return m.AddedMaxRpm()
+	case apikey.FieldMaxNonResponsesRpm:
+		return m.AddedMaxNonResponsesRpm()
 	case apikey.FieldBalanceAlertThreshold:
 		return m.AddedBalanceAlertThreshold()
 	}
@@ -1637,6 +1791,20 @@ func (m *APIKeyMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddMaxConcurrency(v)
+		return nil
+	case apikey.FieldMaxRpm:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMaxRpm(v)
+		return nil
+	case apikey.FieldMaxNonResponsesRpm:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMaxNonResponsesRpm(v)
 		return nil
 	case apikey.FieldBalanceAlertThreshold:
 		v, ok := value.(float64)
@@ -1731,6 +1899,12 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldMaxConcurrency:
 		m.ResetMaxConcurrency()
+		return nil
+	case apikey.FieldMaxRpm:
+		m.ResetMaxRpm()
+		return nil
+	case apikey.FieldMaxNonResponsesRpm:
+		m.ResetMaxNonResponsesRpm()
 		return nil
 	case apikey.FieldBalanceAlertEnabled:
 		m.ResetBalanceAlertEnabled()

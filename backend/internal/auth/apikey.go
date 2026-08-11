@@ -119,8 +119,14 @@ type APIKeyInfo struct {
 	SellRate float64
 
 	// KeyMaxConcurrency API Key 级并发上限，0 表示不限制。
-	// 在 forwarder 路径里会用 Redis 原子 SET 按 key_id 维度争抢槽位。
+	// 在 forwarder 路径里按 key_id 维度使用进程内原子计数。
 	KeyMaxConcurrency int
+
+	// KeyMaxRPM API Key 级总 RPM 上限，0 表示不限制。
+	KeyMaxRPM int
+
+	// KeyMaxNonResponsesRPM API Key 级非 Responses 接口 RPM 上限，0 表示不限制。
+	KeyMaxNonResponsesRPM int
 
 	// UserMaxConcurrency 用户级并发上限，0 表示不限制。
 	// 同一个 user 下所有 API Key 共享这个配额——无论创建多少把 key，
@@ -310,18 +316,20 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 	}
 
 	info := &APIKeyInfo{
-		KeyID:              ak.ID,
-		KeyName:            ak.Name,
-		UserID:             u.ID,
-		UserEmail:          u.Email,
-		GroupID:            g.ID,
-		GroupName:          g.Name,
-		GroupPlatform:      g.Platform,
-		QuotaUSD:           ak.QuotaUsd,
-		UsedQuota:          ak.UsedQuota,
-		SellRate:           ak.SellRate,
-		KeyMaxConcurrency:  ak.MaxConcurrency,
-		UserMaxConcurrency: u.MaxConcurrency,
+		KeyID:                 ak.ID,
+		KeyName:               ak.Name,
+		UserID:                u.ID,
+		UserEmail:             u.Email,
+		GroupID:               g.ID,
+		GroupName:             g.Name,
+		GroupPlatform:         g.Platform,
+		QuotaUSD:              ak.QuotaUsd,
+		UsedQuota:             ak.UsedQuota,
+		SellRate:              ak.SellRate,
+		KeyMaxConcurrency:     ak.MaxConcurrency,
+		KeyMaxRPM:             ak.MaxRpm,
+		KeyMaxNonResponsesRPM: ak.MaxNonResponsesRpm,
+		UserMaxConcurrency:    u.MaxConcurrency,
 
 		UserBalance:            u.Balance,
 		UserGroupRates:         u.GroupRates,

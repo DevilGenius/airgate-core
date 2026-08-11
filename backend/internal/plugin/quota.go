@@ -38,6 +38,37 @@ func (f *Forwarder) checkBalance(c *gin.Context, state *forwardState) bool {
 	return true
 }
 
+// checkAPIKeyRPM 限制 API Key 的总 RPM 与非 Responses RPM。
+// 两个配置都为 0 时直接返回，不做路径解析、不访问 Redis。
+func (f *Forwarder) checkAPIKeyRPM(c *gin.Context, state *forwardState) bool {
+	if f == nil || state == nil || state.keyInfo == nil {
+		return true
+	}
+	totalRPM := state.keyInfo.KeyMaxRPM
+	nonResponsesRPM := state.keyInfo.KeyMaxNonResponsesRPM
+	if totalRPM <= 0 && nonResponsesRPM <= 0 {
+		return true
+	}
+	countNonResponses := nonResponsesRPM > 0 && !isResponsesAPIPath(state.requestPath)
+	if totalRPM <= 0 && !countNonResponses {
+		return true
+	}
+	if f.getClientLimiter().allowRPM(state.keyInfo.KeyID, totalRPM, nonResponsesRPM, countNonResponses) {
+		return true
+	}
+	openAIRateLimitError(c, http.StatusTooManyRequests, "apikey_rpm_limit", "当前API-Key已达RPM限制，请稍后重试", time.Second)
+	return false
+}
+
+func isResponsesAPIPath(path string) bool {
+	switch forwardpath.Normalize(path) {
+	case "/v1/responses", "/responses", "/v1/responses/compact", "/responses/compact":
+		return true
+	default:
+		return false
+	}
+}
+
 // isMetadataOnlyPath 只读元信息（/v1/models、任务查询等）不打上游、不计费、不需要账号调度。
 func isMetadataOnlyPath(path string) bool {
 	switch path {
@@ -60,47 +91,30 @@ func isMetadataOnlyPath(path string) bool {
 	return false
 }
 
-// acquireClientQuota 获取用户级 + API Key 级两层并发槽。返回 release 回调；
+// acquireClientQuota 获取用户级 + API Key 级两层内存并发槽。返回 release 回调；
 // 任意一层超限都直接写 429 并返回 nil（调用方看到 nil 立即 return）。
-//
-// slot ID 独立于 state.requestID：后者在每次 failover 会被重新生成，而这两层槽位
-// 跨整个 Forward 请求稳定，必须有稳定 ID 保证 SREM 能匹配上。
 func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func() {
-	ctx := c.Request.Context()
-	releaseCtx := context.Background()
-	slotID := uuid.New().String()
 	userID, keyID := state.keyInfo.UserID, state.keyInfo.KeyID
-
-	userHeld := false
-	if max := state.keyInfo.UserMaxConcurrency; max > 0 {
-		if err := f.concurrency.AcquireUserSlot(ctx, userID, slotID, max, 0); err != nil {
-			openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "user_concurrency_limit", "用户并发已达上限，请稍后重试")
-			return nil
-		}
-		userHeld = true
+	userMax, keyMax := state.keyInfo.UserMaxConcurrency, state.keyInfo.KeyMaxConcurrency
+	if userMax <= 0 && keyMax <= 0 {
+		return func() {}
 	}
 
-	keyHeld := false
-	if max := state.keyInfo.KeyMaxConcurrency; max > 0 {
-		if err := f.concurrency.AcquireAPIKeySlot(ctx, keyID, slotID, max, 0); err != nil {
-			if userHeld {
-				f.concurrency.ReleaseUserSlot(ctx, userID, slotID)
-			}
-			openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "apikey_concurrency_limit", "API Key 并发已达上限，请稍后重试")
-			return nil
-		}
-		keyHeld = true
+	release, userLimited, keyLimited := f.getClientLimiter().acquire(
+		userID,
+		keyID,
+		userMax,
+		keyMax,
+	)
+	if userLimited {
+		openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "user_concurrency_limit", "用户并发已达上限，请稍后重试")
+		return nil
 	}
-
-	// 反向释放：apikey 先，user 后。
-	return func() {
-		if keyHeld {
-			f.concurrency.ReleaseAPIKeySlot(releaseCtx, keyID, slotID)
-		}
-		if userHeld {
-			f.concurrency.ReleaseUserSlot(releaseCtx, userID, slotID)
-		}
+	if keyLimited {
+		openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "apikey_concurrency_limit", "API Key 并发已达上限，请稍后重试")
+		return nil
 	}
+	return release
 }
 
 // pickAccount 调度选号并写到 state.account。失败时返回 error，由调用方决定如何处理

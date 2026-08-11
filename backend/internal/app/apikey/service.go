@@ -190,6 +190,14 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 	if maxConc < 0 {
 		maxConc = 0
 	}
+	maxRPM := input.MaxRPM
+	if maxRPM < 0 {
+		maxRPM = 0
+	}
+	maxNonResponsesRPM := input.MaxNonResponsesRPM
+	if maxNonResponsesRPM < 0 {
+		maxNonResponsesRPM = 0
+	}
 	balanceAlertEmail := normalizeString(input.BalanceAlertEmail)
 	balanceAlertThreshold := normalizeBalanceAlertThreshold(input.BalanceAlertThreshold)
 	item, err := s.repo.Create(ctx, Mutation{
@@ -206,6 +214,8 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 		QuotaUSD:              &input.QuotaUSD,
 		SellRate:              &sellRate,
 		MaxConcurrency:        &maxConc,
+		MaxRPM:                &maxRPM,
+		MaxNonResponsesRPM:    &maxNonResponsesRPM,
 		BalanceAlertEnabled:   &input.BalanceAlertEnabled,
 		BalanceAlertEmail:     &balanceAlertEmail,
 		BalanceAlertThreshold: &balanceAlertThreshold,
@@ -441,6 +451,8 @@ func (s *Service) buildMutation(ctx context.Context, userID int, input UpdateInp
 		QuotaUSD:              input.QuotaUSD,
 		SellRate:              sellRate,
 		MaxConcurrency:        input.MaxConcurrency,
+		MaxRPM:                input.MaxRPM,
+		MaxNonResponsesRPM:    input.MaxNonResponsesRPM,
 		BalanceAlertEnabled:   input.BalanceAlertEnabled,
 		BalanceAlertEmail:     normalizeOptionalString(input.BalanceAlertEmail),
 		BalanceAlertThreshold: normalizeOptionalBalanceAlertThreshold(input.BalanceAlertThreshold),

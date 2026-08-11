@@ -79,30 +79,42 @@ func init() {
 	apikey.DefaultMaxConcurrency = apikeyDescMaxConcurrency.Default.(int)
 	// apikey.MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
 	apikey.MaxConcurrencyValidator = apikeyDescMaxConcurrency.Validators[0].(func(int) error)
+	// apikeyDescMaxRpm is the schema descriptor for max_rpm field.
+	apikeyDescMaxRpm := apikeyFields[11].Descriptor()
+	// apikey.DefaultMaxRpm holds the default value on creation for the max_rpm field.
+	apikey.DefaultMaxRpm = apikeyDescMaxRpm.Default.(int)
+	// apikey.MaxRpmValidator is a validator for the "max_rpm" field. It is called by the builders before save.
+	apikey.MaxRpmValidator = apikeyDescMaxRpm.Validators[0].(func(int) error)
+	// apikeyDescMaxNonResponsesRpm is the schema descriptor for max_non_responses_rpm field.
+	apikeyDescMaxNonResponsesRpm := apikeyFields[12].Descriptor()
+	// apikey.DefaultMaxNonResponsesRpm holds the default value on creation for the max_non_responses_rpm field.
+	apikey.DefaultMaxNonResponsesRpm = apikeyDescMaxNonResponsesRpm.Default.(int)
+	// apikey.MaxNonResponsesRpmValidator is a validator for the "max_non_responses_rpm" field. It is called by the builders before save.
+	apikey.MaxNonResponsesRpmValidator = apikeyDescMaxNonResponsesRpm.Validators[0].(func(int) error)
 	// apikeyDescBalanceAlertEnabled is the schema descriptor for balance_alert_enabled field.
-	apikeyDescBalanceAlertEnabled := apikeyFields[11].Descriptor()
+	apikeyDescBalanceAlertEnabled := apikeyFields[13].Descriptor()
 	// apikey.DefaultBalanceAlertEnabled holds the default value on creation for the balance_alert_enabled field.
 	apikey.DefaultBalanceAlertEnabled = apikeyDescBalanceAlertEnabled.Default.(bool)
 	// apikeyDescBalanceAlertEmail is the schema descriptor for balance_alert_email field.
-	apikeyDescBalanceAlertEmail := apikeyFields[12].Descriptor()
+	apikeyDescBalanceAlertEmail := apikeyFields[14].Descriptor()
 	// apikey.DefaultBalanceAlertEmail holds the default value on creation for the balance_alert_email field.
 	apikey.DefaultBalanceAlertEmail = apikeyDescBalanceAlertEmail.Default.(string)
 	// apikey.BalanceAlertEmailValidator is a validator for the "balance_alert_email" field. It is called by the builders before save.
 	apikey.BalanceAlertEmailValidator = apikeyDescBalanceAlertEmail.Validators[0].(func(string) error)
 	// apikeyDescBalanceAlertThreshold is the schema descriptor for balance_alert_threshold field.
-	apikeyDescBalanceAlertThreshold := apikeyFields[13].Descriptor()
+	apikeyDescBalanceAlertThreshold := apikeyFields[15].Descriptor()
 	// apikey.DefaultBalanceAlertThreshold holds the default value on creation for the balance_alert_threshold field.
 	apikey.DefaultBalanceAlertThreshold = apikeyDescBalanceAlertThreshold.Default.(float64)
 	// apikeyDescBalanceAlertNotified is the schema descriptor for balance_alert_notified field.
-	apikeyDescBalanceAlertNotified := apikeyFields[14].Descriptor()
+	apikeyDescBalanceAlertNotified := apikeyFields[16].Descriptor()
 	// apikey.DefaultBalanceAlertNotified holds the default value on creation for the balance_alert_notified field.
 	apikey.DefaultBalanceAlertNotified = apikeyDescBalanceAlertNotified.Default.(bool)
 	// apikeyDescCreatedAt is the schema descriptor for created_at field.
-	apikeyDescCreatedAt := apikeyFields[17].Descriptor()
+	apikeyDescCreatedAt := apikeyFields[19].Descriptor()
 	// apikey.DefaultCreatedAt holds the default value on creation for the created_at field.
 	apikey.DefaultCreatedAt = apikeyDescCreatedAt.Default.(func() time.Time)
 	// apikeyDescUpdatedAt is the schema descriptor for updated_at field.
-	apikeyDescUpdatedAt := apikeyFields[18].Descriptor()
+	apikeyDescUpdatedAt := apikeyFields[20].Descriptor()
 	// apikey.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	apikey.DefaultUpdatedAt = apikeyDescUpdatedAt.Default.(func() time.Time)
 	// apikey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

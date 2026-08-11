@@ -37,6 +37,10 @@ const (
 	FieldSellRate = "sell_rate"
 	// FieldMaxConcurrency holds the string denoting the max_concurrency field in the database.
 	FieldMaxConcurrency = "max_concurrency"
+	// FieldMaxRpm holds the string denoting the max_rpm field in the database.
+	FieldMaxRpm = "max_rpm"
+	// FieldMaxNonResponsesRpm holds the string denoting the max_non_responses_rpm field in the database.
+	FieldMaxNonResponsesRpm = "max_non_responses_rpm"
 	// FieldBalanceAlertEnabled holds the string denoting the balance_alert_enabled field in the database.
 	FieldBalanceAlertEnabled = "balance_alert_enabled"
 	// FieldBalanceAlertEmail holds the string denoting the balance_alert_email field in the database.
@@ -98,6 +102,8 @@ var Columns = []string{
 	FieldUsedQuotaActual,
 	FieldSellRate,
 	FieldMaxConcurrency,
+	FieldMaxRpm,
+	FieldMaxNonResponsesRpm,
 	FieldBalanceAlertEnabled,
 	FieldBalanceAlertEmail,
 	FieldBalanceAlertThreshold,
@@ -151,6 +157,14 @@ var (
 	DefaultMaxConcurrency int
 	// MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
 	MaxConcurrencyValidator func(int) error
+	// DefaultMaxRpm holds the default value on creation for the "max_rpm" field.
+	DefaultMaxRpm int
+	// MaxRpmValidator is a validator for the "max_rpm" field. It is called by the builders before save.
+	MaxRpmValidator func(int) error
+	// DefaultMaxNonResponsesRpm holds the default value on creation for the "max_non_responses_rpm" field.
+	DefaultMaxNonResponsesRpm int
+	// MaxNonResponsesRpmValidator is a validator for the "max_non_responses_rpm" field. It is called by the builders before save.
+	MaxNonResponsesRpmValidator func(int) error
 	// DefaultBalanceAlertEnabled holds the default value on creation for the "balance_alert_enabled" field.
 	DefaultBalanceAlertEnabled bool
 	// DefaultBalanceAlertEmail holds the default value on creation for the "balance_alert_email" field.
@@ -246,6 +260,16 @@ func BySellRate(opts ...sql.OrderTermOption) OrderOption {
 // ByMaxConcurrency orders the results by the max_concurrency field.
 func ByMaxConcurrency(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMaxConcurrency, opts...).ToFunc()
+}
+
+// ByMaxRpm orders the results by the max_rpm field.
+func ByMaxRpm(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaxRpm, opts...).ToFunc()
+}
+
+// ByMaxNonResponsesRpm orders the results by the max_non_responses_rpm field.
+func ByMaxNonResponsesRpm(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaxNonResponsesRpm, opts...).ToFunc()
 }
 
 // ByBalanceAlertEnabled orders the results by the balance_alert_enabled field.

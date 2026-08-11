@@ -425,6 +425,10 @@ export interface APIKeyResp {
   sell_rate: number;
   /** API Key 级并发上限：同一把 key 同时在途请求数。0 表示不限制 */
   max_concurrency: number;
+  /** API Key 级总 RPM 上限。0 表示不限制 */
+  max_rpm: number;
+  /** API Key 级非 Responses 接口 RPM 上限。0 表示不限制 */
+  max_non_responses_rpm: number;
   /** API Key 剩余额度邮件提醒开关 */
   balance_alert_enabled: boolean;
   /** API Key 剩余额度提醒接收邮箱 */
@@ -455,6 +459,10 @@ export interface CreateAPIKeyReq {
   sell_rate?: number;
   /** API Key 并发上限，0 或不传表示不限制 */
   max_concurrency?: number;
+  /** API Key 总 RPM 上限，0 或不传表示不限制 */
+  max_rpm?: number;
+  /** API Key 非 Responses 接口 RPM 上限，0 或不传表示不限制 */
+  max_non_responses_rpm?: number;
   balance_alert_enabled?: boolean;
   balance_alert_email?: string;
   balance_alert_threshold?: number;
@@ -471,6 +479,10 @@ export interface UpdateAPIKeyReq {
   sell_rate?: number;
   /** API Key 并发上限，0 表示关闭限制；不传则不改动 */
   max_concurrency?: number;
+  /** API Key 总 RPM 上限，0 表示关闭限制；不传则不改动 */
+  max_rpm?: number;
+  /** API Key 非 Responses 接口 RPM 上限，0 表示关闭限制；不传则不改动 */
+  max_non_responses_rpm?: number;
   balance_alert_enabled?: boolean;
   balance_alert_email?: string;
   balance_alert_threshold?: number;

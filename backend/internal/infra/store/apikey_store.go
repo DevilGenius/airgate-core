@@ -373,6 +373,12 @@ func applyAPIKeyMutationCreate(builder *ent.APIKeyCreate, mutation appapikey.Mut
 	if mutation.MaxConcurrency != nil {
 		builder.SetMaxConcurrency(*mutation.MaxConcurrency)
 	}
+	if mutation.MaxRPM != nil {
+		builder.SetMaxRpm(*mutation.MaxRPM)
+	}
+	if mutation.MaxNonResponsesRPM != nil {
+		builder.SetMaxNonResponsesRpm(*mutation.MaxNonResponsesRPM)
+	}
 	if mutation.BalanceAlertEnabled != nil {
 		builder.SetBalanceAlertEnabled(*mutation.BalanceAlertEnabled)
 	}
@@ -421,6 +427,12 @@ func applyAPIKeyMutationUpdate(builder *ent.APIKeyUpdateOne, mutation appapikey.
 	if mutation.MaxConcurrency != nil {
 		builder.SetMaxConcurrency(*mutation.MaxConcurrency)
 	}
+	if mutation.MaxRPM != nil {
+		builder.SetMaxRpm(*mutation.MaxRPM)
+	}
+	if mutation.MaxNonResponsesRPM != nil {
+		builder.SetMaxNonResponsesRpm(*mutation.MaxNonResponsesRPM)
+	}
 	if mutation.BalanceAlertEnabled != nil {
 		builder.SetBalanceAlertEnabled(*mutation.BalanceAlertEnabled)
 	}
@@ -459,6 +471,8 @@ func mapAPIKey(item *ent.APIKey) appapikey.Key {
 		UsedQuotaActual:       item.UsedQuotaActual,
 		SellRate:              item.SellRate,
 		MaxConcurrency:        item.MaxConcurrency,
+		MaxRPM:                item.MaxRpm,
+		MaxNonResponsesRPM:    item.MaxNonResponsesRpm,
 		BalanceAlertEnabled:   item.BalanceAlertEnabled,
 		BalanceAlertEmail:     item.BalanceAlertEmail,
 		BalanceAlertThreshold: item.BalanceAlertThreshold,

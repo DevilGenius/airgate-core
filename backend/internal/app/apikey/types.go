@@ -27,6 +27,8 @@ type Key struct {
 	UsedQuotaActual       float64 // 真实成本已用（聚合 sum(usage_log.actual_cost)，仅在 fetch 时填充）
 	SellRate              float64 // 销售倍率，0 表示客户侧免费，1 表示不加价
 	MaxConcurrency        int     // API Key 级并发上限，0 表示不限制
+	MaxRPM                int     // 总 RPM 上限，0 表示不限制
+	MaxNonResponsesRPM    int     // 非 Responses 接口 RPM 上限，0 表示不限制
 	BalanceAlertEnabled   bool    // API Key 剩余额度邮件提醒开关
 	BalanceAlertEmail     string  // API Key 剩余额度提醒接收邮箱
 	BalanceAlertThreshold float64 // API Key 剩余额度提醒阈值
@@ -78,6 +80,8 @@ type CreateInput struct {
 	QuotaUSD              float64
 	SellRate              *float64
 	MaxConcurrency        int // 0 表示不限制
+	MaxRPM                int // 总 RPM 上限，0 表示不限制
+	MaxNonResponsesRPM    int // 非 Responses 接口 RPM 上限，0 表示不限制
 	BalanceAlertEnabled   bool
 	BalanceAlertEmail     string
 	BalanceAlertThreshold float64
@@ -95,6 +99,8 @@ type UpdateInput struct {
 	QuotaUSD              *float64
 	SellRate              *float64
 	MaxConcurrency        *int // nil 表示不改动；指向 0 表示关闭并发限制
+	MaxRPM                *int // nil 表示不改动；指向 0 表示关闭总 RPM 限制
+	MaxNonResponsesRPM    *int // nil 表示不改动；指向 0 表示关闭非 Responses RPM 限制
 	BalanceAlertEnabled   *bool
 	BalanceAlertEmail     *string
 	BalanceAlertThreshold *float64
@@ -129,6 +135,8 @@ type Mutation struct {
 	QuotaUSD                  *float64
 	SellRate                  *float64
 	MaxConcurrency            *int
+	MaxRPM                    *int
+	MaxNonResponsesRPM        *int
 	BalanceAlertEnabled       *bool
 	BalanceAlertEmail         *string
 	BalanceAlertThreshold     *float64

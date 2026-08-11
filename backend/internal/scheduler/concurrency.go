@@ -291,7 +291,9 @@ func (cm *ConcurrencyManager) ReleaseSlot(ctx context.Context, accountID int, re
 	}
 }
 
-// AcquireAPIKeySlot 获取 API Key 级并发槽位。
+// AcquireAPIKeySlot 获取 API Key 级分布式并发槽位。
+// HTTP forwarder 的 API Key 热路径不调用此原语，改用 plugin.clientLimiter 的进程内计数；
+// 这里保留底层 Redis 原语，供兼容调用和非 HTTP 调度场景使用。
 // maxConcurrency <= 0 时直接放行（表示该 key 不限制并发）。
 // 与账号级并发独立，两层闸门各自计数，调用方需要分别 release。
 func (cm *ConcurrencyManager) AcquireAPIKeySlot(ctx context.Context, keyID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
@@ -304,7 +306,9 @@ func (cm *ConcurrencyManager) ReleaseAPIKeySlot(ctx context.Context, keyID int, 
 	cm.releaseSlotByKey(ctx, apiKeyConcurrencyKey(keyID), apiKeyConcurrencyCountKey(keyID), "", "", requestID)
 }
 
-// AcquireUserSlot 获取用户级并发槽位。
+// AcquireUserSlot 获取用户级分布式并发槽位。
+// HTTP forwarder 的用户热路径不调用此原语，改用 plugin.clientLimiter 的进程内计数；
+// 这里保留底层 Redis 原语，供兼容调用和非 HTTP 调度场景使用。
 // maxConcurrency <= 0 时直接放行（表示该用户不限制总并发）。
 // 与 apikey / 账号 两级槽位独立，调用方需要分别 release。
 func (cm *ConcurrencyManager) AcquireUserSlot(ctx context.Context, userID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {

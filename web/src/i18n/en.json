@@ -784,7 +784,13 @@
     "balance_alert_threshold": "Alert Threshold (USD)",
     "balance_alert_hint": "Send email when remaining quota is below the threshold",
     "balance_alert_email_required": "Enter a recipient email for quota alerts",
-    "balance_alert_threshold_required": "Enter a quota alert threshold greater than 0"
+    "balance_alert_threshold_required": "Enter a quota alert threshold greater than 0",
+    "max_concurrency_label": "Max Concurrency",
+    "max_concurrency_hint": "0 means unlimited",
+    "max_rpm_label": "Total RPM",
+    "max_rpm_hint": "Maximum total requests per minute.",
+    "max_non_responses_rpm_label": "Non-Responses RPM",
+    "max_non_responses_rpm_hint": "Maximum non-Responses requests per minute."
   },
 
   "subscriptions": {
@@ -1373,7 +1379,13 @@
     "ccs_codex_desc": "OpenAI Codex CLI coding assistant",
     "ccs_not_installed": "CC-Switch not detected. Please install the CC-Switch client first.",
     "ccs_session_expired": "Session expired. Please log in with your API key again before importing.",
-    "codex_config_toml_hint": "Make sure the following content is at the beginning of the config.toml file"
+    "codex_config_toml_hint": "Make sure the following content is at the beginning of the config.toml file",
+    "max_concurrency_label": "Max Concurrency",
+    "max_concurrency_hint": "0 means unlimited",
+    "max_rpm_label": "Total RPM",
+    "max_rpm_hint": "Maximum total requests per minute.",
+    "max_non_responses_rpm_label": "Non-Responses RPM",
+    "max_non_responses_rpm_hint": "Maximum non-Responses requests per minute."
   },
 
   "setup": {

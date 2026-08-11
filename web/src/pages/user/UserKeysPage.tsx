@@ -161,7 +161,9 @@ export default function UserKeysPage() {
       group_id: key.group_id == null ? '' : String(key.group_id),
       quota_usd: key.quota_usd ? String(key.quota_usd) : '',
       sell_rate: Number.isFinite(key.sell_rate) ? String(key.sell_rate) : '1',
-      max_concurrency: key.max_concurrency ? String(key.max_concurrency) : '',
+      max_concurrency: String(key.max_concurrency ?? 0),
+      max_rpm: String(key.max_rpm ?? 0),
+      max_non_responses_rpm: String(key.max_non_responses_rpm ?? 0),
       balance_alert_enabled: key.balance_alert_enabled,
       balance_alert_email: key.balance_alert_email || '',
       balance_alert_threshold: key.balance_alert_threshold ? String(key.balance_alert_threshold) : '',
@@ -214,8 +216,10 @@ export default function UserKeysPage() {
         // 空字符串显式改为 0 = 无限配额；省略字段只表示不修改旧配额
         quota_usd: form.quota_usd.trim() ? Number(form.quota_usd) : 0,
         sell_rate: normalizedSellRate,
-        // 空字符串显式改为 0 = 关闭并发限制；后端看到 0 会清除旧值
+        // 空字符串显式改为 0 = 关闭并发 / 两类 RPM 限制
         max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : 0,
+        max_rpm: form.max_rpm ? Number(form.max_rpm) : 0,
+        max_non_responses_rpm: form.max_non_responses_rpm ? Number(form.max_non_responses_rpm) : 0,
         balance_alert_enabled: form.balance_alert_enabled,
         balance_alert_email: balanceAlertEmail,
         balance_alert_threshold: balanceAlertThreshold,
@@ -229,6 +233,8 @@ export default function UserKeysPage() {
         quota_usd: form.quota_usd ? Number(form.quota_usd) : undefined,
         sell_rate: normalizedSellRate,
         max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : undefined,
+        max_rpm: form.max_rpm ? Number(form.max_rpm) : undefined,
+        max_non_responses_rpm: form.max_non_responses_rpm ? Number(form.max_non_responses_rpm) : undefined,
         balance_alert_enabled: form.balance_alert_enabled,
         balance_alert_email: balanceAlertEmail,
         balance_alert_threshold: balanceAlertThreshold,

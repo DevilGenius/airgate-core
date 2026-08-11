@@ -22,6 +22,8 @@ func toAPIKeyResp(item appapikey.Key) dto.APIKeyResp {
 		UsedQuotaActual:       item.UsedQuotaActual,
 		SellRate:              item.SellRate,
 		MaxConcurrency:        item.MaxConcurrency,
+		MaxRPM:                item.MaxRPM,
+		MaxNonResponsesRPM:    item.MaxNonResponsesRPM,
 		BalanceAlertEnabled:   item.BalanceAlertEnabled,
 		BalanceAlertEmail:     item.BalanceAlertEmail,
 		BalanceAlertThreshold: item.BalanceAlertThreshold,

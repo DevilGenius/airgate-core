@@ -42,6 +42,10 @@ type APIKey struct {
 	SellRate float64 `json:"sell_rate,omitempty"`
 	// API Key 级并发上限：同一把 key 同时在途的请求数。0 表示不限制（默认）。达到上限时返回 429 + apikey_concurrency_limit，保护单个客户端不因并发过高被自己打死或耗光上游账号的并发预算。
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
+	// API Key 级总 RPM 上限：按固定分钟窗口统计所有请求数。0 表示不限制（默认）。
+	MaxRpm int `json:"max_rpm,omitempty"`
+	// API Key 级非 Responses 接口 RPM 上限：按固定分钟窗口统计非 Responses 请求数。0 表示不限制（默认）。
+	MaxNonResponsesRpm int `json:"max_non_responses_rpm,omitempty"`
 	// API Key 剩余额度邮件提醒开关。
 	BalanceAlertEnabled bool `json:"balance_alert_enabled,omitempty"`
 	// API Key 剩余额度提醒接收邮箱。
@@ -121,7 +125,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case apikey.FieldQuotaUsd, apikey.FieldUsedQuota, apikey.FieldUsedQuotaActual, apikey.FieldSellRate, apikey.FieldBalanceAlertThreshold:
 			values[i] = new(sql.NullFloat64)
-		case apikey.FieldID, apikey.FieldMaxConcurrency:
+		case apikey.FieldID, apikey.FieldMaxConcurrency, apikey.FieldMaxRpm, apikey.FieldMaxNonResponsesRpm:
 			values[i] = new(sql.NullInt64)
 		case apikey.FieldName, apikey.FieldKeyHint, apikey.FieldKeyHash, apikey.FieldKeyEncrypted, apikey.FieldBalanceAlertEmail, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -221,6 +225,18 @@ func (ak *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field max_concurrency", values[i])
 			} else if value.Valid {
 				ak.MaxConcurrency = int(value.Int64)
+			}
+		case apikey.FieldMaxRpm:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field max_rpm", values[i])
+			} else if value.Valid {
+				ak.MaxRpm = int(value.Int64)
+			}
+		case apikey.FieldMaxNonResponsesRpm:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field max_non_responses_rpm", values[i])
+			} else if value.Valid {
+				ak.MaxNonResponsesRpm = int(value.Int64)
 			}
 		case apikey.FieldBalanceAlertEnabled:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -366,6 +382,12 @@ func (ak *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("max_concurrency=")
 	builder.WriteString(fmt.Sprintf("%v", ak.MaxConcurrency))
+	builder.WriteString(", ")
+	builder.WriteString("max_rpm=")
+	builder.WriteString(fmt.Sprintf("%v", ak.MaxRpm))
+	builder.WriteString(", ")
+	builder.WriteString("max_non_responses_rpm=")
+	builder.WriteString(fmt.Sprintf("%v", ak.MaxNonResponsesRpm))
 	builder.WriteString(", ")
 	builder.WriteString("balance_alert_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", ak.BalanceAlertEnabled))
