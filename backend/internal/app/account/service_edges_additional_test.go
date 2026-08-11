@@ -144,7 +144,7 @@ func TestGetSingleAccountUsageFetchesAndCachesGatewayResult(t *testing.T) {
 	if !ok || credits["balance"] != 6.25 {
 		t.Fatalf("usage result = %#v", got)
 	}
-	if info, ok := service.getUsageInfoForAccount(t.Context(), 44); !ok || info.Credits == nil || info.Credits.Balance != 6.25 {
+	if info, ok := service.usage.getUsageInfoForAccount(t.Context(), 44); !ok || info.Credits == nil || info.Credits.Balance != 6.25 {
 		t.Fatalf("cached usage info=%+v ok=%v", info, ok)
 	}
 	if probeRequest.Credentials["proxy_url"] != "http://127.0.0.1:7890" {

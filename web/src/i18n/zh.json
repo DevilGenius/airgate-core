@@ -558,7 +558,7 @@
     "stats_start_date": "开始日期",
     "stats_end_date": "结束日期",
     "stats_range_summary": "共 {{days}} 天，活跃 {{active}} 天",
-    "stats_rate_range_summary": "近24小时 · 30分钟固定时间桶",
+    "stats_rate_range_summary": "近24小时 30分钟固定时间桶",
     "stats_range_cost": "总费用",
     "stats_range_requests": "总请求",
     "stats_range_total": "区间总计",

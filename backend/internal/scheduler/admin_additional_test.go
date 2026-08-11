@@ -157,3 +157,14 @@ func TestSchedulerAdminStateWriteEntrypoints(t *testing.T) {
 		t.Fatalf("soft-deleted account changed = state %s deleted_at %v", fresh.State, fresh.DeletedAt)
 	}
 }
+
+func TestSchedulerApplyAccountTestOutcomeRecordsModelSuccessRate(t *testing.T) {
+	s := &Scheduler{modelSuccessRate: NewModelSuccessRateTracker(nil)}
+	s.ApplyAccountTestOutcome(context.Background(), 7, "openai", "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess}, false)
+	s.ApplyAccountTestOutcome(context.Background(), 7, "openai", "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient}, false)
+
+	stats, ok := s.ModelSuccessRate(7, "gpt-5")
+	if !ok || stats.Requests != 2 || stats.Successes != 1 || stats.Failures != 1 {
+		t.Fatalf("account test model success-rate stats = %+v ok=%v, want 2 requests (1 success, 1 failure)", stats, ok)
+	}
+}

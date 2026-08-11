@@ -639,16 +639,17 @@ func (h *AccountHandler) GetAccountStats(c *gin.Context) {
 
 	// 模型级成功率来自调度器内存中的近 24 小时固定 30 分钟桶，与上面的日期区间统计口径不同，
 	// 不受 start_date/end_date 影响；scheduler 为 nil 时返回空列表，不阻断主响应。
-	modelSuccessRates := h.scheduler.ListModelSuccessRates(id)
-	if modelSuccessRates == nil {
-		modelSuccessRates = []scheduler.ModelSuccessRateStats{}
-	}
+	var modelSuccessRates []scheduler.ModelSuccessRateStats
 	var modelSuccessRateWindow *scheduler.ModelSuccessRateWindow
 	if h.scheduler != nil {
-		window := h.scheduler.ModelSuccessRateWindow()
-		if window.BucketCount > 0 {
-			modelSuccessRateWindow = &window
+		rates, rateWindow := h.scheduler.ModelSuccessRateSnapshot(id)
+		modelSuccessRates = rates
+		if rateWindow.BucketCount > 0 {
+			modelSuccessRateWindow = &rateWindow
 		}
+	}
+	if modelSuccessRates == nil {
+		modelSuccessRates = []scheduler.ModelSuccessRateStats{}
 	}
 
 	response.Success(c, gin.H{

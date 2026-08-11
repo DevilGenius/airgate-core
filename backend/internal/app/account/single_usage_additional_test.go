@@ -29,7 +29,7 @@ func TestGetSingleAccountUsageSkipsAPIKeyProbe(t *testing.T) {
 
 func TestFetchSingleAccountUsageDedupReturnsFalseWithoutPluginCatalog(t *testing.T) {
 	service := NewService(stubRepository{}, nil, nil, nil)
-	info, usageErrors, ok := service.fetchSingleAccountUsageDedup(t.Context(), Account{ID: 7, Platform: "custom"})
+	info, usageErrors, ok := service.usage.fetchSingleAccountUsageDedup(t.Context(), Account{ID: 7, Platform: "custom"})
 	if ok || len(usageErrors) != 0 || len(info.Windows) != 0 || info.Credits != nil {
 		t.Fatalf("dedup result info=%+v errors=%+v ok=%v", info, usageErrors, ok)
 	}

@@ -232,20 +232,20 @@ func TestRedisUsageCacheReadWriteAndInvalidation(t *testing.T) {
 	service.SetUsageCacheRedis(rdb)
 
 	mock.ExpectGet(accountcache.UsageKey(7)).SetVal(string(payload))
-	got, ok := service.getUsageInfoForAccount(t.Context(), 7)
+	got, ok := service.usage.getUsageInfoForAccount(t.Context(), 7)
 	if !ok || len(got.Windows) != 1 {
 		t.Fatalf("getUsageInfoForAccount = %+v ok=%v", got, ok)
 	}
 
 	mock.ExpectGet(accountcache.UsageKey(8)).SetVal(`{bad`)
 	mock.ExpectDel(accountcache.UsageKey(8)).SetVal(1)
-	if _, ok := service.getUsageInfoForAccount(t.Context(), 8); ok {
+	if _, ok := service.usage.getUsageInfoForAccount(t.Context(), 8); ok {
 		t.Fatal("invalid Redis payload should miss")
 	}
 
 	mock.ExpectMGet(accountcache.UsageKey(7), accountcache.UsageKey(8), accountcache.UsageKey(9)).SetVal([]interface{}{string(payload), `{bad`, nil})
 	mock.ExpectDel(accountcache.UsageKey(8)).SetVal(1)
-	infos, missing := service.getUsageInfosForAccounts(t.Context(), "openai", []Account{
+	infos, missing := service.usage.getUsageInfosForAccounts(t.Context(), "openai", []Account{
 		{ID: 7, Platform: "openai", Type: "oauth"},
 		{ID: 8, Platform: "openai", Type: "oauth"},
 		{ID: 9, Platform: "openai", Type: "apikey"},
@@ -255,16 +255,16 @@ func TestRedisUsageCacheReadWriteAndInvalidation(t *testing.T) {
 	}
 
 	mock.ExpectMGet(accountcache.UsageKey(7)).SetVal([]interface{}{string(payload)})
-	existing := service.getUsageInfosForCacheWrites(t.Context(), []accountUsageCacheWrite{{account: Account{ID: 7}, info: info}}, now)
+	existing := service.usage.getUsageInfosForCacheWrites(t.Context(), []accountUsageCacheWrite{{account: Account{ID: 7}, info: info}}, now)
 	if len(existing) != 1 || len(existing[7].Windows) != 1 {
 		t.Fatalf("getUsageInfosForCacheWrites redis existing = %+v", existing)
 	}
 
 	mock.Regexp().ExpectSet(accountcache.UsageKey(7), ".*", time.Hour).SetVal("OK")
-	service.writeUsageInfoCache(t.Context(), "openai", 7, info, now)
+	service.usage.writeUsageInfoCache(t.Context(), "openai", 7, info, now)
 
 	mock.ExpectDel(accountcache.UsageKey(7)).SetVal(1)
-	service.writeUsageInfoCache(t.Context(), "openai", 7, AccountUsageInfo{}, now)
+	service.usage.writeUsageInfoCache(t.Context(), "openai", 7, AccountUsageInfo{}, now)
 
 	mock.ExpectSMembers(accountcache.PlatformKey("openai")).SetVal([]string{"7", "bad", "0", "8"})
 	mock.ExpectDel(accountcache.UsageKey(7), accountcache.UsageKey(8)).SetVal(2)
@@ -290,7 +290,7 @@ func TestRedisStatsAndProfileCaches(t *testing.T) {
 
 	todayKey := accountcache.TodayStatsKey(day)
 	mock.ExpectHMGet(todayKey, accountcache.TodayStatsFields(7)...).SetVal([]interface{}{"3", "100", "1.25", "2.5", now.Format(time.RFC3339)})
-	stats, missing := service.loadTodayStatsCache(t.Context(), day, []int{7})
+	stats, missing := service.usage.loadTodayStatsCache(t.Context(), day, []int{7})
 	if len(missing) != 0 || stats[7].Requests != 3 || stats[7].Tokens != 100 {
 		t.Fatalf("loadTodayStatsCache stats=%+v missing=%v", stats, missing)
 	}
@@ -301,11 +301,11 @@ func TestRedisStatsAndProfileCaches(t *testing.T) {
 	mock.ExpectHSetNX(todayKey, accountcache.TodayStatsField(7, "user_cost"), 3.0).SetVal(true)
 	mock.ExpectHSetNX(todayKey, accountcache.TodayStatsField(7, "updated_at"), now.UTC().Format(time.RFC3339)).SetVal(true)
 	mock.ExpectExpire(todayKey, accountcache.TodayStatsTTL).SetVal(true)
-	service.writeTodayStatsCache(t.Context(), day, 7, AccountWindowStats{Requests: 4, Tokens: 120, AccountCost: 1.5, UserCost: 3})
+	service.usage.writeTodayStatsCache(t.Context(), day, 7, AccountWindowStats{Requests: 4, Tokens: 120, AccountCost: 1.5, UserCost: 3})
 
 	mock.ExpectMGet(accountcache.ImageTotalKey(7), accountcache.ImageTotalKey(8)).SetVal([]interface{}{"10", nil})
 	mock.ExpectMGet(accountcache.ImageTodayKey(day, 7), accountcache.ImageTodayKey(day, 8)).SetVal([]interface{}{"2", "1"})
-	imageStats, imageMissing := service.loadImageStatsCache(t.Context(), day, []int{7, 8})
+	imageStats, imageMissing := service.usage.loadImageStatsCache(t.Context(), day, []int{7, 8})
 	if len(imageStats) != 1 || imageStats[7].TotalCount != 10 || imageStats[7].TodayCount != 2 ||
 		len(imageMissing) != 1 || imageMissing[0] != 8 {
 		t.Fatalf("loadImageStatsCache stats=%+v missing=%v", imageStats, imageMissing)
@@ -313,7 +313,7 @@ func TestRedisStatsAndProfileCaches(t *testing.T) {
 
 	mock.ExpectSet(accountcache.ImageTotalKey(7), int64(11), accountcache.ImageTotalTTL).SetVal("OK")
 	mock.ExpectSet(accountcache.ImageTodayKey(day, 7), int64(3), accountcache.TodayStatsTTL).SetVal("OK")
-	service.writeImageStatsCache(t.Context(), day, 7, AccountImageStats{TodayCount: 3, TotalCount: 11})
+	service.usage.writeImageStatsCache(t.Context(), day, 7, AccountImageStats{TodayCount: 3, TotalCount: 11})
 
 	oldPayload, err := json.Marshal(accountProfileCachePayload{ID: 7, Platform: "old"})
 	if err != nil {
@@ -331,7 +331,7 @@ func TestRedisStatsAndProfileCaches(t *testing.T) {
 
 	mock.ExpectMGet(accountcache.ProfileKey(7), accountcache.ProfileKey(8), accountcache.ProfileKey(9)).SetVal([]interface{}{string(freshPayload), string(badPayload), nil})
 	mock.ExpectDel(accountcache.ProfileKey(8)).SetVal(1)
-	accounts, profileMissing := service.loadAccountProfilesForUsage(t.Context(), "openai", []int{7, 8, 9})
+	accounts, profileMissing := service.usage.loadAccountProfilesForUsage(t.Context(), "openai", []int{7, 8, 9})
 	if len(accounts) != 1 || accounts[0].ID != 7 || len(profileMissing) != 2 {
 		t.Fatalf("loadAccountProfilesForUsage accounts=%+v missing=%v", accounts, profileMissing)
 	}
@@ -341,14 +341,14 @@ func TestRedisStatsAndProfileCaches(t *testing.T) {
 	mock.Regexp().ExpectSet(accountcache.ProfileKey(7), ".*", accountcache.ProfileTTL).SetVal("OK")
 	mock.ExpectSAdd(accountcache.PlatformKey("openai"), 7).SetVal(1)
 	mock.ExpectExpire(accountcache.PlatformKey("openai"), accountcache.ProfileTTL).SetVal(true)
-	service.cacheAccountProfiles(t.Context(), []Account{{ID: 0}, freshAccount})
+	service.usage.cacheAccountProfiles(t.Context(), []Account{{ID: 0}, freshAccount})
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("redis expectations: %v", err)
 	}
 }
 
-func TestDeleteAccountCacheKeysUsesProfilePlatform(t *testing.T) {
+func TestDeleteAccountRuntimeStateUsesProfilePlatform(t *testing.T) {
 	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
 	day := accountcache.Day(now)
 	rdb, mock := redismock.NewClientMock()
@@ -364,10 +364,10 @@ func TestDeleteAccountCacheKeysUsesProfilePlatform(t *testing.T) {
 	}
 	mock.ExpectGet(accountcache.ProfileKey(7)).SetVal(string(profileBody))
 	mock.ExpectSRem(accountcache.PlatformKey("openai"), 7).SetVal(1)
-	mock.ExpectDel(accountcache.ProfileKey(7), accountcache.UsageKey(7), accountcache.ModelStatsKey(7), accountcache.ImageTotalKey(7), accountcache.ImageTodayKey(day, 7)).SetVal(5)
+	mock.ExpectDel(accountcache.ProfileKey(7), accountcache.UsageKey(7), accountcache.ImageTotalKey(7), accountcache.ImageTodayKey(day, 7)).SetVal(4)
 	mock.ExpectHDel(todayKeyForTest(day), accountcache.TodayStatsFields(7)...).SetVal(5)
 
-	service.deleteAccountCacheKeys([]int{0, 7})
+	service.deleteAccountRuntimeState([]int{0, 7})
 	if len(observer.accountIDs) != 2 || observer.accountIDs[0] != 0 || observer.accountIDs[1] != 7 {
 		t.Fatalf("deleted account IDs = %v, want [0 7]", observer.accountIDs)
 	}
@@ -376,14 +376,21 @@ func TestDeleteAccountCacheKeysUsesProfilePlatform(t *testing.T) {
 	}
 }
 
-func TestDeleteAccountCacheKeysForgetsModelStatsWithoutRedis(t *testing.T) {
+func TestDeleteAccountRuntimeStateNotifiesObserverWithoutRedis(t *testing.T) {
 	observer := &captureAccountDeletionObserver{}
 	service := NewService(stubRepository{}, nil, nil, nil)
 	service.SetAccountDeletionObserver(observer)
+	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
+	service.usage.setUsageInfoMemoryCache(7, "openai", AccountUsageInfo{
+		Credits: &AccountUsageCredits{Balance: 1},
+	}, now, now.Add(time.Hour))
 
-	service.deleteAccountCacheKeys([]int{7})
+	service.deleteAccountRuntimeState([]int{7})
 	if len(observer.accountIDs) != 1 || observer.accountIDs[0] != 7 {
 		t.Fatalf("deleted account IDs = %v, want [7]", observer.accountIDs)
+	}
+	if _, _, ok := service.usage.getUsageInfoMemoryCache(7); ok {
+		t.Fatal("deleted account still has process-local usage cache")
 	}
 }
 

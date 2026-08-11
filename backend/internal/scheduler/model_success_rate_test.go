@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-redis/redismock/v9"
+
+	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -152,7 +155,7 @@ func TestModelSuccessRateTrackerRecordsFixedBuckets(t *testing.T) {
 	if stats.SuccessRate != 0.5 {
 		t.Fatalf("success rate = %v, want 0.5", stats.SuccessRate)
 	}
-	apiStats := tracker.List(7)
+	apiStats, window := tracker.Snapshot(7)
 	if len(apiStats) != 1 || len(apiStats[0].Buckets) != 1 {
 		t.Fatalf("api stats = %+v", apiStats)
 	}
@@ -163,7 +166,6 @@ func TestModelSuccessRateTrackerRecordsFixedBuckets(t *testing.T) {
 	if latest.Index != 47 {
 		t.Fatalf("latest bucket index = %d, want 47", latest.Index)
 	}
-	window := tracker.Window()
 	if window.BucketCount != 48 || window.BucketSeconds != int64(30*time.Minute/time.Second) {
 		t.Fatalf("window = %+v", window)
 	}
@@ -175,6 +177,33 @@ func TestModelSuccessRateTrackerRecordsFixedBuckets(t *testing.T) {
 	}
 	if stats.Successes != 0 || stats.Failures != 0 || stats.ValidRequests != 0 || stats.Requests != 0 || stats.SuccessRate != 0 {
 		t.Fatalf("expired stats = %+v", stats)
+	}
+}
+
+func TestModelSuccessRateSnapshotUsesOneClockSample(t *testing.T) {
+	beforeBoundary := time.Date(2026, 8, 11, 12, 29, 59, 0, time.UTC)
+	tracker := NewModelSuccessRateTracker(nil)
+	tracker.now = func() time.Time { return beforeBoundary }
+	tracker.Record(7, "gpt-5.4", sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess})
+
+	calls := 0
+	tracker.now = func() time.Time {
+		calls++
+		if calls == 1 {
+			return beforeBoundary
+		}
+		return beforeBoundary.Add(time.Second)
+	}
+	rates, window := tracker.Snapshot(7)
+	if calls != 1 {
+		t.Fatalf("now calls = %d, want 1", calls)
+	}
+	if len(rates) != 1 {
+		t.Fatalf("rates = %+v, want one model", rates)
+	}
+	if !rates[0].WindowStart.Equal(window.WindowStart) || !rates[0].WindowEnd.Equal(window.WindowEnd) {
+		t.Fatalf("rate window = [%s, %s), timeline = [%s, %s)",
+			rates[0].WindowStart, rates[0].WindowEnd, window.WindowStart, window.WindowEnd)
 	}
 }
 
@@ -231,24 +260,21 @@ func TestModelSuccessRateTrackerForgetClearsMemoryAndDirtyState(t *testing.T) {
 	tracker.Record(7, "gpt-5.4", sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess})
 	tracker.Record(8, "gpt-5.4", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
 
-	// Mark account 7 as restored too, so Forget covers every account-level map.
-	tracker.applyPersistedSnapshot(7, []byte(`{"models":[]}`))
 	tracker.Forget(7)
 
 	if _, ok := tracker.Get(7, "gpt-5.4"); ok {
 		t.Fatal("forgotten account still has model statistics")
 	}
-	if got := tracker.List(7); len(got) != 0 {
+	if got, _ := tracker.Snapshot(7); len(got) != 0 {
 		t.Fatalf("forgotten account list = %+v, want empty", got)
 	}
 	_, shard := tracker.shardFor(7)
 	shard.mu.RLock()
 	_, hasSeries := shard.series[7]
 	_, isDirty := shard.dirty[7]
-	_, isRestored := shard.restored[7]
 	shard.mu.RUnlock()
-	if hasSeries || isDirty || isRestored {
-		t.Fatalf("forgotten account remains in memory: series=%v dirty=%v restored=%v", hasSeries, isDirty, isRestored)
+	if hasSeries || isDirty {
+		t.Fatalf("forgotten account remains in memory: series=%v dirty=%v", hasSeries, isDirty)
 	}
 
 	snapshots := tracker.dirtySnapshots()
@@ -259,6 +285,62 @@ func TestModelSuccessRateTrackerForgetClearsMemoryAndDirtyState(t *testing.T) {
 	}
 	if len(snapshots) != 1 || snapshots[0].accountID != 8 {
 		t.Fatalf("dirty snapshots = %+v, want only account 8", snapshots)
+	}
+}
+
+func TestModelSuccessRateRestoreUsesLocalDeduplicationSet(t *testing.T) {
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	rdb, mock := redismock.NewClientMock()
+	tracker := NewModelSuccessRateTracker(rdb)
+	tracker.now = func() time.Time { return now }
+	bucketID := now.Unix() / int64(modelSuccessRateBucketWidth/time.Second)
+	payload, err := json.Marshal(persistedModelSuccessRate{Models: []persistedModelSuccessRateItem{{
+		Model:       "gpt-5.4",
+		LastUpdated: now.UnixMilli(),
+		Buckets: []persistedModelSuccessRateBucket{{
+			Bucket:  bucketID,
+			Success: 2,
+		}},
+	}}})
+	if err != nil {
+		t.Fatalf("marshal persisted snapshot: %v", err)
+	}
+
+	key := accountcache.ModelStatsKey(7)
+	mock.ExpectGet(key).SetVal(string(payload))
+	restored := make(map[int]struct{})
+	if !tracker.restoreKeys(t.Context(), []string{key}, restored) {
+		t.Fatal("first restoreKeys returned false")
+	}
+	if !tracker.restoreKeys(t.Context(), []string{key}, restored) {
+		t.Fatal("duplicate restoreKeys returned false")
+	}
+	stats, ok := tracker.Get(7, "gpt-5.4")
+	if !ok || stats.Successes != 2 {
+		t.Fatalf("restored stats = %+v ok=%v, want two successes once", stats, ok)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("redis expectations: %v", err)
+	}
+}
+
+func TestSchedulerOnAccountsDeletedOwnsModelStatsCleanup(t *testing.T) {
+	rdb, mock := redismock.NewClientMock()
+	tracker := NewModelSuccessRateTracker(rdb)
+	tracker.Record(7, "gpt-5.4", sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess})
+	scheduler := &Scheduler{rdb: rdb, modelSuccessRate: tracker}
+
+	mock.ExpectDel(accountcache.ModelStatsKey(7)).SetVal(1)
+	scheduler.OnAccountsDeleted([]int{0, 7})
+
+	if _, ok := tracker.Get(7, "gpt-5.4"); ok {
+		t.Fatal("deleted account still has in-memory model statistics")
+	}
+	if snapshots := tracker.dirtySnapshots(); len(snapshots) != 0 {
+		t.Fatalf("dirty snapshots after account deletion = %+v, want empty", snapshots)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("redis expectations: %v", err)
 	}
 }
 
@@ -310,7 +392,7 @@ func BenchmarkModelSuccessRateGet(b *testing.B) {
 	})
 }
 
-func BenchmarkModelSuccessRateList(b *testing.B) {
+func BenchmarkModelSuccessRateSnapshot(b *testing.B) {
 	tracker := NewModelSuccessRateTracker(nil)
 	outcome := sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess}
 	for modelID := 0; modelID < 32; modelID++ {
@@ -318,7 +400,7 @@ func BenchmarkModelSuccessRateList(b *testing.B) {
 	}
 	b.ReportAllocs()
 	for index := 0; index < b.N; index++ {
-		_ = tracker.List(1)
+		_, _ = tracker.Snapshot(1)
 	}
 }
 

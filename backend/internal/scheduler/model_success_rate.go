@@ -97,10 +97,9 @@ type modelSuccessRateDirtySnapshot struct {
 }
 
 type modelSuccessRateShard struct {
-	mu       sync.RWMutex
-	series   map[int]map[string]*modelSuccessRateSeries
-	dirty    map[int]uint64
-	restored map[int]struct{}
+	mu     sync.RWMutex
+	series map[int]map[string]*modelSuccessRateSeries
+	dirty  map[int]uint64
 }
 
 // ModelSuccessRateTracker keeps the request-path view in memory. Redis only
@@ -118,7 +117,6 @@ func NewModelSuccessRateTracker(rdb *redis.Client) *ModelSuccessRateTracker {
 	for index := range tracker.shards {
 		tracker.shards[index].series = make(map[int]map[string]*modelSuccessRateSeries)
 		tracker.shards[index].dirty = make(map[int]uint64)
-		tracker.shards[index].restored = make(map[int]struct{})
 	}
 	return tracker
 }
@@ -225,7 +223,6 @@ func (t *ModelSuccessRateTracker) Forget(accountID int) {
 	shard.mu.Lock()
 	delete(shard.series, accountID)
 	delete(shard.dirty, accountID)
-	delete(shard.restored, accountID)
 	shard.mu.Unlock()
 }
 
@@ -312,13 +309,6 @@ func modelSuccessRateWindowInfo(now time.Time) ModelSuccessRateWindow {
 	}
 }
 
-func (t *ModelSuccessRateTracker) Window() ModelSuccessRateWindow {
-	if t == nil {
-		return ModelSuccessRateWindow{}
-	}
-	return modelSuccessRateWindowInfo(t.now())
-}
-
 func (t *ModelSuccessRateTracker) Get(accountID int, model string) (ModelSuccessRateStats, bool) {
 	if t == nil || accountID <= 0 {
 		return ModelSuccessRateStats{}, false
@@ -340,12 +330,7 @@ func (t *ModelSuccessRateTracker) Get(accountID int, model string) (ModelSuccess
 	return result, true
 }
 
-func (t *ModelSuccessRateTracker) List(accountID int) []ModelSuccessRateStats {
-	if t == nil || accountID <= 0 {
-		return nil
-	}
-
-	now := t.now()
+func (t *ModelSuccessRateTracker) listAt(accountID int, now time.Time) []ModelSuccessRateStats {
 	_, shard := t.shardFor(accountID)
 	shard.mu.RLock()
 	models := shard.series[accountID]
@@ -356,6 +341,16 @@ func (t *ModelSuccessRateTracker) List(accountID int) []ModelSuccessRateStats {
 	shard.mu.RUnlock()
 	sort.Slice(result, func(i, j int) bool { return result[i].Model < result[j].Model })
 	return result
+}
+
+// Snapshot returns one account's model statistics and timeline using the same
+// clock sample, so bucket labels cannot cross a boundary independently.
+func (t *ModelSuccessRateTracker) Snapshot(accountID int) ([]ModelSuccessRateStats, ModelSuccessRateWindow) {
+	if t == nil || accountID <= 0 {
+		return nil, ModelSuccessRateWindow{}
+	}
+	now := t.now()
+	return t.listAt(accountID, now), modelSuccessRateWindowInfo(now)
 }
 
 func (t *ModelSuccessRateTracker) Run(ctx context.Context) {
@@ -516,13 +511,14 @@ func (t *ModelSuccessRateTracker) restore(ctx context.Context) {
 		return
 	}
 
+	restored := make(map[int]struct{})
 	var cursor uint64
 	for {
 		keys, next, err := t.rdb.Scan(ctx, cursor, accountcache.ModelStatsPattern(), modelSuccessRateRestoreBatch).Result()
 		if err != nil {
 			return
 		}
-		if !t.restoreKeys(ctx, keys) {
+		if !t.restoreKeys(ctx, keys, restored) {
 			return
 		}
 		if next == 0 {
@@ -532,18 +528,31 @@ func (t *ModelSuccessRateTracker) restore(ctx context.Context) {
 	}
 }
 
-func (t *ModelSuccessRateTracker) restoreKeys(ctx context.Context, keys []string) bool {
+func (t *ModelSuccessRateTracker) restoreKeys(ctx context.Context, keys []string, restored map[int]struct{}) bool {
 	if len(keys) == 0 {
 		return true
 	}
 
-	commands := make(map[int]*redis.StringCmd, len(keys))
+	pending := make(map[int]string, len(keys))
+	for _, key := range keys {
+		accountID, ok := modelStatsAccountID(key)
+		if !ok {
+			continue
+		}
+		if _, alreadyRestored := restored[accountID]; alreadyRestored {
+			continue
+		}
+		restored[accountID] = struct{}{}
+		pending[accountID] = key
+	}
+	if len(pending) == 0 {
+		return true
+	}
+
+	commands := make(map[int]*redis.StringCmd, len(pending))
 	_, err := t.rdb.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		for _, key := range keys {
-			accountID, ok := modelStatsAccountID(key)
-			if ok {
-				commands[accountID] = pipe.Get(ctx, key)
-			}
+		for accountID, key := range pending {
+			commands[accountID] = pipe.Get(ctx, key)
 		}
 		return nil
 	})
@@ -583,9 +592,6 @@ func (t *ModelSuccessRateTracker) applyPersistedSnapshot(accountID int, payload 
 	_, shard := t.shardFor(accountID)
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
-	if _, alreadyRestored := shard.restored[accountID]; alreadyRestored {
-		return
-	}
 	models := shard.series[accountID]
 	for _, item := range persisted.Models {
 		model := normalizeSuccessRateModel(item.Model)
@@ -624,5 +630,4 @@ func (t *ModelSuccessRateTracker) applyPersistedSnapshot(accountID int, payload 
 			}
 		}
 	}
-	shard.restored[accountID] = struct{}{}
 }

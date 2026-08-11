@@ -16,7 +16,13 @@ import (
 // ApplyAccountTestOutcome 使用与正常调度请求相同的账号状态机判定处理管理员账号测试结果。
 // 账号测试没有先递增调度 RPM，因此直接进入 StateMachine，不能调用 Scheduler.Apply 的 RPM 回退。
 func (s *Scheduler) ApplyAccountTestOutcome(ctx context.Context, accountID int, platform, model string, outcome sdk.ForwardOutcome, isPool bool) {
-	if s == nil || s.state == nil || accountID <= 0 {
+	if s == nil || accountID <= 0 {
+		return
+	}
+	// 管理员账号测试同样代表一次真实的账号-模型尝试，成功和上游失败
+	// 都要进入模型成功率统计；状态机为空时仍不能丢掉这条统计记录。
+	s.RecordModelOutcome(accountID, model, outcome)
+	if s.state == nil {
 		return
 	}
 	s.state.Apply(ctx, accountID, Judgment{

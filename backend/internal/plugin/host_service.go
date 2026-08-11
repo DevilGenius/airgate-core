@@ -597,6 +597,7 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 
 	outcome, fwdErr := inst.Forward(fwdCtx, fwdReq)
 	latency := time.Since(start)
+	h.scheduler.RecordModelOutcome(acc.ID, schedulingModel, outcome)
 	h.scheduler.RecordHealthProbeResult(ctx, acc.ID)
 	resp["latency_ms"] = latency.Milliseconds()
 	resp["status_code"] = int64(outcome.Upstream.StatusCode)

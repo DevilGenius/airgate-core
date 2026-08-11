@@ -150,6 +150,10 @@ func TestHostServiceSchedulerProbeAndForwardRuntime(t *testing.T) {
 	if probedAccount.LastProbeAt == nil {
 		t.Fatal("probeForward should update last_probe_at")
 	}
+	probeStats, ok := host.scheduler.ModelSuccessRate(account.ID, "gpt-4.1")
+	if !ok || probeStats.Requests != 1 || probeStats.Successes != 1 {
+		t.Fatalf("probe model success-rate stats = %+v ok=%v, want one successful request", probeStats, ok)
+	}
 
 	routes, email, err := host.hostForwardRoutes(ctx, hostForwardRequest{
 		UserID: int64(user.ID),

@@ -222,7 +222,7 @@ func TestTokenRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 	if !writer.routeRefreshed[9] {
 		t.Fatalf("state writer refreshed=%+v", writer.routeRefreshed)
 	}
-	if info, ok := service.getUsageInfoForAccount(t.Context(), 9); !ok || info.Credits == nil || info.Credits.Balance != 12.5 {
+	if info, ok := service.usage.getUsageInfoForAccount(t.Context(), 9); !ok || info.Credits == nil || info.Credits.Balance != 12.5 {
 		t.Fatalf("usage cache info=%+v ok=%v", info, ok)
 	}
 	mu.Lock()
@@ -307,7 +307,7 @@ func TestUsageProbeThroughGatewayBatchAndFallback(t *testing.T) {
 	service := NewService(stubRepository{}, accountGatewayCatalog{instances: map[string]*plugin.PluginInstance{"openai": runtime.instance}}, nil, writer)
 	service.now = func() time.Time { return time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC) }
 
-	usage, err := service.fetchUpstreamUsageForAccounts(t.Context(), []Account{
+	usage, err := service.usage.fetchUpstreamUsageForAccounts(t.Context(), []Account{
 		{ID: 1, Platform: "openai", Type: "oauth", State: "active", Credentials: map[string]string{"access_token": "a"}, Proxy: &Proxy{Protocol: "http", Address: "127.0.0.1", Port: 7890}},
 		{ID: 2, Platform: "openai", Type: "oauth", State: "disabled", Credentials: map[string]string{"access_token": "b"}},
 		{ID: 3, Platform: "openai", Type: "oauth", State: "active", UpstreamIsPool: true, Credentials: map[string]string{"access_token": "c", "proxy_url": "http://override:8080"}, Proxy: &Proxy{Protocol: "http", Address: "127.0.0.1", Port: 7891}},
@@ -331,7 +331,7 @@ func TestUsageProbeThroughGatewayBatchAndFallback(t *testing.T) {
 		t.Fatalf("usage/accounts body = %s", string(seenBodies[0]))
 	}
 
-	info, usageErrors, ok := service.fetchSingleAccountUsage(t.Context(), Account{ID: 4, Platform: "openai", Type: "oauth"})
+	info, usageErrors, ok := service.usage.fetchSingleAccountUsage(t.Context(), Account{ID: 4, Platform: "openai", Type: "oauth"})
 	if ok || len(usageErrors) != 1 || info.Credits != nil {
 		t.Fatalf("fetchSingleAccountUsage probe-only errors info=%+v errors=%+v ok=%v", info, usageErrors, ok)
 	}
@@ -348,7 +348,7 @@ func TestUsageProbeThroughGatewayBatchAndFallback(t *testing.T) {
 	})
 	defer runtime.cleanup()
 	service = NewService(stubRepository{}, accountGatewayCatalog{instances: map[string]*plugin.PluginInstance{"openai": runtime.instance}}, nil, nil)
-	info, usageErrors, ok = service.fetchSingleAccountUsage(t.Context(), Account{ID: 4, Platform: "openai", Type: "oauth"})
+	info, usageErrors, ok = service.usage.fetchSingleAccountUsage(t.Context(), Account{ID: 4, Platform: "openai", Type: "oauth"})
 	if !ok || len(usageErrors) != 0 || info.Credits == nil || info.Credits.Balance != 8 {
 		t.Fatalf("fetchSingleAccountUsage fallback info=%+v errors=%+v ok=%v", info, usageErrors, ok)
 	}

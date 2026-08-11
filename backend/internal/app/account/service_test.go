@@ -721,7 +721,7 @@ func TestMarkAccountUsageErrorDegradesForbidden(t *testing.T) {
 	writer := newStubStateWriter()
 	service := NewService(stubRepository{}, nil, nil, writer)
 
-	service.markAccountUsageError(context.Background(), 42, "HTTP 403: 访问被拒绝")
+	service.usage.markAccountUsageError(context.Background(), 42, "HTTP 403: 访问被拒绝")
 
 	if got := writer.degraded[42]; got != "HTTP 403: 访问被拒绝" {
 		t.Fatalf("MarkDegraded reason = %q, want forbidden reason", got)
@@ -735,7 +735,7 @@ func TestMarkAccountUsageErrorDisablesNonForbidden(t *testing.T) {
 	writer := newStubStateWriter()
 	service := NewService(stubRepository{}, nil, nil, writer)
 
-	service.markAccountUsageError(context.Background(), 42, "HTTP 401: invalid token")
+	service.usage.markAccountUsageError(context.Background(), 42, "HTTP 401: invalid token")
 
 	if got := writer.disabled[42]; got != "HTTP 401: invalid token" {
 		t.Fatalf("MarkDisabled reason = %q, want auth reason", got)
@@ -1102,7 +1102,7 @@ func TestEnrichTodayStats_AttachesAccountLevelStats(t *testing.T) {
 			},
 		},
 	}
-	svc.enrichTodayStats(t.Context(), merged)
+	svc.usage.enrichTodayStats(t.Context(), merged)
 
 	acct := merged["42"].(map[string]any)
 	stats, ok := acct["today_stats"].(map[string]any)
@@ -1152,7 +1152,7 @@ func TestEnrichTodayStats_ApikeyPlaceholderGetsStats(t *testing.T) {
 	merged := map[string]any{
 		"55": map[string]any{}, // apikey 占位
 	}
-	svc.enrichTodayStats(t.Context(), merged)
+	svc.usage.enrichTodayStats(t.Context(), merged)
 
 	acct := merged["55"].(map[string]any)
 	stats, ok := acct["today_stats"].(map[string]any)
@@ -1182,7 +1182,7 @@ func TestEnrichTodayStats_ZeroWhenNoRecords(t *testing.T) {
 			},
 		},
 	}
-	svc.enrichTodayStats(t.Context(), merged)
+	svc.usage.enrichTodayStats(t.Context(), merged)
 
 	stats := merged["99"].(map[string]any)["today_stats"].(map[string]any)
 	if stats["requests"].(int64) != 0 {
@@ -1232,7 +1232,7 @@ func TestEnrichTodayStats_BatchesAllAccountsInOneQuery(t *testing.T) {
 		"2": map[string]any{"windows": []any{}},
 		"3": map[string]any{"windows": []any{}},
 	}
-	svc.enrichTodayStats(t.Context(), merged)
+	svc.usage.enrichTodayStats(t.Context(), merged)
 
 	if len(repo.captured) != 1 {
 		t.Fatalf("expected exactly 1 BatchWindowStats call, got %d", len(repo.captured))
@@ -1299,7 +1299,7 @@ func TestGetAccountUsage_ExpiredMemoryCacheReturnsStaleWindowsAndRefreshes(t *te
 	}
 	svc := NewService(repo, nil, nil, nil)
 	svc.now = func() time.Time { return now }
-	svc.setUsageInfoMemoryCache(42, "openai", AccountUsageInfo{
+	svc.usage.setUsageInfoMemoryCache(42, "openai", AccountUsageInfo{
 		Windows: []AccountUsageWindow{{
 			Key:          "5h",
 			Label:        "5h",
@@ -1343,7 +1343,7 @@ func TestGetAccountUsage_EmptyMemoryCacheRefreshes(t *testing.T) {
 	}
 	svc := NewService(repo, nil, nil, nil)
 	svc.now = func() time.Time { return now }
-	svc.setUsageInfoMemoryCache(77, "openai", AccountUsageInfo{}, now, now.Add(time.Hour))
+	svc.usage.setUsageInfoMemoryCache(77, "openai", AccountUsageInfo{}, now, now.Add(time.Hour))
 
 	usage, refreshing, err := svc.GetAccountUsage(t.Context(), "openai", []int{77}, false)
 	if err != nil {
@@ -1361,19 +1361,19 @@ func TestInvalidateUsageCacheClearsMemoryEntriesForPlatform(t *testing.T) {
 	now := time.Date(2026, 4, 14, 15, 30, 0, 0, time.Local)
 	svc := NewService(stubRepository{}, nil, nil, nil)
 	svc.now = func() time.Time { return now }
-	svc.setUsageInfoMemoryCache(42, "openai", AccountUsageInfo{
+	svc.usage.setUsageInfoMemoryCache(42, "openai", AccountUsageInfo{
 		Windows: []AccountUsageWindow{{Key: "5h", Label: "5h", UsedPercent: 10}},
 	}, now, now.Add(time.Hour))
-	svc.setUsageInfoMemoryCache(7, "claude", AccountUsageInfo{
+	svc.usage.setUsageInfoMemoryCache(7, "claude", AccountUsageInfo{
 		Windows: []AccountUsageWindow{{Key: "5h", Label: "5h", UsedPercent: 20}},
 	}, now, now.Add(time.Hour))
 
 	svc.InvalidateUsageCache("openai")
 
-	if _, _, ok := svc.getUsageInfoMemoryCache(42); ok {
+	if _, _, ok := svc.usage.getUsageInfoMemoryCache(42); ok {
 		t.Fatalf("openai memory usage entry should be cleared")
 	}
-	if _, _, ok := svc.getUsageInfoMemoryCache(7); !ok {
+	if _, _, ok := svc.usage.getUsageInfoMemoryCache(7); !ok {
 		t.Fatalf("unrelated platform memory usage entry should be kept")
 	}
 }
@@ -1382,7 +1382,7 @@ func TestUpdateAccountUsageCacheUpdatesMemoryEntry(t *testing.T) {
 	now := time.Date(2026, 4, 14, 15, 30, 0, 0, time.Local)
 	svc := NewService(stubRepository{}, nil, nil, nil)
 	svc.now = func() time.Time { return now }
-	svc.updateAccountUsageCache(t.Context(), "openai", 42, AccountUsageInfo{
+	svc.usage.updateAccountUsageCache(t.Context(), "openai", 42, AccountUsageInfo{
 		Windows: []AccountUsageWindow{{
 			Key:          "5h",
 			Label:        "5h",
@@ -1391,7 +1391,7 @@ func TestUpdateAccountUsageCacheUpdatesMemoryEntry(t *testing.T) {
 		}},
 	})
 
-	info, _, ok := svc.getUsageInfoMemoryCache(42)
+	info, _, ok := svc.usage.getUsageInfoMemoryCache(42)
 	if !ok {
 		t.Fatalf("memory usage entry should exist")
 	}
@@ -1592,7 +1592,7 @@ func TestPersistRateLimitFromWindows(t *testing.T) {
 		"1": map[string]any{},
 	}
 
-	svc.persistRateLimitFromWindows(t.Context(), accounts)
+	svc.usage.persistRateLimitFromWindows(t.Context(), accounts)
 
 	if got, ok := writer.rateLimited[42]; !ok || got == nil {
 		t.Fatalf("expected account 42 to be MarkRateLimited, got %+v", got)
@@ -1776,7 +1776,7 @@ func TestHandleSingleAccountUsageErrors(t *testing.T) {
 	writer := newStubStateWriter()
 	service := NewService(stubRepository{}, nil, nil, writer)
 
-	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{
+	service.usage.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{
 		{ID: 8, Message: "wrong account"},
 		{ID: 7},
 	})
@@ -1784,25 +1784,25 @@ func TestHandleSingleAccountUsageErrors(t *testing.T) {
 		t.Fatalf("unexpected state changes for ignored errors: disabled=%+v degraded=%+v", writer.disabled, writer.degraded)
 	}
 
-	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{{ID: 7, Message: "HTTP 403: forbidden"}})
+	service.usage.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{{ID: 7, Message: "HTTP 403: forbidden"}})
 	if writer.degraded[7] != "HTTP 403: forbidden" {
 		t.Fatalf("forbidden usage error should degrade account, got %+v", writer.degraded)
 	}
 
 	inactiveWorkspaceMember := "HTTP 403: Personal access token owner is not an active member of the selected workspace."
-	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{{ID: 7, Message: inactiveWorkspaceMember}})
+	service.usage.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{{ID: 7, Message: inactiveWorkspaceMember}})
 	if writer.disabled[7] != inactiveWorkspaceMember {
 		t.Fatalf("inactive workspace member usage error should disable account, got %+v", writer.disabled)
 	}
 
 	inactiveOwner := "HTTP 403: Personal access token owner is inactive."
-	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{{ID: 7, Message: inactiveOwner}})
+	service.usage.handleSingleAccountUsageErrors(t.Context(), Account{ID: 7, State: "active"}, []accountUsageError{{ID: 7, Message: inactiveOwner}})
 	if writer.disabled[7] != inactiveOwner {
 		t.Fatalf("inactive owner usage error should disable account, got %+v", writer.disabled)
 	}
 
-	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 9, UpstreamIsPool: true}, []accountUsageError{{ID: 9, Message: "HTTP 401"}})
-	service.handleSingleAccountUsageErrors(t.Context(), Account{ID: 10, State: "disabled"}, []accountUsageError{{ID: 10, Message: "HTTP 401"}})
+	service.usage.handleSingleAccountUsageErrors(t.Context(), Account{ID: 9, UpstreamIsPool: true}, []accountUsageError{{ID: 9, Message: "HTTP 401"}})
+	service.usage.handleSingleAccountUsageErrors(t.Context(), Account{ID: 10, State: "disabled"}, []accountUsageError{{ID: 10, Message: "HTTP 401"}})
 	if _, ok := writer.disabled[9]; ok {
 		t.Fatal("pool account should not be disabled")
 	}
@@ -1827,39 +1827,39 @@ func TestUsageCacheMemoryHelpers(t *testing.T) {
 	}
 
 	info := AccountUsageInfo{Windows: []AccountUsageWindow{{Key: "5h", Label: "5h", ResetAt: now.Add(time.Hour).Format(time.RFC3339)}}}
-	service.setUsageInfoMemoryCache(1, "openai", info, now, now.Add(time.Hour))
+	service.usage.setUsageInfoMemoryCache(1, "openai", info, now, now.Add(time.Hour))
 	writes := []accountUsageCacheWrite{{account: Account{ID: 1}, info: info}, {account: Account{ID: 2}, info: info}}
-	existing := service.getUsageInfosForCacheWrites(t.Context(), writes, now)
+	existing := service.usage.getUsageInfosForCacheWrites(t.Context(), writes, now)
 	if len(existing) != 1 || len(existing[1].Windows) != 1 {
 		t.Fatalf("existing cache writes = %+v", existing)
 	}
-	if empty := service.getUsageInfosForCacheWrites(t.Context(), nil, now); len(empty) != 0 {
+	if empty := service.usage.getUsageInfosForCacheWrites(t.Context(), nil, now); len(empty) != 0 {
 		t.Fatalf("empty cache writes = %+v", empty)
 	}
 
-	service.updateAccountUsageCaches(t.Context(),
+	service.usage.updateAccountUsageCaches(t.Context(),
 		[]Account{{ID: 1, Platform: "openai", Type: "oauth"}, {ID: 2, Platform: "openai", Type: "apikey"}, {ID: 3, Platform: "openai", Type: "oauth", State: "disabled"}},
 		map[string]AccountUsageInfo{"1": {Credits: &AccountUsageCredits{Balance: 2}}, "2": info, "3": info},
 	)
-	cached, _, ok := service.getUsageInfoMemoryCache(1)
+	cached, _, ok := service.usage.getUsageInfoMemoryCache(1)
 	if !ok || cached.Credits == nil || cached.Credits.Balance != 2 || len(cached.Windows) != 1 {
 		t.Fatalf("merged cached account 1 = %+v ok=%v", cached, ok)
 	}
-	if _, _, ok := service.getUsageInfoMemoryCache(2); ok {
+	if _, _, ok := service.usage.getUsageInfoMemoryCache(2); ok {
 		t.Fatal("apikey account should not be cached by updateAccountUsageCaches")
 	}
 
-	service.writeUsageInfoCache(t.Context(), "openai", 1, AccountUsageInfo{}, now)
-	if _, _, ok := service.getUsageInfoMemoryCache(1); ok {
+	service.usage.writeUsageInfoCache(t.Context(), "openai", 1, AccountUsageInfo{}, now)
+	if _, _, ok := service.usage.getUsageInfoMemoryCache(1); ok {
 		t.Fatal("empty usage info should delete memory cache")
 	}
-	service.updateAccountUsageCache(t.Context(), "openai", 0, info)
-	if _, _, ok := service.getUsageInfoMemoryCache(0); ok {
+	service.usage.updateAccountUsageCache(t.Context(), "openai", 0, info)
+	if _, _, ok := service.usage.getUsageInfoMemoryCache(0); ok {
 		t.Fatal("accountID <= 0 should not create memory cache")
 	}
 
-	service.setUsageInfoMemoryCache(4, "openai", info, now.Add(-2*time.Hour), now.Add(-time.Hour))
-	byAccount, missing := service.getUsageInfosForAccounts(t.Context(), "openai", []Account{
+	service.usage.setUsageInfoMemoryCache(4, "openai", info, now.Add(-2*time.Hour), now.Add(-time.Hour))
+	byAccount, missing := service.usage.getUsageInfosForAccounts(t.Context(), "openai", []Account{
 		{ID: 4, Platform: "openai", Type: "oauth"},
 		{ID: 5, Platform: "openai", Type: "oauth"},
 		{ID: 6, Platform: "openai", Type: "apikey"},

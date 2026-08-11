@@ -557,7 +557,7 @@
     "stats_start_date": "Start date",
     "stats_end_date": "End date",
     "stats_range_summary": "{{days}} days total, {{active}} days active",
-    "stats_rate_range_summary": "Last 24 hours · fixed 30-minute buckets",
+    "stats_rate_range_summary": "Last 24 hours, fixed 30-minute buckets",
     "stats_range_cost": "Total Cost",
     "stats_range_requests": "Total Requests",
     "stats_range_total": "Range Total",

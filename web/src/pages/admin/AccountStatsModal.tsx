@@ -30,7 +30,9 @@ import { DISTRIBUTION_COLORS } from '../../shared/constants';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 
 const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
-const MODEL_RATE_REFRESH_INTERVAL_MS = 30_000;
+// 成功率统计直接读取 scheduler 内存快照，10 秒轮询即可保持较及时的展示，
+// 同时避免按秒刷新导致账号统计接口产生额外压力。
+const MODEL_RATE_REFRESH_INTERVAL_MS = 10_000;
 
 // 预设时间范围；rate 是近 24 小时模型成功率视图，排在最前且默认选中
 type RangePreset = 'rate' | '7d' | '30d' | '90d' | 'custom';
@@ -146,7 +148,7 @@ export function AccountStatsModal({
               {preset === 'rate' ? (
                 <ModelRequestStats
                   rates={data.model_success_rates ?? []}
-                  window={data.model_success_rate_window}
+                  rateWindow={data.model_success_rate_window}
                 />
               ) : (
                 <StatsContent data={data} lifetimeImageCount={lifetimeImageCount} />
@@ -660,15 +662,15 @@ function aggregateRateBuckets(
 
 function ModelRequestStats({
   rates,
-  window,
+  rateWindow,
 }: {
   rates: AccountModelSuccessRate[];
-  window?: AccountModelSuccessRateWindow | null;
+  rateWindow?: AccountModelSuccessRateWindow | null;
 }) {
   const { t } = useTranslation();
 
   const [selectedBucketIndex, setSelectedBucketIndex] = useState<number | null>(null);
-  const buckets = useMemo(() => aggregateRateBuckets(rates, window), [rates, window]);
+  const buckets = useMemo(() => aggregateRateBuckets(rates, rateWindow), [rates, rateWindow]);
   const selectedBucket = useMemo(() => {
     const selected = selectedBucketIndex !== null
       ? buckets.find((bucket) => bucket.index === selectedBucketIndex)
