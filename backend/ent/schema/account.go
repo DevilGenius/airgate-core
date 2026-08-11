@@ -42,6 +42,8 @@ func (Account) Fields() []ent.Field {
 		field.Int("priority").Default(50).Min(accountpriority.Min).Max(accountpriority.Max),
 		field.Int("max_concurrency").Default(10),
 		field.Float("rate_multiplier").Default(1.0).Min(0.01).Max(100),
+		field.Float("model_downgrade_threshold").Default(0).Min(0).Max(1).
+			Comment("当前 30 分钟桶内单模型达到最低有效请求数且成功率低于该阈值时放入降级池；0 表示关闭"),
 		field.String("error_msg").Default("").
 			Comment("进入当前状态的原因（给运维看）"),
 		field.Bool("upstream_is_pool").Default(false).

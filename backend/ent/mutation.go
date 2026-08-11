@@ -1883,43 +1883,45 @@ func (m *APIKeyMutation) ResetEdge(name string) error {
 // AccountMutation represents an operation that mutates the Account nodes in the graph.
 type AccountMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int
-	name               *string
-	email              *string
-	platform           *string
-	_type              *string
-	credentials        *map[string]string
-	model_policy       *modelpolicy.Policy
-	state              *account.State
-	state_until        *time.Time
-	priority           *int
-	addpriority        *int
-	max_concurrency    *int
-	addmax_concurrency *int
-	rate_multiplier    *float64
-	addrate_multiplier *float64
-	error_msg          *string
-	upstream_is_pool   *bool
-	last_used_at       *time.Time
-	last_probe_at      *time.Time
-	extra              *map[string]interface{}
-	deleted_at         *time.Time
-	created_at         *time.Time
-	updated_at         *time.Time
-	clearedFields      map[string]struct{}
-	groups             map[int]struct{}
-	removedgroups      map[int]struct{}
-	clearedgroups      bool
-	proxy              *int
-	clearedproxy       bool
-	usage_logs         map[int]struct{}
-	removedusage_logs  map[int]struct{}
-	clearedusage_logs  bool
-	done               bool
-	oldValue           func(context.Context) (*Account, error)
-	predicates         []predicate.Account
+	op                           Op
+	typ                          string
+	id                           *int
+	name                         *string
+	email                        *string
+	platform                     *string
+	_type                        *string
+	credentials                  *map[string]string
+	model_policy                 *modelpolicy.Policy
+	state                        *account.State
+	state_until                  *time.Time
+	priority                     *int
+	addpriority                  *int
+	max_concurrency              *int
+	addmax_concurrency           *int
+	rate_multiplier              *float64
+	addrate_multiplier           *float64
+	model_downgrade_threshold    *float64
+	addmodel_downgrade_threshold *float64
+	error_msg                    *string
+	upstream_is_pool             *bool
+	last_used_at                 *time.Time
+	last_probe_at                *time.Time
+	extra                        *map[string]interface{}
+	deleted_at                   *time.Time
+	created_at                   *time.Time
+	updated_at                   *time.Time
+	clearedFields                map[string]struct{}
+	groups                       map[int]struct{}
+	removedgroups                map[int]struct{}
+	clearedgroups                bool
+	proxy                        *int
+	clearedproxy                 bool
+	usage_logs                   map[int]struct{}
+	removedusage_logs            map[int]struct{}
+	clearedusage_logs            bool
+	done                         bool
+	oldValue                     func(context.Context) (*Account, error)
+	predicates                   []predicate.Account
 }
 
 var _ ent.Mutation = (*AccountMutation)(nil)
@@ -2528,6 +2530,62 @@ func (m *AccountMutation) ResetRateMultiplier() {
 	m.addrate_multiplier = nil
 }
 
+// SetModelDowngradeThreshold sets the "model_downgrade_threshold" field.
+func (m *AccountMutation) SetModelDowngradeThreshold(f float64) {
+	m.model_downgrade_threshold = &f
+	m.addmodel_downgrade_threshold = nil
+}
+
+// ModelDowngradeThreshold returns the value of the "model_downgrade_threshold" field in the mutation.
+func (m *AccountMutation) ModelDowngradeThreshold() (r float64, exists bool) {
+	v := m.model_downgrade_threshold
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModelDowngradeThreshold returns the old "model_downgrade_threshold" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldModelDowngradeThreshold(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModelDowngradeThreshold is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModelDowngradeThreshold requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModelDowngradeThreshold: %w", err)
+	}
+	return oldValue.ModelDowngradeThreshold, nil
+}
+
+// AddModelDowngradeThreshold adds f to the "model_downgrade_threshold" field.
+func (m *AccountMutation) AddModelDowngradeThreshold(f float64) {
+	if m.addmodel_downgrade_threshold != nil {
+		*m.addmodel_downgrade_threshold += f
+	} else {
+		m.addmodel_downgrade_threshold = &f
+	}
+}
+
+// AddedModelDowngradeThreshold returns the value that was added to the "model_downgrade_threshold" field in this mutation.
+func (m *AccountMutation) AddedModelDowngradeThreshold() (r float64, exists bool) {
+	v := m.addmodel_downgrade_threshold
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetModelDowngradeThreshold resets all changes to the "model_downgrade_threshold" field.
+func (m *AccountMutation) ResetModelDowngradeThreshold() {
+	m.model_downgrade_threshold = nil
+	m.addmodel_downgrade_threshold = nil
+}
+
 // SetErrorMsg sets the "error_msg" field.
 func (m *AccountMutation) SetErrorMsg(s string) {
 	m.error_msg = &s
@@ -3049,7 +3107,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 20)
 	if m.name != nil {
 		fields = append(fields, account.FieldName)
 	}
@@ -3082,6 +3140,9 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m.rate_multiplier != nil {
 		fields = append(fields, account.FieldRateMultiplier)
+	}
+	if m.model_downgrade_threshold != nil {
+		fields = append(fields, account.FieldModelDowngradeThreshold)
 	}
 	if m.error_msg != nil {
 		fields = append(fields, account.FieldErrorMsg)
@@ -3137,6 +3198,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.MaxConcurrency()
 	case account.FieldRateMultiplier:
 		return m.RateMultiplier()
+	case account.FieldModelDowngradeThreshold:
+		return m.ModelDowngradeThreshold()
 	case account.FieldErrorMsg:
 		return m.ErrorMsg()
 	case account.FieldUpstreamIsPool:
@@ -3184,6 +3247,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldMaxConcurrency(ctx)
 	case account.FieldRateMultiplier:
 		return m.OldRateMultiplier(ctx)
+	case account.FieldModelDowngradeThreshold:
+		return m.OldModelDowngradeThreshold(ctx)
 	case account.FieldErrorMsg:
 		return m.OldErrorMsg(ctx)
 	case account.FieldUpstreamIsPool:
@@ -3286,6 +3351,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRateMultiplier(v)
 		return nil
+	case account.FieldModelDowngradeThreshold:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModelDowngradeThreshold(v)
+		return nil
 	case account.FieldErrorMsg:
 		v, ok := value.(string)
 		if !ok {
@@ -3359,6 +3431,9 @@ func (m *AccountMutation) AddedFields() []string {
 	if m.addrate_multiplier != nil {
 		fields = append(fields, account.FieldRateMultiplier)
 	}
+	if m.addmodel_downgrade_threshold != nil {
+		fields = append(fields, account.FieldModelDowngradeThreshold)
+	}
 	return fields
 }
 
@@ -3373,6 +3448,8 @@ func (m *AccountMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedMaxConcurrency()
 	case account.FieldRateMultiplier:
 		return m.AddedRateMultiplier()
+	case account.FieldModelDowngradeThreshold:
+		return m.AddedModelDowngradeThreshold()
 	}
 	return nil, false
 }
@@ -3402,6 +3479,13 @@ func (m *AccountMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddRateMultiplier(v)
+		return nil
+	case account.FieldModelDowngradeThreshold:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddModelDowngradeThreshold(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Account numeric field %s", name)
@@ -3513,6 +3597,9 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldRateMultiplier:
 		m.ResetRateMultiplier()
+		return nil
+	case account.FieldModelDowngradeThreshold:
+		m.ResetModelDowngradeThreshold()
 		return nil
 	case account.FieldErrorMsg:
 		m.ResetErrorMsg()

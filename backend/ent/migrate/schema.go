@@ -68,6 +68,7 @@ var (
 		{Name: "priority", Type: field.TypeInt, Default: 50},
 		{Name: "max_concurrency", Type: field.TypeInt, Default: 10},
 		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
+		{Name: "model_downgrade_threshold", Type: field.TypeFloat64, Default: 0},
 		{Name: "error_msg", Type: field.TypeString, Default: ""},
 		{Name: "upstream_is_pool", Type: field.TypeBool, Default: false},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
@@ -86,7 +87,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[20]},
+				Columns:    []*schema.Column{AccountsColumns[21]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -100,12 +101,12 @@ var (
 			{
 				Name:    "account_deleted_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[17]},
+				Columns: []*schema.Column{AccountsColumns[18]},
 			},
 			{
 				Name:    "account_priority_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[18]},
+				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[19]},
 			},
 		},
 	}

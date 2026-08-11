@@ -263,6 +263,7 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 				SetPriority(input.Priority).
 				SetMaxConcurrency(input.MaxConcurrency).
 				SetRateMultiplier(rateMultiplier).
+				SetModelDowngradeThreshold(input.ModelDowngradeThreshold).
 				SetErrorMsg("").
 				SetUpstreamIsPool(input.UpstreamIsPool).
 				ClearDeletedAt().
@@ -305,6 +306,7 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 			SetPriority(input.Priority).
 			SetMaxConcurrency(input.MaxConcurrency).
 			SetRateMultiplier(rateMultiplier).
+			SetModelDowngradeThreshold(input.ModelDowngradeThreshold).
 			SetUpstreamIsPool(input.UpstreamIsPool)
 
 		if input.Extra != nil {
@@ -410,6 +412,9 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 	}
 	if input.RateMultiplier != nil {
 		builder = builder.SetRateMultiplier(*input.RateMultiplier)
+	}
+	if input.ModelDowngradeThreshold != nil {
+		builder = builder.SetModelDowngradeThreshold(*input.ModelDowngradeThreshold)
 	}
 	if input.UpstreamIsPool != nil {
 		builder = builder.SetUpstreamIsPool(*input.UpstreamIsPool)
@@ -666,21 +671,22 @@ func mapAccounts(accounts []*ent.Account) []appaccount.Account {
 
 func mapAccount(item *ent.Account) appaccount.Account {
 	result := appaccount.Account{
-		ID:             item.ID,
-		Name:           item.Name,
-		Platform:       item.Platform,
-		Type:           item.Type,
-		Credentials:    cloneCredentials(item.Credentials),
-		ModelPolicy:    cloneModelPolicy(item.ModelPolicy),
-		State:          item.State.String(),
-		Priority:       item.Priority,
-		MaxConcurrency: item.MaxConcurrency,
-		RateMultiplier: item.RateMultiplier,
-		ErrorMsg:       item.ErrorMsg,
-		UpstreamIsPool: item.UpstreamIsPool,
-		Extra:          cloneAnyMap(item.Extra),
-		CreatedAt:      item.CreatedAt,
-		UpdatedAt:      item.UpdatedAt,
+		ID:                      item.ID,
+		Name:                    item.Name,
+		Platform:                item.Platform,
+		Type:                    item.Type,
+		Credentials:             cloneCredentials(item.Credentials),
+		ModelPolicy:             cloneModelPolicy(item.ModelPolicy),
+		State:                   item.State.String(),
+		Priority:                item.Priority,
+		MaxConcurrency:          item.MaxConcurrency,
+		RateMultiplier:          item.RateMultiplier,
+		ModelDowngradeThreshold: item.ModelDowngradeThreshold,
+		ErrorMsg:                item.ErrorMsg,
+		UpstreamIsPool:          item.UpstreamIsPool,
+		Extra:                   cloneAnyMap(item.Extra),
+		CreatedAt:               item.CreatedAt,
+		UpdatedAt:               item.UpdatedAt,
 	}
 
 	if item.Email != nil {

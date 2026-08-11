@@ -152,15 +152,6 @@ func (s *Scheduler) OnAccountsDeleted(accountIDs []int) {
 	_ = s.rdb.Del(ctx, keys...).Err()
 }
 
-// ModelSuccessRate returns one account-model statistic for scheduler
-// degradation decisions. It reads only the request-path in-memory snapshot.
-func (s *Scheduler) ModelSuccessRate(accountID int, model string) (ModelSuccessRateStats, bool) {
-	if s == nil || s.modelSuccessRate == nil {
-		return ModelSuccessRateStats{}, false
-	}
-	return s.modelSuccessRate.Get(accountID, model)
-}
-
 // ModelSuccessRateSnapshot returns statistics and their bucket timeline from
 // one shared clock sample.
 func (s *Scheduler) ModelSuccessRateSnapshot(accountID int) ([]ModelSuccessRateStats, ModelSuccessRateWindow) {

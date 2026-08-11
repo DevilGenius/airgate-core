@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -155,6 +156,44 @@ func TestCreateRejectsInvalidRateMultiplier(t *testing.T) {
 		if !errors.Is(err, ErrInvalidRateMultiplier) {
 			t.Fatalf("Create(rate=%v) error = %v, want ErrInvalidRateMultiplier", rate, err)
 		}
+	}
+}
+
+func TestCreateRejectsInvalidModelDowngradeThreshold(t *testing.T) {
+	service := NewService(stubRepository{
+		create: func(_ context.Context, input CreateInput) (Account, error) {
+			t.Fatalf("repo.Create should not be called for invalid threshold: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	for _, threshold := range []float64{-0.01, 1.01, math.NaN(), math.Inf(1)} {
+		_, err := service.Create(t.Context(), CreateInput{
+			Platform:                "openai",
+			ModelDowngradeThreshold: threshold,
+		})
+		if !errors.Is(err, ErrInvalidModelDowngradeThreshold) {
+			t.Fatalf("Create(threshold=%v) error = %v, want ErrInvalidModelDowngradeThreshold", threshold, err)
+		}
+	}
+}
+
+func TestUpdateAcceptsModelDowngradeThresholdBoundaries(t *testing.T) {
+	var captured []float64
+	service := NewService(stubRepository{
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			captured = append(captured, *input.ModelDowngradeThreshold)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	for _, threshold := range []float64{0, 1} {
+		if _, err := service.Update(t.Context(), 1, UpdateInput{ModelDowngradeThreshold: &threshold}); err != nil {
+			t.Fatalf("Update(threshold=%v) error = %v", threshold, err)
+		}
+	}
+	if len(captured) != 2 || captured[0] != 0 || captured[1] != 1 {
+		t.Fatalf("captured thresholds = %v, want [0 1]", captured)
 	}
 }
 

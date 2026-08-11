@@ -46,8 +46,11 @@ import {
   commitAccountPriorityInput,
   DEFAULT_ACCOUNT_MAX_CONCURRENCY,
   DEFAULT_ACCOUNT_PRIORITY,
+  DEFAULT_MODEL_DOWNGRADE_THRESHOLD,
   getAccountMessageLockEnabled,
+  isValidModelDowngradeThresholdInput,
   isAccountPriorityDraft,
+  parseModelDowngradeThresholdInput,
   parseAccountPriorityInput,
   setAccountMessageLockEnabled,
 } from './accountDefaults';
@@ -77,6 +80,7 @@ export function EditAccountModal({
     priority: account.priority,
     max_concurrency: account.max_concurrency,
     rate_multiplier: account.rate_multiplier,
+    model_downgrade_threshold: account.model_downgrade_threshold ?? DEFAULT_MODEL_DOWNGRADE_THRESHOLD,
     upstream_is_pool: account.upstream_is_pool,
     proxy_id: account.proxy_id,
     extra: account.extra ?? {},
@@ -87,6 +91,9 @@ export function EditAccountModal({
   const [dispatchEnabled, setDispatchEnabled] = useState(initialDispatchEnabled);
   const [priorityInput, setPriorityInput] = useState(String(account.priority ?? DEFAULT_ACCOUNT_PRIORITY));
   const [rateMultiplierInput, setRateMultiplierInput] = useState(String(account.rate_multiplier ?? 1));
+  const [modelDowngradeThresholdInput, setModelDowngradeThresholdInput] = useState(
+    String(account.model_downgrade_threshold ?? DEFAULT_MODEL_DOWNGRADE_THRESHOLD),
+  );
   const [modelAllowlistInput, setModelAllowlistInput] = useState(() =>
     modelPatternsToInput(account.model_policy?.allow),
   );
@@ -157,6 +164,7 @@ export function EditAccountModal({
     const rateMultiplierValue = parseRateMultiplier(rateMultiplierInput);
     const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplierInput);
     if (!rateMultiplierEmpty && !isValidRateMultiplierValue(rateMultiplierValue)) return;
+    if (!modelDowngradeThresholdValid) return;
     const rateMultiplier = rateMultiplierEmpty ? null : rateMultiplierValue;
     const merged = { ...credentials };
     const passwordKeys = new Set(
@@ -181,6 +189,7 @@ export function EditAccountModal({
       ...(nextState ? { state: nextState } : {}),
       priority,
       rate_multiplier: rateMultiplier,
+      model_downgrade_threshold: modelDowngradeThresholdValue,
       type: accountType || undefined,
       credentials: identity.credentials,
       model_policy: buildModelPolicy(modelAllowlistInput, modelDenylistInput),
@@ -215,6 +224,8 @@ export function EditAccountModal({
   const rateMultiplierValid =
     isEmptyRateMultiplierInput(rateMultiplierInput) ||
     isValidRateMultiplierValue(parseRateMultiplier(rateMultiplierInput));
+  const modelDowngradeThresholdValue = parseModelDowngradeThresholdInput(modelDowngradeThresholdInput);
+  const modelDowngradeThresholdValid = isValidModelDowngradeThresholdInput(modelDowngradeThresholdInput);
   const availableGroups = (groupsData?.list ?? []).filter(
     (group) => group.platform === account.platform,
   );
@@ -245,7 +256,7 @@ export function EditAccountModal({
           <Button
             variant="primary"
             onPress={handleSubmit}
-            isDisabled={loading || !form.name || !rateMultiplierValid}
+            isDisabled={loading || !form.name || !rateMultiplierValid || !modelDowngradeThresholdValid}
             aria-busy={loading}
           >
             {t('common.save')}
@@ -360,6 +371,23 @@ export function EditAccountModal({
                         value={rateMultiplierInput}
                         onChange={(event) => setRateMultiplierInput(event.target.value)}
                       />
+                    </HeroTextField>
+
+                    <HeroTextField fullWidth isInvalid={!modelDowngradeThresholdValid}>
+                      <Label>{t('accounts.model_downgrade_threshold')}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={modelDowngradeThresholdInput}
+                        onChange={(event) => setModelDowngradeThresholdInput(event.target.value)}
+                      />
+                      <p className={`mt-1 text-[11px] leading-4 ${modelDowngradeThresholdValid ? 'text-text-tertiary' : 'text-danger'}`}>
+                        {modelDowngradeThresholdValid
+                          ? t('accounts.model_downgrade_threshold_hint')
+                          : t('accounts.model_downgrade_threshold_invalid')}
+                      </p>
                     </HeroTextField>
 
                     <div className="space-y-1.5">

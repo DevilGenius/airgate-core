@@ -1860,6 +1860,7 @@ export default function AccountsPageContent() {
           initialPriorityMax={bulkEditSelection.initialValues.priorityMax}
           initialPriorityMin={bulkEditSelection.initialValues.priorityMin}
           initialRateMultiplier={bulkEditSelection.initialValues.rateMultiplier}
+          initialModelDowngradeThreshold={bulkEditSelection.initialValues.modelDowngradeThreshold}
           onClose={() => setBulkEditSelection(null)}
           onSubmit={(patch) =>
             bulkUpdateMutation.mutate({ account_ids: bulkEditSelection.ids, ...patch })

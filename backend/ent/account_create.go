@@ -154,6 +154,20 @@ func (ac *AccountCreate) SetNillableRateMultiplier(f *float64) *AccountCreate {
 	return ac
 }
 
+// SetModelDowngradeThreshold sets the "model_downgrade_threshold" field.
+func (ac *AccountCreate) SetModelDowngradeThreshold(f float64) *AccountCreate {
+	ac.mutation.SetModelDowngradeThreshold(f)
+	return ac
+}
+
+// SetNillableModelDowngradeThreshold sets the "model_downgrade_threshold" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableModelDowngradeThreshold(f *float64) *AccountCreate {
+	if f != nil {
+		ac.SetModelDowngradeThreshold(*f)
+	}
+	return ac
+}
+
 // SetErrorMsg sets the "error_msg" field.
 func (ac *AccountCreate) SetErrorMsg(s string) *AccountCreate {
 	ac.mutation.SetErrorMsg(s)
@@ -366,6 +380,10 @@ func (ac *AccountCreate) defaults() {
 		v := account.DefaultRateMultiplier
 		ac.mutation.SetRateMultiplier(v)
 	}
+	if _, ok := ac.mutation.ModelDowngradeThreshold(); !ok {
+		v := account.DefaultModelDowngradeThreshold
+		ac.mutation.SetModelDowngradeThreshold(v)
+	}
 	if _, ok := ac.mutation.ErrorMsg(); !ok {
 		v := account.DefaultErrorMsg
 		ac.mutation.SetErrorMsg(v)
@@ -434,6 +452,14 @@ func (ac *AccountCreate) check() error {
 	if v, ok := ac.mutation.RateMultiplier(); ok {
 		if err := account.RateMultiplierValidator(v); err != nil {
 			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Account.rate_multiplier": %w`, err)}
+		}
+	}
+	if _, ok := ac.mutation.ModelDowngradeThreshold(); !ok {
+		return &ValidationError{Name: "model_downgrade_threshold", err: errors.New(`ent: missing required field "Account.model_downgrade_threshold"`)}
+	}
+	if v, ok := ac.mutation.ModelDowngradeThreshold(); ok {
+		if err := account.ModelDowngradeThresholdValidator(v); err != nil {
+			return &ValidationError{Name: "model_downgrade_threshold", err: fmt.Errorf(`ent: validator failed for field "Account.model_downgrade_threshold": %w`, err)}
 		}
 	}
 	if _, ok := ac.mutation.ErrorMsg(); !ok {
@@ -517,6 +543,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.RateMultiplier(); ok {
 		_spec.SetField(account.FieldRateMultiplier, field.TypeFloat64, value)
 		_node.RateMultiplier = value
+	}
+	if value, ok := ac.mutation.ModelDowngradeThreshold(); ok {
+		_spec.SetField(account.FieldModelDowngradeThreshold, field.TypeFloat64, value)
+		_node.ModelDowngradeThreshold = value
 	}
 	if value, ok := ac.mutation.ErrorMsg(); ok {
 		_spec.SetField(account.FieldErrorMsg, field.TypeString, value)

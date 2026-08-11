@@ -223,6 +223,27 @@ func (au *AccountUpdate) AddRateMultiplier(f float64) *AccountUpdate {
 	return au
 }
 
+// SetModelDowngradeThreshold sets the "model_downgrade_threshold" field.
+func (au *AccountUpdate) SetModelDowngradeThreshold(f float64) *AccountUpdate {
+	au.mutation.ResetModelDowngradeThreshold()
+	au.mutation.SetModelDowngradeThreshold(f)
+	return au
+}
+
+// SetNillableModelDowngradeThreshold sets the "model_downgrade_threshold" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableModelDowngradeThreshold(f *float64) *AccountUpdate {
+	if f != nil {
+		au.SetModelDowngradeThreshold(*f)
+	}
+	return au
+}
+
+// AddModelDowngradeThreshold adds f to the "model_downgrade_threshold" field.
+func (au *AccountUpdate) AddModelDowngradeThreshold(f float64) *AccountUpdate {
+	au.mutation.AddModelDowngradeThreshold(f)
+	return au
+}
+
 // SetErrorMsg sets the "error_msg" field.
 func (au *AccountUpdate) SetErrorMsg(s string) *AccountUpdate {
 	au.mutation.SetErrorMsg(s)
@@ -494,6 +515,11 @@ func (au *AccountUpdate) check() error {
 			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Account.rate_multiplier": %w`, err)}
 		}
 	}
+	if v, ok := au.mutation.ModelDowngradeThreshold(); ok {
+		if err := account.ModelDowngradeThresholdValidator(v); err != nil {
+			return &ValidationError{Name: "model_downgrade_threshold", err: fmt.Errorf(`ent: validator failed for field "Account.model_downgrade_threshold": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -562,6 +588,12 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := au.mutation.AddedRateMultiplier(); ok {
 		_spec.AddField(account.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := au.mutation.ModelDowngradeThreshold(); ok {
+		_spec.SetField(account.FieldModelDowngradeThreshold, field.TypeFloat64, value)
+	}
+	if value, ok := au.mutation.AddedModelDowngradeThreshold(); ok {
+		_spec.AddField(account.FieldModelDowngradeThreshold, field.TypeFloat64, value)
 	}
 	if value, ok := au.mutation.ErrorMsg(); ok {
 		_spec.SetField(account.FieldErrorMsg, field.TypeString, value)
@@ -926,6 +958,27 @@ func (auo *AccountUpdateOne) AddRateMultiplier(f float64) *AccountUpdateOne {
 	return auo
 }
 
+// SetModelDowngradeThreshold sets the "model_downgrade_threshold" field.
+func (auo *AccountUpdateOne) SetModelDowngradeThreshold(f float64) *AccountUpdateOne {
+	auo.mutation.ResetModelDowngradeThreshold()
+	auo.mutation.SetModelDowngradeThreshold(f)
+	return auo
+}
+
+// SetNillableModelDowngradeThreshold sets the "model_downgrade_threshold" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableModelDowngradeThreshold(f *float64) *AccountUpdateOne {
+	if f != nil {
+		auo.SetModelDowngradeThreshold(*f)
+	}
+	return auo
+}
+
+// AddModelDowngradeThreshold adds f to the "model_downgrade_threshold" field.
+func (auo *AccountUpdateOne) AddModelDowngradeThreshold(f float64) *AccountUpdateOne {
+	auo.mutation.AddModelDowngradeThreshold(f)
+	return auo
+}
+
 // SetErrorMsg sets the "error_msg" field.
 func (auo *AccountUpdateOne) SetErrorMsg(s string) *AccountUpdateOne {
 	auo.mutation.SetErrorMsg(s)
@@ -1210,6 +1263,11 @@ func (auo *AccountUpdateOne) check() error {
 			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Account.rate_multiplier": %w`, err)}
 		}
 	}
+	if v, ok := auo.mutation.ModelDowngradeThreshold(); ok {
+		if err := account.ModelDowngradeThresholdValidator(v); err != nil {
+			return &ValidationError{Name: "model_downgrade_threshold", err: fmt.Errorf(`ent: validator failed for field "Account.model_downgrade_threshold": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -1295,6 +1353,12 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if value, ok := auo.mutation.AddedRateMultiplier(); ok {
 		_spec.AddField(account.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := auo.mutation.ModelDowngradeThreshold(); ok {
+		_spec.SetField(account.FieldModelDowngradeThreshold, field.TypeFloat64, value)
+	}
+	if value, ok := auo.mutation.AddedModelDowngradeThreshold(); ok {
+		_spec.AddField(account.FieldModelDowngradeThreshold, field.TypeFloat64, value)
 	}
 	if value, ok := auo.mutation.ErrorMsg(); ok {
 		_spec.SetField(account.FieldErrorMsg, field.TypeString, value)

@@ -122,15 +122,16 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 	inputs := make([]appaccount.CreateInput, 0, len(req.Accounts))
 	for _, item := range req.Accounts {
 		inputs = append(inputs, appaccount.CreateInput{
-			Name:           item.Name,
-			Email:          item.Email,
-			Platform:       item.Platform,
-			Type:           item.Type,
-			Credentials:    item.Credentials,
-			ModelPolicy:    item.ModelPolicy,
-			Priority:       item.Priority,
-			MaxConcurrency: item.MaxConcurrency,
-			RateMultiplier: item.RateMultiplier.Ptr(),
+			Name:                    item.Name,
+			Email:                   item.Email,
+			Platform:                item.Platform,
+			Type:                    item.Type,
+			Credentials:             item.Credentials,
+			ModelPolicy:             item.ModelPolicy,
+			Priority:                item.Priority,
+			MaxConcurrency:          item.MaxConcurrency,
+			RateMultiplier:          item.RateMultiplier.Ptr(),
+			ModelDowngradeThreshold: item.ModelDowngradeThreshold,
 		})
 	}
 	inputs, err := h.applyConfiguredImport(c.Request.Context(), inputs)
@@ -168,19 +169,20 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 	}
 
 	item, err := h.service.Create(c.Request.Context(), appaccount.CreateInput{
-		Name:           req.Name,
-		Email:          req.Email,
-		Platform:       req.Platform,
-		Type:           req.Type,
-		Credentials:    req.Credentials,
-		ModelPolicy:    req.ModelPolicy,
-		Priority:       req.Priority,
-		MaxConcurrency: req.MaxConcurrency,
-		ProxyID:        req.ProxyID,
-		RateMultiplier: req.RateMultiplier.Ptr(),
-		UpstreamIsPool: req.UpstreamIsPool,
-		Extra:          req.Extra,
-		GroupIDs:       req.GroupIDs,
+		Name:                    req.Name,
+		Email:                   req.Email,
+		Platform:                req.Platform,
+		Type:                    req.Type,
+		Credentials:             req.Credentials,
+		ModelPolicy:             req.ModelPolicy,
+		Priority:                req.Priority,
+		MaxConcurrency:          req.MaxConcurrency,
+		ProxyID:                 req.ProxyID,
+		RateMultiplier:          req.RateMultiplier.Ptr(),
+		ModelDowngradeThreshold: req.ModelDowngradeThreshold,
+		UpstreamIsPool:          req.UpstreamIsPool,
+		Extra:                   req.Extra,
+		GroupIDs:                req.GroupIDs,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建账号失败", "创建失败", err)
@@ -215,18 +217,19 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 	}
 
 	input := appaccount.UpdateInput{
-		Name:           req.Name,
-		Email:          req.Email,
-		Type:           req.Type,
-		Credentials:    req.Credentials,
-		ModelPolicy:    req.ModelPolicy,
-		State:          req.State,
-		Priority:       req.Priority,
-		MaxConcurrency: req.MaxConcurrency,
-		RateMultiplier: req.RateMultiplier.PtrOrDefault(1),
-		UpstreamIsPool: req.UpstreamIsPool,
-		GroupIDs:       req.GroupIDs,
-		HasGroupIDs:    req.GroupIDs != nil,
+		Name:                    req.Name,
+		Email:                   req.Email,
+		Type:                    req.Type,
+		Credentials:             req.Credentials,
+		ModelPolicy:             req.ModelPolicy,
+		State:                   req.State,
+		Priority:                req.Priority,
+		MaxConcurrency:          req.MaxConcurrency,
+		RateMultiplier:          req.RateMultiplier.PtrOrDefault(1),
+		ModelDowngradeThreshold: req.ModelDowngradeThreshold,
+		UpstreamIsPool:          req.UpstreamIsPool,
+		GroupIDs:                req.GroupIDs,
+		HasGroupIDs:             req.GroupIDs != nil,
 	}
 	if _, ok := rawPayload["email"]; ok {
 		input.HasEmail = true
@@ -290,20 +293,21 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 	}
 
 	result := h.service.BulkUpdate(c.Request.Context(), appaccount.BulkUpdateInput{
-		IDs:              req.AccountIDs,
-		State:            req.State,
-		Priority:         req.Priority,
-		PriorityOffset:   req.PriorityOffset,
-		PrioritySequence: prioritySequence,
-		MaxConcurrency:   req.MaxConcurrency,
-		RateMultiplier:   req.RateMultiplier.PtrOrDefault(1),
-		ModelPolicy:      req.ModelPolicy,
-		GroupIDs:         req.GroupIDs,
-		HasGroupIDs:      req.GroupIDs != nil,
-		ProxyID:          req.ProxyID,
-		HasProxyID:       req.ProxyID != nil,
-		Extra:            req.Extra,
-		HasExtra:         req.Extra != nil,
+		IDs:                     req.AccountIDs,
+		State:                   req.State,
+		Priority:                req.Priority,
+		PriorityOffset:          req.PriorityOffset,
+		PrioritySequence:        prioritySequence,
+		MaxConcurrency:          req.MaxConcurrency,
+		RateMultiplier:          req.RateMultiplier.PtrOrDefault(1),
+		ModelDowngradeThreshold: req.ModelDowngradeThreshold,
+		ModelPolicy:             req.ModelPolicy,
+		GroupIDs:                req.GroupIDs,
+		HasGroupIDs:             req.GroupIDs != nil,
+		ProxyID:                 req.ProxyID,
+		HasProxyID:              req.ProxyID != nil,
+		Extra:                   req.Extra,
+		HasExtra:                req.Extra != nil,
 	})
 	if result.Success > 0 {
 		h.refreshRouteGraphAccounts(c.Request.Context(), result.SuccessIDs)

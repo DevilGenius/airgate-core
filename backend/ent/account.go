@@ -42,6 +42,8 @@ type Account struct {
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	// RateMultiplier holds the value of the "rate_multiplier" field.
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
+	// 当前 30 分钟桶内单模型达到最低有效请求数且成功率低于该阈值时放入降级池；0 表示关闭
+	ModelDowngradeThreshold float64 `json:"model_downgrade_threshold,omitempty"`
 	// 进入当前状态的原因（给运维看）
 	ErrorMsg string `json:"error_msg,omitempty"`
 	// 上游是账号池：403/5xx 走退避 degraded；池自身凭证无效才 disabled
@@ -116,7 +118,7 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case account.FieldUpstreamIsPool:
 			values[i] = new(sql.NullBool)
-		case account.FieldRateMultiplier:
+		case account.FieldRateMultiplier, account.FieldModelDowngradeThreshold:
 			values[i] = new(sql.NullFloat64)
 		case account.FieldID, account.FieldPriority, account.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
@@ -218,6 +220,12 @@ func (a *Account) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field rate_multiplier", values[i])
 			} else if value.Valid {
 				a.RateMultiplier = value.Float64
+			}
+		case account.FieldModelDowngradeThreshold:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field model_downgrade_threshold", values[i])
+			} else if value.Valid {
+				a.ModelDowngradeThreshold = value.Float64
 			}
 		case account.FieldErrorMsg:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -366,6 +374,9 @@ func (a *Account) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("rate_multiplier=")
 	builder.WriteString(fmt.Sprintf("%v", a.RateMultiplier))
+	builder.WriteString(", ")
+	builder.WriteString("model_downgrade_threshold=")
+	builder.WriteString(fmt.Sprintf("%v", a.ModelDowngradeThreshold))
 	builder.WriteString(", ")
 	builder.WriteString("error_msg=")
 	builder.WriteString(a.ErrorMsg)

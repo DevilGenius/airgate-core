@@ -23,19 +23,20 @@ type Proxy struct {
 // State 枚举：active / rate_limited / degraded / disabled
 // StateUntil rate_limited / degraded 的到期时间；disabled 无到期；active 为 nil
 type Account struct {
-	ID                 int
-	Name               string
-	Email              *string
-	Platform           string
-	Type               string
-	Credentials        map[string]string
-	ModelPolicy        modelpolicy.Policy
-	State              string
-	StateUntil         *time.Time
-	Priority           int
-	MaxConcurrency     int
-	CurrentConcurrency int
-	RateMultiplier     float64
+	ID                      int
+	Name                    string
+	Email                   *string
+	Platform                string
+	Type                    string
+	Credentials             map[string]string
+	ModelPolicy             modelpolicy.Policy
+	State                   string
+	StateUntil              *time.Time
+	Priority                int
+	MaxConcurrency          int
+	CurrentConcurrency      int
+	RateMultiplier          float64
+	ModelDowngradeThreshold float64
 	// ErrorMsg 进入当前非 active 状态的原因（给运维看）。
 	ErrorMsg string
 	// UpstreamIsPool 上游是账号池时置 true：临时上游错误会进入退避 degraded，不永久标错。
@@ -122,19 +123,20 @@ type ListResult struct {
 
 // CreateInput 创建账号输入。
 type CreateInput struct {
-	Name           string
-	Email          *string
-	Platform       string
-	Type           string
-	Credentials    map[string]string
-	ModelPolicy    modelpolicy.Policy
-	Priority       int
-	MaxConcurrency int
-	ProxyID        *int64
-	RateMultiplier *float64
-	GroupIDs       []int64
-	UpstreamIsPool bool
-	Extra          map[string]any
+	Name                    string
+	Email                   *string
+	Platform                string
+	Type                    string
+	Credentials             map[string]string
+	ModelPolicy             modelpolicy.Policy
+	Priority                int
+	MaxConcurrency          int
+	ProxyID                 *int64
+	RateMultiplier          *float64
+	ModelDowngradeThreshold float64
+	GroupIDs                []int64
+	UpstreamIsPool          bool
+	Extra                   map[string]any
 }
 
 // UpdateInput 更新账号输入。
@@ -142,23 +144,24 @@ type CreateInput struct {
 // State 传 "active" / "disabled" 表示运维手动恢复 / 禁用；
 // 其它 state 值（rate_limited / degraded）由调度状态机自行维护，不由 API 写入。
 type UpdateInput struct {
-	Name           *string
-	Email          *string
-	HasEmail       bool
-	Type           *string
-	Credentials    map[string]string
-	ModelPolicy    *modelpolicy.Policy
-	State          *string
-	Priority       *int
-	MaxConcurrency *int
-	RateMultiplier *float64
-	UpstreamIsPool *bool
-	GroupIDs       []int64
-	HasGroupIDs    bool
-	ProxyID        *int64
-	HasProxyID     bool
-	Extra          map[string]any
-	HasExtra       bool
+	Name                    *string
+	Email                   *string
+	HasEmail                bool
+	Type                    *string
+	Credentials             map[string]string
+	ModelPolicy             *modelpolicy.Policy
+	State                   *string
+	Priority                *int
+	MaxConcurrency          *int
+	RateMultiplier          *float64
+	ModelDowngradeThreshold *float64
+	UpstreamIsPool          *bool
+	GroupIDs                []int64
+	HasGroupIDs             bool
+	ProxyID                 *int64
+	HasProxyID              bool
+	Extra                   map[string]any
+	HasExtra                bool
 }
 
 // ToggleResult 快速切换调度状态结果。
@@ -171,20 +174,21 @@ type ToggleResult struct {
 // 所有可选字段使用指针/HasXxx 标记：未设置表示「不修改」。
 // GroupIDs 采用整体替换语义：HasGroupIDs=true 时会用新列表覆盖账号原有分组。
 type BulkUpdateInput struct {
-	IDs              []int
-	State            *string
-	Priority         *int
-	PriorityOffset   *int
-	PrioritySequence *PrioritySequenceInput
-	MaxConcurrency   *int
-	RateMultiplier   *float64
-	ModelPolicy      *modelpolicy.Policy
-	GroupIDs         []int64
-	HasGroupIDs      bool
-	ProxyID          *int64
-	HasProxyID       bool
-	Extra            map[string]any
-	HasExtra         bool
+	IDs                     []int
+	State                   *string
+	Priority                *int
+	PriorityOffset          *int
+	PrioritySequence        *PrioritySequenceInput
+	MaxConcurrency          *int
+	RateMultiplier          *float64
+	ModelDowngradeThreshold *float64
+	ModelPolicy             *modelpolicy.Policy
+	GroupIDs                []int64
+	HasGroupIDs             bool
+	ProxyID                 *int64
+	HasProxyID              bool
+	Extra                   map[string]any
+	HasExtra                bool
 }
 
 // PrioritySequenceInput 按 IDs 顺序每 GroupSize 个账号推进一次 Step。

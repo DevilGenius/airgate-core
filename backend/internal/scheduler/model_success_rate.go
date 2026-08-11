@@ -17,13 +17,15 @@ import (
 )
 
 const (
-	modelSuccessRateWindow          = 24 * time.Hour
-	modelSuccessRateBucketWidth     = 30 * time.Minute
-	modelSuccessRateBucketCount     = int(modelSuccessRateWindow / modelSuccessRateBucketWidth)
-	modelSuccessRatePersistInterval = 10 * time.Second
-	modelSuccessRatePruneInterval   = 30 * time.Minute
-	modelSuccessRateRestoreBatch    = 100
-	modelSuccessRateShardCount      = 32
+	modelSuccessRateWindow                 = 24 * time.Hour
+	modelSuccessRateBucketWidth            = 30 * time.Minute
+	modelSuccessRateBucketCount            = int(modelSuccessRateWindow / modelSuccessRateBucketWidth)
+	modelSuccessRatePersistInterval        = 10 * time.Second
+	modelSuccessRatePruneInterval          = 30 * time.Minute
+	modelSuccessRateMinBucketValidRequests = 10
+	modelSuccessRateRestoreBatch           = 100
+	modelSuccessRateShardCount             = 32
+	modelSuccessRateBucketSpreadMultiplier = 997
 )
 
 // ModelSuccessRateStats 是单个账号、单个调度模型在最近 24 小时固定桶内的汇总统计。
@@ -129,6 +131,24 @@ func (t *ModelSuccessRateTracker) shardFor(accountID int) (int, *modelSuccessRat
 	return index, &t.shards[index]
 }
 
+func modelSuccessRateBucketOffset(accountID int) int64 {
+	bucketSeconds := int64(modelSuccessRateBucketWidth / time.Second)
+	if accountID <= 0 || bucketSeconds <= 0 {
+		return 0
+	}
+	return ((int64(accountID) % bucketSeconds) * modelSuccessRateBucketSpreadMultiplier) % bucketSeconds
+}
+
+func modelSuccessRateBucketID(accountID int, now time.Time) int64 {
+	bucketSeconds := int64(modelSuccessRateBucketWidth / time.Second)
+	return (now.Unix() + modelSuccessRateBucketOffset(accountID)) / bucketSeconds
+}
+
+func modelSuccessRateBucketTime(accountID int, bucketID int64) time.Time {
+	bucketSeconds := int64(modelSuccessRateBucketWidth / time.Second)
+	return time.Unix(bucketID*bucketSeconds-modelSuccessRateBucketOffset(accountID), 0).UTC()
+}
+
 type modelSuccessRateDisposition uint8
 
 const (
@@ -192,7 +212,7 @@ func (t *ModelSuccessRateTracker) Record(accountID int, model string, outcome sd
 	}
 
 	now := t.now()
-	bucketID := now.Unix() / int64(modelSuccessRateBucketWidth/time.Second)
+	bucketID := modelSuccessRateBucketID(accountID, now)
 	disposition := classifyModelSuccessRateOutcome(outcome)
 
 	_, shard := t.shardFor(accountID)
@@ -251,14 +271,10 @@ func (s *modelSuccessRateSeries) stats(accountID int, model string, now time.Tim
 	return s.statsWithBuckets(accountID, model, now, true)
 }
 
-func (s *modelSuccessRateSeries) aggregateStats(accountID int, model string, now time.Time) ModelSuccessRateStats {
-	return s.statsWithBuckets(accountID, model, now, false)
-}
-
 func (s *modelSuccessRateSeries) statsWithBuckets(accountID int, model string, now time.Time, includeBuckets bool) ModelSuccessRateStats {
-	currentBucket := now.Unix() / int64(modelSuccessRateBucketWidth/time.Second)
+	currentBucket := modelSuccessRateBucketID(accountID, now)
 	minimumBucket := currentBucket - int64(modelSuccessRateBucketCount) + 1
-	window := modelSuccessRateWindowInfo(now)
+	window := modelSuccessRateWindowInfo(accountID, now)
 	result := ModelSuccessRateStats{
 		AccountID:   accountID,
 		Model:       model,
@@ -297,37 +313,16 @@ func (s *modelSuccessRateSeries) statsWithBuckets(accountID int, model string, n
 	return result
 }
 
-func modelSuccessRateWindowInfo(now time.Time) ModelSuccessRateWindow {
-	currentBucket := now.Unix() / int64(modelSuccessRateBucketWidth/time.Second)
+func modelSuccessRateWindowInfo(accountID int, now time.Time) ModelSuccessRateWindow {
+	currentBucket := modelSuccessRateBucketID(accountID, now)
 	minimumBucket := currentBucket - int64(modelSuccessRateBucketCount) + 1
 	bucketSeconds := int64(modelSuccessRateBucketWidth / time.Second)
 	return ModelSuccessRateWindow{
-		WindowStart:   time.Unix(minimumBucket*bucketSeconds, 0).UTC(),
-		WindowEnd:     time.Unix((currentBucket+1)*bucketSeconds, 0).UTC(),
+		WindowStart:   modelSuccessRateBucketTime(accountID, minimumBucket),
+		WindowEnd:     modelSuccessRateBucketTime(accountID, currentBucket+1),
 		BucketSeconds: bucketSeconds,
 		BucketCount:   modelSuccessRateBucketCount,
 	}
-}
-
-func (t *ModelSuccessRateTracker) Get(accountID int, model string) (ModelSuccessRateStats, bool) {
-	if t == nil || accountID <= 0 {
-		return ModelSuccessRateStats{}, false
-	}
-	model = normalizeSuccessRateModel(model)
-	if model == "" {
-		return ModelSuccessRateStats{}, false
-	}
-
-	_, shard := t.shardFor(accountID)
-	shard.mu.RLock()
-	series := shard.series[accountID][model]
-	if series == nil {
-		shard.mu.RUnlock()
-		return ModelSuccessRateStats{}, false
-	}
-	result := series.aggregateStats(accountID, model, t.now())
-	shard.mu.RUnlock()
-	return result, true
 }
 
 func (t *ModelSuccessRateTracker) listAt(accountID int, now time.Time) []ModelSuccessRateStats {
@@ -350,7 +345,7 @@ func (t *ModelSuccessRateTracker) Snapshot(accountID int) ([]ModelSuccessRateSta
 		return nil, ModelSuccessRateWindow{}
 	}
 	now := t.now()
-	return t.listAt(accountID, now), modelSuccessRateWindowInfo(now)
+	return t.listAt(accountID, now), modelSuccessRateWindowInfo(accountID, now)
 }
 
 func (t *ModelSuccessRateTracker) Run(ctx context.Context) {
@@ -382,6 +377,34 @@ func (t *ModelSuccessRateTracker) Run(ctx context.Context) {
 	}
 }
 
+// isDemotedAt performs an O(1) request-path lookup against the current fixed
+// 30-minute bucket for one exact scheduling model. A new bucket automatically
+// clears the decision because stale bucket IDs never match; no timer, Redis
+// access, or background quality state is required.
+func (t *ModelSuccessRateTracker) isDemotedAt(accountID int, normalizedModel string, threshold float64, now time.Time) bool {
+	if t == nil || accountID <= 0 || normalizedModel == "" || threshold <= 0 || threshold > 1 {
+		return false
+	}
+	bucketID := modelSuccessRateBucketID(accountID, now)
+	_, shard := t.shardFor(accountID)
+	shard.mu.RLock()
+	series := shard.series[accountID][normalizedModel]
+	if series == nil {
+		shard.mu.RUnlock()
+		return false
+	}
+	bucket := series.buckets[int(bucketID%int64(modelSuccessRateBucketCount))]
+	shard.mu.RUnlock()
+	if bucket.bucket != bucketID {
+		return false
+	}
+	valid := bucket.success + bucket.failure
+	if valid < modelSuccessRateMinBucketValidRequests {
+		return false
+	}
+	return float64(bucket.success)/float64(valid) < threshold
+}
+
 func (t *ModelSuccessRateTracker) persistDirty(ctx context.Context) {
 	if t == nil || t.rdb == nil {
 		return
@@ -410,8 +433,6 @@ func (t *ModelSuccessRateTracker) persistDirty(ctx context.Context) {
 
 func (t *ModelSuccessRateTracker) dirtySnapshots() []modelSuccessRateDirtySnapshot {
 	now := t.now()
-	currentBucket := now.Unix() / int64(modelSuccessRateBucketWidth/time.Second)
-	minimumBucket := currentBucket - int64(modelSuccessRateBucketCount) + 1
 
 	snapshots := make([]modelSuccessRateDirtySnapshot, 0)
 	for shardIndex := range t.shards {
@@ -423,6 +444,8 @@ func (t *ModelSuccessRateTracker) dirtySnapshots() []modelSuccessRateDirtySnapsh
 		}
 		sort.Ints(accounts)
 		for _, accountID := range accounts {
+			currentBucket := modelSuccessRateBucketID(accountID, now)
+			minimumBucket := currentBucket - int64(modelSuccessRateBucketCount) + 1
 			persisted := persistedAccountSnapshot(
 				shard.series[accountID],
 				minimumBucket,
@@ -477,12 +500,12 @@ func persistedAccountSnapshot(models map[string]*modelSuccessRateSeries, minimum
 }
 
 func (t *ModelSuccessRateTracker) pruneExpired(now time.Time) {
-	currentBucket := now.Unix() / int64(modelSuccessRateBucketWidth/time.Second)
-	minimumBucket := currentBucket - int64(modelSuccessRateBucketCount) + 1
 	for shardIndex := range t.shards {
 		shard := &t.shards[shardIndex]
 		shard.mu.Lock()
 		for accountID, models := range shard.series {
+			currentBucket := modelSuccessRateBucketID(accountID, now)
+			minimumBucket := currentBucket - int64(modelSuccessRateBucketCount) + 1
 			for model, series := range models {
 				if !series.hasRecentBuckets(minimumBucket, currentBucket) {
 					delete(models, model)
@@ -586,7 +609,7 @@ func (t *ModelSuccessRateTracker) applyPersistedSnapshot(accountID int, payload 
 	}
 
 	now := t.now()
-	currentBucket := now.Unix() / int64(modelSuccessRateBucketWidth/time.Second)
+	currentBucket := modelSuccessRateBucketID(accountID, now)
 	minimumBucket := currentBucket - int64(modelSuccessRateBucketCount) + 1
 
 	_, shard := t.shardFor(accountID)

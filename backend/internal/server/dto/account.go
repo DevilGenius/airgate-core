@@ -25,81 +25,85 @@ type FamilyCooldownDTO struct {
 // today_image_count / total_image_count 仅 OpenAI 平台账号在列表接口下填充；
 // 用户期望"账号管理页一眼看到今天/累计生了几张图"。
 type AccountResp struct {
-	ID                 int64               `json:"id"`
-	Name               string              `json:"name"`
-	Email              *string             `json:"email"`
-	Platform           string              `json:"platform"`
-	Type               string              `json:"type"`
-	Credentials        map[string]string   `json:"credentials"`
-	ModelPolicy        modelpolicy.Policy  `json:"model_policy"`
-	State              string              `json:"state"`
-	StateUntil         *string             `json:"state_until,omitempty"`
-	Priority           int                 `json:"priority"`
-	MaxConcurrency     int                 `json:"max_concurrency"`
-	CurrentConcurrency int                 `json:"current_concurrency"`
-	ProxyID            *int64              `json:"proxy_id,omitempty"`
-	RateMultiplier     float64             `json:"rate_multiplier"`
-	ErrorMsg           string              `json:"error_msg,omitempty"`
-	UpstreamIsPool     bool                `json:"upstream_is_pool"`
-	Extra              map[string]any      `json:"extra,omitempty"`
-	LastUsedAt         *string             `json:"last_used_at,omitempty"`
-	LastProbeAt        *string             `json:"last_probe_at,omitempty"`
-	DeletedAt          *string             `json:"deleted_at,omitempty"`
-	GroupIDs           []int64             `json:"group_ids"`
-	FamilyCooldowns    []FamilyCooldownDTO `json:"family_cooldowns,omitempty"`
-	TodayImageCount    *int64              `json:"today_image_count,omitempty"`
-	TotalImageCount    *int64              `json:"total_image_count,omitempty"`
+	ID                      int64               `json:"id"`
+	Name                    string              `json:"name"`
+	Email                   *string             `json:"email"`
+	Platform                string              `json:"platform"`
+	Type                    string              `json:"type"`
+	Credentials             map[string]string   `json:"credentials"`
+	ModelPolicy             modelpolicy.Policy  `json:"model_policy"`
+	State                   string              `json:"state"`
+	StateUntil              *string             `json:"state_until,omitempty"`
+	Priority                int                 `json:"priority"`
+	MaxConcurrency          int                 `json:"max_concurrency"`
+	CurrentConcurrency      int                 `json:"current_concurrency"`
+	ProxyID                 *int64              `json:"proxy_id,omitempty"`
+	RateMultiplier          float64             `json:"rate_multiplier"`
+	ModelDowngradeThreshold float64             `json:"model_downgrade_threshold"`
+	ErrorMsg                string              `json:"error_msg,omitempty"`
+	UpstreamIsPool          bool                `json:"upstream_is_pool"`
+	Extra                   map[string]any      `json:"extra,omitempty"`
+	LastUsedAt              *string             `json:"last_used_at,omitempty"`
+	LastProbeAt             *string             `json:"last_probe_at,omitempty"`
+	DeletedAt               *string             `json:"deleted_at,omitempty"`
+	GroupIDs                []int64             `json:"group_ids"`
+	FamilyCooldowns         []FamilyCooldownDTO `json:"family_cooldowns,omitempty"`
+	TodayImageCount         *int64              `json:"today_image_count,omitempty"`
+	TotalImageCount         *int64              `json:"total_image_count,omitempty"`
 	TimeMixin
 }
 
 // CreateAccountReq 创建账号请求
 type CreateAccountReq struct {
-	Name           string             `json:"name" binding:"required"`
-	Email          *string            `json:"email"`
-	Platform       string             `json:"platform" binding:"required"`
-	Type           string             `json:"type"` // 账号类型，如 "apikey", "oauth"
-	Credentials    map[string]string  `json:"credentials" binding:"required"`
-	ModelPolicy    modelpolicy.Policy `json:"model_policy"`
-	Priority       int                `json:"priority"`
-	MaxConcurrency int                `json:"max_concurrency"`
-	ProxyID        *int64             `json:"proxy_id"`
-	RateMultiplier OptionalFloat      `json:"rate_multiplier"`
-	UpstreamIsPool bool               `json:"upstream_is_pool"`
-	Extra          map[string]any     `json:"extra,omitempty"`
-	GroupIDs       []int64            `json:"group_ids"`
+	Name                    string             `json:"name" binding:"required"`
+	Email                   *string            `json:"email"`
+	Platform                string             `json:"platform" binding:"required"`
+	Type                    string             `json:"type"` // 账号类型，如 "apikey", "oauth"
+	Credentials             map[string]string  `json:"credentials" binding:"required"`
+	ModelPolicy             modelpolicy.Policy `json:"model_policy"`
+	Priority                int                `json:"priority"`
+	MaxConcurrency          int                `json:"max_concurrency"`
+	ProxyID                 *int64             `json:"proxy_id"`
+	RateMultiplier          OptionalFloat      `json:"rate_multiplier"`
+	ModelDowngradeThreshold float64            `json:"model_downgrade_threshold"`
+	UpstreamIsPool          bool               `json:"upstream_is_pool"`
+	Extra                   map[string]any     `json:"extra,omitempty"`
+	GroupIDs                []int64            `json:"group_ids"`
 }
 
 // UpdateAccountReq 更新账号请求。
 // State 只允许 "active" / "disabled"（运维手动恢复 / 禁用）；
 // rate_limited / degraded 由状态机自动写入，不接受 API 显式赋值。
 type UpdateAccountReq struct {
-	Name           *string             `json:"name"`
-	Email          *string             `json:"email"`
-	Type           *string             `json:"type"`
-	Credentials    map[string]string   `json:"credentials"`
-	ModelPolicy    *modelpolicy.Policy `json:"model_policy"`
-	State          *string             `json:"state" binding:"omitempty,oneof=active disabled"`
-	Priority       *int                `json:"priority"`
-	MaxConcurrency *int                `json:"max_concurrency"`
-	ProxyID        *int64              `json:"proxy_id"`
-	RateMultiplier OptionalFloat       `json:"rate_multiplier"`
-	UpstreamIsPool *bool               `json:"upstream_is_pool"`
-	Extra          map[string]any      `json:"extra,omitempty"`
-	HasExtra       bool                `json:"-"`
-	GroupIDs       []int64             `json:"group_ids"`
+	Name                    *string             `json:"name"`
+	Email                   *string             `json:"email"`
+	Type                    *string             `json:"type"`
+	Credentials             map[string]string   `json:"credentials"`
+	ModelPolicy             *modelpolicy.Policy `json:"model_policy"`
+	State                   *string             `json:"state" binding:"omitempty,oneof=active disabled"`
+	Priority                *int                `json:"priority"`
+	MaxConcurrency          *int                `json:"max_concurrency"`
+	ProxyID                 *int64              `json:"proxy_id"`
+	RateMultiplier          OptionalFloat       `json:"rate_multiplier"`
+	ModelDowngradeThreshold *float64            `json:"model_downgrade_threshold"`
+	UpstreamIsPool          *bool               `json:"upstream_is_pool"`
+	Extra                   map[string]any      `json:"extra,omitempty"`
+	HasExtra                bool                `json:"-"`
+	GroupIDs                []int64             `json:"group_ids"`
 }
 
 // AccountExportItem 导出文件中的单条账号，仅包含可跨环境迁移的字段。
 type AccountExportItem struct {
-	Name           string             `json:"name"`
-	Email          *string            `json:"email"`
-	Platform       string             `json:"platform"`
-	Type           string             `json:"type,omitempty"`
-	Credentials    map[string]string  `json:"credentials"`
-	ModelPolicy    modelpolicy.Policy `json:"model_policy,omitempty"`
-	Priority       int                `json:"priority"`
-	MaxConcurrency int                `json:"max_concurrency"`
-	RateMultiplier OptionalFloat      `json:"rate_multiplier"`
+	Name                    string             `json:"name"`
+	Email                   *string            `json:"email"`
+	Platform                string             `json:"platform"`
+	Type                    string             `json:"type,omitempty"`
+	Credentials             map[string]string  `json:"credentials"`
+	ModelPolicy             modelpolicy.Policy `json:"model_policy,omitempty"`
+	Priority                int                `json:"priority"`
+	MaxConcurrency          int                `json:"max_concurrency"`
+	RateMultiplier          OptionalFloat      `json:"rate_multiplier"`
+	ModelDowngradeThreshold float64            `json:"model_downgrade_threshold"`
 }
 
 // AccountExportFile 导出文件结构，仅包含可跨环境迁移的账号本体字段。
@@ -161,17 +165,18 @@ type UpdateAccountImportConfigReq struct {
 
 // BulkUpdateAccountsReq 批量更新账号请求。
 type BulkUpdateAccountsReq struct {
-	AccountIDs       []int                    `json:"account_ids" binding:"required,min=1"`
-	State            *string                  `json:"state" binding:"omitempty,oneof=active disabled"`
-	Priority         *int                     `json:"priority"`
-	PriorityOffset   *int                     `json:"priority_offset"`
-	PrioritySequence *BulkPrioritySequenceReq `json:"priority_sequence"`
-	MaxConcurrency   *int                     `json:"max_concurrency"`
-	RateMultiplier   OptionalFloat            `json:"rate_multiplier"`
-	ModelPolicy      *modelpolicy.Policy      `json:"model_policy"`
-	GroupIDs         []int64                  `json:"group_ids"`
-	ProxyID          *int64                   `json:"proxy_id"`
-	Extra            map[string]any           `json:"extra,omitempty"`
+	AccountIDs              []int                    `json:"account_ids" binding:"required,min=1"`
+	State                   *string                  `json:"state" binding:"omitempty,oneof=active disabled"`
+	Priority                *int                     `json:"priority"`
+	PriorityOffset          *int                     `json:"priority_offset"`
+	PrioritySequence        *BulkPrioritySequenceReq `json:"priority_sequence"`
+	MaxConcurrency          *int                     `json:"max_concurrency"`
+	RateMultiplier          OptionalFloat            `json:"rate_multiplier"`
+	ModelDowngradeThreshold *float64                 `json:"model_downgrade_threshold"`
+	ModelPolicy             *modelpolicy.Policy      `json:"model_policy"`
+	GroupIDs                []int64                  `json:"group_ids"`
+	ProxyID                 *int64                   `json:"proxy_id"`
+	Extra                   map[string]any           `json:"extra,omitempty"`
 }
 
 // BulkPrioritySequenceReq 按账号请求顺序生成账号优先级序列。

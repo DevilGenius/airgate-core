@@ -95,6 +95,11 @@ func RateMultiplier(v float64) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldRateMultiplier, v))
 }
 
+// ModelDowngradeThreshold applies equality check predicate on the "model_downgrade_threshold" field. It's identical to ModelDowngradeThresholdEQ.
+func ModelDowngradeThreshold(v float64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldModelDowngradeThreshold, v))
+}
+
 // ErrorMsg applies equality check predicate on the "error_msg" field. It's identical to ErrorMsgEQ.
 func ErrorMsg(v string) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldErrorMsg, v))
@@ -608,6 +613,46 @@ func RateMultiplierLT(v float64) predicate.Account {
 // RateMultiplierLTE applies the LTE predicate on the "rate_multiplier" field.
 func RateMultiplierLTE(v float64) predicate.Account {
 	return predicate.Account(sql.FieldLTE(FieldRateMultiplier, v))
+}
+
+// ModelDowngradeThresholdEQ applies the EQ predicate on the "model_downgrade_threshold" field.
+func ModelDowngradeThresholdEQ(v float64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldModelDowngradeThreshold, v))
+}
+
+// ModelDowngradeThresholdNEQ applies the NEQ predicate on the "model_downgrade_threshold" field.
+func ModelDowngradeThresholdNEQ(v float64) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldModelDowngradeThreshold, v))
+}
+
+// ModelDowngradeThresholdIn applies the In predicate on the "model_downgrade_threshold" field.
+func ModelDowngradeThresholdIn(vs ...float64) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldModelDowngradeThreshold, vs...))
+}
+
+// ModelDowngradeThresholdNotIn applies the NotIn predicate on the "model_downgrade_threshold" field.
+func ModelDowngradeThresholdNotIn(vs ...float64) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldModelDowngradeThreshold, vs...))
+}
+
+// ModelDowngradeThresholdGT applies the GT predicate on the "model_downgrade_threshold" field.
+func ModelDowngradeThresholdGT(v float64) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldModelDowngradeThreshold, v))
+}
+
+// ModelDowngradeThresholdGTE applies the GTE predicate on the "model_downgrade_threshold" field.
+func ModelDowngradeThresholdGTE(v float64) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldModelDowngradeThreshold, v))
+}
+
+// ModelDowngradeThresholdLT applies the LT predicate on the "model_downgrade_threshold" field.
+func ModelDowngradeThresholdLT(v float64) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldModelDowngradeThreshold, v))
+}
+
+// ModelDowngradeThresholdLTE applies the LTE predicate on the "model_downgrade_threshold" field.
+func ModelDowngradeThresholdLTE(v float64) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldModelDowngradeThreshold, v))
 }
 
 // ErrorMsgEQ applies the EQ predicate on the "error_msg" field.

@@ -169,24 +169,44 @@ func init() {
 			return nil
 		}
 	}()
+	// accountDescModelDowngradeThreshold is the schema descriptor for model_downgrade_threshold field.
+	accountDescModelDowngradeThreshold := accountFields[11].Descriptor()
+	// account.DefaultModelDowngradeThreshold holds the default value on creation for the model_downgrade_threshold field.
+	account.DefaultModelDowngradeThreshold = accountDescModelDowngradeThreshold.Default.(float64)
+	// account.ModelDowngradeThresholdValidator is a validator for the "model_downgrade_threshold" field. It is called by the builders before save.
+	account.ModelDowngradeThresholdValidator = func() func(float64) error {
+		validators := accountDescModelDowngradeThreshold.Validators
+		fns := [...]func(float64) error{
+			validators[0].(func(float64) error),
+			validators[1].(func(float64) error),
+		}
+		return func(model_downgrade_threshold float64) error {
+			for _, fn := range fns {
+				if err := fn(model_downgrade_threshold); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// accountDescErrorMsg is the schema descriptor for error_msg field.
-	accountDescErrorMsg := accountFields[11].Descriptor()
+	accountDescErrorMsg := accountFields[12].Descriptor()
 	// account.DefaultErrorMsg holds the default value on creation for the error_msg field.
 	account.DefaultErrorMsg = accountDescErrorMsg.Default.(string)
 	// accountDescUpstreamIsPool is the schema descriptor for upstream_is_pool field.
-	accountDescUpstreamIsPool := accountFields[12].Descriptor()
+	accountDescUpstreamIsPool := accountFields[13].Descriptor()
 	// account.DefaultUpstreamIsPool holds the default value on creation for the upstream_is_pool field.
 	account.DefaultUpstreamIsPool = accountDescUpstreamIsPool.Default.(bool)
 	// accountDescExtra is the schema descriptor for extra field.
-	accountDescExtra := accountFields[15].Descriptor()
+	accountDescExtra := accountFields[16].Descriptor()
 	// account.DefaultExtra holds the default value on creation for the extra field.
 	account.DefaultExtra = accountDescExtra.Default.(map[string]interface{})
 	// accountDescCreatedAt is the schema descriptor for created_at field.
-	accountDescCreatedAt := accountFields[17].Descriptor()
+	accountDescCreatedAt := accountFields[18].Descriptor()
 	// account.DefaultCreatedAt holds the default value on creation for the created_at field.
 	account.DefaultCreatedAt = accountDescCreatedAt.Default.(func() time.Time)
 	// accountDescUpdatedAt is the schema descriptor for updated_at field.
-	accountDescUpdatedAt := accountFields[18].Descriptor()
+	accountDescUpdatedAt := accountFields[19].Descriptor()
 	// account.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	account.DefaultUpdatedAt = accountDescUpdatedAt.Default.(func() time.Time)
 	// account.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

@@ -36,9 +36,13 @@ import {
   commitAccountPriorityInput,
   DEFAULT_ACCOUNT_MAX_CONCURRENCY,
   DEFAULT_ACCOUNT_PRIORITY,
+  DEFAULT_MODEL_DOWNGRADE_THRESHOLD,
   getAccountPriorityOffsetRange,
   getAccountPrioritySequencePreview,
   isAccountPriorityDraft,
+  isEmptyModelDowngradeThresholdInput,
+  isValidModelDowngradeThresholdInput,
+  parseModelDowngradeThresholdInput,
   parseAccountPriorityOffsetInput,
   parseAccountPriorityInput,
   setAccountMessageLockEnabled,
@@ -57,6 +61,7 @@ export function BulkEditAccountModal({
   initialPriorityMax,
   initialPriorityMin,
   initialRateMultiplier,
+  initialModelDowngradeThreshold,
   onClose,
   onSubmit,
   loading,
@@ -69,6 +74,7 @@ export function BulkEditAccountModal({
   initialPriorityMax?: number;
   initialPriorityMin?: number;
   initialRateMultiplier?: number;
+  initialModelDowngradeThreshold?: number;
   onClose: () => void;
   onSubmit: (data: Omit<BulkUpdateAccountsReq, 'account_ids'>) => void;
   loading: boolean;
@@ -82,6 +88,7 @@ export function BulkEditAccountModal({
   const [enablePriorityOffset, setEnablePriorityOffset] = useState(false);
   const [enableConcurrency, setEnableConcurrency] = useState(false);
   const [enableRateMultiplier, setEnableRateMultiplier] = useState(false);
+  const [enableModelDowngradeThreshold, setEnableModelDowngradeThreshold] = useState(false);
   const [enableGroups, setEnableGroups] = useState(false);
   const [enableProxy, setEnableProxy] = useState(false);
   const [enableMessageLock, setEnableMessageLock] = useState(false);
@@ -102,6 +109,9 @@ export function BulkEditAccountModal({
   const [priorityOffsetInput, setPriorityOffsetInput] = useState('');
   const [maxConcurrency, setMaxConcurrency] = useState(() => initialMaxConcurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY);
   const [rateMultiplier, setRateMultiplier] = useState(() => String(initialRateMultiplier ?? 1));
+  const [modelDowngradeThreshold, setModelDowngradeThreshold] = useState(
+    () => String(initialModelDowngradeThreshold ?? DEFAULT_MODEL_DOWNGRADE_THRESHOLD),
+  );
   const [groupIds, setGroupIds] = useState<number[]>(() => [...(initialGroupIds ?? [])]);
   const [proxyId, setProxyId] = useState<number | null>(null);
   const [messageLockEnabled, setMessageLockEnabled] = useState(false);
@@ -123,6 +133,7 @@ export function BulkEditAccountModal({
     enablePriorityOffset ||
     enableConcurrency ||
     enableRateMultiplier ||
+    enableModelDowngradeThreshold ||
     enableGroups ||
     enableProxy ||
     enableMessageLock;
@@ -130,6 +141,9 @@ export function BulkEditAccountModal({
   const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplier);
   const rateMultiplierValid =
     !enableRateMultiplier || rateMultiplierEmpty || isValidRateMultiplierValue(parsedRateMultiplier);
+  const modelDowngradeThresholdValue = parseModelDowngradeThresholdInput(modelDowngradeThreshold);
+  const modelDowngradeThresholdEmpty = isEmptyModelDowngradeThresholdInput(modelDowngradeThreshold);
+  const modelDowngradeThresholdValid = !enableModelDowngradeThreshold || isValidModelDowngradeThresholdInput(modelDowngradeThreshold);
   const priorityOffsetRange = getAccountPriorityOffsetRange(initialPriorityMin, initialPriorityMax);
   const parsedPriorityOffset = parseAccountPriorityOffsetInput(priorityOffsetInput);
   const priorityOffsetValid = !enablePriorityOffset || (
@@ -149,6 +163,7 @@ export function BulkEditAccountModal({
     && priorityOffsetValid
     && prioritySequenceValid
     && rateMultiplierValid
+    && modelDowngradeThresholdValid
     && (!enableProxy || proxyId != null);
 
   const handleSubmit = () => {
@@ -172,6 +187,9 @@ export function BulkEditAccountModal({
       } else if (isValidRateMultiplierValue(parsedRateMultiplier)) {
         patch.rate_multiplier = parsedRateMultiplier;
       }
+    }
+    if (enableModelDowngradeThreshold) {
+      patch.model_downgrade_threshold = modelDowngradeThresholdEmpty ? null : modelDowngradeThresholdValue;
     }
     if (enableGroups) patch.group_ids = groupIds;
     if (enableProxy && proxyId != null) patch.proxy_id = proxyId;
@@ -468,6 +486,30 @@ export function BulkEditAccountModal({
               disabled={!enableRateMultiplier}
               onChange={(e) => setRateMultiplier(e.target.value)}
             />
+          </HeroTextField>
+        </FieldRow>
+
+        {/* 模型降级阈值 */}
+        <FieldRow
+          enabled={enableModelDowngradeThreshold}
+          onToggle={setEnableModelDowngradeThreshold}
+          label={t('accounts.model_downgrade_threshold')}
+        >
+          <HeroTextField fullWidth isDisabled={!enableModelDowngradeThreshold} isInvalid={enableModelDowngradeThreshold && !modelDowngradeThresholdValid}>
+            <Input
+              type="number"
+              min={0}
+              max={1}
+              step={0.01}
+              value={modelDowngradeThreshold}
+              disabled={!enableModelDowngradeThreshold}
+              onChange={(event) => setModelDowngradeThreshold(event.target.value)}
+            />
+            <p className={`mt-1 text-[11px] leading-4 ${!enableModelDowngradeThreshold || modelDowngradeThresholdValid ? 'text-text-tertiary' : 'text-danger'}`}>
+              {!enableModelDowngradeThreshold || modelDowngradeThresholdValid
+                ? t('accounts.model_downgrade_threshold_hint')
+                : t('accounts.model_downgrade_threshold_invalid')}
+            </p>
           </HeroTextField>
         </FieldRow>
 

@@ -163,7 +163,15 @@ func TestSchedulerApplyAccountTestOutcomeRecordsModelSuccessRate(t *testing.T) {
 	s.ApplyAccountTestOutcome(context.Background(), 7, "openai", "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess}, false)
 	s.ApplyAccountTestOutcome(context.Background(), 7, "openai", "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient}, false)
 
-	stats, ok := s.ModelSuccessRate(7, "gpt-5")
+	rates, _ := s.ModelSuccessRateSnapshot(7)
+	var stats ModelSuccessRateStats
+	ok := false
+	for _, rate := range rates {
+		if rate.Model == "gpt-5" {
+			stats, ok = rate, true
+			break
+		}
+	}
 	if !ok || stats.Requests != 2 || stats.Successes != 1 || stats.Failures != 1 {
 		t.Fatalf("account test model success-rate stats = %+v ok=%v, want 2 requests (1 success, 1 failure)", stats, ok)
 	}

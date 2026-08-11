@@ -43,8 +43,11 @@ import {
   commitAccountPriorityInput,
   DEFAULT_ACCOUNT_MAX_CONCURRENCY,
   DEFAULT_ACCOUNT_PRIORITY,
+  DEFAULT_MODEL_DOWNGRADE_THRESHOLD,
   getAccountMessageLockEnabled,
   isAccountPriorityDraft,
+  isValidModelDowngradeThresholdInput,
+  parseModelDowngradeThresholdInput,
   parseAccountPriorityInput,
   setAccountMessageLockEnabled,
 } from './accountDefaults';
@@ -76,12 +79,14 @@ export function CreateAccountModal({
     priority: DEFAULT_ACCOUNT_PRIORITY,
     max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY,
     rate_multiplier: 1,
+    model_downgrade_threshold: DEFAULT_MODEL_DOWNGRADE_THRESHOLD,
   });
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [batchMode, setBatchMode] = useState(false);
   const [priorityInput, setPriorityInput] = useState(String(DEFAULT_ACCOUNT_PRIORITY));
   const [rateMultiplierInput, setRateMultiplierInput] = useState('1');
+  const [modelDowngradeThresholdInput, setModelDowngradeThresholdInput] = useState(String(DEFAULT_MODEL_DOWNGRADE_THRESHOLD));
 
   // 根据平台获取凭证字段定义
   const { data: schema } = useQuery({
@@ -118,9 +123,10 @@ export function CreateAccountModal({
     if (open) return;
     setPlatform('');
     setAccountType('');
-    setForm({ name: '', email: null, priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
+    setForm({ name: '', email: null, priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, model_downgrade_threshold: DEFAULT_MODEL_DOWNGRADE_THRESHOLD, upstream_is_pool: false });
     setPriorityInput(String(DEFAULT_ACCOUNT_PRIORITY));
     setRateMultiplierInput('1');
+    setModelDowngradeThresholdInput(String(DEFAULT_MODEL_DOWNGRADE_THRESHOLD));
     setCredentials({});
     setGroupIds([]);
     setBatchMode(false);
@@ -151,6 +157,7 @@ export function CreateAccountModal({
     accounts: PluginBatchAccountInput[],
   ): Promise<PluginBatchImportResult> => {
     if (!onBatchImport) return { imported: 0, failed: accounts.length };
+    if (!modelDowngradeThresholdValid) return { imported: 0, failed: accounts.length };
     const prefix = form.name.trim();
     const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
     const rateMultiplier = isEmptyRateMultiplierInput(rateMultiplierInput)
@@ -167,6 +174,7 @@ export function CreateAccountModal({
         priority,
         max_concurrency: form.max_concurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY,
         rate_multiplier: rateMultiplier,
+        model_downgrade_threshold: modelDowngradeThresholdValue ?? undefined,
       };
     });
     return onBatchImport(toImport);
@@ -184,6 +192,7 @@ export function CreateAccountModal({
     const rateMultiplierValue = parseRateMultiplier(rateMultiplierInput);
     const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplierInput);
     if (!rateMultiplierEmpty && !isValidRateMultiplierValue(rateMultiplierValue)) return;
+    if (!modelDowngradeThresholdValid) return;
     const rateMultiplier = rateMultiplierEmpty ? null : rateMultiplierValue;
     const identity = syncAccountIdentity(credentials, form.email);
     onSubmit({
@@ -191,6 +200,7 @@ export function CreateAccountModal({
       email: identity.email,
       priority,
       rate_multiplier: rateMultiplier,
+      model_downgrade_threshold: modelDowngradeThresholdValue,
       platform,
       type: accountType || undefined,
       credentials: identity.credentials,
@@ -202,9 +212,10 @@ export function CreateAccountModal({
   const handleClose = () => {
     setPlatform('');
     setAccountType('');
-    setForm({ name: '', email: null, priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, upstream_is_pool: false });
+    setForm({ name: '', email: null, priority: DEFAULT_ACCOUNT_PRIORITY, max_concurrency: DEFAULT_ACCOUNT_MAX_CONCURRENCY, rate_multiplier: 1, model_downgrade_threshold: DEFAULT_MODEL_DOWNGRADE_THRESHOLD, upstream_is_pool: false });
     setPriorityInput(String(DEFAULT_ACCOUNT_PRIORITY));
     setRateMultiplierInput('1');
+    setModelDowngradeThresholdInput(String(DEFAULT_MODEL_DOWNGRADE_THRESHOLD));
     setCredentials({});
     setGroupIds([]);
     setBatchMode(false);
@@ -231,6 +242,8 @@ export function CreateAccountModal({
   const rateMultiplierValid =
     isEmptyRateMultiplierInput(rateMultiplierInput) ||
     isValidRateMultiplierValue(parseRateMultiplier(rateMultiplierInput));
+  const modelDowngradeThresholdValue = parseModelDowngradeThresholdInput(modelDowngradeThresholdInput);
+  const modelDowngradeThresholdValid = isValidModelDowngradeThresholdInput(modelDowngradeThresholdInput);
   const proxyOptions = [
     { id: '', label: t('accounts.no_proxy') },
     ...(proxiesData?.list ?? []).map((p) => ({
@@ -267,7 +280,7 @@ export function CreateAccountModal({
             <Button
               aria-busy={loading}
               form={CREATE_ACCOUNT_FORM_ID}
-              isDisabled={loading || !platform || !form.name || !rateMultiplierValid}
+              isDisabled={loading || !platform || !form.name || !rateMultiplierValid || !modelDowngradeThresholdValid}
               type="submit"
               variant="primary"
             >
@@ -395,6 +408,23 @@ export function CreateAccountModal({
                         value={rateMultiplierInput}
                         onChange={(e) => setRateMultiplierInput(e.target.value)}
                       />
+                    </HeroTextField>
+
+                    <HeroTextField fullWidth isInvalid={!modelDowngradeThresholdValid}>
+                      <Label>{t('accounts.model_downgrade_threshold')}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={modelDowngradeThresholdInput}
+                        onChange={(e) => setModelDowngradeThresholdInput(e.target.value)}
+                      />
+                      <p className={`mt-1 text-[11px] leading-4 ${modelDowngradeThresholdValid ? 'text-text-tertiary' : 'text-danger'}`}>
+                        {modelDowngradeThresholdValid
+                          ? t('accounts.model_downgrade_threshold_hint')
+                          : t('accounts.model_downgrade_threshold_invalid')}
+                      </p>
                     </HeroTextField>
 
                     <div className="space-y-1.5">

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"maps"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -418,6 +419,9 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 	if err != nil {
 		return Account{}, err
 	}
+	if err := validateModelDowngradeThreshold(input.ModelDowngradeThreshold); err != nil {
+		return Account{}, err
+	}
 	input.RateMultiplier = &rateMultiplier
 	input.ModelPolicy = modelpolicy.Normalize(input.ModelPolicy)
 	if err := validateModelPolicy(input.ModelPolicy); err != nil {
@@ -595,6 +599,11 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 			return Account{}, err
 		}
 	}
+	if input.ModelDowngradeThreshold != nil {
+		if err := validateModelDowngradeThreshold(*input.ModelDowngradeThreshold); err != nil {
+			return Account{}, err
+		}
+	}
 	if input.ModelPolicy != nil {
 		policy := modelpolicy.Normalize(*input.ModelPolicy)
 		if err := validateModelPolicy(policy); err != nil {
@@ -716,6 +725,14 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			return result
 		}
 	}
+	if input.ModelDowngradeThreshold != nil {
+		if err := validateModelDowngradeThreshold(*input.ModelDowngradeThreshold); err != nil {
+			for _, id := range input.IDs {
+				result.appendFailure(id, err)
+			}
+			return result
+		}
+	}
 	if input.ModelPolicy != nil {
 		policy := modelpolicy.Normalize(*input.ModelPolicy)
 		if err := validateModelPolicy(policy); err != nil {
@@ -733,11 +750,12 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			priority = &sequencePriorities[index]
 		}
 		patch := UpdateInput{
-			State:          input.State,
-			Priority:       priority,
-			MaxConcurrency: input.MaxConcurrency,
-			RateMultiplier: input.RateMultiplier,
-			ModelPolicy:    input.ModelPolicy,
+			State:                   input.State,
+			Priority:                priority,
+			MaxConcurrency:          input.MaxConcurrency,
+			RateMultiplier:          input.RateMultiplier,
+			ModelDowngradeThreshold: input.ModelDowngradeThreshold,
+			ModelPolicy:             input.ModelPolicy,
 		}
 		var existing *Account
 		needsExisting := input.HasExtra || (input.PriorityOffset != nil && *input.PriorityOffset != 0)
@@ -882,6 +900,7 @@ func hasUpdateInputChanges(input UpdateInput) bool {
 		input.Priority != nil ||
 		input.MaxConcurrency != nil ||
 		input.RateMultiplier != nil ||
+		input.ModelDowngradeThreshold != nil ||
 		input.ModelPolicy != nil ||
 		input.UpstreamIsPool != nil ||
 		input.HasGroupIDs ||
@@ -903,6 +922,13 @@ func normalizeCreateRateMultiplier(value *float64) (float64, error) {
 func validateRateMultiplier(value float64) error {
 	if err := ratevalue.ValidateMultiplier(value); err != nil {
 		return errors.Join(ErrInvalidRateMultiplier, err)
+	}
+	return nil
+}
+
+func validateModelDowngradeThreshold(value float64) error {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 1 {
+		return ErrInvalidModelDowngradeThreshold
 	}
 	return nil
 }

@@ -7,6 +7,7 @@ export type BulkEditInitialValues = {
   priorityMax?: number;
   priorityMin?: number;
   rateMultiplier?: number;
+  modelDowngradeThreshold?: number;
 };
 
 export type BulkEditSelection = {
@@ -76,5 +77,6 @@ export function getBulkEditInitialValues(rows: AccountResp[], selectedIds: numbe
     priorityMax: hasCompletePriorityRange ? Math.max(...priorities) : undefined,
     priorityMin: hasCompletePriorityRange ? Math.min(...priorities) : undefined,
     rateMultiplier: getCommonNumber((account) => account.rate_multiplier),
+    modelDowngradeThreshold: getCommonNumber((account) => account.model_downgrade_threshold),
   };
 }

@@ -14,7 +14,10 @@ import {
   getAccountPriorityOffsetRange,
   getAccountPrioritySequencePreview,
   getAccountMessageLockEnabled,
+  isEmptyModelDowngradeThresholdInput,
   isAccountPriorityDraft,
+  isValidModelDowngradeThresholdInput,
+  parseModelDowngradeThresholdInput,
   parseAccountPriorityInput,
   parseAccountPriorityOffsetInput,
   setAccountMessageLockEnabled,
@@ -72,5 +75,15 @@ describe('account default helpers', () => {
       existing: 'value',
       msg_lock_enabled: true,
     });
+  });
+
+  it('validates model downgrade threshold input without coercing invalid values to zero', () => {
+    expect(isEmptyModelDowngradeThresholdInput('  ')).toBe(true);
+    expect(parseModelDowngradeThresholdInput('')).toBeNull();
+    expect(parseModelDowngradeThresholdInput('0.85')).toBe(0.85);
+    expect(parseModelDowngradeThresholdInput('abc')).toBeNull();
+    expect(parseModelDowngradeThresholdInput('1.01')).toBeNull();
+    expect(isValidModelDowngradeThresholdInput('')).toBe(true);
+    expect(isValidModelDowngradeThresholdInput('abc')).toBe(false);
   });
 });

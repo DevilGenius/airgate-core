@@ -37,6 +37,8 @@ const (
 	FieldMaxConcurrency = "max_concurrency"
 	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
 	FieldRateMultiplier = "rate_multiplier"
+	// FieldModelDowngradeThreshold holds the string denoting the model_downgrade_threshold field in the database.
+	FieldModelDowngradeThreshold = "model_downgrade_threshold"
 	// FieldErrorMsg holds the string denoting the error_msg field in the database.
 	FieldErrorMsg = "error_msg"
 	// FieldUpstreamIsPool holds the string denoting the upstream_is_pool field in the database.
@@ -96,6 +98,7 @@ var Columns = []string{
 	FieldPriority,
 	FieldMaxConcurrency,
 	FieldRateMultiplier,
+	FieldModelDowngradeThreshold,
 	FieldErrorMsg,
 	FieldUpstreamIsPool,
 	FieldLastUsedAt,
@@ -152,6 +155,10 @@ var (
 	DefaultRateMultiplier float64
 	// RateMultiplierValidator is a validator for the "rate_multiplier" field. It is called by the builders before save.
 	RateMultiplierValidator func(float64) error
+	// DefaultModelDowngradeThreshold holds the default value on creation for the "model_downgrade_threshold" field.
+	DefaultModelDowngradeThreshold float64
+	// ModelDowngradeThresholdValidator is a validator for the "model_downgrade_threshold" field. It is called by the builders before save.
+	ModelDowngradeThresholdValidator func(float64) error
 	// DefaultErrorMsg holds the default value on creation for the "error_msg" field.
 	DefaultErrorMsg string
 	// DefaultUpstreamIsPool holds the default value on creation for the "upstream_is_pool" field.
@@ -245,6 +252,11 @@ func ByMaxConcurrency(opts ...sql.OrderTermOption) OrderOption {
 // ByRateMultiplier orders the results by the rate_multiplier field.
 func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
+}
+
+// ByModelDowngradeThreshold orders the results by the model_downgrade_threshold field.
+func ByModelDowngradeThreshold(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldModelDowngradeThreshold, opts...).ToFunc()
 }
 
 // ByErrorMsg orders the results by the error_msg field.

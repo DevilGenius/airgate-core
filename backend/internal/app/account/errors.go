@@ -23,6 +23,8 @@ var (
 	ErrInvalidState = errors.New("账号状态无效")
 	// ErrInvalidRateMultiplier 账号倍率非法。
 	ErrInvalidRateMultiplier = errors.New("账号倍率必须是有限正数，范围为 0.01 到 100")
+	// ErrInvalidModelDowngradeThreshold 模型成功率降级阈值必须在 0 到 1 之间。
+	ErrInvalidModelDowngradeThreshold = errors.New("模型降级阈值必须是有限数值，范围为 0 到 1")
 	// ErrConflictingPriorityUpdate 同时提交多个优先级更新模式。
 	ErrConflictingPriorityUpdate = errors.New("固定优先级、优先级偏移和优先级序列只能设置一种")
 	// ErrInvalidPriorityOffset 优先级偏移后的结果超出支持范围。

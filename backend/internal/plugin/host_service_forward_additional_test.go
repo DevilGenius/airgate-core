@@ -150,7 +150,15 @@ func TestHostServiceSchedulerProbeAndForwardRuntime(t *testing.T) {
 	if probedAccount.LastProbeAt == nil {
 		t.Fatal("probeForward should update last_probe_at")
 	}
-	probeStats, ok := host.scheduler.ModelSuccessRate(account.ID, "gpt-4.1")
+	probeRates, _ := host.scheduler.ModelSuccessRateSnapshot(account.ID)
+	var probeStats scheduler.ModelSuccessRateStats
+	ok := false
+	for _, rate := range probeRates {
+		if rate.Model == "gpt-4.1" {
+			probeStats, ok = rate, true
+			break
+		}
+	}
 	if !ok || probeStats.Requests != 1 || probeStats.Successes != 1 {
 		t.Fatalf("probe model success-rate stats = %+v ok=%v, want one successful request", probeStats, ok)
 	}

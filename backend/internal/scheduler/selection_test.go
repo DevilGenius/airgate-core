@@ -10,6 +10,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 type captureMonitorRecorder struct {
@@ -33,6 +34,107 @@ func TestExcludeAccountsDoesNotMutateCandidates(t *testing.T) {
 	}
 	if len(candidates) != 3 || candidates[0].ID != 1 || candidates[1].ID != 2 || candidates[2].ID != 3 {
 		t.Fatalf("candidates mutated to %+v, want original IDs [1 2 3]", candidates)
+	}
+}
+
+func TestSplitModelQualityCandidatesKeepsConfiguredPriorityUntouched(t *testing.T) {
+	tracker := NewModelSuccessRateTracker(nil)
+	for index := 0; index < modelSuccessRateMinBucketValidRequests; index++ {
+		tracker.Record(1, "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
+		tracker.Record(2, "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess})
+	}
+	primary := &ent.Account{ID: 1, Priority: 100, ModelDowngradeThreshold: 0.9}
+	backup := &ent.Account{ID: 2, Priority: 1, ModelDowngradeThreshold: 0.9}
+	s := &Scheduler{modelSuccessRate: tracker}
+	now := tracker.now()
+	healthy, demoted := s.splitModelQualityCandidates([]*ent.Account{primary, backup}, "gpt-5", now)
+	if len(healthy) != 1 || healthy[0].ID != backup.ID {
+		t.Fatalf("healthy candidates = %+v, want account 2", healthy)
+	}
+	if len(demoted) != 1 || demoted[0].ID != primary.ID {
+		t.Fatalf("demoted candidates = %+v, want account 1", demoted)
+	}
+	if primary.Priority != 100 || backup.Priority != 1 {
+		t.Fatalf("configured priorities changed: primary=%d backup=%d", primary.Priority, backup.Priority)
+	}
+}
+
+func TestModelQualityDoesNotPromoteNegativeFallbackLayer(t *testing.T) {
+	ctx := context.Background()
+	tracker := NewModelSuccessRateTracker(nil)
+	primary := newSelectionTestAccount(1)
+	primary.Priority = 50
+	primary.ModelDowngradeThreshold = 0.9
+	reserve := newSelectionTestAccount(2)
+	reserve.Priority = -10
+	reserve.ModelDowngradeThreshold = 0.9
+	for index := 0; index < modelSuccessRateMinBucketValidRequests; index++ {
+		tracker.Record(primary.ID, "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
+	}
+
+	s := newSelectionTestScheduler(Normal)
+	s.modelSuccessRate = tracker
+	seedSelectionTestGroup(t, 7, "openai", []*ent.Account{reserve, primary}, nil)
+
+	selected, err := s.SelectAccount(ctx, "openai", "gpt-5", 1, 7, "")
+	if err != nil {
+		t.Fatalf("SelectAccount() returned error: %v", err)
+	}
+	if selected.ID != primary.ID {
+		t.Fatalf("selected account ID = %d, want demoted non-negative primary %d instead of negative reserve", selected.ID, primary.ID)
+	}
+}
+
+func BenchmarkSplitModelQualityCandidatesDisabled(b *testing.B) {
+	tracker := NewModelSuccessRateTracker(nil)
+	s := &Scheduler{modelSuccessRate: tracker}
+	candidates := make([]*ent.Account, 8)
+	for index := range candidates {
+		candidates[index] = newSelectionTestAccount(index + 1)
+	}
+	now := tracker.now()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for index := 0; index < b.N; index++ {
+		healthy, demoted := s.splitModelQualityCandidates(candidates, "gpt-5", now)
+		if len(healthy) != len(candidates) || len(demoted) != 0 {
+			b.Fatal("disabled quality split changed candidates")
+		}
+	}
+}
+
+func TestSplitModelQualityCandidatesPreservesNormalStickySubset(t *testing.T) {
+	tracker := NewModelSuccessRateTracker(nil)
+	for index := 0; index < modelSuccessRateMinBucketValidRequests; index++ {
+		tracker.Record(1, "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
+	}
+	normal := newSelectionTestAccount(1)
+	normal.ModelDowngradeThreshold = 0.9
+	stickyOnly := newSelectionTestAccount(2)
+	stickyOnly.ModelDowngradeThreshold = 0.9
+	s := &Scheduler{modelSuccessRate: tracker}
+	now := tracker.now()
+	normalHealthy, normalDemoted := s.splitModelQualityCandidates([]*ent.Account{normal}, "gpt-5", now)
+	stickyHealthy, stickyDemoted := s.splitModelQualityCandidates([]*ent.Account{normal, stickyOnly}, "gpt-5", now)
+	if len(normalHealthy) != 0 || len(normalDemoted) != 1 {
+		t.Fatalf("normal quality split healthy=%+v demoted=%+v", normalHealthy, normalDemoted)
+	}
+	normalCandidates := normalDemoted
+	stickyCandidates := stickyHealthy
+	if len(stickyHealthy) == 0 {
+		stickyCandidates = stickyDemoted
+	}
+	stickyCandidates = ensureNormalCandidatesInSticky(normalCandidates, stickyCandidates)
+	if findAccountByID(stickyCandidates, normal.ID) == nil {
+		t.Fatalf("normal candidate %d was lost from sticky pool: %+v", normal.ID, stickyCandidates)
+	}
+
+	disabled := newSelectionTestAccount(3)
+	healthy, demoted := (&Scheduler{modelSuccessRate: tracker}).splitModelQualityCandidates(
+		[]*ent.Account{disabled}, "gpt-5", now,
+	)
+	if len(healthy) != 1 || healthy[0] != disabled || len(demoted) != 0 {
+		t.Fatalf("disabled quality split healthy=%+v demoted=%+v, want original slice and no demotions", healthy, demoted)
 	}
 }
 

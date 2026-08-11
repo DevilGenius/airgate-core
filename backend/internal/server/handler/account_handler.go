@@ -210,6 +210,7 @@ func (h *AccountHandler) handleError(logMessage, publicMessage string, err error
 		errors.Is(err, appaccount.ErrInvalidDateRange),
 		errors.Is(err, appaccount.ErrInvalidState),
 		errors.Is(err, appaccount.ErrInvalidRateMultiplier),
+		errors.Is(err, appaccount.ErrInvalidModelDowngradeThreshold),
 		errors.Is(err, appaccount.ErrInvalidAccountEmail),
 		errors.Is(err, appaccount.ErrAccountEmailMismatch),
 		errors.Is(err, appaccount.ErrInvalidModelPolicy):

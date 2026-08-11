@@ -14,6 +14,18 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
+func modelSuccessRateStatsForTest(tb testing.TB, tracker *ModelSuccessRateTracker, accountID int, model string) (ModelSuccessRateStats, bool) {
+	tb.Helper()
+	model = normalizeSuccessRateModel(model)
+	stats, _ := tracker.Snapshot(accountID)
+	for _, stat := range stats {
+		if stat.Model == model {
+			return stat, true
+		}
+	}
+	return ModelSuccessRateStats{}, false
+}
+
 func TestClassifyModelSuccessRateOutcome(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -102,7 +114,7 @@ func TestModelSuccessRateTrackerAppliesPersistedSnapshotAndLocalDelta(t *testing
 	tracker.now = func() time.Time { return now }
 
 	model := "gpt-5.4"
-	bucketID := now.Unix() / int64(modelSuccessRateBucketWidth/time.Second)
+	bucketID := modelSuccessRateBucketID(7, now)
 	tracker.Record(7, model, sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess})
 	payload, err := json.Marshal(persistedModelSuccessRate{
 		Models: []persistedModelSuccessRateItem{{
@@ -121,7 +133,7 @@ func TestModelSuccessRateTrackerAppliesPersistedSnapshotAndLocalDelta(t *testing
 	}
 	tracker.applyPersistedSnapshot(7, payload)
 
-	stats, ok := tracker.Get(7, model)
+	stats, ok := modelSuccessRateStatsForTest(t, tracker, 7, model)
 	if !ok {
 		t.Fatal("Get returned no model statistics")
 	}
@@ -145,7 +157,7 @@ func TestModelSuccessRateTrackerRecordsFixedBuckets(t *testing.T) {
 		Upstream: sdk.UpstreamResponse{StatusCode: http.StatusForbidden},
 	})
 
-	stats, ok := tracker.Get(7, "gpt-5.4")
+	stats, ok := modelSuccessRateStatsForTest(t, tracker, 7, "gpt-5.4")
 	if !ok {
 		t.Fatal("Get returned no model statistics")
 	}
@@ -171,7 +183,7 @@ func TestModelSuccessRateTrackerRecordsFixedBuckets(t *testing.T) {
 	}
 
 	now = now.Add(25 * time.Hour)
-	stats, ok = tracker.Get(7, "gpt-5.4")
+	stats, ok = modelSuccessRateStatsForTest(t, tracker, 7, "gpt-5.4")
 	if !ok {
 		t.Fatal("Get after window advance returned no model statistics")
 	}
@@ -180,8 +192,87 @@ func TestModelSuccessRateTrackerRecordsFixedBuckets(t *testing.T) {
 	}
 }
 
+func TestModelSuccessRateTrackerCurrentBucketHonorsThresholdAndMinimumSamples(t *testing.T) {
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	tracker := NewModelSuccessRateTracker(nil)
+	tracker.now = func() time.Time { return now }
+
+	for index := 0; index < modelSuccessRateMinBucketValidRequests-1; index++ {
+		tracker.Record(7, "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
+	}
+	if tracker.isDemotedAt(7, "gpt-5", 0.9, tracker.now()) {
+		t.Fatal("current bucket with insufficient samples was demoted")
+	}
+
+	tracker.Record(7, "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
+	if !tracker.isDemotedAt(7, "gpt-5", 0.9, tracker.now()) {
+		t.Fatal("current bucket below threshold was not demoted")
+	}
+	if tracker.isDemotedAt(7, "gpt-5", 0, tracker.now()) {
+		t.Fatal("zero threshold should disable model downgrade")
+	}
+	if tracker.isDemotedAt(7, "gpt-5", 1.1, tracker.now()) {
+		t.Fatal("invalid threshold should disable model downgrade")
+	}
+}
+
+func TestModelSuccessRateTrackerDowngradeIsPerExactModel(t *testing.T) {
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	tracker := NewModelSuccessRateTracker(nil)
+	tracker.now = func() time.Time { return now }
+
+	for index := 0; index < modelSuccessRateMinBucketValidRequests-1; index++ {
+		tracker.Record(7, "gpt-image-1", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
+	}
+	for index := 0; index < modelSuccessRateMinBucketValidRequests; index++ {
+		tracker.Record(7, "gpt-image-2", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
+	}
+	if tracker.isDemotedAt(7, "gpt-image-1", 0.9, tracker.now()) {
+		t.Fatal("samples from another model were incorrectly aggregated")
+	}
+	if !tracker.isDemotedAt(7, "gpt-image-2", 0.9, tracker.now()) {
+		t.Fatal("exact model with enough failures was not demoted")
+	}
+}
+
+func TestModelSuccessRateTrackerDowngradeExpiresAtBucketBoundary(t *testing.T) {
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	tracker := NewModelSuccessRateTracker(nil)
+	tracker.now = func() time.Time { return now }
+	for index := 0; index < modelSuccessRateMinBucketValidRequests; index++ {
+		tracker.Record(7, "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
+	}
+	if !tracker.isDemotedAt(7, "gpt-5", 0.9, tracker.now()) {
+		t.Fatal("model should be demoted in the bucket containing its failures")
+	}
+
+	now = now.Add(modelSuccessRateBucketWidth)
+	if tracker.isDemotedAt(7, "gpt-5", 0.9, tracker.now()) {
+		t.Fatal("model downgrade continued into an empty next bucket")
+	}
+}
+
+func TestModelSuccessRateTrackerThresholdChangeReevaluatesCurrentBucket(t *testing.T) {
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	tracker := NewModelSuccessRateTracker(nil)
+	tracker.now = func() time.Time { return now }
+	for index := 0; index < modelSuccessRateMinBucketValidRequests-1; index++ {
+		tracker.Record(7, "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess})
+	}
+	tracker.Record(7, "gpt-5", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
+
+	if !tracker.isDemotedAt(7, "gpt-5", 0.95, tracker.now()) {
+		t.Fatal("higher threshold should demote the current bucket")
+	}
+	if tracker.isDemotedAt(7, "gpt-5", 0.8, tracker.now()) {
+		t.Fatal("lower threshold should immediately recover the current bucket")
+	}
+}
+
 func TestModelSuccessRateSnapshotUsesOneClockSample(t *testing.T) {
-	beforeBoundary := time.Date(2026, 8, 11, 12, 29, 59, 0, time.UTC)
+	base := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	currentBucket := modelSuccessRateBucketID(7, base)
+	beforeBoundary := modelSuccessRateBucketTime(7, currentBucket+1).Add(-time.Second)
 	tracker := NewModelSuccessRateTracker(nil)
 	tracker.now = func() time.Time { return beforeBoundary }
 	tracker.Record(7, "gpt-5.4", sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess})
@@ -208,14 +299,16 @@ func TestModelSuccessRateSnapshotUsesOneClockSample(t *testing.T) {
 }
 
 func TestModelSuccessRateTrackerUsesThirtyMinuteBoundaries(t *testing.T) {
-	now := time.Date(2026, 8, 11, 12, 0, 1, 0, time.UTC)
+	base := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	bucketStart := modelSuccessRateBucketTime(7, modelSuccessRateBucketID(7, base))
+	now := bucketStart.Add(time.Second)
 	tracker := NewModelSuccessRateTracker(nil)
 	tracker.now = func() time.Time { return now }
 
 	tracker.Record(7, "gpt-5.4", sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess})
-	now = time.Date(2026, 8, 11, 12, 29, 59, 0, time.UTC)
+	now = bucketStart.Add(modelSuccessRateBucketWidth - time.Second)
 	tracker.Record(7, "gpt-5.4", sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess})
-	now = time.Date(2026, 8, 11, 12, 30, 0, 0, time.UTC)
+	now = bucketStart.Add(modelSuccessRateBucketWidth)
 	tracker.Record(7, "gpt-5.4", sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient})
 
 	_, shard := tracker.shardFor(7)
@@ -233,6 +326,24 @@ func TestModelSuccessRateTrackerUsesThirtyMinuteBoundaries(t *testing.T) {
 	}
 }
 
+func TestModelSuccessRateBucketOffsetsSpreadAccounts(t *testing.T) {
+	if first, second := modelSuccessRateBucketOffset(1), modelSuccessRateBucketOffset(2); first == second {
+		t.Fatalf("account offsets should differ: account1=%d account2=%d", first, second)
+	}
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	firstWindow := modelSuccessRateWindowInfo(1, now)
+	secondWindow := modelSuccessRateWindowInfo(2, now)
+	if firstWindow.WindowEnd.Equal(secondWindow.WindowEnd) {
+		t.Fatalf("account bucket boundaries were not spread: %s", firstWindow.WindowEnd)
+	}
+	if firstWindow.WindowEnd.Sub(firstWindow.WindowStart) != modelSuccessRateWindow ||
+		secondWindow.WindowEnd.Sub(secondWindow.WindowStart) != modelSuccessRateWindow {
+		t.Fatalf("spread windows must remain 24h: first=%s second=%s",
+			firstWindow.WindowEnd.Sub(firstWindow.WindowStart),
+			secondWindow.WindowEnd.Sub(secondWindow.WindowStart))
+	}
+}
+
 func TestModelSuccessRateTrackerPrunesExpiredSeries(t *testing.T) {
 	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
 	tracker := NewModelSuccessRateTracker(nil)
@@ -241,7 +352,7 @@ func TestModelSuccessRateTrackerPrunesExpiredSeries(t *testing.T) {
 
 	now = now.Add(25 * time.Hour)
 	tracker.pruneExpired(now)
-	if _, ok := tracker.Get(7, "gpt-5.4"); ok {
+	if _, ok := modelSuccessRateStatsForTest(t, tracker, 7, "gpt-5.4"); ok {
 		t.Fatal("expired model series still present")
 	}
 	_, shard := tracker.shardFor(7)
@@ -262,7 +373,7 @@ func TestModelSuccessRateTrackerForgetClearsMemoryAndDirtyState(t *testing.T) {
 
 	tracker.Forget(7)
 
-	if _, ok := tracker.Get(7, "gpt-5.4"); ok {
+	if _, ok := modelSuccessRateStatsForTest(t, tracker, 7, "gpt-5.4"); ok {
 		t.Fatal("forgotten account still has model statistics")
 	}
 	if got, _ := tracker.Snapshot(7); len(got) != 0 {
@@ -293,7 +404,7 @@ func TestModelSuccessRateRestoreUsesLocalDeduplicationSet(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	tracker := NewModelSuccessRateTracker(rdb)
 	tracker.now = func() time.Time { return now }
-	bucketID := now.Unix() / int64(modelSuccessRateBucketWidth/time.Second)
+	bucketID := modelSuccessRateBucketID(7, now)
 	payload, err := json.Marshal(persistedModelSuccessRate{Models: []persistedModelSuccessRateItem{{
 		Model:       "gpt-5.4",
 		LastUpdated: now.UnixMilli(),
@@ -315,7 +426,7 @@ func TestModelSuccessRateRestoreUsesLocalDeduplicationSet(t *testing.T) {
 	if !tracker.restoreKeys(t.Context(), []string{key}, restored) {
 		t.Fatal("duplicate restoreKeys returned false")
 	}
-	stats, ok := tracker.Get(7, "gpt-5.4")
+	stats, ok := modelSuccessRateStatsForTest(t, tracker, 7, "gpt-5.4")
 	if !ok || stats.Successes != 2 {
 		t.Fatalf("restored stats = %+v ok=%v, want two successes once", stats, ok)
 	}
@@ -333,7 +444,7 @@ func TestSchedulerOnAccountsDeletedOwnsModelStatsCleanup(t *testing.T) {
 	mock.ExpectDel(accountcache.ModelStatsKey(7)).SetVal(1)
 	scheduler.OnAccountsDeleted([]int{0, 7})
 
-	if _, ok := tracker.Get(7, "gpt-5.4"); ok {
+	if _, ok := modelSuccessRateStatsForTest(t, tracker, 7, "gpt-5.4"); ok {
 		t.Fatal("deleted account still has in-memory model statistics")
 	}
 	if snapshots := tracker.dirtySnapshots(); len(snapshots) != 0 {
@@ -383,7 +494,30 @@ func BenchmarkModelSuccessRateGet(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		accountID := 1
 		for pb.Next() {
-			_, _ = tracker.Get(accountID, "gpt-5.4")
+			_, _ = modelSuccessRateStatsForTest(b, tracker, accountID, "gpt-5.4")
+			accountID++
+			if accountID > 64 {
+				accountID = 1
+			}
+		}
+	})
+}
+
+func BenchmarkModelSuccessRateIsDemotedCurrentBucket(b *testing.B) {
+	tracker := NewModelSuccessRateTracker(nil)
+	outcome := sdk.ForwardOutcome{Kind: sdk.OutcomeUpstreamTransient}
+	for accountID := 1; accountID <= 64; accountID++ {
+		for index := 0; index < modelSuccessRateMinBucketValidRequests; index++ {
+			tracker.Record(accountID, "gpt-5.4", outcome)
+		}
+	}
+	normalizedModel := normalizeSuccessRateModel("gpt-5.4")
+	now := tracker.now()
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		accountID := 1
+		for pb.Next() {
+			_ = tracker.isDemotedAt(accountID, normalizedModel, 0.9, now)
 			accountID++
 			if accountID > 64 {
 				accountID = 1

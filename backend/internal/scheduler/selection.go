@@ -62,54 +62,88 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 	}
 
 	snapshot := s.loadedSelectionSnapshot(ctx, candidates, model, now)
-	normalCandidates := make([]*ent.Account, 0, len(candidates))
-	stickyCandidates := make([]*ent.Account, 0, len(candidates))
+	var normalCandidates, stickyCandidates []*ent.Account
+	if !opts.RequireContinuationAffinity {
+		normalCandidates = make([]*ent.Account, 0, len(candidates))
+		stickyCandidates = make([]*ent.Account, 0, len(candidates))
+	}
 	var hardAffinityCandidates []*ent.Account
 	if opts.RequireContinuationAffinity {
 		hardAffinityCandidates = make([]*ent.Account, 0, len(candidates))
 	}
 	for _, acc := range candidates {
 		result := s.checkSchedulabilityResult(ctx, acc, model, now, opts.RequireContinuationAffinity, snapshot)
-		switch result.normal {
-		case Normal:
-			normalCandidates = append(normalCandidates, acc)
-			stickyCandidates = append(stickyCandidates, acc)
-		case StickyOnly:
-			stickyCandidates = append(stickyCandidates, acc)
+		if !opts.RequireContinuationAffinity {
+			switch result.normal {
+			case Normal:
+				normalCandidates = append(normalCandidates, acc)
+				stickyCandidates = append(stickyCandidates, acc)
+			case StickyOnly:
+				stickyCandidates = append(stickyCandidates, acc)
+			}
 		}
 		if opts.RequireContinuationAffinity && result.hardAffinity != NotSchedulable {
 			hardAffinityCandidates = append(hardAffinityCandidates, acc)
 		}
 	}
-	if !opts.RequireContinuationAffinity {
-		normalCandidates, stickyCandidates = preferDifferentAccountTypeCandidates(
-			normalCandidates,
-			stickyCandidates,
-			opts.PreferDifferentAccountType,
-		)
+	if opts.RequireContinuationAffinity {
+		if sessionID != "" {
+			if accountID, found := s.sticky.Get(ctx, userID, platform, sessionID); found {
+				if acc := findAccountByID(hardAffinityCandidates, accountID); acc != nil {
+					s.sticky.Set(ctx, userID, platform, sessionID, accountID)
+					return acc, nil
+				}
+				return nil, continuationBlockedError(candidates, accountID)
+			}
+		}
+		return nil, ErrContinuationAffinityMissing
+	}
+	normalCandidates, stickyCandidates = preferDifferentAccountTypeCandidates(
+		normalCandidates,
+		stickyCandidates,
+		opts.PreferDifferentAccountType,
+	)
+
+	// 先保留优先级的正/负应急层不变量，再在当前层内应用模型质量软降级。
+	// 负优先级是显式储备层：只要仍有非负候选，就不能因为非负账号被降级
+	// 而提前启用负优先级账号。
+	normalCandidates, stickyCandidates = prioritySelectionCandidates(normalCandidates, stickyCandidates)
+
+	// 模型质量降级是软降级：不改变账号持久化 Priority，也不把账号标记为不可用。
+	// 普通请求优先使用健康候选；只有健康 Normal 候选为空时才使用降级候选。
+	qualityModel := normalizeSuccessRateModel(model)
+	normalHealthy, normalDemoted := s.splitModelQualityCandidates(normalCandidates, qualityModel, now)
+	stickyHealthy, stickyDemoted := s.splitModelQualityCandidates(stickyCandidates, qualityModel, now)
+	warnModelQualityDemotions(platform, qualityModel, now, normalDemoted, stickyDemoted)
+	if len(normalHealthy) > 0 {
+		normalCandidates = normalHealthy
+	} else {
+		normalCandidates = normalDemoted
+	}
+	if len(stickyHealthy) > 0 {
+		stickyCandidates = stickyHealthy
+	} else {
+		stickyCandidates = stickyDemoted
+	}
+	// normal 原本是 sticky 的子集；质量分层后，健康 StickyOnly 账号可能让
+	// stickyHealthy 不包含已降级的 normal 账号，因此在这里显式恢复该契约。
+	// 没有任何降级时直接跳过扫描，保持默认关闭路径的额外成本为零。
+	if len(normalDemoted) > 0 || len(stickyDemoted) > 0 {
+		stickyCandidates = ensureNormalCandidatesInSticky(normalCandidates, stickyCandidates)
 	}
 
 	// 续链请求的 session sticky 是硬亲和；普通 session sticky 只是软粘连，
 	// 低优先级旧账号不能抢过当前可用最高优先级账号。
 	if sessionID != "" {
 		if accountID, found := s.sticky.Get(ctx, userID, platform, sessionID); found {
-			if opts.RequireContinuationAffinity {
-				if acc := findAccountByID(hardAffinityCandidates, accountID); acc != nil {
-					s.sticky.Set(ctx, userID, platform, sessionID, accountID)
-					return acc, nil
-				}
-				return nil, continuationBlockedError(candidates, accountID)
-			} else if acc := selectSoftStickyAccount(softStickyCandidates(normalCandidates, stickyCandidates), accountID); acc != nil {
+			if acc := selectSoftStickyAccount(softStickyCandidates(normalCandidates, stickyCandidates), accountID); acc != nil {
 				s.sticky.Set(ctx, userID, platform, sessionID, accountID)
 				return acc, nil
 			}
 		}
 	}
-	if opts.RequireContinuationAffinity {
-		return nil, ErrContinuationAffinityMissing
-	}
 
-	normalSelectionCandidates, stickySelectionCandidates := prioritySelectionCandidates(normalCandidates, stickyCandidates)
+	normalSelectionCandidates, stickySelectionCandidates := normalCandidates, stickyCandidates
 	if len(normalSelectionCandidates) == 0 {
 		// 没有 Normal 但可能有 StickyOnly 兜底（如 degraded 账号）
 		if len(stickySelectionCandidates) == 0 {
@@ -132,6 +166,102 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		return nil, ErrNoAvailableAccount
 	}
 	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalSelectionCandidates, now, snapshot)
+}
+
+func (s *Scheduler) splitModelQualityCandidates(candidates []*ent.Account, normalizedModel string, now time.Time) (healthy, demoted []*ent.Account) {
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+	if s == nil || s.modelSuccessRate == nil || normalizedModel == "" {
+		return candidates, nil
+	}
+	qualityEnabled := false
+	for _, acc := range candidates {
+		if acc != nil && acc.ModelDowngradeThreshold > 0 {
+			qualityEnabled = true
+			break
+		}
+	}
+	if !qualityEnabled {
+		return candidates, nil
+	}
+	healthy = make([]*ent.Account, 0, len(candidates))
+	demoted = make([]*ent.Account, 0, len(candidates))
+	for _, acc := range candidates {
+		if acc == nil {
+			continue
+		}
+		if s.modelSuccessRate != nil && s.modelSuccessRate.isDemotedAt(acc.ID, normalizedModel, acc.ModelDowngradeThreshold, now) {
+			demoted = append(demoted, acc)
+			continue
+		}
+		healthy = append(healthy, acc)
+	}
+	return healthy, demoted
+}
+
+func ensureNormalCandidatesInSticky(normalCandidates, stickyCandidates []*ent.Account) []*ent.Account {
+	if len(normalCandidates) == 0 {
+		return stickyCandidates
+	}
+	missing := 0
+	for _, normal := range normalCandidates {
+		if normal == nil || findAccountByID(stickyCandidates, normal.ID) != nil {
+			continue
+		}
+		missing++
+	}
+	if missing == 0 {
+		return stickyCandidates
+	}
+	merged := make([]*ent.Account, 0, len(stickyCandidates)+missing)
+	merged = append(merged, stickyCandidates...)
+	for _, normal := range normalCandidates {
+		if normal != nil && findAccountByID(merged, normal.ID) == nil {
+			merged = append(merged, normal)
+		}
+	}
+	return merged
+}
+
+func warnModelQualityDemotions(platform, model string, now time.Time, pools ...[]*ent.Account) {
+	if model == "" {
+		return
+	}
+	hasDemotion := false
+	for _, pool := range pools {
+		for _, acc := range pool {
+			if acc != nil {
+				hasDemotion = true
+				break
+			}
+		}
+		if hasDemotion {
+			break
+		}
+	}
+	if !hasDemotion {
+		return
+	}
+	seen := make(map[int]struct{})
+	for _, pool := range pools {
+		for _, acc := range pool {
+			if acc == nil {
+				continue
+			}
+			if _, ok := seen[acc.ID]; ok {
+				continue
+			}
+			seen[acc.ID] = struct{}{}
+			slog.Warn("scheduler_model_account_demotion",
+				sdk.LogFieldAccountID, acc.ID,
+				sdk.LogFieldPlatform, platform,
+				sdk.LogFieldModel, model,
+				"threshold", acc.ModelDowngradeThreshold,
+				"bucket_id", modelSuccessRateBucketID(acc.ID, now),
+			)
+		}
+	}
 }
 
 func (s *Scheduler) recordNoAvailableAccount(ctx context.Context, platform, model string, userID, groupID int, sessionID string, opts AccountSelectionOptions, excludeIDs []int) {

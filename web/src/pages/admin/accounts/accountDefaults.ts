@@ -1,5 +1,6 @@
 export const DEFAULT_ACCOUNT_MAX_CONCURRENCY = 10;
 export const DEFAULT_ACCOUNT_PRIORITY = 50;
+export const DEFAULT_MODEL_DOWNGRADE_THRESHOLD = 0;
 export const DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_INITIAL = 1000;
 export const DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_STEP = -1;
 export const DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_GROUP_SIZE = 5;
@@ -8,6 +9,21 @@ export const ACCOUNT_PRIORITY_MAX = 99999;
 export const ACCOUNT_PRIORITY_OFFSET_MIN = ACCOUNT_PRIORITY_MIN - ACCOUNT_PRIORITY_MAX;
 export const ACCOUNT_PRIORITY_OFFSET_MAX = ACCOUNT_PRIORITY_MAX - ACCOUNT_PRIORITY_MIN;
 export const ACCOUNT_MSG_LOCK_EXTRA_KEY = 'msg_lock_enabled';
+
+export function isEmptyModelDowngradeThresholdInput(value: string) {
+  return value.trim() === '';
+}
+
+export function parseModelDowngradeThresholdInput(value: string): number | null {
+  if (isEmptyModelDowngradeThresholdInput(value)) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) return null;
+  return parsed;
+}
+
+export function isValidModelDowngradeThresholdInput(value: string) {
+  return isEmptyModelDowngradeThresholdInput(value) || parseModelDowngradeThresholdInput(value) != null;
+}
 
 export function clampAccountPriority(value: number) {
   if (!Number.isFinite(value)) return DEFAULT_ACCOUNT_PRIORITY;
