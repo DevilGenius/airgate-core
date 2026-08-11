@@ -48,6 +48,9 @@ type Assignment struct {
 	PriorityEnabled       *bool               `json:"priority_enabled,omitempty"`
 	GroupIDs              []int64             `json:"group_ids,omitempty"`
 	GroupIDsEnabled       *bool               `json:"group_ids_enabled,omitempty"`
+	// 模型降级阈值：0 表示关闭；nil 表示不修改（跟随导入默认值）。
+	ModelDowngradeThreshold        *float64 `json:"model_downgrade_threshold,omitempty"`
+	ModelDowngradeThresholdEnabled *bool    `json:"model_downgrade_threshold_enabled,omitempty"`
 }
 
 type PriorityAssignment struct {
@@ -114,7 +117,7 @@ func validateRule(index int, rule Rule) error {
 			return fmt.Errorf("%s 的 when[%d] 无效: %w", label, conditionIndex, err)
 		}
 	}
-	if rule.Set.MaxConcurrency == nil && rule.Set.Priority == nil && rule.Set.GroupIDs == nil {
+	if rule.Set.MaxConcurrency == nil && rule.Set.Priority == nil && rule.Set.GroupIDs == nil && rule.Set.ModelDowngradeThreshold == nil {
 		return fmt.Errorf("%s 的 set 不能为空", label)
 	}
 	if rule.Set.MaxConcurrency != nil && *rule.Set.MaxConcurrency < 0 {
@@ -122,6 +125,13 @@ func validateRule(index int, rule Rule) error {
 	}
 	if rule.Set.MaxConcurrency == nil && rule.Set.MaxConcurrencyEnabled != nil {
 		return fmt.Errorf("%s 设置 max_concurrency_enabled 时必须提供 max_concurrency", label)
+	}
+	if rule.Set.ModelDowngradeThreshold != nil &&
+		(*rule.Set.ModelDowngradeThreshold < 0 || *rule.Set.ModelDowngradeThreshold > 1) {
+		return fmt.Errorf("%s 的 model_downgrade_threshold 必须在 0～1 范围内", label)
+	}
+	if rule.Set.ModelDowngradeThreshold == nil && rule.Set.ModelDowngradeThresholdEnabled != nil {
+		return fmt.Errorf("%s 设置 model_downgrade_threshold_enabled 时必须提供 model_downgrade_threshold", label)
 	}
 	if rule.Set.Priority == nil && rule.Set.PriorityEnabled != nil {
 		return fmt.Errorf("%s 设置 priority_enabled 时必须提供 priority", label)
@@ -382,6 +392,9 @@ func applyAssignment(
 	}
 	if assignment.GroupIDs != nil && assignmentEnabled(assignment.GroupIDsEnabled) {
 		item.GroupIDs = append([]int64(nil), assignment.GroupIDs...)
+	}
+	if assignment.ModelDowngradeThreshold != nil && assignmentEnabled(assignment.ModelDowngradeThresholdEnabled) {
+		item.ModelDowngradeThreshold = *assignment.ModelDowngradeThreshold
 	}
 	return nil
 }

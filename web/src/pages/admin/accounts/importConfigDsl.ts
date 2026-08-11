@@ -28,6 +28,9 @@ export interface ImportAssignment {
   priority_enabled?: boolean;
   group_ids?: number[];
   group_ids_enabled?: boolean;
+  /** 模型降级阈值（0～1，0 表示关闭）；缺省表示不修改。 */
+  model_downgrade_threshold?: number;
+  model_downgrade_threshold_enabled?: boolean;
 }
 
 export interface ImportRule {
@@ -176,7 +179,21 @@ function parseRule(value: unknown, ruleIndex: number): ImportRule {
     }
     assignment.group_ids_enabled = set.group_ids_enabled;
   }
-  if (assignment.max_concurrency == null && assignment.priority == null && assignment.group_ids == null) {
+  if (set.model_downgrade_threshold != null) {
+    const threshold = Number(set.model_downgrade_threshold);
+    if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+      throw new Error(`rules[${ruleIndex}].set.model_downgrade_threshold is invalid`);
+    }
+    assignment.model_downgrade_threshold = threshold;
+  }
+  if (set.model_downgrade_threshold_enabled != null) {
+    if (typeof set.model_downgrade_threshold_enabled !== 'boolean' || assignment.model_downgrade_threshold == null) {
+      throw new Error(`rules[${ruleIndex}].set.model_downgrade_threshold_enabled is invalid`);
+    }
+    assignment.model_downgrade_threshold_enabled = set.model_downgrade_threshold_enabled;
+  }
+  if (assignment.max_concurrency == null && assignment.priority == null && assignment.group_ids == null
+    && assignment.model_downgrade_threshold == null) {
     throw new Error(`rules[${ruleIndex}].set must configure at least one field`);
   }
   return {

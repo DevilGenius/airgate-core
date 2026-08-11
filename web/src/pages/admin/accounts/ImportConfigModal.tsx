@@ -26,6 +26,10 @@ import {
   type ImportPriority,
   type ImportRule,
 } from './importConfigDsl';
+import {
+  isValidModelDowngradeThresholdInput,
+  parseModelDowngradeThresholdInput,
+} from './accountDefaults';
 
 const CONDITION_FIELD_SUGGESTIONS = [
   'platform',
@@ -126,6 +130,7 @@ export function ImportConfigModal({
   const [selectedRuleIndex, setSelectedRuleIndex] = useState(0);
   const [dslValue, setDSLValue] = useState(() => serializeImportConfigDSL(EMPTY_IMPORT_CONFIG));
   const [dslError, setDSLError] = useState('');
+  const [modelDowngradeThresholdInput, setModelDowngradeThresholdInput] = useState('');
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [dropIndicator, setDropIndicator] = useState<{ index: number; position: 'before' | 'after' } | null>(null);
   const modalState = useOverlayState({
@@ -162,11 +167,17 @@ export function ImportConfigModal({
   const displayedPriority: ImportPriority = selectedRule?.set.priority ?? { mode: 'fixed', value: 50 };
   const capacityEnabled = selectedRule?.set.max_concurrency != null
     && selectedRule.set.max_concurrency_enabled !== false;
+  const thresholdEnabled = selectedRule?.set.model_downgrade_threshold != null
+    && selectedRule.set.model_downgrade_threshold_enabled !== false;
   const priorityEnabled = selectedRule?.set.priority != null
     && selectedRule.set.priority_enabled !== false;
   const groupsEnabled = selectedRule?.set.group_ids != null
     && selectedRule.set.group_ids_enabled !== false;
-  const validationError = useMemo(() => validateConfig(config), [config]);
+  const modelDowngradeThresholdValid = isValidModelDowngradeThresholdInput(modelDowngradeThresholdInput);
+  const configValidationError = useMemo(() => validateConfig(config), [config]);
+  const validationError = modelDowngradeThresholdValid
+    ? configValidationError
+    : t('accounts.model_downgrade_threshold_invalid');
   const selectedPlatform = selectedRule?.when.find(
     (condition) => condition.field === 'platform' && condition.op === 'eq',
   )?.value?.trim().toLowerCase();
@@ -176,6 +187,14 @@ export function ImportConfigModal({
       : sortedGroups,
     [selectedPlatform, sortedGroups],
   );
+
+  useEffect(() => {
+    setModelDowngradeThresholdInput(
+      thresholdEnabled && selectedRule?.set.model_downgrade_threshold != null
+        ? String(selectedRule.set.model_downgrade_threshold)
+        : '',
+    );
+  }, [selectedRuleIndex, selectedRule?.set.model_downgrade_threshold, thresholdEnabled]);
 
   const updateSelectedRule = useCallback((updater: (rule: ImportRule) => void) => {
     setConfig((current) => {
@@ -628,7 +647,7 @@ export function ImportConfigModal({
                   <section className="space-y-4 border-t border-border pt-4">
                     <h3 className="ag-import-config-section-title text-sm font-semibold text-text">{t('accounts.import_config_assignments')}</h3>
 
-                    <div className="grid gap-x-2 gap-y-3 rounded-md bg-surface px-2.5 py-3 sm:grid-cols-[1fr_1fr_1fr_2.25rem]">
+                    <div className="grid gap-x-2 gap-y-3 rounded-md bg-surface px-2.5 py-3 sm:grid-cols-[1fr_1fr_1fr_1fr]">
                       <SimpleSelect
                         ariaLabel={t('accounts.import_config_priority')}
                         fullWidth
@@ -690,8 +709,40 @@ export function ImportConfigModal({
                           });
                         }}
                       />
+                      <HeroTextField fullWidth isInvalid={!modelDowngradeThresholdValid}>
+                        <Input
+                          aria-label={t('accounts.model_downgrade_threshold')}
+                          className="w-full"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder={t('accounts.import_config_threshold_placeholder')}
+                          value={modelDowngradeThresholdInput}
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            setModelDowngradeThresholdInput(raw);
+                            if (raw.trim() === '') {
+                              updateSelectedRule((rule) => {
+                                rule.set.model_downgrade_threshold = rule.set.model_downgrade_threshold ?? 0;
+                                rule.set.model_downgrade_threshold_enabled = false;
+                              });
+                              return;
+                            }
+                            const parsed = parseModelDowngradeThresholdInput(raw);
+                            if (parsed == null) return;
+                            updateSelectedRule((rule) => {
+                              rule.set.model_downgrade_threshold = parsed;
+                              rule.set.model_downgrade_threshold_enabled = true;
+                            });
+                          }}
+                        />
+                        {!modelDowngradeThresholdValid ? (
+                          <p className="mt-1 text-[11px] leading-4 text-danger">
+                            {t('accounts.model_downgrade_threshold_invalid')}
+                          </p>
+                        ) : null}
+                      </HeroTextField>
                       {displayedPriority.mode === 'sequence' ? (
-                        <div className="ag-import-config-sequence-fields grid gap-2 sm:col-span-3 sm:grid-cols-5">
+                        <div className="ag-import-config-sequence-fields grid gap-2 sm:col-span-4 sm:grid-cols-5">
                           <HeroTextField fullWidth>
                             <Label>{t('accounts.priority_sequence_initial')}</Label>
                             <Input type="number" value={String(displayedPriority.initial)} onChange={(event) => setSequenceValue('initial', parseNumber(event.target.value, 0))} />
