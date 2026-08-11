@@ -161,6 +161,15 @@ func (s *Scheduler) ModelSuccessRateSnapshot(accountID int) ([]ModelSuccessRateS
 	return s.modelSuccessRate.Snapshot(accountID)
 }
 
+// ListModelDemotions returns the scheduling models currently demoted for one
+// account (current 30-minute bucket success rate below the given threshold).
+func (s *Scheduler) ListModelDemotions(accountID int, threshold float64) []ModelDemotion {
+	if s == nil || s.modelSuccessRate == nil {
+		return nil
+	}
+	return s.modelSuccessRate.DemotedModels(accountID, threshold)
+}
+
 // BindResponseAccount 记录 Responses response_id 所在账号，用于后续 previous_response_id 续链路由。
 func (s *Scheduler) BindResponseAccount(ctx context.Context, groupID int, platform, responseID string, accountID int) {
 	if s == nil || s.responseAffinity == nil {

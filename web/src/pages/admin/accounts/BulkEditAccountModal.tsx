@@ -293,23 +293,42 @@ export function BulkEditAccountModal({
           {t('accounts.bulk_update_hint')}
         </p>
 
-        {/* 调度状态 */}
-        <FieldRow
-          enabled={enableStatus}
-          onToggle={setEnableStatus}
-          label={t('accounts.enable_dispatch')}
-        >
-          <NativeSwitch
-            isDisabled={!enableStatus}
-            isSelected={status === 'active'}
-            label={(
-              <span className={enableStatus ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
-                {status === 'active' ? t('common.enabled', '已启用') : t('common.disabled', '已禁用')}
-              </span>
-            )}
-            onChange={(on) => setStatus(on ? 'active' : 'disabled')}
-          />
-        </FieldRow>
+        {/* 调度开关 + 消息锁同行；消息锁不显示多选框，拨动即纳入本次批量修改 */}
+        <div className="grid items-center gap-3 border-t border-border-subtle pt-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
+          <NativeCheckbox
+            className="self-center"
+            isSelected={enableStatus}
+            onChange={setEnableStatus}
+          >
+            <span className={enableStatus ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
+              {t('accounts.dispatch_toggle')}
+            </span>
+          </NativeCheckbox>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
+            <NativeSwitch
+              isDisabled={!enableStatus}
+              isSelected={status === 'active'}
+              label={(
+                <span className={enableStatus ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
+                  {status === 'active' ? t('common.enabled', '已启用') : t('common.disabled', '已禁用')}
+                </span>
+              )}
+              onChange={(on) => setStatus(on ? 'active' : 'disabled')}
+            />
+            <NativeSwitch
+              isSelected={messageLockEnabled}
+              label={(
+                <span className={enableMessageLock ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
+                  {t('accounts.message_lock')}
+                </span>
+              )}
+              onChange={(on) => {
+                setEnableMessageLock(true);
+                setMessageLockEnabled(on);
+              }}
+            />
+          </div>
+        </div>
 
         {/* 优先级 */}
         <FieldRow
@@ -505,11 +524,11 @@ export function BulkEditAccountModal({
               disabled={!enableModelDowngradeThreshold}
               onChange={(event) => setModelDowngradeThreshold(event.target.value)}
             />
-            <p className={`mt-1 text-[11px] leading-4 ${!enableModelDowngradeThreshold || modelDowngradeThresholdValid ? 'text-text-tertiary' : 'text-danger'}`}>
-              {!enableModelDowngradeThreshold || modelDowngradeThresholdValid
-                ? t('accounts.model_downgrade_threshold_hint')
-                : t('accounts.model_downgrade_threshold_invalid')}
-            </p>
+            {enableModelDowngradeThreshold && !modelDowngradeThresholdValid && (
+              <p className="mt-1 text-[11px] leading-4 text-danger">
+                {t('accounts.model_downgrade_threshold_invalid')}
+              </p>
+            )}
           </HeroTextField>
         </FieldRow>
 
@@ -566,23 +585,6 @@ export function BulkEditAccountModal({
             isDisabled={!enableProxy}
             selectedLabel={<span className="block min-w-0 truncate">{selectedProxyLabel}</span>}
             onSelectionChange={(key) => setProxyId(key === '' ? null : Number(key))}
-          />
-        </FieldRow>
-
-        <FieldRow
-          enabled={enableMessageLock}
-          onToggle={setEnableMessageLock}
-          label={t('accounts.message_lock')}
-        >
-          <NativeSwitch
-            isDisabled={!enableMessageLock}
-            isSelected={messageLockEnabled}
-            label={(
-              <span className={enableMessageLock ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
-                {messageLockEnabled ? t('common.enabled', '已启用') : t('common.disabled', '已禁用')}
-              </span>
-            )}
-            onChange={setMessageLockEnabled}
           />
         </FieldRow>
       </Form>

@@ -768,51 +768,44 @@ function ModelRequestStats({
             {
               key: 'model',
               title: t('accounts.stats_model'),
-              width: '28%',
+              width: '30%',
               render: (row) => (
                 <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
               ),
             },
             {
-              align: 'end',
+              align: 'center',
               key: 'requests',
-              title: t('accounts.stats_requests'),
-              width: '12%',
+              title: t('accounts.stats_range_requests'),
+              width: '14%',
               render: (row) => <span className="truncate font-mono text-text-secondary">{row.requests.toLocaleString()}</span>,
             },
             {
-              align: 'end',
-              key: 'valid_requests',
-              title: t('accounts.stats_valid_requests'),
-              width: '12%',
-              render: (row) => <span className="truncate font-mono text-text-secondary">{row.valid_requests.toLocaleString()}</span>,
-            },
-            {
-              align: 'end',
-              key: 'successes',
-              title: t('accounts.stats_success'),
-              width: '12%',
-              render: (row) => <span className="truncate font-mono text-success">{row.successes.toLocaleString()}</span>,
-            },
-            {
-              align: 'end',
-              key: 'failures',
-              title: t('accounts.stats_failure'),
-              width: '12%',
-              render: (row) => <span className="truncate font-mono text-danger">{row.failures.toLocaleString()}</span>,
-            },
-            {
-              align: 'end',
+              align: 'center',
               key: 'invalid',
               title: t('accounts.stats_invalid_requests'),
-              width: '12%',
+              width: '14%',
               render: (row) => <span className="truncate font-mono text-text-tertiary">{row.invalid_requests.toLocaleString()}</span>,
             },
             {
-              align: 'end',
+              align: 'center',
+              key: 'valid_requests',
+              title: t('accounts.stats_valid_requests'),
+              width: '26%',
+              render: (row) => (
+                <span className="truncate font-mono text-text-secondary">
+                  (<span className="text-success">{row.successes.toLocaleString()}</span>
+                  <span className="text-text-tertiary">|</span>
+                  <span className="text-danger">{row.failures.toLocaleString()}</span>)
+                  {row.valid_requests.toLocaleString()}
+                </span>
+              ),
+            },
+            {
+              align: 'center',
               key: 'success_rate',
               title: t('accounts.stats_success_rate'),
-              width: '12%',
+              width: '16%',
               render: (row) => (
                 <span
                   className="truncate font-mono font-semibold"

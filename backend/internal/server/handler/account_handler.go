@@ -148,6 +148,27 @@ func familyCooldownDTOs(entries []scheduler.FamilyCooldownEntry) []dto.FamilyCoo
 	return out
 }
 
+// modelDemotionsFor 读取账号当前 30 分钟桶内因成功率低于阈值被降级的调度模型（内存态）。
+// scheduler 为 nil、未配置阈值或没有降级时返回 nil；不阻断主响应。
+func (h *AccountHandler) modelDemotionsFor(account appaccount.Account) []dto.ModelDemotionDTO {
+	if h.scheduler == nil || account.ModelDowngradeThreshold <= 0 {
+		return nil
+	}
+	demotions := h.scheduler.ListModelDemotions(account.ID, account.ModelDowngradeThreshold)
+	if len(demotions) == 0 {
+		return nil
+	}
+	out := make([]dto.ModelDemotionDTO, 0, len(demotions))
+	for _, item := range demotions {
+		out = append(out, dto.ModelDemotionDTO{
+			Model:         item.Model,
+			SuccessRate:   item.SuccessRate,
+			ValidRequests: item.ValidRequests,
+		})
+	}
+	return out
+}
+
 func parseAccountID(raw string) (int, error) {
 	return strconv.Atoi(raw)
 }

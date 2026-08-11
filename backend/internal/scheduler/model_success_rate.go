@@ -405,6 +405,46 @@ func (t *ModelSuccessRateTracker) isDemotedAt(accountID int, normalizedModel str
 	return float64(bucket.success)/float64(valid) < threshold
 }
 
+// ModelDemotion describes one scheduling model whose current fixed 30-minute
+// bucket success rate fell below the account's downgrade threshold.
+type ModelDemotion struct {
+	Model         string  `json:"model"`
+	SuccessRate   float64 `json:"success_rate"`
+	ValidRequests uint64  `json:"valid_requests"`
+}
+
+// DemotedModels lists the account's currently demoted scheduling models using
+// the same current-bucket rule as the request-path isDemotedAt check. Admin
+// surfaces use it to display the model downgrade state; it never touches Redis.
+func (t *ModelSuccessRateTracker) DemotedModels(accountID int, threshold float64) []ModelDemotion {
+	if t == nil || accountID <= 0 || threshold <= 0 || threshold > 1 {
+		return nil
+	}
+	bucketID := modelSuccessRateBucketID(accountID, t.now())
+	_, shard := t.shardFor(accountID)
+	shard.mu.RLock()
+	models := shard.series[accountID]
+	demotions := make([]ModelDemotion, 0, len(models))
+	for model, series := range models {
+		bucket := series.buckets[int(bucketID%int64(modelSuccessRateBucketCount))]
+		if bucket.bucket != bucketID {
+			continue
+		}
+		valid := bucket.success + bucket.failure
+		if valid < modelSuccessRateMinBucketValidRequests {
+			continue
+		}
+		rate := float64(bucket.success) / float64(valid)
+		if rate >= threshold {
+			continue
+		}
+		demotions = append(demotions, ModelDemotion{Model: model, SuccessRate: rate, ValidRequests: valid})
+	}
+	shard.mu.RUnlock()
+	sort.Slice(demotions, func(i, j int) bool { return demotions[i].Model < demotions[j].Model })
+	return demotions
+}
+
 func (t *ModelSuccessRateTracker) persistDirty(ctx context.Context) {
 	if t == nil || t.rdb == nil {
 		return

@@ -16,6 +16,13 @@ type FamilyCooldownDTO struct {
 	Reason string `json:"reason,omitempty"`
 }
 
+// ModelDemotionDTO 账号当前 30 分钟桶内因成功率低于阈值而被降级的调度模型（内存态）。
+type ModelDemotionDTO struct {
+	Model         string  `json:"model"`
+	SuccessRate   float64 `json:"success_rate"`
+	ValidRequests uint64  `json:"valid_requests"`
+}
+
 // AccountResp 账号响应。
 //
 // state 枚举：active / rate_limited / degraded / disabled
@@ -48,6 +55,7 @@ type AccountResp struct {
 	DeletedAt               *string             `json:"deleted_at,omitempty"`
 	GroupIDs                []int64             `json:"group_ids"`
 	FamilyCooldowns         []FamilyCooldownDTO `json:"family_cooldowns,omitempty"`
+	ModelDemotions          []ModelDemotionDTO  `json:"model_demotions,omitempty"`
 	TodayImageCount         *int64              `json:"today_image_count,omitempty"`
 	TotalImageCount         *int64              `json:"total_image_count,omitempty"`
 	TimeMixin

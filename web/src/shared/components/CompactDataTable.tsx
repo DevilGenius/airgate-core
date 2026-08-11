@@ -3,7 +3,7 @@ import { memo, type CSSProperties, type ReactNode } from 'react';
 type RowKey = string | number;
 
 export interface CompactDataTableColumn<T> {
-  align?: 'start' | 'end';
+  align?: 'start' | 'center' | 'end';
   key: string;
   render: (row: T, index: number) => ReactNode;
   title: ReactNode;
@@ -22,6 +22,18 @@ interface CompactDataTableProps<T> {
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
+}
+
+function alignTextClass(align?: 'start' | 'center' | 'end') {
+  return align === 'end' ? 'text-right' : align === 'center' ? 'text-center' : undefined;
+}
+
+function alignCellClass(align?: 'start' | 'center' | 'end') {
+  return align === 'end'
+    ? 'justify-end text-right'
+    : align === 'center'
+      ? 'justify-center text-center'
+      : 'justify-start text-left';
 }
 
 function CompactDataTableComponent<T>({
@@ -51,13 +63,13 @@ function CompactDataTableComponent<T>({
                   id={column.key}
                   key={column.key}
                   scope="col"
-                  className={column.align === 'end' ? 'text-right' : undefined}
+                  className={alignTextClass(column.align)}
                   style={column.width ? { width: column.width } : undefined}
                 >
                   <span
                     className={cx(
                       'ag-compact-data-table-heading',
-                      column.align === 'end' ? 'justify-end text-right' : 'justify-start text-left',
+                      alignCellClass(column.align),
                     )}
                   >
                     {column.title}
@@ -82,12 +94,12 @@ function CompactDataTableComponent<T>({
                       <td
                         data-slot="td"
                         key={column.key}
-                        className={column.align === 'end' ? 'text-right' : undefined}
+                        className={alignTextClass(column.align)}
                       >
                         <div
                           className={cx(
                             'ag-compact-data-table-cell',
-                            column.align === 'end' ? 'justify-end text-right' : 'justify-start text-left',
+                            alignCellClass(column.align),
                           )}
                         >
                           {column.render(row, rowIndex)}

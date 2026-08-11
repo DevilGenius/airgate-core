@@ -320,12 +320,6 @@ export function EditAccountModal({
                 ) : null}
 
                 <section className="ag-create-account-advanced space-y-4">
-                  <NativeSwitch
-                    isSelected={dispatchEnabled}
-                    label={<span className="text-sm text-text">{t('accounts.enable_dispatch')}</span>}
-                    onChange={setDispatchEnabled}
-                  />
-
                   <div className="grid gap-4 md:grid-cols-2">
                     <HeroTextField fullWidth>
                       <Label>{t('accounts.priority_hint')}</Label>
@@ -383,11 +377,11 @@ export function EditAccountModal({
                         value={modelDowngradeThresholdInput}
                         onChange={(event) => setModelDowngradeThresholdInput(event.target.value)}
                       />
-                      <p className={`mt-1 text-[11px] leading-4 ${modelDowngradeThresholdValid ? 'text-text-tertiary' : 'text-danger'}`}>
-                        {modelDowngradeThresholdValid
-                          ? t('accounts.model_downgrade_threshold_hint')
-                          : t('accounts.model_downgrade_threshold_invalid')}
-                      </p>
+                      {!modelDowngradeThresholdValid && (
+                        <p className="mt-1 text-[11px] leading-4 text-danger">
+                          {t('accounts.model_downgrade_threshold_invalid')}
+                        </p>
+                      )}
                     </HeroTextField>
 
                     <div className="space-y-1.5">
@@ -409,6 +403,13 @@ export function EditAccountModal({
                   </div>
 
                   <div className="ag-account-switch-row">
+                    <NativeSwitch
+                      className="ag-account-option-switch"
+                      isSelected={dispatchEnabled}
+                      label={<span className="text-sm text-text">{t('accounts.enable_dispatch')}</span>}
+                      onChange={setDispatchEnabled}
+                    />
+
                     <NativeSwitch
                       className="ag-account-option-switch"
                       isSelected={form.upstream_is_pool ?? false}

@@ -420,11 +420,11 @@ export function CreateAccountModal({
                         value={modelDowngradeThresholdInput}
                         onChange={(e) => setModelDowngradeThresholdInput(e.target.value)}
                       />
-                      <p className={`mt-1 text-[11px] leading-4 ${modelDowngradeThresholdValid ? 'text-text-tertiary' : 'text-danger'}`}>
-                        {modelDowngradeThresholdValid
-                          ? t('accounts.model_downgrade_threshold_hint')
-                          : t('accounts.model_downgrade_threshold_invalid')}
-                      </p>
+                      {!modelDowngradeThresholdValid && (
+                        <p className="mt-1 text-[11px] leading-4 text-danger">
+                          {t('accounts.model_downgrade_threshold_invalid')}
+                        </p>
+                      )}
                     </HeroTextField>
 
                     <div className="space-y-1.5">

@@ -142,6 +142,16 @@ export interface FamilyCooldownDTO {
   reason?: string;
 }
 
+/**
+ * 账号当前 30 分钟桶内因成功率低于 model_downgrade_threshold 被降级的调度模型。
+ * 调度器内存态，随新时间桶自动恢复。
+ */
+export interface AccountModelDemotion {
+  model: string;
+  success_rate: number;
+  valid_requests: number;
+}
+
 export interface ModelPolicy {
   allow?: string[];
   deny?: string[];
@@ -174,6 +184,8 @@ export interface AccountResp {
   group_ids: number[];
   /** 当前在 Redis 上仍生效的家族级限流冷却列表；后端 omitempty，没有冷却时缺省。 */
   family_cooldowns?: FamilyCooldownDTO[];
+  /** 当前 30 分钟桶内因成功率过低被降级的调度模型列表；后端 omitempty。 */
+  model_demotions?: AccountModelDemotion[];
   /**
    * 仅 OpenAI 平台账号在列表接口下填充：今日 / 累计生图请求数（model 名前缀 "gpt-image"）。
    * 0 也会显式给出（`{today: 0, total: 0}`）；非 OpenAI 平台字段缺省。

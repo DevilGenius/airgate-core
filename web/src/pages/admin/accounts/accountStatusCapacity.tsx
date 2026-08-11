@@ -134,11 +134,11 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
 
   const pill = (label: string, bg: string, fg: string, tooltip?: string) => (
     <span
-      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap"
+      className="inline-flex h-[1.0625rem] items-center gap-1 px-1.5 rounded-full text-[10px] font-semibold border whitespace-nowrap"
       style={{ background: bg, color: fg, borderColor: bg }}
       title={tooltip}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: fg }} />
+      <span className="w-1 h-1 rounded-full" style={{ background: fg }} />
       {label}
     </span>
   );
@@ -162,8 +162,8 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   if (row.state === 'rate_limited' && hasCountdown) {
     mainBadge = pill(
       `${t('accounts.rate_limited_label', '限流中')} ${formatCountdown(remainingMs)}`,
-      'var(--ag-warning-subtle)',
-      'var(--ag-warning)',
+      'var(--ag-danger-subtle)',
+      'var(--ag-danger)',
       t('accounts.rate_limited_tooltip', '上游限流，到期自动恢复，不影响调度开关'),
     );
   } else if (row.state === 'degraded' && hasCountdown) {
@@ -234,6 +234,22 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
     });
   }
 
+  // 模型降级（当前 30 分钟桶成功率低于阈值），紫色徽标，tooltip 逐模型列出成功率。
+  const modelDemotions = row.model_demotions ?? [];
+  if (modelDemotions.length > 0) {
+    supplementalBadges.push({
+      key: 'model_demoted',
+      badge: pill(
+        t('accounts.model_demoted_label', '模型降级 ×{{count}}', { count: modelDemotions.length }),
+        'color-mix(in srgb, #a855f7 14%, transparent)',
+        '#a855f7',
+        modelDemotions
+          .map((item) => `${item.model} ${(item.success_rate * 100).toFixed(1)}% (${item.valid_requests})`)
+          .join('\n'),
+      ),
+    });
+  }
+
   if (supplementalBadges.length === 0) {
     if (!freezeCooldownHoverProps) return mainBadge;
     return (
@@ -245,7 +261,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
 
   return (
     <div
-      className="flex w-full max-w-full flex-wrap items-center justify-center gap-1 text-center"
+      className="flex w-full max-w-full flex-wrap items-center justify-center gap-0.5 text-center"
       {...freezeCooldownHoverProps}
     >
       {mainBadge}

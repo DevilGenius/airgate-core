@@ -50,6 +50,7 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 	for _, item := range result.List {
 		resp := toAccountResp(item)
 		resp.FamilyCooldowns = familyCooldowns[item.ID]
+		resp.ModelDemotions = h.modelDemotionsFor(item)
 		list = append(list, resp)
 	}
 

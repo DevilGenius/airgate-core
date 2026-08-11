@@ -71,6 +71,15 @@
   }
 }
 
+/* Status column: compressed chips so up to three rows (state, family cooldown,
+   model demotion) fit without inflating row height. */
+
+.ag-accounts-table .ag-account-status-pill {
+  height: 1.0625rem;
+  padding-inline: 0.375rem;
+  font-size: 0.625rem;
+}
+
 /* Recent access and health-probe timestamps. */
 
 .ag-accounts-table .ag-account-request-times {
