@@ -59,7 +59,11 @@ func TestApplyUsesFirstMatchingRuleAndIndependentSequences(t *testing.T) {
 
 func TestParseRejectsInvalidPriorityAndUnknownFields(t *testing.T) {
 	for _, raw := range []string{
-		`{"version":1,"rules":[{"name":"bad","when":[],"set":{"priority":{"mode":"sequence","initial":1,"step":0,"group_size":1}}}]}`,
+		`{"version":1,"rules":[{"name":"bad","when":[],"set":{"priority":{"mode":"sequence","initial":1,"step":0,"group_size":1},"model_downgrade_threshold":0}}]}`,
+		`{"version":1,"rules":[{"name":"bad","when":[],"set":null}]}`,
+		`{"version":1,"rules":[{"name":"bad","when":[],"set":{}}]}`,
+		`{"version":1,"rules":[{"name":"bad","when":[],"set":{"model_downgrade_threshold":0,"model_downgrade_threshold_enabled":true}}]}`,
+		`{"version":1,"rules":[{"name":"bad","when":[],"set":{"model_downgrade_threshold":null}}]}`,
 		`{"version":1,"rules":[],"unknown":true}`,
 		`{"version":2,"rules":[]}`,
 	} {
@@ -202,29 +206,34 @@ func TestFixedPriorityDoesNotSkipOccupiedValue(t *testing.T) {
 	}
 }
 
-func TestDisabledAssignmentsKeepValuesWithoutApplyingThem(t *testing.T) {
-	disabled := false
-	config := Config{
-		Version: Version,
-		Rules: []Rule{{
-			Name: "disabled assignments",
-			Set: Assignment{
-				MaxConcurrency:        intPtr(99),
-				MaxConcurrencyEnabled: &disabled,
-				Priority:              &PriorityAssignment{Mode: "fixed", Value: intPtr(8000)},
-				PriorityEnabled:       &disabled,
-				GroupIDs:              []int64{2},
-				GroupIDsEnabled:       &disabled,
-			},
-		}},
+func TestParseAssignmentWithoutEnabledFields(t *testing.T) {
+	config, err := Parse(`{"version":1,"rules":[{"name":"current","when":[],"set":{` +
+		`"max_concurrency":99,` +
+		`"priority":{"mode":"fixed","value":8000},` +
+		`"group_ids":[2],` +
+		`"model_downgrade_threshold":0.8}}]}`)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
 	}
-	items, err := config.Apply([]appaccount.CreateInput{{
-		Name: "one", MaxConcurrency: 10, Priority: 50, GroupIDs: []int64{1},
-	}})
+	assignment := config.Rules[0].Set
+	if assignment.MaxConcurrency == nil || *assignment.MaxConcurrency != 99 ||
+		assignment.Priority == nil || assignment.Priority.Value == nil || *assignment.Priority.Value != 8000 ||
+		len(assignment.GroupIDs) != 1 || assignment.GroupIDs[0] != 2 ||
+		assignment.ModelDowngradeThreshold != 0.8 {
+		t.Fatalf("assignment = %+v", assignment)
+	}
+}
+
+func TestApplyAlwaysSetsModelDowngradeThreshold(t *testing.T) {
+	config := Config{Version: Version, Rules: []Rule{{
+		Name: "threshold",
+		Set:  Assignment{ModelDowngradeThreshold: 0.85},
+	}}}
+	items, err := config.Apply([]appaccount.CreateInput{{Name: "one", ModelDowngradeThreshold: 0.2}})
 	if err != nil {
 		t.Fatalf("Apply() error = %v", err)
 	}
-	if items[0].MaxConcurrency != 10 || items[0].Priority != 50 || len(items[0].GroupIDs) != 1 || items[0].GroupIDs[0] != 1 {
-		t.Fatalf("disabled assignments changed item: %+v", items[0])
+	if items[0].ModelDowngradeThreshold != 0.85 {
+		t.Fatalf("threshold = %v, want 0.85", items[0].ModelDowngradeThreshold)
 	}
 }

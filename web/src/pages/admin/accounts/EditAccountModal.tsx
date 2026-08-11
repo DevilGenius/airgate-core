@@ -384,47 +384,50 @@ export function EditAccountModal({
                       )}
                     </HeroTextField>
 
-                    <div className="space-y-1.5">
+                  </div>
+
+                  <div className="ag-edit-account-routing-row">
+                    <div className="min-w-0 space-y-1.5">
                       <Label>{t('accounts.proxy')}</Label>
                       <SimpleSelect
                         ariaLabel={t('accounts.proxy')}
-                      fullWidth
+                        fullWidth
                         items={proxyOptions.map((item) => ({ key: item.id, label: item.label }))}
-                      selectedKey={form.proxy_id == null ? '' : String(form.proxy_id)}
+                        selectedKey={form.proxy_id == null ? '' : String(form.proxy_id)}
                         selectedLabel={selectedProxyLabel}
-                      onSelectionChange={(key) =>
-                        setForm({
-                          ...form,
-                          proxy_id: key ? Number(key) : null,
-                        })
-                      }
+                        onSelectionChange={(key) =>
+                          setForm({
+                            ...form,
+                            proxy_id: key ? Number(key) : null,
+                          })
+                        }
                       />
                     </div>
-                  </div>
 
-                  <div className="ag-account-switch-row">
-                    <NativeSwitch
-                      className="ag-account-option-switch"
-                      isSelected={dispatchEnabled}
-                      label={<span className="text-sm text-text">{t('accounts.enable_dispatch')}</span>}
-                      onChange={setDispatchEnabled}
-                    />
+                    <div className="ag-account-switch-row">
+                      <NativeSwitch
+                        className="ag-account-option-switch"
+                        isSelected={dispatchEnabled}
+                        label={<span className="text-sm text-text">{t('accounts.enable_dispatch')}</span>}
+                        onChange={setDispatchEnabled}
+                      />
 
-                    <NativeSwitch
-                      className="ag-account-option-switch"
-                      isSelected={form.upstream_is_pool ?? false}
-                      label={<span className="text-sm text-text">{t('accounts.upstream_is_pool', '池模式')}</span>}
-                      onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
-                    />
+                      <NativeSwitch
+                        className="ag-account-option-switch"
+                        isSelected={form.upstream_is_pool ?? false}
+                        label={<span className="text-sm text-text">{t('accounts.upstream_is_pool', '池模式')}</span>}
+                        onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
+                      />
 
-                    <NativeSwitch
-                      className="ag-account-option-switch"
-                      isSelected={getAccountMessageLockEnabled(form.extra)}
-                      label={<span className="text-sm text-text">{t('accounts.message_lock')}</span>}
-                      onChange={(checked) =>
-                        setForm({ ...form, extra: setAccountMessageLockEnabled(form.extra, checked) })
-                      }
-                    />
+                      <NativeSwitch
+                        className="ag-account-option-switch"
+                        isSelected={getAccountMessageLockEnabled(form.extra)}
+                        label={<span className="text-sm text-text">{t('accounts.message_lock')}</span>}
+                        onChange={(checked) =>
+                          setForm({ ...form, extra: setAccountMessageLockEnabled(form.extra, checked) })
+                        }
+                      />
+                    </div>
                   </div>
 
                   {availableGroups.length > 0 && (

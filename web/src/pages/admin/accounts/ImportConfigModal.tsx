@@ -26,10 +26,7 @@ import {
   type ImportPriority,
   type ImportRule,
 } from './importConfigDsl';
-import {
-  isValidModelDowngradeThresholdInput,
-  parseModelDowngradeThresholdInput,
-} from './accountDefaults';
+import { parseModelDowngradeThresholdInput } from './accountDefaults';
 
 const CONDITION_FIELD_SUGGESTIONS = [
   'platform',
@@ -79,7 +76,12 @@ function examplePlanRule(
       { field: 'type', op: 'eq', value: 'oauth' },
       { field: 'credentials.plan_type', op: 'in', values: planTypes },
     ],
-    set: { max_concurrency: maxConcurrency, priority, group_ids: [] },
+    set: {
+      max_concurrency: maxConcurrency,
+      priority,
+      group_ids: [],
+      model_downgrade_threshold: 0,
+    },
   };
 }
 
@@ -130,7 +132,7 @@ export function ImportConfigModal({
   const [selectedRuleIndex, setSelectedRuleIndex] = useState(0);
   const [dslValue, setDSLValue] = useState(() => serializeImportConfigDSL(EMPTY_IMPORT_CONFIG));
   const [dslError, setDSLError] = useState('');
-  const [modelDowngradeThresholdInput, setModelDowngradeThresholdInput] = useState('');
+  const [modelDowngradeThresholdInput, setModelDowngradeThresholdInput] = useState('0');
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [dropIndicator, setDropIndicator] = useState<{ index: number; position: 'before' | 'after' } | null>(null);
   const modalState = useOverlayState({
@@ -165,15 +167,8 @@ export function ImportConfigModal({
   );
   const selectedRule = config.rules[selectedRuleIndex];
   const displayedPriority: ImportPriority = selectedRule?.set.priority ?? { mode: 'fixed', value: 50 };
-  const capacityEnabled = selectedRule?.set.max_concurrency != null
-    && selectedRule.set.max_concurrency_enabled !== false;
-  const thresholdEnabled = selectedRule?.set.model_downgrade_threshold != null
-    && selectedRule.set.model_downgrade_threshold_enabled !== false;
-  const priorityEnabled = selectedRule?.set.priority != null
-    && selectedRule.set.priority_enabled !== false;
-  const groupsEnabled = selectedRule?.set.group_ids != null
-    && selectedRule.set.group_ids_enabled !== false;
-  const modelDowngradeThresholdValid = isValidModelDowngradeThresholdInput(modelDowngradeThresholdInput);
+  const modelDowngradeThresholdValue = parseModelDowngradeThresholdInput(modelDowngradeThresholdInput);
+  const modelDowngradeThresholdValid = modelDowngradeThresholdValue != null;
   const configValidationError = useMemo(() => validateConfig(config), [config]);
   const validationError = modelDowngradeThresholdValid
     ? configValidationError
@@ -190,11 +185,9 @@ export function ImportConfigModal({
 
   useEffect(() => {
     setModelDowngradeThresholdInput(
-      thresholdEnabled && selectedRule?.set.model_downgrade_threshold != null
-        ? String(selectedRule.set.model_downgrade_threshold)
-        : '',
+      String(selectedRule?.set.model_downgrade_threshold ?? 0),
     );
-  }, [selectedRuleIndex, selectedRule?.set.model_downgrade_threshold, thresholdEnabled]);
+  }, [selectedRuleIndex, selectedRule?.set.model_downgrade_threshold]);
 
   const updateSelectedRule = useCallback((updater: (rule: ImportRule) => void) => {
     setConfig((current) => {
@@ -381,7 +374,6 @@ export function ImportConfigModal({
     updateSelectedRule((rule) => {
       if (rule.set.priority?.mode === 'sequence') {
         rule.set.priority[key] = value;
-        rule.set.priority_enabled = true;
       }
     });
   };
@@ -658,7 +650,6 @@ export function ImportConfigModal({
                         selectedKey={displayedPriority.mode}
                         onSelectionChange={(key) => {
                           setPriorityMode(key as 'fixed' | 'sequence');
-                          updateSelectedRule((rule) => { rule.set.priority_enabled = true; });
                         }}
                       />
                       <Input
@@ -669,8 +660,8 @@ export function ImportConfigModal({
                         max={IMPORT_PRIORITY_MAX}
                         disabled={displayedPriority.mode !== 'fixed'}
                         placeholder={t('accounts.import_config_priority_placeholder')}
-                        value={priorityEnabled && displayedPriority.mode === 'fixed'
-                          ? String(displayedPriority.value)
+                        value={selectedRule.set.priority?.mode === 'fixed'
+                          ? String(selectedRule.set.priority.value)
                           : ''}
                         onChange={(event) => {
                           const raw = event.target.value.trim();
@@ -679,11 +670,10 @@ export function ImportConfigModal({
                               rule.set.priority = { mode: 'fixed', value: 50 };
                             }
                             if (raw === '') {
-                              rule.set.priority_enabled = false;
+                              delete rule.set.priority;
                               return;
                             }
                             rule.set.priority.value = parseNumber(raw, 0);
-                            rule.set.priority_enabled = true;
                           });
                         }}
                       />
@@ -693,19 +683,17 @@ export function ImportConfigModal({
                         type="number"
                         min={0}
                         placeholder={t('accounts.import_config_capacity_placeholder')}
-                        value={capacityEnabled && selectedRule.set.max_concurrency != null
+                        value={selectedRule.set.max_concurrency != null
                           ? String(selectedRule.set.max_concurrency)
                           : ''}
                         onChange={(event) => {
                           const raw = event.target.value.trim();
                           updateSelectedRule((rule) => {
                             if (raw === '') {
-                              rule.set.max_concurrency = rule.set.max_concurrency ?? 10;
-                              rule.set.max_concurrency_enabled = false;
+                              delete rule.set.max_concurrency;
                               return;
                             }
                             rule.set.max_concurrency = Math.max(0, parseNumber(raw, 0));
-                            rule.set.max_concurrency_enabled = true;
                           });
                         }}
                       />
@@ -720,18 +708,10 @@ export function ImportConfigModal({
                           onChange={(event) => {
                             const raw = event.target.value;
                             setModelDowngradeThresholdInput(raw);
-                            if (raw.trim() === '') {
-                              updateSelectedRule((rule) => {
-                                rule.set.model_downgrade_threshold = rule.set.model_downgrade_threshold ?? 0;
-                                rule.set.model_downgrade_threshold_enabled = false;
-                              });
-                              return;
-                            }
                             const parsed = parseModelDowngradeThresholdInput(raw);
                             if (parsed == null) return;
                             updateSelectedRule((rule) => {
                               rule.set.model_downgrade_threshold = parsed;
-                              rule.set.model_downgrade_threshold_enabled = true;
                             });
                           }}
                         />
@@ -775,14 +755,13 @@ export function ImportConfigModal({
                         {visibleGroups.map((group) => (
                           <NativeCheckbox
                             key={group.id}
-                            isSelected={groupsEnabled && (selectedRule.set.group_ids?.includes(group.id) ?? false)}
+                            isSelected={selectedRule.set.group_ids?.includes(group.id) ?? false}
                             onChange={(selected) => updateSelectedRule((rule) => {
-                              const ids = groupsEnabled ? (rule.set.group_ids ?? []) : [];
+                              const ids = rule.set.group_ids ?? [];
                               const next = selected
                                 ? Array.from(new Set([...ids, group.id]))
                                 : ids.filter((id) => id !== group.id);
                               rule.set.group_ids = next;
-                              rule.set.group_ids_enabled = next.length > 0;
                             })}
                           >
                             <span className="text-sm text-text">

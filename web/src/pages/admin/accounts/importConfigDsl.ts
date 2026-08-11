@@ -23,14 +23,10 @@ export type ImportPriority =
 
 export interface ImportAssignment {
   max_concurrency?: number;
-  max_concurrency_enabled?: boolean;
   priority?: ImportPriority;
-  priority_enabled?: boolean;
   group_ids?: number[];
-  group_ids_enabled?: boolean;
-  /** 模型降级阈值（0～1，0 表示关闭）；缺省表示不修改。 */
-  model_downgrade_threshold?: number;
-  model_downgrade_threshold_enabled?: boolean;
+  /** 模型降级阈值（0～1）：0 表示关闭，其它值表示开启。 */
+  model_downgrade_threshold: number;
 }
 
 export interface ImportRule {
@@ -47,6 +43,13 @@ export interface ImportConfigDSL {
 
 export const EMPTY_IMPORT_CONFIG: ImportConfigDSL = { version: 1, rules: [] };
 
+const IMPORT_ASSIGNMENT_FIELDS = new Set([
+  'max_concurrency',
+  'priority',
+  'group_ids',
+  'model_downgrade_threshold',
+]);
+
 export function createImportRule(index: number): ImportRule {
   return {
     name: `Rule ${index}`,
@@ -56,6 +59,7 @@ export function createImportRule(index: number): ImportRule {
       max_concurrency: 10,
       priority: { mode: 'fixed', value: 50 },
       group_ids: [],
+      model_downgrade_threshold: 0,
     },
   };
 }
@@ -142,26 +146,19 @@ function parseRule(value: unknown, ruleIndex: number): ImportRule {
   if (!Array.isArray(source.when)) throw new Error(`rules[${ruleIndex}].when must be an array`);
   const set = asRecord(source.set);
   if (!set) throw new Error(`rules[${ruleIndex}].set must be an object`);
-  const assignment: ImportAssignment = {};
+  for (const field of Object.keys(set)) {
+    if (!IMPORT_ASSIGNMENT_FIELDS.has(field)) {
+      throw new Error(`rules[${ruleIndex}].set.${field} is unknown`);
+    }
+  }
+  const assignment = {} as ImportAssignment;
   if (set.max_concurrency != null) {
     if (!Number.isSafeInteger(set.max_concurrency) || Number(set.max_concurrency) < 0) {
       throw new Error(`rules[${ruleIndex}].set.max_concurrency is invalid`);
     }
     assignment.max_concurrency = Number(set.max_concurrency);
   }
-  if (set.max_concurrency_enabled != null) {
-    if (typeof set.max_concurrency_enabled !== 'boolean' || assignment.max_concurrency == null) {
-      throw new Error(`rules[${ruleIndex}].set.max_concurrency_enabled is invalid`);
-    }
-    assignment.max_concurrency_enabled = set.max_concurrency_enabled;
-  }
   if (set.priority != null) assignment.priority = parsePriority(set.priority, ruleIndex);
-  if (set.priority_enabled != null) {
-    if (typeof set.priority_enabled !== 'boolean' || assignment.priority == null) {
-      throw new Error(`rules[${ruleIndex}].set.priority_enabled is invalid`);
-    }
-    assignment.priority_enabled = set.priority_enabled;
-  }
   if (set.group_ids != null) {
     if (!Array.isArray(set.group_ids)
       || set.group_ids.some((id) => !Number.isSafeInteger(id) || Number(id) <= 0)) {
@@ -173,29 +170,16 @@ function parseRule(value: unknown, ruleIndex: number): ImportRule {
     }
     assignment.group_ids = groupIDs;
   }
-  if (set.group_ids_enabled != null) {
-    if (typeof set.group_ids_enabled !== 'boolean' || assignment.group_ids == null) {
-      throw new Error(`rules[${ruleIndex}].set.group_ids_enabled is invalid`);
-    }
-    assignment.group_ids_enabled = set.group_ids_enabled;
+  const hasModelDowngradeThreshold = Object.prototype.hasOwnProperty.call(set, 'model_downgrade_threshold');
+  const threshold = set.model_downgrade_threshold;
+  if (!hasModelDowngradeThreshold
+    || typeof threshold !== 'number'
+    || !Number.isFinite(threshold)
+    || threshold < 0
+    || threshold > 1) {
+    throw new Error(`rules[${ruleIndex}].set.model_downgrade_threshold is invalid`);
   }
-  if (set.model_downgrade_threshold != null) {
-    const threshold = Number(set.model_downgrade_threshold);
-    if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
-      throw new Error(`rules[${ruleIndex}].set.model_downgrade_threshold is invalid`);
-    }
-    assignment.model_downgrade_threshold = threshold;
-  }
-  if (set.model_downgrade_threshold_enabled != null) {
-    if (typeof set.model_downgrade_threshold_enabled !== 'boolean' || assignment.model_downgrade_threshold == null) {
-      throw new Error(`rules[${ruleIndex}].set.model_downgrade_threshold_enabled is invalid`);
-    }
-    assignment.model_downgrade_threshold_enabled = set.model_downgrade_threshold_enabled;
-  }
-  if (assignment.max_concurrency == null && assignment.priority == null && assignment.group_ids == null
-    && assignment.model_downgrade_threshold == null) {
-    throw new Error(`rules[${ruleIndex}].set must configure at least one field`);
-  }
+  assignment.model_downgrade_threshold = threshold;
   return {
     name,
     ...(typeof source.enabled === 'boolean' ? { enabled: source.enabled } : {}),

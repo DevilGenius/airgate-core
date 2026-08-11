@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 
@@ -42,15 +43,38 @@ type Condition struct {
 }
 
 type Assignment struct {
-	MaxConcurrency        *int                `json:"max_concurrency,omitempty"`
-	MaxConcurrencyEnabled *bool               `json:"max_concurrency_enabled,omitempty"`
-	Priority              *PriorityAssignment `json:"priority,omitempty"`
-	PriorityEnabled       *bool               `json:"priority_enabled,omitempty"`
-	GroupIDs              []int64             `json:"group_ids,omitempty"`
-	GroupIDsEnabled       *bool               `json:"group_ids_enabled,omitempty"`
-	// 模型降级阈值：0 表示关闭；nil 表示不修改（跟随导入默认值）。
-	ModelDowngradeThreshold        *float64 `json:"model_downgrade_threshold,omitempty"`
-	ModelDowngradeThresholdEnabled *bool    `json:"model_downgrade_threshold_enabled,omitempty"`
+	MaxConcurrency *int                `json:"max_concurrency,omitempty"`
+	Priority       *PriorityAssignment `json:"priority,omitempty"`
+	GroupIDs       []int64             `json:"group_ids,omitempty"`
+	// 模型降级阈值始终应用：0 表示关闭，0～1 之间的其它值表示开启。
+	ModelDowngradeThreshold float64 `json:"model_downgrade_threshold"`
+}
+
+// UnmarshalJSON keeps model_downgrade_threshold required and non-null while
+// preserving value semantics in the runtime Assignment type.
+func (a *Assignment) UnmarshalJSON(data []byte) error {
+	type assignmentWire struct {
+		MaxConcurrency          *int                `json:"max_concurrency,omitempty"`
+		Priority                *PriorityAssignment `json:"priority,omitempty"`
+		GroupIDs                []int64             `json:"group_ids,omitempty"`
+		ModelDowngradeThreshold *float64            `json:"model_downgrade_threshold"`
+	}
+	var wire assignmentWire
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	if wire.ModelDowngradeThreshold == nil {
+		return errors.New("set 必须提供数值 model_downgrade_threshold，使用 0 表示关闭")
+	}
+	*a = Assignment{
+		MaxConcurrency:          wire.MaxConcurrency,
+		Priority:                wire.Priority,
+		GroupIDs:                wire.GroupIDs,
+		ModelDowngradeThreshold: *wire.ModelDowngradeThreshold,
+	}
+	return nil
 }
 
 type PriorityAssignment struct {
@@ -117,27 +141,12 @@ func validateRule(index int, rule Rule) error {
 			return fmt.Errorf("%s 的 when[%d] 无效: %w", label, conditionIndex, err)
 		}
 	}
-	if rule.Set.MaxConcurrency == nil && rule.Set.Priority == nil && rule.Set.GroupIDs == nil && rule.Set.ModelDowngradeThreshold == nil {
-		return fmt.Errorf("%s 的 set 不能为空", label)
-	}
 	if rule.Set.MaxConcurrency != nil && *rule.Set.MaxConcurrency < 0 {
 		return fmt.Errorf("%s 的 max_concurrency 不能小于 0", label)
 	}
-	if rule.Set.MaxConcurrency == nil && rule.Set.MaxConcurrencyEnabled != nil {
-		return fmt.Errorf("%s 设置 max_concurrency_enabled 时必须提供 max_concurrency", label)
-	}
-	if rule.Set.ModelDowngradeThreshold != nil &&
-		(*rule.Set.ModelDowngradeThreshold < 0 || *rule.Set.ModelDowngradeThreshold > 1) {
+	if math.IsNaN(rule.Set.ModelDowngradeThreshold) || math.IsInf(rule.Set.ModelDowngradeThreshold, 0) ||
+		rule.Set.ModelDowngradeThreshold < 0 || rule.Set.ModelDowngradeThreshold > 1 {
 		return fmt.Errorf("%s 的 model_downgrade_threshold 必须在 0～1 范围内", label)
-	}
-	if rule.Set.ModelDowngradeThreshold == nil && rule.Set.ModelDowngradeThresholdEnabled != nil {
-		return fmt.Errorf("%s 设置 model_downgrade_threshold_enabled 时必须提供 model_downgrade_threshold", label)
-	}
-	if rule.Set.Priority == nil && rule.Set.PriorityEnabled != nil {
-		return fmt.Errorf("%s 设置 priority_enabled 时必须提供 priority", label)
-	}
-	if rule.Set.GroupIDs == nil && rule.Set.GroupIDsEnabled != nil {
-		return fmt.Errorf("%s 设置 group_ids_enabled 时必须提供 group_ids", label)
 	}
 	if err := validatePriority(label, rule.Set.Priority); err != nil {
 		return err
@@ -246,7 +255,7 @@ func (c Config) UsesPrioritySequence() bool {
 		if rule.Enabled != nil && !*rule.Enabled {
 			continue
 		}
-		if rule.Set.Priority != nil && assignmentEnabled(rule.Set.PriorityEnabled) &&
+		if rule.Set.Priority != nil &&
 			strings.EqualFold(strings.TrimSpace(rule.Set.Priority.Mode), "sequence") {
 			return true
 		}
@@ -380,27 +389,21 @@ func applyAssignment(
 	occupied map[int]struct{},
 	sequenceState *sequencePriorityState,
 ) error {
-	if assignment.MaxConcurrency != nil && assignmentEnabled(assignment.MaxConcurrencyEnabled) {
+	if assignment.MaxConcurrency != nil {
 		item.MaxConcurrency = *assignment.MaxConcurrency
 	}
-	if assignment.Priority != nil && assignmentEnabled(assignment.PriorityEnabled) {
+	if assignment.Priority != nil {
 		priority, err := assignedPriority(*assignment.Priority, occupied, sequenceState)
 		if err != nil {
 			return err
 		}
 		item.Priority = priority
 	}
-	if assignment.GroupIDs != nil && assignmentEnabled(assignment.GroupIDsEnabled) {
+	if assignment.GroupIDs != nil {
 		item.GroupIDs = append([]int64(nil), assignment.GroupIDs...)
 	}
-	if assignment.ModelDowngradeThreshold != nil && assignmentEnabled(assignment.ModelDowngradeThresholdEnabled) {
-		item.ModelDowngradeThreshold = *assignment.ModelDowngradeThreshold
-	}
+	item.ModelDowngradeThreshold = assignment.ModelDowngradeThreshold
 	return nil
-}
-
-func assignmentEnabled(enabled *bool) bool {
-	return enabled == nil || *enabled
 }
 
 func assignedPriority(

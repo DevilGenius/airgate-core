@@ -223,6 +223,19 @@
   align-items: center;
 }
 
+.ag-edit-account-routing-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+
+.ag-edit-account-routing-row .ag-account-switch-row {
+  min-width: 0;
+  flex-wrap: nowrap;
+  min-height: 2.5rem;
+}
+
 .ag-account-type-field {
   display: flex;
   min-width: 0;
@@ -255,6 +268,17 @@
 
 .ag-account-option-switch {
   min-height: 1.5rem;
+}
+
+@media (max-width: 800px) {
+  .ag-edit-account-routing-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .ag-edit-account-routing-row .ag-account-switch-row {
+    min-height: 0;
+  }
 }
 
 @media (max-width: 640px) {
