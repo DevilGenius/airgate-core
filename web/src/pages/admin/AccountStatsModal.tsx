@@ -78,11 +78,14 @@ function fmtDate(dateStr: string): string {
 export function AccountStatsModal({
   accountId,
   lifetimeImageCount,
+  modelDowngradeThreshold,
   onClose,
 }: {
   accountId: number;
   /** 累计生图数（全部历史，不受时间范围限制）。由列表页直接透传，避免 stats endpoint 多查一遍。仅 OpenAI 平台账号有值。 */
   lifetimeImageCount?: number;
+  /** 账号的模型降级阈值（0 表示关闭）。由列表行透传，用于成功率明细表的阈值列与着色。 */
+  modelDowngradeThreshold?: number;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -149,6 +152,7 @@ export function AccountStatsModal({
                 <ModelRequestStats
                   rates={data.model_success_rates ?? []}
                   rateWindow={data.model_success_rate_window}
+                  threshold={modelDowngradeThreshold ?? 0}
                 />
               ) : (
                 <StatsContent data={data} lifetimeImageCount={lifetimeImageCount} />
@@ -183,7 +187,8 @@ function AccountStatsRangeControls({
   const { t } = useTranslation();
 
   return (
-    <div className="flex min-h-[2rem] flex-wrap items-center gap-2">
+    // 固定 min-h-10（等于日期选择器行高），切到自定义出现日期行时不再顶移下方内容
+    <div className="flex min-h-10 flex-wrap items-center gap-2">
       <Tabs
         className="ag-segmented-tabs ag-segmented-tabs-compact ag-segmented-tabs-auto"
         selectedKey={preset}
@@ -258,7 +263,7 @@ function AccountStatsSkeleton() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {Array.from({ length: 6 }, (_, index) => (
           <div className="space-y-3 rounded-lg border border-border-subtle p-3.5" key={index}>
             <SkeletonBlock className="h-4 w-24 rounded" />
@@ -320,9 +325,9 @@ function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; li
   const dailyAvgTokens = totalTokens / activeDays;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* 顶部 4 个统计卡片 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <MiniStatCard
           label={t('accounts.stats_range_cost')}
           value={fmtCost(range.account_cost, 2)}
@@ -354,7 +359,7 @@ function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; li
       </div>
 
       {/* 中间 3 个信息卡片 */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {/* 今日概览 */}
         <InfoCard title={t('accounts.stats_today')} icon={<Clock className="w-4 h-4" />} color="var(--ag-info)">
           <InfoRow label={t('accounts.stats_cost')} value={fmtCost(data.today.account_cost)} />
@@ -387,7 +392,7 @@ function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; li
       </div>
 
       {/* 下方 3 个信息卡片 */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {/* 累计 Token */}
         <InfoCard title={t('accounts.stats_total_tokens')} icon={<Cpu className="w-4 h-4" />} color="var(--ag-primary)">
           <InfoRow label={t('accounts.stats_range_total')} value={fmtNum(totalTokens)} />
@@ -438,16 +443,16 @@ function MiniStatCard({
   label: string; value: string; sub: string; icon: React.ReactNode; color: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-border-subtle p-3.5 transition-colors hover:border-border">
+    <div className="relative overflow-hidden rounded-lg border border-border-subtle p-2 transition-colors hover:border-border">
       <div className="absolute top-0 left-0 right-0 h-px opacity-40" style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
-      <div className="flex items-start justify-between mb-2">
+      <div className="flex items-start justify-between mb-0.5">
         <span className="text-[11px] text-text-tertiary font-medium">{label}</span>
-        <div className="flex items-center justify-center w-7 h-7 rounded-md" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
+        <div className="flex items-center justify-center w-6 h-6 rounded-md" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
           {icon}
         </div>
       </div>
-      <div className="text-xl font-bold text-text font-mono">{value}</div>
-      <div className="text-[10px] text-text-tertiary mt-1">{sub}</div>
+      <div className="text-lg font-bold text-text font-mono leading-6">{value}</div>
+      <div className="text-[10px] text-text-tertiary">{sub}</div>
     </div>
   );
 }
@@ -460,19 +465,19 @@ function InfoCard({
   title: string; icon: React.ReactNode; color: string; children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border-subtle p-3.5 space-y-2">
+    <div className="rounded-lg border border-border-subtle p-2 space-y-1">
       <div className="flex items-center gap-1.5">
         <div className="flex items-center justify-center w-5 h-5 rounded" style={{ color }}>{icon}</div>
         <span className="text-xs font-semibold text-text">{title}</span>
       </div>
-      <div className="space-y-1.5">{children}</div>
+      <div className="space-y-0.5">{children}</div>
     </div>
   );
 }
 
 function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="flex items-center justify-between text-xs">
+    <div className="flex items-center justify-between text-xs leading-[1.125rem]">
       <span className="text-text-tertiary">{label}</span>
       <span className={`font-mono ${highlight ? 'text-warning font-semibold' : 'text-text-secondary'}`}>{value}</span>
     </div>
@@ -499,9 +504,9 @@ function TrendChart({ data }: { data: AccountStatsResp }) {
   if (chartData.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-border-subtle p-4">
-      <h4 className="text-xs font-semibold text-text mb-3">{t('accounts.stats_trend_title')}</h4>
-      <ResponsiveContainer width="100%" height={isMobile ? 200 : 260} debounce={80}>
+    <div className="rounded-lg border border-border-subtle p-3">
+      <h4 className="text-xs font-semibold text-text mb-2">{t('accounts.stats_trend_title')}</h4>
+      <ResponsiveContainer width="100%" height={isMobile ? 160 : 190} debounce={80}>
         <LineChart data={chartData} margin={isMobile ? { top: 5, right: 4, left: 0, bottom: 5 } : { top: 5, right: 20, left: 10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--ag-border-subtle)" />
           <XAxis
@@ -546,7 +551,7 @@ function TrendChart({ data }: { data: AccountStatsResp }) {
           <Line yAxisId="count" type="monotone" dataKey="count" stroke="#f59e0b" strokeWidth={2} dot={false} isAnimationActive={false} name="count" />
         </LineChart>
       </ResponsiveContainer>
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-2">
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-0.5 mt-1">
         <LegendDot color="#3b82f6" label={`${t('accounts.stats_total_cost_label')} (USD)`} />
         <LegendDot color="#10b981" label={`${t('accounts.stats_actual_cost_label')} (USD)`} />
         <LegendDot color="#f59e0b" label={t('accounts.stats_requests')} />
@@ -593,12 +598,6 @@ function fmtBucketRange(startISO: string, endISO: string): string {
   return startDate === endDate
     ? `${startDate} ${startTime} – ${endTime}`
     : `${startDate} ${startTime} – ${endDate} ${endTime}`;
-}
-
-function successRateColor(rate: number): string {
-  if (rate >= 0.95) return 'var(--ag-success)';
-  if (rate >= 0.8) return 'var(--ag-warning)';
-  return 'var(--ag-danger)';
 }
 
 type AccountModelSuccessRateBucketView = AccountModelSuccessRateBucket & {
@@ -660,12 +659,24 @@ function aggregateRateBuckets(
   return buckets;
 }
 
+// 与后端 modelSuccessRateMinBucketValidRequests 保持一致：桶内有效请求数达到该值才参与阈值判定。
+const MIN_RATE_SAMPLE_REQUESTS = 10;
+
+// 成功率着色：样本不足置灰；满足样本后按阈值分红绿（阈值 0 = 关闭，恒绿）。
+function rateColor(rate: number, validRequests: number, threshold: number): string {
+  if (validRequests < MIN_RATE_SAMPLE_REQUESTS) return 'var(--ag-text-tertiary)';
+  return rate >= threshold ? 'var(--ag-success)' : 'var(--ag-danger)';
+}
+
 function ModelRequestStats({
   rates,
   rateWindow,
+  threshold = 0,
 }: {
   rates: AccountModelSuccessRate[];
   rateWindow?: AccountModelSuccessRateWindow | null;
+  /** 账号模型降级阈值（0 = 关闭）。 */
+  threshold?: number;
 }) {
   const { t } = useTranslation();
 
@@ -712,13 +723,20 @@ function ModelRequestStats({
               </div>
               <strong>{fmtBucketRange(selectedBucket.window_start, selectedBucket.window_end)}</strong>
               <span className="ag-account-rate-selected-range__summary">
-                {t('accounts.stats_bucket_summary', {
-                  requests: selectedBucket.requests.toLocaleString(),
-                  invalid: selectedBucket.invalid_requests.toLocaleString(),
-                  successes: selectedBucket.successes.toLocaleString(),
-                  valid: selectedBucket.valid_requests.toLocaleString(),
-                  rate: selectedBucket.valid_requests > 0 ? fmtPercent(selectedBucket.success_rate) : '-',
-                })}
+                {/* 与明细表同款式：成功绿/失败红，成功率按样本数 + 阈值着色，括号内为有效请求数 */}
+                {t('accounts.stats_range_requests')} {selectedBucket.requests.toLocaleString()}
+                {' '}{t('accounts.stats_invalid_requests')} {selectedBucket.invalid_requests.toLocaleString()}
+                {' '}(<span className="text-success">{t('accounts.stats_success')} {selectedBucket.successes.toLocaleString()}</span>
+                <span className="text-text-tertiary"> | </span>
+                <span className="text-danger">{t('accounts.stats_failure')} {selectedBucket.failures.toLocaleString()}</span>)
+                {' '}{selectedBucket.valid_requests.toLocaleString()}
+                {' '}{t('accounts.stats_success_rate')}{' '}
+                <span className="font-semibold" style={{ color: rateColor(selectedBucket.success_rate, selectedBucket.valid_requests, threshold) }}>
+                  {selectedBucket.valid_requests > 0 ? fmtPercent(selectedBucket.success_rate) : '-'}
+                </span>
+                {selectedBucket.valid_requests > 0 && (
+                  <span className="text-text-secondary"> ({selectedBucket.valid_requests.toLocaleString()})</span>
+                )}
               </span>
             </div>
 
@@ -754,9 +772,8 @@ function ModelRequestStats({
         ) : null}
       </div>
 
-      {/* 模型统计表格独立成卡片 */}
-      <div className="rounded-lg border border-border-subtle p-4">
-        <div className="ag-distribution-table-scroll">
+      {/* 模型统计表格（无外框，与上方卡片同宽） */}
+      <div className="ag-account-rate-table-scroll">
           <CompactDataTable
           ariaLabel={t('accounts.stats_model_requests')}
           className="ag-compact-data-table--dense ag-account-stats-model-table"
@@ -768,7 +785,7 @@ function ModelRequestStats({
             {
               key: 'model',
               title: t('accounts.stats_model'),
-              width: '30%',
+              width: '26%',
               render: (row) => (
                 <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
               ),
@@ -777,21 +794,21 @@ function ModelRequestStats({
               align: 'center',
               key: 'requests',
               title: t('accounts.stats_range_requests'),
-              width: '14%',
+              width: '12%',
               render: (row) => <span className="truncate font-mono text-text-secondary">{row.requests.toLocaleString()}</span>,
             },
             {
               align: 'center',
               key: 'invalid',
               title: t('accounts.stats_invalid_requests'),
-              width: '14%',
+              width: '12%',
               render: (row) => <span className="truncate font-mono text-text-tertiary">{row.invalid_requests.toLocaleString()}</span>,
             },
             {
               align: 'center',
               key: 'valid_requests',
               title: t('accounts.stats_valid_requests'),
-              width: '26%',
+              width: '22%',
               render: (row) => (
                 <span className="truncate font-mono text-text-secondary">
                   (<span className="text-success">{row.successes.toLocaleString()}</span>
@@ -803,21 +820,36 @@ function ModelRequestStats({
             },
             {
               align: 'center',
+              key: 'threshold',
+              title: t('accounts.stats_threshold'),
+              width: '10%',
+              render: () => (
+                <span className="truncate font-mono text-text-secondary">
+                  {threshold > 0 ? fmtPercent(threshold) : '-'}
+                </span>
+              ),
+            },
+            {
+              align: 'center',
               key: 'success_rate',
               title: t('accounts.stats_success_rate'),
               width: '16%',
               render: (row) => (
-                <span
-                  className="truncate font-mono font-semibold"
-                  style={{ color: row.valid_requests > 0 ? successRateColor(row.success_rate) : 'var(--ag-text-tertiary)' }}
-                >
-                  {row.valid_requests > 0 ? fmtPercent(row.success_rate) : '-'}
+                <span className="truncate font-mono">
+                  <span
+                    className="font-semibold"
+                    style={{ color: rateColor(row.success_rate, row.valid_requests, threshold) }}
+                  >
+                    {row.valid_requests > 0 ? fmtPercent(row.success_rate) : '-'}
+                  </span>
+                  {row.valid_requests > 0 && (
+                    <span className="text-text-secondary"> ({row.valid_requests.toLocaleString()})</span>
+                  )}
                 </span>
               ),
             },
           ]}
           />
-        </div>
       </div>
     </>
   );
@@ -830,8 +862,8 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
   const models = data.models ?? [];
 
   return (
-    <div className="rounded-lg border border-border-subtle p-4">
-      <h4 className="text-xs font-semibold text-text mb-3">{t('accounts.stats_model_distribution')}</h4>
+    <div className="rounded-lg border border-border-subtle p-3">
+      <h4 className="text-xs font-semibold text-text mb-2">{t('accounts.stats_model_distribution')}</h4>
       <div className="ag-distribution-table-scroll">
         <CompactDataTable
           ariaLabel={t('accounts.stats_model')}

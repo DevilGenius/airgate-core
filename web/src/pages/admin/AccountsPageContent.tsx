@@ -1946,6 +1946,7 @@ export default function AccountsPageContent() {
           // 累计生图数从列表行直接传：BatchImageStats 一次查到，避免再让 stats endpoint 多跑一次。
           // 仅 OpenAI 平台账号有该字段；非 openai 时 modal 内部会跳过显示。
           lifetimeImageCount={data?.list.find((a) => a.id === statsAccountId)?.total_image_count}
+          modelDowngradeThreshold={data?.list.find((a) => a.id === statsAccountId)?.model_downgrade_threshold}
           onClose={() => setStatsAccountId(null)}
         />
       )}
