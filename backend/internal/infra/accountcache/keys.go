@@ -9,6 +9,7 @@ const (
 	TodayStatsTTL = 48 * time.Hour
 	ImageTotalTTL = 30 * 24 * time.Hour
 	ProfileTTL    = 24 * time.Hour
+	ModelStatsTTL = 24 * time.Hour
 )
 
 func Day(t time.Time) string {
@@ -21,6 +22,14 @@ func ProfileKey(accountID int) string {
 
 func UsageKey(accountID int) string {
 	return fmt.Sprintf("ag:account:usage:%d", accountID)
+}
+
+func ModelStatsKey(accountID int) string {
+	return fmt.Sprintf("ag:account:model-stats:%d", accountID)
+}
+
+func ModelStatsPattern() string {
+	return "ag:account:model-stats:*"
 }
 
 func UsagePattern() string {

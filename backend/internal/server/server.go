@@ -253,6 +253,9 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	if s.statusEvents != nil {
 		safego.Go("admin_status_event_coalescer", func() { s.statusEvents.Run(pluginCtx) })
 	}
+	if s.scheduler != nil {
+		safego.Go("account_model_success_rate_sync", func() { s.scheduler.StartModelSuccessRateSync(pluginCtx) })
+	}
 	safego.Go("asset_migration_loop", func() { plugin.StartAssetMigrationLoop(pluginCtx, s.db) })
 	safego.Go("asset_cleanup_loop", func() { plugin.StartAssetCleanupLoop(pluginCtx, s.db) })
 	safego.Go("monitor_aggregator_loop", func() { appmonitor.StartAggregatorLoop(pluginCtx, s.monitor) })

@@ -33,6 +33,14 @@ type failingManualStateWriter struct {
 	disableErr error
 }
 
+type captureAccountDeletionObserver struct {
+	accountIDs []int
+}
+
+func (f *captureAccountDeletionObserver) OnAccountsDeleted(accountIDs []int) {
+	f.accountIDs = append(f.accountIDs[:0], accountIDs...)
+}
+
 func (s *failingManualStateWriter) ManualRecover(ctx context.Context, accountID int) error {
 	if s.recoverErr != nil {
 		return s.recoverErr
@@ -344,9 +352,11 @@ func TestDeleteAccountCacheKeysUsesProfilePlatform(t *testing.T) {
 	now := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
 	day := accountcache.Day(now)
 	rdb, mock := redismock.NewClientMock()
+	observer := &captureAccountDeletionObserver{}
 	service := NewService(stubRepository{}, nil, nil, nil)
 	service.now = func() time.Time { return now }
 	service.SetUsageCacheRedis(rdb)
+	service.SetAccountDeletionObserver(observer)
 
 	profileBody, err := json.Marshal(accountProfileCachePayload{ID: 7, Platform: "openai"})
 	if err != nil {
@@ -354,12 +364,26 @@ func TestDeleteAccountCacheKeysUsesProfilePlatform(t *testing.T) {
 	}
 	mock.ExpectGet(accountcache.ProfileKey(7)).SetVal(string(profileBody))
 	mock.ExpectSRem(accountcache.PlatformKey("openai"), 7).SetVal(1)
-	mock.ExpectDel(accountcache.ProfileKey(7), accountcache.UsageKey(7), accountcache.ImageTotalKey(7), accountcache.ImageTodayKey(day, 7)).SetVal(4)
+	mock.ExpectDel(accountcache.ProfileKey(7), accountcache.UsageKey(7), accountcache.ModelStatsKey(7), accountcache.ImageTotalKey(7), accountcache.ImageTodayKey(day, 7)).SetVal(5)
 	mock.ExpectHDel(todayKeyForTest(day), accountcache.TodayStatsFields(7)...).SetVal(5)
 
 	service.deleteAccountCacheKeys([]int{0, 7})
+	if len(observer.accountIDs) != 2 || observer.accountIDs[0] != 0 || observer.accountIDs[1] != 7 {
+		t.Fatalf("deleted account IDs = %v, want [0 7]", observer.accountIDs)
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("redis expectations: %v", err)
+	}
+}
+
+func TestDeleteAccountCacheKeysForgetsModelStatsWithoutRedis(t *testing.T) {
+	observer := &captureAccountDeletionObserver{}
+	service := NewService(stubRepository{}, nil, nil, nil)
+	service.SetAccountDeletionObserver(observer)
+
+	service.deleteAccountCacheKeys([]int{7})
+	if len(observer.accountIDs) != 1 || observer.accountIDs[0] != 7 {
+		t.Fatalf("deleted account IDs = %v, want [7]", observer.accountIDs)
 	}
 }
 

@@ -16,7 +16,13 @@ import {
   YAxis,
 } from 'recharts';
 import { PlatformIcon } from '../../shared/ui';
-import { accountsApi, type AccountStatsResp } from '../../shared/api/accounts';
+import {
+  accountsApi,
+  type AccountModelSuccessRate,
+  type AccountModelSuccessRateBucket,
+  type AccountModelSuccessRateWindow,
+  type AccountStatsResp,
+} from '../../shared/api/accounts';
 import { CommonDatePicker } from '../../shared/components/CommonDatePicker';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { CommonModal } from '../../shared/components/CommonModal';
@@ -24,10 +30,11 @@ import { DISTRIBUTION_COLORS } from '../../shared/constants';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 
 const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
+const MODEL_RATE_REFRESH_INTERVAL_MS = 30_000;
 
-// 预设时间范围
-type RangePreset = '7d' | '30d' | '90d' | 'custom';
-const RANGE_PRESETS = ['7d', '30d', '90d', 'custom'] as const;
+// 预设时间范围；rate 是近 24 小时模型成功率视图，排在最前且默认选中
+type RangePreset = 'rate' | '7d' | '30d' | '90d' | 'custom';
+const RANGE_PRESETS = ['rate', '7d', '30d', '90d', 'custom'] as const;
 
 // 按浏览器本地时区拼出 YYYY-MM-DD（不要用 toISOString，那是 UTC，会跨日）。
 function localDateStr(d: Date): string {
@@ -41,7 +48,8 @@ function getPresetDates(preset: RangePreset): { start_date?: string; end_date?: 
   if (preset === 'custom') return {};
   const now = new Date();
   const end = localDateStr(now);
-  const days = preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
+  // rate 视图只展示调度器统计，账号头部不需要历史费用数据，按当天查询即可降低刷新成本。
+  const days = preset === 'rate' ? 1 : preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
   const start = new Date(now);
   start.setDate(start.getDate() - (days - 1));
   return { start_date: localDateStr(start), end_date: end };
@@ -77,8 +85,8 @@ export function AccountStatsModal({
 }) {
   const { t } = useTranslation();
 
-  // 时间范围状态
-  const [preset, setPreset] = useState<RangePreset>('30d');
+  // 时间范围状态，默认"模型成功率"
+  const [preset, setPreset] = useState<RangePreset>('rate');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
 
@@ -89,14 +97,15 @@ export function AccountStatsModal({
     return getPresetDates(preset);
   }, [preset, customStart, customEnd]);
   const queryKey = useMemo(
-    () => ['account-stats', accountId, queryParams.start_date ?? '', queryParams.end_date ?? ''] as const,
-    [accountId, queryParams.end_date, queryParams.start_date],
+    () => ['account-stats', accountId, preset, queryParams.start_date ?? '', queryParams.end_date ?? ''] as const,
+    [accountId, preset, queryParams.end_date, queryParams.start_date],
   );
 
   const { data, isFetching, isLoading } = useQuery({
     queryKey,
     queryFn: () => accountsApi.stats(accountId, queryParams),
     placeholderData: keepPreviousData,
+    refetchInterval: preset === 'rate' ? MODEL_RATE_REFRESH_INTERVAL_MS : false,
     refetchOnWindowFocus: false,
   });
   const initialLoading = isLoading && !data;
@@ -128,9 +137,21 @@ export function AccountStatsModal({
           onPresetChange={setPreset}
         />
 
-        <div className="min-h-[560px]">
+        {/* 固定高度 + 内部滚动，保证切换 tab 时 modal 尺寸不变 */}
+        <div className="h-[min(72vh,760px)] overflow-y-auto">
           {data ? (
-            <StatsContent data={data} lifetimeImageCount={lifetimeImageCount} />
+            <div className="space-y-5">
+              {/* 账号卡片始终显示；成功率统计视图的模型请求表紧随其后 */}
+              <AccountHeaderCard data={data} rateView={preset === 'rate'} />
+              {preset === 'rate' ? (
+                <ModelRequestStats
+                  rates={data.model_success_rates ?? []}
+                  window={data.model_success_rate_window}
+                />
+              ) : (
+                <StatsContent data={data} lifetimeImageCount={lifetimeImageCount} />
+              )}
+            </div>
           ) : (
             <AccountStatsSkeleton />
           )}
@@ -254,6 +275,33 @@ function AccountStatsSkeleton() {
   );
 }
 
+function AccountHeaderCard({ data, rateView }: { data: AccountStatsResp; rateView: boolean }) {
+  const { t } = useTranslation();
+  const activeDays = data.active_days || 1;
+  const rangeLabel = rateView
+    ? t('accounts.stats_rate_range_summary')
+    : `${data.start_date} ~ ${data.end_date} · ${t('accounts.stats_range_summary', { days: data.total_days, active: activeDays })}`;
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 p-4 rounded-lg bg-gradient-to-r from-primary-subtle/50 to-transparent border border-border-subtle">
+      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-subtle">
+        <PlatformIcon platform={data.platform} className="w-5 h-5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-sm text-text truncate">{data.name}</span>
+        </div>
+        <span className="text-xs text-text-tertiary">
+          {rangeLabel}
+        </span>
+      </div>
+      <Chip color={data.state === 'disabled' ? 'default' : 'success'} size="sm" variant="soft">
+        {data.state === 'disabled' ? t('status.disabled') : t('status.active')}
+      </Chip>
+    </div>
+  );
+}
+
 function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; lifetimeImageCount?: number }) {
   const { t } = useTranslation();
   const range = data.range;
@@ -269,29 +317,8 @@ function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; li
   const totalTokens = range.input_tokens + range.output_tokens;
   const dailyAvgTokens = totalTokens / activeDays;
 
-  // 时间范围描述
-  const rangeLabel = `${data.start_date} ~ ${data.end_date}`;
-
   return (
     <div className="space-y-5">
-      {/* 头部信息 */}
-      <div className="flex flex-wrap items-center gap-3 p-4 rounded-lg bg-gradient-to-r from-primary-subtle/50 to-transparent border border-border-subtle">
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-subtle">
-          <PlatformIcon platform={data.platform} className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm text-text truncate">{data.name}</span>
-          </div>
-          <span className="text-xs text-text-tertiary">
-            {rangeLabel} · {t('accounts.stats_range_summary', { days: data.total_days, active: activeDays })}
-          </span>
-        </div>
-        <Chip color={data.state === 'disabled' ? 'default' : 'success'} size="sm" variant="soft">
-          {data.state === 'disabled' ? t('status.disabled') : t('status.active')}
-        </Chip>
-      </div>
-
       {/* 顶部 4 个统计卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MiniStatCard
@@ -532,6 +559,272 @@ function LegendDot({ color, label }: { color: string; label: string }) {
       <div className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
       {label}
     </div>
+  );
+}
+
+// ==================== 模型请求（24h 固定时间桶） ====================
+
+function fmtPercent(ratio: number): string {
+  return `${(ratio * 100).toFixed(1)}%`;
+}
+
+function fmtBucketTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function fmtBucketDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' });
+}
+
+function fmtBucketRange(startISO: string, endISO: string): string {
+  const start = new Date(startISO);
+  const end = new Date(endISO);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return '-';
+  const startDate = fmtBucketDate(startISO);
+  const endDate = fmtBucketDate(endISO);
+  const startTime = fmtBucketTime(startISO);
+  const endTime = fmtBucketTime(endISO);
+  return startDate === endDate
+    ? `${startDate} ${startTime} – ${endTime}`
+    : `${startDate} ${startTime} – ${endDate} ${endTime}`;
+}
+
+function successRateColor(rate: number): string {
+  if (rate >= 0.95) return 'var(--ag-success)';
+  if (rate >= 0.8) return 'var(--ag-warning)';
+  return 'var(--ag-danger)';
+}
+
+type AccountModelSuccessRateBucketView = AccountModelSuccessRateBucket & {
+  window_start: string;
+  window_end: string;
+};
+
+function bucketTone(bucket: AccountModelSuccessRateBucket): 'empty' | 'neutral' | 'good' | 'warning' | 'bad' {
+  if (bucket.requests === 0) return 'empty';
+  if (bucket.valid_requests === 0) return 'neutral';
+  if (bucket.success_rate >= 0.95) return 'good';
+  if (bucket.success_rate >= 0.8) return 'warning';
+  return 'bad';
+}
+
+function aggregateRateBuckets(
+  rates: AccountModelSuccessRate[],
+  rateWindow?: AccountModelSuccessRateWindow | null,
+): AccountModelSuccessRateBucketView[] {
+  const fallbackStart = rates[0]?.window_start;
+  const fallbackEnd = rates[0]?.window_end;
+  const windowStart = rateWindow?.window_start ?? fallbackStart;
+  const bucketCount = rateWindow?.bucket_count || 48;
+  const bucketSeconds = rateWindow?.bucket_seconds || (
+    windowStart && fallbackEnd
+      ? Math.max(1, (new Date(fallbackEnd).getTime() - new Date(windowStart).getTime()) / bucketCount / 1000)
+      : 1800
+  );
+  if (!windowStart || Number.isNaN(new Date(windowStart).getTime())) return [];
+
+  const buckets = Array.from({ length: bucketCount }, (_, index) => {
+    const start = new Date(new Date(windowStart).getTime() + index * bucketSeconds * 1000);
+    const end = new Date(start.getTime() + bucketSeconds * 1000);
+    return {
+      index,
+      window_start: start.toISOString(),
+      window_end: end.toISOString(),
+      requests: 0,
+      valid_requests: 0,
+      invalid_requests: 0,
+      successes: 0,
+      failures: 0,
+      success_rate: 0,
+    } satisfies AccountModelSuccessRateBucketView;
+  });
+
+  rates.forEach((rate) => {
+    (rate.buckets ?? []).forEach((bucket) => {
+      const current = buckets[bucket.index];
+      if (!current) return;
+      current.requests += bucket.requests;
+      current.valid_requests += bucket.valid_requests;
+      current.invalid_requests += bucket.invalid_requests;
+      current.successes += bucket.successes;
+      current.failures += bucket.failures;
+      current.success_rate = current.valid_requests > 0 ? current.successes / current.valid_requests : 0;
+    });
+  });
+  return buckets;
+}
+
+function ModelRequestStats({
+  rates,
+  window,
+}: {
+  rates: AccountModelSuccessRate[];
+  window?: AccountModelSuccessRateWindow | null;
+}) {
+  const { t } = useTranslation();
+
+  const [selectedBucketIndex, setSelectedBucketIndex] = useState<number | null>(null);
+  const buckets = useMemo(() => aggregateRateBuckets(rates, window), [rates, window]);
+  const selectedBucket = useMemo(() => {
+    const selected = selectedBucketIndex !== null
+      ? buckets.find((bucket) => bucket.index === selectedBucketIndex)
+      : undefined;
+    const latestActive = [...buckets].reverse().find((bucket) => bucket.requests > 0);
+    return selected ?? latestActive ?? buckets[buckets.length - 1];
+  }, [buckets, selectedBucketIndex]);
+
+  // 只列出所选固定桶内确有请求的模型，按请求量降序。
+  const rows = useMemo<AccountModelSuccessRate[]>(
+    () => {
+      if (!selectedBucket) return [];
+      return rates
+        .flatMap((rate) => {
+          const bucket = (rate.buckets ?? []).find(
+            (item) => item.index === selectedBucket.index,
+          );
+          return bucket && bucket.requests > 0 ? [{ ...rate, ...bucket }] : [];
+        })
+        .sort((a, b) => b.requests - a.requests);
+    },
+    [rates, selectedBucket],
+  );
+
+  return (
+    <>
+      <div className="ag-account-rate-panel rounded-lg border border-border-subtle p-4">
+        <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
+          <h4 className="text-xs font-semibold text-text">{t('accounts.stats_model_requests')}</h4>
+          <span className="text-[10px] text-text-tertiary">{t('accounts.stats_model_requests_window')}</span>
+        </div>
+
+        {selectedBucket ? (
+          <>
+            <div className="ag-account-rate-selected-range">
+              <div className="ag-account-rate-selected-range__label">
+                <Clock className="size-3.5" />
+                <span>{t('accounts.stats_selected_bucket')}</span>
+              </div>
+              <strong>{fmtBucketRange(selectedBucket.window_start, selectedBucket.window_end)}</strong>
+              <span className="ag-account-rate-selected-range__summary">
+                {t('accounts.stats_bucket_summary', {
+                  requests: selectedBucket.requests.toLocaleString(),
+                  invalid: selectedBucket.invalid_requests.toLocaleString(),
+                  successes: selectedBucket.successes.toLocaleString(),
+                  valid: selectedBucket.valid_requests.toLocaleString(),
+                  rate: selectedBucket.valid_requests > 0 ? fmtPercent(selectedBucket.success_rate) : '-',
+                })}
+              </span>
+            </div>
+
+            <div className="ag-account-rate-buckets" role="group" aria-label={t('accounts.stats_bucket_selector')}>
+              {buckets.map((bucket) => {
+                const selected = bucket.index === selectedBucket.index;
+                const range = fmtBucketRange(bucket.window_start, bucket.window_end);
+                const rate = bucket.valid_requests > 0 ? fmtPercent(bucket.success_rate) : '-';
+                return (
+                  <button
+                    aria-label={t('accounts.stats_bucket_aria', {
+                      range,
+                      requests: bucket.requests.toLocaleString(),
+                      rate,
+                    })}
+                    aria-pressed={selected}
+                    className={`ag-account-rate-bucket ag-account-rate-bucket--${bucketTone(bucket)}`}
+                    data-selected={selected}
+                    key={bucket.index}
+                    title={range}
+                    type="button"
+                    onClick={() => setSelectedBucketIndex(bucket.index)}
+                  >
+                    <span className="ag-account-rate-bucket__time">{fmtBucketTime(bucket.window_start)}</span>
+                    <span className="ag-account-rate-bucket__count">
+                      {bucket.requests > 0 ? bucket.requests.toLocaleString() : '–'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      {/* 模型统计表格独立成卡片 */}
+      <div className="rounded-lg border border-border-subtle p-4">
+        <div className="ag-distribution-table-scroll">
+          <CompactDataTable
+          ariaLabel={t('accounts.stats_model_requests')}
+          className="ag-compact-data-table--dense ag-account-stats-model-table"
+          emptyText={t('common.no_data')}
+          minWidth={650}
+          rowKey={(row) => row.model}
+          rows={rows}
+          columns={[
+            {
+              key: 'model',
+              title: t('accounts.stats_model'),
+              width: '28%',
+              render: (row) => (
+                <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
+              ),
+            },
+            {
+              align: 'end',
+              key: 'requests',
+              title: t('accounts.stats_requests'),
+              width: '12%',
+              render: (row) => <span className="truncate font-mono text-text-secondary">{row.requests.toLocaleString()}</span>,
+            },
+            {
+              align: 'end',
+              key: 'valid_requests',
+              title: t('accounts.stats_valid_requests'),
+              width: '12%',
+              render: (row) => <span className="truncate font-mono text-text-secondary">{row.valid_requests.toLocaleString()}</span>,
+            },
+            {
+              align: 'end',
+              key: 'successes',
+              title: t('accounts.stats_success'),
+              width: '12%',
+              render: (row) => <span className="truncate font-mono text-success">{row.successes.toLocaleString()}</span>,
+            },
+            {
+              align: 'end',
+              key: 'failures',
+              title: t('accounts.stats_failure'),
+              width: '12%',
+              render: (row) => <span className="truncate font-mono text-danger">{row.failures.toLocaleString()}</span>,
+            },
+            {
+              align: 'end',
+              key: 'invalid',
+              title: t('accounts.stats_invalid_requests'),
+              width: '12%',
+              render: (row) => <span className="truncate font-mono text-text-tertiary">{row.invalid_requests.toLocaleString()}</span>,
+            },
+            {
+              align: 'end',
+              key: 'success_rate',
+              title: t('accounts.stats_success_rate'),
+              width: '12%',
+              render: (row) => (
+                <span
+                  className="truncate font-mono font-semibold"
+                  style={{ color: row.valid_requests > 0 ? successRateColor(row.success_rate) : 'var(--ag-text-tertiary)' }}
+                >
+                  {row.valid_requests > 0 ? fmtPercent(row.success_rate) : '-'}
+                </span>
+              ),
+            },
+          ]}
+          />
+        </div>
+      </div>
+    </>
   );
 }
 

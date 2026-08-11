@@ -33,6 +33,12 @@ func TestKeys(t *testing.T) {
 	if got := UsageKey(42); got != "ag:account:usage:42" {
 		t.Fatalf("UsageKey = %q", got)
 	}
+	if got := ModelStatsKey(42); got != "ag:account:model-stats:42" {
+		t.Fatalf("ModelStatsKey = %q", got)
+	}
+	if got := ModelStatsPattern(); got != "ag:account:model-stats:*" {
+		t.Fatalf("ModelStatsPattern = %q", got)
+	}
 	if got := UsagePattern(); got != "ag:account:usage:*" {
 		t.Fatalf("UsagePattern = %q", got)
 	}

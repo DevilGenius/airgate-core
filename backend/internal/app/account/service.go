@@ -111,13 +111,20 @@ type StateWriter interface {
 	RefreshRouteGraphAccount(ctx context.Context, accountID int)
 }
 
+// AccountDeletionObserver 接收账号删除事件，用于清理其它域拥有的账号级运行时状态。
+// 回调在删除 Redis 缓存前同步执行，确保删除后的状态不会再次被后台持久化。
+type AccountDeletionObserver interface {
+	OnAccountsDeleted(accountIDs []int)
+}
+
 type Service struct {
-	repo        Repository
-	plugins     PluginCatalog
-	concurrency ConcurrencyReader
-	stateWriter StateWriter
-	monitor     monitoring.Recorder
-	now         func() time.Time
+	repo             Repository
+	plugins          PluginCatalog
+	concurrency      ConcurrencyReader
+	stateWriter      StateWriter
+	deletionObserver AccountDeletionObserver
+	monitor          monitoring.Recorder
+	now              func() time.Time
 
 	usageMu    sync.RWMutex
 	usageCache map[int]*usageCacheEntry
@@ -147,6 +154,14 @@ func NewService(repo Repository, plugins PluginCatalog, concurrency ConcurrencyR
 // SetUsageCacheRedis enables the cross-process account usage cache.
 func (s *Service) SetUsageCacheRedis(rdb *redis.Client) {
 	s.usageRedis = rdb
+}
+
+// SetAccountDeletionObserver injects the synchronous account deletion hook.
+func (s *Service) SetAccountDeletionObserver(observer AccountDeletionObserver) {
+	if s == nil {
+		return
+	}
+	s.deletionObserver = observer
 }
 
 // SetMonitorRecorder injects the best-effort monitor event recorder.
@@ -2677,6 +2692,9 @@ func redisValueFloat64(value any) (float64, bool) {
 }
 
 func (s *Service) deleteAccountCacheKeys(accountIDs []int) {
+	if s.deletionObserver != nil {
+		s.deletionObserver.OnAccountsDeleted(accountIDs)
+	}
 	if s.usageRedis == nil || len(accountIDs) == 0 {
 		return
 	}
@@ -2698,7 +2716,7 @@ func (s *Service) deleteAccountCacheKeys(accountIDs []int) {
 	_, _ = readPipe.Exec(ctx)
 
 	day := accountcache.Day(s.now())
-	keys := make([]string, 0, len(validIDs)*4)
+	keys := make([]string, 0, len(validIDs)*5)
 	todayStatsFields := make([]string, 0, len(validIDs)*5)
 	pipe := s.usageRedis.Pipeline()
 	for _, id := range validIDs {
@@ -2710,6 +2728,7 @@ func (s *Service) deleteAccountCacheKeys(accountIDs []int) {
 		keys = append(keys,
 			accountcache.ProfileKey(id),
 			accountcache.UsageKey(id),
+			accountcache.ModelStatsKey(id),
 			accountcache.ImageTotalKey(id),
 			accountcache.ImageTodayKey(day, id),
 		)

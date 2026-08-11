@@ -579,7 +579,6 @@ func (s *RuntimeSampler) sampleProcess(parent context.Context) RuntimeProcessSta
 			contextWindowCap = contextCapacity
 		}
 	}
-
 	return RuntimeProcessStats{
 		CPUPercent:          cpuPercent,
 		HeapAllocBytes:      mem.HeapAlloc,

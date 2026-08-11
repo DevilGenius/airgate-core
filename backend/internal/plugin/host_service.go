@@ -795,6 +795,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			outcome, fwdErr := inst.Forward(fwdCtx, fwdReq)
 			releaseCapacity()
 			duration := time.Since(start)
+			h.scheduler.RecordModelOutcome(acc.ID, schedulingModel, outcome)
 			if cerr := hostContextError(fwdErr); cerr != nil {
 				return nil, cerr
 			}
@@ -1004,6 +1005,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 			outcome, fwdErr := inst.Forward(fwdCtx, fwdReq)
 			releaseCapacity()
 			duration := time.Since(start)
+			h.scheduler.RecordModelOutcome(acc.ID, schedulingModel, outcome)
 			if cerr := hostContextError(fwdErr); cerr != nil {
 				return cerr
 			}

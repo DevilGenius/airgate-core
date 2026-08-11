@@ -348,6 +348,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			execution := f.callPlugin(c, state)
 			lastAttemptAccount = state.account
 			totalAttempts++
+			f.scheduler.RecordModelOutcome(accountID, state.modelForScheduling(), execution.outcome)
 			modelRerouteRequested := execution.outcome.FailoverScope == sdk.FailoverScopeModelReroute
 			if trace != nil && !modelRerouteRequested {
 				trace.addFailedAttempt(totalAttempts, state, execution)

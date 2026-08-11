@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
@@ -636,22 +637,38 @@ func (h *AccountHandler) GetAccountStats(c *gin.Context) {
 		return
 	}
 
+	// 模型级成功率来自调度器内存中的近 24 小时固定 30 分钟桶，与上面的日期区间统计口径不同，
+	// 不受 start_date/end_date 影响；scheduler 为 nil 时返回空列表，不阻断主响应。
+	modelSuccessRates := h.scheduler.ListModelSuccessRates(id)
+	if modelSuccessRates == nil {
+		modelSuccessRates = []scheduler.ModelSuccessRateStats{}
+	}
+	var modelSuccessRateWindow *scheduler.ModelSuccessRateWindow
+	if h.scheduler != nil {
+		window := h.scheduler.ModelSuccessRateWindow()
+		if window.BucketCount > 0 {
+			modelSuccessRateWindow = &window
+		}
+	}
+
 	response.Success(c, gin.H{
-		"account_id":       result.AccountID,
-		"name":             result.Name,
-		"platform":         result.Platform,
-		"state":            result.State,
-		"start_date":       result.StartDate,
-		"end_date":         result.EndDate,
-		"total_days":       result.TotalDays,
-		"today":            result.Today,
-		"range":            result.Range,
-		"daily_trend":      result.DailyTrend,
-		"models":           result.Models,
-		"active_days":      result.ActiveDays,
-		"avg_duration_ms":  result.AvgDurationMs,
-		"peak_cost_day":    result.PeakCostDay,
-		"peak_request_day": result.PeakRequestDay,
+		"account_id":                result.AccountID,
+		"name":                      result.Name,
+		"platform":                  result.Platform,
+		"state":                     result.State,
+		"start_date":                result.StartDate,
+		"end_date":                  result.EndDate,
+		"total_days":                result.TotalDays,
+		"today":                     result.Today,
+		"range":                     result.Range,
+		"daily_trend":               result.DailyTrend,
+		"models":                    result.Models,
+		"active_days":               result.ActiveDays,
+		"avg_duration_ms":           result.AvgDurationMs,
+		"peak_cost_day":             result.PeakCostDay,
+		"peak_request_day":          result.PeakRequestDay,
+		"model_success_rates":       modelSuccessRates,
+		"model_success_rate_window": modelSuccessRateWindow,
 	})
 }
 

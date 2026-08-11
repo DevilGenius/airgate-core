@@ -87,6 +87,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	accountStore := store.NewAccountStore(dep.DB)
 	accountService := appaccount.NewService(accountStore, dep.PluginMgr, dep.Concurrency, dep.Scheduler)
 	accountService.SetUsageCacheRedis(dep.Redis)
+	accountService.SetAccountDeletionObserver(dep.Scheduler)
 	groupStore := store.NewGroupStore(dep.DB)
 	groupService := appgroup.NewService(groupStore, dep.Concurrency)
 	proxyStore := store.NewProxyStore(dep.DB)

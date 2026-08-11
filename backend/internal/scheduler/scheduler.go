@@ -12,6 +12,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 var (
@@ -71,6 +72,7 @@ type Scheduler struct {
 	responseAffinity *ResponseAffinity
 	currentLoad      func(ctx context.Context, accountID int) int
 	stateCache       *accountStateCache
+	modelSuccessRate *ModelSuccessRateTracker
 }
 
 // SetMonitorRecorder injects the best-effort monitor event recorder.
@@ -99,12 +101,65 @@ func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 		familyCooldown:   fc,
 		responseAffinity: NewResponseAffinity(rdb),
 		stateCache:       stateCache,
+		modelSuccessRate: NewModelSuccessRateTracker(rdb),
 	}
 	s.state.onCriticalTransition = func(accountID int) {
 		s.RefreshRouteGraphAccount(context.Background(), accountID)
 	}
 	s.state.onStateSnapshotUpdated = stateCache.Store
 	return s
+}
+
+// StartModelSuccessRateSync starts the background Redis synchronization loop.
+// Request-time reads use only the tracker's in-memory snapshot.
+func (s *Scheduler) StartModelSuccessRateSync(ctx context.Context) {
+	if s == nil || s.modelSuccessRate == nil {
+		return
+	}
+	s.modelSuccessRate.Run(ctx)
+}
+
+// RecordModelOutcome records one upstream attempt for account × scheduling model.
+func (s *Scheduler) RecordModelOutcome(accountID int, model string, outcome sdk.ForwardOutcome) {
+	if s == nil || s.modelSuccessRate == nil {
+		return
+	}
+	s.modelSuccessRate.Record(accountID, model, outcome)
+}
+
+// OnAccountsDeleted removes scheduler-owned in-memory state for deleted
+// accounts and prevents its dirty state from being persisted.
+func (s *Scheduler) OnAccountsDeleted(accountIDs []int) {
+	if s == nil || s.modelSuccessRate == nil {
+		return
+	}
+	for _, accountID := range accountIDs {
+		s.modelSuccessRate.Forget(accountID)
+	}
+}
+
+// ModelSuccessRate returns the current in-memory 24-hour fixed-bucket statistic.
+func (s *Scheduler) ModelSuccessRate(accountID int, model string) (ModelSuccessRateStats, bool) {
+	if s == nil || s.modelSuccessRate == nil {
+		return ModelSuccessRateStats{}, false
+	}
+	return s.modelSuccessRate.Get(accountID, model)
+}
+
+// ListModelSuccessRates returns current in-memory statistics for one account.
+func (s *Scheduler) ListModelSuccessRates(accountID int) []ModelSuccessRateStats {
+	if s == nil || s.modelSuccessRate == nil {
+		return nil
+	}
+	return s.modelSuccessRate.List(accountID)
+}
+
+// ModelSuccessRateWindow returns the fixed 30-minute bucket timeline.
+func (s *Scheduler) ModelSuccessRateWindow() ModelSuccessRateWindow {
+	if s == nil || s.modelSuccessRate == nil {
+		return ModelSuccessRateWindow{}
+	}
+	return s.modelSuccessRate.Window()
 }
 
 // BindResponseAccount 记录 Responses response_id 所在账号，用于后续 previous_response_id 续链路由。

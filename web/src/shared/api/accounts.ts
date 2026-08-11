@@ -159,4 +159,39 @@ export interface AccountStatsResp {
   avg_duration_ms: number;
   peak_cost_day: AccountPeakDay;
   peak_request_day: AccountPeakDay;
+  /** 调度器内存中近 24 小时、固定 30 分钟桶的账号 × 调度模型统计，与日期区间口径无关。 */
+  model_success_rates?: AccountModelSuccessRate[] | null;
+  model_success_rate_window?: AccountModelSuccessRateWindow | null;
+}
+
+export interface AccountModelSuccessRateWindow {
+  window_start: string;
+  window_end: string;
+  bucket_seconds: number;
+  bucket_count: number;
+}
+
+export interface AccountModelSuccessRateBucket {
+  index: number;
+  requests: number;
+  valid_requests: number;
+  invalid_requests: number;
+  successes: number;
+  failures: number;
+  success_rate: number;
+}
+
+export interface AccountModelSuccessRate {
+  account_id: number;
+  model: string;
+  requests: number;
+  valid_requests: number;
+  invalid_requests: number;
+  successes: number;
+  failures: number;
+  success_rate: number;
+  window_start: string;
+  window_end: string;
+  last_updated: string;
+  buckets?: AccountModelSuccessRateBucket[];
 }
