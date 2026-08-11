@@ -180,14 +180,12 @@
   }
 }
 
-/* Rate details table: scrolls like distribution tables but without a reserved
-   scrollbar gutter so its right edge stays aligned with the cards above. */
+/* Stats modal tables: always fully expanded; scrolling is handled by the
+   modal's fixed-height content area, so no internal max-height/scroll here. */
 
-.ag-account-rate-table-scroll {
+.ag-account-stats-table-scroll {
   width: 100%;
   min-width: 0;
-  max-height: 11rem;
-  overflow-y: auto;
   overflow-x: hidden;
 }
 

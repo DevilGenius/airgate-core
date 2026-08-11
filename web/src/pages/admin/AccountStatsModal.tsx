@@ -773,7 +773,7 @@ function ModelRequestStats({
       </div>
 
       {/* 模型统计表格（无外框，与上方卡片同宽） */}
-      <div className="ag-account-rate-table-scroll">
+      <div className="ag-account-stats-table-scroll">
           <CompactDataTable
           ariaLabel={t('accounts.stats_model_requests')}
           className="ag-compact-data-table--dense ag-account-stats-model-table"
@@ -864,7 +864,7 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
   return (
     <div className="rounded-lg border border-border-subtle p-3">
       <h4 className="text-xs font-semibold text-text mb-2">{t('accounts.stats_model_distribution')}</h4>
-      <div className="ag-distribution-table-scroll">
+      <div className="ag-account-stats-table-scroll">
         <CompactDataTable
           ariaLabel={t('accounts.stats_model')}
           className="ag-compact-data-table--dense ag-account-stats-model-table"
