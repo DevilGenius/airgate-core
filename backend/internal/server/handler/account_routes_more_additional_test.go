@@ -59,6 +59,7 @@ func TestImportAccountsAppliesConfiguredDSL(t *testing.T) {
     ],
     "set": {
       "max_concurrency": 20,
+      "model_downgrade_threshold": 0,
       "priority": {"mode":"sequence","initial":1000,"step":-10,"group_size":2},
       "group_ids": [%d]
     }
