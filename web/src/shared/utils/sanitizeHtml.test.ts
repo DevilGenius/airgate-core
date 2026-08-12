@@ -27,6 +27,32 @@ describe('sanitizeHtml', () => {
     expect(html).toContain('target="_self"');
     expect(html).not.toContain('target="popup"');
   });
+
+  it('preserves safe rich HTML markup and styles without weakening strict mode', () => {
+    const source = '<style>.notice{color:#92400e}</style><div class="notice" style="background: #fef3c7; color: #92400e; padding: 16px" onclick="x()"><img src="https://example.com/logo.png" alt="Logo">Notice<script>alert(1)</script></div>';
+    const previewHtml = sanitizeHtml(source, { mode: 'rich' });
+
+    expect(sanitizeHtml(source)).toContain('Notice');
+    expect(sanitizeHtml(source)).not.toContain('style=');
+    expect(previewHtml).toContain('<style>.notice{color:#92400e}</style>');
+    expect(previewHtml).toContain('<div class="notice" style="');
+    expect(previewHtml).toContain('background: #fef3c7');
+    expect(previewHtml).toContain('color: #92400e');
+    expect(previewHtml).toContain('padding: 16px');
+    expect(previewHtml).toContain('<img src="https://example.com/logo.png" alt="Logo">');
+    expect(previewHtml).not.toContain('script');
+    expect(previewHtml).not.toContain('onclick');
+  });
+
+  it('removes dangerous rich HTML URLs and CSS while retaining other attributes', () => {
+    const html = sanitizeHtml('<a href="javascript:alert(1)" style="color: red; background-image: url(j\\61vascript:alert(1))" data-track="safe">bad</a>', { mode: 'rich' });
+
+    expect(html).toContain('data-track="safe"');
+    expect(html).toContain('style="color: red"');
+    expect(html).not.toContain('href=');
+    expect(html).not.toContain('background-image');
+    expect(html).not.toContain('javascript:');
+  });
 });
 
 describe('effectiveDocUrl', () => {

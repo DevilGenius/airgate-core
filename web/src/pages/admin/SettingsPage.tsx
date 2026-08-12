@@ -1058,6 +1058,7 @@ function EmailTemplateEditor({
   onPreviewOpenChange: (isOpen: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const previewFrameRef = useRef<HTMLIFrameElement>(null);
 
   // 模板变量替换预览
   function replaceVars(text: string) {
@@ -1068,7 +1069,30 @@ function EmailTemplateEditor({
     return result;
   }
 
-  const previewHtml = sanitizeHtml(replaceVars(body));
+  const previewHtml = sanitizeHtml(replaceVars(body), { mode: 'rich' });
+  const previewDocument = `<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src http: https: data: cid:; style-src 'unsafe-inline'; font-src http: https: data:; base-uri 'none'; form-action 'none'">
+  </head>
+  <body>${previewHtml}</body>
+</html>`;
+  function resizePreviewFrame() {
+    const frame = previewFrameRef.current;
+    const documentElement = frame?.contentDocument?.documentElement;
+    if (!documentElement) return;
+    frame.style.height = '1px';
+    const bodyElement = frame.contentDocument?.body;
+    const contentHeight = Math.max(
+      documentElement.scrollHeight,
+      documentElement.offsetHeight,
+      bodyElement?.scrollHeight ?? 0,
+      bodyElement?.offsetHeight ?? 0,
+    );
+    const maxHeight = Math.max(240, Math.floor(window.innerHeight * 0.6));
+    frame.style.height = `${Math.min(Math.max(contentHeight, 80), maxHeight)}px`;
+  }
   const previewModalState = useOverlayState({
     isOpen: isPreviewOpen,
     onOpenChange: onPreviewOpenChange,
@@ -1124,8 +1148,17 @@ function EmailTemplateEditor({
                         <span className="font-medium text-text">{replaceVars(subject)}</span>
                       </div>
                     </div>
-                    <div className="max-h-[60vh] overflow-y-auto bg-[#f8f9fa] p-5">
-                      <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                    <div className="bg-[#f8f9fa] p-5">
+                      <iframe
+                        className="w-full border-0 bg-white"
+                        onLoad={resizePreviewFrame}
+                        referrerPolicy="no-referrer"
+                        ref={previewFrameRef}
+                        sandbox="allow-same-origin"
+                        srcDoc={previewDocument}
+                        style={{ height: 80 }}
+                        title={t('settings.template_preview')}
+                      />
                     </div>
                   </div>
                 </Modal.Body>

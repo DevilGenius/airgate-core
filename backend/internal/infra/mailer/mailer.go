@@ -12,6 +12,7 @@ import (
 
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
+	"github.com/DevilGenius/airgate-core/internal/infra/htmlsanitize"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
 )
 
@@ -69,6 +70,7 @@ func (m *Mailer) Send(to, subject, body string) error {
 	if m.cfg.FromName != "" {
 		from = fmt.Sprintf("%s <%s>", m.cfg.FromName, m.cfg.FromAddr)
 	}
+	body = htmlsanitize.Sanitize(body)
 
 	msg := strings.Join([]string{
 		"From: " + from,
