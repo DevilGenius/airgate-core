@@ -18,6 +18,15 @@ const CSS_URL_PATTERN = /url\s*\(\s*(['"]?)(.*?)\1\s*\)/gi;
 const CSS_COMMENT_PATTERN = /\/\*[\s\S]*?\*\//g;
 const CSS_ESCAPE_PATTERN = /\\([0-9a-f]{1,6})\s?|\\(.)/gi;
 
+function stripControlCharacters(value: string): string {
+  let sanitized = '';
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint > 0x1f && codePoint !== 0x7f) sanitized += character;
+  }
+  return sanitized;
+}
+
 export function isSafeURL(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return false;
@@ -46,12 +55,11 @@ function isSafeRichHTMLURL(value: string): boolean {
 }
 
 function hasDangerousCSS(value: string): boolean {
-  const normalized = value
+  const normalized = stripControlCharacters(value
     .replace(CSS_COMMENT_PATTERN, '')
     .replace(CSS_ESCAPE_PATTERN, (_match, hex: string | undefined, escaped: string | undefined) => (
       hex ? String.fromCodePoint(Number.parseInt(hex, 16)) : (escaped ?? '')
-    ))
-    .replace(/[\u0000-\u001f\u007f]/g, '');
+    )));
   if (DANGEROUS_CSS_PATTERN.test(normalized)) return true;
 
   CSS_URL_PATTERN.lastIndex = 0;
