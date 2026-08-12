@@ -388,6 +388,8 @@
     "family_limited_label": "Family limited",
     "model_unsupported_label": "Family backing off",
     "model_demoted_label": "Model demoted ×{{count}}",
+    "degraded_label": "Backing off",
+    "degraded_tooltip": "Temporarily backing off due to an upstream error; scheduling resumes automatically.",
     "family_cooldown_label_one": "{{count}} family cooling",
     "family_cooldown_label_other": "{{count}} families cooling",
     "clear_family_cooldowns": "Clear rate-limit markers",
