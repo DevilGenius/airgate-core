@@ -137,7 +137,7 @@ func TestPluginMonitorRecordsExecutionClientAndClosedEvents(t *testing.T) {
 	}
 	retry := recorder.requestEvents[1]
 	if retry.Type != requestmonitoring.TypePluginForwardRetry || retry.Severity != requestmonitoring.SeverityInfo ||
-		retry.RequestID != "retry-request" || retry.Detail["failed_attempt"] != 2 || retry.Detail["retry_number"] != 2 ||
+		retry.RequestID != "retry-request" || retry.Detail["failed_attempt"] != 2 || retry.Detail["retry_number"] != 1 ||
 		retry.Detail["next_attempt"] != 3 || retry.Detail["final_failure"] != false {
 		t.Fatalf("retry event = %+v", retry)
 	}

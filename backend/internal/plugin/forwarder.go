@@ -220,6 +220,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	ctx := c.Request.Context()
 	startedAt := state.startedAt
 	totalAttempts := 0
+	var finalAttemptAccount *ent.Account
 
 	failureSummary := allRoutesFailureSummary{}
 
@@ -365,6 +366,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 
 			execution := f.callPlugin(c, state)
 			lastAttemptAccount = state.account
+			finalAttemptAccount = state.account
 			totalAttempts++
 			f.scheduler.RecordModelOutcome(accountID, state.modelForScheduling(), execution.outcome)
 			modelRerouteRequested := execution.outcome.FailoverScope == sdk.FailoverScopeModelReroute
@@ -460,7 +462,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				}
 				attrs = append(attrs, "will_retry", willRetry)
 				if willRetry {
-					attrs = append(attrs, "retry_number", totalAttempts, "next_attempt", totalAttempts+1)
+					attrs = append(attrs, "retry_number", totalRetriesForAttempts(totalAttempts), "next_attempt", totalAttempts+1)
 				}
 				attemptLogger.Info("forward_attempt_failed", attrs...)
 				releaseAccountSlot()
@@ -521,7 +523,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	c.Set(ginCtxKeyAttempts, totalAttempts)
 	response := selectAllRoutesFailureResponse(failureSummary)
 	f.recordAccountAvailabilityFailure(c, state, failureSummary, response, totalAttempts)
-	f.recordAPIRequestError(c, state, response.status, response.code, response.message)
+	f.recordAPIRequestErrorForKeyAndAccount(c, state.keyInfo, finalAttemptAccount, state.requestedPlatform, state.requestPath, state.model, response.status, response.code, response.message)
 	writeAllRoutesFailedResponse(c, response)
 }
 

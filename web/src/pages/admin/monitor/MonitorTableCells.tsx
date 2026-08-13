@@ -156,8 +156,18 @@ function ordinalLabel(value: string): string {
   return value ? `#${value}` : '';
 }
 
+function attemptLabel(value: string): string {
+  return value === '0' ? value : ordinalLabel(value);
+}
+
 function retryLabel(value: string): string {
   return value === '0' ? value : ordinalLabel(value);
+}
+
+function retryCountForAttempt(value: string): string {
+  const attempt = Number(value);
+  if (!Number.isInteger(attempt) || attempt < 1) return '';
+  return String(attempt - 1);
 }
 
 function durationMsLabel(value?: number | string): string {
@@ -208,7 +218,7 @@ function detailJsonText(entries: DetailEntry[]): string {
 export function monitorDetailEntries(event: MonitorEventResp): DetailEntry[] {
   const detail = event.detail;
   const entries: DetailEntry[] = [];
-  appendDetail(entries, 'attempt', detailValue(detail, 'total_attempts'));
+  appendDetail(entries, 'attempt', attemptLabel(detailValue(detail, 'total_attempts')));
   appendDetail(entries, 'retry', retryLabel(detailValue(detail, 'total_retries')));
   appendDetail(entries, 'model', detailValue(detail, 'model'));
   appendDetail(entries, 'client_model', detailValue(detail, 'client_model'));
@@ -225,10 +235,12 @@ export function requestDetailEntries(event: MonitorRequestEventResp): DetailEntr
   const entries: DetailEntry[] = [];
   const isRetryScheduled = event.type === 'plugin_forward_retry';
   if (isRetryScheduled) {
-    appendDetail(entries, 'attempt', ordinalLabel(detailValue(detail, 'next_attempt')));
-    appendDetail(entries, 'retry', ordinalLabel(detailValue(detail, 'retry_number')));
+    const failedAttempt = detailValue(detail, 'failed_attempt');
+    const retryNumber = retryCountForAttempt(failedAttempt) || detailValue(detail, 'retry_number');
+    appendDetail(entries, 'attempt', attemptLabel(failedAttempt || detailValue(detail, 'next_attempt')));
+    appendDetail(entries, 'retry', retryLabel(retryNumber));
   } else {
-    appendDetail(entries, 'attempt', detailValue(detail, 'total_attempts'));
+    appendDetail(entries, 'attempt', attemptLabel(detailValue(detail, 'total_attempts')));
     appendDetail(entries, 'retry', retryLabel(detailValue(detail, 'total_retries')));
   }
   appendDetail(entries, 'request_id', event.request_id, { hidden: true });

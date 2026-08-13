@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/forwardpath"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
@@ -24,6 +25,10 @@ func (f *Forwarder) recordAPIRequestError(c *gin.Context, state *forwardState, s
 }
 
 func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.APIKeyInfo, platform, path, model string, status int, code, message string) {
+	f.recordAPIRequestErrorForKeyAndAccount(c, keyInfo, nil, platform, path, model, status, code, message)
+}
+
+func (f *Forwarder) recordAPIRequestErrorForKeyAndAccount(c *gin.Context, keyInfo *auth.APIKeyInfo, lastAccount *ent.Account, platform, path, model string, status int, code, message string) {
 	if f == nil || f.requestMonitor == nil || keyInfo == nil {
 		return
 	}
@@ -69,6 +74,11 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 		Title:              "API request error",
 		Message:            message,
 		Detail:             detail,
+	}
+	if lastAccount != nil {
+		accountID := lastAccount.ID
+		input.AccountID = &accountID
+		input.AccountNameSnapshot = lastAccount.Name
 	}
 	f.recordRequestEvent(ctx, input, requestTraceFromGinContext(c), true)
 }
@@ -214,7 +224,7 @@ func (f *Forwarder) recordPluginExecutionRetry(ctx context.Context, state *forwa
 		title:         "Plugin forward retry",
 		stage:         "plugin_forward_retry",
 		failedAttempt: attempts,
-		retryNumber:   attempts,
+		retryNumber:   totalRetriesForAttempts(attempts),
 		nextAttempt:   attempts + 1,
 		finalFailure:  false,
 	})

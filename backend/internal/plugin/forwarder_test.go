@@ -1612,6 +1612,30 @@ func TestRecordAPIRequestErrorIncludesGroupSnapshotInDetail(t *testing.T) {
 	}
 }
 
+func TestRecordAPIRequestErrorIncludesLastAttemptAccount(t *testing.T) {
+	t.Parallel()
+
+	recorder := &captureRequestMonitorRecorder{}
+	forwarder := &Forwarder{requestMonitor: recorder}
+	keyInfo := &auth.APIKeyInfo{KeyID: 11, UserID: 22, GroupID: 33}
+	account := &ent.Account{ID: 5580, Name: "0725-Free-130"}
+	c, _ := pluginTestContext(http.MethodPost, "/v1/responses")
+	c.Set(ginCtxKeyAttempts, 3)
+
+	forwarder.recordAPIRequestErrorForKeyAndAccount(c, keyInfo, account, "openai", "/v1/responses", "gpt-5.6-luna", http.StatusServiceUnavailable, "no_available_account", "暂无可用上游账号，请稍后重试")
+
+	if len(recorder.events) != 1 {
+		t.Fatalf("events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.AccountID == nil || *event.AccountID != 5580 || event.AccountNameSnapshot != "0725-Free-130" {
+		t.Fatalf("last attempt account = %#v/%q, want 5580/0725-Free-130", event.AccountID, event.AccountNameSnapshot)
+	}
+	if event.Detail["total_attempts"] != 3 || event.Detail["total_retries"] != 2 {
+		t.Fatalf("attempt detail = %+v", event.Detail)
+	}
+}
+
 func TestAllRoutesFailureSummaryRecordsTimeout(t *testing.T) {
 	t.Parallel()
 
