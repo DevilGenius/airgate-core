@@ -1636,6 +1636,38 @@ func TestRecordAPIRequestErrorIncludesLastAttemptAccount(t *testing.T) {
 	}
 }
 
+func TestRecordAPIRequestErrorIncludesFinalExecutionContext(t *testing.T) {
+	t.Parallel()
+
+	recorder := &captureRequestMonitorRecorder{}
+	forwarder := &Forwarder{requestMonitor: recorder}
+	keyInfo := &auth.APIKeyInfo{KeyID: 11, UserID: 22, GroupID: 33}
+	account := &ent.Account{ID: 5285, Name: "0724-Free-18"}
+	execution := &forwardExecution{
+		outcome: sdk.ForwardOutcome{
+			Kind:     sdk.OutcomeAccountRateLimited,
+			Reason:   "The usage limit has been reached",
+			Upstream: sdk.UpstreamResponse{StatusCode: http.StatusTooManyRequests},
+		},
+		duration: 1500 * time.Millisecond,
+	}
+	c, _ := pluginTestContext(http.MethodPost, "/v1/responses")
+	c.Set(ginCtxKeyAttempts, 3)
+
+	forwarder.recordAPIRequestErrorForKeyAndAccountWithExecution(c, keyInfo, account, "gateway-openai", execution, "openai", "/v1/responses", "gpt-5.6-luna", http.StatusTooManyRequests, "account_rate_limited", "上游账号当前被限流，请稍后重试")
+
+	if len(recorder.events) != 1 {
+		t.Fatalf("events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.PluginID != "gateway-openai" || event.UpstreamStatus == nil || *event.UpstreamStatus != http.StatusTooManyRequests || event.DurationMS != 1500 {
+		t.Fatalf("execution metadata = %+v", event)
+	}
+	if event.Detail["outcome_kind"] != "account_rate_limited" || event.Detail["reason"] != "The usage limit has been reached" || event.Detail["stage"] != "api_request" {
+		t.Fatalf("execution detail = %+v", event.Detail)
+	}
+}
+
 func TestAllRoutesFailureSummaryRecordsTimeout(t *testing.T) {
 	t.Parallel()
 

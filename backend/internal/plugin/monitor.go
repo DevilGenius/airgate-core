@@ -29,6 +29,10 @@ func (f *Forwarder) recordAPIRequestErrorForKey(c *gin.Context, keyInfo *auth.AP
 }
 
 func (f *Forwarder) recordAPIRequestErrorForKeyAndAccount(c *gin.Context, keyInfo *auth.APIKeyInfo, lastAccount *ent.Account, platform, path, model string, status int, code, message string) {
+	f.recordAPIRequestErrorForKeyAndAccountWithExecution(c, keyInfo, lastAccount, "", nil, platform, path, model, status, code, message)
+}
+
+func (f *Forwarder) recordAPIRequestErrorForKeyAndAccountWithExecution(c *gin.Context, keyInfo *auth.APIKeyInfo, lastAccount *ent.Account, pluginID string, execution *forwardExecution, platform, path, model string, status int, code, message string) {
 	if f == nil || f.requestMonitor == nil || keyInfo == nil {
 		return
 	}
@@ -47,6 +51,14 @@ func (f *Forwarder) recordAPIRequestErrorForKeyAndAccount(c *gin.Context, keyInf
 		"http_status":      status,
 		"http_error_class": httpErrorClassForStatus(status),
 		"error_code":       code,
+	}
+	if execution != nil {
+		reason := judgmentReason(*execution)
+		detail["outcome_kind"] = execution.outcome.Kind.String()
+		detail["duration_ms"] = execution.duration.Milliseconds()
+		detail["upstream_status"] = execution.outcome.Upstream.StatusCode
+		detail["reason"] = reason
+		detail["stage"] = "api_request"
 	}
 	if attempts := forwardAttemptsFromGinContext(c); attempts > 0 {
 		detail["total_attempts"] = attempts
@@ -70,10 +82,15 @@ func (f *Forwarder) recordAPIRequestErrorForKeyAndAccount(c *gin.Context, keyInf
 		RequestPath:        path,
 		Model:              model,
 		HTTPStatus:         intPtr(status),
+		PluginID:           pluginID,
 		ErrorCode:          code,
 		Title:              "API request error",
 		Message:            message,
 		Detail:             detail,
+	}
+	if execution != nil {
+		input.UpstreamStatus = intPtr(execution.outcome.Upstream.StatusCode)
+		input.DurationMS = execution.duration.Milliseconds()
 	}
 	if lastAccount != nil {
 		accountID := lastAccount.ID
