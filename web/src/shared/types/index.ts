@@ -783,6 +783,7 @@ export interface PluginResp {
     default?: string;
     description?: string;
     placeholder?: string;
+    options?: Array<{ value: string; label: string }>;
   }>;
   metadata?: Record<string, string>;
   instruction_presets?: string[];

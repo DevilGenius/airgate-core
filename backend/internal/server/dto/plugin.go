@@ -19,13 +19,19 @@ type PluginResp struct {
 
 // ConfigFieldResp 插件配置字段声明
 type ConfigFieldResp struct {
-	Key         string `json:"key"`
-	Label       string `json:"label,omitempty"`
-	Type        string `json:"type"`
-	Required    bool   `json:"required,omitempty"`
-	Default     string `json:"default,omitempty"`
-	Description string `json:"description,omitempty"`
-	Placeholder string `json:"placeholder,omitempty"`
+	Key         string                  `json:"key"`
+	Label       string                  `json:"label,omitempty"`
+	Type        string                  `json:"type"`
+	Required    bool                    `json:"required,omitempty"`
+	Default     string                  `json:"default,omitempty"`
+	Description string                  `json:"description,omitempty"`
+	Placeholder string                  `json:"placeholder,omitempty"`
+	Options     []ConfigFieldOptionResp `json:"options,omitempty"`
+}
+
+type ConfigFieldOptionResp struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
 }
 
 // PluginConfigResp 插件持久化配置

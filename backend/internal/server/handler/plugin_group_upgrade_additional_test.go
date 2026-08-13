@@ -396,6 +396,10 @@ func (s *pluginHandlerManagerStub) UpdatePluginConfig(_ context.Context, _ strin
 	return nil
 }
 
+func (s *pluginHandlerManagerStub) UpdatePluginConfigLive(context.Context, string, map[string]string) (bool, error) {
+	return false, nil
+}
+
 type pluginHandlerMarketplaceStub struct {
 	available []plugin.MarketplacePlugin
 	synced    bool

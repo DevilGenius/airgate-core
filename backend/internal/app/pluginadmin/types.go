@@ -22,6 +22,7 @@ type Manager interface {
 	GetInstance(string) *plugin.PluginInstance
 	GetPluginConfig(context.Context, string) (map[string]string, error)
 	UpdatePluginConfig(context.Context, string, map[string]string) error
+	UpdatePluginConfigLive(context.Context, string, map[string]string) (bool, error)
 }
 
 // MarketplaceReader 定义插件市场读取能力。

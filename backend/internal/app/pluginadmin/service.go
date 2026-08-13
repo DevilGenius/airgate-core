@@ -79,9 +79,9 @@ func (s *Service) GetConfig(ctx context.Context, name string) (map[string]string
 	return s.manager.GetPluginConfig(ctx, name)
 }
 
-// UpdateConfig 写入插件配置并触发 reload。
+// UpdateConfig 写入插件配置并优先热更新；不支持热更新时才重启插件。
 //
-// 注意 reload 失败不会回滚配置：用户应当看到错误后修改配置再重试。
+// 注意热更新或重启失败不会回滚配置：用户应当看到错误后修改配置再重试。
 func (s *Service) UpdateConfig(ctx context.Context, name string, config map[string]string) error {
 	logger := sdk.LoggerFromContext(ctx)
 	if err := s.manager.UpdatePluginConfig(ctx, name, config); err != nil {
@@ -91,6 +91,13 @@ func (s *Service) UpdateConfig(ctx context.Context, name string, config map[stri
 		return err
 	}
 	logger.Info("plugin_admin_config_updated", sdk.LogFieldPluginID, name)
+	if live, err := s.manager.UpdatePluginConfigLive(ctx, name, config); err != nil {
+		logger.Error("plugin_admin_live_update_failed", sdk.LogFieldPluginID, name, sdk.LogFieldError, err)
+		return err
+	} else if live {
+		logger.Info("plugin_admin_config_hot_updated", sdk.LogFieldPluginID, name)
+		return nil
+	}
 	if err := s.manager.ReloadInstance(ctx, name); err != nil {
 		logger.Error("plugin_admin_reload_failed",
 			sdk.LogFieldPluginID, name,

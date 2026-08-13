@@ -35,7 +35,7 @@ func toPluginResp(item apppluginadmin.PluginMeta) dto.PluginResp {
 		})
 	}
 	for _, field := range item.ConfigSchema {
-		resp.ConfigSchema = append(resp.ConfigSchema, dto.ConfigFieldResp{
+		mapped := dto.ConfigFieldResp{
 			Key:         field.Key,
 			Label:       field.Label,
 			Type:        field.Type,
@@ -43,7 +43,11 @@ func toPluginResp(item apppluginadmin.PluginMeta) dto.PluginResp {
 			Default:     field.Default,
 			Description: field.Description,
 			Placeholder: field.Placeholder,
-		})
+		}
+		for _, option := range field.Options {
+			mapped.Options = append(mapped.Options, dto.ConfigFieldOptionResp{Value: option.Value, Label: option.Label})
+		}
+		resp.ConfigSchema = append(resp.ConfigSchema, mapped)
 	}
 	return resp
 }

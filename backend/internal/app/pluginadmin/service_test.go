@@ -242,6 +242,37 @@ func TestUpdateConfigSuccess(t *testing.T) {
 	}
 }
 
+func TestUpdateConfigHotUpdateSkipsReload(t *testing.T) {
+	liveUpdated := false
+	reloaded := false
+	service := NewService(pluginAdminManagerStub{
+		updatePluginConfig: func(context.Context, string, map[string]string) error {
+			return nil
+		},
+		updatePluginConfigLive: func(_ context.Context, name string, config map[string]string) (bool, error) {
+			if name != "gateway-openai" || config["codex_fingerprint_mode"] != "session" {
+				t.Fatalf("UpdatePluginConfigLive args = %q %+v", name, config)
+			}
+			liveUpdated = true
+			return true, nil
+		},
+		reloadInstance: func(context.Context, string) error {
+			reloaded = true
+			return nil
+		},
+	}, nil)
+
+	if err := service.UpdateConfig(t.Context(), "gateway-openai", map[string]string{"codex_fingerprint_mode": "session"}); err != nil {
+		t.Fatalf("UpdateConfig() error = %v", err)
+	}
+	if !liveUpdated {
+		t.Fatal("UpdatePluginConfigLive was not called")
+	}
+	if reloaded {
+		t.Fatal("ReloadInstance should not be called after hot update")
+	}
+}
+
 func TestUpdateConfigReturnsUpdateError(t *testing.T) {
 	wantErr := errors.New("update failed")
 	reloaded := false
@@ -727,6 +758,7 @@ type pluginAdminManagerStub struct {
 	reloadInstance              func(context.Context, string) error
 	getPluginConfig             func(context.Context, string) (map[string]string, error)
 	updatePluginConfig          func(context.Context, string, map[string]string) error
+	updatePluginConfigLive      func(context.Context, string, map[string]string) (bool, error)
 }
 
 func (s pluginAdminManagerStub) GetAllPluginMeta() []plugin.PluginMeta {
@@ -779,6 +811,12 @@ func (s pluginAdminManagerStub) UpdatePluginConfig(ctx context.Context, name str
 		return s.updatePluginConfig(ctx, name, config)
 	}
 	return nil
+}
+func (s pluginAdminManagerStub) UpdatePluginConfigLive(ctx context.Context, name string, config map[string]string) (bool, error) {
+	if s.updatePluginConfigLive != nil {
+		return s.updatePluginConfigLive(ctx, name, config)
+	}
+	return false, nil
 }
 
 type pluginMarketplaceStub struct {

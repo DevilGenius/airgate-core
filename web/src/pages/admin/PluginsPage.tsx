@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { NativeCheckbox } from '../../shared/components/NativeCheckbox';
+import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
 
 type InstallPrefill = {
@@ -441,7 +442,7 @@ function PluginConfigModal({
       if (plugin?.name) {
         clearPluginFrontendCache(plugin.name);
       }
-      toast('success', '配置已保存，插件已重新加载');
+      toast('success', '配置已保存并生效');
       onSaved();
     },
     onError: (err: Error) => toast('error', err.message),
@@ -472,7 +473,12 @@ function PluginConfigModal({
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog
             className="ag-elevation-modal"
-            style={{ maxWidth: '640px', width: 'min(100%, calc(100vw - 2rem))' }}
+            style={{
+              maxHeight: 'calc(100dvh - 2rem)',
+              maxWidth: '640px',
+              minHeight: 'min(560px, calc(100dvh - 2rem))',
+              width: 'min(100%, calc(100vw - 2rem))',
+            }}
           >
             <Modal.Header>
               <Modal.Heading>{`配置 - ${plugin?.display_name || plugin?.name || ''}`}</Modal.Heading>
@@ -484,7 +490,7 @@ function PluginConfigModal({
                   <Loader2 className="w-5 h-5 animate-spin text-primary" />
                 </div>
               ) : (
-                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                <div className="min-h-[320px] max-h-[calc(100dvh-14rem)] space-y-4 overflow-y-auto pl-1 pr-2">
           {(plugin?.config_schema || []).map((field) => {
             const inputType =
               field.type === 'password' ? 'password' :
@@ -508,6 +514,26 @@ function PluginConfigModal({
                   {field.description && (
                     <p className="mt-1 ml-6 text-xs text-text-tertiary">{field.description}</p>
                   )}
+                </div>
+              );
+            }
+
+            if (field.type === 'select') {
+              return (
+                <div key={field.key}>
+                  <Label>
+                    {field.label || field.key}
+                    {field.required && <span className="text-danger ml-1">*</span>}
+                  </Label>
+                  <SimpleSelect
+                    ariaLabel={field.label || field.key}
+                    fullWidth
+                    items={(field.options || []).map((option) => ({ key: option.value, label: option.label }))}
+                    selectedKey={values[field.key] || field.default || ''}
+                    onSelectionChange={(key) => setValues({ ...values, [field.key]: key })}
+                    placeholder={field.placeholder || '请选择'}
+                  />
+                  {field.description ? <Description>{field.description}</Description> : null}
                 </div>
               );
             }

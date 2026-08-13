@@ -306,7 +306,7 @@ func (m *Manager) GetPluginConfig(ctx context.Context, name string) (map[string]
 }
 
 // UpdatePluginConfig 把用户提交的配置写入 DB。
-// 仅写入；调用方负责后续 reload 让插件生效。
+// 配置写入后由调用方负责热更新或重启插件使其生效。
 // 当 Plugin 行不存在时（dev 插件场景）会自动创建一条占位记录。
 func (m *Manager) UpdatePluginConfig(ctx context.Context, name string, config map[string]string) error {
 	if m.db == nil {
@@ -341,6 +341,27 @@ func (m *Manager) UpdatePluginConfig(ctx context.Context, name string, config ma
 		return fmt.Errorf("更新插件配置失败: %w", err)
 	}
 	return nil
+}
+
+// UpdatePluginConfigLive applies a persisted configuration to a running plugin
+// through ConfigWatcher. It returns false when the plugin does not support the
+// hot-update RPC, allowing callers to fall back to a full reload.
+func (m *Manager) UpdatePluginConfigLive(ctx context.Context, name string, config map[string]string) (bool, error) {
+	inst := m.GetInstance(name)
+	if inst == nil || inst.Gateway == nil {
+		return false, nil
+	}
+	initConfig := m.buildInitConfig(ctx, m.resolveName(name))
+	for key, value := range config {
+		initConfig[key] = value
+	}
+	if err := inst.Gateway.UpdateConfig(newCorePluginContext(initConfig, m.resolveName(name))); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unimplemented") || strings.Contains(strings.ToLower(err.Error()), "does not support config hot reload") {
+			return false, nil
+		}
+		return true, err
+	}
+	return true, nil
 }
 
 // ReloadInstance 用最新 DB 配置重启一个已加载的插件实例（dev 与正式都支持）。
