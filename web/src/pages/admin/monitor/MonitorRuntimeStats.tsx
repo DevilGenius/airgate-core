@@ -63,6 +63,19 @@ function formatCompactThousands(value?: number) {
   return `${thousands.toFixed(precision)}k`;
 }
 
+function formatRequestRejectionUsage(
+  cybersecurityRisk?: number,
+  invalidPrompt?: number,
+  total?: number,
+  capacity?: number,
+) {
+  const cyber = Math.max(0, Math.trunc(cybersecurityRisk ?? 0));
+  const prompt = Math.max(0, Math.trunc(invalidPrompt ?? 0));
+  const size = Math.max(0, Math.trunc(total ?? 0));
+  const cap = Math.max(0, Math.trunc(capacity ?? 0));
+  return `(${cyber}|${prompt})${size}/${cap}`;
+}
+
 function DetailSeparator() {
   return <span className="justify-self-center font-bold text-text-secondary">|</span>;
 }
@@ -149,14 +162,18 @@ function RuntimeCacheMetric({ label, value }: { label: string; value: string }) 
 
 function RuntimeCacheDetails({
   contextLabel,
+  cyberLabel,
   encryptedLabel,
   imageLabel,
+  promptLabel,
   runtime,
   textLabel,
 }: {
   contextLabel: string;
+  cyberLabel: string;
   encryptedLabel: string;
   imageLabel: string;
+  promptLabel: string;
   runtime?: MonitorRuntimeResp['runtime'];
   textLabel: string;
 }) {
@@ -164,12 +181,26 @@ function RuntimeCacheDetails({
     <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_0.75rem_minmax(0,1fr)] items-center gap-y-0.5">
       <RuntimeCacheMetric
         label={textLabel}
-        value={`${runtime?.text_rejection_cache_len ?? 0}/${runtime?.text_rejection_cache_cap ?? 0}`}
+        value={formatRequestRejectionUsage(
+          runtime?.text_rejection_cybersecurity_risk_len,
+          runtime?.text_rejection_invalid_prompt_len,
+          runtime?.text_rejection_cache_len,
+          runtime?.text_rejection_cache_cap,
+        )}
       />
       <DetailSeparator />
       <RuntimeCacheMetric
         label={imageLabel}
         value={`${runtime?.image_rejection_cache_len ?? 0}/${runtime?.image_rejection_cache_cap ?? 0}`}
+      />
+      <RuntimeCacheMetric
+        label={cyberLabel}
+        value={`${runtime?.cyber_rejection_cache_len ?? 0}/${runtime?.cyber_rejection_cache_cap ?? 0}`}
+      />
+      <DetailSeparator />
+      <RuntimeCacheMetric
+        label={promptLabel}
+        value={`${runtime?.prompt_rejection_cache_len ?? 0}/${runtime?.prompt_rejection_cache_cap ?? 0}`}
       />
       <RuntimeCacheMetric
         label={encryptedLabel}
@@ -440,18 +471,17 @@ export function MonitorRuntimeStats({
           ]),
           <RuntimeCacheDetails
             contextLabel={t('monitor.runtime_context_window_cache')}
+            cyberLabel={t('monitor.runtime_cyber_rejection_cache')}
             encryptedLabel={t('monitor.runtime_encrypted_content_cache')}
             imageLabel={t('monitor.runtime_image_rejection_cache')}
+            promptLabel={t('monitor.runtime_prompt_rejection_cache')}
             runtime={runtime}
             textLabel={t('monitor.runtime_text_rejection_cache')}
           />,
         ]}
         icon={<Cpu className="h-5 w-5" />}
-        label={t('monitor.runtime_process')}
-        meta={joinDetail([
-          `CPU ${formatCPU(runtime?.cpu_percent)}`,
-          `heap ${formatBytes(runtime?.heap_alloc_bytes)}`,
-        ])}
+        label={`${t('monitor.runtime_process')}(CPU ${formatCPU(runtime?.cpu_percent)}/heap ${formatBytes(runtime?.heap_alloc_bytes)})`}
+        meta={null}
         tone="bg-violet-100 text-violet-700 ring-violet-200 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/25"
         value={`${fmtNum(runtime?.goroutines ?? 0)} goroutines`}
       />

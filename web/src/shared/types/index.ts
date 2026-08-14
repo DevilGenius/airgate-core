@@ -1178,6 +1178,12 @@ export interface MonitorRuntimeProcessResp {
   monitor_flushed_total: number;
   text_rejection_cache_len: number;
   text_rejection_cache_cap: number;
+  text_rejection_cybersecurity_risk_len: number;
+  text_rejection_invalid_prompt_len: number;
+  cyber_rejection_cache_len: number;
+  cyber_rejection_cache_cap: number;
+  prompt_rejection_cache_len: number;
+  prompt_rejection_cache_cap: number;
   image_rejection_cache_len: number;
   image_rejection_cache_cap: number;
   encrypted_content_cache_len: number;
