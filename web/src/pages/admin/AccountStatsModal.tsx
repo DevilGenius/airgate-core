@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Chip, Tabs, useOverlayState } from '@heroui/react';
@@ -575,6 +575,18 @@ function fmtPercent(ratio: number): string {
   return `${(ratio * 100).toFixed(1)}%`;
 }
 
+function fmtRateCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(n);
+}
+
+function displayWidth(text: string): number {
+  let width = 0;
+  for (const char of text) width += (char.codePointAt(0) ?? 0) > 0xff ? 2 : 1;
+  return width;
+}
+
 function fmtBucketTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '-';
@@ -605,12 +617,15 @@ type AccountModelSuccessRateBucketView = AccountModelSuccessRateBucket & {
   window_end: string;
 };
 
-function bucketTone(bucket: AccountModelSuccessRateBucket): 'empty' | 'neutral' | 'good' | 'warning' | 'bad' {
+function bucketTone(
+  bucket: Pick<AccountModelSuccessRateBucket, 'requests' | 'valid_requests' | 'success_rate'>,
+): 'empty' | 'neutral' | 'good' | 'warning' | 'bad' | 'critical' {
   if (bucket.requests === 0) return 'empty';
   if (bucket.valid_requests === 0) return 'neutral';
   if (bucket.success_rate >= 0.95) return 'good';
   if (bucket.success_rate >= 0.8) return 'warning';
-  return 'bad';
+  if (bucket.success_rate >= 0.5) return 'bad';
+  return 'critical';
 }
 
 function aggregateRateBuckets(
@@ -668,6 +683,93 @@ function rateColor(rate: number, validRequests: number, threshold: number): stri
   return rate >= threshold ? 'var(--ag-success)' : 'var(--ag-danger)';
 }
 
+type RateSummaryStats = Pick<
+  AccountModelSuccessRateBucket,
+  'requests' | 'valid_requests' | 'invalid_requests' | 'successes' | 'failures' | 'success_rate'
+>;
+
+function rateSummaryColor(stats: RateSummaryStats): string {
+  switch (bucketTone(stats)) {
+    case 'good': return 'var(--ag-success)';
+    case 'warning': return 'var(--ag-warning)';
+    case 'bad': return 'var(--ag-danger)';
+    case 'critical': return '#000';
+    default: return 'var(--ag-text-tertiary)';
+  }
+}
+
+function rateSummarySlotTexts(stats: RateSummaryStats): string[] {
+  return [
+    fmtRateCount(stats.requests),
+    fmtRateCount(stats.invalid_requests),
+    fmtRateCount(stats.successes),
+    fmtRateCount(stats.failures),
+    fmtRateCount(stats.valid_requests),
+    stats.valid_requests > 0 ? fmtPercent(stats.success_rate) : '-',
+  ];
+}
+
+function SummaryNum({
+  widthCh,
+  className,
+  style,
+  children,
+}: {
+  widthCh: number;
+  className?: string;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className={`ag-account-rate-summary__num${className ? ` ${className}` : ''}`}
+      style={{ minWidth: `${widthCh}ch`, ...style }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function RateSummaryLine({
+  label,
+  labelWidthCh,
+  stats,
+  slotWidths,
+}: {
+  label: string;
+  labelWidthCh: number;
+  stats: RateSummaryStats;
+  slotWidths: number[];
+}) {
+  const { t } = useTranslation();
+  const summaryColor = rateSummaryColor(stats);
+  return (
+    <div className="ag-account-rate-summary">
+      <span className="ag-account-rate-summary__label" style={{ minWidth: `${labelWidthCh}ch` }}>{label}</span>
+      {' '}{t('accounts.stats_range_requests')}{' '}
+      <SummaryNum widthCh={slotWidths[0] ?? 1}>{fmtRateCount(stats.requests)}</SummaryNum>
+      {' '}{t('accounts.stats_invalid_requests')}{' '}
+      <SummaryNum widthCh={slotWidths[1] ?? 1}>{fmtRateCount(stats.invalid_requests)}</SummaryNum>
+      {' '}{t('accounts.stats_valid_requests')}{' '}
+      (<span className="text-success">{t('accounts.stats_success')}{' '}<SummaryNum style={{ color: 'var(--ag-success)' }} widthCh={slotWidths[2] ?? 1}>{fmtRateCount(stats.successes)}</SummaryNum></span>
+      <span className="text-text-tertiary"> | </span>
+      <span className="text-danger">{t('accounts.stats_failure')}{' '}<SummaryNum style={{ color: 'var(--ag-danger)' }} widthCh={slotWidths[3] ?? 1}>{fmtRateCount(stats.failures)}</SummaryNum></span>){' '}
+      <SummaryNum widthCh={slotWidths[4] ?? 1}>{fmtRateCount(stats.valid_requests)}</SummaryNum>
+      {' '}{t('accounts.stats_success_rate')}{' '}
+      <SummaryNum
+        className="font-semibold"
+        style={{ color: summaryColor }}
+        widthCh={slotWidths[5] ?? 1}
+      >
+        {stats.valid_requests > 0 ? fmtPercent(stats.success_rate) : '-'}
+      </SummaryNum>
+      {stats.valid_requests > 0 && (
+        <span className="text-text-secondary">{' '}(<SummaryNum widthCh={slotWidths[4] ?? 1}>{fmtRateCount(stats.valid_requests)}</SummaryNum>)</span>
+      )}
+    </div>
+  );
+}
+
 function ModelRequestStats({
   rates,
   rateWindow,
@@ -690,6 +792,38 @@ function ModelRequestStats({
     return selected ?? latestActive ?? buckets[buckets.length - 1];
   }, [buckets, selectedBucketIndex]);
 
+  const windowTotals = useMemo<RateSummaryStats>(() => {
+    const totals = { requests: 0, valid_requests: 0, invalid_requests: 0, successes: 0, failures: 0, success_rate: 0 };
+    rates.forEach((rate) => {
+      totals.requests += rate.requests;
+      totals.valid_requests += rate.valid_requests;
+      totals.invalid_requests += rate.invalid_requests;
+      totals.successes += rate.successes;
+      totals.failures += rate.failures;
+    });
+    totals.success_rate = totals.valid_requests > 0 ? totals.successes / totals.valid_requests : 0;
+    return totals;
+  }, [rates]);
+
+  const bucketMinutes = useMemo(() => {
+    if (!selectedBucket) return 30;
+    const ms = new Date(selectedBucket.window_end).getTime() - new Date(selectedBucket.window_start).getTime();
+    const minutes = Math.round(ms / 60_000);
+    return Number.isFinite(minutes) && minutes > 0 ? minutes : 30;
+  }, [selectedBucket]);
+
+  const summaryLabel24h = t('accounts.stats_summary_24h');
+  const summaryLabelBucket = t('accounts.stats_summary_bucket', { minutes: bucketMinutes });
+  const summaryLayout = useMemo(() => {
+    if (!selectedBucket) return null;
+    const totalSlots = rateSummarySlotTexts(windowTotals);
+    const bucketSlots = rateSummarySlotTexts(selectedBucket);
+    return {
+      labelWidthCh: Math.max(displayWidth(summaryLabel24h), displayWidth(summaryLabelBucket)),
+      slotWidths: totalSlots.map((text, index) => Math.max(text.length, bucketSlots[index]?.length ?? 0)),
+    };
+  }, [windowTotals, selectedBucket, summaryLabel24h, summaryLabelBucket]);
+
   // 只列出所选固定桶内确有请求的模型，按请求量降序。
   const rows = useMemo<AccountModelSuccessRate[]>(
     () => {
@@ -709,37 +843,40 @@ function ModelRequestStats({
   return (
     <>
       <div className="ag-account-rate-panel rounded-lg border border-border-subtle p-4">
-        <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
-          <h4 className="text-xs font-semibold text-text">{t('accounts.stats_model_requests')}</h4>
-          <span className="text-[10px] text-text-tertiary">{t('accounts.stats_model_requests_window')}</span>
+        <div className="ag-account-rate-head mb-3">
+          <div>
+            <h4 className="text-sm font-semibold text-text">{t('accounts.stats_model_requests')}</h4>
+            {selectedBucket ? (
+              <div className="mt-1.5 flex items-center gap-1.5 text-sm text-text-tertiary">
+                <Clock className="size-4" />
+                <span>{t('accounts.stats_selected_bucket')}</span>
+                <strong className="font-mono font-semibold text-text">
+                  {fmtBucketRange(selectedBucket.window_start, selectedBucket.window_end)}
+                </strong>
+              </div>
+            ) : null}
+          </div>
+
+          {selectedBucket && summaryLayout ? (
+            <div className="ag-account-rate-summaries">
+              <RateSummaryLine
+                label={summaryLabel24h}
+                labelWidthCh={summaryLayout.labelWidthCh}
+                stats={windowTotals}
+                slotWidths={summaryLayout.slotWidths}
+              />
+              <RateSummaryLine
+                label={summaryLabelBucket}
+                labelWidthCh={summaryLayout.labelWidthCh}
+                stats={selectedBucket}
+                slotWidths={summaryLayout.slotWidths}
+              />
+            </div>
+          ) : null}
         </div>
 
-        {selectedBucket ? (
+        {selectedBucket && summaryLayout ? (
           <>
-            <div className="ag-account-rate-selected-range">
-              <div className="ag-account-rate-selected-range__label">
-                <Clock className="size-3.5" />
-                <span>{t('accounts.stats_selected_bucket')}</span>
-              </div>
-              <strong>{fmtBucketRange(selectedBucket.window_start, selectedBucket.window_end)}</strong>
-              <span className="ag-account-rate-selected-range__summary">
-                {/* 与明细表同款式：成功绿/失败红，成功率按样本数 + 阈值着色，括号内为有效请求数 */}
-                {t('accounts.stats_range_requests')} {selectedBucket.requests.toLocaleString()}
-                {' '}{t('accounts.stats_invalid_requests')} {selectedBucket.invalid_requests.toLocaleString()}
-                {' '}(<span className="text-success">{t('accounts.stats_success')} {selectedBucket.successes.toLocaleString()}</span>
-                <span className="text-text-tertiary"> | </span>
-                <span className="text-danger">{t('accounts.stats_failure')} {selectedBucket.failures.toLocaleString()}</span>)
-                {' '}{selectedBucket.valid_requests.toLocaleString()}
-                {' '}{t('accounts.stats_success_rate')}{' '}
-                <span className="font-semibold" style={{ color: rateColor(selectedBucket.success_rate, selectedBucket.valid_requests, threshold) }}>
-                  {selectedBucket.valid_requests > 0 ? fmtPercent(selectedBucket.success_rate) : '-'}
-                </span>
-                {selectedBucket.valid_requests > 0 && (
-                  <span className="text-text-secondary"> ({selectedBucket.valid_requests.toLocaleString()})</span>
-                )}
-              </span>
-            </div>
-
             <div className="ag-account-rate-buckets" role="group" aria-label={t('accounts.stats_bucket_selector')}>
               {buckets.map((bucket) => {
                 const selected = bucket.index === selectedBucket.index;
