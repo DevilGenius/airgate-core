@@ -470,9 +470,9 @@ func (s *Service) ListAll(ctx context.Context, filter ListFilter) ([]Account, er
 	return s.repo.ListAll(ctx, filter)
 }
 
-// OccupiedPriorities 返回现有账号已使用的优先级。
-func (s *Service) OccupiedPriorities(ctx context.Context) ([]int, error) {
-	return s.repo.OccupiedPriorities(ctx)
+// OccupiedPriorities 返回现有账号按优先级聚合后的占用数量。
+func (s *Service) OccupiedPriorities(ctx context.Context) (map[int]int, error) {
+	return s.repo.OccupiedPriorities(ctx, nil)
 }
 
 // Import 批量导入账号，逐条创建并收集失败信息（不使用事务，允许部分成功）。
@@ -710,7 +710,24 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 		}
 		return result
 	}
-	sequencePriorities, err := buildPrioritySequence(input.PrioritySequence, len(input.IDs))
+	if err := validatePrioritySequenceInput(input.PrioritySequence); err != nil {
+		for _, id := range input.IDs {
+			result.appendFailure(id, err)
+		}
+		return result
+	}
+	var occupiedPriorities map[int]int
+	var err error
+	if input.PrioritySequence != nil {
+		occupiedPriorities, err = s.repo.OccupiedPriorities(ctx, input.IDs)
+		if err != nil {
+			for _, id := range input.IDs {
+				result.appendFailure(id, fmt.Errorf("读取已占用优先级失败: %w", err))
+			}
+			return result
+		}
+	}
+	sequencePriorities, err := buildPrioritySequence(input.PrioritySequence, len(input.IDs), occupiedPriorities)
 	if err != nil {
 		for _, id := range input.IDs {
 			result.appendFailure(id, err)
@@ -834,33 +851,51 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 	return result
 }
 
-func buildPrioritySequence(input *PrioritySequenceInput, count int) ([]int, error) {
+func buildPrioritySequence(input *PrioritySequenceInput, count int, occupied map[int]int) ([]int, error) {
 	if input == nil {
 		return nil, nil
 	}
-	if input.GroupSize <= 0 {
-		return nil, fmt.Errorf("%w：每组账号数必须大于 0", ErrInvalidPrioritySequence)
+	if err := validatePrioritySequenceInput(input); err != nil {
+		return nil, err
 	}
-	if input.Step == 0 {
-		return nil, fmt.Errorf("%w：步进不能为 0", ErrInvalidPrioritySequence)
-	}
-	if input.Initial < accountpriority.Min || input.Initial > accountpriority.Max {
-		return nil, fmt.Errorf("%w：初始值必须在 %d 到 %d 范围内", ErrInvalidPrioritySequence, accountpriority.Min, accountpriority.Max)
+	if occupied == nil {
+		occupied = make(map[int]int)
 	}
 
 	priorities := make([]int, count)
-	current := input.Initial
+	sequenceInput := accountpriority.SequenceInput{
+		Initial:      input.Initial,
+		Step:         input.Step,
+		GroupSize:    input.GroupSize,
+		Min:          accountpriority.Min,
+		Max:          accountpriority.Max,
+		OverflowMode: accountpriority.OverflowClampAfterFull,
+	}
+	state := accountpriority.SequenceState{}
 	for index := range priorities {
-		if index > 0 && index%input.GroupSize == 0 {
-			next, ok := accountpriority.AddOffset(current, input.Step)
-			if !ok {
-				return nil, fmt.Errorf("%w：第 %d 组优先级超出 %d 到 %d 范围", ErrInvalidPrioritySequence, index/input.GroupSize+1, accountpriority.Min, accountpriority.Max)
-			}
-			current = next
+		priority, err := accountpriority.NextSequencePriority(sequenceInput, occupied, &state)
+		if err != nil {
+			return nil, fmt.Errorf("%w：第 %d 个账号的优先级序列超出 %d 到 %d 范围", ErrInvalidPrioritySequence, index+1, accountpriority.Min, accountpriority.Max)
 		}
-		priorities[index] = current
+		priorities[index] = priority
 	}
 	return priorities, nil
+}
+
+func validatePrioritySequenceInput(input *PrioritySequenceInput) error {
+	if input == nil {
+		return nil
+	}
+	if input.GroupSize <= 0 {
+		return fmt.Errorf("%w：每组账号数必须大于 0", ErrInvalidPrioritySequence)
+	}
+	if input.Step == 0 {
+		return fmt.Errorf("%w：步进不能为 0", ErrInvalidPrioritySequence)
+	}
+	if input.Initial < accountpriority.Min || input.Initial > accountpriority.Max {
+		return fmt.Errorf("%w：初始值必须在 %d 到 %d 范围内", ErrInvalidPrioritySequence, accountpriority.Min, accountpriority.Max)
+	}
+	return nil
 }
 
 // BulkDelete 批量删除账号。

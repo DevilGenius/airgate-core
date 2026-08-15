@@ -198,11 +198,25 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 	return mapAccounts(accounts), nil
 }
 
-// OccupiedPriorities 返回现有未删除账号使用中的优先级，用于导入序列跳过已占用档位。
-func (s *AccountStore) OccupiedPriorities(ctx context.Context) ([]int, error) {
-	return accountscope.Query(s.db).
-		Select(entaccount.FieldPriority).
-		Ints(ctx)
+// OccupiedPriorities 返回现有未删除账号按优先级聚合后的占用数量。
+// excludeIDs 用于批量更新：本次目标账号将在序列分配中重新定位，不能把旧位置算作占用。
+func (s *AccountStore) OccupiedPriorities(ctx context.Context, excludeIDs []int) (map[int]int, error) {
+	query := accountscope.Query(s.db)
+	if len(excludeIDs) > 0 {
+		query = query.Where(entaccount.IDNotIn(excludeIDs...))
+	}
+	var rows []struct {
+		Priority int `json:"priority"`
+		Count    int `json:"count"`
+	}
+	if err := query.GroupBy(entaccount.FieldPriority).Aggregate(ent.Count()).Scan(ctx, &rows); err != nil {
+		return nil, err
+	}
+	result := make(map[int]int, len(rows))
+	for _, row := range rows {
+		result[row.Priority] = row.Count
+	}
+	return result, nil
 }
 
 // Create 创建账号；同邮箱软删除账号会复用原行并恢复，同平台 OAuth 账号会刷新凭证。

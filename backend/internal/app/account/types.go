@@ -191,7 +191,7 @@ type BulkUpdateInput struct {
 	HasExtra                bool
 }
 
-// PrioritySequenceInput 按 IDs 顺序每 GroupSize 个账号推进一次 Step。
+// PrioritySequenceInput 按 IDs 顺序分配优先级；已有账号未达到 GroupSize 时先补满，满组后再按 Step 推进。
 type PrioritySequenceInput struct {
 	Initial   int
 	Step      int
@@ -383,7 +383,8 @@ type ImportItemError struct {
 type Repository interface {
 	List(context.Context, ListFilter) ([]Account, int64, error)
 	ListAll(context.Context, ListFilter) ([]Account, error)
-	OccupiedPriorities(context.Context) ([]int, error)
+	// OccupiedPriorities 返回未删除账号按优先级聚合后的占用数量；excludeIDs 用于排除本次批量更新目标。
+	OccupiedPriorities(context.Context, []int) (map[int]int, error)
 	Create(context.Context, CreateInput) (Account, error)
 	Update(context.Context, int, UpdateInput) (Account, error)
 	Delete(context.Context, int) error

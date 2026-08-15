@@ -9,6 +9,14 @@ import (
 
 func intPtr(value int) *int { return &value }
 
+func priorityCounts(values ...int) map[int]int {
+	counts := make(map[int]int)
+	for _, value := range values {
+		counts[value]++
+	}
+	return counts
+}
+
 func TestApplyUsesFirstMatchingRuleAndIndependentSequences(t *testing.T) {
 	config := Config{
 		Version: Version,
@@ -118,26 +126,26 @@ func TestApplyHonorsSequenceBounds(t *testing.T) {
 	}
 }
 
-func TestSequenceBoundaryIgnoresOccupiedPriority(t *testing.T) {
+func TestSequenceFillsPartiallyOccupiedPriorityBeforeAdvancing(t *testing.T) {
 	config := Config{
 		Version: Version,
 		Rules: []Rule{{
 			Name: "bounded",
 			Set: Assignment{Priority: &PriorityAssignment{
-				Mode: "sequence", Initial: intPtr(100), Step: intPtr(-10), GroupSize: intPtr(1),
+				Mode: "sequence", Initial: intPtr(100), Step: intPtr(-10), GroupSize: intPtr(2),
 				Min: intPtr(90), Max: intPtr(100),
 			}},
 		}},
 	}
 	got, err := config.ApplyWithOccupiedPriorities(
-		[]appaccount.CreateInput{{Name: "one"}},
-		[]int{100, 90},
+		[]appaccount.CreateInput{{Name: "one"}, {Name: "two"}},
+		priorityCounts(100),
 	)
 	if err != nil {
 		t.Fatalf("ApplyWithOccupiedPriorities() error = %v", err)
 	}
-	if got[0].Priority != 90 {
-		t.Fatalf("priority = %d, want occupied boundary 90", got[0].Priority)
+	if got[0].Priority != 100 || got[1].Priority != 90 {
+		t.Fatalf("priorities = %d, %d, want 100, 90", got[0].Priority, got[1].Priority)
 	}
 }
 
@@ -159,7 +167,7 @@ func TestApplySkipsDisabledRule(t *testing.T) {
 	}
 }
 
-func TestSequencePrioritySkipsOccupiedLevels(t *testing.T) {
+func TestSequencePriorityFillsOccupiedLevelsByGroupSize(t *testing.T) {
 	config := Config{
 		Version: Version,
 		Rules: []Rule{{
@@ -173,19 +181,41 @@ func TestSequencePrioritySkipsOccupiedLevels(t *testing.T) {
 	for index := range items {
 		items[index].Name = fmt.Sprintf("account-%d", index)
 	}
-	got, err := config.ApplyWithOccupiedPriorities(items, []int{8000, 7999})
+	got, err := config.ApplyWithOccupiedPriorities(items, priorityCounts(8000, 7999))
 	if err != nil {
 		t.Fatalf("ApplyWithOccupiedPriorities() error = %v", err)
 	}
-	for index := 0; index < 5; index++ {
-		if got[index].Priority != 7998 {
-			t.Fatalf("priority[%d] = %d, want 7998", index, got[index].Priority)
+	for index := 0; index < 4; index++ {
+		if got[index].Priority != 8000 {
+			t.Fatalf("priority[%d] = %d, want 8000", index, got[index].Priority)
 		}
 	}
-	for index := 5; index < 7; index++ {
-		if got[index].Priority != 7997 {
-			t.Fatalf("priority[%d] = %d, want 7997", index, got[index].Priority)
+	for index := 4; index < 7; index++ {
+		if got[index].Priority != 7999 {
+			t.Fatalf("priority[%d] = %d, want 7999", index, got[index].Priority)
 		}
+	}
+}
+
+func TestSequencePriorityAdvancesPastFullOccupiedLevel(t *testing.T) {
+	config := Config{
+		Version: Version,
+		Rules: []Rule{{
+			Name: "sequence",
+			Set: Assignment{Priority: &PriorityAssignment{
+				Mode: "sequence", Initial: intPtr(8000), Step: intPtr(-1), GroupSize: intPtr(2),
+			}},
+		}},
+	}
+	got, err := config.ApplyWithOccupiedPriorities(
+		[]appaccount.CreateInput{{Name: "one"}},
+		priorityCounts(8000, 8000, 8000),
+	)
+	if err != nil {
+		t.Fatalf("ApplyWithOccupiedPriorities() error = %v", err)
+	}
+	if got[0].Priority != 7999 {
+		t.Fatalf("priority = %d, want 7999", got[0].Priority)
 	}
 }
 
@@ -197,7 +227,7 @@ func TestFixedPriorityDoesNotSkipOccupiedValue(t *testing.T) {
 			Set:  Assignment{Priority: &PriorityAssignment{Mode: "fixed", Value: intPtr(8000)}},
 		}},
 	}
-	got, err := config.ApplyWithOccupiedPriorities([]appaccount.CreateInput{{Name: "fixed"}}, []int{8000})
+	got, err := config.ApplyWithOccupiedPriorities([]appaccount.CreateInput{{Name: "fixed"}}, priorityCounts(8000))
 	if err != nil {
 		t.Fatalf("ApplyWithOccupiedPriorities() error = %v", err)
 	}

@@ -81,7 +81,7 @@ func TestImportAccountsAppliesConfiguredDSL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load imported account: %v", err)
 	}
-	if imported.Priority != 980 || imported.MaxConcurrency != 20 {
+	if imported.Priority != 1000 || imported.MaxConcurrency != 20 {
 		t.Fatalf("configured priority/capacity = %d/%d", imported.Priority, imported.MaxConcurrency)
 	}
 	groups, err := imported.QueryGroups().IDs(ctx)

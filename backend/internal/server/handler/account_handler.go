@@ -80,7 +80,7 @@ func (h *AccountHandler) applyConfiguredImport(
 	if err != nil {
 		return nil, &configuredImportError{err: fmt.Errorf("导入配置无效: %w", err)}
 	}
-	var occupiedPriorities []int
+	var occupiedPriorities map[int]int
 	if config.UsesPrioritySequence() {
 		occupiedPriorities, err = h.service.OccupiedPriorities(ctx)
 		if err != nil {

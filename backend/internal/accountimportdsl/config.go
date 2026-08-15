@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 )
 
@@ -267,22 +268,16 @@ func (c Config) Apply(items []appaccount.CreateInput) ([]appaccount.CreateInput,
 	return c.ApplyWithOccupiedPriorities(items, nil)
 }
 
-type sequencePriorityState struct {
-	current     int
-	assigned    int
-	initialized bool
-}
-
 func (c Config) ApplyWithOccupiedPriorities(
 	items []appaccount.CreateInput,
-	occupiedPriorities []int,
+	occupiedPriorityCounts map[int]int,
 ) ([]appaccount.CreateInput, error) {
 	result := append([]appaccount.CreateInput(nil), items...)
-	occupied := make(map[int]struct{}, len(occupiedPriorities)+len(c.Rules))
-	for _, priority := range occupiedPriorities {
-		occupied[priority] = struct{}{}
+	occupied := make(map[int]int, len(occupiedPriorityCounts)+len(c.Rules))
+	for priority, count := range occupiedPriorityCounts {
+		occupied[priority] = count
 	}
-	sequenceStates := make([]sequencePriorityState, len(c.Rules))
+	sequenceStates := make([]accountpriority.SequenceState, len(c.Rules))
 	for itemIndex := range result {
 		for ruleIndex, rule := range c.Rules {
 			if rule.Enabled != nil && !*rule.Enabled {
@@ -386,8 +381,8 @@ func conditionMatches(value string, condition Condition) bool {
 func applyAssignment(
 	item *appaccount.CreateInput,
 	assignment Assignment,
-	occupied map[int]struct{},
-	sequenceState *sequencePriorityState,
+	occupied map[int]int,
+	sequenceState *accountpriority.SequenceState,
 ) error {
 	if assignment.MaxConcurrency != nil {
 		item.MaxConcurrency = *assignment.MaxConcurrency
@@ -408,8 +403,8 @@ func applyAssignment(
 
 func assignedPriority(
 	assignment PriorityAssignment,
-	occupied map[int]struct{},
-	sequenceState *sequencePriorityState,
+	occupied map[int]int,
+	sequenceState *accountpriority.SequenceState,
 ) (int, error) {
 	switch strings.ToLower(strings.TrimSpace(assignment.Mode)) {
 	case "fixed":
@@ -423,50 +418,21 @@ func assignedPriority(
 
 func nextSequencePriority(
 	assignment PriorityAssignment,
-	occupied map[int]struct{},
-	state *sequencePriorityState,
+	occupied map[int]int,
+	state *accountpriority.SequenceState,
 ) (int, error) {
-	if state == nil {
-		return 0, errors.New("缺少优先级序列状态")
-	}
-	if state.initialized && state.assigned < *assignment.GroupSize {
-		state.assigned++
-		return state.current, nil
-	}
-
 	minimum, maximum, err := priorityBounds(&assignment)
 	if err != nil {
 		return 0, err
 	}
-	candidate := int64(*assignment.Initial)
-	if state.initialized {
-		candidate = int64(state.current) + int64(*assignment.Step)
-	}
-	for {
-		if candidate < int64(minimum) {
-			return commitSequencePriority(minimum, occupied, state), nil
-		}
-		if candidate > int64(maximum) {
-			return commitSequencePriority(maximum, occupied, state), nil
-		}
-		priority := int(candidate)
-		if _, exists := occupied[priority]; !exists {
-			return commitSequencePriority(priority, occupied, state), nil
-		}
-		candidate += int64(*assignment.Step)
-	}
-}
-
-func commitSequencePriority(
-	priority int,
-	occupied map[int]struct{},
-	state *sequencePriorityState,
-) int {
-	occupied[priority] = struct{}{}
-	state.current = priority
-	state.assigned = 1
-	state.initialized = true
-	return priority
+	return accountpriority.NextSequencePriority(accountpriority.SequenceInput{
+		Initial:      *assignment.Initial,
+		Step:         *assignment.Step,
+		GroupSize:    *assignment.GroupSize,
+		Min:          minimum,
+		Max:          maximum,
+		OverflowMode: accountpriority.OverflowClamp,
+	}, occupied, state)
 }
 
 func ruleLabel(index int, name string) string {

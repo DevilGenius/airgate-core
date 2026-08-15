@@ -13,6 +13,50 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/testdb"
 )
 
+func TestAccountStoreOccupiedPrioritiesGroupsAndExcludes(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	create := func(name string, priority int) int {
+		item, err := db.Account.Create().
+			SetName(name).
+			SetPlatform("openai").
+			SetType("oauth").
+			SetCredentials(map[string]string{"access_token": name}).
+			SetPriority(priority).
+			Save(ctx)
+		if err != nil {
+			t.Fatalf("create account %s: %v", name, err)
+		}
+		return item.ID
+	}
+	excludedID := create("excluded", 100)
+	create("same-priority", 100)
+	create("lower-priority", 90)
+
+	store := NewAccountStore(db)
+	counts, err := store.OccupiedPriorities(ctx, nil)
+	if err != nil {
+		t.Fatalf("OccupiedPriorities() error = %v", err)
+	}
+	if counts[100] != 2 || counts[90] != 1 || len(counts) != 2 {
+		t.Fatalf("occupied counts = %v, want map[100:2 90:1]", counts)
+	}
+
+	counts, err = store.OccupiedPriorities(ctx, []int{excludedID})
+	if err != nil {
+		t.Fatalf("OccupiedPriorities(exclude) error = %v", err)
+	}
+	if counts[100] != 1 || counts[90] != 1 || len(counts) != 2 {
+		t.Fatalf("excluded occupied counts = %v, want map[100:1 90:1]", counts)
+	}
+}
+
 func TestAccountStoreCreateRefreshesExistingOAuthByEmail(t *testing.T) {
 	db := enttestOpen(t)
 	defer func() {

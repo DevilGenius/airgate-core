@@ -585,17 +585,18 @@ func TestListKeepsUnknownOAuthPlanFilterExact(t *testing.T) {
 }
 
 type stubRepository struct {
-	create           func(context.Context, CreateInput) (Account, error)
-	update           func(context.Context, int, UpdateInput) (Account, error)
-	delete           func(context.Context, int) error
-	findByID         func(context.Context, int, LoadOptions) (Account, error)
-	list             func(context.Context, ListFilter) ([]Account, int64, error)
-	listAll          func(context.Context, ListFilter) ([]Account, error)
-	occupiedPriority func(context.Context) ([]int, error)
-	listByPlatform   func(context.Context, string) ([]Account, error)
-	findUsageLogs    func(context.Context, int, time.Time, time.Time) ([]UsageLog, error)
-	batchWindowStats func(context.Context, []int, time.Time) (map[int]AccountWindowStats, error)
-	batchImageStats  func(context.Context, []int, time.Time) (map[int]AccountImageStats, error)
+	create                    func(context.Context, CreateInput) (Account, error)
+	update                    func(context.Context, int, UpdateInput) (Account, error)
+	delete                    func(context.Context, int) error
+	findByID                  func(context.Context, int, LoadOptions) (Account, error)
+	list                      func(context.Context, ListFilter) ([]Account, int64, error)
+	listAll                   func(context.Context, ListFilter) ([]Account, error)
+	occupiedPriority          func(context.Context) (map[int]int, error)
+	occupiedPriorityExcluding func(context.Context, []int) (map[int]int, error)
+	listByPlatform            func(context.Context, string) ([]Account, error)
+	findUsageLogs             func(context.Context, int, time.Time, time.Time) ([]UsageLog, error)
+	batchWindowStats          func(context.Context, []int, time.Time) (map[int]AccountWindowStats, error)
+	batchImageStats           func(context.Context, []int, time.Time) (map[int]AccountImageStats, error)
 }
 
 type noOpConcurrency struct{}
@@ -622,7 +623,10 @@ func (s stubRepository) ListAll(ctx context.Context, filter ListFilter) ([]Accou
 	return nil, nil
 }
 
-func (s stubRepository) OccupiedPriorities(ctx context.Context) ([]int, error) {
+func (s stubRepository) OccupiedPriorities(ctx context.Context, excludeIDs []int) (map[int]int, error) {
+	if s.occupiedPriorityExcluding != nil {
+		return s.occupiedPriorityExcluding(ctx, excludeIDs)
+	}
 	if s.occupiedPriority != nil {
 		return s.occupiedPriority(ctx)
 	}
@@ -989,6 +993,166 @@ func TestBulkUpdateAppliesPrioritySequenceInRequestOrder(t *testing.T) {
 	}
 }
 
+func TestBulkUpdateFillsPartiallyOccupiedPriorityBeforeAdvancing(t *testing.T) {
+	ids := []int{11, 12, 13}
+	updated := make([]int, 0, len(ids))
+	service := NewService(stubRepository{
+		occupiedPriority: func(context.Context) (map[int]int, error) {
+			return map[int]int{1000: 2}, nil
+		},
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			if input.Priority == nil {
+				t.Fatalf("repo.Update Priority = nil for account %d", id)
+			}
+			updated = append(updated, *input.Priority)
+			return Account{ID: id, Platform: "openai", Priority: *input.Priority}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs: ids,
+		PrioritySequence: &PrioritySequenceInput{
+			Initial: 1000, Step: -2, GroupSize: 3,
+		},
+	})
+
+	if result.Success != len(ids) || result.Failed != 0 {
+		t.Fatalf("BulkUpdate result = %+v, want %d success", result, len(ids))
+	}
+	want := []int{1000, 998, 998}
+	if !slices.Equal(updated, want) {
+		t.Fatalf("updated priorities = %v, want %v", updated, want)
+	}
+}
+
+func TestBulkUpdateExcludesSelectedAccountsFromPriorityOccupancy(t *testing.T) {
+	ids := []int{11, 12}
+	var excluded []int
+	updated := make([]int, 0, len(ids)*2)
+	service := NewService(stubRepository{
+		occupiedPriorityExcluding: func(_ context.Context, got []int) (map[int]int, error) {
+			excluded = append([]int(nil), got...)
+			return map[int]int{}, nil
+		},
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			if input.Priority == nil {
+				t.Fatalf("repo.Update Priority = nil for account %d", id)
+			}
+			updated = append(updated, *input.Priority)
+			return Account{ID: id, Platform: "openai", Priority: *input.Priority}, nil
+		},
+	}, nil, nil, nil)
+
+	input := BulkUpdateInput{
+		IDs: ids,
+		PrioritySequence: &PrioritySequenceInput{
+			Initial: 1000, Step: -2, GroupSize: 3,
+		},
+	}
+	for range 2 {
+		result := service.BulkUpdate(t.Context(), input)
+		if result.Success != len(ids) || result.Failed != 0 {
+			t.Fatalf("BulkUpdate result = %+v, want %d success", result, len(ids))
+		}
+	}
+
+	if !slices.Equal(excluded, ids) {
+		t.Fatalf("excluded IDs = %v, want %v", excluded, ids)
+	}
+	if !slices.Equal(updated, []int{1000, 1000, 1000, 1000}) {
+		t.Fatalf("updated priorities = %v, want both retries to stay at 1000", updated)
+	}
+}
+
+func TestBulkUpdateAdvancesPastFullOccupiedPriority(t *testing.T) {
+	updated := make([]int, 0, 1)
+	service := NewService(stubRepository{
+		occupiedPriority: func(context.Context) (map[int]int, error) {
+			return map[int]int{1000: 3}, nil
+		},
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			if input.Priority == nil {
+				t.Fatalf("repo.Update Priority = nil for account %d", id)
+			}
+			updated = append(updated, *input.Priority)
+			return Account{ID: id, Platform: "openai", Priority: *input.Priority}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs: []int{11},
+		PrioritySequence: &PrioritySequenceInput{
+			Initial: 1000, Step: -2, GroupSize: 3,
+		},
+	})
+
+	if result.Success != 1 || result.Failed != 0 || !slices.Equal(updated, []int{998}) {
+		t.Fatalf("BulkUpdate result = %+v, updated priorities = %v, want [998]", result, updated)
+	}
+}
+
+func TestBulkUpdateClampsAfterFullOccupiedBoundary(t *testing.T) {
+	ids := []int{11, 12, 13}
+	updated := make([]int, 0, len(ids))
+	service := NewService(stubRepository{
+		occupiedPriority: func(context.Context) (map[int]int, error) {
+			return map[int]int{99998: 2, 99999: 2}, nil
+		},
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			if input.Priority == nil {
+				t.Fatalf("repo.Update Priority = nil for account %d", id)
+			}
+			updated = append(updated, *input.Priority)
+			return Account{ID: id, Platform: "openai", Priority: *input.Priority}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs: ids,
+		PrioritySequence: &PrioritySequenceInput{
+			Initial: 99998, Step: 1, GroupSize: 2,
+		},
+	})
+
+	if result.Success != len(ids) || result.Failed != 0 {
+		t.Fatalf("BulkUpdate result = %+v, want %d success", result, len(ids))
+	}
+	if !slices.Equal(updated, []int{99999, 99999, 99999}) {
+		t.Fatalf("updated priorities = %v, want all values clamped to 99999", updated)
+	}
+}
+
+func TestBulkUpdateClampsAfterFullOccupiedLowerBoundary(t *testing.T) {
+	ids := []int{11, 12, 13}
+	updated := make([]int, 0, len(ids))
+	service := NewService(stubRepository{
+		occupiedPriority: func(context.Context) (map[int]int, error) {
+			return map[int]int{-99998: 2, -99999: 2}, nil
+		},
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			if input.Priority == nil {
+				t.Fatalf("repo.Update Priority = nil for account %d", id)
+			}
+			updated = append(updated, *input.Priority)
+			return Account{ID: id, Platform: "openai", Priority: *input.Priority}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs: ids,
+		PrioritySequence: &PrioritySequenceInput{
+			Initial: -99998, Step: -1, GroupSize: 2,
+		},
+	})
+
+	if result.Success != len(ids) || result.Failed != 0 {
+		t.Fatalf("BulkUpdate result = %+v, want %d success", result, len(ids))
+	}
+	if !slices.Equal(updated, []int{-99999, -99999, -99999}) {
+		t.Fatalf("updated priorities = %v, want all values clamped to -99999", updated)
+	}
+}
+
 func TestBulkUpdateRejectsInvalidPrioritySequenceBeforeUpdating(t *testing.T) {
 	service := NewService(stubRepository{
 		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
@@ -1008,6 +1172,59 @@ func TestBulkUpdateRejectsInvalidPrioritySequenceBeforeUpdating(t *testing.T) {
 
 	if result.Failed != 2 || !strings.Contains(result.Results[0].Error, ErrInvalidPrioritySequence.Error()) {
 		t.Fatalf("invalid priority sequence result = %+v", result)
+	}
+}
+
+func TestBulkUpdateValidatesPrioritySequenceBeforeReadingOccupancy(t *testing.T) {
+	readOccupancy := false
+	service := NewService(stubRepository{
+		occupiedPriorityExcluding: func(context.Context, []int) (map[int]int, error) {
+			readOccupancy = true
+			return nil, errors.New("occupancy should not be read")
+		},
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs: []int{21, 22},
+		PrioritySequence: &PrioritySequenceInput{
+			Initial:   1000,
+			Step:      0,
+			GroupSize: 2,
+		},
+	})
+
+	if readOccupancy {
+		t.Fatal("OccupiedPriorities should not be called for invalid sequence input")
+	}
+	if result.Failed != 2 || !strings.Contains(result.Results[0].Error, "步进不能为 0") {
+		t.Fatalf("invalid priority sequence result = %+v", result)
+	}
+}
+
+func TestBulkUpdateReportsPriorityOccupancyReadFailure(t *testing.T) {
+	service := NewService(stubRepository{
+		occupiedPriorityExcluding: func(context.Context, []int) (map[int]int, error) {
+			return nil, errors.New("occupancy unavailable")
+		},
+		update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+			t.Fatalf("repo.Update should not be called: %+v", input)
+			return Account{}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs: []int{21, 22},
+		PrioritySequence: &PrioritySequenceInput{
+			Initial: 1000, Step: -1, GroupSize: 2,
+		},
+	})
+
+	if result.Failed != 2 || !strings.Contains(result.Results[0].Error, "读取已占用优先级失败") {
+		t.Fatalf("occupancy read failure result = %+v", result)
 	}
 }
 
