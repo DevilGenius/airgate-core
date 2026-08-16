@@ -71,7 +71,6 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		t.Fatalf("decode response: %v; body=%s", err, w.Body.String())
 	}
 	if envelope.Data.SchemaVersion != 1 || envelope.Data.Traffic.Source != "dashboard_stats" ||
-		envelope.Data.Traffic.Window1MSeconds != 60 || envelope.Data.Traffic.Window10MSeconds != 600 ||
 		envelope.Data.Traffic.RPM1M != 0 || envelope.Data.Traffic.TPM1M != 0 ||
 		envelope.Data.Traffic.RPM10M != 0 || envelope.Data.Traffic.TPM10M != 0 {
 		t.Fatalf("overview metadata = %+v", envelope.Data)

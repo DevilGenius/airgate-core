@@ -23,13 +23,11 @@ type CredentialAccountsOverviewResp struct {
 }
 
 type CredentialTrafficResp struct {
-	Source           string  `json:"source"`
-	Window1MSeconds  int     `json:"window_1m_seconds"`
-	Window10MSeconds int     `json:"window_10m_seconds"`
-	RPM1M            float64 `json:"rpm_1m"`
-	TPM1M            float64 `json:"tpm_1m"`
-	RPM10M           float64 `json:"rpm_10m"`
-	TPM10M           float64 `json:"tpm_10m"`
+	Source string  `json:"source"`
+	RPM1M  float64 `json:"rpm_1m"`
+	TPM1M  float64 `json:"tpm_1m"`
+	RPM10M float64 `json:"rpm_10m"`
+	TPM10M float64 `json:"tpm_10m"`
 }
 
 type CredentialSchedulingResp struct {

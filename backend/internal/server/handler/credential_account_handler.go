@@ -90,13 +90,11 @@ func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 		SchemaVersion: credentialAccountsOverviewSchemaVersion,
 		GeneratedAt:   now.Format(time.RFC3339),
 		Traffic: dto.CredentialTrafficResp{
-			Source:           "dashboard_stats",
-			Window1MSeconds:  60,
-			Window10MSeconds: 600,
-			RPM1M:            stats.RPM1M,
-			TPM1M:            stats.TPM1M,
-			RPM10M:           stats.RPM10M,
-			TPM10M:           stats.TPM10M,
+			Source: "dashboard_stats",
+			RPM1M:  stats.RPM1M,
+			TPM1M:  stats.TPM1M,
+			RPM10M: stats.RPM10M,
+			TPM10M: stats.TPM10M,
 		},
 		AccountSummary: dto.CredentialAccountSummaryResp{
 			Platform:    platform,
