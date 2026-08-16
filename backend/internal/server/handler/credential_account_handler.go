@@ -170,6 +170,7 @@ func credentialAccountResp(account appaccount.Account, current int) dto.Credenti
 		Platform:           account.Platform,
 		Type:               account.Type,
 		State:              account.State,
+		Priority:           account.Priority,
 		MaxConcurrency:     account.MaxConcurrency,
 		CurrentConcurrency: current,
 		StateReason:        truncateCredentialStateReason(account.ErrorMsg),

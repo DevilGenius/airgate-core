@@ -29,6 +29,7 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		SetType("oauth").
 		SetCredentials(map[string]string{"access_token": "secret"}).
 		SetMaxConcurrency(20).
+		SetPriority(120).
 		SetRateMultiplier(1).
 		Save(ctx); err != nil {
 		t.Fatalf("create active account: %v", err)
@@ -81,8 +82,15 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		envelope.Data.AccountSummary.ConfiguredCapacity != 20 {
 		t.Fatalf("account summary = %+v", envelope.Data.AccountSummary)
 	}
-	if len(envelope.Data.Accounts.List) != 2 || envelope.Data.Accounts.List[0].Email == "" {
+	if len(envelope.Data.Accounts.List) != 2 {
 		t.Fatalf("account list = %+v", envelope.Data.Accounts)
+	}
+	byName := make(map[string]dto.CredentialAccountResp, len(envelope.Data.Accounts.List))
+	for _, item := range envelope.Data.Accounts.List {
+		byName[item.Name] = item
+	}
+	if byName["active-team"].Email == "" || byName["active-team"].Priority != 120 || byName["disabled-team"].Priority != 50 {
+		t.Fatalf("account priority mapping = %+v", byName)
 	}
 	if strings.Contains(w.Body.String(), "access_token") || strings.Contains(w.Body.String(), "secret") {
 		t.Fatalf("overview leaked credentials: %s", w.Body.String())

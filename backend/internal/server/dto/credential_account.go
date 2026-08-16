@@ -73,6 +73,7 @@ type CredentialAccountResp struct {
 	Platform           string `json:"platform"`
 	Type               string `json:"type"`
 	State              string `json:"state"`
+	Priority           int    `json:"priority"`
 	StateUntil         string `json:"state_until,omitempty"`
 	StateReason        string `json:"state_reason,omitempty"`
 	MaxConcurrency     int    `json:"max_concurrency"`
