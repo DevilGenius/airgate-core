@@ -59,9 +59,10 @@ func (s *Service) Stats(ctx context.Context, userID int, tz string) (Stats, erro
 	loc := timezone.Resolve(tz)
 	now := s.now().In(loc)
 	todayStart := timezone.StartOfDay(now)
-	fiveMinAgo := now.Add(-5 * time.Minute)
+	oneMinAgo := now.Add(-1 * time.Minute)
+	tenMinAgo := now.Add(-10 * time.Minute)
 
-	snapshot, err := s.repo.LoadStatsSnapshot(ctx, todayStart, fiveMinAgo, userID)
+	snapshot, err := s.repo.LoadStatsSnapshot(ctx, todayStart, oneMinAgo, tenMinAgo, userID)
 	if err != nil {
 		sdk.LoggerFromContext(ctx).Error("dashboard_query_failed",
 			sdk.LogFieldUserID, userID,
@@ -90,8 +91,10 @@ func (s *Service) Stats(ctx context.Context, userID int, tz string) (Stats, erro
 		AllTimeCost:         snapshot.AllTimeCost,
 		AllTimeStandardCost: snapshot.AllTimeStandardCost,
 		ActiveUsers:         snapshot.ActiveUsers,
-		RPM:                 float64(snapshot.RecentRequests) / 5.0,
-		TPM:                 float64(snapshot.RecentTokens) / 5.0,
+		RPM1M:               float64(snapshot.RecentRequests1M),
+		TPM1M:               float64(snapshot.RecentTokens1M),
+		RPM10M:              float64(snapshot.RecentRequests10M) / 10.0,
+		TPM10M:              float64(snapshot.RecentTokens10M) / 10.0,
 	}
 	if snapshot.TodayNonImageRequests > 0 {
 		result.AvgDurationMs = float64(snapshot.TodayNonImageDurationMs) / float64(snapshot.TodayNonImageRequests)

@@ -214,6 +214,7 @@
     "performance": "Performance",
     "rpm": "RPM",
     "tpm": "TPM",
+    "performance_window": "Performance (1min/10min)",
     "avg_response": "Avg Response",
     "active_users": "{{count}} active users",
     "active_users_label": "Active users: {{count}}",

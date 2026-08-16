@@ -169,7 +169,8 @@ func TestDashboardStatsCacheHelpers(t *testing.T) {
 func TestDashboardStatsWaitAndLoadCachePaths(t *testing.T) {
 	ctx := context.Background()
 	today := time.Date(2026, 6, 20, 0, 0, 0, 0, time.UTC)
-	fiveMinAgo := today.Add(12 * time.Hour)
+	oneMinAgo := today.Add(12*time.Hour - time.Minute)
+	tenMinAgo := today.Add(12*time.Hour - 10*time.Minute)
 	key := dashboardStatsCacheKey(0, today)
 	lockKey := dashboardStatsLockKey(0, today)
 	snapshot := appdashboard.StatsSnapshot{TotalAPIKeys: 3, TodayRequests: 4}
@@ -216,7 +217,7 @@ func TestDashboardStatsWaitAndLoadCachePaths(t *testing.T) {
 	rdb, mock = redismock.NewClientMock()
 	storeWithRedis = NewDashboardStore(nil, rdb)
 	mock.ExpectGet(key).SetVal(string(raw))
-	got, err = storeWithRedis.LoadStatsSnapshot(ctx, today, fiveMinAgo, 0)
+	got, err = storeWithRedis.LoadStatsSnapshot(ctx, today, oneMinAgo, tenMinAgo, 0)
 	if err != nil || got.TodayRequests != 4 {
 		t.Fatalf("LoadStatsSnapshot cache = %+v %v", got, err)
 	}
@@ -238,7 +239,7 @@ func TestDashboardStatsWaitAndLoadCachePaths(t *testing.T) {
 	mock.ExpectGet(key).SetErr(redis.Nil)
 	mock.Regexp().ExpectSet(key, ".*", dashboardStatsCacheTTL).SetVal("OK")
 	mock.Regexp().ExpectEvalSha(dashboardStatsLockReleaseScript.Hash(), []string{lockKey}, ".+").SetVal(int64(1))
-	got, err = storeWithRedis.LoadStatsSnapshot(ctx, today, fiveMinAgo, 0)
+	got, err = storeWithRedis.LoadStatsSnapshot(ctx, today, oneMinAgo, tenMinAgo, 0)
 	if err != nil || got.TotalAPIKeys != 0 {
 		t.Fatalf("LoadStatsSnapshot lock fresh = %+v %v", got, err)
 	}
@@ -251,7 +252,7 @@ func TestDashboardStatsWaitAndLoadCachePaths(t *testing.T) {
 	mock.ExpectGet(key).SetErr(redis.Nil)
 	mock.Regexp().ExpectSetNX(lockKey, ".+", dashboardStatsLockTTL).SetVal(false)
 	mock.ExpectGet(key).SetVal(string(raw))
-	got, err = storeWithRedis.LoadStatsSnapshot(ctx, today, fiveMinAgo, 0)
+	got, err = storeWithRedis.LoadStatsSnapshot(ctx, today, oneMinAgo, tenMinAgo, 0)
 	if err != nil || got.TotalAPIKeys != 3 {
 		t.Fatalf("LoadStatsSnapshot lock busy cache = %+v %v", got, err)
 	}

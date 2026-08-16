@@ -7,7 +7,7 @@ import (
 
 // Repository 定义仪表盘域持久化接口。
 type Repository interface {
-	LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time, userID int) (StatsSnapshot, error)
+	LoadStatsSnapshot(ctx context.Context, todayStart, oneMinAgo, tenMinAgo time.Time, userID int) (StatsSnapshot, error)
 	ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]TrendLog, error)
 }
 
@@ -38,8 +38,10 @@ type StatsSnapshot struct {
 	AllTimeTokens           int64
 	AllTimeCost             float64
 	AllTimeStandardCost     float64
-	RecentRequests          int64
-	RecentTokens            int64
+	RecentRequests1M        int64
+	RecentTokens1M          int64
+	RecentRequests10M       int64
+	RecentTokens10M         int64
 }
 
 // Stats 表示仪表盘统计结果。
@@ -61,8 +63,10 @@ type Stats struct {
 	AllTimeTokens       int64
 	AllTimeCost         float64
 	AllTimeStandardCost float64
-	RPM                 float64
-	TPM                 float64
+	RPM1M               float64
+	TPM1M               float64
+	RPM10M              float64
+	TPM10M              float64
 	AvgFirstEventMs     float64
 	AvgFirstTokenMs     float64
 	AvgDurationMs       float64

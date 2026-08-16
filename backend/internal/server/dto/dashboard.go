@@ -32,8 +32,10 @@ type DashboardStatsResp struct {
 	AllTimeStandardCost float64 `json:"alltime_standard_cost"` //nolint:misspell
 
 	// 性能指标
-	RPM float64 `json:"rpm"`
-	TPM float64 `json:"tpm"`
+	RPM1M  float64 `json:"rpm_1m"`
+	TPM1M  float64 `json:"tpm_1m"`
+	RPM10M float64 `json:"rpm_10m"`
+	TPM10M float64 `json:"tpm_10m"`
 	// AvgFirstEventMs 是请求进入插件到首个上游事件的平均耗时（FRT）。
 	AvgFirstEventMs float64 `json:"avg_first_event_ms"`
 	// AvgFirstTokenMs 是首个真实输出 token/工具调用内容的平均耗时（TTFT）。

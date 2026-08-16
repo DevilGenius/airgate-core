@@ -13,7 +13,7 @@ import (
 
 func TestStatsComputesDerivedMetrics(t *testing.T) {
 	service := NewService(dashboardStubRepository{
-		loadStatsSnapshot: func(_ context.Context, _, _ time.Time) (StatsSnapshot, error) {
+		loadStatsSnapshot: func(_ context.Context, _, _, _ time.Time) (StatsSnapshot, error) {
 			return StatsSnapshot{
 				TodayRequests:           6,
 				TodayImageRequests:      2,
@@ -24,8 +24,10 @@ func TestStatsComputesDerivedMetrics(t *testing.T) {
 				TodayFirstTokenRequests: 2,
 				TodayFirstTokenMs:       500,
 				TodayImageDurationMs:    240000,
-				RecentRequests:          10,
-				RecentTokens:            500,
+				RecentRequests1M:        10,
+				RecentTokens1M:          500,
+				RecentRequests10M:       30,
+				RecentTokens10M:         1500,
 			}, nil
 		},
 	})
@@ -49,18 +51,24 @@ func TestStatsComputesDerivedMetrics(t *testing.T) {
 	if result.TodayImageRequests != 2 {
 		t.Fatalf("TodayImageRequests = %v, want 2", result.TodayImageRequests)
 	}
-	if result.RPM != 2 {
-		t.Fatalf("RPM = %v, want 2", result.RPM)
+	if result.RPM1M != 10 {
+		t.Fatalf("RPM1M = %v, want 10", result.RPM1M)
 	}
-	if result.TPM != 100 {
-		t.Fatalf("TPM = %v, want 100", result.TPM)
+	if result.TPM1M != 500 {
+		t.Fatalf("TPM1M = %v, want 500", result.TPM1M)
+	}
+	if result.RPM10M != 3 {
+		t.Fatalf("RPM10M = %v, want 3", result.RPM10M)
+	}
+	if result.TPM10M != 150 {
+		t.Fatalf("TPM10M = %v, want 150", result.TPM10M)
 	}
 }
 
 func TestStatsReturnsRepositoryError(t *testing.T) {
 	repoErr := errors.New("stats failed")
 	service := NewService(dashboardStubRepository{
-		loadStatsSnapshot: func(context.Context, time.Time, time.Time) (StatsSnapshot, error) {
+		loadStatsSnapshot: func(context.Context, time.Time, time.Time, time.Time) (StatsSnapshot, error) {
 			return StatsSnapshot{}, repoErr
 		},
 	})
@@ -556,15 +564,15 @@ func TestAggregateTopUsersLimitsAndSortsDailyPoints(t *testing.T) {
 }
 
 type dashboardStubRepository struct {
-	loadStatsSnapshot func(context.Context, time.Time, time.Time) (StatsSnapshot, error)
+	loadStatsSnapshot func(context.Context, time.Time, time.Time, time.Time) (StatsSnapshot, error)
 	listTrendLogs     func(context.Context, time.Time, time.Time) ([]TrendLog, error)
 }
 
-func (s dashboardStubRepository) LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time, _ int) (StatsSnapshot, error) {
+func (s dashboardStubRepository) LoadStatsSnapshot(ctx context.Context, todayStart, oneMinAgo, tenMinAgo time.Time, _ int) (StatsSnapshot, error) {
 	if s.loadStatsSnapshot == nil {
 		return StatsSnapshot{}, nil
 	}
-	return s.loadStatsSnapshot(ctx, todayStart, fiveMinAgo)
+	return s.loadStatsSnapshot(ctx, todayStart, oneMinAgo, tenMinAgo)
 }
 
 func (s dashboardStubRepository) ListTrendLogs(ctx context.Context, startTime, endTime time.Time, _ int) ([]TrendLog, error) {

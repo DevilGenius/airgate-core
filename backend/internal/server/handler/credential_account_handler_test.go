@@ -70,7 +70,10 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("decode response: %v; body=%s", err, w.Body.String())
 	}
-	if envelope.Data.SchemaVersion != 1 || envelope.Data.Traffic.Source != "dashboard_stats" {
+	if envelope.Data.SchemaVersion != 1 || envelope.Data.Traffic.Source != "dashboard_stats" ||
+		envelope.Data.Traffic.Window1MSeconds != 60 || envelope.Data.Traffic.Window10MSeconds != 600 ||
+		envelope.Data.Traffic.RPM1M != 0 || envelope.Data.Traffic.TPM1M != 0 ||
+		envelope.Data.Traffic.RPM10M != 0 || envelope.Data.Traffic.TPM10M != 0 {
 		t.Fatalf("overview metadata = %+v", envelope.Data)
 	}
 	if envelope.Data.AccountSummary.Total != 2 ||

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Alert, Card, Skeleton, Tabs } from '@heroui/react';
@@ -80,6 +80,23 @@ function fmtDurationMs(ms: number | undefined | null): string {
   const seconds = ms / 1000;
   if (seconds >= 100) return `${Math.round(seconds)}s`;
   return `${seconds.toFixed(seconds >= 10 ? 1 : 2)}s`;
+}
+
+/** 速率指标紧凑格式化：最多 1 位小数（截断防进位），整数省略 .0 */
+function fmtRate(n: number | undefined | null): string {
+  if (n == null || n <= 0) return '0';
+  const units: Array<[divisor: number, suffix: string]> = [
+    [1_000_000_000, 'B'],
+    [1_000_000, 'M'],
+    [1_000, 'K'],
+  ];
+  for (const [divisor, suffix] of units) {
+    if (n >= divisor) {
+      const truncated = Math.floor((n / divisor) * 10) / 10;
+      return `${Number.isInteger(truncated) ? truncated.toFixed(0) : truncated.toFixed(1)}${suffix}`;
+    }
+  }
+  return String(Math.floor(n));
 }
 
 type DashboardTimeLabel = {
@@ -197,9 +214,67 @@ function MetricCard({
           <div className="mt-1 flex min-w-0 items-baseline gap-2">
             <div className="flex min-w-0 items-baseline font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">
               {value}
-              {valueSuffix ? <span className="ml-1.5 text-xs font-medium text-text-tertiary 2xl:text-sm">{valueSuffix}</span> : null}
+              {valueSuffix ? <span className="ml-1.5 text-[11px] font-medium leading-none text-text-tertiary">{valueSuffix}</span> : null}
             </div>
             <div className={`min-w-0 truncate text-xs font-semibold ${META_TONE_CLASSES[metaTone]}`}>{meta}</div>
+          </div>
+        </div>
+        <span
+          className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES[tone]}`}
+          style={METRIC_TONE_STYLES[tone]}
+        >
+          {icon}
+        </span>
+      </Card.Content>
+    </Card>
+  );
+}
+
+function PerformanceMetricCard({
+  icon,
+  rpm1m,
+  rpm10m,
+  title,
+  tone,
+  tpm1m,
+  tpm10m,
+}: {
+  icon: ReactNode;
+  rpm1m: number;
+  rpm10m: number;
+  title: string;
+  tone: MetricTone;
+  tpm1m: number;
+  tpm10m: number;
+}) {
+  const { t } = useTranslation();
+  const windows = [
+    { label: '1min', rpm: rpm1m, tpm: tpm1m },
+    { label: '10min', rpm: rpm10m, tpm: tpm10m },
+  ];
+  return (
+    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
+      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+        <div className="ag-dashboard-metric-copy">
+          <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
+          <div className="mt-1 flex h-5 items-end gap-1.5 whitespace-nowrap 2xl:h-6">
+            {windows.map((item, index) => (
+              <Fragment key={item.label}>
+                {index > 0 ? (
+                  <span aria-hidden="true" className="font-mono text-base leading-none text-text-tertiary">/</span>
+                ) : null}
+                <span className="flex items-baseline gap-2">
+                  <span className="flex items-baseline gap-1">
+                    <span className="font-mono text-base font-semibold leading-none text-text">{fmtRate(item.rpm)}</span>
+                    <span className="text-[11px] leading-none text-text-tertiary">{t('dashboard.rpm')}</span>
+                  </span>
+                  <span className="flex items-baseline gap-1">
+                    <span className="font-mono text-base font-semibold leading-none text-text">{fmtRate(item.tpm)}</span>
+                    <span className="text-[11px] leading-none text-text-tertiary">{t('dashboard.tpm')}</span>
+                  </span>
+                </span>
+              </Fragment>
+            ))}
           </div>
         </div>
         <span
@@ -283,14 +358,14 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         value={fmtNum(stats.alltime_tokens)}
         meta={<CostPair actual={stats.alltime_cost} standard={stats.alltime_standard_cost} />}
       />
-      <MetricCard
+      <PerformanceMetricCard
         icon={<Zap className="h-5 w-5" />}
         tone="amber"
-        metaTone="accent"
-        title={t('dashboard.performance')}
-        value={Math.round(stats.rpm ?? 0)}
-        valueSuffix={t('dashboard.rpm')}
-        meta={`${fmtNum(stats.tpm ?? 0)} ${t('dashboard.tpm')}`}
+        title={t('dashboard.performance_window')}
+        rpm1m={stats.rpm_1m ?? 0}
+        tpm1m={stats.tpm_1m ?? 0}
+        rpm10m={stats.rpm_10m ?? 0}
+        tpm10m={stats.tpm_10m ?? 0}
       />
       <MetricCard
         icon={<Clock className="h-5 w-5" />}

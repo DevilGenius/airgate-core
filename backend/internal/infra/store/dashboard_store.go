@@ -54,7 +54,7 @@ var dashboardStatsLockReleaseScript = redis.NewScript(`
 `)
 
 // LoadStatsSnapshot 读取统计快照。userID 为 0 表示查全部。
-func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time, userID int) (appdashboard.StatsSnapshot, error) {
+func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, oneMinAgo, tenMinAgo time.Time, userID int) (appdashboard.StatsSnapshot, error) {
 	if snapshot, ok := s.loadStatsSnapshotCache(ctx, userID, todayStart); ok {
 		return snapshot, nil
 	}
@@ -66,7 +66,7 @@ func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, five
 			return snapshot, nil
 		}
 
-		snapshot, err := s.loadStatsSnapshotFresh(ctx, todayStart, fiveMinAgo, userID)
+		snapshot, err := s.loadStatsSnapshotFresh(ctx, todayStart, oneMinAgo, tenMinAgo, userID)
 		if err != nil {
 			return appdashboard.StatsSnapshot{}, err
 		}
@@ -78,7 +78,7 @@ func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, five
 		}
 	}
 
-	snapshot, err := s.loadStatsSnapshotFresh(ctx, todayStart, fiveMinAgo, userID)
+	snapshot, err := s.loadStatsSnapshotFresh(ctx, todayStart, oneMinAgo, tenMinAgo, userID)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
@@ -503,7 +503,7 @@ func (s *DashboardStore) storeStatsSnapshotCache(ctx context.Context, userID int
 	_ = s.rdb.Set(ctx, dashboardStatsCacheKey(userID, todayStart), raw, dashboardStatsCacheTTL).Err()
 }
 
-func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart, fiveMinAgo time.Time, userID int) (appdashboard.StatsSnapshot, error) {
+func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart, oneMinAgo, tenMinAgo time.Time, userID int) (appdashboard.StatsSnapshot, error) {
 	// 用户过滤谓词
 	var userPred []predicate.UsageLog
 	if userID > 0 {
@@ -563,13 +563,18 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 
 	var allTimeTotals usageTotals
 	var todayUsage usageTodaySnapshot
-	var recentTotals usageTotals
+	var recentTotals1M usageTotals
+	var recentTotals10M usageTotals
 	if rollupSnapshot, handled, err := s.loadStatsUsageFromRollups(ctx, todayStart, userID); err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	} else if handled {
 		allTimeTotals = rollupSnapshot.AllTime
 		todayUsage = rollupSnapshot.Today
-		recentTotals, err = queryUsageTotals(ctx, s.db.UsageLog.Query().Where(userPred...).Where(entusagelog.CreatedAtGTE(fiveMinAgo)))
+		recentTotals1M, err = queryUsageTotals(ctx, s.db.UsageLog.Query().Where(userPred...).Where(entusagelog.CreatedAtGTE(oneMinAgo)))
+		if err != nil {
+			return appdashboard.StatsSnapshot{}, err
+		}
+		recentTotals10M, err = queryUsageTotals(ctx, s.db.UsageLog.Query().Where(userPred...).Where(entusagelog.CreatedAtGTE(tenMinAgo)))
 		if err != nil {
 			return appdashboard.StatsSnapshot{}, err
 		}
@@ -585,7 +590,11 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 			return appdashboard.StatsSnapshot{}, err
 		}
 
-		recentTotals, err = queryUsageTotals(ctx, usageQuery.Clone().Where(entusagelog.CreatedAtGTE(fiveMinAgo)))
+		recentTotals1M, err = queryUsageTotals(ctx, usageQuery.Clone().Where(entusagelog.CreatedAtGTE(oneMinAgo)))
+		if err != nil {
+			return appdashboard.StatsSnapshot{}, err
+		}
+		recentTotals10M, err = queryUsageTotals(ctx, usageQuery.Clone().Where(entusagelog.CreatedAtGTE(tenMinAgo)))
 		if err != nil {
 			return appdashboard.StatsSnapshot{}, err
 		}
@@ -617,8 +626,10 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		AllTimeTokens:           allTimeTotals.Tokens,
 		AllTimeCost:             allTimeTotals.Cost,
 		AllTimeStandardCost:     allTimeTotals.StandardCost,
-		RecentRequests:          recentTotals.Requests,
-		RecentTokens:            recentTotals.Tokens,
+		RecentRequests1M:        recentTotals1M.Requests,
+		RecentTokens1M:          recentTotals1M.Tokens,
+		RecentRequests10M:       recentTotals10M.Requests,
+		RecentTokens10M:         recentTotals10M.Tokens,
 	}, nil
 }
 

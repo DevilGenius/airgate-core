@@ -858,8 +858,10 @@ export interface DashboardStatsResp {
   alltime_tokens: number;
   alltime_cost: number;
   alltime_standard_cost: number;
-  rpm: number;
-  tpm: number;
+  rpm_1m: number;
+  tpm_1m: number;
+  rpm_10m: number;
+  tpm_10m: number;
   avg_first_event_ms: number;
   avg_first_token_ms: number;
   avg_duration_ms: number;

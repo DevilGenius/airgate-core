@@ -18,7 +18,7 @@ const credentialAccountsOverviewSchemaVersion = 1
 
 // CredentialAccountHandler 提供凭证管理 API Key 的只读账号概览。
 //
-// 该 Handler 只挂在 /credentials 路由组，不参与管理员账号请求和模型转发热路径。
+// 该 Handler 同时挂在 /credentials 和 /admin 路由组，不参与模型转发热路径。
 type CredentialAccountHandler struct {
 	accounts  *appaccount.Service
 	dashboard *appdashboard.Service
@@ -38,7 +38,7 @@ func NewCredentialAccountHandler(
 }
 
 // GetOverview 返回账号状态、全局流量和调度容量的精简快照。
-// RPM/TPM 复用 Dashboard Service 的最近 5 分钟统计口径；全局运行态容量复用
+// RPM/TPM 复用 Dashboard Service 的 1 分钟和 10 分钟统计口径；全局运行态容量复用
 // RuntimeSampler 的内存快照。账号列表的当前并发只做一次批量运行态读取，
 // 这些操作均不在请求转发热路径中执行。
 func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
@@ -90,10 +90,13 @@ func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 		SchemaVersion: credentialAccountsOverviewSchemaVersion,
 		GeneratedAt:   now.Format(time.RFC3339),
 		Traffic: dto.CredentialTrafficResp{
-			Source:        "dashboard_stats",
-			WindowSeconds: 300,
-			RPM:           stats.RPM,
-			TPM:           stats.TPM,
+			Source:           "dashboard_stats",
+			Window1MSeconds:  60,
+			Window10MSeconds: 600,
+			RPM1M:            stats.RPM1M,
+			TPM1M:            stats.TPM1M,
+			RPM10M:           stats.RPM10M,
+			TPM10M:           stats.TPM10M,
 		},
 		AccountSummary: dto.CredentialAccountSummaryResp{
 			Platform:    platform,

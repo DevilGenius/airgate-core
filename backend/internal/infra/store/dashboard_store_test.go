@@ -18,7 +18,8 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 
 	ctx := context.Background()
 	todayStart := time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC)
-	fiveMinAgo := time.Date(2026, 5, 27, 11, 55, 0, 0, time.UTC)
+	oneMinAgo := time.Date(2026, 5, 27, 11, 57, 0, 0, time.UTC)
+	tenMinAgo := time.Date(2026, 5, 27, 11, 50, 0, 0, time.UTC)
 
 	u, err := db.User.Create().
 		SetEmail("active@example.com").
@@ -91,13 +92,13 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 		SetDurationMs(2400).
 		SetUserIDSnapshot(u.ID).
 		SetUserEmailSnapshot(u.Email).
-		SetCreatedAt(fiveMinAgo.Add(1 * time.Minute)).
+		SetCreatedAt(time.Date(2026, 5, 27, 11, 56, 0, 0, time.UTC)).
 		Save(ctx); err != nil {
 		t.Fatalf("create snapshot usage log: %v", err)
 	}
 
 	store := NewDashboardStore(db)
-	snapshot, err := store.LoadStatsSnapshot(ctx, todayStart, fiveMinAgo, u.ID)
+	snapshot, err := store.LoadStatsSnapshot(ctx, todayStart, oneMinAgo, tenMinAgo, u.ID)
 	if err != nil {
 		t.Fatalf("LoadStatsSnapshot returned error: %v", err)
 	}
@@ -111,8 +112,8 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	if snapshot.TodayRequests != 2 || snapshot.TodayImageRequests != 1 || snapshot.TodayNonImageRequests != 1 {
 		t.Fatalf("today request counts = (%d, %d, %d), want (2, 1, 1)", snapshot.TodayRequests, snapshot.TodayImageRequests, snapshot.TodayNonImageRequests)
 	}
-	if snapshot.TodayTokens != 40 || snapshot.AllTimeTokens != 40 || snapshot.RecentTokens != 3 {
-		t.Fatalf("token counts = (%d, %d, %d), want (40, 40, 3)", snapshot.TodayTokens, snapshot.AllTimeTokens, snapshot.RecentTokens)
+	if snapshot.TodayTokens != 40 || snapshot.AllTimeTokens != 40 || snapshot.RecentTokens1M != 0 || snapshot.RecentTokens10M != 3 {
+		t.Fatalf("token counts = (%d, %d, %d, %d), want (40, 40, 0, 3)", snapshot.TodayTokens, snapshot.AllTimeTokens, snapshot.RecentTokens1M, snapshot.RecentTokens10M)
 	}
 	if snapshot.TodayCost != 5.0 || snapshot.TodayStandardCost != 7.0 {
 		t.Fatalf("today costs = (%v, %v), want (5.0, 7.0)", snapshot.TodayCost, snapshot.TodayStandardCost)
@@ -126,8 +127,8 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	if snapshot.ActiveUsers != 1 {
 		t.Fatalf("ActiveUsers = %d, want 1", snapshot.ActiveUsers)
 	}
-	if snapshot.AllTimeRequests != 2 || snapshot.RecentRequests != 1 {
-		t.Fatalf("request totals = (%d, %d), want (2, 1)", snapshot.AllTimeRequests, snapshot.RecentRequests)
+	if snapshot.AllTimeRequests != 2 || snapshot.RecentRequests1M != 0 || snapshot.RecentRequests10M != 1 {
+		t.Fatalf("request totals = (%d, %d, %d), want (2, 0, 1)", snapshot.AllTimeRequests, snapshot.RecentRequests1M, snapshot.RecentRequests10M)
 	}
 }
 
