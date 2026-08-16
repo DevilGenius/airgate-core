@@ -94,7 +94,7 @@
 }
 
 .ag-api-keys-table .ag-metric-chips--quota .ag-metric-chip[data-tone="warning"] {
-  border-color: color-mix(in oklab, var(--ag-warning) 42%, transparent);
+  border-color: color-mix(in oklab, var(--ag-warning) 70%, transparent);
   background: color-mix(in oklab, var(--ag-warning) 18%, transparent);
 }
 
@@ -104,7 +104,7 @@
 }
 
 .ag-api-keys-table .ag-metric-chips--quota .ag-metric-chip[data-tone="success"] {
-  border-color: color-mix(in oklab, var(--ag-success) 42%, transparent);
+  border-color: color-mix(in oklab, var(--ag-success) 70%, transparent);
   background: color-mix(in oklab, var(--ag-success) 18%, transparent);
 }
 

@@ -119,13 +119,13 @@ body::selection {
 }
 
 .ag-native-soft-chip[data-tone="default"] {
-  border-color: color-mix(in oklab, var(--ag-border) 88%, transparent);
+  border-color: color-mix(in oklab, var(--ag-default-foreground) 70%, transparent);
   background: var(--ag-default-bg);
   color: var(--ag-default-foreground);
 }
 
 .ag-native-soft-chip[data-tone="success"] {
-  border-color: color-mix(in oklab, var(--ag-success) 28%, transparent);
+  border-color: color-mix(in oklab, var(--ag-success) 70%, transparent);
   background: var(--ag-success-subtle);
   color: var(--ag-success);
 }

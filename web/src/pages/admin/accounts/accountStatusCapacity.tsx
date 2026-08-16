@@ -1,24 +1,28 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Ban } from 'lucide-react';
 import type { AccountResp, FamilyCooldownDTO } from '../../../shared/types';
 import { AccountCapacityStore } from './accountRuntimeStores';
 import { NativeSoftChip } from './accountNativeChip';
 
 function StatusPill({
+  icon,
   label,
   status,
   tooltip,
 }: {
+  icon?: ReactNode;
   label: string;
   status: 'active' | 'disabled';
   tooltip?: string;
 }) {
   return (
     <NativeSoftChip
-      className="ag-account-status-pill"
+      className={icon ? 'ag-account-status-pill flex-row gap-0.5 whitespace-nowrap' : 'ag-account-status-pill'}
       title={tooltip}
       tone={status === 'active' ? 'success' : 'default'}
     >
+      {icon}
       {label}
     </NativeSoftChip>
   );
@@ -135,7 +139,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   const pill = (label: string, bg: string, fg: string, tooltip?: string) => (
     <span
       className="inline-flex h-[1.0625rem] items-center gap-1 px-1.5 rounded-full text-[10px] font-semibold border whitespace-nowrap"
-      style={{ background: bg, color: fg, borderColor: bg }}
+      style={{ background: bg, color: fg, borderColor: `color-mix(in oklab, ${fg} 70%, transparent)` }}
       title={tooltip}
     >
       <span className="w-1 h-1 rounded-full" style={{ background: fg }} />
@@ -174,10 +178,17 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
       t('accounts.degraded_tooltip', '退避中，暂停调度，到期自动恢复'),
     );
   } else if (row.state === 'disabled') {
-    const reason = row.error_msg?.trim() === '管理员手动关闭调度' ? '手动关闭' : row.error_msg?.trim();
+    const trimmedError = row.error_msg?.trim();
+    const isManualDisabled = trimmedError === '手动关闭' || trimmedError === '管理员手动关闭调度';
+    const reason = trimmedError === '管理员手动关闭调度' ? '手动关闭' : trimmedError;
     mainBadge = (
       <div className="inline-flex min-w-0 max-w-full flex-col items-center gap-0.5">
-        <StatusPill label={t('status.disabled')} status="disabled" tooltip={reason || undefined} />
+        <StatusPill
+          icon={isManualDisabled ? undefined : <Ban aria-hidden="true" className="relative -top-[0.5px] h-2.5 w-2.5 shrink-0 text-danger" />}
+          label={t('status.disabled')}
+          status="disabled"
+          tooltip={reason || undefined}
+        />
         {reason && (
           <span className="block max-w-[5.75rem] truncate text-center text-[10px] leading-none text-[var(--ag-muted)]" title={reason}>
             {reason}
@@ -266,7 +277,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
     >
       {mainBadge}
       {supplementalBadges.map((item) => (
-        <span key={item.key}>{item.badge}</span>
+        <span key={item.key} className="inline-flex">{item.badge}</span>
       ))}
     </div>
   );
