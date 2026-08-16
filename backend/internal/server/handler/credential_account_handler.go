@@ -169,6 +169,7 @@ func credentialAccountResp(account appaccount.Account, current int) dto.Credenti
 		Name:               account.Name,
 		Platform:           account.Platform,
 		Type:               account.Type,
+		PlanType:           appaccount.NormalizePlanType(account.Credentials["plan_type"]),
 		State:              account.State,
 		Priority:           account.Priority,
 		MaxConcurrency:     account.MaxConcurrency,

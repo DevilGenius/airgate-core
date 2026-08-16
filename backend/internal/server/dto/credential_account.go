@@ -72,6 +72,7 @@ type CredentialAccountResp struct {
 	Email              string `json:"email,omitempty"`
 	Platform           string `json:"platform"`
 	Type               string `json:"type"`
+	PlanType           string `json:"plan_type,omitempty"`
 	State              string `json:"state"`
 	Priority           int    `json:"priority"`
 	StateUntil         string `json:"state_until,omitempty"`

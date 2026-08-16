@@ -27,7 +27,7 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		SetEmail("active@example.com").
 		SetPlatform("openai").
 		SetType("oauth").
-		SetCredentials(map[string]string{"access_token": "secret"}).
+		SetCredentials(map[string]string{"access_token": "secret", "plan_type": "ChatGPT Plus"}).
 		SetMaxConcurrency(20).
 		SetPriority(120).
 		SetRateMultiplier(1).
@@ -39,7 +39,7 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		SetEmail("disabled@example.com").
 		SetPlatform("openai").
 		SetType("oauth").
-		SetCredentials(map[string]string{"access_token": "secret-2"}).
+		SetCredentials(map[string]string{"access_token": "secret-2", "plan_type": "K12"}).
 		SetState(account.StateDisabled).
 		SetMaxConcurrency(10).
 		SetRateMultiplier(1).
@@ -89,7 +89,8 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 	for _, item := range envelope.Data.Accounts.List {
 		byName[item.Name] = item
 	}
-	if byName["active-team"].Email == "" || byName["active-team"].Priority != 120 || byName["disabled-team"].Priority != 50 {
+	if byName["active-team"].Email == "" || byName["active-team"].PlanType != "plus" ||
+		byName["active-team"].Priority != 120 || byName["disabled-team"].PlanType != "k12" || byName["disabled-team"].Priority != 50 {
 		t.Fatalf("account priority mapping = %+v", byName)
 	}
 	if strings.Contains(w.Body.String(), "access_token") || strings.Contains(w.Body.String(), "secret") {
