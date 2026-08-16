@@ -55,7 +55,6 @@ type CredentialAccountSummaryResp struct {
 	Total              int            `json:"total"`
 	ConfiguredCapacity int            `json:"configured_capacity"`
 	CurrentConcurrency int            `json:"current_concurrency"`
-	AvailableCapacity  int            `json:"available_capacity"`
 	ByState            map[string]int `json:"by_state"`
 }
 
@@ -77,7 +76,6 @@ type CredentialAccountResp struct {
 	StateReason        string `json:"state_reason,omitempty"`
 	MaxConcurrency     int    `json:"max_concurrency"`
 	CurrentConcurrency int    `json:"current_concurrency"`
-	AvailableCapacity  int    `json:"available_capacity"`
 	LastUsedAt         string `json:"last_used_at,omitempty"`
 	LastProbeAt        string `json:"last_probe_at,omitempty"`
 }

@@ -143,10 +143,6 @@ func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 		result.AccountSummary.CurrentConcurrency += current
 		result.AccountSummary.ByState[account.State]++
 	}
-	result.AccountSummary.AvailableCapacity = maxInt(
-		result.AccountSummary.ConfiguredCapacity - result.AccountSummary.CurrentConcurrency,
-	)
-
 	start := len(accounts)
 	totalPages := (len(accounts) + pageSize - 1) / pageSize
 	if page <= totalPages {
@@ -175,7 +171,6 @@ func credentialAccountResp(account appaccount.Account, current int) dto.Credenti
 		State:              account.State,
 		MaxConcurrency:     account.MaxConcurrency,
 		CurrentConcurrency: current,
-		AvailableCapacity:  maxInt(account.MaxConcurrency - current),
 		StateReason:        truncateCredentialStateReason(account.ErrorMsg),
 	}
 	if account.Email != nil {
