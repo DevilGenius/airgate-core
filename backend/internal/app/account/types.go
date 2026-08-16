@@ -385,6 +385,8 @@ type Repository interface {
 	ListAll(context.Context, ListFilter) ([]Account, error)
 	// OccupiedPriorities 返回未删除账号按优先级聚合后的占用数量；excludeIDs 用于排除本次批量更新目标。
 	OccupiedPriorities(context.Context, []int) (map[int]int, error)
+	// OccupiedEnabledPriorities 返回未删除且启用账号按优先级聚合后的占用数量，供配置导入使用。
+	OccupiedEnabledPriorities(context.Context) (map[int]int, error)
 	Create(context.Context, CreateInput) (Account, error)
 	Update(context.Context, int, UpdateInput) (Account, error)
 	Delete(context.Context, int) error

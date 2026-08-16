@@ -593,6 +593,7 @@ type stubRepository struct {
 	listAll                   func(context.Context, ListFilter) ([]Account, error)
 	occupiedPriority          func(context.Context) (map[int]int, error)
 	occupiedPriorityExcluding func(context.Context, []int) (map[int]int, error)
+	occupiedEnabledPriority   func(context.Context) (map[int]int, error)
 	listByPlatform            func(context.Context, string) ([]Account, error)
 	findUsageLogs             func(context.Context, int, time.Time, time.Time) ([]UsageLog, error)
 	batchWindowStats          func(context.Context, []int, time.Time) (map[int]AccountWindowStats, error)
@@ -626,6 +627,16 @@ func (s stubRepository) ListAll(ctx context.Context, filter ListFilter) ([]Accou
 func (s stubRepository) OccupiedPriorities(ctx context.Context, excludeIDs []int) (map[int]int, error) {
 	if s.occupiedPriorityExcluding != nil {
 		return s.occupiedPriorityExcluding(ctx, excludeIDs)
+	}
+	if s.occupiedPriority != nil {
+		return s.occupiedPriority(ctx)
+	}
+	return nil, nil
+}
+
+func (s stubRepository) OccupiedEnabledPriorities(ctx context.Context) (map[int]int, error) {
+	if s.occupiedEnabledPriority != nil {
+		return s.occupiedEnabledPriority(ctx)
 	}
 	if s.occupiedPriority != nil {
 		return s.occupiedPriority(ctx)
@@ -990,6 +1001,28 @@ func TestBulkUpdateAppliesPrioritySequenceInRequestOrder(t *testing.T) {
 	want := []int{1000, 1000, 1000, 998, 998, 998, 996}
 	if !slices.Equal(updated, want) {
 		t.Fatalf("updated priorities = %v, want %v", updated, want)
+	}
+}
+
+func TestBulkUpdateCanEditDisabledAccount(t *testing.T) {
+	priority := 321
+	updated := false
+	service := NewService(stubRepository{
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			if id != 11 || input.Priority == nil || *input.Priority != priority {
+				t.Fatalf("disabled account update = id %d, priority %v", id, input.Priority)
+			}
+			updated = true
+			return Account{ID: id, State: "disabled", Priority: *input.Priority}, nil
+		},
+	}, nil, nil, nil)
+
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs:      []int{11},
+		Priority: &priority,
+	})
+	if result.Success != 1 || result.Failed != 0 || !updated {
+		t.Fatalf("BulkUpdate disabled account result = %+v, updated=%v", result, updated)
 	}
 }
 

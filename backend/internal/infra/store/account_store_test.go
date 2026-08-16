@@ -37,6 +37,16 @@ func TestAccountStoreOccupiedPrioritiesGroupsAndExcludes(t *testing.T) {
 	}
 	excludedID := create("excluded", 100)
 	create("same-priority", 100)
+	if _, err := db.Account.Create().
+		SetName("disabled").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{"access_token": "disabled"}).
+		SetPriority(100).
+		SetState(entaccount.StateDisabled).
+		Save(ctx); err != nil {
+		t.Fatalf("create disabled account: %v", err)
+	}
 	create("lower-priority", 90)
 
 	store := NewAccountStore(db)
@@ -44,16 +54,24 @@ func TestAccountStoreOccupiedPrioritiesGroupsAndExcludes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OccupiedPriorities() error = %v", err)
 	}
-	if counts[100] != 2 || counts[90] != 1 || len(counts) != 2 {
-		t.Fatalf("occupied counts = %v, want map[100:2 90:1]", counts)
+	if counts[100] != 3 || counts[90] != 1 || len(counts) != 2 {
+		t.Fatalf("occupied counts = %v, want map[100:3 90:1]", counts)
 	}
 
 	counts, err = store.OccupiedPriorities(ctx, []int{excludedID})
 	if err != nil {
 		t.Fatalf("OccupiedPriorities(exclude) error = %v", err)
 	}
-	if counts[100] != 1 || counts[90] != 1 || len(counts) != 2 {
-		t.Fatalf("excluded occupied counts = %v, want map[100:1 90:1]", counts)
+	if counts[100] != 2 || counts[90] != 1 || len(counts) != 2 {
+		t.Fatalf("excluded occupied counts = %v, want map[100:2 90:1]", counts)
+	}
+
+	enabledCounts, err := store.OccupiedEnabledPriorities(ctx)
+	if err != nil {
+		t.Fatalf("OccupiedEnabledPriorities() error = %v", err)
+	}
+	if enabledCounts[100] != 2 || enabledCounts[90] != 1 || len(enabledCounts) != 2 {
+		t.Fatalf("enabled occupied counts = %v, want map[100:2 90:1]", enabledCounts)
 	}
 }
 

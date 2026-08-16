@@ -47,6 +47,18 @@ func TestImportAccountsAppliesConfiguredDSL(t *testing.T) {
 			t.Fatalf("create occupied account: %v", err)
 		}
 	}
+	if _, err := db.Account.Create().
+		SetName("disabled-occupied").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{"access_token": "disabled-occupied"}).
+		SetPriority(1000).
+		SetState(account.StateDisabled).
+		SetMaxConcurrency(1).
+		SetRateMultiplier(1).
+		Save(ctx); err != nil {
+		t.Fatalf("create disabled occupied account: %v", err)
+	}
 	settingsService := appsettings.NewService(store.NewSettingsStore(db))
 	dsl := fmt.Sprintf(`{
   "version": 1,
@@ -90,6 +102,52 @@ func TestImportAccountsAppliesConfiguredDSL(t *testing.T) {
 	}
 	if len(groups) != 1 || groups[0] != group.ID {
 		t.Fatalf("configured groups = %v, want [%d]", groups, group.ID)
+	}
+}
+
+func TestBulkUpdateAccountsCanEditDisabledAccount(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.OpenMemoryEnt(t, "handler_bulk_update_disabled_account", schema.WithGlobalUniqueID(false))
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	item, err := db.Account.Create().
+		SetName("disabled-account").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{"access_token": "disabled-account"}).
+		SetState(account.StateDisabled).
+		SetPriority(100).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create disabled account: %v", err)
+	}
+
+	accountService := appaccount.NewService(store.NewAccountStore(db), nil, scheduler.NewConcurrencyManager(nil), nil)
+	accountHandler := NewAccountHandler(accountService, nil)
+	priority := 321
+	w := invokeHandlerForValidation(
+		http.MethodPatch,
+		"/accounts/bulk",
+		fmt.Sprintf(`{"account_ids":[%d],"priority":%d}`, item.ID, priority),
+		nil,
+		nil,
+		accountHandler.BulkUpdateAccounts,
+	)
+	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+	if !strings.Contains(w.Body.String(), `"success":1`) {
+		t.Fatalf("bulk update disabled account body = %s", w.Body.String())
+	}
+
+	updated, err := db.Account.Get(ctx, item.ID)
+	if err != nil {
+		t.Fatalf("load disabled account: %v", err)
+	}
+	if updated.State != account.StateDisabled || updated.Priority != priority {
+		t.Fatalf("disabled account after bulk update = state %q priority %d", updated.State, updated.Priority)
 	}
 }
 

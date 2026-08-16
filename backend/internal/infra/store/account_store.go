@@ -205,6 +205,17 @@ func (s *AccountStore) OccupiedPriorities(ctx context.Context, excludeIDs []int)
 	if len(excludeIDs) > 0 {
 		query = query.Where(entaccount.IDNotIn(excludeIDs...))
 	}
+	return aggregateOccupiedPriorities(ctx, query)
+}
+
+// OccupiedEnabledPriorities 返回现有未删除且启用账号按优先级聚合后的占用数量。
+// disabled 账号（包括 401/402 等凭证失效和手动关闭）不参与配置导入的序列分配。
+func (s *AccountStore) OccupiedEnabledPriorities(ctx context.Context) (map[int]int, error) {
+	query := accountscope.Query(s.db).Where(entaccount.StateNEQ(entaccount.StateDisabled))
+	return aggregateOccupiedPriorities(ctx, query)
+}
+
+func aggregateOccupiedPriorities(ctx context.Context, query *ent.AccountQuery) (map[int]int, error) {
 	var rows []struct {
 		Priority int `json:"priority"`
 		Count    int `json:"count"`

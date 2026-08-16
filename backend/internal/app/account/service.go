@@ -470,9 +470,9 @@ func (s *Service) ListAll(ctx context.Context, filter ListFilter) ([]Account, er
 	return s.repo.ListAll(ctx, filter)
 }
 
-// OccupiedPriorities 返回现有账号按优先级聚合后的占用数量。
+// OccupiedPriorities 返回现有启用账号按优先级聚合后的占用数量，供配置导入分配序列优先级。
 func (s *Service) OccupiedPriorities(ctx context.Context) (map[int]int, error) {
-	return s.repo.OccupiedPriorities(ctx, nil)
+	return s.repo.OccupiedEnabledPriorities(ctx)
 }
 
 // Import 批量导入账号，逐条创建并收集失败信息（不使用事务，允许部分成功）。
