@@ -36,6 +36,9 @@ func TestHandlerConstructors(t *testing.T) {
 	if got := NewCredentialImportHandler(nil, nil); got == nil {
 		t.Fatal("NewCredentialImportHandler returned nil")
 	}
+	if got := NewCredentialAccountHandler(nil, nil, nil); got == nil {
+		t.Fatal("NewCredentialAccountHandler returned nil")
+	}
 	if got := NewAPIKeyHandler(nil, nil); got == nil {
 		t.Fatal("NewAPIKeyHandler returned nil")
 	}

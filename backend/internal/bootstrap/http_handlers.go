@@ -56,22 +56,23 @@ type HTTPDependencies struct {
 
 // HTTPHandlers 聚合所有 HTTP 处理器。
 type HTTPHandlers struct {
-	Auth             *handler.AuthHandler
-	User             *handler.UserHandler
-	Account          *handler.AccountHandler
-	CredentialImport *handler.CredentialImportHandler
-	Group            *handler.GroupHandler
-	APIKey           *handler.APIKeyHandler
-	Subscription     *handler.SubscriptionHandler
-	Usage            *handler.UsageHandler
-	Proxy            *handler.ProxyHandler
-	Settings         *handler.SettingsHandler
-	Dashboard        *handler.DashboardHandler
-	Plugin           *handler.PluginHandler
-	Version          *handler.VersionHandler
-	Upgrade          *handler.UpgradeHandler
-	Monitor          *handler.MonitorHandler
-	Event            *handler.EventHandler
+	Auth              *handler.AuthHandler
+	User              *handler.UserHandler
+	Account           *handler.AccountHandler
+	CredentialAccount *handler.CredentialAccountHandler
+	CredentialImport  *handler.CredentialImportHandler
+	Group             *handler.GroupHandler
+	APIKey            *handler.APIKeyHandler
+	Subscription      *handler.SubscriptionHandler
+	Usage             *handler.UsageHandler
+	Proxy             *handler.ProxyHandler
+	Settings          *handler.SettingsHandler
+	Dashboard         *handler.DashboardHandler
+	Plugin            *handler.PluginHandler
+	Version           *handler.VersionHandler
+	Upgrade           *handler.UpgradeHandler
+	Monitor           *handler.MonitorHandler
+	Event             *handler.EventHandler
 
 	AccountService *appaccount.Service
 }
@@ -125,23 +126,24 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 
 	accountHandler := handler.NewAccountHandler(accountService, dep.Scheduler, settingsService)
 	return &HTTPHandlers{
-		Auth:             handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
-		User:             handler.NewUserHandler(userService, settingsService, dep.Scheduler),
-		Account:          accountHandler,
-		CredentialImport: handler.NewCredentialImportHandler(accountHandler, credentialImportService),
-		Group:            handler.NewGroupHandler(groupService, dep.Scheduler),
-		APIKey:           handler.NewAPIKeyHandler(apiKeyService, dep.Scheduler),
-		Subscription:     handler.NewSubscriptionHandler(subscriptionService),
-		Usage:            handler.NewUsageHandler(usageService),
-		Proxy:            handler.NewProxyHandler(proxyService),
-		Settings:         handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret(), notificationService),
-		Dashboard:        handler.NewDashboardHandler(dashboardService),
-		Plugin:           handler.NewPluginHandler(pluginAdminService),
-		Version:          handler.NewVersionHandler(),
-		Upgrade:          handler.NewUpgradeHandler(upgradeService),
-		Monitor:          handler.NewMonitorHandler(monitorService, dep.Runtime),
-		Event:            handler.NewEventHandler(dep.Events),
-		AccountService:   accountService,
+		Auth:              handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
+		User:              handler.NewUserHandler(userService, settingsService, dep.Scheduler),
+		Account:           accountHandler,
+		CredentialAccount: handler.NewCredentialAccountHandler(accountService, dashboardService, dep.Runtime),
+		CredentialImport:  handler.NewCredentialImportHandler(accountHandler, credentialImportService),
+		Group:             handler.NewGroupHandler(groupService, dep.Scheduler),
+		APIKey:            handler.NewAPIKeyHandler(apiKeyService, dep.Scheduler),
+		Subscription:      handler.NewSubscriptionHandler(subscriptionService),
+		Usage:             handler.NewUsageHandler(usageService),
+		Proxy:             handler.NewProxyHandler(proxyService),
+		Settings:          handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret(), notificationService),
+		Dashboard:         handler.NewDashboardHandler(dashboardService),
+		Plugin:            handler.NewPluginHandler(pluginAdminService),
+		Version:           handler.NewVersionHandler(),
+		Upgrade:           handler.NewUpgradeHandler(upgradeService),
+		Monitor:           handler.NewMonitorHandler(monitorService, dep.Runtime),
+		Event:             handler.NewEventHandler(dep.Events),
+		AccountService:    accountService,
 	}
 }
 

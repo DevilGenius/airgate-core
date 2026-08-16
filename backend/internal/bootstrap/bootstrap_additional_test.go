@@ -62,7 +62,7 @@ func TestNewHTTPHandlersConstructsServicesAndHandlers(t *testing.T) {
 		Recorder:    recorder,
 	})
 
-	if handlers == nil || handlers.Auth == nil || handlers.User == nil || handlers.Account == nil ||
+	if handlers == nil || handlers.Auth == nil || handlers.User == nil || handlers.Account == nil || handlers.CredentialAccount == nil ||
 		handlers.Group == nil || handlers.APIKey == nil || handlers.Subscription == nil ||
 		handlers.Usage == nil || handlers.Proxy == nil || handlers.Settings == nil ||
 		handlers.Dashboard == nil || handlers.Plugin == nil || handlers.Version == nil ||

@@ -122,6 +122,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/accounts/usage", handlers.Account.GetAccountUsage)
 		adminGroup.GET("/accounts/capacity", handlers.Account.GetAccountCapacity)
 		adminGroup.GET("/accounts/export", handlers.Account.ExportAccounts)
+		adminGroup.POST("/accounts/overview", handlers.CredentialAccount.GetOverview)
 		adminGroup.GET("/accounts/import-config", handlers.Account.GetImportConfig)
 		adminGroup.PUT("/accounts/import-config", handlers.Account.UpdateImportConfig)
 		adminGroup.POST("/accounts/import", handlers.Account.ImportAccounts)
@@ -240,6 +241,7 @@ func (s *Server) registerRoutes() {
 	credentialGroup := v1.Group("/credentials")
 	credentialGroup.Use(middleware.PublicRateLimit(20, time.Minute), middleware.CredentialKeyAuth(s.db))
 	{
+		credentialGroup.POST("/accounts/overview", handlers.CredentialAccount.GetOverview)
 		credentialGroup.POST("/accounts/import/compat", handlers.CredentialImport.ImportCompatibleAccounts)
 	}
 
