@@ -20,7 +20,7 @@ import (
 func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 	ctx := t.Context()
 	db := testdb.OpenMemoryEnt(t, "credential_account_overview", schema.WithGlobalUniqueID(false))
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if _, err := db.Account.Create().
 		SetName("active-team").
