@@ -13,10 +13,11 @@ import (
 const (
 	GroupName = "notification"
 
-	KeyEnabled       = "notification_enabled"
-	KeyWebhookURL    = "notification_webhook_url"
-	KeyWebhookSecret = "notification_webhook_secret"
-	KeyWebhookBody   = "notification_webhook_body"
+	KeyEnabled            = "notification_enabled"
+	KeyWebhookURL         = "notification_webhook_url"
+	KeyWebhookHeaderName  = "notification_webhook_header_name"
+	KeyWebhookHeaderValue = "notification_webhook_header_value"
+	KeyWebhookBody        = "notification_webhook_body"
 )
 
 // Service sends configured core message notifications.
@@ -52,23 +53,31 @@ func (s *Service) IsConfigured(ctx context.Context) (bool, error) {
 	}
 	hasURL := false
 	hasBody := false
+	headerName := ""
+	headerValue := ""
 	for _, item := range items {
 		switch item.Key {
 		case KeyWebhookURL:
 			hasURL = strings.TrimSpace(item.Value) != ""
+		case KeyWebhookHeaderName:
+			headerName = strings.TrimSpace(item.Value)
+		case KeyWebhookHeaderValue:
+			headerValue = strings.TrimSpace(item.Value)
 		case KeyWebhookBody:
 			hasBody = strings.TrimSpace(item.Value) != ""
 		}
 	}
-	return hasURL && hasBody, nil
+	headerConfigured := (headerName == "" && headerValue == "") || (headerName != "" && headerValue != "")
+	return hasURL && hasBody && headerConfigured, nil
 }
 
 // Test renders and sends a notification using unsaved form values from the settings page.
-func (s *Service) Test(ctx context.Context, webhookURL, secret, body string) error {
+func (s *Service) Test(ctx context.Context, webhookURL, headerName, headerValue, body string) error {
 	return s.SendWithConfig(ctx, notifier.WebhookConfig{
-		URL:    webhookURL,
-		Secret: secret,
-		Body:   body,
+		URL:         webhookURL,
+		HeaderName:  headerName,
+		HeaderValue: headerValue,
+		Body:        body,
 	}, s.DefaultTemplateValues("测试标题", "测试内容"))
 }
 
@@ -97,8 +106,10 @@ func (s *Service) LoadConfig(ctx context.Context) (notifier.WebhookConfig, error
 		switch item.Key {
 		case KeyWebhookURL:
 			cfg.URL = item.Value
-		case KeyWebhookSecret:
-			cfg.Secret = item.Value
+		case KeyWebhookHeaderName:
+			cfg.HeaderName = item.Value
+		case KeyWebhookHeaderValue:
+			cfg.HeaderValue = item.Value
 		case KeyWebhookBody:
 			cfg.Body = item.Value
 		}
@@ -108,6 +119,9 @@ func (s *Service) LoadConfig(ctx context.Context) (notifier.WebhookConfig, error
 	}
 	if strings.TrimSpace(cfg.Body) == "" {
 		return notifier.WebhookConfig{}, fmt.Errorf("notification webhook body is not configured")
+	}
+	if (strings.TrimSpace(cfg.HeaderName) == "") != (strings.TrimSpace(cfg.HeaderValue) == "") {
+		return notifier.WebhookConfig{}, fmt.Errorf("notification webhook header name and value must be configured together")
 	}
 	return cfg, nil
 }
@@ -122,9 +136,9 @@ func notificationEnabled(items []appsettings.Setting) bool {
 }
 
 // DefaultTemplateValues returns common template variables for notification bodies.
-func (s *Service) DefaultTemplateValues(title, content string) map[string]string {
+func (s *Service) DefaultTemplateValues(title, message string) map[string]string {
 	return map[string]string{
 		"title":   title,
-		"content": content,
+		"message": message,
 	}
 }

@@ -16,7 +16,7 @@ import (
 func TestIsConfiguredRequiresExplicitEnable(t *testing.T) {
 	base := []appsettings.Setting{
 		{Key: KeyWebhookURL, Value: "https://example.com/webhook", Group: GroupName},
-		{Key: KeyWebhookBody, Value: `{"title":"{{title}}"}`, Group: GroupName},
+		{Key: KeyWebhookBody, Value: `{"title":"{{title}}","message":"{{message}}"}`, Group: GroupName},
 	}
 
 	tests := []struct {
@@ -29,6 +29,8 @@ func TestIsConfiguredRequiresExplicitEnable(t *testing.T) {
 		{name: "enabled true ignores case and spaces", item: appsettings.Setting{Key: KeyEnabled, Value: " TRUE ", Group: GroupName}, want: true},
 		{name: "enabled false", item: appsettings.Setting{Key: KeyEnabled, Value: "false", Group: GroupName}, want: false},
 		{name: "enabled empty", item: appsettings.Setting{Key: KeyEnabled, Value: "", Group: GroupName}, want: false},
+		{name: "header name without value", item: appsettings.Setting{Key: KeyWebhookHeaderName, Value: "X-Webhook-Key", Group: GroupName}, want: false},
+		{name: "header value without name", item: appsettings.Setting{Key: KeyWebhookHeaderValue, Value: "secret", Group: GroupName}, want: false},
 	}
 
 	for _, tt := range tests {
@@ -51,7 +53,7 @@ func TestIsConfiguredRequiresExplicitEnable(t *testing.T) {
 func TestLoadConfigReturnsDisabledWhenNotExplicitlyEnabled(t *testing.T) {
 	items := []appsettings.Setting{
 		{Key: KeyWebhookURL, Value: "https://example.com/webhook", Group: GroupName},
-		{Key: KeyWebhookBody, Value: `{"title":"{{title}}"}`, Group: GroupName},
+		{Key: KeyWebhookBody, Value: `{"title":"{{title}}","message":"{{message}}"}`, Group: GroupName},
 	}
 
 	_, err := newTestService(items).LoadConfig(t.Context())
@@ -64,15 +66,17 @@ func TestLoadConfigReadsEnabledWebhookSettings(t *testing.T) {
 	items := []appsettings.Setting{
 		{Key: KeyEnabled, Value: "true", Group: GroupName},
 		{Key: KeyWebhookURL, Value: "https://example.com/webhook", Group: GroupName},
-		{Key: KeyWebhookSecret, Value: "secret", Group: GroupName},
-		{Key: KeyWebhookBody, Value: `{"title":"{{title}}"}`, Group: GroupName},
+		{Key: KeyWebhookHeaderName, Value: "X-Webhook-Key", Group: GroupName},
+		{Key: KeyWebhookHeaderValue, Value: "secret", Group: GroupName},
+		{Key: KeyWebhookBody, Value: `{"title":"{{title}}","message":"{{message}}"}`, Group: GroupName},
 	}
 
 	cfg, err := newTestService(items).LoadConfig(t.Context())
 	if err != nil {
 		t.Fatalf("LoadConfig() returned error: %v", err)
 	}
-	if cfg.URL != "https://example.com/webhook" || cfg.Secret != "secret" || cfg.Body == "" {
+	if cfg.URL != "https://example.com/webhook" ||
+		cfg.HeaderName != "X-Webhook-Key" || cfg.HeaderValue != "secret" || cfg.Body == "" {
 		t.Fatalf("LoadConfig() = %+v, want saved webhook config", cfg)
 	}
 }
@@ -98,10 +102,20 @@ func TestNilServiceAndSettingsErrors(t *testing.T) {
 func TestLoadConfigRequiresURLAndBody(t *testing.T) {
 	_, err := newTestService([]appsettings.Setting{
 		{Key: KeyEnabled, Value: "true", Group: GroupName},
-		{Key: KeyWebhookBody, Value: `{"title":"{{title}}"}`, Group: GroupName},
+		{Key: KeyWebhookBody, Value: `{"title":"{{title}}","message":"{{message}}"}`, Group: GroupName},
 	}).LoadConfig(t.Context())
 	if err == nil || !strings.Contains(err.Error(), "url") {
 		t.Fatalf("missing URL error = %v", err)
+	}
+
+	_, err = newTestService([]appsettings.Setting{
+		{Key: KeyEnabled, Value: "true", Group: GroupName},
+		{Key: KeyWebhookURL, Value: "https://example.com/webhook", Group: GroupName},
+		{Key: KeyWebhookHeaderName, Value: "X-Webhook-Key", Group: GroupName},
+		{Key: KeyWebhookBody, Value: `{"title":"{{title}}","message":"{{message}}"}`, Group: GroupName},
+	}).LoadConfig(t.Context())
+	if err == nil || !strings.Contains(err.Error(), "header name and value") {
+		t.Fatalf("incomplete header error = %v", err)
 	}
 
 	_, err = newTestService([]appsettings.Setting{
@@ -126,12 +140,14 @@ func TestSendAndTestPostRenderedWebhook(t *testing.T) {
 	service := newTestService([]appsettings.Setting{
 		{Key: KeyEnabled, Value: "true", Group: GroupName},
 		{Key: KeyWebhookURL, Value: server.URL, Group: GroupName},
-		{Key: KeyWebhookBody, Value: `{"title":"{{title}}","content":"{{content}}"}`, Group: GroupName},
+		{Key: KeyWebhookHeaderName, Value: "X-Webhook-Key", Group: GroupName},
+		{Key: KeyWebhookHeaderValue, Value: "secret", Group: GroupName},
+		{Key: KeyWebhookBody, Value: `{"title":"{{title}}","message":"{{message}}"}`, Group: GroupName},
 	})
-	if err := service.Send(t.Context(), map[string]string{"title": "Hello", "content": "World"}); err != nil {
+	if err := service.Send(t.Context(), map[string]string{"title": "Hello", "message": "World"}); err != nil {
 		t.Fatalf("Send() error = %v", err)
 	}
-	if err := service.Test(t.Context(), server.URL, "", `{"title":"{{title}}","content":"{{content}}"}`); err != nil {
+	if err := service.Test(t.Context(), server.URL, "X-Webhook-Key", "secret", `{"title":"{{title}}","message":"{{message}}"}`); err != nil {
 		t.Fatalf("Test() error = %v", err)
 	}
 	if len(bodies) != 2 || !strings.Contains(bodies[0], "Hello") || !strings.Contains(bodies[1], "测试标题") {
@@ -152,16 +168,16 @@ func TestSendWithConfigPropagatesWebhookError(t *testing.T) {
 	service := NewService(nil)
 	err := service.SendWithConfig(t.Context(), notifier.WebhookConfig{
 		URL:  "://bad-url",
-		Body: `{"title":"{{title}}"}`,
-	}, map[string]string{"title": "Hello"})
+		Body: `{"title":"{{title}}","message":"{{message}}"}`,
+	}, map[string]string{"title": "Hello", "message": "World"})
 	if err == nil {
 		t.Fatal("SendWithConfig() error = nil, want invalid URL error")
 	}
 }
 
 func TestDefaultTemplateValues(t *testing.T) {
-	values := NewService(nil).DefaultTemplateValues("Title", "Content")
-	if values["title"] != "Title" || values["content"] != "Content" {
+	values := NewService(nil).DefaultTemplateValues("Title", "Message")
+	if values["title"] != "Title" || values["message"] != "Message" {
 		t.Fatalf("DefaultTemplateValues() = %#v", values)
 	}
 }

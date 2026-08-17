@@ -68,11 +68,11 @@ func TestSendWebhookSuccess(t *testing.T) {
 		if got := r.Header.Get("User-Agent"); got != "airgate-core-notifier" {
 			t.Fatalf("User-Agent = %q", got)
 		}
-		if got := r.Header.Get("Authorization"); got != "Bearer secret-token" {
-			t.Fatalf("Authorization = %q", got)
+		if got := r.Header.Get("X-Webhook-Key"); got != "secret-token" {
+			t.Fatalf("X-Webhook-Key = %q", got)
 		}
-		if got := r.Header.Get("X-AirGate-Webhook-Secret"); got != "secret-token" {
-			t.Fatalf("X-AirGate-Webhook-Secret = %q", got)
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Fatalf("Authorization = %q, want empty", got)
 		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -84,15 +84,32 @@ func TestSendWebhookSuccess(t *testing.T) {
 	defer server.Close()
 
 	err := SendWebhook(context.Background(), WebhookConfig{
-		URL:    " " + server.URL + " ",
-		Secret: " secret-token ",
-		Body:   `{"ok":true}`,
+		URL:         " " + server.URL + " ",
+		HeaderName:  " X-Webhook-Key ",
+		HeaderValue: " secret-token ",
+		Body:        `{"ok":true}`,
 	})
 	if err != nil {
 		t.Fatalf("SendWebhook() error = %v", err)
 	}
 	if gotBody != `{"ok":true}` {
 		t.Fatalf("body = %q", gotBody)
+	}
+}
+
+func TestSendWebhookRejectsIncompleteCustomHeader(t *testing.T) {
+	for name, cfg := range map[string]WebhookConfig{
+		"missing name":  {URL: "https://example.com/hook", HeaderValue: "token", Body: "{}"},
+		"missing value": {URL: "https://example.com/hook", HeaderName: "X-Webhook-Key", Body: "{}"},
+		"invalid name":  {URL: "https://example.com/hook", HeaderName: "X Webhook Key", HeaderValue: "token", Body: "{}"},
+		"invalid value": {URL: "https://example.com/hook", HeaderName: "X-Webhook-Key", HeaderValue: "token\n", Body: "{}"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := SendWebhook(context.Background(), cfg)
+			if err == nil {
+				t.Fatal("SendWebhook() error = nil")
+			}
+		})
 	}
 }
 

@@ -50,7 +50,8 @@ const SMTP_KEYS = [
 const NOTIFICATION_KEYS = [
   'notification_enabled',
   'notification_webhook_url',
-  'notification_webhook_secret',
+  'notification_webhook_header_name',
+  'notification_webhook_header_value',
   'notification_webhook_body',
 ] as const;
 
@@ -100,7 +101,7 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
 
 const DEFAULT_NOTIFICATION_BODY = `{
   "title": "{{title}}",
-  "content": "{{content}}"
+  "message": "{{message}}"
 }`;
 
 // ==================== Tab 定义 ====================
@@ -278,7 +279,8 @@ export default function SettingsPage() {
   function handleTestNotification() {
     notificationTestMutation.mutate({
       webhook_url: val('notification_webhook_url'),
-      secret: val('notification_webhook_secret'),
+      header_name: val('notification_webhook_header_name'),
+      header_value: val('notification_webhook_header_value'),
       body: notificationBody(),
     });
   }
@@ -1192,8 +1194,14 @@ function NotificationPanel({
   val: (key: string) => string;
 }) {
   const { t } = useTranslation();
-  const variables = ['title', 'content'];
-  const canTest = val('notification_webhook_url').trim() !== '' && body.trim() !== '';
+  const variables = ['title', 'message'];
+  const headerName = val('notification_webhook_header_name').trim();
+  const headerValue = val('notification_webhook_header_value').trim();
+  const headerConfigured = (headerName === '' && headerValue === '')
+    || (headerName !== '' && headerValue !== '');
+  const canTest = val('notification_webhook_url').trim() !== ''
+    && body.trim() !== ''
+    && headerConfigured;
   const notificationEnabled = val('notification_enabled') === 'true';
 
   return (
@@ -1245,16 +1253,27 @@ function NotificationPanel({
                 />
               </Field>
               <Field
-                className="col-span-1 md:col-span-2"
-                hint={t('settings.notification_webhook_secret_hint')}
-                label={t('settings.notification_webhook_secret')}
+                hint={t('settings.notification_webhook_header_name_hint')}
+                label={t('settings.notification_webhook_header_name')}
               >
                 <Input
                   autoComplete="off"
-                  name="notification_webhook_secret"
-                  onChange={(e) => set('notification_webhook_secret', e.target.value)}
+                  name="notification_webhook_header_name"
+                  onChange={(e) => set('notification_webhook_header_name', e.target.value)}
+                  placeholder="X-Webhook-Key"
+                  value={val('notification_webhook_header_name')}
+                />
+              </Field>
+              <Field
+                hint={t('settings.notification_webhook_header_value_hint')}
+                label={t('settings.notification_webhook_header_value')}
+              >
+                <Input
+                  autoComplete="off"
+                  name="notification_webhook_header_value"
+                  onChange={(e) => set('notification_webhook_header_value', e.target.value)}
                   type="password"
-                  value={val('notification_webhook_secret')}
+                  value={val('notification_webhook_header_value')}
                 />
               </Field>
             </Form>

@@ -186,7 +186,13 @@ func (h *SettingsHandler) TestNotification(c *gin.Context) {
 		return
 	}
 
-	if err := h.notificationService.Test(c.Request.Context(), req.WebhookURL, req.Secret, req.Body); err != nil {
+	if err := h.notificationService.Test(
+		c.Request.Context(),
+		req.WebhookURL,
+		req.HeaderName,
+		req.HeaderValue,
+		req.Body,
+	); err != nil {
 		slog.Error("notification_test_failed", "error", err)
 		response.BadRequest(c, fmt.Sprintf("Webhook send failed: %v", err))
 		return

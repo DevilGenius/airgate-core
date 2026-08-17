@@ -834,7 +834,8 @@ export interface TestSMTPReq {
 
 export interface TestNotificationReq {
   webhook_url: string;
-  secret: string;
+  header_name: string;
+  header_value: string;
   body: string;
 }
 

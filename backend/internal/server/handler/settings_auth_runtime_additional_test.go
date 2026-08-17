@@ -58,8 +58,11 @@ func TestSettingsSMTPAndNotificationRoutes(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("notification method = %s", r.Method)
 		}
-		if got := r.Header.Get("Authorization"); got != "Bearer secret-token" {
+		if got := r.Header.Get("X-Webhook-Key"); got != "secret-token" {
 			t.Fatalf("notification auth = %q", got)
+		}
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Fatalf("notification Authorization = %q, want empty", got)
 		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -73,7 +76,7 @@ func TestSettingsSMTPAndNotificationRoutes(t *testing.T) {
 	}))
 	defer notificationServer.Close()
 
-	notificationBody := fmt.Sprintf(`{"webhook_url":%q,"secret":"secret-token","body":"{\"title\":\"{{title}}\",\"content\":\"{{content}}\"}"}`, notificationServer.URL)
+	notificationBody := fmt.Sprintf(`{"webhook_url":%q,"header_name":"X-Webhook-Key","header_value":"secret-token","body":"{\"title\":\"{{title}}\",\"message\":\"{{message}}\"}"}`, notificationServer.URL)
 	w = invokeHandlerForValidation(http.MethodPost, "/settings/notification/test", notificationBody, nil, nil, handler.TestNotification)
 	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
 

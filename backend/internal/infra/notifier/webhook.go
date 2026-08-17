@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strings"
 	"time"
@@ -21,9 +22,10 @@ var newWebhookRequest = http.NewRequestWithContext
 
 // WebhookConfig describes a single webhook notification request.
 type WebhookConfig struct {
-	URL    string
-	Secret string
-	Body   string
+	URL         string
+	HeaderName  string
+	HeaderValue string
+	Body        string
 }
 
 // RenderBody replaces {{name}} placeholders with their corresponding values.
@@ -58,9 +60,22 @@ func SendWebhook(ctx context.Context, cfg WebhookConfig) error {
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("User-Agent", "airgate-core-notifier")
-	if secret := strings.TrimSpace(cfg.Secret); secret != "" {
-		req.Header.Set("Authorization", "Bearer "+secret)
-		req.Header.Set("X-AirGate-Webhook-Secret", secret)
+	headerName := strings.TrimSpace(cfg.HeaderName)
+	headerValue := strings.TrimSpace(cfg.HeaderValue)
+	if headerName != "" || headerValue != "" {
+		if headerName == "" {
+			return fmt.Errorf("webhook header name is required when header value is set")
+		}
+		if headerValue == "" {
+			return fmt.Errorf("webhook header value is required when header name is set")
+		}
+		if textproto.CanonicalMIMEHeaderKey(headerName) == "" {
+			return fmt.Errorf("invalid webhook header name")
+		}
+		if strings.ContainsAny(headerValue, "\r\n") {
+			return fmt.Errorf("invalid webhook header value")
+		}
+		req.Header.Set(headerName, headerValue)
 	}
 
 	client := &http.Client{Timeout: defaultWebhookTimeout}

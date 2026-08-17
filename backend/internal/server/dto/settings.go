@@ -41,7 +41,8 @@ type TestSMTPReq struct {
 
 // TestNotificationReq 消息通知测试请求。
 type TestNotificationReq struct {
-	WebhookURL string `json:"webhook_url" binding:"required"`
-	Secret     string `json:"secret"`
-	Body       string `json:"body" binding:"required"`
+	WebhookURL  string `json:"webhook_url" binding:"required"`
+	HeaderName  string `json:"header_name"`
+	HeaderValue string `json:"header_value"`
+	Body        string `json:"body" binding:"required"`
 }
