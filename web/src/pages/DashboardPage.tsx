@@ -1,9 +1,12 @@
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Alert, Card, Skeleton, Tabs } from '@heroui/react';
 import {
   Activity,
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
   Astroid,
   CalendarDays,
   Clock,
@@ -230,12 +233,28 @@ function MetricCard({
   );
 }
 
+/** RPM 负载等级对应的图标徽章配色：0 灰，≤50 同账号卡片(emerald)，≤200 同总Token卡片(stream)，≤500 同今日Token卡片(amber)，≤1000 红，>1000 黑 */
+const RPM_BADGE_LEVELS: Array<{ max: number; className: string; style?: CSSProperties }> = [
+  { max: 0, className: METRIC_TONE_CLASSES.gray, style: METRIC_TONE_STYLES.gray },
+  { max: 50, className: METRIC_TONE_CLASSES.emerald, style: METRIC_TONE_STYLES.emerald },
+  { max: 200, className: METRIC_TONE_CLASSES.stream, style: METRIC_TONE_STYLES.stream },
+  { max: 500, className: METRIC_TONE_CLASSES.amber, style: METRIC_TONE_STYLES.amber },
+  { max: 1000, className: 'bg-red-100 text-red-600 ring-red-200 dark:bg-red-400/15 dark:text-red-300 dark:ring-red-400/25' },
+];
+const RPM_BADGE_MAX_CLASS = 'bg-zinc-900 text-white ring-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:ring-zinc-700';
+
+function rpmBadge(rpm: number): { className: string; style?: CSSProperties } {
+  for (const level of RPM_BADGE_LEVELS) {
+    if (rpm <= level.max) return level;
+  }
+  return { className: RPM_BADGE_MAX_CLASS };
+}
+
 function PerformanceMetricCard({
   icon,
   rpm1m,
   rpm10m,
   title,
-  tone,
   tpm1m,
   tpm10m,
 }: {
@@ -243,34 +262,46 @@ function PerformanceMetricCard({
   rpm1m: number;
   rpm10m: number;
   title: string;
-  tone: MetricTone;
   tpm1m: number;
   tpm10m: number;
 }) {
   const { t } = useTranslation();
-  const windows = [
-    { label: '1min', rpm: rpm1m, tpm: tpm1m },
-    { label: '10min', rpm: rpm10m, tpm: tpm10m },
-  ];
+  const rpmTexts = [fmtRate(rpm1m), fmtRate(rpm10m)];
+  const tpmTexts = [fmtRate(tpm1m), fmtRate(tpm10m)];
+  const rpmTrend = rpm1m > rpm10m ? 'up' : rpm1m < rpm10m ? 'down' : 'flat';
+  const badge = rpmBadge(rpm1m);
   return (
     <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
       <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
         <div className="ag-dashboard-metric-copy">
-          <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
-          <div className="mt-1 flex h-5 items-end gap-1.5 whitespace-nowrap 2xl:h-6">
-            {windows.map((item, index) => (
-              <Fragment key={item.label}>
+          <div className="flex items-center gap-1 text-sm font-semibold tracking-normal text-text-tertiary">
+            <span className="truncate">{title}</span>
+            {rpmTrend === 'up' ? (
+              <ArrowUp className="h-3.5 w-3.5 shrink-0 text-success" />
+            ) : rpmTrend === 'down' ? (
+              <ArrowDown className="h-3.5 w-3.5 shrink-0 text-danger" />
+            ) : (
+              <ArrowRight className="h-3.5 w-3.5 shrink-0 text-black" />
+            )}
+          </div>
+          <div className="mt-1 flex min-w-0 items-baseline gap-x-2 whitespace-nowrap">
+            {rpmTexts.map((rpmText, index) => (
+              <Fragment key={index}>
                 {index > 0 ? (
                   <span aria-hidden="true" className="font-mono text-base leading-none text-text-tertiary">/</span>
                 ) : null}
-                <span className="flex items-baseline gap-2">
+                <span className="flex items-baseline gap-x-1.5">
                   <span className="flex items-baseline gap-1">
-                    <span className="font-mono text-base font-semibold leading-none text-text">{fmtRate(item.rpm)}</span>
-                    <span className="text-[11px] leading-none text-text-tertiary">{t('dashboard.rpm')}</span>
+                    <span className="font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">
+                      {rpmText}
+                    </span>
+                    <span className="text-[11px] font-medium leading-none text-text-tertiary">{t('dashboard.rpm')}</span>
                   </span>
                   <span className="flex items-baseline gap-1">
-                    <span className="font-mono text-base font-semibold leading-none text-text">{fmtRate(item.tpm)}</span>
-                    <span className="text-[11px] leading-none text-text-tertiary">{t('dashboard.tpm')}</span>
+                    <span className="font-mono text-sm font-semibold leading-none text-text">
+                      {tpmTexts[index]}
+                    </span>
+                    <span className="text-[11px] font-medium leading-none text-text-tertiary">{t('dashboard.tpm')}</span>
                   </span>
                 </span>
               </Fragment>
@@ -278,8 +309,8 @@ function PerformanceMetricCard({
           </div>
         </div>
         <span
-          className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES[tone]}`}
-          style={METRIC_TONE_STYLES[tone]}
+          className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${badge.className}`}
+          style={badge.style}
         >
           {icon}
         </span>
@@ -360,7 +391,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       />
       <PerformanceMetricCard
         icon={<Zap className="h-5 w-5" />}
-        tone="amber"
         title={t('dashboard.performance_window')}
         rpm1m={stats.rpm_1m ?? 0}
         tpm1m={stats.tpm_1m ?? 0}
