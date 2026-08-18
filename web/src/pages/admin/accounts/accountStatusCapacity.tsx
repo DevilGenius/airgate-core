@@ -55,6 +55,25 @@ function isModelUnsupportedCooldown(cooldown: FamilyCooldownDTO): boolean {
   return cooldown.reason?.toLowerCase().includes(OAUTH_MODEL_UNSUPPORTED_REASON) ?? false;
 }
 
+const TRANSIENT_FAMILY_COOLDOWN_REASON_MARKERS = [
+  'overload',
+  '过载',
+  '超载',
+  'bad gateway',
+  'gateway timeout',
+  'service unavailable',
+  'timeout',
+  'timed out',
+  'deadline exceeded',
+];
+
+function isTransientFamilyCooldown(cooldown: FamilyCooldownDTO): boolean {
+  const reason = cooldown.reason?.trim().toLowerCase() ?? '';
+  if (isModelUnsupportedCooldown(cooldown)) return true;
+  if (/\b5\d{2}\b/.test(reason)) return true;
+  return TRANSIENT_FAMILY_COOLDOWN_REASON_MARKERS.some((marker) => reason.includes(marker));
+}
+
 let cooldownClockNow = Date.now();
 let cooldownClockTimer: number | null = null;
 const cooldownClockListeners = new Set<() => void>();
@@ -94,17 +113,11 @@ function useCooldownClock(enabled: boolean): number {
   );
 }
 /**
- * AccountStatusCell 渲染账号状态徽标，按 state + state_until 动态展示：
- *   active         → 绿色 "活跃"
- *   family_limited → 橙色 "家族限流中"（由 family_cooldowns 派生，不改变调度状态）
- *   model_unsupported → 橙色 "家族退避中"（OAuth 账号不具备该模型权限，阶梯退避）
- *   rate_limited   → 橙色 "限流中 Xh Ym"（state_until 倒计时）
- *   degraded       → 黄色 "降级 Xm"（上游退避，倒计时）
- *   disabled       → 红色 "已禁用"（tooltip 显示 error_msg）
+ * AccountStatusCell 将状态拆成最多三行：
+ *   1. 主状态（活跃 / 限流 / 账号级退避 / 已禁用）
+ *   2. 模型状态（家族限流 / 模型降级）
+ *   3. 瞬时状态（家族退避等）
  * 到期的 rate_limited / degraded 视作 active（后端 lazy 回收，前端可先显示 active）。
- *
- * family_limited 仅是 Redis family_cooldowns 派生的展示状态；账号级状态优先时，
- * 仍用附加 pill 标出限流家族数，hover tooltip 列出每个家族剩余时间。
  */
 export function AccountStatusCell({ row }: { row: AccountResp }) {
   const { t } = useTranslation();
@@ -122,9 +135,9 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   const liveFamilyCooldowns = (row.family_cooldowns || []).filter(
     (fc) => Date.parse(fc.until) > now,
   );
-  const modelUnsupportedCooldowns = liveFamilyCooldowns.filter(isModelUnsupportedCooldown);
+  const transientFamilyCooldowns = liveFamilyCooldowns.filter(isTransientFamilyCooldown);
   const rateLimitedFamilyCooldowns = liveFamilyCooldowns.filter(
-    (cooldown) => !isModelUnsupportedCooldown(cooldown),
+    (cooldown) => !isTransientFamilyCooldown(cooldown),
   );
   const cooldownTooltip = (cooldowns: FamilyCooldownDTO[]) => cooldowns
     .map((fc) => {
@@ -134,7 +147,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
     })
     .join('\n');
   const familyTooltip = cooldownTooltip(rateLimitedFamilyCooldowns);
-  const modelUnsupportedTooltip = cooldownTooltip(modelUnsupportedCooldowns);
+  const transientFamilyTooltip = cooldownTooltip(transientFamilyCooldowns);
 
   const pill = (label: string, bg: string, fg: string, tooltip?: string) => (
     <span
@@ -160,9 +173,8 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
     }
     : undefined;
 
-  // 主 state 徽标
+  // 主状态始终占据第一行；家族冷却与模型降级不能抢占主状态位置。
   let mainBadge: ReactElement;
-  let mainFamilyCooldownType: 'rate_limited' | 'model_unsupported' | null = null;
   if (row.state === 'rate_limited' && hasCountdown) {
     mainBadge = pill(
       `${t('accounts.rate_limited_label', '限流中')} ${formatCountdown(remainingMs)}`,
@@ -196,51 +208,21 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
         )}
       </div>
     );
-  } else if (rateLimitedFamilyCooldowns.length > 0) {
-    mainFamilyCooldownType = 'rate_limited';
-    mainBadge = pill(
-      t('accounts.family_limited_label', '家族限流中'),
-      'var(--ag-warning-subtle)',
-      'var(--ag-warning)',
-      familyTooltip,
-    );
-  } else if (modelUnsupportedCooldowns.length > 0) {
-    mainFamilyCooldownType = 'model_unsupported';
-    mainBadge = pill(
-      t('accounts.model_unsupported_label', '家族退避中'),
-      'var(--ag-warning-subtle)',
-      'var(--ag-warning)',
-      modelUnsupportedTooltip,
-    );
   } else {
     // active，或 rate_limited/degraded 已到期（lazy 恢复）
     mainBadge = <StatusPill label={t('status.active')} status="active" />;
   }
 
-  const supplementalBadges: Array<{ key: string; badge: ReactElement }> = [];
-  if (rateLimitedFamilyCooldowns.length > 0 && mainFamilyCooldownType !== 'rate_limited') {
-    supplementalBadges.push({
+  // 模型状态独立占据第二行，家族限流与模型降级在同一行展示。
+  const modelStatusBadges: Array<{ key: string; badge: ReactElement }> = [];
+  if (rateLimitedFamilyCooldowns.length > 0) {
+    modelStatusBadges.push({
       key: 'rate_limited',
       badge: pill(
-        t(
-          'accounts.family_cooldown_label',
-          '{{count}} 家族限流',
-          { count: rateLimitedFamilyCooldowns.length },
-        ),
+        t('accounts.family_limited_status_label', '家族限流'),
         'var(--ag-warning-subtle)',
         'var(--ag-warning)',
         familyTooltip,
-      ),
-    });
-  }
-  if (modelUnsupportedCooldowns.length > 0 && mainFamilyCooldownType !== 'model_unsupported') {
-    supplementalBadges.push({
-      key: 'model_unsupported',
-      badge: pill(
-        t('accounts.model_unsupported_label', '家族退避中'),
-        'var(--ag-warning-subtle)',
-        'var(--ag-warning)',
-        modelUnsupportedTooltip,
       ),
     });
   }
@@ -248,10 +230,10 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   // 模型降级（当前 30 分钟桶成功率低于阈值），紫色徽标，tooltip 逐模型列出成功率。
   const modelDemotions = row.model_demotions ?? [];
   if (modelDemotions.length > 0) {
-    supplementalBadges.push({
+    modelStatusBadges.push({
       key: 'model_demoted',
       badge: pill(
-        t('accounts.model_demoted_label', '模型降级 ×{{count}}', { count: modelDemotions.length }),
+        t('accounts.model_demoted_status_label', '降级 ×{{count}}', { count: modelDemotions.length }),
         'color-mix(in srgb, #a855f7 14%, transparent)',
         '#a855f7',
         modelDemotions
@@ -261,23 +243,48 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
     });
   }
 
-  if (supplementalBadges.length === 0) {
+  // 瞬时状态独立占据第三行，避免与主状态或模型状态混排。
+  const transientStatusBadges: Array<{ key: string; badge: ReactElement }> = [];
+  if (transientFamilyCooldowns.length > 0) {
+    transientStatusBadges.push({
+      key: 'family_transient',
+      badge: pill(
+        t('accounts.family_transient_status_label', '家族退避中'),
+        'color-mix(in srgb, #06b6d4 14%, transparent)',
+        '#06b6d4',
+        transientFamilyTooltip,
+      ),
+    });
+  }
+
+  const statusRows = [
+    { key: 'main', badges: [{ key: 'main', badge: mainBadge }] },
+    { key: 'model', badges: modelStatusBadges },
+    { key: 'transient', badges: transientStatusBadges },
+  ].filter((row) => row.badges.length > 0);
+
+  if (statusRows.length === 1) {
     if (!freezeCooldownHoverProps) return mainBadge;
     return (
-      <span className="inline-flex max-w-full" {...freezeCooldownHoverProps}>
-        {mainBadge}
-      </span>
+      <div className="flex w-full max-w-full flex-col items-center gap-0.5 text-center" {...freezeCooldownHoverProps}>
+        <div className="flex max-w-full flex-nowrap items-center justify-center gap-0.5">
+          {mainBadge}
+        </div>
+      </div>
     );
   }
 
   return (
     <div
-      className="flex w-full max-w-full flex-wrap items-center justify-center gap-0.5 text-center"
+      className="flex w-full max-w-full flex-col items-center gap-0.5 text-center"
       {...freezeCooldownHoverProps}
     >
-      {mainBadge}
-      {supplementalBadges.map((item) => (
-        <span key={item.key} className="inline-flex">{item.badge}</span>
+      {statusRows.map((row) => (
+        <div key={row.key} className="flex max-w-full flex-nowrap items-center justify-center gap-0.5">
+          {row.badges.map((item) => (
+            <span key={item.key} className="inline-flex">{item.badge}</span>
+          ))}
+        </div>
       ))}
     </div>
   );
