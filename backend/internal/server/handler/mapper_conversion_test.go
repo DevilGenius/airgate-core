@@ -89,8 +89,8 @@ func TestSubscriptionMappersCloneUsageAndWindows(t *testing.T) {
 }
 
 func TestDashboardAndUsageMappers(t *testing.T) {
-	stats := toDashboardStatsResp(appdashboard.Stats{TotalAPIKeys: 2, ClosedAccounts: 4, TodayRequests: 7, TodayImageRequests: 3, RPM1M: 3, TPM1M: 30, RPM10M: 2, TPM10M: 20, AvgFirstEventMs: 120, AvgFirstTokenMs: 240, AvgImageDurationMs: 120000})
-	if stats.TotalAPIKeys != 2 || stats.ClosedAccounts != 4 || stats.TodayRequests != 7 || stats.TodayImageRequests != 3 || stats.RPM1M != 3 || stats.TPM1M != 30 || stats.RPM10M != 2 || stats.TPM10M != 20 || stats.AvgFirstEventMs != 120 || stats.AvgFirstTokenMs != 240 || stats.AvgImageDurationMs != 120000 {
+	stats := toDashboardStatsResp(appdashboard.Stats{TotalAPIKeys: 2, ClosedAccounts: 4, TodayRequests: 7, TodayImageRequests: 3, RPM1M: 3, TPM1M: 30, RPM10M: 2, TPM10M: 20, TPMPerRPMCoefficient1M: 0.1, TPMPerRPMCoefficient10M: 0.2, AvgFirstEventMs: 120, AvgFirstTokenMs: 240, AvgImageDurationMs: 120000})
+	if stats.TotalAPIKeys != 2 || stats.ClosedAccounts != 4 || stats.TodayRequests != 7 || stats.TodayImageRequests != 3 || stats.RPM1M != 3 || stats.TPM1M != 30 || stats.RPM10M != 2 || stats.TPM10M != 20 || stats.TPMPerRPMCoefficient1M != 0.1 || stats.TPMPerRPMCoefficient10M != 0.2 || stats.AvgFirstEventMs != 120 || stats.AvgFirstTokenMs != 240 || stats.AvgImageDurationMs != 120000 {
 		t.Fatalf("仪表盘统计响应异常: %+v", stats)
 	}
 

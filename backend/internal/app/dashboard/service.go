@@ -39,6 +39,8 @@ const (
 	trendLockTTL        = 5 * time.Second
 	trendLockWait       = 1 * time.Second
 	trendCacheKeyPrefix = "ag:dashboard:trend"
+	// tpmPerRPMBaseline is the reference workload of 1 RPM and 100k TPM.
+	tpmPerRPMBaseline = 100000.0
 )
 
 var trendLockReleaseScript = redis.NewScript(`
@@ -96,6 +98,8 @@ func (s *Service) Stats(ctx context.Context, userID int, tz string) (Stats, erro
 		RPM10M:              float64(snapshot.RecentRequests10M) / 10.0,
 		TPM10M:              float64(snapshot.RecentTokens10M) / 10.0,
 	}
+	result.TPMPerRPMCoefficient1M = tpmPerRPMCoefficient(result.RPM1M, result.TPM1M)
+	result.TPMPerRPMCoefficient10M = tpmPerRPMCoefficient(result.RPM10M, result.TPM10M)
 	if snapshot.TodayNonImageRequests > 0 {
 		result.AvgDurationMs = float64(snapshot.TodayNonImageDurationMs) / float64(snapshot.TodayNonImageRequests)
 	}
@@ -110,6 +114,16 @@ func (s *Service) Stats(ctx context.Context, userID int, tz string) (Stats, erro
 	}
 
 	return result, nil
+}
+
+// tpmPerRPMCoefficient returns the ratio of average tokens per request to the
+// reference workload (1 RPM, 100k TPM). A window with no requests has no
+// meaningful average and therefore returns zero.
+func tpmPerRPMCoefficient(rpm, tpm float64) float64 {
+	if rpm <= 0 || tpm <= 0 {
+		return 0
+	}
+	return tpm / rpm / tpmPerRPMBaseline
 }
 
 // Trend 查询仪表盘趋势。

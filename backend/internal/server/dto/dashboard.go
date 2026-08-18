@@ -36,6 +36,9 @@ type DashboardStatsResp struct {
 	TPM1M  float64 `json:"tpm_1m"`
 	RPM10M float64 `json:"rpm_10m"`
 	TPM10M float64 `json:"tpm_10m"`
+	// TPMPerRPMCoefficient 是平均每个请求的 Token 数相对 100k Token/请求基准的系数。
+	TPMPerRPMCoefficient1M  float64 `json:"tpm_per_rpm_coefficient_1m"`
+	TPMPerRPMCoefficient10M float64 `json:"tpm_per_rpm_coefficient_10m"`
 	// AvgFirstEventMs 是请求进入插件到首个上游事件的平均耗时（FRT）。
 	AvgFirstEventMs float64 `json:"avg_first_event_ms"`
 	// AvgFirstTokenMs 是首个真实输出 token/工具调用内容的平均耗时（TTFT）。

@@ -23,11 +23,13 @@ type CredentialAccountsOverviewResp struct {
 }
 
 type CredentialTrafficResp struct {
-	Source string  `json:"source"`
-	RPM1M  float64 `json:"rpm_1m"`
-	TPM1M  float64 `json:"tpm_1m"`
-	RPM10M float64 `json:"rpm_10m"`
-	TPM10M float64 `json:"tpm_10m"`
+	Source                  string  `json:"source"`
+	RPM1M                   float64 `json:"rpm_1m"`
+	TPM1M                   float64 `json:"tpm_1m"`
+	RPM10M                  float64 `json:"rpm_10m"`
+	TPM10M                  float64 `json:"tpm_10m"`
+	TPMPerRPMCoefficient1M  float64 `json:"tpm_per_rpm_coefficient_1m"`
+	TPMPerRPMCoefficient10M float64 `json:"tpm_per_rpm_coefficient_10m"`
 }
 
 type CredentialSchedulingResp struct {

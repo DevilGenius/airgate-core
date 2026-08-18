@@ -214,7 +214,7 @@
     "performance": "性能指标",
     "rpm": "RPM",
     "tpm": "TPM",
-    "performance_window": "请求指标（1min/10min）",
+    "performance_window": "请求指标（1min-{{coefficient1m}}/10min-{{coefficient10m}}）",
     "avg_response": "平均响应",
     "active_users": "{{count}} 活跃用户",
     "active_users_label": "活跃用户: {{count}}",

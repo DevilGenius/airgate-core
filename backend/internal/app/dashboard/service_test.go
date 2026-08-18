@@ -63,6 +63,34 @@ func TestStatsComputesDerivedMetrics(t *testing.T) {
 	if result.TPM10M != 150 {
 		t.Fatalf("TPM10M = %v, want 150", result.TPM10M)
 	}
+	if result.TPMPerRPMCoefficient1M != 0.0005 {
+		t.Fatalf("TPMPerRPMCoefficient1M = %v, want 0.0005", result.TPMPerRPMCoefficient1M)
+	}
+	if result.TPMPerRPMCoefficient10M != 0.0005 {
+		t.Fatalf("TPMPerRPMCoefficient10M = %v, want 0.0005", result.TPMPerRPMCoefficient10M)
+	}
+}
+
+func TestTPMPerRPMCoefficientUsesReferenceWorkload(t *testing.T) {
+	tests := []struct {
+		name string
+		rpm  float64
+		tpm  float64
+		want float64
+	}{
+		{name: "reference", rpm: 1, tpm: 100000, want: 1},
+		{name: "double tokens", rpm: 2, tpm: 400000, want: 2},
+		{name: "no requests", rpm: 0, tpm: 100000, want: 0},
+		{name: "no tokens", rpm: 1, tpm: 0, want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tpmPerRPMCoefficient(tt.rpm, tt.tpm); got != tt.want {
+				t.Fatalf("tpmPerRPMCoefficient(%v, %v) = %v, want %v", tt.rpm, tt.tpm, got, tt.want)
+			}
+		})
+	}
 }
 
 func TestStatsReturnsRepositoryError(t *testing.T) {

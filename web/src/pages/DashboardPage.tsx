@@ -102,6 +102,11 @@ function fmtRate(n: number | undefined | null): string {
   return String(Math.floor(n));
 }
 
+function fmtCoefficient(n: number | undefined | null): string {
+  if (n == null || n <= 0) return '0.00';
+  return n.toFixed(2);
+}
+
 type DashboardTimeLabel = {
   primary: string;
   secondary?: string;
@@ -268,7 +273,9 @@ function PerformanceMetricCard({
   const { t } = useTranslation();
   const rpmTexts = [fmtRate(rpm1m), fmtRate(rpm10m)];
   const tpmTexts = [fmtRate(tpm1m), fmtRate(tpm10m)];
-  const rpmTrend = rpm1m > rpm10m ? 'up' : rpm1m < rpm10m ? 'down' : 'flat';
+  const rpm1mInteger = Math.trunc(rpm1m);
+  const rpm10mInteger = Math.trunc(rpm10m);
+  const rpmTrend = rpm1mInteger > rpm10mInteger ? 'up' : rpm1mInteger < rpm10mInteger ? 'down' : 'flat';
   const badge = rpmBadge(rpm1m);
   return (
     <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
@@ -391,7 +398,10 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       />
       <PerformanceMetricCard
         icon={<Zap className="h-5 w-5" />}
-        title={t('dashboard.performance_window')}
+        title={t('dashboard.performance_window', {
+          coefficient1m: fmtCoefficient(stats.tpm_per_rpm_coefficient_1m),
+          coefficient10m: fmtCoefficient(stats.tpm_per_rpm_coefficient_10m),
+        })}
         rpm1m={stats.rpm_1m ?? 0}
         tpm1m={stats.tpm_1m ?? 0}
         rpm10m={stats.rpm_10m ?? 0}

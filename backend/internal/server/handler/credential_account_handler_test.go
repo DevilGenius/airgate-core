@@ -73,7 +73,8 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 	}
 	if envelope.Data.SchemaVersion != 1 || envelope.Data.Traffic.Source != "dashboard_stats" ||
 		envelope.Data.Traffic.RPM1M != 0 || envelope.Data.Traffic.TPM1M != 0 ||
-		envelope.Data.Traffic.RPM10M != 0 || envelope.Data.Traffic.TPM10M != 0 {
+		envelope.Data.Traffic.RPM10M != 0 || envelope.Data.Traffic.TPM10M != 0 ||
+		envelope.Data.Traffic.TPMPerRPMCoefficient1M != 0 || envelope.Data.Traffic.TPMPerRPMCoefficient10M != 0 {
 		t.Fatalf("overview metadata = %+v", envelope.Data)
 	}
 	if envelope.Data.AccountSummary.Total != 2 ||
