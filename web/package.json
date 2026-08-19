@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "packageManager": "pnpm@11.12.0",
+  "packageManager": "pnpm@11.22.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -14,7 +14,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@devilgenius/airgate-theme": "https://github.com/DevilGenius/airgate-sdk/releases/download/v0.2.11/airgate-theme-v0.2.11.tgz",
+    "@devilgenius/airgate-theme": "https://github.com/DevilGenius/airgate-sdk/releases/download/v0.2.12/airgate-theme-v0.2.12.tgz",
     "@fontsource/fira-code": "^5.2.7",
     "@heroui/react": "^3.2.2",
     "@heroui/styles": "^3.2.2",

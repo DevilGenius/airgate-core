@@ -21,10 +21,10 @@ jobs:
         with:
           node-version: 22
 
-      - name: Enable pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.12.0 --activate
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
 
       - name: Build frontend
         run: cd web && pnpm install --frozen-lockfile && pnpm run build
