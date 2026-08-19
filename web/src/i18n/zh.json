@@ -1121,8 +1121,15 @@
     "tab_smtp": "邮件配置",
     "tab_notification": "消息通知",
     "tab_storage": "对象存储",
+    "tab_scheduling": "网关配置",
     "tab_security": "用户管理",
     "tab_system": "系统更新",
+
+    "scheduling_title": "网关配置",
+    "family_transient_backoff_title": "家族退避",
+    "family_transient_backoff_description": "仅控制 overloaded 等 FamilyTransient 错误产生的模型家族退避，配置保存后立即生效。",
+    "family_transient_backoff_seconds": "家族退避时间（秒）",
+    "family_transient_backoff_seconds_hint": "-1：指数退避；0：跳过家族退避；正整数：每次按该秒数固定退避。",
 
     "system_update_title": "系统更新",
     "system_current_version": "当前版本",

@@ -310,6 +310,59 @@ func TestTransientAvoidanceDelayStartsOnSecondFailure(t *testing.T) {
 	}
 }
 
+func TestFamilyTransientBackoffSettingDoesNotAffectAccountLevel5xx(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_family_setting_account_5xx")
+	sm := NewStateMachine(db, nil)
+	sm.setFamilyTransientBackoffPolicy(FamilyTransientBackoffPolicy{Seconds: 0})
+	acc := createStateMachineAccount(ctx, db, "account 5xx", false)
+
+	applyJudgmentN(ctx, sm, acc.ID, Judgment{Kind: sdk.OutcomeUpstreamTransient, Reason: "HTTP 502"}, 2)
+
+	fresh := db.Account.GetX(ctx, acc.ID)
+	assertShortDBAvoidance(t, fresh, 2, 6*time.Second, 9*time.Second)
+}
+
+func TestFamilyTransientBackoffZeroSkipsFamilyCooldown(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_family_backoff_zero")
+	recorder := &captureMonitorRecorder{}
+	sm := NewStateMachine(db, NewFamilyCooldown(nil))
+	sm.monitor = recorder
+	sm.setFamilyTransientBackoffPolicy(FamilyTransientBackoffPolicy{Seconds: 0})
+	acc := createStateMachineAccount(ctx, db, "family zero", false)
+
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeFamilyTransient, Family: "gpt-5", Reason: "overloaded"})
+
+	if len(recorder.events) != 0 {
+		t.Fatalf("zero family backoff recorded %d monitor events", len(recorder.events))
+	}
+	fresh := db.Account.GetX(ctx, acc.ID)
+	if fresh.State != account.StateActive || fresh.StateUntil != nil {
+		t.Fatalf("zero family backoff changed account state: %s until=%v", fresh.State, fresh.StateUntil)
+	}
+}
+
+func TestFamilyTransientBackoffPositiveUsesFixedDuration(t *testing.T) {
+	ctx := context.Background()
+	db := openStateMachineTestDB(t, "scheduler_family_backoff_fixed")
+	recorder := &captureMonitorRecorder{}
+	sm := NewStateMachine(db, NewFamilyCooldown(nil))
+	sm.monitor = recorder
+	sm.setFamilyTransientBackoffPolicy(FamilyTransientBackoffPolicy{Seconds: 12})
+	acc := createStateMachineAccount(ctx, db, "family fixed", false)
+
+	sm.Apply(ctx, acc.ID, Judgment{Kind: sdk.OutcomeFamilyTransient, Family: "gpt-5", Reason: "overloaded"})
+
+	if len(recorder.events) != 1 || recorder.events[0].AutoResolveAt == nil {
+		t.Fatalf("fixed family backoff events = %+v", recorder.events)
+	}
+	delay := time.Until(*recorder.events[0].AutoResolveAt)
+	if delay < 11*time.Second || delay > 13*time.Second {
+		t.Fatalf("fixed family backoff delay = %s, want about 12s", delay)
+	}
+}
+
 func TestStateMachineSuccessClearsFamilyTransientStep(t *testing.T) {
 	ctx := context.Background()
 	db := openStateMachineTestDB(t, "scheduler_family_transient_success")

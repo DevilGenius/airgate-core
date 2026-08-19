@@ -16,7 +16,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Download, Database, TriangleAlert,
+  ShieldCheck, Copy, Trash2, KeyRound, Download, Database, TriangleAlert, Gauge,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq, TestNotificationReq } from '../../shared/types';
 import { SystemUpdatePanel } from './SystemUpdatePanel';
@@ -60,6 +60,10 @@ const STORAGE_KEYS = [
   's3_region', 's3_use_ssl', 's3_public_base_url',
   's3_presign_ttl_minutes', 's3_path_prefix', 'local_storage_dir',
   'asset_retention_generated_days',
+] as const;
+
+const SCHEDULING_KEYS = [
+  'family_transient_backoff_seconds',
 ] as const;
 
 const DEFAULT_EMAIL_SUBJECT = '{{site_name}} - 邮箱验证码';
@@ -106,11 +110,12 @@ const DEFAULT_NOTIFICATION_BODY = `{
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'security' | 'smtp' | 'notification' | 'storage' | 'system';
+type TabKey = 'site' | 'security' | 'smtp' | 'notification' | 'storage' | 'scheduling' | 'system';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
   { key: 'security', labelKey: 'settings.tab_security', icon: ShieldCheck },
+  { key: 'scheduling', labelKey: 'settings.tab_scheduling', icon: Gauge },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
   { key: 'notification', labelKey: 'settings.tab_notification', icon: Send },
   { key: 'storage', labelKey: 'settings.tab_storage', icon: Database },
@@ -125,6 +130,7 @@ const TAB_GROUP: Record<SaveTabKey, string> = {
   smtp: 'smtp',
   notification: 'notification',
   storage: 'storage',
+  scheduling: 'scheduling',
 };
 
 const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
@@ -132,6 +138,7 @@ const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
   smtp: SMTP_KEYS,
   notification: NOTIFICATION_KEYS,
   storage: STORAGE_KEYS,
+  scheduling: SCHEDULING_KEYS,
 };
 
 // ==================== Component ====================
@@ -239,6 +246,9 @@ export default function SettingsPage() {
       }
       if (tab === 'notification' && key === 'notification_webhook_body') {
         return valOrDefault(key, DEFAULT_NOTIFICATION_BODY);
+      }
+      if (tab === 'scheduling' && key === 'family_transient_backoff_seconds') {
+        return val(key).trim() || '-1';
       }
       return values[key] ?? '';
     }
@@ -610,6 +620,36 @@ export default function SettingsPage() {
 
         {activeTab === 'storage' && (
           <StoragePanel set={set} boolVal={boolVal} val={val} footer={saveAction} />
+        )}
+
+        {activeTab === 'scheduling' && (
+          <Card>
+            <Card.Header>
+              <Card.Title>{t('settings.scheduling_title')}</Card.Title>
+            </Card.Header>
+            <Card.Content>
+              <SettingsSection
+                description={t('settings.family_transient_backoff_description')}
+                title={t('settings.family_transient_backoff_title')}
+              >
+                <div className="max-w-xl">
+                  <Field
+                    hint={t('settings.family_transient_backoff_seconds_hint')}
+                    label={t('settings.family_transient_backoff_seconds')}
+                  >
+                    <Input
+                      min="-1"
+                      onChange={(event) => set('family_transient_backoff_seconds', event.target.value)}
+                      step="1"
+                      type="number"
+                      value={valOrDefault('family_transient_backoff_seconds', '-1')}
+                    />
+                  </Field>
+                </div>
+              </SettingsSection>
+              {saveAction}
+            </Card.Content>
+          </Card>
         )}
 
         {activeTab === 'system' && <SystemUpdatePanel />}

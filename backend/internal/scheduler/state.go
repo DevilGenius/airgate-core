@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent"
@@ -63,6 +64,9 @@ type StateMachine struct {
 	monitor         monitoring.Recorder
 	statusPublisher AccountStatusEventPublisher
 
+	familyBackoffMu sync.RWMutex
+	familyBackoff   FamilyTransientBackoffPolicy
+
 	// onCriticalTransition Active ↔ Disabled 转移后的回调（由 Scheduler 注入）。
 	// 用来刷新 RouteGraph，让下次 SelectAccount 立刻看到新状态；
 	// RateLimited / Degraded 这种"带 state_until 的临时状态"不走这里，由 TTL 兜底。
@@ -77,7 +81,30 @@ func NewStateMachine(db *ent.Client, fc *FamilyCooldown) *StateMachine {
 	return &StateMachine{
 		db:             db,
 		familyCooldown: fc,
+		familyBackoff:  DefaultFamilyTransientBackoffPolicy(),
 	}
+}
+
+func (sm *StateMachine) setFamilyTransientBackoffPolicy(policy FamilyTransientBackoffPolicy) {
+	if sm == nil {
+		return
+	}
+	sm.familyBackoffMu.Lock()
+	sm.familyBackoff = policy
+	sm.familyBackoffMu.Unlock()
+}
+
+func (sm *StateMachine) familyTransientBackoffPolicy() FamilyTransientBackoffPolicy {
+	if sm == nil {
+		return DefaultFamilyTransientBackoffPolicy()
+	}
+	sm.familyBackoffMu.RLock()
+	policy := sm.familyBackoff
+	sm.familyBackoffMu.RUnlock()
+	if policy.Seconds < FamilyTransientBackoffExponential {
+		return DefaultFamilyTransientBackoffPolicy()
+	}
+	return policy
 }
 
 // notifyCritical 发出关键状态变更事件。nil 回调时安静跳过。
@@ -103,7 +130,7 @@ func (sm *StateMachine) notifyStateSnapshot(accountID int, state account.State, 
 //	AccountQuotaExhausted → 余额或配额耗尽，直接 disabled，不进入冷却
 //	AccountUnavailable  → 首次记错，第二次起瞬时避让；连续 403 只降级，不自动 disabled
 //	UpstreamTransient   → 首次记错，第二次起瞬时避让；不会 disabled
-//	FamilyTransient     → (account, family) 维度首次记错、第二次起瞬时避让；不改账号级 DB state
+//	FamilyTransient     → 按系统设置处理 (account, family) 维度退避；不改账号级 DB state
 //	ClientError / StreamAborted / Unknown → 不改状态（账号无辜）
 func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 	switch j.Kind {
@@ -160,10 +187,31 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		sm.applyTransientAvoidance(ctx, accountID, j, transientKindUpstream)
 
 	case sdk.OutcomeFamilyTransient:
-		sm.applyFamilyTransientAvoidance(ctx, accountID, j)
+		sm.applyConfiguredFamilyTransientAvoidance(ctx, accountID, j)
 
 	case sdk.OutcomeClientError, sdk.OutcomeStreamAborted, sdk.OutcomeUnknown:
 		// 账号无辜，不改状态。
+	}
+}
+
+func (sm *StateMachine) applyConfiguredFamilyTransientAvoidance(ctx context.Context, accountID int, j Judgment) {
+	if j.Family == "" || sm.familyCooldown == nil {
+		sm.applyFamilyTransientAvoidance(ctx, accountID, j)
+		return
+	}
+	policy := sm.familyTransientBackoffPolicy()
+	switch {
+	case policy.Seconds == 0:
+		slog.Warn("scheduler_family_transient_backoff_skipped",
+			sdk.LogFieldAccountID, accountID,
+			"family", j.Family,
+			"backoff_seconds", policy.Seconds,
+			sdk.LogFieldReason, j.Reason,
+		)
+	case policy.Seconds > 0:
+		sm.applyFixedFamilyTransientAvoidance(ctx, accountID, j, policy.FixedDuration())
+	default:
+		sm.applyFamilyTransientAvoidance(ctx, accountID, j)
 	}
 }
 
@@ -222,6 +270,43 @@ func (sm *StateMachine) applyFamilyTransientAvoidance(ctx context.Context, accou
 		reason:         j.Reason,
 		step:           nextStep,
 		shortAvoidance: !degraded,
+	})
+}
+
+func (sm *StateMachine) applyFixedFamilyTransientAvoidance(ctx context.Context, accountID int, j Judgment, delay time.Duration) {
+	if j.Family == "" || sm.familyCooldown == nil {
+		sm.applyTransientAvoidance(ctx, accountID, j, transientKindUpstream)
+		return
+	}
+
+	snapshot := sm.loadAccountMonitorSnapshot(accountID)
+	if snapshot != nil && snapshot.State == account.StateDisabled {
+		slog.Warn("scheduler_family_transient_ignored_disabled",
+			sdk.LogFieldAccountID, accountID,
+			"family", j.Family,
+			sdk.LogFieldReason, j.Reason,
+		)
+		return
+	}
+
+	until := time.Now().Add(delay)
+	sm.familyCooldown.Mark(ctx, accountID, j.Family, until, j.Reason)
+	sm.publishAccountFamilyCooldownUpsert(accountID, j.Family, until, j.Reason)
+	slog.Warn("scheduler_family_transient_cooldown",
+		sdk.LogFieldAccountID, accountID,
+		"family", j.Family,
+		"step", 0,
+		"until", until,
+		"short_avoidance", delay < transientDegradedWindow,
+		"backoff_seconds", int64(delay/time.Second),
+		sdk.LogFieldReason, j.Reason,
+	)
+	sm.recordFamilyCooldownEvent(ctx, accountID, snapshot, j, familyCooldownEvent{
+		family:         j.Family,
+		stateUntil:     &until,
+		reason:         j.Reason,
+		step:           0,
+		shortAvoidance: delay < transientDegradedWindow,
 	})
 }
 

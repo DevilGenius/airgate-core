@@ -73,6 +73,8 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		response.BindError(c, err)
 		return
 	}
+	h.updateMu.Lock()
+	defer h.updateMu.Unlock()
 
 	items := make([]appsettings.ItemInput, 0, len(req.Settings))
 	for _, item := range req.Settings {
@@ -82,11 +84,20 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 			Group: item.Group,
 		})
 	}
+	if h.updateHook != nil {
+		if err := h.updateHook.ValidateSettingsUpdate(items); err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+	}
 
 	if err := h.service.Update(c.Request.Context(), items); err != nil {
 		slog.Error("更新设置失败", "error", err)
 		response.InternalError(c, "更新设置失败")
 		return
+	}
+	if h.updateHook != nil {
+		h.updateHook.ApplySettingsUpdate(items)
 	}
 
 	response.Success(c, nil)

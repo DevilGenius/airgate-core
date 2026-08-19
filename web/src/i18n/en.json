@@ -1118,8 +1118,15 @@
     "tab_smtp": "Email (SMTP)",
     "tab_notification": "Message Notifications",
     "tab_storage": "Object Storage",
+    "tab_scheduling": "Gateway",
     "tab_security": "User Management",
     "tab_system": "System Update",
+
+    "scheduling_title": "Gateway Configuration",
+    "family_transient_backoff_title": "Model-family backoff",
+    "family_transient_backoff_description": "Only controls model-family backoff created by FamilyTransient errors such as overloaded. Changes take effect immediately after saving.",
+    "family_transient_backoff_seconds": "Model-family backoff (seconds)",
+    "family_transient_backoff_seconds_hint": "-1: exponential backoff; 0: skip model-family backoff; positive integer: always back off for that many seconds.",
 
     "system_update_title": "System Update",
     "system_current_version": "Current",

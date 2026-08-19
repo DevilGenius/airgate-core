@@ -70,7 +70,14 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	// 核心服务组件
 	eventHub := adminevents.NewHub(0)
 	statusEvents := adminevents.NewCoalescingStatusPublisher(eventHub)
+	monitorSettingsStore := store.NewSettingsStore(db)
+	monitorSettingsService := appsettings.NewService(monitorSettingsStore)
+	familyBackoffPolicy, err := scheduler.LoadOrInitializeFamilyTransientBackoffPolicy(context.Background(), monitorSettingsService)
+	if err != nil {
+		return nil, fmt.Errorf("初始化家族退避设置失败: %w", err)
+	}
 	sched := scheduler.NewScheduler(db, rdb)
+	sched.SetFamilyTransientBackoffPolicy(familyBackoffPolicy)
 	sched.SetAccountStatusEventPublisher(statusEvents)
 	concurrency := scheduler.NewConcurrencyManager(rdb)
 	concurrency.SetCapacityEventPublisher(eventHub)
@@ -81,8 +88,6 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		sqlDB = sqlDBOpt[0]
 	}
 	monitorStore := store.NewMonitorStore(db)
-	monitorSettingsStore := store.NewSettingsStore(db)
-	monitorSettingsService := appsettings.NewService(monitorSettingsStore)
 	runtimeFeatureState, err := runtimefeatures.LoadOrInitialize(context.Background(), monitorSettingsService)
 	if err != nil {
 		return nil, fmt.Errorf("初始化运行时功能设置失败: %w", err)
@@ -182,6 +187,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	})
 	if s.handlers.Monitor != nil {
 		s.handlers.Monitor.SetRuntimeFeatures(runtimeFeatureController)
+	}
+	if s.handlers.Settings != nil {
+		s.handlers.Settings.SetUpdateHook(sched)
 	}
 	if s.handlers.AccountService != nil {
 		s.handlers.AccountService.SetMonitorRecorder(monitorService)
