@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { useAccountTableColumns } from './useAccountTableColumns';
 import { AccountCapacityStore, type AccountUsageData } from './AccountPageSupport';
+import { parseAccountPoolAdjustmentPlans } from './accountPoolAdjustment';
 import { queryKeys } from '../../../shared/queryKeys';
 import type { AccountResp } from '../../../shared/types';
 
@@ -53,6 +54,7 @@ const account: AccountResp = {
 
 function Harness({ usageData }: { usageData: AccountUsageData }) {
   const { columns, rowMetaById } = useAccountTableColumns({
+    accountPoolAdjustmentPlans: parseAccountPoolAdjustmentPlans(''),
     capacityStore: new AccountCapacityStore(),
     groupMap: new Map(),
     onClearRateLimitMarkers: vi.fn(),

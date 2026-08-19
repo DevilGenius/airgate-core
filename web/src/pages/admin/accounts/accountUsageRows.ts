@@ -42,6 +42,13 @@ export function getWindowDisplay(w: AccountUsageWindow) {
   const explicitLabel = w.display_label?.trim();
   const fallbackLabel = explicitLabel || slot || w.label;
   if (group !== 'base' && slot) {
+    const model = group.replace(/^model:/, '').trim().toLowerCase();
+    if ((model === 'spark' || model === 'gpt-5.3-codex-spark') && (slot === '5h' || slot === '7d')) {
+      return {
+        label: `${slot}S`,
+        title: `${slot} Spark`,
+      };
+    }
     const groupLabel = getWindowGroupLabel(group, slot, w.label || '');
     if (groupLabel && (!explicitLabel || normalizeWindowToken(explicitLabel) === slot)) {
       return {

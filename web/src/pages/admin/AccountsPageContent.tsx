@@ -42,6 +42,13 @@ import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { useAccountTableColumns } from './accounts/useAccountTableColumns';
+import {
+  ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY,
+  LEGACY_ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY,
+  OPENAI_PLUGIN_ID,
+  accountPoolDisplayUsageWindows,
+  parseAccountPoolAdjustmentPlans,
+} from './accounts/accountPoolAdjustment';
 import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
 import { BulkAccountTestModal } from './accounts/BulkAccountTestModal';
 import { BulkRefreshProgressModal } from './accounts/BulkRefreshProgressModal';
@@ -273,6 +280,18 @@ export default function AccountsPageContent() {
   // key 中编入解析出的名称，确保依赖它的 memo（筛选选项、表格列）在名称变化时也会重算。
   const platformsKey = platforms.map((platform) => `${platform}${platformName(platform)}`).join('\u0000');
   const openAICompatImportEnabled = platforms.includes('openai');
+  const { data: openAIPluginConfig } = useQuery({
+    queryKey: queryKeys.pluginConfig(OPENAI_PLUGIN_ID),
+    queryFn: () => pluginsApi.getConfig(OPENAI_PLUGIN_ID),
+    enabled: openAICompatImportEnabled,
+    meta: { globalLoading: false },
+  });
+  const accountPoolAdjustmentConfig = openAIPluginConfig?.config?.[ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY]
+    ?? openAIPluginConfig?.config?.[LEGACY_ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY];
+  const accountPoolAdjustmentPlans = useMemo(
+    () => parseAccountPoolAdjustmentPlans(accountPoolAdjustmentConfig),
+    [accountPoolAdjustmentConfig],
+  );
   const { toast } = useToast();
   useSyncExternalStore(subscribeAccountIdentityChange, getAccountIdentityVersion);
 
@@ -778,14 +797,18 @@ export default function AccountsPageContent() {
     if (!usageAccounts) return new Set<number>();
 
     const nextExpandedIds = new Set<number>();
-    for (const accountId of visibleAccountIds) {
-      const windows = usageAccounts[String(accountId)]?.windows;
+    for (const row of rows) {
+      const windows = accountPoolDisplayUsageWindows(
+        row,
+        usageAccounts[String(row.id)]?.windows,
+        accountPoolAdjustmentPlans,
+      );
       if (shouldExpandUsageWindows(windows)) {
-        nextExpandedIds.add(accountId);
+        nextExpandedIds.add(row.id);
       }
     }
     return nextExpandedIds;
-  }, [usageData?.accounts, visibleAccountIds]);
+  }, [accountPoolAdjustmentPlans, rows, usageData?.accounts]);
 
   // 创建账号
   const createMutation = useCrudMutation({
@@ -1290,6 +1313,7 @@ export default function AccountsPageContent() {
   }, [data?.list, markModalOpenStart, rows.length, selectionStore, t, toast]);
 
   const { columns, rowMetaById } = useAccountTableColumns({
+    accountPoolAdjustmentPlans,
     capacityStore,
     groupMap,
     onClearRateLimitMarkers: handleClearRateLimitMarkers,

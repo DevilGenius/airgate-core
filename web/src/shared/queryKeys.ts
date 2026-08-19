@@ -9,6 +9,7 @@ export const queryKeys = {
   proxies: (...args: unknown[]) => ['proxies', ...args] as const,
   subscriptions: (...args: unknown[]) => ['subscriptions', ...args] as const,
   plugins: () => ['plugins'] as const,
+  pluginConfig: (...args: unknown[]) => ['plugin-config', ...args] as const,
   pluginsMenu: () => ['plugins-menu'] as const,
   marketplace: () => ['marketplace'] as const,
   platforms: () => ['installed-platforms'] as const,

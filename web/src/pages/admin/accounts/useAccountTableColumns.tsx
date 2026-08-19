@@ -22,6 +22,12 @@ import {
   type AccountUsageWindow,
 } from './AccountPageSupport';
 import { buildWindowRows, getWindowDisplay, getWindowSlot, shouldExpandUsageWindows } from './accountUsageRows';
+import {
+  accountPoolDisplayName,
+  accountPoolDisplayUsageWindows,
+  isAccountPoolProAdjusted,
+  type AccountPoolAdjustmentPlan,
+} from './accountPoolAdjustment';
 
 const ACCOUNT_GROUP_CARD_STYLE: CSSProperties = {
   background: 'var(--ag-bg-surface)',
@@ -252,9 +258,18 @@ function usageColor(pct: number) {
   return 'var(--ag-danger)';
 }
 
-function prepareUsageView(row: AccountResp, usage: AccountUsageInfo | undefined, resetNow: number): PreparedUsageView {
+function prepareUsageView(
+  row: AccountResp,
+  usage: AccountUsageInfo | undefined,
+  resetNow: number,
+  accountPoolAdjustmentPlans: ReadonlySet<AccountPoolAdjustmentPlan>,
+): PreparedUsageView {
   const missing = !usage;
-  const windows: AccountUsageWindow[] = Array.isArray(usage?.windows) ? usage.windows : [];
+  const windows: AccountUsageWindow[] = accountPoolDisplayUsageWindows(
+    row,
+    Array.isArray(usage?.windows) ? usage.windows : [],
+    accountPoolAdjustmentPlans,
+  ) ?? [];
   const credits: AccountUsageCredits | null = usage?.credits || null;
   const todayStatsRaw = usage?.today_stats || null;
   const todayStats: AccountUsageTodayStats | null = todayStatsRaw
@@ -323,6 +338,7 @@ function prepareRequestTime(value: string | undefined): PreparedRequestTime {
 }
 
 type UseAccountTableColumnsArgs = {
+  accountPoolAdjustmentPlans: ReadonlySet<AccountPoolAdjustmentPlan>;
   capacityStore: AccountCapacityStore;
   groupMap: Map<number, string>;
   onClearRateLimitMarkers: (id: number) => void;
@@ -408,6 +424,7 @@ function accountRowRenderMetaEqual(left: AccountRowRenderMeta | undefined, right
 }
 
 export function useAccountTableColumns({
+  accountPoolAdjustmentPlans,
   capacityStore,
   groupMap,
   onClearRateLimitMarkers,
@@ -445,7 +462,7 @@ export function useAccountTableColumns({
         hiddenGroupCount: Math.max(0, groupNames.length - visibleGroups.length),
         lastAccessTime,
         lastProbeTime,
-        usage: prepareUsageView(row, usageAccounts[String(row.id)], resetNow),
+        usage: prepareUsageView(row, usageAccounts[String(row.id)], resetNow, accountPoolAdjustmentPlans),
         visibleGroups,
       };
       const previousMeta = previousMetaById.get(row.id);
@@ -458,7 +475,7 @@ export function useAccountTableColumns({
 
     rowMetaCacheRef.current = nextMeta;
     return nextMeta;
-  }, [groupMap, resetNow, rows, t, usageData?.accounts]);
+  }, [accountPoolAdjustmentPlans, groupMap, resetNow, rows, t, usageData?.accounts]);
 
   const accountActionLabels = useMemo(() => ({
     actions: t('common.actions'),
@@ -497,10 +514,11 @@ export function useAccountTableColumns({
       mobileWidth: '112px',
       render: (row) => {
         const email = row.email;
+        const displayName = accountPoolDisplayName(row, accountPoolAdjustmentPlans);
         return (
           <div className="flex w-full min-w-0 flex-col items-center text-center">
-            <span style={{ color: 'var(--ag-text)' }} className="max-w-full truncate font-medium" title={row.name}>
-              {row.name}
+            <span style={{ color: 'var(--ag-text)' }} className="max-w-full truncate font-medium" title={displayName}>
+              {displayName}
             </span>
             {email && (
               <span className="max-w-full truncate text-[11px]" style={{ color: 'var(--ag-text)' }} title={email}>
@@ -518,6 +536,9 @@ export function useAccountTableColumns({
       mobileWidth: '84px',
       render: (row) => {
         const PluginAccountIdentity = getPluginAccountIdentity(row.platform);
+        const displayOverrides = isAccountPoolProAdjusted(row, accountPoolAdjustmentPlans)
+          ? { plan_type: 'pro' }
+          : undefined;
         return (
           <div className="flex w-full min-w-0 flex-col items-center gap-1 text-center">
             <span className="max-w-full min-w-0 truncate">
@@ -527,7 +548,11 @@ export function useAccountTableColumns({
               <PluginAccountIdentity
                 accountId={row.id}
                 accountType={row.type}
-                context={{ account: row, credentials: row.credentials }}
+                context={{
+                  account: row,
+                  credentials: row.credentials,
+                  ...(displayOverrides ? { display_overrides: displayOverrides } : {}),
+                }}
               />
             ) : row.type ? (
               <span className="max-w-full truncate rounded px-1 py-0 text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
@@ -810,6 +835,7 @@ export function useAccountTableColumns({
     ];
     return columns;
   }, [
+    accountPoolAdjustmentPlans,
     accountActionLabels,
     accountUsageLabels,
     capacityStore,

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { AccountUsageWindow } from './accountUsageSupport';
-import { buildWindowRows, countUsageWindowGroups, getWindowSlot, shouldExpandUsageWindows } from './accountUsageRows';
+import {
+  buildWindowRows,
+  countUsageWindowGroups,
+  getWindowDisplay,
+  getWindowSlot,
+  shouldExpandUsageWindows,
+} from './accountUsageRows';
 
 // Build a normalized usage window the way the backend / mergeCachedUsageWindows do
 // (explicit slot + group), so buildWindowRows is exercised deterministically.
@@ -123,5 +129,24 @@ describe('getWindowSlot', () => {
     });
     // Unknown patterns default to the 5h slot and base group.
     expect(getWindowSlot({ label: 'whatever', used_percent: 0 })).toEqual({ slot: '5h', group: 'base' });
+  });
+});
+
+describe('getWindowDisplay', () => {
+  it('uses compact Spark tags for both Spark group variants', () => {
+    expect(getWindowDisplay({
+      key: 'model:5h:spark',
+      label: '5h spark',
+      slot: '5h',
+      group: 'model:spark',
+      used_percent: 0,
+    })).toEqual({ label: '5hS', title: '5h Spark' });
+    expect(getWindowDisplay({
+      key: 'model:7d:gpt-5.3-codex-spark',
+      label: '7d gpt-5.3-codex-spark',
+      slot: '7d',
+      group: 'model:gpt-5.3-codex-spark',
+      used_percent: 0,
+    })).toEqual({ label: '7dS', title: '7d Spark' });
   });
 });

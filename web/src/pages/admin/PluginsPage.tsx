@@ -17,6 +17,12 @@ import { CommonTable } from '../../shared/components/CommonTable';
 import { NativeCheckbox } from '../../shared/components/NativeCheckbox';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
+import {
+  ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY,
+  ALL_ACCOUNT_POOL_ADJUSTMENT_PLANS,
+  LEGACY_ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY,
+  OPENAI_PLUGIN_ID,
+} from './accounts/accountPoolAdjustment';
 
 type InstallPrefill = {
   repo: string;
@@ -408,12 +414,13 @@ function PluginConfigModal({
   onSaved: () => void;
 }) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [values, setValues] = useState<Record<string, string>>({});
   const open = !!plugin;
 
   // 拉取持久化配置作为初始值
   const { data: configData, isLoading } = useQuery({
-    queryKey: ['plugin-config', plugin?.name],
+    queryKey: queryKeys.pluginConfig(plugin?.name),
     queryFn: () => pluginsApi.getConfig(plugin!.name),
     enabled: open,
   });
@@ -433,13 +440,22 @@ function PluginConfigModal({
     if (configData?.config) {
       Object.assign(init, configData.config);
     }
+    if (
+      plugin.name === OPENAI_PLUGIN_ID
+      && init[ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY] === undefined
+      && init[LEGACY_ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY] === 'oauth_pro'
+    ) {
+      init[ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY] = ALL_ACCOUNT_POOL_ADJUSTMENT_PLANS;
+      delete init[LEGACY_ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY];
+    }
     setValues(init);
   }, [plugin, configData]);
 
   const saveMutation = useMutation({
     mutationFn: (cfg: Record<string, string>) => pluginsApi.updateConfig(plugin!.name, cfg),
-    onSuccess: () => {
+    onSuccess: (_result, config) => {
       if (plugin?.name) {
+        queryClient.setQueryData(queryKeys.pluginConfig(plugin.name), { config });
         clearPluginFrontendCache(plugin.name);
       }
       toast('success', '配置已保存并生效');
@@ -514,6 +530,44 @@ function PluginConfigModal({
                   {field.description && (
                     <p className="mt-1 ml-6 text-xs text-text-tertiary">{field.description}</p>
                   )}
+                </div>
+              );
+            }
+
+            if (field.type === 'multiselect') {
+              const selectedValues = new Set(
+                (values[field.key] || field.default || '')
+                  .split(',')
+                  .map((value) => value.trim())
+                  .filter(Boolean),
+              );
+              const setOptionSelected = (optionValue: string, selected: boolean) => {
+                const nextSelected = new Set(selectedValues);
+                if (selected) nextSelected.add(optionValue);
+                else nextSelected.delete(optionValue);
+                const orderedValues = (field.options || [])
+                  .map((option) => option.value)
+                  .filter((value) => nextSelected.has(value));
+                setValues({ ...values, [field.key]: orderedValues.join(',') });
+              };
+              return (
+                <div key={field.key}>
+                  <Label>
+                    {field.label || field.key}
+                    {field.required && <span className="text-danger ml-1">*</span>}
+                  </Label>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {(field.options || []).map((option) => (
+                      <NativeCheckbox
+                        key={option.value}
+                        isSelected={selectedValues.has(option.value)}
+                        onChange={(selected) => setOptionSelected(option.value, selected)}
+                      >
+                        {option.label}
+                      </NativeCheckbox>
+                    ))}
+                  </div>
+                  {field.description ? <Description>{field.description}</Description> : null}
                 </div>
               );
             }
