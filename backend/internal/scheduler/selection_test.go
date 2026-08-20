@@ -767,6 +767,23 @@ func TestHardAffinityDoesNotBypassNonWindowConstraints(t *testing.T) {
 	}
 }
 
+func TestSelectAccountReportsCapacityExhaustion(t *testing.T) {
+	ctx := context.Background()
+	s := newSelectionTestScheduler(Normal)
+	account := newSelectionTestAccount(10)
+	account.MaxConcurrency = 1
+	s.currentLoad = func(context.Context, int) int { return 1 }
+	seedSelectionTestGroup(t, 7, "openai", []*ent.Account{account}, nil)
+
+	_, err := s.SelectAccount(ctx, "openai", "gpt-4.1", 1, 7, "")
+	if !errors.Is(err, ErrAccountCapacityExhausted) {
+		t.Fatalf("SelectAccount() error = %v, want ErrAccountCapacityExhausted", err)
+	}
+	if !errors.Is(err, ErrNoAvailableAccount) {
+		t.Fatalf("capacity error must retain ErrNoAvailableAccount compatibility: %v", err)
+	}
+}
+
 type scriptedSessionTracker struct {
 	stubSessionTracker
 	allowed []bool

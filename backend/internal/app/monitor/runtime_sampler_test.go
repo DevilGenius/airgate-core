@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
 const runtimeLatencyTestDriverName = "airgate_runtime_latency_test"
@@ -19,6 +21,49 @@ var (
 	runtimeLatencyTestDriverOnce sync.Once
 	runtimeLatencyTestFixtures   sync.Map
 )
+
+type runtimeCapacityQueueReader struct {
+	stats scheduler.CapacityQueueStats
+}
+
+func (r *runtimeCapacityQueueReader) CapacityQueueStats() scheduler.CapacityQueueStats {
+	return r.stats
+}
+
+func TestRuntimeSamplerSamplesCapacityQueueDeltas(t *testing.T) {
+	reader := &runtimeCapacityQueueReader{stats: scheduler.CapacityQueueStats{
+		Waiters:            3,
+		WaitingPools:       2,
+		MaxPoolWaiters:     2,
+		MaxWaitersPerPool:  64,
+		MaxTotalWaiters:    1024,
+		EnqueuedTotal:      10,
+		WokenTotal:         6,
+		TimedOutTotal:      1,
+		RejectedTotal:      2,
+		CanceledTotal:      1,
+		WaitCompletedTotal: 8,
+		WaitDurationMS:     400,
+	}}
+	sampler := NewRuntimeSampler(nil, nil, nil, nil, nil, nil)
+	sampler.SetCapacityQueueStatsReader(reader)
+	first := sampler.sampleCapacity(t.Context())
+	if first.CapacityQueueWaiters != 3 || first.CapacityQueueEnqueuedDelta != 0 {
+		t.Fatalf("first capacity queue sample = %+v", first)
+	}
+
+	reader.stats.EnqueuedTotal += 4
+	reader.stats.WokenTotal += 2
+	reader.stats.TimedOutTotal++
+	reader.stats.WaitCompletedTotal += 4
+	reader.stats.WaitDurationMS += 1000
+	second := sampler.sampleCapacity(t.Context())
+	if second.CapacityQueueEnqueuedDelta != 4 || second.CapacityQueueWokenDelta != 2 ||
+		second.CapacityQueueTimeoutDelta != 1 || second.CapacityQueueWaitAvgMS != 250 ||
+		second.CapacityQueueWaitSamplesDelta != 4 || second.CapacityQueueWaitDurationDelta != 1000 {
+		t.Fatalf("second capacity queue sample = %+v", second)
+	}
+}
 
 func TestRuntimeSamplerQueryLatencyWindowsSplitsModelKinds(t *testing.T) {
 	db, fixture := openRuntimeLatencyTestDB(t)

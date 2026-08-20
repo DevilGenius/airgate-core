@@ -30,13 +30,14 @@ const (
 // RuntimeSampler periodically collects low-cost operational signals and keeps
 // the latest snapshot in memory for the admin monitor API.
 type RuntimeSampler struct {
-	sqlDB        *stdsql.DB
-	rdb          *redis.Client
-	scheduler    *scheduler.Scheduler
-	concurrency  *scheduler.ConcurrencyManager
-	recorder     *billing.Recorder
-	monitor      *Service
-	runtimeCache RuntimeCacheStatsReader
+	sqlDB         *stdsql.DB
+	rdb           *redis.Client
+	scheduler     *scheduler.Scheduler
+	concurrency   *scheduler.ConcurrencyManager
+	recorder      *billing.Recorder
+	monitor       *Service
+	runtimeCache  RuntimeCacheStatsReader
+	capacityQueue CapacityQueueStatsReader
 
 	sampleInterval  time.Duration
 	latencyInterval time.Duration
@@ -50,11 +51,13 @@ type RuntimeSampler struct {
 	lastRedisTimeouts          int64
 	lastConcurrencyRejectTotal int64
 	lastWaiterRejectTotal      int64
+	lastCapacityQueueStats     scheduler.CapacityQueueStats
 	postgresWaitCountReady     bool
 	postgresWaitDurationReady  bool
 	redisDeltaReady            bool
 	concurrencyDeltaReady      bool
 	waiterDeltaReady           bool
+	capacityQueueDeltaReady    bool
 }
 
 // RuntimeCacheStatsReader provides runtime cache usage without coupling the
@@ -70,6 +73,12 @@ type RuntimeCacheStatsReader interface {
 		contextWindowSize, contextWindowCapacity int,
 		err error,
 	)
+}
+
+// CapacityQueueStatsReader exposes the Forwarder's bounded pool queues without
+// making the monitor package depend on plugin implementation details.
+type CapacityQueueStatsReader interface {
+	CapacityQueueStats() scheduler.CapacityQueueStats
 }
 
 // RuntimeSnapshot is the complete payload returned by /admin/monitor/runtime.
@@ -105,14 +114,27 @@ type RuntimeLatencyStats struct {
 }
 
 type RuntimeCapacityStats struct {
-	AccountInUse           int   `json:"account_in_use"`
-	AccountCapacity        int   `json:"account_capacity"`
-	WorkingAccounts        int   `json:"working_accounts"`
-	MessageWaiters         int   `json:"message_waiters"`
-	MaxAccountWaiters      int   `json:"max_account_waiters"`
-	WaitingAccounts        int   `json:"waiting_accounts"`
-	ConcurrencyRejectDelta int64 `json:"concurrency_reject_delta"`
-	QueueFullDelta         int64 `json:"queue_full_delta"`
+	AccountInUse                   int   `json:"account_in_use"`
+	AccountCapacity                int   `json:"account_capacity"`
+	WorkingAccounts                int   `json:"working_accounts"`
+	MessageWaiters                 int   `json:"message_waiters"`
+	MaxAccountWaiters              int   `json:"max_account_waiters"`
+	WaitingAccounts                int   `json:"waiting_accounts"`
+	ConcurrencyRejectDelta         int64 `json:"concurrency_reject_delta"`
+	QueueFullDelta                 int64 `json:"queue_full_delta"`
+	CapacityQueueWaiters           int   `json:"capacity_queue_waiters"`
+	CapacityQueueWaitingPools      int   `json:"capacity_queue_waiting_pools"`
+	CapacityQueueMaxPoolWaiters    int   `json:"capacity_queue_max_pool_waiters"`
+	CapacityQueueMaxWaitersPerPool int   `json:"capacity_queue_max_waiters_per_pool"`
+	CapacityQueueMaxTotalWaiters   int   `json:"capacity_queue_max_total_waiters"`
+	CapacityQueueEnqueuedDelta     int64 `json:"capacity_queue_enqueued_delta"`
+	CapacityQueueWokenDelta        int64 `json:"capacity_queue_woken_delta"`
+	CapacityQueueTimeoutDelta      int64 `json:"capacity_queue_timeout_delta"`
+	CapacityQueueRejectedDelta     int64 `json:"capacity_queue_rejected_delta"`
+	CapacityQueueCanceledDelta     int64 `json:"capacity_queue_canceled_delta"`
+	CapacityQueueWaitAvgMS         int64 `json:"capacity_queue_wait_avg_ms"`
+	CapacityQueueWaitSamplesDelta  int64 `json:"capacity_queue_wait_samples_delta"`
+	CapacityQueueWaitDurationDelta int64 `json:"capacity_queue_wait_duration_ms_delta"`
 }
 
 type RuntimeDependencyStats struct {
@@ -204,6 +226,13 @@ func NewRuntimeSampler(sqlDB *stdsql.DB, rdb *redis.Client, sched *scheduler.Sch
 func (s *RuntimeSampler) SetRuntimeCacheStatsReader(reader RuntimeCacheStatsReader) {
 	if s != nil {
 		s.runtimeCache = reader
+	}
+}
+
+// SetCapacityQueueStatsReader injects bounded account-capacity queue metrics.
+func (s *RuntimeSampler) SetCapacityQueueStatsReader(reader CapacityQueueStatsReader) {
+	if s != nil {
+		s.capacityQueue = reader
 	}
 }
 
@@ -463,7 +492,38 @@ func (s *RuntimeSampler) sampleCapacity(parent context.Context) RuntimeCapacityS
 		stats.WaitingAccounts = queueStats.WaitingAccounts
 		stats.QueueFullDelta = s.deltaInt64(queueStats.WaiterRejectTotal, &s.lastWaiterRejectTotal, &s.waiterDeltaReady)
 	}
+	if s.capacityQueue != nil {
+		queueStats := s.capacityQueue.CapacityQueueStats()
+		stats.CapacityQueueWaiters = queueStats.Waiters
+		stats.CapacityQueueWaitingPools = queueStats.WaitingPools
+		stats.CapacityQueueMaxPoolWaiters = queueStats.MaxPoolWaiters
+		stats.CapacityQueueMaxWaitersPerPool = queueStats.MaxWaitersPerPool
+		stats.CapacityQueueMaxTotalWaiters = queueStats.MaxTotalWaiters
+		if s.capacityQueueDeltaReady {
+			stats.CapacityQueueEnqueuedDelta = monotonicDelta(queueStats.EnqueuedTotal, s.lastCapacityQueueStats.EnqueuedTotal)
+			stats.CapacityQueueWokenDelta = monotonicDelta(queueStats.WokenTotal, s.lastCapacityQueueStats.WokenTotal)
+			stats.CapacityQueueTimeoutDelta = monotonicDelta(queueStats.TimedOutTotal, s.lastCapacityQueueStats.TimedOutTotal)
+			stats.CapacityQueueRejectedDelta = monotonicDelta(queueStats.RejectedTotal, s.lastCapacityQueueStats.RejectedTotal)
+			stats.CapacityQueueCanceledDelta = monotonicDelta(queueStats.CanceledTotal, s.lastCapacityQueueStats.CanceledTotal)
+			completedDelta := monotonicDelta(queueStats.WaitCompletedTotal, s.lastCapacityQueueStats.WaitCompletedTotal)
+			waitDurationDelta := monotonicDelta(queueStats.WaitDurationMS, s.lastCapacityQueueStats.WaitDurationMS)
+			stats.CapacityQueueWaitSamplesDelta = completedDelta
+			stats.CapacityQueueWaitDurationDelta = waitDurationDelta
+			if completedDelta > 0 {
+				stats.CapacityQueueWaitAvgMS = waitDurationDelta / completedDelta
+			}
+		}
+		s.lastCapacityQueueStats = queueStats
+		s.capacityQueueDeltaReady = true
+	}
 	return stats
+}
+
+func monotonicDelta(current, previous int64) int64 {
+	if current < previous {
+		return current
+	}
+	return current - previous
 }
 
 func (s *RuntimeSampler) queryAccountCapacity(parent context.Context) int {

@@ -454,9 +454,9 @@ func TestQuotaAcquireClientAndAccountSlotsWithNilRedis(t *testing.T) {
 			Extra: map[string]interface{}{"slot_ttl_seconds": 1},
 		},
 	}
-	releaseAccount, ok := forwarder.acquireAccountSlot(c, state)
-	if !ok || releaseAccount == nil || state.requestID == "" {
-		t.Fatalf("account slot ok=%v release=%v requestID=%q", ok, releaseAccount != nil, state.requestID)
+	releaseAccount, acquireFailure := forwarder.acquireAccountSlot(c, state)
+	if acquireFailure != accountSlotAcquireSuccess || releaseAccount == nil || state.requestID == "" {
+		t.Fatalf("account slot failure=%v release=%v requestID=%q", acquireFailure, releaseAccount != nil, state.requestID)
 	}
 	releaseAccount()
 
@@ -472,9 +472,9 @@ func TestQuotaAcquireClientAndAccountSlotsWithNilRedis(t *testing.T) {
 			},
 		},
 	}
-	releaseAccount, ok = forwarder.acquireAccountSlot(c, state)
-	if !ok || releaseAccount == nil {
-		t.Fatalf("message-lock account slot ok=%v release=%v", ok, releaseAccount != nil)
+	releaseAccount, acquireFailure = forwarder.acquireAccountSlot(c, state)
+	if acquireFailure != accountSlotAcquireSuccess || releaseAccount == nil {
+		t.Fatalf("message-lock account slot failure=%v release=%v", acquireFailure, releaseAccount != nil)
 	}
 	releaseAccount()
 }

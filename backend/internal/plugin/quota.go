@@ -125,6 +125,7 @@ func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs 
 
 func (f *Forwarder) pickAccountPreferringDifferentType(c *gin.Context, state *forwardState, preferredDifferentType string, excludeIDs ...int) error {
 	var lastErr error
+	var capacityErr error
 	plans := state.dispatch.Plans()
 	for idx := state.dispatch.StartIndex(); idx < len(plans); idx++ {
 		candidate := state.dispatch.Candidate(idx)
@@ -153,9 +154,16 @@ func (f *Forwarder) pickAccountPreferringDifferentType(c *gin.Context, state *fo
 			return nil
 		}
 		lastErr = err
+		if errors.Is(err, scheduler.ErrAccountCapacityExhausted) {
+			capacityErr = err
+			state.dispatchPlan = candidate.Plan
+		}
 		if !errors.Is(err, scheduler.ErrNoAvailableAccount) {
 			return err
 		}
+	}
+	if capacityErr != nil {
+		return capacityErr
 	}
 	if lastErr != nil {
 		return lastErr
@@ -163,8 +171,17 @@ func (f *Forwarder) pickAccountPreferringDifferentType(c *gin.Context, state *fo
 	return scheduler.ErrNoAvailableAccount
 }
 
+type accountSlotAcquireFailure uint8
+
+const (
+	accountSlotAcquireSuccess accountSlotAcquireFailure = iota
+	accountSlotAcquireRPM
+	accountSlotAcquireConcurrency
+	accountSlotAcquireMessageLock
+)
+
 // acquireAccountSlot 获取账号级闸门：RPM 配额 + 账号并发槽 + 可选真实用户消息串行锁。
-// 返回 release func 与 ok 标记。ok=false 表示当前账号暂不可用（RPM 已满 / 并发已满），
+// 返回 release func 与失败类型。非 Success 表示当前账号暂不可用（RPM 已满 / 并发已满），
 // 调用方应把本账号加入 excludeIDs 并 failover 到下一个账号。失败时不写客户端响应——
 // 由主循环在 failover 全部用尽时兜底写 503。
 //
@@ -172,17 +189,20 @@ func (f *Forwarder) pickAccountPreferringDifferentType(c *gin.Context, state *fo
 // 需要反映到账号管理页容量，并让后续调度能看到高优先级账号已接近满载。
 //
 // 每次 failover attempt 都要重新 acquire。release 顺序和 acquire 顺序相反。
-func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (func(), bool) {
+func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (func(), accountSlotAcquireFailure) {
 	ctx := c.Request.Context()
 	releaseCtx := context.Background()
 	state.requestID = uuid.New().String()
+	accountID := state.account.ID
+	requestID := state.requestID
+	poolKey := capacityPoolKeyForState(state)
 
 	// 1. RPM 原子检查并递增
 	maxRPM := scheduler.ExtraInt(state.account.Extra, "max_rpm")
 	if !f.scheduler.TryIncrementRPM(ctx, state.account.ID, maxRPM) {
 		slog.Info("账号 RPM 已达上限，尝试 failover",
 			"account_id", state.account.ID, "max_rpm", maxRPM)
-		return nil, false
+		return nil, accountSlotAcquireRPM
 	}
 
 	// 2. 账号并发槽
@@ -196,10 +216,13 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 		f.scheduler.DecrementRPM(releaseCtx, state.account.ID)
 		slog.Info("账号并发已满，尝试 failover",
 			"account_id", state.account.ID, "max_concurrency", maxConc)
-		return nil, false
+		return nil, accountSlotAcquireConcurrency
 	}
 	releaseAccountSlot := func() {
-		f.concurrency.ReleaseSlot(releaseCtx, state.account.ID, state.requestID)
+		f.concurrency.ReleaseSlot(releaseCtx, accountID, requestID)
+		if f.capacityQueue != nil {
+			f.capacityQueue.Notify(poolKey)
+		}
 	}
 
 	// 3. 可选消息锁 + 均摊延迟（仅显式启用且为真实用户消息）
@@ -213,7 +236,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 				"account_id", state.account.ID,
 				"error", err,
 			)
-			return nil, false
+			return nil, accountSlotAcquireMessageLock
 		}
 		if !acquired {
 			releaseAccountSlot()
@@ -222,10 +245,10 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 				"account_id", state.account.ID,
 				"max_waiters", scheduler.MessageLockMaxWaiters(state.account.Extra),
 			)
-			return nil, false
+			return nil, accountSlotAcquireMessageLock
 		}
 		releaseMsgLock = func() {
-			f.scheduler.ReleaseMessageLock(releaseCtx, state.account.ID, state.requestID)
+			f.scheduler.ReleaseMessageLock(releaseCtx, accountID, requestID)
 		}
 		f.scheduler.EnforceMessageDelay(ctx, state.account.ID, state.account.Extra)
 	}
@@ -235,7 +258,23 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 	return func() {
 		releaseMsgLock()
 		releaseAccountSlot()
-	}, true
+	}, accountSlotAcquireSuccess
+}
+
+func capacityPoolKeyForState(state *forwardState) scheduler.CapacityPoolKey {
+	if state == nil {
+		return scheduler.CapacityPoolKey{}
+	}
+	groupID := 0
+	if state.keyInfo != nil {
+		groupID = state.keyInfo.GroupID
+	}
+	platform := state.requestedPlatform
+	if state.account != nil && state.account.Platform != "" {
+		platform = state.account.Platform
+	}
+	family := scheduler.ModelFamily(platform, state.modelForScheduling())
+	return scheduler.NewCapacityPoolKey(groupID, platform, family)
 }
 
 // forwardMetadataOnly 处理只读元信息请求（/v1/models 等）。

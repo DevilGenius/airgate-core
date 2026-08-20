@@ -63,6 +63,7 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 
 	snapshot := s.loadedSelectionSnapshot(ctx, candidates, model, now)
 	var normalCandidates, stickyCandidates []*ent.Account
+	capacityBlocked := false
 	if !opts.RequireContinuationAffinity {
 		normalCandidates = make([]*ent.Account, 0, len(candidates))
 		stickyCandidates = make([]*ent.Account, 0, len(candidates))
@@ -73,6 +74,7 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 	}
 	for _, acc := range candidates {
 		result := s.checkSchedulabilityResult(ctx, acc, model, now, opts.RequireContinuationAffinity, snapshot)
+		capacityBlocked = capacityBlocked || result.capacityBlocked
 		if !opts.RequireContinuationAffinity {
 			switch result.normal {
 			case Normal:
@@ -147,6 +149,9 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 	if len(normalSelectionCandidates) == 0 {
 		// 没有 Normal 但可能有 StickyOnly 兜底（如 degraded 账号）
 		if len(stickySelectionCandidates) == 0 {
+			if capacityBlocked {
+				return nil, ErrAccountCapacityExhausted
+			}
 			return nil, ErrNoAvailableAccount
 		}
 		selected = s.selectByLoadBalance(ctx, stickySelectionCandidates, now, snapshot)
@@ -636,8 +641,9 @@ func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, m
 }
 
 type schedulabilityResult struct {
-	normal       Schedulability
-	hardAffinity Schedulability
+	normal          Schedulability
+	hardAffinity    Schedulability
+	capacityBlocked bool
 }
 
 // checkHardAffinitySchedulability 用于 previous_response_id / continuation session 这类硬亲和。
@@ -677,6 +683,9 @@ func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Acco
 	}
 
 	sched := s.concurrencySchedulability(ctx, acc, snapshot)
+	if sched == NotSchedulable {
+		result.capacityBlocked = true
+	}
 	if sched > result.normal {
 		result.normal = sched
 	}

@@ -124,6 +124,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	// 替代旧的 admin HTTP API + admin_api_key 模式。必须在加载任何插件之前注入。
 	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched, concurrency, calculator, recorder))
 	forwarder := plugin.NewForwarder(db, pluginMgr, sched, concurrency, calculator, recorder)
+	runtimeSampler.SetCapacityQueueStatsReader(forwarder)
 	forwarder.SetMonitorRecorder(monitorService)
 	forwarder.SetRequestTraceEnabled(runtimeFeatureState.RequestTraceEnabled)
 	runtimeFeatureController := runtimefeatures.NewController(

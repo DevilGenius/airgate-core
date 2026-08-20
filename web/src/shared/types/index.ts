@@ -1137,6 +1137,19 @@ export interface MonitorRuntimeCapacityResp {
   waiting_accounts: number;
   concurrency_reject_delta: number;
   queue_full_delta: number;
+  capacity_queue_waiters: number;
+  capacity_queue_waiting_pools: number;
+  capacity_queue_max_pool_waiters: number;
+  capacity_queue_max_waiters_per_pool: number;
+  capacity_queue_max_total_waiters: number;
+  capacity_queue_enqueued_delta: number;
+  capacity_queue_woken_delta: number;
+  capacity_queue_timeout_delta: number;
+  capacity_queue_rejected_delta: number;
+  capacity_queue_canceled_delta: number;
+  capacity_queue_wait_avg_ms: number;
+  capacity_queue_wait_samples_delta: number;
+  capacity_queue_wait_duration_ms_delta: number;
 }
 
 export interface MonitorRuntimeDependenciesResp {

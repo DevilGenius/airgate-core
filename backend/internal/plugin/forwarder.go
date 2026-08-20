@@ -38,6 +38,7 @@ type Forwarder struct {
 	manager              *Manager
 	scheduler            *scheduler.Scheduler
 	concurrency          *scheduler.ConcurrencyManager
+	capacityQueue        *scheduler.CapacityQueue
 	calculator           *billing.Calculator
 	recorder             *billing.Recorder
 	monitor              monitoring.Recorder
@@ -63,11 +64,21 @@ func NewForwarder(
 		manager:              manager,
 		scheduler:            sched,
 		concurrency:          concurrency,
+		capacityQueue:        scheduler.NewCapacityQueue(capacityQueueMaxWaitersPerPool, capacityQueueMaxTotalWaiters),
 		calculator:           calculator,
 		recorder:             recorder,
 		clientLimiter:        newClientLimiter(),
 		credentialPersistSem: make(chan struct{}, 32),
 	}
+}
+
+// CapacityQueueStats exposes the bounded pool queue without coupling runtime
+// monitoring to Forwarder internals.
+func (f *Forwarder) CapacityQueueStats() scheduler.CapacityQueueStats {
+	if f == nil || f.capacityQueue == nil {
+		return scheduler.CapacityQueueStats{}
+	}
+	return f.capacityQueue.Stats()
 }
 
 func (f *Forwarder) getClientLimiter() *clientLimiter {
@@ -129,14 +140,14 @@ func preferredDifferentAccountTypeForAttempt(attempt, maxAttempts int, previousA
 	return scheduler.AccountFailoverType(previousAccount)
 }
 
-// queueWaitTimeout 所有账号 slot 都被占满时，请求最多排队等多久再放弃。
-// 1 分钟对号池小 / 并发高的场景能把毛刺吸收掉；超过这个时长意味着号池真的不够用。
-const queueWaitTimeout = 60 * time.Second
+// capacityQueueWaitTimeout 是一次客户端请求在所有路由间共享的总容量等待预算。
+// 队列只吸收短暂槽位竞争；持续过载在 1 秒内快速返回 429。
+const capacityQueueWaitTimeout = time.Second
 
-// queuePollInterval slot 未释放时的初始轮询间隔；连续排队会指数退避到上限。
-const queuePollInterval = 200 * time.Millisecond
-
-const queueMaxPollInterval = 2 * time.Second
+const (
+	capacityQueueMaxWaitersPerPool = 64
+	capacityQueueMaxTotalWaiters   = 1024
+)
 
 // 499 是 nginx 风格的 Client Closed Request，仅用于本地日志和状态归类。
 const statusClientClosedRequest = 499
@@ -224,6 +235,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	var finalExecution *forwardExecution
 
 	failureSummary := allRoutesFailureSummary{}
+	var capacityQueueDeadline time.Time
 
 	for routeIndex, route := range routes {
 		state.selectedRoute = route
@@ -234,8 +246,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		softExclude := make([]int, 0, maxFailoverAttempts)
 		attempt := 0
 		var lastAttemptAccount *ent.Account
-		queueDeadline := time.Now().Add(queueWaitTimeout)
-		queuePollDelay := queuePollInterval
+		capacityCollisionSeen := false
+		capacityProbeGeneration := uint64(0)
+		capacityProbeReady := false
 
 		for canStartForwardAttempt(state, attempt) {
 			if status := canceledRequestStatus(ctx.Err()); status != 0 {
@@ -246,6 +259,11 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					"total_attempts", totalAttempts,
 				)
 				return
+			}
+
+			if f.capacityQueue != nil && !capacityProbeReady {
+				capacityProbeGeneration = f.capacityQueue.Generation(capacityPoolKeyForState(state))
+				capacityProbeReady = true
 			}
 
 			exclude := make([]int, 0, len(hardExclude)+len(softExclude))
@@ -289,42 +307,38 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					break
 				}
 				failureSummary.recordPickAccountError(err)
-				if len(softExclude) > 0 && time.Now().Before(queueDeadline) {
+				if errors.Is(err, scheduler.ErrAccountCapacityExhausted) {
+					failureSummary.recordLocalCapacityFailure()
+					capacityCollisionSeen = true
+				}
+				if capacityCollisionSeen && f.capacityQueue != nil {
+					if capacityQueueDeadline.IsZero() {
+						capacityQueueDeadline = time.Now().Add(capacityQueueWaitTimeout)
+					}
+					remaining := time.Until(capacityQueueDeadline)
+					if remaining <= 0 {
+						break
+					}
 					softExclude = softExclude[:0]
-					wait := queuePollDelay
-					if remaining := time.Until(queueDeadline); remaining < wait {
-						wait = remaining
+					capacityCollisionSeen = false
+					waitErr := f.capacityQueue.Wait(ctx, capacityPoolKeyForState(state), remaining, capacityProbeGeneration)
+					if waitErr == nil {
+						capacityProbeReady = false
+						continue
 					}
-					if wait > 0 {
-						timer := time.NewTimer(wait)
-						select {
-						case <-ctx.Done():
-							if !timer.Stop() {
-								select {
-								case <-timer.C:
-								default:
-								}
-							}
-							if status := canceledRequestStatus(ctx.Err()); status != 0 {
-								markCanceledRequest(c, status)
-								f.recordClientClosedRequest(c, state, status, totalAttempts)
-								logger.Debug("forward_request_canceled",
-									"status_code", status,
-									"total_attempts", totalAttempts,
-								)
-								return
-							}
-							return
-						case <-timer.C:
-						}
+					if status := canceledRequestStatus(ctx.Err()); status != 0 {
+						markCanceledRequest(c, status)
+						f.recordClientClosedRequest(c, state, status, totalAttempts)
+						logger.Debug("forward_request_canceled",
+							"status_code", status,
+							"total_attempts", totalAttempts,
+						)
+						return
 					}
-					if queuePollDelay < queueMaxPollInterval {
-						queuePollDelay *= 2
-						if queuePollDelay > queueMaxPollInterval {
-							queuePollDelay = queueMaxPollInterval
-						}
-					}
-					continue
+					logger.Info("forward_capacity_queue_rejected",
+						sdk.LogFieldError, waitErr,
+						"wait_budget_ms", capacityQueueWaitTimeout.Milliseconds(),
+					)
 				}
 				attrs := []any{sdk.LogFieldError, err}
 				if models := state.schedulingModelCandidates(); len(models) > 0 {
@@ -339,20 +353,23 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				logger.Warn("forward_pick_account_failed", attrs...)
 				break
 			}
-			queuePollDelay = queuePollInterval
-
 			accountID := state.account.ID
 			// logger 已经从 auth middleware 继承了 group_id，这里只补 account_id 避免重复字段。
 			attemptLogger := logger.With(sdk.LogFieldAccountID, accountID)
-			releaseAccountSlot, ok := f.acquireAccountSlot(c, state)
-			if !ok {
+			releaseAccountSlot, acquireFailure := f.acquireAccountSlot(c, state)
+			if acquireFailure != accountSlotAcquireSuccess {
 				failureSummary.recordLocalCapacityFailure()
 				if state.requireContinuationAffinity {
 					break
 				}
+				if acquireFailure == accountSlotAcquireConcurrency {
+					capacityCollisionSeen = true
+				}
 				softExclude = append(softExclude, accountID)
 				continue
 			}
+			capacityCollisionSeen = false
+			capacityProbeReady = false
 
 			if !beginCalled {
 				allowed, bag := f.runForwardBeginChain(c, state)

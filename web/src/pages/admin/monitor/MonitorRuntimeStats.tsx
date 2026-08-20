@@ -151,7 +151,7 @@ function SampleFailureDetails({
   );
 }
 
-function RuntimeCacheMetric({ label, value }: { label: string; value: string }) {
+function RuntimeMetric({ label, value }: { label: string; value: string }) {
   return (
     <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1">
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-pre">{label}</span>
@@ -179,7 +179,7 @@ function RuntimeCacheDetails({
 }) {
   return (
     <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_0.75rem_minmax(0,1fr)] items-center gap-y-0.5">
-      <RuntimeCacheMetric
+      <RuntimeMetric
         label={textLabel}
         value={formatRequestRejectionUsage(
           runtime?.text_rejection_cybersecurity_risk_len,
@@ -189,27 +189,90 @@ function RuntimeCacheDetails({
         )}
       />
       <DetailSeparator />
-      <RuntimeCacheMetric
+      <RuntimeMetric
         label={imageLabel}
         value={`${runtime?.image_rejection_cache_len ?? 0}/${runtime?.image_rejection_cache_cap ?? 0}`}
       />
-      <RuntimeCacheMetric
+      <RuntimeMetric
         label={cyberLabel}
         value={`${runtime?.cyber_rejection_cache_len ?? 0}/${runtime?.cyber_rejection_cache_cap ?? 0}`}
       />
       <DetailSeparator />
-      <RuntimeCacheMetric
+      <RuntimeMetric
         label={promptLabel}
         value={`${runtime?.prompt_rejection_cache_len ?? 0}/${runtime?.prompt_rejection_cache_cap ?? 0}`}
       />
-      <RuntimeCacheMetric
+      <RuntimeMetric
         label={encryptedLabel}
         value={`${Math.max(0, Math.trunc(runtime?.encrypted_content_cache_len ?? 0))}/${formatCompactThousands(runtime?.encrypted_content_cache_cap)}`}
       />
       <DetailSeparator />
-      <RuntimeCacheMetric
+      <RuntimeMetric
         label={contextLabel}
         value={`${Math.max(0, Math.trunc(runtime?.context_window_cache_len ?? 0))}/${formatCompactThousands(runtime?.context_window_cache_cap)}`}
+      />
+    </span>
+  );
+}
+
+function RuntimeQueueDetails({
+  avgWaitLabel,
+  capacity,
+  capacityLabel,
+  enqueuedLabel,
+  poolsLabel,
+  rejectedLabel,
+  timeoutLabel,
+  waitersLabel,
+  wokenLabel,
+}: {
+  avgWaitLabel: string;
+  capacity?: MonitorRuntimeResp['capacity'];
+  capacityLabel: string;
+  enqueuedLabel: string;
+  poolsLabel: string;
+  rejectedLabel: string;
+  timeoutLabel: string;
+  waitersLabel: string;
+  wokenLabel: string;
+}) {
+  return (
+    <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_0.75rem_minmax(0,1fr)] items-center gap-y-0.5">
+      <RuntimeMetric
+        label={capacityLabel}
+        value={ratioText(capacity?.capacity_queue_waiters, capacity?.capacity_queue_max_total_waiters)}
+      />
+      <DetailSeparator />
+      <RuntimeMetric
+        label={enqueuedLabel}
+        value={`+${fmtNum(capacity?.capacity_queue_enqueued_delta ?? 0)}`}
+      />
+      <RuntimeMetric
+        label={poolsLabel}
+        value={`${fmtNum(capacity?.capacity_queue_waiting_pools ?? 0)} (${fmtNum(capacity?.capacity_queue_max_pool_waiters ?? 0)}/${fmtNum(capacity?.capacity_queue_max_waiters_per_pool ?? 0)})`}
+      />
+      <DetailSeparator />
+      <RuntimeMetric
+        label={wokenLabel}
+        value={`+${fmtNum(capacity?.capacity_queue_woken_delta ?? 0)}`}
+      />
+      <RuntimeMetric
+        label={avgWaitLabel}
+        value={formatDuration(capacity?.capacity_queue_wait_avg_ms)}
+      />
+      <DetailSeparator />
+      <RuntimeMetric
+        label={`${timeoutLabel}/${rejectedLabel}`}
+        value={`+${fmtNum(capacity?.capacity_queue_timeout_delta ?? 0)}/+${fmtNum(capacity?.capacity_queue_rejected_delta ?? 0)}`}
+      />
+      <RuntimeMetric
+        label={waitersLabel}
+        value={`${fmtNum(capacity?.message_waiters ?? 0)} (${fmtNum(capacity?.max_account_waiters ?? 0)})`}
+      />
+      <DetailSeparator />
+      <RuntimeMetric
+        label="reject"
+        value={`+${fmtNum(capacity?.concurrency_reject_delta ?? 0)}`}
       />
     </span>
   );
@@ -251,7 +314,7 @@ function RuntimeCard({
   value: ReactNode;
 }) {
   return (
-    <Card className="ag-dashboard-metric h-[172px] 2xl:h-[180px]">
+    <Card className="ag-dashboard-metric h-[190px] 2xl:h-[198px]">
       <Card.Content className="flex h-full flex-col p-3 2xl:p-3.5">
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="min-w-0">
@@ -340,7 +403,7 @@ function MonitorSummaryCard({
 }) {
   const { t } = useTranslation();
   return (
-    <Card className="ag-dashboard-metric h-[172px] 2xl:h-[180px]">
+    <Card className="ag-dashboard-metric h-[190px] 2xl:h-[198px]">
       <Card.Content className="flex h-full flex-col p-3 2xl:p-3.5">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
@@ -466,8 +529,8 @@ export function MonitorRuntimeStats({
             `${t('monitor.runtime_working')} ${fmtNum(capacity?.working_accounts ?? 0)}`,
           ]),
           joinDetail([
-            `${t('monitor.runtime_waiters')} ${fmtNum(capacity?.message_waiters ?? 0)} (${t('monitor.runtime_max_account_waiters')} ${fmtNum(capacity?.max_account_waiters ?? 0)})`,
-            `reject +${fmtNum(capacity?.concurrency_reject_delta ?? 0)}`,
+            `billing ${runtime?.billing_queue_len ?? 0}/${runtime?.billing_queue_cap ?? 0}`,
+            `monitor ${runtime?.monitor_queue_len ?? 0}/${runtime?.monitor_queue_cap ?? 0}`,
           ]),
           <RuntimeCacheDetails
             contextLabel={t('monitor.runtime_context_window_cache')}
@@ -495,10 +558,17 @@ export function MonitorRuntimeStats({
             `PG wait +${fmtNum(postgres?.wait_count_delta ?? 0)}`,
             `Redis timeout +${fmtNum(redis?.timeout_delta ?? 0)}`,
           ]),
-          joinDetail([
-            `billing ${runtime?.billing_queue_len ?? 0}/${runtime?.billing_queue_cap ?? 0}`,
-            `monitor ${runtime?.monitor_queue_len ?? 0}/${runtime?.monitor_queue_cap ?? 0}`,
-          ]),
+          <RuntimeQueueDetails
+            avgWaitLabel={t('monitor.runtime_queue_wait_avg')}
+            capacity={capacity}
+            capacityLabel={t('monitor.runtime_capacity_queue')}
+            enqueuedLabel={t('monitor.runtime_queue_enqueued')}
+            poolsLabel={t('monitor.runtime_waiting_pools')}
+            rejectedLabel={t('monitor.runtime_queue_rejected')}
+            timeoutLabel={t('monitor.runtime_queue_timeout')}
+            waitersLabel={t('monitor.runtime_waiters')}
+            wokenLabel={t('monitor.runtime_queue_woken')}
+          />,
         ]}
         icon={<Database className="h-5 w-5" />}
         label={t('monitor.runtime_dependencies')}
