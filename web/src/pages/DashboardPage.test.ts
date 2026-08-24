@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtCostPerMinute, fmtUsageEstimateCost, fmtUsageEstimateDuration, shouldHideUsageEstimateIcon } from './DashboardPage';
+import { fmtCostPerMinute, fmtUsageEstimateCost, fmtUsageEstimateDuration } from './DashboardPage';
 
 describe('dashboard usage estimate formatting', () => {
   it('formats account cost rates compactly', () => {
@@ -17,9 +17,4 @@ describe('dashboard usage estimate formatting', () => {
     expect(fmtUsageEstimateCost(1999.6)).toBe('$2000');
   });
 
-  it('hides the icon when both windows and plans need the available width', () => {
-    expect(shouldHideUsageEstimateIcon(30, 2, 2)).toBe(true);
-    expect(shouldHideUsageEstimateIcon(30, 1, 2)).toBe(false);
-    expect(shouldHideUsageEstimateIcon(48, 1, 1)).toBe(true);
-  });
 });

@@ -5,7 +5,6 @@ import { Alert, Card, Skeleton, Tabs } from '@heroui/react';
 import {
   Activity,
   Astroid,
-  Bell,
   Calculator,
   CalendarDays,
   Clock,
@@ -125,10 +124,6 @@ export function fmtUsageEstimateDuration(minutes: number | undefined): string {
 export function fmtUsageEstimateCost(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '$0';
   return `$${Math.round(value)}`;
-}
-
-export function shouldHideUsageEstimateIcon(contentLength: number, windowCount: number, planCount: number): boolean {
-  return contentLength > 42 || (windowCount > 1 && planCount > 1);
 }
 
 /** 将 $ 金额文本渲染为绿色 $ + 继承色金额，参考今日 Token 卡片标准成本（text-success）样式 */
@@ -410,21 +405,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
     const rank = (plan: string) => plan === 'plus' ? 0 : plan === 'pro' ? 1 : 2;
     return rank(left.plan) - rank(right.plan);
   });
-  const usageEstimateHeaderLength = t('dashboard.usage_estimate').length + 14
-    + fmtCostPerMinute(stats.account_cost_per_minute_1m).length
-    + fmtCostPerMinute(stats.account_cost_per_minute_10m).length;
-  const usageEstimateValueLength = orderedUsageEstimates.reduce(
-    (total, estimate) => total + estimate.windows.reduce((subtotal, window) => {
-      if (window.status !== 'ready' || window.remaining_minutes == null || window.remaining_cost == null) return subtotal + 8;
-      return subtotal + fmtUsageEstimateDuration(window.remaining_minutes).length + fmtUsageEstimateCost(window.remaining_cost).length + 1;
-    }, 0),
-    0,
-  );
-  const hideUsageEstimateIcon = shouldHideUsageEstimateIcon(
-    usageEstimateHeaderLength + usageEstimateValueLength,
-    usageEstimateWindows.length,
-    orderedUsageEstimates.length,
-  );
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
       <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
@@ -538,14 +518,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
               </div>
             )}
           </div>
-          {hideUsageEstimateIcon ? null : (
-            <span
-              className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES.teal}`}
-              style={METRIC_TONE_STYLES.teal}
-            >
-              <Bell className="h-5 w-5" />
-            </span>
-          )}
         </Card.Content>
       </Card>
     </div>

@@ -807,7 +807,7 @@ export function useAccountTableColumns({
             ? { slot: '7d', value: formatDailyUsageGrowth(row.usage_7d_daily_growth ?? 0) }
             : null,
         ].filter((item): item is { slot: string; value: string } => item !== null);
-        const growthText = growth.map((item) => `${item.slot} +${item.value}%`).join(' ');
+        const growthText = growth.map((item) => `${item.slot} -${item.value}%`).join(' ');
         const detail = [access.display, growthText].filter(Boolean).join('\n');
         return (
           <div className="ag-account-request-times" title={detail}>
@@ -821,7 +821,7 @@ export function useAccountTableColumns({
                 {growth.map((item) => (
                   <span key={item.slot} className="ag-account-daily-usage-growth-item">
                     <span>{item.slot}</span>
-                    <span className="ag-account-daily-usage-growth-value">+{item.value}%</span>
+                    <span className="ag-account-daily-usage-growth-value">-{item.value}%</span>
                   </span>
                 ))}
               </div>

@@ -165,8 +165,8 @@ describe('useAccountTableColumns usage refresh', () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText('+65%')).toBeInTheDocument();
-    expect(screen.getByText('+16%')).toBeInTheDocument();
+    expect(screen.getByText('-65%')).toBeInTheDocument();
+    expect(screen.getByText('-16%')).toBeInTheDocument();
     expect(container.querySelectorAll('time')).toHaveLength(1);
   });
 });
