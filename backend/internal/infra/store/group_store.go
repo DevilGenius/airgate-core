@@ -8,6 +8,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
+
 	"github.com/DevilGenius/airgate-core/ent"
 	entaccount "github.com/DevilGenius/airgate-core/ent/account"
 	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"

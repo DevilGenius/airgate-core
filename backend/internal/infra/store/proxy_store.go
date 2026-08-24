@@ -4,6 +4,7 @@ import (
 	"context"
 
 	entsql "entgo.io/ent/dialect/sql"
+
 	"github.com/DevilGenius/airgate-core/ent"
 	entaccount "github.com/DevilGenius/airgate-core/ent/account"
 	entproxy "github.com/DevilGenius/airgate-core/ent/proxy"
