@@ -38,7 +38,7 @@ const (
 	trendCacheTTL       = 15 * time.Second
 	trendLockTTL        = 5 * time.Second
 	trendLockWait       = 1 * time.Second
-	trendCacheKeyPrefix = "ag:dashboard:trend"
+	trendCacheKeyPrefix = "ag:dashboard:trend:v2"
 	// tpmPerRPMBaseline is the reference workload of 1 RPM and 100k TPM.
 	tpmPerRPMBaseline = 100000.0
 )
@@ -182,12 +182,17 @@ func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *tim
 	if err != nil {
 		return Trend{}, err
 	}
+	apiKeyLogs, err := s.repo.ListAPIKeyTrendLogs(ctx, startTime, endTime, query.UserID)
+	if err != nil {
+		return Trend{}, err
+	}
 
 	return Trend{
 		ModelDistribution: aggregateModelDistribution(logs),
 		UserRanking:       aggregateUserRanking(logs),
 		TokenTrend:        aggregateTokenTrend(logs, query.Granularity, loc),
 		TopUsers:          aggregateTopUsers(logs, query.Granularity, loc),
+		TopAPIKeys:        aggregateTopAPIKeys(apiKeyLogs, query.Granularity, loc),
 	}, nil
 }
 
@@ -473,6 +478,70 @@ func aggregateTopUsers(logs []TrendLog, granularity string, loc *time.Location) 
 		})
 	}
 
+	return result
+}
+
+func aggregateTopAPIKeys(logs []APIKeyTrendLog, granularity string, loc *time.Location) []APIKeyTrend {
+	if len(logs) == 0 {
+		return nil
+	}
+	type keyTotal struct {
+		ID     int
+		Name   string
+		Tokens int64
+	}
+	totalMap := make(map[int]*keyTotal)
+	for _, item := range logs {
+		total := totalMap[item.APIKeyID]
+		if total == nil {
+			total = &keyTotal{ID: item.APIKeyID, Name: item.APIKeyName}
+			totalMap[item.APIKeyID] = total
+		}
+		if item.APIKeyName != "" {
+			total.Name = item.APIKeyName
+		}
+		total.Tokens += item.Tokens
+	}
+	totals := make([]keyTotal, 0, len(totalMap))
+	for _, item := range totalMap {
+		totals = append(totals, *item)
+	}
+	sort.Slice(totals, func(i, j int) bool {
+		if totals[i].Tokens == totals[j].Tokens {
+			return totals[i].ID < totals[j].ID
+		}
+		return totals[i].Tokens > totals[j].Tokens
+	})
+	if len(totals) > 12 {
+		totals = totals[:12]
+	}
+
+	layout := trendTimeLayout(granularity)
+	topSet := make(map[int]bool, len(totals))
+	for _, item := range totals {
+		topSet[item.ID] = true
+	}
+	buckets := make(map[int]map[string]int64)
+	for _, item := range logs {
+		if !topSet[item.APIKeyID] {
+			continue
+		}
+		key := item.CreatedAt.In(loc).Format(layout)
+		if buckets[item.APIKeyID] == nil {
+			buckets[item.APIKeyID] = make(map[string]int64)
+		}
+		buckets[item.APIKeyID][key] += item.Tokens
+	}
+
+	result := make([]APIKeyTrend, 0, len(totals))
+	for _, item := range totals {
+		points := make([]APIKeyTrendPoint, 0, len(buckets[item.ID]))
+		for key, tokens := range buckets[item.ID] {
+			points = append(points, APIKeyTrendPoint{Time: key, Tokens: tokens})
+		}
+		sort.Slice(points, func(i, j int) bool { return points[i].Time < points[j].Time })
+		result = append(result, APIKeyTrend{APIKeyID: int64(item.ID), Name: item.Name, Trend: points})
+	}
 	return result
 }
 

@@ -93,6 +93,7 @@ type DashboardTrendResp struct {
 	UserRanking       []DashboardUserRanking `json:"user_ranking"`
 	TokenTrend        []DashboardTimeBucket  `json:"token_trend"`
 	TopUsers          []DashboardUserTrend   `json:"top_users"`
+	TopAPIKeys        []DashboardAPIKeyTrend `json:"top_api_keys"`
 }
 
 // DashboardModelStats 模型分布统计
@@ -134,6 +135,18 @@ type DashboardUserTrend struct {
 
 // DashboardUserTrendPoint 用户趋势数据点
 type DashboardUserTrendPoint struct {
+	Time   string `json:"time"`
+	Tokens int64  `json:"tokens"`
+}
+
+// DashboardAPIKeyTrend Top API Key 使用趋势。
+type DashboardAPIKeyTrend struct {
+	APIKeyID int64                       `json:"api_key_id"`
+	Name     string                      `json:"name"`
+	Trend    []DashboardAPIKeyTrendPoint `json:"trend"`
+}
+
+type DashboardAPIKeyTrendPoint struct {
 	Time   string `json:"time"`
 	Tokens int64  `json:"tokens"`
 }

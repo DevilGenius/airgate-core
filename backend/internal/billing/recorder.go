@@ -236,6 +236,9 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 		if err := upsertUsageHourlyRollups(ctx, tx, inserted); err != nil {
 			return 0, fmt.Errorf("更新 UsageLog 聚合失败: %w", err)
 		}
+		if err := upsertUsageAPIKeyHourlyRollups(ctx, tx, inserted); err != nil {
+			return 0, fmt.Errorf("更新 API Key UsageLog 聚合失败: %w", err)
+		}
 		if err := updateAccountLastUsedAt(ctx, tx, inserted); err != nil {
 			return 0, fmt.Errorf("更新账号最近访问时间失败: %w", err)
 		}
@@ -436,6 +439,9 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 
 	if err := upsertUsageHourlyRollups(ctx, tx, inserted); err != nil {
 		return fmt.Errorf("更新 UsageLog 聚合失败: %w", err)
+	}
+	if err := upsertUsageAPIKeyHourlyRollups(ctx, tx, inserted); err != nil {
+		return fmt.Errorf("更新 API Key UsageLog 聚合失败: %w", err)
 	}
 	if err := updateAccountLastUsedAt(ctx, tx, inserted); err != nil {
 		return fmt.Errorf("更新账号最近访问时间失败: %w", err)
@@ -799,6 +805,89 @@ ON CONFLICT (bucket_start, user_id, model) DO UPDATE SET
 func isUsageHourlyRollupMissing(err error) bool {
 	var pqErr *pq.Error
 	return errors.As(err, &pqErr) && pqErr.Code == "42P01"
+}
+
+// upsertUsageAPIKeyHourlyRollups 为管理员使用记录汇总维护 API Key 小时粒度数据。
+// 它与 usage_logs 写入处于同一事务，避免汇总与明细长期分叉。
+func upsertUsageAPIKeyHourlyRollups(ctx context.Context, tx *ent.Tx, inserted []insertedUsageLog) error {
+	if len(inserted) == 0 || recorderInsertDialect(tx) != dialect.Postgres {
+		return nil
+	}
+	var args []any
+	rows := make([]string, 0, len(inserted))
+	for _, item := range inserted {
+		fields := []usageHourlyRollupBatchField{
+			{name: "created_at", cast: "timestamptz", value: item.CreatedAt},
+			{name: "api_key_id", cast: "integer", value: rollupID(item.Record.APIKeyID)},
+			{name: "user_id", cast: "integer", value: rollupID(item.Record.UserID)},
+			{name: "group_id", cast: "integer", value: rollupID(item.Record.GroupID)},
+			{name: "account_id", cast: "integer", value: rollupID(item.Record.AccountID)},
+			{name: "platform", cast: "text", value: item.Record.Platform},
+			{name: "model", cast: "text", value: item.Record.Model},
+			{name: "input_tokens", cast: "bigint", value: item.Record.InputTokens},
+			{name: "output_tokens", cast: "bigint", value: item.Record.OutputTokens},
+			{name: "cached_input_tokens", cast: "bigint", value: item.Record.CachedInputTokens},
+			{name: "cache_creation_tokens", cast: "bigint", value: item.Record.CacheCreationTokens},
+			{name: "total_cost", cast: "numeric", value: item.Record.TotalCost},
+			{name: "actual_cost", cast: "numeric", value: item.Record.ActualCost},
+			{name: "billed_cost", cast: "numeric", value: item.Record.BilledCost},
+		}
+		placeholders := make([]string, 0, len(fields))
+		for _, field := range fields {
+			args = append(args, field.value)
+			placeholders = append(placeholders, fmt.Sprintf("$%d::%s", len(args), field.cast))
+		}
+		rows = append(rows, "("+strings.Join(placeholders, ",")+")")
+	}
+	query := `WITH batch (
+	created_at, api_key_id, user_id, group_id, account_id, platform, model,
+	input_tokens, output_tokens, cached_input_tokens, cache_creation_tokens,
+	total_cost, actual_cost, billed_cost
+) AS (VALUES ` + strings.Join(rows, ",") + `)
+INSERT INTO public.usage_api_key_hourly_rollups (
+	bucket_start, api_key_id, user_id, group_id, account_id, platform, model,
+	requests, input_tokens, output_tokens, cached_input_tokens, cache_creation_tokens,
+	total_cost, actual_cost, billed_cost, updated_at
+)
+SELECT
+	date_trunc('hour', created_at), api_key_id, user_id, group_id, account_id, platform, model,
+	COUNT(*)::bigint,
+	COALESCE(SUM(input_tokens), 0)::bigint,
+	COALESCE(SUM(output_tokens), 0)::bigint,
+	COALESCE(SUM(cached_input_tokens), 0)::bigint,
+	COALESCE(SUM(cache_creation_tokens), 0)::bigint,
+	COALESCE(SUM(total_cost), 0),
+	COALESCE(SUM(actual_cost), 0),
+	COALESCE(SUM(billed_cost), 0),
+	now()
+FROM batch
+GROUP BY 1, api_key_id, user_id, group_id, account_id, platform, model
+ON CONFLICT (bucket_start, api_key_id, user_id, group_id, account_id, platform, model) DO UPDATE SET
+	requests = public.usage_api_key_hourly_rollups.requests + EXCLUDED.requests,
+	input_tokens = public.usage_api_key_hourly_rollups.input_tokens + EXCLUDED.input_tokens,
+	output_tokens = public.usage_api_key_hourly_rollups.output_tokens + EXCLUDED.output_tokens,
+	cached_input_tokens = public.usage_api_key_hourly_rollups.cached_input_tokens + EXCLUDED.cached_input_tokens,
+	cache_creation_tokens = public.usage_api_key_hourly_rollups.cache_creation_tokens + EXCLUDED.cache_creation_tokens,
+	total_cost = public.usage_api_key_hourly_rollups.total_cost + EXCLUDED.total_cost,
+	actual_cost = public.usage_api_key_hourly_rollups.actual_cost + EXCLUDED.actual_cost,
+	billed_cost = public.usage_api_key_hourly_rollups.billed_cost + EXCLUDED.billed_cost,
+	updated_at = now()`
+
+	var result entsql.Result
+	if err := tx.Driver().Exec(ctx, query, args, &result); err != nil {
+		if isUsageHourlyRollupMissing(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+func rollupID(value int) int {
+	if value < 0 {
+		return 0
+	}
+	return value
 }
 
 func appendUsageHourlyRollupBatchRow(args []any, item insertedUsageLog) ([]any, string) {

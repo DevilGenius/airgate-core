@@ -153,6 +153,9 @@ func (s *UsageStore) SummaryUser(ctx context.Context, userID int64, filter appus
 
 // SummaryAdmin 查询管理员汇总统计。
 func (s *UsageStore) SummaryAdmin(ctx context.Context, filter appusage.StatsFilter) (appusage.Summary, error) {
+	if summary, handled, err := s.summaryAdminFromAPIKeyRollups(ctx, filter); handled {
+		return summary, err
+	}
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
 		query = query.Where(usageUserPredicate(*filter.UserID))

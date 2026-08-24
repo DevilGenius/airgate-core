@@ -9,6 +9,7 @@ import (
 type Repository interface {
 	LoadStatsSnapshot(ctx context.Context, todayStart, oneMinAgo, tenMinAgo time.Time, userID int) (StatsSnapshot, error)
 	ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]TrendLog, error)
+	ListAPIKeyTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]APIKeyTrendLog, error)
 }
 
 // StatsSnapshot 表示从存储层读取的原始统计快照。
@@ -114,6 +115,7 @@ type Trend struct {
 	UserRanking       []UserRanking
 	TokenTrend        []TimeBucket
 	TopUsers          []UserTrend
+	TopAPIKeys        []APIKeyTrend
 }
 
 // TrendLog 表示趋势聚合所需的使用日志。
@@ -129,6 +131,15 @@ type TrendLog struct {
 	ActualCost          float64
 	StandardCost        float64
 	CreatedAt           time.Time
+}
+
+// APIKeyTrendLog 表示 API Key 小时汇总中的一条时间桶记录。
+type APIKeyTrendLog struct {
+	APIKeyID   int
+	APIKeyName string
+	Requests   int64
+	Tokens     int64
+	CreatedAt  time.Time
 }
 
 // ModelStats 表示模型分布统计。
@@ -170,6 +181,18 @@ type UserTrend struct {
 
 // UserTrendPoint 表示单个用户趋势点。
 type UserTrendPoint struct {
+	Time   string
+	Tokens int64
+}
+
+// APIKeyTrend 表示单个 API Key 的 Top12 使用趋势。
+type APIKeyTrend struct {
+	APIKeyID int64
+	Name     string
+	Trend    []APIKeyTrendPoint
+}
+
+type APIKeyTrendPoint struct {
 	Time   string
 	Tokens int64
 }

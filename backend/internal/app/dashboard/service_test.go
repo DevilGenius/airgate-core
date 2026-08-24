@@ -604,9 +604,26 @@ func TestAggregateTopUsersLimitsAndSortsDailyPoints(t *testing.T) {
 	}
 }
 
+func TestAggregateTopAPIKeysLimitsAndSortsDailyPoints(t *testing.T) {
+	base := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	logs := make([]APIKeyTrendLog, 0, 14)
+	for i := 1; i <= 13; i++ {
+		logs = append(logs, APIKeyTrendLog{APIKeyID: i, APIKeyName: "key", Tokens: int64(i), CreatedAt: base.Add(time.Duration(i) * time.Hour)})
+	}
+	logs = append(logs,
+		APIKeyTrendLog{APIKeyID: 13, APIKeyName: "top-key", Tokens: 100, CreatedAt: base},
+		APIKeyTrendLog{APIKeyID: 13, APIKeyName: "top-key", Tokens: 100, CreatedAt: base.AddDate(0, 0, 1)},
+	)
+	result := aggregateTopAPIKeys(logs, "day", time.UTC)
+	if len(result) != 12 || result[0].APIKeyID != 13 || result[0].Name != "top-key" || len(result[0].Trend) != 2 {
+		t.Fatalf("top API keys = %+v", result)
+	}
+}
+
 type dashboardStubRepository struct {
-	loadStatsSnapshot func(context.Context, time.Time, time.Time, time.Time) (StatsSnapshot, error)
-	listTrendLogs     func(context.Context, time.Time, time.Time) ([]TrendLog, error)
+	loadStatsSnapshot   func(context.Context, time.Time, time.Time, time.Time) (StatsSnapshot, error)
+	listTrendLogs       func(context.Context, time.Time, time.Time) ([]TrendLog, error)
+	listAPIKeyTrendLogs func(context.Context, time.Time, time.Time) ([]APIKeyTrendLog, error)
 }
 
 func (s dashboardStubRepository) LoadStatsSnapshot(ctx context.Context, todayStart, oneMinAgo, tenMinAgo time.Time, _ int) (StatsSnapshot, error) {
@@ -621,4 +638,11 @@ func (s dashboardStubRepository) ListTrendLogs(ctx context.Context, startTime, e
 		return nil, nil
 	}
 	return s.listTrendLogs(ctx, startTime, endTime)
+}
+
+func (s dashboardStubRepository) ListAPIKeyTrendLogs(ctx context.Context, startTime, endTime time.Time, _ int) ([]APIKeyTrendLog, error) {
+	if s.listAPIKeyTrendLogs == nil {
+		return nil, nil
+	}
+	return s.listAPIKeyTrendLogs(ctx, startTime, endTime)
 }

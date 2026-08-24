@@ -864,42 +864,42 @@ function TokenTrendLegend({ lineLabels }: { lineLabels: Record<string, string> }
   );
 }
 
-function topUserSeriesKey(userId: number, index: number) {
-  return userId > 0 ? `user_${userId}` : `user_index_${index}`;
+function topAPIKeySeriesKey(apiKeyID: number, index: number) {
+  return apiKeyID > 0 ? `api_key_${apiKeyID}` : `api_key_index_${index}`;
 }
 
-function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
+function TopAPIKeysCard({ trend }: { trend: DashboardTrendResp }) {
   const { t } = useTranslation();
-  const topUsers = trend.top_users ?? [];
-  const userSeries = useMemo(
-    () => topUsers.map((user, index) => ({
+  const topAPIKeys = trend.top_api_keys ?? [];
+  const apiKeySeries = useMemo(
+    () => topAPIKeys.map((apiKey, index) => ({
       color: getUserTrendColor(index),
-      id: user.user_id,
-      key: topUserSeriesKey(user.user_id, index),
-      label: user.email,
+      id: apiKey.api_key_id,
+      key: topAPIKeySeriesKey(apiKey.api_key_id, index),
+      label: apiKey.name || (apiKey.api_key_id > 0 ? `#${apiKey.api_key_id}` : t('usage.api_key_plugin_call')),
     })),
-    [topUsers],
+    [t, topAPIKeys],
   );
   const chartData = useMemo(() => {
-    if (topUsers.length === 0) return [];
+    if (topAPIKeys.length === 0) return [];
     const timeSet = new Set<string>();
-    topUsers.forEach((user) => user.trend.forEach((point) => timeSet.add(point.time)));
-    const trendByUser = topUsers.map((user) => new Map(user.trend.map((point) => [point.time, point.tokens])));
+    topAPIKeys.forEach((apiKey) => apiKey.trend.forEach((point) => timeSet.add(point.time)));
+    const trendByAPIKey = topAPIKeys.map((apiKey) => new Map(apiKey.trend.map((point) => [point.time, point.tokens])));
     return Array.from(timeSet).sort().map((time) => {
       const row: Record<string, DashboardTimeLabel | number | string> = {
         time,
         timeLabel: formatDashboardTime(time),
       };
-      userSeries.forEach((series, index) => {
-        row[series.key] = trendByUser[index]?.get(time) ?? 0;
+      apiKeySeries.forEach((series, index) => {
+        row[series.key] = trendByAPIKey[index]?.get(time) ?? 0;
       });
       return row;
     });
-  }, [topUsers, userSeries]);
+  }, [apiKeySeries, topAPIKeys]);
 
   return (
-    <DashboardCard title={t('dashboard.top_users')}>
-      {topUsers.length > 0 ? (
+    <DashboardCard title={t('dashboard.top_api_keys')}>
+      {topAPIKeys.length > 0 ? (
         <div className="flex h-[268px] w-full min-w-0 flex-col 2xl:h-[320px]">
           <div className="min-h-0 flex-1">
             <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={DASHBOARD_TOP_USERS_INITIAL_DIMENSION}>
@@ -923,13 +923,13 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
                   width={DASHBOARD_TOKEN_Y_AXIS_WIDTH}
                 />
                 <RechartsTooltip content={<ChartTooltip />} />
-                {userSeries.map((user) => (
-                  <Line key={user.key} dataKey={user.key} dot={false} isAnimationActive={false} name={user.label} stroke={user.color} strokeWidth={2.5} type="monotone" />
+                {apiKeySeries.map((apiKey) => (
+                  <Line key={apiKey.key} dataKey={apiKey.key} dot={false} isAnimationActive={false} name={apiKey.label} stroke={apiKey.color} strokeWidth={2.5} type="monotone" />
                 ))}
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <TopUsersLegend users={userSeries} />
+          <TopAPIKeysLegend apiKeys={apiKeySeries} />
         </div>
       ) : (
         <div className="flex h-[268px] items-center justify-center text-sm text-text 2xl:h-[320px]">{t('common.no_data')}</div>
@@ -938,13 +938,13 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
   );
 }
 
-function TopUsersLegend({ users }: { users: Array<{ color: string; id: number; label: string }> }) {
+function TopAPIKeysLegend({ apiKeys }: { apiKeys: Array<{ color: string; id: number; label: string }> }) {
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
-      {users.map((user) => (
-        <span key={user.id} className="inline-flex min-w-0 items-center gap-1.5">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: user.color }} />
-          <span className="max-w-40 truncate">{user.label}</span>
+      {apiKeys.map((apiKey) => (
+        <span key={apiKey.id} className="inline-flex min-w-0 items-center gap-1.5">
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: apiKey.color }} />
+          <span className="max-w-40 truncate">{apiKey.label}</span>
         </span>
       ))}
     </div>
@@ -958,7 +958,7 @@ function TrendCharts({ trend }: { trend: DashboardTrendResp }) {
         <ModelDistributionCard trend={trend} />
         <TokenTrendCard trend={trend} />
       </div>
-      <TopUsersCard trend={trend} />
+      <TopAPIKeysCard trend={trend} />
     </div>
   );
 }

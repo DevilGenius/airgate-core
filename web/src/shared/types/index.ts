@@ -907,6 +907,7 @@ export interface DashboardTrendResp {
   user_ranking: DashboardUserRanking[];
   token_trend: DashboardTimeBucket[];
   top_users: DashboardUserTrend[];
+  top_api_keys?: DashboardAPIKeyTrend[];
 }
 
 export interface DashboardModelStats {
@@ -944,6 +945,17 @@ export interface DashboardUserTrend {
 }
 
 export interface DashboardUserTrendPoint {
+  time: string;
+  tokens: number;
+}
+
+export interface DashboardAPIKeyTrend {
+  api_key_id: number;
+  name: string;
+  trend: DashboardAPIKeyTrendPoint[];
+}
+
+export interface DashboardAPIKeyTrendPoint {
   time: string;
   tokens: number;
 }

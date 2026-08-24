@@ -141,6 +141,49 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 	return s.fillTrendLogEmails(ctx, result)
 }
 
+// ListAPIKeyTrendLogs 从 API Key 小时汇总读取 Top12 所需的时间桶数据。
+// 汇总表为空时返回空结果，不回退扫描 usage_logs。
+func (s *DashboardStore) ListAPIKeyTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]appdashboard.APIKeyTrendLog, error) {
+	if !s.canQueryDashboardRollups() {
+		return []appdashboard.APIKeyTrendLog{}, nil
+	}
+	const query = `
+SELECT
+	r.api_key_id,
+	COALESCE(k.name, ''),
+	COALESCE(SUM(r.requests), 0)::bigint,
+	COALESCE(SUM(r.input_tokens + r.output_tokens + r.cached_input_tokens + r.cache_creation_tokens), 0)::bigint,
+	r.bucket_start
+FROM public.usage_api_key_hourly_rollups r
+LEFT JOIN public.api_keys k ON k.id = r.api_key_id
+WHERE r.bucket_start >= $1
+	AND r.bucket_start < $2
+	AND ($3::integer = 0 OR r.user_id = $3::integer)
+GROUP BY r.api_key_id, k.name, r.bucket_start
+ORDER BY r.bucket_start`
+
+	var rows entsql.Rows
+	if err := s.db.Driver().Query(ctx, query, []any{startTime, endTime, userID}, &rows); err != nil {
+		if isDashboardRollupUnavailable(err) {
+			return []appdashboard.APIKeyTrendLog{}, nil
+		}
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	result := make([]appdashboard.APIKeyTrendLog, 0)
+	for rows.Next() {
+		var item appdashboard.APIKeyTrendLog
+		if err := rows.Scan(&item.APIKeyID, &item.APIKeyName, &item.Requests, &item.Tokens, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (s *DashboardStore) fillTrendLogEmails(ctx context.Context, logs []appdashboard.TrendLog) ([]appdashboard.TrendLog, error) {
 	emailMap := make(map[int]string)
 	userIDs := make([]int, 0, len(logs))

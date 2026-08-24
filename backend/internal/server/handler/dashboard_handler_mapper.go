@@ -69,7 +69,20 @@ func toDashboardTrendResp(item appdashboard.Trend) dto.DashboardTrendResp {
 		UserRanking:       toDashboardUserRankings(item.UserRanking),
 		TokenTrend:        toDashboardTimeBuckets(item.TokenTrend),
 		TopUsers:          toDashboardUserTrends(item.TopUsers),
+		TopAPIKeys:        toDashboardAPIKeyTrends(item.TopAPIKeys),
 	}
+}
+
+func toDashboardAPIKeyTrends(items []appdashboard.APIKeyTrend) []dto.DashboardAPIKeyTrend {
+	result := make([]dto.DashboardAPIKeyTrend, 0, len(items))
+	for _, item := range items {
+		trend := make([]dto.DashboardAPIKeyTrendPoint, 0, len(item.Trend))
+		for _, point := range item.Trend {
+			trend = append(trend, dto.DashboardAPIKeyTrendPoint{Time: point.Time, Tokens: point.Tokens})
+		}
+		result = append(result, dto.DashboardAPIKeyTrend{APIKeyID: item.APIKeyID, Name: item.Name, Trend: trend})
+	}
+	return result
 }
 
 func toDashboardModelStats(items []appdashboard.ModelStats) []dto.DashboardModelStats {

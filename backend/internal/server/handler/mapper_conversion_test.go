@@ -103,8 +103,9 @@ func TestDashboardAndUsageMappers(t *testing.T) {
 		UserRanking:       []appdashboard.UserRanking{{UserID: 1, Email: "u@test.com", Tokens: 30}},
 		TokenTrend:        []appdashboard.TimeBucket{{Time: "10:00", InputTokens: 1}},
 		TopUsers:          []appdashboard.UserTrend{{UserID: 1, Email: "u@test.com", Trend: []appdashboard.UserTrendPoint{{Time: "10:00", Tokens: 5}}}},
+		TopAPIKeys:        []appdashboard.APIKeyTrend{{APIKeyID: 8, Name: "prod", Trend: []appdashboard.APIKeyTrendPoint{{Time: "10:00", Tokens: 7}}}},
 	})
-	if len(trend.ModelDistribution) != 1 || len(trend.TopUsers) != 1 || len(trend.TopUsers[0].Trend) != 1 {
+	if len(trend.ModelDistribution) != 1 || len(trend.TopUsers) != 1 || len(trend.TopUsers[0].Trend) != 1 || len(trend.TopAPIKeys) != 1 || trend.TopAPIKeys[0].APIKeyID != 8 || len(trend.TopAPIKeys[0].Trend) != 1 {
 		t.Fatalf("仪表盘趋势响应异常: %+v", trend)
 	}
 
