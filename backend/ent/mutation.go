@@ -2083,6 +2083,8 @@ type AccountMutation struct {
 	last_probe_at                *time.Time
 	usage_estimate_meta          *accountusage.EstimateMeta
 	extra                        *map[string]interface{}
+	proxy_slot                   *int
+	addproxy_slot                *int
 	deleted_at                   *time.Time
 	created_at                   *time.Time
 	updated_at                   *time.Time
@@ -3030,6 +3032,76 @@ func (m *AccountMutation) ResetExtra() {
 	delete(m.clearedFields, account.FieldExtra)
 }
 
+// SetProxySlot sets the "proxy_slot" field.
+func (m *AccountMutation) SetProxySlot(i int) {
+	m.proxy_slot = &i
+	m.addproxy_slot = nil
+}
+
+// ProxySlot returns the value of the "proxy_slot" field in the mutation.
+func (m *AccountMutation) ProxySlot() (r int, exists bool) {
+	v := m.proxy_slot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProxySlot returns the old "proxy_slot" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldProxySlot(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProxySlot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProxySlot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProxySlot: %w", err)
+	}
+	return oldValue.ProxySlot, nil
+}
+
+// AddProxySlot adds i to the "proxy_slot" field.
+func (m *AccountMutation) AddProxySlot(i int) {
+	if m.addproxy_slot != nil {
+		*m.addproxy_slot += i
+	} else {
+		m.addproxy_slot = &i
+	}
+}
+
+// AddedProxySlot returns the value that was added to the "proxy_slot" field in this mutation.
+func (m *AccountMutation) AddedProxySlot() (r int, exists bool) {
+	v := m.addproxy_slot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearProxySlot clears the value of the "proxy_slot" field.
+func (m *AccountMutation) ClearProxySlot() {
+	m.proxy_slot = nil
+	m.addproxy_slot = nil
+	m.clearedFields[account.FieldProxySlot] = struct{}{}
+}
+
+// ProxySlotCleared returns if the "proxy_slot" field was cleared in this mutation.
+func (m *AccountMutation) ProxySlotCleared() bool {
+	_, ok := m.clearedFields[account.FieldProxySlot]
+	return ok
+}
+
+// ResetProxySlot resets all changes to the "proxy_slot" field.
+func (m *AccountMutation) ResetProxySlot() {
+	m.proxy_slot = nil
+	m.addproxy_slot = nil
+	delete(m.clearedFields, account.FieldProxySlot)
+}
+
 // SetDeletedAt sets the "deleted_at" field.
 func (m *AccountMutation) SetDeletedAt(t time.Time) {
 	m.deleted_at = &t
@@ -3332,7 +3404,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 22)
 	if m.name != nil {
 		fields = append(fields, account.FieldName)
 	}
@@ -3387,6 +3459,9 @@ func (m *AccountMutation) Fields() []string {
 	if m.extra != nil {
 		fields = append(fields, account.FieldExtra)
 	}
+	if m.proxy_slot != nil {
+		fields = append(fields, account.FieldProxySlot)
+	}
 	if m.deleted_at != nil {
 		fields = append(fields, account.FieldDeletedAt)
 	}
@@ -3440,6 +3515,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.UsageEstimateMeta()
 	case account.FieldExtra:
 		return m.Extra()
+	case account.FieldProxySlot:
+		return m.ProxySlot()
 	case account.FieldDeletedAt:
 		return m.DeletedAt()
 	case account.FieldCreatedAt:
@@ -3491,6 +3568,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldUsageEstimateMeta(ctx)
 	case account.FieldExtra:
 		return m.OldExtra(ctx)
+	case account.FieldProxySlot:
+		return m.OldProxySlot(ctx)
 	case account.FieldDeletedAt:
 		return m.OldDeletedAt(ctx)
 	case account.FieldCreatedAt:
@@ -3632,6 +3711,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetExtra(v)
 		return nil
+	case account.FieldProxySlot:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProxySlot(v)
+		return nil
 	case account.FieldDeletedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -3673,6 +3759,9 @@ func (m *AccountMutation) AddedFields() []string {
 	if m.addmodel_downgrade_threshold != nil {
 		fields = append(fields, account.FieldModelDowngradeThreshold)
 	}
+	if m.addproxy_slot != nil {
+		fields = append(fields, account.FieldProxySlot)
+	}
 	return fields
 }
 
@@ -3689,6 +3778,8 @@ func (m *AccountMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedRateMultiplier()
 	case account.FieldModelDowngradeThreshold:
 		return m.AddedModelDowngradeThreshold()
+	case account.FieldProxySlot:
+		return m.AddedProxySlot()
 	}
 	return nil, false
 }
@@ -3726,6 +3817,13 @@ func (m *AccountMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddModelDowngradeThreshold(v)
 		return nil
+	case account.FieldProxySlot:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddProxySlot(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Account numeric field %s", name)
 }
@@ -3757,6 +3855,9 @@ func (m *AccountMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(account.FieldExtra) {
 		fields = append(fields, account.FieldExtra)
+	}
+	if m.FieldCleared(account.FieldProxySlot) {
+		fields = append(fields, account.FieldProxySlot)
 	}
 	if m.FieldCleared(account.FieldDeletedAt) {
 		fields = append(fields, account.FieldDeletedAt)
@@ -3798,6 +3899,9 @@ func (m *AccountMutation) ClearField(name string) error {
 		return nil
 	case account.FieldExtra:
 		m.ClearExtra()
+		return nil
+	case account.FieldProxySlot:
+		m.ClearProxySlot()
 		return nil
 	case account.FieldDeletedAt:
 		m.ClearDeletedAt()
@@ -3863,6 +3967,9 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldExtra:
 		m.ResetExtra()
+		return nil
+	case account.FieldProxySlot:
+		m.ResetProxySlot()
 		return nil
 	case account.FieldDeletedAt:
 		m.ResetDeletedAt()
@@ -12927,12 +13034,17 @@ type ProxyMutation struct {
 	typ             string
 	id              *int
 	name            *string
+	mode            *proxy.Mode
 	protocol        *proxy.Protocol
 	address         *string
 	port            *int
 	addport         *int
 	username        *string
 	password        *string
+	slot_start      *int
+	addslot_start   *int
+	slot_end        *int
+	addslot_end     *int
 	status          *proxy.Status
 	created_at      *time.Time
 	updated_at      *time.Time
@@ -13077,6 +13189,42 @@ func (m *ProxyMutation) OldName(ctx context.Context) (v string, err error) {
 // ResetName resets all changes to the "name" field.
 func (m *ProxyMutation) ResetName() {
 	m.name = nil
+}
+
+// SetMode sets the "mode" field.
+func (m *ProxyMutation) SetMode(pr proxy.Mode) {
+	m.mode = &pr
+}
+
+// Mode returns the value of the "mode" field in the mutation.
+func (m *ProxyMutation) Mode() (r proxy.Mode, exists bool) {
+	v := m.mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMode returns the old "mode" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldMode(ctx context.Context) (v proxy.Mode, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMode: %w", err)
+	}
+	return oldValue.Mode, nil
+}
+
+// ResetMode resets all changes to the "mode" field.
+func (m *ProxyMutation) ResetMode() {
+	m.mode = nil
 }
 
 // SetProtocol sets the "protocol" field.
@@ -13279,6 +13427,118 @@ func (m *ProxyMutation) ResetPassword() {
 	m.password = nil
 }
 
+// SetSlotStart sets the "slot_start" field.
+func (m *ProxyMutation) SetSlotStart(i int) {
+	m.slot_start = &i
+	m.addslot_start = nil
+}
+
+// SlotStart returns the value of the "slot_start" field in the mutation.
+func (m *ProxyMutation) SlotStart() (r int, exists bool) {
+	v := m.slot_start
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSlotStart returns the old "slot_start" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldSlotStart(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSlotStart is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSlotStart requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSlotStart: %w", err)
+	}
+	return oldValue.SlotStart, nil
+}
+
+// AddSlotStart adds i to the "slot_start" field.
+func (m *ProxyMutation) AddSlotStart(i int) {
+	if m.addslot_start != nil {
+		*m.addslot_start += i
+	} else {
+		m.addslot_start = &i
+	}
+}
+
+// AddedSlotStart returns the value that was added to the "slot_start" field in this mutation.
+func (m *ProxyMutation) AddedSlotStart() (r int, exists bool) {
+	v := m.addslot_start
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSlotStart resets all changes to the "slot_start" field.
+func (m *ProxyMutation) ResetSlotStart() {
+	m.slot_start = nil
+	m.addslot_start = nil
+}
+
+// SetSlotEnd sets the "slot_end" field.
+func (m *ProxyMutation) SetSlotEnd(i int) {
+	m.slot_end = &i
+	m.addslot_end = nil
+}
+
+// SlotEnd returns the value of the "slot_end" field in the mutation.
+func (m *ProxyMutation) SlotEnd() (r int, exists bool) {
+	v := m.slot_end
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSlotEnd returns the old "slot_end" field's value of the Proxy entity.
+// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProxyMutation) OldSlotEnd(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSlotEnd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSlotEnd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSlotEnd: %w", err)
+	}
+	return oldValue.SlotEnd, nil
+}
+
+// AddSlotEnd adds i to the "slot_end" field.
+func (m *ProxyMutation) AddSlotEnd(i int) {
+	if m.addslot_end != nil {
+		*m.addslot_end += i
+	} else {
+		m.addslot_end = &i
+	}
+}
+
+// AddedSlotEnd returns the value that was added to the "slot_end" field in this mutation.
+func (m *ProxyMutation) AddedSlotEnd() (r int, exists bool) {
+	v := m.addslot_end
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSlotEnd resets all changes to the "slot_end" field.
+func (m *ProxyMutation) ResetSlotEnd() {
+	m.slot_end = nil
+	m.addslot_end = nil
+}
+
 // SetStatus sets the "status" field.
 func (m *ProxyMutation) SetStatus(pr proxy.Status) {
 	m.status = &pr
@@ -13475,9 +13735,12 @@ func (m *ProxyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProxyMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 12)
 	if m.name != nil {
 		fields = append(fields, proxy.FieldName)
+	}
+	if m.mode != nil {
+		fields = append(fields, proxy.FieldMode)
 	}
 	if m.protocol != nil {
 		fields = append(fields, proxy.FieldProtocol)
@@ -13493,6 +13756,12 @@ func (m *ProxyMutation) Fields() []string {
 	}
 	if m.password != nil {
 		fields = append(fields, proxy.FieldPassword)
+	}
+	if m.slot_start != nil {
+		fields = append(fields, proxy.FieldSlotStart)
+	}
+	if m.slot_end != nil {
+		fields = append(fields, proxy.FieldSlotEnd)
 	}
 	if m.status != nil {
 		fields = append(fields, proxy.FieldStatus)
@@ -13513,6 +13782,8 @@ func (m *ProxyMutation) Field(name string) (ent.Value, bool) {
 	switch name {
 	case proxy.FieldName:
 		return m.Name()
+	case proxy.FieldMode:
+		return m.Mode()
 	case proxy.FieldProtocol:
 		return m.Protocol()
 	case proxy.FieldAddress:
@@ -13523,6 +13794,10 @@ func (m *ProxyMutation) Field(name string) (ent.Value, bool) {
 		return m.Username()
 	case proxy.FieldPassword:
 		return m.Password()
+	case proxy.FieldSlotStart:
+		return m.SlotStart()
+	case proxy.FieldSlotEnd:
+		return m.SlotEnd()
 	case proxy.FieldStatus:
 		return m.Status()
 	case proxy.FieldCreatedAt:
@@ -13540,6 +13815,8 @@ func (m *ProxyMutation) OldField(ctx context.Context, name string) (ent.Value, e
 	switch name {
 	case proxy.FieldName:
 		return m.OldName(ctx)
+	case proxy.FieldMode:
+		return m.OldMode(ctx)
 	case proxy.FieldProtocol:
 		return m.OldProtocol(ctx)
 	case proxy.FieldAddress:
@@ -13550,6 +13827,10 @@ func (m *ProxyMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldUsername(ctx)
 	case proxy.FieldPassword:
 		return m.OldPassword(ctx)
+	case proxy.FieldSlotStart:
+		return m.OldSlotStart(ctx)
+	case proxy.FieldSlotEnd:
+		return m.OldSlotEnd(ctx)
 	case proxy.FieldStatus:
 		return m.OldStatus(ctx)
 	case proxy.FieldCreatedAt:
@@ -13571,6 +13852,13 @@ func (m *ProxyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetName(v)
+		return nil
+	case proxy.FieldMode:
+		v, ok := value.(proxy.Mode)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMode(v)
 		return nil
 	case proxy.FieldProtocol:
 		v, ok := value.(proxy.Protocol)
@@ -13607,6 +13895,20 @@ func (m *ProxyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPassword(v)
 		return nil
+	case proxy.FieldSlotStart:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSlotStart(v)
+		return nil
+	case proxy.FieldSlotEnd:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSlotEnd(v)
+		return nil
 	case proxy.FieldStatus:
 		v, ok := value.(proxy.Status)
 		if !ok {
@@ -13639,6 +13941,12 @@ func (m *ProxyMutation) AddedFields() []string {
 	if m.addport != nil {
 		fields = append(fields, proxy.FieldPort)
 	}
+	if m.addslot_start != nil {
+		fields = append(fields, proxy.FieldSlotStart)
+	}
+	if m.addslot_end != nil {
+		fields = append(fields, proxy.FieldSlotEnd)
+	}
 	return fields
 }
 
@@ -13649,6 +13957,10 @@ func (m *ProxyMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case proxy.FieldPort:
 		return m.AddedPort()
+	case proxy.FieldSlotStart:
+		return m.AddedSlotStart()
+	case proxy.FieldSlotEnd:
+		return m.AddedSlotEnd()
 	}
 	return nil, false
 }
@@ -13664,6 +13976,20 @@ func (m *ProxyMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddPort(v)
+		return nil
+	case proxy.FieldSlotStart:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSlotStart(v)
+		return nil
+	case proxy.FieldSlotEnd:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSlotEnd(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Proxy numeric field %s", name)
@@ -13695,6 +14021,9 @@ func (m *ProxyMutation) ResetField(name string) error {
 	case proxy.FieldName:
 		m.ResetName()
 		return nil
+	case proxy.FieldMode:
+		m.ResetMode()
+		return nil
 	case proxy.FieldProtocol:
 		m.ResetProtocol()
 		return nil
@@ -13709,6 +14038,12 @@ func (m *ProxyMutation) ResetField(name string) error {
 		return nil
 	case proxy.FieldPassword:
 		m.ResetPassword()
+		return nil
+	case proxy.FieldSlotStart:
+		m.ResetSlotStart()
+		return nil
+	case proxy.FieldSlotEnd:
+		m.ResetSlotEnd()
 		return nil
 	case proxy.FieldStatus:
 		m.ResetStatus()

@@ -2085,12 +2085,5 @@ func cloneDispatchPlansHost(input []sdk.DispatchPlan) []sdk.DispatchPlan {
 // proxyURLFromAccount 从 ent.Account 的 proxy edge 拼装 proxy URL。
 // 与 account.buildProxyURL 等价，但接收 ent.Proxy 而非 service.Proxy。
 func proxyURLFromAccount(a *ent.Account) string {
-	if a == nil || a.Edges.Proxy == nil {
-		return ""
-	}
-	p := a.Edges.Proxy
-	if p.Username != "" {
-		return fmt.Sprintf("%s://%s:%s@%s:%d", p.Protocol, p.Username, p.Password, p.Address, p.Port)
-	}
-	return fmt.Sprintf("%s://%s:%d", p.Protocol, p.Address, p.Port)
+	return buildProxyURLFromEnt(a)
 }

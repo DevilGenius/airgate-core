@@ -57,6 +57,8 @@ func (Account) Fields() []ent.Field {
 			Comment("账号级 5h/7d 日增长、滚动成本校准和观测游标"),
 		field.JSON("extra", map[string]interface{}{}).Optional().Default(map[string]interface{}{}).
 			Comment("扩展配置（max_rpm / max_window_cost / max_sessions 等）"),
+		field.Int("proxy_slot").Optional().Nillable().Min(0).Max(65535).
+			Comment("代理组内固定的十六进制 slot；单代理或未绑定代理时为空"),
 		field.Time("deleted_at").Optional().Nillable().
 			Comment("软删除时间；非空账号不再参与管理和调度，历史 usage log 关联保留"),
 		field.Time("created_at").Default(timeNow).Immutable(),
@@ -81,5 +83,10 @@ func (Account) Indexes() []ent.Index {
 			StorageKey("account_deleted_at"),
 		index.Fields("priority", "created_at").
 			StorageKey("account_priority_created_at"),
+		index.Edges("proxy").
+			StorageKey("account_proxy_idx"),
+		index.Edges("proxy").
+			Fields("proxy_slot").
+			StorageKey("account_proxy_slot_idx"),
 	}
 }

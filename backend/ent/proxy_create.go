@@ -27,6 +27,20 @@ func (pc *ProxyCreate) SetName(s string) *ProxyCreate {
 	return pc
 }
 
+// SetMode sets the "mode" field.
+func (pc *ProxyCreate) SetMode(pr proxy.Mode) *ProxyCreate {
+	pc.mutation.SetMode(pr)
+	return pc
+}
+
+// SetNillableMode sets the "mode" field if the given value is not nil.
+func (pc *ProxyCreate) SetNillableMode(pr *proxy.Mode) *ProxyCreate {
+	if pr != nil {
+		pc.SetMode(*pr)
+	}
+	return pc
+}
+
 // SetProtocol sets the "protocol" field.
 func (pc *ProxyCreate) SetProtocol(pr proxy.Protocol) *ProxyCreate {
 	pc.mutation.SetProtocol(pr)
@@ -77,6 +91,34 @@ func (pc *ProxyCreate) SetPassword(s string) *ProxyCreate {
 func (pc *ProxyCreate) SetNillablePassword(s *string) *ProxyCreate {
 	if s != nil {
 		pc.SetPassword(*s)
+	}
+	return pc
+}
+
+// SetSlotStart sets the "slot_start" field.
+func (pc *ProxyCreate) SetSlotStart(i int) *ProxyCreate {
+	pc.mutation.SetSlotStart(i)
+	return pc
+}
+
+// SetNillableSlotStart sets the "slot_start" field if the given value is not nil.
+func (pc *ProxyCreate) SetNillableSlotStart(i *int) *ProxyCreate {
+	if i != nil {
+		pc.SetSlotStart(*i)
+	}
+	return pc
+}
+
+// SetSlotEnd sets the "slot_end" field.
+func (pc *ProxyCreate) SetSlotEnd(i int) *ProxyCreate {
+	pc.mutation.SetSlotEnd(i)
+	return pc
+}
+
+// SetNillableSlotEnd sets the "slot_end" field if the given value is not nil.
+func (pc *ProxyCreate) SetNillableSlotEnd(i *int) *ProxyCreate {
+	if i != nil {
+		pc.SetSlotEnd(*i)
 	}
 	return pc
 }
@@ -173,6 +215,10 @@ func (pc *ProxyCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (pc *ProxyCreate) defaults() {
+	if _, ok := pc.mutation.Mode(); !ok {
+		v := proxy.DefaultMode
+		pc.mutation.SetMode(v)
+	}
 	if _, ok := pc.mutation.Protocol(); !ok {
 		v := proxy.DefaultProtocol
 		pc.mutation.SetProtocol(v)
@@ -184,6 +230,14 @@ func (pc *ProxyCreate) defaults() {
 	if _, ok := pc.mutation.Password(); !ok {
 		v := proxy.DefaultPassword
 		pc.mutation.SetPassword(v)
+	}
+	if _, ok := pc.mutation.SlotStart(); !ok {
+		v := proxy.DefaultSlotStart
+		pc.mutation.SetSlotStart(v)
+	}
+	if _, ok := pc.mutation.SlotEnd(); !ok {
+		v := proxy.DefaultSlotEnd
+		pc.mutation.SetSlotEnd(v)
 	}
 	if _, ok := pc.mutation.Status(); !ok {
 		v := proxy.DefaultStatus
@@ -207,6 +261,14 @@ func (pc *ProxyCreate) check() error {
 	if v, ok := pc.mutation.Name(); ok {
 		if err := proxy.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Proxy.name": %w`, err)}
+		}
+	}
+	if _, ok := pc.mutation.Mode(); !ok {
+		return &ValidationError{Name: "mode", err: errors.New(`ent: missing required field "Proxy.mode"`)}
+	}
+	if v, ok := pc.mutation.Mode(); ok {
+		if err := proxy.ModeValidator(v); err != nil {
+			return &ValidationError{Name: "mode", err: fmt.Errorf(`ent: validator failed for field "Proxy.mode": %w`, err)}
 		}
 	}
 	if _, ok := pc.mutation.Protocol(); !ok {
@@ -233,6 +295,22 @@ func (pc *ProxyCreate) check() error {
 	}
 	if _, ok := pc.mutation.Password(); !ok {
 		return &ValidationError{Name: "password", err: errors.New(`ent: missing required field "Proxy.password"`)}
+	}
+	if _, ok := pc.mutation.SlotStart(); !ok {
+		return &ValidationError{Name: "slot_start", err: errors.New(`ent: missing required field "Proxy.slot_start"`)}
+	}
+	if v, ok := pc.mutation.SlotStart(); ok {
+		if err := proxy.SlotStartValidator(v); err != nil {
+			return &ValidationError{Name: "slot_start", err: fmt.Errorf(`ent: validator failed for field "Proxy.slot_start": %w`, err)}
+		}
+	}
+	if _, ok := pc.mutation.SlotEnd(); !ok {
+		return &ValidationError{Name: "slot_end", err: errors.New(`ent: missing required field "Proxy.slot_end"`)}
+	}
+	if v, ok := pc.mutation.SlotEnd(); ok {
+		if err := proxy.SlotEndValidator(v); err != nil {
+			return &ValidationError{Name: "slot_end", err: fmt.Errorf(`ent: validator failed for field "Proxy.slot_end": %w`, err)}
+		}
 	}
 	if _, ok := pc.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Proxy.status"`)}
@@ -278,6 +356,10 @@ func (pc *ProxyCreate) createSpec() (*Proxy, *sqlgraph.CreateSpec) {
 		_spec.SetField(proxy.FieldName, field.TypeString, value)
 		_node.Name = value
 	}
+	if value, ok := pc.mutation.Mode(); ok {
+		_spec.SetField(proxy.FieldMode, field.TypeEnum, value)
+		_node.Mode = value
+	}
 	if value, ok := pc.mutation.Protocol(); ok {
 		_spec.SetField(proxy.FieldProtocol, field.TypeEnum, value)
 		_node.Protocol = value
@@ -297,6 +379,14 @@ func (pc *ProxyCreate) createSpec() (*Proxy, *sqlgraph.CreateSpec) {
 	if value, ok := pc.mutation.Password(); ok {
 		_spec.SetField(proxy.FieldPassword, field.TypeString, value)
 		_node.Password = value
+	}
+	if value, ok := pc.mutation.SlotStart(); ok {
+		_spec.SetField(proxy.FieldSlotStart, field.TypeInt, value)
+		_node.SlotStart = value
+	}
+	if value, ok := pc.mutation.SlotEnd(); ok {
+		_spec.SetField(proxy.FieldSlotEnd, field.TypeInt, value)
+		_node.SlotEnd = value
 	}
 	if value, ok := pc.mutation.Status(); ok {
 		_spec.SetField(proxy.FieldStatus, field.TypeEnum, value)

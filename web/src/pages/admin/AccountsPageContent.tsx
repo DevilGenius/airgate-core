@@ -684,8 +684,7 @@ export default function AccountsPageContent() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 查询代理列表（用于表格中 ID→名称映射）
-  // 代理列表（只用于顶部筛选器；之前的"代理"列已移除）
+  // 代理列表用于顶部筛选器和导入配置；之前的“代理”表格列已移除。
   const { data: allProxiesData } = useQuery({
     queryKey: queryKeys.proxiesAll(),
     queryFn: () => proxiesApi.list(FETCH_ALL_PARAMS),
@@ -1825,6 +1824,7 @@ export default function AccountsPageContent() {
           open
           dsl={importConfigQuery.data?.dsl ?? ''}
           groups={allGroupsData?.list ?? []}
+          proxies={allProxiesData?.list ?? []}
           loading={importConfigQuery.isLoading || importConfigMutation.isPending}
           onClose={() => setShowImportConfigModal(false)}
           onSubmit={(dsl) => importConfigMutation.mutate(dsl)}

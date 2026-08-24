@@ -44,12 +44,15 @@ func (h *ProxyHandler) CreateProxy(c *gin.Context) {
 	}
 
 	item, err := h.service.Create(c.Request.Context(), appproxy.CreateInput{
-		Name:     req.Name,
-		Protocol: req.Protocol,
-		Address:  req.Address,
-		Port:     req.Port,
-		Username: req.Username,
-		Password: req.Password,
+		Name:      req.Name,
+		Mode:      req.Mode,
+		Protocol:  req.Protocol,
+		Address:   req.Address,
+		Port:      req.Port,
+		Username:  req.Username,
+		Password:  req.Password,
+		SlotStart: req.SlotStart,
+		SlotEnd:   req.SlotEnd,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建代理失败", "创建失败", err)
@@ -75,13 +78,16 @@ func (h *ProxyHandler) UpdateProxy(c *gin.Context) {
 	}
 
 	item, err := h.service.Update(c.Request.Context(), id, appproxy.UpdateInput{
-		Name:     req.Name,
-		Protocol: req.Protocol,
-		Address:  req.Address,
-		Port:     req.Port,
-		Username: req.Username,
-		Password: req.Password,
-		Status:   req.Status,
+		Name:      req.Name,
+		Mode:      req.Mode,
+		Protocol:  req.Protocol,
+		Address:   req.Address,
+		Port:      req.Port,
+		Username:  req.Username,
+		Password:  req.Password,
+		SlotStart: req.SlotStart,
+		SlotEnd:   req.SlotEnd,
+		Status:    req.Status,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("更新代理失败", "更新失败", err)

@@ -43,6 +43,20 @@ func (pu *ProxyUpdate) SetNillableName(s *string) *ProxyUpdate {
 	return pu
 }
 
+// SetMode sets the "mode" field.
+func (pu *ProxyUpdate) SetMode(pr proxy.Mode) *ProxyUpdate {
+	pu.mutation.SetMode(pr)
+	return pu
+}
+
+// SetNillableMode sets the "mode" field if the given value is not nil.
+func (pu *ProxyUpdate) SetNillableMode(pr *proxy.Mode) *ProxyUpdate {
+	if pr != nil {
+		pu.SetMode(*pr)
+	}
+	return pu
+}
+
 // SetProtocol sets the "protocol" field.
 func (pu *ProxyUpdate) SetProtocol(pr proxy.Protocol) *ProxyUpdate {
 	pu.mutation.SetProtocol(pr)
@@ -117,6 +131,48 @@ func (pu *ProxyUpdate) SetNillablePassword(s *string) *ProxyUpdate {
 	if s != nil {
 		pu.SetPassword(*s)
 	}
+	return pu
+}
+
+// SetSlotStart sets the "slot_start" field.
+func (pu *ProxyUpdate) SetSlotStart(i int) *ProxyUpdate {
+	pu.mutation.ResetSlotStart()
+	pu.mutation.SetSlotStart(i)
+	return pu
+}
+
+// SetNillableSlotStart sets the "slot_start" field if the given value is not nil.
+func (pu *ProxyUpdate) SetNillableSlotStart(i *int) *ProxyUpdate {
+	if i != nil {
+		pu.SetSlotStart(*i)
+	}
+	return pu
+}
+
+// AddSlotStart adds i to the "slot_start" field.
+func (pu *ProxyUpdate) AddSlotStart(i int) *ProxyUpdate {
+	pu.mutation.AddSlotStart(i)
+	return pu
+}
+
+// SetSlotEnd sets the "slot_end" field.
+func (pu *ProxyUpdate) SetSlotEnd(i int) *ProxyUpdate {
+	pu.mutation.ResetSlotEnd()
+	pu.mutation.SetSlotEnd(i)
+	return pu
+}
+
+// SetNillableSlotEnd sets the "slot_end" field if the given value is not nil.
+func (pu *ProxyUpdate) SetNillableSlotEnd(i *int) *ProxyUpdate {
+	if i != nil {
+		pu.SetSlotEnd(*i)
+	}
+	return pu
+}
+
+// AddSlotEnd adds i to the "slot_end" field.
+func (pu *ProxyUpdate) AddSlotEnd(i int) *ProxyUpdate {
+	pu.mutation.AddSlotEnd(i)
 	return pu
 }
 
@@ -224,6 +280,11 @@ func (pu *ProxyUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Proxy.name": %w`, err)}
 		}
 	}
+	if v, ok := pu.mutation.Mode(); ok {
+		if err := proxy.ModeValidator(v); err != nil {
+			return &ValidationError{Name: "mode", err: fmt.Errorf(`ent: validator failed for field "Proxy.mode": %w`, err)}
+		}
+	}
 	if v, ok := pu.mutation.Protocol(); ok {
 		if err := proxy.ProtocolValidator(v); err != nil {
 			return &ValidationError{Name: "protocol", err: fmt.Errorf(`ent: validator failed for field "Proxy.protocol": %w`, err)}
@@ -232,6 +293,16 @@ func (pu *ProxyUpdate) check() error {
 	if v, ok := pu.mutation.Address(); ok {
 		if err := proxy.AddressValidator(v); err != nil {
 			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "Proxy.address": %w`, err)}
+		}
+	}
+	if v, ok := pu.mutation.SlotStart(); ok {
+		if err := proxy.SlotStartValidator(v); err != nil {
+			return &ValidationError{Name: "slot_start", err: fmt.Errorf(`ent: validator failed for field "Proxy.slot_start": %w`, err)}
+		}
+	}
+	if v, ok := pu.mutation.SlotEnd(); ok {
+		if err := proxy.SlotEndValidator(v); err != nil {
+			return &ValidationError{Name: "slot_end", err: fmt.Errorf(`ent: validator failed for field "Proxy.slot_end": %w`, err)}
 		}
 	}
 	if v, ok := pu.mutation.Status(); ok {
@@ -257,6 +328,9 @@ func (pu *ProxyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := pu.mutation.Name(); ok {
 		_spec.SetField(proxy.FieldName, field.TypeString, value)
 	}
+	if value, ok := pu.mutation.Mode(); ok {
+		_spec.SetField(proxy.FieldMode, field.TypeEnum, value)
+	}
 	if value, ok := pu.mutation.Protocol(); ok {
 		_spec.SetField(proxy.FieldProtocol, field.TypeEnum, value)
 	}
@@ -274,6 +348,18 @@ func (pu *ProxyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := pu.mutation.Password(); ok {
 		_spec.SetField(proxy.FieldPassword, field.TypeString, value)
+	}
+	if value, ok := pu.mutation.SlotStart(); ok {
+		_spec.SetField(proxy.FieldSlotStart, field.TypeInt, value)
+	}
+	if value, ok := pu.mutation.AddedSlotStart(); ok {
+		_spec.AddField(proxy.FieldSlotStart, field.TypeInt, value)
+	}
+	if value, ok := pu.mutation.SlotEnd(); ok {
+		_spec.SetField(proxy.FieldSlotEnd, field.TypeInt, value)
+	}
+	if value, ok := pu.mutation.AddedSlotEnd(); ok {
+		_spec.AddField(proxy.FieldSlotEnd, field.TypeInt, value)
 	}
 	if value, ok := pu.mutation.Status(); ok {
 		_spec.SetField(proxy.FieldStatus, field.TypeEnum, value)
@@ -360,6 +446,20 @@ func (puo *ProxyUpdateOne) SetNillableName(s *string) *ProxyUpdateOne {
 	return puo
 }
 
+// SetMode sets the "mode" field.
+func (puo *ProxyUpdateOne) SetMode(pr proxy.Mode) *ProxyUpdateOne {
+	puo.mutation.SetMode(pr)
+	return puo
+}
+
+// SetNillableMode sets the "mode" field if the given value is not nil.
+func (puo *ProxyUpdateOne) SetNillableMode(pr *proxy.Mode) *ProxyUpdateOne {
+	if pr != nil {
+		puo.SetMode(*pr)
+	}
+	return puo
+}
+
 // SetProtocol sets the "protocol" field.
 func (puo *ProxyUpdateOne) SetProtocol(pr proxy.Protocol) *ProxyUpdateOne {
 	puo.mutation.SetProtocol(pr)
@@ -434,6 +534,48 @@ func (puo *ProxyUpdateOne) SetNillablePassword(s *string) *ProxyUpdateOne {
 	if s != nil {
 		puo.SetPassword(*s)
 	}
+	return puo
+}
+
+// SetSlotStart sets the "slot_start" field.
+func (puo *ProxyUpdateOne) SetSlotStart(i int) *ProxyUpdateOne {
+	puo.mutation.ResetSlotStart()
+	puo.mutation.SetSlotStart(i)
+	return puo
+}
+
+// SetNillableSlotStart sets the "slot_start" field if the given value is not nil.
+func (puo *ProxyUpdateOne) SetNillableSlotStart(i *int) *ProxyUpdateOne {
+	if i != nil {
+		puo.SetSlotStart(*i)
+	}
+	return puo
+}
+
+// AddSlotStart adds i to the "slot_start" field.
+func (puo *ProxyUpdateOne) AddSlotStart(i int) *ProxyUpdateOne {
+	puo.mutation.AddSlotStart(i)
+	return puo
+}
+
+// SetSlotEnd sets the "slot_end" field.
+func (puo *ProxyUpdateOne) SetSlotEnd(i int) *ProxyUpdateOne {
+	puo.mutation.ResetSlotEnd()
+	puo.mutation.SetSlotEnd(i)
+	return puo
+}
+
+// SetNillableSlotEnd sets the "slot_end" field if the given value is not nil.
+func (puo *ProxyUpdateOne) SetNillableSlotEnd(i *int) *ProxyUpdateOne {
+	if i != nil {
+		puo.SetSlotEnd(*i)
+	}
+	return puo
+}
+
+// AddSlotEnd adds i to the "slot_end" field.
+func (puo *ProxyUpdateOne) AddSlotEnd(i int) *ProxyUpdateOne {
+	puo.mutation.AddSlotEnd(i)
 	return puo
 }
 
@@ -554,6 +696,11 @@ func (puo *ProxyUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Proxy.name": %w`, err)}
 		}
 	}
+	if v, ok := puo.mutation.Mode(); ok {
+		if err := proxy.ModeValidator(v); err != nil {
+			return &ValidationError{Name: "mode", err: fmt.Errorf(`ent: validator failed for field "Proxy.mode": %w`, err)}
+		}
+	}
 	if v, ok := puo.mutation.Protocol(); ok {
 		if err := proxy.ProtocolValidator(v); err != nil {
 			return &ValidationError{Name: "protocol", err: fmt.Errorf(`ent: validator failed for field "Proxy.protocol": %w`, err)}
@@ -562,6 +709,16 @@ func (puo *ProxyUpdateOne) check() error {
 	if v, ok := puo.mutation.Address(); ok {
 		if err := proxy.AddressValidator(v); err != nil {
 			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "Proxy.address": %w`, err)}
+		}
+	}
+	if v, ok := puo.mutation.SlotStart(); ok {
+		if err := proxy.SlotStartValidator(v); err != nil {
+			return &ValidationError{Name: "slot_start", err: fmt.Errorf(`ent: validator failed for field "Proxy.slot_start": %w`, err)}
+		}
+	}
+	if v, ok := puo.mutation.SlotEnd(); ok {
+		if err := proxy.SlotEndValidator(v); err != nil {
+			return &ValidationError{Name: "slot_end", err: fmt.Errorf(`ent: validator failed for field "Proxy.slot_end": %w`, err)}
 		}
 	}
 	if v, ok := puo.mutation.Status(); ok {
@@ -604,6 +761,9 @@ func (puo *ProxyUpdateOne) sqlSave(ctx context.Context) (_node *Proxy, err error
 	if value, ok := puo.mutation.Name(); ok {
 		_spec.SetField(proxy.FieldName, field.TypeString, value)
 	}
+	if value, ok := puo.mutation.Mode(); ok {
+		_spec.SetField(proxy.FieldMode, field.TypeEnum, value)
+	}
 	if value, ok := puo.mutation.Protocol(); ok {
 		_spec.SetField(proxy.FieldProtocol, field.TypeEnum, value)
 	}
@@ -621,6 +781,18 @@ func (puo *ProxyUpdateOne) sqlSave(ctx context.Context) (_node *Proxy, err error
 	}
 	if value, ok := puo.mutation.Password(); ok {
 		_spec.SetField(proxy.FieldPassword, field.TypeString, value)
+	}
+	if value, ok := puo.mutation.SlotStart(); ok {
+		_spec.SetField(proxy.FieldSlotStart, field.TypeInt, value)
+	}
+	if value, ok := puo.mutation.AddedSlotStart(); ok {
+		_spec.AddField(proxy.FieldSlotStart, field.TypeInt, value)
+	}
+	if value, ok := puo.mutation.SlotEnd(); ok {
+		_spec.SetField(proxy.FieldSlotEnd, field.TypeInt, value)
+	}
+	if value, ok := puo.mutation.AddedSlotEnd(); ok {
+		_spec.AddField(proxy.FieldSlotEnd, field.TypeInt, value)
 	}
 	if value, ok := puo.mutation.Status(); ok {
 		_spec.SetField(proxy.FieldStatus, field.TypeEnum, value)

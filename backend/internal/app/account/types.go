@@ -11,12 +11,15 @@ import (
 
 // Proxy 账号绑定的代理信息。
 type Proxy struct {
-	ID       int
-	Protocol string
-	Address  string
-	Port     int
-	Username string
-	Password string
+	ID        int
+	Mode      string
+	Protocol  string
+	Address   string
+	Port      int
+	Username  string
+	Password  string
+	SlotStart int
+	SlotEnd   int
 }
 
 // Account 账号领域对象。
@@ -47,6 +50,7 @@ type Account struct {
 	UsageEstimateMeta accountusage.EstimateMeta
 	DeletedAt         *time.Time
 	GroupIDs          []int64
+	ProxySlot         *int
 	Proxy             *Proxy
 	Extra             map[string]any
 	CreatedAt         time.Time
@@ -143,6 +147,8 @@ type CreateInput struct {
 	Priority                int
 	MaxConcurrency          int
 	ProxyID                 *int64
+	ProxyAssignment         string
+	ProxySlot               *int
 	RateMultiplier          *float64
 	ModelDowngradeThreshold float64
 	GroupIDs                []int64
@@ -171,6 +177,8 @@ type UpdateInput struct {
 	HasGroupIDs             bool
 	ProxyID                 *int64
 	HasProxyID              bool
+	ProxyAssignment         string
+	ProxySlot               *int
 	Extra                   map[string]any
 	HasExtra                bool
 }
@@ -198,6 +206,8 @@ type BulkUpdateInput struct {
 	HasGroupIDs             bool
 	ProxyID                 *int64
 	HasProxyID              bool
+	ProxyAssignment         string
+	ProxySlot               *int
 	Extra                   map[string]any
 	HasExtra                bool
 }

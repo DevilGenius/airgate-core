@@ -22,9 +22,11 @@ export type ImportPriority =
   };
 
 export interface ImportAssignment {
-  max_concurrency?: number;
-  priority?: ImportPriority;
-  group_ids?: number[];
+	max_concurrency?: number;
+	priority?: ImportPriority;
+	group_ids?: number[];
+	proxy_id?: number;
+	proxy_slot?: number | 'random';
   /** 模型降级阈值（0～1）：0 表示关闭，其它值表示开启。 */
   model_downgrade_threshold: number;
 }
@@ -47,6 +49,8 @@ const IMPORT_ASSIGNMENT_FIELDS = new Set([
   'max_concurrency',
   'priority',
   'group_ids',
+  'proxy_id',
+  'proxy_slot',
   'model_downgrade_threshold',
 ]);
 
@@ -169,6 +173,24 @@ function parseRule(value: unknown, ruleIndex: number): ImportRule {
       throw new Error(`rules[${ruleIndex}].set.group_ids contains duplicates`);
     }
     assignment.group_ids = groupIDs;
+  }
+  const hasProxyID = Object.prototype.hasOwnProperty.call(set, 'proxy_id');
+  const hasProxySlot = Object.prototype.hasOwnProperty.call(set, 'proxy_slot');
+  if (!hasProxyID && hasProxySlot) {
+    throw new Error(`rules[${ruleIndex}].set.proxy_slot requires proxy_id`);
+  }
+  if (hasProxyID) {
+    if (!Number.isSafeInteger(set.proxy_id) || Number(set.proxy_id) <= 0) {
+      throw new Error(`rules[${ruleIndex}].set.proxy_id is invalid`);
+    }
+    assignment.proxy_id = Number(set.proxy_id);
+  }
+  if (hasProxySlot) {
+    if (set.proxy_slot !== 'random'
+      && (!Number.isSafeInteger(set.proxy_slot) || Number(set.proxy_slot) < 0 || Number(set.proxy_slot) > 0xffff)) {
+      throw new Error(`rules[${ruleIndex}].set.proxy_slot is invalid`);
+    }
+    assignment.proxy_slot = set.proxy_slot === 'random' ? 'random' : Number(set.proxy_slot);
   }
   const hasModelDowngradeThreshold = Object.prototype.hasOwnProperty.call(set, 'model_downgrade_threshold');
   const threshold = set.model_downgrade_threshold;

@@ -16,7 +16,7 @@ import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
-import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import { ProxyBindingFields, resolveProxyBinding } from './ProxyBindingFields';
 import {
   MAX_RATE_MULTIPLIER,
   MIN_POSITIVE_RATE_MULTIPLIER,
@@ -114,6 +114,7 @@ export function BulkEditAccountModal({
   );
   const [groupIds, setGroupIds] = useState<number[]>(() => [...(initialGroupIds ?? [])]);
   const [proxyId, setProxyId] = useState<number | null>(null);
+  const [proxySlotInput, setProxySlotInput] = useState('random');
   const [messageLockEnabled, setMessageLockEnabled] = useState(false);
 
   const { data: groupsData } = useQuery({
@@ -159,12 +160,14 @@ export function BulkEditAccountModal({
     parseAccountPriorityOffsetInput(prioritySequenceGroupSizeInput),
   );
   const prioritySequenceValid = !enablePrioritySequence || prioritySequencePreview != null;
+  const proxies = proxiesData?.list ?? [];
+  const proxyBinding = resolveProxyBinding(proxies, proxyId, proxySlotInput);
   const canSubmit = hasAnyField
     && priorityOffsetValid
     && prioritySequenceValid
     && rateMultiplierValid
     && modelDowngradeThresholdValid
-    && (!enableProxy || proxyId != null);
+    && (!enableProxy || (proxyId != null && proxyBinding.valid));
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -192,7 +195,13 @@ export function BulkEditAccountModal({
       patch.model_downgrade_threshold = modelDowngradeThresholdEmpty ? null : modelDowngradeThresholdValue;
     }
     if (enableGroups) patch.group_ids = groupIds;
-    if (enableProxy && proxyId != null) patch.proxy_id = proxyId;
+    if (enableProxy && proxyId != null) {
+      patch.proxy_id = proxyId;
+      if (proxyBinding.assignment) {
+        patch.proxy_assignment = proxyBinding.assignment;
+        patch.proxy_slot = proxyBinding.slot;
+      }
+    }
     let extraPatch: Record<string, unknown> | undefined;
     if (enableMessageLock) {
       extraPatch = setAccountMessageLockEnabled(extraPatch, messageLockEnabled);
@@ -200,16 +209,10 @@ export function BulkEditAccountModal({
     if (extraPatch) patch.extra = extraPatch;
     onSubmit(patch);
   };
-  const proxyOptions = [
-    { id: '', label: t('accounts.select_proxy'), endpoint: '' },
-    ...(proxiesData?.list ?? []).map((p) => ({
-      id: String(p.id),
-      label: p.name,
-      endpoint: `${p.protocol}://${p.address}:${p.port}`,
-    })),
-  ];
-  const selectedProxyLabel =
-    proxyOptions.find((item) => item.id === (proxyId == null ? '' : String(proxyId)))?.label ?? t('accounts.select_proxy');
+  const handleProxyChange = (nextProxyID: number | null, proxy: typeof proxyBinding.proxy) => {
+    setProxyId(nextProxyID);
+    setProxySlotInput(proxy?.mode === 'group' ? 'random' : '');
+  };
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -532,6 +535,23 @@ export function BulkEditAccountModal({
           </HeroTextField>
         </FieldRow>
 
+        {/* 代理 */}
+        <FieldRow
+          enabled={enableProxy}
+          onToggle={setEnableProxy}
+          label={t('accounts.proxy')}
+        >
+          <ProxyBindingFields
+            disabled={!enableProxy}
+            emptyLabel={t('accounts.select_proxy')}
+            onProxyChange={handleProxyChange}
+            onSlotChange={setProxySlotInput}
+            proxies={proxies}
+            proxyId={proxyId}
+            slotInput={proxySlotInput}
+          />
+        </FieldRow>
+
         {/* 所属分组（直接替换） */}
         <FieldRow
           enabled={enableGroups}
@@ -567,26 +587,6 @@ export function BulkEditAccountModal({
           </div>
         </FieldRow>
 
-        {/* 代理 */}
-        <FieldRow
-          enabled={enableProxy}
-          onToggle={setEnableProxy}
-          label={t('accounts.proxy')}
-        >
-          <SimpleSelect
-            fullWidth
-            ariaLabel={t('accounts.proxy')}
-            items={proxyOptions.map((item) => ({
-              key: item.id,
-              label: item.label,
-              description: item.endpoint,
-            }))}
-            selectedKey={proxyId == null ? '' : String(proxyId)}
-            isDisabled={!enableProxy}
-            selectedLabel={<span className="block min-w-0 truncate">{selectedProxyLabel}</span>}
-            onSelectionChange={(key) => setProxyId(key === '' ? null : Number(key))}
-          />
-        </FieldRow>
       </Form>
     </CommonModal>
   );

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 )
 
 func intPtr(value int) *int { return &value }
@@ -72,6 +73,7 @@ func TestParseRejectsInvalidPriorityAndUnknownFields(t *testing.T) {
 		`{"version":1,"rules":[{"name":"bad","when":[],"set":{}}]}`,
 		`{"version":1,"rules":[{"name":"bad","when":[],"set":{"model_downgrade_threshold":0,"model_downgrade_threshold_enabled":true}}]}`,
 		`{"version":1,"rules":[{"name":"bad","when":[],"set":{"model_downgrade_threshold":null}}]}`,
+		`{"version":1,"rules":[{"name":"bad","when":[],"set":{"proxy_slot":"random","model_downgrade_threshold":0}}]}`,
 		`{"version":1,"rules":[],"unknown":true}`,
 		`{"version":2,"rules":[]}`,
 	} {
@@ -241,6 +243,7 @@ func TestParseAssignmentWithoutEnabledFields(t *testing.T) {
 		`"max_concurrency":99,` +
 		`"priority":{"mode":"fixed","value":8000},` +
 		`"group_ids":[2],` +
+		`"proxy_id":7,"proxy_slot":"random",` +
 		`"model_downgrade_threshold":0.8}}]}`)
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
@@ -249,8 +252,13 @@ func TestParseAssignmentWithoutEnabledFields(t *testing.T) {
 	if assignment.MaxConcurrency == nil || *assignment.MaxConcurrency != 99 ||
 		assignment.Priority == nil || assignment.Priority.Value == nil || *assignment.Priority.Value != 8000 ||
 		len(assignment.GroupIDs) != 1 || assignment.GroupIDs[0] != 2 ||
+		assignment.ProxyID == nil || *assignment.ProxyID != 7 || assignment.ProxySlot == nil || !assignment.ProxySlot.Random ||
 		assignment.ModelDowngradeThreshold != 0.8 {
 		t.Fatalf("assignment = %+v", assignment)
+	}
+	items, err := config.Apply([]appaccount.CreateInput{{Name: "proxy"}})
+	if err != nil || items[0].ProxyID == nil || *items[0].ProxyID != 7 || items[0].ProxyAssignment != appproxy.AssignmentRandom {
+		t.Fatalf("applied proxy assignment = %+v, err=%v", items[0], err)
 	}
 }
 
@@ -265,5 +273,18 @@ func TestApplyAlwaysSetsModelDowngradeThreshold(t *testing.T) {
 	}
 	if items[0].ModelDowngradeThreshold != 0.85 {
 		t.Fatalf("threshold = %v, want 0.85", items[0].ModelDowngradeThreshold)
+	}
+}
+
+func TestProxySlotNumericAssignment(t *testing.T) {
+	config, err := Parse(`{"version":1,"rules":[{"name":"proxy","when":[],"set":{` +
+		`"proxy_id":7,"proxy_slot":42,"model_downgrade_threshold":0}}]}`)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	items, err := config.Apply([]appaccount.CreateInput{{Name: "numeric"}})
+	if err != nil || items[0].ProxyID == nil || *items[0].ProxyID != 7 ||
+		items[0].ProxyAssignment != appproxy.AssignmentCustom || items[0].ProxySlot == nil || *items[0].ProxySlot != 42 {
+		t.Fatalf("numeric proxy assignment = %+v, err=%v", items[0], err)
 	}
 }

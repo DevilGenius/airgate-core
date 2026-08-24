@@ -11,7 +11,8 @@ import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import { ToolbarMenuItem } from '../../../shared/components/ToolbarMenu';
-import type { GroupResp } from '../../../shared/types';
+import type { GroupResp, ProxyResp } from '../../../shared/types';
+import { ProxyBindingFields, resolveProxyBinding } from './ProxyBindingFields';
 import {
   EMPTY_IMPORT_CONFIG,
   IMPORT_PRIORITY_MAX,
@@ -115,6 +116,7 @@ export function ImportConfigModal({
   open,
   dsl,
   groups,
+  proxies,
   loading,
   onClose,
   onSubmit,
@@ -122,6 +124,7 @@ export function ImportConfigModal({
   open: boolean;
   dsl: string;
   groups: GroupResp[];
+  proxies: ProxyResp[];
   loading: boolean;
   onClose: () => void;
   onSubmit: (dsl: string) => void;
@@ -133,6 +136,7 @@ export function ImportConfigModal({
   const [dslValue, setDSLValue] = useState(() => serializeImportConfigDSL(EMPTY_IMPORT_CONFIG));
   const [dslError, setDSLError] = useState('');
   const [modelDowngradeThresholdInput, setModelDowngradeThresholdInput] = useState('0');
+  const [proxySlotInput, setProxySlotInput] = useState('');
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [dropIndicator, setDropIndicator] = useState<{ index: number; position: 'before' | 'after' } | null>(null);
   const modalState = useOverlayState({
@@ -169,10 +173,19 @@ export function ImportConfigModal({
   const displayedPriority: ImportPriority = selectedRule?.set.priority ?? { mode: 'fixed', value: 50 };
   const modelDowngradeThresholdValue = parseModelDowngradeThresholdInput(modelDowngradeThresholdInput);
   const modelDowngradeThresholdValid = modelDowngradeThresholdValue != null;
+  const proxyID = selectedRule?.set.proxy_id ?? null;
+  const proxyBinding = resolveProxyBinding(proxies, proxyID, proxySlotInput);
   const configValidationError = useMemo(() => validateConfig(config), [config]);
-  const validationError = modelDowngradeThresholdValid
-    ? configValidationError
-    : t('accounts.model_downgrade_threshold_invalid');
+  const proxyAssignmentsValid = useMemo(() => config.rules.every((rule) => resolveProxyBinding(
+    proxies,
+    rule.set.proxy_id,
+    rule.set.proxy_slot == null ? '' : String(rule.set.proxy_slot),
+  ).valid), [config.rules, proxies]);
+  const validationError = !modelDowngradeThresholdValid
+    ? t('accounts.model_downgrade_threshold_invalid')
+    : !proxyBinding.valid || !proxyAssignmentsValid
+      ? t('accounts.proxy_slot_invalid')
+      : configValidationError;
   const selectedPlatform = selectedRule?.when.find(
     (condition) => condition.field === 'platform' && condition.op === 'eq',
   )?.value?.trim().toLowerCase();
@@ -189,6 +202,10 @@ export function ImportConfigModal({
     );
   }, [selectedRuleIndex, selectedRule?.set.model_downgrade_threshold]);
 
+  useEffect(() => {
+    setProxySlotInput(selectedRule?.set.proxy_slot == null ? '' : String(selectedRule.set.proxy_slot));
+  }, [selectedRuleIndex, selectedRule?.set.proxy_slot]);
+
   const updateSelectedRule = useCallback((updater: (rule: ImportRule) => void) => {
     setConfig((current) => {
       if (!current.rules[selectedRuleIndex]) return current;
@@ -197,6 +214,30 @@ export function ImportConfigModal({
       return next;
     });
   }, [selectedRuleIndex]);
+
+  const handleProxyChange = (nextProxyID: number | null, proxy: typeof proxyBinding.proxy) => {
+    const nextSlot = proxy?.mode === 'group' ? 'random' : '';
+    setProxySlotInput(nextSlot);
+    updateSelectedRule((rule) => {
+      if (nextProxyID == null) {
+        delete rule.set.proxy_id;
+        delete rule.set.proxy_slot;
+        return;
+      }
+      rule.set.proxy_id = nextProxyID;
+      if (proxy?.mode === 'group') rule.set.proxy_slot = 'random';
+      else delete rule.set.proxy_slot;
+    });
+  };
+
+  const handleProxySlotChange = (value: string) => {
+    setProxySlotInput(value);
+    const nextBinding = resolveProxyBinding(proxies, proxyID, value);
+    if (!nextBinding.valid || !nextBinding.assignment) return;
+    updateSelectedRule((rule) => {
+      rule.set.proxy_slot = nextBinding.assignment === 'random' ? 'random' : nextBinding.slot;
+    });
+  };
 
   const switchView = (nextView: 'form' | 'dsl') => {
     if (nextView === view) return;
@@ -745,6 +786,17 @@ export function ImportConfigModal({
                           </HeroTextField>
                         </div>
                       ) : null}
+                    </div>
+
+                    <div className="rounded-md border-t border-border bg-surface px-2.5 py-3">
+                      <ProxyBindingFields
+                        emptyLabel={t('accounts.no_proxy')}
+                        onProxyChange={handleProxyChange}
+                        onSlotChange={handleProxySlotChange}
+                        proxies={proxies}
+                        proxyId={proxyID}
+                        slotInput={proxySlotInput}
+                      />
                     </div>
 
                     <div className="space-y-2 rounded-md border-t border-border bg-surface px-2.5 py-3">

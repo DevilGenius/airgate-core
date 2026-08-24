@@ -828,14 +828,7 @@ func buildSDKAccount(account *ent.Account) *sdk.Account {
 }
 
 func buildProxyURL(account *ent.Account) string {
-	proxy, err := account.Edges.ProxyOrErr()
-	if err != nil || proxy == nil {
-		return ""
-	}
-	if proxy.Username != "" {
-		return fmt.Sprintf("%s://%s:%s@%s:%d", proxy.Protocol, proxy.Username, proxy.Password, proxy.Address, proxy.Port)
-	}
-	return fmt.Sprintf("%s://%s:%d", proxy.Protocol, proxy.Address, proxy.Port)
+	return buildProxyURLFromEnt(account)
 }
 
 // availablePlatforms 列出当前已加载的网关平台，用于 plugin_not_loaded_for_platform 日志诊断。

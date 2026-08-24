@@ -18,6 +18,8 @@ describe('importConfigDsl', () => {
             max_concurrency: 20,
             priority: { mode: 'sequence', initial: 1000, step: -10, group_size: 5, min: 900, max: 1000 },
             group_ids: [2],
+            proxy_id: 7,
+            proxy_slot: 'random',
             model_downgrade_threshold: 0.85,
           },
         },
@@ -29,6 +31,8 @@ describe('importConfigDsl', () => {
       max_concurrency: 20,
       priority: { mode: 'sequence', initial: 1000, step: -10, group_size: 5, min: 900, max: 1000 },
       group_ids: [2],
+      proxy_id: 7,
+      proxy_slot: 'random',
       model_downgrade_threshold: 0.85,
     });
     const priority = parsed.rules[0]?.set.priority;

@@ -17,6 +17,8 @@ const (
 	FieldID = "id"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
+	// FieldMode holds the string denoting the mode field in the database.
+	FieldMode = "mode"
 	// FieldProtocol holds the string denoting the protocol field in the database.
 	FieldProtocol = "protocol"
 	// FieldAddress holds the string denoting the address field in the database.
@@ -27,6 +29,10 @@ const (
 	FieldUsername = "username"
 	// FieldPassword holds the string denoting the password field in the database.
 	FieldPassword = "password"
+	// FieldSlotStart holds the string denoting the slot_start field in the database.
+	FieldSlotStart = "slot_start"
+	// FieldSlotEnd holds the string denoting the slot_end field in the database.
+	FieldSlotEnd = "slot_end"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -50,11 +56,14 @@ const (
 var Columns = []string{
 	FieldID,
 	FieldName,
+	FieldMode,
 	FieldProtocol,
 	FieldAddress,
 	FieldPort,
 	FieldUsername,
 	FieldPassword,
+	FieldSlotStart,
+	FieldSlotEnd,
 	FieldStatus,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -79,6 +88,14 @@ var (
 	DefaultUsername string
 	// DefaultPassword holds the default value on creation for the "password" field.
 	DefaultPassword string
+	// DefaultSlotStart holds the default value on creation for the "slot_start" field.
+	DefaultSlotStart int
+	// SlotStartValidator is a validator for the "slot_start" field. It is called by the builders before save.
+	SlotStartValidator func(int) error
+	// DefaultSlotEnd holds the default value on creation for the "slot_end" field.
+	DefaultSlotEnd int
+	// SlotEndValidator is a validator for the "slot_end" field. It is called by the builders before save.
+	SlotEndValidator func(int) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -86,6 +103,32 @@ var (
 	// UpdateDefaultUpdatedAt holds the default value on update for the "updated_at" field.
 	UpdateDefaultUpdatedAt func() time.Time
 )
+
+// Mode defines the type for the "mode" enum field.
+type Mode string
+
+// ModeSingle is the default value of the Mode enum.
+const DefaultMode = ModeSingle
+
+// Mode values.
+const (
+	ModeSingle Mode = "single"
+	ModeGroup  Mode = "group"
+)
+
+func (m Mode) String() string {
+	return string(m)
+}
+
+// ModeValidator is a validator for the "mode" field enum values. It is called by the builders before save.
+func ModeValidator(m Mode) error {
+	switch m {
+	case ModeSingle, ModeGroup:
+		return nil
+	default:
+		return fmt.Errorf("proxy: invalid enum value for mode field: %q", m)
+	}
+}
 
 // Protocol defines the type for the "protocol" enum field.
 type Protocol string
@@ -152,6 +195,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
 }
 
+// ByMode orders the results by the mode field.
+func ByMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMode, opts...).ToFunc()
+}
+
 // ByProtocol orders the results by the protocol field.
 func ByProtocol(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProtocol, opts...).ToFunc()
@@ -175,6 +223,16 @@ func ByUsername(opts ...sql.OrderTermOption) OrderOption {
 // ByPassword orders the results by the password field.
 func ByPassword(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPassword, opts...).ToFunc()
+}
+
+// BySlotStart orders the results by the slot_start field.
+func BySlotStart(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSlotStart, opts...).ToFunc()
+}
+
+// BySlotEnd orders the results by the slot_end field.
+func BySlotEnd(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSlotEnd, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

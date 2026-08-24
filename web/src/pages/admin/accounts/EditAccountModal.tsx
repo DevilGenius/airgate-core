@@ -30,7 +30,7 @@ import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
-import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import { ProxyBindingFields, resolveProxyBinding } from './ProxyBindingFields';
 import {
   MAX_RATE_MULTIPLIER,
   MIN_POSITIVE_RATE_MULTIPLIER,
@@ -89,6 +89,9 @@ export function EditAccountModal({
   const [credentials, setCredentials] = useState<Record<string, string>>(account.credentials);
   const [groupIds, setGroupIds] = useState<number[]>(account.group_ids ?? []);
   const [dispatchEnabled, setDispatchEnabled] = useState(initialDispatchEnabled);
+  const [proxySlotInput, setProxySlotInput] = useState(
+    account.proxy_slot == null ? '' : String(account.proxy_slot),
+  );
   const [priorityInput, setPriorityInput] = useState(String(account.priority ?? DEFAULT_ACCOUNT_PRIORITY));
   const [rateMultiplierInput, setRateMultiplierInput] = useState(String(account.rate_multiplier ?? 1));
   const [modelDowngradeThresholdInput, setModelDowngradeThresholdInput] = useState(
@@ -159,12 +162,17 @@ export function EditAccountModal({
     setCredentials((prev) => filterCredentialsForAccountType(prev, selectedType));
   };
 
+  const proxies = proxiesData?.list ?? [];
+  const proxyBinding = resolveProxyBinding(proxies, form.proxy_id, proxySlotInput);
+  const proxySlotInputValid = proxyBinding.valid;
+
   const handleSubmit = () => {
     const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
     const rateMultiplierValue = parseRateMultiplier(rateMultiplierInput);
     const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplierInput);
     if (!rateMultiplierEmpty && !isValidRateMultiplierValue(rateMultiplierValue)) return;
     if (!modelDowngradeThresholdValid) return;
+    if (!proxySlotInputValid) return;
     const rateMultiplier = rateMultiplierEmpty ? null : rateMultiplierValue;
     const merged = { ...credentials };
     const passwordKeys = new Set(
@@ -183,8 +191,15 @@ export function EditAccountModal({
 
     const identity = syncAccountIdentity(merged, form.email);
 
+    const proxyAssignmentPatch: Pick<UpdateAccountReq, 'proxy_assignment' | 'proxy_slot'> = {};
+    if (proxyBinding.assignment) {
+      proxyAssignmentPatch.proxy_assignment = proxyBinding.assignment;
+      proxyAssignmentPatch.proxy_slot = proxyBinding.slot;
+    }
+
     onSubmit({
       ...form,
+      ...proxyAssignmentPatch,
       email: identity.email,
       ...(nextState ? { state: nextState } : {}),
       priority,
@@ -211,16 +226,18 @@ export function EditAccountModal({
     setForm((prev) => ({ ...prev, priority }));
   };
 
-  const proxyOptions = [
-    { id: '', label: t('accounts.no_proxy') },
-    ...(proxiesData?.list ?? []).map((proxy) => ({
-      id: String(proxy.id),
-      label: `${proxy.name} (${proxy.protocol}://${proxy.address}:${proxy.port})`,
-    })),
-  ];
-  const selectedProxyLabel =
-    proxyOptions.find((item) => item.id === (form.proxy_id == null ? '' : String(form.proxy_id)))
-      ?.label ?? t('accounts.no_proxy');
+  const handleProxySelectionChange = (nextProxyID: number | null, nextProxy: typeof proxyBinding.proxy) => {
+    setForm((previous) => ({ ...previous, proxy_id: nextProxyID }));
+    if (nextProxy?.mode !== 'group') {
+      setProxySlotInput('');
+      return;
+    }
+    if (nextProxyID === account.proxy_id && account.proxy_slot != null) {
+      setProxySlotInput(String(account.proxy_slot));
+      return;
+    }
+    setProxySlotInput('random');
+  };
   const rateMultiplierValid =
     isEmptyRateMultiplierInput(rateMultiplierInput) ||
     isValidRateMultiplierValue(parseRateMultiplier(rateMultiplierInput));
@@ -256,7 +273,7 @@ export function EditAccountModal({
           <Button
             variant="primary"
             onPress={handleSubmit}
-            isDisabled={loading || !form.name || !rateMultiplierValid || !modelDowngradeThresholdValid}
+            isDisabled={loading || !form.name || !rateMultiplierValid || !modelDowngradeThresholdValid || !proxySlotInputValid}
             aria-busy={loading}
           >
             {t('common.save')}
@@ -387,22 +404,14 @@ export function EditAccountModal({
                   </div>
 
                   <div className="ag-edit-account-routing-row">
-                    <div className="min-w-0 space-y-1.5">
-                      <Label>{t('accounts.proxy')}</Label>
-                      <SimpleSelect
-                        ariaLabel={t('accounts.proxy')}
-                        fullWidth
-                        items={proxyOptions.map((item) => ({ key: item.id, label: item.label }))}
-                        selectedKey={form.proxy_id == null ? '' : String(form.proxy_id)}
-                        selectedLabel={selectedProxyLabel}
-                        onSelectionChange={(key) =>
-                          setForm({
-                            ...form,
-                            proxy_id: key ? Number(key) : null,
-                          })
-                        }
-                      />
-                    </div>
+                    <ProxyBindingFields
+                      emptyLabel={t('accounts.no_proxy')}
+                      onProxyChange={handleProxySelectionChange}
+                      onSlotChange={setProxySlotInput}
+                      proxies={proxies}
+                      proxyId={form.proxy_id}
+                      slotInput={proxySlotInput}
+                    />
 
                     <div className="ag-account-switch-row">
                       <NativeSwitch

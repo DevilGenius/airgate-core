@@ -52,6 +52,8 @@ const (
 	FieldUsageEstimateMeta = "usage_estimate_meta"
 	// FieldExtra holds the string denoting the extra field in the database.
 	FieldExtra = "extra"
+	// FieldProxySlot holds the string denoting the proxy_slot field in the database.
+	FieldProxySlot = "proxy_slot"
 	// FieldDeletedAt holds the string denoting the deleted_at field in the database.
 	FieldDeletedAt = "deleted_at"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -108,6 +110,7 @@ var Columns = []string{
 	FieldLastProbeAt,
 	FieldUsageEstimateMeta,
 	FieldExtra,
+	FieldProxySlot,
 	FieldDeletedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -171,6 +174,8 @@ var (
 	DefaultUsageEstimateMeta accountusage.EstimateMeta
 	// DefaultExtra holds the default value on creation for the "extra" field.
 	DefaultExtra map[string]interface{}
+	// ProxySlotValidator is a validator for the "proxy_slot" field. It is called by the builders before save.
+	ProxySlotValidator func(int) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -283,6 +288,11 @@ func ByLastUsedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByLastProbeAt orders the results by the last_probe_at field.
 func ByLastProbeAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastProbeAt, opts...).ToFunc()
+}
+
+// ByProxySlot orders the results by the proxy_slot field.
+func ByProxySlot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProxySlot, opts...).ToFunc()
 }
 
 // ByDeletedAt orders the results by the deleted_at field.

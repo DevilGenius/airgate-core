@@ -14,11 +14,14 @@ type Proxy struct {
 func (Proxy) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
+		field.Enum("mode").Values("single", "group").Default("single"),
 		field.Enum("protocol").Values("http", "socks5").Default("http"),
 		field.String("address").NotEmpty(),
 		field.Int("port"),
 		field.String("username").Default(""),
 		field.String("password").Default("").Sensitive(),
+		field.Int("slot_start").Default(0).Min(0).Max(65535),
+		field.Int("slot_end").Default(0).Min(0).Max(65535),
 		field.Enum("status").Values("active", "disabled").Default("active"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),

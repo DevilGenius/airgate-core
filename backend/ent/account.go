@@ -57,6 +57,8 @@ type Account struct {
 	UsageEstimateMeta accountusage.EstimateMeta `json:"usage_estimate_meta,omitempty"`
 	// 扩展配置（max_rpm / max_window_cost / max_sessions 等）
 	Extra map[string]interface{} `json:"extra,omitempty"`
+	// 代理组内固定的十六进制 slot；单代理或未绑定代理时为空
+	ProxySlot *int `json:"proxy_slot,omitempty"`
 	// 软删除时间；非空账号不再参与管理和调度，历史 usage log 关联保留
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -123,7 +125,7 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case account.FieldRateMultiplier, account.FieldModelDowngradeThreshold:
 			values[i] = new(sql.NullFloat64)
-		case account.FieldID, account.FieldPriority, account.FieldMaxConcurrency:
+		case account.FieldID, account.FieldPriority, account.FieldMaxConcurrency, account.FieldProxySlot:
 			values[i] = new(sql.NullInt64)
 		case account.FieldName, account.FieldEmail, account.FieldPlatform, account.FieldType, account.FieldState, account.FieldErrorMsg:
 			values[i] = new(sql.NullString)
@@ -272,6 +274,13 @@ func (a *Account) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field extra: %w", err)
 				}
 			}
+		case account.FieldProxySlot:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field proxy_slot", values[i])
+			} else if value.Valid {
+				a.ProxySlot = new(int)
+				*a.ProxySlot = int(value.Int64)
+			}
 		case account.FieldDeletedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field deleted_at", values[i])
@@ -410,6 +419,11 @@ func (a *Account) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("extra=")
 	builder.WriteString(fmt.Sprintf("%v", a.Extra))
+	builder.WriteString(", ")
+	if v := a.ProxySlot; v != nil {
+		builder.WriteString("proxy_slot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := a.DeletedAt; v != nil {
 		builder.WriteString("deleted_at=")

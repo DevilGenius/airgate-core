@@ -12,6 +12,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 )
 
 const (
@@ -44,9 +45,11 @@ type Condition struct {
 }
 
 type Assignment struct {
-	MaxConcurrency *int                `json:"max_concurrency,omitempty"`
-	Priority       *PriorityAssignment `json:"priority,omitempty"`
-	GroupIDs       []int64             `json:"group_ids,omitempty"`
+	MaxConcurrency *int                 `json:"max_concurrency,omitempty"`
+	Priority       *PriorityAssignment  `json:"priority,omitempty"`
+	GroupIDs       []int64              `json:"group_ids,omitempty"`
+	ProxyID        *int64               `json:"proxy_id,omitempty"`
+	ProxySlot      *ProxySlotAssignment `json:"proxy_slot,omitempty"`
 	// 模型降级阈值始终应用：0 表示关闭，0～1 之间的其它值表示开启。
 	ModelDowngradeThreshold float64 `json:"model_downgrade_threshold"`
 }
@@ -55,10 +58,12 @@ type Assignment struct {
 // preserving value semantics in the runtime Assignment type.
 func (a *Assignment) UnmarshalJSON(data []byte) error {
 	type assignmentWire struct {
-		MaxConcurrency          *int                `json:"max_concurrency,omitempty"`
-		Priority                *PriorityAssignment `json:"priority,omitempty"`
-		GroupIDs                []int64             `json:"group_ids,omitempty"`
-		ModelDowngradeThreshold *float64            `json:"model_downgrade_threshold"`
+		MaxConcurrency          *int                 `json:"max_concurrency,omitempty"`
+		Priority                *PriorityAssignment  `json:"priority,omitempty"`
+		GroupIDs                []int64              `json:"group_ids,omitempty"`
+		ProxyID                 *int64               `json:"proxy_id,omitempty"`
+		ProxySlot               *ProxySlotAssignment `json:"proxy_slot,omitempty"`
+		ModelDowngradeThreshold *float64             `json:"model_downgrade_threshold"`
 	}
 	var wire assignmentWire
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -73,9 +78,45 @@ func (a *Assignment) UnmarshalJSON(data []byte) error {
 		MaxConcurrency:          wire.MaxConcurrency,
 		Priority:                wire.Priority,
 		GroupIDs:                wire.GroupIDs,
+		ProxyID:                 wire.ProxyID,
+		ProxySlot:               wire.ProxySlot,
 		ModelDowngradeThreshold: *wire.ModelDowngradeThreshold,
 	}
 	return nil
+}
+
+type ProxySlotAssignment struct {
+	Random bool
+	Value  *int
+}
+
+func (p *ProxySlotAssignment) UnmarshalJSON(data []byte) error {
+	var random string
+	if err := json.Unmarshal(data, &random); err == nil {
+		if strings.EqualFold(strings.TrimSpace(random), appproxy.AssignmentRandom) {
+			p.Random = true
+			p.Value = nil
+			return nil
+		}
+		return errors.New("proxy_slot 字符串只能是 random")
+	}
+	var value int
+	if err := json.Unmarshal(data, &value); err != nil || value < 0 || value > appproxy.MaxSlot {
+		return errors.New("proxy_slot 必须是 random 或 0～65535 的整数")
+	}
+	p.Random = false
+	p.Value = &value
+	return nil
+}
+
+func (p ProxySlotAssignment) MarshalJSON() ([]byte, error) {
+	if p.Random {
+		return json.Marshal(appproxy.AssignmentRandom)
+	}
+	if p.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(*p.Value)
 }
 
 type PriorityAssignment struct {
@@ -161,6 +202,15 @@ func validateRule(index int, rule Rule) error {
 			return fmt.Errorf("%s 的 group_ids 包含重复值 %d", label, groupID)
 		}
 		seenGroups[groupID] = struct{}{}
+	}
+	if rule.Set.ProxyID == nil && rule.Set.ProxySlot != nil {
+		return fmt.Errorf("%s 设置 proxy_slot 时必须同时设置 proxy_id", label)
+	}
+	if rule.Set.ProxyID != nil && *rule.Set.ProxyID <= 0 {
+		return fmt.Errorf("%s 的 proxy_id 必须是正整数", label)
+	}
+	if rule.Set.ProxySlot != nil && !rule.Set.ProxySlot.Random && rule.Set.ProxySlot.Value == nil {
+		return fmt.Errorf("%s 的 proxy_slot 无效", label)
 	}
 	return nil
 }
@@ -396,6 +446,20 @@ func applyAssignment(
 	}
 	if assignment.GroupIDs != nil {
 		item.GroupIDs = append([]int64(nil), assignment.GroupIDs...)
+	}
+	if assignment.ProxyID != nil {
+		proxyID := *assignment.ProxyID
+		item.ProxyID = &proxyID
+	}
+	if assignment.ProxySlot != nil {
+		if assignment.ProxySlot.Random {
+			item.ProxyAssignment = appproxy.AssignmentRandom
+			item.ProxySlot = nil
+		} else {
+			item.ProxyAssignment = appproxy.AssignmentCustom
+			slot := *assignment.ProxySlot.Value
+			item.ProxySlot = &slot
+		}
 	}
 	item.ModelDowngradeThreshold = assignment.ModelDowngradeThreshold
 	return nil

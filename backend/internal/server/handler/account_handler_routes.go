@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 	"github.com/DevilGenius/airgate-core/internal/server/response"
@@ -245,6 +246,20 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 			input.ProxyID = req.ProxyID
 		}
 	}
+	if req.ProxyAssignment != "" {
+		if !input.HasProxyID || input.ProxyID == nil {
+			response.BadRequest(c, "代理用户名分配需要绑定代理组")
+			return
+		}
+		input.ProxyAssignment = req.ProxyAssignment
+		if req.ProxyAssignment == appproxy.AssignmentCustom {
+			if req.ProxySlot == nil {
+				response.BadRequest(c, "自定义代理必须填写纯数字 slot 编号")
+				return
+			}
+			input.ProxySlot = req.ProxySlot
+		}
+	}
 
 	item, err := h.service.Update(c.Request.Context(), id, input)
 	if err != nil {
@@ -307,6 +322,8 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		HasGroupIDs:             req.GroupIDs != nil,
 		ProxyID:                 req.ProxyID,
 		HasProxyID:              req.ProxyID != nil,
+		ProxyAssignment:         req.ProxyAssignment,
+		ProxySlot:               req.ProxySlot,
 		Extra:                   req.Extra,
 		HasExtra:                req.Extra != nil,
 	})

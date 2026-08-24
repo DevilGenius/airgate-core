@@ -107,6 +107,13 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 
 // Create 创建代理。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Proxy, error) {
+	input.Mode = NormalizeMode(input.Mode)
+	if err := ValidateConfig(input.Mode, input.SlotStart, input.SlotEnd); err != nil {
+		return Proxy{}, err
+	}
+	if input.Mode == ModeSingle {
+		input.SlotStart, input.SlotEnd = 0, 0
+	}
 	logger := sdk.LoggerFromContext(ctx)
 	p, err := s.repo.Create(ctx, input)
 	if err != nil {
@@ -166,6 +173,10 @@ func (s *Service) Test(ctx context.Context, id int) (TestResult, error) {
 			sdk.LogFieldError, err)
 		return TestResult{}, err
 	}
+	item, err = resolveProbeProxy(item)
+	if err != nil {
+		return TestResult{Success: false, ErrorMsg: err.Error()}, nil
+	}
 	result := s.prober.ProbeConnectivity(ctx, item)
 	if !result.Success {
 		logger.Warn("proxy_test_failed",
@@ -189,6 +200,10 @@ func (s *Service) LookupIP(ctx context.Context, id int) (TestResult, error) {
 		return TestResult{}, err
 	}
 
+	item, err = resolveProbeProxy(item)
+	if err != nil {
+		return TestResult{Success: false, ErrorMsg: err.Error()}, nil
+	}
 	result := s.prober.LookupIP(ctx, item)
 	if !result.Success {
 		logger.Info("proxy_ip_lookup_unavailable",
@@ -198,6 +213,19 @@ func (s *Service) LookupIP(ctx context.Context, id int) (TestResult, error) {
 			sdk.LogFieldReason, result.ErrorMsg)
 	}
 	return result, nil
+}
+
+func resolveProbeProxy(item Proxy) (Proxy, error) {
+	if NormalizeMode(item.Mode) != ModeGroup {
+		return item, nil
+	}
+	slot := item.SlotStart
+	username, err := item.UsernameForSlot(&slot)
+	if err != nil {
+		return Proxy{}, err
+	}
+	item.Username = username
+	return item, nil
 }
 
 // DefaultProber 是默认代理探测器。

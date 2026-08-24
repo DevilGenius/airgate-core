@@ -345,6 +345,33 @@ func (au *AccountUpdate) ClearExtra() *AccountUpdate {
 	return au
 }
 
+// SetProxySlot sets the "proxy_slot" field.
+func (au *AccountUpdate) SetProxySlot(i int) *AccountUpdate {
+	au.mutation.ResetProxySlot()
+	au.mutation.SetProxySlot(i)
+	return au
+}
+
+// SetNillableProxySlot sets the "proxy_slot" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableProxySlot(i *int) *AccountUpdate {
+	if i != nil {
+		au.SetProxySlot(*i)
+	}
+	return au
+}
+
+// AddProxySlot adds i to the "proxy_slot" field.
+func (au *AccountUpdate) AddProxySlot(i int) *AccountUpdate {
+	au.mutation.AddProxySlot(i)
+	return au
+}
+
+// ClearProxySlot clears the value of the "proxy_slot" field.
+func (au *AccountUpdate) ClearProxySlot() *AccountUpdate {
+	au.mutation.ClearProxySlot()
+	return au
+}
+
 // SetDeletedAt sets the "deleted_at" field.
 func (au *AccountUpdate) SetDeletedAt(t time.Time) *AccountUpdate {
 	au.mutation.SetDeletedAt(t)
@@ -541,6 +568,11 @@ func (au *AccountUpdate) check() error {
 			return &ValidationError{Name: "model_downgrade_threshold", err: fmt.Errorf(`ent: validator failed for field "Account.model_downgrade_threshold": %w`, err)}
 		}
 	}
+	if v, ok := au.mutation.ProxySlot(); ok {
+		if err := account.ProxySlotValidator(v); err != nil {
+			return &ValidationError{Name: "proxy_slot", err: fmt.Errorf(`ent: validator failed for field "Account.proxy_slot": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -645,6 +677,15 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if au.mutation.ExtraCleared() {
 		_spec.ClearField(account.FieldExtra, field.TypeJSON)
+	}
+	if value, ok := au.mutation.ProxySlot(); ok {
+		_spec.SetField(account.FieldProxySlot, field.TypeInt, value)
+	}
+	if value, ok := au.mutation.AddedProxySlot(); ok {
+		_spec.AddField(account.FieldProxySlot, field.TypeInt, value)
+	}
+	if au.mutation.ProxySlotCleared() {
+		_spec.ClearField(account.FieldProxySlot, field.TypeInt)
 	}
 	if value, ok := au.mutation.DeletedAt(); ok {
 		_spec.SetField(account.FieldDeletedAt, field.TypeTime, value)
@@ -1106,6 +1147,33 @@ func (auo *AccountUpdateOne) ClearExtra() *AccountUpdateOne {
 	return auo
 }
 
+// SetProxySlot sets the "proxy_slot" field.
+func (auo *AccountUpdateOne) SetProxySlot(i int) *AccountUpdateOne {
+	auo.mutation.ResetProxySlot()
+	auo.mutation.SetProxySlot(i)
+	return auo
+}
+
+// SetNillableProxySlot sets the "proxy_slot" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableProxySlot(i *int) *AccountUpdateOne {
+	if i != nil {
+		auo.SetProxySlot(*i)
+	}
+	return auo
+}
+
+// AddProxySlot adds i to the "proxy_slot" field.
+func (auo *AccountUpdateOne) AddProxySlot(i int) *AccountUpdateOne {
+	auo.mutation.AddProxySlot(i)
+	return auo
+}
+
+// ClearProxySlot clears the value of the "proxy_slot" field.
+func (auo *AccountUpdateOne) ClearProxySlot() *AccountUpdateOne {
+	auo.mutation.ClearProxySlot()
+	return auo
+}
+
 // SetDeletedAt sets the "deleted_at" field.
 func (auo *AccountUpdateOne) SetDeletedAt(t time.Time) *AccountUpdateOne {
 	auo.mutation.SetDeletedAt(t)
@@ -1315,6 +1383,11 @@ func (auo *AccountUpdateOne) check() error {
 			return &ValidationError{Name: "model_downgrade_threshold", err: fmt.Errorf(`ent: validator failed for field "Account.model_downgrade_threshold": %w`, err)}
 		}
 	}
+	if v, ok := auo.mutation.ProxySlot(); ok {
+		if err := account.ProxySlotValidator(v); err != nil {
+			return &ValidationError{Name: "proxy_slot", err: fmt.Errorf(`ent: validator failed for field "Account.proxy_slot": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -1436,6 +1509,15 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if auo.mutation.ExtraCleared() {
 		_spec.ClearField(account.FieldExtra, field.TypeJSON)
+	}
+	if value, ok := auo.mutation.ProxySlot(); ok {
+		_spec.SetField(account.FieldProxySlot, field.TypeInt, value)
+	}
+	if value, ok := auo.mutation.AddedProxySlot(); ok {
+		_spec.AddField(account.FieldProxySlot, field.TypeInt, value)
+	}
+	if auo.mutation.ProxySlotCleared() {
+		_spec.ClearField(account.FieldProxySlot, field.TypeInt)
 	}
 	if value, ok := auo.mutation.DeletedAt(); ok {
 		_spec.SetField(account.FieldDeletedAt, field.TypeTime, value)

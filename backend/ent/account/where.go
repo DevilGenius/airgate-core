@@ -120,6 +120,11 @@ func LastProbeAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldLastProbeAt, v))
 }
 
+// ProxySlot applies equality check predicate on the "proxy_slot" field. It's identical to ProxySlotEQ.
+func ProxySlot(v int) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldProxySlot, v))
+}
+
 // DeletedAt applies equality check predicate on the "deleted_at" field. It's identical to DeletedAtEQ.
 func DeletedAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldDeletedAt, v))
@@ -848,6 +853,56 @@ func ExtraIsNil() predicate.Account {
 // ExtraNotNil applies the NotNil predicate on the "extra" field.
 func ExtraNotNil() predicate.Account {
 	return predicate.Account(sql.FieldNotNull(FieldExtra))
+}
+
+// ProxySlotEQ applies the EQ predicate on the "proxy_slot" field.
+func ProxySlotEQ(v int) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldProxySlot, v))
+}
+
+// ProxySlotNEQ applies the NEQ predicate on the "proxy_slot" field.
+func ProxySlotNEQ(v int) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldProxySlot, v))
+}
+
+// ProxySlotIn applies the In predicate on the "proxy_slot" field.
+func ProxySlotIn(vs ...int) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldProxySlot, vs...))
+}
+
+// ProxySlotNotIn applies the NotIn predicate on the "proxy_slot" field.
+func ProxySlotNotIn(vs ...int) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldProxySlot, vs...))
+}
+
+// ProxySlotGT applies the GT predicate on the "proxy_slot" field.
+func ProxySlotGT(v int) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldProxySlot, v))
+}
+
+// ProxySlotGTE applies the GTE predicate on the "proxy_slot" field.
+func ProxySlotGTE(v int) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldProxySlot, v))
+}
+
+// ProxySlotLT applies the LT predicate on the "proxy_slot" field.
+func ProxySlotLT(v int) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldProxySlot, v))
+}
+
+// ProxySlotLTE applies the LTE predicate on the "proxy_slot" field.
+func ProxySlotLTE(v int) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldProxySlot, v))
+}
+
+// ProxySlotIsNil applies the IsNil predicate on the "proxy_slot" field.
+func ProxySlotIsNil() predicate.Account {
+	return predicate.Account(sql.FieldIsNull(FieldProxySlot))
+}
+
+// ProxySlotNotNil applies the NotNil predicate on the "proxy_slot" field.
+func ProxySlotNotNil() predicate.Account {
+	return predicate.Account(sql.FieldNotNull(FieldProxySlot))
 }
 
 // DeletedAtEQ applies the EQ predicate on the "deleted_at" field.

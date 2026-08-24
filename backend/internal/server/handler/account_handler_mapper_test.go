@@ -18,6 +18,7 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 	stateUntil := time.Date(2026, 6, 20, 9, 2, 3, 0, time.FixedZone("cst", 8*3600))
 	deletedAt := time.Date(2026, 6, 21, 9, 2, 3, 0, time.FixedZone("cst", 8*3600))
 	email := "oauth@example.com"
+	proxySlot := 0x2a
 	resp := toAccountResp(appaccount.Account{
 		ID:                 9,
 		Name:               "oauth",
@@ -40,7 +41,8 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 			SevenDay: accountusage.WindowEstimate{GrowthDate: "2026-06-20", DailyGrowth: 16, ObservedAt: &lastProbe},
 		},
 		DeletedAt:  &deletedAt,
-		Proxy:      &appaccount.Proxy{ID: 7},
+		ProxySlot:  &proxySlot,
+		Proxy:      &appaccount.Proxy{ID: 7, Username: "002a"},
 		Extra:      map[string]any{"plan": "plus"},
 		ImageStats: &appaccount.AccountImageStats{TodayCount: 5, TotalCount: 8},
 		CreatedAt:  lastUsed,
@@ -48,6 +50,9 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 	})
 	if resp.ID != 9 || resp.Email == nil || *resp.Email != email || resp.ProxyID == nil || *resp.ProxyID != 7 || resp.LastUsedAt == nil || *resp.LastUsedAt != "2026-06-20T01:02:03Z" || resp.LastProbeAt == nil || *resp.LastProbeAt != "2026-06-20T02:03:04Z" {
 		t.Fatalf("account response optional fields = %+v", resp)
+	}
+	if resp.ProxySlot == nil || *resp.ProxySlot != proxySlot || resp.ProxyUsername != "002a" {
+		t.Fatalf("account proxy slot = %+v/%q", resp.ProxySlot, resp.ProxyUsername)
 	}
 	if resp.StateUntil == nil || *resp.StateUntil != "2026-06-20T01:02:03Z" {
 		t.Fatalf("state until = %#v, want UTC formatted", resp.StateUntil)

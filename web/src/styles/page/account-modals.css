@@ -238,7 +238,8 @@
 
 .ag-elevation-modal.ag-create-account-modal.ag-edit-account-modal,
 .ag-elevation-modal.modal__dialog--lg.ag-create-account-modal.ag-edit-account-modal {
-  max-height: min(98dvh, 80rem);
+  --ag-modal-max-height: min(96dvh, calc(86dvh + 2.5rem));
+  --ag-modal-max-height-cap: 64.5rem;
 }
 
 .ag-create-account-modal .modal__body {
@@ -274,6 +275,13 @@
 }
 
 .ag-edit-account-routing-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.ag-account-proxy-binding-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;

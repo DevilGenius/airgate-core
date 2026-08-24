@@ -19,6 +19,7 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
@@ -415,6 +416,9 @@ func intersectAccountIDs(left []int, right []int) []int {
 // Create 创建账号。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error) {
 	logger := sdk.LoggerFromContext(ctx)
+	if err := validateProxySlotAssignment(input.ProxyID != nil, input.ProxyID, input.ProxyAssignment, input.ProxySlot); err != nil {
+		return Account{}, err
+	}
 	rateMultiplier, err := normalizeCreateRateMultiplier(input.RateMultiplier)
 	if err != nil {
 		return Account{}, err
@@ -481,7 +485,7 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary
 }
 
 // ImportConfigured 批量导入已由 Core 导入 DSL 生成的账号。
-// GroupIDs 只来自服务端保存并校验过的 DSL，因此允许写入；普通文件导入仍使用 Import，
+// 分组和代理绑定只来自服务端保存并校验过的 DSL，因此允许写入；普通文件导入仍使用 Import，
 // 继续清空跨环境的分组和代理引用。
 func (s *Service) ImportConfigured(ctx context.Context, items []CreateInput) ImportSummary {
 	return s.importAccounts(ctx, items, true)
@@ -503,10 +507,10 @@ func (s *Service) ValidateConfiguredImport(_ context.Context, items []CreateInpu
 	return errors
 }
 
-func (s *Service) importAccounts(ctx context.Context, items []CreateInput, preserveGroupIDs bool) ImportSummary {
+func (s *Service) importAccounts(ctx context.Context, items []CreateInput, preserveAssignments bool) ImportSummary {
 	summary := ImportSummary{}
 	for index, input := range items {
-		prepared, err := prepareImportAccount(input, preserveGroupIDs)
+		prepared, err := prepareImportAccount(input, preserveAssignments)
 		if err != nil {
 			summary.Failed++
 			summary.Errors = append(summary.Errors, ImportItemError{
@@ -535,7 +539,7 @@ func (s *Service) importAccounts(ctx context.Context, items []CreateInput, prese
 	return summary
 }
 
-func prepareImportAccount(input CreateInput, preserveGroupIDs bool) (CreateInput, error) {
+func prepareImportAccount(input CreateInput, preserveAssignments bool) (CreateInput, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Platform = strings.ToLower(strings.TrimSpace(input.Platform))
 	input.Type = strings.ToLower(strings.TrimSpace(input.Type))
@@ -573,10 +577,15 @@ func prepareImportAccount(input CreateInput, preserveGroupIDs bool) (CreateInput
 	if err != nil {
 		return CreateInput{}, err
 	}
-	if !preserveGroupIDs {
+	if !preserveAssignments {
 		input.GroupIDs = nil
+		input.ProxyID = nil
+		input.ProxyAssignment = ""
+		input.ProxySlot = nil
 	}
-	input.ProxyID = nil
+	if err := validateProxySlotAssignment(input.ProxyID != nil, input.ProxyID, input.ProxyAssignment, input.ProxySlot); err != nil {
+		return CreateInput{}, err
+	}
 	input.Extra = stripDeprecatedAccountExtra(input.Extra)
 	return input, nil
 }
@@ -584,6 +593,9 @@ func prepareImportAccount(input CreateInput, preserveGroupIDs bool) (CreateInput
 // Update 更新账号。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Account, error) {
 	logger := sdk.LoggerFromContext(ctx)
+	if err := validateProxySlotAssignment(input.HasProxyID, input.ProxyID, input.ProxyAssignment, input.ProxySlot); err != nil {
+		return Account{}, err
+	}
 	if input.HasEmail || input.Credentials != nil {
 		current, err := s.repo.FindByID(ctx, id, LoadOptions{})
 		if err != nil {
@@ -760,6 +772,12 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 		}
 		input.ModelPolicy = &policy
 	}
+	if err := validateProxySlotAssignment(input.HasProxyID, input.ProxyID, input.ProxyAssignment, input.ProxySlot); err != nil {
+		for _, id := range input.IDs {
+			result.appendFailure(id, err)
+		}
+		return result
+	}
 	mutated := false
 	for index, id := range input.IDs {
 		priority := input.Priority
@@ -773,6 +791,8 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			RateMultiplier:          input.RateMultiplier,
 			ModelDowngradeThreshold: input.ModelDowngradeThreshold,
 			ModelPolicy:             input.ModelPolicy,
+			ProxyAssignment:         input.ProxyAssignment,
+			ProxySlot:               input.ProxySlot,
 		}
 		var existing *Account
 		needsExisting := input.HasExtra || (input.PriorityOffset != nil && *input.PriorityOffset != 0)
@@ -940,6 +960,7 @@ func hasUpdateInputChanges(input UpdateInput) bool {
 		input.UpstreamIsPool != nil ||
 		input.HasGroupIDs ||
 		input.HasProxyID ||
+		input.ProxyAssignment != "" ||
 		input.HasExtra
 }
 
@@ -973,6 +994,26 @@ func validateModelPolicy(policy modelpolicy.Policy) error {
 		return errors.Join(ErrInvalidModelPolicy, err)
 	}
 	return nil
+}
+
+func validateProxySlotAssignment(hasProxyID bool, proxyID *int64, assignment string, slot *int) error {
+	if assignment == "" {
+		return nil
+	}
+	if !hasProxyID || proxyID == nil {
+		return appproxy.ErrProxyAssignmentRequiresGroup
+	}
+	switch assignment {
+	case appproxy.AssignmentRandom:
+		return nil
+	case appproxy.AssignmentCustom:
+		if slot == nil || *slot < 0 || *slot > appproxy.MaxSlot {
+			return appproxy.ErrInvalidProxySlotRange
+		}
+		return nil
+	default:
+		return appproxy.ErrInvalidProxySlotRange
+	}
 }
 
 func mergeAnyMap(base, patch map[string]any) map[string]any {

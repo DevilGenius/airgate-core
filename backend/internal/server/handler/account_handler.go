@@ -11,6 +11,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/internal/accountimportdsl"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
@@ -218,6 +219,11 @@ func (h *AccountHandler) handleError(logMessage, publicMessage string, err error
 		return 404, err.Error()
 	case errors.Is(err, appaccount.ErrAccountEmailExists):
 		return 409, err.Error()
+	case errors.Is(err, appproxy.ErrProxyNotFound):
+		return 400, err.Error()
+	case errors.Is(err, appproxy.ErrInvalidProxySlotRange),
+		errors.Is(err, appproxy.ErrProxyAssignmentRequiresGroup):
+		return 400, err.Error()
 	case errors.Is(err, appaccount.ErrPluginNotFound):
 		return 500, err.Error()
 	case errors.Is(err, appaccount.ErrReauthRequired):

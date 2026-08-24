@@ -45,6 +45,8 @@ type AccountResp struct {
 	MaxConcurrency          int                 `json:"max_concurrency"`
 	CurrentConcurrency      int                 `json:"current_concurrency"`
 	ProxyID                 *int64              `json:"proxy_id,omitempty"`
+	ProxySlot               *int                `json:"proxy_slot,omitempty"`
+	ProxyUsername           string              `json:"proxy_username,omitempty"`
 	RateMultiplier          float64             `json:"rate_multiplier"`
 	ModelDowngradeThreshold float64             `json:"model_downgrade_threshold"`
 	ErrorMsg                string              `json:"error_msg,omitempty"`
@@ -98,6 +100,8 @@ type UpdateAccountReq struct {
 	Priority                *int                `json:"priority"`
 	MaxConcurrency          *int                `json:"max_concurrency"`
 	ProxyID                 *int64              `json:"proxy_id"`
+	ProxyAssignment         string              `json:"proxy_assignment" binding:"omitempty,oneof=random custom"`
+	ProxySlot               *int                `json:"proxy_slot" binding:"omitempty,gte=0,lte=65535"`
 	RateMultiplier          OptionalFloat       `json:"rate_multiplier"`
 	ModelDowngradeThreshold *float64            `json:"model_downgrade_threshold"`
 	UpstreamIsPool          *bool               `json:"upstream_is_pool"`
@@ -190,6 +194,8 @@ type BulkUpdateAccountsReq struct {
 	ModelPolicy             *modelpolicy.Policy      `json:"model_policy"`
 	GroupIDs                []int64                  `json:"group_ids"`
 	ProxyID                 *int64                   `json:"proxy_id"`
+	ProxyAssignment         string                   `json:"proxy_assignment" binding:"omitempty,oneof=random custom"`
+	ProxySlot               *int                     `json:"proxy_slot" binding:"omitempty,gte=0,lte=65535"`
 	Extra                   map[string]any           `json:"extra,omitempty"`
 }
 

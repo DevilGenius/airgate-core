@@ -218,12 +218,30 @@ func init() {
 	accountDescExtra := accountFields[17].Descriptor()
 	// account.DefaultExtra holds the default value on creation for the extra field.
 	account.DefaultExtra = accountDescExtra.Default.(map[string]interface{})
+	// accountDescProxySlot is the schema descriptor for proxy_slot field.
+	accountDescProxySlot := accountFields[18].Descriptor()
+	// account.ProxySlotValidator is a validator for the "proxy_slot" field. It is called by the builders before save.
+	account.ProxySlotValidator = func() func(int) error {
+		validators := accountDescProxySlot.Validators
+		fns := [...]func(int) error{
+			validators[0].(func(int) error),
+			validators[1].(func(int) error),
+		}
+		return func(proxy_slot int) error {
+			for _, fn := range fns {
+				if err := fn(proxy_slot); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// accountDescCreatedAt is the schema descriptor for created_at field.
-	accountDescCreatedAt := accountFields[19].Descriptor()
+	accountDescCreatedAt := accountFields[20].Descriptor()
 	// account.DefaultCreatedAt holds the default value on creation for the created_at field.
 	account.DefaultCreatedAt = accountDescCreatedAt.Default.(func() time.Time)
 	// accountDescUpdatedAt is the schema descriptor for updated_at field.
-	accountDescUpdatedAt := accountFields[20].Descriptor()
+	accountDescUpdatedAt := accountFields[21].Descriptor()
 	// account.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	account.DefaultUpdatedAt = accountDescUpdatedAt.Default.(func() time.Time)
 	// account.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -651,23 +669,63 @@ func init() {
 	// proxy.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	proxy.NameValidator = proxyDescName.Validators[0].(func(string) error)
 	// proxyDescAddress is the schema descriptor for address field.
-	proxyDescAddress := proxyFields[2].Descriptor()
+	proxyDescAddress := proxyFields[3].Descriptor()
 	// proxy.AddressValidator is a validator for the "address" field. It is called by the builders before save.
 	proxy.AddressValidator = proxyDescAddress.Validators[0].(func(string) error)
 	// proxyDescUsername is the schema descriptor for username field.
-	proxyDescUsername := proxyFields[4].Descriptor()
+	proxyDescUsername := proxyFields[5].Descriptor()
 	// proxy.DefaultUsername holds the default value on creation for the username field.
 	proxy.DefaultUsername = proxyDescUsername.Default.(string)
 	// proxyDescPassword is the schema descriptor for password field.
-	proxyDescPassword := proxyFields[5].Descriptor()
+	proxyDescPassword := proxyFields[6].Descriptor()
 	// proxy.DefaultPassword holds the default value on creation for the password field.
 	proxy.DefaultPassword = proxyDescPassword.Default.(string)
+	// proxyDescSlotStart is the schema descriptor for slot_start field.
+	proxyDescSlotStart := proxyFields[7].Descriptor()
+	// proxy.DefaultSlotStart holds the default value on creation for the slot_start field.
+	proxy.DefaultSlotStart = proxyDescSlotStart.Default.(int)
+	// proxy.SlotStartValidator is a validator for the "slot_start" field. It is called by the builders before save.
+	proxy.SlotStartValidator = func() func(int) error {
+		validators := proxyDescSlotStart.Validators
+		fns := [...]func(int) error{
+			validators[0].(func(int) error),
+			validators[1].(func(int) error),
+		}
+		return func(slot_start int) error {
+			for _, fn := range fns {
+				if err := fn(slot_start); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// proxyDescSlotEnd is the schema descriptor for slot_end field.
+	proxyDescSlotEnd := proxyFields[8].Descriptor()
+	// proxy.DefaultSlotEnd holds the default value on creation for the slot_end field.
+	proxy.DefaultSlotEnd = proxyDescSlotEnd.Default.(int)
+	// proxy.SlotEndValidator is a validator for the "slot_end" field. It is called by the builders before save.
+	proxy.SlotEndValidator = func() func(int) error {
+		validators := proxyDescSlotEnd.Validators
+		fns := [...]func(int) error{
+			validators[0].(func(int) error),
+			validators[1].(func(int) error),
+		}
+		return func(slot_end int) error {
+			for _, fn := range fns {
+				if err := fn(slot_end); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// proxyDescCreatedAt is the schema descriptor for created_at field.
-	proxyDescCreatedAt := proxyFields[7].Descriptor()
+	proxyDescCreatedAt := proxyFields[10].Descriptor()
 	// proxy.DefaultCreatedAt holds the default value on creation for the created_at field.
 	proxy.DefaultCreatedAt = proxyDescCreatedAt.Default.(func() time.Time)
 	// proxyDescUpdatedAt is the schema descriptor for updated_at field.
-	proxyDescUpdatedAt := proxyFields[8].Descriptor()
+	proxyDescUpdatedAt := proxyFields[11].Descriptor()
 	// proxy.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	proxy.DefaultUpdatedAt = proxyDescUpdatedAt.Default.(func() time.Time)
 	// proxy.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

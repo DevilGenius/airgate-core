@@ -26,6 +26,12 @@ func (h *ProxyHandler) handleError(logMessage, publicMessage string, err error) 
 	switch {
 	case errors.Is(err, appproxy.ErrProxyNotFound):
 		return 404, err.Error()
+	case errors.Is(err, appproxy.ErrInvalidProxyMode),
+		errors.Is(err, appproxy.ErrInvalidProxySlotRange),
+		errors.Is(err, appproxy.ErrProxySlotRangeInUse):
+		return 400, err.Error()
+	case errors.Is(err, appproxy.ErrProxyGroupHasAccounts):
+		return 409, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage

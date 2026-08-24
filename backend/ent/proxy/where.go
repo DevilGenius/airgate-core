@@ -80,6 +80,16 @@ func Password(v string) predicate.Proxy {
 	return predicate.Proxy(sql.FieldEQ(FieldPassword, v))
 }
 
+// SlotStart applies equality check predicate on the "slot_start" field. It's identical to SlotStartEQ.
+func SlotStart(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldSlotStart, v))
+}
+
+// SlotEnd applies equality check predicate on the "slot_end" field. It's identical to SlotEndEQ.
+func SlotEnd(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldSlotEnd, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.Proxy {
 	return predicate.Proxy(sql.FieldEQ(FieldCreatedAt, v))
@@ -153,6 +163,26 @@ func NameEqualFold(v string) predicate.Proxy {
 // NameContainsFold applies the ContainsFold predicate on the "name" field.
 func NameContainsFold(v string) predicate.Proxy {
 	return predicate.Proxy(sql.FieldContainsFold(FieldName, v))
+}
+
+// ModeEQ applies the EQ predicate on the "mode" field.
+func ModeEQ(v Mode) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldMode, v))
+}
+
+// ModeNEQ applies the NEQ predicate on the "mode" field.
+func ModeNEQ(v Mode) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldMode, v))
+}
+
+// ModeIn applies the In predicate on the "mode" field.
+func ModeIn(vs ...Mode) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldMode, vs...))
+}
+
+// ModeNotIn applies the NotIn predicate on the "mode" field.
+func ModeNotIn(vs ...Mode) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldMode, vs...))
 }
 
 // ProtocolEQ applies the EQ predicate on the "protocol" field.
@@ -408,6 +438,86 @@ func PasswordEqualFold(v string) predicate.Proxy {
 // PasswordContainsFold applies the ContainsFold predicate on the "password" field.
 func PasswordContainsFold(v string) predicate.Proxy {
 	return predicate.Proxy(sql.FieldContainsFold(FieldPassword, v))
+}
+
+// SlotStartEQ applies the EQ predicate on the "slot_start" field.
+func SlotStartEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldSlotStart, v))
+}
+
+// SlotStartNEQ applies the NEQ predicate on the "slot_start" field.
+func SlotStartNEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldSlotStart, v))
+}
+
+// SlotStartIn applies the In predicate on the "slot_start" field.
+func SlotStartIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldSlotStart, vs...))
+}
+
+// SlotStartNotIn applies the NotIn predicate on the "slot_start" field.
+func SlotStartNotIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldSlotStart, vs...))
+}
+
+// SlotStartGT applies the GT predicate on the "slot_start" field.
+func SlotStartGT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldSlotStart, v))
+}
+
+// SlotStartGTE applies the GTE predicate on the "slot_start" field.
+func SlotStartGTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldSlotStart, v))
+}
+
+// SlotStartLT applies the LT predicate on the "slot_start" field.
+func SlotStartLT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldSlotStart, v))
+}
+
+// SlotStartLTE applies the LTE predicate on the "slot_start" field.
+func SlotStartLTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldSlotStart, v))
+}
+
+// SlotEndEQ applies the EQ predicate on the "slot_end" field.
+func SlotEndEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldEQ(FieldSlotEnd, v))
+}
+
+// SlotEndNEQ applies the NEQ predicate on the "slot_end" field.
+func SlotEndNEQ(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNEQ(FieldSlotEnd, v))
+}
+
+// SlotEndIn applies the In predicate on the "slot_end" field.
+func SlotEndIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldIn(FieldSlotEnd, vs...))
+}
+
+// SlotEndNotIn applies the NotIn predicate on the "slot_end" field.
+func SlotEndNotIn(vs ...int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldNotIn(FieldSlotEnd, vs...))
+}
+
+// SlotEndGT applies the GT predicate on the "slot_end" field.
+func SlotEndGT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGT(FieldSlotEnd, v))
+}
+
+// SlotEndGTE applies the GTE predicate on the "slot_end" field.
+func SlotEndGTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldGTE(FieldSlotEnd, v))
+}
+
+// SlotEndLT applies the LT predicate on the "slot_end" field.
+func SlotEndLT(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLT(FieldSlotEnd, v))
+}
+
+// SlotEndLTE applies the LTE predicate on the "slot_end" field.
+func SlotEndLTE(v int) predicate.Proxy {
+	return predicate.Proxy(sql.FieldLTE(FieldSlotEnd, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

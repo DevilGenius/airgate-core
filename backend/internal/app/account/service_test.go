@@ -15,6 +15,7 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
@@ -51,14 +52,14 @@ func TestImportIgnoresEnvironmentScopedIDs(t *testing.T) {
 	}
 }
 
-func TestImportConfiguredPreservesDSLGroupIDs(t *testing.T) {
+func TestImportConfiguredPreservesDSLAssignments(t *testing.T) {
 	service := NewService(stubRepository{
 		create: func(_ context.Context, input CreateInput) (Account, error) {
 			if !slices.Equal(input.GroupIDs, []int64{2, 1}) {
 				t.Fatalf("configured import group IDs = %v", input.GroupIDs)
 			}
-			if input.ProxyID != nil {
-				t.Fatalf("configured import must still clear proxy ID, got %v", *input.ProxyID)
+			if input.ProxyID == nil || *input.ProxyID != 99 || input.ProxyAssignment != appproxy.AssignmentRandom {
+				t.Fatalf("configured import proxy assignment = id %v mode %q", input.ProxyID, input.ProxyAssignment)
 			}
 			return Account{ID: 1, Name: input.Name}, nil
 		},
@@ -66,12 +67,13 @@ func TestImportConfiguredPreservesDSLGroupIDs(t *testing.T) {
 
 	proxyID := int64(99)
 	summary := service.ImportConfigured(t.Context(), []CreateInput{{
-		Name:        "configured",
-		Platform:    "openai",
-		Type:        "oauth",
-		GroupIDs:    []int64{2, 1},
-		ProxyID:     &proxyID,
-		Credentials: map[string]string{"access_token": "token"},
+		Name:            "configured",
+		Platform:        "openai",
+		Type:            "oauth",
+		GroupIDs:        []int64{2, 1},
+		ProxyID:         &proxyID,
+		ProxyAssignment: appproxy.AssignmentRandom,
+		Credentials:     map[string]string{"access_token": "token"},
 	}})
 	if summary.Imported != 1 || summary.Failed != 0 {
 		t.Fatalf("unexpected configured import summary: %+v", summary)
@@ -294,6 +296,28 @@ func TestBulkUpdateRejectsInvalidRateMultiplier(t *testing.T) {
 		if item.Success || item.Error == "" {
 			t.Fatalf("result item = %+v, want invalid rate failure", item)
 		}
+	}
+}
+
+func TestBulkUpdateAppliesRandomProxyPerAccount(t *testing.T) {
+	proxyID := int64(7)
+	updated := make([]int, 0, 2)
+	service := NewService(stubRepository{
+		update: func(_ context.Context, id int, input UpdateInput) (Account, error) {
+			if !input.HasProxyID || input.ProxyID == nil || *input.ProxyID != proxyID ||
+				input.ProxyAssignment != appproxy.AssignmentRandom {
+				t.Fatalf("proxy update input = %+v", input)
+			}
+			updated = append(updated, id)
+			return Account{ID: id}, nil
+		},
+	}, nil, nil, nil)
+	result := service.BulkUpdate(t.Context(), BulkUpdateInput{
+		IDs: []int{1, 2}, ProxyID: &proxyID, HasProxyID: true,
+		ProxyAssignment: appproxy.AssignmentRandom,
+	})
+	if result.Success != 2 || !slices.Equal(updated, []int{1, 2}) {
+		t.Fatalf("BulkUpdate random proxy result=%+v updated=%v", result, updated)
 	}
 }
 

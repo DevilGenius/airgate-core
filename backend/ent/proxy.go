@@ -19,6 +19,8 @@ type Proxy struct {
 	ID int `json:"id,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
+	// Mode holds the value of the "mode" field.
+	Mode proxy.Mode `json:"mode,omitempty"`
 	// Protocol holds the value of the "protocol" field.
 	Protocol proxy.Protocol `json:"protocol,omitempty"`
 	// Address holds the value of the "address" field.
@@ -29,6 +31,10 @@ type Proxy struct {
 	Username string `json:"username,omitempty"`
 	// Password holds the value of the "password" field.
 	Password string `json:"-"`
+	// SlotStart holds the value of the "slot_start" field.
+	SlotStart int `json:"slot_start,omitempty"`
+	// SlotEnd holds the value of the "slot_end" field.
+	SlotEnd int `json:"slot_end,omitempty"`
 	// Status holds the value of the "status" field.
 	Status proxy.Status `json:"status,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -64,9 +70,9 @@ func (*Proxy) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case proxy.FieldID, proxy.FieldPort:
+		case proxy.FieldID, proxy.FieldPort, proxy.FieldSlotStart, proxy.FieldSlotEnd:
 			values[i] = new(sql.NullInt64)
-		case proxy.FieldName, proxy.FieldProtocol, proxy.FieldAddress, proxy.FieldUsername, proxy.FieldPassword, proxy.FieldStatus:
+		case proxy.FieldName, proxy.FieldMode, proxy.FieldProtocol, proxy.FieldAddress, proxy.FieldUsername, proxy.FieldPassword, proxy.FieldStatus:
 			values[i] = new(sql.NullString)
 		case proxy.FieldCreatedAt, proxy.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -97,6 +103,12 @@ func (pr *Proxy) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				pr.Name = value.String
 			}
+		case proxy.FieldMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field mode", values[i])
+			} else if value.Valid {
+				pr.Mode = proxy.Mode(value.String)
+			}
 		case proxy.FieldProtocol:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field protocol", values[i])
@@ -126,6 +138,18 @@ func (pr *Proxy) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field password", values[i])
 			} else if value.Valid {
 				pr.Password = value.String
+			}
+		case proxy.FieldSlotStart:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field slot_start", values[i])
+			} else if value.Valid {
+				pr.SlotStart = int(value.Int64)
+			}
+		case proxy.FieldSlotEnd:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field slot_end", values[i])
+			} else if value.Valid {
+				pr.SlotEnd = int(value.Int64)
 			}
 		case proxy.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -189,6 +213,9 @@ func (pr *Proxy) String() string {
 	builder.WriteString("name=")
 	builder.WriteString(pr.Name)
 	builder.WriteString(", ")
+	builder.WriteString("mode=")
+	builder.WriteString(fmt.Sprintf("%v", pr.Mode))
+	builder.WriteString(", ")
 	builder.WriteString("protocol=")
 	builder.WriteString(fmt.Sprintf("%v", pr.Protocol))
 	builder.WriteString(", ")
@@ -202,6 +229,12 @@ func (pr *Proxy) String() string {
 	builder.WriteString(pr.Username)
 	builder.WriteString(", ")
 	builder.WriteString("password=<sensitive>")
+	builder.WriteString(", ")
+	builder.WriteString("slot_start=")
+	builder.WriteString(fmt.Sprintf("%v", pr.SlotStart))
+	builder.WriteString(", ")
+	builder.WriteString("slot_end=")
+	builder.WriteString(fmt.Sprintf("%v", pr.SlotEnd))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", pr.Status))

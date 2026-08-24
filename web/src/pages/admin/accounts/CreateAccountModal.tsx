@@ -10,6 +10,7 @@ import type {
 import { accountsApi } from '../../../shared/api/accounts';
 import { groupsApi } from '../../../shared/api/groups';
 import { proxiesApi } from '../../../shared/api/proxies';
+import { proxyEndpointLabel } from '../../../shared/utils/proxy';
 import { usePlatforms } from '../../../shared/hooks/usePlatforms';
 import { queryKeys } from '../../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
@@ -248,7 +249,7 @@ export function CreateAccountModal({
     { id: '', label: t('accounts.no_proxy') },
     ...(proxiesData?.list ?? []).map((p) => ({
       id: String(p.id),
-      label: `${p.name} (${p.protocol}://${p.address}:${p.port})`,
+      label: proxyEndpointLabel(p),
     })),
   ];
   const selectedProxyLabel =

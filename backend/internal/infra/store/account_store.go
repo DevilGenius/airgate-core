@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	rand "math/rand/v2"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	"github.com/DevilGenius/airgate-core/internal/accountusage"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 )
@@ -232,6 +234,141 @@ func aggregateOccupiedPriorities(ctx context.Context, query *ent.AccountQuery) (
 	return result, nil
 }
 
+// allocateProxySlot assigns one stable username slot when an account is bound
+// to a logical proxy group. The proxy row is locked on PostgreSQL so concurrent
+// account creation cannot choose the same free slot.
+type proxySlotAllocation struct {
+	preferred *int
+	requested *int
+	random    bool
+}
+
+func allocateProxySlot(ctx context.Context, tx *ent.Tx, accountID, proxyID int, allocation proxySlotAllocation) (*int, error) {
+	proxy, err := lockProxyForSlot(ctx, tx, proxyID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, appproxy.ErrProxyNotFound
+		}
+		return nil, err
+	}
+	if proxy.Mode != entproxy.ModeGroup {
+		if allocation.requested != nil || allocation.random {
+			return nil, appproxy.ErrProxyAssignmentRequiresGroup
+		}
+		return nil, nil
+	}
+	if err := appproxy.ValidateConfig(proxy.Mode.String(), proxy.SlotStart, proxy.SlotEnd); err != nil {
+		return nil, err
+	}
+
+	if allocation.requested != nil {
+		if *allocation.requested < proxy.SlotStart || *allocation.requested > proxy.SlotEnd {
+			return nil, appproxy.ErrInvalidProxySlotRange
+		}
+		slot := *allocation.requested
+		return &slot, nil
+	}
+	if allocation.preferred != nil && *allocation.preferred >= proxy.SlotStart && *allocation.preferred <= proxy.SlotEnd {
+		slot := *allocation.preferred
+		return &slot, nil
+	}
+	if tx.Driver().Dialect() == dialect.Postgres {
+		orderBy := "candidate.slot"
+		if allocation.random {
+			orderBy = "random()"
+		}
+		query := `
+SELECT candidate.slot
+FROM generate_series($1::integer, $2::integer) AS candidate(slot)
+LEFT JOIN accounts AS bound_account
+	ON bound_account.account_proxy = $3::integer
+	AND bound_account.proxy_slot = candidate.slot
+	AND bound_account.id <> $4::integer
+WHERE bound_account.id IS NULL
+ORDER BY ` + orderBy + `
+LIMIT 1`
+		var rows sql.Rows
+		if err := tx.Driver().Query(ctx, query, []any{proxy.SlotStart, proxy.SlotEnd, proxyID, accountID}, &rows); err != nil {
+			return nil, err
+		}
+		defer func() { _ = rows.Close() }()
+		if rows.Next() {
+			var slot int
+			if err := rows.Scan(&slot); err != nil {
+				return nil, err
+			}
+			return &slot, nil
+		}
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		slot := proxy.SlotStart + rand.IntN(proxy.SlotEnd-proxy.SlotStart+1)
+		return &slot, nil
+	}
+
+	var occupiedRows []struct {
+		Slot int `json:"proxy_slot"`
+	}
+	if err := tx.Account.Query().
+		Where(
+			entaccount.HasProxyWith(entproxy.IDEQ(proxyID)),
+			entaccount.ProxySlotNotNil(),
+			entaccount.IDNotIn(accountID),
+		).
+		Select(entaccount.FieldProxySlot).
+		Scan(ctx, &occupiedRows); err != nil {
+		return nil, err
+	}
+	occupied := make(map[int]struct{}, len(occupiedRows))
+	for _, row := range occupiedRows {
+		occupied[row.Slot] = struct{}{}
+	}
+	free := make([]int, 0, proxy.SlotEnd-proxy.SlotStart+1-len(occupied))
+	for slot := proxy.SlotStart; slot <= proxy.SlotEnd; slot++ {
+		if _, exists := occupied[slot]; exists {
+			continue
+		}
+		if !allocation.random {
+			return &slot, nil
+		}
+		free = append(free, slot)
+	}
+	if len(free) > 0 {
+		slot := free[rand.IntN(len(free))]
+		return &slot, nil
+	}
+	slot := proxy.SlotStart + rand.IntN(proxy.SlotEnd-proxy.SlotStart+1)
+	return &slot, nil
+}
+
+func lockProxyForSlot(ctx context.Context, tx *ent.Tx, proxyID int) (*ent.Proxy, error) {
+	if tx.Driver().Dialect() == dialect.Postgres {
+		var rows sql.Rows
+		if err := tx.Driver().Query(ctx,
+			"SELECT id FROM proxies WHERE id = $1 FOR UPDATE",
+			[]any{proxyID}, &rows); err != nil {
+			return nil, err
+		}
+		found := rows.Next()
+		if found {
+			var id int
+			if err := rows.Scan(&id); err != nil {
+				_ = rows.Close()
+				return nil, err
+			}
+		}
+		rowsErr := rows.Err()
+		_ = rows.Close()
+		if rowsErr != nil {
+			return nil, rowsErr
+		}
+		if !found {
+			return tx.Proxy.Get(ctx, proxyID)
+		}
+	}
+	return tx.Proxy.Get(ctx, proxyID)
+}
+
 // Create 创建账号；同邮箱软删除账号会复用原行并恢复，同平台 OAuth 账号会刷新凭证。
 func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput) (appaccount.Account, error) {
 	resolvedEmail, resolvedCredentials, identityErr := accountidentity.Resolve(input.Email, input.Credentials)
@@ -249,8 +386,17 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 	defer func() {
 		_ = tx.Rollback()
 	}()
+	if input.ProxyID != nil {
+		if _, proxyErr := tx.Proxy.Get(ctx, int(*input.ProxyID)); proxyErr != nil {
+			if ent.IsNotFound(proxyErr) {
+				return appaccount.Account{}, appproxy.ErrProxyNotFound
+			}
+			return appaccount.Account{}, proxyErr
+		}
+	}
 
 	accountID := 0
+	proxyBindingRequested := false
 	if input.Email != nil {
 		existing, queryErr := tx.Account.Query().
 			Where(entaccount.EmailEQ(*input.Email)).
@@ -295,7 +441,8 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 				SetUpstreamIsPool(input.UpstreamIsPool).
 				ClearDeletedAt().
 				ClearGroups().
-				ClearProxy()
+				ClearProxy().
+				ClearProxySlot()
 			if input.Extra == nil {
 				builder = builder.SetExtra(map[string]interface{}{})
 			} else {
@@ -315,6 +462,7 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 				return appaccount.Account{}, mapAccountEmailConstraint(saveErr)
 			}
 			accountID = item.ID
+			proxyBindingRequested = true
 		case ent.IsNotFound(queryErr):
 			// 继续创建新账号。
 		default:
@@ -351,6 +499,33 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 			return appaccount.Account{}, mapAccountEmailConstraint(saveErr)
 		}
 		accountID = item.ID
+		proxyBindingRequested = true
+	}
+
+	if proxyBindingRequested {
+		var slot *int
+		if input.ProxyID != nil {
+			allocation := proxySlotAllocation{}
+			switch input.ProxyAssignment {
+			case appproxy.AssignmentRandom:
+				allocation.random = true
+			case appproxy.AssignmentCustom:
+				allocation.requested = input.ProxySlot
+			}
+			slot, err = allocateProxySlot(ctx, tx, accountID, int(*input.ProxyID), allocation)
+			if err != nil {
+				return appaccount.Account{}, err
+			}
+		}
+		bindingUpdate := tx.Account.UpdateOneID(accountID)
+		if slot == nil {
+			bindingUpdate.ClearProxySlot()
+		} else {
+			bindingUpdate.SetProxySlot(*slot)
+		}
+		if err := bindingUpdate.Exec(ctx); err != nil {
+			return appaccount.Account{}, err
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -407,7 +582,43 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 		input.Credentials = resolvedCredentials
 	}
 
-	builder := accountscope.UpdateOneID(s.db, id)
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return appaccount.Account{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var currentProxyID *int
+	var preferredSlot *int
+	if input.HasProxyID {
+		if input.ProxyID != nil {
+			if _, proxyErr := tx.Proxy.Get(ctx, int(*input.ProxyID)); proxyErr != nil {
+				if ent.IsNotFound(proxyErr) {
+					return appaccount.Account{}, appproxy.ErrProxyNotFound
+				}
+				return appaccount.Account{}, proxyErr
+			}
+		}
+		current, queryErr := accountscope.QueryByID(tx.Client(), id).
+			WithProxy().
+			Only(ctx)
+		if queryErr != nil {
+			if ent.IsNotFound(queryErr) {
+				return appaccount.Account{}, appaccount.ErrAccountNotFound
+			}
+			return appaccount.Account{}, queryErr
+		}
+		if current.Edges.Proxy != nil {
+			proxyID := current.Edges.Proxy.ID
+			currentProxyID = &proxyID
+		}
+		if current.ProxySlot != nil {
+			slot := *current.ProxySlot
+			preferredSlot = &slot
+		}
+	}
+
+	builder := accountscope.UpdateOneID(tx.Client(), id)
 
 	if input.Name != nil {
 		builder = builder.SetName(*input.Name)
@@ -454,9 +665,9 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 	}
 	if input.HasProxyID {
 		if input.ProxyID == nil {
-			builder = builder.ClearProxy()
+			builder = builder.ClearProxy().ClearProxySlot()
 		} else {
-			builder = builder.ClearProxy().SetProxyID(int(*input.ProxyID))
+			builder = builder.ClearProxy().SetProxyID(int(*input.ProxyID)).ClearProxySlot()
 		}
 	}
 	if input.HasExtra {
@@ -473,8 +684,44 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 		}
 		return appaccount.Account{}, mapAccountEmailConstraint(err)
 	}
+	if input.HasProxyID && input.ProxyID != nil {
+		allocation := proxySlotAllocation{
+			preferred: preferredSlotForProxy(currentProxyID, preferredSlot, int(*input.ProxyID)),
+		}
+		switch input.ProxyAssignment {
+		case appproxy.AssignmentRandom:
+			allocation.preferred = nil
+			allocation.random = true
+		case appproxy.AssignmentCustom:
+			allocation.preferred = nil
+			allocation.requested = input.ProxySlot
+		}
+		slot, err := allocateProxySlot(ctx, tx, id, int(*input.ProxyID), allocation)
+		if err != nil {
+			return appaccount.Account{}, err
+		}
+		bindingUpdate := tx.Account.UpdateOneID(id)
+		if slot == nil {
+			bindingUpdate.ClearProxySlot()
+		} else {
+			bindingUpdate.SetProxySlot(*slot)
+		}
+		if err := bindingUpdate.Exec(ctx); err != nil {
+			return appaccount.Account{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return appaccount.Account{}, err
+	}
 
 	return s.FindByID(ctx, id, appaccount.LoadOptions{WithGroups: true, WithProxy: true})
+}
+
+func preferredSlotForProxy(currentProxyID, preferredSlot *int, targetProxyID int) *int {
+	if currentProxyID == nil || *currentProxyID != targetProxyID {
+		return nil
+	}
+	return preferredSlot
 }
 
 // Delete 软删除账号。保留凭证和关联边，供历史 Usage Log 回溯。
@@ -482,6 +729,7 @@ func (s *AccountStore) Delete(ctx context.Context, id int) error {
 	if err := accountscope.UpdateOneID(s.db, id).
 		SetDeletedAt(time.Now()).
 		SetState(entaccount.StateDisabled).
+		ClearProxySlot().
 		ClearStateUntil().
 		Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
@@ -836,6 +1084,10 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		CreatedAt:               item.CreatedAt,
 		UpdatedAt:               item.UpdatedAt,
 	}
+	if item.ProxySlot != nil {
+		value := *item.ProxySlot
+		result.ProxySlot = &value
+	}
 
 	if item.Email != nil {
 		value := *item.Email
@@ -858,13 +1110,30 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		result.StateUntil = &value
 	}
 	if item.Edges.Proxy != nil {
+		proxy := appproxy.Proxy{
+			ID:        item.Edges.Proxy.ID,
+			Mode:      item.Edges.Proxy.Mode.String(),
+			Protocol:  string(item.Edges.Proxy.Protocol),
+			Address:   item.Edges.Proxy.Address,
+			Port:      item.Edges.Proxy.Port,
+			Username:  item.Edges.Proxy.Username,
+			Password:  item.Edges.Proxy.Password,
+			SlotStart: item.Edges.Proxy.SlotStart,
+			SlotEnd:   item.Edges.Proxy.SlotEnd,
+		}
+		if username, err := proxy.UsernameForSlot(item.ProxySlot); err == nil {
+			proxy.Username = username
+		}
 		result.Proxy = &appaccount.Proxy{
-			ID:       item.Edges.Proxy.ID,
-			Protocol: string(item.Edges.Proxy.Protocol),
-			Address:  item.Edges.Proxy.Address,
-			Port:     item.Edges.Proxy.Port,
-			Username: item.Edges.Proxy.Username,
-			Password: item.Edges.Proxy.Password,
+			ID:        proxy.ID,
+			Mode:      proxy.Mode,
+			Protocol:  proxy.Protocol,
+			Address:   proxy.Address,
+			Port:      proxy.Port,
+			Username:  proxy.Username,
+			Password:  proxy.Password,
+			SlotStart: proxy.SlotStart,
+			SlotEnd:   proxy.SlotEnd,
 		}
 	}
 	for _, relatedGroup := range item.Edges.Groups {

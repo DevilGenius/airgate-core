@@ -172,6 +172,8 @@ export interface AccountResp {
   max_concurrency: number;
   current_concurrency: number;
   proxy_id?: number;
+  proxy_slot?: number;
+  proxy_username?: string;
   rate_multiplier: number;
   /** 成功率低于该阈值时将对应模型候选放入降级池；0 表示关闭。 */
   model_downgrade_threshold?: number;
@@ -230,6 +232,8 @@ export interface UpdateAccountReq {
   priority?: number;
   max_concurrency?: number;
   proxy_id?: number | null;
+  proxy_assignment?: 'random' | 'custom';
+  proxy_slot?: number;
   rate_multiplier?: number | null;
   model_downgrade_threshold?: number | null;
   upstream_is_pool?: boolean;
@@ -254,6 +258,8 @@ export interface BulkUpdateAccountsReq {
   model_policy?: ModelPolicy | null;
   group_ids?: number[];
   proxy_id?: number;
+  proxy_assignment?: 'random' | 'custom';
+  proxy_slot?: number;
   extra?: Record<string, unknown>;
 }
 
@@ -726,10 +732,14 @@ export interface UsageTrendBucket {
 export interface ProxyResp {
   id: number;
   name: string;
+  mode: 'single' | 'group';
   protocol: 'http' | 'socks5';
   address: string;
   port: number;
   username?: string;
+  slot_start?: number;
+  slot_end?: number;
+  assigned_slots: number;
   status: string;
   created_at: string;
   updated_at: string;
@@ -737,20 +747,26 @@ export interface ProxyResp {
 
 export interface CreateProxyReq {
   name: string;
+  mode?: 'single' | 'group';
   protocol: 'http' | 'socks5';
   address: string;
   port: number;
   username?: string;
   password?: string;
+  slot_start?: number;
+  slot_end?: number;
 }
 
 export interface UpdateProxyReq {
   name?: string;
+  mode?: 'single' | 'group';
   protocol?: 'http' | 'socks5';
   address?: string;
   port?: number;
   username?: string;
   password?: string;
+  slot_start?: number;
+  slot_end?: number;
   status?: 'active' | 'disabled';
 }
 

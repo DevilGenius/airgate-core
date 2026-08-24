@@ -7,13 +7,17 @@ import (
 
 func toProxyRespFromDomain(item appproxy.Proxy) dto.ProxyResp {
 	return dto.ProxyResp{
-		ID:       int64(item.ID),
-		Name:     item.Name,
-		Protocol: item.Protocol,
-		Address:  item.Address,
-		Port:     item.Port,
-		Username: item.Username,
-		Status:   item.Status,
+		ID:            int64(item.ID),
+		Name:          item.Name,
+		Mode:          appproxy.NormalizeMode(item.Mode),
+		Protocol:      item.Protocol,
+		Address:       item.Address,
+		Port:          item.Port,
+		Username:      item.Username,
+		SlotStart:     item.SlotStart,
+		SlotEnd:       item.SlotEnd,
+		AssignedSlots: item.AssignedSlots,
+		Status:        item.Status,
 		TimeMixin: dto.TimeMixin{
 			CreatedAt: item.CreatedAt,
 			UpdatedAt: item.UpdatedAt,

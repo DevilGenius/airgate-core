@@ -245,6 +245,20 @@ func (ac *AccountCreate) SetExtra(m map[string]interface{}) *AccountCreate {
 	return ac
 }
 
+// SetProxySlot sets the "proxy_slot" field.
+func (ac *AccountCreate) SetProxySlot(i int) *AccountCreate {
+	ac.mutation.SetProxySlot(i)
+	return ac
+}
+
+// SetNillableProxySlot sets the "proxy_slot" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableProxySlot(i *int) *AccountCreate {
+	if i != nil {
+		ac.SetProxySlot(*i)
+	}
+	return ac
+}
+
 // SetDeletedAt sets the "deleted_at" field.
 func (ac *AccountCreate) SetDeletedAt(t time.Time) *AccountCreate {
 	ac.mutation.SetDeletedAt(t)
@@ -487,6 +501,11 @@ func (ac *AccountCreate) check() error {
 	if _, ok := ac.mutation.UpstreamIsPool(); !ok {
 		return &ValidationError{Name: "upstream_is_pool", err: errors.New(`ent: missing required field "Account.upstream_is_pool"`)}
 	}
+	if v, ok := ac.mutation.ProxySlot(); ok {
+		if err := account.ProxySlotValidator(v); err != nil {
+			return &ValidationError{Name: "proxy_slot", err: fmt.Errorf(`ent: validator failed for field "Account.proxy_slot": %w`, err)}
+		}
+	}
 	if _, ok := ac.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Account.created_at"`)}
 	}
@@ -590,6 +609,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
 		_node.Extra = value
+	}
+	if value, ok := ac.mutation.ProxySlot(); ok {
+		_spec.SetField(account.FieldProxySlot, field.TypeInt, value)
+		_node.ProxySlot = &value
 	}
 	if value, ok := ac.mutation.DeletedAt(); ok {
 		_spec.SetField(account.FieldDeletedAt, field.TypeTime, value)

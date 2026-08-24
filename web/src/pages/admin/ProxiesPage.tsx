@@ -17,25 +17,38 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { TablePage } from '../../shared/components/TablePage';
+import { formatProxySlot } from '../../shared/utils/proxy';
 
 // 代理表单数据
 interface ProxyForm {
   name: string;
+  mode: 'single' | 'group';
   protocol: 'http' | 'socks5';
   address: string;
   port: string;
   username: string;
   password: string;
+  slotStart: string;
+  slotEnd: string;
 }
 
 const emptyForm: ProxyForm = {
   name: '',
+  mode: 'single',
   protocol: 'http',
   address: '',
   port: '',
   username: '',
   password: '',
+  slotStart: '0000',
+  slotEnd: 'ffff',
 };
+
+function parseSlot(value: string) {
+  const normalized = value.trim();
+  if (!/^[0-9a-f]{1,4}$/i.test(normalized)) return null;
+  return Number.parseInt(normalized, 16);
+}
 
 export default function ProxiesPage() {
   const { t } = useTranslation();
@@ -145,11 +158,14 @@ export default function ProxiesPage() {
     setEditingProxy(proxy);
     setForm({
       name: proxy.name,
+      mode: proxy.mode ?? 'single',
       protocol: proxy.protocol,
       address: proxy.address,
       port: String(proxy.port),
-      username: proxy.username || '',
+      username: proxy.mode === 'group' ? '' : (proxy.username || ''),
       password: '',
+      slotStart: formatProxySlot(proxy.slot_start, '0000'),
+      slotEnd: formatProxySlot(proxy.slot_end, 'ffff'),
     });
     setModalOpen(true);
   }
@@ -169,13 +185,30 @@ export default function ProxiesPage() {
       return;
     }
 
+    const mode = form.mode;
+    let slotStart = 0;
+    let slotEnd = 0;
+    if (mode === 'group') {
+      const parsedStart = parseSlot(form.slotStart);
+      const parsedEnd = parseSlot(form.slotEnd);
+      if (parsedStart == null || parsedEnd == null || parsedStart > parsedEnd) {
+        toast('error', t('proxies.slot_range_invalid'));
+        return;
+      }
+      slotStart = parsedStart;
+      slotEnd = parsedEnd;
+    }
+
     const payload = {
       name: form.name,
+      mode,
       protocol: form.protocol,
       address: form.address,
       port: Number(form.port),
-      username: form.username || undefined,
+      username: mode === 'single' ? (form.username || undefined) : undefined,
       password: form.password || undefined,
+      slot_start: slotStart,
+      slot_end: slotEnd,
     };
 
     if (editingProxy) {
@@ -200,6 +233,13 @@ export default function ProxiesPage() {
     { id: 'socks5', label: 'SOCKS5' },
   ];
   const selectedProtocolLabel = protocolOptions.find((item) => item.id === form.protocol)?.label ?? 'HTTP';
+
+  const proxyUsernameDisplay = (proxy: ProxyResp) => {
+    if (proxy.mode !== 'group') return proxy.username || '-';
+    const range = `${formatProxySlot(proxy.slot_start, '0000')}-${formatProxySlot(proxy.slot_end, 'ffff')}`;
+    const capacity = Math.max(0, (proxy.slot_end ?? 0) - (proxy.slot_start ?? 0) + 1);
+    return `${range} · ${proxy.assigned_slots ?? 0}/${capacity}`;
+  };
   const proxyDialogState = useOverlayState({
     isOpen: modalOpen,
     onOpenChange: (open) => {
@@ -290,8 +330,11 @@ export default function ProxiesPage() {
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="block max-w-full truncate text-text-secondary" title={row.username || '-'}>
-                        {row.username || '-'}
+                      <span
+                        className="block max-w-full truncate text-text-secondary"
+                        title={proxyUsernameDisplay(row)}
+                      >
+                        {proxyUsernameDisplay(row)}
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
@@ -358,6 +401,20 @@ export default function ProxiesPage() {
                     />
                   </HeroTextField>
                   <div className="space-y-1.5">
+                    <Label>{t('proxies.mode')}</Label>
+                    <SimpleSelect
+                      ariaLabel={t('proxies.mode')}
+                      fullWidth
+                      items={[
+                        { key: 'single', label: t('proxies.mode_single') },
+                        { key: 'group', label: t('proxies.mode_group') },
+                      ]}
+                      selectedKey={form.mode}
+                      selectedLabel={form.mode === 'group' ? t('proxies.mode_group') : t('proxies.mode_single')}
+                      onSelectionChange={(key) => setForm({ ...form, mode: (key || 'single') as 'single' | 'group' })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
                     <Label>{t('proxies.protocol')}</Label>
                     <SimpleSelect
                       ariaLabel={t('proxies.protocol')}
@@ -392,15 +449,38 @@ export default function ProxiesPage() {
                       required
                     />
                   </HeroTextField>
-                  <HeroTextField fullWidth>
-                    <Label>{t('proxies.username')}</Label>
-                    <Input
-                      name="username"
-                      autoComplete="username"
-                      value={form.username}
-                      onChange={(e) => setForm({ ...form, username: e.target.value })}
-                    />
-                  </HeroTextField>
+                  {form.mode === 'group' ? (
+                    <div className="space-y-1.5">
+                      <Label>{t('proxies.slot_range')}</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          aria-label={t('proxies.slot_start')}
+                          maxLength={4}
+                          value={form.slotStart}
+                          onChange={(e) => setForm({ ...form, slotStart: e.target.value })}
+                          placeholder="0000"
+                        />
+                        <Input
+                          aria-label={t('proxies.slot_end')}
+                          maxLength={4}
+                          value={form.slotEnd}
+                          onChange={(e) => setForm({ ...form, slotEnd: e.target.value })}
+                          placeholder="ffff"
+                        />
+                      </div>
+                      <p className="text-xs text-text-secondary">{t('proxies.slot_range_hint')}</p>
+                    </div>
+                  ) : (
+                    <HeroTextField fullWidth>
+                      <Label>{t('proxies.username')}</Label>
+                      <Input
+                        name="username"
+                        autoComplete="username"
+                        value={form.username}
+                        onChange={(e) => setForm({ ...form, username: e.target.value })}
+                      />
+                    </HeroTextField>
+                  )}
                   <HeroTextField fullWidth>
                     <Label>{t('proxies.password_label')}</Label>
                     <Input

@@ -59,7 +59,7 @@
   width: min(var(--ag-modal-width, var(--ag-modal-md-width)), 100%) !important;
   max-width: min(var(--ag-modal-width, var(--ag-modal-md-width)), calc(100vw - clamp(1.5rem, 5vw, 6rem))) !important;
   overflow: hidden;
-  max-height: min(86dvh, 62rem) !important;
+  max-height: min(var(--ag-modal-max-height, 86dvh), var(--ag-modal-max-height-cap, 62rem)) !important;
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
   border-radius: var(--radius-3xl) !important;
   background-color: var(--overlay) !important;

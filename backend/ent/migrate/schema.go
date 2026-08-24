@@ -77,6 +77,7 @@ var (
 		{Name: "last_probe_at", Type: field.TypeTime, Nullable: true},
 		{Name: "usage_estimate_meta", Type: field.TypeJSON, Nullable: true},
 		{Name: "extra", Type: field.TypeJSON, Nullable: true},
+		{Name: "proxy_slot", Type: field.TypeInt, Nullable: true},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -90,7 +91,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[22]},
+				Columns:    []*schema.Column{AccountsColumns[23]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -104,12 +105,22 @@ var (
 			{
 				Name:    "account_deleted_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[19]},
+				Columns: []*schema.Column{AccountsColumns[20]},
 			},
 			{
 				Name:    "account_priority_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[20]},
+				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[21]},
+			},
+			{
+				Name:    "account_proxy_idx",
+				Unique:  false,
+				Columns: []*schema.Column{AccountsColumns[23]},
+			},
+			{
+				Name:    "account_proxy_slot_idx",
+				Unique:  false,
+				Columns: []*schema.Column{AccountsColumns[19], AccountsColumns[23]},
 			},
 		},
 	}
@@ -374,11 +385,14 @@ var (
 	ProxiesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString},
+		{Name: "mode", Type: field.TypeEnum, Enums: []string{"single", "group"}, Default: "single"},
 		{Name: "protocol", Type: field.TypeEnum, Enums: []string{"http", "socks5"}, Default: "http"},
 		{Name: "address", Type: field.TypeString},
 		{Name: "port", Type: field.TypeInt},
 		{Name: "username", Type: field.TypeString, Default: ""},
 		{Name: "password", Type: field.TypeString, Default: ""},
+		{Name: "slot_start", Type: field.TypeInt, Default: 0},
+		{Name: "slot_end", Type: field.TypeInt, Default: 0},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "disabled"}, Default: "active"},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},

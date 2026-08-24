@@ -66,6 +66,11 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 	if account.Proxy != nil {
 		proxyID := int64(account.Proxy.ID)
 		resp.ProxyID = &proxyID
+		resp.ProxyUsername = account.Proxy.Username
+	}
+	if account.ProxySlot != nil {
+		slot := *account.ProxySlot
+		resp.ProxySlot = &slot
 	}
 	// 生图计数仅 OpenAI 平台在列表路径上填充；其它平台 / 详情路径 ImageStats=nil → 字段缺省。
 	if account.ImageStats != nil {
