@@ -8,12 +8,12 @@ import {
   ArrowRight,
   ArrowUp,
   Astroid,
+  Bell,
+  Calculator,
   CalendarDays,
   Clock,
   KeyRound,
-  Sigma,
   ToggleRight,
-  Users,
   Zap,
 } from 'lucide-react';
 import {
@@ -353,13 +353,31 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
   const todayTextRequests = Math.max(0, (stats.today_requests ?? 0) - todayImageRequests);
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
-      <MetricCard
-        icon={<KeyRound className="h-5 w-5" />}
-        tone="gray"
-        title={t('dashboard.api_keys')}
-        value={stats.total_api_keys}
-        meta={t('dashboard.api_keys_enabled', { count: stats.enabled_api_keys })}
-      />
+      <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
+        <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+          <div className="ag-dashboard-metric-copy">
+            <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">
+              {t('dashboard.users_summary', { active: stats.active_users, total: stats.total_users })} {t('dashboard.new_users', { count: stats.new_users_today })}
+            </div>
+            <div className="mt-1 flex min-w-0 items-baseline gap-x-2 whitespace-nowrap">
+              <span className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">{stats.enabled_api_keys}</span>
+                <span className="text-xs font-semibold leading-none text-text">{t('dashboard.enabled_label')}</span>
+              </span>
+              <span className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">{stats.total_api_keys}</span>
+                <span className="text-xs font-semibold leading-none text-text">{t('dashboard.total_label')}</span>
+              </span>
+            </div>
+          </div>
+          <span
+            className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES.gray}`}
+            style={METRIC_TONE_STYLES.gray}
+          >
+            <KeyRound className="h-5 w-5" />
+          </span>
+        </Card.Content>
+      </Card>
       <MetricCard
         icon={<ToggleRight className="h-5 w-5" />}
         tone="emerald"
@@ -376,11 +394,15 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         meta={t('dashboard.alltime_requests', { count: fmtNum(stats.alltime_requests) } as Record<string, string>)}
       />
       <MetricCard
-        icon={<Users className="h-5 w-5" />}
-        tone="teal"
-        title={t('dashboard.users')}
-        value={t('dashboard.new_users', { count: stats.new_users_today })}
-        meta={`${t('dashboard.total_count', { count: stats.total_users })}  ${t('dashboard.active_users_label', { count: stats.active_users })}`}
+        icon={<Clock className="h-5 w-5" />}
+        tone="rose"
+        title={t('dashboard.avg_response')}
+        value={`${fmtDurationMs(stats.avg_first_event_ms)}/${fmtDurationMs(stats.avg_duration_ms)}`}
+        meta={
+          (stats.avg_image_duration_ms ?? 0) > 0
+            ? t('dashboard.image_response_time', { time: fmtDurationMs(stats.avg_image_duration_ms) })
+            : undefined
+        }
       />
       <MetricCard
         icon={<Astroid className="h-5 w-5" />}
@@ -390,7 +412,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         meta={<CostPair actual={stats.today_cost} standard={stats.today_standard_cost} />}
       />
       <MetricCard
-        icon={<Sigma className="h-5 w-5" />}
+        icon={<Calculator className="h-5 w-5" />}
         tone="stream"
         title={t('dashboard.total_tokens')}
         value={fmtNum(stats.alltime_tokens)}
@@ -407,17 +429,21 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         rpm10m={stats.rpm_10m ?? 0}
         tpm10m={stats.tpm_10m ?? 0}
       />
-      <MetricCard
-        icon={<Clock className="h-5 w-5" />}
-        tone="rose"
-        title={t('dashboard.avg_response')}
-        value={`${fmtDurationMs(stats.avg_first_event_ms)}/${fmtDurationMs(stats.avg_duration_ms)}`}
-        meta={
-          (stats.avg_image_duration_ms ?? 0) > 0
-            ? t('dashboard.image_response_time', { time: fmtDurationMs(stats.avg_image_duration_ms) })
-            : undefined
-        }
-      />
+      <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
+        <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+          <div className="ag-dashboard-metric-copy">
+            <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">
+              {t('dashboard.usage_estimate')}
+            </div>
+          </div>
+          <span
+            className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES.teal}`}
+            style={METRIC_TONE_STYLES.teal}
+          >
+            <Bell className="h-5 w-5" />
+          </span>
+        </Card.Content>
+      </Card>
     </div>
   );
 }
