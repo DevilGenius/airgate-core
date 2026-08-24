@@ -182,8 +182,10 @@ export interface AccountResp {
   last_probe_at?: string;
   usage_5h_growth_date?: string;
   usage_5h_daily_growth?: number;
+  usage_5h_observed_at?: string;
   usage_7d_growth_date?: string;
   usage_7d_daily_growth?: number;
+  usage_7d_observed_at?: string;
   deleted_at?: string;
   group_ids: number[];
   /** 当前在 Redis 上仍生效的家族级限流冷却列表；后端 omitempty，没有冷却时缺省。 */

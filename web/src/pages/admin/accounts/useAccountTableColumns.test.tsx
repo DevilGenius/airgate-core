@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import { useAccountTableColumns } from './useAccountTableColumns';
+import { isObservedToday, useAccountTableColumns } from './useAccountTableColumns';
 import { AccountCapacityStore, type AccountUsageData } from './AccountPageSupport';
 import { parseAccountPoolAdjustmentPlans } from './accountPoolAdjustment';
 import { queryKeys } from '../../../shared/queryKeys';
@@ -106,6 +106,13 @@ describe('useAccountTableColumns usage refresh', () => {
     });
   });
 
+  it('compares observed ISO timestamps in the browser local timezone', () => {
+    const observedAt = '2026-08-24T16:30:00.000Z';
+    const browserNow = new Date('2026-08-25T00:30:00+08:00');
+    expect(isObservedToday(observedAt, browserNow)).toBe(true);
+    expect(isObservedToday('2026-08-24T15:30:00.000Z', browserNow)).toBe(false);
+  });
+
   it('refreshes usage without invoking the token refresh flow', async () => {
     const client = new QueryClient();
     const usageKey = queryKeys.accountUsage('openai', '1');
@@ -145,8 +152,10 @@ describe('useAccountTableColumns usage refresh', () => {
       last_probe_at: new Date(now.getTime() - 60_000).toISOString(),
       usage_5h_growth_date: today,
       usage_5h_daily_growth: 65,
+      usage_5h_observed_at: now.toISOString(),
       usage_7d_growth_date: today,
       usage_7d_daily_growth: 16,
+      usage_7d_observed_at: now.toISOString(),
     };
 
     const { container } = render(

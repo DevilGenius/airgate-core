@@ -335,9 +335,13 @@ function prepareRequestTime(value: string | undefined): PreparedRequestTime {
   };
 }
 
-function localDateKey(value = new Date()) {
-  const pad = (part: number) => String(part).padStart(2, '0');
-  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+export function isObservedToday(value: string | undefined, now = new Date()) {
+  if (!value) return false;
+  const observedAt = new Date(value);
+  if (Number.isNaN(observedAt.getTime())) return false;
+  return observedAt.getFullYear() === now.getFullYear()
+    && observedAt.getMonth() === now.getMonth()
+    && observedAt.getDate() === now.getDate();
 }
 
 function formatDailyUsageGrowth(value: number) {
@@ -795,12 +799,11 @@ export function useAccountTableColumns({
       align: 'center',
       render: (row) => {
         const access = prepareRequestTime(row.last_used_at);
-        const today = localDateKey();
         const growth = [
-          row.usage_5h_growth_date === today
+          isObservedToday(row.usage_5h_observed_at)
             ? { slot: '5h', value: formatDailyUsageGrowth(row.usage_5h_daily_growth ?? 0) }
             : null,
-          row.usage_7d_growth_date === today
+          isObservedToday(row.usage_7d_observed_at)
             ? { slot: '7d', value: formatDailyUsageGrowth(row.usage_7d_daily_growth ?? 0) }
             : null,
         ].filter((item): item is { slot: string; value: string } => item !== null);

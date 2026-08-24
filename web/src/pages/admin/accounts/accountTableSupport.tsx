@@ -154,8 +154,10 @@ function sameAccountExceptCapacity(left: AccountResp, right: AccountResp) {
     && left.last_probe_at === right.last_probe_at
     && left.usage_5h_growth_date === right.usage_5h_growth_date
     && left.usage_5h_daily_growth === right.usage_5h_daily_growth
+    && left.usage_5h_observed_at === right.usage_5h_observed_at
     && left.usage_7d_growth_date === right.usage_7d_growth_date
     && left.usage_7d_daily_growth === right.usage_7d_daily_growth
+    && left.usage_7d_observed_at === right.usage_7d_observed_at
     && left.group_ids === right.group_ids
     && left.family_cooldowns === right.family_cooldowns
     && left.today_image_count === right.today_image_count
@@ -198,6 +200,7 @@ function accountTableCellRowsEqual(columnKey: string, left: AccountResp, right: 
       return left.last_used_at === right.last_used_at
         && left.usage_5h_growth_date === right.usage_5h_growth_date
         && left.usage_5h_daily_growth === right.usage_5h_daily_growth
+        && left.usage_5h_observed_at === right.usage_5h_observed_at
         && left.usage_7d_growth_date === right.usage_7d_growth_date
         && left.usage_7d_daily_growth === right.usage_7d_daily_growth;
     default:

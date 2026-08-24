@@ -55,6 +55,9 @@ func (w *WindowEstimate) ApplyObservation(observation WindowObservation, costDel
 		(w.ObservedAt != nil && !observation.ObservedAt.After(*w.ObservedAt)) {
 		return false
 	}
+	if w.GrowthDate != "" && observation.Day != "" && observation.Day < w.GrowthDate {
+		return false
+	}
 	interval, canCalibrate := w.CostInterval(observation)
 	w.ObservedAt = cloneTime(&observation.ObservedAt)
 
@@ -111,6 +114,9 @@ func DecayWeight(weight float64, elapsed time.Duration) float64 {
 
 func nextDailyGrowth(storedDate string, growth, last, current float64, day string) (string, float64, float64, bool) {
 	if day == "" || !validPercent(current) {
+		return storedDate, growth, last, false
+	}
+	if storedDate != "" && day < storedDate {
 		return storedDate, growth, last, false
 	}
 	if storedDate != day {

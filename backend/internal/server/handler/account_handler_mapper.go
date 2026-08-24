@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"time"
+
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
@@ -44,6 +46,14 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 	if account.LastProbeAt != nil {
 		lastProbeAt := account.LastProbeAt.UTC().Format("2006-01-02T15:04:05Z")
 		resp.LastProbeAt = &lastProbeAt
+	}
+	if account.UsageEstimateMeta.FiveHour.ObservedAt != nil {
+		observedAt := account.UsageEstimateMeta.FiveHour.ObservedAt.UTC().Format(time.RFC3339)
+		resp.Usage5hObservedAt = &observedAt
+	}
+	if account.UsageEstimateMeta.SevenDay.ObservedAt != nil {
+		observedAt := account.UsageEstimateMeta.SevenDay.ObservedAt.UTC().Format(time.RFC3339)
+		resp.Usage7dObservedAt = &observedAt
 	}
 	if account.DeletedAt != nil {
 		deletedAt := account.DeletedAt.UTC().Format("2006-01-02T15:04:05Z")

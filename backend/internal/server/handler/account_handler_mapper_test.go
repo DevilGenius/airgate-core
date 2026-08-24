@@ -36,8 +36,8 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 		LastUsedAt:         &lastUsed,
 		LastProbeAt:        &lastProbe,
 		UsageEstimateMeta: accountusage.EstimateMeta{
-			FiveHour: accountusage.WindowEstimate{GrowthDate: "2026-06-20", DailyGrowth: 65},
-			SevenDay: accountusage.WindowEstimate{GrowthDate: "2026-06-20", DailyGrowth: 16},
+			FiveHour: accountusage.WindowEstimate{GrowthDate: "2026-06-20", DailyGrowth: 65, ObservedAt: &lastUsed},
+			SevenDay: accountusage.WindowEstimate{GrowthDate: "2026-06-20", DailyGrowth: 16, ObservedAt: &lastProbe},
 		},
 		DeletedAt:  &deletedAt,
 		Proxy:      &appaccount.Proxy{ID: 7},
@@ -61,6 +61,10 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 	if resp.Usage5hGrowthDate != "2026-06-20" || resp.Usage5hDailyGrowth != 65 ||
 		resp.Usage7dGrowthDate != "2026-06-20" || resp.Usage7dDailyGrowth != 16 {
 		t.Fatalf("usage growth = %+v", resp)
+	}
+	if resp.Usage5hObservedAt == nil || *resp.Usage5hObservedAt != "2026-06-20T01:02:03Z" ||
+		resp.Usage7dObservedAt == nil || *resp.Usage7dObservedAt != "2026-06-20T02:03:04Z" {
+		t.Fatalf("usage observation timestamps = (%v, %v)", resp.Usage5hObservedAt, resp.Usage7dObservedAt)
 	}
 	if resp.GroupIDs == nil || len(resp.GroupIDs) != 0 {
 		t.Fatalf("nil group IDs should map to empty slice: %#v", resp.GroupIDs)

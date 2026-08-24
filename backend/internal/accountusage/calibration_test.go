@@ -28,3 +28,25 @@ func TestWindowEstimateTracksFreshObservationWithoutMovingCalibrationCursor(t *t
 		t.Fatalf("window timestamps = %+v", window)
 	}
 }
+
+func TestWindowEstimateIgnoresLatePreviousDayObservation(t *testing.T) {
+	base := time.Date(2026, 8, 25, 0, 5, 0, 0, time.UTC)
+	window := WindowEstimate{
+		GrowthDate:  "2026-08-25",
+		DailyGrowth: 12,
+		LastPercent: 42,
+		ObservedAt:  &base,
+	}
+	late := WindowObservation{
+		Day:            "2026-08-24",
+		ObservedAt:     base.Add(time.Minute),
+		CurrentPercent: 99,
+		MaxSampleGap:   FiveHourMaxSampleGap,
+	}
+	if window.ApplyObservation(late, 100) {
+		t.Fatal("late previous-day observation should be ignored")
+	}
+	if window.GrowthDate != "2026-08-25" || window.DailyGrowth != 12 || window.LastPercent != 42 {
+		t.Fatalf("window regressed after late observation: %+v", window)
+	}
+}
