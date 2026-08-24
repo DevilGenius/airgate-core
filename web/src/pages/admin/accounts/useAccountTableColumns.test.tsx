@@ -107,10 +107,11 @@ describe('useAccountTableColumns usage refresh', () => {
   });
 
   it('compares observed ISO timestamps in the browser local timezone', () => {
-    const observedAt = '2026-08-24T16:30:00.000Z';
-    const browserNow = new Date('2026-08-25T00:30:00+08:00');
-    expect(isObservedToday(observedAt, browserNow)).toBe(true);
-    expect(isObservedToday('2026-08-24T15:30:00.000Z', browserNow)).toBe(false);
+    const browserNow = new Date(2026, 7, 25, 0, 30);
+    const observedToday = new Date(2026, 7, 25, 0, 30).toISOString();
+    const observedYesterday = new Date(2026, 7, 24, 23, 30).toISOString();
+    expect(isObservedToday(observedToday, browserNow)).toBe(true);
+    expect(isObservedToday(observedYesterday, browserNow)).toBe(false);
   });
 
   it('refreshes usage without invoking the token refresh flow', async () => {
