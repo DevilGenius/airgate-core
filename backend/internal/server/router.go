@@ -145,6 +145,8 @@ func (s *Server) registerRoutes() {
 
 		// 分组管理
 		adminGroup.GET("/groups", handlers.Group.ListGroups)
+		// 管理页统计视图单独路由，避免列表接口隐式执行重查询。
+		adminGroup.GET("/groups/overview", handlers.Group.ListGroupOverview)
 		adminGroup.POST("/groups", handlers.Group.CreateGroup)
 		adminGroup.GET("/groups/:id", handlers.Group.GetGroup)
 		adminGroup.PUT("/groups/:id", handlers.Group.UpdateGroup)

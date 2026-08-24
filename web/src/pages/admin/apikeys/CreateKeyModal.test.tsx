@@ -121,12 +121,6 @@ vi.mock('../../../shared/components/SimpleSelect', () => ({
 
 function group(overrides: Partial<GroupResp>): GroupResp {
   return {
-    account_active: 0,
-    account_disabled: 0,
-    account_error: 0,
-    account_total: 0,
-    capacity_total: 0,
-    capacity_used: 0,
     created_at: '2026-06-20T00:00:00Z',
     id: 0,
     is_exclusive: false,
@@ -136,8 +130,6 @@ function group(overrides: Partial<GroupResp>): GroupResp {
     sort_weight: 0,
     status_visible: true,
     subscription_type: 'standard',
-    today_cost: 0,
-    total_cost: 0,
     updated_at: '2026-06-20T00:00:00Z',
     ...overrides,
   };

@@ -10,14 +10,52 @@ import (
 
 // ListGroups 查询分组列表。
 func (h *GroupHandler) ListGroups(c *gin.Context) {
-	var page dto.PageReq
-	if err := c.ShouldBindQuery(&page); err != nil {
-		response.BindError(c, err)
+	result, ok := h.listGroups(c)
+	if !ok {
+		return
+	}
+	list := make([]dto.GroupResp, 0, len(result.List))
+	for _, item := range result.List {
+		list = append(list, toGroupRespFromDomain(item))
+	}
+
+	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
+}
+
+// ListGroupOverview 查询分组管理页所需的配置和运行统计。
+// 统计视图单独命名，避免轻量分组列表隐式触发账号关系和用量查询。
+func (h *GroupHandler) ListGroupOverview(c *gin.Context) {
+	result, ok := h.listGroups(c)
+	if !ok {
 		return
 	}
 
-	ctx := c.Request.Context()
-	result, err := h.service.List(ctx, appgroup.ListFilter{
+	groupIDs := make([]int, 0, len(result.List))
+	for _, item := range result.List {
+		groupIDs = append(groupIDs, item.ID)
+	}
+	statsMap, err := h.service.StatsForGroups(c.Request.Context(), groupIDs, c.Query("tz"))
+	if err != nil {
+		httpCode, message := h.handleError("查询分组统计失败", "查询失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	list := make([]dto.GroupOverviewResp, 0, len(result.List))
+	for _, item := range result.List {
+		list = append(list, toGroupOverviewResp(item, statsMap[item.ID]))
+	}
+	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
+}
+
+func (h *GroupHandler) listGroups(c *gin.Context) (appgroup.ListResult, bool) {
+	var page dto.PageReq
+	if err := c.ShouldBindQuery(&page); err != nil {
+		response.BindError(c, err)
+		return appgroup.ListResult{}, false
+	}
+
+	result, err := h.service.List(c.Request.Context(), appgroup.ListFilter{
 		Page:        page.Page,
 		PageSize:    page.PageSize,
 		Keyword:     page.Keyword,
@@ -27,33 +65,9 @@ func (h *GroupHandler) ListGroups(c *gin.Context) {
 	if err != nil {
 		httpCode, message := h.handleError("查询分组列表失败", "查询失败", err)
 		response.Error(c, httpCode, httpCode, message)
-		return
+		return appgroup.ListResult{}, false
 	}
-
-	// 批量查询分组统计
-	groupIDs := make([]int, 0, len(result.List))
-	for _, item := range result.List {
-		groupIDs = append(groupIDs, item.ID)
-	}
-	statsMap, _ := h.service.StatsForGroups(ctx, groupIDs, c.Query("tz"))
-
-	list := make([]dto.GroupResp, 0, len(result.List))
-	for _, item := range result.List {
-		resp := toGroupRespFromDomain(item)
-		if stats, ok := statsMap[item.ID]; ok {
-			resp.AccountActive = stats.AccountActive
-			resp.AccountError = stats.AccountError
-			resp.AccountDisabled = stats.AccountDisabled
-			resp.AccountTotal = stats.AccountTotal
-			resp.CapacityUsed = stats.CapacityUsed
-			resp.CapacityTotal = stats.CapacityTotal
-			resp.TodayCost = stats.TodayCost
-			resp.TotalCost = stats.TotalCost
-		}
-		list = append(list, resp)
-	}
-
-	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
+	return result, true
 }
 
 // ListAvailableGroups 查询当前用户可用分组列表。

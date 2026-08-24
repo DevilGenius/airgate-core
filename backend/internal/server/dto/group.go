@@ -25,8 +25,12 @@ type GroupResp struct {
 	ForceInstructions        string                        `json:"force_instructions,omitempty"`
 	Note                     string                        `json:"note,omitempty"`
 	SortWeight               int                           `json:"sort_weight"`
+	TimeMixin
+}
 
-	// 统计字段（仅管理员列表返回）
+// GroupStatsResp 分组运行统计。与分组配置响应分离，避免轻量列表触发
+// 账号关系和用量汇总查询。
+type GroupStatsResp struct {
 	AccountActive   int     `json:"account_active"`
 	AccountError    int     `json:"account_error"`
 	AccountDisabled int     `json:"account_disabled"`
@@ -35,8 +39,12 @@ type GroupResp struct {
 	CapacityTotal   int     `json:"capacity_total"`
 	TodayCost       float64 `json:"today_cost"`
 	TotalCost       float64 `json:"total_cost"`
+}
 
-	TimeMixin
+// GroupOverviewResp 是分组管理页使用的配置 + 统计视图。
+type GroupOverviewResp struct {
+	GroupResp
+	GroupStatsResp
 }
 
 // CreateGroupReq 创建分组请求

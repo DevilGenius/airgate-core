@@ -1,6 +1,7 @@
 import { del, get, post, put } from './client';
 import type {
   GroupResp,
+  GroupOverviewResp,
   CreateGroupReq,
   UpdateGroupReq,
   PageReq,
@@ -13,9 +14,12 @@ export const groupsApi = {
   listAvailable: (params: PageReq & { platform?: string }) =>
     get<PagedData<GroupResp>>('/api/v1/groups', params),
 
-  // 管理员接口
-  list: (params: PageReq & { platform?: string }) =>
+  // 管理员轻量配置列表
+  list: (params: PageReq & { platform?: string; service_tier?: string }) =>
     get<PagedData<GroupResp>>('/api/v1/admin/groups', params),
+  // 分组管理页完整视图（显式包含账号/容量/用量统计）
+  overview: (params: PageReq & { platform?: string; service_tier?: string }) =>
+    get<PagedData<GroupOverviewResp>>('/api/v1/admin/groups/overview', params),
   get: (id: number) => get<GroupResp>(`/api/v1/admin/groups/${id}`),
   create: (data: CreateGroupReq) => post<GroupResp>('/api/v1/admin/groups', data),
   update: (id: number, data: UpdateGroupReq) => put<void>(`/api/v1/admin/groups/${id}`, data),

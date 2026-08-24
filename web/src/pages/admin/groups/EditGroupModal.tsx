@@ -16,6 +16,7 @@ import {
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { ArrowUpDown, Layers, X } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
+import { queryKeys } from '../../../shared/queryKeys';
 import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
@@ -27,7 +28,7 @@ import {
   isValidRateMultiplierValue,
   parseRateMultiplier,
 } from '../../../shared/utils/rateMultiplier';
-import type { GroupResp, CreateGroupReq, UpdateGroupReq, ModelPolicy } from '../../../shared/types';
+import type { GroupOverviewResp, GroupResp, CreateGroupReq, UpdateGroupReq, ModelPolicy } from '../../../shared/types';
 
 function parseQuotas(quotas?: Record<string, unknown>): { daily: string; weekly: string; monthly: string } {
   return {
@@ -234,11 +235,11 @@ export function GroupFormModal({
   const [copyFromGroupIds, setCopyFromGroupIds] = useState<number[]>([]);
 
   const { data: copySourceData } = useQuery({
-    queryKey: ['groups-for-copy', form.platform],
-    queryFn: () => groupsApi.list({ page: 1, page_size: 100, platform: form.platform }),
+    queryKey: queryKeys.groupsOverview('copy', form.platform),
+    queryFn: () => groupsApi.overview({ page: 1, page_size: 100, platform: form.platform }),
     enabled: !isEdit && !!form.platform && open,
   });
-  const copySourceGroups: GroupResp[] = copySourceData?.list ?? [];
+  const copySourceGroups: GroupOverviewResp[] = copySourceData?.list ?? [];
   const platformOptions = [
     { id: '', label: t('groups.select_platform') },
     ...platforms.map((platform) => ({ id: platform, label: platform })),

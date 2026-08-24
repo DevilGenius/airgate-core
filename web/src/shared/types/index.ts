@@ -348,6 +348,11 @@ export interface GroupResp {
   force_instructions?: string;
   note?: string;
   sort_weight: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupStatsResp {
   account_active: number;
   account_error: number;
   account_disabled: number;
@@ -356,9 +361,9 @@ export interface GroupResp {
   capacity_total: number;
   today_cost: number;
   total_cost: number;
-  created_at: string;
-  updated_at: string;
 }
+
+export type GroupOverviewResp = GroupResp & GroupStatsResp;
 
 export interface CreateGroupReq {
   name: string;

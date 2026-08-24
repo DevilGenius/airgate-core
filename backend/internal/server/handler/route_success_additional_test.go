@@ -69,6 +69,15 @@ func TestGroupAndProxyRoutesSuccessWithSQLite(t *testing.T) {
 	if !strings.Contains(w.Body.String(), `"total":1`) {
 		t.Fatalf("group list body = %s", w.Body.String())
 	}
+	if strings.Contains(w.Body.String(), `"account_total"`) {
+		t.Fatalf("lightweight group list unexpectedly contains stats: %s", w.Body.String())
+	}
+
+	w = invokeHandlerForValidation(http.MethodGet, "/groups/overview?page=1&page_size=10&platform=openai&service_tier=", "", nil, nil, groupHandler.ListGroupOverview)
+	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+	if !strings.Contains(w.Body.String(), `"account_total":0`) {
+		t.Fatalf("group overview body = %s", w.Body.String())
+	}
 
 	w = invokeHandlerForValidation(http.MethodGet, "/groups/1", "", gin.Params{{Key: "id", Value: "1"}}, nil, groupHandler.GetGroup)
 	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))

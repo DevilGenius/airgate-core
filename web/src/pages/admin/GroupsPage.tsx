@@ -94,9 +94,9 @@ export default function GroupsPage() {
 
   // 查询分组列表
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: queryKeys.groups(page, pageSize, platformFilter),
+    queryKey: queryKeys.groupsOverview(page, pageSize, platformFilter),
     queryFn: () =>
-      groupsApi.list({
+      groupsApi.overview({
         page,
         page_size: pageSize,
         platform: platformFilter || undefined,

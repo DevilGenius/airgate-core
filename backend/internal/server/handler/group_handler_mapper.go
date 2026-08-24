@@ -31,3 +31,23 @@ func toGroupRespFromDomain(item appgroup.Group) dto.GroupResp {
 		},
 	}
 }
+
+func toGroupStatsResp(stats appgroup.GroupStats) dto.GroupStatsResp {
+	return dto.GroupStatsResp{
+		AccountActive:   stats.AccountActive,
+		AccountError:    stats.AccountError,
+		AccountDisabled: stats.AccountDisabled,
+		AccountTotal:    stats.AccountTotal,
+		CapacityUsed:    stats.CapacityUsed,
+		CapacityTotal:   stats.CapacityTotal,
+		TodayCost:       stats.TodayCost,
+		TotalCost:       stats.TotalCost,
+	}
+}
+
+func toGroupOverviewResp(item appgroup.Group, stats appgroup.GroupStats) dto.GroupOverviewResp {
+	return dto.GroupOverviewResp{
+		GroupResp:      toGroupRespFromDomain(item),
+		GroupStatsResp: toGroupStatsResp(stats),
+	}
+}

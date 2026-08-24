@@ -2,6 +2,7 @@ export const queryKeys = {
   users: (...args: unknown[]) => ['users', ...args] as const,
   usersAll: () => ['users-all'] as const,
   groups: (...args: unknown[]) => ['groups', ...args] as const,
+  groupsOverview: (...args: unknown[]) => ['groups', 'overview', ...args] as const,
   groupsAll: () => ['groups-all'] as const,
   groupsForKeys: () => ['groups-for-keys'] as const,
   apikeys: (...args: unknown[]) => ['apikeys', ...args] as const,

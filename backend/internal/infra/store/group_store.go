@@ -2,8 +2,12 @@ package store
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/DevilGenius/airgate-core/ent"
 	entaccount "github.com/DevilGenius/airgate-core/ent/account"
 	entapikey "github.com/DevilGenius/airgate-core/ent/apikey"
@@ -392,48 +396,113 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 		result[g.ID] = stats
 	}
 
-	// 2. 查询每个分组的总用量
+	// 2. PostgreSQL 只读取 API-Key 小时汇总。汇总表为空时返回 0；不再
+	// 回退到 usage_logs，避免旧明细查询重新成为分组页的全表扫描入口。
+	var usageByGroup map[int]groupUsageSummary
+	if s.db.Driver().Dialect() == dialect.Postgres {
+		usageByGroup, err = s.groupUsageFromAPIKeyRollups(ctx, groupIDs, todayStart)
+	} else {
+		// SQLite 仅用于单元测试，使用明细查询保持测试数据库无需额外建汇总表。
+		usageByGroup, err = s.groupUsageFromUsageLogs(ctx, groupIDs, todayStart)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	for groupID, usage := range usageByGroup {
+		stats := result[groupID]
+		stats.TotalCost = usage.TotalCost
+		stats.TodayCost = usage.TodayCost
+		result[groupID] = stats
+	}
+
+	return result, activeAccounts, nil
+}
+
+type groupUsageSummary struct {
+	TotalCost float64
+	TodayCost float64
+}
+
+func (s *GroupStore) groupUsageFromAPIKeyRollups(ctx context.Context, groupIDs []int, todayStart time.Time) (map[int]groupUsageSummary, error) {
+	args := make([]any, 0, len(groupIDs)+1)
+	placeholders := make([]string, 0, len(groupIDs))
+	for _, groupID := range groupIDs {
+		args = append(args, groupID)
+		placeholders = append(placeholders, fmt.Sprintf("$%d::integer", len(args)))
+	}
+	args = append(args, todayStart)
+	todayArg := fmt.Sprintf("$%d::timestamptz", len(args))
+	query := `
+SELECT
+	group_id,
+	COALESCE(SUM(total_cost), 0)::double precision AS total_cost,
+	COALESCE(SUM(total_cost) FILTER (WHERE bucket_start >= ` + todayArg + `), 0)::double precision AS today_cost
+FROM ` + usageAPIKeyHourlyRollupTable + `
+WHERE group_id IN (` + strings.Join(placeholders, ", ") + `)
+GROUP BY group_id`
+
+	var rows entsql.Rows
+	if err := s.db.Driver().Query(ctx, query, args, &rows); err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make(map[int]groupUsageSummary, len(groupIDs))
+	for rows.Next() {
+		var groupID int
+		var usage groupUsageSummary
+		if err := rows.Scan(&groupID, &usage.TotalCost, &usage.TodayCost); err != nil {
+			return nil, err
+		}
+		result[groupID] = usage
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// groupUsageFromUsageLogs 仅供 SQLite 测试数据库使用。生产 PostgreSQL
+// 必须走 API-Key 汇总表，避免把明细表扫描重新带回管理页面。
+func (s *GroupStore) groupUsageFromUsageLogs(ctx context.Context, groupIDs []int, todayStart time.Time) (map[int]groupUsageSummary, error) {
+	result := make(map[int]groupUsageSummary, len(groupIDs))
 	var totalRows []struct {
 		GroupID   int     `json:"group_usage_logs"`
 		TotalCost float64 `json:"total_cost"`
 	}
-	err = s.db.UsageLog.Query().
+	if err := s.db.UsageLog.Query().
 		Where(entusagelog.HasGroupWith(entgroup.IDIn(groupIDs...))).
 		GroupBy("group_usage_logs").
 		Aggregate(ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost")).
-		Scan(ctx, &totalRows)
-	if err != nil {
-		return nil, nil, err
+		Scan(ctx, &totalRows); err != nil {
+		return nil, err
 	}
 	for _, row := range totalRows {
-		stats := result[row.GroupID]
-		stats.TotalCost = row.TotalCost
-		result[row.GroupID] = stats
+		usage := result[row.GroupID]
+		usage.TotalCost = row.TotalCost
+		result[row.GroupID] = usage
 	}
 
-	// 3. 查询每个分组的今日用量
 	var todayRows []struct {
 		GroupID   int     `json:"group_usage_logs"`
 		TotalCost float64 `json:"total_cost"`
 	}
-	err = s.db.UsageLog.Query().
+	if err := s.db.UsageLog.Query().
 		Where(
 			entusagelog.HasGroupWith(entgroup.IDIn(groupIDs...)),
 			entusagelog.CreatedAtGTE(todayStart),
 		).
 		GroupBy("group_usage_logs").
 		Aggregate(ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost")).
-		Scan(ctx, &todayRows)
-	if err != nil {
-		return nil, nil, err
+		Scan(ctx, &todayRows); err != nil {
+		return nil, err
 	}
 	for _, row := range todayRows {
-		stats := result[row.GroupID]
-		stats.TodayCost = row.TotalCost
-		result[row.GroupID] = stats
+		usage := result[row.GroupID]
+		usage.TodayCost = row.TotalCost
+		result[row.GroupID] = usage
 	}
-
-	return result, activeAccounts, nil
+	return result, nil
 }
 
 func applyGroupListFilters(query *ent.GroupQuery, keyword, platform, serviceTier string) *ent.GroupQuery {
