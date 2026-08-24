@@ -65,9 +65,9 @@ func TestUsageGrowthObservationUsesBaseFiveHourAndSevenDayWindows(t *testing.T) 
 		{Key: "model:5h:spark", UsedPercent: 99},
 		{Key: "7d", UsedPercent: 16},
 		{Key: "7d_sonnet", Label: "7d Sonnet", UsedPercent: 88},
-	}}, "2026-08-24")
+	}}, time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local))
 
-	if got.Day != "2026-08-24" || got.FiveHourPercent == nil || *got.FiveHourPercent != 65 ||
+	if got.Day != "2026-08-24" || got.ObservedAt.IsZero() || got.FiveHourPercent == nil || *got.FiveHourPercent != 65 ||
 		got.SevenDayPercent == nil || *got.SevenDayPercent != 16 {
 		t.Fatalf("usageGrowthObservation() = %+v", got)
 	}

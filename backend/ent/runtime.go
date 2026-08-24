@@ -21,6 +21,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/ent/usersubscription"
+	"github.com/DevilGenius/airgate-core/internal/accountusage"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -209,40 +210,20 @@ func init() {
 	accountDescUpstreamIsPool := accountFields[13].Descriptor()
 	// account.DefaultUpstreamIsPool holds the default value on creation for the upstream_is_pool field.
 	account.DefaultUpstreamIsPool = accountDescUpstreamIsPool.Default.(bool)
-	// accountDescUsage5hGrowthDate is the schema descriptor for usage_5h_growth_date field.
-	accountDescUsage5hGrowthDate := accountFields[16].Descriptor()
-	// account.DefaultUsage5hGrowthDate holds the default value on creation for the usage_5h_growth_date field.
-	account.DefaultUsage5hGrowthDate = accountDescUsage5hGrowthDate.Default.(string)
-	// accountDescUsage5hDailyGrowth is the schema descriptor for usage_5h_daily_growth field.
-	accountDescUsage5hDailyGrowth := accountFields[17].Descriptor()
-	// account.DefaultUsage5hDailyGrowth holds the default value on creation for the usage_5h_daily_growth field.
-	account.DefaultUsage5hDailyGrowth = accountDescUsage5hDailyGrowth.Default.(float64)
-	// accountDescUsage5hLastPercent is the schema descriptor for usage_5h_last_percent field.
-	accountDescUsage5hLastPercent := accountFields[18].Descriptor()
-	// account.DefaultUsage5hLastPercent holds the default value on creation for the usage_5h_last_percent field.
-	account.DefaultUsage5hLastPercent = accountDescUsage5hLastPercent.Default.(float64)
-	// accountDescUsage7dGrowthDate is the schema descriptor for usage_7d_growth_date field.
-	accountDescUsage7dGrowthDate := accountFields[19].Descriptor()
-	// account.DefaultUsage7dGrowthDate holds the default value on creation for the usage_7d_growth_date field.
-	account.DefaultUsage7dGrowthDate = accountDescUsage7dGrowthDate.Default.(string)
-	// accountDescUsage7dDailyGrowth is the schema descriptor for usage_7d_daily_growth field.
-	accountDescUsage7dDailyGrowth := accountFields[20].Descriptor()
-	// account.DefaultUsage7dDailyGrowth holds the default value on creation for the usage_7d_daily_growth field.
-	account.DefaultUsage7dDailyGrowth = accountDescUsage7dDailyGrowth.Default.(float64)
-	// accountDescUsage7dLastPercent is the schema descriptor for usage_7d_last_percent field.
-	accountDescUsage7dLastPercent := accountFields[21].Descriptor()
-	// account.DefaultUsage7dLastPercent holds the default value on creation for the usage_7d_last_percent field.
-	account.DefaultUsage7dLastPercent = accountDescUsage7dLastPercent.Default.(float64)
+	// accountDescUsageEstimateMeta is the schema descriptor for usage_estimate_meta field.
+	accountDescUsageEstimateMeta := accountFields[16].Descriptor()
+	// account.DefaultUsageEstimateMeta holds the default value on creation for the usage_estimate_meta field.
+	account.DefaultUsageEstimateMeta = accountDescUsageEstimateMeta.Default.(accountusage.EstimateMeta)
 	// accountDescExtra is the schema descriptor for extra field.
-	accountDescExtra := accountFields[22].Descriptor()
+	accountDescExtra := accountFields[17].Descriptor()
 	// account.DefaultExtra holds the default value on creation for the extra field.
 	account.DefaultExtra = accountDescExtra.Default.(map[string]interface{})
 	// accountDescCreatedAt is the schema descriptor for created_at field.
-	accountDescCreatedAt := accountFields[24].Descriptor()
+	accountDescCreatedAt := accountFields[19].Descriptor()
 	// account.DefaultCreatedAt holds the default value on creation for the created_at field.
 	account.DefaultCreatedAt = accountDescCreatedAt.Default.(func() time.Time)
 	// accountDescUpdatedAt is the schema descriptor for updated_at field.
-	accountDescUpdatedAt := accountFields[25].Descriptor()
+	accountDescUpdatedAt := accountFields[20].Descriptor()
 	// account.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	account.DefaultUpdatedAt = accountDescUpdatedAt.Default.(func() time.Time)
 	// account.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

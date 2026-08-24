@@ -93,41 +93,76 @@ func TestAccountStoreObserveUsageGrowthAccumulatesResetsAndDays(t *testing.T) {
 		t.Fatalf("create account: %v", err)
 	}
 	store := NewAccountStore(db)
-	observe := func(day string, five, seven *float64) {
+	observe := func(day string, observedAt time.Time, five, seven *float64) {
 		t.Helper()
 		if err := store.ObserveUsageGrowth(ctx, item.ID, account.UsageGrowthObservation{
-			Day: day, FiveHourPercent: five, SevenDayPercent: seven,
+			Day: day, ObservedAt: observedAt, FiveHourPercent: five, SevenDayPercent: seven,
 		}); err != nil {
 			t.Fatalf("ObserveUsageGrowth(%s): %v", day, err)
 		}
 	}
 	value := func(v float64) *float64 { return &v }
+	firstObservedAt := time.Date(2026, 8, 24, 10, 0, 0, 0, time.Local)
 
-	observe("2026-08-24", value(10), value(20))
-	observe("2026-08-24", value(70), value(36))
-	observe("2026-08-24", value(5), value(36))
+	observe("2026-08-24", firstObservedAt, value(10), value(20))
+	if _, err := db.UsageLog.Create().
+		SetBillingEventID("bill_usage_growth_first_interval").
+		SetPlatform("openai").
+		SetModel("gpt-5").
+		SetAccountCost(120).
+		SetAccountID(item.ID).
+		SetCreatedAt(firstObservedAt.Add(30 * time.Minute)).
+		Save(ctx); err != nil {
+		t.Fatalf("create first calibration usage: %v", err)
+	}
+	observe("2026-08-24", firstObservedAt.Add(time.Hour), value(70), value(36))
+	if _, err := db.UsageLog.Create().
+		SetBillingEventID("bill_usage_growth_reset_interval").
+		SetPlatform("openai").
+		SetModel("gpt-5").
+		SetAccountCost(10).
+		SetAccountID(item.ID).
+		SetCreatedAt(firstObservedAt.Add(90 * time.Minute)).
+		Save(ctx); err != nil {
+		t.Fatalf("create reset calibration usage: %v", err)
+	}
+	observe("2026-08-24", firstObservedAt.Add(2*time.Hour), value(5), value(36))
 
 	got, err := db.Account.Get(ctx, item.ID)
 	if err != nil {
 		t.Fatalf("get account: %v", err)
 	}
-	if got.Usage5hGrowthDate != "2026-08-24" || got.Usage5hDailyGrowth != 65 || got.Usage5hLastPercent != 5 {
-		t.Fatalf("5h growth state = (%q, %v, %v), want (2026-08-24, 65, 5)", got.Usage5hGrowthDate, got.Usage5hDailyGrowth, got.Usage5hLastPercent)
+	fiveHour := got.UsageEstimateMeta.FiveHour
+	sevenDay := got.UsageEstimateMeta.SevenDay
+	if fiveHour.GrowthDate != "2026-08-24" || fiveHour.DailyGrowth != 65 || fiveHour.LastPercent != 5 {
+		t.Fatalf("5h growth state = %+v, want date=2026-08-24 growth=65 last=5", fiveHour)
 	}
-	if got.Usage7dGrowthDate != "2026-08-24" || got.Usage7dDailyGrowth != 16 || got.Usage7dLastPercent != 36 {
-		t.Fatalf("7d growth state = (%q, %v, %v), want (2026-08-24, 16, 36)", got.Usage7dGrowthDate, got.Usage7dDailyGrowth, got.Usage7dLastPercent)
+	if sevenDay.GrowthDate != "2026-08-24" || sevenDay.DailyGrowth != 16 || sevenDay.LastPercent != 36 {
+		t.Fatalf("7d growth state = %+v, want date=2026-08-24 growth=16 last=36", sevenDay)
+	}
+	if fiveHour.CostPerPercent != 2 || sevenDay.CostPerPercent != 7.5 || fiveHour.CalibratedAt == nil || sevenDay.CalibratedAt == nil {
+		t.Fatalf("rolling calibration = (5h=%+v, 7d=%+v)", fiveHour, sevenDay)
+	}
+	if sevenDay.ObservedAt == nil || !sevenDay.ObservedAt.Equal(firstObservedAt.Add(2*time.Hour)) ||
+		sevenDay.CalibrationCursorAt == nil || !sevenDay.CalibrationCursorAt.Equal(firstObservedAt.Add(time.Hour)) {
+		t.Fatalf("unchanged 7d should refresh observation but retain calibration cursor: %+v", sevenDay)
 	}
 
-	observe("2026-08-25", value(12), nil)
+	observe("2026-08-25", firstObservedAt.Add(24*time.Hour), value(12), nil)
 	got, err = db.Account.Get(ctx, item.ID)
 	if err != nil {
 		t.Fatalf("get next-day account: %v", err)
 	}
-	if got.Usage5hGrowthDate != "2026-08-25" || got.Usage5hDailyGrowth != 0 || got.Usage5hLastPercent != 12 {
-		t.Fatalf("next-day 5h state = (%q, %v, %v), want baseline (2026-08-25, 0, 12)", got.Usage5hGrowthDate, got.Usage5hDailyGrowth, got.Usage5hLastPercent)
+	fiveHour = got.UsageEstimateMeta.FiveHour
+	sevenDay = got.UsageEstimateMeta.SevenDay
+	if fiveHour.GrowthDate != "2026-08-25" || fiveHour.DailyGrowth != 0 || fiveHour.LastPercent != 12 {
+		t.Fatalf("next-day 5h state = %+v, want baseline date=2026-08-25 growth=0 last=12", fiveHour)
 	}
-	if got.Usage7dGrowthDate != "2026-08-24" || got.Usage7dDailyGrowth != 16 {
-		t.Fatalf("missing next-day 7d observation changed state: (%q, %v)", got.Usage7dGrowthDate, got.Usage7dDailyGrowth)
+	if sevenDay.GrowthDate != "2026-08-24" || sevenDay.DailyGrowth != 16 {
+		t.Fatalf("missing next-day 7d observation changed state: %+v", sevenDay)
+	}
+	if fiveHour.CostPerPercent != 2 || sevenDay.CostPerPercent != 7.5 {
+		t.Fatalf("cross-day baseline should retain calibration: (5h=%+v, 7d=%+v)", fiveHour, sevenDay)
 	}
 }
 

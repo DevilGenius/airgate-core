@@ -48,6 +48,27 @@ type DashboardStatsResp struct {
 	// 前端在 0 时隐藏对应的副标。
 	AvgImageDurationMs float64 `json:"avg_image_duration_ms"`
 	ActiveUsers        int64   `json:"active_users"`
+
+	// 用量估算：账号页“成本”口径（usage_logs.account_cost）。
+	AccountCostPerMinute1M  float64                  `json:"account_cost_per_minute_1m"`
+	AccountCostPerMinute10M float64                  `json:"account_cost_per_minute_10m"`
+	UsageEstimates          []DashboardUsageEstimate `json:"usage_estimates"`
+}
+
+// DashboardUsageEstimate 套餐池按当前一分钟成本速率换算的剩余时间。
+type DashboardUsageEstimate struct {
+	Plan    string                         `json:"plan"`
+	Windows []DashboardUsageEstimateWindow `json:"windows"`
+}
+
+// DashboardUsageEstimateWindow 单个 5h/7d 窗口剩余用量估值。
+type DashboardUsageEstimateWindow struct {
+	Window             string   `json:"window"`
+	Status             string   `json:"status"`
+	DailyGrowthPercent float64  `json:"daily_growth_percent"`
+	FullCost           float64  `json:"full_cost"`
+	RemainingCost      *float64 `json:"remaining_cost,omitempty"`
+	RemainingMinutes   *float64 `json:"remaining_minutes,omitempty"`
 }
 
 // DashboardStatsReq 仪表盘统计查询参数

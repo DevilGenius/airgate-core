@@ -4,15 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Card, Skeleton, Tabs } from '@heroui/react';
 import {
   Activity,
-  ArrowDown,
-  ArrowRight,
-  ArrowUp,
   Astroid,
   Bell,
   Calculator,
   CalendarDays,
   Clock,
   KeyRound,
+  MoveDown,
+  MoveRight,
+  MoveUp,
   ToggleRight,
   Zap,
 } from 'lucide-react';
@@ -37,7 +37,7 @@ import { UserSearchFilterComboBox } from '../shared/components/UserSearchFilterC
 import { usePersistentAutoRefresh } from '../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../shared/storageKeys';
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../shared/ui/metricTones';
-import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
+import type { DashboardStatsResp, DashboardTrendResp, DashboardUsageEstimateWindow } from '../shared/types';
 
 const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 const USER_COLORS = [...decorativePalette];
@@ -105,6 +105,57 @@ function fmtRate(n: number | undefined | null): string {
 function fmtCoefficient(n: number | undefined | null): string {
   if (n == null || n <= 0) return '0.00';
   return n.toFixed(2);
+}
+
+export function fmtCostPerMinute(value: number | undefined | null): string {
+  if (value == null || !Number.isFinite(value) || value <= 0) return '$0';
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+export function fmtUsageEstimateDuration(minutes: number | undefined): string {
+  if (minutes == null || !Number.isFinite(minutes) || minutes < 0) return '';
+  const totalMinutes = Math.round(minutes);
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+  if (hours <= 0) return `${remainingMinutes}min`;
+  if (remainingMinutes === 0) return `${hours}h`;
+  return `${hours}h${remainingMinutes}min`;
+}
+
+export function fmtUsageEstimateCost(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '$0';
+  return `$${Math.round(value)}`;
+}
+
+export function shouldHideUsageEstimateIcon(contentLength: number, windowCount: number, planCount: number): boolean {
+  return contentLength > 42 || (windowCount > 1 && planCount > 1);
+}
+
+/** 将 $ 金额文本渲染为绿色 $ + 继承色金额，参考今日 Token 卡片标准成本（text-success）样式 */
+function GreenCost({ text }: { text: string }) {
+  if (!text.startsWith('$')) return <>{text}</>;
+  return (
+    <>
+      <span className="text-success">$</span>
+      {text.slice(1)}
+    </>
+  );
+}
+
+/** 用量估算单窗口单元格：剩余时间-剩余标准用量。 */
+function UsageEstimateCell({ window }: { window: DashboardUsageEstimateWindow }) {
+  const { t } = useTranslation();
+  if (window.status !== 'ready' || window.remaining_minutes == null || window.remaining_cost == null) {
+    return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
+  }
+  const duration = fmtUsageEstimateDuration(window.remaining_minutes);
+  const cost = fmtUsageEstimateCost(window.remaining_cost);
+  if (!duration) return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
+  return (
+    <span className="font-mono text-lg font-semibold leading-none text-text 2xl:text-xl">
+      {duration}-<GreenCost text={cost} />
+    </span>
+  );
 }
 
 type DashboardTimeLabel = {
@@ -284,11 +335,11 @@ function PerformanceMetricCard({
           <div className="flex items-center gap-1 text-sm font-semibold tracking-normal text-text-tertiary">
             <span className="truncate">{title}</span>
             {rpmTrend === 'up' ? (
-              <ArrowUp className="h-3.5 w-3.5 shrink-0 text-success" />
+              <MoveUp className="h-3.5 w-3.5 shrink-0 text-success" />
             ) : rpmTrend === 'down' ? (
-              <ArrowDown className="h-3.5 w-3.5 shrink-0 text-danger" />
+              <MoveDown className="h-3.5 w-3.5 shrink-0 text-danger" />
             ) : (
-              <ArrowRight className="h-3.5 w-3.5 shrink-0 text-black" />
+              <MoveRight className="h-3.5 w-3.5 shrink-0 text-black" />
             )}
           </div>
           <div className="mt-1 flex min-w-0 items-baseline gap-x-2 whitespace-nowrap">
@@ -351,6 +402,29 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
   const { t } = useTranslation();
   const todayImageRequests = stats.today_image_requests ?? 0;
   const todayTextRequests = Math.max(0, (stats.today_requests ?? 0) - todayImageRequests);
+  const usageEstimates = stats.usage_estimates ?? [];
+  const usageEstimateWindows = (['5h', '7d'] as const).filter((windowKey) =>
+    usageEstimates.some((estimate) => estimate.windows.some((window) => window.window === windowKey)),
+  );
+  const orderedUsageEstimates = [...usageEstimates].sort((left, right) => {
+    const rank = (plan: string) => plan === 'plus' ? 0 : plan === 'pro' ? 1 : 2;
+    return rank(left.plan) - rank(right.plan);
+  });
+  const usageEstimateHeaderLength = t('dashboard.usage_estimate').length + 14
+    + fmtCostPerMinute(stats.account_cost_per_minute_1m).length
+    + fmtCostPerMinute(stats.account_cost_per_minute_10m).length;
+  const usageEstimateValueLength = orderedUsageEstimates.reduce(
+    (total, estimate) => total + estimate.windows.reduce((subtotal, window) => {
+      if (window.status !== 'ready' || window.remaining_minutes == null || window.remaining_cost == null) return subtotal + 8;
+      return subtotal + fmtUsageEstimateDuration(window.remaining_minutes).length + fmtUsageEstimateCost(window.remaining_cost).length + 1;
+    }, 0),
+    0,
+  );
+  const hideUsageEstimateIcon = shouldHideUsageEstimateIcon(
+    usageEstimateHeaderLength + usageEstimateValueLength,
+    usageEstimateWindows.length,
+    orderedUsageEstimates.length,
+  );
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
       <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
@@ -431,17 +505,47 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       />
       <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
         <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
-          <div className="ag-dashboard-metric-copy">
-            <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">
-              {t('dashboard.usage_estimate')}
+          <div className="ag-dashboard-metric-copy flex min-h-12 flex-col justify-center">
+            <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text-tertiary">
+              {t('dashboard.usage_estimate')} (1min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_1m)} />/10min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_10m)} />)
             </div>
+            {usageEstimates.length === 0 ? (
+              <div className="mt-1 flex min-h-7 items-center font-mono text-xs font-semibold leading-none text-text">
+                <span className="text-text-tertiary">-</span>
+              </div>
+            ) : (
+              <div className="mt-1 flex min-h-7 flex-col justify-center gap-0.5 font-mono text-sm font-semibold leading-none text-text">
+                {usageEstimateWindows.map((windowKey) => {
+                  const estimatesForWindow = orderedUsageEstimates
+                    .flatMap((estimate) => {
+                      const window = estimate.windows.find((item) => item.window === windowKey);
+                      return window ? [{ estimate, window }] : [];
+                    });
+                  return (
+                    <div key={windowKey} className="flex min-w-0 items-baseline gap-x-1.5 whitespace-nowrap">
+                      {estimatesForWindow.map(({ estimate, window }, index) => (
+                        <Fragment key={estimate.plan}>
+                          {index > 0 ? (
+                            <span aria-hidden="true" className="font-mono text-sm leading-none text-text-tertiary">/</span>
+                          ) : null}
+                          <span className="shrink-0"><UsageEstimateCell window={window} /></span>
+                        </Fragment>
+                      ))}
+                      <span className="shrink-0 text-[10px] font-medium leading-none text-text-tertiary">{windowKey}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <span
-            className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES.teal}`}
-            style={METRIC_TONE_STYLES.teal}
-          >
-            <Bell className="h-5 w-5" />
-          </span>
+          {hideUsageEstimateIcon ? null : (
+            <span
+              className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES.teal}`}
+              style={METRIC_TONE_STYLES.teal}
+            >
+              <Bell className="h-5 w-5" />
+            </span>
+          )}
         </Card.Content>
       </Card>
     </div>

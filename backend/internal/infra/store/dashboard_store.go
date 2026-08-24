@@ -21,6 +21,7 @@ import (
 	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	"github.com/DevilGenius/airgate-core/internal/accountscope"
+	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 )
@@ -246,6 +247,7 @@ type usageTotals struct {
 	Tokens       int64
 	Cost         float64
 	StandardCost float64
+	AccountCost  float64
 }
 
 type usageTodaySnapshot struct {
@@ -348,6 +350,7 @@ func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (usageTotal
 		CacheCreationSum int64   `json:"cache_creation_sum"`
 		CostSum          float64 `json:"cost_sum"`
 		StandardCostSum  float64 `json:"standard_cost_sum"`
+		AccountCostSum   float64 `json:"account_cost_sum"`
 	}
 	if err := query.Clone().Aggregate(
 		ent.Count(),
@@ -357,6 +360,7 @@ func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (usageTotal
 		ent.As(ent.Sum(entusagelog.FieldCacheCreationTokens), "cache_creation_sum"),
 		ent.As(ent.Sum(entusagelog.FieldActualCost), "cost_sum"),
 		ent.As(ent.Sum(entusagelog.FieldTotalCost), "standard_cost_sum"),
+		ent.As(ent.Sum(entusagelog.FieldAccountCost), "account_cost_sum"),
 	).Scan(ctx, &rows); err != nil {
 		return usageTotals{}, err
 	}
@@ -368,7 +372,56 @@ func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (usageTotal
 		Tokens:       rows[0].InputSum + rows[0].OutputSum + rows[0].CacheSum + rows[0].CacheCreationSum,
 		Cost:         rows[0].CostSum,
 		StandardCost: rows[0].StandardCostSum,
+		AccountCost:  rows[0].AccountCostSum,
 	}, nil
+}
+
+func (s *DashboardStore) loadDashboardUsageEstimates(
+	ctx context.Context,
+	now time.Time,
+	accountCostPerMinute float64,
+) ([]appdashboard.UsageEstimate, error) {
+	accounts, err := accountscope.Query(s.db).
+		Where(
+			entaccount.PlatformEQ("openai"),
+			entaccount.TypeEQ("oauth"),
+			entaccount.StateNEQ(entaccount.StateDisabled),
+		).
+		Select(
+			entaccount.FieldID,
+			entaccount.FieldCredentials,
+			entaccount.FieldUsageEstimateMeta,
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(accounts) == 0 {
+		return []appdashboard.UsageEstimate{}, nil
+	}
+
+	sources := make([]appdashboard.UsageEstimateSource, 0, len(accounts))
+	for _, item := range accounts {
+		plan := dashboardEstimatePlan(item.Credentials, now)
+		if plan != "plus" && plan != "team" && plan != "k12" && plan != "pro" {
+			continue
+		}
+		sources = append(sources, appdashboard.UsageEstimateSource{Plan: plan, Meta: item.UsageEstimateMeta})
+	}
+	return appdashboard.BuildUsageEstimates(sources, now, accountCostPerMinute), nil
+}
+
+func dashboardEstimatePlan(credentials map[string]string, now time.Time) string {
+	plan := appaccount.NormalizePlanType(credentials["plan_type"])
+	if plan == "" || plan == "free" {
+		return plan
+	}
+	if raw := strings.TrimSpace(credentials["subscription_active_until"]); raw != "" {
+		if expiresAt, err := time.Parse(time.RFC3339, raw); err == nil && !expiresAt.After(now) {
+			return "free"
+		}
+	}
+	return plan
 }
 
 func queryTodayUsageSnapshot(ctx context.Context, query *ent.UsageLogQuery, todayStart time.Time) (usageTodaySnapshot, error) {
@@ -565,6 +618,7 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 	var todayUsage usageTodaySnapshot
 	var recentTotals1M usageTotals
 	var recentTotals10M usageTotals
+	var usageEstimates []appdashboard.UsageEstimate
 	if rollupSnapshot, handled, err := s.loadStatsUsageFromRollups(ctx, todayStart, userID); err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	} else if handled {
@@ -599,6 +653,11 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 			return appdashboard.StatsSnapshot{}, err
 		}
 	}
+	estimateNow := oneMinAgo.Add(time.Minute).In(time.Local)
+	usageEstimates, err = s.loadDashboardUsageEstimates(ctx, estimateNow, recentTotals1M.AccountCost)
+	if err != nil {
+		return appdashboard.StatsSnapshot{}, err
+	}
 
 	return appdashboard.StatsSnapshot{
 		TotalAPIKeys:            int64(totalAPIKeys),
@@ -630,6 +689,9 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		RecentTokens1M:          recentTotals1M.Tokens,
 		RecentRequests10M:       recentTotals10M.Requests,
 		RecentTokens10M:         recentTotals10M.Tokens,
+		RecentAccountCost1M:     recentTotals1M.AccountCost,
+		RecentAccountCost10M:    recentTotals10M.AccountCost,
+		UsageEstimates:          usageEstimates,
 	}, nil
 }
 

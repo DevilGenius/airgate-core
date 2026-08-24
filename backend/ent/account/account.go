@@ -8,6 +8,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/DevilGenius/airgate-core/internal/accountusage"
 )
 
 const (
@@ -47,18 +48,8 @@ const (
 	FieldLastUsedAt = "last_used_at"
 	// FieldLastProbeAt holds the string denoting the last_probe_at field in the database.
 	FieldLastProbeAt = "last_probe_at"
-	// FieldUsage5hGrowthDate holds the string denoting the usage_5h_growth_date field in the database.
-	FieldUsage5hGrowthDate = "usage_5h_growth_date"
-	// FieldUsage5hDailyGrowth holds the string denoting the usage_5h_daily_growth field in the database.
-	FieldUsage5hDailyGrowth = "usage_5h_daily_growth"
-	// FieldUsage5hLastPercent holds the string denoting the usage_5h_last_percent field in the database.
-	FieldUsage5hLastPercent = "usage_5h_last_percent"
-	// FieldUsage7dGrowthDate holds the string denoting the usage_7d_growth_date field in the database.
-	FieldUsage7dGrowthDate = "usage_7d_growth_date"
-	// FieldUsage7dDailyGrowth holds the string denoting the usage_7d_daily_growth field in the database.
-	FieldUsage7dDailyGrowth = "usage_7d_daily_growth"
-	// FieldUsage7dLastPercent holds the string denoting the usage_7d_last_percent field in the database.
-	FieldUsage7dLastPercent = "usage_7d_last_percent"
+	// FieldUsageEstimateMeta holds the string denoting the usage_estimate_meta field in the database.
+	FieldUsageEstimateMeta = "usage_estimate_meta"
 	// FieldExtra holds the string denoting the extra field in the database.
 	FieldExtra = "extra"
 	// FieldDeletedAt holds the string denoting the deleted_at field in the database.
@@ -115,12 +106,7 @@ var Columns = []string{
 	FieldUpstreamIsPool,
 	FieldLastUsedAt,
 	FieldLastProbeAt,
-	FieldUsage5hGrowthDate,
-	FieldUsage5hDailyGrowth,
-	FieldUsage5hLastPercent,
-	FieldUsage7dGrowthDate,
-	FieldUsage7dDailyGrowth,
-	FieldUsage7dLastPercent,
+	FieldUsageEstimateMeta,
 	FieldExtra,
 	FieldDeletedAt,
 	FieldCreatedAt,
@@ -181,18 +167,8 @@ var (
 	DefaultErrorMsg string
 	// DefaultUpstreamIsPool holds the default value on creation for the "upstream_is_pool" field.
 	DefaultUpstreamIsPool bool
-	// DefaultUsage5hGrowthDate holds the default value on creation for the "usage_5h_growth_date" field.
-	DefaultUsage5hGrowthDate string
-	// DefaultUsage5hDailyGrowth holds the default value on creation for the "usage_5h_daily_growth" field.
-	DefaultUsage5hDailyGrowth float64
-	// DefaultUsage5hLastPercent holds the default value on creation for the "usage_5h_last_percent" field.
-	DefaultUsage5hLastPercent float64
-	// DefaultUsage7dGrowthDate holds the default value on creation for the "usage_7d_growth_date" field.
-	DefaultUsage7dGrowthDate string
-	// DefaultUsage7dDailyGrowth holds the default value on creation for the "usage_7d_daily_growth" field.
-	DefaultUsage7dDailyGrowth float64
-	// DefaultUsage7dLastPercent holds the default value on creation for the "usage_7d_last_percent" field.
-	DefaultUsage7dLastPercent float64
+	// DefaultUsageEstimateMeta holds the default value on creation for the "usage_estimate_meta" field.
+	DefaultUsageEstimateMeta accountusage.EstimateMeta
 	// DefaultExtra holds the default value on creation for the "extra" field.
 	DefaultExtra map[string]interface{}
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -307,36 +283,6 @@ func ByLastUsedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByLastProbeAt orders the results by the last_probe_at field.
 func ByLastProbeAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastProbeAt, opts...).ToFunc()
-}
-
-// ByUsage5hGrowthDate orders the results by the usage_5h_growth_date field.
-func ByUsage5hGrowthDate(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUsage5hGrowthDate, opts...).ToFunc()
-}
-
-// ByUsage5hDailyGrowth orders the results by the usage_5h_daily_growth field.
-func ByUsage5hDailyGrowth(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUsage5hDailyGrowth, opts...).ToFunc()
-}
-
-// ByUsage5hLastPercent orders the results by the usage_5h_last_percent field.
-func ByUsage5hLastPercent(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUsage5hLastPercent, opts...).ToFunc()
-}
-
-// ByUsage7dGrowthDate orders the results by the usage_7d_growth_date field.
-func ByUsage7dGrowthDate(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUsage7dGrowthDate, opts...).ToFunc()
-}
-
-// ByUsage7dDailyGrowth orders the results by the usage_7d_daily_growth field.
-func ByUsage7dDailyGrowth(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUsage7dDailyGrowth, opts...).ToFunc()
-}
-
-// ByUsage7dLastPercent orders the results by the usage_7d_last_percent field.
-func ByUsage7dLastPercent(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUsage7dLastPercent, opts...).ToFunc()
 }
 
 // ByDeletedAt orders the results by the deleted_at field.

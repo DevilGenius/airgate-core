@@ -429,7 +429,7 @@ func (s *accountUsageService) updateAccountUsageCaches(ctx context.Context, acco
 }
 
 func (s *accountUsageService) observeDailyUsageGrowth(ctx context.Context, accountID int, info AccountUsageInfo, now time.Time) {
-	observation := usageGrowthObservation(info, now.In(time.Local).Format("2006-01-02"))
+	observation := usageGrowthObservation(info, now)
 	if observation.FiveHourPercent == nil && observation.SevenDayPercent == nil {
 		return
 	}
@@ -440,8 +440,15 @@ func (s *accountUsageService) observeDailyUsageGrowth(ctx context.Context, accou
 	}
 }
 
-func usageGrowthObservation(info AccountUsageInfo, day string) UsageGrowthObservation {
-	result := UsageGrowthObservation{Day: day}
+func usageGrowthObservation(info AccountUsageInfo, fallback time.Time) UsageGrowthObservation {
+	observedAt := fallback
+	if parsed, err := time.Parse(time.RFC3339, info.UpdatedAt); err == nil && !parsed.IsZero() {
+		observedAt = parsed
+	}
+	result := UsageGrowthObservation{
+		Day:        observedAt.In(time.Local).Format("2006-01-02"),
+		ObservedAt: observedAt,
+	}
 	for _, window := range normalizeAccountUsageInfo(info).Windows {
 		if window.Group != "base" {
 			continue

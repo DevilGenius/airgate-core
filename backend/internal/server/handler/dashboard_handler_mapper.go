@@ -35,7 +35,32 @@ func toDashboardStatsResp(item appdashboard.Stats) dto.DashboardStatsResp {
 		AvgDurationMs:           item.AvgDurationMs,
 		AvgImageDurationMs:      item.AvgImageDurationMs,
 		ActiveUsers:             item.ActiveUsers,
+		AccountCostPerMinute1M:  item.AccountCostPerMinute1M,
+		AccountCostPerMinute10M: item.AccountCostPerMinute10M,
+		UsageEstimates:          toDashboardUsageEstimates(item.UsageEstimates),
 	}
+}
+
+func toDashboardUsageEstimates(items []appdashboard.UsageEstimate) []dto.DashboardUsageEstimate {
+	result := make([]dto.DashboardUsageEstimate, 0, len(items))
+	for _, item := range items {
+		windows := make([]dto.DashboardUsageEstimateWindow, 0, len(item.Windows))
+		for _, window := range item.Windows {
+			windows = append(windows, dto.DashboardUsageEstimateWindow{
+				Window:             window.Window,
+				Status:             window.Status,
+				DailyGrowthPercent: window.DailyGrowthPercent,
+				FullCost:           window.FullCost,
+				RemainingCost:      window.RemainingCost,
+				RemainingMinutes:   window.RemainingMinutes,
+			})
+		}
+		result = append(result, dto.DashboardUsageEstimate{
+			Plan:    item.Plan,
+			Windows: windows,
+		})
+	}
+	return result
 }
 
 func toDashboardTrendResp(item appdashboard.Trend) dto.DashboardTrendResp {

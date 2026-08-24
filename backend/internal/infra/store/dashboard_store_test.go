@@ -6,6 +6,7 @@ import (
 	"time"
 
 	entaccount "github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/accountusage"
 )
 
 func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
@@ -89,6 +90,7 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 		SetOutputTokens(2).
 		SetActualCost(3.5).
 		SetTotalCost(5.0).
+		SetAccountCost(4.0).
 		SetDurationMs(2400).
 		SetUserIDSnapshot(u.ID).
 		SetUserEmailSnapshot(u.Email).
@@ -129,6 +131,134 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	}
 	if snapshot.AllTimeRequests != 2 || snapshot.RecentRequests1M != 0 || snapshot.RecentRequests10M != 1 {
 		t.Fatalf("request totals = (%d, %d, %d), want (2, 0, 1)", snapshot.AllTimeRequests, snapshot.RecentRequests1M, snapshot.RecentRequests10M)
+	}
+	if snapshot.RecentAccountCost1M != 0 || snapshot.RecentAccountCost10M != 4 {
+		t.Fatalf("recent account costs = (%v, %v), want (0, 4)", snapshot.RecentAccountCost1M, snapshot.RecentAccountCost10M)
+	}
+}
+
+func TestDashboardStoreUsageEstimatesAggregatePlusTeamAndPro(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	createAccount := func(name, plan string, costPerPercent, growth, last float64) int {
+		t.Helper()
+		meta := accountusage.EstimateMeta{SevenDay: accountusage.WindowEstimate{
+			GrowthDate:  "2026-08-24",
+			DailyGrowth: growth,
+			LastPercent: last,
+			ObservedAt:  &now,
+		}}
+		if costPerPercent > 0 {
+			meta.SevenDay.CostPerPercent = costPerPercent
+			meta.SevenDay.CalibrationWeight = 20
+			meta.SevenDay.CalibratedAt = &now
+		}
+		builder := db.Account.Create().
+			SetName(name).
+			SetPlatform("openai").
+			SetType("oauth").
+			SetCredentials(map[string]string{"plan_type": plan}).
+			SetUsageEstimateMeta(meta)
+		item, err := builder.Save(ctx)
+		if err != nil {
+			t.Fatalf("create account %s: %v", name, err)
+		}
+		return item.ID
+	}
+	plusID := createAccount("plus", "ChatGPT Plus", 0.5, 20, 50) // full $50, remaining $25
+	teamID := createAccount("team", "Team", 0.5, 40, 60)         // full $50, remaining $20
+	proID := createAccount("pro", "Pro", 1, 30, 70)              // full $100, remaining $30
+	disabledID := createAccount("disabled", "Plus", 2, 0, 0)
+	if err := db.Account.UpdateOneID(disabledID).SetState(entaccount.StateDisabled).Exec(ctx); err != nil {
+		t.Fatalf("disable account: %v", err)
+	}
+
+	estimates, err := NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
+	if err != nil {
+		t.Fatalf("loadDashboardUsageEstimates: %v", err)
+	}
+	if len(estimates) != 2 {
+		t.Fatalf("estimates = %+v, want Plus and Pro", estimates)
+	}
+	if estimates[0].Plan != "plus" || len(estimates[0].Windows) != 1 {
+		t.Fatalf("plus estimate = %+v, want only 7d", estimates[0])
+	}
+	plusWindow := estimates[0].Windows[0]
+	if plusWindow.Window != "7d" || plusWindow.Status != "ready" || plusWindow.DailyGrowthPercent != 30 || plusWindow.FullCost != 100 || plusWindow.RemainingMinutes == nil || *plusWindow.RemainingMinutes != 45 {
+		t.Fatalf("plus 7d estimate = %+v, want +30%% $100 45min", plusWindow)
+	}
+	if estimates[1].Plan != "pro" || len(estimates[1].Windows) != 1 {
+		t.Fatalf("pro estimate = %+v, want only 7d", estimates[1])
+	}
+	proWindow := estimates[1].Windows[0]
+	if proWindow.Window != "7d" || proWindow.Status != "ready" || proWindow.DailyGrowthPercent != 30 || proWindow.FullCost != 200 || proWindow.RemainingMinutes == nil || *proWindow.RemainingMinutes != 75 {
+		t.Fatalf("pro 7d estimate = %+v, want +30%% $200 75min", proWindow)
+	}
+
+	plusAccount, err := db.Account.Get(ctx, plusID)
+	if err != nil {
+		t.Fatalf("get plus account: %v", err)
+	}
+	plusMeta := plusAccount.UsageEstimateMeta
+	plusMeta.FiveHour = accountusage.WindowEstimate{
+		GrowthDate:        "2026-08-24",
+		CostPerPercent:    0.5,
+		CalibrationWeight: 20,
+		CalibratedAt:      &now,
+		ObservedAt:        &now,
+	}
+	if err := db.Account.UpdateOneID(plusID).SetUsageEstimateMeta(plusMeta).Exec(ctx); err != nil {
+		t.Fatalf("set calibrated zero-growth 5h sample: %v", err)
+	}
+	estimates, err = NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
+	if err != nil {
+		t.Fatalf("load estimates with calibrated zero-growth 5h: %v", err)
+	}
+	if len(estimates[0].Windows) != 2 || estimates[0].Windows[0].Window != "5h" || estimates[0].Windows[0].Status != "ready" || estimates[0].Windows[0].DailyGrowthPercent != 0 || estimates[0].Windows[0].FullCost != 50 ||
+		len(estimates[1].Windows) != 2 || estimates[1].Windows[0].Window != "5h" || estimates[1].Windows[0].Status != "ready" {
+		t.Fatalf("calibrated zero-growth 5h should remain usable: %+v", estimates)
+	}
+
+	newID := createAccount("new", "Plus", 0, 0, 0)
+	estimates, err = NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
+	if err != nil {
+		t.Fatalf("load estimates with partial new account: %v", err)
+	}
+	plusWindow = estimates[0].Windows[1]
+	if plusWindow.Status != "ready" || plusWindow.FullCost != 150 || plusWindow.DailyGrowthPercent != 20 || plusWindow.RemainingMinutes == nil || *plusWindow.RemainingMinutes != 95 {
+		t.Fatalf("new account should use pool median fallback: %+v", plusWindow)
+	}
+
+	if err := db.Account.UpdateOneID(disabledID).SetState(entaccount.StateActive).Exec(ctx); err != nil {
+		t.Fatalf("reactivate account: %v", err)
+	}
+	estimates, err = NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
+	if err != nil {
+		t.Fatalf("load estimates after reactivation: %v", err)
+	}
+	if estimates[0].Windows[1].Status != "ready" || estimates[0].Windows[1].FullCost != 350 ||
+		estimates[1].Windows[1].Status != "ready" || estimates[1].Windows[1].FullCost != 475 {
+		t.Fatalf("reactivated calibrated account should rejoin estimates: %+v", estimates)
+	}
+
+	for _, id := range []int{plusID, teamID, proID, disabledID} {
+		if err := db.Account.UpdateOneID(id).SetState(entaccount.StateDisabled).Exec(ctx); err != nil {
+			t.Fatalf("disable calibrated account %d: %v", id, err)
+		}
+	}
+	estimates, err = NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
+	if err != nil {
+		t.Fatalf("load all-new estimates: %v", err)
+	}
+	if len(estimates) != 1 || estimates[0].Plan != "plus" || len(estimates[0].Windows) != 1 || estimates[0].Windows[0].Status != "insufficient" {
+		t.Fatalf("all-new active pool should be insufficient: %+v (new_id=%d)", estimates, newID)
 	}
 }
 

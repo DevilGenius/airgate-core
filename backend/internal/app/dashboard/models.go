@@ -42,6 +42,9 @@ type StatsSnapshot struct {
 	RecentTokens1M          int64
 	RecentRequests10M       int64
 	RecentTokens10M         int64
+	RecentAccountCost1M     float64
+	RecentAccountCost10M    float64
+	UsageEstimates          []UsageEstimate
 }
 
 // Stats 表示仪表盘统计结果。
@@ -74,6 +77,25 @@ type Stats struct {
 	AvgDurationMs           float64
 	AvgImageDurationMs      float64
 	ActiveUsers             int64
+	AccountCostPerMinute1M  float64
+	AccountCostPerMinute10M float64
+	UsageEstimates          []UsageEstimate
+}
+
+// UsageEstimate 表示按最近一分钟账号成本速率换算的套餐剩余可用时间。
+type UsageEstimate struct {
+	Plan    string
+	Windows []UsageEstimateWindow
+}
+
+// UsageEstimateWindow 表示一个套餐池窗口的有效性、日增长、总容量和剩余成本估值。
+type UsageEstimateWindow struct {
+	Window             string
+	Status             string
+	DailyGrowthPercent float64
+	FullCost           float64
+	RemainingCost      *float64
+	RemainingMinutes   *float64
 }
 
 // TrendQuery 表示趋势查询参数。

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DevilGenius/airgate-core/internal/accountusage"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
 	appsubscription "github.com/DevilGenius/airgate-core/internal/app/subscription"
@@ -34,16 +35,16 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 		UpstreamIsPool:     true,
 		LastUsedAt:         &lastUsed,
 		LastProbeAt:        &lastProbe,
-		Usage5hGrowthDate:  "2026-06-20",
-		Usage5hDailyGrowth: 65,
-		Usage7dGrowthDate:  "2026-06-20",
-		Usage7dDailyGrowth: 16,
-		DeletedAt:          &deletedAt,
-		Proxy:              &appaccount.Proxy{ID: 7},
-		Extra:              map[string]any{"plan": "plus"},
-		ImageStats:         &appaccount.AccountImageStats{TodayCount: 5, TotalCount: 8},
-		CreatedAt:          lastUsed,
-		UpdatedAt:          lastUsed,
+		UsageEstimateMeta: accountusage.EstimateMeta{
+			FiveHour: accountusage.WindowEstimate{GrowthDate: "2026-06-20", DailyGrowth: 65},
+			SevenDay: accountusage.WindowEstimate{GrowthDate: "2026-06-20", DailyGrowth: 16},
+		},
+		DeletedAt:  &deletedAt,
+		Proxy:      &appaccount.Proxy{ID: 7},
+		Extra:      map[string]any{"plan": "plus"},
+		ImageStats: &appaccount.AccountImageStats{TodayCount: 5, TotalCount: 8},
+		CreatedAt:  lastUsed,
+		UpdatedAt:  lastUsed,
 	})
 	if resp.ID != 9 || resp.Email == nil || *resp.Email != email || resp.ProxyID == nil || *resp.ProxyID != 7 || resp.LastUsedAt == nil || *resp.LastUsedAt != "2026-06-20T01:02:03Z" || resp.LastProbeAt == nil || *resp.LastProbeAt != "2026-06-20T02:03:04Z" {
 		t.Fatalf("account response optional fields = %+v", resp)

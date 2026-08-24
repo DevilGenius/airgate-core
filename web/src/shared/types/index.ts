@@ -874,6 +874,23 @@ export interface DashboardStatsResp {
   avg_duration_ms: number;
   avg_image_duration_ms: number;
   active_users: number;
+  account_cost_per_minute_1m: number;
+  account_cost_per_minute_10m: number;
+  usage_estimates: DashboardUsageEstimate[];
+}
+
+export interface DashboardUsageEstimate {
+  plan: string;
+  windows: DashboardUsageEstimateWindow[];
+}
+
+export interface DashboardUsageEstimateWindow {
+  window: '5h' | '7d';
+  status: 'ready' | 'insufficient';
+  daily_growth_percent: number;
+  full_cost: number;
+  remaining_cost?: number;
+  remaining_minutes?: number;
 }
 
 export interface DashboardTrendReq {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/DevilGenius/airgate-core/internal/accountusage"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 )
 
@@ -40,21 +41,16 @@ type Account struct {
 	// ErrorMsg 进入当前非 active 状态的原因（给运维看）。
 	ErrorMsg string
 	// UpstreamIsPool 上游是账号池时置 true：临时上游错误会进入退避 degraded，不永久标错。
-	UpstreamIsPool     bool
-	LastUsedAt         *time.Time
-	LastProbeAt        *time.Time
-	Usage5hGrowthDate  string
-	Usage5hDailyGrowth float64
-	Usage5hLastPercent float64
-	Usage7dGrowthDate  string
-	Usage7dDailyGrowth float64
-	Usage7dLastPercent float64
-	DeletedAt          *time.Time
-	GroupIDs           []int64
-	Proxy              *Proxy
-	Extra              map[string]any
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	UpstreamIsPool    bool
+	LastUsedAt        *time.Time
+	LastProbeAt       *time.Time
+	UsageEstimateMeta accountusage.EstimateMeta
+	DeletedAt         *time.Time
+	GroupIDs          []int64
+	Proxy             *Proxy
+	Extra             map[string]any
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 	// ImageStats 仅 OpenAI 平台账号在列表查询路径上填充；其它平台 / 详情查询路径为 nil。
 	// 取自 usage_log model 名前缀 "gpt-image" 的子集聚合。
 	ImageStats *AccountImageStats
@@ -84,6 +80,7 @@ type AccountImageStats struct {
 // nil 表示本次插件响应没有该窗口，不更新对应累计状态。
 type UsageGrowthObservation struct {
 	Day             string
+	ObservedAt      time.Time
 	FiveHourPercent *float64
 	SevenDayPercent *float64
 }

@@ -3,10 +3,10 @@ package store
 import (
 	"context"
 	"errors"
-	"math"
 	"strings"
 	"time"
 
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqljson"
 
@@ -18,6 +18,7 @@ import (
 	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
 	"github.com/DevilGenius/airgate-core/internal/accountidentity"
 	"github.com/DevilGenius/airgate-core/internal/accountscope"
+	"github.com/DevilGenius/airgate-core/internal/accountusage"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
@@ -694,16 +695,21 @@ func (s *AccountStore) ObserveUsageGrowth(ctx context.Context, id int, observati
 		return nil
 	}
 
-	item, err := accountscope.QueryByID(s.db, id).
-		Select(
-			entaccount.FieldUsage5hGrowthDate,
-			entaccount.FieldUsage5hDailyGrowth,
-			entaccount.FieldUsage5hLastPercent,
-			entaccount.FieldUsage7dGrowthDate,
-			entaccount.FieldUsage7dDailyGrowth,
-			entaccount.FieldUsage7dLastPercent,
-		).
-		Only(ctx)
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	client := tx.Client()
+	query := accountscope.QueryByID(client, id)
+	if s.db.Driver().Dialect() == dialect.Postgres {
+		// Ent 当前未为 AccountQuery 生成 Modify；借助自定义 predicate 给 SELECT 加行锁，
+		// 避免多个探测进程同时读改写同一份 JSONB meta 时丢失更新。
+		query.Where(func(selector *sql.Selector) {
+			selector.ForUpdate()
+		})
+	}
+	item, err := query.Select(entaccount.FieldUsageEstimateMeta).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return appaccount.ErrAccountNotFound
@@ -711,61 +717,95 @@ func (s *AccountStore) ObserveUsageGrowth(ctx context.Context, id int, observati
 		return err
 	}
 
-	update := accountscope.UpdateOneID(s.db, id)
+	observedAt := observation.ObservedAt
+	if observedAt.IsZero() {
+		observedAt = time.Now()
+	}
+	meta := accountusage.Clone(item.UsageEstimateMeta)
+	meta.Version = accountusage.EstimateMetaVersion
 	changed := false
 	if observation.FiveHourPercent != nil {
-		date, growth, last, ok := nextObservedDailyGrowth(
-			item.Usage5hGrowthDate,
-			item.Usage5hDailyGrowth,
-			item.Usage5hLastPercent,
-			*observation.FiveHourPercent,
-			observation.Day,
+		windowChanged, err := s.observeUsageEstimateWindow(
+			ctx,
+			client,
+			id,
+			&meta.FiveHour,
+			accountusage.WindowObservation{
+				Day:            observation.Day,
+				ObservedAt:     observedAt,
+				CurrentPercent: *observation.FiveHourPercent,
+				MaxSampleGap:   accountusage.FiveHourMaxSampleGap,
+			},
 		)
-		if ok {
-			update = update.
-				SetUsage5hGrowthDate(date).
-				SetUsage5hDailyGrowth(growth).
-				SetUsage5hLastPercent(last)
-			changed = true
+		if err != nil {
+			return err
 		}
+		changed = changed || windowChanged
 	}
 	if observation.SevenDayPercent != nil {
-		date, growth, last, ok := nextObservedDailyGrowth(
-			item.Usage7dGrowthDate,
-			item.Usage7dDailyGrowth,
-			item.Usage7dLastPercent,
-			*observation.SevenDayPercent,
-			observation.Day,
+		windowChanged, err := s.observeUsageEstimateWindow(
+			ctx,
+			client,
+			id,
+			&meta.SevenDay,
+			accountusage.WindowObservation{
+				Day:            observation.Day,
+				ObservedAt:     observedAt,
+				CurrentPercent: *observation.SevenDayPercent,
+				MaxSampleGap:   accountusage.SevenDayMaxSampleGap,
+			},
 		)
-		if ok {
-			update = update.
-				SetUsage7dGrowthDate(date).
-				SetUsage7dDailyGrowth(growth).
-				SetUsage7dLastPercent(last)
-			changed = true
+		if err != nil {
+			return err
 		}
+		changed = changed || windowChanged
 	}
 	if !changed {
 		return nil
 	}
-	return update.Exec(ctx)
+	if err := accountscope.UpdateOneID(client, id).SetUsageEstimateMeta(meta).Exec(ctx); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
-func nextObservedDailyGrowth(storedDate string, growth, last, current float64, day string) (string, float64, float64, bool) {
-	if day == "" || current < 0 || math.IsNaN(current) || math.IsInf(current, 0) {
-		return storedDate, growth, last, false
+func (s *AccountStore) observeUsageEstimateWindow(
+	ctx context.Context,
+	client *ent.Client,
+	accountID int,
+	window *accountusage.WindowEstimate,
+	observation accountusage.WindowObservation,
+) (bool, error) {
+	interval, needsCost := window.CostInterval(observation)
+	costDelta := 0.0
+	if needsCost {
+		var err error
+		costDelta, err = queryAccountCostBetween(ctx, client, accountID, interval.Start, interval.End)
+		if err != nil {
+			return false, err
+		}
 	}
-	if storedDate != day {
-		return day, 0, current, true
+	return window.ApplyObservation(observation, costDelta), nil
+}
+
+func queryAccountCostBetween(ctx context.Context, client *ent.Client, accountID int, start, end time.Time) (float64, error) {
+	var rows []struct {
+		Cost float64 `json:"cost"`
 	}
-	if current == last {
-		return storedDate, growth, last, false
+	if err := client.UsageLog.Query().
+		Where(
+			entusagelog.HasAccountWith(entaccount.IDEQ(accountID)),
+			entusagelog.CreatedAtGT(start),
+			entusagelog.CreatedAtLTE(end),
+		).
+		Aggregate(ent.As(ent.Sum(entusagelog.FieldAccountCost), "cost")).
+		Scan(ctx, &rows); err != nil {
+		return 0, err
 	}
-	delta := current - last
-	if delta < 0 {
-		delta = current
+	if len(rows) == 0 {
+		return 0, nil
 	}
-	return storedDate, growth + delta, current, true
+	return rows[0].Cost, nil
 }
 
 func mapAccounts(accounts []*ent.Account) []appaccount.Account {
@@ -791,12 +831,7 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		ModelDowngradeThreshold: item.ModelDowngradeThreshold,
 		ErrorMsg:                item.ErrorMsg,
 		UpstreamIsPool:          item.UpstreamIsPool,
-		Usage5hGrowthDate:       item.Usage5hGrowthDate,
-		Usage5hDailyGrowth:      item.Usage5hDailyGrowth,
-		Usage5hLastPercent:      item.Usage5hLastPercent,
-		Usage7dGrowthDate:       item.Usage7dGrowthDate,
-		Usage7dDailyGrowth:      item.Usage7dDailyGrowth,
-		Usage7dLastPercent:      item.Usage7dLastPercent,
+		UsageEstimateMeta:       accountusage.Clone(item.UsageEstimateMeta),
 		Extra:                   cloneAnyMap(item.Extra),
 		CreatedAt:               item.CreatedAt,
 		UpdatedAt:               item.UpdatedAt,

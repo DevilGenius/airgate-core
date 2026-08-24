@@ -12,6 +12,7 @@ import (
 )
 
 func TestStatsComputesDerivedMetrics(t *testing.T) {
+	sevenDayMinutes := 85.0
 	service := NewService(dashboardStubRepository{
 		loadStatsSnapshot: func(_ context.Context, _, _, _ time.Time) (StatsSnapshot, error) {
 			return StatsSnapshot{
@@ -28,6 +29,11 @@ func TestStatsComputesDerivedMetrics(t *testing.T) {
 				RecentTokens1M:          500,
 				RecentRequests10M:       30,
 				RecentTokens10M:         1500,
+				RecentAccountCost1M:     15,
+				RecentAccountCost10M:    132,
+				UsageEstimates: []UsageEstimate{{Plan: "plus", Windows: []UsageEstimateWindow{{
+					Window: "7d", Status: "ready", DailyGrowthPercent: 16, FullCost: 2000, RemainingCost: &sevenDayMinutes, RemainingMinutes: &sevenDayMinutes,
+				}}}},
 			}, nil
 		},
 	})
@@ -68,6 +74,13 @@ func TestStatsComputesDerivedMetrics(t *testing.T) {
 	}
 	if result.TPMPerRPMCoefficient10M != 0.0005 {
 		t.Fatalf("TPMPerRPMCoefficient10M = %v, want 0.0005", result.TPMPerRPMCoefficient10M)
+	}
+	if result.AccountCostPerMinute1M != 15 || result.AccountCostPerMinute10M != 13.2 {
+		t.Fatalf("account cost rates = (%v, %v), want (15, 13.2)", result.AccountCostPerMinute1M, result.AccountCostPerMinute10M)
+	}
+	if len(result.UsageEstimates) != 1 || len(result.UsageEstimates[0].Windows) != 1 ||
+		result.UsageEstimates[0].Windows[0].RemainingMinutes == nil || *result.UsageEstimates[0].Windows[0].RemainingMinutes != 85 {
+		t.Fatalf("usage estimates = %+v", result.UsageEstimates)
 	}
 }
 

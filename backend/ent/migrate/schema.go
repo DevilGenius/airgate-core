@@ -75,12 +75,7 @@ var (
 		{Name: "upstream_is_pool", Type: field.TypeBool, Default: false},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "last_probe_at", Type: field.TypeTime, Nullable: true},
-		{Name: "usage_5h_growth_date", Type: field.TypeString, Default: ""},
-		{Name: "usage_5h_daily_growth", Type: field.TypeFloat64, Default: 0},
-		{Name: "usage_5h_last_percent", Type: field.TypeFloat64, Default: 0},
-		{Name: "usage_7d_growth_date", Type: field.TypeString, Default: ""},
-		{Name: "usage_7d_daily_growth", Type: field.TypeFloat64, Default: 0},
-		{Name: "usage_7d_last_percent", Type: field.TypeFloat64, Default: 0},
+		{Name: "usage_estimate_meta", Type: field.TypeJSON, Nullable: true},
 		{Name: "extra", Type: field.TypeJSON, Nullable: true},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
@@ -95,7 +90,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[27]},
+				Columns:    []*schema.Column{AccountsColumns[22]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -109,12 +104,12 @@ var (
 			{
 				Name:    "account_deleted_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[24]},
+				Columns: []*schema.Column{AccountsColumns[19]},
 			},
 			{
 				Name:    "account_priority_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[25]},
+				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[20]},
 			},
 		},
 	}

@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent/schema/index"
 
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
+	"github.com/DevilGenius/airgate-core/internal/accountusage"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 )
 
@@ -52,18 +53,8 @@ func (Account) Fields() []ent.Field {
 			Comment("最近一次真实业务访问或生图用量落库时间"),
 		field.Time("last_probe_at").Optional().Nillable().
 			Comment("最近一次健康探测完成时间；不包含账号测试和状态回报"),
-		field.String("usage_5h_growth_date").Default("").
-			Comment("5h 用量窗口日增量所属日期（服务器本地时区，YYYY-MM-DD）"),
-		field.Float("usage_5h_daily_growth").Default(0).
-			Comment("5h 用量窗口当日已观测增长百分比，可超过 100"),
-		field.Float("usage_5h_last_percent").Default(0).
-			Comment("5h 用量窗口最近一次观测值，用于估算当日增量"),
-		field.String("usage_7d_growth_date").Default("").
-			Comment("7d 用量窗口日增量所属日期（服务器本地时区，YYYY-MM-DD）"),
-		field.Float("usage_7d_daily_growth").Default(0).
-			Comment("7d 用量窗口当日已观测增长百分比，可超过 100"),
-		field.Float("usage_7d_last_percent").Default(0).
-			Comment("7d 用量窗口最近一次观测值，用于估算当日增量"),
+		field.JSON("usage_estimate_meta", accountusage.EstimateMeta{}).Optional().Default(accountusage.EstimateMeta{}).
+			Comment("账号级 5h/7d 日增长、滚动成本校准和观测游标"),
 		field.JSON("extra", map[string]interface{}{}).Optional().Default(map[string]interface{}{}).
 			Comment("扩展配置（max_rpm / max_window_cost / max_sessions 等）"),
 		field.Time("deleted_at").Optional().Nillable().
