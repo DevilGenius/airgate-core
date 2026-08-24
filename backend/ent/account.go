@@ -52,6 +52,18 @@ type Account struct {
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	// 最近一次健康探测完成时间；不包含账号测试和状态回报
 	LastProbeAt *time.Time `json:"last_probe_at,omitempty"`
+	// 5h 用量窗口日增量所属日期（服务器本地时区，YYYY-MM-DD）
+	Usage5hGrowthDate string `json:"usage_5h_growth_date,omitempty"`
+	// 5h 用量窗口当日已观测增长百分比，可超过 100
+	Usage5hDailyGrowth float64 `json:"usage_5h_daily_growth,omitempty"`
+	// 5h 用量窗口最近一次观测值，用于估算当日增量
+	Usage5hLastPercent float64 `json:"usage_5h_last_percent,omitempty"`
+	// 7d 用量窗口日增量所属日期（服务器本地时区，YYYY-MM-DD）
+	Usage7dGrowthDate string `json:"usage_7d_growth_date,omitempty"`
+	// 7d 用量窗口当日已观测增长百分比，可超过 100
+	Usage7dDailyGrowth float64 `json:"usage_7d_daily_growth,omitempty"`
+	// 7d 用量窗口最近一次观测值，用于估算当日增量
+	Usage7dLastPercent float64 `json:"usage_7d_last_percent,omitempty"`
 	// 扩展配置（max_rpm / max_window_cost / max_sessions 等）
 	Extra map[string]interface{} `json:"extra,omitempty"`
 	// 软删除时间；非空账号不再参与管理和调度，历史 usage log 关联保留
@@ -118,11 +130,11 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case account.FieldUpstreamIsPool:
 			values[i] = new(sql.NullBool)
-		case account.FieldRateMultiplier, account.FieldModelDowngradeThreshold:
+		case account.FieldRateMultiplier, account.FieldModelDowngradeThreshold, account.FieldUsage5hDailyGrowth, account.FieldUsage5hLastPercent, account.FieldUsage7dDailyGrowth, account.FieldUsage7dLastPercent:
 			values[i] = new(sql.NullFloat64)
 		case account.FieldID, account.FieldPriority, account.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
-		case account.FieldName, account.FieldEmail, account.FieldPlatform, account.FieldType, account.FieldState, account.FieldErrorMsg:
+		case account.FieldName, account.FieldEmail, account.FieldPlatform, account.FieldType, account.FieldState, account.FieldErrorMsg, account.FieldUsage5hGrowthDate, account.FieldUsage7dGrowthDate:
 			values[i] = new(sql.NullString)
 		case account.FieldStateUntil, account.FieldLastUsedAt, account.FieldLastProbeAt, account.FieldDeletedAt, account.FieldCreatedAt, account.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -252,6 +264,42 @@ func (a *Account) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				a.LastProbeAt = new(time.Time)
 				*a.LastProbeAt = value.Time
+			}
+		case account.FieldUsage5hGrowthDate:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_5h_growth_date", values[i])
+			} else if value.Valid {
+				a.Usage5hGrowthDate = value.String
+			}
+		case account.FieldUsage5hDailyGrowth:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_5h_daily_growth", values[i])
+			} else if value.Valid {
+				a.Usage5hDailyGrowth = value.Float64
+			}
+		case account.FieldUsage5hLastPercent:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_5h_last_percent", values[i])
+			} else if value.Valid {
+				a.Usage5hLastPercent = value.Float64
+			}
+		case account.FieldUsage7dGrowthDate:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_7d_growth_date", values[i])
+			} else if value.Valid {
+				a.Usage7dGrowthDate = value.String
+			}
+		case account.FieldUsage7dDailyGrowth:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_7d_daily_growth", values[i])
+			} else if value.Valid {
+				a.Usage7dDailyGrowth = value.Float64
+			}
+		case account.FieldUsage7dLastPercent:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_7d_last_percent", values[i])
+			} else if value.Valid {
+				a.Usage7dLastPercent = value.Float64
 			}
 		case account.FieldExtra:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -393,6 +441,24 @@ func (a *Account) String() string {
 		builder.WriteString("last_probe_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("usage_5h_growth_date=")
+	builder.WriteString(a.Usage5hGrowthDate)
+	builder.WriteString(", ")
+	builder.WriteString("usage_5h_daily_growth=")
+	builder.WriteString(fmt.Sprintf("%v", a.Usage5hDailyGrowth))
+	builder.WriteString(", ")
+	builder.WriteString("usage_5h_last_percent=")
+	builder.WriteString(fmt.Sprintf("%v", a.Usage5hLastPercent))
+	builder.WriteString(", ")
+	builder.WriteString("usage_7d_growth_date=")
+	builder.WriteString(a.Usage7dGrowthDate)
+	builder.WriteString(", ")
+	builder.WriteString("usage_7d_daily_growth=")
+	builder.WriteString(fmt.Sprintf("%v", a.Usage7dDailyGrowth))
+	builder.WriteString(", ")
+	builder.WriteString("usage_7d_last_percent=")
+	builder.WriteString(fmt.Sprintf("%v", a.Usage7dLastPercent))
 	builder.WriteString(", ")
 	builder.WriteString("extra=")
 	builder.WriteString(fmt.Sprintf("%v", a.Extra))

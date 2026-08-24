@@ -152,6 +152,10 @@ function sameAccountExceptCapacity(left: AccountResp, right: AccountResp) {
     && left.extra === right.extra
     && left.last_used_at === right.last_used_at
     && left.last_probe_at === right.last_probe_at
+    && left.usage_5h_growth_date === right.usage_5h_growth_date
+    && left.usage_5h_daily_growth === right.usage_5h_daily_growth
+    && left.usage_7d_growth_date === right.usage_7d_growth_date
+    && left.usage_7d_daily_growth === right.usage_7d_daily_growth
     && left.group_ids === right.group_ids
     && left.family_cooldowns === right.family_cooldowns
     && left.today_image_count === right.today_image_count
@@ -189,8 +193,13 @@ function accountTableCellRowsEqual(columnKey: string, left: AccountResp, right: 
     case 'rate_multiplier':
       return left.rate_multiplier === right.rate_multiplier;
     case 'usage_window':
-    case 'last_used_at':
       return left.id === right.id;
+    case 'last_used_at':
+      return left.last_used_at === right.last_used_at
+        && left.usage_5h_growth_date === right.usage_5h_growth_date
+        && left.usage_5h_daily_growth === right.usage_5h_daily_growth
+        && left.usage_7d_growth_date === right.usage_7d_growth_date
+        && left.usage_7d_daily_growth === right.usage_7d_daily_growth;
     default:
       return false;
   }
@@ -217,24 +226,9 @@ function accountTableCellMetaEqual(columnKey: string, left: unknown, right: unkn
     }
     case 'usage_window':
       return (left as { usage?: unknown } | undefined)?.usage === (right as { usage?: unknown } | undefined)?.usage;
-    case 'last_used_at':
-      return accountRequestTimesEqual(left, right);
     default:
       return true;
   }
-}
-
-function accountRequestTimesEqual(left: unknown, right: unknown) {
-  if (!left || !right) return false;
-  const leftMeta = left as {
-    lastAccessTime?: { display?: string; iso?: string };
-    lastProbeTime?: { display?: string; iso?: string };
-  };
-  const rightMeta = right as typeof leftMeta;
-  return leftMeta.lastAccessTime?.display === rightMeta.lastAccessTime?.display
-    && leftMeta.lastAccessTime?.iso === rightMeta.lastAccessTime?.iso
-    && leftMeta.lastProbeTime?.display === rightMeta.lastProbeTime?.display
-    && leftMeta.lastProbeTime?.iso === rightMeta.lastProbeTime?.iso;
 }
 
 function stringListEqual(left: string[] | undefined, right: string[] | undefined) {

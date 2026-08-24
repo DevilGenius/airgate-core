@@ -2080,6 +2080,16 @@ type AccountMutation struct {
 	upstream_is_pool             *bool
 	last_used_at                 *time.Time
 	last_probe_at                *time.Time
+	usage_5h_growth_date         *string
+	usage_5h_daily_growth        *float64
+	addusage_5h_daily_growth     *float64
+	usage_5h_last_percent        *float64
+	addusage_5h_last_percent     *float64
+	usage_7d_growth_date         *string
+	usage_7d_daily_growth        *float64
+	addusage_7d_daily_growth     *float64
+	usage_7d_last_percent        *float64
+	addusage_7d_last_percent     *float64
 	extra                        *map[string]interface{}
 	deleted_at                   *time.Time
 	created_at                   *time.Time
@@ -2930,6 +2940,302 @@ func (m *AccountMutation) ResetLastProbeAt() {
 	delete(m.clearedFields, account.FieldLastProbeAt)
 }
 
+// SetUsage5hGrowthDate sets the "usage_5h_growth_date" field.
+func (m *AccountMutation) SetUsage5hGrowthDate(s string) {
+	m.usage_5h_growth_date = &s
+}
+
+// Usage5hGrowthDate returns the value of the "usage_5h_growth_date" field in the mutation.
+func (m *AccountMutation) Usage5hGrowthDate() (r string, exists bool) {
+	v := m.usage_5h_growth_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsage5hGrowthDate returns the old "usage_5h_growth_date" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldUsage5hGrowthDate(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsage5hGrowthDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsage5hGrowthDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsage5hGrowthDate: %w", err)
+	}
+	return oldValue.Usage5hGrowthDate, nil
+}
+
+// ResetUsage5hGrowthDate resets all changes to the "usage_5h_growth_date" field.
+func (m *AccountMutation) ResetUsage5hGrowthDate() {
+	m.usage_5h_growth_date = nil
+}
+
+// SetUsage5hDailyGrowth sets the "usage_5h_daily_growth" field.
+func (m *AccountMutation) SetUsage5hDailyGrowth(f float64) {
+	m.usage_5h_daily_growth = &f
+	m.addusage_5h_daily_growth = nil
+}
+
+// Usage5hDailyGrowth returns the value of the "usage_5h_daily_growth" field in the mutation.
+func (m *AccountMutation) Usage5hDailyGrowth() (r float64, exists bool) {
+	v := m.usage_5h_daily_growth
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsage5hDailyGrowth returns the old "usage_5h_daily_growth" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldUsage5hDailyGrowth(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsage5hDailyGrowth is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsage5hDailyGrowth requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsage5hDailyGrowth: %w", err)
+	}
+	return oldValue.Usage5hDailyGrowth, nil
+}
+
+// AddUsage5hDailyGrowth adds f to the "usage_5h_daily_growth" field.
+func (m *AccountMutation) AddUsage5hDailyGrowth(f float64) {
+	if m.addusage_5h_daily_growth != nil {
+		*m.addusage_5h_daily_growth += f
+	} else {
+		m.addusage_5h_daily_growth = &f
+	}
+}
+
+// AddedUsage5hDailyGrowth returns the value that was added to the "usage_5h_daily_growth" field in this mutation.
+func (m *AccountMutation) AddedUsage5hDailyGrowth() (r float64, exists bool) {
+	v := m.addusage_5h_daily_growth
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUsage5hDailyGrowth resets all changes to the "usage_5h_daily_growth" field.
+func (m *AccountMutation) ResetUsage5hDailyGrowth() {
+	m.usage_5h_daily_growth = nil
+	m.addusage_5h_daily_growth = nil
+}
+
+// SetUsage5hLastPercent sets the "usage_5h_last_percent" field.
+func (m *AccountMutation) SetUsage5hLastPercent(f float64) {
+	m.usage_5h_last_percent = &f
+	m.addusage_5h_last_percent = nil
+}
+
+// Usage5hLastPercent returns the value of the "usage_5h_last_percent" field in the mutation.
+func (m *AccountMutation) Usage5hLastPercent() (r float64, exists bool) {
+	v := m.usage_5h_last_percent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsage5hLastPercent returns the old "usage_5h_last_percent" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldUsage5hLastPercent(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsage5hLastPercent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsage5hLastPercent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsage5hLastPercent: %w", err)
+	}
+	return oldValue.Usage5hLastPercent, nil
+}
+
+// AddUsage5hLastPercent adds f to the "usage_5h_last_percent" field.
+func (m *AccountMutation) AddUsage5hLastPercent(f float64) {
+	if m.addusage_5h_last_percent != nil {
+		*m.addusage_5h_last_percent += f
+	} else {
+		m.addusage_5h_last_percent = &f
+	}
+}
+
+// AddedUsage5hLastPercent returns the value that was added to the "usage_5h_last_percent" field in this mutation.
+func (m *AccountMutation) AddedUsage5hLastPercent() (r float64, exists bool) {
+	v := m.addusage_5h_last_percent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUsage5hLastPercent resets all changes to the "usage_5h_last_percent" field.
+func (m *AccountMutation) ResetUsage5hLastPercent() {
+	m.usage_5h_last_percent = nil
+	m.addusage_5h_last_percent = nil
+}
+
+// SetUsage7dGrowthDate sets the "usage_7d_growth_date" field.
+func (m *AccountMutation) SetUsage7dGrowthDate(s string) {
+	m.usage_7d_growth_date = &s
+}
+
+// Usage7dGrowthDate returns the value of the "usage_7d_growth_date" field in the mutation.
+func (m *AccountMutation) Usage7dGrowthDate() (r string, exists bool) {
+	v := m.usage_7d_growth_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsage7dGrowthDate returns the old "usage_7d_growth_date" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldUsage7dGrowthDate(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsage7dGrowthDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsage7dGrowthDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsage7dGrowthDate: %w", err)
+	}
+	return oldValue.Usage7dGrowthDate, nil
+}
+
+// ResetUsage7dGrowthDate resets all changes to the "usage_7d_growth_date" field.
+func (m *AccountMutation) ResetUsage7dGrowthDate() {
+	m.usage_7d_growth_date = nil
+}
+
+// SetUsage7dDailyGrowth sets the "usage_7d_daily_growth" field.
+func (m *AccountMutation) SetUsage7dDailyGrowth(f float64) {
+	m.usage_7d_daily_growth = &f
+	m.addusage_7d_daily_growth = nil
+}
+
+// Usage7dDailyGrowth returns the value of the "usage_7d_daily_growth" field in the mutation.
+func (m *AccountMutation) Usage7dDailyGrowth() (r float64, exists bool) {
+	v := m.usage_7d_daily_growth
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsage7dDailyGrowth returns the old "usage_7d_daily_growth" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldUsage7dDailyGrowth(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsage7dDailyGrowth is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsage7dDailyGrowth requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsage7dDailyGrowth: %w", err)
+	}
+	return oldValue.Usage7dDailyGrowth, nil
+}
+
+// AddUsage7dDailyGrowth adds f to the "usage_7d_daily_growth" field.
+func (m *AccountMutation) AddUsage7dDailyGrowth(f float64) {
+	if m.addusage_7d_daily_growth != nil {
+		*m.addusage_7d_daily_growth += f
+	} else {
+		m.addusage_7d_daily_growth = &f
+	}
+}
+
+// AddedUsage7dDailyGrowth returns the value that was added to the "usage_7d_daily_growth" field in this mutation.
+func (m *AccountMutation) AddedUsage7dDailyGrowth() (r float64, exists bool) {
+	v := m.addusage_7d_daily_growth
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUsage7dDailyGrowth resets all changes to the "usage_7d_daily_growth" field.
+func (m *AccountMutation) ResetUsage7dDailyGrowth() {
+	m.usage_7d_daily_growth = nil
+	m.addusage_7d_daily_growth = nil
+}
+
+// SetUsage7dLastPercent sets the "usage_7d_last_percent" field.
+func (m *AccountMutation) SetUsage7dLastPercent(f float64) {
+	m.usage_7d_last_percent = &f
+	m.addusage_7d_last_percent = nil
+}
+
+// Usage7dLastPercent returns the value of the "usage_7d_last_percent" field in the mutation.
+func (m *AccountMutation) Usage7dLastPercent() (r float64, exists bool) {
+	v := m.usage_7d_last_percent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsage7dLastPercent returns the old "usage_7d_last_percent" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldUsage7dLastPercent(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsage7dLastPercent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsage7dLastPercent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsage7dLastPercent: %w", err)
+	}
+	return oldValue.Usage7dLastPercent, nil
+}
+
+// AddUsage7dLastPercent adds f to the "usage_7d_last_percent" field.
+func (m *AccountMutation) AddUsage7dLastPercent(f float64) {
+	if m.addusage_7d_last_percent != nil {
+		*m.addusage_7d_last_percent += f
+	} else {
+		m.addusage_7d_last_percent = &f
+	}
+}
+
+// AddedUsage7dLastPercent returns the value that was added to the "usage_7d_last_percent" field in this mutation.
+func (m *AccountMutation) AddedUsage7dLastPercent() (r float64, exists bool) {
+	v := m.addusage_7d_last_percent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUsage7dLastPercent resets all changes to the "usage_7d_last_percent" field.
+func (m *AccountMutation) ResetUsage7dLastPercent() {
+	m.usage_7d_last_percent = nil
+	m.addusage_7d_last_percent = nil
+}
+
 // SetExtra sets the "extra" field.
 func (m *AccountMutation) SetExtra(value map[string]interface{}) {
 	m.extra = &value
@@ -3281,7 +3587,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 20)
+	fields := make([]string, 0, 26)
 	if m.name != nil {
 		fields = append(fields, account.FieldName)
 	}
@@ -3329,6 +3635,24 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m.last_probe_at != nil {
 		fields = append(fields, account.FieldLastProbeAt)
+	}
+	if m.usage_5h_growth_date != nil {
+		fields = append(fields, account.FieldUsage5hGrowthDate)
+	}
+	if m.usage_5h_daily_growth != nil {
+		fields = append(fields, account.FieldUsage5hDailyGrowth)
+	}
+	if m.usage_5h_last_percent != nil {
+		fields = append(fields, account.FieldUsage5hLastPercent)
+	}
+	if m.usage_7d_growth_date != nil {
+		fields = append(fields, account.FieldUsage7dGrowthDate)
+	}
+	if m.usage_7d_daily_growth != nil {
+		fields = append(fields, account.FieldUsage7dDailyGrowth)
+	}
+	if m.usage_7d_last_percent != nil {
+		fields = append(fields, account.FieldUsage7dLastPercent)
 	}
 	if m.extra != nil {
 		fields = append(fields, account.FieldExtra)
@@ -3382,6 +3706,18 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.LastUsedAt()
 	case account.FieldLastProbeAt:
 		return m.LastProbeAt()
+	case account.FieldUsage5hGrowthDate:
+		return m.Usage5hGrowthDate()
+	case account.FieldUsage5hDailyGrowth:
+		return m.Usage5hDailyGrowth()
+	case account.FieldUsage5hLastPercent:
+		return m.Usage5hLastPercent()
+	case account.FieldUsage7dGrowthDate:
+		return m.Usage7dGrowthDate()
+	case account.FieldUsage7dDailyGrowth:
+		return m.Usage7dDailyGrowth()
+	case account.FieldUsage7dLastPercent:
+		return m.Usage7dLastPercent()
 	case account.FieldExtra:
 		return m.Extra()
 	case account.FieldDeletedAt:
@@ -3431,6 +3767,18 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldLastUsedAt(ctx)
 	case account.FieldLastProbeAt:
 		return m.OldLastProbeAt(ctx)
+	case account.FieldUsage5hGrowthDate:
+		return m.OldUsage5hGrowthDate(ctx)
+	case account.FieldUsage5hDailyGrowth:
+		return m.OldUsage5hDailyGrowth(ctx)
+	case account.FieldUsage5hLastPercent:
+		return m.OldUsage5hLastPercent(ctx)
+	case account.FieldUsage7dGrowthDate:
+		return m.OldUsage7dGrowthDate(ctx)
+	case account.FieldUsage7dDailyGrowth:
+		return m.OldUsage7dDailyGrowth(ctx)
+	case account.FieldUsage7dLastPercent:
+		return m.OldUsage7dLastPercent(ctx)
 	case account.FieldExtra:
 		return m.OldExtra(ctx)
 	case account.FieldDeletedAt:
@@ -3560,6 +3908,48 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetLastProbeAt(v)
 		return nil
+	case account.FieldUsage5hGrowthDate:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsage5hGrowthDate(v)
+		return nil
+	case account.FieldUsage5hDailyGrowth:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsage5hDailyGrowth(v)
+		return nil
+	case account.FieldUsage5hLastPercent:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsage5hLastPercent(v)
+		return nil
+	case account.FieldUsage7dGrowthDate:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsage7dGrowthDate(v)
+		return nil
+	case account.FieldUsage7dDailyGrowth:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsage7dDailyGrowth(v)
+		return nil
+	case account.FieldUsage7dLastPercent:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsage7dLastPercent(v)
+		return nil
 	case account.FieldExtra:
 		v, ok := value.(map[string]interface{})
 		if !ok {
@@ -3608,6 +3998,18 @@ func (m *AccountMutation) AddedFields() []string {
 	if m.addmodel_downgrade_threshold != nil {
 		fields = append(fields, account.FieldModelDowngradeThreshold)
 	}
+	if m.addusage_5h_daily_growth != nil {
+		fields = append(fields, account.FieldUsage5hDailyGrowth)
+	}
+	if m.addusage_5h_last_percent != nil {
+		fields = append(fields, account.FieldUsage5hLastPercent)
+	}
+	if m.addusage_7d_daily_growth != nil {
+		fields = append(fields, account.FieldUsage7dDailyGrowth)
+	}
+	if m.addusage_7d_last_percent != nil {
+		fields = append(fields, account.FieldUsage7dLastPercent)
+	}
 	return fields
 }
 
@@ -3624,6 +4026,14 @@ func (m *AccountMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedRateMultiplier()
 	case account.FieldModelDowngradeThreshold:
 		return m.AddedModelDowngradeThreshold()
+	case account.FieldUsage5hDailyGrowth:
+		return m.AddedUsage5hDailyGrowth()
+	case account.FieldUsage5hLastPercent:
+		return m.AddedUsage5hLastPercent()
+	case account.FieldUsage7dDailyGrowth:
+		return m.AddedUsage7dDailyGrowth()
+	case account.FieldUsage7dLastPercent:
+		return m.AddedUsage7dLastPercent()
 	}
 	return nil, false
 }
@@ -3660,6 +4070,34 @@ func (m *AccountMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddModelDowngradeThreshold(v)
+		return nil
+	case account.FieldUsage5hDailyGrowth:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUsage5hDailyGrowth(v)
+		return nil
+	case account.FieldUsage5hLastPercent:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUsage5hLastPercent(v)
+		return nil
+	case account.FieldUsage7dDailyGrowth:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUsage7dDailyGrowth(v)
+		return nil
+	case account.FieldUsage7dLastPercent:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUsage7dLastPercent(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Account numeric field %s", name)
@@ -3786,6 +4224,24 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldLastProbeAt:
 		m.ResetLastProbeAt()
+		return nil
+	case account.FieldUsage5hGrowthDate:
+		m.ResetUsage5hGrowthDate()
+		return nil
+	case account.FieldUsage5hDailyGrowth:
+		m.ResetUsage5hDailyGrowth()
+		return nil
+	case account.FieldUsage5hLastPercent:
+		m.ResetUsage5hLastPercent()
+		return nil
+	case account.FieldUsage7dGrowthDate:
+		m.ResetUsage7dGrowthDate()
+		return nil
+	case account.FieldUsage7dDailyGrowth:
+		m.ResetUsage7dDailyGrowth()
+		return nil
+	case account.FieldUsage7dLastPercent:
+		m.ResetUsage7dLastPercent()
 		return nil
 	case account.FieldExtra:
 		m.ResetExtra()

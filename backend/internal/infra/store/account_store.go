@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 	"time"
 
@@ -686,6 +687,87 @@ func (s *AccountStore) BatchImageStats(ctx context.Context, accountIDs []int, to
 	return result, nil
 }
 
+// ObserveUsageGrowth 累计基础 5h/7d 窗口的当日已观测增长。
+// 同日数值下降按窗口重置处理；跨日首次观测只建立新基线。
+func (s *AccountStore) ObserveUsageGrowth(ctx context.Context, id int, observation appaccount.UsageGrowthObservation) error {
+	if id <= 0 || observation.Day == "" || (observation.FiveHourPercent == nil && observation.SevenDayPercent == nil) {
+		return nil
+	}
+
+	item, err := accountscope.QueryByID(s.db, id).
+		Select(
+			entaccount.FieldUsage5hGrowthDate,
+			entaccount.FieldUsage5hDailyGrowth,
+			entaccount.FieldUsage5hLastPercent,
+			entaccount.FieldUsage7dGrowthDate,
+			entaccount.FieldUsage7dDailyGrowth,
+			entaccount.FieldUsage7dLastPercent,
+		).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return appaccount.ErrAccountNotFound
+		}
+		return err
+	}
+
+	update := accountscope.UpdateOneID(s.db, id)
+	changed := false
+	if observation.FiveHourPercent != nil {
+		date, growth, last, ok := nextObservedDailyGrowth(
+			item.Usage5hGrowthDate,
+			item.Usage5hDailyGrowth,
+			item.Usage5hLastPercent,
+			*observation.FiveHourPercent,
+			observation.Day,
+		)
+		if ok {
+			update = update.
+				SetUsage5hGrowthDate(date).
+				SetUsage5hDailyGrowth(growth).
+				SetUsage5hLastPercent(last)
+			changed = true
+		}
+	}
+	if observation.SevenDayPercent != nil {
+		date, growth, last, ok := nextObservedDailyGrowth(
+			item.Usage7dGrowthDate,
+			item.Usage7dDailyGrowth,
+			item.Usage7dLastPercent,
+			*observation.SevenDayPercent,
+			observation.Day,
+		)
+		if ok {
+			update = update.
+				SetUsage7dGrowthDate(date).
+				SetUsage7dDailyGrowth(growth).
+				SetUsage7dLastPercent(last)
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return update.Exec(ctx)
+}
+
+func nextObservedDailyGrowth(storedDate string, growth, last, current float64, day string) (string, float64, float64, bool) {
+	if day == "" || current < 0 || math.IsNaN(current) || math.IsInf(current, 0) {
+		return storedDate, growth, last, false
+	}
+	if storedDate != day {
+		return day, 0, current, true
+	}
+	if current == last {
+		return storedDate, growth, last, false
+	}
+	delta := current - last
+	if delta < 0 {
+		delta = current
+	}
+	return storedDate, growth + delta, current, true
+}
+
 func mapAccounts(accounts []*ent.Account) []appaccount.Account {
 	result := make([]appaccount.Account, 0, len(accounts))
 	for _, item := range accounts {
@@ -709,6 +791,12 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		ModelDowngradeThreshold: item.ModelDowngradeThreshold,
 		ErrorMsg:                item.ErrorMsg,
 		UpstreamIsPool:          item.UpstreamIsPool,
+		Usage5hGrowthDate:       item.Usage5hGrowthDate,
+		Usage5hDailyGrowth:      item.Usage5hDailyGrowth,
+		Usage5hLastPercent:      item.Usage5hLastPercent,
+		Usage7dGrowthDate:       item.Usage7dGrowthDate,
+		Usage7dDailyGrowth:      item.Usage7dDailyGrowth,
+		Usage7dLastPercent:      item.Usage7dLastPercent,
 		Extra:                   cloneAnyMap(item.Extra),
 		CreatedAt:               item.CreatedAt,
 		UpdatedAt:               item.UpdatedAt,

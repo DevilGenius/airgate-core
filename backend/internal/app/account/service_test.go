@@ -598,6 +598,7 @@ type stubRepository struct {
 	findUsageLogs             func(context.Context, int, time.Time, time.Time) ([]UsageLog, error)
 	batchWindowStats          func(context.Context, []int, time.Time) (map[int]AccountWindowStats, error)
 	batchImageStats           func(context.Context, []int, time.Time) (map[int]AccountImageStats, error)
+	observeUsageGrowth        func(context.Context, int, UsageGrowthObservation) error
 }
 
 type noOpConcurrency struct{}
@@ -698,6 +699,13 @@ func (s stubRepository) BatchImageStats(ctx context.Context, ids []int, start ti
 		return s.batchImageStats(ctx, ids, start)
 	}
 	return nil, nil
+}
+
+func (s stubRepository) ObserveUsageGrowth(ctx context.Context, id int, observation UsageGrowthObservation) error {
+	if s.observeUsageGrowth != nil {
+		return s.observeUsageGrowth(ctx, id, observation)
+	}
+	return nil
 }
 
 // stubStateWriter 捕获 StateWriter 调用。

@@ -735,6 +735,14 @@ export default function AccountsPageContent() {
     () => mergeCachedUsageWindows(rawUsageData as AccountUsageData | undefined, usageWindowCacheRef.current, rawUsageDataUpdatedAt),
     [rawUsageData, rawUsageDataUpdatedAt],
   );
+  const usageWasRefreshingRef = useRef(false);
+  useEffect(() => {
+    const refreshing = Boolean(usageMerge.data?.refreshing);
+    if (usageWasRefreshingRef.current && !refreshing) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+    }
+    usageWasRefreshingRef.current = refreshing;
+  }, [queryClient, usageMerge.data?.refreshing]);
   useEffect(() => {
     usageWindowCacheRef.current = usageMerge.cache;
   }, [usageMerge.cache]);

@@ -224,6 +224,90 @@ func (ac *AccountCreate) SetNillableLastProbeAt(t *time.Time) *AccountCreate {
 	return ac
 }
 
+// SetUsage5hGrowthDate sets the "usage_5h_growth_date" field.
+func (ac *AccountCreate) SetUsage5hGrowthDate(s string) *AccountCreate {
+	ac.mutation.SetUsage5hGrowthDate(s)
+	return ac
+}
+
+// SetNillableUsage5hGrowthDate sets the "usage_5h_growth_date" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableUsage5hGrowthDate(s *string) *AccountCreate {
+	if s != nil {
+		ac.SetUsage5hGrowthDate(*s)
+	}
+	return ac
+}
+
+// SetUsage5hDailyGrowth sets the "usage_5h_daily_growth" field.
+func (ac *AccountCreate) SetUsage5hDailyGrowth(f float64) *AccountCreate {
+	ac.mutation.SetUsage5hDailyGrowth(f)
+	return ac
+}
+
+// SetNillableUsage5hDailyGrowth sets the "usage_5h_daily_growth" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableUsage5hDailyGrowth(f *float64) *AccountCreate {
+	if f != nil {
+		ac.SetUsage5hDailyGrowth(*f)
+	}
+	return ac
+}
+
+// SetUsage5hLastPercent sets the "usage_5h_last_percent" field.
+func (ac *AccountCreate) SetUsage5hLastPercent(f float64) *AccountCreate {
+	ac.mutation.SetUsage5hLastPercent(f)
+	return ac
+}
+
+// SetNillableUsage5hLastPercent sets the "usage_5h_last_percent" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableUsage5hLastPercent(f *float64) *AccountCreate {
+	if f != nil {
+		ac.SetUsage5hLastPercent(*f)
+	}
+	return ac
+}
+
+// SetUsage7dGrowthDate sets the "usage_7d_growth_date" field.
+func (ac *AccountCreate) SetUsage7dGrowthDate(s string) *AccountCreate {
+	ac.mutation.SetUsage7dGrowthDate(s)
+	return ac
+}
+
+// SetNillableUsage7dGrowthDate sets the "usage_7d_growth_date" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableUsage7dGrowthDate(s *string) *AccountCreate {
+	if s != nil {
+		ac.SetUsage7dGrowthDate(*s)
+	}
+	return ac
+}
+
+// SetUsage7dDailyGrowth sets the "usage_7d_daily_growth" field.
+func (ac *AccountCreate) SetUsage7dDailyGrowth(f float64) *AccountCreate {
+	ac.mutation.SetUsage7dDailyGrowth(f)
+	return ac
+}
+
+// SetNillableUsage7dDailyGrowth sets the "usage_7d_daily_growth" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableUsage7dDailyGrowth(f *float64) *AccountCreate {
+	if f != nil {
+		ac.SetUsage7dDailyGrowth(*f)
+	}
+	return ac
+}
+
+// SetUsage7dLastPercent sets the "usage_7d_last_percent" field.
+func (ac *AccountCreate) SetUsage7dLastPercent(f float64) *AccountCreate {
+	ac.mutation.SetUsage7dLastPercent(f)
+	return ac
+}
+
+// SetNillableUsage7dLastPercent sets the "usage_7d_last_percent" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableUsage7dLastPercent(f *float64) *AccountCreate {
+	if f != nil {
+		ac.SetUsage7dLastPercent(*f)
+	}
+	return ac
+}
+
 // SetExtra sets the "extra" field.
 func (ac *AccountCreate) SetExtra(m map[string]interface{}) *AccountCreate {
 	ac.mutation.SetExtra(m)
@@ -392,6 +476,30 @@ func (ac *AccountCreate) defaults() {
 		v := account.DefaultUpstreamIsPool
 		ac.mutation.SetUpstreamIsPool(v)
 	}
+	if _, ok := ac.mutation.Usage5hGrowthDate(); !ok {
+		v := account.DefaultUsage5hGrowthDate
+		ac.mutation.SetUsage5hGrowthDate(v)
+	}
+	if _, ok := ac.mutation.Usage5hDailyGrowth(); !ok {
+		v := account.DefaultUsage5hDailyGrowth
+		ac.mutation.SetUsage5hDailyGrowth(v)
+	}
+	if _, ok := ac.mutation.Usage5hLastPercent(); !ok {
+		v := account.DefaultUsage5hLastPercent
+		ac.mutation.SetUsage5hLastPercent(v)
+	}
+	if _, ok := ac.mutation.Usage7dGrowthDate(); !ok {
+		v := account.DefaultUsage7dGrowthDate
+		ac.mutation.SetUsage7dGrowthDate(v)
+	}
+	if _, ok := ac.mutation.Usage7dDailyGrowth(); !ok {
+		v := account.DefaultUsage7dDailyGrowth
+		ac.mutation.SetUsage7dDailyGrowth(v)
+	}
+	if _, ok := ac.mutation.Usage7dLastPercent(); !ok {
+		v := account.DefaultUsage7dLastPercent
+		ac.mutation.SetUsage7dLastPercent(v)
+	}
 	if _, ok := ac.mutation.Extra(); !ok {
 		v := account.DefaultExtra
 		ac.mutation.SetExtra(v)
@@ -467,6 +575,24 @@ func (ac *AccountCreate) check() error {
 	}
 	if _, ok := ac.mutation.UpstreamIsPool(); !ok {
 		return &ValidationError{Name: "upstream_is_pool", err: errors.New(`ent: missing required field "Account.upstream_is_pool"`)}
+	}
+	if _, ok := ac.mutation.Usage5hGrowthDate(); !ok {
+		return &ValidationError{Name: "usage_5h_growth_date", err: errors.New(`ent: missing required field "Account.usage_5h_growth_date"`)}
+	}
+	if _, ok := ac.mutation.Usage5hDailyGrowth(); !ok {
+		return &ValidationError{Name: "usage_5h_daily_growth", err: errors.New(`ent: missing required field "Account.usage_5h_daily_growth"`)}
+	}
+	if _, ok := ac.mutation.Usage5hLastPercent(); !ok {
+		return &ValidationError{Name: "usage_5h_last_percent", err: errors.New(`ent: missing required field "Account.usage_5h_last_percent"`)}
+	}
+	if _, ok := ac.mutation.Usage7dGrowthDate(); !ok {
+		return &ValidationError{Name: "usage_7d_growth_date", err: errors.New(`ent: missing required field "Account.usage_7d_growth_date"`)}
+	}
+	if _, ok := ac.mutation.Usage7dDailyGrowth(); !ok {
+		return &ValidationError{Name: "usage_7d_daily_growth", err: errors.New(`ent: missing required field "Account.usage_7d_daily_growth"`)}
+	}
+	if _, ok := ac.mutation.Usage7dLastPercent(); !ok {
+		return &ValidationError{Name: "usage_7d_last_percent", err: errors.New(`ent: missing required field "Account.usage_7d_last_percent"`)}
 	}
 	if _, ok := ac.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Account.created_at"`)}
@@ -563,6 +689,30 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.LastProbeAt(); ok {
 		_spec.SetField(account.FieldLastProbeAt, field.TypeTime, value)
 		_node.LastProbeAt = &value
+	}
+	if value, ok := ac.mutation.Usage5hGrowthDate(); ok {
+		_spec.SetField(account.FieldUsage5hGrowthDate, field.TypeString, value)
+		_node.Usage5hGrowthDate = value
+	}
+	if value, ok := ac.mutation.Usage5hDailyGrowth(); ok {
+		_spec.SetField(account.FieldUsage5hDailyGrowth, field.TypeFloat64, value)
+		_node.Usage5hDailyGrowth = value
+	}
+	if value, ok := ac.mutation.Usage5hLastPercent(); ok {
+		_spec.SetField(account.FieldUsage5hLastPercent, field.TypeFloat64, value)
+		_node.Usage5hLastPercent = value
+	}
+	if value, ok := ac.mutation.Usage7dGrowthDate(); ok {
+		_spec.SetField(account.FieldUsage7dGrowthDate, field.TypeString, value)
+		_node.Usage7dGrowthDate = value
+	}
+	if value, ok := ac.mutation.Usage7dDailyGrowth(); ok {
+		_spec.SetField(account.FieldUsage7dDailyGrowth, field.TypeFloat64, value)
+		_node.Usage7dDailyGrowth = value
+	}
+	if value, ok := ac.mutation.Usage7dLastPercent(); ok {
+		_spec.SetField(account.FieldUsage7dLastPercent, field.TypeFloat64, value)
+		_node.Usage7dLastPercent = value
 	}
 	if value, ok := ac.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)

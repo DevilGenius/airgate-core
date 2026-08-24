@@ -52,6 +52,10 @@ type AccountResp struct {
 	Extra                   map[string]any      `json:"extra,omitempty"`
 	LastUsedAt              *string             `json:"last_used_at,omitempty"`
 	LastProbeAt             *string             `json:"last_probe_at,omitempty"`
+	Usage5hGrowthDate       string              `json:"usage_5h_growth_date,omitempty"`
+	Usage5hDailyGrowth      float64             `json:"usage_5h_daily_growth"`
+	Usage7dGrowthDate       string              `json:"usage_7d_growth_date,omitempty"`
+	Usage7dDailyGrowth      float64             `json:"usage_7d_daily_growth"`
 	DeletedAt               *string             `json:"deleted_at,omitempty"`
 	GroupIDs                []int64             `json:"group_ids"`
 	FamilyCooldowns         []FamilyCooldownDTO `json:"family_cooldowns,omitempty"`

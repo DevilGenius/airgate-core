@@ -59,6 +59,20 @@ func TestNormalizeAccountUsageWindowContractFields(t *testing.T) {
 	}
 }
 
+func TestUsageGrowthObservationUsesBaseFiveHourAndSevenDayWindows(t *testing.T) {
+	got := usageGrowthObservation(AccountUsageInfo{Windows: []AccountUsageWindow{
+		{Key: "5h", UsedPercent: 65},
+		{Key: "model:5h:spark", UsedPercent: 99},
+		{Key: "7d", UsedPercent: 16},
+		{Key: "7d_sonnet", Label: "7d Sonnet", UsedPercent: 88},
+	}}, "2026-08-24")
+
+	if got.Day != "2026-08-24" || got.FiveHourPercent == nil || *got.FiveHourPercent != 65 ||
+		got.SevenDayPercent == nil || *got.SevenDayPercent != 16 {
+		t.Fatalf("usageGrowthObservation() = %+v", got)
+	}
+}
+
 func TestUsageCacheExpiresAtKeepsWindowsUntilTheirOwnReset(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 

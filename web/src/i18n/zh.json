@@ -529,7 +529,7 @@
     "capacity_auto_refresh": "容量刷新",
     "scheduling": "调度",
     "groups": "所属分组",
-    "last_used": "最近请求",
+    "last_used": "最近使用",
     "last_access": "访问",
     "last_probe": "探测",
     "just_now": "刚刚",

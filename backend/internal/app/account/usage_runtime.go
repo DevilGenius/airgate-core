@@ -384,6 +384,7 @@ func (s *accountUsageService) updateAccountUsageCache(ctx context.Context, platf
 		return
 	}
 	now := s.now()
+	s.observeDailyUsageGrowth(ctx, accountID, info, now)
 	if existing, ok := s.getUsageInfoForAccount(ctx, accountID); ok {
 		info = mergeAccountUsageInfo(existing, info, now)
 	}
@@ -418,12 +419,46 @@ func (s *accountUsageService) updateAccountUsageCaches(ctx context.Context, acco
 	now := s.now()
 	existing := s.getUsageInfosForCacheWrites(ctx, writes, now)
 	for _, write := range writes {
+		s.observeDailyUsageGrowth(ctx, write.account.ID, write.info, now)
 		info := write.info
 		if cached, ok := existing[write.account.ID]; ok {
 			info = mergeAccountUsageInfo(cached, info, now)
 		}
 		s.writeUsageInfoCache(ctx, write.account.Platform, write.account.ID, info, now)
 	}
+}
+
+func (s *accountUsageService) observeDailyUsageGrowth(ctx context.Context, accountID int, info AccountUsageInfo, now time.Time) {
+	observation := usageGrowthObservation(info, now.In(time.Local).Format("2006-01-02"))
+	if observation.FiveHourPercent == nil && observation.SevenDayPercent == nil {
+		return
+	}
+	if err := s.repo.ObserveUsageGrowth(ctx, accountID, observation); err != nil {
+		slog.Debug("account_usage_growth_update_failed",
+			sdk.LogFieldAccountID, accountID,
+			sdk.LogFieldError, err)
+	}
+}
+
+func usageGrowthObservation(info AccountUsageInfo, day string) UsageGrowthObservation {
+	result := UsageGrowthObservation{Day: day}
+	for _, window := range normalizeAccountUsageInfo(info).Windows {
+		if window.Group != "base" {
+			continue
+		}
+		value := window.UsedPercent
+		switch window.Slot {
+		case "5h":
+			if result.FiveHourPercent == nil {
+				result.FiveHourPercent = &value
+			}
+		case "7d":
+			if result.SevenDayPercent == nil {
+				result.SevenDayPercent = &value
+			}
+		}
+	}
+	return result
 }
 
 func (s *accountUsageCache) getUsageInfosForCacheWrites(ctx context.Context, writes []accountUsageCacheWrite, now time.Time) map[int]AccountUsageInfo {

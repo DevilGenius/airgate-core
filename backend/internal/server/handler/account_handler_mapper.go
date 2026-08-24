@@ -22,6 +22,10 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		ModelDowngradeThreshold: account.ModelDowngradeThreshold,
 		ErrorMsg:                account.ErrorMsg,
 		UpstreamIsPool:          account.UpstreamIsPool,
+		Usage5hGrowthDate:       account.Usage5hGrowthDate,
+		Usage5hDailyGrowth:      account.Usage5hDailyGrowth,
+		Usage7dGrowthDate:       account.Usage7dGrowthDate,
+		Usage7dDailyGrowth:      account.Usage7dDailyGrowth,
 		Extra:                   account.Extra,
 		GroupIDs:                account.GroupIDs,
 		TimeMixin: dto.TimeMixin{

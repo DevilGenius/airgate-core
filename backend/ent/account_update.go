@@ -312,6 +312,118 @@ func (au *AccountUpdate) ClearLastProbeAt() *AccountUpdate {
 	return au
 }
 
+// SetUsage5hGrowthDate sets the "usage_5h_growth_date" field.
+func (au *AccountUpdate) SetUsage5hGrowthDate(s string) *AccountUpdate {
+	au.mutation.SetUsage5hGrowthDate(s)
+	return au
+}
+
+// SetNillableUsage5hGrowthDate sets the "usage_5h_growth_date" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableUsage5hGrowthDate(s *string) *AccountUpdate {
+	if s != nil {
+		au.SetUsage5hGrowthDate(*s)
+	}
+	return au
+}
+
+// SetUsage5hDailyGrowth sets the "usage_5h_daily_growth" field.
+func (au *AccountUpdate) SetUsage5hDailyGrowth(f float64) *AccountUpdate {
+	au.mutation.ResetUsage5hDailyGrowth()
+	au.mutation.SetUsage5hDailyGrowth(f)
+	return au
+}
+
+// SetNillableUsage5hDailyGrowth sets the "usage_5h_daily_growth" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableUsage5hDailyGrowth(f *float64) *AccountUpdate {
+	if f != nil {
+		au.SetUsage5hDailyGrowth(*f)
+	}
+	return au
+}
+
+// AddUsage5hDailyGrowth adds f to the "usage_5h_daily_growth" field.
+func (au *AccountUpdate) AddUsage5hDailyGrowth(f float64) *AccountUpdate {
+	au.mutation.AddUsage5hDailyGrowth(f)
+	return au
+}
+
+// SetUsage5hLastPercent sets the "usage_5h_last_percent" field.
+func (au *AccountUpdate) SetUsage5hLastPercent(f float64) *AccountUpdate {
+	au.mutation.ResetUsage5hLastPercent()
+	au.mutation.SetUsage5hLastPercent(f)
+	return au
+}
+
+// SetNillableUsage5hLastPercent sets the "usage_5h_last_percent" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableUsage5hLastPercent(f *float64) *AccountUpdate {
+	if f != nil {
+		au.SetUsage5hLastPercent(*f)
+	}
+	return au
+}
+
+// AddUsage5hLastPercent adds f to the "usage_5h_last_percent" field.
+func (au *AccountUpdate) AddUsage5hLastPercent(f float64) *AccountUpdate {
+	au.mutation.AddUsage5hLastPercent(f)
+	return au
+}
+
+// SetUsage7dGrowthDate sets the "usage_7d_growth_date" field.
+func (au *AccountUpdate) SetUsage7dGrowthDate(s string) *AccountUpdate {
+	au.mutation.SetUsage7dGrowthDate(s)
+	return au
+}
+
+// SetNillableUsage7dGrowthDate sets the "usage_7d_growth_date" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableUsage7dGrowthDate(s *string) *AccountUpdate {
+	if s != nil {
+		au.SetUsage7dGrowthDate(*s)
+	}
+	return au
+}
+
+// SetUsage7dDailyGrowth sets the "usage_7d_daily_growth" field.
+func (au *AccountUpdate) SetUsage7dDailyGrowth(f float64) *AccountUpdate {
+	au.mutation.ResetUsage7dDailyGrowth()
+	au.mutation.SetUsage7dDailyGrowth(f)
+	return au
+}
+
+// SetNillableUsage7dDailyGrowth sets the "usage_7d_daily_growth" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableUsage7dDailyGrowth(f *float64) *AccountUpdate {
+	if f != nil {
+		au.SetUsage7dDailyGrowth(*f)
+	}
+	return au
+}
+
+// AddUsage7dDailyGrowth adds f to the "usage_7d_daily_growth" field.
+func (au *AccountUpdate) AddUsage7dDailyGrowth(f float64) *AccountUpdate {
+	au.mutation.AddUsage7dDailyGrowth(f)
+	return au
+}
+
+// SetUsage7dLastPercent sets the "usage_7d_last_percent" field.
+func (au *AccountUpdate) SetUsage7dLastPercent(f float64) *AccountUpdate {
+	au.mutation.ResetUsage7dLastPercent()
+	au.mutation.SetUsage7dLastPercent(f)
+	return au
+}
+
+// SetNillableUsage7dLastPercent sets the "usage_7d_last_percent" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableUsage7dLastPercent(f *float64) *AccountUpdate {
+	if f != nil {
+		au.SetUsage7dLastPercent(*f)
+	}
+	return au
+}
+
+// AddUsage7dLastPercent adds f to the "usage_7d_last_percent" field.
+func (au *AccountUpdate) AddUsage7dLastPercent(f float64) *AccountUpdate {
+	au.mutation.AddUsage7dLastPercent(f)
+	return au
+}
+
 // SetExtra sets the "extra" field.
 func (au *AccountUpdate) SetExtra(m map[string]interface{}) *AccountUpdate {
 	au.mutation.SetExtra(m)
@@ -612,6 +724,36 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if au.mutation.LastProbeAtCleared() {
 		_spec.ClearField(account.FieldLastProbeAt, field.TypeTime)
+	}
+	if value, ok := au.mutation.Usage5hGrowthDate(); ok {
+		_spec.SetField(account.FieldUsage5hGrowthDate, field.TypeString, value)
+	}
+	if value, ok := au.mutation.Usage5hDailyGrowth(); ok {
+		_spec.SetField(account.FieldUsage5hDailyGrowth, field.TypeFloat64, value)
+	}
+	if value, ok := au.mutation.AddedUsage5hDailyGrowth(); ok {
+		_spec.AddField(account.FieldUsage5hDailyGrowth, field.TypeFloat64, value)
+	}
+	if value, ok := au.mutation.Usage5hLastPercent(); ok {
+		_spec.SetField(account.FieldUsage5hLastPercent, field.TypeFloat64, value)
+	}
+	if value, ok := au.mutation.AddedUsage5hLastPercent(); ok {
+		_spec.AddField(account.FieldUsage5hLastPercent, field.TypeFloat64, value)
+	}
+	if value, ok := au.mutation.Usage7dGrowthDate(); ok {
+		_spec.SetField(account.FieldUsage7dGrowthDate, field.TypeString, value)
+	}
+	if value, ok := au.mutation.Usage7dDailyGrowth(); ok {
+		_spec.SetField(account.FieldUsage7dDailyGrowth, field.TypeFloat64, value)
+	}
+	if value, ok := au.mutation.AddedUsage7dDailyGrowth(); ok {
+		_spec.AddField(account.FieldUsage7dDailyGrowth, field.TypeFloat64, value)
+	}
+	if value, ok := au.mutation.Usage7dLastPercent(); ok {
+		_spec.SetField(account.FieldUsage7dLastPercent, field.TypeFloat64, value)
+	}
+	if value, ok := au.mutation.AddedUsage7dLastPercent(); ok {
+		_spec.AddField(account.FieldUsage7dLastPercent, field.TypeFloat64, value)
 	}
 	if value, ok := au.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
@@ -1047,6 +1189,118 @@ func (auo *AccountUpdateOne) ClearLastProbeAt() *AccountUpdateOne {
 	return auo
 }
 
+// SetUsage5hGrowthDate sets the "usage_5h_growth_date" field.
+func (auo *AccountUpdateOne) SetUsage5hGrowthDate(s string) *AccountUpdateOne {
+	auo.mutation.SetUsage5hGrowthDate(s)
+	return auo
+}
+
+// SetNillableUsage5hGrowthDate sets the "usage_5h_growth_date" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableUsage5hGrowthDate(s *string) *AccountUpdateOne {
+	if s != nil {
+		auo.SetUsage5hGrowthDate(*s)
+	}
+	return auo
+}
+
+// SetUsage5hDailyGrowth sets the "usage_5h_daily_growth" field.
+func (auo *AccountUpdateOne) SetUsage5hDailyGrowth(f float64) *AccountUpdateOne {
+	auo.mutation.ResetUsage5hDailyGrowth()
+	auo.mutation.SetUsage5hDailyGrowth(f)
+	return auo
+}
+
+// SetNillableUsage5hDailyGrowth sets the "usage_5h_daily_growth" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableUsage5hDailyGrowth(f *float64) *AccountUpdateOne {
+	if f != nil {
+		auo.SetUsage5hDailyGrowth(*f)
+	}
+	return auo
+}
+
+// AddUsage5hDailyGrowth adds f to the "usage_5h_daily_growth" field.
+func (auo *AccountUpdateOne) AddUsage5hDailyGrowth(f float64) *AccountUpdateOne {
+	auo.mutation.AddUsage5hDailyGrowth(f)
+	return auo
+}
+
+// SetUsage5hLastPercent sets the "usage_5h_last_percent" field.
+func (auo *AccountUpdateOne) SetUsage5hLastPercent(f float64) *AccountUpdateOne {
+	auo.mutation.ResetUsage5hLastPercent()
+	auo.mutation.SetUsage5hLastPercent(f)
+	return auo
+}
+
+// SetNillableUsage5hLastPercent sets the "usage_5h_last_percent" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableUsage5hLastPercent(f *float64) *AccountUpdateOne {
+	if f != nil {
+		auo.SetUsage5hLastPercent(*f)
+	}
+	return auo
+}
+
+// AddUsage5hLastPercent adds f to the "usage_5h_last_percent" field.
+func (auo *AccountUpdateOne) AddUsage5hLastPercent(f float64) *AccountUpdateOne {
+	auo.mutation.AddUsage5hLastPercent(f)
+	return auo
+}
+
+// SetUsage7dGrowthDate sets the "usage_7d_growth_date" field.
+func (auo *AccountUpdateOne) SetUsage7dGrowthDate(s string) *AccountUpdateOne {
+	auo.mutation.SetUsage7dGrowthDate(s)
+	return auo
+}
+
+// SetNillableUsage7dGrowthDate sets the "usage_7d_growth_date" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableUsage7dGrowthDate(s *string) *AccountUpdateOne {
+	if s != nil {
+		auo.SetUsage7dGrowthDate(*s)
+	}
+	return auo
+}
+
+// SetUsage7dDailyGrowth sets the "usage_7d_daily_growth" field.
+func (auo *AccountUpdateOne) SetUsage7dDailyGrowth(f float64) *AccountUpdateOne {
+	auo.mutation.ResetUsage7dDailyGrowth()
+	auo.mutation.SetUsage7dDailyGrowth(f)
+	return auo
+}
+
+// SetNillableUsage7dDailyGrowth sets the "usage_7d_daily_growth" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableUsage7dDailyGrowth(f *float64) *AccountUpdateOne {
+	if f != nil {
+		auo.SetUsage7dDailyGrowth(*f)
+	}
+	return auo
+}
+
+// AddUsage7dDailyGrowth adds f to the "usage_7d_daily_growth" field.
+func (auo *AccountUpdateOne) AddUsage7dDailyGrowth(f float64) *AccountUpdateOne {
+	auo.mutation.AddUsage7dDailyGrowth(f)
+	return auo
+}
+
+// SetUsage7dLastPercent sets the "usage_7d_last_percent" field.
+func (auo *AccountUpdateOne) SetUsage7dLastPercent(f float64) *AccountUpdateOne {
+	auo.mutation.ResetUsage7dLastPercent()
+	auo.mutation.SetUsage7dLastPercent(f)
+	return auo
+}
+
+// SetNillableUsage7dLastPercent sets the "usage_7d_last_percent" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableUsage7dLastPercent(f *float64) *AccountUpdateOne {
+	if f != nil {
+		auo.SetUsage7dLastPercent(*f)
+	}
+	return auo
+}
+
+// AddUsage7dLastPercent adds f to the "usage_7d_last_percent" field.
+func (auo *AccountUpdateOne) AddUsage7dLastPercent(f float64) *AccountUpdateOne {
+	auo.mutation.AddUsage7dLastPercent(f)
+	return auo
+}
+
 // SetExtra sets the "extra" field.
 func (auo *AccountUpdateOne) SetExtra(m map[string]interface{}) *AccountUpdateOne {
 	auo.mutation.SetExtra(m)
@@ -1377,6 +1631,36 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if auo.mutation.LastProbeAtCleared() {
 		_spec.ClearField(account.FieldLastProbeAt, field.TypeTime)
+	}
+	if value, ok := auo.mutation.Usage5hGrowthDate(); ok {
+		_spec.SetField(account.FieldUsage5hGrowthDate, field.TypeString, value)
+	}
+	if value, ok := auo.mutation.Usage5hDailyGrowth(); ok {
+		_spec.SetField(account.FieldUsage5hDailyGrowth, field.TypeFloat64, value)
+	}
+	if value, ok := auo.mutation.AddedUsage5hDailyGrowth(); ok {
+		_spec.AddField(account.FieldUsage5hDailyGrowth, field.TypeFloat64, value)
+	}
+	if value, ok := auo.mutation.Usage5hLastPercent(); ok {
+		_spec.SetField(account.FieldUsage5hLastPercent, field.TypeFloat64, value)
+	}
+	if value, ok := auo.mutation.AddedUsage5hLastPercent(); ok {
+		_spec.AddField(account.FieldUsage5hLastPercent, field.TypeFloat64, value)
+	}
+	if value, ok := auo.mutation.Usage7dGrowthDate(); ok {
+		_spec.SetField(account.FieldUsage7dGrowthDate, field.TypeString, value)
+	}
+	if value, ok := auo.mutation.Usage7dDailyGrowth(); ok {
+		_spec.SetField(account.FieldUsage7dDailyGrowth, field.TypeFloat64, value)
+	}
+	if value, ok := auo.mutation.AddedUsage7dDailyGrowth(); ok {
+		_spec.AddField(account.FieldUsage7dDailyGrowth, field.TypeFloat64, value)
+	}
+	if value, ok := auo.mutation.Usage7dLastPercent(); ok {
+		_spec.SetField(account.FieldUsage7dLastPercent, field.TypeFloat64, value)
+	}
+	if value, ok := auo.mutation.AddedUsage7dLastPercent(); ok {
+		_spec.AddField(account.FieldUsage7dLastPercent, field.TypeFloat64, value)
 	}
 	if value, ok := auo.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)

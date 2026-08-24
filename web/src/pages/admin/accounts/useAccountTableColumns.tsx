@@ -105,8 +105,6 @@ type PreparedRequestTime = {
 type AccountRowRenderMeta = {
   groupNames: string[];
   hiddenGroupCount: number;
-  lastAccessTime: PreparedRequestTime;
-  lastProbeTime: PreparedRequestTime;
   usage: PreparedUsageView;
   visibleGroups: string[];
 };
@@ -337,6 +335,16 @@ function prepareRequestTime(value: string | undefined): PreparedRequestTime {
   };
 }
 
+function localDateKey(value = new Date()) {
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
+function formatDailyUsageGrowth(value: number) {
+  if (!Number.isFinite(value) || value < 0) return '0';
+  return String(Math.round(value));
+}
+
 type UseAccountTableColumnsArgs = {
   accountPoolAdjustmentPlans: ReadonlySet<AccountPoolAdjustmentPlan>;
   capacityStore: AccountCapacityStore;
@@ -414,10 +422,6 @@ function usageViewsEqual(left: PreparedUsageView, right: PreparedUsageView) {
 function accountRowRenderMetaEqual(left: AccountRowRenderMeta | undefined, right: AccountRowRenderMeta) {
   if (!left) return false;
   return left.hiddenGroupCount === right.hiddenGroupCount
-    && left.lastAccessTime.display === right.lastAccessTime.display
-    && left.lastAccessTime.iso === right.lastAccessTime.iso
-    && left.lastProbeTime.display === right.lastProbeTime.display
-    && left.lastProbeTime.iso === right.lastProbeTime.iso
     && stringArraysEqual(left.groupNames, right.groupNames)
     && stringArraysEqual(left.visibleGroups, right.visibleGroups)
     && usageViewsEqual(left.usage, right.usage);
@@ -454,14 +458,10 @@ export function useAccountTableColumns({
     for (const row of rows) {
       const groupNames = (row.group_ids ?? []).map((gid) => groupMap.get(gid) ?? `#${gid}`);
       const visibleGroups = groupNames.length > 3 ? groupNames.slice(0, 2) : groupNames.slice(0, 3);
-      const lastAccessTime = prepareRequestTime(row.last_used_at);
-      const lastProbeTime = prepareRequestTime(row.last_probe_at);
 
       const rowMeta: AccountRowRenderMeta = {
         groupNames,
         hiddenGroupCount: Math.max(0, groupNames.length - visibleGroups.length),
-        lastAccessTime,
-        lastProbeTime,
         usage: prepareUsageView(row, usageAccounts[String(row.id)], resetNow, accountPoolAdjustmentPlans),
         visibleGroups,
       };
@@ -680,6 +680,7 @@ export function useAccountTableColumns({
                 },
               }),
             );
+            await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
             toast('success', accountUsageLabels.refreshUsageSuccess);
           } catch (err) {
             const message = err instanceof Error && err.message ? err.message : accountUsageLabels.refreshUsageFailed;
@@ -789,14 +790,22 @@ export function useAccountTableColumns({
     {
       key: 'last_used_at',
       title: t('accounts.last_used'),
-      width: '88px',
-      mobileWidth: '88px',
+      width: '132px',
+      mobileWidth: '124px',
       align: 'center',
-      render: (_row, rowMeta) => {
-        const meta = rowMeta as AccountRowRenderMeta | undefined;
-        const access = meta?.lastAccessTime ?? { display: '-', iso: '' };
-        const probe = meta?.lastProbeTime ?? { display: '-', iso: '' };
-        const detail = `${t('accounts.last_access')}: ${access.display}\n${t('accounts.last_probe')}: ${probe.display}`;
+      render: (row) => {
+        const access = prepareRequestTime(row.last_used_at);
+        const today = localDateKey();
+        const growth = [
+          row.usage_5h_growth_date === today
+            ? { slot: '5h', value: formatDailyUsageGrowth(row.usage_5h_daily_growth ?? 0) }
+            : null,
+          row.usage_7d_growth_date === today
+            ? { slot: '7d', value: formatDailyUsageGrowth(row.usage_7d_daily_growth ?? 0) }
+            : null,
+        ].filter((item): item is { slot: string; value: string } => item !== null);
+        const growthText = growth.map((item) => `${item.slot} +${item.value}%`).join(' ');
+        const detail = [access.display, growthText].filter(Boolean).join('\n');
         return (
           <div className="ag-account-request-times" title={detail}>
             <div className="ag-account-request-time">
@@ -804,11 +813,16 @@ export function useAccountTableColumns({
                 {access.display}
               </time>
             </div>
-            <div className="ag-account-request-time">
-              <time className="ag-account-request-time-value" dateTime={probe.iso || undefined}>
-                {probe.display}
-              </time>
-            </div>
+            {growth.length > 0 ? (
+              <div className="ag-account-daily-usage-growth">
+                {growth.map((item) => (
+                  <span key={item.slot} className="ag-account-daily-usage-growth-item">
+                    <span>{item.slot}</span>
+                    <span className="ag-account-daily-usage-growth-value">+{item.value}%</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         );
       },

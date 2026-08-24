@@ -40,15 +40,21 @@ type Account struct {
 	// ErrorMsg 进入当前非 active 状态的原因（给运维看）。
 	ErrorMsg string
 	// UpstreamIsPool 上游是账号池时置 true：临时上游错误会进入退避 degraded，不永久标错。
-	UpstreamIsPool bool
-	LastUsedAt     *time.Time
-	LastProbeAt    *time.Time
-	DeletedAt      *time.Time
-	GroupIDs       []int64
-	Proxy          *Proxy
-	Extra          map[string]any
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	UpstreamIsPool     bool
+	LastUsedAt         *time.Time
+	LastProbeAt        *time.Time
+	Usage5hGrowthDate  string
+	Usage5hDailyGrowth float64
+	Usage5hLastPercent float64
+	Usage7dGrowthDate  string
+	Usage7dDailyGrowth float64
+	Usage7dLastPercent float64
+	DeletedAt          *time.Time
+	GroupIDs           []int64
+	Proxy              *Proxy
+	Extra              map[string]any
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 	// ImageStats 仅 OpenAI 平台账号在列表查询路径上填充；其它平台 / 详情查询路径为 nil。
 	// 取自 usage_log model 名前缀 "gpt-image" 的子集聚合。
 	ImageStats *AccountImageStats
@@ -72,6 +78,14 @@ type AccountWindowStats struct {
 type AccountImageStats struct {
 	TodayCount int64 // 今日 00:00（服务器本地时区）至今的生图请求数
 	TotalCount int64 // 全部历史生图请求数
+}
+
+// UsageGrowthObservation 是一次基础 5h/7d 用量窗口观测。
+// nil 表示本次插件响应没有该窗口，不更新对应累计状态。
+type UsageGrowthObservation struct {
+	Day             string
+	FiveHourPercent *float64
+	SevenDayPercent *float64
 }
 
 // UsageLog 使用记录聚合输入。
@@ -398,4 +412,6 @@ type Repository interface {
 	// BatchImageStats 批量统计指定账号的生图请求数（model 前缀 "gpt-image"）。
 	// 同时返回 [todayStart, now] 区间和 全部历史 两个计数。无记录的账号不出现在返回 map 中。
 	BatchImageStats(ctx context.Context, accountIDs []int, todayStart time.Time) (map[int]AccountImageStats, error)
+	// ObserveUsageGrowth 根据最新窗口百分比累计账号当日已观测增长。
+	ObserveUsageGrowth(context.Context, int, UsageGrowthObservation) error
 }

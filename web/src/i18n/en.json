@@ -530,7 +530,7 @@
     "capacity_auto_refresh": "Capacity",
     "scheduling": "Scheduling",
     "groups": "Groups",
-    "last_used": "Recent Requests",
+    "last_used": "Recent Usage",
     "last_access": "Access",
     "last_probe": "Probe",
     "just_now": "Just now",

@@ -75,6 +75,62 @@ func TestAccountStoreOccupiedPrioritiesGroupsAndExcludes(t *testing.T) {
 	}
 }
 
+func TestAccountStoreObserveUsageGrowthAccumulatesResetsAndDays(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	item, err := db.Account.Create().
+		SetName("usage-growth").
+		SetPlatform("openai").
+		SetType("oauth").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	store := NewAccountStore(db)
+	observe := func(day string, five, seven *float64) {
+		t.Helper()
+		if err := store.ObserveUsageGrowth(ctx, item.ID, account.UsageGrowthObservation{
+			Day: day, FiveHourPercent: five, SevenDayPercent: seven,
+		}); err != nil {
+			t.Fatalf("ObserveUsageGrowth(%s): %v", day, err)
+		}
+	}
+	value := func(v float64) *float64 { return &v }
+
+	observe("2026-08-24", value(10), value(20))
+	observe("2026-08-24", value(70), value(36))
+	observe("2026-08-24", value(5), value(36))
+
+	got, err := db.Account.Get(ctx, item.ID)
+	if err != nil {
+		t.Fatalf("get account: %v", err)
+	}
+	if got.Usage5hGrowthDate != "2026-08-24" || got.Usage5hDailyGrowth != 65 || got.Usage5hLastPercent != 5 {
+		t.Fatalf("5h growth state = (%q, %v, %v), want (2026-08-24, 65, 5)", got.Usage5hGrowthDate, got.Usage5hDailyGrowth, got.Usage5hLastPercent)
+	}
+	if got.Usage7dGrowthDate != "2026-08-24" || got.Usage7dDailyGrowth != 16 || got.Usage7dLastPercent != 36 {
+		t.Fatalf("7d growth state = (%q, %v, %v), want (2026-08-24, 16, 36)", got.Usage7dGrowthDate, got.Usage7dDailyGrowth, got.Usage7dLastPercent)
+	}
+
+	observe("2026-08-25", value(12), nil)
+	got, err = db.Account.Get(ctx, item.ID)
+	if err != nil {
+		t.Fatalf("get next-day account: %v", err)
+	}
+	if got.Usage5hGrowthDate != "2026-08-25" || got.Usage5hDailyGrowth != 0 || got.Usage5hLastPercent != 12 {
+		t.Fatalf("next-day 5h state = (%q, %v, %v), want baseline (2026-08-25, 0, 12)", got.Usage5hGrowthDate, got.Usage5hDailyGrowth, got.Usage5hLastPercent)
+	}
+	if got.Usage7dGrowthDate != "2026-08-24" || got.Usage7dDailyGrowth != 16 {
+		t.Fatalf("missing next-day 7d observation changed state: (%q, %v)", got.Usage7dGrowthDate, got.Usage7dDailyGrowth)
+	}
+}
+
 func TestAccountStoreCreateRefreshesExistingOAuthByEmail(t *testing.T) {
 	db := enttestOpen(t)
 	defer func() {

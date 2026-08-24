@@ -75,6 +75,29 @@ function Harness({ usageData }: { usageData: AccountUsageData }) {
   return usageColumn.render(account, rowMetaById.get(account.id)) as ReactNode;
 }
 
+function RecentUsageHarness({ row }: { row: AccountResp }) {
+  const { columns } = useAccountTableColumns({
+    accountPoolAdjustmentPlans: parseAccountPoolAdjustmentPlans(''),
+    capacityStore: new AccountCapacityStore(),
+    groupMap: new Map(),
+    onClearRateLimitMarkers: vi.fn(),
+    onDeleteAccount: vi.fn(),
+    onEditAccount: vi.fn(),
+    onRefreshToken: vi.fn(),
+    onStatsAccount: vi.fn(),
+    onTestAccount: vi.fn(),
+    onToggleScheduling: vi.fn(),
+    platformFilter: 'openai',
+    platformName: (platform) => platform,
+    platformsKey: 'openaiopenai',
+    rows: [row],
+    usageData: { accounts: {} },
+  });
+  const recentUsageColumn = columns.find((column) => column.key === 'last_used_at');
+  if (!recentUsageColumn) throw new Error('recent usage column not found');
+  return recentUsageColumn.render(row) as ReactNode;
+}
+
 describe('useAccountTableColumns usage refresh', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -110,5 +133,30 @@ describe('useAccountTableColumns usage refresh', () => {
     expect(mocks.refreshToken).not.toHaveBeenCalled();
     expect(mocks.toast).toHaveBeenCalledWith('success', '用量刷新成功');
     expect(client.getQueryData<AccountUsageData>(usageKey)?.accounts?.['1']?.windows?.[0]?.used_percent).toBe(75);
+  });
+
+  it('shows daily 5h and 7d growth without the probe timestamp', () => {
+    const now = new Date();
+    const pad = (part: number) => String(part).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const row: AccountResp = {
+      ...account,
+      last_used_at: now.toISOString(),
+      last_probe_at: new Date(now.getTime() - 60_000).toISOString(),
+      usage_5h_growth_date: today,
+      usage_5h_daily_growth: 65,
+      usage_7d_growth_date: today,
+      usage_7d_daily_growth: 16,
+    };
+
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RecentUsageHarness row={row} />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText('+65%')).toBeInTheDocument();
+    expect(screen.getByText('+16%')).toBeInTheDocument();
+    expect(container.querySelectorAll('time')).toHaveLength(1);
   });
 });

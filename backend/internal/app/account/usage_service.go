@@ -23,6 +23,7 @@ type accountUsageRepository interface {
 	FindByID(context.Context, int, LoadOptions) (Account, error)
 	BatchWindowStats(context.Context, []int, time.Time) (map[int]AccountWindowStats, error)
 	BatchImageStats(context.Context, []int, time.Time) (map[int]AccountImageStats, error)
+	ObserveUsageGrowth(context.Context, int, UsageGrowthObservation) error
 }
 
 type accountUsagePluginCatalog interface {

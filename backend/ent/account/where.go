@@ -120,6 +120,36 @@ func LastProbeAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldLastProbeAt, v))
 }
 
+// Usage5hGrowthDate applies equality check predicate on the "usage_5h_growth_date" field. It's identical to Usage5hGrowthDateEQ.
+func Usage5hGrowthDate(v string) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hDailyGrowth applies equality check predicate on the "usage_5h_daily_growth" field. It's identical to Usage5hDailyGrowthEQ.
+func Usage5hDailyGrowth(v float64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage5hDailyGrowth, v))
+}
+
+// Usage5hLastPercent applies equality check predicate on the "usage_5h_last_percent" field. It's identical to Usage5hLastPercentEQ.
+func Usage5hLastPercent(v float64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage5hLastPercent, v))
+}
+
+// Usage7dGrowthDate applies equality check predicate on the "usage_7d_growth_date" field. It's identical to Usage7dGrowthDateEQ.
+func Usage7dGrowthDate(v string) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dDailyGrowth applies equality check predicate on the "usage_7d_daily_growth" field. It's identical to Usage7dDailyGrowthEQ.
+func Usage7dDailyGrowth(v float64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage7dDailyGrowth, v))
+}
+
+// Usage7dLastPercent applies equality check predicate on the "usage_7d_last_percent" field. It's identical to Usage7dLastPercentEQ.
+func Usage7dLastPercent(v float64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage7dLastPercent, v))
+}
+
 // DeletedAt applies equality check predicate on the "deleted_at" field. It's identical to DeletedAtEQ.
 func DeletedAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldDeletedAt, v))
@@ -828,6 +858,296 @@ func LastProbeAtIsNil() predicate.Account {
 // LastProbeAtNotNil applies the NotNil predicate on the "last_probe_at" field.
 func LastProbeAtNotNil() predicate.Account {
 	return predicate.Account(sql.FieldNotNull(FieldLastProbeAt))
+}
+
+// Usage5hGrowthDateEQ applies the EQ predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateEQ(v string) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hGrowthDateNEQ applies the NEQ predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateNEQ(v string) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hGrowthDateIn applies the In predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateIn(vs ...string) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldUsage5hGrowthDate, vs...))
+}
+
+// Usage5hGrowthDateNotIn applies the NotIn predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateNotIn(vs ...string) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldUsage5hGrowthDate, vs...))
+}
+
+// Usage5hGrowthDateGT applies the GT predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateGT(v string) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hGrowthDateGTE applies the GTE predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateGTE(v string) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hGrowthDateLT applies the LT predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateLT(v string) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hGrowthDateLTE applies the LTE predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateLTE(v string) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hGrowthDateContains applies the Contains predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateContains(v string) predicate.Account {
+	return predicate.Account(sql.FieldContains(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hGrowthDateHasPrefix applies the HasPrefix predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateHasPrefix(v string) predicate.Account {
+	return predicate.Account(sql.FieldHasPrefix(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hGrowthDateHasSuffix applies the HasSuffix predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateHasSuffix(v string) predicate.Account {
+	return predicate.Account(sql.FieldHasSuffix(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hGrowthDateEqualFold applies the EqualFold predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateEqualFold(v string) predicate.Account {
+	return predicate.Account(sql.FieldEqualFold(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hGrowthDateContainsFold applies the ContainsFold predicate on the "usage_5h_growth_date" field.
+func Usage5hGrowthDateContainsFold(v string) predicate.Account {
+	return predicate.Account(sql.FieldContainsFold(FieldUsage5hGrowthDate, v))
+}
+
+// Usage5hDailyGrowthEQ applies the EQ predicate on the "usage_5h_daily_growth" field.
+func Usage5hDailyGrowthEQ(v float64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage5hDailyGrowth, v))
+}
+
+// Usage5hDailyGrowthNEQ applies the NEQ predicate on the "usage_5h_daily_growth" field.
+func Usage5hDailyGrowthNEQ(v float64) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldUsage5hDailyGrowth, v))
+}
+
+// Usage5hDailyGrowthIn applies the In predicate on the "usage_5h_daily_growth" field.
+func Usage5hDailyGrowthIn(vs ...float64) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldUsage5hDailyGrowth, vs...))
+}
+
+// Usage5hDailyGrowthNotIn applies the NotIn predicate on the "usage_5h_daily_growth" field.
+func Usage5hDailyGrowthNotIn(vs ...float64) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldUsage5hDailyGrowth, vs...))
+}
+
+// Usage5hDailyGrowthGT applies the GT predicate on the "usage_5h_daily_growth" field.
+func Usage5hDailyGrowthGT(v float64) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldUsage5hDailyGrowth, v))
+}
+
+// Usage5hDailyGrowthGTE applies the GTE predicate on the "usage_5h_daily_growth" field.
+func Usage5hDailyGrowthGTE(v float64) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldUsage5hDailyGrowth, v))
+}
+
+// Usage5hDailyGrowthLT applies the LT predicate on the "usage_5h_daily_growth" field.
+func Usage5hDailyGrowthLT(v float64) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldUsage5hDailyGrowth, v))
+}
+
+// Usage5hDailyGrowthLTE applies the LTE predicate on the "usage_5h_daily_growth" field.
+func Usage5hDailyGrowthLTE(v float64) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldUsage5hDailyGrowth, v))
+}
+
+// Usage5hLastPercentEQ applies the EQ predicate on the "usage_5h_last_percent" field.
+func Usage5hLastPercentEQ(v float64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage5hLastPercent, v))
+}
+
+// Usage5hLastPercentNEQ applies the NEQ predicate on the "usage_5h_last_percent" field.
+func Usage5hLastPercentNEQ(v float64) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldUsage5hLastPercent, v))
+}
+
+// Usage5hLastPercentIn applies the In predicate on the "usage_5h_last_percent" field.
+func Usage5hLastPercentIn(vs ...float64) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldUsage5hLastPercent, vs...))
+}
+
+// Usage5hLastPercentNotIn applies the NotIn predicate on the "usage_5h_last_percent" field.
+func Usage5hLastPercentNotIn(vs ...float64) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldUsage5hLastPercent, vs...))
+}
+
+// Usage5hLastPercentGT applies the GT predicate on the "usage_5h_last_percent" field.
+func Usage5hLastPercentGT(v float64) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldUsage5hLastPercent, v))
+}
+
+// Usage5hLastPercentGTE applies the GTE predicate on the "usage_5h_last_percent" field.
+func Usage5hLastPercentGTE(v float64) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldUsage5hLastPercent, v))
+}
+
+// Usage5hLastPercentLT applies the LT predicate on the "usage_5h_last_percent" field.
+func Usage5hLastPercentLT(v float64) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldUsage5hLastPercent, v))
+}
+
+// Usage5hLastPercentLTE applies the LTE predicate on the "usage_5h_last_percent" field.
+func Usage5hLastPercentLTE(v float64) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldUsage5hLastPercent, v))
+}
+
+// Usage7dGrowthDateEQ applies the EQ predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateEQ(v string) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dGrowthDateNEQ applies the NEQ predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateNEQ(v string) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dGrowthDateIn applies the In predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateIn(vs ...string) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldUsage7dGrowthDate, vs...))
+}
+
+// Usage7dGrowthDateNotIn applies the NotIn predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateNotIn(vs ...string) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldUsage7dGrowthDate, vs...))
+}
+
+// Usage7dGrowthDateGT applies the GT predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateGT(v string) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dGrowthDateGTE applies the GTE predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateGTE(v string) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dGrowthDateLT applies the LT predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateLT(v string) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dGrowthDateLTE applies the LTE predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateLTE(v string) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dGrowthDateContains applies the Contains predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateContains(v string) predicate.Account {
+	return predicate.Account(sql.FieldContains(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dGrowthDateHasPrefix applies the HasPrefix predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateHasPrefix(v string) predicate.Account {
+	return predicate.Account(sql.FieldHasPrefix(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dGrowthDateHasSuffix applies the HasSuffix predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateHasSuffix(v string) predicate.Account {
+	return predicate.Account(sql.FieldHasSuffix(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dGrowthDateEqualFold applies the EqualFold predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateEqualFold(v string) predicate.Account {
+	return predicate.Account(sql.FieldEqualFold(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dGrowthDateContainsFold applies the ContainsFold predicate on the "usage_7d_growth_date" field.
+func Usage7dGrowthDateContainsFold(v string) predicate.Account {
+	return predicate.Account(sql.FieldContainsFold(FieldUsage7dGrowthDate, v))
+}
+
+// Usage7dDailyGrowthEQ applies the EQ predicate on the "usage_7d_daily_growth" field.
+func Usage7dDailyGrowthEQ(v float64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage7dDailyGrowth, v))
+}
+
+// Usage7dDailyGrowthNEQ applies the NEQ predicate on the "usage_7d_daily_growth" field.
+func Usage7dDailyGrowthNEQ(v float64) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldUsage7dDailyGrowth, v))
+}
+
+// Usage7dDailyGrowthIn applies the In predicate on the "usage_7d_daily_growth" field.
+func Usage7dDailyGrowthIn(vs ...float64) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldUsage7dDailyGrowth, vs...))
+}
+
+// Usage7dDailyGrowthNotIn applies the NotIn predicate on the "usage_7d_daily_growth" field.
+func Usage7dDailyGrowthNotIn(vs ...float64) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldUsage7dDailyGrowth, vs...))
+}
+
+// Usage7dDailyGrowthGT applies the GT predicate on the "usage_7d_daily_growth" field.
+func Usage7dDailyGrowthGT(v float64) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldUsage7dDailyGrowth, v))
+}
+
+// Usage7dDailyGrowthGTE applies the GTE predicate on the "usage_7d_daily_growth" field.
+func Usage7dDailyGrowthGTE(v float64) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldUsage7dDailyGrowth, v))
+}
+
+// Usage7dDailyGrowthLT applies the LT predicate on the "usage_7d_daily_growth" field.
+func Usage7dDailyGrowthLT(v float64) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldUsage7dDailyGrowth, v))
+}
+
+// Usage7dDailyGrowthLTE applies the LTE predicate on the "usage_7d_daily_growth" field.
+func Usage7dDailyGrowthLTE(v float64) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldUsage7dDailyGrowth, v))
+}
+
+// Usage7dLastPercentEQ applies the EQ predicate on the "usage_7d_last_percent" field.
+func Usage7dLastPercentEQ(v float64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldUsage7dLastPercent, v))
+}
+
+// Usage7dLastPercentNEQ applies the NEQ predicate on the "usage_7d_last_percent" field.
+func Usage7dLastPercentNEQ(v float64) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldUsage7dLastPercent, v))
+}
+
+// Usage7dLastPercentIn applies the In predicate on the "usage_7d_last_percent" field.
+func Usage7dLastPercentIn(vs ...float64) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldUsage7dLastPercent, vs...))
+}
+
+// Usage7dLastPercentNotIn applies the NotIn predicate on the "usage_7d_last_percent" field.
+func Usage7dLastPercentNotIn(vs ...float64) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldUsage7dLastPercent, vs...))
+}
+
+// Usage7dLastPercentGT applies the GT predicate on the "usage_7d_last_percent" field.
+func Usage7dLastPercentGT(v float64) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldUsage7dLastPercent, v))
+}
+
+// Usage7dLastPercentGTE applies the GTE predicate on the "usage_7d_last_percent" field.
+func Usage7dLastPercentGTE(v float64) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldUsage7dLastPercent, v))
+}
+
+// Usage7dLastPercentLT applies the LT predicate on the "usage_7d_last_percent" field.
+func Usage7dLastPercentLT(v float64) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldUsage7dLastPercent, v))
+}
+
+// Usage7dLastPercentLTE applies the LTE predicate on the "usage_7d_last_percent" field.
+func Usage7dLastPercentLTE(v float64) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldUsage7dLastPercent, v))
 }
 
 // ExtraIsNil applies the IsNil predicate on the "extra" field.

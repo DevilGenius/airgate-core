@@ -34,6 +34,10 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 		UpstreamIsPool:     true,
 		LastUsedAt:         &lastUsed,
 		LastProbeAt:        &lastProbe,
+		Usage5hGrowthDate:  "2026-06-20",
+		Usage5hDailyGrowth: 65,
+		Usage7dGrowthDate:  "2026-06-20",
+		Usage7dDailyGrowth: 16,
 		DeletedAt:          &deletedAt,
 		Proxy:              &appaccount.Proxy{ID: 7},
 		Extra:              map[string]any{"plan": "plus"},
@@ -52,6 +56,10 @@ func TestAccountAndCredentialSchemaMappersCoverOptionalFields(t *testing.T) {
 	}
 	if resp.TodayImageCount == nil || *resp.TodayImageCount != 5 || resp.TotalImageCount == nil || *resp.TotalImageCount != 8 {
 		t.Fatalf("image counters = %#v/%#v", resp.TodayImageCount, resp.TotalImageCount)
+	}
+	if resp.Usage5hGrowthDate != "2026-06-20" || resp.Usage5hDailyGrowth != 65 ||
+		resp.Usage7dGrowthDate != "2026-06-20" || resp.Usage7dDailyGrowth != 16 {
+		t.Fatalf("usage growth = %+v", resp)
 	}
 	if resp.GroupIDs == nil || len(resp.GroupIDs) != 0 {
 		t.Fatalf("nil group IDs should map to empty slice: %#v", resp.GroupIDs)
