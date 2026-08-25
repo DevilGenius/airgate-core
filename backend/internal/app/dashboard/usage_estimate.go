@@ -37,13 +37,26 @@ type usageEstimateObservation struct {
 	plan     string
 	day      string
 	optional bool
+	maxAge   time.Duration
 }
 
-// BuildUsageEstimates 聚合 Plus/Pro 套餐池的增长、100% 成本和剩余时间。
+// BuildUsageEstimates 聚合 Plus/Pro 套餐池的消耗、100% 成本和剩余时间。
 func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCostPerMinute float64) []UsageEstimate {
 	plus := usageEstimatePool{plan: "plus", requiredPlans: []string{"plus"}}
 	pro := usageEstimatePool{plan: "pro", requiredPlans: []string{"pro"}}
 	hasPlusAccounts := false
+	planHasFiveHour := make(map[string]bool)
+	for _, source := range sources {
+		if source.Plan != "plus" && source.Plan != "team" && source.Plan != "k12" && source.Plan != "pro" {
+			continue
+		}
+		planHasFiveHour[source.Plan] = planHasFiveHour[source.Plan] || observationSupported(usageEstimateObservation{
+			window:   source.Meta.FiveHour,
+			optional: true,
+		})
+	}
+	plusShortTerm := make([]usageEstimateObservation, 0, len(sources))
+	proShortTerm := make([]usageEstimateObservation, 0, len(sources))
 	day := now.In(time.Local).Format("2006-01-02")
 	for _, source := range sources {
 		isPlusPool := source.Plan == "plus" || source.Plan == "team" || source.Plan == "k12"
@@ -54,16 +67,39 @@ func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCo
 		if source.Plan == "plus" {
 			hasPlusAccounts = true
 		}
-		fiveHour := usageEstimateObservation{window: source.Meta.FiveHour, plan: source.Plan, day: day, optional: true}
-		sevenDay := usageEstimateObservation{window: source.Meta.SevenDay, plan: source.Plan, day: day}
+		fiveHour := usageEstimateObservation{
+			window: source.Meta.FiveHour, plan: source.Plan, day: day, optional: true, maxAge: usage5hObservationAge,
+		}
+		sevenDay := usageEstimateObservation{
+			window: source.Meta.SevenDay, plan: source.Plan, day: day, maxAge: usage7dObservationAge,
+		}
+		shortTerm := sevenDay
+		if planHasFiveHour[source.Plan] {
+			shortTerm = fiveHour
+			// 5h 能力按 plan_type 判定；同套餐的新账号也必须计入，并共享该套餐标准值。
+			shortTerm.optional = false
+		}
 		if isPlusPool {
 			plus.present = true
-			plus.add(fiveHour, sevenDay)
-			pro.add(fiveHour, sevenDay)
+			plus.sevenDay.add(sevenDay)
+			pro.sevenDay.add(sevenDay)
+			plusShortTerm = append(plusShortTerm, shortTerm)
+			proShortTerm = append(proShortTerm, shortTerm)
 		}
 		if isProPlan {
 			pro.present = true
-			pro.add(fiveHour, sevenDay)
+			pro.sevenDay.add(sevenDay)
+			proShortTerm = append(proShortTerm, shortTerm)
+		}
+	}
+	// 短期行按 plan_type 选择有效限制：有 5h 则用 5h，否则使用 7d。
+	// 是否显示整行只由 Plus 决定；Plus 没有 5h 时，短期余量与 7d 相同，省略重复行。
+	if planHasFiveHour["plus"] {
+		for _, observation := range plusShortTerm {
+			plus.fiveHour.add(observation)
+		}
+		for _, observation := range proShortTerm {
+			pro.fiveHour.add(observation)
 		}
 	}
 	if hasPlusAccounts {
@@ -89,18 +125,17 @@ func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCo
 	return result
 }
 
-func (p *usageEstimatePool) add(fiveHour, sevenDay usageEstimateObservation) {
-	p.fiveHour.add(fiveHour)
-	p.sevenDay.add(sevenDay)
-}
-
 func (p *usageEstimateWindowPool) add(observation usageEstimateObservation) {
-	w := observation.window
-	if observation.optional && w.GrowthDate == "" && w.ObservedAt == nil && w.CostPerPercent <= 0 {
+	if !observationSupported(observation) {
 		return
 	}
 	p.supported = true
 	p.observations = append(p.observations, observation)
+}
+
+func observationSupported(observation usageEstimateObservation) bool {
+	w := observation.window
+	return !observation.optional || w.GrowthDate != "" || w.ObservedAt != nil || w.CostPerPercent > 0
 }
 
 func (p usageEstimateWindowPool) estimate(window string, requiredPlans []string, accountCostPerMinute float64, now time.Time, observationMaxAge time.Duration) UsageEstimateWindow {
@@ -126,7 +161,11 @@ func (p usageEstimateWindowPool) estimate(window string, requiredPlans []string,
 		if w.GrowthDate == observation.day && validPositive(w.DailyGrowth) {
 			weightedConsumed += rate * w.DailyGrowth
 		}
-		if observationFresh(w.ObservedAt, now, observationMaxAge) && validPercent(w.LastPercent) {
+		maxAge := observation.maxAge
+		if maxAge <= 0 {
+			maxAge = observationMaxAge
+		}
+		if observationFresh(w.ObservedAt, now, maxAge) && validPercent(w.LastPercent) {
 			remainingCost += rate * math.Max(0, 100-w.LastPercent)
 		} else {
 			remainingAvailable = false

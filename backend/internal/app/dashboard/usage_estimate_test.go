@@ -102,6 +102,93 @@ func TestBuildUsageEstimatesSharesWeightedStandardWithinPlan(t *testing.T) {
 	}
 }
 
+func TestProShortTermEstimateUsesSevenDayWhenProHasNoFiveHour(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	window := func(rate, last float64) accountusage.WindowEstimate {
+		return accountusage.WindowEstimate{
+			GrowthDate: "2026-08-24", DailyGrowth: 10, LastPercent: last,
+			CostPerPercent: rate, CalibrationWeight: 10, CalibratedAt: &now, ObservedAt: &now,
+		}
+	}
+	proSevenDay := window(2, 50)
+	proObservedAt := now.Add(-12 * time.Hour)
+	proSevenDay.ObservedAt = &proObservedAt
+	result := BuildUsageEstimates([]UsageEstimateSource{
+		{Plan: "plus", Meta: accountusage.EstimateMeta{
+			FiveHour: window(1, 100),
+			SevenDay: window(1, 50),
+		}},
+		{Plan: "pro", Meta: accountusage.EstimateMeta{
+			SevenDay: proSevenDay,
+		}},
+	}, now, 1)
+	if len(result) != 2 || len(result[1].Windows) != 2 {
+		t.Fatalf("result = %+v", result)
+	}
+	shortTerm := result[1].Windows[0]
+	if shortTerm.Window != "5h" || shortTerm.Status != "ready" || shortTerm.FullCost != 300 ||
+		shortTerm.RemainingCost == nil || *shortTerm.RemainingCost != 100 ||
+		shortTerm.RemainingMinutes == nil || *shortTerm.RemainingMinutes != 100 {
+		t.Fatalf("Pro short-term estimate should combine Plus 5h and Pro 7d: %+v", shortTerm)
+	}
+}
+
+func TestShortTermEstimateChoosesFiveHourOrSevenDayPerPlan(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	window := func(rate, last float64) accountusage.WindowEstimate {
+		return accountusage.WindowEstimate{
+			GrowthDate: "2026-08-24", DailyGrowth: 10, LastPercent: last,
+			CostPerPercent: rate, CalibrationWeight: 10, CalibratedAt: &now, ObservedAt: &now,
+		}
+	}
+	result := BuildUsageEstimates([]UsageEstimateSource{
+		{Plan: "plus", Meta: accountusage.EstimateMeta{
+			FiveHour: window(1, 100),
+			SevenDay: window(1, 50),
+		}},
+		{Plan: "team", Meta: accountusage.EstimateMeta{
+			SevenDay: window(2, 50),
+		}},
+		{Plan: "k12", Meta: accountusage.EstimateMeta{
+			FiveHour: window(3, 50),
+			SevenDay: window(4, 50),
+		}},
+	}, now, 1)
+	if len(result) != 1 || len(result[0].Windows) != 2 {
+		t.Fatalf("result = %+v", result)
+	}
+	shortTerm := result[0].Windows[0]
+	if shortTerm.Window != "5h" || shortTerm.Status != "ready" || shortTerm.FullCost != 600 ||
+		shortTerm.RemainingCost == nil || *shortTerm.RemainingCost != 250 {
+		t.Fatalf("short-term estimate should use Plus 5h + Team 7d + K12 5h: %+v", shortTerm)
+	}
+	sevenDay := result[0].Windows[1]
+	if sevenDay.Window != "7d" || sevenDay.Status != "ready" || sevenDay.FullCost != 700 ||
+		sevenDay.RemainingCost == nil || *sevenDay.RemainingCost != 350 {
+		t.Fatalf("7d estimate should use every plan's 7d window: %+v", sevenDay)
+	}
+}
+
+func TestFiveHourRowVisibilityDependsOnlyOnPlus(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	window := func(rate float64) accountusage.WindowEstimate {
+		return accountusage.WindowEstimate{
+			GrowthDate: "2026-08-24", DailyGrowth: 10, LastPercent: 50,
+			CostPerPercent: rate, CalibrationWeight: 10, CalibratedAt: &now, ObservedAt: &now,
+		}
+	}
+	result := BuildUsageEstimates([]UsageEstimateSource{
+		{Plan: "plus", Meta: accountusage.EstimateMeta{SevenDay: window(1)}},
+		{Plan: "team", Meta: accountusage.EstimateMeta{FiveHour: window(2), SevenDay: window(2)}},
+		{Plan: "k12", Meta: accountusage.EstimateMeta{FiveHour: window(3), SevenDay: window(3)}},
+		{Plan: "pro", Meta: accountusage.EstimateMeta{SevenDay: window(4)}},
+	}, now, 1)
+	if len(result) != 2 || len(result[0].Windows) != 1 || result[0].Windows[0].Window != "7d" ||
+		len(result[1].Windows) != 1 || result[1].Windows[0].Window != "7d" {
+		t.Fatalf("5h row must be omitted when Plus has no 5h window: %+v", result)
+	}
+}
+
 func TestUsageEstimateFreshnessWindows(t *testing.T) {
 	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
 	calibratedAt := now.Add(-6 * 24 * time.Hour)
