@@ -44,10 +44,12 @@ import { EditAccountModal } from './accounts/EditAccountModal';
 import { useAccountTableColumns } from './accounts/useAccountTableColumns';
 import {
   ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY,
+  ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_CONFIG_KEY,
   LEGACY_ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY,
   OPENAI_PLUGIN_ID,
   accountPoolDisplayUsageWindows,
   parseAccountPoolAdjustmentPlans,
+  shouldShowAccountPoolAdjustedBaseFiveHour,
 } from './accounts/accountPoolAdjustment';
 import { BulkEditAccountModal } from './accounts/BulkEditAccountModal';
 import { BulkAccountTestModal } from './accounts/BulkAccountTestModal';
@@ -291,6 +293,9 @@ export default function AccountsPageContent() {
   const accountPoolAdjustmentPlans = useMemo(
     () => parseAccountPoolAdjustmentPlans(accountPoolAdjustmentConfig),
     [accountPoolAdjustmentConfig],
+  );
+  const showAccountPoolAdjustedBaseFiveHour = shouldShowAccountPoolAdjustedBaseFiveHour(
+    openAIPluginConfig?.config?.[ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_CONFIG_KEY],
   );
   const { toast } = useToast();
   useSyncExternalStore(subscribeAccountIdentityChange, getAccountIdentityVersion);
@@ -809,13 +814,14 @@ export default function AccountsPageContent() {
         row,
         usageAccounts[String(row.id)]?.windows,
         accountPoolAdjustmentPlans,
+        showAccountPoolAdjustedBaseFiveHour,
       );
       if (shouldExpandUsageWindows(windows)) {
         nextExpandedIds.add(row.id);
       }
     }
     return nextExpandedIds;
-  }, [accountPoolAdjustmentPlans, rows, usageData?.accounts]);
+  }, [accountPoolAdjustmentPlans, rows, showAccountPoolAdjustedBaseFiveHour, usageData?.accounts]);
 
   // 创建账号
   const createMutation = useCrudMutation({
@@ -1321,6 +1327,7 @@ export default function AccountsPageContent() {
 
   const { columns, rowMetaById } = useAccountTableColumns({
     accountPoolAdjustmentPlans,
+    showAccountPoolAdjustedBaseFiveHour,
     capacityStore,
     groupMap,
     onClearRateLimitMarkers: handleClearRateLimitMarkers,

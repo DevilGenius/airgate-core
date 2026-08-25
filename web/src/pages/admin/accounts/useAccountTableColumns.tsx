@@ -261,12 +261,14 @@ function prepareUsageView(
   usage: AccountUsageInfo | undefined,
   resetNow: number,
   accountPoolAdjustmentPlans: ReadonlySet<AccountPoolAdjustmentPlan>,
+  showAccountPoolAdjustedBaseFiveHour: boolean,
 ): PreparedUsageView {
   const missing = !usage;
   const windows: AccountUsageWindow[] = accountPoolDisplayUsageWindows(
     row,
     Array.isArray(usage?.windows) ? usage.windows : [],
     accountPoolAdjustmentPlans,
+    showAccountPoolAdjustedBaseFiveHour,
   ) ?? [];
   const credits: AccountUsageCredits | null = usage?.credits || null;
   const todayStatsRaw = usage?.today_stats || null;
@@ -351,6 +353,7 @@ function formatDailyUsageConsumed(value: number) {
 
 type UseAccountTableColumnsArgs = {
   accountPoolAdjustmentPlans: ReadonlySet<AccountPoolAdjustmentPlan>;
+  showAccountPoolAdjustedBaseFiveHour: boolean;
   capacityStore: AccountCapacityStore;
   groupMap: Map<number, string>;
   onClearRateLimitMarkers: (id: number) => void;
@@ -433,6 +436,7 @@ function accountRowRenderMetaEqual(left: AccountRowRenderMeta | undefined, right
 
 export function useAccountTableColumns({
   accountPoolAdjustmentPlans,
+  showAccountPoolAdjustedBaseFiveHour,
   capacityStore,
   groupMap,
   onClearRateLimitMarkers,
@@ -466,7 +470,13 @@ export function useAccountTableColumns({
       const rowMeta: AccountRowRenderMeta = {
         groupNames,
         hiddenGroupCount: Math.max(0, groupNames.length - visibleGroups.length),
-        usage: prepareUsageView(row, usageAccounts[String(row.id)], resetNow, accountPoolAdjustmentPlans),
+        usage: prepareUsageView(
+          row,
+          usageAccounts[String(row.id)],
+          resetNow,
+          accountPoolAdjustmentPlans,
+          showAccountPoolAdjustedBaseFiveHour,
+        ),
         visibleGroups,
       };
       const previousMeta = previousMetaById.get(row.id);
@@ -479,7 +489,7 @@ export function useAccountTableColumns({
 
     rowMetaCacheRef.current = nextMeta;
     return nextMeta;
-  }, [accountPoolAdjustmentPlans, groupMap, resetNow, rows, t, usageData?.accounts]);
+  }, [accountPoolAdjustmentPlans, groupMap, resetNow, rows, showAccountPoolAdjustedBaseFiveHour, t, usageData?.accounts]);
 
   const accountActionLabels = useMemo(() => ({
     actions: t('common.actions'),

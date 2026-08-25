@@ -55,6 +55,7 @@ const account: AccountResp = {
 function Harness({ usageData }: { usageData: AccountUsageData }) {
   const { columns, rowMetaById } = useAccountTableColumns({
     accountPoolAdjustmentPlans: parseAccountPoolAdjustmentPlans(''),
+    showAccountPoolAdjustedBaseFiveHour: false,
     capacityStore: new AccountCapacityStore(),
     groupMap: new Map(),
     onClearRateLimitMarkers: vi.fn(),
@@ -78,6 +79,7 @@ function Harness({ usageData }: { usageData: AccountUsageData }) {
 function RecentUsageHarness({ row }: { row: AccountResp }) {
   const { columns } = useAccountTableColumns({
     accountPoolAdjustmentPlans: parseAccountPoolAdjustmentPlans(''),
+    showAccountPoolAdjustedBaseFiveHour: false,
     capacityStore: new AccountCapacityStore(),
     groupMap: new Map(),
     onClearRateLimitMarkers: vi.fn(),

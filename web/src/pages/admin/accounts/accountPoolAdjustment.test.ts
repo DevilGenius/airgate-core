@@ -4,6 +4,7 @@ import {
   accountPoolDisplayUsageWindows,
   isAccountPoolProAdjusted,
   parseAccountPoolAdjustmentPlans,
+  shouldShowAccountPoolAdjustedBaseFiveHour,
 } from './accountPoolAdjustment';
 
 const oauthAccount = {
@@ -19,6 +20,12 @@ describe('account pool adjustment', () => {
     expect([...parseAccountPoolAdjustmentPlans('plus, team,invalid,k12')]).toEqual(['plus', 'team', 'k12']);
     expect([...parseAccountPoolAdjustmentPlans('oauth_pro')]).toEqual(['plus', 'team', 'k12', 'free']);
     expect([...parseAccountPoolAdjustmentPlans('')]).toEqual([]);
+  });
+
+  it('reads the base five-hour display switch', () => {
+    expect(shouldShowAccountPoolAdjustedBaseFiveHour('true')).toBe(true);
+    expect(shouldShowAccountPoolAdjustedBaseFiveHour('false')).toBe(false);
+    expect(shouldShowAccountPoolAdjustedBaseFiveHour(undefined)).toBe(false);
   });
 
   it('only adjusts selected OpenAI OAuth plans', () => {
@@ -52,6 +59,7 @@ describe('account pool adjustment', () => {
       oauthAccount,
       windows,
       adjustedPlans,
+      true,
     );
 
     expect(displayed).toHaveLength(4);
@@ -76,11 +84,12 @@ describe('account pool adjustment', () => {
     expect(windows).toHaveLength(2);
   });
 
-  it('keeps Spark 5h visible without a base 5h window and leaves its reset empty', () => {
+  it('keeps Spark 5h visible without creating a base 5h window', () => {
     const displayed = accountPoolDisplayUsageWindows(
       oauthAccount,
       [{ key: '7d', label: '7d', slot: '7d', group: 'base', used_percent: 34 }],
       adjustedPlans,
+      true,
     );
 
     expect(displayed).toHaveLength(3);
@@ -96,6 +105,26 @@ describe('account pool adjustment', () => {
       display_label: '7dS',
       used_percent: 0,
     }));
+  });
+
+  it('hides only the base 5h window when the display switch is off', () => {
+    const displayed = accountPoolDisplayUsageWindows(
+      oauthAccount,
+      [
+        { key: '5h', label: '5h', slot: '5h', group: 'base', used_percent: 12 },
+        { key: '7d', label: '7d', slot: '7d', group: 'base', used_percent: 34 },
+        { key: 'model:5h:spark', label: '5h spark', slot: '5h', group: 'model:spark', used_percent: 56 },
+      ],
+      adjustedPlans,
+      false,
+    );
+
+    expect(displayed?.find((window) => window.group === 'base' && window.slot === '5h')).toBeUndefined();
+    expect(displayed?.map((window) => window.key)).toEqual([
+      '7d',
+      'model:5h:gpt-5.3-codex-spark',
+      'model:7d:gpt-5.3-codex-spark',
+    ]);
   });
 
   it('replaces existing Spark values with zero and the matching base reset times', () => {
@@ -116,6 +145,7 @@ describe('account pool adjustment', () => {
       oauthAccount,
       windows,
       adjustedPlans,
+      true,
     );
 
     expect(displayed).toHaveLength(4);
@@ -147,6 +177,7 @@ describe('account pool adjustment', () => {
         reset_seconds: thirtyDaysAndOneHour,
       }],
       parseAccountPoolAdjustmentPlans('free'),
+      true,
     );
 
     expect(displayed?.[0]?.reset_seconds).toBe(twoDaysAndOneHour);

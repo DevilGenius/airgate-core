@@ -15,10 +15,13 @@ import {
 } from 'lucide-react';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { NativeCheckbox } from '../../shared/components/NativeCheckbox';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
 import {
   ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY,
+  ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_CONFIG_KEY,
+  ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_LABEL,
   ALL_ACCOUNT_POOL_ADJUSTMENT_PLANS,
   LEGACY_ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY,
   OPENAI_PLUGIN_ID,
@@ -535,6 +538,9 @@ function PluginConfigModal({
             }
 
             if (field.type === 'multiselect') {
+              const options = field.options || [];
+              const showBaseFiveHourSwitch = plugin?.name === OPENAI_PLUGIN_ID
+                && field.key === ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY;
               const selectedValues = new Set(
                 (values[field.key] || field.default || '')
                   .split(',')
@@ -545,7 +551,7 @@ function PluginConfigModal({
                 const nextSelected = new Set(selectedValues);
                 if (selected) nextSelected.add(optionValue);
                 else nextSelected.delete(optionValue);
-                const orderedValues = (field.options || [])
+                const orderedValues = options
                   .map((option) => option.value)
                   .filter((value) => nextSelected.has(value));
                 setValues({ ...values, [field.key]: orderedValues.join(',') });
@@ -557,7 +563,7 @@ function PluginConfigModal({
                     {field.required && <span className="text-danger ml-1">*</span>}
                   </Label>
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    {(field.options || []).map((option) => (
+                    {options.map((option) => (
                       <NativeCheckbox
                         key={option.value}
                         isSelected={selectedValues.has(option.value)}
@@ -567,6 +573,19 @@ function PluginConfigModal({
                       </NativeCheckbox>
                     ))}
                   </div>
+                  {showBaseFiveHourSwitch ? (
+                    <div className="mt-3">
+                      <NativeSwitch
+                        ariaLabel={ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_LABEL}
+                        isSelected={values[ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_CONFIG_KEY] === 'true'}
+                        label={ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_LABEL}
+                        onChange={(selected) => setValues({
+                          ...values,
+                          [ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_CONFIG_KEY]: String(selected),
+                        })}
+                      />
+                    </div>
+                  ) : null}
                   {field.description ? <Description>{field.description}</Description> : null}
                 </div>
               );

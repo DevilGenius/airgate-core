@@ -6,6 +6,8 @@ export const OPENAI_PLUGIN_ID = 'gateway-openai';
 export const ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY = 'account_pool_adjustment_plans';
 export const LEGACY_ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY = 'account_pool_adjustment';
 export const ALL_ACCOUNT_POOL_ADJUSTMENT_PLANS = 'plus,team,k12,free';
+export const ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_CONFIG_KEY = 'account_pool_adjustment_show_5h';
+export const ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_LABEL = '显示';
 export const ADJUSTED_USAGE_MODEL = 'gpt-5.3-codex-spark';
 
 export type AccountPoolAdjustmentPlan = 'plus' | 'team' | 'k12' | 'free';
@@ -26,6 +28,10 @@ export function parseAccountPoolAdjustmentPlans(value: unknown): ReadonlySet<Acc
     .map((plan) => plan.trim().toLowerCase())
     .filter((plan): plan is AccountPoolAdjustmentPlan => ADJUSTABLE_PLANS.has(plan as AccountPoolAdjustmentPlan));
   return new Set(plans);
+}
+
+export function shouldShowAccountPoolAdjustedBaseFiveHour(value: unknown) {
+  return typeof value === 'string' && value.trim().toLowerCase() === 'true';
 }
 
 function accountPlan(account: AccountDisplaySource): AccountPoolAdjustmentPlan | '' {
@@ -112,16 +118,22 @@ export function accountPoolDisplayUsageWindows(
   account: AccountDisplaySource,
   windows: AccountUsageWindow[] | undefined,
   plans: ReadonlySet<AccountPoolAdjustmentPlan>,
+  showBaseFiveHour: boolean,
 ): AccountUsageWindow[] | undefined {
   if (!Array.isArray(windows) || !isAccountPoolProAdjusted(account, plans)) return windows;
 
   const targetGroup = `model:${ADJUSTED_USAGE_MODEL}`;
   const baseWindows = new Map<string, AccountUsageWindow>();
-  const adjustedWindows = windows.map(adjustedResetWindow).filter((window) => {
+  const resetAdjustedWindows = windows.map(adjustedResetWindow);
+  for (const window of resetAdjustedWindows) {
     const { group, slot } = getWindowSlot(window);
     if (group === 'base' && (slot === '5h' || slot === '7d')) {
       baseWindows.set(slot, window);
     }
+  }
+  const adjustedWindows = resetAdjustedWindows.filter((window) => {
+    const { group, slot } = getWindowSlot(window);
+    if (group === 'base' && slot === '5h' && !showBaseFiveHour) return false;
     return !isAdjustedUsageModelGroup(group) || (slot !== '5h' && slot !== '7d');
   });
 
