@@ -48,7 +48,7 @@ func (w WindowEstimate) CostInterval(observation WindowObservation) (Calibration
 	}, true
 }
 
-// ApplyObservation 更新当日累计已消耗百分比、观测游标和滚动成本校准。
+// ApplyObservation 更新当日累计用量增长、观测游标和滚动成本校准。
 // costDelta 仅在 CostInterval 返回有效区间时传入；没有有效成本样本时传 0。
 func (w *WindowEstimate) ApplyObservation(observation WindowObservation, costDelta float64) bool {
 	if w == nil || !validPercent(observation.CurrentPercent) || observation.ObservedAt.IsZero() ||

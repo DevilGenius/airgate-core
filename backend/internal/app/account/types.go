@@ -419,6 +419,6 @@ type Repository interface {
 	// BatchImageStats 批量统计指定账号的生图请求数（model 前缀 "gpt-image"）。
 	// 同时返回 [todayStart, now] 区间和 全部历史 两个计数。无记录的账号不出现在返回 map 中。
 	BatchImageStats(ctx context.Context, accountIDs []int, todayStart time.Time) (map[int]AccountImageStats, error)
-	// ObserveUsageGrowth 根据最新窗口百分比累计账号当日已观测消耗（方法名保留兼容）。
+	// ObserveUsageGrowth 根据最新窗口百分比累计账号当日已观测用量增长。
 	ObserveUsageGrowth(context.Context, int, UsageGrowthObservation) error
 }

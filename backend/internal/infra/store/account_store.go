@@ -948,7 +948,7 @@ type preparedUsageGrowth struct {
 	sevenDay *preparedUsageGrowthWindow
 }
 
-// ObserveUsageGrowth 累计基础 5h/7d 窗口当日已观测的消耗百分比（方法名保留兼容）。
+// ObserveUsageGrowth 累计基础 5h/7d 窗口当日已观测的用量增长。
 // usage log 成本聚合在事务外完成；短事务只锁账号行、校验 meta 快照并写回。
 // 若并发探测已更新 meta，则基于最新快照重新准备，避免覆盖其它进程的观测。
 func (s *AccountStore) ObserveUsageGrowth(ctx context.Context, id int, observation appaccount.UsageGrowthObservation) error {

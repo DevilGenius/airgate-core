@@ -109,7 +109,7 @@
   white-space: nowrap;
 }
 
-.ag-accounts-table .ag-account-daily-usage-consumption {
+.ag-accounts-table .ag-account-daily-usage-growth {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -121,13 +121,13 @@
   white-space: nowrap;
 }
 
-.ag-accounts-table .ag-account-daily-usage-consumption-item {
+.ag-accounts-table .ag-account-daily-usage-growth-item {
   display: inline-flex;
   align-items: center;
   gap: 0.125rem;
 }
 
-.ag-accounts-table .ag-account-daily-usage-consumption-value {
+.ag-accounts-table .ag-account-daily-usage-growth-value {
   color: var(--ag-primary);
 }
 

@@ -4,7 +4,7 @@ import "time"
 
 const EstimateMetaVersion = 1
 
-// EstimateMeta 保存账号级 5h/7d 已消耗百分比与滚动成本校准状态。
+// EstimateMeta 保存账号级 5h/7d 用量增长与滚动成本校准状态。
 type EstimateMeta struct {
 	Version  int            `json:"version,omitempty"`
 	FiveHour WindowEstimate `json:"5h,omitempty"`
@@ -13,7 +13,7 @@ type EstimateMeta struct {
 
 // WindowEstimate 保存单个用量窗口的展示状态、校准值和观测游标。
 type WindowEstimate struct {
-	// GrowthDate / DailyGrowth 是历史 JSON 兼容命名；实际保存正数的当日累计已消耗百分比。
+	// DailyGrowth 保存正数的当日累计用量增长，即已消耗百分比的增量。
 	GrowthDate          string     `json:"growth_date,omitempty"`
 	DailyGrowth         float64    `json:"daily_growth,omitempty"`
 	LastPercent         float64    `json:"last_percent,omitempty"`

@@ -55,10 +55,10 @@ type AccountResp struct {
 	LastUsedAt              *string             `json:"last_used_at,omitempty"`
 	LastProbeAt             *string             `json:"last_probe_at,omitempty"`
 	Usage5hGrowthDate       string              `json:"usage_5h_growth_date,omitempty"`
-	Usage5hDailyGrowth      float64             `json:"usage_5h_daily_growth"` // 正数消耗幅度；字段名保留兼容
+	Usage5hDailyGrowth      float64             `json:"usage_5h_daily_growth"` // 正数用量增长幅度（已消耗百分比增量）
 	Usage5hObservedAt       *string             `json:"usage_5h_observed_at,omitempty"`
 	Usage7dGrowthDate       string              `json:"usage_7d_growth_date,omitempty"`
-	Usage7dDailyGrowth      float64             `json:"usage_7d_daily_growth"` // 正数消耗幅度；字段名保留兼容
+	Usage7dDailyGrowth      float64             `json:"usage_7d_daily_growth"` // 正数用量增长幅度（已消耗百分比增量）
 	Usage7dObservedAt       *string             `json:"usage_7d_observed_at,omitempty"`
 	DeletedAt               *string             `json:"deleted_at,omitempty"`
 	GroupIDs                []int64             `json:"group_ids"`

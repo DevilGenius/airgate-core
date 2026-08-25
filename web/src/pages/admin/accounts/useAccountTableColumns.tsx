@@ -346,7 +346,7 @@ export function isObservedToday(value: string | undefined, now = new Date()) {
     && observedAt.getDate() === now.getDate();
 }
 
-function formatDailyUsageConsumed(value: number) {
+function formatDailyUsageGrowth(value: number) {
   if (!Number.isFinite(value) || value < 0) return '0';
   return String(Math.round(value));
 }
@@ -809,16 +809,16 @@ export function useAccountTableColumns({
       align: 'center',
       render: (row) => {
         const access = prepareRequestTime(row.last_used_at);
-        const consumption = [
+        const growth = [
           isObservedToday(row.usage_5h_observed_at)
-            ? { slot: '5h', value: formatDailyUsageConsumed(row.usage_5h_daily_growth ?? 0) }
+            ? { slot: '5h', value: formatDailyUsageGrowth(row.usage_5h_daily_growth ?? 0) }
             : null,
           isObservedToday(row.usage_7d_observed_at)
-            ? { slot: '7d', value: formatDailyUsageConsumed(row.usage_7d_daily_growth ?? 0) }
+            ? { slot: '7d', value: formatDailyUsageGrowth(row.usage_7d_daily_growth ?? 0) }
             : null,
         ].filter((item): item is { slot: string; value: string } => item !== null);
-        const consumptionText = consumption.map((item) => `${item.slot} -${item.value}%`).join(' ');
-        const detail = [access.display, consumptionText].filter(Boolean).join('\n');
+        const growthText = growth.map((item) => `${item.slot} +${item.value}%`).join(' ');
+        const detail = [access.display, growthText].filter(Boolean).join('\n');
         return (
           <div className="ag-account-request-times" title={detail}>
             <div className="ag-account-request-time">
@@ -826,12 +826,12 @@ export function useAccountTableColumns({
                 {access.display}
               </time>
             </div>
-            {consumption.length > 0 ? (
-              <div className="ag-account-daily-usage-consumption">
-                {consumption.map((item) => (
-                  <span key={item.slot} className="ag-account-daily-usage-consumption-item">
+            {growth.length > 0 ? (
+              <div className="ag-account-daily-usage-growth">
+                {growth.map((item) => (
+                  <span key={item.slot} className="ag-account-daily-usage-growth-item">
                     <span>{item.slot}</span>
-                    <span className="ag-account-daily-usage-consumption-value">-{item.value}%</span>
+                    <span className="ag-account-daily-usage-growth-value">+{item.value}%</span>
                   </span>
                 ))}
               </div>

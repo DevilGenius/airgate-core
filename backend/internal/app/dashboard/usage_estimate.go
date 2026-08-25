@@ -40,7 +40,7 @@ type usageEstimateObservation struct {
 	maxAge   time.Duration
 }
 
-// BuildUsageEstimates 聚合 Plus/Pro 套餐池的消耗、100% 成本和剩余时间。
+// BuildUsageEstimates 聚合 Plus/Pro 套餐池的用量增长、100% 成本和剩余时间。
 func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCostPerMinute float64) []UsageEstimate {
 	plus := usageEstimatePool{plan: "plus", requiredPlans: []string{"plus"}}
 	pro := usageEstimatePool{plan: "pro", requiredPlans: []string{"pro"}}
@@ -175,7 +175,7 @@ func (p usageEstimateWindowPool) estimate(window string, requiredPlans []string,
 		return result
 	}
 	result.Status = "ready"
-	// DailyGrowthPercent 是兼容字段名，实际语义为正数的“当日累计已消耗百分比”。
+	// DailyGrowthPercent 是正数的当日累计用量增长，即已消耗百分比的增量。
 	result.DailyGrowthPercent = weightedConsumed / rateSum
 	result.FullCost = rateSum * 100
 	if remainingAvailable {
