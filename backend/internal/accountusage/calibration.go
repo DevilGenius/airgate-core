@@ -48,7 +48,7 @@ func (w WindowEstimate) CostInterval(observation WindowObservation) (Calibration
 	}, true
 }
 
-// ApplyObservation 更新日增长、观测游标和滚动成本校准。
+// ApplyObservation 更新当日累计已消耗百分比、观测游标和滚动成本校准。
 // costDelta 仅在 CostInterval 返回有效区间时传入；没有有效成本样本时传 0。
 func (w *WindowEstimate) ApplyObservation(observation WindowObservation, costDelta float64) bool {
 	if w == nil || !validPercent(observation.CurrentPercent) || observation.ObservedAt.IsZero() ||
@@ -61,7 +61,7 @@ func (w *WindowEstimate) ApplyObservation(observation WindowObservation, costDel
 	interval, canCalibrate := w.CostInterval(observation)
 	w.ObservedAt = cloneTime(&observation.ObservedAt)
 
-	date, growth, last, changed := nextDailyGrowth(
+	date, consumed, last, changed := nextDailyConsumption(
 		w.GrowthDate,
 		w.DailyGrowth,
 		w.LastPercent,
@@ -76,7 +76,7 @@ func (w *WindowEstimate) ApplyObservation(observation WindowObservation, costDel
 	}
 
 	w.GrowthDate = date
-	w.DailyGrowth = growth
+	w.DailyGrowth = consumed
 	w.LastPercent = last
 	w.CalibrationCursorAt = cloneTime(&observation.ObservedAt)
 	if canCalibrate && validPositive(costDelta) {
@@ -112,24 +112,24 @@ func DecayWeight(weight float64, elapsed time.Duration) float64 {
 	return weight * math.Exp(-math.Ln2*float64(elapsed)/float64(CalibrationHalfLife))
 }
 
-func nextDailyGrowth(storedDate string, growth, last, current float64, day string) (string, float64, float64, bool) {
+func nextDailyConsumption(storedDate string, consumed, last, current float64, day string) (string, float64, float64, bool) {
 	if day == "" || !validPercent(current) {
-		return storedDate, growth, last, false
+		return storedDate, consumed, last, false
 	}
 	if storedDate != "" && day < storedDate {
-		return storedDate, growth, last, false
+		return storedDate, consumed, last, false
 	}
 	if storedDate != day {
 		return day, 0, current, true
 	}
 	if current == last {
-		return storedDate, growth, last, false
+		return storedDate, consumed, last, false
 	}
 	delta := current - last
 	if delta < 0 {
 		delta = current
 	}
-	return storedDate, growth + delta, current, true
+	return storedDate, consumed + delta, current, true
 }
 
 func percentDelta(previous, current float64) float64 {

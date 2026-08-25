@@ -20,10 +20,11 @@ type UsageEstimateSource struct {
 }
 
 type usageEstimatePool struct {
-	plan     string
-	present  bool
-	fiveHour usageEstimateWindowPool
-	sevenDay usageEstimateWindowPool
+	plan          string
+	requiredPlans []string
+	present       bool
+	fiveHour      usageEstimateWindowPool
+	sevenDay      usageEstimateWindowPool
 }
 
 type usageEstimateWindowPool struct {
@@ -40,14 +41,18 @@ type usageEstimateObservation struct {
 
 // BuildUsageEstimates 聚合 Plus/Pro 套餐池的增长、100% 成本和剩余时间。
 func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCostPerMinute float64) []UsageEstimate {
-	plus := usageEstimatePool{plan: "plus"}
-	pro := usageEstimatePool{plan: "pro"}
+	plus := usageEstimatePool{plan: "plus", requiredPlans: []string{"plus"}}
+	pro := usageEstimatePool{plan: "pro", requiredPlans: []string{"pro"}}
+	hasPlusAccounts := false
 	day := now.In(time.Local).Format("2006-01-02")
 	for _, source := range sources {
 		isPlusPool := source.Plan == "plus" || source.Plan == "team" || source.Plan == "k12"
 		isProPlan := source.Plan == "pro"
 		if !isPlusPool && !isProPlan {
 			continue
+		}
+		if source.Plan == "plus" {
+			hasPlusAccounts = true
 		}
 		fiveHour := usageEstimateObservation{window: source.Meta.FiveHour, plan: source.Plan, day: day, optional: true}
 		sevenDay := usageEstimateObservation{window: source.Meta.SevenDay, plan: source.Plan, day: day}
@@ -61,6 +66,9 @@ func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCo
 			pro.add(fiveHour, sevenDay)
 		}
 	}
+	if hasPlusAccounts {
+		pro.requiredPlans = append(pro.requiredPlans, "plus")
+	}
 
 	result := make([]UsageEstimate, 0, 2)
 	for _, pool := range []*usageEstimatePool{&plus, &pro} {
@@ -69,10 +77,10 @@ func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCo
 		}
 		item := UsageEstimate{Plan: pool.plan, Windows: make([]UsageEstimateWindow, 0, 2)}
 		if pool.fiveHour.supported {
-			item.Windows = append(item.Windows, pool.fiveHour.estimate("5h", accountCostPerMinute, now, usage5hObservationAge))
+			item.Windows = append(item.Windows, pool.fiveHour.estimate("5h", pool.requiredPlans, accountCostPerMinute, now, usage5hObservationAge))
 		}
 		if pool.sevenDay.supported {
-			item.Windows = append(item.Windows, pool.sevenDay.estimate("7d", accountCostPerMinute, now, usage7dObservationAge))
+			item.Windows = append(item.Windows, pool.sevenDay.estimate("7d", pool.requiredPlans, accountCostPerMinute, now, usage7dObservationAge))
 		}
 		if len(item.Windows) > 0 {
 			result = append(result, item)
@@ -95,22 +103,28 @@ func (p *usageEstimateWindowPool) add(observation usageEstimateObservation) {
 	p.observations = append(p.observations, observation)
 }
 
-func (p usageEstimateWindowPool) estimate(window string, accountCostPerMinute float64, now time.Time, observationMaxAge time.Duration) UsageEstimateWindow {
+func (p usageEstimateWindowPool) estimate(window string, requiredPlans []string, accountCostPerMinute float64, now time.Time, observationMaxAge time.Duration) UsageEstimateWindow {
 	result := UsageEstimateWindow{Window: window, Status: "insufficient"}
-	planRates, complete := sharedPlanRates(p.observations, now)
-	if !complete {
-		return result
+	planRates := sharedPlanRates(p.observations, now)
+	for _, plan := range requiredPlans {
+		if _, available := planRates[plan]; !available {
+			return result
+		}
 	}
-	weightedGrowth := 0.0
+	weightedConsumed := 0.0
 	rateSum := 0.0
 	remainingCost := 0.0
 	remainingAvailable := true
 	for _, observation := range p.observations {
 		w := observation.window
-		rate := planRates[observation.plan]
+		rate, calibrated := planRates[observation.plan]
+		if !calibrated {
+			// 未校准套餐不借用其它 plan_type 的标准值，也不阻断已知套餐的保守估算。
+			continue
+		}
 		rateSum += rate
 		if w.GrowthDate == observation.day && validPositive(w.DailyGrowth) {
-			weightedGrowth += rate * w.DailyGrowth
+			weightedConsumed += rate * w.DailyGrowth
 		}
 		if observationFresh(w.ObservedAt, now, observationMaxAge) && validPercent(w.LastPercent) {
 			remainingCost += rate * math.Max(0, 100-w.LastPercent)
@@ -122,7 +136,8 @@ func (p usageEstimateWindowPool) estimate(window string, accountCostPerMinute fl
 		return result
 	}
 	result.Status = "ready"
-	result.DailyGrowthPercent = weightedGrowth / rateSum
+	// DailyGrowthPercent 是兼容字段名，实际语义为正数的“当日累计已消耗百分比”。
+	result.DailyGrowthPercent = weightedConsumed / rateSum
 	result.FullCost = rateSum * 100
 	if remainingAvailable {
 		result.RemainingCost = &remainingCost
@@ -136,15 +151,13 @@ func (p usageEstimateWindowPool) estimate(window string, accountCostPerMinute fl
 
 // sharedPlanRates 为每个精确 plan_type 生成 5h/7d 独立的标准消耗值。
 // 同套餐账号共享标准值；不同套餐之间绝不借用校准样本。
-func sharedPlanRates(observations []usageEstimateObservation, now time.Time) (map[string]float64, bool) {
+func sharedPlanRates(observations []usageEstimateObservation, now time.Time) map[string]float64 {
 	type aggregate struct {
 		weightedCost float64
 		weight       float64
 	}
-	plans := make(map[string]struct{}, len(observations))
 	aggregates := make(map[string]aggregate, len(observations))
 	for _, observation := range observations {
-		plans[observation.plan] = struct{}{}
 		window := observation.window
 		if !usageCalibrationValid(window, now) {
 			continue
@@ -162,19 +175,18 @@ func sharedPlanRates(observations []usageEstimateObservation, now time.Time) (ma
 		aggregates[observation.plan] = aggregate
 	}
 
-	rates := make(map[string]float64, len(plans))
-	for plan := range plans {
-		aggregate := aggregates[plan]
+	rates := make(map[string]float64, len(aggregates))
+	for plan, aggregate := range aggregates {
 		if !validPositive(aggregate.weight) {
-			return nil, false
+			continue
 		}
 		rate := aggregate.weightedCost / aggregate.weight
 		if !validPositive(rate) {
-			return nil, false
+			continue
 		}
 		rates[plan] = rate
 	}
-	return rates, len(rates) > 0
+	return rates
 }
 
 func usageCalibrationValid(window accountusage.WindowEstimate, now time.Time) bool {

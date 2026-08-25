@@ -93,7 +93,7 @@ type UsageEstimate struct {
 type UsageEstimateWindow struct {
 	Window             string
 	Status             string
-	DailyGrowthPercent float64
+	DailyGrowthPercent float64 // 兼容命名：正数的当日累计已消耗百分比
 	FullCost           float64
 	RemainingCost      *float64
 	RemainingMinutes   *float64

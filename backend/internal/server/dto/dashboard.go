@@ -65,7 +65,7 @@ type DashboardUsageEstimate struct {
 type DashboardUsageEstimateWindow struct {
 	Window             string   `json:"window"`
 	Status             string   `json:"status"`
-	DailyGrowthPercent float64  `json:"daily_growth_percent"`
+	DailyGrowthPercent float64  `json:"daily_growth_percent"` // 正数消耗幅度；字段名保留兼容
 	FullCost           float64  `json:"full_cost"`
 	RemainingCost      *float64 `json:"remaining_cost,omitempty"`
 	RemainingMinutes   *float64 `json:"remaining_minutes,omitempty"`

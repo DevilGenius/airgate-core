@@ -183,9 +183,11 @@ export interface AccountResp {
   last_used_at?: string;
   last_probe_at?: string;
   usage_5h_growth_date?: string;
+  /** Positive daily consumed percentage; the UI renders it with a minus sign. Legacy API name. */
   usage_5h_daily_growth?: number;
   usage_5h_observed_at?: string;
   usage_7d_growth_date?: string;
+  /** Positive daily consumed percentage; the UI renders it with a minus sign. Legacy API name. */
   usage_7d_daily_growth?: number;
   usage_7d_observed_at?: string;
   deleted_at?: string;
@@ -910,6 +912,7 @@ export interface DashboardUsageEstimate {
 export interface DashboardUsageEstimateWindow {
   window: '5h' | '7d';
   status: 'ready' | 'insufficient';
+  /** Positive consumed percentage; legacy API name. */
   daily_growth_percent: number;
   full_cost: number;
   remaining_cost?: number;

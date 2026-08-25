@@ -936,7 +936,7 @@ func (s *AccountStore) BatchImageStats(ctx context.Context, accountIDs []int, to
 	return result, nil
 }
 
-// ObserveUsageGrowth 累计基础 5h/7d 窗口的当日已观测增长。
+// ObserveUsageGrowth 累计基础 5h/7d 窗口当日已观测的消耗百分比（方法名保留兼容）。
 // 同日数值下降按窗口重置处理；跨日首次观测只建立新基线。
 func (s *AccountStore) ObserveUsageGrowth(ctx context.Context, id int, observation appaccount.UsageGrowthObservation) error {
 	if id <= 0 || observation.Day == "" || (observation.FiveHourPercent == nil && observation.SevenDayPercent == nil) {

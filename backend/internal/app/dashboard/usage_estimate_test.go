@@ -30,7 +30,7 @@ func TestBuildUsageEstimatesUsesPlanStandardForNewAccounts(t *testing.T) {
 	}
 }
 
-func TestBuildUsageEstimatesDoesNotShareStandardsAcrossPlans(t *testing.T) {
+func TestBuildUsageEstimatesUsesRequiredPlanAnchors(t *testing.T) {
 	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
 	calibrated := func(rate, weight float64) accountusage.EstimateMeta {
 		return accountusage.EstimateMeta{SevenDay: accountusage.WindowEstimate{
@@ -46,16 +46,34 @@ func TestBuildUsageEstimatesDoesNotShareStandardsAcrossPlans(t *testing.T) {
 		{Plan: "plus", Meta: calibrated(1, 10)},
 		{Plan: "team", Meta: uncalibrated},
 	}, now, 1)
-	if len(result) != 1 || result[0].Windows[0].Status != "insufficient" {
-		t.Fatalf("team without a standard must not borrow plus: %+v", result)
+	if len(result) != 1 || result[0].Windows[0].Status != "ready" || result[0].Windows[0].FullCost != 100 {
+		t.Fatalf("team without a standard should be omitted from the conservative Plus estimate: %+v", result)
 	}
 
 	result = BuildUsageEstimates([]UsageEstimateSource{
 		{Plan: "plus", Meta: calibrated(1, 10)},
 		{Plan: "pro", Meta: uncalibrated},
 	}, now, 1)
-	if len(result) != 2 || result[0].Windows[0].Status != "ready" || result[1].Windows[0].Status != "insufficient" {
-		t.Fatalf("pro without a standard must not borrow plus: %+v", result)
+	if len(result) != 2 || result[0].Windows[0].Status != "ready" ||
+		result[1].Windows[0].Status != "insufficient" {
+		t.Fatalf("the Pro estimate requires both Plus and Pro standards: %+v", result)
+	}
+
+	result = BuildUsageEstimates([]UsageEstimateSource{
+		{Plan: "team", Meta: calibrated(1, 10)},
+		{Plan: "pro", Meta: calibrated(2, 10)},
+	}, now, 1)
+	if len(result) != 2 || result[0].Windows[0].Status != "insufficient" ||
+		result[1].Windows[0].Status != "ready" || result[1].Windows[0].FullCost != 300 {
+		t.Fatalf("Team must not replace the left Plus anchor, while Pro remains independently usable: %+v", result)
+	}
+
+	result = BuildUsageEstimates([]UsageEstimateSource{
+		{Plan: "pro", Meta: calibrated(2, 10)},
+	}, now, 1)
+	if len(result) != 1 || result[0].Plan != "pro" || result[0].Windows[0].Status != "ready" ||
+		result[0].Windows[0].FullCost != 200 {
+		t.Fatalf("a Pro-only pool should estimate from its Pro standard: %+v", result)
 	}
 }
 

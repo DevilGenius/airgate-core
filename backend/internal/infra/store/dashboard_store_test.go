@@ -222,8 +222,8 @@ func TestDashboardStoreUsageEstimatesAggregatePlusTeamAndPro(t *testing.T) {
 		t.Fatalf("load estimates with calibrated zero-growth 5h: %v", err)
 	}
 	if len(estimates[0].Windows) != 2 || estimates[0].Windows[0].Window != "5h" || estimates[0].Windows[0].Status != "ready" || estimates[0].Windows[0].DailyGrowthPercent != 0 || estimates[0].Windows[0].FullCost != 50 ||
-		len(estimates[1].Windows) != 2 || estimates[1].Windows[0].Window != "5h" || estimates[1].Windows[0].Status != "ready" {
-		t.Fatalf("calibrated zero-growth 5h should remain usable: %+v", estimates)
+		len(estimates[1].Windows) != 2 || estimates[1].Windows[0].Window != "5h" || estimates[1].Windows[0].Status != "insufficient" {
+		t.Fatalf("Plus 5h should be ready while Pro 5h still requires a Pro standard: %+v", estimates)
 	}
 
 	newID := createAccount("new", "Plus", 0, 0, 0)
