@@ -71,11 +71,19 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("decode response: %v; body=%s", err, w.Body.String())
 	}
-	if envelope.Data.SchemaVersion != 1 || envelope.Data.Traffic.Source != "dashboard_stats" ||
+	if envelope.Data.SchemaVersion != 2 || envelope.Data.Traffic.Source != "dashboard_stats" ||
 		envelope.Data.Traffic.RPM1M != 0 || envelope.Data.Traffic.TPM1M != 0 ||
 		envelope.Data.Traffic.RPM10M != 0 || envelope.Data.Traffic.TPM10M != 0 ||
 		envelope.Data.Traffic.TPMPerRPMCoefficient1M != 0 || envelope.Data.Traffic.TPMPerRPMCoefficient10M != 0 {
 		t.Fatalf("overview metadata = %+v", envelope.Data)
+	}
+	if envelope.Data.UsageEstimate.StandardCostPerMinute1M != 0 ||
+		envelope.Data.UsageEstimate.StandardCostPerMinute10M != 0 ||
+		envelope.Data.UsageEstimate.Plus5h.Status != "insufficient" ||
+		envelope.Data.UsageEstimate.Pro5h.Status != "insufficient" ||
+		envelope.Data.UsageEstimate.Plus7d.Status != "insufficient" ||
+		envelope.Data.UsageEstimate.Pro7d.Status != "insufficient" {
+		t.Fatalf("usage estimate defaults = %+v", envelope.Data.UsageEstimate)
 	}
 	if envelope.Data.AccountSummary.Total != 2 ||
 		envelope.Data.AccountSummary.ByState["active"] != 1 ||
@@ -96,6 +104,34 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 	}
 	if strings.Contains(w.Body.String(), "access_token") || strings.Contains(w.Body.String(), "secret") {
 		t.Fatalf("overview leaked credentials: %s", w.Body.String())
+	}
+}
+
+func TestCredentialUsageEstimateRespMapsAllWindows(t *testing.T) {
+	plus5Minutes, plus5Cost := 30.0, 300.0
+	pro5Minutes, pro5Cost := 60.0, 600.0
+	plus7Minutes, plus7Cost := 90.0, 900.0
+	pro7Minutes, pro7Cost := 120.0, 1200.0
+	result := credentialUsageEstimateResp(appdashboard.Stats{
+		AccountCostPerMinute1M:  10.25,
+		AccountCostPerMinute10M: 4.78,
+		UsageEstimates: []appdashboard.UsageEstimate{
+			{Plan: "plus", Windows: []appdashboard.UsageEstimateWindow{
+				{Window: "5h", Status: "ready", RemainingMinutes: &plus5Minutes, RemainingCost: &plus5Cost},
+				{Window: "7d", Status: "ready", RemainingMinutes: &plus7Minutes, RemainingCost: &plus7Cost},
+			}},
+			{Plan: "pro", Windows: []appdashboard.UsageEstimateWindow{
+				{Window: "5h", Status: "ready", RemainingMinutes: &pro5Minutes, RemainingCost: &pro5Cost},
+				{Window: "7d", Status: "ready", RemainingMinutes: &pro7Minutes, RemainingCost: &pro7Cost},
+			}},
+		},
+	})
+	if result.StandardCostPerMinute1M != 10.25 || result.StandardCostPerMinute10M != 4.78 ||
+		result.Plus5h.AvailableMinutes == nil || *result.Plus5h.AvailableMinutes != plus5Minutes ||
+		result.Pro5h.AvailableStandardCost == nil || *result.Pro5h.AvailableStandardCost != pro5Cost ||
+		result.Plus7d.AvailableMinutes == nil || *result.Plus7d.AvailableMinutes != plus7Minutes ||
+		result.Pro7d.AvailableStandardCost == nil || *result.Pro7d.AvailableStandardCost != pro7Cost {
+		t.Fatalf("mapped usage estimate = %+v", result)
 	}
 }
 

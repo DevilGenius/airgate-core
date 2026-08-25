@@ -14,7 +14,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
-const credentialAccountsOverviewSchemaVersion = 1
+const credentialAccountsOverviewSchemaVersion = 2
 
 // CredentialAccountHandler 提供凭证管理 API Key 的只读账号概览。
 //
@@ -98,6 +98,7 @@ func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 			TPMPerRPMCoefficient1M:  stats.TPMPerRPMCoefficient1M,
 			TPMPerRPMCoefficient10M: stats.TPMPerRPMCoefficient10M,
 		},
+		UsageEstimate: credentialUsageEstimateResp(stats),
 		AccountSummary: dto.CredentialAccountSummaryResp{
 			Platform:    platform,
 			AccountType: accountType,
@@ -163,6 +164,40 @@ func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 	}
 
 	response.Success(c, result)
+}
+
+func credentialUsageEstimateResp(stats appdashboard.Stats) dto.CredentialUsageEstimateResp {
+	insufficient := func() dto.CredentialUsageAvailabilityResp {
+		return dto.CredentialUsageAvailabilityResp{Status: "insufficient"}
+	}
+	result := dto.CredentialUsageEstimateResp{
+		StandardCostPerMinute1M:  stats.AccountCostPerMinute1M,
+		StandardCostPerMinute10M: stats.AccountCostPerMinute10M,
+		Plus5h:                   insufficient(),
+		Pro5h:                    insufficient(),
+		Plus7d:                   insufficient(),
+		Pro7d:                    insufficient(),
+	}
+	for _, estimate := range stats.UsageEstimates {
+		for _, window := range estimate.Windows {
+			availability := dto.CredentialUsageAvailabilityResp{
+				Status:                window.Status,
+				AvailableMinutes:      window.RemainingMinutes,
+				AvailableStandardCost: window.RemainingCost,
+			}
+			switch {
+			case estimate.Plan == "plus" && window.Window == "5h":
+				result.Plus5h = availability
+			case estimate.Plan == "pro" && window.Window == "5h":
+				result.Pro5h = availability
+			case estimate.Plan == "plus" && window.Window == "7d":
+				result.Plus7d = availability
+			case estimate.Plan == "pro" && window.Window == "7d":
+				result.Pro7d = availability
+			}
+		}
+	}
+	return result
 }
 
 func credentialAccountResp(account appaccount.Account, current int) dto.CredentialAccountResp {

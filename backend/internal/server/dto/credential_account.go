@@ -17,9 +17,26 @@ type CredentialAccountsOverviewResp struct {
 	SchemaVersion  int                          `json:"schema_version"`
 	GeneratedAt    string                       `json:"generated_at"`
 	Traffic        CredentialTrafficResp        `json:"traffic"`
+	UsageEstimate  CredentialUsageEstimateResp  `json:"usage_estimate"`
 	Scheduling     CredentialSchedulingResp     `json:"scheduling"`
 	AccountSummary CredentialAccountSummaryResp `json:"account_summary"`
 	Accounts       CredentialAccountsPageResp   `json:"accounts"`
+}
+
+// CredentialUsageEstimateResp 提供账号池标准消耗速率及四个套餐窗口的可用量估算。
+type CredentialUsageEstimateResp struct {
+	StandardCostPerMinute1M  float64                         `json:"standard_cost_per_minute_1m"`
+	StandardCostPerMinute10M float64                         `json:"standard_cost_per_minute_10m"`
+	Plus5h                   CredentialUsageAvailabilityResp `json:"plus_5h"`
+	Pro5h                    CredentialUsageAvailabilityResp `json:"pro_5h"`
+	Plus7d                   CredentialUsageAvailabilityResp `json:"plus_7d"`
+	Pro7d                    CredentialUsageAvailabilityResp `json:"pro_7d"`
+}
+
+type CredentialUsageAvailabilityResp struct {
+	Status                string   `json:"status"`
+	AvailableMinutes      *float64 `json:"available_minutes"`
+	AvailableStandardCost *float64 `json:"available_standard_cost"`
 }
 
 type CredentialTrafficResp struct {
