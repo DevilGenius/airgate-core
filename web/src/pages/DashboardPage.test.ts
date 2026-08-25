@@ -8,8 +8,9 @@ describe('dashboard usage estimate formatting', () => {
   });
 
   it('formats estimated minutes as compact hours and minutes', () => {
-    expect(fmtUsageEstimateDuration(85)).toBe('1h25min');
-    expect(fmtUsageEstimateDuration(334)).toBe('5h34min');
+    expect(fmtUsageEstimateDuration(30)).toBe('30m');
+    expect(fmtUsageEstimateDuration(85)).toBe('1h25m');
+    expect(fmtUsageEstimateDuration(334)).toBe('5h34m');
     expect(fmtUsageEstimateDuration(undefined)).toBe('');
   });
 

@@ -116,9 +116,9 @@ export function fmtUsageEstimateDuration(minutes: number | undefined): string {
   const totalMinutes = Math.round(minutes);
   const hours = Math.floor(totalMinutes / 60);
   const remainingMinutes = totalMinutes % 60;
-  if (hours <= 0) return `${remainingMinutes}min`;
+  if (hours <= 0) return `${remainingMinutes}m`;
   if (remainingMinutes === 0) return `${hours}h`;
-  return `${hours}h${remainingMinutes}min`;
+  return `${hours}h${remainingMinutes}m`;
 }
 
 export function fmtUsageEstimateCost(value: number): string {
@@ -147,7 +147,7 @@ function UsageEstimateCell({ window }: { window: DashboardUsageEstimateWindow })
   const cost = fmtUsageEstimateCost(window.remaining_cost);
   if (!duration) return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
   return (
-    <span className="font-mono text-lg font-semibold leading-none text-text 2xl:text-xl">
+    <span className="font-mono text-base font-semibold leading-none text-text 2xl:text-lg">
       {duration}-<GreenCost text={cost} />
     </span>
   );

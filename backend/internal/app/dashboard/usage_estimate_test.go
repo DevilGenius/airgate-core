@@ -7,7 +7,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/accountusage"
 )
 
-func TestBuildUsageEstimatesUsesMedianForNewAccounts(t *testing.T) {
+func TestBuildUsageEstimatesUsesPlanStandardForNewAccounts(t *testing.T) {
 	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
 	calibrated := func(rate, growth, last float64) accountusage.EstimateMeta {
 		return accountusage.EstimateMeta{SevenDay: accountusage.WindowEstimate{
@@ -27,6 +27,60 @@ func TestBuildUsageEstimatesUsesMedianForNewAccounts(t *testing.T) {
 	window := result[0].Windows[0]
 	if window.Status != "ready" || window.FullCost != 150 || window.DailyGrowthPercent != 20 || window.RemainingCost == nil || *window.RemainingCost != 95 || window.RemainingMinutes == nil || *window.RemainingMinutes != 95 {
 		t.Fatalf("window = %+v", window)
+	}
+}
+
+func TestBuildUsageEstimatesDoesNotShareStandardsAcrossPlans(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	calibrated := func(rate, weight float64) accountusage.EstimateMeta {
+		return accountusage.EstimateMeta{SevenDay: accountusage.WindowEstimate{
+			GrowthDate: "2026-08-24", DailyGrowth: 20, LastPercent: 50,
+			CostPerPercent: rate, CalibrationWeight: weight, CalibratedAt: &now, ObservedAt: &now,
+		}}
+	}
+	uncalibrated := accountusage.EstimateMeta{SevenDay: accountusage.WindowEstimate{
+		GrowthDate: "2026-08-24", LastPercent: 50, ObservedAt: &now,
+	}}
+
+	result := BuildUsageEstimates([]UsageEstimateSource{
+		{Plan: "plus", Meta: calibrated(1, 10)},
+		{Plan: "team", Meta: uncalibrated},
+	}, now, 1)
+	if len(result) != 1 || result[0].Windows[0].Status != "insufficient" {
+		t.Fatalf("team without a standard must not borrow plus: %+v", result)
+	}
+
+	result = BuildUsageEstimates([]UsageEstimateSource{
+		{Plan: "plus", Meta: calibrated(1, 10)},
+		{Plan: "pro", Meta: uncalibrated},
+	}, now, 1)
+	if len(result) != 2 || result[0].Windows[0].Status != "ready" || result[1].Windows[0].Status != "insufficient" {
+		t.Fatalf("pro without a standard must not borrow plus: %+v", result)
+	}
+}
+
+func TestBuildUsageEstimatesSharesWeightedStandardWithinPlan(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	calibrated := func(rate, weight float64) accountusage.EstimateMeta {
+		return accountusage.EstimateMeta{SevenDay: accountusage.WindowEstimate{
+			GrowthDate: "2026-08-24", DailyGrowth: 10, LastPercent: 50,
+			CostPerPercent: rate, CalibrationWeight: weight, CalibratedAt: &now, ObservedAt: &now,
+		}}
+	}
+	result := BuildUsageEstimates([]UsageEstimateSource{
+		{Plan: "plus", Meta: calibrated(1, 10)},
+		{Plan: "plus", Meta: calibrated(3, 30)},
+		{Plan: "plus", Meta: accountusage.EstimateMeta{SevenDay: accountusage.WindowEstimate{
+			GrowthDate: "2026-08-24", LastPercent: 50, ObservedAt: &now,
+		}}},
+	}, now, 1)
+	if len(result) != 1 || len(result[0].Windows) != 1 {
+		t.Fatalf("result = %+v", result)
+	}
+	window := result[0].Windows[0]
+	// Shared Plus standard = (1*10 + 3*30) / 40 = $2.5 per percent.
+	if window.Status != "ready" || window.FullCost != 750 || window.RemainingCost == nil || *window.RemainingCost != 375 {
+		t.Fatalf("shared weighted standard = %+v", window)
 	}
 }
 

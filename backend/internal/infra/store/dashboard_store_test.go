@@ -233,7 +233,7 @@ func TestDashboardStoreUsageEstimatesAggregatePlusTeamAndPro(t *testing.T) {
 	}
 	plusWindow = estimates[0].Windows[1]
 	if plusWindow.Status != "ready" || plusWindow.FullCost != 150 || plusWindow.DailyGrowthPercent != 20 || plusWindow.RemainingMinutes == nil || *plusWindow.RemainingMinutes != 95 {
-		t.Fatalf("new account should use pool median fallback: %+v", plusWindow)
+		t.Fatalf("new account should use the shared Plus standard: %+v", plusWindow)
 	}
 
 	if err := db.Account.UpdateOneID(disabledID).SetState(entaccount.StateActive).Exec(ctx); err != nil {
@@ -243,8 +243,8 @@ func TestDashboardStoreUsageEstimatesAggregatePlusTeamAndPro(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load estimates after reactivation: %v", err)
 	}
-	if estimates[0].Windows[1].Status != "ready" || estimates[0].Windows[1].FullCost != 350 ||
-		estimates[1].Windows[1].Status != "ready" || estimates[1].Windows[1].FullCost != 475 {
+	if estimates[0].Windows[1].Status != "ready" || estimates[0].Windows[1].FullCost != 425 ||
+		estimates[1].Windows[1].Status != "ready" || estimates[1].Windows[1].FullCost != 525 {
 		t.Fatalf("reactivated calibrated account should rejoin estimates: %+v", estimates)
 	}
 

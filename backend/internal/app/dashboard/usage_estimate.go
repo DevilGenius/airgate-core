@@ -2,7 +2,6 @@ package dashboard
 
 import (
 	"math"
-	"sort"
 	"time"
 
 	"github.com/DevilGenius/airgate-core/internal/accountusage"
@@ -34,6 +33,7 @@ type usageEstimateWindowPool struct {
 
 type usageEstimateObservation struct {
 	window   accountusage.WindowEstimate
+	plan     string
 	day      string
 	optional bool
 }
@@ -49,8 +49,8 @@ func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCo
 		if !isPlusPool && !isProPlan {
 			continue
 		}
-		fiveHour := usageEstimateObservation{window: source.Meta.FiveHour, day: day, optional: true}
-		sevenDay := usageEstimateObservation{window: source.Meta.SevenDay, day: day}
+		fiveHour := usageEstimateObservation{window: source.Meta.FiveHour, plan: source.Plan, day: day, optional: true}
+		sevenDay := usageEstimateObservation{window: source.Meta.SevenDay, plan: source.Plan, day: day}
 		if isPlusPool {
 			plus.present = true
 			plus.add(fiveHour, sevenDay)
@@ -97,26 +97,17 @@ func (p *usageEstimateWindowPool) add(observation usageEstimateObservation) {
 
 func (p usageEstimateWindowPool) estimate(window string, accountCostPerMinute float64, now time.Time, observationMaxAge time.Duration) UsageEstimateWindow {
 	result := UsageEstimateWindow{Window: window, Status: "insufficient"}
-	validRates := make([]float64, 0, len(p.observations))
-	for _, observation := range p.observations {
-		if usageCalibrationValid(observation.window, now) {
-			validRates = append(validRates, observation.window.CostPerPercent)
-		}
-	}
-	if len(validRates) == 0 {
+	planRates, complete := sharedPlanRates(p.observations, now)
+	if !complete {
 		return result
 	}
-	fallbackRate := median(validRates)
 	weightedGrowth := 0.0
 	rateSum := 0.0
 	remainingCost := 0.0
 	remainingAvailable := true
 	for _, observation := range p.observations {
 		w := observation.window
-		rate := w.CostPerPercent
-		if !usageCalibrationValid(w, now) {
-			rate = fallbackRate
-		}
+		rate := planRates[observation.plan]
 		rateSum += rate
 		if w.GrowthDate == observation.day && validPositive(w.DailyGrowth) {
 			weightedGrowth += rate * w.DailyGrowth
@@ -143,6 +134,49 @@ func (p usageEstimateWindowPool) estimate(window string, accountCostPerMinute fl
 	return result
 }
 
+// sharedPlanRates 为每个精确 plan_type 生成 5h/7d 独立的标准消耗值。
+// 同套餐账号共享标准值；不同套餐之间绝不借用校准样本。
+func sharedPlanRates(observations []usageEstimateObservation, now time.Time) (map[string]float64, bool) {
+	type aggregate struct {
+		weightedCost float64
+		weight       float64
+	}
+	plans := make(map[string]struct{}, len(observations))
+	aggregates := make(map[string]aggregate, len(observations))
+	for _, observation := range observations {
+		plans[observation.plan] = struct{}{}
+		window := observation.window
+		if !usageCalibrationValid(window, now) {
+			continue
+		}
+		weight := window.CalibrationWeight
+		if window.CalibratedAt != nil && now.After(*window.CalibratedAt) {
+			weight = accountusage.DecayWeight(weight, now.Sub(*window.CalibratedAt))
+		}
+		if !validPositive(weight) {
+			continue
+		}
+		aggregate := aggregates[observation.plan]
+		aggregate.weightedCost += window.CostPerPercent * weight
+		aggregate.weight += weight
+		aggregates[observation.plan] = aggregate
+	}
+
+	rates := make(map[string]float64, len(plans))
+	for plan := range plans {
+		aggregate := aggregates[plan]
+		if !validPositive(aggregate.weight) {
+			return nil, false
+		}
+		rate := aggregate.weightedCost / aggregate.weight
+		if !validPositive(rate) {
+			return nil, false
+		}
+		rates[plan] = rate
+	}
+	return rates, len(rates) > 0
+}
+
 func usageCalibrationValid(window accountusage.WindowEstimate, now time.Time) bool {
 	if !validPositive(window.CostPerPercent) || !validPositive(window.CalibrationWeight) || window.CalibratedAt == nil {
 		return false
@@ -157,16 +191,6 @@ func observationFresh(observedAt *time.Time, now time.Time, maxAge time.Duration
 	}
 	age := now.Sub(*observedAt)
 	return age >= -5*time.Minute && age <= maxAge
-}
-
-func median(values []float64) float64 {
-	sorted := append([]float64(nil), values...)
-	sort.Float64s(sorted)
-	middle := len(sorted) / 2
-	if len(sorted)%2 == 1 {
-		return sorted[middle]
-	}
-	return (sorted[middle-1] + sorted[middle]) / 2
 }
 
 func validPercent(value float64) bool {
