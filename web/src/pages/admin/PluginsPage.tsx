@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type DragEvent } from 'react';
+import { useState, useRef, useEffect, useMemo, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pluginsApi } from '../../shared/api/plugins';
@@ -38,6 +38,11 @@ const typeVariant: Record<string, 'accent' | 'success' | 'warning'> = {
   payment: 'success',
   extension: 'warning',
 };
+
+function compareInstalledPlugins(left: PluginResp, right: PluginResp) {
+  if (left.name === right.name) return 0;
+  return left.name < right.name ? -1 : 1;
+}
 
 export default function PluginsPage() {
   const { t } = useTranslation();
@@ -138,7 +143,11 @@ export default function PluginsPage() {
     { key: 'installed' as const, label: t('plugins.installed_tab'), icon: Package },
     { key: 'marketplace' as const, label: t('plugins.marketplace_tab'), icon: Store },
   ];
-  const installedRows = pluginsData?.list ?? [];
+  // 后端插件实例来自 Go map，接口返回顺序不稳定；按不可变插件 ID 固定表格顺序。
+  const installedRows = useMemo(
+    () => [...(pluginsData?.list ?? [])].sort(compareInstalledPlugins),
+    [pluginsData?.list],
+  );
 
   return (
     <div className="ag-plugins-page">
