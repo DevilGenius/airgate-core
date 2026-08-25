@@ -31,6 +31,32 @@ func Clone(value EstimateMeta) EstimateMeta {
 	return value
 }
 
+// Equal 判断两份估算状态是否表示同一个持久化快照。
+// 时间使用 Time.Equal 比较，避免相同时刻因 Location 表示不同而触发无意义重试。
+func Equal(left, right EstimateMeta) bool {
+	return left.Version == right.Version &&
+		windowEqual(left.FiveHour, right.FiveHour) &&
+		windowEqual(left.SevenDay, right.SevenDay)
+}
+
+func windowEqual(left, right WindowEstimate) bool {
+	return left.GrowthDate == right.GrowthDate &&
+		left.DailyGrowth == right.DailyGrowth &&
+		left.LastPercent == right.LastPercent &&
+		left.CostPerPercent == right.CostPerPercent &&
+		left.CalibrationWeight == right.CalibrationWeight &&
+		timeEqual(left.CalibratedAt, right.CalibratedAt) &&
+		timeEqual(left.CalibrationCursorAt, right.CalibrationCursorAt) &&
+		timeEqual(left.ObservedAt, right.ObservedAt)
+}
+
+func timeEqual(left, right *time.Time) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return left.Equal(*right)
+}
+
 func cloneWindow(value WindowEstimate) WindowEstimate {
 	value.CalibratedAt = cloneTime(value.CalibratedAt)
 	value.CalibrationCursorAt = cloneTime(value.CalibrationCursorAt)

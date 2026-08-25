@@ -28,12 +28,13 @@ import (
 
 // AccountStore 使用 Ent 实现账号仓储。
 type AccountStore struct {
-	db *ent.Client
+	db                 *ent.Client
+	accountCostBetween func(context.Context, *ent.Client, int, time.Time, time.Time) (float64, error)
 }
 
 // NewAccountStore 创建账号仓储。
 func NewAccountStore(db *ent.Client) *AccountStore {
-	return &AccountStore{db: db}
+	return &AccountStore{db: db, accountCostBetween: queryAccountCostBetween}
 }
 
 func accountKeywordMatches(keyword string) predicate.Account {
@@ -936,23 +937,129 @@ func (s *AccountStore) BatchImageStats(ctx context.Context, accountIDs []int, to
 	return result, nil
 }
 
+type preparedUsageGrowthWindow struct {
+	observation accountusage.WindowObservation
+	costDelta   float64
+}
+
+type preparedUsageGrowth struct {
+	baseline accountusage.EstimateMeta
+	fiveHour *preparedUsageGrowthWindow
+	sevenDay *preparedUsageGrowthWindow
+}
+
 // ObserveUsageGrowth 累计基础 5h/7d 窗口当日已观测的消耗百分比（方法名保留兼容）。
-// 同日数值下降按窗口重置处理；跨日首次观测只建立新基线。
+// usage log 成本聚合在事务外完成；短事务只锁账号行、校验 meta 快照并写回。
+// 若并发探测已更新 meta，则基于最新快照重新准备，避免覆盖其它进程的观测。
 func (s *AccountStore) ObserveUsageGrowth(ctx context.Context, id int, observation appaccount.UsageGrowthObservation) error {
 	if id <= 0 || observation.Day == "" || (observation.FiveHourPercent == nil && observation.SevenDayPercent == nil) {
 		return nil
 	}
 
-	tx, err := s.db.Tx(ctx)
+	observedAt := observation.ObservedAt
+	if observedAt.IsZero() {
+		observedAt = time.Now()
+	}
+	for {
+		prepared, err := s.prepareUsageGrowth(ctx, id, observation, observedAt)
+		if err != nil {
+			return err
+		}
+		retry, err := s.commitPreparedUsageGrowth(ctx, id, prepared)
+		if err != nil {
+			return err
+		}
+		if !retry {
+			return nil
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
+}
+
+func (s *AccountStore) prepareUsageGrowth(
+	ctx context.Context,
+	accountID int,
+	observation appaccount.UsageGrowthObservation,
+	observedAt time.Time,
+) (preparedUsageGrowth, error) {
+	item, err := accountscope.QueryByID(s.db, accountID).
+		Select(entaccount.FieldUsageEstimateMeta).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return preparedUsageGrowth{}, appaccount.ErrAccountNotFound
+		}
+		return preparedUsageGrowth{}, err
+	}
+
+	prepared := preparedUsageGrowth{baseline: accountusage.Clone(item.UsageEstimateMeta)}
+	if observation.FiveHourPercent != nil {
+		window := preparedUsageGrowthWindow{observation: accountusage.WindowObservation{
+			Day:            observation.Day,
+			ObservedAt:     observedAt,
+			CurrentPercent: *observation.FiveHourPercent,
+			MaxSampleGap:   accountusage.FiveHourMaxSampleGap,
+		}}
+		if err := s.prepareUsageGrowthWindow(ctx, accountID, prepared.baseline.FiveHour, &window); err != nil {
+			return preparedUsageGrowth{}, err
+		}
+		prepared.fiveHour = &window
+	}
+	if observation.SevenDayPercent != nil {
+		window := preparedUsageGrowthWindow{observation: accountusage.WindowObservation{
+			Day:            observation.Day,
+			ObservedAt:     observedAt,
+			CurrentPercent: *observation.SevenDayPercent,
+			MaxSampleGap:   accountusage.SevenDayMaxSampleGap,
+		}}
+		if err := s.prepareUsageGrowthWindow(ctx, accountID, prepared.baseline.SevenDay, &window); err != nil {
+			return preparedUsageGrowth{}, err
+		}
+		prepared.sevenDay = &window
+	}
+	return prepared, nil
+}
+
+func (s *AccountStore) prepareUsageGrowthWindow(
+	ctx context.Context,
+	accountID int,
+	baseline accountusage.WindowEstimate,
+	prepared *preparedUsageGrowthWindow,
+) error {
+	interval, needsCost := baseline.CostInterval(prepared.observation)
+	if !needsCost {
+		return nil
+	}
+	query := s.accountCostBetween
+	if query == nil {
+		query = queryAccountCostBetween
+	}
+	costDelta, err := query(ctx, s.db, accountID, interval.Start, interval.End)
 	if err != nil {
 		return err
+	}
+	prepared.costDelta = costDelta
+	return nil
+}
+
+// commitPreparedUsageGrowth 返回 retry=true 表示事务锁定后的 meta 已变化，调用方应重新准备成本区间。
+func (s *AccountStore) commitPreparedUsageGrowth(
+	ctx context.Context,
+	id int,
+	prepared preparedUsageGrowth,
+) (retry bool, err error) {
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return false, err
 	}
 	defer func() { _ = tx.Rollback() }()
 	client := tx.Client()
 	query := accountscope.QueryByID(client, id)
 	if s.db.Driver().Dialect() == dialect.Postgres {
 		// Ent 当前未为 AccountQuery 生成 Modify；借助自定义 predicate 给 SELECT 加行锁，
-		// 避免多个探测进程同时读改写同一份 JSONB meta 时丢失更新。
+		// 防止校验后到 JSONB 写回之间出现并发更新。
 		query.Where(func(selector *sql.Selector) {
 			selector.ForUpdate()
 		})
@@ -960,80 +1067,39 @@ func (s *AccountStore) ObserveUsageGrowth(ctx context.Context, id int, observati
 	item, err := query.Select(entaccount.FieldUsageEstimateMeta).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return appaccount.ErrAccountNotFound
+			return false, appaccount.ErrAccountNotFound
 		}
-		return err
+		return false, err
+	}
+	if !accountusage.Equal(item.UsageEstimateMeta, prepared.baseline) {
+		return true, nil
 	}
 
-	observedAt := observation.ObservedAt
-	if observedAt.IsZero() {
-		observedAt = time.Now()
-	}
 	meta := accountusage.Clone(item.UsageEstimateMeta)
 	meta.Version = accountusage.EstimateMetaVersion
 	changed := false
-	if observation.FiveHourPercent != nil {
-		windowChanged, err := s.observeUsageEstimateWindow(
-			ctx,
-			client,
-			id,
-			&meta.FiveHour,
-			accountusage.WindowObservation{
-				Day:            observation.Day,
-				ObservedAt:     observedAt,
-				CurrentPercent: *observation.FiveHourPercent,
-				MaxSampleGap:   accountusage.FiveHourMaxSampleGap,
-			},
-		)
-		if err != nil {
-			return err
-		}
-		changed = changed || windowChanged
+	if prepared.fiveHour != nil {
+		changed = meta.FiveHour.ApplyObservation(
+			prepared.fiveHour.observation,
+			prepared.fiveHour.costDelta,
+		) || changed
 	}
-	if observation.SevenDayPercent != nil {
-		windowChanged, err := s.observeUsageEstimateWindow(
-			ctx,
-			client,
-			id,
-			&meta.SevenDay,
-			accountusage.WindowObservation{
-				Day:            observation.Day,
-				ObservedAt:     observedAt,
-				CurrentPercent: *observation.SevenDayPercent,
-				MaxSampleGap:   accountusage.SevenDayMaxSampleGap,
-			},
-		)
-		if err != nil {
-			return err
-		}
-		changed = changed || windowChanged
+	if prepared.sevenDay != nil {
+		changed = meta.SevenDay.ApplyObservation(
+			prepared.sevenDay.observation,
+			prepared.sevenDay.costDelta,
+		) || changed
 	}
 	if !changed {
-		return nil
+		return false, nil
 	}
 	if err := accountscope.UpdateOneID(client, id).SetUsageEstimateMeta(meta).Exec(ctx); err != nil {
-		return err
+		return false, err
 	}
-	return tx.Commit()
-}
-
-func (s *AccountStore) observeUsageEstimateWindow(
-	ctx context.Context,
-	client *ent.Client,
-	accountID int,
-	window *accountusage.WindowEstimate,
-	observation accountusage.WindowObservation,
-) (bool, error) {
-	interval, needsCost := window.CostInterval(observation)
-	costDelta := 0.0
-	if needsCost {
-		var err error
-		costDelta, err = queryAccountCostBetween(ctx, client, accountID, interval.Start, interval.End)
-		if err != nil {
-			return false, err
-		}
+	if err := tx.Commit(); err != nil {
+		return false, err
 	}
-	return window.ApplyObservation(observation, costDelta), nil
+	return false, nil
 }
 
 func queryAccountCostBetween(ctx context.Context, client *ent.Client, accountID int, start, end time.Time) (float64, error) {

@@ -166,6 +166,91 @@ func TestAccountStoreObserveUsageGrowthAccumulatesResetsAndDays(t *testing.T) {
 	}
 }
 
+func TestAccountStoreObserveUsageGrowthAggregatesOutsideLockAndRetriesChangedMeta(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	item, err := db.Account.Create().
+		SetName("usage-growth-retry").
+		SetPlatform("openai").
+		SetType("oauth").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	store := NewAccountStore(db)
+	value := func(v float64) *float64 { return &v }
+	observedAt := time.Date(2026, 8, 24, 10, 0, 0, 0, time.Local)
+	if err := store.ObserveUsageGrowth(ctx, item.ID, account.UsageGrowthObservation{
+		Day: "2026-08-24", ObservedAt: observedAt, FiveHourPercent: value(10),
+	}); err != nil {
+		t.Fatalf("create usage baseline: %v", err)
+	}
+	if _, err := db.UsageLog.Create().
+		SetBillingEventID("bill_usage_growth_retry").
+		SetPlatform("openai").
+		SetModel("gpt-5").
+		SetAccountCost(60).
+		SetAccountID(item.ID).
+		SetCreatedAt(observedAt.Add(30 * time.Minute)).
+		Save(ctx); err != nil {
+		t.Fatalf("create calibration usage: %v", err)
+	}
+
+	originalCostQuery := store.accountCostBetween
+	queryCalls := 0
+	store.accountCostBetween = func(
+		ctx context.Context,
+		client *ent.Client,
+		accountID int,
+		start time.Time,
+		end time.Time,
+	) (float64, error) {
+		if client != db {
+			return 0, errors.New("account cost query used the locked transaction client")
+		}
+		cost, err := originalCostQuery(ctx, client, accountID, start, end)
+		if err != nil {
+			return 0, err
+		}
+		queryCalls++
+		if queryCalls == 1 {
+			current, err := db.Account.Get(ctx, item.ID)
+			if err != nil {
+				return 0, err
+			}
+			meta := current.UsageEstimateMeta
+			meta.Version = 99
+			if err := db.Account.UpdateOneID(item.ID).SetUsageEstimateMeta(meta).Exec(ctx); err != nil {
+				return 0, err
+			}
+		}
+		return cost, nil
+	}
+
+	if err := store.ObserveUsageGrowth(ctx, item.ID, account.UsageGrowthObservation{
+		Day: "2026-08-24", ObservedAt: observedAt.Add(time.Hour), FiveHourPercent: value(40),
+	}); err != nil {
+		t.Fatalf("observe usage after concurrent meta change: %v", err)
+	}
+	if queryCalls != 2 {
+		t.Fatalf("account cost query calls = %d, want 2 after optimistic retry", queryCalls)
+	}
+	fresh, err := db.Account.Get(ctx, item.ID)
+	if err != nil {
+		t.Fatalf("get updated account: %v", err)
+	}
+	fiveHour := fresh.UsageEstimateMeta.FiveHour
+	if fresh.UsageEstimateMeta.Version != 1 || fiveHour.DailyGrowth != 30 || fiveHour.LastPercent != 40 || fiveHour.CostPerPercent != 2 {
+		t.Fatalf("usage estimate after retry = %+v", fresh.UsageEstimateMeta)
+	}
+}
+
 func TestAccountStoreCreateRefreshesExistingOAuthByEmail(t *testing.T) {
 	db := enttestOpen(t)
 	defer func() {
